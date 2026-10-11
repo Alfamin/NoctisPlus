@@ -54,6 +54,13 @@ FLAC, ALAC, WAV, AIFF, APE, WavPack, MP3, AAC, M4A, MP4, OGG, Opus, WMA.
 **Themes**
 Dark, Gray, Midnight, Light, System — plus a custom theme editor.
 
+**Languages — 10 built in**
+English, Arabic, Chinese (Simplified), Chinese (Traditional), French, Japanese,
+Korean, Russian (new after 1.6.2, GitHub #128), Spanish, Turkish
+(`src/Noctis.UI/Localization/Strings*.resx`, `Loc.KnownCultures`). Picked in
+Settings → General → Language, switches without a restart, untranslated strings
+fall back to English. Community translations on Crowdin.
+
 **Privacy — approved wording**
 > No telemetry. No analytics. No crash reporting. No ads.
 
