@@ -207,6 +207,9 @@ Deezer and TIDAL: paste the link.</value></data>
   <data name="Settings.Custom" xml:space="preserve"><value>Custom</value><comment>Text in SettingsView.axaml</comment></data>
   <data name="Settings.AccentFollowsArtwork" xml:space="preserve"><value>Accent follows album art</value><comment>Appearance toggle in SettingsView.axaml</comment></data>
   <data name="Settings.AccentFollowsArtworkHint" xml:space="preserve"><value>Recolour the accent from the playing cover. Your chosen accent returns when nothing is playing.</value><comment>Appearance toggle hint in SettingsView.axaml</comment></data>
+  <data name="Settings.AccentTrackLinks" xml:space="preserve"><value>Accent colour on artist and album names</value><comment>Appearance toggle in SettingsView.axaml (GitHub #125)</comment></data>
+  <data name="Settings.AccentTrackLinksHint" xml:space="preserve"><value>Artist, album and genre names in playlists and Songs take the accent colour. Off shows them in the regular text colour.</value><comment>Appearance toggle hint in SettingsView.axaml (GitHub #125)</comment></data>
+  <data name="Playlist.DragCount" xml:space="preserve"><value>{0} songs</value><comment>Pill on the floating drag card when several selected songs are dragged together; {0} = count (GitHub #125)</comment></data>
   <data name="Settings.AccentColor" xml:space="preserve"><value>Accent Color</value><comment>Text in SettingsView.axaml</comment></data>
   <data name="Settings.PickPresetOpenPicker" xml:space="preserve"><value>Pick a preset or open the picker for any custom color.</value><comment>Text in SettingsView.axaml</comment></data>
   <data name="Settings.CustomColorTip" xml:space="preserve"><value>Custom Color</value><comment>ToolTip.Tip in SettingsView.axaml</comment></data>

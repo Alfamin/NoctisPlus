@@ -64,6 +64,7 @@ public class SettingsResetTests : IDisposable
         {
             CommunityPluginsEnabled = false,
             AccentFollowsArtwork = true,
+            AccentTrackLinks = false,
             UpmixMode = "Surround",
             Shortcuts = new Dictionary<string, string> { [nameof(ShortcutAction.PlayPause)] = "P" },
             LyricsBackgroundMediaOverrides = new Dictionary<string, string> { ["track:1"] = clip },
@@ -95,6 +96,7 @@ public class SettingsResetTests : IDisposable
         vm.SetAudioPlayer(audio);
         await vm.LoadAsync();
         Assert.True(vm.AccentFollowsArtwork);
+        Assert.False(vm.AccentTrackLinks);
         Assert.False(vm.ShortcutService.IsDefault(ShortcutAction.PlayPause));
         Assert.True(vm.HasLyricsBackgroundOverride("track:1"));
         Assert.Equal("Surround", audio.UpmixMode);

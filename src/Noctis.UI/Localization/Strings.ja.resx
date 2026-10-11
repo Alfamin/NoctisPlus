@@ -564,6 +564,18 @@
     <value>表紙のアクセントを変更します。何も再生していないときに選択したアクセントが戻ります。</value>
     <comment>Appearance toggle hint in SettingsView.axaml</comment>
   </data>
+  <data name="Settings.AccentTrackLinks" xml:space="preserve">
+    <value>アーティスト名とアルバム名にアクセントカラー</value>
+    <comment>Appearance toggle in SettingsView.axaml (GitHub #125)</comment>
+  </data>
+  <data name="Settings.AccentTrackLinksHint" xml:space="preserve">
+    <value>プレイリストと「曲」のアーティスト名・アルバム名・ジャンル名をアクセントカラーで表示します。オフにすると通常の文字色になります。</value>
+    <comment>Appearance toggle hint in SettingsView.axaml (GitHub #125)</comment>
+  </data>
+  <data name="Playlist.DragCount" xml:space="preserve">
+    <value>{0} 曲</value>
+    <comment>Pill on the floating drag card when several selected songs are dragged together; {0} = count (GitHub #125)</comment>
+  </data>
   <data name="Settings.AccentColor" xml:space="preserve">
     <value>アクセントカラー</value>
     <comment>Text in SettingsView.axaml</comment>

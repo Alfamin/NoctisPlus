@@ -559,6 +559,14 @@ public partial class SettingsViewModel : ViewModelBase
         if (_settingsLoaded) _ = SaveAsync();
     }
 
+    /// <summary>GitHub #125: accent-coloured artist/album/genre names in song lists (MainWindow applies it).</summary>
+    [ObservableProperty] private bool _accentTrackLinks = true;
+
+    partial void OnAccentTrackLinksChanged(bool value)
+    {
+        if (_settingsLoaded) _ = SaveAsync();
+    }
+
     /// <summary>Drives the custom colour-picker flyout.</summary>
     [ObservableProperty] private Avalonia.Media.Color _pickerColor = Avalonia.Media.Color.Parse("#E74856");
 
@@ -2488,6 +2496,7 @@ public partial class SettingsViewModel : ViewModelBase
             ActiveAccentName = string.IsNullOrWhiteSpace(_settings.AccentPresetName) ? "Crimson" : _settings.AccentPresetName;
             CustomAccentHex = ActiveAccentHex;
             AccentFollowsArtwork = _settings.AccentFollowsArtwork;
+            AccentTrackLinks = _settings.AccentTrackLinks;
             try
             {
                 _suppressPickerSync = true;
@@ -2960,6 +2969,7 @@ public partial class SettingsViewModel : ViewModelBase
         _settings.AccentColorHex = ActiveAccentHex;
         _settings.AccentPresetName = ActiveAccentName;
         _settings.AccentFollowsArtwork = AccentFollowsArtwork;
+        _settings.AccentTrackLinks = AccentTrackLinks;
 
         _settings.ScanOnStartup = ScanOnStartup;
         _settings.WatchFoldersEnabled = WatchFoldersEnabled;
@@ -6704,6 +6714,7 @@ public partial class SettingsViewModel : ViewModelBase
             ActiveAccentName = defaultSettings.AccentPresetName;
             CustomAccentHex = ActiveAccentHex;
             AccentFollowsArtwork = defaultSettings.AccentFollowsArtwork;
+            AccentTrackLinks = defaultSettings.AccentTrackLinks;
             try
             {
                 _suppressPickerSync = true;

@@ -103,6 +103,10 @@ public class AppSettings
     /// <summary>Accent recolours from the playing track's cover; the chosen accent returns when nothing plays.</summary>
     public bool AccentFollowsArtwork { get; set; }
 
+    /// <summary>GitHub #125: artist, album and genre names in song lists take the accent colour.
+    /// Off shows them in the plain text colour.</summary>
+    public bool AccentTrackLinks { get; set; } = true;
+
     /// <summary>Phone: "System" (follow Android's dark/light), "Dark" (the dark theme in
     /// <see cref="Theme"/>) or "Light".</summary>
     public string MobileAppearance { get; set; } = "System";
