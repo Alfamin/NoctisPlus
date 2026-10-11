@@ -4,6 +4,7 @@
       "tag": "v1.6.2",
       "version": "1.6.2",
       "name": "v1.6.2",
+      "label": "1.6.2",
       "publishedAt": "2026-10-11T04:48:02Z",
       "url": "https://github.com/heartached/Noctis/releases/tag/v1.6.2",
       "prerelease": false,
@@ -31,12 +32,14 @@
             "Fixed Arabic and Chinese accent translations using the wrong meaning"
           ]
         }
-      ]
+      ],
+      "summary": null
     },
     {
       "tag": "v1.6.1",
       "version": "1.6.1",
       "name": "v1.6.1",
+      "label": "1.6.1",
       "publishedAt": "2026-10-11T02:18:45Z",
       "url": "https://github.com/heartached/Noctis/releases/tag/v1.6.1",
       "prerelease": false,
@@ -90,12 +93,14 @@
             "Fixed artist credit zooming on hover or click"
           ]
         }
-      ]
+      ],
+      "summary": null
     },
     {
       "tag": "v1.6.0",
       "version": "1.6.0",
       "name": "v1.6.0",
+      "label": "1.6.0",
       "publishedAt": "2026-10-10T12:34:43Z",
       "url": "https://github.com/heartached/Noctis/releases/tag/v1.6.0",
       "prerelease": false,
@@ -282,12 +287,25 @@
             "Fixed Settings background blur lagging theme changes"
           ]
         }
-      ]
+      ],
+      "summary": null
+    },
+    {
+      "tag": "plugin-mixxx-v1.0.1",
+      "version": "plugin-mixxx-v1.0.1",
+      "name": "Mixxx plugin 1.0.1",
+      "label": "Mixxx",
+      "publishedAt": "2026-10-10T12:30:32Z",
+      "url": "https://github.com/heartached/Noctis/releases/tag/plugin-mixxx-v1.0.1",
+      "prerelease": true,
+      "sections": [],
+      "summary": "Brings the BPM and key from your Mixxx library into Noctis. Works with Noctis 1.5.9 and up. Install it from Settings > Plugins."
     },
     {
       "tag": "v1.5.9",
       "version": "1.5.9",
       "name": "v1.5.9",
+      "label": "1.5.9",
       "publishedAt": "2026-10-02T11:17:04Z",
       "url": "https://github.com/heartached/Noctis/releases/tag/v1.5.9",
       "prerelease": false,
@@ -333,12 +351,14 @@
             "Fixed stray line and misleading message on the Plugins page"
           ]
         }
-      ]
+      ],
+      "summary": null
     },
     {
       "tag": "v1.5.8",
       "version": "1.5.8",
       "name": "v1.5.8",
+      "label": "1.5.8",
       "publishedAt": "2026-10-01T00:19:56Z",
       "url": "https://github.com/heartached/Noctis/releases/tag/v1.5.8",
       "prerelease": false,
@@ -396,21 +416,25 @@
             "Fixed genre label being cropped"
           ]
         }
-      ]
+      ],
+      "summary": null
     },
     {
       "tag": "lullaby-v1",
       "version": "lullaby-v1",
       "name": "Lullaby v1.0.0",
+      "label": "Lullaby",
       "publishedAt": "2026-09-30T22:11:46Z",
       "url": "https://github.com/heartached/Noctis/releases/tag/lullaby-v1",
       "prerelease": false,
-      "sections": []
+      "sections": [],
+      "summary": "Lyrics Studio's speech model. Noctis downloads it automatically the first time you use the Studio, so there's nothing to install here."
     },
     {
       "tag": "v1.5.7",
       "version": "1.5.7",
       "name": "v1.5.7",
+      "label": "1.5.7",
       "publishedAt": "2026-09-29T01:16:34Z",
       "url": "https://github.com/heartached/Noctis/releases/tag/v1.5.7",
       "prerelease": false,
@@ -444,12 +468,14 @@
             "Fixed blurry and jagged album art"
           ]
         }
-      ]
+      ],
+      "summary": null
     },
     {
       "tag": "v1.5.6",
       "version": "1.5.6",
       "name": "v1.5.6",
+      "label": "1.5.6",
       "publishedAt": "2026-09-28T02:56:21Z",
       "url": "https://github.com/heartached/Noctis/releases/tag/v1.5.6",
       "prerelease": false,
@@ -460,12 +486,14 @@
             "Bug fixes and performance improvements."
           ]
         }
-      ]
+      ],
+      "summary": null
     },
     {
       "tag": "v1.5.5",
       "version": "1.5.5",
       "name": "v1.5.5",
+      "label": "1.5.5",
       "publishedAt": "2026-09-26T16:58:48Z",
       "url": "https://github.com/heartached/Noctis/releases/tag/v1.5.5",
       "prerelease": false,
@@ -562,12 +590,14 @@
             "Updated Tmds.DBus.Protocol to 0.95.1"
           ]
         }
-      ]
+      ],
+      "summary": null
     },
     {
       "tag": "v1.5.4",
       "version": "1.5.4",
       "name": "v1.5.4",
+      "label": "1.5.4",
       "publishedAt": "2026-09-25T02:20:44Z",
       "url": "https://github.com/heartached/Noctis/releases/tag/v1.5.4",
       "prerelease": false,
@@ -598,12 +628,14 @@
             "Fixed search button magnifier icon misalignment"
           ]
         }
-      ]
+      ],
+      "summary": null
     },
     {
       "tag": "v1.5.3",
       "version": "1.5.3",
       "name": "v1.5.3",
+      "label": "1.5.3",
       "publishedAt": "2026-09-25T00:40:15Z",
       "url": "https://github.com/heartached/Noctis/releases/tag/v1.5.3",
       "prerelease": false,
@@ -660,12 +692,14 @@
             "Fixed white flicker on Wine when clicking a track"
           ]
         }
-      ]
+      ],
+      "summary": null
     },
     {
       "tag": "v1.5.2",
       "version": "1.5.2",
       "name": "v1.5.2",
+      "label": "1.5.2",
       "publishedAt": "2026-09-23T02:21:30Z",
       "url": "https://github.com/heartached/Noctis/releases/tag/v1.5.2",
       "prerelease": false,
@@ -713,12 +747,14 @@
             "Fixed album cover picking wrong track's cover on scan"
           ]
         }
-      ]
+      ],
+      "summary": null
     },
     {
       "tag": "v1.5.1",
       "version": "1.5.1",
       "name": "v1.5.1",
+      "label": "1.5.1",
       "publishedAt": "2026-09-22T04:59:23Z",
       "url": "https://github.com/heartached/Noctis/releases/tag/v1.5.1",
       "prerelease": false,
@@ -765,12 +801,14 @@
             "Fixed visualizer showing static dots on Linux/macOS"
           ]
         }
-      ]
+      ],
+      "summary": null
     },
     {
       "tag": "v1.5.0",
       "version": "1.5.0",
       "name": "v1.5.0",
+      "label": "1.5.0",
       "publishedAt": "2026-09-20T23:06:27Z",
       "url": "https://github.com/heartached/Noctis/releases/tag/v1.5.0",
       "prerelease": false,
@@ -977,12 +1015,14 @@
             "Fixed wrong artist match on accented names"
           ]
         }
-      ]
+      ],
+      "summary": null
     },
     {
       "tag": "v1.4.7",
       "version": "1.4.7",
       "name": "v1.4.7",
+      "label": "1.4.7",
       "publishedAt": "2026-08-16T18:37:18Z",
       "url": "https://github.com/heartached/Noctis/releases/tag/v1.4.7",
       "prerelease": false,
@@ -1014,12 +1054,14 @@
             "Fixed toggle-spam audio death/glitching"
           ]
         }
-      ]
+      ],
+      "summary": null
     },
     {
       "tag": "v1.4.6",
       "version": "1.4.6",
       "name": "v1.4.6",
+      "label": "1.4.6",
       "publishedAt": "2026-08-16T00:32:40Z",
       "url": "https://github.com/heartached/Noctis/releases/tag/v1.4.6",
       "prerelease": false,
@@ -1047,12 +1089,14 @@
             "Fixed wrong IP selected for local address detection"
           ]
         }
-      ]
+      ],
+      "summary": null
     },
     {
       "tag": "v1.4.5",
       "version": "1.4.5",
       "name": "v1.4.5",
+      "label": "1.4.5",
       "publishedAt": "2026-08-15T18:12:03Z",
       "url": "https://github.com/heartached/Noctis/releases/tag/v1.4.5",
       "prerelease": false,
@@ -1086,12 +1130,14 @@
             "Fixed middle-click autoscroll judder"
           ]
         }
-      ]
+      ],
+      "summary": null
     },
     {
       "tag": "v1.4.4",
       "version": "1.4.4",
       "name": "v1.4.4",
+      "label": "1.4.4",
       "publishedAt": "2026-08-14T03:30:32Z",
       "url": "https://github.com/heartached/Noctis/releases/tag/v1.4.4",
       "prerelease": false,
@@ -1138,12 +1184,14 @@
             "Fixed ReplayGain volume too low"
           ]
         }
-      ]
+      ],
+      "summary": null
     },
     {
       "tag": "v1.4.3",
       "version": "1.4.3",
       "name": "v1.4.3",
+      "label": "1.4.3",
       "publishedAt": "2026-08-10T18:57:09Z",
       "url": "https://github.com/heartached/Noctis/releases/tag/v1.4.3",
       "prerelease": false,
@@ -1175,12 +1223,14 @@
             "Fixed silent tracks on Linux/macOS"
           ]
         }
-      ]
+      ],
+      "summary": null
     },
     {
       "tag": "v1.4.2",
       "version": "1.4.2",
       "name": "v1.4.2",
+      "label": "1.4.2",
       "publishedAt": "2026-08-10T04:06:56Z",
       "url": "https://github.com/heartached/Noctis/releases/tag/v1.4.2",
       "prerelease": false,
@@ -1229,12 +1279,14 @@
             "Fixed Queue covering player instead of opening"
           ]
         }
-      ]
+      ],
+      "summary": null
     },
     {
       "tag": "v1.4.1",
       "version": "1.4.1",
       "name": "v1.4.1",
+      "label": "1.4.1",
       "publishedAt": "2026-08-08T19:19:47Z",
       "url": "https://github.com/heartached/Noctis/releases/tag/v1.4.1",
       "prerelease": false,
@@ -1275,12 +1327,14 @@
             "Fixed glide fighting scrollbar thumb during manual scroll"
           ]
         }
-      ]
+      ],
+      "summary": null
     },
     {
       "tag": "v1.4.0",
       "version": "1.4.0",
       "name": "v1.4.0",
+      "label": "1.4.0",
       "publishedAt": "2026-08-06T23:52:13Z",
       "url": "https://github.com/heartached/Noctis/releases/tag/v1.4.0",
       "prerelease": false,
@@ -1310,12 +1364,14 @@
             "Fixed Jellyfin \"Couldn't reach the server\" on bare addresses"
           ]
         }
-      ]
+      ],
+      "summary": null
     },
     {
       "tag": "v1.3.9",
       "version": "1.3.9",
       "name": "v1.3.9",
+      "label": "1.3.9",
       "publishedAt": "2026-08-06T02:26:11Z",
       "url": "https://github.com/heartached/Noctis/releases/tag/v1.3.9",
       "prerelease": false,
@@ -1413,12 +1469,14 @@
             "Fixed duplicate stale comments"
           ]
         }
-      ]
+      ],
+      "summary": null
     },
     {
       "tag": "v1.3.8",
       "version": "1.3.8",
       "name": "v1.3.8",
+      "label": "1.3.8",
       "publishedAt": "2026-07-31T00:17:55Z",
       "url": "https://github.com/heartached/Noctis/releases/tag/v1.3.8",
       "prerelease": false,
@@ -1459,12 +1517,14 @@
             "Fixed emphasis glow snapping and freezing"
           ]
         }
-      ]
+      ],
+      "summary": null
     },
     {
       "tag": "v1.3.7",
       "version": "1.3.7",
       "name": "v1.3.7",
+      "label": "1.3.7",
       "publishedAt": "2026-07-30T20:25:56Z",
       "url": "https://github.com/heartached/Noctis/releases/tag/v1.3.7",
       "prerelease": false,
@@ -1483,12 +1543,14 @@
             "Fixed lost folders upon restarting"
           ]
         }
-      ]
+      ],
+      "summary": null
     },
     {
       "tag": "v1.3.6",
       "version": "1.3.6",
       "name": "v1.3.6",
+      "label": "1.3.6",
       "publishedAt": "2026-07-28T23:06:46Z",
       "url": "https://github.com/heartached/Noctis/releases/tag/v1.3.6",
       "prerelease": false,
@@ -1521,12 +1583,14 @@
             "Fixed volume flyout stuck-open bug"
           ]
         }
-      ]
+      ],
+      "summary": null
     },
     {
       "tag": "v1.3.5",
       "version": "1.3.5",
       "name": "v1.3.5",
+      "label": "1.3.5",
       "publishedAt": "2026-07-26T02:01:32Z",
       "url": "https://github.com/heartached/Noctis/releases/tag/v1.3.5",
       "prerelease": false,
@@ -1546,12 +1610,14 @@
             "Fixed wrong artwork never self-healing"
           ]
         }
-      ]
+      ],
+      "summary": null
     },
     {
       "tag": "v1.3.4",
       "version": "1.3.4",
       "name": "v1.3.4",
+      "label": "1.3.4",
       "publishedAt": "2026-07-25T23:31:58Z",
       "url": "https://github.com/heartached/Noctis/releases/tag/v1.3.4",
       "prerelease": false,
@@ -1584,12 +1650,14 @@
             "Fixed Discord relay not republishing while paused"
           ]
         }
-      ]
+      ],
+      "summary": null
     },
     {
       "tag": "v1.3.3",
       "version": "1.3.3",
       "name": "v1.3.3",
+      "label": "1.3.3",
       "publishedAt": "2026-07-25T01:41:19Z",
       "url": "https://github.com/heartached/Noctis/releases/tag/v1.3.3",
       "prerelease": false,
@@ -1657,12 +1725,14 @@
             "Fixed M3U file:// decoding"
           ]
         }
-      ]
+      ],
+      "summary": null
     },
     {
       "tag": "v1.3.2",
       "version": "1.3.2",
       "name": "v1.3.2",
+      "label": "1.3.2",
       "publishedAt": "2026-07-24T01:53:27Z",
       "url": "https://github.com/heartached/Noctis/releases/tag/v1.3.2",
       "prerelease": false,
@@ -1728,12 +1798,14 @@
             "Fixed M3U8 imports from VLC/foobar"
           ]
         }
-      ]
+      ],
+      "summary": null
     },
     {
       "tag": "v1.3.1",
       "version": "1.3.1",
       "name": "v1.3.1",
+      "label": "1.3.1",
       "publishedAt": "2026-07-20T23:13:17Z",
       "url": "https://github.com/heartached/Noctis/releases/tag/v1.3.1",
       "prerelease": false,
@@ -1795,12 +1867,14 @@
             "Fixed Queue popup double-click closing the panel"
           ]
         }
-      ]
+      ],
+      "summary": null
     },
     {
       "tag": "v1.3.0",
       "version": "1.3.0",
       "name": "v1.3.0",
+      "label": "1.3.0",
       "publishedAt": "2026-07-17T02:44:14Z",
       "url": "https://github.com/heartached/Noctis/releases/tag/v1.3.0",
       "prerelease": false,
@@ -1821,12 +1895,14 @@
             "Fixed Synced Lyrics clipping in metadata editor"
           ]
         }
-      ]
+      ],
+      "summary": null
     },
     {
       "tag": "v1.2.9",
       "version": "1.2.9",
       "name": "v1.2.9",
+      "label": "1.2.9",
       "publishedAt": "2026-07-15T23:49:50Z",
       "url": "https://github.com/heartached/Noctis/releases/tag/v1.2.9",
       "prerelease": false,
@@ -1854,12 +1930,14 @@
             "Fixed row-number clipping in Folders"
           ]
         }
-      ]
+      ],
+      "summary": null
     },
     {
       "tag": "v1.2.8",
       "version": "1.2.8",
       "name": "v1.2.8",
+      "label": "1.2.8",
       "publishedAt": "2026-07-15T03:18:52Z",
       "url": "https://github.com/heartached/Noctis/releases/tag/v1.2.8",
       "prerelease": false,
@@ -1911,12 +1989,14 @@
             "Fixed Artists page press-drag highlight"
           ]
         }
-      ]
+      ],
+      "summary": null
     },
     {
       "tag": "v1.2.7",
       "version": "1.2.7",
       "name": "v1.2.7",
+      "label": "1.2.7",
       "publishedAt": "2026-07-12T14:42:07Z",
       "url": "https://github.com/heartached/Noctis/releases/tag/v1.2.7",
       "prerelease": false,
@@ -1943,12 +2023,14 @@
             "Fixed intermittent silent tracks on Linux"
           ]
         }
-      ]
+      ],
+      "summary": null
     },
     {
       "tag": "v1.2.6",
       "version": "1.2.6",
       "name": "v1.2.6",
+      "label": "1.2.6",
       "publishedAt": "2026-07-11T20:33:51Z",
       "url": "https://github.com/heartached/Noctis/releases/tag/v1.2.6",
       "prerelease": false,
@@ -1980,12 +2062,14 @@
             "Fixed hover highlight box on lyric lines"
           ]
         }
-      ]
+      ],
+      "summary": null
     },
     {
       "tag": "v1.2.5",
       "version": "1.2.5",
       "name": "v1.2.5",
+      "label": "1.2.5",
       "publishedAt": "2026-07-11T01:32:39Z",
       "url": "https://github.com/heartached/Noctis/releases/tag/v1.2.5",
       "prerelease": false,
@@ -2023,12 +2107,14 @@
             "Fixed drop import silently doing nothing when folder contains no audio files"
           ]
         }
-      ]
+      ],
+      "summary": null
     },
     {
       "tag": "v1.2.4",
       "version": "1.2.4",
       "name": "v1.2.4",
+      "label": "1.2.4",
       "publishedAt": "2026-07-10T02:25:41Z",
       "url": "https://github.com/heartached/Noctis/releases/tag/v1.2.4",
       "prerelease": false,
@@ -2079,12 +2165,14 @@
             "Fixed empty space inside share card with artwork background"
           ]
         }
-      ]
+      ],
+      "summary": null
     },
     {
       "tag": "v1.2.3",
       "version": "1.2.3",
       "name": "v1.2.3",
+      "label": "1.2.3",
       "publishedAt": "2026-07-08T03:13:26Z",
       "url": "https://github.com/heartached/Noctis/releases/tag/v1.2.3",
       "prerelease": false,
@@ -2206,12 +2294,14 @@
             "Fixed filename-based argument injection in ffprobe reader"
           ]
         }
-      ]
+      ],
+      "summary": null
     },
     {
       "tag": "v1.2.2",
       "version": "1.2.2",
       "name": "v1.2.2",
+      "label": "1.2.2",
       "publishedAt": "2026-06-25T00:23:36Z",
       "url": "https://github.com/heartached/Noctis/releases/tag/v1.2.2",
       "prerelease": false,
@@ -2255,12 +2345,14 @@
             "Fixed track-start audio clipping"
           ]
         }
-      ]
+      ],
+      "summary": null
     },
     {
       "tag": "v1.2.1",
       "version": "1.2.1",
       "name": "v1.2.1",
+      "label": "1.2.1",
       "publishedAt": "2026-06-23T11:27:09Z",
       "url": "https://github.com/heartached/Noctis/releases/tag/v1.2.1",
       "prerelease": false,
@@ -2271,12 +2363,14 @@
             "Fixed a startup crash where the app failed to launch with a \"resource could not be found\" error, caused by case-mismatched icon references"
           ]
         }
-      ]
+      ],
+      "summary": null
     },
     {
       "tag": "v1.2.0",
       "version": "1.2.0",
       "name": "v1.2.0",
+      "label": "1.2.0",
       "publishedAt": "2026-06-23T10:32:33Z",
       "url": "https://github.com/heartached/Noctis/releases/tag/v1.2.0",
       "prerelease": false,
@@ -2374,12 +2468,14 @@
             "Fixed multiple Settings persistence and UI issues"
           ]
         }
-      ]
+      ],
+      "summary": null
     },
     {
       "tag": "v1.1.16",
       "version": "1.1.16",
       "name": "v1.1.16",
+      "label": "1.1.16",
       "publishedAt": "2026-06-10T00:21:32Z",
       "url": "https://github.com/heartached/Noctis/releases/tag/v1.1.16",
       "prerelease": true,
@@ -2400,12 +2496,14 @@
             "Fixed volume controls affecting the keep-alive stream instead of active playback"
           ]
         }
-      ]
+      ],
+      "summary": null
     },
     {
       "tag": "v1.1.15",
       "version": "1.1.15",
       "name": "v1.1.15",
+      "label": "1.1.15",
       "publishedAt": "2026-06-08T22:21:11Z",
       "url": "https://github.com/heartached/Noctis/releases/tag/v1.1.15",
       "prerelease": true,
@@ -2437,12 +2535,14 @@
             "Fixed Bluetooth audio stuttering and frame skipping during playback"
           ]
         }
-      ]
+      ],
+      "summary": null
     },
     {
       "tag": "v1.1.14",
       "version": "1.1.14",
       "name": "v1.1.14",
+      "label": "1.1.14",
       "publishedAt": "2026-06-03T15:18:43Z",
       "url": "https://github.com/heartached/Noctis/releases/tag/v1.1.14",
       "prerelease": false,
@@ -2462,12 +2562,14 @@
             "Fixed missing or stale Discord Rich Presence artwork after relay reconnections"
           ]
         }
-      ]
+      ],
+      "summary": null
     },
     {
       "tag": "v1.1.13",
       "version": "1.1.13",
       "name": "v1.1.13",
+      "label": "1.1.13",
       "publishedAt": "2026-06-01T20:22:25Z",
       "url": "https://github.com/heartached/Noctis/releases/tag/v1.1.13",
       "prerelease": false,
@@ -2509,12 +2611,14 @@
             "Fixed album edition grouping for versioned releases"
           ]
         }
-      ]
+      ],
+      "summary": null
     },
     {
       "tag": "v1.1.12",
       "version": "1.1.12",
       "name": "v1.1.12",
+      "label": "1.1.12",
       "publishedAt": "2026-06-01T03:04:06Z",
       "url": "https://github.com/heartached/Noctis/releases/tag/v1.1.12",
       "prerelease": false,
@@ -2596,12 +2700,14 @@
             "Fixed outdated Chocolatey package metadata and installer references"
           ]
         }
-      ]
+      ],
+      "summary": null
     },
     {
       "tag": "v1.1.11",
       "version": "1.1.11",
       "name": "v1.1.11",
+      "label": "1.1.11",
       "publishedAt": "2026-05-28T22:57:22Z",
       "url": "https://github.com/heartached/Noctis/releases/tag/v1.1.11",
       "prerelease": false,
@@ -2628,12 +2734,14 @@
             "Fixed stale storage size values after library scans"
           ]
         }
-      ]
+      ],
+      "summary": null
     },
     {
       "tag": "v1.1.10",
       "version": "1.1.10",
       "name": "v1.1.10",
+      "label": "1.1.10",
       "publishedAt": "2026-05-27T19:33:33Z",
       "url": "https://github.com/heartached/Noctis/releases/tag/v1.1.10",
       "prerelease": false,
@@ -2668,12 +2776,14 @@
             "Fixed active lyric line clipping on long lyrics"
           ]
         }
-      ]
+      ],
+      "summary": null
     },
     {
       "tag": "v1.1.9",
       "version": "1.1.9",
       "name": "v1.1.9",
+      "label": "1.1.9",
       "publishedAt": "2026-05-26T17:22:35Z",
       "url": "https://github.com/heartached/Noctis/releases/tag/v1.1.9",
       "prerelease": false,
@@ -2740,12 +2850,14 @@
             "Fixed volume slider static and popping during drag"
           ]
         }
-      ]
+      ],
+      "summary": null
     },
     {
       "tag": "v1.1.8",
       "version": "1.1.8",
       "name": "v1.1.8",
+      "label": "1.1.8",
       "publishedAt": "2026-05-21T17:26:59Z",
       "url": "https://github.com/heartached/Noctis/releases/tag/v1.1.8",
       "prerelease": false,
@@ -2756,12 +2868,14 @@
             "Bug fixes and improvements"
           ]
         }
-      ]
+      ],
+      "summary": null
     },
     {
       "tag": "v1.1.7",
       "version": "1.1.7",
       "name": "v1.1.7",
+      "label": "1.1.7",
       "publishedAt": "2026-05-19T17:57:48Z",
       "url": "https://github.com/heartached/Noctis/releases/tag/v1.1.7",
       "prerelease": false,
@@ -2810,12 +2924,14 @@
             "Fixed Back button text clipping issues"
           ]
         }
-      ]
+      ],
+      "summary": null
     },
     {
       "tag": "v1.1.6",
       "version": "1.1.6",
       "name": "v1.1.6",
+      "label": "1.1.6",
       "publishedAt": "2026-05-19T04:42:57Z",
       "url": "https://github.com/heartached/Noctis/releases/tag/v1.1.6",
       "prerelease": false,
@@ -2919,12 +3035,14 @@
             "Fixed nested submenu corner radius mismatches"
           ]
         }
-      ]
+      ],
+      "summary": null
     },
     {
       "tag": "v1.1.5",
       "version": "1.1.5",
       "name": "v1.1.5",
+      "label": "1.1.5",
       "publishedAt": "2026-05-11T05:14:34Z",
       "url": "https://github.com/heartached/Noctis/releases/tag/v1.1.5",
       "prerelease": false,
@@ -2990,12 +3108,14 @@
             "Fixed hover and click animations on playback controls"
           ]
         }
-      ]
+      ],
+      "summary": null
     },
     {
       "tag": "v1.1.4",
       "version": "1.1.4",
       "name": "v1.1.4",
+      "label": "1.1.4",
       "publishedAt": "2026-05-06T17:49:58Z",
       "url": "https://github.com/heartached/Noctis/releases/tag/v1.1.4",
       "prerelease": false,
@@ -3014,12 +3134,14 @@
             "Fixed terminal window opening alongside Noctis on Windows"
           ]
         }
-      ]
+      ],
+      "summary": null
     },
     {
       "tag": "v1.1.3",
       "version": "1.1.3",
       "name": "v1.1.3",
+      "label": "1.1.3",
       "publishedAt": "2026-05-06T01:07:18Z",
       "url": "https://github.com/heartached/Noctis/releases/tag/v1.1.3",
       "prerelease": false,
@@ -3038,12 +3160,14 @@
             "Fixed terminal window opening alongside Noctis on Windows"
           ]
         }
-      ]
+      ],
+      "summary": null
     },
     {
       "tag": "v1.1.2",
       "version": "1.1.2",
       "name": "v1.1.2",
+      "label": "1.1.2",
       "publishedAt": "2026-05-06T00:23:50Z",
       "url": "https://github.com/heartached/Noctis/releases/tag/v1.1.2",
       "prerelease": false,
@@ -3094,12 +3218,14 @@
             "Fixed context menu stuttering issues"
           ]
         }
-      ]
+      ],
+      "summary": null
     },
     {
       "tag": "v1.1.1",
       "version": "1.1.1",
       "name": "v1.1.1",
+      "label": "1.1.1",
       "publishedAt": "2026-05-04T23:18:12Z",
       "url": "https://github.com/heartached/Noctis/releases/tag/v1.1.1",
       "prerelease": false,
@@ -3180,12 +3306,14 @@
             "Fixed theme migration persistence issues"
           ]
         }
-      ]
+      ],
+      "summary": null
     },
     {
       "tag": "v1.1.0",
       "version": "1.1.0",
       "name": "v1.1.0",
+      "label": "1.1.0",
       "publishedAt": "2026-04-02T17:10:43Z",
       "url": "https://github.com/heartached/Noctis/releases/tag/v1.1.0",
       "prerelease": false,
@@ -3249,12 +3377,14 @@
             "Fixed artwork cache memory leaks"
           ]
         }
-      ]
+      ],
+      "summary": null
     },
     {
       "tag": "v1.0.2",
       "version": "1.0.2",
       "name": "v1.0.2",
+      "label": "1.0.2",
       "publishedAt": "2026-03-20T22:14:04Z",
       "url": "https://github.com/heartached/Noctis/releases/tag/v1.0.2",
       "prerelease": false,
@@ -3282,12 +3412,14 @@
             "Fixed inconsistent styling in Play menu items"
           ]
         }
-      ]
+      ],
+      "summary": null
     },
     {
       "tag": "v1.0.1",
       "version": "1.0.1",
       "name": "v1.0.1",
+      "label": "1.0.1",
       "publishedAt": "2026-03-19T19:08:47Z",
       "url": "https://github.com/heartached/Noctis/releases/tag/v1.0.1",
       "prerelease": false,
@@ -3314,18 +3446,21 @@
             "Fixed player bar overlapping top bar buttons during window resize"
           ]
         }
-      ]
+      ],
+      "summary": null
     },
     {
       "tag": "v1.0.0",
       "version": "1.0.0",
       "name": "v1.0.0",
+      "label": "1.0.0",
       "publishedAt": "2026-03-19T04:16:15Z",
       "url": "https://github.com/heartached/Noctis/releases/tag/v1.0.0",
       "prerelease": false,
-      "sections": []
+      "sections": [],
+      "summary": "Initial Release"
     }
   ],
-  "updatedAt": "2026-10-11T04:48:17.031Z",
+  "updatedAt": "2026-10-11T22:59:28.936Z",
   "degraded": false
 }
