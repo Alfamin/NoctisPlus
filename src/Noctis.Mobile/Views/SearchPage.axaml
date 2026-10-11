@@ -7,30 +7,60 @@
              x:Class="Noctis.Mobile.Views.SearchPage"
              x:DataType="vm:SearchPageViewModel">
     <Grid RowDefinitions="Auto,Auto,Auto,*">
-        <TextBlock Grid.Row="0" Classes="title" Text="Search" Margin="20,12,20,8" />
+        <!-- The title, with the sort menu in the header's glass pill (as Library's tools are), so
+             the chip row below has the full width to scroll in. -->
+        <Grid Grid.Row="0" ColumnDefinitions="*,Auto" Margin="20,12,16,8">
+            <TextBlock Classes="title" Text="Search" VerticalAlignment="Center" />
+            <controls:GlassPanel Grid.Column="1" Name="SortGlass" Classes="header-glass" IsVisible="{Binding HasQuery}">
+                <Button Name="SortButton" Classes="glass-round" Classes.on="{Binding IsSorted}" Click="OnSortClick">
+                    <PathIcon Data="{DynamicResource PhSort}" />
+                </Button>
+            </controls:GlassPanel>
+        </Grid>
         <TextBox Grid.Row="1" Name="SearchBox" Margin="16,0,16,8" Text="{Binding Query}"
                  PlaceholderText="Artists, songs, albums, playlists" CornerRadius="12" />
 
-        <!-- The filters sit right under the box: a chip per kind of result, and the sort menu. -->
-        <Grid Grid.Row="2" Name="ScopeBar" ColumnDefinitions="*,Auto" Margin="0,0,12,6" IsVisible="{Binding HasQuery}">
-            <ScrollViewer HorizontalScrollBarVisibility="Hidden" VerticalScrollBarVisibility="Disabled">
-                <StackPanel Orientation="Horizontal" Spacing="8" Margin="16,0,8,0">
-                    <Button Name="ScopeAll" Classes="text-chip" Classes.selected="{Binding IsAllScope}" Content="All"
-                            Command="{Binding SetScopeCommand}" CommandParameter="{x:Static vm:SearchScope.All}" />
-                    <Button Name="ScopeSongs" Classes="text-chip" Classes.selected="{Binding IsSongsScope}" Content="Songs"
-                            Command="{Binding SetScopeCommand}" CommandParameter="{x:Static vm:SearchScope.Songs}" />
-                    <Button Name="ScopeAlbums" Classes="text-chip" Classes.selected="{Binding IsAlbumsScope}" Content="Albums"
-                            Command="{Binding SetScopeCommand}" CommandParameter="{x:Static vm:SearchScope.Albums}" />
-                    <Button Name="ScopeArtists" Classes="text-chip" Classes.selected="{Binding IsArtistsScope}" Content="Artists"
-                            Command="{Binding SetScopeCommand}" CommandParameter="{x:Static vm:SearchScope.Artists}" />
-                    <Button Name="ScopePlaylists" Classes="text-chip" Classes.selected="{Binding IsPlaylistsScope}" Content="Playlists"
-                            Command="{Binding SetScopeCommand}" CommandParameter="{x:Static vm:SearchScope.Playlists}" />
-                </StackPanel>
-            </ScrollViewer>
-            <Button Grid.Column="1" Name="SortButton" Classes="icon" Classes.on="{Binding IsSorted}" Click="OnSortClick">
-                <PathIcon Data="{DynamicResource PhSort}" />
-            </Button>
-        </Grid>
+        <!-- A chip per kind of result, with its icon, right under the box. -->
+        <ScrollViewer Grid.Row="2" Name="ScopeBar" HorizontalScrollBarVisibility="Hidden" VerticalScrollBarVisibility="Disabled"
+                      Margin="0,0,0,6" IsVisible="{Binding HasQuery}">
+            <StackPanel Orientation="Horizontal" Spacing="8" Margin="16,0">
+                <Button Name="ScopeAll" Classes="text-chip" Classes.selected="{Binding IsAllScope}"
+                        Command="{Binding SetScopeCommand}" CommandParameter="{x:Static vm:SearchScope.All}">
+                    <StackPanel Orientation="Horizontal" Spacing="6">
+                        <PathIcon Data="{DynamicResource ChipAllMusicIcon}" Width="17" Height="17" />
+                        <TextBlock Text="All" VerticalAlignment="Center" />
+                    </StackPanel>
+                </Button>
+                <Button Name="ScopeSongs" Classes="text-chip" Classes.selected="{Binding IsSongsScope}"
+                        Command="{Binding SetScopeCommand}" CommandParameter="{x:Static vm:SearchScope.Songs}">
+                    <StackPanel Orientation="Horizontal" Spacing="6">
+                        <PathIcon Data="{DynamicResource ChipSongsIcon}" Width="17" Height="17" />
+                        <TextBlock Text="Songs" VerticalAlignment="Center" />
+                    </StackPanel>
+                </Button>
+                <Button Name="ScopeAlbums" Classes="text-chip" Classes.selected="{Binding IsAlbumsScope}"
+                        Command="{Binding SetScopeCommand}" CommandParameter="{x:Static vm:SearchScope.Albums}">
+                    <StackPanel Orientation="Horizontal" Spacing="6">
+                        <PathIcon Data="{DynamicResource ChipAlbumsIcon}" Width="17" Height="17" />
+                        <TextBlock Text="Albums" VerticalAlignment="Center" />
+                    </StackPanel>
+                </Button>
+                <Button Name="ScopeArtists" Classes="text-chip" Classes.selected="{Binding IsArtistsScope}"
+                        Command="{Binding SetScopeCommand}" CommandParameter="{x:Static vm:SearchScope.Artists}">
+                    <StackPanel Orientation="Horizontal" Spacing="6">
+                        <PathIcon Data="{DynamicResource ChipArtistsIcon}" Width="17" Height="17" />
+                        <TextBlock Text="Artists" VerticalAlignment="Center" />
+                    </StackPanel>
+                </Button>
+                <Button Name="ScopePlaylists" Classes="text-chip" Classes.selected="{Binding IsPlaylistsScope}"
+                        Command="{Binding SetScopeCommand}" CommandParameter="{x:Static vm:SearchScope.Playlists}">
+                    <StackPanel Orientation="Horizontal" Spacing="6">
+                        <PathIcon Data="{DynamicResource ChipPlaylistsIcon}" Width="17" Height="17" />
+                        <TextBlock Text="Playlists" VerticalAlignment="Center" />
+                    </StackPanel>
+                </Button>
+            </StackPanel>
+        </ScrollViewer>
 
         <TextBlock Grid.Row="3" Name="SearchPrompt" Classes="subtle" Text="Search your library" HorizontalAlignment="Center"
                    Margin="0,40,0,0" IsVisible="{Binding ShowPrompt}" />

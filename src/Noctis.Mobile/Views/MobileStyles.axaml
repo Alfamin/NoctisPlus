@@ -229,7 +229,7 @@
         <Setter Property="Foreground" Value="{DynamicResource AccentForegroundBrush}" />
     </Style>
     <!-- A favourite's heart on a song row, and a page tool that is on (a filter in use). -->
-    <Style Selector="Button.row-heart.on PathIcon, Button.icon.on PathIcon">
+    <Style Selector="Button.row-heart.on PathIcon, Button.icon.on PathIcon, Button.glass-round.on PathIcon">
         <Setter Property="Foreground" Value="{DynamicResource AccentTextBrush}" />
     </Style>
     <!-- The long-press sheet's quick actions: an icon over a short label, four across. -->

@@ -255,6 +255,38 @@ public class MobileRedesignTests
         Assert.Equal(new[] { "Old", "Fresh" }, page.Songs.Select(t => t.Title));  // newest to the playlist first
     }
 
+    // ── Headers ──
+
+    [AvaloniaFact]
+    public void Headers_TheListToolsSitInTheTitleRow_AndOnlyLibraryKeepsTheProfile()
+    {
+        var a = MobileFixtures.Song("Alpha", favourite: true);
+        using var rig = MobileFixtures.MakeRig(new[] { a });
+        var window = MobileFixtures.Mount(rig.Shell, out var view);
+
+        rig.Shell.SelectTabCommand.Execute(MobileTab.Favorites);
+        window.UpdateLayout();
+        var favourites = view.FindControl<Grid>("FavoritesRoot")!;
+        // One pill shows: the header's (the embedded list hides its own title row).
+        var tools = favourites.GetVisualDescendants().OfType<ListTools>().Single(t => t.IsEffectivelyVisible);
+        Assert.Same(rig.Shell.FavoritesRoot, tools.DataContext);
+        // No profile button outside Library: Settings is reached from Library's header.
+        Assert.DoesNotContain(favourites.GetVisualDescendants().OfType<Button>(), b => b.Command == rig.Shell.OpenSettingsCommand);
+        Assert.DoesNotContain(view.FindControl<Grid>("PlaylistsRoot")!.GetVisualDescendants().OfType<Button>(),
+            b => b.Command == rig.Shell.OpenSettingsCommand);
+
+        rig.Shell.SelectTabCommand.Execute(MobileTab.Search);
+        rig.Shell.Search.Query = "alp";
+        window.UpdateLayout();
+        var sort = MobileFixtures.Named<Button>(view, "SortButton");
+        var chips = MobileFixtures.Named<ScrollViewer>(view, "ScopeBar");
+        // The sort button sits above the chip row, so the chips never scroll under it.
+        var sortBottom = sort.TranslatePoint(new Point(0, sort.Bounds.Height), view)!.Value.Y;
+        var chipsTop = chips.TranslatePoint(new Point(0, 0), view)!.Value.Y;
+        Assert.True(sortBottom <= chipsTop, $"sort bottom {sortBottom} vs chips top {chipsTop}");
+        window.Close();
+    }
+
     // ── Mini player ──
 
     [AvaloniaFact]
