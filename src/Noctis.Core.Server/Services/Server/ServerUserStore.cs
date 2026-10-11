@@ -340,13 +340,15 @@ public sealed class ServerUserStore
     private static string ValidateName(string name)
     {
         name = (name ?? "").Trim();
-        if (name.Length is < 1 or > 64) throw new ArgumentException("Invalid user name or password.");
+        // Create / change only (sign-in never validates here), so the message can say what to fix.
+        if (name.Length == 0) throw new ArgumentException("Enter an email address.");
+        if (name.Length > 64) throw new ArgumentException("That email address is too long (64 characters at most).");
         if (name.Any(c => char.IsControl(c) || c is '/' or '\\' or ':' or '?' or '&' or '=')) throw new ArgumentException("User name contains characters that are not allowed.");
         return name;
     }
 
     private static void ValidatePassword(string password)
     {
-        if (password is null || password.Length < 8) throw new ArgumentException("Invalid user name or password.");
+        if (password is null || password.Length < 8) throw new ArgumentException("Use a password of at least 8 characters.");
     }
 }

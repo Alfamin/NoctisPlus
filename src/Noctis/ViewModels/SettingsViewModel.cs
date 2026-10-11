@@ -1272,7 +1272,7 @@ public partial class SettingsViewModel : ViewModelBase
         RefreshSignedInDevices();
     }
 
-    /// <summary>Account errors ("Invalid user name or password.") leave on their own like
+    /// <summary>Account errors ("Use a password of at least 8 characters.") leave on their own like
     /// every other confirmation text in Settings (<see cref="TransientStatus"/>).</summary>
     private void ShowServerUserError(string message)
         => TransientStatus.Show(nameof(ServerUserError), v => ServerUserError = v, message);

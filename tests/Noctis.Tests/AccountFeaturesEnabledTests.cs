@@ -114,4 +114,14 @@ public class AccountFeaturesEnabledTests : IDisposable
         vm.ToggleChangePasswordCommand.Execute(null);
         Assert.False(vm.IsPasswordRevealed);
     }
+
+    [Fact]
+    public void CreateAccount_ShortPasswordOrNoEmail_SaysWhatToFix()
+    {
+        var store = new ServerUserStore(Path.Combine(_root, "users.db"));
+        Assert.Equal("Use a password of at least 8 characters.",
+            Assert.Throws<ArgumentException>(() => store.Create("me@example.com", "short")).Message);
+        Assert.Equal("Enter an email address.",
+            Assert.Throws<ArgumentException>(() => store.Create("  ", "long enough")).Message);
+    }
 }
