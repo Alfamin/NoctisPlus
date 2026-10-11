@@ -87,9 +87,23 @@ public sealed partial class ShellViewModel : ObservableObject
             _account = value;
             if (value == null) return;
             value.PlaylistsChanged += OnAccountPlaylistsChanged;
+            value.StateChanged += OnAccountStateChanged;
+            _profileAvatarPath = AccountAvatarPath();
         }
     }
     private readonly INoctisAccountService? _account;
+
+    /// <summary>The signed-in desktop's profile picture for the profile button (ProfileButton);
+    /// null when signed out or the desktop has none (the person glyph shows).</summary>
+    [ObservableProperty] private string? _profileAvatarPath;
+
+    private string? AccountAvatarPath() => _account is { IsSignedIn: true } a ? a.AvatarPath : null;
+
+    /// <summary>StateChanged fires on every download step too: hop to the UI thread only for a new picture.</summary>
+    private void OnAccountStateChanged(object? sender, EventArgs e)
+    {
+        if (AccountAvatarPath() != ProfileAvatarPath) Marshal(() => ProfileAvatarPath = AccountAvatarPath());
+    }
 
     /// <summary>
     /// A sync writes the desktop's playlists straight into playlists.json and sign-out drops them,

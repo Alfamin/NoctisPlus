@@ -26,6 +26,10 @@ public interface IServerLibrary : Sync.ISyncApplier
     /// <summary>Path of the album's cover file, or null.</summary>
     string? ArtworkPath(Guid albumId);
 
+    /// <summary>Path of <paramref name="userName"/>'s profile picture, or null (getAvatar then answers
+    /// 70). The desktop keeps one profile, so every account on it gets the owner's picture.</summary>
+    string? AvatarPath(string userName) => null;
+
     /// <summary>Stars/unstars tracks (albums and artists star every track they contain). Persists user state.</summary>
     Task SetStarredAsync(IReadOnlyList<Guid> trackIds, IReadOnlyList<Guid> albumIds, IReadOnlyList<Guid> artistIds, bool starred);
 

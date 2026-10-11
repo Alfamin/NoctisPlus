@@ -311,7 +311,7 @@ public sealed partial class NoctisServer : IAsyncDisposable
         return user is null ? (null, null, SubsonicResponse.ErrWrongCredentials, "Wrong username or password") : (user, null, 0, "");
     }
 
-    // ── Binary endpoints: stream / download / getCoverArt ───────────────────
+    // ── Binary endpoints: stream / download / getCoverArt / getAvatar ───────
 
     private async Task<bool> TryHandleBinaryAsync(HttpContext ctx, string method, Params p)
     {
@@ -380,6 +380,23 @@ public sealed partial class NoctisServer : IAsyncDisposable
                 await Results.File(path, ContentTypeFor(path)).ExecuteAsync(ctx).ConfigureAwait(false);
                 return true;
             }
+            case "getavatar":
+            {
+                // The caller's own picture only: another account's name is 70, never the owner's
+                // picture handed to whoever asks. No username = the caller (Subsonic requires it;
+                // the phone sends it, a lenient default costs nothing).
+                var user = (ServerUser)ctx.Items["user"]!;
+                var name = p.Get("username");
+                if (name is not null && !name.Equals(user.Name, StringComparison.OrdinalIgnoreCase)) throw NotFound();
+                var path = _library.AvatarPath(user.Name) ?? throw NotFound();
+                // The setting can name any file on the PC: serve it only as a picture.
+                var contentType = ContentTypeFor(path);
+                if (!contentType.StartsWith("image/", StringComparison.Ordinal)) throw NotFound();
+                // A changed picture keeps no name the phone could cache by: always revalidate.
+                ctx.Response.Headers.CacheControl = "private, no-cache";
+                await Results.File(path, contentType).ExecuteAsync(ctx).ConfigureAwait(false);
+                return true;
+            }
         }
         return false;
     }
@@ -390,6 +407,7 @@ public sealed partial class NoctisServer : IAsyncDisposable
         ".ogg" or ".oga" => "audio/ogg", ".opus" => "audio/ogg", ".wav" => "audio/wav", ".wma" => "audio/x-ms-wma",
         ".aif" or ".aiff" => "audio/aiff", ".ape" => "audio/x-ape", ".wv" => "audio/x-wavpack", ".dsf" => "audio/x-dsf",
         ".jpg" or ".jpeg" => "image/jpeg", ".png" => "image/png", ".webp" => "image/webp", ".gif" => "image/gif",
+        ".bmp" => "image/bmp", // the desktop's profile picture picker offers .bmp
         _ => "application/octet-stream",
     };
 

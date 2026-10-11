@@ -1,3 +1,4 @@
+using System.Text;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using Noctis.Mobile.Services.Account;
@@ -7,7 +8,8 @@ namespace Noctis.Mobile.ViewModels;
 
 /// <summary>
 /// Settings → Account: signs the phone in to the owner's Noctis desktop and, once signed in,
-/// shows the link with Sync now, Download everything, the downloads' size and Sign out.
+/// shows the account (the desktop's profile picture, name, PC, last sync) over Sync now,
+/// Download everything, the downloads' size, Remove all downloads and Sign out.
 /// Sign-in is two steps: the address is probed for the server certificate's fingerprint,
 /// which the user compares with the one on the computer, and only a confirmed fingerprint
 /// is signed in with (and pinned by the service). Every call goes through
@@ -91,6 +93,28 @@ public sealed partial class AccountPageViewModel : MobilePage
 
     /// <summary>"owner on Studio PC".</summary>
     [ObservableProperty] private string _accountText = string.Empty;
+
+    /// <summary>The header: the account name, large.</summary>
+    [ObservableProperty] private string _displayName = string.Empty;
+
+    /// <summary>The header's second line: "on Studio PC".</summary>
+    [ObservableProperty] private string _serverText = string.Empty;
+
+    /// <summary>The desktop's profile picture (a local file the service cached), or null.</summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(HasAvatar), nameof(ShowInitials), nameof(ShowPersonGlyph))]
+    private string? _avatarPath;
+
+    public bool HasAvatar => !string.IsNullOrEmpty(AvatarPath);
+
+    /// <summary>No picture: the accent circle shows these ("OW" for "owner", "JD" for "John Doe").</summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(ShowInitials), nameof(ShowPersonGlyph))]
+    private string _initials = string.Empty;
+
+    public bool ShowInitials => !HasAvatar && Initials.Length > 0;
+    public bool ShowPersonGlyph => !HasAvatar && Initials.Length == 0;
+
     [ObservableProperty] private string _lastSyncText = string.Empty;
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(CanSync))]
@@ -106,8 +130,11 @@ public sealed partial class AccountPageViewModel : MobilePage
     public bool CanDownload => IsIdle && !IsDownloading;
     [ObservableProperty] private string _downloadText = string.Empty;
 
-    /// <summary>"Downloaded: 12 songs · 340 MB".</summary>
+    /// <summary>"Downloaded: 12 songs · 340 MB" (the Downloaded row's spoken name).</summary>
     [ObservableProperty] private string _storageText = string.Empty;
+
+    /// <summary>The Downloaded row's value: "12 songs · 340 MB".</summary>
+    [ObservableProperty] private string _storageValue = string.Empty;
 
     [ObservableProperty] private bool _isConfirmingSignOut;
     [ObservableProperty] private bool _alsoRemoveDownloads;
@@ -318,6 +345,10 @@ public sealed partial class AccountPageViewModel : MobilePage
         var account = _account.Account;
         IsSignedIn = _account.IsSignedIn && account != null;
         AccountText = account == null ? string.Empty : $"{account.UserName} on {ServerLabel(account)}";
+        DisplayName = account?.UserName ?? string.Empty;
+        ServerText = account == null ? string.Empty : $"on {ServerLabel(account)}";
+        Initials = InitialsOf(account?.UserName);
+        AvatarPath = IsSignedIn ? _account.AvatarPath : null;
         LastSyncText = account?.LastSyncUtc is { } synced ? $"Last synced {FormatWhen(synced)}" : "Not synced yet";
         IsSyncing = _syncRunning || _account.IsSyncing;
         if (!IsSignedIn)
@@ -331,7 +362,8 @@ public sealed partial class AccountPageViewModel : MobilePage
 
     private void RefreshDownloads()
     {
-        StorageText = $"Downloaded: {Count(_account.DownloadedCount, "song")} · {FormatBytes(_account.DownloadedBytes)}";
+        StorageValue = $"{Count(_account.DownloadedCount, "song")} · {FormatBytes(_account.DownloadedBytes)}";
+        StorageText = $"Downloaded: {StorageValue}";
         var pending = _lastDownload is { Pending: > 0 };
         IsDownloading = _downloadRunning || pending;
         if (_lastDownload is not { } p) return;
@@ -422,6 +454,20 @@ public sealed partial class AccountPageViewModel : MobilePage
         !string.IsNullOrWhiteSpace(account.ServerName) ? account.ServerName
         : Uri.TryCreate(account.ServerUrl, UriKind.Absolute, out var uri) ? uri.Host
         : account.ServerUrl;
+
+    /// <summary>Up to two letters for the avatar fallback: the first letters of the first two
+    /// words ("John Doe" → "JD"), else the first two of one word ("owner" → "OW"); empty for none.</summary>
+    internal static string InitialsOf(string? name)
+    {
+        var words = (name ?? string.Empty).Split([' ', '.', '_', '-'], StringSplitOptions.RemoveEmptyEntries);
+        var letters = words.Length >= 2
+            ? new[] { FirstLetter(words[0]), FirstLetter(words[1]) }
+            : words.Length == 1 ? words[0].EnumerateRunes().Where(Rune.IsLetterOrDigit).Take(2).Select(r => r.ToString()).ToArray()
+            : Array.Empty<string?>();
+        return string.Concat(letters.Where(l => l != null)).ToUpperInvariant();
+
+        static string? FirstLetter(string word) => word.EnumerateRunes().Where(Rune.IsLetterOrDigit).Select(r => r.ToString()).FirstOrDefault();
+    }
 
     internal static string FormatBytes(long bytes) =>
         bytes >= 1L << 30 ? $"{bytes / (double)(1L << 30):0.0} GB" : $"{bytes / (double)(1L << 20):0} MB";

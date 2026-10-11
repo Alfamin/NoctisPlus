@@ -1,0 +1,29 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:controls="using:Noctis.Controls"
+             x:Class="Noctis.Mobile.Views.ProfileButton">
+    <!-- The profile button for a page header: the signed-in desktop's picture in a circle, else
+         the person glyph. Code-behind drives both from AvatarPath and Command, so the control
+         works under any DataContext (ShellViewModel or a page with a Shell). -->
+    <UserControl.Styles>
+        <Style Selector="Border.avatar">
+            <Setter Property="Width" Value="34" />
+            <Setter Property="Height" Value="34" />
+            <Setter Property="CornerRadius" Value="17" />
+            <Setter Property="ClipToBounds" Value="True" />
+            <Setter Property="Background" Value="{DynamicResource HomeCardBackground}" />
+            <Setter Property="HorizontalAlignment" Value="Center" />
+            <Setter Property="VerticalAlignment" Value="Center" />
+        </Style>
+    </UserControl.Styles>
+
+    <!-- "icon" (MobileStyles): 44 dp round touch target, transparent, Apple-style press dim. -->
+    <Button Name="ProfileButtonRoot" Classes="icon" AutomationProperties.Name="Profile and settings">
+        <Panel>
+            <PathIcon Name="AvatarGlyph" Data="{DynamicResource PhPerson}" />
+            <Border Name="AvatarClip" Classes="avatar" IsVisible="False">
+                <controls:CachedImage Name="AvatarImage" DecodeWidth="128" Stretch="UniformToFill" />
+            </Border>
+        </Panel>
+    </Button>
+</UserControl>

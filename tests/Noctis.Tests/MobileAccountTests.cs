@@ -29,8 +29,11 @@ public class MobileAccountTests
         public NoctisAccount? Account { get; set; }
         public bool IsSignedIn => Account != null;
         public bool IsSyncing { get; set; }
+        public string? AvatarPath { get; set; }
 
         public event EventHandler? StateChanged;
+
+        public void RaiseStateChanged() => StateChanged?.Invoke(this, EventArgs.Empty);
         public event EventHandler<NoctisSyncProgress>? SyncProgress;
         public event EventHandler<NoctisDownloadProgress>? DownloadProgress;
         public event EventHandler? PlaylistsChanged { add { } remove { } }
@@ -76,6 +79,7 @@ public class MobileAccountTests
         {
             SignOuts.Add(removeDownloads);
             Account = null;
+            AvatarPath = null;
             if (removeDownloads) DownloadedIds.Clear();
             StateChanged?.Invoke(this, EventArgs.Empty);
             return Task.CompletedTask;
@@ -736,6 +740,184 @@ public class MobileAccountTests
 
         Assert.Contains("redact-marker-91c2 apiKey=***", exporter.Text);
         Assert.DoesNotContain("nk_leakme123", exporter.Text);
+    }
+
+    // ── The desktop's profile picture: Account header, ProfileButton ──
+
+    /// <summary>A real 64×64 PNG in a fresh temp folder (the caller deletes the folder).</summary>
+    private static string MakePicture(out string dir)
+    {
+        dir = System.IO.Path.Combine(System.IO.Path.GetTempPath(), "noctis-avatar-" + Guid.NewGuid().ToString("N"));
+        System.IO.Directory.CreateDirectory(dir);
+        var path = System.IO.Path.Combine(dir, "avatar-0123456789abcdef.img");
+        using var bmp = new SkiaSharp.SKBitmap(64, 64);
+        bmp.Erase(new SkiaSharp.SKColor(40, 120, 200));
+        using var img = SkiaSharp.SKImage.FromBitmap(bmp);
+        using var png = img.Encode(SkiaSharp.SKEncodedImageFormat.Png, 100);
+        System.IO.File.WriteAllBytes(path, png.ToArray());
+        return path;
+    }
+
+    [Theory]
+    [InlineData("owner", "OW")]
+    [InlineData("John Doe", "JD")]
+    [InlineData("jane.smith", "JS")]
+    [InlineData("x", "X")]
+    [InlineData("élodie", "ÉL")]
+    [InlineData("  ", "")]
+    [InlineData(null, "")]
+    public void Initials_ForTheAvatarFallback(string? name, string expected)
+        => Assert.Equal(expected, AccountPageViewModel.InitialsOf(name));
+
+    [Fact]
+    public void ShellProfileAvatarPath_FollowsTheAccount()
+    {
+        using var rig = MobileFixtures.MakeRig();
+        var account = new FakeAccount { Account = FakeAccount.SignedInAs(), AvatarPath = "/data/account/avatar-1.img" };
+        var shell = ShellWith(rig, account);
+        Assert.Equal("/data/account/avatar-1.img", shell.ProfileAvatarPath);   // from the first frame
+
+        account.AvatarPath = "/data/account/avatar-2.img";                     // a sync brought a new picture
+        account.RaiseStateChanged();
+        Assert.Equal("/data/account/avatar-2.img", shell.ProfileAvatarPath);
+
+        account.Account = null;                                                // signed out: the glyph again
+        account.RaiseStateChanged();
+        Assert.Null(shell.ProfileAvatarPath);
+
+        Assert.Null(ShellWith(rig, null).ProfileAvatarPath);                   // no account service at all
+    }
+
+    [Fact]
+    public async Task AccountPage_Header_ShowsTheAvatar_ElseInitials()
+    {
+        using var rig = MobileFixtures.MakeRig();
+        var account = new FakeAccount { Account = FakeAccount.SignedInAs("owner", "Studio PC") };
+        var page = OpenAccount(ShellWith(rig, account));
+        Assert.Equal("owner", page.DisplayName);
+        Assert.Equal("on Studio PC", page.ServerText);
+        Assert.Equal("0 songs · 0 MB", page.StorageValue);
+        Assert.False(page.HasAvatar);
+        Assert.True(page.ShowInitials);
+        Assert.Equal("OW", page.Initials);
+
+        account.AvatarPath = "/data/account/avatar-1.img";
+        account.RaiseStateChanged();
+        Assert.True(page.HasAvatar);
+        Assert.Equal("/data/account/avatar-1.img", page.AvatarPath);
+        Assert.False(page.ShowInitials);
+        Assert.False(page.ShowPersonGlyph);
+
+        await account.SignOutAsync(removeDownloads: false);
+        Assert.False(page.IsSignedIn);
+        Assert.Null(page.AvatarPath);
+    }
+
+    [AvaloniaFact]
+    public void AccountPage_SignedIn_ShowsTheHeaderPicture_AndTheRows()
+    {
+        var picture = MakePicture(out var dir);
+        try
+        {
+            using var rig = MobileFixtures.MakeRig();
+            var account = new FakeAccount { Account = FakeAccount.SignedInAs(), AvatarPath = picture };
+            var shell = ShellWith(rig, account);
+            var window = MobileFixtures.Mount(shell, out var view);
+            shell.OpenAccountCommand.Execute(null);
+            window.UpdateLayout();
+
+            var page = MobileFixtures.Find<AccountPage>(view);
+            Assert.True(MobileFixtures.Named<StackPanel>(page, "SignedInPanel").IsEffectivelyVisible);
+            var image = MobileFixtures.Named<Noctis.Controls.CachedImage>(page, "AvatarImage");
+            Assert.True(image.IsEffectivelyVisible);
+            Assert.Equal(picture, image.SourcePath);
+            Assert.False(MobileFixtures.Named<TextBlock>(page, "AvatarInitials").IsEffectivelyVisible);
+            var circle = MobileFixtures.Named<Border>(page, "AvatarCircle");
+            Assert.Equal(96, circle.Bounds.Width);
+            Assert.True(circle.ClipToBounds);
+
+            // Every action row is a full-width touch target of at least 52 dp.
+            foreach (var name in new[] { "SyncNowButton", "DownloadAllButton", "RemoveDownloadsButton", "SignOutButton" })
+            {
+                var row = MobileFixtures.Named<Button>(page, name);
+                Assert.True(row.IsEffectivelyVisible, name);
+                Assert.True(row.Bounds.Height >= 52, $"{name} is {row.Bounds.Height} dp");
+                Assert.NotNull(row.Command);
+            }
+            Assert.Equal("0 songs · 0 MB", MobileFixtures.Named<TextBlock>(page, "StorageLabel").Text);
+
+            // Remove all downloads still asks first, inline.
+            MobileFixtures.Named<Button>(page, "RemoveDownloadsButton").Command!.Execute(null);
+            window.UpdateLayout();
+            Assert.True(MobileFixtures.Named<StackPanel>(page, "RemoveDownloadsConfirm").IsEffectivelyVisible);
+
+            // No picture: the initials on the accent circle.
+            account.AvatarPath = null;
+            account.RaiseStateChanged();
+            window.UpdateLayout();
+            Assert.False(image.IsEffectivelyVisible);
+            Assert.True(MobileFixtures.Named<TextBlock>(page, "AvatarInitials").IsEffectivelyVisible);
+            window.Close();
+        }
+        finally
+        {
+            try { System.IO.Directory.Delete(dir, true); } catch { }
+        }
+    }
+
+    [AvaloniaFact]
+    public void ProfileButton_ShowsTheAvatar_WhenSet_ElseTheGlyph_AndOpensSettings()
+    {
+        var picture = MakePicture(out var dir);
+        try
+        {
+            using var rig = MobileFixtures.MakeRig();
+            var account = new FakeAccount { Account = FakeAccount.SignedInAs() };
+            var shell = ShellWith(rig, account);
+            var button = new ProfileButton { DataContext = shell };
+            button.Bind(ProfileButton.AvatarPathProperty, new Avalonia.Data.Binding(nameof(ShellViewModel.ProfileAvatarPath)));
+            button.Bind(ProfileButton.CommandProperty, new Avalonia.Data.Binding(nameof(ShellViewModel.OpenSettingsCommand)));
+            var window = new Window { Width = 200, Height = 200, Content = button };
+            window.Show();
+            window.UpdateLayout();
+
+            var image = MobileFixtures.Named<Noctis.Controls.CachedImage>(button, "AvatarImage");
+            var glyph = MobileFixtures.Named<PathIcon>(button, "AvatarGlyph");
+            Assert.False(button.HasAvatar);
+            Assert.True(glyph.IsEffectivelyVisible);
+            Assert.False(image.IsEffectivelyVisible);
+
+            account.AvatarPath = picture;
+            account.RaiseStateChanged();
+            window.UpdateLayout();
+            Assert.Equal(picture, shell.ProfileAvatarPath);
+            Assert.True(button.HasAvatar);
+            Assert.True(image.IsEffectivelyVisible);
+            Assert.Equal(picture, image.SourcePath);
+            Assert.False(glyph.IsEffectivelyVisible);
+            var clip = MobileFixtures.Named<Border>(button, "AvatarClip");
+            Assert.True(clip.ClipToBounds);
+            Assert.Equal(clip.Bounds.Width / 2, clip.CornerRadius.TopLeft);   // a circle
+
+            // A tap opens Settings.
+            var root = MobileFixtures.Named<Button>(button, "ProfileButtonRoot");
+            root.Command!.Execute(root.CommandParameter);
+            Assert.IsType<SettingsPageViewModel>(shell.CurrentPage);
+
+            // Signed out: the glyph again.
+            account.Account = null;
+            account.RaiseStateChanged();
+            window.UpdateLayout();
+            Assert.Null(shell.ProfileAvatarPath);
+            Assert.True(glyph.IsEffectivelyVisible);
+            Assert.False(image.IsEffectivelyVisible);
+            Assert.Null(image.SourcePath);
+            window.Close();
+        }
+        finally
+        {
+            try { System.IO.Directory.Delete(dir, true); } catch { }
+        }
     }
 
     private sealed class CapturingExporter : ILogExporter

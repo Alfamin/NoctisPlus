@@ -167,6 +167,7 @@ public sealed partial class NoctisAccountService : INoctisAccountService, ITrack
         _sync = _store.LoadSyncState();
         _pending = _store.LoadPending();
         IndexDownloads();
+        LoadCachedAvatar();
         stateRecorder?.Attach(this);
     }
 
@@ -240,6 +241,7 @@ public sealed partial class NoctisAccountService : INoctisAccountService, ITrack
         }
         DebugLog.Write("Account", $"signed in (sync {(result.SyncEnabled ? "on" : "off")} on the desktop)");
         RaiseStateChanged();
+        StartAvatarRefresh();
     }
 
     private static bool SameIdentity(string url, string user, NoctisAccount account) =>
@@ -296,6 +298,7 @@ public sealed partial class NoctisAccountService : INoctisAccountService, ITrack
             _client = null;
             _account = null;
         }
+        ClearAvatar();
         RaiseStateChanged();
 
         var playlistsRemoved = await Task.Run(async () =>
@@ -339,6 +342,7 @@ public sealed partial class NoctisAccountService : INoctisAccountService, ITrack
             _client = null;
             _account = null;
         }
+        ClearAvatar();
         DebugLog.Write("Account", "the desktop no longer accepts this phone's key; signed out locally");
         RaiseStateChanged();
     }
@@ -443,6 +447,9 @@ public sealed partial class NoctisAccountService : INoctisAccountService, ITrack
         // 5. Plays.
         var plays = await SendPlaysAsync(client, ct).ConfigureAwait(false);
 
+        // 6. The desktop's profile picture (best effort: never fails the sync).
+        await RefreshAvatarAsync(ct).ConfigureAwait(false);
+
         NoctisAccount? updated;
         lock (_gate)
         {
@@ -455,7 +462,7 @@ public sealed partial class NoctisAccountService : INoctisAccountService, ITrack
         }
         RaiseStateChanged();
 
-        // 6. Lyrics for downloaded songs that have none saved (after LastSyncUtc, so they count as current).
+        // 7. Lyrics for downloaded songs that have none saved (after LastSyncUtc, so they count as current).
         await PrefetchDownloadedLyricsAsync(ct).ConfigureAwait(false);
         if (syncOff is not null) throw syncOff;
         return new NoctisSyncResult(tracks.Count, playlistCount, pulled, pushed, plays);

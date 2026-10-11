@@ -82,6 +82,33 @@ public class LibraryServerAdapterHeadlessTests
     }
 
     [Fact]
+    public void AvatarPath_IsTheCurrentProfilePicture_WhileItExists()
+    {
+        var dir = System.IO.Path.Combine(System.IO.Path.GetTempPath(), "noctis-avatar-" + Guid.NewGuid().ToString("N"));
+        System.IO.Directory.CreateDirectory(dir);
+        try
+        {
+            var picture = System.IO.Path.Combine(dir, "avatar-1.png");
+            System.IO.File.WriteAllBytes(picture, new byte[] { 0x89, 0x50, 0x4E, 0x47 });
+            string? setting = picture;
+            using var persistence = new TestPersistenceService();
+            var adapter = new LibraryServerAdapter(new FakeLibraryService(), persistence, new CountingPlayHistory(), avatarPath: () => setting);
+
+            Assert.Equal(picture, adapter.AvatarPath("alice"));
+            setting = System.IO.Path.Combine(dir, "gone.png");   // read per call: a new pick shows at once
+            Assert.Null(adapter.AvatarPath("alice"));
+            setting = string.Empty;                              // the desktop's "no picture"
+            Assert.Null(adapter.AvatarPath("alice"));
+            // The headless host passes nothing: no avatar.
+            Assert.Null(new LibraryServerAdapter(new FakeLibraryService(), persistence, new CountingPlayHistory()).AvatarPath("alice"));
+        }
+        finally
+        {
+            try { System.IO.Directory.Delete(dir, true); } catch { }
+        }
+    }
+
+    [Fact]
     public async Task Playlists_RoundTrip_ThroughThePersistenceStore()
     {
         var library = new FakeLibraryService();

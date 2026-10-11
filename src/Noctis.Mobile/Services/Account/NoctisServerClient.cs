@@ -295,23 +295,36 @@ internal sealed partial class NoctisServerClient : IDisposable
     /// getCoverArt at <see cref="CoverSize"/> into <paramref name="destination"/> (written beside
     /// it, then moved over it). False when the server has no cover for the album.
     /// </summary>
-    public async Task<bool> DownloadCoverAsync(Guid albumId, string destination, CancellationToken ct)
-    {
-        using var timeout = CancellationTokenSource.CreateLinkedTokenSource(ct);
-        timeout.CancelAfter(ApiTimeout);
-        using var request = Request(HttpMethod.Get, "getCoverArt", new KeyValuePair<string, string>[]
+    public Task<bool> DownloadCoverAsync(Guid albumId, string destination, CancellationToken ct) =>
+        DownloadImageAsync("getCoverArt", new KeyValuePair<string, string>[]
         {
             new("id", NoctisRemoteIds.ToServerAlbumId(albumId)),
             new("size", CoverSize.ToString(CultureInfo.InvariantCulture)),
-        });
-        using var response = await SendAsync(request, HttpCompletionOption.ResponseHeadersRead, "cover", timeout.Token, ct).ConfigureAwait(false);
+        }, destination, "cover", ct);
+
+    /// <summary>
+    /// getAvatar: <paramref name="userName"/>'s profile picture (the desktop's) into
+    /// <paramref name="destination"/>, written beside it then moved over it. False when the
+    /// desktop has none, or is older than getAvatar (its "unknown method" is a server error too).
+    /// </summary>
+    public Task<bool> GetAvatarAsync(string userName, string destination, CancellationToken ct) =>
+        DownloadImageAsync("getAvatar", new KeyValuePair<string, string>[] { new("username", userName) }, destination, "avatar", ct);
+
+    /// <summary>One picture endpoint into a file; false when the server answers with an error envelope.</summary>
+    private async Task<bool> DownloadImageAsync(string endpoint, IEnumerable<KeyValuePair<string, string>> query, string destination,
+        string what, CancellationToken ct)
+    {
+        using var timeout = CancellationTokenSource.CreateLinkedTokenSource(ct);
+        timeout.CancelAfter(ApiTimeout);
+        using var request = Request(HttpMethod.Get, endpoint, query);
+        using var response = await SendAsync(request, HttpCompletionOption.ResponseHeadersRead, what, timeout.Token, ct).ConfigureAwait(false);
         try
         {
-            await ThrowIfEnvelopeAsync(response, "cover", timeout.Token, ct).ConfigureAwait(false);
+            await ThrowIfEnvelopeAsync(response, what, timeout.Token, ct).ConfigureAwait(false);
         }
         catch (NoctisServerException ex) when (ex.Kind == NoctisErrorKind.Server)
         {
-            return false; // 70 not found: the album has no art
+            return false; // 70 not found: no picture
         }
         var dir = Path.GetDirectoryName(destination)!;
         Directory.CreateDirectory(dir);
@@ -328,12 +341,12 @@ internal sealed partial class NoctisServerClient : IDisposable
         catch (OperationCanceledException) when (!ct.IsCancellationRequested)
         {
             TryDelete(tmp);
-            throw Log(Unreachable(), "cover", 0);
+            throw Log(Unreachable(), what, 0);
         }
         catch (Exception ex) when (ex is IOException or HttpRequestException)
         {
             TryDelete(tmp);
-            throw Log(Unreachable(), "cover", 0);
+            throw Log(Unreachable(), what, 0);
         }
     }
 

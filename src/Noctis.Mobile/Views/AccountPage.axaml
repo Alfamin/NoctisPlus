@@ -1,14 +1,86 @@
 <UserControl xmlns="https://github.com/avaloniaui"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:vm="using:Noctis.Mobile.ViewModels"
+             xmlns:controls="using:Noctis.Controls"
              x:Class="Noctis.Mobile.Views.AccountPage"
              x:DataType="vm:AccountPageViewModel">
+
+    <UserControl.Resources>
+        <!-- Destructive actions: the same red as the error line. -->
+        <SolidColorBrush x:Key="AccountDangerBrush" Color="#E74856" />
+        <!-- Sign out: a door bracket with an arrow leaving it, drawn on the 24-grid like
+             PhoneIcons.axaml (the corner anchors keep its box). -->
+        <StreamGeometry x:Key="AccountSignOutIcon">M0 0ZM24 24ZM10 3.1L6 3.1Q3.1 3.1 3.1 6L3.1 18Q3.1 20.9 6 20.9L10 20.9Q10.9 20.9 10.9 20Q10.9 19.1 10 19.1L6 19.1Q4.9 19.1 4.9 18L4.9 6Q4.9 4.9 6 4.9L10 4.9Q10.9 4.9 10.9 4Q10.9 3.1 10 3.1ZM9 11.1L18.03 11.1L15.36 8.43Q15.1 8.17 15.1 7.8Q15.1 7.43 15.36 7.16Q15.63 6.9 16 6.9Q16.37 6.9 16.64 7.16L20.84 11.36Q21.1 11.63 21.1 12Q21.1 12.37 20.84 12.64L16.64 16.84Q16.37 17.1 16 17.1Q15.63 17.1 15.36 16.84Q15.1 16.57 15.1 16.2Q15.1 15.83 15.36 15.57L18.03 12.9L9 12.9Q8.1 12.9 8.1 12Q8.1 11.1 9 11.1Z</StreamGeometry>
+    </UserControl.Resources>
 
     <UserControl.Styles>
         <Style Selector="Border.settings-card">
             <Setter Property="Background" Value="{DynamicResource HomeCardBackground}" />
             <Setter Property="CornerRadius" Value="14" />
             <Setter Property="Padding" Value="16,12" />
+        </Style>
+        <!-- A card of rows: the rows reach its edges, so the card clips their press dim. -->
+        <Style Selector="Border.row-card">
+            <Setter Property="Background" Value="{DynamicResource HomeCardBackground}" />
+            <Setter Property="CornerRadius" Value="14" />
+            <Setter Property="ClipToBounds" Value="True" />
+        </Style>
+
+        <!-- One settings row, the Windows app's way: icon, label (and a status line), value or
+             chevron on the right. 56 dp tall: a comfortable touch target. -->
+        <Style Selector="Button.account-row">
+            <Setter Property="MinHeight" Value="56" />
+            <Setter Property="Padding" Value="16,8" />
+        </Style>
+        <Style Selector="Button.account-row PathIcon.row-icon">
+            <Setter Property="Width" Value="22" />
+            <Setter Property="Height" Value="22" />
+            <Setter Property="Margin" Value="0,0,14,0" />
+            <Setter Property="VerticalAlignment" Value="Center" />
+        </Style>
+        <Style Selector="Button.account-row TextBlock.row-label">
+            <Setter Property="FontSize" Value="16" />
+            <Setter Property="VerticalAlignment" Value="Center" />
+        </Style>
+        <Style Selector="Button.account-row TextBlock.row-status">
+            <Setter Property="FontSize" Value="13" />
+            <Setter Property="Foreground" Value="{DynamicResource SecondaryTextBrush}" />
+            <Setter Property="TextWrapping" Value="Wrap" />
+            <Setter Property="Margin" Value="0,2,0,0" />
+        </Style>
+        <Style Selector="Button.account-row.danger PathIcon">
+            <Setter Property="Foreground" Value="{DynamicResource AccountDangerBrush}" />
+        </Style>
+        <Style Selector="Button.account-row.danger TextBlock.row-label">
+            <Setter Property="Foreground" Value="{DynamicResource AccountDangerBrush}" />
+        </Style>
+        <Style Selector="Button.account-row:disabled">
+            <Setter Property="Opacity" Value="0.45" />
+        </Style>
+        <!-- Hairline between rows, starting under the label (16 + 22 + 14). -->
+        <Style Selector="Border.row-separator">
+            <Setter Property="Height" Value="1" />
+            <Setter Property="Margin" Value="52,0,0,0" />
+            <Setter Property="Background" Value="#1F808080" />
+        </Style>
+        <!-- An inline "are you sure?" under its row. -->
+        <Style Selector="StackPanel.confirm">
+            <Setter Property="Margin" Value="52,0,16,14" />
+            <Setter Property="Spacing" Value="10" />
+        </Style>
+        <Style Selector="Button.pill.danger">
+            <Setter Property="Background" Value="{DynamicResource AccountDangerBrush}" />
+            <Setter Property="Foreground" Value="White" />
+        </Style>
+
+        <!-- The header's picture: a 96 dp circle. -->
+        <Style Selector="Border.avatar">
+            <Setter Property="Width" Value="96" />
+            <Setter Property="Height" Value="96" />
+            <Setter Property="CornerRadius" Value="48" />
+            <Setter Property="ClipToBounds" Value="True" />
+            <Setter Property="HorizontalAlignment" Value="Center" />
+            <Setter Property="Background" Value="{DynamicResource AccentColorBrush}" />
         </Style>
     </UserControl.Styles>
 
@@ -65,42 +137,90 @@
                 </Border>
 
                 <TextBlock Name="StatusLabel" Classes="subtle" Text="{Binding StatusText}" IsVisible="{Binding IsBusy}" />
-                <TextBlock Name="ErrorLabel" Foreground="#E74856" TextWrapping="Wrap" Text="{Binding ErrorText}" IsVisible="{Binding HasError}" />
+                <TextBlock Name="ErrorLabel" Foreground="{DynamicResource AccountDangerBrush}" TextWrapping="Wrap"
+                           Text="{Binding ErrorText}" IsVisible="{Binding HasError}" />
 
                 <!-- Signed in. -->
                 <StackPanel Name="SignedInPanel" Spacing="14" IsVisible="{Binding IsSignedIn}">
-                    <Border Classes="settings-card">
-                        <StackPanel Spacing="4">
-                            <TextBlock Name="AccountLabel" Classes="row-title" Text="{Binding AccountText}" />
-                            <TextBlock Name="LastSyncLabel" Classes="subtle" Text="{Binding LastSyncText}" />
+
+                    <!-- Who: the desktop's profile picture (else initials on the accent), the name,
+                         the PC and the last sync. -->
+                    <Border Name="AccountHeader" Classes="settings-card" Padding="20,24,20,20">
+                        <StackPanel Spacing="4" HorizontalAlignment="Center">
+                            <Border Name="AvatarCircle" Classes="avatar" Margin="0,0,0,10">
+                                <Panel>
+                                    <TextBlock Name="AvatarInitials" Text="{Binding Initials}" IsVisible="{Binding ShowInitials}"
+                                               FontSize="34" FontWeight="SemiBold" Foreground="{DynamicResource AccentForegroundBrush}"
+                                               HorizontalAlignment="Center" VerticalAlignment="Center" />
+                                    <PathIcon Name="AvatarGlyph" Data="{DynamicResource PersonIcon}" IsVisible="{Binding ShowPersonGlyph}"
+                                              Width="44" Height="44" Foreground="{DynamicResource AccentForegroundBrush}" />
+                                    <controls:CachedImage Name="AvatarImage" SourcePath="{Binding AvatarPath}" IsVisible="{Binding HasAvatar}"
+                                                          DecodeWidth="384" Stretch="UniformToFill" />
+                                </Panel>
+                            </Border>
+                            <TextBlock Name="AccountNameLabel" Text="{Binding DisplayName}" FontSize="22" FontWeight="Bold"
+                                       HorizontalAlignment="Center" TextTrimming="CharacterEllipsis" />
+                            <TextBlock Name="AccountLabel" Classes="subtle" FontSize="14" Text="{Binding ServerText}"
+                                       HorizontalAlignment="Center" TextTrimming="CharacterEllipsis" />
+                            <TextBlock Name="LastSyncLabel" Classes="subtle" Text="{Binding LastSyncText}" HorizontalAlignment="Center" />
                         </StackPanel>
                     </Border>
 
-                    <Border Classes="settings-card" IsVisible="{Binding CanUseServer}">
-                        <Grid ColumnDefinitions="Auto,*">
-                            <Button Name="SyncNowButton" Classes="pill" Content="Sync now"
-                                    Command="{Binding SyncNowCommand}" IsEnabled="{Binding CanSync}" />
-                            <TextBlock Grid.Column="1" Name="SyncLabel" Classes="subtle" Margin="10,0,0,0" VerticalAlignment="Center"
-                                       TextWrapping="Wrap" Text="{Binding SyncText}" />
-                        </Grid>
-                    </Border>
+                    <!-- Library on this phone. -->
+                    <Border Classes="row-card">
+                        <StackPanel>
+                            <StackPanel IsVisible="{Binding CanUseServer}">
+                                <Button Name="SyncNowButton" Classes="row account-row" Command="{Binding SyncNowCommand}"
+                                        IsEnabled="{Binding CanSync}" AutomationProperties.Name="Sync now">
+                                    <Grid ColumnDefinitions="Auto,*">
+                                        <PathIcon Classes="row-icon" Data="{DynamicResource SyncIcon}" />
+                                        <StackPanel Grid.Column="1" VerticalAlignment="Center">
+                                            <TextBlock Classes="row-label" Text="Sync now" />
+                                            <TextBlock Name="SyncLabel" Classes="row-status" Text="{Binding SyncText}"
+                                                       IsVisible="{Binding SyncText, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
+                                        </StackPanel>
+                                    </Grid>
+                                </Button>
+                                <Border Classes="row-separator" />
+                            </StackPanel>
 
-                    <Border Classes="settings-card">
-                        <StackPanel Spacing="8">
-                            <TextBlock Name="StorageLabel" Text="{Binding StorageText}" />
-                            <Grid ColumnDefinitions="Auto,*" IsVisible="{Binding CanUseServer}">
-                                <Button Name="DownloadAllButton" Classes="pill" Content="Download everything"
-                                        Command="{Binding DownloadAllCommand}" IsEnabled="{Binding CanDownload}" />
-                                <TextBlock Grid.Column="1" Name="DownloadLabel" Classes="subtle" Margin="10,0,0,0" VerticalAlignment="Center"
-                                           TextWrapping="Wrap" Text="{Binding DownloadText}" />
+                            <!-- Not a button: nothing to open, the row only reports. -->
+                            <Grid Name="StorageRow" ColumnDefinitions="Auto,*,Auto" MinHeight="56" Margin="16,0"
+                                  AutomationProperties.Name="{Binding StorageText}">
+                                <PathIcon Data="{DynamicResource FolderIcon}" Width="22" Height="22" Margin="0,0,14,0" VerticalAlignment="Center" />
+                                <TextBlock Grid.Column="1" Text="Downloaded" FontSize="16" VerticalAlignment="Center" />
+                                <TextBlock Grid.Column="2" Name="StorageLabel" Classes="subtle" FontSize="14" Margin="8,0,0,0"
+                                           VerticalAlignment="Center" Text="{Binding StorageValue}" />
                             </Grid>
-                            <Button Name="RemoveDownloadsButton" Classes="pill" Content="Remove all downloads"
-                                    Command="{Binding AskRemoveDownloadsCommand}" IsVisible="{Binding !IsConfirmingRemoveDownloads}" />
-                            <StackPanel Name="RemoveDownloadsConfirm" Spacing="8" IsVisible="{Binding IsConfirmingRemoveDownloads}">
+
+                            <StackPanel IsVisible="{Binding CanUseServer}">
+                                <Border Classes="row-separator" />
+                                <Button Name="DownloadAllButton" Classes="row account-row" Command="{Binding DownloadAllCommand}"
+                                        IsEnabled="{Binding CanDownload}" AutomationProperties.Name="Download everything">
+                                    <Grid ColumnDefinitions="Auto,*">
+                                        <PathIcon Classes="row-icon" Data="{DynamicResource PhDownload}" />
+                                        <StackPanel Grid.Column="1" VerticalAlignment="Center">
+                                            <TextBlock Classes="row-label" Text="Download everything" />
+                                            <TextBlock Name="DownloadLabel" Classes="row-status" Text="{Binding DownloadText}"
+                                                       IsVisible="{Binding DownloadText, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
+                                        </StackPanel>
+                                    </Grid>
+                                </Button>
+                            </StackPanel>
+
+                            <Border Classes="row-separator" />
+                            <Button Name="RemoveDownloadsButton" Classes="row account-row danger" Command="{Binding AskRemoveDownloadsCommand}"
+                                    IsEnabled="{Binding !IsConfirmingRemoveDownloads}" AutomationProperties.Name="Remove all downloads">
+                                <Grid ColumnDefinitions="Auto,*">
+                                    <PathIcon Classes="row-icon" Data="{DynamicResource PhTrash}" />
+                                    <TextBlock Grid.Column="1" Classes="row-label" Text="Remove all downloads" />
+                                </Grid>
+                            </Button>
+                            <StackPanel Name="RemoveDownloadsConfirm" Classes="confirm" IsVisible="{Binding IsConfirmingRemoveDownloads}">
                                 <TextBlock TextWrapping="Wrap"
                                            Text="Remove every downloaded song from this phone? They stay on your computer and still stream." />
                                 <StackPanel Orientation="Horizontal" Spacing="8">
-                                    <Button Name="ConfirmRemoveDownloadsButton" Classes="pill-accent" Content="Remove"
+                                    <Button Name="ConfirmRemoveDownloadsButton" Classes="pill danger" Content="Remove"
                                             Command="{Binding ConfirmRemoveDownloadsCommand}" />
                                     <Button Classes="pill" Content="Cancel" Command="{Binding CancelRemoveDownloadsCommand}" />
                                 </StackPanel>
@@ -108,17 +228,24 @@
                         </StackPanel>
                     </Border>
 
-                    <Border Classes="settings-card">
-                        <StackPanel Spacing="8">
-                            <Button Name="SignOutButton" Classes="pill" Content="Sign out"
-                                    Command="{Binding AskSignOutCommand}" IsVisible="{Binding !IsConfirmingSignOut}" IsEnabled="{Binding IsIdle}" />
-                            <StackPanel Name="SignOutConfirm" Spacing="8" IsVisible="{Binding IsConfirmingSignOut}">
+                    <!-- Leaving: its own card, away from the everyday actions. -->
+                    <Border Classes="row-card">
+                        <StackPanel>
+                            <Button Name="SignOutButton" Classes="row account-row danger" Command="{Binding AskSignOutCommand}"
+                                    IsEnabled="{Binding IsIdle}" IsVisible="{Binding !IsConfirmingSignOut}"
+                                    AutomationProperties.Name="Sign out">
+                                <Grid ColumnDefinitions="Auto,*">
+                                    <PathIcon Classes="row-icon" Data="{StaticResource AccountSignOutIcon}" />
+                                    <TextBlock Grid.Column="1" Classes="row-label" Text="Sign out" />
+                                </Grid>
+                            </Button>
+                            <StackPanel Name="SignOutConfirm" Spacing="10" Margin="16,14" IsVisible="{Binding IsConfirmingSignOut}">
                                 <TextBlock TextWrapping="Wrap"
                                            Text="Sign out of your Noctis desktop? Its songs leave this phone's library." />
                                 <CheckBox Name="AlsoRemoveDownloadsBox" Content="Also delete downloaded songs from this phone"
                                           IsChecked="{Binding AlsoRemoveDownloads}" />
                                 <StackPanel Orientation="Horizontal" Spacing="8">
-                                    <Button Name="ConfirmSignOutButton" Classes="pill-accent" Content="Sign out"
+                                    <Button Name="ConfirmSignOutButton" Classes="pill danger" Content="Sign out"
                                             Command="{Binding ConfirmSignOutCommand}" />
                                     <Button Classes="pill" Content="Cancel" Command="{Binding CancelSignOutCommand}" />
                                 </StackPanel>

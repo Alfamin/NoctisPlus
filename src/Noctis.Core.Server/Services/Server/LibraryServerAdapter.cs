@@ -19,19 +19,25 @@ public sealed class LibraryServerAdapter : IServerLibrary
     private readonly IPlayHistoryService _playHistory;
     private readonly Func<Task>? _playlistsChanged;
     private readonly Func<Func<Task>, Task> _marshal;
+    private readonly Func<string?>? _avatarPath;
 
     /// <param name="marshal">
     /// Runs a library mutation on the thread that owns the library. Null serialises
     /// mutations through a lock, which is right for a host with no UI thread.
     /// </param>
+    /// <param name="avatarPath">
+    /// The current profile picture's path (the desktop's AppSettings.ProfileAvatarPath), read
+    /// per request so a new picture is served at once. Null (the headless host): no avatar.
+    /// </param>
     public LibraryServerAdapter(ILibraryService library, IPersistenceService persistence, IPlayHistoryService playHistory,
-        Func<Task>? playlistsChanged = null, Func<Func<Task>, Task>? marshal = null)
+        Func<Task>? playlistsChanged = null, Func<Func<Task>, Task>? marshal = null, Func<string?>? avatarPath = null)
     {
         _library = library;
         _persistence = persistence;
         _playHistory = playHistory;
         _playlistsChanged = playlistsChanged;
         _marshal = marshal ?? SerialisingMarshaller();
+        _avatarPath = avatarPath;
     }
 
     /// <summary>One mutation at a time, on whatever thread called; for hosts without a UI thread.</summary>
@@ -70,6 +76,12 @@ public sealed class LibraryServerAdapter : IServerLibrary
     public string? ArtworkPath(Guid albumId)
     {
         var path = _persistence.GetArtworkPath(albumId);
+        return !string.IsNullOrEmpty(path) && File.Exists(path) ? path : null;
+    }
+
+    public string? AvatarPath(string userName)
+    {
+        var path = _avatarPath?.Invoke();
         return !string.IsNullOrEmpty(path) && File.Exists(path) ? path : null;
     }
 

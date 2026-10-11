@@ -75,7 +75,12 @@ public interface INoctisAccountService
     bool IsSignedIn { get; }
     bool IsSyncing { get; }
 
-    /// <summary>Raised (any thread) when Account, IsSyncing or download state changes.</summary>
+    /// <summary>The desktop's profile picture as a local file (fetched at sign-in and on each sync,
+    /// kept across restarts), or null: signed out, or the desktop has none. A new picture gets a
+    /// new path (image caches key by path).</summary>
+    string? AvatarPath { get; }
+
+    /// <summary>Raised (any thread) when Account, IsSyncing, AvatarPath or download state changes.</summary>
     event EventHandler? StateChanged;
     event EventHandler<NoctisSyncProgress>? SyncProgress;
     event EventHandler<NoctisDownloadProgress>? DownloadProgress;

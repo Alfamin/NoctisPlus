@@ -1152,7 +1152,10 @@ public partial class SettingsViewModel : ViewModelBase
                 // threads hop onto the dispatcher (the headless host serialises instead).
                 var adapter = new LibraryServerAdapter(_library, _persistence, _playHistory,
                     () => App.Services?.GetService<MainWindowViewModel>()?.Sidebar.LoadPlaylistsAsync() ?? Task.CompletedTask,
-                    marshal: work => Dispatcher.UIThread.CheckAccess() ? work() : Dispatcher.UIThread.InvokeAsync(work));
+                    marshal: work => Dispatcher.UIThread.CheckAccess() ? work() : Dispatcher.UIThread.InvokeAsync(work),
+                    // getAvatar: the profile picture, so a signed-in phone shows the same face
+                    // (one reference read per request, safe off the UI thread).
+                    avatarPath: () => ProfileAvatarPath);
                 // Covers shrink to what the phone asks for (cached under server/covers); the
                 // desktop's server is for the home network, so other addresses get a 403.
                 var covers = new ServerCoverResizer(Path.Combine(ServerDataDirectory, "covers"));

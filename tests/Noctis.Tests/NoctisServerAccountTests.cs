@@ -363,6 +363,68 @@ public class NoctisServerAccountTests : IAsyncLifetime
         Assert.Equal(70, ErrorCode(Envelope(await refused.Content.ReadAsStringAsync(TestContext.Current.CancellationToken))));
     }
 
+    private async Task<HttpResponseMessage> Avatar(string? key, string query = "")
+    {
+        var req = new HttpRequestMessage(HttpMethod.Get, $"rest/getAvatar.view?f=json{query}");
+        if (key is not null) req.Headers.Add(NoctisServer.KeyHeader, key);
+        return await _http.SendAsync(req, TestContext.Current.CancellationToken);
+    }
+
+    [Fact]
+    public async Task GetAvatar_ServesTheProfilePicture_ToItsOwnAccount()
+    {
+        var picture = Path.Combine(_dir, "avatar-20261011.png");
+        var bytes = new byte[] { 0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A, 1, 2, 3 };
+        File.WriteAllBytes(picture, bytes);
+        _lib.Avatar = picture;
+        var key = await SignInKey();
+
+        foreach (var query in new[] { "&username=alice", "&username=ALICE", "" })
+        {
+            var res = await Avatar(key, query);
+            Assert.Equal(HttpStatusCode.OK, res.StatusCode);
+            Assert.Equal("image/png", res.Content.Headers.ContentType!.MediaType);
+            Assert.Equal(bytes, await res.Content.ReadAsByteArrayAsync(TestContext.Current.CancellationToken));
+            Assert.True(res.Headers.CacheControl?.NoCache); // a new pick must reach the phone at once
+        }
+        lock (_lib.AvatarAsks) Assert.All(_lib.AvatarAsks, name => Assert.Equal("alice", name));
+
+        // .bmp is one of the desktop picker's types: served as a picture, not refused.
+        var bmp = Path.Combine(_dir, "avatar-1.bmp");
+        File.WriteAllBytes(bmp, new byte[] { 0x42, 0x4D, 1, 2 });
+        _lib.Avatar = bmp;
+        Assert.Equal("image/bmp", (await Avatar(key)).Content.Headers.ContentType!.MediaType);
+    }
+
+    [Fact]
+    public async Task GetAvatar_NoPicture_AnotherAccount_OrNotAPicture_Is70_AndNeedsAuth()
+    {
+        var key = await SignInKey();
+        async Task<int> Code(HttpResponseMessage res) =>
+            ErrorCode(Envelope(await res.Content.ReadAsStringAsync(TestContext.Current.CancellationToken)));
+
+        _lib.Avatar = null;
+        Assert.Equal(70, await Code(await Avatar(key, "&username=alice")));
+
+        var picture = Path.Combine(_dir, "avatar-2.jpg");
+        File.WriteAllBytes(picture, new byte[] { 0xFF, 0xD8, 0xFF, 0xE0 });
+        _lib.Avatar = picture;
+        // Another account's name never gets this account's (the owner's) picture.
+        Assert.Equal(70, await Code(await Avatar(key, "&username=bob")));
+        // The setting can name any file: anything but a picture is refused.
+        var notAPicture = Path.Combine(_dir, "notes.txt");
+        File.WriteAllText(notAPicture, "secret");
+        _lib.Avatar = notAPicture;
+        Assert.Equal(70, await Code(await Avatar(key)));
+
+        // Same auth as every other method: no key, no picture.
+        _lib.Avatar = picture;
+        var anonymous = Envelope(await (await Avatar(null)).Content.ReadAsStringAsync(TestContext.Current.CancellationToken));
+        Assert.Equal("failed", anonymous.GetProperty("status").GetString());
+        var badKey = Envelope(await (await Avatar("nk_not-a-key")).Content.ReadAsStringAsync(TestContext.Current.CancellationToken));
+        Assert.Equal(40, ErrorCode(badKey));
+    }
+
     [Fact]
     public async Task CoverResizer_RefusesOversizedSources()
     {
@@ -422,6 +484,10 @@ public class NoctisServerAccountTests : IAsyncLifetime
 
         public Task<LibrarySnapshot> SnapshotAsync() => Task.FromResult(new LibrarySnapshot(Tracks.ToList(), new List<Album> { _album }, new List<Artist> { new() { Id = Guid.NewGuid(), Name = "X" } }, new List<Playlist>()));
         public string? ArtworkPath(Guid albumId) => albumId == _album.Id ? _cover : null;
+        /// <summary>The desktop's profile picture; null = none.</summary>
+        public string? Avatar { get; set; }
+        public List<string> AvatarAsks { get; } = new();
+        public string? AvatarPath(string userName) { lock (AvatarAsks) AvatarAsks.Add(userName); return Avatar; }
         public Task SetStarredAsync(IReadOnlyList<Guid> trackIds, IReadOnlyList<Guid> albumIds, IReadOnlyList<Guid> artistIds, bool starred) => Task.CompletedTask;
         public Task ScrobbleAsync(Guid trackId) => ScrobbleAsync(trackId, DateTime.UtcNow);
         public Task ScrobbleAsync(Guid trackId, DateTime playedUtc) { lock (Scrobbles) Scrobbles.Add((trackId, playedUtc)); return Task.CompletedTask; }
