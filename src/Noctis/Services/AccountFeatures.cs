@@ -11,5 +11,5 @@ namespace Noctis.Services;
 /// </summary>
 public static class AccountFeatures
 {
-    public static readonly bool Enabled = false;
+    public static readonly bool Enabled = true;
 }

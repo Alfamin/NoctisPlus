@@ -8,11 +8,11 @@ using Xunit;
 namespace Noctis.Tests;
 
 /// <summary>
-/// v1.5.8 ships the account and sync cards as Coming soon (<see cref="AccountFeatures"/> off):
-/// a SyncEnabled flag or an account left by an earlier test build activates nothing, and no
-/// command can create an account or turn sync on.
+/// The account and sync cards are live (<see cref="AccountFeatures"/> on, owner 10-11, to test
+/// desktop-to-phone sync): the stored SyncEnabled flag is honoured, the toggle turns sync on and
+/// saves it, and Create account makes the primary account in the server's user store.
 /// </summary>
-public class AccountFeaturesParkedTests : IDisposable
+public class AccountFeaturesEnabledTests : IDisposable
 {
     private readonly string _root =
         Path.Combine(Path.GetTempPath(), "NoctisTests", Guid.NewGuid().ToString("N"));
@@ -33,42 +33,42 @@ public class AccountFeaturesParkedTests : IDisposable
     }
 
     [Fact]
-    public void Switch_IsOffForThisRelease() => Assert.False(AccountFeatures.Enabled);
+    public void Switch_IsOn() => Assert.True(AccountFeatures.Enabled);
 
     [AvaloniaFact]
-    public async Task StoredSyncFlag_StaysOff_AndNothingTurnsItOn()
+    public async Task StoredSyncFlag_IsHonoured_AndTheToggleSavesIt()
     {
         var persistence = new PersistenceService(_root);
         await persistence.SaveSettingsAsync(new AppSettings { SyncEnabled = true });
 
         var vm = new SettingsViewModel(persistence, new FakeLibraryService(), new NoOpPlayHistoryService());
         await vm.LoadAsync();
-        Assert.False(vm.AccountFeaturesEnabled);
-        Assert.False(vm.SyncEnabled);
+        Assert.True(vm.AccountFeaturesEnabled);
+        Assert.True(vm.SyncEnabled);
 
-        vm.SyncEnabled = true; // the toggle, or TogglePairing's "sync on"
-        Assert.False(vm.SyncEnabled);
-        Assert.False(vm.TogglePairingCommand.CanExecute(null));
+        vm.SyncEnabled = false;
+        await vm.SaveAsync();
+        Assert.False((await persistence.LoadSettingsAsync()).SyncEnabled);
 
-        // The stored flag is left for a build that ships the feature; it activates nothing here.
+        vm.SyncEnabled = true;
         await vm.SaveAsync();
         Assert.True((await persistence.LoadSettingsAsync()).SyncEnabled);
     }
 
     [AvaloniaFact]
-    public async Task CreateAccount_CannotExecute_AndCreatesNothing()
+    public async Task CreateAccount_MakesThePrimaryAccount()
     {
         var persistence = new PersistenceService(_root);
         var vm = new SettingsViewModel(persistence, new FakeLibraryService(), new NoOpPlayHistoryService());
         await vm.LoadAsync();
 
-        Assert.False(vm.CreatePrimaryAccountCommand.CanExecute(null));
-        Assert.False(vm.AddServerUserCommand.CanExecute(null));
-
+        Assert.True(vm.CreatePrimaryAccountCommand.CanExecute(null));
         vm.NewServerUserName = "me@example.com";
         vm.NewServerUserPassword = "correct horse";
-        vm.CreatePrimaryAccountCommand.Execute(null); // Execute does not consult CanExecute
-        Assert.False(vm.HasPrimaryAccount);
-        Assert.Empty(new ServerUserStore(Path.Combine(persistence.DataDirectory, "server", "users.db")).List());
+        vm.CreatePrimaryAccountCommand.Execute(null);
+
+        Assert.True(vm.HasPrimaryAccount);
+        var user = Assert.Single(new ServerUserStore(Path.Combine(persistence.DataDirectory, "server", "users.db")).List());
+        Assert.Equal("me@example.com", user.Name);
     }
 }
