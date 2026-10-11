@@ -227,7 +227,7 @@ public class MobileSettingsTests
         });
         var window = MobileFixtures.Mount(rig.Shell, out var view);
 
-        var profile = MobileFixtures.Named<Button>(view, "LibraryProfileButton");
+        var profile = MobileFixtures.Named<Button>(view, "ProfileButtonRoot");   // Library's header ProfileButton
         profile.Command!.Execute(profile.CommandParameter);
         await ((SettingsPageViewModel)rig.Shell.CurrentPage!).Loaded;
         window.UpdateLayout();

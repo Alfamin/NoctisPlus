@@ -277,10 +277,11 @@
                         </Button>
                     </StackPanel>
                 </controls:GlassPanel>
+                <!-- The one profile button in the app: the desktop account's picture once signed in. -->
                 <controls:GlassPanel Name="LibraryProfileGlass" Classes="header-glass">
-                    <Button Name="LibraryProfileButton" Classes="glass-round" Command="{Binding OpenSettingsCommand}">
-                        <PathIcon Data="{DynamicResource PhPerson}" />
-                    </Button>
+                    <views:ProfileButton Name="LibraryProfile" AvatarPath="{Binding ProfileAvatarPath}"
+                                         Command="{Binding OpenSettingsCommand}"
+                                         HorizontalAlignment="Center" VerticalAlignment="Center" />
                 </controls:GlassPanel>
             </StackPanel>
             <Button Grid.Column="1" Name="LibraryEditDoneButton" Classes="edit-done" Command="{Binding LibraryRows.DoneCommand}">
