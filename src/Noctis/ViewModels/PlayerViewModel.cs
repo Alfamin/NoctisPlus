@@ -472,8 +472,16 @@ public partial class PlayerViewModel : ViewModelBase
     [ObservableProperty] private bool _isLyricsPlainActive;
     [ObservableProperty] private bool _isLyricsSyncedAvailable;
     [ObservableProperty] private bool _canShareLyrics;
-    /// <summary>The lyrics page shows synced online lyrics of a local file (GitHub #115).</summary>
-    [ObservableProperty] private bool _canSaveLyricsToFile;
+    /// <summary>The lyrics page shows synced online lyrics of a local file (GitHub #115): Save Lyrics to File ▸ LRC.</summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(HasSaveLyricsMenu))]
+    private bool _canSaveLyricsToFile;
+    /// <summary>The lyrics page shows time-synced lyrics a .ttml can be made of: Save Lyrics to File ▸ TTML.</summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(HasSaveLyricsMenu))]
+    private bool _canSaveLyricsAsTtml;
+    /// <summary>Shows the Save Lyrics to File submenu: one of its formats can be saved.</summary>
+    public bool HasSaveLyricsMenu => CanSaveLyricsToFile || CanSaveLyricsAsTtml;
 
     /// <summary>
     /// Path to the current track's artwork file (or null if none).
@@ -493,6 +501,7 @@ public partial class PlayerViewModel : ViewModelBase
     private Action? _removeLyrics;
     private Action? _shareLyrics;
     private Action? _saveLyrics;
+    private Action? _saveLyricsTtml;
 
     /// <summary>Also the play/pause button's accessible name (AccessibleNames), so localized.</summary>
     public string PlayPauseTooltip => Localization.Loc.T(State == PlaybackState.Playing ? "PlaybackBar.Pause" : "PlaybackBar.Play");
@@ -1181,6 +1190,9 @@ public partial class PlayerViewModel : ViewModelBase
     [RelayCommand]
     private void SaveCurrentTrackLyrics() => _saveLyrics?.Invoke();
 
+    [RelayCommand]
+    private void SaveCurrentTrackLyricsAsTtml() => _saveLyricsTtml?.Invoke();
+
     /// <summary>
     /// Called by MainWindowViewModel when the lyrics view becomes the current view.
     /// Wires the three pass-through commands and seeds the active-state flags.
@@ -1196,7 +1208,9 @@ public partial class PlayerViewModel : ViewModelBase
         bool isSyncedAvailable,
         bool canShare,
         Action? saveLyrics = null,
-        bool canSaveLyrics = false)
+        bool canSaveLyrics = false,
+        Action? saveLyricsTtml = null,
+        bool canSaveLyricsTtml = false)
     {
         _selectLyricsSynced = selectSynced;
         _selectLyricsPlain = selectPlain;
@@ -1204,11 +1218,13 @@ public partial class PlayerViewModel : ViewModelBase
         _removeLyrics = removeLyrics;
         _shareLyrics = shareLyrics;
         _saveLyrics = saveLyrics;
+        _saveLyricsTtml = saveLyricsTtml;
         IsLyricsSyncedActive = isSyncedActive;
         IsLyricsPlainActive = isPlainActive;
         IsLyricsSyncedAvailable = isSyncedAvailable;
         CanShareLyrics = canShare;
         CanSaveLyricsToFile = canSaveLyrics;
+        CanSaveLyricsAsTtml = canSaveLyricsTtml;
         IsLyricsPageActive = true;
     }
 
@@ -1223,25 +1239,29 @@ public partial class PlayerViewModel : ViewModelBase
         _removeLyrics = null;
         _shareLyrics = null;
         _saveLyrics = null;
+        _saveLyricsTtml = null;
         IsLyricsPageActive = false;
         IsLyricsSyncedActive = false;
         IsLyricsPlainActive = false;
         IsLyricsSyncedAvailable = false;
         CanShareLyrics = false;
         CanSaveLyricsToFile = false;
+        CanSaveLyricsAsTtml = false;
     }
 
     /// <summary>
     /// Called by MainWindowViewModel whenever the lyrics view's Synced/Plain selection
     /// or synced-availability changes, to keep the menu's checkmarks accurate.
     /// </summary>
-    public void UpdateLyricsPageState(bool isSyncedActive, bool isPlainActive, bool isSyncedAvailable, bool canShare, bool canSaveLyrics = false)
+    public void UpdateLyricsPageState(bool isSyncedActive, bool isPlainActive, bool isSyncedAvailable, bool canShare, bool canSaveLyrics = false,
+        bool canSaveLyricsTtml = false)
     {
         IsLyricsSyncedActive = isSyncedActive;
         IsLyricsPlainActive = isPlainActive;
         IsLyricsSyncedAvailable = isSyncedAvailable;
         CanShareLyrics = canShare;
         CanSaveLyricsToFile = canSaveLyrics;
+        CanSaveLyricsAsTtml = canSaveLyricsTtml;
     }
 
     /// <summary>Sets the sidebar ViewModel for playlist access.</summary>
