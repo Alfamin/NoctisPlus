@@ -1,6 +1,39 @@
 {
   "releases": [
     {
+      "tag": "v1.6.2",
+      "version": "1.6.2",
+      "name": "v1.6.2",
+      "publishedAt": "2026-10-11T04:48:02Z",
+      "url": "https://github.com/heartached/Noctis/releases/tag/v1.6.2",
+      "prerelease": false,
+      "sections": [
+        {
+          "title": "New Features",
+          "items": [
+            "Added setting to turn off accent color on artist and album names",
+            "Added whole-selection drag in playlists"
+          ]
+        },
+        {
+          "title": "Improvements",
+          "items": [
+            "Improved drag card to show a song count when carrying multiple songs"
+          ]
+        },
+        {
+          "title": "Bug Fixes",
+          "items": [
+            "Fixed YouTube search and download failing until restart after installer updates",
+            "Fixed dragging several selected playlist songs moving only one",
+            "Fixed rows staying highlighted after selection was cleared",
+            "Fixed incorrect \"game cover\" wording in accent translations",
+            "Fixed Arabic and Chinese accent translations using the wrong meaning"
+          ]
+        }
+      ]
+    },
+    {
       "tag": "v1.6.1",
       "version": "1.6.1",
       "name": "v1.6.1",
@@ -3293,6 +3326,6 @@
       "sections": []
     }
   ],
-  "updatedAt": "2026-10-11T02:19:00.832Z",
+  "updatedAt": "2026-10-11T04:48:17.031Z",
   "degraded": false
 }
