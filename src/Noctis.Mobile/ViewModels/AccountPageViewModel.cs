@@ -155,7 +155,7 @@ public sealed partial class AccountPageViewModel : MobilePage
         }
         if (UserName.Trim().Length == 0 || Password.Length == 0)
         {
-            ErrorText = "Enter your account name and password.";
+            ErrorText = "Enter your email or username and your password.";
             return;
         }
         ServerAddress = url;
@@ -392,7 +392,7 @@ public sealed partial class AccountPageViewModel : MobilePage
         NoctisErrorKind.CertificateChanged => signedIn
             ? "Your computer's certificate changed. Sign out and sign in again to trust the new one."
             : "Your computer's certificate changed while signing in. Try again and check the fingerprint.",
-        NoctisErrorKind.BadCredentials => "Wrong account name or password.",
+        NoctisErrorKind.BadCredentials => "Wrong email, username or password.",
         NoctisErrorKind.LockedOut => "Too many failed sign-ins. Wait a few minutes, then try again.",
         NoctisErrorKind.SyncDisabled => "Turn on Sync on your computer (Settings → Account & Devices).",
         NoctisErrorKind.SignedOut => "This phone was removed on your computer. Sign in again.",

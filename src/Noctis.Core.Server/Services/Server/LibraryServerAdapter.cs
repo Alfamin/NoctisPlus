@@ -20,6 +20,7 @@ public sealed class LibraryServerAdapter : IServerLibrary
     private readonly Func<Task>? _playlistsChanged;
     private readonly Func<Func<Task>, Task> _marshal;
     private readonly Func<string?>? _avatarPath;
+    private readonly Func<string?>? _profileName;
 
     /// <param name="marshal">
     /// Runs a library mutation on the thread that owns the library. Null serialises
@@ -30,7 +31,8 @@ public sealed class LibraryServerAdapter : IServerLibrary
     /// per request so a new picture is served at once. Null (the headless host): no avatar.
     /// </param>
     public LibraryServerAdapter(ILibraryService library, IPersistenceService persistence, IPlayHistoryService playHistory,
-        Func<Task>? playlistsChanged = null, Func<Func<Task>, Task>? marshal = null, Func<string?>? avatarPath = null)
+        Func<Task>? playlistsChanged = null, Func<Func<Task>, Task>? marshal = null, Func<string?>? avatarPath = null,
+        Func<string?>? profileName = null)
     {
         _library = library;
         _persistence = persistence;
@@ -38,6 +40,7 @@ public sealed class LibraryServerAdapter : IServerLibrary
         _playlistsChanged = playlistsChanged;
         _marshal = marshal ?? SerialisingMarshaller();
         _avatarPath = avatarPath;
+        _profileName = profileName;
     }
 
     /// <summary>One mutation at a time, on whatever thread called; for hosts without a UI thread.</summary>
@@ -78,6 +81,8 @@ public sealed class LibraryServerAdapter : IServerLibrary
         var path = _persistence.GetArtworkPath(albumId);
         return !string.IsNullOrEmpty(path) && File.Exists(path) ? path : null;
     }
+
+    public string? ProfileName => _profileName?.Invoke();
 
     public string? AvatarPath(string userName)
     {

@@ -282,6 +282,23 @@ public sealed partial class NoctisServer : IAsyncDisposable
 
     // ── Auth ────────────────────────────────────────────────────────────────
 
+    /// <summary>
+    /// The account a sign-in name means: an account's own name (its email, any case), or the
+    /// desktop's profile name ("Username" in Settings), which stands for the main account (the
+    /// admin, else the first). Anything else is passed on unchanged and fails in Verify, which
+    /// takes the same time either way.
+    /// </summary>
+    internal string ResolveSignInName(string name)
+    {
+        var typed = name.Trim();
+        var users = _users.List();
+        // The stored spelling, so the phone keeps the account's own name whatever case was typed.
+        if (users.FirstOrDefault(x => string.Equals(x.Name, typed, StringComparison.OrdinalIgnoreCase)) is { } match) return match.Name;
+        var profile = _library.ProfileName?.Trim();
+        if (string.IsNullOrEmpty(profile) || !string.Equals(profile, typed, StringComparison.OrdinalIgnoreCase)) return typed;
+        return (users.FirstOrDefault(x => x.IsAdmin) ?? users.FirstOrDefault())?.Name ?? typed;
+    }
+
     /// <summary>The requesting user; <c>Device</c> is set when the API key is a signed-in device's key.</summary>
     private (ServerUser? User, ServerDevice? Device, int Error, string Message) Authenticate(Params p, string? apiKey)
     {
@@ -307,7 +324,7 @@ public sealed partial class NoctisServer : IAsyncDisposable
             try { pw = System.Text.Encoding.UTF8.GetString(Convert.FromHexString(pw[4..])); }
             catch (FormatException) { return (null, null, SubsonicResponse.ErrWrongCredentials, "Wrong username or password"); }
         }
-        var user = _users.Verify(u, pw);
+        var user = _users.Verify(ResolveSignInName(u), pw);
         return user is null ? (null, null, SubsonicResponse.ErrWrongCredentials, "Wrong username or password") : (user, null, 0, "");
     }
 

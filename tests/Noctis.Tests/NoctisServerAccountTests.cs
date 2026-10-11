@@ -99,6 +99,44 @@ public class NoctisServerAccountTests : IAsyncLifetime
 
     private static int ErrorCode(JsonElement r) => r.GetProperty("error").GetProperty("code").GetInt32();
 
+    // ── Sign in by email or username (owner 10-11) ──
+
+    [Fact]
+    public async Task SignIn_TheDesktopsProfileName_SignsInToTheMainAccount_AndReturnsItsEmail()
+    {
+        _lib.ProfileName = "notheartached";
+
+        var (r, _) = await SignIn(user: "NotHeartached");          // any case, as a keyboard capitalises it
+
+        Assert.Equal("ok", r.GetProperty("status").GetString());
+        Assert.Equal("alice", r.GetProperty("noctisSignIn").GetProperty("user").GetString());
+    }
+
+    [Fact]
+    public async Task SignIn_TheAccountNameInAnotherCase_ReturnsTheStoredSpelling()
+    {
+        var (r, _) = await SignIn(user: "ALICE");
+        Assert.Equal("alice", r.GetProperty("noctisSignIn").GetProperty("user").GetString());
+    }
+
+    [Fact]
+    public async Task SignIn_TheProfileNameWithAWrongPassword_OrAnUnknownName_IsRefused()
+    {
+        _lib.ProfileName = "notheartached";
+        Assert.Equal(40, ErrorCode((await SignIn(user: "notheartached", password: "wrong password")).Body));
+        Assert.Equal(40, ErrorCode((await SignIn(user: "somebody")).Body));
+    }
+
+    [Fact]
+    public async Task SignIn_AnAccountNamedLikeTheProfile_WinsOverTheAlias()
+    {
+        _users.Create("bob", "another pass");
+        _lib.ProfileName = "bob";                                  // "bob" is a real account: it means that account
+
+        var (r, _) = await SignIn(user: "bob", password: "another pass");
+        Assert.Equal("bob", r.GetProperty("noctisSignIn").GetProperty("user").GetString());
+    }
+
     [Fact]
     public async Task SignIn_IssuesADeviceKey_ThatWorksForGetUserAndStream()
     {
@@ -484,6 +522,7 @@ public class NoctisServerAccountTests : IAsyncLifetime
 
         public Task<LibrarySnapshot> SnapshotAsync() => Task.FromResult(new LibrarySnapshot(Tracks.ToList(), new List<Album> { _album }, new List<Artist> { new() { Id = Guid.NewGuid(), Name = "X" } }, new List<Playlist>()));
         public string? ArtworkPath(Guid albumId) => albumId == _album.Id ? _cover : null;
+        public string? ProfileName { get; set; }
         /// <summary>The desktop's profile picture; null = none.</summary>
         public string? Avatar { get; set; }
         public List<string> AvatarAsks { get; } = new();

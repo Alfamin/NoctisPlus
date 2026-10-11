@@ -276,7 +276,7 @@ public class MobileAccountTests
     [Theory]
     [InlineData(NoctisErrorKind.Unreachable, "Can't reach your computer. Check it's on, Noctis is open, Pair a device is on, and both are on the same Wi-Fi.")]
     [InlineData(NoctisErrorKind.CertificateChanged, "Your computer's certificate changed while signing in. Try again and check the fingerprint.")]
-    [InlineData(NoctisErrorKind.BadCredentials, "Wrong account name or password.")]
+    [InlineData(NoctisErrorKind.BadCredentials, "Wrong email, username or password.")]
     [InlineData(NoctisErrorKind.LockedOut, "Too many failed sign-ins. Wait a few minutes, then try again.")]
     [InlineData(NoctisErrorKind.SyncDisabled, "Turn on Sync on your computer (Settings → Account & Devices).")]
     [InlineData(NoctisErrorKind.SignedOut, "This phone was removed on your computer. Sign in again.")]

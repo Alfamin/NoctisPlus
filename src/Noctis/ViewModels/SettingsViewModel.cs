@@ -1189,7 +1189,9 @@ public partial class SettingsViewModel : ViewModelBase
                     marshal: work => Dispatcher.UIThread.CheckAccess() ? work() : Dispatcher.UIThread.InvokeAsync(work),
                     // getAvatar: the profile picture, so a signed-in phone shows the same face
                     // (one reference read per request, safe off the UI thread).
-                    avatarPath: () => ProfileAvatarPath);
+                    avatarPath: () => ProfileAvatarPath,
+                    // Sign-in by the profile name ("Username"), as well as the account's email.
+                    profileName: () => ProfileName);
                 // Covers shrink to what the phone asks for (cached under server/covers); the
                 // desktop's server is for the home network, so other addresses get a 403.
                 var covers = new ServerCoverResizer(Path.Combine(ServerDataDirectory, "covers"));
