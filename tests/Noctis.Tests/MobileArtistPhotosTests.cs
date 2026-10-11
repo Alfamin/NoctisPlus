@@ -115,7 +115,7 @@ public class MobileArtistPhotosTests
 
         photos.Cached["Bruno Mars"] = "/photos/bruno.jpg";
         rig.Shell.Search.Query = "brun";
-        Assert.Equal("/photos/bruno.jpg", rig.Shell.Search.Artists.Single().ArtworkPath);   // on the phone: at once
+        Assert.Equal("/photos/bruno.jpg", rig.Shell.Search.Featured!.ArtworkPath);   // on the phone: at once (featured: "brun" names them)
     }
 
     [Fact]

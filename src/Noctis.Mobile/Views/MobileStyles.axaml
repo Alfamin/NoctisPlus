@@ -207,6 +207,61 @@
         <Setter Property="Opacity" Value="1" />
         <Setter Property="Margin" Value="7,0,0,0" />
     </Style>
+    <!-- Text chips (Search's scopes): the library chip's shape with a label that always shows. -->
+    <Style Selector="Button.text-chip">
+        <Setter Property="Background" Value="{DynamicResource HomeCardBackground}" />
+        <Setter Property="BorderThickness" Value="0" />
+        <Setter Property="CornerRadius" Value="18" />
+        <Setter Property="Padding" Value="16,0" />
+        <Setter Property="Height" Value="36" />
+        <Setter Property="FontSize" Value="14" />
+        <Setter Property="FontWeight" Value="SemiBold" />
+        <Setter Property="HorizontalContentAlignment" Value="Center" />
+        <Setter Property="VerticalContentAlignment" Value="Center" />
+        <Setter Property="Transitions">
+            <Transitions>
+                <BrushTransition Property="Background" Duration="0:0:0.22" />
+            </Transitions>
+        </Setter>
+    </Style>
+    <Style Selector="Button.text-chip.selected">
+        <Setter Property="Background" Value="{DynamicResource AccentColorBrush}" />
+        <Setter Property="Foreground" Value="{DynamicResource AccentForegroundBrush}" />
+    </Style>
+    <!-- A favourite's heart on a song row, and a page tool that is on (a filter in use). -->
+    <Style Selector="Button.row-heart.on PathIcon, Button.icon.on PathIcon">
+        <Setter Property="Foreground" Value="{DynamicResource AccentTextBrush}" />
+    </Style>
+    <!-- The long-press sheet's quick actions: an icon over a short label, four across. -->
+    <Style Selector="Button.sheet-tile">
+        <Setter Property="Background" Value="{DynamicResource HomeCardBackground}" />
+        <Setter Property="BorderThickness" Value="0" />
+        <Setter Property="CornerRadius" Value="14" />
+        <Setter Property="Padding" Value="4,10" />
+        <Setter Property="Margin" Value="4,0" />
+        <Setter Property="MinHeight" Value="68" />
+        <!-- Fill the grid cell both ways: a two-line label ("Add to Playlist") makes its cell
+             taller, and every tile in the row takes that same height. -->
+        <Setter Property="HorizontalAlignment" Value="Stretch" />
+        <Setter Property="VerticalAlignment" Value="Stretch" />
+        <Setter Property="HorizontalContentAlignment" Value="Center" />
+        <Setter Property="VerticalContentAlignment" Value="Center" />
+    </Style>
+    <Style Selector="Button.sheet-tile PathIcon">
+        <Setter Property="Width" Value="24" />
+        <Setter Property="Height" Value="24" />
+        <Setter Property="HorizontalAlignment" Value="Center" />
+    </Style>
+    <Style Selector="Button.sheet-tile TextBlock">
+        <Setter Property="FontSize" Value="12" />
+        <Setter Property="TextAlignment" Value="Center" />
+        <Setter Property="TextWrapping" Value="Wrap" />
+        <Setter Property="MaxLines" Value="2" />
+        <Setter Property="Margin" Value="0,6,0,0" />
+    </Style>
+    <Style Selector="Button.sheet-tile.on PathIcon">
+        <Setter Property="Foreground" Value="{DynamicResource AccentTextBrush}" />
+    </Style>
 
     <!-- A Library section title: accent icon, title, a small chevron; the whole row opens the list. -->
     <Style Selector="Button.section-header">
@@ -382,7 +437,7 @@
         <Setter Property="Padding" Value="{DynamicResource ShellBottomInset}" />
     </Style>
 
-    <Style Selector="Button.row:pointerover /template/ ContentPresenter#PART_ContentPresenter, Button.row:pressed /template/ ContentPresenter#PART_ContentPresenter, Button.icon:pointerover /template/ ContentPresenter#PART_ContentPresenter, Button.icon:pressed /template/ ContentPresenter#PART_ContentPresenter, Button.round:pointerover /template/ ContentPresenter#PART_ContentPresenter, Button.round:pressed /template/ ContentPresenter#PART_ContentPresenter, Button.pill:pointerover /template/ ContentPresenter#PART_ContentPresenter, Button.pill:pressed /template/ ContentPresenter#PART_ContentPresenter, Button.pill-accent:pointerover /template/ ContentPresenter#PART_ContentPresenter, Button.pill-accent:pressed /template/ ContentPresenter#PART_ContentPresenter, Button.chip:pointerover /template/ ContentPresenter#PART_ContentPresenter, Button.chip:pressed /template/ ContentPresenter#PART_ContentPresenter, Button.tile:pointerover /template/ ContentPresenter#PART_ContentPresenter, Button.tile:pressed /template/ ContentPresenter#PART_ContentPresenter, Button.tab:pointerover /template/ ContentPresenter#PART_ContentPresenter, Button.tab:pressed /template/ ContentPresenter#PART_ContentPresenter">
+    <Style Selector="Button.row:pointerover /template/ ContentPresenter#PART_ContentPresenter, Button.row:pressed /template/ ContentPresenter#PART_ContentPresenter, Button.icon:pointerover /template/ ContentPresenter#PART_ContentPresenter, Button.icon:pressed /template/ ContentPresenter#PART_ContentPresenter, Button.round:pointerover /template/ ContentPresenter#PART_ContentPresenter, Button.round:pressed /template/ ContentPresenter#PART_ContentPresenter, Button.pill:pointerover /template/ ContentPresenter#PART_ContentPresenter, Button.pill:pressed /template/ ContentPresenter#PART_ContentPresenter, Button.pill-accent:pointerover /template/ ContentPresenter#PART_ContentPresenter, Button.pill-accent:pressed /template/ ContentPresenter#PART_ContentPresenter, Button.chip:pointerover /template/ ContentPresenter#PART_ContentPresenter, Button.chip:pressed /template/ ContentPresenter#PART_ContentPresenter, Button.tile:pointerover /template/ ContentPresenter#PART_ContentPresenter, Button.tile:pressed /template/ ContentPresenter#PART_ContentPresenter, Button.tab:pointerover /template/ ContentPresenter#PART_ContentPresenter, Button.tab:pressed /template/ ContentPresenter#PART_ContentPresenter, Button.text-chip:pointerover /template/ ContentPresenter#PART_ContentPresenter, Button.text-chip:pressed /template/ ContentPresenter#PART_ContentPresenter, Button.sheet-tile:pointerover /template/ ContentPresenter#PART_ContentPresenter, Button.sheet-tile:pressed /template/ ContentPresenter#PART_ContentPresenter">
         <Setter Property="Background" Value="{Binding $parent[Button].Background}" />
         <Setter Property="BorderBrush" Value="{Binding $parent[Button].BorderBrush}" />
         <Setter Property="Foreground" Value="{Binding $parent[Button].Foreground}" />
@@ -415,7 +470,7 @@
             </Transitions>
         </Setter>
     </Style>
-    <Style Selector="Button.icon:pressed, Button.round:pressed, Button.glass-round:pressed, Button.pill:pressed, Button.pill-accent:pressed, Button.chip:pressed, Button.tile:pressed, Button.tab:pressed">
+    <Style Selector="Button.icon:pressed, Button.round:pressed, Button.glass-round:pressed, Button.pill:pressed, Button.pill-accent:pressed, Button.chip:pressed, Button.tile:pressed, Button.tab:pressed, Button.text-chip:pressed, Button.sheet-tile:pressed">
         <Setter Property="Opacity" Value="0.6" />
         <Setter Property="RenderTransform" Value="scale(0.96)" />
     </Style>

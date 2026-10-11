@@ -33,4 +33,9 @@ public partial class SearchPage : UserControl
         if (e.PropertyName == nameof(ShellViewModel.SelectedTab) && _shell?.IsSearchSelected == true)
             Dispatcher.UIThread.Post(() => SearchBox.Focus(), DispatcherPriority.Loaded);
     }
+
+    private void OnSortClick(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
+    {
+        if (DataContext is SearchPageViewModel vm && sender is Control button) SortMenu.Show(button, vm);
+    }
 }

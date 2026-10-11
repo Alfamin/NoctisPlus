@@ -11,7 +11,7 @@
             <Border Classes="art" Width="160" Height="160" CornerRadius="10">
                 <Panel>
                     <PathIcon Data="{DynamicResource AlbumsIcon}" Width="40" Height="40" Opacity="0.4" />
-                    <controls:CachedImage SourcePath="{Binding ArtworkPath}" DecodeWidth="384" Stretch="UniformToFill" />
+                    <controls:CachedImage SourcePath="{Binding ArtworkPath}" DecodeWidth="768" PixelExact="True" Stretch="UniformToFill" />
                 </Panel>
             </Border>
         </Viewbox>

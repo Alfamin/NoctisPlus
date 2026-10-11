@@ -237,6 +237,15 @@
                 <controls:GlassPanel Name="MiniBar" Classes="liquid" CornerRadius="30" VerticalAlignment="Bottom"
                                      IsVisible="{Binding IsMiniBarVisible}">
                     <Panel>
+                        <!-- The elapsed part of the song, filled in the cover's colour with a bright
+                             edge along the bottom: progress at a glance, as the full player shows it. -->
+                        <Border Name="MiniProgress" CornerRadius="30" ClipToBounds="True" IsHitTestVisible="False">
+                            <views:FractionPanel Fraction="{Binding Player.ProgressFraction}">
+                                <Border Name="MiniProgressFill" Background="{Binding MiniProgressFill}" />
+                                <Border Name="MiniProgressLine" Background="{Binding MiniProgressLine}" Height="2.5"
+                                        VerticalAlignment="Bottom" />
+                            </views:FractionPanel>
+                        </Border>
                         <Border Background="{DynamicResource GlassBarSheen}" CornerRadius="30" IsHitTestVisible="False" />
                         <Grid ColumnDefinitions="*,Auto,Auto" Margin="13,0,6,0">
                             <!-- Stretch both ways: Fluent sets Left/Center, which shrank the tap target

@@ -5,21 +5,41 @@ using Noctis.Models;
 
 namespace Noctis.Mobile.ViewModels;
 
+/// <summary>What a song list's sort menu orders by; Default is the list's own order (a playlist's saved order).</summary>
+public enum SongSort { Default, Title, Artist, Album, DateAdded, Year, Duration, MostPlayed, RecentlyPlayed }
+
 /// <summary>
 /// A flat list of songs: all songs, favourites, recently added, a playlist (and, until the
 /// album and artist pages land, an album or an artist). The rows come from a source function
 /// re-read on every library refresh, so a rescan or a heart toggle shows in an open list.
+/// The toolbar sorts, filters (favourites, downloaded) and searches the list; Play and Shuffle
+/// play what is shown.
 /// </summary>
-public sealed partial class SongListPageViewModel : MobilePage
+public sealed partial class SongListPageViewModel : MobilePage, ISortable
 {
     private readonly string _title;
     private readonly Func<IEnumerable<Track>> _source;
+    private readonly Playlist? _playlist;
+    private List<Track> _all = new();
 
-    public SongListPageViewModel(ShellViewModel shell, string title, Func<IEnumerable<Track>> source)
+    public SongListPageViewModel(ShellViewModel shell, string title, Func<IEnumerable<Track>> source, Playlist? playlist = null)
     {
         Shell = shell;
         _title = title;
         _source = source;
+        _playlist = playlist;
+        SortChoices = new[]
+        {
+            new SortChoice(playlist != null ? "Playlist Order" : "Default Order", SongSort.Default) { IsSelected = true },
+            new SortChoice("Title", SongSort.Title),
+            new SortChoice("Artist", SongSort.Artist),
+            new SortChoice("Album", SongSort.Album),
+            new SortChoice("Date Added", SongSort.DateAdded),
+            new SortChoice("Release Year", SongSort.Year),
+            new SortChoice("Time", SongSort.Duration),
+            new SortChoice("Most Played", SongSort.MostPlayed),
+            new SortChoice("Recently Played", SongSort.RecentlyPlayed),
+        };
         Shell.Library.Refreshed += OnRefreshed;
         Refresh();
     }
@@ -28,20 +48,134 @@ public sealed partial class SongListPageViewModel : MobilePage
 
     public override string Title => _title;
 
+    /// <summary>The rows shown: the source, filtered and sorted.</summary>
     public BulkObservableCollection<Track> Songs { get; } = new();
 
+    /// <summary>The whole list's size; the toolbar stays while a filter hides every row.</summary>
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(HasSongs), nameof(CountText))]
+    private int _totalCount;
+
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(CountText), nameof(ShowEmpty), nameof(EmptyText))]
     private int _songCount;
 
-    public bool HasSongs => SongCount > 0;
+    public bool HasSongs => TotalCount > 0;
 
-    public string CountText => SongCount == 1 ? "1 song" : $"{SongCount} songs";
+    public bool ShowEmpty => SongCount == 0;
+
+    public string EmptyText => TotalCount == 0 ? "No songs" : "No matching songs";
+
+    public string CountText => SongCount == TotalCount
+        ? (SongCount == 1 ? "1 song" : $"{SongCount} songs")
+        : $"{SongCount} of {TotalCount}";
+
+    // ── Search in the list ──
+
+    [ObservableProperty] private bool _isSearchOpen;
+    [ObservableProperty] private string _filterText = string.Empty;
+
+    partial void OnFilterTextChanged(string value) => Apply();
+
+    [RelayCommand]
+    private void ToggleSearch()
+    {
+        IsSearchOpen = !IsSearchOpen;
+        if (!IsSearchOpen) FilterText = string.Empty;
+    }
+
+    // ── Filters ──
+
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(IsFiltered))]
+    private bool _onlyFavourites;
+
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(IsFiltered))]
+    private bool _onlyDownloaded;
+
+    partial void OnOnlyFavouritesChanged(bool value) => Apply();
+    partial void OnOnlyDownloadedChanged(bool value) => Apply();
+
+    /// <summary>The filter button lights up while a filter is on.</summary>
+    public bool IsFiltered => OnlyFavourites || OnlyDownloaded;
+
+    /// <summary>Downloaded means a desktop song's offline copy: offered only with an account.</summary>
+    public bool CanFilterDownloaded => Shell.Account != null;
+
+    // ── Sort ──
+
+    public IReadOnlyList<SortChoice> SortChoices { get; }
+
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(IsSorted))]
+    private SongSort _sort = SongSort.Default;
+
+    [ObservableProperty] private bool _isDescending;
+
+    /// <summary>The sort button lights up away from the list's own order.</summary>
+    public bool IsSorted => Sort != SongSort.Default || IsDescending;
+
+    public bool HasSortDirection => true;
+
+    public void ChooseSort(SortChoice choice)
+    {
+        foreach (var c in SortChoices) c.IsSelected = ReferenceEquals(c, choice);
+        var sort = (SongSort)choice.Key;
+        // Each order starts the way it is usually read: names A→Z, dates and counts newest/most first.
+        IsDescending = sort is SongSort.DateAdded or SongSort.Year or SongSort.MostPlayed or SongSort.RecentlyPlayed;
+        Sort = sort;
+        Apply();
+    }
+
+    public void ChooseDirection(bool descending)
+    {
+        IsDescending = descending;
+        OnPropertyChanged(nameof(IsSorted));
+        Apply();
+    }
 
     public void Refresh()
     {
-        Songs.ReplaceAll(_source());
+        _all = _source().ToList();
+        TotalCount = _all.Count;
+        Apply();
+    }
+
+    private void Apply()
+    {
+        IEnumerable<Track> rows = _all;
+        if (OnlyFavourites) rows = rows.Where(t => t.IsFavorite);
+        if (OnlyDownloaded && Shell.Account is { } account) rows = rows.Where(account.IsDownloaded);
+        if (!string.IsNullOrWhiteSpace(FilterText))
+        {
+            var match = new MobileSearch.Matcher(FilterText);
+            rows = rows.Where(match.HitTrack);
+        }
+        Songs.ReplaceAll(Order(rows));
         SongCount = Songs.Count;
+    }
+
+    private IEnumerable<Track> Order(IEnumerable<Track> rows)
+    {
+        var names = StringComparer.CurrentCultureIgnoreCase;
+        if (Sort == SongSort.Default) return IsDescending ? rows.Reverse() : rows;
+        IOrderedEnumerable<Track> By<TKey>(Func<Track, TKey> key, IComparer<TKey>? comparer = null) =>
+            IsDescending ? rows.OrderByDescending(key, comparer) : rows.OrderBy(key, comparer);
+        var ordered = Sort switch
+        {
+            SongSort.Title => By(t => t.Title, names),
+            SongSort.Artist => By(t => t.Artist, names),
+            SongSort.Album => By(t => t.Album, names),
+            SongSort.DateAdded => By(t => _playlist?.AddedDateFor(t.Id, t.DateAdded) ?? t.DateAdded),
+            SongSort.Year => By(t => t.Year),
+            SongSort.Duration => By(t => t.Duration),
+            SongSort.MostPlayed => By(t => t.PlayCount),
+            SongSort.RecentlyPlayed => By(t => t.LastPlayed ?? DateTime.MinValue),
+            _ => By(t => t.Title, names),
+        };
+        // Ties read naturally: by album, then its track order, then title.
+        return ordered.ThenBy(t => t.Album, names).ThenBy(t => t.DiscNumber).ThenBy(t => t.TrackNumber).ThenBy(t => t.Title, names);
     }
 
     private void OnRefreshed(object? sender, EventArgs e) => Refresh();

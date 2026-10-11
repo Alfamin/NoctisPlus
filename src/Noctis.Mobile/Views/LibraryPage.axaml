@@ -11,7 +11,7 @@
     <UserControl.Resources>
         <!-- One rail tile: three covers across with the fourth peeking, like Apple's Library. -->
         <DataTemplate x:Key="RailTileTemplate" x:DataType="vm:RailItem">
-            <Button Classes="row" Width="112" VerticalAlignment="Top"
+            <Button Classes="row" Width="140" VerticalAlignment="Top"
                     views:LongPress.Command="{Binding $parent[views:ShellView].((vm:ShellViewModel)DataContext).OpenRailItemSheetCommand}"
                     Command="{Binding $parent[views:LibraryPage].((vm:ShellViewModel)DataContext).OpenRailItemCommand}"
                     CommandParameter="{Binding}">

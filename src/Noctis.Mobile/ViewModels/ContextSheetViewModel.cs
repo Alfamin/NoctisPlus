@@ -59,6 +59,9 @@ public sealed partial class ContextSheetViewModel : ObservableObject
     public bool IsFavourite => Tracks.Count > 0 && Tracks.All(t => t.IsFavorite);
     public string FavouriteLabel => IsFavourite ? "Remove from Favorites" : "Favorite";
 
+    /// <summary>The quick-action tile's short label: what the heart shows now.</summary>
+    public string FavouriteTileLabel => IsFavourite ? "Favorited" : "Favorite";
+
     /// <summary>Anything can be pinned to Library → Pinned: albums, artists, playlists and songs.</summary>
     public bool CanPin => Album != null || Playlist != null || Artist != null || Track != null;
     public bool IsPinned =>
@@ -67,6 +70,7 @@ public sealed partial class ContextSheetViewModel : ObservableObject
         : Playlist != null ? Playlist.IsPinned
         : Track != null && _shell.Library.IsTrackPinned(Track.Id);
     public string PinLabel => IsPinned ? "Unpin" : "Pin to Library";
+    public string PinTileLabel => IsPinned ? "Pinned" : "Pin";
 
     public bool CanGoToAlbum => Track != null;
     public bool CanGoToArtist => Track != null || Album != null;
@@ -87,6 +91,14 @@ public sealed partial class ContextSheetViewModel : ObservableObject
     public bool CanRemoveDownload => _shell.Account != null && Downloaded.Any();
 
     public string DownloadLabel => Album != null ? "Download album" : Playlist != null ? "Download playlist" : "Download";
+
+    /// <summary>Every desktop song here already has its offline copy: the tile shows a check.</summary>
+    public bool IsAllDownloaded => _shell.Account != null && RemoteTracks.Count > 0 && !NotDownloaded.Any();
+
+    /// <summary>The Download tile shows for desktop songs only (a phone's own files are already offline).</summary>
+    public bool ShowDownloadTile => CanDownload || IsAllDownloaded;
+
+    public string DownloadTileLabel => IsAllDownloaded ? "Downloaded" : "Download";
     public string RemoveDownloadLabel => Track != null ? "Remove download" : "Remove downloads";
 
     /// <summary>The sheet's second page: pick a playlist or name a new one.</summary>

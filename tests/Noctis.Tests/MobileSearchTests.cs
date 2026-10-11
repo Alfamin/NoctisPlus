@@ -39,7 +39,9 @@ public class MobileSearchTests
 
         Assert.Equal(new[] { "Halo", "Crazy In Love" }, search.Songs.Select(t => t.Title));   // more plays first
         Assert.Equal(new[] { "Dangerously in Love" }, search.Albums.Select(a => a.Name));
-        Assert.Equal(new[] { "Beyoncé" }, search.Artists.Select(a => a.Name));
+        // The query names the artist: they head the results instead of sitting in the Artists row.
+        Assert.Equal("Beyoncé", search.Featured!.Name);
+        Assert.Empty(search.Artists);
         Assert.False(search.ShowNoResults);
     }
 
@@ -82,7 +84,7 @@ public class MobileSearchTests
         search.PlaySongCommand.Execute(search.Songs[1]);
         Assert.Equal("Crazy In Love", rig.Shell.Player.CurrentTrack!.Title);
 
-        search.OpenArtistCommand.Execute(search.Artists[0]);
+        search.OpenArtistCommand.Execute(search.Featured);
         Assert.Equal("Beyoncé", rig.Shell.CurrentPage!.Title);
     }
 
@@ -121,7 +123,7 @@ public class MobileSearchTests
         // Tap the artist result, as on device: the tap takes focus off the box.
         rig.Shell.Search.Query = "beyonce";
         window.UpdateLayout();
-        var result = MobileFixtures.Named<ItemsControl>(page, "ArtistResults").GetVisualDescendants().OfType<Button>().First();
+        var result = MobileFixtures.Named<Button>(page, "FeaturedArtistButton");
         var centre = result.TranslatePoint(new Point(result.Bounds.Width / 2, result.Bounds.Height / 2), window)!.Value;
         window.MouseDown(centre, MouseButton.Left);
         window.MouseUp(centre, MouseButton.Left);
