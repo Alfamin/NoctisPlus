@@ -1110,6 +1110,15 @@ public partial class SettingsViewModel : ViewModelBase
     [ObservableProperty] private string _issuedApiKeyUser = string.Empty;
     [ObservableProperty] private string _serverUserError = string.Empty;
     public bool HasIssuedApiKey => IssuedApiKey.Length > 0;
+
+    /// <summary>Drives the key panel's fold. Separate from <see cref="HasIssuedApiKey"/> so Done
+    /// folds the panel shut with the key still in it (as Web Remote keeps its URL) and the key
+    /// is cleared once the fold is over: emptying it first made the panel jump, then fold.</summary>
+    [ObservableProperty] private bool _isIssuedApiKeyOpen;
+
+    /// <summary>The panel's close (CollapsibleContent's Glide close, 240 ms) plus a margin.</summary>
+    internal static TimeSpan IssuedApiKeyClearDelay { get; set; } = TimeSpan.FromMilliseconds(320);
+
     public bool HasServerUsers => ServerUsersList.Count > 0;
 
     /// <summary>The key shows as dots until the eye is pressed: it is a password, and Settings
@@ -1127,6 +1136,8 @@ public partial class SettingsViewModel : ViewModelBase
 
     partial void OnIssuedApiKeyChanged(string value)
     {
+        // Cleared straight (the account removed, the tab left): the panel closes with it.
+        IsIssuedApiKeyOpen = value.Length > 0;
         IsIssuedApiKeyRevealed = false;
         IssuedApiKeyCopied = false;
         OnPropertyChanged(nameof(HasIssuedApiKey));
@@ -1311,7 +1322,16 @@ public partial class SettingsViewModel : ViewModelBase
     }
 
     [RelayCommand]
-    private void HideIssuedApiKey() { IssuedApiKey = string.Empty; IssuedApiKeyUser = string.Empty; }
+    private async Task HideIssuedApiKeyAsync()
+    {
+        IsIssuedApiKeyOpen = false;
+        var key = IssuedApiKey;
+        await Task.Delay(IssuedApiKeyClearDelay);
+        // A key issued while the panel was closing is a new one: leave it.
+        if (IsIssuedApiKeyOpen || IssuedApiKey != key) return;
+        IssuedApiKey = string.Empty;
+        IssuedApiKeyUser = string.Empty;
+    }
 
     [RelayCommand]
     private async Task CopyNoctisServerUrlAsync()

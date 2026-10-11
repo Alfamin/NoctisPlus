@@ -4973,7 +4973,7 @@
             <Border Classes="setting-row" Classes.parked="{Binding !AccountFeaturesEnabled}" IsEnabled="{Binding AccountFeaturesEnabled}">
                 <StackPanel Spacing="14">
                     <!-- No account yet -->
-                    <controls:CollapsibleContent IsOpen="{Binding !HasPrimaryAccount}" Lift="6">
+                    <controls:CollapsibleContent IsOpen="{Binding !HasPrimaryAccount}" Lift="10" Motion="Glide">
                     <StackPanel Spacing="12">
                         <StackPanel Spacing="2">
                             <StackPanel Orientation="Horizontal" Spacing="8">
@@ -5008,7 +5008,7 @@
                     </controls:CollapsibleContent>
 
                     <!-- Account exists -->
-                    <controls:CollapsibleContent IsOpen="{Binding HasPrimaryAccount}" Lift="6">
+                    <controls:CollapsibleContent IsOpen="{Binding HasPrimaryAccount}" Lift="10" Motion="Glide">
                     <StackPanel Spacing="14">
                         <!-- The account's actions, one row of icon pills (the picture and the account
                              name are the profile row above: one avatar, not two). -->
@@ -5039,7 +5039,7 @@
                         </WrapPanel>
 
                         <!-- Change password (inline) -->
-                        <controls:CollapsibleContent IsOpen="{Binding IsChangePasswordVisible}" Lift="6">
+                        <controls:CollapsibleContent IsOpen="{Binding IsChangePasswordVisible}" Lift="10" Motion="Glide">
                         <Grid ColumnDefinitions="*,Auto,Auto" ColumnSpacing="8" MaxWidth="560" HorizontalAlignment="Left">
                             <TextBox Grid.Column="0" Text="{Binding ChangePasswordValue}" PasswordChar="•" RevealPassword="{Binding IsPasswordRevealed}"
                                      Watermark="{loc:T AccountSync.NewPassword}" CornerRadius="999" Padding="14,8,4,8" BorderThickness="1.5" MinHeight="0" MinWidth="260">
@@ -5063,7 +5063,7 @@
                         </controls:CollapsibleContent>
 
                         <!-- Pairing: address + QR + fingerprint, or the switch to turn the server on -->
-                        <controls:CollapsibleContent IsOpen="{Binding IsPairingVisible}" Lift="6">
+                        <controls:CollapsibleContent IsOpen="{Binding IsPairingVisible}" Lift="10" Motion="Glide">
                         <Border Background="#18000000" CornerRadius="12" Padding="14,12">
                             <StackPanel Spacing="10">
                                 <StackPanel Spacing="10" IsVisible="{Binding NoctisServerUrl, Converter={x:Static StringConverters.IsNotNullOrEmpty}}">
@@ -5131,7 +5131,7 @@
 
                     <!-- Freshly issued key: shown once, never stored in clear. Hidden behind dots until
                      the eye is pressed; Copy works either way. -->
-                    <controls:CollapsibleContent IsOpen="{Binding HasIssuedApiKey}" Lift="6">
+                    <controls:CollapsibleContent IsOpen="{Binding IsIssuedApiKeyOpen}" Lift="10" Motion="Glide">
                     <Border x:Name="ApiKeyPanel" Background="#18000000" CornerRadius="14" Padding="14,12">
                         <StackPanel Spacing="10">
                             <StackPanel Orientation="Horizontal" Spacing="8">

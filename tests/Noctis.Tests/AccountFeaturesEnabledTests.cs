@@ -96,7 +96,11 @@ public class AccountFeaturesEnabledTests : IDisposable
         Assert.NotEqual(key, vm.IssuedApiKey);
         Assert.False(vm.IsIssuedApiKeyRevealed);
 
-        vm.HideIssuedApiKeyCommand.Execute(null);
+        // Done folds the panel with the key still in it, and clears the key once it has folded.
+        var hide = vm.HideIssuedApiKeyCommand.ExecuteAsync(null);
+        Assert.False(vm.IsIssuedApiKeyOpen);
+        Assert.True(vm.HasIssuedApiKey);
+        await hide;
         Assert.False(vm.HasIssuedApiKey);
     }
 
