@@ -15,10 +15,15 @@ public sealed record AccentSwatch(string Name, string Hex)
     public IBrush Brush { get; } = new Avalonia.Media.Immutable.ImmutableSolidColorBrush(Color.Parse(Hex));
 }
 
+/// <summary>One configured music folder as Settings lists it: the name the user would give it
+/// ("Music/Tones") and whether the phone lost its access (its songs stay listed, none plays).</summary>
+public sealed record SettingsFolder(string Name, bool AccessLost);
+
 /// <summary>
-/// Phone Settings. Changes apply at once (theme through the host, gapless on the player,
-/// text size on the lyrics page) and are saved in order through one queued chain, so two
-/// quick changes cannot interleave their load-modify-save of settings.json.
+/// Phone Settings. Changes apply at once (theme through the host, text size on the lyrics
+/// page) and are saved in order through one queued chain, so two quick changes cannot
+/// interleave their load-modify-save of settings.json. Gapless playback has no setting here:
+/// the phone is always gapless (NowPlayingViewModel), and the saved desktop value is left as is.
 /// </summary>
 public sealed partial class SettingsPageViewModel : MobilePage
 {
@@ -48,11 +53,14 @@ public sealed partial class SettingsPageViewModel : MobilePage
     public IReadOnlyList<string> DarkThemes => MobileTheme.DarkThemes;
     public IReadOnlyList<AccentSwatch> AccentChoices => Accents;
 
-    /// <summary>The configured roots as the user would name them ("Music/Tones"), not SAF URIs.
-    /// A folder whose access was lost says so: its songs stay listed but none of them plays.</summary>
-    public IReadOnlyList<string> FolderLabels => Shell.Library.Folders
-        .Select(f => Shell.Library.HasAccess(f) ? FolderDisplay(f) : $"{FolderDisplay(f)} (access lost: add it again)")
+    /// <summary>The configured roots as the user would name them ("Music/Tones"), not SAF URIs,
+    /// each flagged when its access was lost: its songs stay listed but none of them plays.</summary>
+    public IReadOnlyList<SettingsFolder> FolderRows => Shell.Library.Folders
+        .Select(f => new SettingsFolder(FolderDisplay(f), !Shell.Library.HasAccess(f)))
         .ToList();
+
+    /// <summary>The dark style only matters when the app can go dark: hidden under Light.</summary>
+    public bool ShowsDarkThemes => Appearance != "Light";
 
     public string VersionText => Shell.VersionText;
 
@@ -61,10 +69,11 @@ public sealed partial class SettingsPageViewModel : MobilePage
         ? $"Signed in as {account.UserName} · {AccountPageViewModel.ServerLabel(account)}"
         : "Sign in to your Noctis desktop";
 
-    [ObservableProperty] private string _appearance = "System";
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(ShowsDarkThemes))]
+    private string _appearance = "System";
     [ObservableProperty] private string _darkTheme = "Ink";
     [ObservableProperty] private AccentSwatch? _selectedAccent;
-    [ObservableProperty] private bool _gapless = true;
     [ObservableProperty] private double _lyricsTextScale = 1.0;
     [ObservableProperty] private string _exportStatus = string.Empty;
 
@@ -86,7 +95,6 @@ public sealed partial class SettingsPageViewModel : MobilePage
             DarkTheme = MobileTheme.DarkThemes.Contains(settings.Theme) ? settings.Theme : "Ink";
             _accentHex = string.IsNullOrWhiteSpace(settings.AccentColorHex) ? MobileTheme.DefaultAccent : settings.AccentColorHex;
             SelectedAccent = Accents.FirstOrDefault(a => string.Equals(a.Hex, _accentHex, StringComparison.OrdinalIgnoreCase));
-            Gapless = settings.GaplessPlaybackEnabled;
             LyricsTextScale = Math.Clamp(settings.MobileLyricsTextScale, 0.8, 1.6);
         }
         finally
@@ -102,13 +110,6 @@ public sealed partial class SettingsPageViewModel : MobilePage
     {
         if (value != null) _accentHex = value.Hex;
         ThemeChanged();
-    }
-
-    partial void OnGaplessChanged(bool value)
-    {
-        if (_loading) return;
-        Shell.Player.SetGapless(value);
-        QueueSave();
     }
 
     partial void OnLyricsTextScaleChanged(double value)
@@ -138,7 +139,6 @@ public sealed partial class SettingsPageViewModel : MobilePage
             settings.ThemeV2Migrated = true;
             settings.AccentColorHex = _accentHex;
             settings.AccentPresetName = Accents.FirstOrDefault(a => string.Equals(a.Hex, _accentHex, StringComparison.OrdinalIgnoreCase))?.Name ?? "Custom";
-            settings.GaplessPlaybackEnabled = Gapless;
             settings.MobileLyricsTextScale = LyricsTextScale;
             await Shell.Library.Persistence.SaveSettingsAsync(settings);
         }
@@ -173,7 +173,7 @@ public sealed partial class SettingsPageViewModel : MobilePage
         return colon >= 0 && colon < text.Length - 1 ? text[(colon + 1)..] : text;
     }
 
-    private void OnFoldersChanged(object? sender, NotifyCollectionChangedEventArgs e) => OnPropertyChanged(nameof(FolderLabels));
+    private void OnFoldersChanged(object? sender, NotifyCollectionChangedEventArgs e) => OnPropertyChanged(nameof(FolderRows));
 
     private void OnAccountChanged(object? sender, EventArgs e) => Shell.Marshal(() => OnPropertyChanged(nameof(AccountRowText)));
 

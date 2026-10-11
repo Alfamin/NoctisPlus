@@ -4,7 +4,9 @@ using System.Linq;
 using System.Threading.Tasks;
 using Avalonia;
 using Avalonia.Controls;
+using Ellipse = Avalonia.Controls.Shapes.Ellipse;
 using Avalonia.Headless.XUnit;
+using Avalonia.Markup.Xaml.Styling;
 using Avalonia.Media;
 using Avalonia.Platform;
 using Avalonia.Styling;
@@ -155,24 +157,65 @@ public class MobileSettingsTests
     }
 
     [Fact]
-    public async Task Settings_GaplessAndLyricsTextSize_ApplyAndPersist()
+    public async Task Settings_LyricsTextSize_AppliesAndPersists()
     {
         using var rig = MobileFixtures.MakeRig();
         var page = await OpenSettings(rig.Shell);
 
-        page.Gapless = false;
         page.LyricsTextScale = 1.4;
         await page.PendingSave;
 
-        Assert.False(rig.Player.GaplessEnabled);
         Assert.Equal(LyricsPageViewModel.BaseFontSize * 1.4, rig.Shell.Lyrics.LineFontSize, 6);
         var saved = await rig.Persistence.LoadSettingsAsync();
-        Assert.False(saved.GaplessPlaybackEnabled);
         Assert.Equal(1.4, saved.MobileLyricsTextScale, 6);
 
         var fresh = new LyricsPageViewModel(rig.Player, rig.Shell.Player, new FakeTrackFiles(), rig.Persistence, work => Task.FromResult(work()));
         await fresh.InitializeAsync();
         Assert.Equal(1.4, fresh.TextScale, 6);
+    }
+
+    /// <summary>Owner 10-11: gapless is always on on the phone. A settings.json that says off
+    /// (written by the desktop, or by an older phone build that had the switch) changes nothing:
+    /// the player is gapless from the moment the shell is built, as the Android startup builds
+    /// it, and stays so through Settings; the saved desktop value is left alone.</summary>
+    [Fact]
+    public async Task Gapless_IsOnFromStartup_EvenWhenSettingsSayOff()
+    {
+        var root = Path.Combine(Path.GetTempPath(), "NoctisTests", Guid.NewGuid().ToString("N"));
+        try
+        {
+            var persistence = new PersistenceService(root);
+            var seeded = await persistence.LoadSettingsAsync();
+            seeded.GaplessPlaybackEnabled = false;
+            await persistence.SaveSettingsAsync(seeded);
+
+            var tracks = new[] { MobileFixtures.Song("One"), MobileFixtures.Song("Two") };
+            var library = new FakeLibraryService();
+            library.TrackList.AddRange(tracks);
+            var player = new FakeAudioPlayer();
+            player.SetGapless(false);                               // whatever the player came up with
+            var history = new FakeHistoryLog();
+            var nowPlaying = new NowPlayingViewModel(player, library, persistence, history, marshal: a => a());
+            var shell = new ShellViewModel(
+                new LibraryViewModel(library, persistence, new MobileFixtures.NoPicker(), history, marshal: a => a()),
+                nowPlaying,
+                new LyricsPageViewModel(player, nowPlaying, new FakeTrackFiles(), persistence, work => Task.FromResult(work())));
+            await shell.Library.InitializeAsync();
+            Assert.True(player.GaplessEnabled);
+
+            var page = await OpenSettings(shell);
+            page.LyricsTextScale = 1.2;                             // a save through Settings
+            await page.PendingSave;
+            Assert.True(player.GaplessEnabled);
+            Assert.False((await persistence.LoadSettingsAsync()).GaplessPlaybackEnabled);
+
+            nowPlaying.PlayTracks(tracks, 0);
+            Assert.Equal(new[] { tracks[1].FilePath }, player.PreparedPaths);
+        }
+        finally
+        {
+            try { Directory.Delete(root, recursive: true); } catch { }
+        }
     }
 
     [Fact]
@@ -213,7 +256,7 @@ public class MobileSettingsTests
         var page = (SettingsPageViewModel)rig.Shell.CurrentPage!;
         await page.Loaded;
 
-        Assert.Equal(new[] { "Music/Tones", "Music/Beats (access lost: add it again)" }, page.FolderLabels);
+        Assert.Equal(new[] { new SettingsFolder("Music/Tones", false), new SettingsFolder("Music/Beats", true) }, page.FolderRows);
     }
 
     [AvaloniaFact]
@@ -233,7 +276,7 @@ public class MobileSettingsTests
         window.UpdateLayout();
 
         var page = MobileFixtures.Find<SettingsPage>(view);
-        Assert.Equal(new[] { "Music/Tones" }, ((SettingsPageViewModel)page.DataContext!).FolderLabels);
+        Assert.Equal(new[] { new SettingsFolder("Music/Tones", false) }, ((SettingsPageViewModel)page.DataContext!).FolderRows);
         Assert.Contains(MobileFixtures.Named<ItemsControl>(page, "FolderList").GetVisualDescendants().OfType<TextBlock>(), t => t.Text == "Music/Tones");
         Assert.True(MobileFixtures.Named<Button>(page, "ExportLogsButton").IsEffectivelyVisible);
         window.Close();
@@ -267,5 +310,146 @@ public class MobileSettingsTests
         {
             app.RequestedThemeVariant = before;
         }
+    }
+
+    /// <summary>Mounts Settings with the desktop icon set merged as the device merges it
+    /// (AndroidApp.axaml), so the section badges resolve their Rail icons.</summary>
+    private static async Task WithMountedSettings(MobileFixtures.Rig rig, Action<SettingsPage, SettingsPageViewModel, Window> check)
+    {
+        var app = Application.Current!;
+        var icons = new ResourceInclude(new Uri("avares://Noctis.Mobile/")) { Source = new Uri("avares://Noctis.UI/Assets/Icons.axaml") };
+        app.Resources.MergedDictionaries.Add(icons);
+        var window = MobileFixtures.Mount(rig.Shell, out var view);
+        try
+        {
+            rig.Shell.OpenSettingsCommand.Execute(null);
+            var vm = (SettingsPageViewModel)rig.Shell.CurrentPage!;
+            await vm.Loaded;
+            window.UpdateLayout();
+            check(MobileFixtures.Find<SettingsPage>(view), vm, window);
+        }
+        finally
+        {
+            window.Close();
+            app.Resources.MergedDictionaries.Remove(icons);
+        }
+    }
+
+    /// <summary>Owner 10-11: every section is a rounded card headed by the desktop Settings
+    /// rail's icon for it, and the gapless switch is gone (the phone is always gapless).</summary>
+    [AvaloniaFact]
+    public async Task Settings_IsRoundedCards_EachHeadedByItsDesktopIcon_WithNoGaplessSwitch()
+    {
+        using var rig = MobileFixtures.MakeRig();
+        await WithMountedSettings(rig, (page, _, _) =>
+        {
+            var cards = page.GetVisualDescendants().OfType<Border>()
+                .Where(b => b.Classes.Contains("settings-card") && b.IsEffectivelyVisible).ToList();
+            var heads = cards.Select(c =>
+            {
+                var title = c.GetVisualDescendants().OfType<TextBlock>().First(t => t.Classes.Contains("section-title")).Text;
+                var badge = c.GetVisualDescendants().OfType<Border>().First(b => b.Classes.Contains("section-badge"));
+                return (Title: title, Icon: badge.GetVisualDescendants().OfType<PathIcon>().Single().Data, Corner: c.CornerRadius.TopLeft);
+            }).ToList();
+
+            // No account service in this rig: the Account card stays hidden.
+            Assert.Equal(new[] { "Library", "Appearance", "Lyrics", "Advanced", "About" }, heads.Select(h => h.Title));
+            var keys = new[] { "RailFolderIcon", "RailPaletteIcon", "RailLyricsIcon", "RailWrenchIcon", "RailInfoIcon" };
+            for (var i = 0; i < keys.Length; i++)
+            {
+                Assert.True(Application.Current!.TryGetResource(keys[i], null, out var geometry), keys[i]);
+                Assert.Same(geometry, heads[i].Icon);
+            }
+            Assert.All(heads, h => Assert.Equal(20, h.Corner));
+
+            Assert.DoesNotContain(page.GetVisualDescendants().OfType<Control>(), c => c.Name == "GaplessSwitch");
+            Assert.DoesNotContain(page.GetVisualDescendants().OfType<TextBlock>(), t => t.Text?.Contains("Gapless", StringComparison.OrdinalIgnoreCase) == true);
+        });
+    }
+
+    /// <summary>Rows are touch-sized (each at least 52 dp tall, each button at least 44 dp)
+    /// and each leads with an icon.</summary>
+    [AvaloniaFact]
+    public async Task Settings_Rows_AreTouchSized_AndLeadWithAnIcon()
+    {
+        using var rig = MobileFixtures.MakeRig(seed: async p =>
+        {
+            var s = await p.LoadSettingsAsync();
+            s.MusicFolders.Add("content://com.android.externalstorage.documents/tree/primary%3AMusic%2FTones");
+            await p.SaveSettingsAsync(s);
+        });
+        await WithMountedSettings(rig, (page, _, _) =>
+        {
+            var rows = page.GetVisualDescendants().OfType<Control>()
+                .Where(c => c.IsEffectivelyVisible && (c.Classes.Contains("setting-row") || c.Classes.Contains("switch-row"))).ToList();
+            Assert.True(rows.Count >= 9, $"{rows.Count} rows");
+            Assert.All(rows, r =>
+            {
+                Assert.True(r.Bounds.Height >= 52, $"{r.Name ?? r.GetType().Name} is {r.Bounds.Height} tall");
+                var icon = r.GetVisualDescendants().OfType<Control>().First(c => c is PathIcon or Ellipse);
+                Assert.True(icon.Bounds.Width >= 20, $"{r.Name ?? r.GetType().Name} has no leading icon");
+            });
+            Assert.All(page.GetVisualDescendants().OfType<Button>().Where(b => b.IsEffectivelyVisible && b.TemplatedParent == null),  // not a slider's parts
+                b => Assert.True(b.Bounds.Height >= 44, $"{b.Name} is {b.Bounds.Height} tall"));
+        });
+    }
+
+    /// <summary>The library card lists each folder by name, says in place when its access was
+    /// lost, and offers Add folder and Rescan as icon pills.</summary>
+    [AvaloniaFact]
+    public async Task Settings_LibraryCard_ShowsTheLostFolder_AndTheTwoActionPills()
+    {
+        const string tones = "content://com.android.externalstorage.documents/tree/primary%3AMusic%2FTones";
+        const string beats = "content://com.android.externalstorage.documents/tree/primary%3AMusic%2FBeats";
+        var picker = new MobileFixtures.NoPicker();
+        picker.Lost.Add(beats);
+        using var rig = MobileFixtures.MakeRig(picker: picker, seed: async p =>
+        {
+            var s = await p.LoadSettingsAsync();
+            s.MusicFolders.Add(tones);
+            s.MusicFolders.Add(beats);
+            await p.SaveSettingsAsync(s);
+        });
+        await WithMountedSettings(rig, (page, _, _) =>
+        {
+            var warnings = MobileFixtures.Named<ItemsControl>(page, "FolderList").GetVisualDescendants().OfType<TextBlock>()
+                .Where(t => t.Classes.Contains("folder-lost")).ToList();
+            Assert.Equal(new[] { false, true }, warnings.Select(w => w.IsEffectivelyVisible));
+            Assert.False(MobileFixtures.Named<Grid>(page, "NoFoldersRow").IsEffectivelyVisible);
+
+            foreach (var (name, label) in new[] { ("AddFolderButton", "Add folder"), ("RescanButton", "Rescan") })
+            {
+                var pill = MobileFixtures.Named<Button>(page, name);
+                Assert.Contains("pill", pill.Classes);
+                Assert.NotNull(pill.GetVisualDescendants().OfType<PathIcon>().Single().Data);
+                Assert.Contains(pill.GetVisualDescendants().OfType<TextBlock>(), t => t.Text == label);
+            }
+        });
+    }
+
+    /// <summary>System / Dark / Light leads Appearance; the dark style hides under Light,
+    /// where it cannot apply, and comes back for System and Dark.</summary>
+    [AvaloniaFact]
+    public async Task Settings_Appearance_LeadsWithTheThemeChoice_AndHidesTheDarkStyleUnderLight()
+    {
+        using var rig = MobileFixtures.MakeRig();
+        await WithMountedSettings(rig, (page, vm, window) =>
+        {
+            var lists = MobileFixtures.Named<Border>(page, "AppearanceCard").GetVisualDescendants().OfType<ListBox>().ToList();
+            Assert.Equal("AppearanceList", lists[0].Name);
+            Assert.Equal(new[] { "System", "Dark", "Light" }, lists[0].Items.Cast<string>());
+            Assert.True(MobileFixtures.Named<StackPanel>(page, "DarkThemeSection").IsEffectivelyVisible);
+
+            vm.Appearance = "Light";
+            window.UpdateLayout();
+            Assert.False(vm.ShowsDarkThemes);
+            Assert.False(MobileFixtures.Named<StackPanel>(page, "DarkThemeSection").IsEffectivelyVisible);
+            Assert.Equal("Light", lists[0].SelectedItem);
+
+            vm.Appearance = "Dark";
+            window.UpdateLayout();
+            Assert.True(MobileFixtures.Named<StackPanel>(page, "DarkThemeSection").IsEffectivelyVisible);
+        });
+        await ((SettingsPageViewModel)rig.Shell.CurrentPage!).PendingSave;
     }
 }

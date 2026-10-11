@@ -249,11 +249,12 @@ public partial class AndroidApp : Avalonia.Application, IThemeHost
             var settings = await persistence.LoadSettingsAsync();
             Loc.Instance.SetCulture(settings.Language);
             ApplyTheme(settings.MobileAppearance, settings.Theme, settings.AccentColorHex);
-            _shell!.Player.SetGapless(settings.GaplessPlaybackEnabled);
+            // No SetGapless(settings.GaplessPlaybackEnabled): the phone is always gapless
+            // (NowPlayingViewModel turns it on), whatever a desktop-written settings.json says.
             await history.PreloadAsync();
             await library.LoadAsync();
             _libraryLoaded.TrySetResult();
-            await _shell.InitializeAsync();
+            await _shell!.InitializeAsync();
         }
         catch (Exception ex)
         {
