@@ -1659,6 +1659,8 @@ Deezer и TIDAL: вставьте ссылку.</value></data>
   <data name="PlaybackBar.BackgroundColor" xml:space="preserve"><value>Цвет фона</value><comment>Header in PlaybackBarView.axaml</comment></data>
   <data name="PlaybackBar.ShareLyrics" xml:space="preserve"><value>Поделиться текстом</value><comment>Header in PlaybackBarView.axaml</comment></data>
   <data name="PlaybackBar.SaveLyrics" xml:space="preserve"><value>Сохранить текст в файл</value><comment>Header in PlaybackBarView.axaml (lyrics page, online lyrics shown)</comment></data>
+  <data name="PlaybackBar.SaveLyricsLrc" xml:space="preserve"><value>LRC</value><comment>Item under Save Lyrics to File in PlaybackBarView.axaml: saves online lyrics as an .lrc file (.elrc too when word-synced). File format name, usually not translated</comment></data>
+  <data name="PlaybackBar.SaveLyricsTtml" xml:space="preserve"><value>TTML</value><comment>Item under Save Lyrics to File in PlaybackBarView.axaml: saves time-synced lyrics as a .ttml file (Apple Music style, keeps word timings). File format name, usually not translated</comment></data>
   <data name="PlaybackBar.QueueTip" xml:space="preserve"><value>Очередь</value><comment>ToolTip.Tip in PlaybackBarView.axaml</comment></data>
   <data name="PlaybackBar.LyricsTip" xml:space="preserve"><value>Текст</value><comment>ToolTip.Tip in PlaybackBarView.axaml</comment></data>
   <data name="PlaybackBar.VolumeTip" xml:space="preserve"><value>Громкость</value><comment>ToolTip.Tip in PlaybackBarView.axaml</comment></data>
