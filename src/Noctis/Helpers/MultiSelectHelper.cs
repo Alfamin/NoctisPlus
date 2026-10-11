@@ -211,7 +211,12 @@ public static class MultiSelectHelper
 
         if (!e.KeyModifiers.HasFlag(KeyModifiers.Control))
         {
-            ClearTrackSelectionsByData(selectedData);
+            // Strip the realized rows too: clearing only the set left every row painted
+            // ctrl-selected after a plain click, with the selection bar already gone.
+            if (ItemsControl.ItemsControlFromItemContainer(item) is ListBox listBox)
+                ClearTrackSelectionsByData(selectedData, listBox);
+            else
+                ClearTrackSelectionsByData(selectedData);
             return false;
         }
 
