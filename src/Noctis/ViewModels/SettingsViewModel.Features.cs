@@ -211,7 +211,14 @@ public partial class SettingsViewModel
     {
         IsChangePasswordVisible = !IsChangePasswordVisible;
         ChangePasswordValue = string.Empty;
+        IsPasswordRevealed = false;
     }
+
+    /// <summary>The eye in the password boxes (create account, change password): show what was typed.</summary>
+    [ObservableProperty] private bool _isPasswordRevealed;
+
+    [RelayCommand]
+    private void TogglePasswordReveal() => IsPasswordRevealed = !IsPasswordRevealed;
 
     [RelayCommand]
     private void ChangePrimaryPassword()

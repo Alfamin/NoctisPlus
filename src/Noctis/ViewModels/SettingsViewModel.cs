@@ -1111,7 +1111,30 @@ public partial class SettingsViewModel : ViewModelBase
     [ObservableProperty] private string _serverUserError = string.Empty;
     public bool HasIssuedApiKey => IssuedApiKey.Length > 0;
     public bool HasServerUsers => ServerUsersList.Count > 0;
-    partial void OnIssuedApiKeyChanged(string value) => OnPropertyChanged(nameof(HasIssuedApiKey));
+
+    /// <summary>The key shows as dots until the eye is pressed: it is a password, and Settings
+    /// is on screen during calls and screen shares. Each new key starts hidden again.</summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(DisplayedApiKey))]
+    private bool _isIssuedApiKeyRevealed;
+
+    [ObservableProperty] private bool _issuedApiKeyCopied;
+
+    /// <summary>What the key box shows: the key, or its prefix and a row of dots.</summary>
+    public string DisplayedApiKey => IsIssuedApiKeyRevealed || IssuedApiKey.Length == 0
+        ? IssuedApiKey
+        : IssuedApiKey[..Math.Min(3, IssuedApiKey.Length)] + new string('•', 24);
+
+    partial void OnIssuedApiKeyChanged(string value)
+    {
+        IsIssuedApiKeyRevealed = false;
+        IssuedApiKeyCopied = false;
+        OnPropertyChanged(nameof(HasIssuedApiKey));
+        OnPropertyChanged(nameof(DisplayedApiKey));
+    }
+
+    [RelayCommand]
+    private void ToggleIssuedApiKeyReveal() => IsIssuedApiKeyRevealed = !IsIssuedApiKeyRevealed;
 
     partial void OnNoctisServerEnabledChanged(bool value)
     {
@@ -1310,7 +1333,10 @@ public partial class SettingsViewModel : ViewModelBase
             as Avalonia.Controls.ApplicationLifetimes.IClassicDesktopStyleApplicationLifetime)
             ?.MainWindow?.Clipboard;
         if (clipboard is null || IssuedApiKey.Length == 0) return;
-        try { await clipboard.SetTextAsync(IssuedApiKey); } catch { }
+        try { await clipboard.SetTextAsync(IssuedApiKey); } catch { return; }
+        IssuedApiKeyCopied = true;
+        await Task.Delay(1500);
+        IssuedApiKeyCopied = false;
     }
 
     // ── Web remote ──

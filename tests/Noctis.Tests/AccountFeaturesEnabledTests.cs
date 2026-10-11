@@ -71,4 +71,43 @@ public class AccountFeaturesEnabledTests : IDisposable
         var user = Assert.Single(new ServerUserStore(Path.Combine(persistence.DataDirectory, "server", "users.db")).List());
         Assert.Equal("me@example.com", user.Name);
     }
+
+    [AvaloniaFact]
+    public async Task IssuedApiKey_StartsHidden_TheEyeShowsIt_AndANewKeyHidesItAgain()
+    {
+        var persistence = new PersistenceService(_root);
+        var vm = new SettingsViewModel(persistence, new FakeLibraryService(), new NoOpPlayHistoryService());
+        await vm.LoadAsync();
+        vm.NewServerUserName = "me@example.com";
+        vm.NewServerUserPassword = "correct horse";
+        vm.CreatePrimaryAccountCommand.Execute(null);
+
+        vm.RegenerateServerApiKeyCommand.Execute(vm.PrimaryAccount);
+        var key = vm.IssuedApiKey;
+        Assert.True(key.Length > 10);
+        Assert.False(vm.IsIssuedApiKeyRevealed);
+        Assert.DoesNotContain(key[3..], vm.DisplayedApiKey);           // only the prefix shows
+        Assert.StartsWith(key[..3], vm.DisplayedApiKey);
+
+        vm.ToggleIssuedApiKeyRevealCommand.Execute(null);
+        Assert.Equal(key, vm.DisplayedApiKey);
+
+        vm.RegenerateServerApiKeyCommand.Execute(vm.PrimaryAccount);
+        Assert.NotEqual(key, vm.IssuedApiKey);
+        Assert.False(vm.IsIssuedApiKeyRevealed);
+
+        vm.HideIssuedApiKeyCommand.Execute(null);
+        Assert.False(vm.HasIssuedApiKey);
+    }
+
+    [AvaloniaFact]
+    public async Task PasswordEye_TogglesAndClosingChangePasswordHidesItAgain()
+    {
+        var vm = new SettingsViewModel(new PersistenceService(_root), new FakeLibraryService(), new NoOpPlayHistoryService());
+        await vm.LoadAsync();
+        vm.TogglePasswordRevealCommand.Execute(null);
+        Assert.True(vm.IsPasswordRevealed);
+        vm.ToggleChangePasswordCommand.Execute(null);
+        Assert.False(vm.IsPasswordRevealed);
+    }
 }
