@@ -526,6 +526,18 @@ public partial class LyricsViewModel : ViewModelBase, IDisposable
     [ObservableProperty]
     private bool _canSaveToFile;
 
+    /// <summary>
+    /// Whether "Save Lyrics to File ▸ TTML" is offered: the page shows time-synced lyrics of a
+    /// local file — online ones (as for LRC), or the song's own from an .lrc/.elrc/.lyricsfile,
+    /// its tags or the cache. Not for lyrics read from a .ttml (that file is already there),
+    /// plain lyrics, or a Lyrics Studio preview.
+    /// </summary>
+    [ObservableProperty]
+    private bool _canSaveTtmlToFile;
+
+    /// <summary>The LRC/ELRC text of the song's own synced lyrics on the page, for a TTML save; null otherwise.</summary>
+    private string? _localSyncedForSave;
+
     /// <summary>Whether lyrics can be removed (true for online-fetched or cached service lyrics).</summary>
     [ObservableProperty]
     private bool _canRemoveLyrics;
@@ -1635,6 +1647,15 @@ public partial class LyricsViewModel : ViewModelBase, IDisposable
         && track is { SourceType: SourceType.Local } && !string.IsNullOrWhiteSpace(track.FilePath)
         && SyncedToWrite(result) is not null;
 
+    /// <summary>Offers Save ▸ TTML for the song's own synced lyrics on the page (<paramref name="synced"/>: their LRC/ELRC text, null when none).</summary>
+    private void OfferTtmlSave(Track track, string? synced)
+    {
+        _localSyncedForSave = string.IsNullOrWhiteSpace(synced) || IsPreviewActive
+            || track is not { SourceType: SourceType.Local } || string.IsNullOrWhiteSpace(track.FilePath)
+            ? null : synced;
+        CanSaveTtmlToFile = _localSyncedForSave is not null;
+    }
+
     /// <summary>
     /// The synced text an online result is written as: the word timings of its Lyricsfile as
     /// ELRC when it has them, else its line-level synced lyrics. LRCLIB sends both; writing only
@@ -1661,20 +1682,58 @@ public partial class LyricsViewModel : ViewModelBase, IDisposable
     /// lyrics page never reads.
     /// </remarks>
     [RelayCommand]
-    private async Task SaveLyricsToFile()
+    private Task SaveLyricsToFile() => SaveLyricsToFileCore(asTtml: false);
+
+    /// <summary>
+    /// "Save Lyrics to File ▸ TTML" (Discord, nutf!xx: players that read TTML but not ELRC):
+    /// the same save as LRC, plus a .ttml beside the song in Apple Music's layout — word spans
+    /// and background vocals when the lyrics have word timings, line times otherwise. The page
+    /// reads the .ttml first, so it shows the save. Offered for the song's own synced lyrics too
+    /// (an .lrc/.elrc/.lyricsfile, its tags, the cache), not only online ones: the automatic
+    /// save had already put most found lyrics in an .lrc, which LRC alone never turned into TTML.
+    /// </summary>
+    [RelayCommand]
+    private Task SaveLyricsAsTtml() => SaveLyricsToFileCore(asTtml: true);
+
+    /// <summary>A .ttml of LRC/ELRC <paramref name="synced"/>: word timings when it has them, line times otherwise; null when nothing is timed.</summary>
+    internal static string? BuildTtmlFromSynced(string synced)
     {
-        if (_currentTrack is not { } track || _currentOnlineResult is not { } result
-            || !CanSaveOnlineLyrics(track, result) || IsPreviewActive) return;
+        var lines = Services.LyricsStudio.ExistingLyricsLoader.ParseTimed(synced);
+        return lines.Count == 0 ? null : Services.LyricsStudio.TimedLyricsBuilder.BuildTtml(lines);
+    }
+
+    private async Task SaveLyricsToFileCore(bool asTtml)
+    {
+        if (_currentTrack is not { } track || IsPreviewActive) return;
+        string synced, plain;
+        if (_currentOnlineResult is { } result)
+        {
+            if (!CanSaveOnlineLyrics(track, result)) return;
+            synced = SyncedToWrite(result)!;
+            plain = !string.IsNullOrWhiteSpace(result.PlainLyrics) ? result.PlainLyrics : LyricsTextHelper.StripTimestamps(synced);
+        }
+        else
+        {
+            // The song's own lyrics: only TTML is offered for them; its plain lyrics are kept.
+            if (!asTtml || !CanSaveTtmlToFile || _localSyncedForSave is not { } local) return;
+            synced = local;
+            var own = track.Lyrics;
+            plain = !string.IsNullOrWhiteSpace(own) && !LyricsTextHelper.ContainsTimestamps(own) ? own : LyricsTextHelper.StripTimestamps(synced);
+        }
         var trackPath = track.FilePath;
-        var synced = SyncedToWrite(result)!;
-        var plain = !string.IsNullOrWhiteSpace(result.PlainLyrics) ? result.PlainLyrics : LyricsTextHelper.StripTimestamps(synced);
+        var ttml = asTtml ? BuildTtmlFromSynced(synced) : null;
+        if (asTtml && ttml is null)
+        {
+            ShowStatusText(Localization.Loc.T("Lyrics.SaveFailed"), 5000);
+            return;
+        }
 
         try
         {
             // On the writer lane, behind the automatic save of these lyrics that may still be
             // queued, so the prompt names only files this save really changes.
             var changed = new List<string>();
-            await EnqueueLyricsFileWork(() => changed = Services.Lyrics.LyricsWriter.FilesChangedBySave(trackPath, synced));
+            await EnqueueLyricsFileWork(() => changed = Services.Lyrics.LyricsWriter.FilesChangedBySave(trackPath, synced, ttml));
             if (changed.Count > 0)
             {
                 var message = Localization.Loc.T(changed.Count == 1 ? "Lyrics.SaveReplaceOne" : "Lyrics.SaveReplaceMany",
@@ -1691,9 +1750,9 @@ public partial class LyricsViewModel : ViewModelBase, IDisposable
             var outcome = Services.Lyrics.LyricsSaveOutcome.Nothing;
             // Off the UI thread (trashing can wait on the OS) and in order with every other lyrics write.
             await EnqueueLyricsFileWork(() =>
-                outcome = writer.SaveDetailed(track, plain, synced, embedInTags: false, replaceForeignSidecar: true));
+                outcome = writer.SaveDetailed(track, plain, synced, embedInTags: false, replaceForeignSidecar: true, ttml));
             DebugLogger.Info(DebugLogger.Category.Lyrics, "SaveLyricsToFile",
-                $"written={outcome.SidecarWritten}, replacedForeign={outcome.ReplacedForeignSidecar}, keptForeign={outcome.KeptForeignSidecar}");
+                $"ttml={asTtml}, written={outcome.SidecarWritten}, replacedForeign={outcome.ReplacedForeignSidecar}, keptForeign={outcome.KeptForeignSidecar}");
 
             // Show what is on disk now; the reload also ends the online state (and the Save item).
             if (ReferenceEquals(_currentTrack, track))
@@ -1981,6 +2040,8 @@ public partial class LyricsViewModel : ViewModelBase, IDisposable
         HasSyncedLyricsAvailable = false;
         ActiveLineIndex = -1;
         CanSaveToFile = false;
+        CanSaveTtmlToFile = false;
+        _localSyncedForSave = null;
         CanRemoveLyrics = false;
         HasAlternateLyrics = false;
         LyricsSourceName = string.Empty;
@@ -2193,6 +2254,8 @@ public partial class LyricsViewModel : ViewModelBase, IDisposable
 
         RefreshActiveLyricPosition();
         CanSaveToFile = CanSaveOnlineLyrics(_currentTrack, result);
+        _localSyncedForSave = null;
+        CanSaveTtmlToFile = CanSaveToFile;
         CanRemoveLyrics = true;
         ShowSearchButton = false;
 
@@ -2232,6 +2295,8 @@ public partial class LyricsViewModel : ViewModelBase, IDisposable
         HasSyncedLyricsAvailable = false;
         ActiveLineIndex = -1;
         CanSaveToFile = false;
+        CanSaveTtmlToFile = false;
+        _localSyncedForSave = null;
         CanRemoveLyrics = false;
         HasAlternateLyrics = false;
         LyricsSourceName = string.Empty;
@@ -2501,6 +2566,8 @@ public partial class LyricsViewModel : ViewModelBase, IDisposable
         SearchFailedMessage = string.Empty;
         IsSearching = false;
         CanSaveToFile = false;
+        CanSaveTtmlToFile = false;
+        _localSyncedForSave = null;
         CanRemoveLyrics = false;
         SaveStatusText = string.Empty;
         IsAutoFollowPaused = false;
@@ -2622,11 +2689,13 @@ public partial class LyricsViewModel : ViewModelBase, IDisposable
         await applied.Task;
     }
 
+    /// <param name="SyncedText">The source as LRC/ELRC text, for "Save Lyrics to File ▸ TTML"; null for a .ttml or a preview.</param>
     private readonly record struct LocalLyricsProbe(
         List<LyricLine>? Lines,
         string? UnsyncedPlain,
         string Source,
-        bool FromCache);
+        bool FromCache,
+        string? SyncedText = null);
 
     /// <summary>Synchronous probe helper — must only be called off the UI thread.</summary>
     private static LocalLyricsProbe ProbeLocalLyricSources(Track track, bool joinSplitWords, string uiLanguage)
@@ -2639,7 +2708,7 @@ public partial class LyricsViewModel : ViewModelBase, IDisposable
             {
                 var (lines, plain) = LyricsfileParser.Parse(sidecarYaml);
                 if (lines != null && lines.Count > 0)
-                    return new LocalLyricsProbe(lines, plain, "Sidecar:Lyricsfile", FromCache: false);
+                    return new LocalLyricsProbe(lines, plain, "Sidecar:Lyricsfile", FromCache: false, LyricsfileParser.ToElrc(sidecarYaml));
             }
         }
         catch { }
@@ -2665,7 +2734,7 @@ public partial class LyricsViewModel : ViewModelBase, IDisposable
             {
                 var lines = ParseLrcContent(sidecarElrc);
                 if (lines.Count > 0)
-                    return new LocalLyricsProbe(lines, null, "Sidecar:Elrc", FromCache: false);
+                    return new LocalLyricsProbe(lines, null, "Sidecar:Elrc", FromCache: false, sidecarElrc);
             }
         }
         catch { }
@@ -2678,7 +2747,7 @@ public partial class LyricsViewModel : ViewModelBase, IDisposable
             {
                 var lines = ParseLrcContent(sidecarLrc);
                 if (lines.Count > 0)
-                    return new LocalLyricsProbe(lines, null, "Sidecar:Lrc", FromCache: false);
+                    return new LocalLyricsProbe(lines, null, "Sidecar:Lrc", FromCache: false, sidecarLrc);
             }
         }
         catch { }
@@ -2697,7 +2766,7 @@ public partial class LyricsViewModel : ViewModelBase, IDisposable
             {
                 var (lines, plain) = LyricsfileParser.Parse(cachedYaml);
                 if (lines != null && lines.Count > 0)
-                    return new LocalLyricsProbe(lines, plain, "Cache:Lyricsfile", FromCache: true);
+                    return new LocalLyricsProbe(lines, plain, "Cache:Lyricsfile", FromCache: true, LyricsfileParser.ToElrc(cachedYaml));
             }
 
             var cachedLrc = TryReadCacheFile(track.Id, ".lrc");
@@ -2707,7 +2776,7 @@ public partial class LyricsViewModel : ViewModelBase, IDisposable
                 {
                     var lines = ParseLrcContent(cachedLrc);
                     if (lines.Count > 0)
-                        return new LocalLyricsProbe(lines, null, "Cache:Lrc", FromCache: true);
+                        return new LocalLyricsProbe(lines, null, "Cache:Lrc", FromCache: true, cachedLrc);
                 }
                 return new LocalLyricsProbe(null, cachedLrc, "Cache:Plain", FromCache: true);
             }
@@ -2752,6 +2821,7 @@ public partial class LyricsViewModel : ViewModelBase, IDisposable
 
             LyricsSourceName = string.Empty;
             if (probe.FromCache) CanRemoveLyrics = true;
+            OfferTtmlSave(track, _hasSyncedLyrics ? probe.SyncedText : null);
             RefreshActiveLyricPosition();
 
             if (_hasSyncedLyrics && IsSyncTabSelected && _player.State == Models.PlaybackState.Playing)
@@ -2762,6 +2832,7 @@ public partial class LyricsViewModel : ViewModelBase, IDisposable
         if (probe.Source == "Embedded")
         {
             LoadEmbeddedLyrics(track);
+            OfferTtmlSave(track, _localSyncedForSave);
             if (_hasSyncedLyrics && IsSyncTabSelected && _player.State == Models.PlaybackState.Playing)
                 _lyricsSyncTimer.Start();
             return;
@@ -2823,6 +2894,7 @@ public partial class LyricsViewModel : ViewModelBase, IDisposable
             _hasSyncedLyrics = parsedLines.Any(l => l.IsSynced);
             IsSynced = _hasSyncedLyrics;
             HasSyncedLyricsAvailable = _hasSyncedLyrics;
+            if (_hasSyncedLyrics) _localSyncedForSave = syncedSource;
 
             if (_hasSyncedLyrics)
                 LrcParser.InsertIntroPlaceholderIfNeeded(parsedLines);

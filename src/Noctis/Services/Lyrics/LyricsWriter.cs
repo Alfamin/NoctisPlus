@@ -118,16 +118,17 @@ public sealed class LyricsWriter
 
     /// <summary>
     /// The lyrics files beside <paramref name="audioPath"/> that a <see cref="SaveDetailed"/> of
-    /// <paramref name="synced"/> (no TTML) would replace or remove, quoted names only, in the
-    /// lyrics page's read order — for the prompt before a save. A file that already holds exactly
-    /// what the save writes is left out: re-saving lyrics already on disk changes nothing.
+    /// <paramref name="synced"/> (and <paramref name="ttml"/>, when given) would replace or remove,
+    /// quoted names only, in the lyrics page's read order — for the prompt before a save. A file
+    /// that already holds exactly what the save writes is left out: re-saving lyrics already on
+    /// disk changes nothing.
     /// </summary>
-    internal static List<string> FilesChangedBySave(string audioPath, string synced)
+    internal static List<string> FilesChangedBySave(string audioPath, string synced, string? ttml = null)
     {
         var changed = new List<string>();
         var isWordLevel = LyricsFormatDetector.Detect(null, synced) == LyricsFormat.Elrc;
         Check(".lyricsfile", null);
-        Check(".ttml", null);
+        Check(".ttml", string.IsNullOrWhiteSpace(ttml) ? null : ttml);
         Check(".elrc", isWordLevel ? synced : null);
         Check(".lrc", isWordLevel ? LineLevelProjection(synced) : synced);
         return changed;
@@ -144,9 +145,17 @@ public sealed class LyricsWriter
                 changed.Add($"“{Path.GetFileName(path)}”");
             }
         }
+    }
 
-        static string Comparable(string text) =>
-            text.TrimStart('﻿').Replace("\r\n", "\n", StringComparison.Ordinal).Replace('\r', '\n').TrimEnd();
+    /// <summary>Text as a sidecar comparison sees it: no BOM, LF line ends, no trailing blank space.</summary>
+    private static string Comparable(string text) =>
+        text.TrimStart('﻿').Replace("\r\n", "\n", StringComparison.Ordinal).Replace('\r', '\n').TrimEnd();
+
+    /// <summary>The file at <paramref name="path"/> already holds <paramref name="content"/> (as <see cref="Comparable"/> sees it).</summary>
+    private static bool HoldsAlready(string path, string content)
+    {
+        try { return Comparable(File.ReadAllText(path)) == Comparable(content); }
+        catch { return false; }
     }
 
     /// <summary>
@@ -216,6 +225,14 @@ public sealed class LyricsWriter
     private void WriteSidecar(string sidecarPath, string content, bool replaceForeign, ref bool written, ref bool replaced, ref bool kept)
     {
         var foreign = File.Exists(sidecarPath) && !_registry.Contains(sidecarPath);
+        // The user's own file already says exactly this: leave it be. The prompt before a save
+        // leaves such a file out (FilesChangedBySave), so trashing it here went unannounced —
+        // Save ▸ TTML of the song's own .lrc sent that same .lrc to the Recycle Bin.
+        if (foreign && HoldsAlready(sidecarPath, content))
+        {
+            written = true;
+            return;
+        }
         if (foreign)
         {
             if (!replaceForeign) return;
