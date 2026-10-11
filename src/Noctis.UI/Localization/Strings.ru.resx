@@ -43,7 +43,7 @@
   <data name="Visualizer.Title" xml:space="preserve"><value>Визуализатор</value></data>
   <data name="Visualizer.Empty" xml:space="preserve"><value>Включите музыку, чтобы увидеть движение.</value></data>
   <data name="Visualizer.NowPlaying" xml:space="preserve"><value>СЕЙЧАС ИГРАЕТ</value><comment>Text in VisualizerView.axaml</comment></data>
-  <data name="Visualizer.Style.Bars" xml:space="preserve"><value>Полосы</value></data>
+  <data name="Visualizer.Style.Bars" xml:space="preserve"><value>Столбцы</value></data>
   <data name="Visualizer.Style.Mirror" xml:space="preserve"><value>Зеркало</value></data>
   <data name="Visualizer.Style.Wave" xml:space="preserve"><value>Волна</value></data>
 
@@ -133,15 +133,15 @@ Deezer и TIDAL: вставьте ссылку.</value></data>
   <data name="Settings.CollapseAlbumEditions" xml:space="preserve"><value>Объединять издания альбомов</value><comment>Text in SettingsView.axaml</comment></data>
   <data name="Settings.ShowOneTilePer" xml:space="preserve"><value>Одна плитка на релиз. Другие издания показываются в разделе «Другие версии».</value><comment>Text in SettingsView.axaml</comment></data>
   <data name="Settings.MergeFeaturedArtistsFrom" xml:space="preserve"><value>Брать приглашённых исполнителей из названий</value><comment>Text in SettingsView.axaml</comment></data>
-  <data name="Settings.TurnFeatXTrack" xml:space="preserve"><value>Превращать «(feat. X)» в названиях в указание исполнителя.</value><comment>Text in SettingsView.axaml</comment></data>
+  <data name="Settings.TurnFeatXTrack" xml:space="preserve"><value>Переносить «(feat. X)» из названий в исполнителей.</value><comment>Text in SettingsView.axaml</comment></data>
   <data name="Settings.GroupArtistsBy" xml:space="preserve"><value>Группировать исполнителей по</value><comment>Text in SettingsView.axaml</comment></data>
-  <data name="Settings.WhichTagArtistsSection" xml:space="preserve"><value>«Исполнитель альбома» держит сборники вместе и не учитывает гостей отдельных треков.</value><comment>Text in SettingsView.axaml</comment></data>
+  <data name="Settings.WhichTagArtistsSection" xml:space="preserve"><value>«Исполнитель альбома» не разбивает сборники и не учитывает гостей в отдельных треках.</value><comment>Text in SettingsView.axaml</comment></data>
   <data name="Settings.FirstCreditedArtistEachTip" xml:space="preserve"><value>Первый исполнитель, указанный в теге «Исполнитель» каждой песни</value><comment>ToolTip.Tip in SettingsView.axaml</comment></data>
   <data name="Settings.Artist" xml:space="preserve"><value>Исполнитель</value><comment>Text in SettingsView.axaml</comment></data>
   <data name="Settings.SongSArtistTag" xml:space="preserve"><value>Тег исполнителя песни</value><comment>Text in SettingsView.axaml</comment></data>
   <data name="Settings.AlbumArtistTagSongsTip" xml:space="preserve"><value>Тег «Исполнитель альбома»; для песен без него используется исполнитель</value><comment>ToolTip.Tip in SettingsView.axaml</comment></data>
   <data name="Settings.AlbumArtist" xml:space="preserve"><value>Исполнитель альбома</value><comment>Text in SettingsView.axaml</comment></data>
-  <data name="Settings.ReleaseSAlbumArtist" xml:space="preserve"><value>Тег исполнителя альбома у релиза</value><comment>Text in SettingsView.axaml</comment></data>
+  <data name="Settings.ReleaseSAlbumArtist" xml:space="preserve"><value>Тег исполнителя альбома</value><comment>Text in SettingsView.axaml</comment></data>
   <data name="Settings.ArtistTagSeparators" xml:space="preserve"><value>Разделители в теге исполнителя</value><comment>Text in SettingsView.axaml</comment></data>
   <data name="Settings.TextSplitsOneArtist" xml:space="preserve"><value>Текст, который делит один тег исполнителя на несколько. Удалите разделитель, чтобы имена вроде «Simon &amp; Garfunkel» оставались целыми.</value><comment>Text in SettingsView.axaml</comment></data>
   <data name="Settings.Reset" xml:space="preserve"><value>Сбросить</value><comment>Content in SettingsView.axaml</comment></data>
@@ -164,7 +164,7 @@ Deezer и TIDAL: вставьте ссылку.</value></data>
   <data name="Settings.AutoDownloadUpdatesCaption" xml:space="preserve"><value>Новые версии загружаются в фоне. Нажмите «Установить и перезапустить», когда будете готовы.</value><comment>Text in SettingsView.axaml</comment></data>
   <data name="Settings.Postpone" xml:space="preserve"><value>Отложить</value><comment>Text in SettingsView.axaml</comment></data>
   <data name="Settings.WhatsNew" xml:space="preserve"><value>Что нового</value><comment>Text in SettingsView.axaml</comment></data>
-  <data name="Settings.ShowRecentReleasesOnly" xml:space="preserve"><value>Последние выпуски</value><comment>Advanced: collapses the release history</comment></data>
+  <data name="Settings.ShowRecentReleasesOnly" xml:space="preserve"><value>Показать последние выпуски</value><comment>Advanced: collapses the release history</comment></data>
   <data name="Settings.LyricsBackgroundPerSongHint" xml:space="preserve"><value>Щёлкните правой кнопкой по песне или альбому, чтобы задать для него отдельное видео.</value><comment>Appearance: under Lyrics Background Video</comment></data>
   <data name="Settings.PauseVideoWithPlayback" xml:space="preserve"><value>Ставить видео на паузу вместе с музыкой</value><comment>Appearance toggle title</comment></data>
   <data name="Settings.PauseVideoWithPlaybackDesc" xml:space="preserve"><value>Фоновое видео замирает, пока песня на паузе.</value><comment>Appearance toggle description</comment></data>
@@ -177,12 +177,12 @@ Deezer и TIDAL: вставьте ссылку.</value></data>
   <data name="Settings.About.GitHubCaption" xml:space="preserve"><value>Поставьте звезду</value><comment>About tile caption in SettingsView.axaml</comment></data>
   <data name="Settings.About.DiscordCaption" xml:space="preserve"><value>Помощь и новости</value><comment>About tile caption in SettingsView.axaml</comment></data>
   <data name="Settings.About.WebsiteCaption" xml:space="preserve"><value>Документация и загрузки</value><comment>About tile caption in SettingsView.axaml</comment></data>
-  <data name="Settings.IncludePreReleaseUpdates" xml:space="preserve"><value>Предварительные версии в обновлениях</value><comment>Text in SettingsView.axaml</comment></data>
+  <data name="Settings.IncludePreReleaseUpdates" xml:space="preserve"><value>Получать предварительные версии</value><comment>Text in SettingsView.axaml</comment></data>
   <data name="Settings.OfferBetaBuildsUpdater" xml:space="preserve"><value>Предлагать бета-сборки при обновлении.</value><comment>Text in SettingsView.axaml</comment></data>
   <data name="Settings.YoursTrulyHeartached" xml:space="preserve"><value>Искренне ваш, heartached.</value><comment>Text in SettingsView.axaml</comment></data>
   <data name="Settings.DeveloperMode" xml:space="preserve"><value>Режим разработчика</value><comment>Text in SettingsView.axaml</comment></data>
   <data name="Settings.ShowVersionManagerDebug" xml:space="preserve"><value>Показывать менеджер версий и журналы отладки.</value><comment>Text in SettingsView.axaml</comment></data>
-  <data name="Settings.DownloadInstallAnyRelease" xml:space="preserve"><value>Установите любой выпуск с GitHub. Установка закроет приложение.</value><comment>Text in SettingsView.axaml</comment></data>
+  <data name="Settings.DownloadInstallAnyRelease" xml:space="preserve"><value>Можно установить любой выпуск с GitHub. Установка закроет приложение.</value><comment>Text in SettingsView.axaml</comment></data>
   <data name="Settings.NoReleasesFound" xml:space="preserve"><value>Выпуски не найдены.</value><comment>Text in SettingsView.axaml</comment></data>
   <data name="Settings.PreRelease2" xml:space="preserve"><value>Предварительная</value><comment>Text in SettingsView.axaml</comment></data>
   <data name="Settings.Latest" xml:space="preserve"><value>Последняя</value><comment>Text in SettingsView.axaml</comment></data>
@@ -205,7 +205,7 @@ Deezer и TIDAL: вставьте ссылку.</value></data>
   <data name="Settings.Delete" xml:space="preserve"><value>Удалить</value><comment>Header in SettingsView.axaml</comment></data>
   <data name="Settings.CreateCustomThemeTip" xml:space="preserve"><value>Создать свою тему</value><comment>ToolTip.Tip in SettingsView.axaml</comment></data>
   <data name="Settings.Custom" xml:space="preserve"><value>Своя</value><comment>Text in SettingsView.axaml</comment></data>
-  <data name="Settings.AccentFollowsArtwork" xml:space="preserve"><value>Акцент по обложке</value><comment>Appearance toggle in SettingsView.axaml</comment></data>
+  <data name="Settings.AccentFollowsArtwork" xml:space="preserve"><value>Акцентный цвет из обложки</value><comment>Appearance toggle in SettingsView.axaml</comment></data>
   <data name="Settings.AccentFollowsArtworkHint" xml:space="preserve"><value>Акцентный цвет берётся из обложки текущего трека. Когда ничего не играет, возвращается выбранный вами цвет.</value><comment>Appearance toggle hint in SettingsView.axaml</comment></data>
   <data name="Settings.AccentTrackLinks" xml:space="preserve"><value>Акцентный цвет для имён исполнителей и альбомов</value><comment>Appearance toggle in SettingsView.axaml (GitHub #125)</comment></data>
   <data name="Settings.AccentTrackLinksHint" xml:space="preserve"><value>Имена исполнителей, альбомов и жанров в плейлистах, в «Песнях» и в плеере окрашиваются в акцентный цвет. Если выключено, они показываются обычным цветом текста.</value><comment>Appearance toggle hint in SettingsView.axaml (GitHub #125)</comment></data>
@@ -263,9 +263,9 @@ Deezer и TIDAL: вставьте ссылку.</value></data>
   <data name="Settings.SleepTimer" xml:space="preserve"><value>Таймер сна</value><comment>Text in SettingsView.axaml</comment></data>
   <data name="Settings.SleepTimerOneClick" xml:space="preserve"><value>Таймер сна в один клик.</value><comment>Text in SettingsView.axaml</comment></data>
   <data name="Settings.Shuffle" xml:space="preserve"><value>Перемешивание</value><comment>Text in SettingsView.axaml</comment></data>
-  <data name="Settings.ShuffleButtonAfterRepeat" xml:space="preserve"><value>Кнопка перемешивания рядом с повтором.</value><comment>Text in SettingsView.axaml</comment></data>
+  <data name="Settings.ShuffleButtonAfterRepeat" xml:space="preserve"><value>Кнопка «Перемешать» рядом с кнопкой «Повтор».</value><comment>Text in SettingsView.axaml</comment></data>
   <data name="Settings.EqualizerButton" xml:space="preserve"><value>Эквалайзер</value><comment>Player Island Buttons row: EQ on/off button (GitHub #94)</comment></data>
-  <data name="Settings.EqualizerButtonHint" xml:space="preserve"><value>Кнопка включения эквалайзера после перемешивания.</value><comment>Player Island Buttons row hint</comment></data>
+  <data name="Settings.EqualizerButtonHint" xml:space="preserve"><value>Кнопка включения эквалайзера после кнопки «Перемешать».</value><comment>Player Island Buttons row hint</comment></data>
   <data name="Settings.PlaybackTime" xml:space="preserve"><value>Время воспроизведения</value><comment>Text in SettingsView.axaml</comment></data>
   <data name="Settings.PlaybackTimeInTrackBox" xml:space="preserve"><value>Прошедшее и оставшееся время текущего трека в блоке трека.</value><comment>Text in SettingsView.axaml</comment></data>
   <data name="Settings.WaveformSeekBar" xml:space="preserve"><value>Волновая форма на полосе перемотки</value><comment>Text in SettingsView.axaml</comment></data>
@@ -273,7 +273,7 @@ Deezer и TIDAL: вставьте ссылку.</value></data>
   <data name="Settings.TrackBoxOpacity" xml:space="preserve"><value>Непрозрачность блока трека</value><comment>Text in SettingsView.axaml</comment></data>
   <data name="Settings.HowSolidTrackBox" xml:space="preserve"><value>Насколько плотный фон у блока со сведениями о песне на панели плеера. При 0% он скрыт.</value><comment>Text in SettingsView.axaml</comment></data>
   <data name="Settings.RepeatButton" xml:space="preserve"><value>Повтор</value><comment>Text in SettingsView.axaml</comment></data>
-  <data name="Settings.RepeatButtonNextToForward" xml:space="preserve"><value>Кнопка повтора после «Далее»: по кругу Выкл. → Все → Один.</value><comment>Text in SettingsView.axaml</comment></data>
+  <data name="Settings.RepeatButtonNextToForward" xml:space="preserve"><value>Кнопка повтора после «Вперёд»: по кругу Выкл. → Все → Один.</value><comment>Text in SettingsView.axaml</comment></data>
   <data name="Settings.FavoriteButton" xml:space="preserve"><value>Избранное</value><comment>Text in SettingsView.axaml</comment></data>
   <data name="Settings.FavoriteButtonHeart" xml:space="preserve"><value>Сердечко справа, чтобы добавить текущую песню в избранное одним щелчком.</value><comment>Text in SettingsView.axaml</comment></data>
   <data name="Settings.MiniPlayerButton" xml:space="preserve"><value>Мини-плеер</value><comment>Text in SettingsView.axaml</comment></data>
@@ -295,10 +295,10 @@ Deezer и TIDAL: вставьте ссылку.</value></data>
   <data name="Settings.AudioVisualizer" xml:space="preserve"><value>Аудиовизуализатор</value><comment>Text in SettingsView.axaml</comment></data>
   <data name="Settings.DrawLiveSpectrumMusic" xml:space="preserve"><value>Живой спектр вдоль нижнего края страницы текста.</value><comment>Text in SettingsView.axaml</comment></data>
   <data name="Settings.ArtworkColour" xml:space="preserve"><value>Цвет обложки</value><comment>Text in SettingsView.axaml</comment></data>
-  <data name="Settings.TintBarsCurrentCover" xml:space="preserve"><value>Окрашивать полосы в цвет обложки. Если выключено — белые.</value><comment>Text in SettingsView.axaml</comment></data>
-  <data name="Settings.FrequencyBarsRisingFromTip" xml:space="preserve"><value>Частотные полосы, растущие снизу</value><comment>ToolTip.Tip in SettingsView.axaml</comment></data>
-  <data name="Settings.Bars" xml:space="preserve"><value>Полосы</value><comment>Text in SettingsView.axaml</comment></data>
-  <data name="Settings.BarsMirroredAboutCentreTip" xml:space="preserve"><value>Полосы, отражённые относительно центральной линии</value><comment>ToolTip.Tip in SettingsView.axaml</comment></data>
+  <data name="Settings.TintBarsCurrentCover" xml:space="preserve"><value>Окрашивать столбцы в цвет обложки. Если выключено — они белые.</value><comment>Text in SettingsView.axaml</comment></data>
+  <data name="Settings.FrequencyBarsRisingFromTip" xml:space="preserve"><value>Частотные столбцы, растущие снизу</value><comment>ToolTip.Tip in SettingsView.axaml</comment></data>
+  <data name="Settings.Bars" xml:space="preserve"><value>Столбцы</value><comment>Text in SettingsView.axaml</comment></data>
+  <data name="Settings.BarsMirroredAboutCentreTip" xml:space="preserve"><value>Столбцы, отражённые относительно центральной линии</value><comment>ToolTip.Tip in SettingsView.axaml</comment></data>
   <data name="Settings.Mirror" xml:space="preserve"><value>Зеркало</value><comment>Text in SettingsView.axaml</comment></data>
   <data name="Settings.SmoothFilledCurveTip" xml:space="preserve"><value>Плавная заполненная кривая</value><comment>ToolTip.Tip in SettingsView.axaml</comment></data>
   <data name="Settings.Wave" xml:space="preserve"><value>Волна</value><comment>Text in SettingsView.axaml</comment></data>
@@ -349,7 +349,7 @@ Deezer и TIDAL: вставьте ссылку.</value></data>
   <data name="LyricsVideo.BestQuality" xml:space="preserve"><value>Наилучшее доступное</value><comment>YouTube panel: no resolution cap</comment></data>
   <data name="LyricsVideo.Order" xml:space="preserve"><value>Песня использует своё видео, затем видео альбома, затем видео по умолчанию.</value><comment>Picker footer note</comment></data>
   <data name="Settings.Modify" xml:space="preserve"><value>Изменить</value><comment>Appearance: opens the lyrics background video picker</comment></data>
-  <data name="Settings.SeeMoreReleases" xml:space="preserve"><value>Больше выпусков</value><comment>Advanced: expands the release history</comment></data>
+  <data name="Settings.SeeMoreReleases" xml:space="preserve"><value>Показать больше выпусков</value><comment>Advanced: expands the release history</comment></data>
   <data name="Settings.Remove" xml:space="preserve"><value>Удалить</value><comment>Content in SettingsView.axaml</comment></data>
   <data name="Settings.FullscreenLyricsFocus" xml:space="preserve"><value>Фокус в полноэкранном тексте</value><comment>Text in SettingsView.axaml</comment></data>
   <data name="Settings.DimAllButCurrent" xml:space="preserve"><value>Приглушать все строки, кроме текущей и соседних.</value><comment>Text in SettingsView.axaml</comment></data>
@@ -385,7 +385,7 @@ Deezer и TIDAL: вставьте ссылку.</value></data>
   <data name="Settings.10s" xml:space="preserve"><value>10 с</value><comment>Content in SettingsView.axaml</comment></data>
   <data name="Settings.SoundCheck" xml:space="preserve"><value>Выравнивание громкости</value><comment>Text in SettingsView.axaml</comment></data>
   <data name="Settings.KeepSongVolumeAt" xml:space="preserve"><value>Поддерживать одинаковый уровень громкости песен.</value><comment>Text in SettingsView.axaml</comment></data>
-  <data name="Settings.PlayPauseFade" xml:space="preserve"><value>Плавность при паузе</value><comment>Text in SettingsView.axaml</comment></data>
+  <data name="Settings.PlayPauseFade" xml:space="preserve"><value>Плавный запуск и пауза</value><comment>Text in SettingsView.axaml</comment></data>
   <data name="Settings.PlayPauseFadeHint" xml:space="preserve"><value>Плавно убирать звук при паузе и возвращать при продолжении вместо резкой остановки.</value><comment>Text in SettingsView.axaml</comment></data>
   <data name="Settings.FadeDuration" xml:space="preserve"><value>Длительность затухания</value><comment>Text in SettingsView.axaml</comment></data>
   <data name="Settings.PlayCountAfter" xml:space="preserve"><value>Засчитывать прослушивание после</value><comment>Text in SettingsView.axaml</comment></data>
@@ -400,7 +400,7 @@ Deezer и TIDAL: вставьте ссылку.</value></data>
   <data name="Settings.KeepPlayedInQueueHint" xml:space="preserve"><value>Показывать прослушанные песни над «Сейчас играет» в очереди и оставлять последнюю песню загруженной, когда очередь закончится.</value><comment>Text in SettingsView.axaml</comment></data>
   <data name="Queue.Played" xml:space="preserve"><value>Прослушано</value><comment>Text in MainWindow.axaml</comment></data>
   <data name="MiniPlayer.Played" xml:space="preserve"><value>Прослушано</value><comment>Text in MiniPlayerWindow.axaml</comment></data>
-  <data name="Settings.ExplicitContent" xml:space="preserve"><value>Откровенный контент</value><comment>Text in SettingsView.axaml</comment></data>
+  <data name="Settings.ExplicitContent" xml:space="preserve"><value>Ненормативный контент</value><comment>Text in SettingsView.axaml</comment></data>
   <data name="Settings.AllowExplicitSongsWhen" xml:space="preserve"><value>Если выключено, песни с ненормативной лексикой пропускаются, если вы не включаете их сами.</value><comment>Text in SettingsView.axaml</comment></data>
   <data name="Settings.ExclusiveMode" xml:space="preserve"><value>Монопольный режим</value><comment>Text in SettingsView.axaml</comment></data>
   <data name="Settings.BitPerfectOutputBypasses" xml:space="preserve"><value>Бит-в-бит вывод в обход микшера Windows. Звук других приложений отключается, переходы выключены.</value><comment>Text in SettingsView.axaml</comment></data>
@@ -411,7 +411,7 @@ Deezer и TIDAL: вставьте ссылку.</value></data>
   <data name="Settings.Equalizer" xml:space="preserve"><value>Эквалайзер</value><comment>Text in SettingsView.axaml</comment></data>
   <data name="Settings.ParametricEQTuneEach" xml:space="preserve"><value>Настройте частоту, усиление и ширину каждой полосы.</value><comment>Text in SettingsView.axaml</comment></data>
   <data name="Settings.Preamp" xml:space="preserve"><value>Предусиление</value><comment>Text in SettingsView.axaml</comment></data>
-  <data name="Settings.LevelBeforeEQLowerTip" xml:space="preserve"><value>Уровень перед эквалайзером — понизьте, если усиленные полосы искажаются. Двойное касание — сброс.</value><comment>ToolTip.Tip in SettingsView.axaml</comment></data>
+  <data name="Settings.LevelBeforeEQLowerTip" xml:space="preserve"><value>Уровень перед эквалайзером — понизьте, если усиленные полосы искажаются. Двойной щелчок — сброс.</value><comment>ToolTip.Tip in SettingsView.axaml</comment></data>
   <data name="Settings.FREQUENCY" xml:space="preserve"><value>ЧАСТОТА</value><comment>Text in SettingsView.axaml</comment></data>
   <data name="Settings.GAIN" xml:space="preserve"><value>УСИЛЕНИЕ</value><comment>Text in SettingsView.axaml</comment></data>
   <data name="Settings.CenterFrequencyHzTypeTip" xml:space="preserve"><value>Центральная частота (Гц) — введите, прокрутите или используйте стрелки</value><comment>ToolTip.Tip in SettingsView.axaml</comment></data>
@@ -429,7 +429,7 @@ Deezer и TIDAL: вставьте ссылку.</value></data>
   <data name="Settings.EqPresetNameTooLong" xml:space="preserve"><value>Название пресета — не более 40 символов.</value><comment>Save preset flyout error</comment></data>
   <data name="Settings.EqPresetNameReserved" xml:space="preserve"><value>Это имя занято встроенным пресетом. Выберите другое.</value><comment>Save preset flyout error (built-in names, Custom, None)</comment></data>
   <data name="Settings.DeleteEqPreset" xml:space="preserve"><value>Удалить</value><comment>Equalizer card: deletes the selected preset</comment></data>
-  <data name="Settings.DeleteEqPresetTip" xml:space="preserve"><value>Удалить выбранный пресет. «Свой» и «Ровный» удалить нельзя.</value><comment>Equalizer card Delete button tooltip</comment></data>
+  <data name="Settings.DeleteEqPresetTip" xml:space="preserve"><value>Удалить выбранный пресет. «Custom» и «Flat» удалить нельзя.</value><comment>Equalizer card Delete button tooltip</comment></data>
   <data name="Settings.RestoreEqPresets" xml:space="preserve"><value>Восстановить пресеты</value><comment>Equalizer card: brings back deleted built-in presets</comment></data>
   <data name="Settings.RestoreEqPresetsTip" xml:space="preserve"><value>Вернуть удалённые встроенные пресеты</value><comment>Equalizer card Restore presets tooltip</comment></data>
   <data name="Settings.AUDIOTOOLS" xml:space="preserve"><value>АУДИОИНСТРУМЕНТЫ</value><comment>Text in SettingsView.axaml</comment></data>
@@ -462,7 +462,7 @@ Deezer и TIDAL: вставьте ссылку.</value></data>
   <data name="Settings.LocalApiHideToken" xml:space="preserve"><value>Скрыть</value><comment>Masks the Local API token</comment></data>
   <data name="Settings.LocalApiRegenerate" xml:space="preserve"><value>Создать новый токен</value><comment>Text in SettingsView.axaml</comment></data>
   <data name="Settings.LocalApiRegenerateTip" xml:space="preserve"><value>Создать новый токен. Приложения со старым токеном перестанут работать, пока вы не передадите им новый.</value><comment>ToolTip.Tip in SettingsView.axaml</comment></data>
-  <data name="Settings.LocalApiWarning" xml:space="preserve"><value>Любая программа на этом ПК, у которой есть токен, может управлять воспроизведением и читать вашу медиатеку. Передавайте его только доверенным приложениям и пересоздайте, если он утёк.</value><comment>Text in SettingsView.axaml</comment></data>
+  <data name="Settings.LocalApiWarning" xml:space="preserve"><value>Любая программа на этом ПК, у которой есть токен, может управлять воспроизведением и читать вашу медиатеку. Передавайте его только доверенным приложениям, а при утечке создайте новый.</value><comment>Text in SettingsView.axaml</comment></data>
   <data name="Settings.LocalApiDiscovery" xml:space="preserve"><value>Приложения могут найти адрес и токен в файле local-api.json в папке данных Noctis.</value><comment>Text in SettingsView.axaml</comment></data>
   <data name="Settings.ACCOUNTS" xml:space="preserve"><value>АККАУНТЫ</value><comment>Text in SettingsView.axaml</comment></data>
   <data name="Settings.DiscordRichPresence" xml:space="preserve"><value>Discord Rich Presence</value><comment>Text in SettingsView.axaml</comment></data>
@@ -585,7 +585,7 @@ Deezer и TIDAL: вставьте ссылку.</value></data>
   <data name="Settings.KeyboardShortcuts" xml:space="preserve"><value>Сочетания клавиш</value><comment>Text in SettingsView.axaml</comment></data>
   <data name="Settings.ClickKeyChangePress" xml:space="preserve"><value>Нажмите на клавишу, чтобы изменить её. Esc — отмена, Backspace — снять назначение. Мультимедийные клавиши работают всегда.</value><comment>Text in SettingsView.axaml</comment></data>
   <data name="Settings.ResetAll" xml:space="preserve"><value>Сбросить все</value><comment>Content in SettingsView.axaml</comment></data>
-  <data name="Settings.ResetDefaultTip" xml:space="preserve"><value>Сбросить по умолчанию</value><comment>ToolTip.Tip in SettingsView.axaml</comment></data>
+  <data name="Settings.ResetDefaultTip" xml:space="preserve"><value>Вернуть значение по умолчанию</value><comment>ToolTip.Tip in SettingsView.axaml</comment></data>
   <data name="Settings.LIBRARYOVERVIEW" xml:space="preserve"><value>ОБЗОР МЕДИАТЕКИ</value><comment>Text in SettingsView.axaml</comment></data>
   <data name="Settings.MusicLibrary" xml:space="preserve"><value>Ваша медиатека</value><comment>Text in SettingsView.axaml</comment></data>
   <data name="Settings.Songs" xml:space="preserve"><value>Песни</value><comment>Text in SettingsView.axaml</comment></data>
@@ -602,7 +602,7 @@ Deezer и TIDAL: вставьте ссылку.</value></data>
   <data name="Settings.TimeListened" xml:space="preserve"><value>Время прослушивания</value><comment>Text in SettingsView.axaml</comment></data>
   <data name="Settings.AvgTrackLength" xml:space="preserve"><value>Средняя длина трека</value><comment>Text in SettingsView.axaml</comment></data>
   <data name="Settings.LikedSongs" xml:space="preserve"><value>Любимые песни</value><comment>Text in SettingsView.axaml</comment></data>
-  <data name="Settings.TOPPLAYED" xml:space="preserve"><value>САМОЕ ПОПУЛЯРНОЕ</value><comment>Text in SettingsView.axaml</comment></data>
+  <data name="Settings.TOPPLAYED" xml:space="preserve"><value>САМОЕ ПРОСЛУШИВАЕМОЕ</value><comment>Text in SettingsView.axaml</comment></data>
   <data name="Settings.TopArtists" xml:space="preserve"><value>Топ исполнителей</value><comment>Text in SettingsView.axaml</comment></data>
   <data name="Settings.PlaySomeTracksSee" xml:space="preserve"><value>Послушайте несколько треков, чтобы увидеть топ исполнителей</value><comment>Text in SettingsView.axaml</comment></data>
   <data name="Settings.TopAlbums" xml:space="preserve"><value>Топ альбомов</value><comment>Text in SettingsView.axaml</comment></data>
@@ -646,7 +646,7 @@ Deezer и TIDAL: вставьте ссылку.</value></data>
   <data name="AddToPlaylist.Back" xml:space="preserve"><value>Назад</value><comment>Content in AddToPlaylistDialog.axaml</comment></data>
   <data name="AddToPlaylist.Create" xml:space="preserve"><value>Создать</value><comment>Content in AddToPlaylistDialog.axaml</comment></data>
   <data name="AddToPlaylist.Playlists" xml:space="preserve"><value>Ваши плейлисты</value><comment>Text in AddToPlaylistDialog.axaml</comment></data>
-  <data name="AddToPlaylist.NoPlaylistsYetCreate" xml:space="preserve"><value>Плейлистов пока нет — создайте плейлист выше.</value><comment>Text in AddToPlaylistDialog.axaml</comment></data>
+  <data name="AddToPlaylist.NoPlaylistsYetCreate" xml:space="preserve"><value>Плейлистов пока нет — создайте первый выше.</value><comment>Text in AddToPlaylistDialog.axaml</comment></data>
   <data name="AddToPlaylist.AddingOneSong" xml:space="preserve"><value>Добавляется 1 песня</value><comment>Subtitle under the title in AddToPlaylistDialog.axaml when exactly one song is being added</comment></data>
   <data name="AddToPlaylist.AddingSongs" xml:space="preserve"><value>Добавляется песен: {0:N0}</value><comment>Subtitle under the title in AddToPlaylistDialog.axaml; {0} = number of songs being added</comment></data>
   <data name="AddToPlaylist.Name" xml:space="preserve"><value>Название</value><comment>Field label in the create pane of AddToPlaylistDialog.axaml</comment></data>
@@ -658,7 +658,7 @@ Deezer и TIDAL: вставьте ссылку.</value></data>
   <!-- AlbumDescriptionDialog.axaml (auto-migrated) -->
   <data name="AlbumDescription.AlbumDescription" xml:space="preserve"><value>Описание альбома</value><comment>Title in AlbumDescriptionDialog.axaml</comment></data>
   <data name="AlbumDescription.Text" xml:space="preserve"><value>♪</value><comment>Text in AlbumDescriptionDialog.axaml</comment></data>
-  <data name="AlbumDescription.RELEASED" xml:space="preserve"><value>ВЫПУЩЕН</value><comment>Text in AlbumDescriptionDialog.axaml</comment></data>
+  <data name="AlbumDescription.RELEASED" xml:space="preserve"><value>ДАТА ВЫПУСКА</value><comment>Text in AlbumDescriptionDialog.axaml</comment></data>
   <data name="AlbumDescription.GENRE" xml:space="preserve"><value>ЖАНР</value><comment>Text in AlbumDescriptionDialog.axaml</comment></data>
   <data name="AlbumDescription.TRACKS" xml:space="preserve"><value>ТРЕКИ</value><comment>Text in AlbumDescriptionDialog.axaml</comment></data>
   <data name="AlbumDescription.QUALITY" xml:space="preserve"><value>КАЧЕСТВО</value><comment>Text in AlbumDescriptionDialog.axaml</comment></data>
@@ -715,9 +715,9 @@ Deezer и TIDAL: вставьте ссылку.</value></data>
   <data name="ArtistDetail.RemoveFromLibrary" xml:space="preserve"><value>Удалить из медиатеки</value><comment>Header in ArtistDetailView.axaml</comment></data>
   <data name="ArtistDetail.Text" xml:space="preserve"><value>♪</value><comment>Text in ArtistDetailView.axaml</comment></data>
   <data name="ArtistDetail.ExplicitTip" xml:space="preserve"><value>Ненормативная лексика</value><comment>ToolTip.Tip in ArtistDetailView.axaml</comment></data>
-  <data name="ArtistDetail.PlayEverythingByArtistTip" xml:space="preserve"><value>Слушать всё от этого исполнителя</value><comment>ToolTip.Tip in ArtistDetailView.axaml</comment></data>
-  <data name="ArtistDetail.ShuffleEverythingByArtistTip" xml:space="preserve"><value>Перемешать всё от этого исполнителя</value><comment>ToolTip.Tip in ArtistDetailView.axaml</comment></data>
-  <data name="ArtistDetail.FavoriteArtistTip" xml:space="preserve"><value>Исполнитель в избранное</value><comment>ToolTip.Tip in ArtistDetailView.axaml</comment></data>
+  <data name="ArtistDetail.PlayEverythingByArtistTip" xml:space="preserve"><value>Слушать все песни исполнителя</value><comment>ToolTip.Tip in ArtistDetailView.axaml</comment></data>
+  <data name="ArtistDetail.ShuffleEverythingByArtistTip" xml:space="preserve"><value>Перемешать все песни исполнителя</value><comment>ToolTip.Tip in ArtistDetailView.axaml</comment></data>
+  <data name="ArtistDetail.FavoriteArtistTip" xml:space="preserve"><value>Добавить исполнителя в избранное</value><comment>ToolTip.Tip in ArtistDetailView.axaml</comment></data>
   <data name="ArtistDetail.OptionsTip" xml:space="preserve"><value>Параметры</value><comment>ToolTip.Tip in ArtistDetailView.axaml</comment></data>
   <data name="ArtistDetail.ShufflePopular" xml:space="preserve"><value>Перемешать лучшие песни</value><comment>Header in ArtistDetailView.axaml</comment></data>
   <data name="ArtistDetail.ShuffleFavorites" xml:space="preserve"><value>Перемешать избранное</value><comment>Header in ArtistDetailView.axaml</comment></data>
@@ -866,7 +866,7 @@ Deezer и TIDAL: вставьте ссылку.</value></data>
   <data name="CreateSmartPlaylist.NameRequired" xml:space="preserve"><value>Укажите название</value><comment>Text in CreateSmartPlaylistDialog.axaml</comment></data>
   <data name="CreateSmartPlaylist.DescriptionOptional" xml:space="preserve"><value>Описание (необязательно)</value><comment>Watermark in CreateSmartPlaylistDialog.axaml</comment></data>
   <data name="CreateSmartPlaylist.Rules" xml:space="preserve"><value>Правила</value><comment>Text in CreateSmartPlaylistDialog.axaml</comment></data>
-  <data name="CreateSmartPlaylist.Match" xml:space="preserve"><value>Совпадение</value><comment>Text in CreateSmartPlaylistDialog.axaml</comment></data>
+  <data name="CreateSmartPlaylist.Match" xml:space="preserve"><value>Соответствие</value><comment>Text in CreateSmartPlaylistDialog.axaml</comment></data>
   <data name="CreateSmartPlaylist.Value" xml:space="preserve"><value>Значение</value><comment>Watermark in CreateSmartPlaylistDialog.axaml</comment></data>
   <data name="CreateSmartPlaylist.To" xml:space="preserve"><value>До...</value><comment>Watermark in CreateSmartPlaylistDialog.axaml</comment></data>
   <data name="CreateSmartPlaylist.AddRule" xml:space="preserve"><value>Добавить правило</value><comment>Text in CreateSmartPlaylistDialog.axaml</comment></data>
@@ -877,8 +877,8 @@ Deezer и TIDAL: вставьте ссылку.</value></data>
   <data name="CreateSmartPlaylist.Description" xml:space="preserve"><value>Описание</value><comment>Field label in CreateSmartPlaylistDialog.axaml</comment></data>
   <data name="CreateSmartPlaylist.AddDescription" xml:space="preserve"><value>Добавить описание</value><comment>Button that reveals the optional description field in CreateSmartPlaylistDialog.axaml</comment></data>
   <data name="CreateSmartPlaylist.Optional" xml:space="preserve"><value>Необязательно</value><comment>Watermark of the description field in CreateSmartPlaylistDialog.axaml</comment></data>
-  <data name="CreateSmartPlaylist.MatchAll" xml:space="preserve"><value>Все</value><comment>Segment: a track must match every rule (Match All / Any) in CreateSmartPlaylistDialog.axaml</comment></data>
-  <data name="CreateSmartPlaylist.MatchAny" xml:space="preserve"><value>Любое</value><comment>Segment: a track may match any one rule (Match All / Any) in CreateSmartPlaylistDialog.axaml</comment></data>
+  <data name="CreateSmartPlaylist.MatchAll" xml:space="preserve"><value>Всем</value><comment>Segment: a track must match every rule (Match All / Any) in CreateSmartPlaylistDialog.axaml</comment></data>
+  <data name="CreateSmartPlaylist.MatchAny" xml:space="preserve"><value>Любому</value><comment>Segment: a track may match any one rule (Match All / Any) in CreateSmartPlaylistDialog.axaml</comment></data>
   <data name="CreateSmartPlaylist.MatchesCount" xml:space="preserve"><value>Подходящих треков: {0:N0}</value><comment>Live count in the footer of CreateSmartPlaylistDialog.axaml; {0} = number of tracks</comment></data>
   <data name="CreateSmartPlaylist.MatchesOne" xml:space="preserve"><value>Подходит 1 трек</value><comment>Live count in the footer of CreateSmartPlaylistDialog.axaml when exactly one track matches</comment></data>
   <data name="CreateSmartPlaylist.NoRules" xml:space="preserve"><value>Добавьте правило, чтобы начать</value><comment>Footer of CreateSmartPlaylistDialog.axaml when every rule was removed</comment></data>
@@ -923,7 +923,7 @@ Deezer и TIDAL: вставьте ссылку.</value></data>
   <data name="EditPlaylist.SidebarFolder" xml:space="preserve"><value>Папка на боковой панели</value><comment>Text in EditPlaylistDialog.axaml</comment></data>
   <data name="EditPlaylist.NoFolder" xml:space="preserve"><value>Без папки</value><comment>Watermark in EditPlaylistDialog.axaml</comment></data>
   <data name="EditPlaylist.PickExistingFolderType" xml:space="preserve"><value>Выберите существующую папку или введите новое имя, чтобы сгруппировать плейлисты на боковой панели.</value><comment>Text in EditPlaylistDialog.axaml</comment></data>
-  <data name="EditPlaylist.StarKeepAtTop" xml:space="preserve"><value>Звезда — держать вверху боковой панели</value><comment>Content in EditPlaylistDialog.axaml</comment></data>
+  <data name="EditPlaylist.StarKeepAtTop" xml:space="preserve"><value>Звезда — закрепить вверху боковой панели</value><comment>Content in EditPlaylistDialog.axaml</comment></data>
 
   <!-- FavoritesView.axaml (auto-migrated) -->
   <data name="Favorites.Play" xml:space="preserve"><value>Слушать</value><comment>Text in FavoritesView.axaml</comment></data>
@@ -948,8 +948,8 @@ Deezer и TIDAL: вставьте ссылку.</value></data>
 
   <!-- HomeView.axaml (auto-migrated) -->
   <data name="Home.HideShowSectionTip" xml:space="preserve"><value>Скрыть или показать этот раздел</value><comment>ToolTip.Tip in HomeView.axaml</comment></data>
-  <data name="Home.MostPlayed" xml:space="preserve"><value>Чаще всего</value><comment>Home chart header</comment></data>
-  <data name="Home.LastPlayed" xml:space="preserve"><value>Недавно звучали</value><comment>Home chart header</comment></data>
+  <data name="Home.MostPlayed" xml:space="preserve"><value>Самое прослушиваемое</value><comment>Home chart header</comment></data>
+  <data name="Home.LastPlayed" xml:space="preserve"><value>Недавно прослушанное</value><comment>Home chart header</comment></data>
   <data name="Home.Text" xml:space="preserve"><value>♪</value><comment>Text in HomeView.axaml</comment></data>
   <data name="Home.ExplicitTip" xml:space="preserve"><value>Ненормативная лексика</value><comment>ToolTip.Tip in HomeView.axaml</comment></data>
   <data name="Home.ListenCountTip" xml:space="preserve"><value>Число прослушиваний</value><comment>ToolTip.Tip in HomeView.axaml</comment></data>
@@ -1047,7 +1047,7 @@ Deezer и TIDAL: вставьте ссылку.</value></data>
   <data name="LrcEditor.PlayPause" xml:space="preserve"><value>Воспроизведение / пауза</value><comment>Content in LrcEditorDialog.axaml</comment></data>
   <data name="LrcEditor.StampPlayingPositionOntoTip" xml:space="preserve"><value>Поставить текущую позицию на выделенную строку и перейти к следующей (Пробел)</value><comment>ToolTip.Tip in LrcEditorDialog.axaml</comment></data>
   <data name="LrcEditor.StampLineSpace" xml:space="preserve"><value>⏱  Отметить строку  (Пробел)</value><comment>Text in LrcEditorDialog.axaml</comment></data>
-  <data name="LrcEditor.PlayFrom1sBeforeTip" xml:space="preserve"><value>Играть с 1 с до этой строки</value><comment>ToolTip.Tip in LrcEditorDialog.axaml</comment></data>
+  <data name="LrcEditor.PlayFrom1sBeforeTip" xml:space="preserve"><value>Играть с точки за 1 с до этой строки</value><comment>ToolTip.Tip in LrcEditorDialog.axaml</comment></data>
   <data name="LrcEditor.Nudge01sEarlierTip" xml:space="preserve"><value>Сдвинуть на 0,1 с раньше</value><comment>ToolTip.Tip in LrcEditorDialog.axaml</comment></data>
   <data name="LrcEditor.Nudge01sLaterTip" xml:space="preserve"><value>Сдвинуть на 0,1 с позже</value><comment>ToolTip.Tip in LrcEditorDialog.axaml</comment></data>
   <data name="LrcEditor.StampCurrentPositionTip" xml:space="preserve"><value>Отметить текущей позицией</value><comment>ToolTip.Tip in LrcEditorDialog.axaml</comment></data>
@@ -1134,7 +1134,7 @@ Deezer и TIDAL: вставьте ссылку.</value></data>
   <data name="LyricsSearch.Failed" xml:space="preserve"><value>Ошибка поиска — проверьте подключение к интернету.</value><comment>Status in LyricsSearchViewModel</comment></data>
   <data name="LyricsSearch.NoSources" xml:space="preserve"><value>Все источники выключены в настройках. Выберите один выше.</value><comment>Status in LyricsSearchViewModel</comment></data>
   <data name="LyricsSearch.WordSynced" xml:space="preserve"><value>По словам</value><comment>Result format in LyricsSearchViewModel</comment></data>
-  <data name="LyricsSearch.LineSynced" xml:space="preserve"><value>Синхронизирован</value><comment>Result format in LyricsSearchViewModel (line-level timing)</comment></data>
+  <data name="LyricsSearch.LineSynced" xml:space="preserve"><value>По строкам</value><comment>Result format in LyricsSearchViewModel (line-level timing)</comment></data>
   <data name="LyricsSearch.Plain" xml:space="preserve"><value>Обычный</value><comment>Result format in LyricsSearchViewModel (no timing)</comment></data>
   <data name="LyricsSearch.NoMatch" xml:space="preserve"><value>Нет совпадений</value><comment>Result in LyricsSearchViewModel</comment></data>
   <data name="LyricsSearch.CouldNotConnect" xml:space="preserve"><value>Не удалось подключиться</value><comment>Result in LyricsSearchViewModel</comment></data>
@@ -1178,7 +1178,7 @@ Deezer и TIDAL: вставьте ссылку.</value></data>
   <data name="Main.Year" xml:space="preserve"><value>Год</value><comment>Header in MainWindow.axaml</comment></data>
   <data name="Main.RecentlyAdded" xml:space="preserve"><value>Недавно добавленные</value><comment>Header in MainWindow.axaml</comment></data>
   <data name="Main.MostPlayed" xml:space="preserve"><value>Самые прослушиваемые</value><comment>Header in MainWindow.axaml</comment></data>
-  <data name="Main.Random" xml:space="preserve"><value>Случайно</value><comment>Header in MainWindow.axaml</comment></data>
+  <data name="Main.Random" xml:space="preserve"><value>В случайном порядке</value><comment>Header in MainWindow.axaml</comment></data>
   <data name="Main.Ascending" xml:space="preserve"><value>По возрастанию</value><comment>Header in MainWindow.axaml</comment></data>
   <data name="Main.NewestAlbumsFirst" xml:space="preserve"><value>Сначала новые альбомы</value><comment>Albums sort menu toggle in MainWindow.axaml (GitHub #106): under Album Artist sort, each artist's albums newest first</comment></data>
   <data name="Main.Descending" xml:space="preserve"><value>По убыванию</value><comment>Header in MainWindow.axaml</comment></data>
@@ -1246,7 +1246,7 @@ Deezer и TIDAL: вставьте ссылку.</value></data>
   <data name="Main.RemoveFromQueue" xml:space="preserve"><value>Удалить из очереди</value><comment>Header in MainWindow.axaml</comment></data>
   <data name="Main.ScanReplayGain" xml:space="preserve"><value>Сканировать ReplayGain</value><comment>Queue row menu in MainWindow.axaml</comment></data>
   <data name="Main.ExplicitTip" xml:space="preserve"><value>Ненормативная лексика</value><comment>ToolTip.Tip in MainWindow.axaml</comment></data>
-  <data name="Main.DropFilesImport" xml:space="preserve"><value>Перетащите файлы для импорта</value><comment>Text in MainWindow.axaml</comment></data>
+  <data name="Main.DropFilesImport" xml:space="preserve"><value>Отпустите файлы для импорта</value><comment>Text in MainWindow.axaml</comment></data>
   <data name="Main.DropZonePlay" xml:space="preserve"><value>Слушать сейчас</value><comment>Drop zone in DropOverlay.axaml (Import dropped files off): play the dropped files, nothing is loaded</comment></data>
   <data name="Main.DropZoneQueue" xml:space="preserve"><value>В очередь</value><comment>Drop zone in DropOverlay.axaml (Import dropped files off): something is playing, the files join the queue</comment></data>
   <data name="Main.DropZonePlayHint" xml:space="preserve"><value>Не добавляется в медиатеку</value><comment>Small line under the Play now / Add to queue drop zone</comment></data>
@@ -1260,11 +1260,11 @@ Deezer и TIDAL: вставьте ссылку.</value></data>
   <data name="Main.DropAddedToLibraryOne" xml:space="preserve"><value>В медиатеку добавлена 1 песня</value><comment>Drop pill after the Add to library drop zone</comment></data>
   <data name="Main.DropAddedToLibraryMany" xml:space="preserve"><value>Добавлено в медиатеку песен: {0}</value><comment>Drop pill after the Add to library drop zone; {0} = song count</comment></data>
   <data name="Main.DropAlreadyInLibrary" xml:space="preserve"><value>Уже в вашей медиатеке</value><comment>Drop pill after the Add to library drop zone when every dropped song was in the library</comment></data>
-  <data name="Main.DropNewPlaylistOne" xml:space="preserve"><value>1 песня добавлена в новый плейлист {0}</value><comment>Drop pill after the New playlist drop zone; {0} = playlist name</comment></data>
-  <data name="Main.DropNewPlaylistMany" xml:space="preserve"><value>Добавлено песен в новый плейлист {1}: {0}</value><comment>Drop pill after the New playlist drop zone; {0} = song count, {1} = playlist name</comment></data>
-  <data name="Main.DropAddedToPlaylistOne" xml:space="preserve"><value>1 песня добавлена в {0}</value><comment>Drop pill after files were dropped onto a sidebar playlist; {0} = playlist name</comment></data>
-  <data name="Main.DropAddedToPlaylistMany" xml:space="preserve"><value>Добавлено песен в {1}: {0}</value><comment>Drop pill after files were dropped onto a sidebar playlist; {0} = song count, {1} = playlist name</comment></data>
-  <data name="Main.DropAlreadyInPlaylist" xml:space="preserve"><value>Уже в {0}</value><comment>Drop pill when every song dropped onto a sidebar playlist was in it already; {0} = playlist name</comment></data>
+  <data name="Main.DropNewPlaylistOne" xml:space="preserve"><value>1 песня добавлена в новый плейлист «{0}»</value><comment>Drop pill after the New playlist drop zone; {0} = playlist name</comment></data>
+  <data name="Main.DropNewPlaylistMany" xml:space="preserve"><value>Добавлено песен в новый плейлист «{1}»: {0}</value><comment>Drop pill after the New playlist drop zone; {0} = song count, {1} = playlist name</comment></data>
+  <data name="Main.DropAddedToPlaylistOne" xml:space="preserve"><value>1 песня добавлена в «{0}»</value><comment>Drop pill after files were dropped onto a sidebar playlist; {0} = playlist name</comment></data>
+  <data name="Main.DropAddedToPlaylistMany" xml:space="preserve"><value>Добавлено песен в «{1}»: {0}</value><comment>Drop pill after files were dropped onto a sidebar playlist; {0} = song count, {1} = playlist name</comment></data>
+  <data name="Main.DropAlreadyInPlaylist" xml:space="preserve"><value>Уже в «{0}»</value><comment>Drop pill when every song dropped onto a sidebar playlist was in it already; {0} = playlist name</comment></data>
 
   <!-- MetadataFinderDialog.axaml (auto-migrated) -->
   <data name="MetadataFinder.FindMetadata" xml:space="preserve"><value>Поиск метаданных</value><comment>Title in MetadataFinderDialog.axaml</comment></data>
@@ -1272,8 +1272,8 @@ Deezer и TIDAL: вставьте ссылку.</value></data>
   <data name="MetadataFinder.IdentifyAll" xml:space="preserve"><value>Определить все</value><comment>Content in MetadataFinderDialog.axaml</comment></data>
   <data name="MetadataFinder.Close" xml:space="preserve"><value>Закрыть</value><comment>Content in MetadataFinderDialog.axaml</comment></data>
   <data name="MetadataFinder.Apply" xml:space="preserve"><value>Применить</value><comment>Content in MetadataFinderDialog.axaml</comment></data>
-  <data name="MetadataFinder.Current" xml:space="preserve"><value>Сейчас</value><comment>Text in MetadataFinderDialog.axaml</comment></data>
-  <data name="MetadataFinder.Proposed" xml:space="preserve"><value>Предлагается</value><comment>Text in MetadataFinderDialog.axaml</comment></data>
+  <data name="MetadataFinder.Current" xml:space="preserve"><value>Текущие</value><comment>Text in MetadataFinderDialog.axaml</comment></data>
+  <data name="MetadataFinder.Proposed" xml:space="preserve"><value>Предлагаемые</value><comment>Text in MetadataFinderDialog.axaml</comment></data>
   <data name="MetadataFinder.SourcesTip" xml:space="preserve"><value>Поиск по текущим тегам сначала в Deezer, затем в MusicBrainz. Источники меняются в настройках.</value><comment>Header ⓘ tooltip in the Find Metadata tool (MetadataFinderViewModel)</comment></data>
   <data name="MetadataFinder.NothingToFix" xml:space="preserve"><value>Нет треков с плохими тегами</value><comment>Find Metadata tool (MetadataFinderViewModel): nothing to fix</comment></data>
   <data name="MetadataFinder.ToIdentifyOne" xml:space="preserve"><value>1 трек для определения</value><comment>Find Metadata tool (MetadataFinderViewModel)</comment></data>
@@ -1283,7 +1283,7 @@ Deezer и TIDAL: вставьте ссылку.</value></data>
   <data name="MetadataFinder.Cancelled" xml:space="preserve"><value>Отменено</value><comment>Find Metadata tool (MetadataFinderViewModel): Identify all stopped</comment></data>
   <data name="MetadataFinder.Writing" xml:space="preserve"><value>Запись тегов (треков: {0})…</value><comment>Find Metadata tool (MetadataFinderViewModel); {0} = track count</comment></data>
   <data name="MetadataFinder.AppliedOne" xml:space="preserve"><value>Применено к 1 треку</value><comment>Find Metadata tool (MetadataFinderViewModel)</comment></data>
-  <data name="MetadataFinder.AppliedMany" xml:space="preserve"><value>Применено, треков: {0}</value><comment>Find Metadata tool (MetadataFinderViewModel); {0} = track count</comment></data>
+  <data name="MetadataFinder.AppliedMany" xml:space="preserve"><value>Применено к трекам: {0}</value><comment>Find Metadata tool (MetadataFinderViewModel); {0} = track count</comment></data>
   <data name="MetadataFinder.AppliedFailed" xml:space="preserve"><value>Применено: {0}, с ошибкой: {1}</value><comment>Find Metadata tool (MetadataFinderViewModel); {0} = written, {1} = failed</comment></data>
   <data name="MetadataFinder.Pending" xml:space="preserve"><value>В ожидании</value><comment>Row status in the Find Metadata tool (MetadataFinderViewModel)</comment></data>
   <data name="MetadataFinder.Matched" xml:space="preserve"><value>Найдено</value><comment>Row status in the Find Metadata tool (MetadataFinderViewModel): confident match, ticked</comment></data>
@@ -1337,12 +1337,12 @@ Deezer и TIDAL: вставьте ссылку.</value></data>
   <data name="Metadata.Movement" xml:space="preserve"><value>часть</value><comment>Text in MetadataWindow.axaml</comment></data>
   <data name="Metadata.Album2" xml:space="preserve"><value>альбом</value><comment>Text in MetadataWindow.axaml</comment></data>
   <data name="Metadata.AlbumCompilation" xml:space="preserve"><value>Альбом — сборник</value><comment>Content in MetadataWindow.axaml</comment></data>
-  <data name="Metadata.MarksContentAsExplicitTip" xml:space="preserve"><value>Помечает содержимое как откровенное (тег iTunes advisory). Настройка «Откровенный контент» использует его, чтобы пропускать песни.</value><comment>ToolTip.Tip in MetadataWindow.axaml</comment></data>
+  <data name="Metadata.MarksContentAsExplicitTip" xml:space="preserve"><value>Помечает содержимое как ненормативное (тег iTunes advisory). Настройка «Ненормативный контент» использует его, чтобы пропускать песни.</value><comment>ToolTip.Tip in MetadataWindow.axaml</comment></data>
   <data name="Metadata.Artist" xml:space="preserve"><value>исполнитель</value><comment>Text in MetadataWindow.axaml</comment></data>
   <data name="Metadata.AlbumArtist" xml:space="preserve"><value>исполнитель альбома</value><comment>Text in MetadataWindow.axaml</comment></data>
   <data name="Metadata.Performer" xml:space="preserve"><value>исполнитель партии</value><comment>Text in MetadataWindow.axaml</comment></data>
   <data name="Metadata.Composer" xml:space="preserve"><value>композитор</value><comment>Text in MetadataWindow.axaml</comment></data>
-  <data name="Metadata.ShowComposerAllViews" xml:space="preserve"><value>Показывать композитора во всех видах</value><comment>Content in MetadataWindow.axaml</comment></data>
+  <data name="Metadata.ShowComposerAllViews" xml:space="preserve"><value>Показывать композитора во всех разделах</value><comment>Content in MetadataWindow.axaml</comment></data>
   <data name="Metadata.Grouping" xml:space="preserve"><value>группировка</value><comment>Text in MetadataWindow.axaml</comment></data>
   <data name="Metadata.Genre" xml:space="preserve"><value>жанр</value><comment>Text in MetadataWindow.axaml</comment></data>
   <data name="Metadata.GenreTip" xml:space="preserve"><value>Выберите жанр или введите новый</value><comment>ToolTip.Tip in MetadataWindow.axaml (genre box)</comment></data>
@@ -1352,7 +1352,7 @@ Deezer и TIDAL: вставьте ссылку.</value></data>
   <data name="Metadata.Rating" xml:space="preserve"><value>оценка</value><comment>Text in MetadataWindow.axaml</comment></data>
   <data name="Metadata.NotLiked" xml:space="preserve"><value>Не нравится</value><comment>Content in MetadataWindow.axaml</comment></data>
   <data name="Metadata.Bpm" xml:space="preserve"><value>bpm</value><comment>Text in MetadataWindow.axaml</comment></data>
-  <data name="Metadata.PlayCount" xml:space="preserve"><value>прослушивания</value><comment>Text in MetadataWindow.axaml</comment></data>
+  <data name="Metadata.PlayCount" xml:space="preserve"><value>число прослушиваний</value><comment>Text in MetadataWindow.axaml</comment></data>
   <data name="Metadata.Reset" xml:space="preserve"><value>Сбросить</value><comment>Content in MetadataWindow.axaml</comment></data>
   <data name="Metadata.Comment" xml:space="preserve"><value>комментарий</value><comment>Text in MetadataWindow.axaml</comment></data>
   <data name="Metadata.AdvancedDetails" xml:space="preserve"><value>Расширенные сведения</value><comment>Header in MetadataWindow.axaml</comment></data>
@@ -1379,7 +1379,7 @@ Deezer и TIDAL: вставьте ссылку.</value></data>
   <data name="Metadata.ReleaseDate" xml:space="preserve"><value>дата выпуска</value><comment>Text in MetadataWindow.axaml</comment></data>
   <data name="Metadata.Copyright" xml:space="preserve"><value>авторские права</value><comment>Text in MetadataWindow.axaml</comment></data>
   <data name="Metadata.TECHNICAL" xml:space="preserve"><value>ТЕХНИЧЕСКИЕ ДАННЫЕ</value><comment>Text in MetadataWindow.axaml</comment></data>
-  <data name="Metadata.Encoder" xml:space="preserve"><value>кодировщик</value><comment>Text in MetadataWindow.axaml</comment></data>
+  <data name="Metadata.Encoder" xml:space="preserve"><value>кодер</value><comment>Text in MetadataWindow.axaml</comment></data>
   <data name="Metadata.TrackGain" xml:space="preserve"><value>усиление трека</value><comment>Text in MetadataWindow.axaml</comment></data>
   <data name="Metadata.TrackPeak" xml:space="preserve"><value>пик трека</value><comment>Text in MetadataWindow.axaml</comment></data>
   <data name="Metadata.AlbumGain" xml:space="preserve"><value>усиление альбома</value><comment>Text in MetadataWindow.axaml</comment></data>
@@ -1408,7 +1408,7 @@ Deezer и TIDAL: вставьте ссылку.</value></data>
   <data name="Metadata.NoAnimatedArtwork" xml:space="preserve"><value>Нет анимированной обложки</value><comment>Text in MetadataWindow.axaml</comment></data>
   <data name="Metadata.PlainLyrics" xml:space="preserve"><value>Обычный текст</value><comment>Header in MetadataWindow.axaml</comment></data>
   <data name="Metadata.Enable" xml:space="preserve"><value>Включить</value><comment>Text in MetadataWindow.axaml</comment></data>
-  <data name="Metadata.ImportFile" xml:space="preserve"><value>Импорт файла</value><comment>Content in MetadataWindow.axaml</comment></data>
+  <data name="Metadata.ImportFile" xml:space="preserve"><value>Импортировать файл</value><comment>Content in MetadataWindow.axaml</comment></data>
   <data name="Metadata.LoadTxtPlainLrcTip" xml:space="preserve"><value>Загрузить с диска файл текста .txt (обычный) или .lrc (синхронизированный)</value><comment>ToolTip.Tip in MetadataWindow.axaml</comment></data>
   <data name="Metadata.ShareLyrics" xml:space="preserve"><value>Поделиться текстом</value><comment>Content in MetadataWindow.axaml</comment></data>
   <data name="Metadata.SyncedLyrics" xml:space="preserve"><value>Синхронизированный текст</value><comment>Header in MetadataWindow.axaml</comment></data>
@@ -1424,7 +1424,7 @@ Deezer и TIDAL: вставьте ссылку.</value></data>
   <data name="Metadata.NoSyncedLyricsYet" xml:space="preserve"><value>Синхронизированного текста пока нет. Добавьте его через «Найти текст».</value><comment>Text in MetadataWindow.axaml</comment></data>
   <data name="Metadata.TimestampLyrics" xml:space="preserve"><value>Метки времени</value><comment>Header in MetadataWindow.axaml</comment></data>
   <data name="Metadata.LinesCarryPerWordTip2" xml:space="preserve"><value>Строки содержат метки времени для каждого слова; при сохранении они не теряются</value><comment>ToolTip.Tip in MetadataWindow.axaml</comment></data>
-  <data name="Metadata.HoverOverLineNudge" xml:space="preserve"><value>Наведите курсор на строку, чтобы подвинуть её тайминг.</value><comment>Text in MetadataWindow.axaml</comment></data>
+  <data name="Metadata.HoverOverLineNudge" xml:space="preserve"><value>Наведите курсор на строку, чтобы сдвинуть её метку времени.</value><comment>Text in MetadataWindow.axaml</comment></data>
   <data name="Metadata.ShiftAll" xml:space="preserve"><value>Сдвинуть все</value><comment>Text in MetadataWindow.axaml</comment></data>
   <data name="Metadata.Earlier" xml:space="preserve"><value>Раньше</value><comment>Content in MetadataWindow.axaml</comment></data>
   <data name="Metadata.MoveEveryLineSTip" xml:space="preserve"><value>Сдвинуть метки времени всех строк раньше на столько секунд</value><comment>ToolTip.Tip in MetadataWindow.axaml</comment></data>
@@ -1512,8 +1512,8 @@ Deezer и TIDAL: вставьте ссылку.</value></data>
   <data name="MetadataSearch.SelectAllTip" xml:space="preserve"><value>Выбрать все</value><comment>Text in MetadataSearchPanel.axaml</comment></data>
   <data name="MetadataSearch.Options" xml:space="preserve"><value>Параметры</value><comment>Text in MetadataSearchPanel.axaml</comment></data>
   <data name="MetadataSearch.F.Cover" xml:space="preserve"><value>Обложка</value><comment>Text in MetadataSearchPanel.axaml</comment></data>
-  <data name="MetadataSearch.Explicit" xml:space="preserve"><value>Откровенный</value><comment>Text in MetadataSearchPanel.axaml</comment></data>
-  <data name="MetadataSearch.NotExplicit" xml:space="preserve"><value>Не откровенный</value><comment>Text in MetadataSearchPanel.axaml</comment></data>
+  <data name="MetadataSearch.Explicit" xml:space="preserve"><value>Есть</value><comment>Text in MetadataSearchPanel.axaml</comment></data>
+  <data name="MetadataSearch.NotExplicit" xml:space="preserve"><value>Нет</value><comment>Text in MetadataSearchPanel.axaml</comment></data>
   <data name="MetadataSearch.Clean" xml:space="preserve"><value>Цензурная версия</value><comment>Text in MetadataSearchPanel.axaml</comment></data>
   <data name="MetadataSearch.Mixed" xml:space="preserve"><value>Разные</value><comment>Text in MetadataSearchPanel.axaml</comment></data>
   <data name="MetadataSearch.BlockedAlbum" xml:space="preserve"><value>Хранится для каждого трека: измените отдельный трек</value><comment>Text in MetadataSearchPanel.axaml</comment></data>
@@ -1538,12 +1538,12 @@ Deezer и TIDAL: вставьте ссылку.</value></data>
   <data name="MetadataSearch.F.Copyright" xml:space="preserve"><value>Авторские права</value><comment>Text in MetadataSearchPanel.axaml</comment></data>
   <data name="MetadataSearch.F.Isrc" xml:space="preserve"><value>ISRC</value><comment>Text in MetadataSearchPanel.axaml</comment></data>
   <data name="MetadataSearch.F.Barcode" xml:space="preserve"><value>Штрихкод / UPC</value><comment>Text in MetadataSearchPanel.axaml</comment></data>
-  <data name="MetadataSearch.F.Explicit" xml:space="preserve"><value>Откровенный</value><comment>Text in MetadataSearchPanel.axaml</comment></data>
+  <data name="MetadataSearch.F.Explicit" xml:space="preserve"><value>Ненормативная лексика</value><comment>Text in MetadataSearchPanel.axaml</comment></data>
   <data name="MetadataSearch.F.Bpm" xml:space="preserve"><value>BPM</value><comment>Text in MetadataSearchPanel.axaml</comment></data>
 
   <!-- MiniPlayerWindow.axaml (auto-migrated) -->
   <data name="MiniPlayer.NoctisMiniPlayer" xml:space="preserve"><value>Мини-плеер Noctis</value><comment>Title in MiniPlayerWindow.axaml</comment></data>
-  <data name="MiniPlayer.BackFullViewTip" xml:space="preserve"><value>Вернуться в полный вид</value><comment>ToolTip.Tip in MiniPlayerWindow.axaml</comment></data>
+  <data name="MiniPlayer.BackFullViewTip" xml:space="preserve"><value>Вернуться в обычный вид</value><comment>ToolTip.Tip in MiniPlayerWindow.axaml</comment></data>
   <data name="MiniPlayer.ExplicitTip" xml:space="preserve"><value>Ненормативная лексика</value><comment>ToolTip.Tip in MiniPlayerWindow.axaml</comment></data>
   <data name="MiniPlayer.FavoritesTip" xml:space="preserve"><value>Избранное</value><comment>ToolTip.Tip in MiniPlayerWindow.axaml</comment></data>
   <data name="MiniPlayer.MoreTip" xml:space="preserve"><value>Ещё</value><comment>ToolTip.Tip in MiniPlayerWindow.axaml</comment></data>
@@ -1723,7 +1723,7 @@ Deezer и TIDAL: вставьте ссылку.</value></data>
   <data name="Badge.Cancel" xml:space="preserve"><value>Отмена</value><comment>Text in BadgeNameDialog.axaml</comment></data>
   <data name="Playlist.FEATUREDARTISTS" xml:space="preserve"><value>ИСПОЛНИТЕЛИ В ПЛЕЙЛИСТЕ</value><comment>Text in PlaylistView.axaml</comment></data>
   <data name="Playlist.Text2" xml:space="preserve"><value>&#xE76C;</value><comment>Text in PlaylistView.axaml</comment></data>
-  <data name="Playlist.SUGGESTED" xml:space="preserve"><value>РЕКОМЕНДУЕМОЕ</value><comment>Text in PlaylistView.axaml</comment></data>
+  <data name="Playlist.SUGGESTED" xml:space="preserve"><value>РЕКОМЕНДАЦИИ</value><comment>Text in PlaylistView.axaml</comment></data>
   <data name="Playlist.FromLibraryBasedArtistsTip" xml:space="preserve"><value>Из вашей медиатеки, на основе исполнителей этого плейлиста</value><comment>ToolTip.Tip in PlaylistView.axaml</comment></data>
   <data name="Playlist.RefreshSuggestionsTip" xml:space="preserve"><value>Обновить рекомендации</value><comment>ToolTip.Tip in PlaylistView.axaml</comment></data>
   <data name="Playlist.Text3" xml:space="preserve"><value>&#xE72C;</value><comment>Text in PlaylistView.axaml</comment></data>
@@ -1929,7 +1929,7 @@ Deezer и TIDAL: вставьте ссылку.</value></data>
   <data name="Stats.PeriodAll" xml:space="preserve"><value>Всё время</value><comment>Statistics period pill</comment></data>
   <data name="Stats.RangeLast7Days" xml:space="preserve"><value>Последние 7 дней</value><comment>Caption naming the period a statistic covers</comment></data>
   <data name="Stats.RangeLast30Days" xml:space="preserve"><value>Последние 30 дней</value><comment>Caption naming the period a statistic covers</comment></data>
-  <data name="Stats.RangeThisYear" xml:space="preserve"><value>{0}, с начала года</value><comment>Caption naming the period a statistic covers; {0} = year</comment></data>
+  <data name="Stats.RangeThisYear" xml:space="preserve"><value>С начала {0} года</value><comment>Caption naming the period a statistic covers; {0} = year</comment></data>
   <data name="Stats.RangeAllTime" xml:space="preserve"><value>За всё время</value><comment>Caption naming the period a statistic covers</comment></data>
   <data name="Stats.RangeAllTimeSince" xml:space="preserve"><value>За всё время · с {0}</value><comment>Caption naming the period a statistic covers; {0} = date of the oldest logged play</comment></data>
   <data name="Stats.LogCoverage" xml:space="preserve"><value>Журнал прослушиваний с {0} · {1}</value><comment>Statistics header note; {0} = date of the oldest logged play, {1} = e.g. 8,470 plays</comment></data>
@@ -1952,12 +1952,12 @@ Deezer и TIDAL: вставьте ссылку.</value></data>
   <data name="Stats.VsLastYear" xml:space="preserve"><value>к тому же периоду прошлого года</value><comment>Beside the plays change chip</comment></data>
   <data name="Stats.DeltaNew" xml:space="preserve"><value>Новое</value><comment>Plays change chip when the comparison period had no plays</comment></data>
   <data name="Stats.DeltaSame" xml:space="preserve"><value>Без изменений</value><comment>Plays change chip when the two periods are equal</comment></data>
-  <data name="Stats.DeltaTip" xml:space="preserve"><value>{0} прослуш. против {1} в периоде сравнения</value><comment>Tooltip of the plays change chip; {0}/{1} = numbers</comment></data>
+  <data name="Stats.DeltaTip" xml:space="preserve"><value>{0} прослуш. против {1} за период сравнения</value><comment>Tooltip of the plays change chip; {0}/{1} = numbers</comment></data>
   <data name="Stats.TopSongs" xml:space="preserve"><value>Лучшие песни</value><comment>Statistics section title</comment></data>
   <data name="Stats.NoPlaysInPeriod" xml:space="preserve"><value>За этот период прослушиваний нет</value><comment>Empty state of a Statistics list</comment></data>
   <data name="Stats.PeakHour" xml:space="preserve"><value>Пик активности около {0} · {1} прослушиваний</value><comment>Listening by Hour callout; {0} = hour like 22:00, {1} = percentage</comment></data>
   <data name="Stats.HourTip" xml:space="preserve"><value>{0}–{1} · {2}</value><comment>Listening by Hour bar tooltip; {0}/{1} = 22:00/22:59, {2} = e.g. 120 plays</comment></data>
-  <data name="Stats.SkipHint" xml:space="preserve"><value>Песни, сыгранные 3+ раза, по доле пропусков</value><comment>Most Skipped caption</comment></data>
+  <data name="Stats.SkipHint" xml:space="preserve"><value>Песни, прослушанные 3+ раза, по доле пропусков</value><comment>Most Skipped caption</comment></data>
   <data name="Stats.SkipDetail" xml:space="preserve"><value>Пропущено {0} из {1}</value><comment>Most Skipped row; {0}/{1} = numbers</comment></data>
   <data name="Stats.ForgottenHint" xml:space="preserve"><value>Любимые или с оценкой 4+ звезды, не звучали 6+ месяцев</value><comment>Forgotten Favorites caption</comment></data>
   <data name="Stats.NoForgottenFavorites" xml:space="preserve"><value>Все любимые песни звучали за последние 6 месяцев</value><comment>Forgotten Favorites empty state</comment></data>
@@ -1973,9 +1973,9 @@ Deezer и TIDAL: вставьте ссылку.</value></data>
   <data name="Stats.Formats" xml:space="preserve"><value>Форматы</value><comment>Library section: format bars title</comment></data>
 
   <!-- TextPromptDialog.axaml (auto-migrated) -->
-  <data name="TextPrompt.EnterName" xml:space="preserve"><value>Введите имя</value><comment>Title in TextPromptDialog.axaml</comment></data>
+  <data name="TextPrompt.EnterName" xml:space="preserve"><value>Введите название</value><comment>Title in TextPromptDialog.axaml</comment></data>
   <data name="TextPrompt.Cancel" xml:space="preserve"><value>Отмена</value><comment>Content in TextPromptDialog.axaml</comment></data>
-  <data name="TextPrompt.Name" xml:space="preserve"><value>Имя</value><comment>Text in TextPromptDialog.axaml</comment></data>
+  <data name="TextPrompt.Name" xml:space="preserve"><value>Название</value><comment>Text in TextPromptDialog.axaml</comment></data>
 
   <!-- ThemeEditorDialog.axaml (auto-migrated) -->
   <data name="ThemeEditor.ThemeEditor" xml:space="preserve"><value>Редактор тем</value><comment>Title in ThemeEditorDialog.axaml</comment></data>
@@ -2013,7 +2013,7 @@ Deezer и TIDAL: вставьте ссылку.</value></data>
   <data name="Wrap.MinutesListened" xml:space="preserve"><value>Минут прослушано</value><comment>Text in WrapDialog.axaml</comment></data>
   <data name="Wrap.TracksPlayed" xml:space="preserve"><value>Треков прослушано</value><comment>Text in WrapDialog.axaml</comment></data>
   <data name="Wrap.DifferentArtists" xml:space="preserve"><value>Разных исполнителей</value><comment>Text in WrapDialog.axaml</comment></data>
-  <data name="Wrap.AlbumsExplored" xml:space="preserve"><value>Альбомов открыто</value><comment>Text in WrapDialog.axaml</comment></data>
+  <data name="Wrap.AlbumsExplored" xml:space="preserve"><value>Альбомов послушано</value><comment>Text in WrapDialog.axaml</comment></data>
   <data name="Wrap.UniqueTracks" xml:space="preserve"><value>Уникальных треков</value><comment>Text in WrapDialog.axaml</comment></data>
   <data name="Wrap.LosslessPlays" xml:space="preserve"><value>Прослушиваний без потерь</value><comment>Text in WrapDialog.axaml</comment></data>
   <data name="Wrap.HiResPlays" xml:space="preserve"><value>Прослушиваний Hi-Res</value><comment>Text in WrapDialog.axaml</comment></data>
@@ -2028,7 +2028,7 @@ Deezer и TIDAL: вставьте ссылку.</value></data>
   <data name="Wrap.OnePlay" xml:space="preserve"><value>1 прослушивание</value><comment>Play count on a Wrap row, singular</comment></data>
   <data name="Wrap.PlaysCount" xml:space="preserve"><value>{0} прослуш.</value><comment>Play count on a Wrap row; {0} = count</comment></data>
   <data name="Wrap.NewCount" xml:space="preserve"><value>новых: {0}</value><comment>Under the Wrap artist count: artists first heard in this period; {0} = count</comment></data>
-  <data name="Wrap.RecordedSince" xml:space="preserve"><value>Записывается с {0}</value><comment>Wrap header when the play log starts inside the period; {0} = date</comment></data>
+  <data name="Wrap.RecordedSince" xml:space="preserve"><value>Журнал ведётся с {0}</value><comment>Wrap header when the play log starts inside the period; {0} = date</comment></data>
   <data name="Wrap.ShortPlaysLeftOut" xml:space="preserve"><value>Не учтено прослушиваний, прерванных в первые 30 секунд: {0}</value><comment>Wrap header: logged plays the next play followed within 30 s are left out; {0} = count</comment></data>
   <data name="Wrap.OneShortPlayLeftOut" xml:space="preserve"><value>Не учтено 1 прослушивание, прерванное в первые 30 секунд</value><comment>Wrap header, singular of Wrap.ShortPlaysLeftOut</comment></data>
   <data name="Wrap.PartialYear" xml:space="preserve"><value>Неполный год: когда этот год сохранялся, журнал прослушиваний уже не доходил до января</value><comment>Wrap header for an archived year saved from a trimmed play log</comment></data>
@@ -2109,7 +2109,7 @@ Deezer и TIDAL: вставьте ссылку.</value></data>
   <data name="Plugins.Perm.PlaybackControl" xml:space="preserve"><value>Управлять воспроизведением: запуск, пауза, переключение и перемотка</value></data>
   <data name="Plugins.Perm.LibraryRead" xml:space="preserve"><value>Искать в медиатеке (названия, исполнители, альбомы, пути к файлам, число прослушиваний)</value></data>
   <data name="Plugins.Perm.Network" xml:space="preserve"><value>Подключаться к интернету</value></data>
-  <data name="Plugins.Perm.LyricsProvider" xml:space="preserve"><value>Поставлять тексты для поиска текстов</value></data>
+  <data name="Plugins.Perm.LyricsProvider" xml:space="preserve"><value>Служить источником для поиска текстов</value></data>
   <data name="Plugins.Perm.MenuCommands" xml:space="preserve"><value>Добавлять пункты в меню трека</value></data>
   <data name="Plugins.Perm.Notifications" xml:space="preserve"><value>Показывать короткие уведомления</value></data>
   <data name="Plugins.Perm.LibraryWriteAnalysis" xml:space="preserve"><value>Задавать BPM и тональность треков медиатеки (только в Noctis, никогда в ваших файлах)</value></data>
@@ -2211,7 +2211,7 @@ Deezer и TIDAL: вставьте ссылку.</value></data>
   <data name="SendToFolder.LyricsHint" xml:space="preserve"><value>Файлы текстов каждой песни копируются вместе с ней.</value><comment>Line under the Include lyrics option</comment></data>
   <data name="SendToFolder.PickFolder" xml:space="preserve"><value>Выберите папку для копирования.</value><comment>Footer before a destination is set</comment></data>
   <data name="SendToFolder.PickFolderMove" xml:space="preserve"><value>Выберите папку для перемещения.</value><comment>Footer before a destination is set, while Move instead of copy is on</comment></data>
-  <data name="SendToFolder.SubtitleMove" xml:space="preserve"><value>Переместить в другую папку; медиатека последует за ними.</value><comment>Header line under the title in SendToFolderDialog.axaml while Move instead of copy is on</comment></data>
+  <data name="SendToFolder.SubtitleMove" xml:space="preserve"><value>Переместить в другую папку; медиатека обновится автоматически.</value><comment>Header line under the title in SendToFolderDialog.axaml while Move instead of copy is on</comment></data>
   <data name="SendToFolder.FolderMissing" xml:space="preserve"><value>Такой папки не существует.</value><comment>Error under the destination field</comment></data>
   <data name="SendToFolder.NeedFullPath" xml:space="preserve"><value>Введите полный путь к папке или нажмите «Обзор».</value><comment>Error under the destination field for a relative path</comment></data>
   <data name="SendToFolder.SummaryCopy" xml:space="preserve"><value>скопировать: {0}</value><comment>Plan summary part; {0} number of songs</comment></data>
@@ -2307,9 +2307,9 @@ Deezer и TIDAL: вставьте ссылку.</value></data>
   <data name="Upmix.Off" xml:space="preserve"><value>Выкл.</value><comment>Upmix mode</comment></data>
   <data name="Upmix.OffHint" xml:space="preserve"><value>Только стерео</value><comment>Upmix mode hint</comment></data>
   <data name="Upmix.Duplicate" xml:space="preserve"><value>Стерео везде</value><comment>Upmix mode</comment></data>
-  <data name="Upmix.DuplicateHint" xml:space="preserve"><value>Одна и та же музыка на каждой паре, центр и сабвуфер заполняются</value><comment>Upmix mode hint</comment></data>
+  <data name="Upmix.DuplicateHint" xml:space="preserve"><value>Одинаковый звук на каждой паре колонок, центр и сабвуфер заполняются</value><comment>Upmix mode hint</comment></data>
   <data name="Upmix.Surround" xml:space="preserve"><value>Объёмный звук</value><comment>Upmix mode</comment></data>
-  <data name="Upmix.SurroundHint" xml:space="preserve"><value>Атмосфера в тылах, широкая сцена спереди</value><comment>Upmix mode hint</comment></data>
+  <data name="Upmix.SurroundHint" xml:space="preserve"><value>Атмосфера в тыловых колонках, широкая сцена спереди</value><comment>Upmix mode hint</comment></data>
   <data name="Upmix.Note" xml:space="preserve"><value>Только для встроенного движка вывода. Монопольный режим сохраняет собственную раскладку каналов файла.</value><comment>Upmix footnote</comment></data>
 
   <data name="Server.AccountsMoved" xml:space="preserve"><value>Аккаунты и синхронизация устройств управляются в разделе «Аккаунт и синхронизация».</value><comment>Integrations → Noctis Server card footer</comment></data>
@@ -2335,7 +2335,7 @@ Deezer и TIDAL: вставьте ссылку.</value></data>
   <data name="AccountSync.OtherTitle" xml:space="preserve"><value>Семья и гости</value><comment>Other accounts card title</comment></data>
   <data name="AccountSync.OtherHelp" xml:space="preserve"><value>Дополнительные аккаунты, которые могут входить со своих устройств.</value><comment>Other accounts card help</comment></data>
   <data name="AccountSync.PairPhoneHint" xml:space="preserve"><value>На телефоне: «Настройки → Аккаунт», введите этот адрес, свой email или имя пользователя и пароль и убедитесь, что отпечаток совпадает.</value><comment>Pairing block help above the address and fingerprint</comment></data>
-  <data name="AccountSync.SignedInDevices" xml:space="preserve"><value>УСТРОЙСТВА С ВЫПОЛНЕННЫМ ВХОДОМ</value><comment>Account card list label</comment></data>
+  <data name="AccountSync.SignedInDevices" xml:space="preserve"><value>ПОДКЛЮЧЁННЫЕ УСТРОЙСТВА</value><comment>Account card list label</comment></data>
   <data name="AccountSync.NoSignedInDevices" xml:space="preserve"><value>Пока ни одно устройство не выполнило вход.</value><comment>Account card list empty state</comment></data>
 
   <data name="Sync.Title" xml:space="preserve"><value>Синхронизация между устройствами</value><comment>Sync card title</comment></data>
@@ -2413,7 +2413,7 @@ Deezer и TIDAL: вставьте ссылку.</value></data>
   <data name="LyricsStudio.Queue" xml:space="preserve"><value>ПЕСНИ</value><comment>Queue column header</comment></data>
   <data name="LyricsStudio.ReviewEmptyTitle" xml:space="preserve"><value>Пока нечего проверять</value><comment>Review pane empty state</comment></data>
   <data name="LyricsStudio.ReviewEmptyBody" xml:space="preserve"><value>Выберите песню в списке. Песни с текстом синхронизируются, когда вы нажмёте «Начать»; для песен без текста откроется поле, куда его можно вставить.</value><comment>Review pane empty state</comment></data>
-  <data name="LyricsStudio.Upgrade" xml:space="preserve"><value>Тайминг каждого слова</value><comment>Review button, shown for line-level lyrics</comment></data>
+  <data name="LyricsStudio.Upgrade" xml:space="preserve"><value>Расставить тайминг слов</value><comment>Review button, shown for line-level lyrics</comment></data>
   <data name="LyricsStudio.UpgradeTip" xml:space="preserve"><value>Расставляет время для каждого слова этих строк. Файл с таймингом по строкам сохраняется.</value><comment>Review button tooltip</comment></data>
   <data name="LyricsStudio.ReviewHint" xml:space="preserve"><value>Нажмите на время, чтобы прослушать строку. Текст можно править на месте. Подсвеченные строки стоит перепроверить.</value><comment>Review pane hint</comment></data>
   <data name="LyricsStudio.NudgeEarlier" xml:space="preserve"><value>Все строки на 0,1 с раньше · клавиша [</value><comment>Tooltip</comment></data>
@@ -2426,7 +2426,7 @@ Deezer и TIDAL: вставьте ссылку.</value></data>
   <data name="LyricsStudio.ClearLyricsConfirm" xml:space="preserve"><value>Очистить текст, показанный для «{0}»?
 
 Строки и их тайминг будут удалены, и откроется пустое поле для вашего текста. На диске ничего не изменится, пока вы не нажмёте «Сохранить текст».</value><comment>Confirm before Clear lyrics ({0} = song title)</comment></data>
-  <data name="LyricsStudio.ClearedStatus" xml:space="preserve"><value>Очищено · вставьте текст, затем выровняйте</value><comment>Song status after Clear lyrics</comment></data>
+  <data name="LyricsStudio.ClearedStatus" xml:space="preserve"><value>Очищено · вставьте текст, затем нажмите «Выровнять текст»</value><comment>Song status after Clear lyrics</comment></data>
   <data name="LyricsStudio.MoreTip" xml:space="preserve"><value>Ещё</value><comment>Tooltip on the review's "…" button (Skip, Transcribe instead)</comment></data>
   <data name="LyricsStudio.Format" xml:space="preserve"><value>Формат</value><comment>Toolbar label before the ELRC / LRC chips</comment></data>
   <data name="LyricsStudio.Settings" xml:space="preserve"><value>Настройки</value><comment>Toolbar popover: language, run options</comment></data>
@@ -2438,7 +2438,7 @@ Deezer и TIDAL: вставьте ссылку.</value></data>
   <data name="LyricsStudio.ComposeCheck" xml:space="preserve"><value>Проверьте текст ниже — по одной строке на каждую спетую строку, — затем нажмите «Выровнять текст».</value><comment>Lyrics box hint when text is present</comment></data>
   <data name="LyricsStudio.TranscriptBanner" xml:space="preserve"><value>Экспериментальная расшифровка. Пение часто распознаётся плохо, поэтому исправьте слова ниже, затем нажмите «Выровнять текст», чтобы расставить тайминг.</value><comment>Lyrics box banner after a transcription</comment></data>
   <data name="LyricsStudio.PasteWatermark" xml:space="preserve"><value>Вставьте сюда текст, по одной строке на каждую спетую строку…</value><comment>Lyrics box watermark</comment></data>
-  <data name="LyricsStudio.ImportFile" xml:space="preserve"><value>Импорт файла…</value><comment>Lyrics box button</comment></data>
+  <data name="LyricsStudio.ImportFile" xml:space="preserve"><value>Импортировать файл…</value><comment>Lyrics box button</comment></data>
   <data name="LyricsStudio.ImportFileTip" xml:space="preserve"><value>Загрузить текст из файла .txt, .lrc или .elrc (метки времени отбрасываются и расставляются заново)</value><comment>Tooltip</comment></data>
   <data name="LyricsStudio.TranscribeDraft" xml:space="preserve"><value>Распознать на слух · Экспериментально</value><comment>Lyrics box button: transcribe the song into the box</comment></data>
   <data name="LyricsStudio.TranscribeDraftTip" xml:space="preserve"><value>Lullaby записывает то, что слышит. Пение часто распознаётся плохо: исправьте слова до выравнивания.</value><comment>Tooltip "Lullaby" is the model's name: keep it untranslated.</comment></data>
@@ -2516,7 +2516,7 @@ Deezer и TIDAL: вставьте ссылку.</value></data>
   <data name="Settings.Desc.AccountDevices" xml:space="preserve"><value>Ваш аккаунт, синхронизация между устройствами и веб-пульт.</value><comment>Settings page description</comment></data>
   <data name="Settings.Desc.Integrations" xml:space="preserve"><value>Discord, скробблинг, TIDAL и музыкальные серверы.</value><comment>Settings page description</comment></data>
   <data name="Settings.Desc.Plugins" xml:space="preserve"><value>Дополнительные возможности для Noctis.</value><comment>Settings page description</comment></data>
-  <data name="Settings.Desc.Statistics" xml:space="preserve"><value>Ваша медиатека и прослушивания с первого взгляда.</value><comment>Settings page description</comment></data>
+  <data name="Settings.Desc.Statistics" xml:space="preserve"><value>Краткий обзор медиатеки и прослушиваний.</value><comment>Settings page description</comment></data>
   <data name="Settings.Desc.About" xml:space="preserve"><value>Версия, обновления и ссылки.</value><comment>Settings page description</comment></data>
   <data name="Settings.Section.Language" xml:space="preserve"><value>Язык</value><comment>Settings section label</comment></data>
   <data name="Settings.Section.StartupWindow" xml:space="preserve"><value>Запуск и окно</value><comment>Settings section label</comment></data>
@@ -2547,7 +2547,7 @@ Deezer и TIDAL: вставьте ссылку.</value></data>
   <data name="Settings.Section.HiddenTracks" xml:space="preserve"><value>Скрытые треки</value><comment>Settings section label</comment></data>
   <data name="Settings.Section.Storage" xml:space="preserve"><value>Хранилище</value><comment>Settings section label</comment></data>
   <data name="Settings.Section.AudioTools" xml:space="preserve"><value>Вспомогательные программы</value><comment>Settings section label</comment></data>
-  <data name="Settings.Section.Updates" xml:space="preserve"><value>Обновления и разработка</value><comment>Settings section label</comment></data>
+  <data name="Settings.Section.Updates" xml:space="preserve"><value>Обновления и режим разработчика</value><comment>Settings section label</comment></data>
   <data name="Settings.Section.Reset" xml:space="preserve"><value>Сброс</value><comment>Settings section label</comment></data>
   <data name="Settings.Section.YourAccount" xml:space="preserve"><value>Ваш аккаунт</value><comment>Settings section label</comment></data>
   <data name="Settings.Section.Sync" xml:space="preserve"><value>Синхронизация</value><comment>Settings section label</comment></data>
@@ -2560,7 +2560,7 @@ Deezer и TIDAL: вставьте ссылку.</value></data>
   <data name="Settings.Section.MediaServer" xml:space="preserve"><value>Медиасервер</value><comment>Settings section label</comment></data>
   <data name="Settings.Section.LibraryOverview" xml:space="preserve"><value>Обзор медиатеки</value><comment>Settings section label</comment></data>
   <data name="Settings.Section.Listening" xml:space="preserve"><value>Прослушивание</value><comment>Settings section label</comment></data>
-  <data name="Settings.Section.TopPlayed" xml:space="preserve"><value>Самое популярное</value><comment>Settings section label</comment></data>
+  <data name="Settings.Section.TopPlayed" xml:space="preserve"><value>Самое прослушиваемое</value><comment>Settings section label</comment></data>
   <data name="Settings.CloseTip" xml:space="preserve"><value>Закрыть настройки</value><comment>Tooltip on the X in the settings header</comment></data>
   <data name="AccountSync.EmailWatermark" xml:space="preserve"><value>Адрес эл. почты</value><comment>Create form watermark</comment></data>
   <data name="AccountSync.PasswordWatermark" xml:space="preserve"><value>Пароль</value><comment>Create form watermark</comment></data>
@@ -2593,7 +2593,7 @@ Deezer и TIDAL: вставьте ссылку.</value></data>
   <data name="Scrobble.ResumeArtist" xml:space="preserve"><value>Снова скробблить этого исполнителя</value><comment>Artist menu: undo Don't Scrobble</comment></data>
   <data name="Scrobble.OffByAlbumOrArtist" xml:space="preserve"><value>Не скробблится (альбом или исполнитель)</value><comment>Song menu, disabled: the song's album or artist is set to not scrobble</comment></data>
   <data name="QueueToast.AddedToQueue" xml:space="preserve"><value>Добавлено в очередь</value><comment>Confirmation pill above the playback island after Add to Queue</comment></data>
-  <data name="QueueToast.PlayingNext" xml:space="preserve"><value>Играет следующим</value><comment>Confirmation pill above the playback island after Play Next</comment></data>
+  <data name="QueueToast.PlayingNext" xml:space="preserve"><value>Будет играть следующим</value><comment>Confirmation pill above the playback island after Play Next</comment></data>
   <data name="QueueToast.SongCount" xml:space="preserve"><value>Песен: {0}</value><comment>Confirmation pill detail line when several songs were queued; {0} = count</comment></data>
   <data name="QueueToast.OneSong" xml:space="preserve"><value>1 песня</value><comment>Confirmation pill detail line for one untitled song</comment></data>
   <data name="A11y.ScrollLeft" xml:space="preserve"><value>Прокрутить влево</value><comment>Screen-reader name of the arrow that scrolls an album page tile row left</comment></data>
