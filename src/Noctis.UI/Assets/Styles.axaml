@@ -1048,8 +1048,14 @@
          the now-playing overrides below can flip them to white on the tinted box —
          a local Foreground would always beat a style setter. Must stay ABOVE the
          now-playing styles: equal-origin styles resolve by declaration order. -->
-    <Style Selector="controls|HighlightTextBlock.accent-link">
+    <Style Selector="controls|HighlightTextBlock.accent-link, TextBlock.accent-link">
         <Setter Property="Foreground" Value="{DynamicResource AccentTextExactBrush}" />
+    </Style>
+    <!-- GitHub #125: Settings → "Accent-coloured names in song lists" off (MainWindow's
+         plain-track-links class) shows them in the plain secondary text colour. Also above
+         the now-playing styles, so the playing row still takes its own foreground. -->
+    <Style Selector=":is(Window).plain-track-links controls|HighlightTextBlock.accent-link, :is(Window).plain-track-links TextBlock.accent-link">
+        <Setter Property="Foreground" Value="{DynamicResource SystemControlForegroundBaseMediumBrush}" />
     </Style>
     <Style Selector="PathIcon.row-dots-icon">
         <Setter Property="Foreground" Value="{DynamicResource AccentTextExactBrush}" />

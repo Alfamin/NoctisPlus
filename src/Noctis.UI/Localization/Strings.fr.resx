@@ -561,8 +561,20 @@
     <comment>Appearance toggle in SettingsView.axaml</comment>
   </data>
   <data name="Settings.AccentFollowsArtworkHint" xml:space="preserve">
-    <value>Rappelez l'accent de la couverture de jeu. Votre accent choisi revient lorsque rien ne joue.</value>
+    <value>Reprend la couleur d'accentuation de la pochette en cours de lecture. Votre couleur revient lorsque rien n'est en lecture.</value>
     <comment>Appearance toggle hint in SettingsView.axaml</comment>
+  </data>
+  <data name="Settings.AccentTrackLinks" xml:space="preserve">
+    <value>Couleur d'accentuation sur les artistes et albums</value>
+    <comment>Appearance toggle in SettingsView.axaml (GitHub #125)</comment>
+  </data>
+  <data name="Settings.AccentTrackLinksHint" xml:space="preserve">
+    <value>Les noms d'artiste, d'album et de genre des listes de lecture, de Titres et du lecteur prennent la couleur d'accentuation. Désactivé, ils gardent la couleur de texte normale.</value>
+    <comment>Appearance toggle hint in SettingsView.axaml (GitHub #125)</comment>
+  </data>
+  <data name="Playlist.DragCount" xml:space="preserve">
+    <value>{0} titres</value>
+    <comment>Pill on the floating drag card when several selected songs are dragged together; {0} = count (GitHub #125)</comment>
   </data>
   <data name="Settings.AccentColor" xml:space="preserve">
     <value>Couleur d'accentuation</value>

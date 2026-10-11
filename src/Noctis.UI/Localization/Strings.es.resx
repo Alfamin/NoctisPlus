@@ -561,8 +561,20 @@
     <comment>Appearance toggle in SettingsView.axaml</comment>
   </data>
   <data name="Settings.AccentFollowsArtworkHint" xml:space="preserve">
-    <value>Cambia el color del acento de la cubierta del juego.</value>
+    <value>Toma el color de acento de la portada que está sonando. Tu color de acento vuelve cuando no se reproduce nada.</value>
     <comment>Appearance toggle hint in SettingsView.axaml</comment>
+  </data>
+  <data name="Settings.AccentTrackLinks" xml:space="preserve">
+    <value>Color de acento en artistas y álbumes</value>
+    <comment>Appearance toggle in SettingsView.axaml (GitHub #125)</comment>
+  </data>
+  <data name="Settings.AccentTrackLinksHint" xml:space="preserve">
+    <value>Los nombres de artista, álbum y género en las listas de reproducción, en Canciones y en el reproductor usan el color de acento. Desactivado, usan el color de texto normal.</value>
+    <comment>Appearance toggle hint in SettingsView.axaml (GitHub #125)</comment>
+  </data>
+  <data name="Playlist.DragCount" xml:space="preserve">
+    <value>{0} canciones</value>
+    <comment>Pill on the floating drag card when several selected songs are dragged together; {0} = count (GitHub #125)</comment>
   </data>
   <data name="Settings.AccentColor" xml:space="preserve">
     <value>Color de acento</value>

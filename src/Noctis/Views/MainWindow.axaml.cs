@@ -120,6 +120,10 @@ public partial class MainWindow : Window, IPageKeyOverlayHost
     private System.ComponentModel.PropertyChangedEventHandler? _artworkAccentSettingsHandler;
     private string? _artworkAccentPath;
 
+    /// <summary>GitHub #125: with the setting off, the window's plain-track-links class turns
+    /// the accent-link names in song lists (Styles.axaml) to the plain text colour.</summary>
+    private void ApplyTrackLinkAccent(bool accent) => Classes.Set("plain-track-links", !accent);
+
     /// <summary>
     /// "Accent follows album art": recolours the accent from the playing cover's vibrant
     /// colour (path-cached; first decode runs off the UI thread), and restores the user's
@@ -535,8 +539,11 @@ public partial class MainWindow : Window, IPageKeyOverlayHost
                 {
                     if (e.PropertyName == nameof(SettingsViewModel.AccentFollowsArtwork))
                         ApplyArtworkAccent();
+                    else if (e.PropertyName == nameof(SettingsViewModel.AccentTrackLinks))
+                        ApplyTrackLinkAccent(vm.Settings.AccentTrackLinks);
                 };
                 vm.Settings.PropertyChanged += _artworkAccentSettingsHandler;
+                ApplyTrackLinkAccent(vm.Settings.AccentTrackLinks);
 
                 _liquidGlassChangedHandler = (_, on) => ApplyLiquidGlass(on);
                 vm.Settings.LiquidGlassChanged += _liquidGlassChangedHandler;

@@ -557,12 +557,24 @@
     <comment>Text in SettingsView.axaml</comment>
   </data>
   <data name="Settings.AccentFollowsArtwork" xml:space="preserve">
-    <value>紧随专辑封面</value>
+    <value>强调色跟随专辑封面</value>
     <comment>Appearance toggle in SettingsView.axaml</comment>
   </data>
   <data name="Settings.AccentFollowsArtworkHint" xml:space="preserve">
-    <value>从游戏封面重写重音。您选择的重音在没有播放时返回。</value>
+    <value>根据正在播放的封面改变强调色。没有播放时恢复你选择的强调色。</value>
     <comment>Appearance toggle hint in SettingsView.axaml</comment>
+  </data>
+  <data name="Settings.AccentTrackLinks" xml:space="preserve">
+    <value>艺人和专辑名称使用强调色</value>
+    <comment>Appearance toggle in SettingsView.axaml (GitHub #125)</comment>
+  </data>
+  <data name="Settings.AccentTrackLinksHint" xml:space="preserve">
+    <value>播放列表、“歌曲”和播放器中的艺人、专辑和流派名称使用强调色。关闭后使用普通文字颜色。</value>
+    <comment>Appearance toggle hint in SettingsView.axaml (GitHub #125)</comment>
+  </data>
+  <data name="Playlist.DragCount" xml:space="preserve">
+    <value>{0} 首歌曲</value>
+    <comment>Pill on the floating drag card when several selected songs are dragged together; {0} = count (GitHub #125)</comment>
   </data>
   <data name="Settings.AccentColor" xml:space="preserve">
     <value>强调色</value>

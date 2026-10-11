@@ -2127,6 +2127,18 @@
                                               IsChecked="{Binding AccentFollowsArtwork}"
                                               VerticalAlignment="Center"/>
                     </Grid>
+
+                    <!-- GitHub #125: plain artist / album names in song lists -->
+                    <Grid ColumnDefinitions="*,Auto">
+                        <StackPanel Grid.Column="0" Spacing="2">
+                            <TextBlock Text="{loc:T Settings.AccentTrackLinks}" FontSize="13" FontWeight="SemiBold"/>
+                            <TextBlock Text="{loc:T Settings.AccentTrackLinksHint}"
+                                       FontSize="12" Opacity="0.5" TextWrapping="Wrap"/>
+                        </StackPanel>
+                        <controls:LottieToggle Grid.Column="1"
+                                              IsChecked="{Binding AccentTrackLinks}"
+                                              VerticalAlignment="Center"/>
+                    </Grid>
                 </StackPanel>
             </Border>
 

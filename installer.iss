@@ -3,7 +3,7 @@
 ; Compile with: ISCC.exe installer.iss
 
 #define MyAppName "Noctis"
-#define MyAppVersion "1.6.1"
+#define MyAppVersion "1.6.2"
 #define MyAppPublisher "heartached"
 #define MyAppExeName "Noctis.exe"
 #define MyAppURL "https://github.com/heartached/Noctis"
@@ -27,6 +27,12 @@ Compression=lzma2/ultra64
 SolidCompression=yes
 WizardStyle=modern
 PrivilegesRequired=lowest
+; Inno 6.5+ turns on Windows RedirectionGuard for Setup, and on current Windows builds the app
+; Setup launches (finish page or the in-app updater's relaunch) inherits it. That session's
+; yt-dlp then dies with WinError 448 on any user-made junction in PATH (e.g. scoop's
+; apps\*\current), so every YouTube search/download fails until Noctis is restarted. The guard
+; protects elevated installers; this one never elevates (lowest), so it buys nothing here.
+RedirectionGuard=no
 ArchitecturesAllowed=x64compatible
 ArchitecturesInstallIn64BitMode=x64compatible
 ; Tell Explorer associations changed so the Open-with list refreshes without a re-login.

@@ -564,6 +564,18 @@
     <value>재생 중인 커버에서 강조색을 가져옵니다. 재생 중인 곡이 없으면 선택한 강조색으로 돌아갑니다.</value>
     <comment>Appearance toggle hint in SettingsView.axaml</comment>
   </data>
+  <data name="Settings.AccentTrackLinks" xml:space="preserve">
+    <value>아티스트·앨범 이름에 강조 색상</value>
+    <comment>Appearance toggle in SettingsView.axaml (GitHub #125)</comment>
+  </data>
+  <data name="Settings.AccentTrackLinksHint" xml:space="preserve">
+    <value>재생목록, 노래 페이지, 플레이어의 아티스트, 앨범, 장르 이름을 강조 색상으로 표시합니다. 끄면 일반 글자 색상으로 표시됩니다.</value>
+    <comment>Appearance toggle hint in SettingsView.axaml (GitHub #125)</comment>
+  </data>
+  <data name="Playlist.DragCount" xml:space="preserve">
+    <value>{0}곡</value>
+    <comment>Pill on the floating drag card when several selected songs are dragged together; {0} = count (GitHub #125)</comment>
+  </data>
   <data name="Settings.AccentColor" xml:space="preserve">
     <value>강조 색상</value>
     <comment>Text in SettingsView.axaml</comment>

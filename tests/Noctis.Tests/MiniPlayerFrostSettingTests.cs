@@ -367,6 +367,43 @@ public class MiniPlayerFrostSettingTests : IDisposable
         }
     }
 
+    /// <summary>GitHub #125: Settings → "Accent colour on artist and album names" off takes the
+    /// mini player's artist lines off the accent too, live, and back on when it is switched on.</summary>
+    [AvaloniaFact]
+    public void ArtistLines_FollowTheAccentNamesSetting()
+    {
+        var app = Application.Current!;
+        if (!app.Resources.TryGetResource("SearchIcon", null, out _))
+            app.Resources.MergedDictionaries.Add(new ResourceInclude((Uri?)null) { Source = new Uri("avares://Noctis.UI/Assets/Icons.axaml") });
+        var accent = new Avalonia.Media.SolidColorBrush(Avalonia.Media.Colors.Red);
+        app.Resources["AccentColorBrush"] = accent;
+        var library = new FakeLibraryService();
+        var player = new PlayerViewModel(new FakeAudioPlayer(), library, new TestPersistenceService(), new FakeAnimatedCoverService());
+        var lyrics = new LyricsViewModel(player, new StubLrcLib(), new StubNetEase(), new StubMetadata(), new TestPersistenceService(), library);
+        var settings = new SettingsViewModel(new TestPersistenceService(), library, new NoOpPlayHistoryService());
+        settings.AccentTrackLinks = false;
+        var vm = new MiniPlayerViewModel(player, lyrics, settings, library);
+        var win = new MiniPlayerWindow { DataContext = vm };
+        win.Show();
+        Dispatcher.UIThread.RunJobs();
+        try
+        {
+            var lines = Avalonia.VisualTree.VisualExtensions.GetVisualDescendants(win)
+                .OfType<Noctis.Controls.MarqueeTextBlock>().Where(m => m.Classes.Contains("mini-artist")).ToList();
+            Assert.NotEmpty(lines);
+            Assert.True(win.TryFindResource("MiniDrawerTextSoft", out var soft));
+            Assert.All(lines, m => Assert.Same(soft, m.Foreground));
+
+            settings.AccentTrackLinks = true;
+            Dispatcher.UIThread.RunJobs();
+            Assert.All(lines, m => Assert.Same(accent, m.Foreground));
+        }
+        finally
+        {
+            win.Close();
+        }
+    }
+
     [Fact]
     public void RegionPixels_CoverTheShapeInDevicePixels()
     {

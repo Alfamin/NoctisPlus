@@ -557,12 +557,24 @@
     <comment>Text in SettingsView.axaml</comment>
   </data>
   <data name="Settings.AccentFollowsArtwork" xml:space="preserve">
-    <value>اللكنة تتبع صورة الألبوم</value>
+    <value>لون التمييز يتبع صورة الألبوم</value>
     <comment>Appearance toggle in SettingsView.axaml</comment>
   </data>
   <data name="Settings.AccentFollowsArtworkHint" xml:space="preserve">
-    <value>استعيد اللهجة من غلاف اللعب. اللهجة التي اخترتها تعود عندما لا يلعب أي شيء.</value>
+    <value>يأخذ لون التمييز من غلاف المقطع قيد التشغيل. يعود لون التمييز الذي اخترته عندما لا يتم تشغيل أي شيء.</value>
     <comment>Appearance toggle hint in SettingsView.axaml</comment>
+  </data>
+  <data name="Settings.AccentTrackLinks" xml:space="preserve">
+    <value>لون التمييز لأسماء الفنانين والألبومات</value>
+    <comment>Appearance toggle in SettingsView.axaml (GitHub #125)</comment>
+  </data>
+  <data name="Settings.AccentTrackLinksHint" xml:space="preserve">
+    <value>تظهر أسماء الفنانين والألبومات والأنواع في قوائم التشغيل والأغاني والمشغّل بلون التمييز. عند الإيقاف تظهر بلون النص العادي.</value>
+    <comment>Appearance toggle hint in SettingsView.axaml (GitHub #125)</comment>
+  </data>
+  <data name="Playlist.DragCount" xml:space="preserve">
+    <value>{0} أغانٍ</value>
+    <comment>Pill on the floating drag card when several selected songs are dragged together; {0} = count (GitHub #125)</comment>
   </data>
   <data name="Settings.AccentColor" xml:space="preserve">
     <value>لون التمييز</value>

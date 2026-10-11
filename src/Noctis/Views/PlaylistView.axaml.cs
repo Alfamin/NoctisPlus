@@ -34,6 +34,9 @@ public partial class PlaylistView : UserControl
     private Track? _dragTrack;
     private int _dragSourceIndex = -1;
     private double _dragRowOffsetY;
+    /// <summary>A plain press landed on a row of the multi-selection: the clear a plain
+    /// click does waits for the release, so a drag from that press carries the selection.</summary>
+    private bool _clearSelectionOnRelease;
 
     public PlaylistView()
     {
@@ -360,6 +363,19 @@ public partial class PlaylistView : UserControl
         if (source is not ListBoxItem item) return;
         if (item.DataContext is not Track track) return;
 
+        // GitHub #125: this tunnel runs before the row's drag handler, and clearing here
+        // emptied the selection before a drag could begin, so dragging a selected row
+        // only ever moved that one row. OnTrackRowPointerReleased clears it on a click.
+        _clearSelectionOnRelease = false;
+        if (_selectedTracks.Count > 1 && _selectedTracks.Contains(track)
+            && !e.KeyModifiers.HasFlag(KeyModifiers.Control)
+            && e.GetCurrentPoint(null).Properties.IsLeftButtonPressed
+            && DataContext is PlaylistViewModel { CanReorder: true })
+        {
+            _clearSelectionOnRelease = true;
+            return;
+        }
+
         MultiSelectHelper.HandleTrackRowClickByData(item, track, e, _selectedTracks);
         SyncSelectionToViewModel();
 
@@ -681,13 +697,19 @@ public partial class PlaylistView : UserControl
         // plain click it runs BEFORE the row's buttons see the release: dropping the
         // capture there reset the pressed Button and its Click never fired, killing the
         // artist/album links, heart, art play and "..." menu (Discord Luwi 2026-10-03).
+        var clearSelection = _clearSelectionOnRelease;
+        _clearSelectionOnRelease = false;
         if (_dragActive)
         {
             BeginPlaylistSettle();
             e.Pointer.Capture(null);
         }
         else
+        {
             ResetPlaylistDragState();
+            if (clearSelection)
+                ClearSelectionState();
+        }
     }
 
     private void OnTrackRowPointerCaptureLost(object? sender, PointerCaptureLostEventArgs e)
@@ -706,6 +728,10 @@ public partial class PlaylistView : UserControl
         var preview = this.FindControl<Border>("PlaylistDragPreview");
         if (preview == null || _dragTrack == null) return;
         preview.DataContext = _dragTrack;
+        // Same rule BeginPlaylistSettle uses to move the block.
+        var carried = _selectedTracks.Count > 1 && _selectedTracks.Contains(_dragTrack) ? _selectedTracks.Count : 1;
+        PlaylistDragCount.IsVisible = carried > 1;
+        PlaylistDragCountText.Text = carried > 1 ? Noctis.Localization.Loc.T("Playlist.DragCount", carried) : null;
 
         var body = RowBodySlot(rowItem);
         liquid.Pitch = body.Height;
