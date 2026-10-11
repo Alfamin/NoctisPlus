@@ -21,6 +21,7 @@ public sealed class LibraryServerAdapter : IServerLibrary
     private readonly Func<Func<Task>, Task> _marshal;
     private readonly Func<string?>? _avatarPath;
     private readonly Func<string?>? _profileName;
+    private readonly Func<CancellationToken, Task<string?>>? _uploadRoot;
 
     /// <param name="marshal">
     /// Runs a library mutation on the thread that owns the library. Null serialises
@@ -30,9 +31,14 @@ public sealed class LibraryServerAdapter : IServerLibrary
     /// The current profile picture's path (the desktop's AppSettings.ProfileAvatarPath), read
     /// per request so a new picture is served at once. Null (the headless host): no avatar.
     /// </param>
+    /// <param name="uploadRoot">
+    /// The folder songs sent from a phone go under (the desktop's managed "Noctis Imports",
+    /// created and added to the music folders on first use), run through <c>marshal</c> because it
+    /// may touch the settings. Null (the headless host): phones cannot send songs.
+    /// </param>
     public LibraryServerAdapter(ILibraryService library, IPersistenceService persistence, IPlayHistoryService playHistory,
         Func<Task>? playlistsChanged = null, Func<Func<Task>, Task>? marshal = null, Func<string?>? avatarPath = null,
-        Func<string?>? profileName = null)
+        Func<string?>? profileName = null, Func<CancellationToken, Task<string?>>? uploadRoot = null)
     {
         _library = library;
         _persistence = persistence;
@@ -41,6 +47,7 @@ public sealed class LibraryServerAdapter : IServerLibrary
         _marshal = marshal ?? SerialisingMarshaller();
         _avatarPath = avatarPath;
         _profileName = profileName;
+        _uploadRoot = uploadRoot;
     }
 
     /// <summary>One mutation at a time, on whatever thread called; for hosts without a UI thread.</summary>
@@ -83,6 +90,19 @@ public sealed class LibraryServerAdapter : IServerLibrary
     }
 
     public string? ProfileName => _profileName?.Invoke();
+
+    public async Task<string?> UploadRootAsync(CancellationToken ct)
+    {
+        if (_uploadRoot is null) return null;
+        string? root = null;
+        await Run(async () => root = await _uploadRoot(ct)).ConfigureAwait(false);
+        return root;
+    }
+
+    /// <summary>The import path a drop takes (ImportFilesAsync), on the library's thread like
+    /// every other write: the song lands in the library and library.json.</summary>
+    public Task ImportUploadedAsync(string path, CancellationToken ct)
+        => Run(() => _library.ImportFilesAsync(new[] { path }, ct));
 
     public string? AvatarPath(string userName)
     {

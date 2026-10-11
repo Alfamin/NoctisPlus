@@ -12,6 +12,9 @@
         <!-- Sign out: a door bracket with an arrow leaving it, drawn on the 24-grid like
              PhoneIcons.axaml (the corner anchors keep its box). -->
         <StreamGeometry x:Key="AccountSignOutIcon">M0 0ZM24 24ZM10 3.1L6 3.1Q3.1 3.1 3.1 6L3.1 18Q3.1 20.9 6 20.9L10 20.9Q10.9 20.9 10.9 20Q10.9 19.1 10 19.1L6 19.1Q4.9 19.1 4.9 18L4.9 6Q4.9 4.9 6 4.9L10 4.9Q10.9 4.9 10.9 4Q10.9 3.1 10 3.1ZM9 11.1L18.03 11.1L15.36 8.43Q15.1 8.17 15.1 7.8Q15.1 7.43 15.36 7.16Q15.63 6.9 16 6.9Q16.37 6.9 16.64 7.16L20.84 11.36Q21.1 11.63 21.1 12Q21.1 12.37 20.84 12.64L16.64 16.84Q16.37 17.1 16 17.1Q15.63 17.1 15.36 16.84Q15.1 16.57 15.1 16.2Q15.1 15.83 15.36 15.57L18.03 12.9L9 12.9Q8.1 12.9 8.1 12Q8.1 11.1 9 11.1Z</StreamGeometry>
+        <!-- Send phone songs to computer: PhDownload's ring with its arrow turned up (mirrored
+             about the middle), so the two directions read as a pair. -->
+        <StreamGeometry x:Key="AccountSendIcon">M0 0ZM24 24ZM19.07 19.07Q16.14 22 12 22Q7.86 22 4.93 19.07Q2 16.14 2 12Q2 7.86 4.93 4.93Q7.86 2 12 2Q16.14 2 19.07 4.93Q22 7.86 22 12Q22 16.14 19.07 19.07ZM17.8 6.2Q15.4 3.8 12 3.8Q8.6 3.8 6.2 6.2Q3.8 8.6 3.8 12Q3.8 15.4 6.2 17.8Q8.6 20.2 12 20.2Q15.4 20.2 17.8 17.8Q20.2 15.4 20.2 12Q20.2 8.6 17.8 6.2ZM9.88 10.99L11.1 9.77L11.1 16.7Q11.1 17.07 11.36 17.34Q11.63 17.6 12 17.6Q12.37 17.6 12.64 17.34Q12.9 17.07 12.9 16.7L12.9 9.77L14.12 10.99Q14.38 11.26 14.76 11.26Q15.13 11.26 15.39 10.99Q15.66 10.73 15.66 10.36Q15.66 9.98 15.39 9.72L12.64 6.96Q12.37 6.7 12 6.7Q11.63 6.7 11.36 6.96L8.61 9.72Q8.34 9.98 8.34 10.36Q8.34 10.73 8.61 10.99Q8.87 11.26 9.24 11.26Q9.62 11.26 9.88 10.99Z</StreamGeometry>
         <!-- The eye on the password (the desktop's account card glyphs). -->
         <StreamGeometry x:Key="AccountEyeIcon">M12 4.5C7 4.5 2.73 7.61 1 12c1.73 4.39 6 7.5 11 7.5s9.27-3.11 11-7.5c-1.73-4.39-6-7.5-11-7.5zM12 17c-2.76 0-5-2.24-5-5s2.24-5 5-5 5 2.24 5 5-2.24 5-5 5zm0-8c-1.66 0-3 1.34-3 3s1.34 3 3 3 3-1.34 3-3-1.34-3-3-3z</StreamGeometry>
         <StreamGeometry x:Key="AccountEyeOffIcon">M12 7c2.76 0 5 2.24 5 5 0 .65-.13 1.26-.36 1.83l2.92 2.92c1.51-1.26 2.7-2.89 3.43-4.75-1.73-4.39-6-7.5-11-7.5-1.4 0-2.74.25-3.98.7l2.16 2.16C10.74 7.13 11.35 7 12 7zM2 4.27l2.28 2.28.46.46C3.08 8.3 1.78 10.02 1 12c1.73 4.39 6 7.5 11 7.5 1.55 0 3.03-.3 4.38-.84l.42.42L19.73 22 21 20.73 3.27 3 2 4.27zM7.53 9.8l1.55 1.55c-.05.21-.08.43-.08.65 0 1.66 1.34 3 3 3 .22 0 .44-.03.65-.08l1.55 1.55c-.67.33-1.41.53-2.2.53-2.76 0-5-2.24-5-5 0-.79.2-1.53.53-2.2zm4.31-.78l3.15 3.15.02-.16c0-1.66-1.34-3-3-3l-.17.01z</StreamGeometry>
@@ -209,8 +212,8 @@
                 <!-- Signed in. -->
                 <StackPanel Name="SignedInPanel" Spacing="14" IsVisible="{Binding IsSignedIn}">
 
-                    <!-- Who: the desktop's profile picture (else initials on the accent), the name,
-                         the PC and the last sync. -->
+                    <!-- Who: the desktop's profile picture (else initials on the accent), its profile
+                         name (else the email), the email smaller under it, the PC and the last sync. -->
                     <Border Name="AccountHeader" Classes="settings-card" Padding="20,24,20,20">
                         <StackPanel Spacing="4" HorizontalAlignment="Center">
                             <Border Name="AvatarCircle" Classes="avatar" Margin="0,0,0,10">
@@ -225,6 +228,9 @@
                                 </Panel>
                             </Border>
                             <TextBlock Name="AccountNameLabel" Text="{Binding DisplayName}" FontSize="22" FontWeight="Bold"
+                                       HorizontalAlignment="Center" TextTrimming="CharacterEllipsis" />
+                            <TextBlock Name="EmailLabel" Classes="subtle" FontSize="14" Text="{Binding EmailText}"
+                                       IsVisible="{Binding HasEmailText}"
                                        HorizontalAlignment="Center" TextTrimming="CharacterEllipsis" />
                             <TextBlock Name="AccountLabel" Classes="subtle" FontSize="14" Text="{Binding ServerText}"
                                        HorizontalAlignment="Center" TextTrimming="CharacterEllipsis" />
@@ -269,6 +275,19 @@
                                             <TextBlock Classes="row-label" Text="Download everything" />
                                             <TextBlock Name="DownloadLabel" Classes="row-status" Text="{Binding DownloadText}"
                                                        IsVisible="{Binding DownloadText, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
+                                        </StackPanel>
+                                    </Grid>
+                                </Button>
+                                <Border Classes="row-separator" />
+                                <!-- The other way: the phone's own songs into the computer's library. -->
+                                <Button Name="SendSongsButton" Classes="row account-row" Command="{Binding SendSongsCommand}"
+                                        IsEnabled="{Binding CanUpload}" AutomationProperties.Name="{Binding UploadLabel}">
+                                    <Grid ColumnDefinitions="Auto,*">
+                                        <views:GridIcon Classes="row-icon" Data="{StaticResource AccountSendIcon}" />
+                                        <StackPanel Grid.Column="1" VerticalAlignment="Center">
+                                            <TextBlock Name="SendSongsLabel" Classes="row-label" Text="{Binding UploadLabel}" />
+                                            <TextBlock Name="UploadLabel" Classes="row-status" Text="{Binding UploadText}"
+                                                       IsVisible="{Binding UploadText, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
                                         </StackPanel>
                                     </Grid>
                                 </Button>

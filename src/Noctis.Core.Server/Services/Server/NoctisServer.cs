@@ -115,7 +115,7 @@ public sealed partial class NoctisServer : IAsyncDisposable
         builder.WebHost.ConfigureKestrel(k =>
         {
             k.AddServerHeader = false;
-            k.Limits.MaxRequestBodySize = 1024 * 1024; // form posts only; audio flows the other way
+            k.Limits.MaxRequestBodySize = 1024 * 1024; // form posts; noctisUploadTrack raises it for its own body
             k.Listen(bindAddress ?? IPAddress.Any, port, listen =>
             {
                 if (certificate is not null) listen.UseHttps(certificate);
@@ -299,6 +299,55 @@ public sealed partial class NoctisServer : IAsyncDisposable
         return (users.FirstOrDefault(x => x.IsAdmin) ?? users.FirstOrDefault())?.Name ?? typed;
     }
 
+    /// <summary>The desktop's profile name for the phone's account header, or null when it has none.
+    /// The desktop keeps one profile, so every account on it shows the owner's name (as the picture).</summary>
+    private string? DisplayName() => _library.ProfileName?.Trim() is { Length: > 0 } name ? name : null;
+
+    /// <summary>
+    /// How long a song file's "is it on disk" answer is reused. The library can list songs whose
+    /// file was deleted or moved outside Noctis; the server leaves those out of what it lists (a
+    /// phone offered them could neither stream nor download them: download answered 70 for each).
+    /// A File.Exists costs ~50–160 µs on a warm Windows disk (measured 10-11: 7000 files in
+    /// 340 ms–1.1 s), and a phone's catalog read is ~16 requests, so the answers are kept for a
+    /// minute instead of re-asked per request: one pass per catalog read.
+    /// </summary>
+    internal TimeSpan FileCheckMaxAge { get; set; } = TimeSpan.FromMinutes(1);
+
+    private readonly object _fileCheckGate = new();
+    private readonly Dictionary<string, bool> _fileExists = new(StringComparer.Ordinal);
+    private DateTime _fileChecksAtUtc;
+
+    /// <summary>
+    /// The snapshot without songs whose file is gone, and without albums left with none. Keyed by
+    /// path, so a new or relinked song is checked when first seen. A whole library missing (an
+    /// unplugged drive) lists nothing; the phone keeps what it has when a catalog comes back empty.
+    /// </summary>
+    internal LibrarySnapshot Playable(LibrarySnapshot snap)
+    {
+        var tracks = new List<Track>(snap.Tracks.Count);
+        lock (_fileCheckGate)
+        {
+            var now = DateTime.UtcNow;
+            if (now - _fileChecksAtUtc >= FileCheckMaxAge)
+            {
+                _fileExists.Clear();
+                _fileChecksAtUtc = now;
+            }
+            foreach (var t in snap.Tracks)
+            {
+                var path = t.FilePath ?? string.Empty;
+                if (!_fileExists.TryGetValue(path, out var exists))
+                    _fileExists[path] = exists = path.Length > 0 && File.Exists(path);
+                if (exists) tracks.Add(t);
+            }
+        }
+        if (tracks.Count == snap.Tracks.Count) return snap;
+        var listed = tracks.Select(t => t.AlbumId).ToHashSet();
+        var hadSongs = snap.Tracks.Select(t => t.AlbumId).ToHashSet();
+        var albums = snap.Albums.Where(a => listed.Contains(a.Id) || !hadSongs.Contains(a.Id)).ToList();
+        return snap with { Tracks = tracks, Albums = albums };
+    }
+
     /// <summary>The requesting user; <c>Device</c> is set when the API key is a signed-in device's key.</summary>
     private (ServerUser? User, ServerDevice? Device, int Error, string Message) Authenticate(Params p, string? apiKey)
     {
@@ -464,17 +513,21 @@ public sealed partial class NoctisServer : IAsyncDisposable
                 var key = _users.IssueDeviceKey(user.Name, deviceId, deviceName);
                 DebugLogger.Info(DebugLogger.Category.State, "Server", $"device signed in: {deviceName}");
                 DevicesChanged?.Invoke(this, EventArgs.Empty);
-                return new JsonObject
+                var signIn = new JsonObject
                 {
-                    ["noctisSignIn"] = new JsonObject
-                    {
-                        ["apiKey"] = key,
-                        ["user"] = user.Name,
-                        ["server"] = _sync?.DeviceName ?? Environment.MachineName,
-                        ["syncEnabled"] = _sync is { IsEnabled: true },
-                    },
+                    ["apiKey"] = key,
+                    ["user"] = user.Name,
+                    ["server"] = _sync?.DeviceName ?? Environment.MachineName,
+                    ["syncEnabled"] = _sync is { IsEnabled: true },
                 };
+                if (DisplayName() is { } displayName) signIn["displayName"] = displayName;
+                return new JsonObject { ["noctisSignIn"] = signIn };
             }
+            // Songs sent from the phone (NoctisServer.Upload.cs): body streamed to disk, not to a snapshot.
+            case "noctisuploadtrack":
+                return await UploadTrackAsync(p, ctx).ConfigureAwait(false);
+            case "noctishastracks":
+                return await HasTracksAsync(p, ctx).ConfigureAwait(false);
             case "noctissignout":
             {
                 if (ctx.Items["device"] is not ServerDevice device)
@@ -485,7 +538,7 @@ public sealed partial class NoctisServer : IAsyncDisposable
             }
         }
 
-        var snap = await _library.SnapshotAsync().ConfigureAwait(false);
+        var snap = Playable(await _library.SnapshotAsync().ConfigureAwait(false));
         var view = new LibraryView(snap);
 
         switch (method.ToLowerInvariant())
@@ -714,6 +767,8 @@ public sealed partial class NoctisServer : IAsyncDisposable
                             ["lastSeq"] = d.LastSeq,
                         }).ToArray()),
                 };
+                // The phone reads it each sync (sync on or off), so a renamed profile reaches it.
+                if (DisplayName() is { } displayName) status["displayName"] = displayName;
                 return new JsonObject { ["noctisSync"] = status };
             }
             case "getnoctissyncchanges":

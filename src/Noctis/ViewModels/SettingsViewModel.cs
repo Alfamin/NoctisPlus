@@ -1191,7 +1191,10 @@ public partial class SettingsViewModel : ViewModelBase
                     // (one reference read per request, safe off the UI thread).
                     avatarPath: () => ProfileAvatarPath,
                     // Sign-in by the profile name ("Username"), as well as the account's email.
-                    profileName: () => ProfileName);
+                    profileName: () => ProfileName,
+                    // Songs a phone sends go where dropped files go (Noctis Imports), then into the library.
+                    uploadRoot: ct => App.Services?.GetService<MainWindowViewModel>()?.EnsureManagedImportRootAsync(ct)
+                                      ?? Task.FromResult<string?>(null));
                 // Covers shrink to what the phone asks for (cached under server/covers); the
                 // desktop's server is for the home network, so other addresses get a 403.
                 var covers = new ServerCoverResizer(Path.Combine(ServerDataDirectory, "covers"));

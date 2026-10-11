@@ -2853,7 +2853,10 @@ public partial class MainWindowViewModel : ViewModelBase
                 ManagedImportFolderName,
                 StringComparison.OrdinalIgnoreCase));
 
-    private async Task<string?> EnsureManagedImportRootAsync(CancellationToken ct)
+    /// <summary>The managed imports folder (created, and added to the music folders, when
+    /// missing); null when it cannot be made. Drops are moved here, and songs a phone sends
+    /// (the Noctis server's noctisUploadTrack) land under it too.</summary>
+    internal async Task<string?> EnsureManagedImportRootAsync(CancellationToken ct)
     {
         try
         {

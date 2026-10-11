@@ -526,6 +526,29 @@ public class NoctisAccountServiceTests : IAsyncLifetime
     }
 
     [Fact]
+    public async Task ADownloadOfASongWhoseFileIsGoneOnTheComputer_CountsAsMissing_NotAsAServerError()
+    {
+        // The owner's log (10-11): every "Download everything" item failed as "download: Server (HTTP 200)";
+        // the desktop listed songs whose files no longer exist and answered error 70 for each.
+        var ct = TestContext.Current.CancellationToken;
+        var svc = await SignedInAsync();
+        await svc.SyncNowAsync(ct);
+        _t2.FilePath = Path.Combine(_dir, "deleted since.flac");               // gone after the phone's catalog
+        NoctisDownloadProgress? last = null;
+        svc.DownloadProgress += (_, p) => last = p;
+
+        await svc.DownloadAllAsync(ct);
+
+        Assert.Equal(new NoctisDownloadProgress(0, 2, 1, 2L * _audio.Length, Missing: 1), last);
+        Assert.False(svc.IsDownloaded(Phone(_t2)));
+        Assert.Equal(NoctisErrorKind.FileMissing, NoctisServerClient.MapError(70, signingIn: false, "download").Kind);
+        Assert.Equal(NoctisErrorKind.Server, NoctisServerClient.MapError(70, signingIn: false, "getSong").Kind);
+        // The next catalog leaves it out, so the phone stops offering it.
+        await svc.SyncNowAsync(ct);
+        Assert.Null(_phoneLibrary.GetTrackById(_t2.Id));
+    }
+
+    [Fact]
     public async Task ANewDownloadBatch_CountsFromZero()
     {
         var ct = TestContext.Current.CancellationToken;

@@ -66,7 +66,7 @@ public sealed partial class SettingsPageViewModel : MobilePage
 
     /// <summary>Settings → Account's row: who this phone is signed in as, or the invitation to sign in.</summary>
     public string AccountRowText => Shell.Account?.Account is { } account && Shell.Account.IsSignedIn
-        ? $"Signed in as {account.UserName} · {AccountPageViewModel.ServerLabel(account)}"
+        ? $"Signed in as {AccountPageViewModel.ShownName(account)} · {AccountPageViewModel.ServerLabel(account)}"
         : "Sign in to your Noctis desktop";
 
     [ObservableProperty]

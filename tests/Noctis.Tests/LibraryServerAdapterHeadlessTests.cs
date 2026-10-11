@@ -125,6 +125,24 @@ public class LibraryServerAdapterHeadlessTests
         Assert.Empty((await adapter.SnapshotAsync()).Playlists);
     }
 
+    [Fact]
+    public async Task SongsFromAPhone_AskTheHostForTheirFolder_AndImport_OnTheLibrarysThread()
+    {
+        using var persistence = new TestPersistenceService();
+        // The headless host passes no folder: phones cannot send songs to it.
+        Assert.Null(await new LibraryServerAdapter(new FakeLibraryService(), persistence, new CountingPlayHistory())
+            .UploadRootAsync(TestContext.Current.CancellationToken));
+
+        var marshalled = 0;
+        var adapter = new LibraryServerAdapter(new FakeLibraryService(), persistence, new CountingPlayHistory(),
+            marshal: async work => { Interlocked.Increment(ref marshalled); await work(); },
+            uploadRoot: _ => Task.FromResult<string?>(@"C:\Music\Noctis Imports"));
+
+        Assert.Equal(@"C:\Music\Noctis Imports", await adapter.UploadRootAsync(TestContext.Current.CancellationToken));
+        await adapter.ImportUploadedAsync(@"C:\Music\Noctis Imports\Phone\a.mp3", TestContext.Current.CancellationToken);
+        Assert.Equal(2, marshalled);   // the desktop's marshal is the UI thread: settings and library writes live there
+    }
+
     /// <summary>The shared fake forgets playlists; this one keeps them like the real store.</summary>
     private sealed class PlaylistKeepingPersistence : TestPersistenceService
     {

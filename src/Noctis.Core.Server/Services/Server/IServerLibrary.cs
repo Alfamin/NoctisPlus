@@ -35,6 +35,15 @@ public interface IServerLibrary : Sync.ISyncApplier
     /// main account.</summary>
     string? ProfileName => null;
 
+    /// <summary>The folder songs sent from a phone (noctisUploadTrack) go under, created if
+    /// needed: the desktop's "Noctis Imports", the same place a dropped file is moved to. Null =
+    /// this host takes no songs (the call then answers error 0).</summary>
+    Task<string?> UploadRootAsync(CancellationToken ct) => Task.FromResult<string?>(null);
+
+    /// <summary>Adds a file noctisUploadTrack just wrote under <see cref="UploadRootAsync"/> to the
+    /// library, the way a dropped file is added (then it lists, streams and syncs like any other).</summary>
+    Task ImportUploadedAsync(string path, CancellationToken ct) => Task.CompletedTask;
+
     /// <summary>Stars/unstars tracks (albums and artists star every track they contain). Persists user state.</summary>
     Task SetStarredAsync(IReadOnlyList<Guid> trackIds, IReadOnlyList<Guid> albumIds, IReadOnlyList<Guid> artistIds, bool starred);
 

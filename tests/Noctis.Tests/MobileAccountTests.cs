@@ -139,6 +139,32 @@ public class MobileAccountTests
         }
 
         public string? ResolvePlaybackUri(string filePath) => null;
+
+        public void RaiseDownloadProgress(NoctisDownloadProgress progress) => DownloadProgress?.Invoke(this, progress);
+
+        public bool IsUploading { get; set; }
+        public event EventHandler<NoctisUploadProgress>? UploadProgress;
+        public NoctisUploadResult UploadResult { get; set; } = new(40, 2, 1, 0);
+        public Exception? UploadError { get; set; }
+        public int UploadCalls { get; private set; }
+
+        /// <summary>Set: the send reports "2 of 40 done" then waits for this (or the token) before finishing.</summary>
+        public TaskCompletionSource? UploadGate { get; set; }
+
+        public async Task<NoctisUploadResult> SendLocalSongsAsync(CancellationToken ct = default)
+        {
+            UploadCalls++;
+            IsUploading = true;
+            try
+            {
+                if (UploadError != null) throw UploadError;
+                UploadProgress?.Invoke(this, new NoctisUploadProgress(0, 0));
+                UploadProgress?.Invoke(this, new NoctisUploadProgress(2, 40));
+                if (UploadGate != null) await UploadGate.Task.WaitAsync(ct);
+                return UploadResult;
+            }
+            finally { IsUploading = false; }
+        }
     }
 
     private static Track RemoteSong(string title)
@@ -422,6 +448,145 @@ public class MobileAccountTests
         Assert.False(page.IsDownloading);
         Assert.Equal("Downloads finished · 1 failed", page.DownloadText);
         Assert.Equal("Downloaded: 2 songs · 10 MB", page.StorageText);
+    }
+
+    [Fact]
+    public void DownloadResult_TellsSongsMissingOnTheComputer_ApartFromOtherFailures()
+    {
+        using var rig = MobileFixtures.MakeRig();
+        var account = new FakeAccount { Account = FakeAccount.SignedInAs() };
+        var page = OpenAccount(ShellWith(rig, account));
+
+        account.RaiseDownloadProgress(new NoctisDownloadProgress(0, 0, 77, 0, Missing: 77));
+        Assert.Equal("Downloads finished · 77 missing on your computer", page.DownloadText);
+
+        account.RaiseDownloadProgress(new NoctisDownloadProgress(3, 1, 3, 0, Missing: 2));
+        Assert.Equal("Downloading 1 of 4 · 2 missing on your computer · 1 failed", page.DownloadText);
+        Assert.Equal("This song's file is missing on your computer.", AccountPageViewModel.Describe(NoctisErrorKind.FileMissing, true));
+    }
+
+    [Fact]
+    public async Task SendSongs_ShowsProgress_ThenTheCounts()
+    {
+        using var rig = MobileFixtures.MakeRig();
+        var account = new FakeAccount { Account = FakeAccount.SignedInAs(), UploadGate = new TaskCompletionSource() };
+        var page = OpenAccount(ShellWith(rig, account));
+        Assert.Equal("Send phone songs to computer", page.UploadLabel);
+        Assert.True(page.CanUpload);
+
+        var send = page.SendSongsCommand.ExecuteAsync(null);
+        Assert.True(page.IsUploading);
+        Assert.Equal("Sending 3 of 40", page.UploadText);                     // two done, the third going out
+        Assert.Equal("Stop sending", page.UploadLabel);
+
+        account.UploadGate.SetResult();
+        await send;
+
+        Assert.Equal(1, account.UploadCalls);
+        Assert.False(page.IsUploading);
+        Assert.Equal("Sent 40 · 2 already on your computer · 1 failed", page.UploadText);
+        Assert.Equal("Send phone songs to computer", page.UploadLabel);
+        Assert.False(page.HasError);
+    }
+
+    [Fact]
+    public async Task SendSongs_TappedAgainWhileSending_Stops_AndSaysTheRestWaits()
+    {
+        using var rig = MobileFixtures.MakeRig();
+        var account = new FakeAccount { Account = FakeAccount.SignedInAs(), UploadGate = new TaskCompletionSource() };
+        var page = OpenAccount(ShellWith(rig, account));
+
+        var send = page.SendSongsCommand.ExecuteAsync(null);
+        Assert.True(page.SendSongsCommand.CanExecute(null));                  // the second tap reaches the command
+        await page.SendSongsCommand.ExecuteAsync(null);
+        await send;
+
+        Assert.Equal(1, account.UploadCalls);
+        Assert.False(page.IsUploading);
+        Assert.Equal("Stopped. Tap again to send the rest.", page.UploadText);
+        Assert.False(page.HasError);
+    }
+
+    [Theory]
+    [InlineData(0, 0, 0, 3, "Everything is already on your computer")]
+    [InlineData(0, 0, 0, 0, "No songs on this phone to send")]
+    [InlineData(5, 0, 0, 2, "Sent 5")]
+    [InlineData(0, 4, 0, 0, "Sent 0 · 4 already on your computer")]
+    [InlineData(1, 0, 2, 0, "Sent 1 · 2 failed")]
+    public void SendSongs_Result_IsWorded(int sent, int already, int failed, int previously, string text)
+        => Assert.Equal(text, AccountPageViewModel.DescribeUpload(new NoctisUploadResult(sent, already, failed, previously)));
+
+    [Fact]
+    public async Task SendSongs_SyncOffOnTheComputer_IsWorded()
+    {
+        using var rig = MobileFixtures.MakeRig();
+        var account = new FakeAccount { Account = FakeAccount.SignedInAs(), UploadError = new NoctisServerException(NoctisErrorKind.SyncDisabled, "50") };
+        var page = OpenAccount(ShellWith(rig, account));
+
+        await page.SendSongsCommand.ExecuteAsync(null);
+
+        Assert.Equal("Turn on Sync on your computer (Settings → Account & Devices).", page.ErrorText);
+        Assert.Equal(string.Empty, page.UploadText);
+        Assert.False(page.IsUploading);
+    }
+
+    [Fact]
+    public void Header_ShowsTheDesktopsProfileName_WithTheEmailSmallerUnderIt()
+    {
+        using var rig = MobileFixtures.MakeRig();
+        var account = new FakeAccount { Account = FakeAccount.SignedInAs("owner@example.com") with { DisplayName = "notheartached" } };
+        var shell = ShellWith(rig, account);
+        var settings = new SettingsPageViewModel(shell);
+        var page = OpenAccount(shell);
+
+        Assert.Equal("notheartached", page.DisplayName);
+        Assert.Equal("owner@example.com", page.EmailText);
+        Assert.True(page.HasEmailText);
+        Assert.Equal("NO", page.Initials);
+        Assert.Equal("Signed in as notheartached · Studio PC", settings.AccountRowText);
+
+        // No profile name (an older desktop, or none set): the email is the name, shown once.
+        account.Account = account.Account! with { DisplayName = null };
+        account.RaiseStateChanged();
+        Assert.Equal("owner@example.com", page.DisplayName);
+        Assert.False(page.HasEmailText);
+        Assert.Equal("OC", page.Initials);                                     // "owner@example" + "com", as before
+        settings.OnClosed();
+    }
+
+    [AvaloniaFact]
+    public void Header_View_ShowsTheNameLarge_AndTheEmailLine_AndTheSendRow()
+    {
+        using var rig = MobileFixtures.MakeRig();
+        var account = new FakeAccount { Account = FakeAccount.SignedInAs("owner@example.com") with { DisplayName = "notheartached" } };
+        var shell = ShellWith(rig, account);
+        var window = MobileFixtures.Mount(shell, out var view);
+        shell.OpenAccountCommand.Execute(null);
+        window.UpdateLayout();
+
+        var page = MobileFixtures.Find<AccountPage>(view);
+        var name = MobileFixtures.Named<TextBlock>(page, "AccountNameLabel");
+        var email = MobileFixtures.Named<TextBlock>(page, "EmailLabel");
+        Assert.Equal("notheartached", name.Text);
+        Assert.True(email.IsEffectivelyVisible);
+        Assert.Equal("owner@example.com", email.Text);
+        Assert.True(email.FontSize < name.FontSize);
+
+        var row = MobileFixtures.Named<Button>(page, "SendSongsButton");
+        Assert.True(row.IsEffectivelyVisible);
+        Assert.True(row.IsEnabled);
+        Assert.Equal("Send phone songs to computer", MobileFixtures.Named<TextBlock>(page, "SendSongsLabel").Text);
+        Assert.False(MobileFixtures.Named<TextBlock>(page, "UploadLabel").IsEffectivelyVisible);   // no status yet
+
+        account.UploadGate = new TaskCompletionSource();
+        row.Command!.Execute(null);
+        window.UpdateLayout();
+        Assert.Equal("Stop sending", MobileFixtures.Named<TextBlock>(page, "SendSongsLabel").Text);
+        var status = MobileFixtures.Named<TextBlock>(page, "UploadLabel");
+        Assert.True(status.IsEffectivelyVisible);
+        Assert.Equal("Sending 3 of 40", status.Text);
+        account.UploadGate.SetResult();
+        window.Close();
     }
 
     [Fact]
@@ -837,7 +1002,7 @@ public class MobileAccountTests
             Assert.True(circle.ClipToBounds);
 
             // Every action row is a full-width touch target of at least 52 dp.
-            foreach (var name in new[] { "SyncNowButton", "DownloadAllButton", "RemoveDownloadsButton", "SignOutButton" })
+            foreach (var name in new[] { "SyncNowButton", "DownloadAllButton", "SendSongsButton", "RemoveDownloadsButton", "SignOutButton" })
             {
                 var row = MobileFixtures.Named<Button>(page, name);
                 Assert.True(row.IsEffectivelyVisible, name);

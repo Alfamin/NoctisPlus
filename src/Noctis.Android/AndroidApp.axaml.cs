@@ -178,6 +178,9 @@ public partial class AndroidApp : Avalonia.Application, IThemeHost
                 // No ALAC decoder, neither the phone's nor the bundled FFmpeg (a build without
                 // Libs/media3-decoder-ffmpeg): the desktop sends its ALAC songs as FLAC.
                 PreferFlacForAlac = !Media3AudioPlayer.HasDecoder("audio/alac"),
+                // "Send phone songs to computer" reads the phone's songs as playback does: the SAF
+                // document through its file descriptor, streamed, never copied.
+                LocalFiles = new SafTrackFileAccess(context),
             };
         }
         catch (Exception ex)
