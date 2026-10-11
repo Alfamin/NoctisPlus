@@ -210,6 +210,15 @@
         <Style Selector="Button.artist-link-btn:pressed Border.artist-text-hover">
             <Setter Property="Background" Value="#33FFFFFF" />
         </Style>
+        <!-- Artist name in the track box: accent, or the bar's secondary text colour when
+             Settings → "Accent colour on artist and album names" is off (GitHub #125;
+             MainWindow's plain-track-links class). Style setters, not local values. -->
+        <Style Selector="TextBlock.bar-artist">
+            <Setter Property="Foreground" Value="{DynamicResource AccentColorBrush}" />
+        </Style>
+        <Style Selector=":is(Window).plain-track-links TextBlock.bar-artist">
+            <Setter Property="Foreground" Value="{DynamicResource IslandForegroundSecondary}" />
+        </Style>
 
         <!-- Compact vertical volume slider -->
         <Style Selector="Slider.volume-vertical">
@@ -1134,10 +1143,10 @@
                                                  and logged a warning at every startup. Artist raises no INPC, so
                                                  re-evaluating on CurrentTrack change is exactly equivalent. -->
                                             <TextBlock x:Name="ArtistNameTextBlock"
+                                                       Classes="bar-artist"
                                                        Text="{Binding CurrentTrack, Converter={StaticResource DisplayArtist}, FallbackValue=''}"
                                                        FontSize="10"
                                                        MaxLines="1"
-                                                       Foreground="{DynamicResource AccentColorBrush}"
                                                        Margin="0,1,0,0">
                                                 <TextBlock.RenderTransform>
                                                     <TranslateTransform X="0" />
@@ -1148,10 +1157,10 @@
                                              48 − the hover border's 3px padding, so it sits one gap after
                                              the text; it rides the same offset as the text. -->
                                         <TextBlock x:Name="ArtistNameLoopCopy"
+                                                   Classes="bar-artist"
                                                    Text="{Binding CurrentTrack, Converter={StaticResource DisplayArtist}, FallbackValue=''}"
                                                    FontSize="10"
                                                    MaxLines="1"
-                                                   Foreground="{DynamicResource AccentColorBrush}"
                                                    Margin="45,1,0,0"
                                                    IsVisible="False">
                                             <TextBlock.RenderTransform>

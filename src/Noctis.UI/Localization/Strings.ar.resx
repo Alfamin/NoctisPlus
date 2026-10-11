@@ -569,7 +569,7 @@
     <comment>Appearance toggle in SettingsView.axaml (GitHub #125)</comment>
   </data>
   <data name="Settings.AccentTrackLinksHint" xml:space="preserve">
-    <value>تظهر أسماء الفنانين والألبومات والأنواع في قوائم التشغيل والأغاني بلون التمييز. عند الإيقاف تظهر بلون النص العادي.</value>
+    <value>تظهر أسماء الفنانين والألبومات والأنواع في قوائم التشغيل والأغاني والمشغّل بلون التمييز. عند الإيقاف تظهر بلون النص العادي.</value>
     <comment>Appearance toggle hint in SettingsView.axaml (GitHub #125)</comment>
   </data>
   <data name="Playlist.DragCount" xml:space="preserve">

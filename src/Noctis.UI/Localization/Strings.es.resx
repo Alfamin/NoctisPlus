@@ -569,7 +569,7 @@
     <comment>Appearance toggle in SettingsView.axaml (GitHub #125)</comment>
   </data>
   <data name="Settings.AccentTrackLinksHint" xml:space="preserve">
-    <value>Los nombres de artista, álbum y género en las listas de reproducción y en Canciones usan el color de acento. Desactivado, usan el color de texto normal.</value>
+    <value>Los nombres de artista, álbum y género en las listas de reproducción, en Canciones y en el reproductor usan el color de acento. Desactivado, usan el color de texto normal.</value>
     <comment>Appearance toggle hint in SettingsView.axaml (GitHub #125)</comment>
   </data>
   <data name="Playlist.DragCount" xml:space="preserve">

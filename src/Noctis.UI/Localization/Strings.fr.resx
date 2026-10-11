@@ -569,7 +569,7 @@
     <comment>Appearance toggle in SettingsView.axaml (GitHub #125)</comment>
   </data>
   <data name="Settings.AccentTrackLinksHint" xml:space="preserve">
-    <value>Les noms d'artiste, d'album et de genre des listes de lecture et de Titres prennent la couleur d'accentuation. Désactivé, ils gardent la couleur de texte normale.</value>
+    <value>Les noms d'artiste, d'album et de genre des listes de lecture, de Titres et du lecteur prennent la couleur d'accentuation. Désactivé, ils gardent la couleur de texte normale.</value>
     <comment>Appearance toggle hint in SettingsView.axaml (GitHub #125)</comment>
   </data>
   <data name="Playlist.DragCount" xml:space="preserve">

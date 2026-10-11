@@ -188,6 +188,14 @@
         <!-- Compact seek/volume slider (accent fill/thumb to match the playback bar).
              ClipToBounds stops the track parts (negative margins under the thumb) from
              extending the clickable area past the slider. -->
+        <!-- Artist line: accent, or soft white with Settings → "Accent colour on artist and
+             album names" off (GitHub #125; this window's plain-track-links class). -->
+        <Style Selector="controls|MarqueeTextBlock.mini-artist">
+            <Setter Property="Foreground" Value="{DynamicResource AccentColorBrush}"/>
+        </Style>
+        <Style Selector="Window.plain-track-links controls|MarqueeTextBlock.mini-artist">
+            <Setter Property="Foreground" Value="{DynamicResource MiniDrawerTextSoft}"/>
+        </Style>
         <Style Selector="Slider.mini-seek">
             <Setter Property="Height" Value="16"/>
             <Setter Property="ClipToBounds" Value="True"/>
@@ -879,8 +887,8 @@
                             </controls:MarqueeTextBlock.InlineContent>
                         </controls:MarqueeTextBlock>
                         <controls:MarqueeTextBlock Text="{Binding Player.CurrentTrack.ArtistDisplay, FallbackValue=''}"
+                                                   Classes="mini-artist"
                                                    FontSize="12"
-                                                   Foreground="{DynamicResource AccentColorBrush}"
                                                    MaxDisplayWidth="{Binding #BarInfoHost.Bounds.Width}"
                                                    HorizontalAlignment="Left"
                                                    IsMiniPlayer="True"
@@ -1040,8 +1048,8 @@
                             </controls:MarqueeTextBlock.InlineContent>
                         </controls:MarqueeTextBlock>
                         <controls:MarqueeTextBlock Text="{Binding Player.CurrentTrack.ArtistDisplay, FallbackValue=''}"
+                                                   Classes="mini-artist"
                                                    FontSize="13"
-                                                   Foreground="{DynamicResource AccentColorBrush}"
                                                    MaxDisplayWidth="{Binding #CardInfoHost.Bounds.Width}"
                                                    HorizontalAlignment="Left"
                                                    IsMiniPlayer="True"

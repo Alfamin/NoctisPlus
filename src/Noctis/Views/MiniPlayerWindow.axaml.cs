@@ -400,6 +400,7 @@ public partial class MiniPlayerWindow : Window
         UpdateDesignSegment();
         ApplyTransparencyHint();
         ApplyPin();
+        Classes.Set("plain-track-links", !_hookedVm.Settings.AccentTrackLinks);
 
         // A DataContext arriving after Opened would otherwise leave every form hidden.
         SyncFormVisual();
@@ -961,6 +962,8 @@ public partial class MiniPlayerWindow : Window
             UpdateDesignSegment();
         else if (e.PropertyName == nameof(SettingsViewModel.MiniPlayerFrostedBackground))
             ApplyTransparencyHint();
+        else if (e.PropertyName == nameof(SettingsViewModel.AccentTrackLinks))
+            Classes.Set("plain-track-links", !(Vm?.Settings.AccentTrackLinks ?? true));
     }
 
     // ── Frosted background (GitHub #76) ──

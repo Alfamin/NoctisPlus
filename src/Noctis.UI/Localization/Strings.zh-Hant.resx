@@ -569,7 +569,7 @@
     <comment>Appearance toggle in SettingsView.axaml (GitHub #125)</comment>
   </data>
   <data name="Settings.AccentTrackLinksHint" xml:space="preserve">
-    <value>播放清單和「歌曲」中的演出者、專輯和類型名稱使用強調色。關閉後使用一般文字顏色。</value>
+    <value>播放清單、「歌曲」和播放器中的演出者、專輯和類型名稱使用強調色。關閉後使用一般文字顏色。</value>
     <comment>Appearance toggle hint in SettingsView.axaml (GitHub #125)</comment>
   </data>
   <data name="Playlist.DragCount" xml:space="preserve">

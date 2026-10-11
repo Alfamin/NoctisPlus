@@ -569,7 +569,7 @@
     <comment>Appearance toggle in SettingsView.axaml (GitHub #125)</comment>
   </data>
   <data name="Settings.AccentTrackLinksHint" xml:space="preserve">
-    <value>プレイリストと「曲」のアーティスト名・アルバム名・ジャンル名をアクセントカラーで表示します。オフにすると通常の文字色になります。</value>
+    <value>プレイリスト、「曲」、プレーヤーのアーティスト名・アルバム名・ジャンル名をアクセントカラーで表示します。オフにすると通常の文字色になります。</value>
     <comment>Appearance toggle hint in SettingsView.axaml (GitHub #125)</comment>
   </data>
   <data name="Playlist.DragCount" xml:space="preserve">

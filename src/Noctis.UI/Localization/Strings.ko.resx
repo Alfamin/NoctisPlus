@@ -569,7 +569,7 @@
     <comment>Appearance toggle in SettingsView.axaml (GitHub #125)</comment>
   </data>
   <data name="Settings.AccentTrackLinksHint" xml:space="preserve">
-    <value>재생목록과 노래 페이지의 아티스트, 앨범, 장르 이름을 강조 색상으로 표시합니다. 끄면 일반 글자 색상으로 표시됩니다.</value>
+    <value>재생목록, 노래 페이지, 플레이어의 아티스트, 앨범, 장르 이름을 강조 색상으로 표시합니다. 끄면 일반 글자 색상으로 표시됩니다.</value>
     <comment>Appearance toggle hint in SettingsView.axaml (GitHub #125)</comment>
   </data>
   <data name="Playlist.DragCount" xml:space="preserve">
