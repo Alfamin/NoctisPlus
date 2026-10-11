@@ -145,7 +145,7 @@ Options and client notes are in [docs/SELF-HOSTING.md](docs/SELF-HOSTING.md).
 
 ### Languages
 
-- [x] English, Arabic, French, Japanese, Korean, Spanish, Simplified Chinese and Traditional Chinese
+- [x] English, Arabic, French, Japanese, Korean, Russian, Spanish, Simplified Chinese and Traditional Chinese
 - [x] Switch language from Settings without a restart
 
 <p align="center">
