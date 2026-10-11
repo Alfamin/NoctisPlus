@@ -2,6 +2,7 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:vm="using:Noctis.Mobile.ViewModels"
              xmlns:controls="using:Noctis.Controls"
+             xmlns:views="using:Noctis.Mobile.Views"
              x:Class="Noctis.Mobile.Views.AccountPage"
              x:DataType="vm:AccountPageViewModel">
 
@@ -16,13 +17,13 @@
     <UserControl.Styles>
         <Style Selector="Border.settings-card">
             <Setter Property="Background" Value="{DynamicResource HomeCardBackground}" />
-            <Setter Property="CornerRadius" Value="14" />
+            <Setter Property="CornerRadius" Value="20" />
             <Setter Property="Padding" Value="16,12" />
         </Style>
         <!-- A card of rows: the rows reach its edges, so the card clips their press dim. -->
         <Style Selector="Border.row-card">
             <Setter Property="Background" Value="{DynamicResource HomeCardBackground}" />
-            <Setter Property="CornerRadius" Value="14" />
+            <Setter Property="CornerRadius" Value="20" />
             <Setter Property="ClipToBounds" Value="True" />
         </Style>
 
@@ -32,10 +33,11 @@
             <Setter Property="MinHeight" Value="56" />
             <Setter Property="Padding" Value="16,8" />
         </Style>
-        <Style Selector="Button.account-row PathIcon.row-icon">
-            <Setter Property="Width" Value="22" />
-            <Setter Property="Height" Value="22" />
-            <Setter Property="Margin" Value="0,0,14,0" />
+        <!-- GridIcon (as Settings): every glyph at its 24-grid size, so the column lines up. -->
+        <Style Selector="views|GridIcon.row-icon">
+            <Setter Property="Width" Value="24" />
+            <Setter Property="Height" Value="24" />
+            <Setter Property="Margin" Value="0,0,16,0" />
             <Setter Property="VerticalAlignment" Value="Center" />
         </Style>
         <Style Selector="Button.account-row TextBlock.row-label">
@@ -48,7 +50,7 @@
             <Setter Property="TextWrapping" Value="Wrap" />
             <Setter Property="Margin" Value="0,2,0,0" />
         </Style>
-        <Style Selector="Button.account-row.danger PathIcon">
+        <Style Selector="Button.account-row.danger views|GridIcon">
             <Setter Property="Foreground" Value="{DynamicResource AccountDangerBrush}" />
         </Style>
         <Style Selector="Button.account-row.danger TextBlock.row-label">
@@ -57,15 +59,15 @@
         <Style Selector="Button.account-row:disabled">
             <Setter Property="Opacity" Value="0.45" />
         </Style>
-        <!-- Hairline between rows, starting under the label (16 + 22 + 14). -->
+        <!-- Hairline between rows, starting under the label (16 + 24 + 16). -->
         <Style Selector="Border.row-separator">
             <Setter Property="Height" Value="1" />
-            <Setter Property="Margin" Value="52,0,0,0" />
+            <Setter Property="Margin" Value="56,0,0,0" />
             <Setter Property="Background" Value="#1F808080" />
         </Style>
         <!-- An inline "are you sure?" under its row. -->
         <Style Selector="StackPanel.confirm">
-            <Setter Property="Margin" Value="52,0,16,14" />
+            <Setter Property="Margin" Value="56,0,16,14" />
             <Setter Property="Spacing" Value="10" />
         </Style>
         <Style Selector="Button.pill.danger">
@@ -173,7 +175,7 @@
                                 <Button Name="SyncNowButton" Classes="row account-row" Command="{Binding SyncNowCommand}"
                                         IsEnabled="{Binding CanSync}" AutomationProperties.Name="Sync now">
                                     <Grid ColumnDefinitions="Auto,*">
-                                        <PathIcon Classes="row-icon" Data="{DynamicResource SyncIcon}" />
+                                        <views:GridIcon Classes="row-icon" Data="{DynamicResource SyncIcon}" />
                                         <StackPanel Grid.Column="1" VerticalAlignment="Center">
                                             <TextBlock Classes="row-label" Text="Sync now" />
                                             <TextBlock Name="SyncLabel" Classes="row-status" Text="{Binding SyncText}"
@@ -187,7 +189,7 @@
                             <!-- Not a button: nothing to open, the row only reports. -->
                             <Grid Name="StorageRow" ColumnDefinitions="Auto,*,Auto" MinHeight="56" Margin="16,0"
                                   AutomationProperties.Name="{Binding StorageText}">
-                                <PathIcon Data="{DynamicResource FolderIcon}" Width="22" Height="22" Margin="0,0,14,0" VerticalAlignment="Center" />
+                                <views:GridIcon Classes="row-icon" Data="{DynamicResource FolderIcon}" />
                                 <TextBlock Grid.Column="1" Text="Downloaded" FontSize="16" VerticalAlignment="Center" />
                                 <TextBlock Grid.Column="2" Name="StorageLabel" Classes="subtle" FontSize="14" Margin="8,0,0,0"
                                            VerticalAlignment="Center" Text="{Binding StorageValue}" />
@@ -198,7 +200,7 @@
                                 <Button Name="DownloadAllButton" Classes="row account-row" Command="{Binding DownloadAllCommand}"
                                         IsEnabled="{Binding CanDownload}" AutomationProperties.Name="Download everything">
                                     <Grid ColumnDefinitions="Auto,*">
-                                        <PathIcon Classes="row-icon" Data="{DynamicResource PhDownload}" />
+                                        <views:GridIcon Classes="row-icon" Data="{DynamicResource PhDownload}" />
                                         <StackPanel Grid.Column="1" VerticalAlignment="Center">
                                             <TextBlock Classes="row-label" Text="Download everything" />
                                             <TextBlock Name="DownloadLabel" Classes="row-status" Text="{Binding DownloadText}"
@@ -212,7 +214,7 @@
                             <Button Name="RemoveDownloadsButton" Classes="row account-row danger" Command="{Binding AskRemoveDownloadsCommand}"
                                     IsEnabled="{Binding !IsConfirmingRemoveDownloads}" AutomationProperties.Name="Remove all downloads">
                                 <Grid ColumnDefinitions="Auto,*">
-                                    <PathIcon Classes="row-icon" Data="{DynamicResource PhTrash}" />
+                                    <views:GridIcon Classes="row-icon" Data="{DynamicResource PhTrash}" />
                                     <TextBlock Grid.Column="1" Classes="row-label" Text="Remove all downloads" />
                                 </Grid>
                             </Button>
@@ -235,7 +237,7 @@
                                     IsEnabled="{Binding IsIdle}" IsVisible="{Binding !IsConfirmingSignOut}"
                                     AutomationProperties.Name="Sign out">
                                 <Grid ColumnDefinitions="Auto,*">
-                                    <PathIcon Classes="row-icon" Data="{StaticResource AccountSignOutIcon}" />
+                                    <views:GridIcon Classes="row-icon" Data="{StaticResource AccountSignOutIcon}" />
                                     <TextBlock Grid.Column="1" Classes="row-label" Text="Sign out" />
                                 </Grid>
                             </Button>

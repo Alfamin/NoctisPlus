@@ -349,7 +349,7 @@ public class MobileSettingsTests
             {
                 var title = c.GetVisualDescendants().OfType<TextBlock>().First(t => t.Classes.Contains("section-title")).Text;
                 var badge = c.GetVisualDescendants().OfType<Border>().First(b => b.Classes.Contains("section-badge"));
-                return (Title: title, Icon: badge.GetVisualDescendants().OfType<PathIcon>().Single().Data, Corner: c.CornerRadius.TopLeft);
+                return (Title: title, Icon: badge.GetVisualDescendants().OfType<GridIcon>().Single().Data, Corner: c.CornerRadius.TopLeft);
             }).ToList();
 
             // No account service in this rig: the Account card stays hidden.
@@ -386,8 +386,20 @@ public class MobileSettingsTests
             Assert.All(rows, r =>
             {
                 Assert.True(r.Bounds.Height >= 52, $"{r.Name ?? r.GetType().Name} is {r.Bounds.Height} tall");
-                var icon = r.GetVisualDescendants().OfType<Control>().First(c => c is PathIcon or Ellipse);
-                Assert.True(icon.Bounds.Width >= 20, $"{r.Name ?? r.GetType().Name} has no leading icon");
+                var icon = r.GetVisualDescendants().OfType<Control>().First(c => c is GridIcon or Ellipse);
+                Assert.True(icon.Bounds.Width >= 18, $"{r.Name ?? r.GetType().Name} has no leading icon");
+            });
+            // Every row icon is the same 24 dp box at the same left edge, centred on its row:
+            // PathIcon stretched each glyph's own bounds, so they came out uneven (owner 10-11).
+            var icons = rows.Select(r => r.GetVisualDescendants().OfType<GridIcon>().FirstOrDefault()).OfType<GridIcon>().ToList();
+            Assert.True(icons.Count >= 8, $"{icons.Count} grid icons");
+            Assert.All(icons, i => Assert.Equal(new Size(24, 24), i.Bounds.Size));
+            Assert.Single(icons.Select(i => Math.Round(i.TranslatePoint(new Point(0, 0), page)!.Value.X)).Distinct());
+            Assert.All(rows.Where(r => r.GetVisualDescendants().OfType<GridIcon>().Any()), r =>
+            {
+                var icon = r.GetVisualDescendants().OfType<GridIcon>().First();
+                var centre = icon.TranslatePoint(new Point(0, 12), r)!.Value.Y;
+                Assert.InRange(centre, r.Bounds.Height / 2 - 1.5, r.Bounds.Height / 2 + 1.5);
             });
             Assert.All(page.GetVisualDescendants().OfType<Button>().Where(b => b.IsEffectivelyVisible && b.TemplatedParent == null),  // not a slider's parts
                 b => Assert.True(b.Bounds.Height >= 44, $"{b.Name} is {b.Bounds.Height} tall"));
@@ -421,7 +433,7 @@ public class MobileSettingsTests
             {
                 var pill = MobileFixtures.Named<Button>(page, name);
                 Assert.Contains("pill", pill.Classes);
-                Assert.NotNull(pill.GetVisualDescendants().OfType<PathIcon>().Single().Data);
+                Assert.NotNull(pill.GetVisualDescendants().OfType<GridIcon>().Single().Data);
                 Assert.Contains(pill.GetVisualDescendants().OfType<TextBlock>(), t => t.Text == label);
             }
         });
