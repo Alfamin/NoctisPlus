@@ -68,6 +68,7 @@ public class LocalizationTests : IDisposable
     [InlineData("en-GB", "en")]
     [InlineData("fr", "fr")]
     [InlineData("zh-CN", "zh-Hans")]
+    [InlineData("ru-RU", "ru")]
     [InlineData("pt-BR", "en")] // no Portuguese → English
     public void Resolve_MapsASettingToAShippedTranslation(string setting, string expected)
         => Assert.Equal(expected, Loc.Resolve(setting));
@@ -135,6 +136,46 @@ public class LocalizationTests : IDisposable
             .OrderBy(c => c, StringComparer.OrdinalIgnoreCase).ToList();
         Assert.Equal(shipped, Loc.KnownCultures.OrderBy(c => c, StringComparer.OrdinalIgnoreCase).ToList());
     }
+
+    [AvaloniaFact]
+    public void Russian_LoadsFromItsSatelliteAssembly()
+    {
+        Loc.Instance.SetCulture("ru");
+        Assert.Equal("Главная", Loc.T("Nav.Home"));
+        Assert.Equal("Песен: 12", Loc.T("QueueToast.SongCount", 12));
+    }
+
+    /// <summary>
+    /// Translations that ship complete (Russian, GitHub #128) must carry every English key and
+    /// nothing else, with the same {0} / {1:N0} placeholders per key: a dropped placeholder loses
+    /// a value on screen and an extra one makes string.Format throw.
+    /// </summary>
+    [Theory]
+    [InlineData("ru")]
+    public void CompleteTranslation_MatchesEnglishKeysAndPlaceholders(string culture)
+    {
+        var dir = Path.Combine(FindRepoRoot(), "src", "Noctis.UI", "Localization");
+        var english = ReadValues(Path.Combine(dir, "Strings.resx"));
+        var translated = ReadValues(Path.Combine(dir, $"Strings.{culture}.resx"));
+
+        var missing = english.Keys.Where(k => !translated.ContainsKey(k)).ToList();
+        var extra = translated.Keys.Where(k => !english.ContainsKey(k)).ToList();
+        Assert.True(missing.Count == 0, $"Strings.{culture}.resx is missing: {string.Join(", ", missing)}");
+        Assert.True(extra.Count == 0, $"Strings.{culture}.resx has keys not in Strings.resx: {string.Join(", ", extra)}");
+
+        static string Placeholders(string value) => string.Join(" ",
+            Regex.Matches(value, @"\{[^{}]*\}").Select(m => m.Value).Distinct().OrderBy(p => p, StringComparer.Ordinal));
+        var mismatched = english
+            .Where(e => Placeholders(e.Value) != Placeholders(translated[e.Key]))
+            .Select(e => $"{e.Key} [{Placeholders(e.Value)}] vs [{Placeholders(translated[e.Key])}]")
+            .ToList();
+        Assert.True(mismatched.Count == 0, "Placeholder mismatch: " + string.Join("; ", mismatched));
+    }
+
+    private static Dictionary<string, string> ReadValues(string resxPath)
+        => XDocument.Load(resxPath).Root!
+            .Elements("data")
+            .ToDictionary(d => (string)d.Attribute("name")!, d => (string?)d.Element("value") ?? "", StringComparer.Ordinal);
 
     private static HashSet<string> ReadKeys(string resxPath)
         => XDocument.Load(resxPath).Root!
