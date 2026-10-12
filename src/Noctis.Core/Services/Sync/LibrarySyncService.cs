@@ -130,10 +130,14 @@ public sealed class LibrarySyncService : ILibrarySyncService
             foreach (var t in tracks)
             {
                 if (t is null || t.SourceType != SourceType.Local) continue;
-                if (!t.IsFavorite && t.Rating == 0 && !t.IsDisliked && t.PlayCount == 0) continue;
                 var id = t.Id.ToString("N");
-                if (Store.Get(SyncKinds.Track, id) is not null) continue;
-                Store.Upsert(SyncKinds.Track, id, SyncJson.Serialize(TrackSyncState.From(t)), now, device);
+                var payload = SyncJson.Serialize(TrackSyncState.From(t));
+                // A song the ledger has is brought up to date: sync was off while it changed
+                // (unfavourited, re-rated), so nothing recorded that. A new one only with state.
+                if (Store.Get(SyncKinds.Track, id) is { } existing
+                        ? existing.Payload == payload
+                        : !t.IsFavorite && t.Rating == 0 && !t.IsDisliked && t.PlayCount == 0) continue;
+                Store.Upsert(SyncKinds.Track, id, payload, now, device);
             }
             RefreshPlaylists(playlists);
         });
