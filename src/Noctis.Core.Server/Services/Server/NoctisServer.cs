@@ -235,9 +235,12 @@ public sealed partial class NoctisServer : IAsyncDisposable
                 // every account. API keys are 256-bit random (not guessable), so a request that
                 // carries one is never throttled. The attempt is reserved (counted) BEFORE the
                 // password is verified, so parallel requests cannot each get a free guess.
+                // Keyed by the account the name means (ResolveSignInName), so the profile
+                // name is not a second set of guesses at the main account.
                 var client = ctx.Connection.RemoteIpAddress?.ToString() ?? "unknown";
                 var name = apiKey is null ? p.Get("u") : null;
-                var throttleKey = name is null ? null : LoginThrottle.Key(client, name);
+                var signInName = name is null ? null : ResolveSignInName(name);
+                var throttleKey = signInName is null ? null : LoginThrottle.Key(client, signInName);
                 var lockedNow = false;
                 if (throttleKey is not null && !_throttle.TryReserve(throttleKey, out var retryAfter, out lockedNow))
                 {
@@ -247,7 +250,7 @@ public sealed partial class NoctisServer : IAsyncDisposable
                     return;
                 }
 
-                var (user, device, error, errorMessage) = Authenticate(p, apiKey);
+                var (user, device, error, errorMessage) = Authenticate(p, apiKey, signInName);
                 if (user is null)
                 {
                     if (lockedNow) DebugLogger.Warn(DebugLogger.Category.State, "Server", $"login lockout for {client}");
@@ -363,8 +366,10 @@ public sealed partial class NoctisServer : IAsyncDisposable
         return snap with { Tracks = tracks, Albums = albums };
     }
 
-    /// <summary>The requesting user; <c>Device</c> is set when the API key is a signed-in device's key.</summary>
-    private (ServerUser? User, ServerDevice? Device, int Error, string Message) Authenticate(Params p, string? apiKey)
+    /// <summary>The requesting user; <c>Device</c> is set when the API key is a signed-in device's key.
+    /// <paramref name="signInName"/> is <c>u</c> as <see cref="ResolveSignInName"/> read it (the caller
+    /// keyed the login brake by it); null when there is no <c>u</c>.</summary>
+    private (ServerUser? User, ServerDevice? Device, int Error, string Message) Authenticate(Params p, string? apiKey, string? signInName)
     {
         var u = p.Get("u");
         var pw = p.Get("p");
@@ -388,7 +393,7 @@ public sealed partial class NoctisServer : IAsyncDisposable
             try { pw = System.Text.Encoding.UTF8.GetString(Convert.FromHexString(pw[4..])); }
             catch (FormatException) { return (null, null, SubsonicResponse.ErrWrongCredentials, "Wrong username or password"); }
         }
-        var user = _users.Verify(ResolveSignInName(u), pw);
+        var user = _users.Verify(signInName ?? ResolveSignInName(u), pw);
         return user is null ? (null, null, SubsonicResponse.ErrWrongCredentials, "Wrong username or password") : (user, null, 0, "");
     }
 

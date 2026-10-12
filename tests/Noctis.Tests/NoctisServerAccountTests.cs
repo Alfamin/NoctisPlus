@@ -236,6 +236,19 @@ public class NoctisServerAccountTests : IAsyncLifetime
     }
 
     [Fact]
+    public async Task LoginBrake_CountsTheProfileNameAlias_AgainstTheAccountItMeans()
+    {
+        // The profile name signs in to the main account, so guesses under it are guesses at
+        // that account's password: one brake for both names, not eight guesses under each.
+        _lib.ProfileName = "notheartached";
+        for (var i = 0; i < LoginThrottle.MaxFailures; i++) await SignIn(user: "NotHeartached", password: "wrong one");
+
+        var (r, res) = await SignIn(user: "alice"); // the right password: locked all the same
+        Assert.Equal(HttpStatusCode.TooManyRequests, res.StatusCode);
+        Assert.Equal(40, ErrorCode(r));
+    }
+
+    [Fact]
     public async Task SignInAgain_FromTheSameDevice_ReplacesItsKey()
     {
         var first = await SignInKey();
