@@ -365,10 +365,12 @@
                           MaxDropDownHeight="320">
                     <ComboBox.ItemTemplate>
                         <DataTemplate x:DataType="vm:ShareBackgroundChoice">
+                            <!-- The ring follows the theme: a fixed white one vanished with the
+                                 pale swatches (Mist, Cream) on the Light theme's pale list. -->
                             <StackPanel Orientation="Horizontal" Spacing="9">
                                 <Border Width="16" Height="16" CornerRadius="8"
                                         Background="{Binding Preview}"
-                                        BorderBrush="#40FFFFFF" BorderThickness="1"
+                                        BorderBrush="{DynamicResource GlassPillBorder}" BorderThickness="1"
                                         VerticalAlignment="Center" />
                                 <TextBlock Text="{Binding Name}" VerticalAlignment="Center"
                                            TextTrimming="CharacterEllipsis" />

@@ -573,6 +573,49 @@ public class LyricShareDialogTests
         finally { if (win.IsVisible) { win.Close(); PumpUntil(() => !win.IsVisible); } }
     }
 
+    /// <summary>
+    /// Bug: the Background swatches' ring was a fixed white (#40FFFFFF), so on the Light
+    /// theme's pale list the pale swatches had no edge: Mist (#E4ECF4) and Cream (#F5E6CC) sat
+    /// on the #F2F2F2 list at about 1.07:1 and 1.1:1 and all but vanished. The ring has to
+    /// stand off the list on both themes: darker on Light, lighter on Dark.
+    /// </summary>
+    [AvaloniaFact]
+    public void SwatchRings_StandOffTheList_OnBothThemes()
+    {
+        EnsureAppStyles();
+        foreach (var variant in new[] { Avalonia.Styling.ThemeVariant.Light, Avalonia.Styling.ThemeVariant.Dark })
+        {
+            var vm = new LyricShareViewModel(Song(), new[] { "one" }, 0);
+            var win = new Noctis.Views.LyricShareDialog(vm) { RequestedThemeVariant = variant, Width = 1280, Height = 860 };
+            win.Show();
+            try
+            {
+                var box = Named<ComboBox>(win, "BackgroundBox");
+                var popup = Avalonia.VisualTree.VisualExtensions.GetVisualDescendants(box)
+                    .OfType<Avalonia.Controls.Primitives.Popup>().Single(p => p.Name == "PART_Popup");
+                box.IsDropDownOpen = true;
+                Assert.True(PumpUntil(() => popup.IsOpen && popup.Child is Control { Bounds.Height: > 0 }), "the list never opened");
+                var list = (Border)popup.Child!;
+                var under = AccentTestHarness.ColorOf(list.Background);
+                var rings = Avalonia.VisualTree.VisualExtensions.GetVisualDescendants(list).OfType<Border>()
+                    .Where(b => b.DataContext is ShareBackgroundChoice && b.Width == 16).ToList();
+                Assert.NotEmpty(rings);
+                foreach (var ring in rings)
+                {
+                    var c = AccentTestHarness.ColorOf(ring.BorderBrush);
+                    double a = c.A / 255.0;
+                    double Lum(double r, double g, double b) => (0.2126 * r + 0.7152 * g + 0.0722 * b) / 255;
+                    var drawn = Lum(a * c.R + (1 - a) * under.R, a * c.G + (1 - a) * under.G, a * c.B + (1 - a) * under.B);
+                    var delta = drawn - Lum(under.R, under.G, under.B);
+                    Assert.True(variant == Avalonia.Styling.ThemeVariant.Light ? delta < -0.05 : delta > 0.05,
+                        $"{variant}: ring {c} on the {under} list shifts it by {delta:0.000}");
+                }
+                box.IsDropDownOpen = false;
+            }
+            finally { if (win.IsVisible) { win.Close(); PumpUntil(() => !win.IsVisible); } }
+        }
+    }
+
     /// <summary>Esc in a line's edit box puts the text back and keeps the dialog open.</summary>
     [AvaloniaFact]
     public void EscapeWhileEditing_RestoresTheLine_AndKeepsTheDialog()
