@@ -6,9 +6,13 @@ namespace Noctis.Services.Server;
 
 /// <summary>
 /// The server's TLS certificate: self-signed, generated once per install and kept as a PFX
-/// beside a random password file (owner-only on Unix). Clients pair by pinning the SHA-256
-/// fingerprint the app shows next to the QR code, which is what makes a self-signed cert
-/// safe here: the phone trusts THIS certificate, not a CA.
+/// beside its random password. On Windows the password file holds the password DPAPI-protected
+/// to the user (as the scrobbler tokens in settings.json are), so a copy of the two files —
+/// another account on the PC, a backup, a synced profile — is not this server's identity; a
+/// password file an earlier build left in plain text is read as before and protected in place,
+/// the certificate unchanged. On Unix the password stays plain text, owner-only. Clients pair
+/// by pinning the SHA-256 fingerprint the app shows next to the QR code, which is what makes a
+/// self-signed cert safe here: the phone trusts THIS certificate, not a CA.
 /// </summary>
 public static class ServerCertificate
 {
@@ -35,9 +39,17 @@ public static class ServerCertificate
         {
             try
             {
-                var cert = X509CertificateLoader.LoadPkcs12FromFile(pfx, File.ReadAllText(keyFile).Trim(),
-                    KeyFlags);
-                if (cert.NotAfter > DateTime.UtcNow.AddDays(30) && cert.HasPrivateKey) return cert;
+                // Plain text (an earlier build, or Unix) passes through; a DPAPI blob from
+                // another user or machine unprotects to nothing and fails the load below.
+                var stored = File.ReadAllText(keyFile).Trim();
+                var current = PersistenceService.UnprotectSecret(stored);
+                var cert = X509CertificateLoader.LoadPkcs12FromFile(pfx, current, KeyFlags);
+                if (cert.NotAfter > DateTime.UtcNow.AddDays(30) && cert.HasPrivateKey)
+                {
+                    var protectedPassword = PersistenceService.ProtectSecret(current);
+                    if (protectedPassword != stored) WriteKeyFile(keyFile, protectedPassword);
+                    return cert;
+                }
                 cert.Dispose();
             }
             catch (CryptographicException)
@@ -49,10 +61,18 @@ public static class ServerCertificate
         var created = Create();
         var password = Convert.ToBase64String(RandomNumberGenerator.GetBytes(24));
         File.WriteAllBytes(pfx, created.Export(X509ContentType.Pkcs12, password));
-        File.WriteAllText(keyFile, password);
+        WriteKeyFile(keyFile, PersistenceService.ProtectSecret(password));
         RestrictToOwner(pfx);
-        RestrictToOwner(keyFile);
         return created;
+    }
+
+    /// <summary>Writes the password file in one step: a half-written one would mean a new certificate, and re-pairing every phone.</summary>
+    private static void WriteKeyFile(string path, string text)
+    {
+        var temp = path + ".tmp";
+        File.WriteAllText(temp, text);
+        RestrictToOwner(temp);
+        File.Move(temp, path, overwrite: true);
     }
 
     /// <summary>A fresh self-signed RSA-2048 certificate for "Noctis", valid <see cref="ValidYears"/> years, with server-auth EKU and localhost/machine-name SANs.</summary>

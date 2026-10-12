@@ -32,6 +32,23 @@ public sealed partial class NoctisServer : IAsyncDisposable
     private readonly LoginThrottle _throttle = new();
     private WebApplication? _app;
 
+    /// <summary>
+    /// Most password checks (PBKDF2, 100k rounds: tens of ms of CPU each, for unknown names too)
+    /// in flight at once. The login brake is per address and name, so a flood of made-up names
+    /// is never throttled; without this cap it ran one PBKDF2 per thread and pegged the CPU.
+    /// Keys (device, account) are looked up by hash and never wait here.
+    /// </summary>
+    public const int MaxConcurrentPasswordChecks = 2;
+
+    /// <summary>How long a password check waits for a slot before the request is turned away (503).</summary>
+    private static readonly TimeSpan PasswordQueueTimeout = TimeSpan.FromSeconds(10);
+
+    private readonly SemaphoreSlim _passwordGate = new(MaxConcurrentPasswordChecks, MaxConcurrentPasswordChecks);
+
+    /// <summary>Most password checks seen in flight at once (test seam for the cap).</summary>
+    internal int PeakPasswordChecks => _peakPasswordChecks;
+    private int _passwordChecks, _peakPasswordChecks;
+
     /// <param name="coverResizer">
     /// Makes a <c>getCoverArt&amp;size=N</c> copy: (album id, source path, longest side, ct) → path
     /// of a cached JPEG, or null when the cover cannot be shrunk safely. Null (the headless host)
@@ -110,7 +127,14 @@ public sealed partial class NoctisServer : IAsyncDisposable
     {
         if (_app is not null) return;
 
-        var builder = WebApplication.CreateSlimBuilder(new WebApplicationOptions { ApplicationName = "Noctis" });
+        // Production whatever the process environment says: in "Development" (a dev box's
+        // ASPNETCORE_ENVIRONMENT) the host adds its developer exception page, which would hand
+        // stack traces and source paths to whoever sends a request the pipeline chokes on.
+        var builder = WebApplication.CreateSlimBuilder(new WebApplicationOptions
+        {
+            ApplicationName = "Noctis",
+            EnvironmentName = Microsoft.Extensions.Hosting.Environments.Production,
+        });
         builder.Logging.ClearProviders();
         builder.WebHost.ConfigureKestrel(k =>
         {
@@ -196,17 +220,20 @@ public sealed partial class NoctisServer : IAsyncDisposable
         if (method.EndsWith(".view", StringComparison.OrdinalIgnoreCase)) method = method[..^5];
         // The sign-in reply carries a new key: no cache (or proxy) may keep it.
         if (method.Equals("noctisSignIn", StringComparison.OrdinalIgnoreCase)) ctx.Response.Headers.CacheControl = "no-store";
-        var p = await ReadParamsAsync(ctx).ConfigureAwait(false);
-        var format = p.Get("f");
-        // Parked sign-in: refused before auth, so no password is checked for it.
-        if (!DeviceSignInEnabled && IsDeviceSignInMethod(method))
-        {
-            await WriteAsync(ctx, SubsonicResponse.Error(SubsonicResponse.ErrGeneric, $"Unknown method '{method}'", format, _serverVersion), 200).ConfigureAwait(false);
-            return;
-        }
-
+        string? format = null;
         try
         {
+            // Inside the try: a form the reader refuses (too many values) is an error reply
+            // like any other, never an unhandled exception for the host to render.
+            var p = await ReadParamsAsync(ctx).ConfigureAwait(false);
+            format = p.Get("f");
+            // Parked sign-in: refused before auth, so no password is checked for it.
+            if (!DeviceSignInEnabled && IsDeviceSignInMethod(method))
+            {
+                await WriteAsync(ctx, SubsonicResponse.Error(SubsonicResponse.ErrGeneric, $"Unknown method '{method}'", format, _serverVersion), 200).ConfigureAwait(false);
+                return;
+            }
+
             if (!NoAuthMethods.Contains(method))
             {
                 var apiKey = ApiKeyOf(ctx, p);
@@ -218,36 +245,68 @@ public sealed partial class NoctisServer : IAsyncDisposable
                     return;
                 }
 
-                // Brute-force brake per remote address + account name: after repeated bad
-                // logins for a name, that name is refused for a while, before its password is
-                // even checked. Keyed by name too because behind the documented reverse proxy
-                // every client shares the proxy's address, and one bad client must not lock out
-                // every account. API keys are 256-bit random (not guessable), so a request that
-                // carries one is never throttled. The attempt is reserved (counted) BEFORE the
-                // password is verified, so parallel requests cannot each get a free guess.
-                var client = ctx.Connection.RemoteIpAddress?.ToString() ?? "unknown";
-                var name = apiKey is null ? p.Get("u") : null;
-                var throttleKey = name is null ? null : LoginThrottle.Key(client, name);
-                var lockedNow = false;
-                if (throttleKey is not null && !_throttle.TryReserve(throttleKey, out var retryAfter, out lockedNow))
+                // A password check waits for one of the few slots (MaxConcurrentPasswordChecks)
+                // before anything else, so a refusal below holds no brake reservation. A flood
+                // that keeps the slots busy this long is turned away, not queued without end.
+                var checkingPassword = apiKey is null;
+                if (checkingPassword && !await _passwordGate.WaitAsync(PasswordQueueTimeout, ctx.RequestAborted).ConfigureAwait(false))
                 {
-                    ctx.Response.Headers.RetryAfter = ((int)Math.Ceiling(retryAfter.TotalSeconds)).ToString();
-                    await WriteAsync(ctx, SubsonicResponse.Error(SubsonicResponse.ErrWrongCredentials,
-                        "Too many failed login attempts. Try again later.", format, _serverVersion), 429).ConfigureAwait(false);
+                    ctx.Response.Headers.RetryAfter = "5";
+                    await WriteAsync(ctx, SubsonicResponse.Error(SubsonicResponse.ErrGeneric,
+                        "The server is busy checking passwords. Try again in a moment.", format, _serverVersion), 503).ConfigureAwait(false);
                     return;
                 }
+                try
+                {
+                    if (checkingPassword)
+                    {
+                        var inFlight = Interlocked.Increment(ref _passwordChecks);
+                        for (var peak = _peakPasswordChecks; inFlight > peak; peak = _peakPasswordChecks)
+                            if (Interlocked.CompareExchange(ref _peakPasswordChecks, inFlight, peak) == peak) break;
+                    }
 
-                var (user, device, error, errorMessage) = Authenticate(p, apiKey);
-                if (user is null)
-                {
-                    if (lockedNow) DebugLogger.Warn(DebugLogger.Category.State, "Server", $"login lockout for {client}");
-                    await WriteAsync(ctx, SubsonicResponse.Error(error, errorMessage, format, _serverVersion), 200).ConfigureAwait(false);
-                    return;
+                    // Brute-force brake per remote address + account name: after repeated bad
+                    // logins for a name, that name is refused for a while, before its password is
+                    // even checked. Keyed by name too because behind the documented reverse proxy
+                    // every client shares the proxy's address, and one bad client must not lock out
+                    // every account. API keys are 256-bit random (not guessable), so a request that
+                    // carries one is never throttled. The attempt is reserved (counted) BEFORE the
+                    // password is verified, so parallel requests cannot each get a free guess.
+                    // Keyed by the account the name means (ResolveSignInName), so the profile
+                    // name is not a second set of guesses at the main account.
+                    var client = ctx.Connection.RemoteIpAddress?.ToString() ?? "unknown";
+                    var name = checkingPassword ? p.Get("u") : null;
+                    var signInName = name is null ? null : ResolveSignInName(name);
+                    var throttleKey = signInName is null ? null : LoginThrottle.Key(client, signInName);
+                    var lockedNow = false;
+                    if (throttleKey is not null && !_throttle.TryReserve(throttleKey, out var retryAfter, out lockedNow))
+                    {
+                        ctx.Response.Headers.RetryAfter = ((int)Math.Ceiling(retryAfter.TotalSeconds)).ToString();
+                        await WriteAsync(ctx, SubsonicResponse.Error(SubsonicResponse.ErrWrongCredentials,
+                            "Too many failed login attempts. Try again later.", format, _serverVersion), 429).ConfigureAwait(false);
+                        return;
+                    }
+
+                    var (user, device, error, errorMessage) = Authenticate(p, apiKey, signInName);
+                    if (user is null)
+                    {
+                        if (lockedNow) DebugLogger.Warn(DebugLogger.Category.State, "Server", $"login lockout for {client}");
+                        await WriteAsync(ctx, SubsonicResponse.Error(error, errorMessage, format, _serverVersion), 200).ConfigureAwait(false);
+                        return;
+                    }
+                    if (throttleKey is not null) _throttle.RecordSuccess(throttleKey);
+                    ClientAuthenticated?.Invoke(this, user.Name);
+                    ctx.Items["user"] = user;
+                    if (device is not null) ctx.Items["device"] = device;
                 }
-                if (throttleKey is not null) _throttle.RecordSuccess(throttleKey);
-                ClientAuthenticated?.Invoke(this, user.Name);
-                ctx.Items["user"] = user;
-                if (device is not null) ctx.Items["device"] = device;
+                finally
+                {
+                    if (checkingPassword)
+                    {
+                        Interlocked.Decrement(ref _passwordChecks);
+                        _passwordGate.Release();
+                    }
+                }
             }
 
             if (await TryHandleBinaryAsync(ctx, method, p).ConfigureAwait(false)) return;
@@ -263,6 +322,15 @@ public sealed partial class NoctisServer : IAsyncDisposable
         catch (SubsonicException ex)
         {
             await WriteAsync(ctx, SubsonicResponse.Error(ex.Code, ex.Message, format, _serverVersion), 200).ConfigureAwait(false);
+        }
+        catch (OperationCanceledException) when (ctx.RequestAborted.IsCancellationRequested)
+        {
+            // The client hung up (while waiting for a password slot, say): nobody to answer.
+        }
+        catch (BadHttpRequestException ex)
+        {
+            // Kestrel's own verdict (a body over the limit is 413): its status, our envelope.
+            await WriteAsync(ctx, SubsonicResponse.Error(SubsonicResponse.ErrGeneric, "Bad request", format, _serverVersion), ex.StatusCode).ConfigureAwait(false);
         }
         catch (Exception ex)
         {
@@ -348,8 +416,10 @@ public sealed partial class NoctisServer : IAsyncDisposable
         return snap with { Tracks = tracks, Albums = albums };
     }
 
-    /// <summary>The requesting user; <c>Device</c> is set when the API key is a signed-in device's key.</summary>
-    private (ServerUser? User, ServerDevice? Device, int Error, string Message) Authenticate(Params p, string? apiKey)
+    /// <summary>The requesting user; <c>Device</c> is set when the API key is a signed-in device's key.
+    /// <paramref name="signInName"/> is <c>u</c> as <see cref="ResolveSignInName"/> read it (the caller
+    /// keyed the login brake by it); null when there is no <c>u</c>.</summary>
+    private (ServerUser? User, ServerDevice? Device, int Error, string Message) Authenticate(Params p, string? apiKey, string? signInName)
     {
         var u = p.Get("u");
         var pw = p.Get("p");
@@ -373,7 +443,7 @@ public sealed partial class NoctisServer : IAsyncDisposable
             try { pw = System.Text.Encoding.UTF8.GetString(Convert.FromHexString(pw[4..])); }
             catch (FormatException) { return (null, null, SubsonicResponse.ErrWrongCredentials, "Wrong username or password"); }
         }
-        var user = _users.Verify(ResolveSignInName(u), pw);
+        var user = _users.Verify(signInName ?? ResolveSignInName(u), pw);
         return user is null ? (null, null, SubsonicResponse.ErrWrongCredentials, "Wrong username or password") : (user, null, 0, "");
     }
 
