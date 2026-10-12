@@ -451,14 +451,20 @@ public sealed partial class NoctisAccountService : INoctisAccountService, ITrack
 
         // 6. The desktop's profile picture and name (best effort: never fail the sync).
         await RefreshAvatarAsync(ct).ConfigureAwait(false);
-        var (nameKnown, displayName) = await FetchDisplayNameAsync(client, ct).ConfigureAwait(false);
+        var (nameKnown, displayName, serverName) = await FetchDisplayNameAsync(client, ct).ConfigureAwait(false);
 
         NoctisAccount? updated;
         lock (_gate)
         {
             // An unanswered ask keeps the name shown; an answer without one clears it (the desktop's was removed).
+            // The computer's name follows a rename in its Settings (sign-in only had the old one).
             updated = _account is null ? null
-                : _account with { LastSyncUtc = UtcNow, DisplayName = nameKnown ? displayName : _account.DisplayName };
+                : _account with
+                {
+                    LastSyncUtc = UtcNow,
+                    DisplayName = nameKnown ? displayName : _account.DisplayName,
+                    ServerName = serverName ?? _account.ServerName,
+                };
             if (updated is not null)
             {
                 _store.SaveAccount(updated);
@@ -693,18 +699,19 @@ public sealed partial class NoctisAccountService : INoctisAccountService, ITrack
         }
     }
 
-    /// <summary>The desktop's profile name for the header (getNoctisSyncStatus). Known = false when
-    /// the ask failed (unreachable, a desktop without it): the name shown stays.</summary>
-    private static async Task<(bool Known, string? Name)> FetchDisplayNameAsync(NoctisServerClient client, CancellationToken ct)
+    /// <summary>The desktop's profile name for the header and the computer's name (getNoctisSyncStatus).
+    /// Known = false when the ask failed (unreachable, a desktop without it): the names shown stay.</summary>
+    private static async Task<(bool Known, string? Name, string? ServerName)> FetchDisplayNameAsync(NoctisServerClient client, CancellationToken ct)
     {
         try
         {
-            return (true, await client.GetDisplayNameAsync(ct).ConfigureAwait(false));
+            var (name, server) = await client.GetDisplayNameAsync(ct).ConfigureAwait(false);
+            return (true, name, server);
         }
         catch (NoctisServerException ex)
         {
             DebugLog.Write("Account", $"profile name not fetched: {ex.Kind}");
-            return (false, null);
+            return (false, null, null);
         }
     }
 

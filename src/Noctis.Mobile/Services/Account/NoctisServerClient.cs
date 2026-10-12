@@ -202,12 +202,15 @@ internal sealed partial class NoctisServerClient : IDisposable
             CleanDisplayName(Str(s, "displayName")));
     }
 
-    /// <summary>getNoctisSyncStatus: the desktop's profile name (null when it has none). Answers
-    /// with sync on or off; an older desktop without the field also gives null.</summary>
-    public async Task<string?> GetDisplayNameAsync(CancellationToken ct)
+    /// <summary>getNoctisSyncStatus: the desktop's profile name (null when it has none) and the
+    /// computer's name as sign-in gave it (null when it gives none). Answers with sync on or off;
+    /// an older desktop without the profile name also gives null for it.</summary>
+    public async Task<(string? DisplayName, string? ServerName)> GetDisplayNameAsync(CancellationToken ct)
     {
         var r = await GetJsonAsync("getNoctisSyncStatus", Array.Empty<KeyValuePair<string, string>>(), ct).ConfigureAwait(false);
-        return r.TryGetProperty("noctisSync", out var s) && s.ValueKind == JsonValueKind.Object ? CleanDisplayName(Str(s, "displayName")) : null;
+        if (!r.TryGetProperty("noctisSync", out var s) || s.ValueKind != JsonValueKind.Object) return (null, null);
+        var server = Cap(Str(s, "name"), 100);
+        return (CleanDisplayName(Str(s, "displayName")), string.IsNullOrWhiteSpace(server) ? null : server);
     }
 
     /// <summary>A name from the desktop as shown in the header: control and format characters
