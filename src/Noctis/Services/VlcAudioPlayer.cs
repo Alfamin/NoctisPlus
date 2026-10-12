@@ -235,6 +235,9 @@ public class VlcAudioPlayer : IAudioPlayer
     private string? _standbyPath;
     private long _standbyStartPositionMs = -1;
     private long _standbyPreparedTicksUtc;
+    // Bumped each time PrepareNext stages a track on the standby player, so a deferred
+    // cleanup can tell that the player it was queued for has been re-staged since.
+    private long _standbyPrepareGeneration;
     private bool _standbyPrepared;
     // volatile: Dispose writes this from the UI thread while the volume-ramp worker, the
     // EQ queue, both fade loops and the seek worker read it in spin loops with no barrier.
@@ -2675,6 +2678,7 @@ public class VlcAudioPlayer : IAudioPlayer
                 _standbyPath = normalizedPath;
                 _standbyStartPositionMs = startPositionMs;
                 Interlocked.Exchange(ref _standbyPreparedTicksUtc, DateTime.UtcNow.Ticks);
+                Interlocked.Increment(ref _standbyPrepareGeneration);
                 _standbyPrepared = true;
                 // Gapless (no crossfade) pre-rolls the standby below: park it at
                 // the session-open level on EVERY path, never 0 — the paused
@@ -4006,6 +4010,7 @@ public class VlcAudioPlayer : IAudioPlayer
 
     private void QueueInactivePlayerCleanup(MediaPlayer inactivePlayer, Media? inactiveMedia, long sessionId, int extraDelayMs = 0)
     {
+        var prepareGeneration = Interlocked.Read(ref _standbyPrepareGeneration);
         ThreadPool.QueueUserWorkItem(_ =>
         {
             var cleanupStart = Environment.TickCount64;
@@ -4014,6 +4019,23 @@ public class VlcAudioPlayer : IAudioPlayer
                 Thread.Sleep(DeferredCleanupDelayMs + Math.Max(0, extraDelayMs));
                 if (_disposed) return;
                 DebugLogger.Info(DebugLogger.Category.Playback, "AutoMix.CleanupStart", $"session={sessionId}");
+
+                // A track shorter than the view model's prepare lead plus this delay has its
+                // successor staged on THIS player before the cleanup runs (PrepareNext reuses
+                // the standby and stops the old input itself). Stopping it here then killed
+                // the staged track: silence at the next boundary on the engine (GitHub #127
+                // harness: the staged track went silent half a second in), a cold open on the
+                // classic path. Only the old media is retired then.
+                if (CleanupTargetRestaged(ReferenceEquals(inactivePlayer, _standbyPlayer),
+                        ReferenceEquals(inactivePlayer, _player), _standbyPrepared,
+                        prepareGeneration, Interlocked.Read(ref _standbyPrepareGeneration)))
+                {
+                    try { inactiveMedia?.Dispose(); }
+                    catch (Exception ex) { DebugLogger.Warn(DebugLogger.Category.Playback, "AutoMix.CleanupStep", $"Dispose: {ex.GetType().Name}"); }
+                    DebugLogger.Info(DebugLogger.Category.Playback, "AutoMix.CleanupKeptRestaged",
+                        $"session={sessionId}, elapsedMs={Environment.TickCount64 - cleanupStart}");
+                    return;
+                }
 
                 // CRITICAL: do NOT zero this player's Volume on the OS-session path. On
                 // Windows mmdevice MediaPlayer.Volume IS the shared process audio session
@@ -5987,6 +6009,17 @@ public class VlcAudioPlayer : IAudioPlayer
     /// </summary>
     internal static bool ShouldForceAvformatDemux(bool isLinux, string? bundledVlcEnv)
         => !isLinux || bundledVlcEnv == "1";
+
+    /// <summary>
+    /// Whether a deferred cleanup's player was re-staged by PrepareNext after the cleanup
+    /// was queued (<paramref name="generationAtQueue"/> vs <paramref name="generationNow"/>):
+    /// it is the standby again holding the prepared next track, or that track was already
+    /// swapped in and the player is the active one. Either way it carries audio that must
+    /// not be stopped. Pure; internal for tests.
+    /// </summary>
+    internal static bool CleanupTargetRestaged(bool isStandby, bool isActive, bool standbyPrepared,
+        long generationAtQueue, long generationNow)
+        => generationNow != generationAtQueue && (isActive || (isStandby && standbyPrepared));
 
     /// <summary>
     /// Read-ahead for media opened after a delivery gap of <paramref name="gapMs"/> was
