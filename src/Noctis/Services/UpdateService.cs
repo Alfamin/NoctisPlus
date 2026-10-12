@@ -806,7 +806,8 @@ public sealed class UpdateService
         {
             Tag = update.TagName,
             FromVersion = CurrentVersion.ToString(3),
-            ToVersion = update.Version.ToString(3),
+            // Normalized: a two-part tag ("v2.0") parses with Build -1, and ToString(3) throws on it.
+            ToVersion = AutoUpdatePolicy.Normalize(update.Version).ToString(3),
             InstallerPath = installerPath,
             Sha256 = sha,
             IsPrerelease = update.IsPrerelease,

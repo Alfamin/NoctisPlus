@@ -122,6 +122,78 @@ public class AutoUpdateShouldDownloadTests
     public void BlockIsPerTag_ANewerReleaseStillDownloads()
         => Assert.True(AutoUpdatePolicy.ShouldAutoDownload(
             Failed(3, TimeSpan.FromMinutes(5), blocked: true, tag: "v1.5.5"), Release("v1.5.6"), Now, out _));
+
+    // ── When to ask again (GitHub #130) ──
+
+    [Fact]
+    public void Soaking_RetriesWhenTheSoakEnds()
+        => Assert.Equal(Now + TimeSpan.FromHours(22),
+            AutoUpdatePolicy.RetryAt(null, Release(age: TimeSpan.FromHours(2)), Now));
+
+    [Fact]
+    public void Soaking_WithoutChecksumsYet_StillRetriesWhenTheSoakEnds()
+        => Assert.Equal(Now + TimeSpan.FromHours(23),
+            AutoUpdatePolicy.RetryAt(null, Release(sums: false, age: TimeSpan.FromHours(1)), Now));
+
+    [Theory]
+    [InlineData(1, 30, 30)]          // 1 h backoff, 30 min in: 30 min left
+    [InlineData(2, 5 * 60, 60)]      // 6 h backoff, 5 h in: 1 h left
+    public void BackingOff_RetriesWhenTheBackoffEnds(int failures, int minutesAgo, int minutesLeft)
+        => Assert.Equal(Now + TimeSpan.FromMinutes(minutesLeft),
+            AutoUpdatePolicy.RetryAt(Failed(failures, TimeSpan.FromMinutes(minutesAgo)), Release(), Now));
+
+    [Fact]
+    public void SoakOutlastsTheBackoff_RetriesWhenTheSoakEnds()
+        => Assert.Equal(Now + TimeSpan.FromHours(20),
+            AutoUpdatePolicy.RetryAt(Failed(1, TimeSpan.FromMinutes(10)), Release(age: TimeSpan.FromHours(4)), Now));
+
+    [Fact]
+    public void BackoffOfAnotherTag_DoesNotDelay()
+        => Assert.Null(AutoUpdatePolicy.RetryAt(Failed(1, TimeSpan.FromMinutes(10), tag: "v1.5.4"), Release(), Now));
+
+    [Fact]
+    public void WaitingChangesNothing_NoEarlyRetry()
+    {
+        Assert.Null(AutoUpdatePolicy.RetryAt(null, Release(), Now));                        // already eligible
+        Assert.Null(AutoUpdatePolicy.RetryAt(null, Release(installer: false, age: TimeSpan.FromHours(1)), Now));
+        Assert.Null(AutoUpdatePolicy.RetryAt(null, Release(warning: "Crashes.", age: TimeSpan.FromHours(1)), Now));
+        Assert.Null(AutoUpdatePolicy.RetryAt(null, Release(published: false), Now));
+        Assert.Null(AutoUpdatePolicy.RetryAt(null, Release(sums: false), Now));            // soaked, sums still missing
+        Assert.Null(AutoUpdatePolicy.RetryAt(Failed(3, TimeSpan.FromMinutes(5), blocked: true), Release(age: TimeSpan.FromHours(1)), Now));
+    }
+
+    [Fact]
+    public void NextCheck_IsDailyWithoutARetry()
+        => Assert.Equal(Now + AutoUpdatePolicy.RecheckInterval, AutoUpdatePolicy.NextCheckDue(Now, null));
+
+    [Fact]
+    public void NextCheck_IsTheRetryWhenSooner()
+        => Assert.Equal(Now.AddHours(3), AutoUpdatePolicy.NextCheckDue(Now, Now.AddHours(3)));
+
+    [Fact]
+    public void NextCheck_RetryLaterThanADay_StaysDaily()
+        => Assert.Equal(Now + AutoUpdatePolicy.RecheckInterval, AutoUpdatePolicy.NextCheckDue(Now, Now.AddHours(30)));
+
+    [Fact]
+    public void NextCheck_RetryAlreadyUsed_IsIgnored_SoTheLoopCannotSpin()
+    {
+        Assert.Equal(Now + AutoUpdatePolicy.RecheckInterval, AutoUpdatePolicy.NextCheckDue(Now, Now));
+        Assert.Equal(Now + AutoUpdatePolicy.RecheckInterval, AutoUpdatePolicy.NextCheckDue(Now, Now.AddMinutes(-1)));
+    }
+
+    /// <summary>GitHub #130: a session opened 2 h after a release used to re-ask only 24 h later
+    /// (26 h after publish); it now asks the moment the 24 h soak ends, and that check downloads.</summary>
+    [Fact]
+    public void SessionOpenedDuringTheSoak_DownloadsWhenTheSoakEnds_NotADayLater()
+    {
+        var release = Release(age: TimeSpan.FromHours(2));
+        Assert.False(AutoUpdatePolicy.ShouldAutoDownload(null, release, Now, out _));
+
+        var due = AutoUpdatePolicy.NextCheckDue(Now, AutoUpdatePolicy.RetryAt(null, release, Now));
+
+        Assert.Equal(release.PublishedAt!.Value + AutoUpdatePolicy.SoakPeriod, due);
+        Assert.True(AutoUpdatePolicy.ShouldAutoDownload(null, release, due, out _));
+    }
 }
 
 public class AutoUpdateFailureTests

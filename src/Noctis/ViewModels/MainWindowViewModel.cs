@@ -845,10 +845,18 @@ public partial class MainWindowViewModel : ViewModelBase
                 Debug.WriteLine($"[Update] Silent check failed: {ex.Message}");
             }
 
-            // Tray users who keep Noctis running for days still pick up a release while auto-update is on.
+            // Tray users who keep Noctis running for days still pick up a release while auto-update is on:
+            // daily, or sooner when a known release's soak or backoff ends or a check failed (GitHub #130).
+            var lastCheck = DateTimeOffset.UtcNow;
             while (true)
             {
-                await Task.Delay(AutoUpdatePolicy.RecheckInterval);
+                var wait = AutoUpdatePolicy.NextCheckDue(lastCheck, Settings.AutoUpdateRetryAtUtc) - DateTimeOffset.UtcNow;
+                if (wait > TimeSpan.Zero)
+                {
+                    await Task.Delay(wait < AutoUpdatePolicy.RecheckWake ? wait : AutoUpdatePolicy.RecheckWake);
+                    continue;
+                }
+                lastCheck = DateTimeOffset.UtcNow;
                 try { if (Settings.AutoInstallUpdates) await Settings.CheckForUpdateSilentAsync(); }
                 catch (Exception ex) { Debug.WriteLine($"[Update] Periodic check failed: {ex.Message}"); }
             }
