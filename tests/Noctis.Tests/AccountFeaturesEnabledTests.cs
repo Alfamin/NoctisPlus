@@ -115,6 +115,27 @@ public class AccountFeaturesEnabledTests : IDisposable
         Assert.False(vm.IsPasswordRevealed);
     }
 
+    /// <summary>
+    /// Bug: the desktop's sync device id was made at load straight onto the settings object, and
+    /// the first save re-based those settings on the file (which had none), so it went back to
+    /// empty: the ledger stamped this computer's changes with a new random id each launch, then
+    /// with the "desktop-&lt;machine&gt;" fallback (three ids for one PC in the owner's ledger, 10-11).
+    /// </summary>
+    [AvaloniaFact]
+    public async Task SyncDeviceId_IsMadeOnce_AndSurvivesASave()
+    {
+        var persistence = new PersistenceService(_root);
+        var vm = new SettingsViewModel(persistence, new FakeLibraryService(), new NoOpPlayHistoryService());
+        await vm.LoadAsync();
+        var id = vm.GetSettings().SyncDeviceId;
+        Assert.False(string.IsNullOrWhiteSpace(id));
+
+        await vm.SaveAsync();
+
+        Assert.Equal(id, vm.GetSettings().SyncDeviceId);                        // what the ledger stamps with
+        Assert.Equal(id, (await persistence.LoadSettingsAsync()).SyncDeviceId); // what the next launch reads
+    }
+
     [Fact]
     public void CreateAccount_ShortPasswordOrNoEmail_SaysWhatToFix()
     {
