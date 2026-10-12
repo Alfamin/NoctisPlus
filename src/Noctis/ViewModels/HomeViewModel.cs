@@ -512,21 +512,30 @@ public partial class HomeViewModel : ViewModelBase, IDisposable
                 // Resolve the play-count ranking back to actual Artist rows so the row
                 // benefits from the existing image-cache flow.
                 var byName = _library.Artists.ToDictionary(a => a.Name, a => a, StringComparer.OrdinalIgnoreCase);
-                return plays
+                var top = plays
                     .OrderByDescending(kv => kv.Value)
                     .Take(MaxTopArtists)
                     .Select(kv => byName.TryGetValue(kv.Key, out var artist)
                         ? artist
                         : new Artist { Name = kv.Key, Id = ComputeArtistId(kv.Key) })
                     .ToList();
+
+                // The row is built with each cached portrait in hand, as the artist page
+                // does (GitHub #137): a scan publish hands over new Artist objects with no
+                // ImagePath every 1.5 s, and the fetch below can queue behind other sweeps.
+                foreach (var artist in top)
+                    artist.ImagePath = StatisticsViewModel.CachedArtistPhoto(artist, _artistImages);
+                return top;
             });
             ReplaceTopArtistsIfChanged(topArtists);
 
             // Kick a background image-fetch for any artist that doesn't have a cached
             // picture yet, then re-materialize the row so the portraits are actually read.
-            if (_artistImages != null && topArtists.Count > 0)
-                _ = _artistImages.FetchAndCacheAsync(topArtists, (_, _) =>
-                    Dispatcher.UIThread.Post(ScheduleTopArtistImageRefresh));
+            // For the instances the row shows: ReplaceTopArtistsIfChanged keeps the old
+            // ones when only the objects changed, and filling in the new ones left the
+            // shown tiles blank.
+            if (_artistImages != null && TopArtists.Count > 0)
+                _ = FetchTopArtistImagesAsync(TopArtists.ToList());
 
             await RefreshTimeAwareRowsAsync();
             if (log) DebugLog.Write("Home", $"rebuild #{rebuild}: done");
@@ -695,10 +704,30 @@ public partial class HomeViewModel : ViewModelBase, IDisposable
         _topArtistImageDebounce.Start();
     }
 
+    private async Task FetchTopArtistImagesAsync(List<Artist> shown)
+    {
+        var painted = shown.Select(a => a.ImagePath).ToList();
+        var reported = new HashSet<Artist>(ReferenceEqualityComparer.Instance);
+        await _artistImages!.FetchAndCacheAsync(shown, (artist, _) =>
+        {
+            reported.Add(artist);
+            Dispatcher.UIThread.Post(ScheduleTopArtistImageRefresh);
+        });
+
+        // A shown artist is the library's own object, so another sweep (the Artists tab's)
+        // can put a portrait on it first; this fetch then finds the path already set and
+        // never reports it, and the row kept its placeholder (GitHub #137).
+        if (shown.Where((a, i) => a.ImagePath != painted[i] && !reported.Contains(a)).Any())
+            Dispatcher.UIThread.Post(ScheduleTopArtistImageRefresh);
+    }
+
     private void ReplaceTopArtistsIfChanged(IReadOnlyList<Artist> artists)
     {
+        // Same artists but a different portrait (a fresh instance from a scan publish
+        // that has one where the shown tile has none) is a change too.
         if (TopArtists.Count == artists.Count &&
-            TopArtists.Zip(artists).All(pair => pair.First.Id == pair.Second.Id))
+            TopArtists.Zip(artists).All(pair => pair.First.Id == pair.Second.Id
+                                                && pair.First.ImagePath == pair.Second.ImagePath))
             return;
 
         TopArtists.ReplaceAll(artists);
