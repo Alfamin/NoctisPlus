@@ -200,8 +200,8 @@ public sealed class LibrarySyncService : ILibrarySyncService
     /// <summary>Earliest stamp a device may send; older ones are raised to it.</summary>
     public static readonly DateTime OldestStamp = new(2000, 1, 1, 0, 0, 0, DateTimeKind.Utc);
 
-    /// <summary>How far past this computer's clock a device's stamp may be. A far-future stamp would win last-writer-wins forever.</summary>
-    public static readonly TimeSpan MaxClockSkew = TimeSpan.FromMinutes(2);
+    /// <summary>How far past this computer's clock a device's stamp may be (the store's rule: a stamp past it never holds an item).</summary>
+    public static readonly TimeSpan MaxClockSkew = SyncStore.MaxClockSkew;
 
     public const int MaxPlaylistTracks = 10_000, MaxPlaylistName = 200, MaxPlaylistDescription = 2000;
 
