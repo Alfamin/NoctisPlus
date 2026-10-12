@@ -36,9 +36,22 @@ public sealed class ShortcutService
         _isMac = isMac ?? OperatingSystem.IsMacOS();
     }
 
-    /// <summary>Effective gesture, or null when the user unbound the action.</summary>
+    /// <summary>
+    /// Effective gesture, or null when the user unbound the action. A default that a user
+    /// override on another action already claims is shadowed (null): saved settings from
+    /// before a new default existed (Ctrl+Shift+L bound to Play/Pause, then GitHub #103
+    /// gave it to Lyrics) would otherwise put two actions on one key, with the first in
+    /// display order winning and the tab showing the same chord twice. The user's explicit
+    /// choice wins; freeing the key brings the default back.
+    /// </summary>
     public KeyGesture? Get(ShortcutAction action)
-        => _overrides.TryGetValue(action, out var g) ? g : ShortcutDefaults.For(action, _isMac);
+    {
+        if (_overrides.TryGetValue(action, out var g)) return g;
+        var fallback = ShortcutDefaults.For(action, _isMac);
+        foreach (var (other, gesture) in _overrides)
+            if (other != action && fallback.Equals(gesture)) return null;
+        return fallback;
+    }
 
     public KeyGesture Default(ShortcutAction action) => ShortcutDefaults.For(action, _isMac);
 

@@ -223,4 +223,28 @@ public class ShortcutServiceTests
         Assert.Equal(ShortcutAction.NextTrack, s.TryMatch(Press(Key.Right, KeyModifiers.Meta)));
         Assert.Null(s.TryMatch(Press(Key.Right, KeyModifiers.Control)));
     }
+
+    /// <summary>
+    /// Settings saved before a default existed can already hold that chord on another
+    /// action: Ctrl+Shift+L on Play/Pause from before GitHub #103 gave it to Lyrics. Load
+    /// kept both, so one key belonged to two actions: the earlier one in display order won
+    /// and the tab listed the chord twice. The user's own binding wins; the newer default
+    /// stays out of the way until the key is free again.
+    /// </summary>
+    [Fact]
+    public void Load_OverrideOnANewerDefault_ShadowsThatDefault_UntilFreed()
+    {
+        var ctrlShiftL = new KeyGesture(Key.L, KeyModifiers.Control | KeyModifiers.Shift);
+        var s = Win();
+        s.Load(new AppSettings { Shortcuts = new Dictionary<string, string> { ["PlayPause"] = "Ctrl+Shift+L" } });
+
+        Assert.Equal(ctrlShiftL, s.Get(ShortcutAction.PlayPause));
+        Assert.Null(s.Get(ShortcutAction.ToggleLyrics));
+        Assert.Equal(ShortcutAction.PlayPause, s.TryMatch(Press(Key.L, KeyModifiers.Control | KeyModifiers.Shift)));
+        Assert.Null(s.FindConflict(new KeyGesture(Key.F9), ShortcutAction.ToggleLyrics));
+
+        s.Reset(ShortcutAction.PlayPause);
+        Assert.Equal(ctrlShiftL, s.Get(ShortcutAction.ToggleLyrics));
+        Assert.Equal(ShortcutAction.ToggleLyrics, s.TryMatch(Press(Key.L, KeyModifiers.Control | KeyModifiers.Shift)));
+    }
 }
