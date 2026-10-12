@@ -466,6 +466,32 @@ public class NoctisAccountServiceTests : IAsyncLifetime
     }
 
     [Fact]
+    public async Task Covers_AreNotFetched_WhenThePhoneHasNoRoomLeft()
+    {
+        await SignedInAsync();
+        // Covers are written for every album the catalog lists, each up to its own cap: with the
+        // phone at the reserve they must stop like downloads do, instead of filling the volume.
+        var svc = new NoctisAccountService(_phoneLibrary, _phonePersistence, NoctisHandlers.Sockets, AccountDir, OfflineDir,
+            "Test Phone", _recorder, marshal: a => a())
+        {
+            FreeSpace = _ => NoctisAccountService.StorageReserveBytes - 1,
+        };
+
+        var result = await svc.SyncNowAsync(TestContext.Current.CancellationToken);
+
+        Assert.Equal(3, result.Songs);                      // the rest of the sync still goes
+        Assert.Equal(1, result.Playlists);
+        Assert.False(File.Exists(_phonePersistence.GetArtworkPath(AlbumA)));
+        lock (_coverSizes) Assert.Empty(_coverSizes);       // not even asked for
+        Assert.True(svc.IsSignedIn);
+
+        // Room again: the next sync fetches them.
+        var roomy = Restart();
+        await roomy.SyncNowAsync(TestContext.Current.CancellationToken);
+        Assert.Equal(_art, File.ReadAllBytes(_phonePersistence.GetArtworkPath(AlbumA)));
+    }
+
+    [Fact]
     public async Task Downloads_StopWithStorageFull_WhenTheReserveRunsOutMidDownload()
     {
         await SignedInAsync();
