@@ -421,6 +421,10 @@ public sealed partial class AccountPageViewModel : MobilePage
 
     private void OnUploadProgress(object? sender, NoctisUploadProgress progress) => _marshal(() =>
     {
+        // The send's last report is posted before its task completes, but the page's await
+        // resumes first: landing after the result it put "Sent 40 of 40" over the summary and
+        // the label back on "Stop sending". A send that is over has nothing left to report.
+        if (_uploadCts is null && !_account.IsUploading) return;
         IsUploading = true;
         UploadText = DescribeUploadProgress(progress);
     });
