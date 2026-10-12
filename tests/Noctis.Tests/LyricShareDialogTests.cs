@@ -537,6 +537,42 @@ public class LyricShareDialogTests
         finally { if (win.IsVisible) { win.Close(); PumpUntil(() => !win.IsVisible); } }
     }
 
+    /// <summary>
+    /// Bug: a double-click to edit a line moved its text about 8 px right and grew the row by
+    /// about 19 px. TextBox.sl-edit (Padding 12,6 and MinHeight 0, under a -12,-6 margin so the
+    /// text stays put) lived in Window.Styles, but PillDialogHost adds PillDialog.axaml to its
+    /// own Styles, nearer the box, so pill-area's Padding 18,14 and MinHeight 40 won.
+    /// </summary>
+    [AvaloniaFact]
+    public void EditBox_KeepsTheLineInPlace()
+    {
+        EnsureAppStyles();
+        var vm = new LyricShareViewModel(Song(), new[] { "alpha line", "beta line" }, 0);
+        var win = new Noctis.Views.LyricShareDialog(vm) { Width = 1280, Height = 860 };
+        win.Show();
+        try
+        {
+            var host = Avalonia.VisualTree.VisualExtensions.GetVisualDescendants(win).OfType<Noctis.Controls.PillDialogHost>().Single();
+            Assert.True(PumpUntil(() => host.Card is { Opacity: > 0.999 }), "open animation never settled");
+            var list = Named<ItemsControl>(win, "LineItems");
+            var row = Avalonia.VisualTree.VisualExtensions.GetVisualDescendants(list).OfType<Panel>()
+                .First(p => p.Classes.Contains("sl-line") && ReferenceEquals(p.DataContext, vm.Lines[1]));
+            var text = Avalonia.VisualTree.VisualExtensions.GetVisualDescendants(row).OfType<TextBlock>().Single(t => t.Classes.Contains("sl-text"));
+            var x0 = text.TranslatePoint(default, row)!.Value.X;
+            var h0 = row.Bounds.Height;
+
+            vm.BeginEdit(vm.Lines[1]);
+            var box = Avalonia.VisualTree.VisualExtensions.GetVisualDescendants(row).OfType<TextBox>().Single();
+            Assert.True(PumpUntil(() => box.IsVisible && box.Bounds.Height > 0));
+            PumpUntil(() => false, 50);
+            var presenter = Avalonia.VisualTree.VisualExtensions.GetVisualDescendants(box).OfType<Avalonia.Controls.Presenters.TextPresenter>().First();
+            var x1 = presenter.TranslatePoint(default, row)!.Value.X;
+            Assert.True(Math.Abs(x1 - x0) <= 2, $"the text moved {x1 - x0:0.0} px (padding {box.Padding})");
+            Assert.True(row.Bounds.Height - h0 <= 4, $"the row grew {row.Bounds.Height - h0:0.0} px (min height {box.MinHeight})");
+        }
+        finally { if (win.IsVisible) { win.Close(); PumpUntil(() => !win.IsVisible); } }
+    }
+
     /// <summary>Esc in a line's edit box puts the text back and keeps the dialog open.</summary>
     [AvaloniaFact]
     public void EscapeWhileEditing_RestoresTheLine_AndKeepsTheDialog()

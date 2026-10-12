@@ -129,15 +129,6 @@
             <Setter Property="Opacity" Value="1" />
             <Setter Property="RenderTransform" Value="scale(1)" />
         </Style>
-        <Style Selector="TextBox.sl-edit">
-            <Setter Property="MinHeight" Value="0" />
-            <Setter Property="Padding" Value="12,6" />
-            <Setter Property="Margin" Value="-12,-6,0,-6" />
-            <Setter Property="FontSize" Value="14" />
-            <Setter Property="TextWrapping" Value="Wrap" />
-            <Setter Property="AcceptsReturn" Value="False" />
-        </Style>
-
         <!-- A stray white glyph (the Fluent scrollbar's line-up arrow) showed at the top of
              the line list at rest: the bar stays hidden until the list is hovered. -->
         <Style Selector="ScrollViewer.sl-lines /template/ ScrollBar:vertical">
@@ -263,6 +254,19 @@
                               HorizontalScrollBarVisibility="Disabled"
                               VerticalScrollBarVisibility="Auto">
                     <ItemsControl x:Name="LineItems" ItemsSource="{Binding Lines}" Margin="0,0,12,0">
+                        <!-- The edit box keeps the line where it was: its padding cancels its
+                             margin. Here, not in Window.Styles: PillDialogHost's own pill-area
+                             style (Padding 18,14, MinHeight 40) sits nearer and won there. -->
+                        <ItemsControl.Styles>
+                            <Style Selector="TextBox.sl-edit">
+                                <Setter Property="MinHeight" Value="0" />
+                                <Setter Property="Padding" Value="12,6" />
+                                <Setter Property="Margin" Value="-12,-6,0,-6" />
+                                <Setter Property="FontSize" Value="14" />
+                                <Setter Property="TextWrapping" Value="Wrap" />
+                                <Setter Property="AcceptsReturn" Value="False" />
+                            </Style>
+                        </ItemsControl.Styles>
                         <ItemsControl.ItemTemplate>
                             <DataTemplate x:DataType="vm:SelectableLyricLine">
                                 <Panel Classes="sl-line"
