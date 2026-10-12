@@ -821,7 +821,12 @@ public class NoctisAccountServiceTests : IAsyncLifetime
             await Task.Delay(300, TestContext.Current.CancellationToken);
         }
 
-        await Until(() => File.ReadAllText(pendingFile).Contains(_t1.Id.ToString("N")));
+        // Our own read can land while the save is replacing the file: that is "not yet".
+        await Until(() =>
+        {
+            try { return File.ReadAllText(pendingFile).Contains(_t1.Id.ToString("N")); }
+            catch (IOException) { return false; }
+        });
         Assert.Equal(1, Restart().PendingPlayCount);
     }
 
