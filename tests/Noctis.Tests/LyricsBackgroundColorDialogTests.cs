@@ -168,7 +168,7 @@ public class LyricsBackgroundColorDialogTests : IDisposable
         {
             var dialog = OpenFromMenu(vm, owner);
             var host = Assert.IsType<PillDialogHost>(dialog.Content);
-            Assert.False(host.BlurBackdrop); // a frozen snapshot would hide the live repaint
+            Assert.True(host.BlurBackdrop); // blurred like the other pop-ups; picks re-take it
             var card = Named<Grid>(dialog, "PickerCard");
             Assert.Equal(HorizontalAlignment.Center, host.Card!.HorizontalAlignment);
             Assert.Equal(VerticalAlignment.Center, host.Card.VerticalAlignment);
@@ -331,7 +331,9 @@ public class LyricsBackgroundColorDialogTests : IDisposable
             Pump(300);
             Assert.True(dialog.IsVisible);
             dialog.MouseDown(new Point(10, 10), MouseButton.Left);
-            dialog.MouseUp(new Point(10, 10), MouseButton.Left);
+            // The press closes it; under software Skia the blurred frame can take longer than
+            // the close animation, so the window may already be gone for the release.
+            if (dialog.PlatformImpl != null) dialog.MouseUp(new Point(10, 10), MouseButton.Left);
             Assert.True(PumpUntil(() => !dialog.IsVisible), "a click outside the card never closed it");
         }
         finally { owner.Close(); }
@@ -357,6 +359,88 @@ public class LyricsBackgroundColorDialogTests : IDisposable
     }
 
     // ── Shots ──
+
+    /// <summary>
+    /// Owner 10-12: blur the app behind like every other pop-up. A frozen blur would hide the
+    /// lyrics page repainting as you pick, so a pick (or a mode switch) re-takes it once the
+    /// page has repainted: one re-take for a quick run of picks.
+    /// </summary>
+    [AvaloniaFact]
+    public void Picks_RetakeTheBlurredBackdrop_OnceTheyStop()
+    {
+        EnsureAppStyles();
+        var (vm, _, _) = MakeViewModel();
+        var (owner, _) = ShowPage(vm);
+        try
+        {
+            var dialog = OpenFromMenu(vm, owner);
+            var host = Assert.IsType<PillDialogHost>(dialog.Content);
+            Assert.True(host.BlurBackdrop);
+            Pump(400);
+            var before = host.BackdropRefreshes;
+
+            vm.SelectColorModeSolidCommand.Execute(null);
+            vm.SetBackgroundColorCommand.Execute("#1A1A2E");
+            vm.SetBackgroundColorCommand.Execute("#5C8A6E");
+            Pump(60);
+            Assert.Equal(before, host.BackdropRefreshes);             // not while picking
+            Assert.True(PumpUntil(() => host.BackdropRefreshes == before + 1, 1500), "no re-take after the picks");
+            Pump(400);
+            Assert.Equal(before + 1, host.BackdropRefreshes);         // one for the run
+
+            vm.SelectColorModeGradientCommand.Execute(null);
+            Assert.True(PumpUntil(() => host.BackdropRefreshes == before + 2, 1500), "no re-take after the mode switch");
+
+            dialog.Close();
+            Assert.True(PumpUntil(() => !dialog.IsVisible));
+            var closed = host.BackdropRefreshes;
+            vm.SetBackgroundColorCommand.Execute("#1A1A2E");
+            Pump(500);
+            Assert.Equal(closed, host.BackdropRefreshes);             // nothing after it closed
+        }
+        finally { owner.Close(); }
+    }
+
+    /// <summary>Real Skia: the re-taken blur shows the new colour (the first one, the old).</summary>
+    [AvaloniaFact]
+    public void RetakenBackdrop_ShowsTheNewColour()
+    {
+        if (!HeadlessTestApp.RealRendering)
+            Assert.Skip("needs real Skia rendering (NOCTIS_TEST_SKIA=1)");
+        EnsureAppStyles();
+        var (vm, _, _) = MakeViewModel();
+        vm.SelectColorModeSolidCommand.Execute(null);
+        vm.SetBackgroundColorCommand.Execute("#0A0A0A");
+        var (owner, _) = ShowPage(vm);
+        try
+        {
+            Pump(300);
+            var dialog = OpenFromMenu(vm, owner);
+            var host = Assert.IsType<PillDialogHost>(dialog.Content);
+            Assert.True(PumpUntil(() => host.BackdropBitmap != null, 3000));
+            var first = host.BackdropBitmap!;
+            static byte RedAt(Avalonia.Media.Imaging.Bitmap b)
+            {
+                var px = new byte[4 * b.PixelSize.Width * b.PixelSize.Height];
+                var handle = System.Runtime.InteropServices.GCHandle.Alloc(px, System.Runtime.InteropServices.GCHandleType.Pinned);
+                try { b.CopyPixels(new PixelRect(b.PixelSize), handle.AddrOfPinnedObject(), px.Length, 4 * b.PixelSize.Width); }
+                finally { handle.Free(); }
+                // A spot on the page's own background: right edge, a third down.
+                var x = b.PixelSize.Width - 8; var y = b.PixelSize.Height / 3;
+                return px[(y * b.PixelSize.Width + x) * 4 + 2]; // BGRA: red
+            }
+            var redBefore = RedAt(first);
+
+            vm.SetBackgroundColorCommand.Execute("#C94B4B");
+            Assert.True(PumpUntil(() => !ReferenceEquals(host.BackdropBitmap, first) && host.BackdropBitmap != null, 3000), "the blur was never re-taken");
+            var redAfter = RedAt(host.BackdropBitmap!);
+            _o.WriteLine($"red before {redBefore}, after {redAfter}");
+            Assert.True(redAfter > redBefore + 40, $"the re-taken blur still shows the old colour (red {redBefore} -> {redAfter})");
+            dialog.Close();
+            PumpUntil(() => !dialog.IsVisible);
+        }
+        finally { owner.Close(); }
+    }
 
     /// <summary>
     /// Bug (owner screenshot 10-12, a 125% display): the ring sat about a pixel up and left of

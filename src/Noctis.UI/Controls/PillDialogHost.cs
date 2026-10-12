@@ -99,6 +99,7 @@ public class PillDialogHost : ContentControl
     private Image? _backdrop;
     private Control? _card;
     private Bitmap? _backdropBitmap;
+    private int _backdropGeneration;
     private Window? _window;
 
     private DoubleTransition? _backdropFade;
@@ -135,6 +136,20 @@ public class PillDialogHost : ContentControl
     internal bool IsOpenStarted { get; private set; }
     /// <summary>The blurred owner snapshot currently shown, if any (tests).</summary>
     internal Bitmap? BackdropBitmap => _backdropBitmap;
+    /// <summary>How many times <see cref="RefreshBackdropAsync"/> re-took the backdrop (tests).</summary>
+    internal int BackdropRefreshes { get; private set; }
+
+    /// <summary>
+    /// Takes the blurred copy of the owner again, for a pop-up whose choices repaint the page
+    /// behind it (the lyrics Background Color): the blur then shows the new look instead of
+    /// the one from when it opened. The newest capture wins.
+    /// </summary>
+    public Task RefreshBackdropAsync()
+    {
+        if (_closed || _closeAnimating || !BlurBackdrop || _window is not { } window) return Task.CompletedTask;
+        BackdropRefreshes++;
+        return CaptureBackdropAsync(window);
+    }
     internal Control? Card => _card;
     internal Panel? BackdropLayer => _backdropLayer;
 
@@ -332,9 +347,17 @@ public class PillDialogHost : ContentControl
     private async Task CaptureBackdropAsync(Window window)
     {
         if (!BlurBackdrop || window.Owner is not TopLevel owner) return;
+        var generation = ++_backdropGeneration;
         var bitmap = await BackdropSnapshot.CaptureBlurredAsync(owner, owner, "PillDialog.Backdrop");
         if (bitmap is null) return;
-        if (_closed || _backdrop is null) { bitmap.Dispose(); return; }
+        // Closed or closing meanwhile (the host may have left the window: PointToScreen below
+        // would throw), or a newer capture (a refresh) already started: this one is stale.
+        if (_closed || _backdrop is null || generation != _backdropGeneration
+            || (_closeAnimating && _backdropBitmap != null) || TopLevel.GetTopLevel(this) is null)
+        {
+            bitmap.Dispose();
+            return;
+        }
 
         // Where the owner's client area sits inside this window. The overlay can extend
         // over the owner's title bar (DialogHelper.SizeToOwner on Windows) or a maximized
@@ -349,8 +372,10 @@ public class PillDialogHost : ContentControl
         _backdrop.Width = size.Width;
         _backdrop.Height = size.Height;
 
-        _backdropBitmap?.Dispose();
+        // Swap, then free the old one a frame later: the last frame drawn may still use it.
+        var old = _backdropBitmap;
         _backdropBitmap = bitmap;
         _backdrop.Source = bitmap;
+        if (old != null) Dispatcher.UIThread.Post(old.Dispose, DispatcherPriority.Background);
     }
 }

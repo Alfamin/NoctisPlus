@@ -7,6 +7,7 @@ using Avalonia.Interactivity;
 using Avalonia.Media.Transformation;
 using Avalonia.Threading;
 using Noctis.Helpers;
+using Noctis.ViewModels;
 
 namespace Noctis.Views;
 
@@ -44,6 +45,34 @@ public partial class LyricsBackgroundColorDialog : Window
             {
                 if (e.Property == IsVisibleProperty && e.NewValue is true && IsLoaded) FadeIn(panel);
             };
+
+        // A pick repaints the page behind; once the picks stop, the blur is re-taken.
+        DataContextChanged += (_, _) => WatchPicks(DataContext as LyricsViewModel);
+        Closed += (_, _) => WatchPicks(null);
+    }
+
+    /// <summary>How long after the last pick the blur is re-taken: the page repaints at once
+    /// (the background is a plain binding), and a quick run of picks costs one capture.</summary>
+    private static readonly TimeSpan BackdropRetakeDelay = TimeSpan.FromMilliseconds(150);
+    private LyricsViewModel? _watched;
+    private int _pickGeneration;
+
+    private void WatchPicks(LyricsViewModel? vm)
+    {
+        if (_watched != null) _watched.PropertyChanged -= OnPickChanged;
+        _watched = vm;
+        if (vm != null) vm.PropertyChanged += OnPickChanged;
+    }
+
+    private async void OnPickChanged(object? sender, System.ComponentModel.PropertyChangedEventArgs e)
+    {
+        if (e.PropertyName is not (nameof(LyricsViewModel.FullBackgroundBrush) or nameof(LyricsViewModel.IsColorModeArtwork)
+            or nameof(LyricsViewModel.IsColorModeSolid) or nameof(LyricsViewModel.IsColorModeGradient))) return;
+        // Only the last of a quick run of picks re-takes it (and none once closed).
+        var generation = ++_pickGeneration;
+        await Task.Delay(BackdropRetakeDelay);
+        if (generation != _pickGeneration || _watched is null) return;
+        await Host.RefreshBackdropAsync();
     }
 
     private RadioButton[] Segments => new[] { ArtworkSegment, SolidSegment, GradientSegment };

@@ -107,13 +107,10 @@
     </Window.Styles>
 
     <!-- The shared rounded pop-up (PillDialogHost): card in the middle, open/close
-         animation, Esc / Done / a click outside close it. No blurred copy of the app behind:
-         every pick repaints the lyrics page right away, and a frozen snapshot would hide
-         that. The dim is lighter than the other pop-ups' for the same reason. -->
-    <controls:PillDialogHost BlurBackdrop="False">
-        <controls:PillDialogHost.Resources>
-            <SolidColorBrush x:Key="PillDialogScrimBrush" Color="#33000000" />
-        </controls:PillDialogHost.Resources>
+         animation, Esc / Done / a click outside close it. The app behind is blurred like
+         under every other pop-up; a pick repaints the lyrics page and the blur is re-taken
+         right after it (code-behind), so the new colour shows through. -->
+    <controls:PillDialogHost x:Name="Host">
 
         <Grid x:Name="PickerCard" Width="560" RowDefinitions="Auto,Auto,Auto">
 
