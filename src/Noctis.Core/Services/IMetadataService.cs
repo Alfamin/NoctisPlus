@@ -97,6 +97,17 @@ public interface IMetadataService
     bool ClearYear(string filePath) => false;
 
     /// <summary>
+    /// Writes only the lyrics fields of an audio file (GitHub #135): the text field gets the
+    /// synced text when there is any, else <paramref name="plain"/>; ID3v2 also gets a SYLT
+    /// frame. Both empty clears them. When <paramref name="onlyIf"/> is given, the file's
+    /// current lyrics are read first and nothing is written unless it approves them — how an
+    /// automatic save avoids replacing lyrics the user put in the file. A read-only file is
+    /// left alone. Returns false when nothing was written for any reason other than the file
+    /// already holding these lyrics. The default writes nothing, so test stubs keep compiling.
+    /// </summary>
+    bool WriteLyrics(string filePath, string? plain, string? synced, Func<EmbeddedLyricsText, bool>? onlyIf = null) => false;
+
+    /// <summary>
     /// Writes only the rating and "not liked" tags to an audio file
     /// (ID3 POPM / Vorbis RATING) without touching other metadata.
     /// </summary>

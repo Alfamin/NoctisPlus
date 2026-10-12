@@ -54,6 +54,12 @@ public partial class LrcEditorViewModel : ViewModelBase
     private readonly PlayerViewModel _player;
     private readonly IMetadataService _metadata;
 
+    /// <summary>Settings ▸ Lyrics ▸ Save lyrics to (GitHub #135); the player's live value, replaceable in tests.</summary>
+    internal Func<LyricsSaveTarget> SaveTarget { get; set; }
+
+    /// <summary>Writes the tags once the song stops playing (the editor runs while it plays); null = right away.</summary>
+    internal IDeferredTagWriter? TagWriter { get; set; }
+
     public ObservableCollection<LrcEditorLine> Lines { get; } = new();
 
     [ObservableProperty] private int _selectedIndex;
@@ -72,6 +78,7 @@ public partial class LrcEditorViewModel : ViewModelBase
         _track = track;
         _player = player;
         _metadata = metadata;
+        SaveTarget = () => LyricsSaveOptions.ParseTarget(player.LyricsSaveTarget);
 
         // Prefer existing synced lyrics (retiming); otherwise start from plain
         // text lines with no timestamps (the tap-to-sync starting point).
@@ -284,10 +291,17 @@ public partial class LrcEditorViewModel : ViewModelBase
             // WriteTrackMetadata copies and rewrites the whole audio file, so the
             // file work runs on a worker thread — inline it froze the UI for the
             // duration of the copy on large files.
+            // Settings ▸ Lyrics ▸ Save lyrics to (GitHub #135).
+            LyricsSaveTarget target;
+            try { target = SaveTarget(); } catch { target = LyricsSaveTarget.Sidecar; }
+            var tagsFailed = false;
             await Task.Run(() =>
             {
                 // Sidecar first (root-cause fix: tag writes can fail on in-use files).
-                if (!string.IsNullOrWhiteSpace(_track.FilePath))
+                // Inside the file only: no new .lrc, but one already there is kept current —
+                // the lyrics page reads it before the tags.
+                if (!string.IsNullOrWhiteSpace(_track.FilePath)
+                    && (target.WritesSidecars() || File.Exists(Path.ChangeExtension(_track.FilePath, ".lrc"))))
                 {
                     var lrcPath = Path.ChangeExtension(_track.FilePath, ".lrc");
 
@@ -311,8 +325,27 @@ public partial class LrcEditorViewModel : ViewModelBase
 
                 // Best-effort metadata write.
                 try { _metadata.WriteTrackMetadata(_track); } catch { }
+
+                // The timed lyrics inside the audio file (synced text in its lyrics tag, SYLT for ID3v2).
+                if (target.WritesTags() && !string.IsNullOrWhiteSpace(_track.FilePath))
+                {
+                    var (path, plain) = (_track.FilePath, _track.Lyrics);
+                    if (TagWriter is { } deferred)
+                        deferred.Enqueue(path, "lyrics", () => _metadata.WriteLyrics(path, plain, lrc));
+                    else
+                    {
+                        try { tagsFailed = !_metadata.WriteLyrics(path, plain, lrc); }
+                        catch { tagsFailed = true; }
+                    }
+                }
             });
 
+            if (tagsFailed)
+            {
+                StatusText = "Saved · couldn't write the lyrics into the audio file (in use or read-only?)";
+                Saved?.Invoke(this, EventArgs.Empty);
+                return;
+            }
             Noctis.Helpers.TransientStatus.Show(nameof(StatusText), v => StatusText = v, "Saved");
             Saved?.Invoke(this, EventArgs.Empty);
         }

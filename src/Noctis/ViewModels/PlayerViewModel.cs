@@ -468,6 +468,12 @@ public partial class PlayerViewModel : ViewModelBase
     [ObservableProperty] private bool _lyricsShowTranslations = true;
     [ObservableProperty] private bool _lyricsShowRomanization = true;
     [ObservableProperty] private bool _lyricsShowBackgroundVocals = true;
+    /// <summary>Where the lyrics page saves lyrics ("Sidecar" / "Embedded" / "Both", GitHub #135). Driven by Settings.</summary>
+    [ObservableProperty] private string _lyricsSaveTarget = nameof(Models.LyricsSaveTarget.Sidecar);
+    /// <summary>Search online when a lyrics view opens on a song with none (GitHub #135). Driven by Settings.</summary>
+    [ObservableProperty] private bool _lyricsAutoDownload;
+    /// <summary>What an automatic online pick keeps ("WordSynced" / "LineSynced" / "Plain", GitHub #135). Driven by Settings.</summary>
+    [ObservableProperty] private string _lyricsPreferredType = nameof(Models.LyricsPreferredType.WordSynced);
 
     // ── Lyrics page integration (flags + pass-through commands set up by MainWindowViewModel) ──
 

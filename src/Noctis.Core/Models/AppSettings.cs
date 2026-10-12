@@ -864,6 +864,17 @@ public class AppSettings
     /// <summary>Show the background-vocal (adlib) row under lyric lines.</summary>
     public bool LyricsShowBackgroundVocals { get; set; } = true;
 
+    /// <summary>Where saved lyrics go: "Sidecar" (.lrc / .elrc files beside the song, the default),
+    /// "Embedded" (the audio file's tags) or "Both". See <see cref="LyricsSaveOptions.ParseTarget"/> (GitHub #135).</summary>
+    public string LyricsSaveTarget { get; set; } = nameof(Models.LyricsSaveTarget.Sidecar);
+
+    /// <summary>Search online by itself when the lyrics view opens on a song with no lyrics (GitHub #135).</summary>
+    public bool LyricsAutoDownload { get; set; }
+
+    /// <summary>What an automatic online pick keeps: "WordSynced" (the richest, the default),
+    /// "LineSynced" or "Plain". See <see cref="LyricsSaveOptions.ParsePreferredType"/> (GitHub #135).</summary>
+    public string LyricsPreferredType { get; set; } = nameof(Models.LyricsPreferredType.WordSynced);
+
     // ── Lyrics providers ──
 
     /// <summary>Whether LRCLIB online lyrics search is enabled.</summary>

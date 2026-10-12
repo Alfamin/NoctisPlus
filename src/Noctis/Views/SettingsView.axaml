@@ -3232,6 +3232,59 @@
             </StackPanel>
             </Border>
 
+            <!-- GitHub #135: where saved lyrics go, and the automatic download. -->
+            <TextBlock Classes="section-title" Text="{loc:T Settings.Section.SavingLyrics}" Margin="0,16,0,8"/>
+            <Border Classes="setting-card group-card">
+            <StackPanel>
+            <Border Classes="setting-row">
+                <Grid ColumnDefinitions="*,Auto">
+                    <StackPanel Grid.Column="0" Spacing="2" Margin="0,0,12,0">
+                        <TextBlock Text="{loc:T Settings.LyricsSaveTarget}" FontSize="15" FontWeight="SemiBold"/>
+                        <TextBlock Text="{loc:T Settings.LyricsSaveTargetHint}"
+                                   FontSize="12" Opacity="0.5" TextWrapping="Wrap"/>
+                    </StackPanel>
+                    <ComboBox Grid.Column="1"
+                              Classes="pill-list"
+                              ItemsSource="{Binding LyricsSaveTargetOptions}"
+                              SelectedItem="{Binding SelectedLyricsSaveTargetOption}"
+                              MinWidth="200"
+                              VerticalAlignment="Center"
+                              CornerRadius="999"
+                              Padding="14,8"/>
+                </Grid>
+            </Border>
+            <Border Classes="setting-row">
+                <Grid ColumnDefinitions="*,Auto">
+                    <StackPanel Grid.Column="0" Spacing="2">
+                        <TextBlock Text="{loc:T Settings.LyricsAutoDownload}" FontSize="15" FontWeight="SemiBold"/>
+                        <TextBlock Text="{loc:T Settings.LyricsAutoDownloadHint}"
+                                   FontSize="12" Opacity="0.5" TextWrapping="Wrap"/>
+                    </StackPanel>
+                    <controls:LottieToggle Grid.Column="1"
+                                          IsChecked="{Binding LyricsAutoDownload}"
+                                          VerticalAlignment="Center"/>
+                </Grid>
+            </Border>
+            <Border Classes="setting-row">
+                <Grid ColumnDefinitions="*,Auto">
+                    <StackPanel Grid.Column="0" Spacing="2" Margin="0,0,12,0">
+                        <TextBlock Text="{loc:T Settings.LyricsPreferredType}" FontSize="15" FontWeight="SemiBold"/>
+                        <TextBlock Text="{loc:T Settings.LyricsPreferredTypeHint}"
+                                   FontSize="12" Opacity="0.5" TextWrapping="Wrap"/>
+                    </StackPanel>
+                    <ComboBox Grid.Column="1"
+                              Classes="pill-list"
+                              ItemsSource="{Binding LyricsPreferredTypeOptions}"
+                              SelectedItem="{Binding SelectedLyricsPreferredTypeOption}"
+                              MinWidth="200"
+                              VerticalAlignment="Center"
+                              CornerRadius="999"
+                              Padding="14,8"/>
+                </Grid>
+            </Border>
+            </StackPanel>
+            </Border>
+
             </StackPanel>
 
             <StackPanel x:Name="ShortcutsTabPanel" Classes="tab-page" IsVisible="{Binding IsShortcutsTabVisible}" Spacing="4">

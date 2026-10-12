@@ -1157,6 +1157,7 @@ Saving replaces it with the lyrics on screen. A lyrics file Noctis didn't write 
 
 Saving replaces them with the lyrics on screen. A lyrics file Noctis didn't write goes to the Recycle Bin first.</value><comment>Save Lyrics to File prompt in LyricsViewModel; {0} = song title, {1} = quoted file names joined by Lyrics.SaveFilesJoin</comment></data>
   <data name="Lyrics.SaveFilesJoin" xml:space="preserve"><value> and </value><comment>Joins the file names in Lyrics.SaveReplaceMany (keep the spaces)</comment></data>
+  <data name="Lyrics.SaveReplaceTags" xml:space="preserve"><value>the lyrics inside the audio file</value><comment>Save Lyrics to File prompt: joined into {1} of Lyrics.SaveReplaceOne/Many when the save replaces lyrics in the audio file's tags (GitHub #135)</comment></data>
   <data name="Lyrics.Saved" xml:space="preserve"><value>Saved Lyrics</value><comment>Lyrics page status after Save Lyrics to File</comment></data>
   <data name="Lyrics.SaveKeptOld" xml:space="preserve"><value>Saved · an old lyrics file was kept, couldn't move it to the Recycle Bin</value><comment>Lyrics page status after Save Lyrics to File</comment></data>
   <data name="Lyrics.SaveFailed" xml:space="preserve"><value>Save failed — check file permissions</value><comment>Lyrics page status after Save Lyrics to File</comment></data>
@@ -2546,6 +2547,19 @@ The lines and their timings are dropped and an empty lyrics box opens for your o
   <data name="Settings.Section.CoverFlow" xml:space="preserve"><value>Cover Flow</value><comment>Settings section label</comment></data>
   <data name="Settings.Section.LyricsPage" xml:space="preserve"><value>Lyrics page</value><comment>Settings section label</comment></data>
   <data name="Settings.Section.OnlineLyrics" xml:space="preserve"><value>Online lyrics</value><comment>Settings section label</comment></data>
+  <data name="Settings.Section.SavingLyrics" xml:space="preserve"><value>Saving lyrics</value><comment>Settings section label</comment></data>
+  <data name="Settings.LyricsSaveTarget" xml:space="preserve"><value>Save lyrics to</value><comment>Settings ▸ Lyrics (GitHub #135), SettingsView.axaml</comment></data>
+  <data name="Settings.LyricsSaveTargetHint" xml:space="preserve"><value>Where Noctis puts lyrics it saves: Save Lyrics to File, Lyrics Studio, the sync editor, Edit Info, and lyrics found online.</value><comment>Settings ▸ Lyrics (GitHub #135), SettingsView.axaml</comment></data>
+  <data name="Settings.LyricsSaveTarget.Sidecar" xml:space="preserve"><value>Separate file (.lrc)</value><comment>Save lyrics to choice: .lrc/.elrc files beside the song (SettingsViewModel)</comment></data>
+  <data name="Settings.LyricsSaveTarget.Embedded" xml:space="preserve"><value>Inside the audio file</value><comment>Save lyrics to choice: the audio file's own tags (SettingsViewModel)</comment></data>
+  <data name="Settings.LyricsSaveTarget.Both" xml:space="preserve"><value>Both</value><comment>Save lyrics to choice: files and the audio file's tags (SettingsViewModel)</comment></data>
+  <data name="Settings.LyricsAutoDownload" xml:space="preserve"><value>Automatically download lyrics</value><comment>Settings ▸ Lyrics (GitHub #135), SettingsView.axaml</comment></data>
+  <data name="Settings.LyricsAutoDownloadHint" xml:space="preserve"><value>When the lyrics view opens on a song without lyrics, search online and save what is found. Lyrics a song already has are never replaced.</value><comment>Settings ▸ Lyrics (GitHub #135), SettingsView.axaml</comment></data>
+  <data name="Settings.LyricsPreferredType" xml:space="preserve"><value>Preferred lyrics type</value><comment>Settings ▸ Lyrics (GitHub #135), SettingsView.axaml</comment></data>
+  <data name="Settings.LyricsPreferredTypeHint" xml:space="preserve"><value>What Noctis keeps when it picks lyrics online by itself.</value><comment>Settings ▸ Lyrics (GitHub #135), SettingsView.axaml</comment></data>
+  <data name="Settings.LyricsPreferredType.WordSynced" xml:space="preserve"><value>Word-synced (best available)</value><comment>Preferred lyrics type choice (SettingsViewModel)</comment></data>
+  <data name="Settings.LyricsPreferredType.LineSynced" xml:space="preserve"><value>Line-synced</value><comment>Preferred lyrics type choice (SettingsViewModel)</comment></data>
+  <data name="Settings.LyricsPreferredType.Plain" xml:space="preserve"><value>Plain text</value><comment>Preferred lyrics type choice (SettingsViewModel)</comment></data>
   <data name="Settings.Section.LyricsStudio" xml:space="preserve"><value>Lyrics Studio</value><comment>Settings section label</comment></data>
   <data name="Settings.Section.Playback" xml:space="preserve"><value>Playback</value><comment>Settings section label</comment></data>
   <data name="Settings.Section.Output" xml:space="preserve"><value>Output</value><comment>Settings section label</comment></data>
