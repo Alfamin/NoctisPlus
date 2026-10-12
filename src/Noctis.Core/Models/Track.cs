@@ -82,6 +82,9 @@ public partial class Track : ObservableObject
     }
     private string _genre = string.Empty;
 
+    /// <summary>Genre as shown in "Genre · Year" lines: "Rock · Pop" (see <see cref="DotGenres"/>).</summary>
+    [JsonIgnore] public string GenreDisplay => DotGenres(_genre);
+
     /// <summary>Track number within the disc (TRCK tag).</summary>
     public int TrackNumber { get; set; }
 
@@ -597,6 +600,10 @@ public partial class Track : ObservableObject
 
     /// <summary>Typed genre text in the stored form: "rock ;Pop;" → "rock; Pop".</summary>
     public static string NormalizeGenre(string? value) => string.Join(GenreSeparator, SplitGenres(value));
+
+    /// <summary>Stored genres for display, joined with " · " like the artist page's GENRE fact:
+    /// "Alternative Rock; Alt-Pop" → "Alternative Rock · Alt-Pop" (GitHub #136).</summary>
+    public static string DotGenres(string? value) => string.Join(" · ", SplitGenres(value));
 
     /// <summary>True when <paramref name="value"/> holds any of <paramref name="genres"/>
     /// (case-insensitive). Allocation-free: Autoplay and radio call it for every library track.</summary>

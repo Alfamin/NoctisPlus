@@ -47,6 +47,13 @@ public class Album : ObservableObject
     /// <summary>Genre (from the first track that has one).</summary>
     public string Genre { get; set; } = "Unknown";
 
+    /// <summary>The album's genres for the header line, each one separate like the artist
+    /// page's GENRE fact ("Alternative Rock · Alt-Pop · Indie", GitHub #136); empty for the
+    /// "Unknown" placeholder.</summary>
+    public string GenreDisplay => string.Equals(Genre?.Trim(), "Unknown", StringComparison.OrdinalIgnoreCase)
+        ? string.Empty
+        : Track.DotGenres(Genre);
+
     /// <summary>Number of tracks in this album.</summary>
     public int TrackCount { get; set; }
 

@@ -146,8 +146,9 @@ public sealed partial class AlbumPageViewModel : MobilePage, ITintedPage
     public static string BuildMetaLine(Album album)
     {
         var parts = new List<string>();
-        if (!string.IsNullOrWhiteSpace(album.Genre) && !string.Equals(album.Genre, "Unknown", StringComparison.OrdinalIgnoreCase))
-            parts.Add(album.Genre);
+        // Each genre of a multi-genre album on its own: "Rock · Pop · 2018" (GitHub #136).
+        if (album.GenreDisplay.Length > 0)
+            parts.Add(album.GenreDisplay);
         if (album.Year > 0) parts.Add(album.Year.ToString(CultureInfo.InvariantCulture));
         return string.Join(" · ", parts);
     }

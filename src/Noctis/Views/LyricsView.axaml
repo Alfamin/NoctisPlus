@@ -696,7 +696,7 @@
                             <!-- MetadataLine skips empty segments: untagged files (no genre/year)
                                  otherwise render a stray leading "· 2018 · 24 tracks" dot. -->
                             <MultiBinding Converter="{StaticResource MetadataLine}" ConverterParameter="track">
-                                <Binding Path="Player.CurrentTrack.Genre" FallbackValue=""/>
+                                <Binding Path="Player.CurrentTrack.GenreDisplay" FallbackValue=""/>
                                 <Binding Path="Player.CurrentTrack.DisplayYear" FallbackValue="0"/>
                                 <!-- Album-wide count (every disc), not the file's per-disc TRCK
                                      total: "9 tracks" on a 19-song, 3-disc album (Discord, aaron 09-21). -->

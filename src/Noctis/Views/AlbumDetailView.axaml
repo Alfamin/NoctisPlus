@@ -451,7 +451,7 @@
                     <TextBlock FontSize="13" Opacity="0.5" VerticalAlignment="Center">
                         <TextBlock.Text>
                             <MultiBinding Converter="{StaticResource MetadataLine}">
-                                <Binding Path="Album.Genre" />
+                                <Binding Path="Album.GenreDisplay" />
                                 <Binding Path="Album.ReleaseDateFormatted" />
                                 <Binding Path="Album.TrackCountText" />
                                 <Binding Path="Album.HeaderDurationFormatted" />
