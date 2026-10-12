@@ -127,6 +127,7 @@ public sealed class LibrarySyncService : ILibrarySyncService
         var device = DeviceId;
         await Task.Run(() =>
         {
+            var known = Store.All(SyncKinds.Track).ToDictionary(i => i.Id, i => i.Payload, StringComparer.Ordinal);
             foreach (var t in tracks)
             {
                 if (t is null || t.SourceType != SourceType.Local) continue;
@@ -134,8 +135,8 @@ public sealed class LibrarySyncService : ILibrarySyncService
                 var payload = SyncJson.Serialize(TrackSyncState.From(t));
                 // A song the ledger has is brought up to date: sync was off while it changed
                 // (unfavourited, re-rated), so nothing recorded that. A new one only with state.
-                if (Store.Get(SyncKinds.Track, id) is { } existing
-                        ? existing.Payload == payload
+                if (known.TryGetValue(id, out var stored)
+                        ? stored == payload
                         : !t.IsFavorite && t.Rating == 0 && !t.IsDisliked && t.PlayCount == 0) continue;
                 Store.Upsert(SyncKinds.Track, id, payload, now, device);
             }
