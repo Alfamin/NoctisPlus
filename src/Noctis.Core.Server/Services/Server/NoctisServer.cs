@@ -110,7 +110,14 @@ public sealed partial class NoctisServer : IAsyncDisposable
     {
         if (_app is not null) return;
 
-        var builder = WebApplication.CreateSlimBuilder(new WebApplicationOptions { ApplicationName = "Noctis" });
+        // Production whatever the process environment says: in "Development" (a dev box's
+        // ASPNETCORE_ENVIRONMENT) the host adds its developer exception page, which would hand
+        // stack traces and source paths to whoever sends a request the pipeline chokes on.
+        var builder = WebApplication.CreateSlimBuilder(new WebApplicationOptions
+        {
+            ApplicationName = "Noctis",
+            EnvironmentName = Microsoft.Extensions.Hosting.Environments.Production,
+        });
         builder.Logging.ClearProviders();
         builder.WebHost.ConfigureKestrel(k =>
         {
@@ -196,17 +203,20 @@ public sealed partial class NoctisServer : IAsyncDisposable
         if (method.EndsWith(".view", StringComparison.OrdinalIgnoreCase)) method = method[..^5];
         // The sign-in reply carries a new key: no cache (or proxy) may keep it.
         if (method.Equals("noctisSignIn", StringComparison.OrdinalIgnoreCase)) ctx.Response.Headers.CacheControl = "no-store";
-        var p = await ReadParamsAsync(ctx).ConfigureAwait(false);
-        var format = p.Get("f");
-        // Parked sign-in: refused before auth, so no password is checked for it.
-        if (!DeviceSignInEnabled && IsDeviceSignInMethod(method))
-        {
-            await WriteAsync(ctx, SubsonicResponse.Error(SubsonicResponse.ErrGeneric, $"Unknown method '{method}'", format, _serverVersion), 200).ConfigureAwait(false);
-            return;
-        }
-
+        string? format = null;
         try
         {
+            // Inside the try: a form the reader refuses (too many values) is an error reply
+            // like any other, never an unhandled exception for the host to render.
+            var p = await ReadParamsAsync(ctx).ConfigureAwait(false);
+            format = p.Get("f");
+            // Parked sign-in: refused before auth, so no password is checked for it.
+            if (!DeviceSignInEnabled && IsDeviceSignInMethod(method))
+            {
+                await WriteAsync(ctx, SubsonicResponse.Error(SubsonicResponse.ErrGeneric, $"Unknown method '{method}'", format, _serverVersion), 200).ConfigureAwait(false);
+                return;
+            }
+
             if (!NoAuthMethods.Contains(method))
             {
                 var apiKey = ApiKeyOf(ctx, p);
@@ -263,6 +273,11 @@ public sealed partial class NoctisServer : IAsyncDisposable
         catch (SubsonicException ex)
         {
             await WriteAsync(ctx, SubsonicResponse.Error(ex.Code, ex.Message, format, _serverVersion), 200).ConfigureAwait(false);
+        }
+        catch (BadHttpRequestException ex)
+        {
+            // Kestrel's own verdict (a body over the limit is 413): its status, our envelope.
+            await WriteAsync(ctx, SubsonicResponse.Error(SubsonicResponse.ErrGeneric, "Bad request", format, _serverVersion), ex.StatusCode).ConfigureAwait(false);
         }
         catch (Exception ex)
         {

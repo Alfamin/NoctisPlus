@@ -342,6 +342,30 @@ public class NoctisServerTests : IAsyncLifetime
     }
 
     [Fact]
+    public async Task AnUnhandledRequestError_NeverShowsAStackTrace_EvenInADevelopmentEnvironment()
+    {
+        // ASP.NET Core adds its developer exception page (stack trace, source paths) when the
+        // process runs with ASPNETCORE_ENVIRONMENT=Development, as a dev box may; the server
+        // answers the network, so it must never pick that up.
+        var previous = Environment.GetEnvironmentVariable("ASPNETCORE_ENVIRONMENT");
+        Environment.SetEnvironmentVariable("ASPNETCORE_ENVIRONMENT", "Development");
+        var server = new NoctisServer(_lib, _users, "test");
+        try { await server.StartAsync(0, certificate: null, bindAddress: IPAddress.Loopback); }
+        finally { Environment.SetEnvironmentVariable("ASPNETCORE_ENVIRONMENT", previous); }
+        try
+        {
+            using var http = new HttpClient { BaseAddress = new Uri($"http://127.0.0.1:{server.Port}/") };
+            // 1025 form values: past the form reader's limit, which throws before the handler's own try.
+            var fields = Enumerable.Range(0, 1025).Select(_ => new KeyValuePair<string, string>("id", "x"));
+            var res = await http.PostAsync("rest/ping.view?f=json", new FormUrlEncodedContent(fields), TestContext.Current.CancellationToken);
+            var body = await res.Content.ReadAsStringAsync(TestContext.Current.CancellationToken);
+            Assert.DoesNotContain("Exception", body);
+            Assert.DoesNotContain("   at ", body);
+        }
+        finally { await server.StopAsync(); }
+    }
+
+    [Fact]
     public async Task Https_Handshake_Succeeds_WithFreshAndReloadedCertificate()
     {
         // Schannel refuses ephemeral private keys for a server credential: Kestrel still starts,
