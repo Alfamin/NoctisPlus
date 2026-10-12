@@ -16,6 +16,9 @@ public partial class LyricShareDialog : Window
     // picker is up) would render and ask again.
     private bool _busy;
 
+    /// <summary>A save or copy is in flight (tests).</summary>
+    internal bool IsBusy => _busy;
+
     public LyricShareDialog()
     {
         InitializeComponent();
@@ -142,8 +145,9 @@ public partial class LyricShareDialog : Window
         _busy = true;
         try
         {
-            // Re-render at export resolution — the preview is a small bitmap.
-            if (await vm.RenderExportPngAsync() is not { } png) return;
+            // Re-render at export resolution — the preview is a small bitmap. It renders while
+            // the picker is up: awaited first, the picker opened 0.3-0.9 s after the click.
+            var png = vm.RenderExportPngAsync();
             var status = await PngExportHelper.SavePngAsync(this, png, vm.SuggestedFileName);
             if (status != null)
                 vm.ReportStatus(status);

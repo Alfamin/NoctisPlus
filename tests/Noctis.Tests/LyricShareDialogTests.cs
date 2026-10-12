@@ -730,6 +730,39 @@ public class LyricShareDialogTests
         }
     }
 
+    /// <summary>
+    /// Bug: Save Card drew the full-size card (2160 px, PNG) before the save picker opened, so
+    /// a click sat 0.3-0.9 s before anything showed (measured: 1:1 solid ~300 ms, 9:16 artwork
+    /// ~870 ms). The card renders while the picker is up. Headless, the picker cancels at once,
+    /// so the click is done long before the card could have rendered.
+    /// </summary>
+    [AvaloniaFact]
+    public void SaveCard_OpensThePicker_WithoutWaitingForTheRender()
+    {
+        EnsureAppStyles();
+        var dir = Path.Combine(Path.GetTempPath(), $"noctis-share-test-{Guid.NewGuid():N}");
+        Directory.CreateDirectory(dir);
+        var track = Song();
+        track.AlbumArtworkPath = WriteCover(dir, 3000);
+        var vm = new LyricShareViewModel(track, new[] { "one line", "two lines", "three lines" }, 0) { FormatIndex = 1 };
+        vm.SelectedBackground = vm.BackgroundChoices[0];
+        var win = new Noctis.Views.LyricShareDialog(vm) { Width = 1280, Height = 860 };
+        win.Show();
+        try
+        {
+            Assert.True(PumpUntil(() => vm.Preview != null && vm.IsPreviewCurrent, 10000), "preview never rendered");
+            var sw = Stopwatch.StartNew();
+            Named<Button>(win, "SaveCardButton").RaiseEvent(new Avalonia.Interactivity.RoutedEventArgs(Button.ClickEvent));
+            Assert.True(PumpUntil(() => !win.IsBusy, 5000), "Save Card never finished");
+            Assert.True(sw.ElapsedMilliseconds < 150, $"the picker waited {sw.ElapsedMilliseconds} ms for the card");
+        }
+        finally
+        {
+            if (win.IsVisible) { win.Close(); PumpUntil(() => !win.IsVisible); }
+            try { Directory.Delete(dir, true); } catch { }
+        }
+    }
+
     /// <summary>Esc in a line's edit box puts the text back and keeps the dialog open.</summary>
     [AvaloniaFact]
     public void EscapeWhileEditing_RestoresTheLine_AndKeepsTheDialog()

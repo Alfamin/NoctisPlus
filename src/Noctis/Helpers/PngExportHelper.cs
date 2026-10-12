@@ -11,7 +11,12 @@ namespace Noctis.Helpers;
 /// </summary>
 public static class PngExportHelper
 {
-    public static async Task<string?> SavePngAsync(TopLevel topLevel, byte[] png, string suggestedFileName)
+    public static Task<string?> SavePngAsync(TopLevel topLevel, byte[] png, string suggestedFileName)
+        => SavePngAsync(topLevel, Task.FromResult<byte[]?>(png), suggestedFileName);
+
+    /// <summary>As above for an image still rendering: the picker opens at once and the bytes
+    /// are awaited only once a file is chosen (null bytes: the render failed).</summary>
+    public static async Task<string?> SavePngAsync(TopLevel topLevel, Task<byte[]?> pngTask, string suggestedFileName)
     {
         var file = await topLevel.StorageProvider.SaveFilePickerAsync(new FilePickerSaveOptions
         {
@@ -25,6 +30,8 @@ public static class PngExportHelper
 
         try
         {
+            if (await pngTask is not { } png)
+                return "Save failed";
             await using var stream = await file.OpenWriteAsync();
             await stream.WriteAsync(png);
             return "Saved";
