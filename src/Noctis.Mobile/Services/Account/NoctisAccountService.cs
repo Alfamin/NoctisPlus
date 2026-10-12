@@ -398,7 +398,9 @@ public sealed partial class NoctisAccountService : INoctisAccountService, ITrack
         }
         catch (Exception ex)
         {
-            RaiseSyncProgress(NoctisSyncStage.Failed, 0, 0);
+            // Sync switched off on the computer still ran to the end (catalog, covers, plays):
+            // it reads as finished, not as "didn't finish, try again".
+            RaiseSyncProgress(ex is NoctisServerException { Kind: NoctisErrorKind.SyncDisabled } ? NoctisSyncStage.Done : NoctisSyncStage.Failed, 0, 0);
             if (ex is NoctisServerException { Kind: NoctisErrorKind.SignedOut }) ForgetAccountLocally();
             DebugLog.Write("Account", $"sync failed: {(ex is NoctisServerException n ? n.Kind.ToString() : ex.GetType().Name)}");
             throw;

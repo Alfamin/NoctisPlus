@@ -36,6 +36,8 @@ public class MobileAccountTests
 
         public void RaiseStateChanged() => StateChanged?.Invoke(this, EventArgs.Empty);
         public event EventHandler<NoctisSyncProgress>? SyncProgress;
+        /// <summary>A progress event the way a phone delivers it: posted, so it can land after the sync's task already completed.</summary>
+        public void RaiseLateProgress(NoctisSyncStage stage) => SyncProgress?.Invoke(this, new NoctisSyncProgress(stage, 0, 0));
         public event EventHandler<NoctisDownloadProgress>? DownloadProgress;
         public event EventHandler? PlaylistsChanged { add { } remove { } }
 
@@ -377,6 +379,51 @@ public class MobileAccountTests
         Assert.False(page.HasError);
         Assert.True(page.CanUseServer);
         Assert.Equal("Songs updated. Sync is off on your computer.", page.SyncText);
+    }
+
+    [Theory]
+    [InlineData(NoctisSyncStage.Done)]    // what the service now raises when sync is off on the computer
+    [InlineData(NoctisSyncStage.Failed)]  // what it raised before
+    public async Task SyncNow_SyncOffOnTheComputer_TheLateEndOfThatSyncKeepsTheNote(NoctisSyncStage lateEnd)
+    {
+        // On the emulator the sync's own end arrived after the page's catch had run and
+        // replaced "Songs updated…" with "The last sync didn't finish. Tap Sync now to try again."
+        using var rig = MobileFixtures.MakeRig();
+        var account = new FakeAccount { Account = FakeAccount.SignedInAs(), SyncError = new NoctisServerException(NoctisErrorKind.SyncDisabled, "50") };
+        var page = OpenAccount(ShellWith(rig, account));
+
+        await page.SyncNowCommand.ExecuteAsync(null);
+        account.RaiseLateProgress(lateEnd);
+
+        Assert.Equal("Songs updated. Sync is off on your computer.", page.SyncText);
+        Assert.False(page.HasError);
+    }
+
+    [Fact]
+    public async Task SyncNow_Failed_TheLateEndOfThatSyncKeepsTheErrorAlone()
+    {
+        using var rig = MobileFixtures.MakeRig();
+        var account = new FakeAccount { Account = FakeAccount.SignedInAs(), SyncError = new NoctisServerException(NoctisErrorKind.Unreachable, "x") };
+        var page = OpenAccount(ShellWith(rig, account));
+
+        await page.SyncNowCommand.ExecuteAsync(null);
+        account.RaiseLateProgress(NoctisSyncStage.Failed);
+
+        Assert.True(page.HasError);
+        Assert.Equal(string.Empty, page.SyncText);
+    }
+
+    [Fact]
+    public async Task ABackgroundSyncFailing_AfterThePagesOwnSync_StillSaysSo()
+    {
+        using var rig = MobileFixtures.MakeRig();
+        var account = new FakeAccount { Account = FakeAccount.SignedInAs() };
+        var page = OpenAccount(ShellWith(rig, account));
+        await page.SyncNowCommand.ExecuteAsync(null);   // the fake raises its Done during the sync
+
+        account.RaiseLateProgress(NoctisSyncStage.Failed); // a later sync the page did not start
+
+        Assert.Equal("The last sync didn't finish. Tap Sync now to try again.", page.SyncText);
     }
 
     [Fact]

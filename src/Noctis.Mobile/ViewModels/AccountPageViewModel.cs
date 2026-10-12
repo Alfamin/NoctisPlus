@@ -25,6 +25,8 @@ public sealed partial class AccountPageViewModel : MobilePage
     private readonly Action<Action> _marshal;
     private string? _probedUrl;
     private bool _syncRunning;
+    /// <summary>This page started a sync whose Done/Failed has not arrived yet (see OnSyncProgress).</summary>
+    private bool _ownSyncEndPending;
     private bool _downloadRunning;
     private NoctisDownloadProgress? _lastDownload;
     private CancellationTokenSource? _uploadCts;
@@ -226,6 +228,7 @@ public sealed partial class AccountPageViewModel : MobilePage
         if (!_account.IsSignedIn || _syncRunning || _account.IsSyncing) return;
         ErrorText = string.Empty;
         _syncRunning = true;
+        _ownSyncEndPending = true;
         IsSyncing = true;
         SyncText = "Syncing…";
         try
@@ -390,10 +393,15 @@ public sealed partial class AccountPageViewModel : MobilePage
         // The finished text comes from the result (or the error); a late Done/Failed must not overwrite it.
         if (progress.Stage is NoctisSyncStage.Done or NoctisSyncStage.Failed or NoctisSyncStage.Idle)
         {
-            if (!_syncRunning && progress.Stage == NoctisSyncStage.Done) SyncText = "Sync finished";
+            // This page's own sync ends with one Done or Failed. It is posted before the task
+            // completes, but on a phone it can land after the page's catch already reset
+            // _syncRunning, so it is matched by flag: it read as a background sync failing
+            // and replaced the page's own text ("Songs updated…") with "didn't finish".
+            if (_ownSyncEndPending && progress.Stage != NoctisSyncStage.Idle) _ownSyncEndPending = false;
+            else if (!_syncRunning && progress.Stage == NoctisSyncStage.Done) SyncText = "Sync finished";
             // A background sync (the one at app start) that failed left its last stage up
             // ("Getting covers… 812 of 1332") with no error; this page's own syncs show theirs.
-            if (!_syncRunning && progress.Stage == NoctisSyncStage.Failed) SyncText = "The last sync didn't finish. Tap Sync now to try again.";
+            else if (!_syncRunning && progress.Stage == NoctisSyncStage.Failed) SyncText = "The last sync didn't finish. Tap Sync now to try again.";
             IsSyncing = _syncRunning || _account.IsSyncing;
             return;
         }
