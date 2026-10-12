@@ -688,14 +688,16 @@ public partial class LyricsView : UserControl
     // parked too — no point animating layers nobody can see.
     // The Style setting decides WHICH flowing background draws: the built-in Drift layers,
     // or one plugin visual layer (Kawarp, …) that replaces them. A selected plugin that is not
-    // loaded/enabled falls back to Drift so the toggle never shows nothing.
+    // loaded/enabled falls back to Drift so the toggle never shows nothing. Like Drift and
+    // Kawarp, a plugin layer belongs to the Artwork mode: over Solid or Gradient it would
+    // hide the colour the user picked.
     private void UpdateFlowAnimationState(LyricsViewModel vm)
     {
         var flowing = vm.Player.LyricsFlowingLightEnabled
                       && string.IsNullOrEmpty(vm.Player.LyricsBackgroundMediaPath);
         var style = FlowingStyles.Normalize(vm.Player.LyricsFlowingStyle);
         var kawarp = flowing && vm.IsColorModeArtwork && FlowingStyles.IsKawarp(style);
-        var plugin = flowing && !kawarp ? SelectedPluginLayer(vm) : null;
+        var plugin = flowing && vm.IsColorModeArtwork && !kawarp ? SelectedPluginLayer(vm) : null;
         var builtIn = flowing && !kawarp && plugin is null;
 
         FlowLayerHost.IsVisible = builtIn;

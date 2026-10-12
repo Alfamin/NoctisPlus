@@ -516,7 +516,7 @@
 
         <!-- Plugin visual layer: the IVisualLayerProvider picked by Settings → Appearance →
              Flowing Lyrics Background → Style, filled by code-behind (RebuildPluginLayers) only
-             while the toggle is on and no video background covers the page; behind the lyrics,
+             while the toggle is on, the background is Artwork and no video covers the page; behind the lyrics,
              above the backdrop. Empty (and its RAF loops stopped) otherwise. -->
         <Panel x:Name="PluginLayerHost"
                Grid.ColumnSpan="2"

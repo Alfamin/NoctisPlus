@@ -119,4 +119,58 @@ public class LyricsBackgroundModeTests : IDisposable
         Assert.Equal(Color.Parse("#33FFFFFF"), ColorOf(vm.LyricsBtnBg));
         Assert.Equal(Color.Parse("#B0FFFFFF"), ColorOf(vm.LyricsSecondaryFg));
     }
+
+    /// <summary>
+    /// Bug: a plugin Flowing style (Settings ▸ Appearance ▸ Flowing Lyrics Background ▸ Style)
+    /// kept its layer on the page after switching the background to Solid or Gradient. The
+    /// built-in Drift and Kawarp styles stop outside Artwork mode; the plugin layer, which
+    /// stands in for them and paints over the page's colour, did not, so the picked colour
+    /// never showed.
+    /// </summary>
+    [AvaloniaFact]
+    public void PluginFlowingLayer_ShowsOnlyInArtworkMode()
+    {
+        var pluginDir = Path.Combine(_dir, "plugins", "PulseRingPlugin");
+        Directory.CreateDirectory(pluginDir);
+        File.Copy(Path.Combine(AppContext.BaseDirectory, "Noctis.SamplePlugin.dll"),
+            Path.Combine(pluginDir, "Noctis.SamplePlugin.dll"));
+        var settings = new AppSettings();
+        var plugins = new PluginHost(null, _dir, () => settings, () => { }, "test");
+        plugins.LoadAll();
+        var layer = Assert.Single(plugins.VisualLayers);
+
+        var player = NewPlayer();
+        player.LyricsFlowingLightEnabled = true;
+        player.LyricsFlowingStyle = layer.Name;
+        var vm = NewVm(player);
+        var view = new LyricsView { DataContext = vm };
+        var win = new Window { Width = 1280, Height = 800, Content = view };
+        win.Show();
+        try
+        {
+            Dispatcher.UIThread.RunJobs();
+            // The page takes its plugin host from the app's services, which tests don't have.
+            typeof(LyricsView).GetField("_pluginHost", BindingFlags.Instance | BindingFlags.NonPublic)!.SetValue(view, plugins);
+            typeof(LyricsView).GetMethod("UpdateFlowAnimationState", BindingFlags.Instance | BindingFlags.NonPublic)!.Invoke(view, new object[] { vm });
+            var host = view.FindControl<Panel>("PluginLayerHost")!;
+            Assert.Single(host.Children);
+
+            vm.SelectColorModeSolidCommand.Execute(null);
+            Dispatcher.UIThread.RunJobs();
+            Assert.Empty(host.Children);
+
+            vm.SelectColorModeGradientCommand.Execute(null);
+            Dispatcher.UIThread.RunJobs();
+            Assert.Empty(host.Children);
+
+            vm.SelectColorModeArtworkCommand.Execute(null);
+            Dispatcher.UIThread.RunJobs();
+            Assert.Single(host.Children);
+        }
+        finally
+        {
+            win.Close();
+            plugins.UnloadAll();
+        }
+    }
 }
