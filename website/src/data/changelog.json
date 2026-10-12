@@ -1,6 +1,98 @@
 {
   "releases": [
     {
+      "tag": "v1.6.3",
+      "version": "1.6.3",
+      "name": "v1.6.3",
+      "label": "1.6.3",
+      "publishedAt": "2026-10-12T22:03:53Z",
+      "url": "https://github.com/heartached/Noctis/releases/tag/v1.6.3",
+      "prerelease": false,
+      "sections": [
+        {
+          "title": "New Features",
+          "items": [
+            "Added Save Lyrics to File as LRC or TTML",
+            "Added Russian language",
+            "Added Account and Devices reorganised into four groups",
+            "Added phone app card with server switch and phone list",
+            "Added Background Color pop-up with Artwork, Solid and Gradient modes",
+            "Added Gradient Auto that persists across restarts",
+            "Added twelve new rebindable shortcuts",
+            "Added second singer placement in TTML files",
+            "Added .ttml import in Edit Info and Lyrics Studio",
+            "Added Keep Played Songs queue view with Clear Played",
+            "Added Saving lyrics settings section",
+            "Added automatic lyrics download when the lyrics view opens"
+          ]
+        },
+        {
+          "title": "Improvements",
+          "items": [
+            "Improved password check protection against flood attempts",
+            "Improved profile name handling against password guessing",
+            "Improved server error messages hiding stack traces",
+            "Improved certificate password storage",
+            "Improved Local API token handling",
+            "Improved sync handling of future-dated changes",
+            "Improved Share Lyrics option speed and dialog behaviour",
+            "Improved lyrics background colour picks",
+            "Improved Settings switches for keyboard and screen reader use",
+            "Improved queue scrolling to the playing song",
+            "Improved About page update timing display",
+            "Improved translations across all ten languages"
+          ]
+        },
+        {
+          "title": "Bug Fixes",
+          "items": [
+            "Fixed Newest Albums First resetting after going Back",
+            "Fixed gaps and stutter between songs on Linux",
+            "Fixed MP3 track edges including encoder padding and garbled starts",
+            "Fixed short tracks going silent",
+            "Fixed saving lyrics sending your lyrics file to the Recycle Bin",
+            "Fixed Account page deleting an account with one click",
+            "Fixed Account page creating an API key without asking",
+            "Fixed pairing turning sync on unexpectedly",
+            "Fixed server staying on after switching it off",
+            "Fixed sync ID changing on every save",
+            "Fixed sync changes made while off not applying when turned back on",
+            "Fixed renaming the PC not reaching signed-in phones",
+            "Fixed signed-out phones not being removable",
+            "Fixed Share Lyrics option changes being slow",
+            "Fixed Share Lyrics Save Card delay",
+            "Fixed Share Lyrics black text on Artwork background",
+            "Fixed Share Lyrics line jumping when editing",
+            "Fixed Share Lyrics option lists running off the window",
+            "Fixed file names starting with \" - \" for songs without an artist",
+            "Fixed Share Lyrics messages not following app language",
+            "Fixed lyrics background text colours over some covers",
+            "Fixed lyrics background gradients showing a green band",
+            "Fixed saved gradient text colours coming back wrong",
+            "Fixed damaged saved colours breaking the artwork background",
+            "Fixed Visualizer frozen when Exclusive Mode is off",
+            "Fixed auto-update never installing on time",
+            "Fixed auto-update crashing on two-part version tags",
+            "Fixed TTML lines with the same start time being shuffled",
+            "Fixed TTML line breaks and indentation showing up in lyrics",
+            "Fixed TTML files with a stray blank line showing no lyrics",
+            "Fixed \"Your queue is empty\" showing while a song plays",
+            "Fixed played songs not being removable from the queue",
+            "Fixed double-clicking Up Next restarting the queue",
+            "Fixed Liquid Glass letting page text show through the island",
+            "Fixed embedded lyrics fields being ignored",
+            "Fixed saving tags turning timed lyrics into plain text",
+            "Fixed Edit Info creating a stray lrc file",
+            "Fixed shortcut conflicts running two actions on one key",
+            "Fixed phone app sort button staying lit",
+            "Fixed phone app stop sending needing two taps",
+            "Fixed phone app send summary being overwritten"
+          ]
+        }
+      ],
+      "summary": null
+    },
+    {
       "tag": "v1.6.2",
       "version": "1.6.2",
       "name": "v1.6.2",
@@ -3461,6 +3553,6 @@
       "summary": "Initial Release"
     }
   ],
-  "updatedAt": "2026-10-11T22:59:28.936Z",
+  "updatedAt": "2026-10-12T22:04:11.729Z",
   "degraded": false
 }
