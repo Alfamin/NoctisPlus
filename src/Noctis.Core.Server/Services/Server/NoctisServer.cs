@@ -669,15 +669,18 @@ public sealed partial class NoctisServer : IAsyncDisposable
             }
             case "getgenres":
             {
-                var genres = snap.Tracks.Where(t => !string.IsNullOrWhiteSpace(t.Genre)).GroupBy(t => t.Genre, StringComparer.OrdinalIgnoreCase)
+                // One entry per single genre: a "Rock; Pop" song counts under Rock and Pop, not
+                // as a third "Rock; Pop" genre (GitHub #136; the desktop splits the same way).
+                var genres = snap.Tracks.SelectMany(t => Track.SplitGenres(t.Genre), (t, g) => (Track: t, Genre: g))
+                    .GroupBy(x => x.Genre, StringComparer.OrdinalIgnoreCase)
                     .OrderBy(g => g.Key, StringComparer.OrdinalIgnoreCase)
-                    .Select(g => new JsonObject { ["value"] = g.Key, ["songCount"] = g.Count(), ["albumCount"] = g.Select(t => t.AlbumId).Distinct().Count() });
+                    .Select(g => new JsonObject { ["value"] = g.Key, ["songCount"] = g.Count(), ["albumCount"] = g.Select(x => x.Track.AlbumId).Distinct().Count() });
                 return new JsonObject { ["genres"] = new JsonObject { ["genre"] = new JsonArray(genres.ToArray()) } };
             }
             case "getsongsbygenre":
             {
                 var genre = p.Get("genre") ?? throw Missing("genre");
-                var songs = snap.Tracks.Where(t => string.Equals(t.Genre, genre, StringComparison.OrdinalIgnoreCase))
+                var songs = snap.Tracks.Where(t => LibraryView.HasGenre(t.Genre, genre))
                     .Skip(Math.Max(0, p.Int("offset", 0))).Take(Math.Clamp(p.Int("count", 10), 1, 500));
                 return new JsonObject { ["songsByGenre"] = new JsonObject { ["song"] = new JsonArray(songs.Select(view.SongObject).ToArray()) } };
             }
@@ -1248,6 +1251,13 @@ internal sealed class LibraryView
 
     // ── Lists & search ──
 
+    /// <summary>True when a stored genre value ("Rock; Pop") holds <paramref name="genre"/>, as
+    /// getGenres lists it, or is that exact value (a client that kept the old combined name).</summary>
+    public static bool HasGenre(string? value, string? genre)
+        => !string.IsNullOrWhiteSpace(genre)
+           && (string.Equals(value?.Trim(), genre.Trim(), StringComparison.OrdinalIgnoreCase)
+               || Track.SharesGenre(new[] { genre.Trim() }, value));
+
     public IEnumerable<Album> AlbumList(string type, string? genre, int fromYear, int toYear)
     {
         IEnumerable<Album> all = _s.Albums;
@@ -1262,8 +1272,7 @@ internal sealed class LibraryView
             "byyear" => (fromYear <= toYear
                     ? all.Where(a => a.Year >= fromYear && a.Year <= toYear).OrderBy(a => a.Year)
                     : all.Where(a => a.Year >= toYear && a.Year <= fromYear).OrderByDescending(a => a.Year)),
-            "bygenre" => all.Where(a => string.Equals(a.Genre, genre, StringComparison.OrdinalIgnoreCase)
-                                     || _tracksByAlbum[a.Id].Any(t => string.Equals(t.Genre, genre, StringComparison.OrdinalIgnoreCase))),
+            "bygenre" => all.Where(a => HasGenre(a.Genre, genre) || _tracksByAlbum[a.Id].Any(t => HasGenre(t.Genre, genre))),
             "highest" => all.OrderByDescending(a => _tracksByAlbum[a.Id].Select(t => t.Rating).DefaultIfEmpty(0).Average()),
             _ => all.OrderBy(a => a.Name, StringComparer.OrdinalIgnoreCase), // alphabeticalByName
         };

@@ -44,13 +44,13 @@ public class NoctisServerTests : IAsyncLifetime
 
         var t1 = new Track { Id = Guid.NewGuid(), Title = "Alpha", Artist = "The Xylophones", AlbumArtist = "The Xylophones", Album = "First", AlbumId = AlbumA, FilePath = audio, Duration = TimeSpan.FromSeconds(200), TrackNumber = 1, Year = 2001, Genre = "Rock", FileSize = 5000, Bitrate = 320 };
         var t2 = new Track { Id = Guid.NewGuid(), Title = "Beta", Artist = "The Xylophones", AlbumArtist = "The Xylophones", Album = "First", AlbumId = AlbumA, FilePath = audio, Duration = TimeSpan.FromSeconds(100), TrackNumber = 2, Year = 2001, Genre = "Rock", FileSize = 5000 };
-        var t3 = new Track { Id = Guid.NewGuid(), Title = "Gamma", Artist = "Yolanda", AlbumArtist = "Yolanda", Album = "Second", AlbumId = AlbumB, FilePath = audio, Duration = TimeSpan.FromSeconds(50), TrackNumber = 1, Year = 2010, Genre = "Jazz", FileSize = 5000, IsFavorite = true };
+        var t3 = new Track { Id = Guid.NewGuid(), Title = "Gamma", Artist = "Yolanda", AlbumArtist = "Yolanda", Album = "Second", AlbumId = AlbumB, FilePath = audio, Duration = TimeSpan.FromSeconds(50), TrackNumber = 1, Year = 2010, Genre = "Jazz; Rock", FileSize = 5000, IsFavorite = true };
         _lib = new FakeServerLibrary(
             new[] { t1, t2, t3 },
             new[]
             {
                 new Album { Id = AlbumA, Name = "First", Artist = "The Xylophones", Year = 2001, Genre = "Rock", TrackCount = 2 },
-                new Album { Id = AlbumB, Name = "Second", Artist = "Yolanda", Year = 2010, Genre = "Jazz", TrackCount = 1 },
+                new Album { Id = AlbumB, Name = "Second", Artist = "Yolanda", Year = 2010, Genre = "Jazz; Rock", TrackCount = 1 },
             },
             new[] { new Artist { Id = ArtistX, Name = "The Xylophones", AlbumCount = 1 }, new Artist { Id = ArtistY, Name = "Yolanda", AlbumCount = 1 } },
             new List<Playlist> { new() { Name = "Mix", TrackIds = { t1.Id, t3.Id } } },
@@ -167,6 +167,28 @@ public class NoctisServerTests : IAsyncLifetime
         var starred = await Get("getStarred2");
         Assert.Equal("Gamma", starred.GetProperty("starred2").GetProperty("song")[0].GetProperty("title").GetString());
         Assert.Equal("Second", starred.GetProperty("starred2").GetProperty("album")[0].GetProperty("name").GetString()); // all its tracks are starred
+    }
+
+    /// <summary>GitHub #136: Gamma is tagged "Jazz; Rock". It counts under Jazz and Rock, not
+    /// as a third "Jazz; Rock" genre, and browsing either genre finds it.</summary>
+    [Fact]
+    public async Task MultiGenreSong_IsListedAndBrowsedUnderEachGenre()
+    {
+        var genres = (await Get("getGenres")).GetProperty("genres").GetProperty("genre").EnumerateArray()
+            .ToDictionary(g => g.GetProperty("value").GetString()!, g => (Songs: g.GetProperty("songCount").GetInt32(), Albums: g.GetProperty("albumCount").GetInt32()));
+        Assert.Equal(new[] { "Jazz", "Rock" }, genres.Keys.ToArray());
+        Assert.Equal((1, 1), genres["Jazz"]);
+        Assert.Equal((3, 2), genres["Rock"]);
+
+        async Task<string[]> SongsIn(string genre) => (await Get("getSongsByGenre", $"genre={Uri.EscapeDataString(genre)}&count=50"))
+            .GetProperty("songsByGenre").GetProperty("song").EnumerateArray().Select(s => s.GetProperty("title").GetString()!).OrderBy(s => s).ToArray();
+        Assert.Equal(new[] { "Alpha", "Beta", "Gamma" }, await SongsIn("rock"));
+        Assert.Equal(new[] { "Gamma" }, await SongsIn("Jazz"));
+        Assert.Equal(new[] { "Gamma" }, await SongsIn("Jazz; Rock")); // a client holding the old combined name
+
+        var byGenre = await Get("getAlbumList2", "type=byGenre&genre=Rock&size=50");
+        Assert.Equal(new[] { "First", "Second" }, byGenre.GetProperty("albumList2").GetProperty("album").EnumerateArray()
+            .Select(a => a.GetProperty("name").GetString()!).OrderBy(n => n).ToArray());
     }
 
     [Fact]
