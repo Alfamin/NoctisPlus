@@ -197,8 +197,10 @@ public partial class App : Application
             var analysisCoordinator = Services!.GetRequiredService<Noctis.Services.AudioAnalysis.AudioAnalysisCoordinator>();
             var library = Services!.GetRequiredService<ILibraryService>();
             library.LibraryUpdated += (_, _) => analysisCoordinator.StartBackfill();
-            // No-op on Windows (the output chain taps the meters); elsewhere this is the
-            // only thing that makes the visualizer / beat-reactive backdrops move.
+            // Feeds the visualizer / beat-reactive backdrops whenever the output does not
+            // tap the meters itself (LibVLC's own output: macOS, and Windows/Linux shared
+            // mode without the gapless engine); stands aside while the engine or the
+            // exclusive sink does.
             var sideFeed = Services!.GetRequiredService<Noctis.Services.AudioAnalysis.SideDecodeMeterFeed>();
             sideFeed.Start();
 

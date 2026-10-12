@@ -9,19 +9,24 @@ namespace Noctis.Services.AudioAnalysis;
 
 /// <summary>
 /// Feeds <see cref="SpectrumMeter"/> and <see cref="BeatMeter"/> from a SIDE decode
-/// of the playing track, for the platforms where the render chain never sees PCM.
+/// of the playing track, whenever the output path never shows PCM to managed code.
 ///
-/// On Windows the meters are fed by <see cref="BeatTapProvider"/> inside the NAudio
-/// output chain (gapless engine / WASAPI sink). On Linux and macOS LibVLC plays
-/// straight to the device — no amem callbacks, no managed chain — so nothing ever
-/// called <c>Feed</c> and the visualizer, the EQ bars, Kawarp's beat pulse and the
-/// plugin audio API all sat at rest (Discord: "a row of dots doing nothing" on the
-/// Flatpak build). This decodes the same file through ffmpeg (already bundled for
-/// the converter / BPM analysis) and pushes samples a little ahead of the player's
-/// clock, so the meters' own latency alignment lands the picture on the ear.
+/// The gapless engine, the exclusive-mode sink and the experimental WASAPI sink feed
+/// the meters from <see cref="BeatTapProvider"/> inside their NAudio chain
+/// (<see cref="IAudioPlayer.OutputTapsMeters"/>). Every other path is LibVLC playing
+/// straight to the device — no amem callbacks, no managed chain — so nothing called
+/// <c>Feed</c> and the visualizer, the EQ bars, Kawarp's beat pulse and the plugin
+/// audio API all sat at rest: macOS always, Linux without the engine (Discord: "a row
+/// of dots doing nothing" on the Flatpak build), and Windows shared mode once an
+/// Exclusive Mode toggle retired the engine for the session (Discord, 1.6.2: "Exclusive
+/// OFF = dead Visualizer"). This decodes the same file through ffmpeg (already bundled
+/// for the converter / BPM analysis) and pushes samples a little ahead of the player's
+/// clock, so the meters' own latency alignment lands the picture on the ear. It stands
+/// aside, tick by tick, while the output taps the meters itself: two writers on the
+/// meters' single-writer rings would interleave two streams into one window.
 ///
 /// The pure media-time logic lives in <see cref="SideDecodeFeedCore"/> (unit-tested);
-/// this class only owns the thread, the player polling and the ffmpeg process.
+/// this class owns the thread, the player polling and the ffmpeg process.
 /// </summary>
 public sealed class SideDecodeMeterFeed : IDisposable
 {
@@ -32,30 +37,59 @@ public sealed class SideDecodeMeterFeed : IDisposable
     private const int TickMs = 20;
 
     private readonly IAudioPlayer _player;
-    private readonly IAudioConverterService _ffmpeg;
+    private readonly Func<string?> _ffmpegPath;
+    private readonly Func<string, string, long, Stream?> _openPipe;
+    private readonly Func<double> _nowMs;
+    private readonly string? _env;
     private readonly LyricsPlaybackClock _clock = new();
+    private readonly SideDecodeFeedCore _core;
     private Thread? _thread;
     private volatile bool _stop;
     private bool _loggedMissingFfmpeg;
 
+    // Tick state (feed thread only).
+    private string? _mediaPath;
+    private string? _ffmpegExe;
+    private bool _isLocalFile;
+    private bool? _feeding; // last ShouldFeed verdict, for the transition log
+
     public SideDecodeMeterFeed(IAudioPlayer player, IAudioConverterService ffmpeg)
+        : this(player, ffmpeg.GetFfmpegPath, (exe, path, frame) => FfmpegPcmPipe.Open(exe, path, frame, SampleRate),
+            SpectrumMeter.Shared, BeatMeter.Shared, Environment.GetEnvironmentVariable("NOCTIS_SIDE_FEED"), null)
+    {
+    }
+
+    /// <summary>Test seam: ffmpeg lookup, pipe, meters, env value and clock injected.</summary>
+    internal SideDecodeMeterFeed(IAudioPlayer player, Func<string?> ffmpegPath,
+        Func<string, string, long, Stream?> openPipe, SpectrumMeter spectrum, BeatMeter beat,
+        string? env, Func<double>? nowMs)
     {
         _player = player;
-        _ffmpeg = ffmpeg;
+        _ffmpegPath = ffmpegPath;
+        _openPipe = openPipe;
+        _env = env;
+        _nowMs = nowMs ?? (static () => Stopwatch.GetElapsedTime(0).TotalMilliseconds);
+        _core = new SideDecodeFeedCore(OpenAt, SampleRate, spectrum, beat);
     }
 
     /// <summary>
-    /// Windows has the render-chain tap, so the side feed would double-write the
-    /// meters there; <c>NOCTIS_SIDE_FEED=1</c> forces it on for development (pair it
-    /// with <c>NOCTIS_GAPLESS_ENGINE=0</c>) and <c>=0</c> is the escape hatch elsewhere.
+    /// Whether the feed thread exists at all: <c>NOCTIS_SIDE_FEED=0</c> is the escape hatch.
+    /// Every platform runs it otherwise; <see cref="ShouldFeed"/> decides per tick.
     /// </summary>
-    public static bool ShouldRun(bool isWindows, string? env)
-        => env == "1" || (!isWindows && env != "0");
+    public static bool ShouldRun(string? env) => env != "0";
+
+    /// <summary>
+    /// Per tick: feed only while the output does not tap the meters itself, so they never
+    /// get two writers. <c>NOCTIS_SIDE_FEED=1</c> forces the feed on for development (pair
+    /// it with <c>NOCTIS_GAPLESS_ENGINE=0</c>); <c>=0</c> never feeds.
+    /// </summary>
+    public static bool ShouldFeed(string? env, bool outputTapsMeters)
+        => env == "1" || (env != "0" && !outputTapsMeters);
 
     public void Start()
     {
         if (_thread != null) return;
-        if (!ShouldRun(OperatingSystem.IsWindows(), Environment.GetEnvironmentVariable("NOCTIS_SIDE_FEED")))
+        if (!ShouldRun(_env))
             return;
         _thread = new Thread(Loop) { IsBackground = true, Name = "side-decode-feed" };
         _thread.Start();
@@ -64,46 +98,13 @@ public sealed class SideDecodeMeterFeed : IDisposable
 
     private void Loop()
     {
-        string? mediaPath = null;
-        string? ffmpegPath = null;
-        var isLocalFile = false;
-        var core = new SideDecodeFeedCore(OpenAt, SampleRate, SpectrumMeter.Shared, BeatMeter.Shared);
         try
         {
             while (!_stop)
             {
                 try
                 {
-                    var path = _player.CurrentMediaPath;
-                    if (!string.Equals(path, mediaPath, StringComparison.Ordinal))
-                    {
-                        mediaPath = path;
-                        core.Reset();
-                        _clock.Reset();
-                        // Streams / audio CDs have no file for ffmpeg to open.
-                        isLocalFile = path != null && File.Exists(path);
-                        // Re-resolve per track so a path set later in Settings is picked up.
-                        ffmpegPath = _ffmpeg.GetFfmpegPath();
-                        if (ffmpegPath == null && !_loggedMissingFfmpeg)
-                        {
-                            _loggedMissingFfmpeg = true;
-                            DebugLogger.Warn(DebugLogger.Category.Playback, "SideDecodeFeed.NoFfmpeg",
-                                "visualizer feed needs ffmpeg (Settings → Advanced → Helper programs)");
-                        }
-                    }
-
-                    if (_player.State == PlaybackState.Playing && isLocalFile && ffmpegPath != null)
-                    {
-                        var raw = _player.Position.TotalMilliseconds;
-                        var now = Stopwatch.GetElapsedTime(0).TotalMilliseconds;
-                        var heard = _clock.Sample(raw, now) - _player.OutputLatency.TotalMilliseconds;
-                        core.Advance(Math.Max(0, heard));
-                    }
-                    else
-                    {
-                        // Paused/stopped: no feed, the meters go non-live and the bars rest.
-                        _clock.Reset();
-                    }
+                    Tick();
                 }
                 catch (Exception ex)
                 {
@@ -114,23 +115,75 @@ public sealed class SideDecodeMeterFeed : IDisposable
         }
         finally
         {
-            core.Reset();
+            _core.Reset();
+        }
+    }
+
+    /// <summary>One poll of the player: feed the meters up to the heard position, or stand aside.</summary>
+    internal void Tick()
+    {
+        var feeding = ShouldFeed(_env, _player.OutputTapsMeters);
+        if (feeding != _feeding)
+        {
+            _feeding = feeding;
+            DebugLogger.Info(DebugLogger.Category.Playback, "SideDecodeFeed.Active",
+                $"feeding={feeding}, outputTapsMeters={!feeding}");
+        }
+        if (!feeding)
+        {
+            // The output's own tap owns the meters. Drop the decode and forget the track,
+            // so taking over later (exclusive toggled off mid-track) reopens at the heard spot.
+            _core.Reset();
+            _clock.Reset();
+            _mediaPath = null;
+            _isLocalFile = false;
+            return;
         }
 
-        Stream? OpenAt(long startFrame)
+        var path = _player.CurrentMediaPath;
+        if (!string.Equals(path, _mediaPath, StringComparison.Ordinal))
         {
-            var exe = ffmpegPath;
-            var path = mediaPath;
-            if (exe == null || path == null) return null;
-            try
+            _mediaPath = path;
+            _core.Reset();
+            _clock.Reset();
+            // Streams / audio CDs have no file for ffmpeg to open.
+            _isLocalFile = path != null && File.Exists(path);
+            // Re-resolve per track so a path set later in Settings is picked up.
+            _ffmpegExe = _ffmpegPath();
+            if (_ffmpegExe == null && !_loggedMissingFfmpeg)
             {
-                return FfmpegPcmPipe.Open(exe, path, startFrame, SampleRate);
+                _loggedMissingFfmpeg = true;
+                DebugLogger.Warn(DebugLogger.Category.Playback, "SideDecodeFeed.NoFfmpeg",
+                    "visualizer feed needs ffmpeg (Settings → Advanced → Helper programs)");
             }
-            catch (Exception ex)
-            {
-                DebugLogger.Warn(DebugLogger.Category.Playback, "SideDecodeFeed.OpenFailed", ex.Message);
-                return null;
-            }
+        }
+
+        if (_player.State == PlaybackState.Playing && _isLocalFile && _ffmpegExe != null)
+        {
+            var raw = _player.Position.TotalMilliseconds;
+            var heard = _clock.Sample(raw, _nowMs()) - _player.OutputLatency.TotalMilliseconds;
+            _core.Advance(Math.Max(0, heard));
+        }
+        else
+        {
+            // Paused/stopped: no feed, the meters go non-live and the bars rest.
+            _clock.Reset();
+        }
+    }
+
+    private Stream? OpenAt(long startFrame)
+    {
+        var exe = _ffmpegExe;
+        var path = _mediaPath;
+        if (exe == null || path == null) return null;
+        try
+        {
+            return _openPipe(exe, path, startFrame);
+        }
+        catch (Exception ex)
+        {
+            DebugLogger.Warn(DebugLogger.Category.Playback, "SideDecodeFeed.OpenFailed", ex.Message);
+            return null;
         }
     }
 
