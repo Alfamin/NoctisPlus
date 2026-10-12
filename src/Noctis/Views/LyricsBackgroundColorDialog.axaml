@@ -51,8 +51,11 @@
             <Setter Property="Background" Value="{DynamicResource PillFieldBackgroundPointerOver}" />
         </Style>
 
-        <!-- Swatch: a 34px dot in a 44px cell. The ring around it shows the current choice
-             in the accent colour, and a faint one on hover. Names come up as the tooltip. -->
+        <!-- Swatch: a 32px dot in a 44px cell. The ring around it shows the current choice
+             in the accent colour, and a faint one on hover. Names come up as the tooltip.
+             The ring sits 2px inside the swatch: drawn on its edge, a grid row (exactly the
+             swatch's height) clipped its soft edge flat at the top and bottom on a scaled
+             display. -->
         <Style Selector="Button.lc-swatch" x:DataType="vm:ColorSwatch">
             <Setter Property="Width" Value="44" />
             <Setter Property="Height" Value="44" />
@@ -64,7 +67,7 @@
             <Setter Property="Template">
                 <ControlTemplate>
                     <Panel Background="Transparent">
-                        <Ellipse x:Name="Ring" StrokeThickness="2" Stroke="Transparent" />
+                        <Ellipse x:Name="Ring" StrokeThickness="2" Stroke="Transparent" Margin="2" />
                         <ContentPresenter Content="{TemplateBinding Content}"
                                           HorizontalAlignment="Center"
                                           VerticalAlignment="Center" />
@@ -86,8 +89,8 @@
         <!-- The dot: its own colour, with a hairline so pale swatches stay visible on the
              Light theme's white card. -->
         <Style Selector="Ellipse.lc-dot">
-            <Setter Property="Width" Value="34" />
-            <Setter Property="Height" Value="34" />
+            <Setter Property="Width" Value="32" />
+            <Setter Property="Height" Value="32" />
             <Setter Property="StrokeThickness" Value="1" />
             <Setter Property="Stroke" Value="{DynamicResource SystemControlForegroundBaseLowBrush}" />
         </Style>

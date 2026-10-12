@@ -359,6 +359,48 @@ public class LyricsBackgroundColorDialogTests : IDisposable
     // ── Shots ──
 
     /// <summary>
+    /// Bug (owner screenshots 10-12): the hover and selected rings looked cut flat at the top
+    /// and bottom. The ring was drawn right at the edge of its 44 px swatch, and a grid row is
+    /// exactly that tall, so at a scaled display its soft outer edge fell outside the row and
+    /// was clipped (the columns are wider, so the sides stayed round). The ring now sits
+    /// inside the swatch with room on every side, in both grids.
+    /// </summary>
+    [AvaloniaFact]
+    public void SwatchRings_SitInsideTheSwatch_WithRoomOnEverySide()
+    {
+        EnsureAppStyles();
+        var (vm, _, _) = MakeViewModel();
+        var (owner, _) = ShowPage(vm);
+        try
+        {
+            var dialog = OpenFromMenu(vm, owner);
+            foreach (var (mode, grid) in new (Action, string)[]
+                     {
+                         (() => vm.SelectColorModeSolidCommand.Execute(null), "SolidGrid"),
+                         (() => vm.SelectColorModeGradientCommand.Execute(null), "GradientGrid"),
+                     })
+            {
+                mode();
+                Assert.True(PumpUntil(() => Named<ItemsControl>(dialog, grid).IsEffectivelyVisible));
+                foreach (var swatch in Swatches(dialog, grid))
+                {
+                    var ring = swatch.GetVisualDescendants().OfType<Avalonia.Controls.Shapes.Ellipse>().Single(e => e.Name == "Ring");
+                    var dot = swatch.GetVisualDescendants().OfType<Avalonia.Controls.Shapes.Ellipse>().Single(e => e.Classes.Contains("lc-dot"));
+                    var r = ring.Bounds;
+                    Assert.True(r.X >= 2 && r.Y >= 2 && r.Right <= swatch.Bounds.Width - 2 && r.Bottom <= swatch.Bounds.Height - 2,
+                        $"{grid}: ring {r} touches the edge of its {swatch.Bounds.Size} swatch");
+                    // And the dot still fits inside the ring with a gap.
+                    Assert.True(dot.Bounds.Width + 2 * ring.StrokeThickness + 2 <= r.Width,
+                        $"{grid}: dot {dot.Bounds.Width} doesn't fit inside ring {r.Width}");
+                }
+            }
+            dialog.Close();
+            PumpUntil(() => !dialog.IsVisible);
+        }
+        finally { owner.Close(); }
+    }
+
+    /// <summary>
     /// Renders the page with the pop-up open under Skia, one PNG per mode (and Solid on the
     /// Light theme). Explicit only: NOCTIS_TEST_SKIA=1 and NOCTIS_LYRICS_BG_SHOTS names the
     /// file prefix; NOCTIS_LYRICS_BG_SHOTS_DIR overrides the output folder.
