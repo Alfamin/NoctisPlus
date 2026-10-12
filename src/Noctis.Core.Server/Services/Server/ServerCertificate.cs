@@ -46,8 +46,10 @@ public static class ServerCertificate
                 var cert = X509CertificateLoader.LoadPkcs12FromFile(pfx, current, KeyFlags);
                 if (cert.NotAfter > DateTime.UtcNow.AddDays(30) && cert.HasPrivateKey)
                 {
-                    var protectedPassword = PersistenceService.ProtectSecret(current);
-                    if (protectedPassword != stored) WriteKeyFile(keyFile, protectedPassword);
+                    // Only a plain-text file is rewritten: DPAPI output differs on every call,
+                    // so comparing a fresh blob with the stored one rewrote it on every start.
+                    if (current == stored && PersistenceService.ProtectSecret(current) is var protectedPassword && protectedPassword != stored)
+                        WriteKeyFile(keyFile, protectedPassword);
                     return cert;
                 }
                 cert.Dispose();

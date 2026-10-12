@@ -377,6 +377,12 @@ public class NoctisServerTests : IAsyncLifetime
         Assert.NotEqual(password, File.ReadAllText(Path.Combine(legacy, ServerCertificate.KeyFileName)).Trim());
         using var again = ServerCertificate.LoadOrCreate(legacy);
         Assert.Equal(legacyFp, ServerCertificate.Fingerprint(again));
+
+        // Protected once, then left alone: DPAPI output differs on every call, so comparing a
+        // fresh blob with the stored one rewrote the file on every server start.
+        var once = File.ReadAllText(Path.Combine(legacy, ServerCertificate.KeyFileName));
+        using var third = ServerCertificate.LoadOrCreate(legacy);
+        Assert.Equal(once, File.ReadAllText(Path.Combine(legacy, ServerCertificate.KeyFileName)));
     }
 
     [Fact]
