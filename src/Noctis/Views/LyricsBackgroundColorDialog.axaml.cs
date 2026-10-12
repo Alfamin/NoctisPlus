@@ -1,7 +1,12 @@
 using Avalonia;
+using Avalonia.Animation;
 using Avalonia.Controls;
+using Avalonia.Controls.Primitives;
 using Avalonia.Input;
 using Avalonia.Interactivity;
+using Avalonia.Media.Transformation;
+using Avalonia.Threading;
+using Noctis.Helpers;
 
 namespace Noctis.Views;
 
@@ -14,12 +19,77 @@ namespace Noctis.Views;
 /// </summary>
 public partial class LyricsBackgroundColorDialog : Window
 {
+    // Switching modes: the shared pill slides to the chosen label and that mode's choices
+    // fade in, rising a few pixels. Ease-out-quint, as the queue toast settles.
+    private static readonly Avalonia.Animation.Easings.Easing Settle = new CubicBezierEase(0.22, 1, 0.36, 1);
+    private static readonly TimeSpan SlideDuration = TimeSpan.FromMilliseconds(260);
+    private static readonly TimeSpan FadeDuration = TimeSpan.FromMilliseconds(200);
+    private const double FadeRise = 8;
+
     public LyricsBackgroundColorDialog()
     {
         InitializeComponent();
         // On the window, not the host: outside the card the host draws nothing hit-testable,
         // so a press there reaches the window alone (as in SongsViewOptionsDialog).
         AddHandler(PointerPressedEvent, OnBackdropPointerPressed, RoutingStrategies.Tunnel);
+
+        SegmentGrid.SizeChanged += (_, _) => PlaceIndicator(animate: false);
+        foreach (var segment in Segments)
+            segment.PropertyChanged += (_, e) =>
+            {
+                if (e.Property == ToggleButton.IsCheckedProperty && e.NewValue is true) PlaceIndicator(animate: IsLoaded);
+            };
+        foreach (var panel in new Control[] { ArtworkPanel, SolidPanel, GradientPanel })
+            panel.PropertyChanged += (_, e) =>
+            {
+                if (e.Property == IsVisibleProperty && e.NewValue is true && IsLoaded) FadeIn(panel);
+            };
+    }
+
+    private RadioButton[] Segments => new[] { ArtworkSegment, SolidSegment, GradientSegment };
+
+    /// <summary>Puts the shared pill on the checked label's laid-out box (thirds round to
+    /// whole pixels): in place at first, sliding after.</summary>
+    private void PlaceIndicator(bool animate)
+    {
+        var checkedSegment = Array.Find(Segments, s => s.IsChecked == true);
+        SegIndicator.IsVisible = checkedSegment is not null;
+        if (checkedSegment is not { Bounds: { Width: > 0 } cell }) return;
+        SegIndicator.Width = cell.Width;
+        SegIndicator.Height = cell.Height;
+        SegIndicator.Transitions = animate
+            ? new Transitions { new TransformOperationsTransition { Property = RenderTransformProperty, Duration = SlideDuration, Easing = Settle } }
+            : null;
+        SegIndicator.RenderTransform = Translate(cell.X, cell.Y);
+    }
+
+    /// <summary>
+    /// Fades a mode's choices in. Two steps: the start (clear, a little low) with no
+    /// transitions, then the end once they are on (a code-built Animation can't drive
+    /// RenderTransform here; a transition can).
+    /// </summary>
+    private static void FadeIn(Control panel)
+    {
+        panel.Transitions = null;
+        panel.Opacity = 0;
+        panel.RenderTransform = Translate(0, FadeRise);
+        Dispatcher.UIThread.Post(() =>
+        {
+            panel.Transitions = new Transitions
+            {
+                new DoubleTransition { Property = OpacityProperty, Duration = FadeDuration, Easing = Settle },
+                new TransformOperationsTransition { Property = RenderTransformProperty, Duration = FadeDuration, Easing = Settle },
+            };
+            panel.Opacity = 1;
+            panel.RenderTransform = Translate(0, 0);
+        });
+    }
+
+    private static TransformOperations Translate(double x, double y)
+    {
+        var builder = TransformOperations.CreateBuilder(1);
+        builder.AppendTranslate(x, y);
+        return builder.Build();
     }
 
     protected override void OnKeyDown(KeyEventArgs e)

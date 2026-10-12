@@ -22,7 +22,8 @@
         </Style>
 
         <!-- Segmented pill: View Options' Ascending / Descending recipe (vo-seg), three
-             equal parts. The chosen one is a brighter filled pill at full strength. -->
+             equal parts. The chosen one is at full strength over one shared filled pill
+             (SegIndicator) that slides to it; the labels fade between strengths. -->
         <Style Selector="RadioButton.lc-seg">
             <Setter Property="MinHeight" Value="34" />
             <Setter Property="HorizontalAlignment" Value="Stretch" />
@@ -31,6 +32,11 @@
             <Setter Property="Cursor" Value="Hand" />
             <Setter Property="Background" Value="Transparent" />
             <Setter Property="Opacity" Value="0.6" />
+            <Setter Property="Transitions">
+                <Transitions>
+                    <DoubleTransition Property="Opacity" Duration="0:0:0.18" />
+                </Transitions>
+            </Setter>
             <Setter Property="Template">
                 <ControlTemplate>
                     <Border Background="{TemplateBinding Background}" CornerRadius="999">
@@ -48,7 +54,6 @@
         </Style>
         <Style Selector="RadioButton.lc-seg:checked">
             <Setter Property="Opacity" Value="1" />
-            <Setter Property="Background" Value="{DynamicResource PillFieldBackgroundPointerOver}" />
         </Style>
 
         <!-- Swatch: a 32px dot in a 44px cell. The ring around it shows the current choice
@@ -132,7 +137,10 @@
 
                 <!-- 1. The mode. Each one runs the command the old pill buttons ran. -->
                 <Border Classes="pill-well" CornerRadius="999" Padding="5">
-                    <UniformGrid Columns="3">
+                    <Panel>
+                    <Border x:Name="SegIndicator" CornerRadius="999" HorizontalAlignment="Left" IsHitTestVisible="False"
+                            Background="{DynamicResource PillFieldBackgroundPointerOver}" />
+                    <UniformGrid x:Name="SegmentGrid" Columns="3">
                         <RadioButton x:Name="ArtworkSegment" Classes="lc-seg" GroupName="LyricsColorMode"
                                      Content="{loc:T Lyrics.Artwork}"
                                      ToolTip.Tip="{loc:T Lyrics.ShowBlurredAlbumArtworkTip}"
@@ -147,6 +155,7 @@
                                      IsChecked="{Binding IsColorModeGradient, Mode=OneWay}"
                                      Command="{Binding SelectColorModeGradientCommand}" />
                     </UniformGrid>
+                    </Panel>
                 </Border>
 
                 <!-- 2. Only the chosen mode's choices. One height for all three, so the card

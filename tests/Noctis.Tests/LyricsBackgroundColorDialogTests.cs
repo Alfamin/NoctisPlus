@@ -359,6 +359,46 @@ public class LyricsBackgroundColorDialogTests : IDisposable
     // ── Shots ──
 
     /// <summary>
+    /// Switching Artwork / Solid / Gradient animates (owner 10-12): one pill behind the three
+    /// labels slides to the chosen one, and the chosen mode's choices fade in instead of
+    /// popping. The first open shows everything in place, with no animation.
+    /// </summary>
+    [AvaloniaFact]
+    public void SwitchingModes_SlidesThePill_AndFadesTheChoicesIn()
+    {
+        EnsureAppStyles();
+        var (vm, _, _) = MakeViewModel();
+        var (owner, _) = ShowPage(vm);
+        try
+        {
+            var dialog = OpenFromMenu(vm, owner);
+            var pill = Named<Border>(dialog, "SegIndicator");
+            double PillX() => pill.RenderTransform?.Value.M31 ?? 0;
+            double XOf(string segment) => Named<RadioButton>(dialog, segment).Bounds.X;
+            Assert.Equal(Named<RadioButton>(dialog, "ArtworkSegment").Bounds.Width, pill.Bounds.Width);
+            Assert.Equal(XOf("ArtworkSegment"), PillX());                      // on Artwork, in place
+            Assert.Equal(1, Named<Border>(dialog, "ArtworkPanel").Opacity);   // no fade on open
+
+            vm.SelectColorModeGradientCommand.Execute(null);
+            var gradient = Named<StackPanel>(dialog, "GradientPanel");
+            Assert.True(PumpUntil(() => gradient.IsEffectivelyVisible));
+            Pump(30);
+            Assert.True(PillX() > XOf("ArtworkSegment") && PillX() < XOf("GradientSegment") - 1, $"the pill jumped to {PillX()} instead of sliding");
+            Assert.True(gradient.Opacity < 1, "the Gradient choices popped in");
+
+            Assert.True(PumpUntil(() => Math.Abs(PillX() - XOf("GradientSegment")) < 0.5 && gradient.Opacity >= 0.999, 1500),
+                $"the pill settled at {PillX()} (want {XOf("GradientSegment")}), opacity {gradient.Opacity}");
+
+            vm.SelectColorModeSolidCommand.Execute(null);
+            Assert.True(PumpUntil(() => Math.Abs(PillX() - XOf("SolidSegment")) < 0.5
+                                        && Named<StackPanel>(dialog, "SolidPanel").Opacity >= 0.999, 1500));
+            dialog.Close();
+            PumpUntil(() => !dialog.IsVisible);
+        }
+        finally { owner.Close(); }
+    }
+
+    /// <summary>
     /// Bug (owner screenshots 10-12): the hover and selected rings looked cut flat at the top
     /// and bottom. The ring was drawn right at the edge of its 44 px swatch, and a grid row is
     /// exactly that tall, so at a scaled display its soft outer edge fell outside the row and
