@@ -94,6 +94,14 @@
             <Setter Property="Opacity" Value="1" />
         </Style>
 
+        <!-- The option lists open upward, into the card. Opened below, they hung under the
+             card from its foot (Background's: 233 px) and ran past the window's bottom edge,
+             cut off there: on Windows a list is its own popup bounded by the screen, not by
+             this dialog. Same template-part style as Lyrics Studio's ComboBox.open-up. -->
+        <Style Selector="ComboBox.pill-field /template/ Popup#PART_Popup">
+            <Setter Property="Placement" Value="TopEdgeAlignedLeft" />
+        </Style>
+
         <!-- Quiet pills fade when off instead of Fluent's grey box. -->
         <Style Selector="Button.pill-secondary:disabled /template/ ContentPresenter#PART_ContentPresenter">
             <Setter Property="Background" Value="{DynamicResource PillFieldBackground}" />

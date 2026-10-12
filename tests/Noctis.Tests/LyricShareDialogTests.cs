@@ -434,6 +434,50 @@ public class LyricShareDialogTests
         });
     }
 
+    /// <summary>
+    /// Bug (owner 10-12 screenshot): the option lists opened below their pills, which sit at
+    /// the card's foot, so the Background list (320 px) hung 233 px under the card, down to
+    /// the window's bottom edge, its last row cut off there; in a 910 px window it ran 98 px
+    /// past the edge. On Windows the list is its own popup window, bounded by the screen and
+    /// not by the dialog, so nothing pulled it back in: the constraint is switched off here
+    /// to place it the same way. Every list opens upward now, inside the card.
+    /// </summary>
+    [AvaloniaFact]
+    public void OptionLists_OpenUpward_InsideTheCard()
+    {
+        EnsureAppStyles();
+        var vm = new LyricShareViewModel(Song(), Enumerable.Range(0, 12).Select(i => $"line {i}").ToList(), 0);
+        var win = new Noctis.Views.LyricShareDialog(vm) { Width = 1154, Height = 910 };
+        win.Show();
+        try
+        {
+            var host = Avalonia.VisualTree.VisualExtensions.GetVisualDescendants(win).OfType<Noctis.Controls.PillDialogHost>().Single();
+            Assert.True(PumpUntil(() => host.Card is { Opacity: > 0.999 }), "open animation never settled");
+            var card = host.Card!;
+            var cardTop = card.TranslatePoint(default, win)!.Value.Y;
+            var cardBottom = cardTop + card.Bounds.Height;
+            foreach (var name in new[] { "LayoutBox", "FormatBox", "TextColorBox", "BackgroundBox" })
+            {
+                var box = Named<ComboBox>(win, name);
+                var popup = Avalonia.VisualTree.VisualExtensions.GetVisualDescendants(box)
+                    .OfType<Avalonia.Controls.Primitives.Popup>().Single(p => p.Name == "PART_Popup");
+                popup.PlacementConstraintAdjustment = Avalonia.Controls.Primitives.PopupPositioning.PopupPositionerConstraintAdjustment.None;
+                box.IsDropDownOpen = true;
+                Assert.True(PumpUntil(() => popup.IsOpen && popup.Child is Control { Bounds.Height: > 0 }), $"{name}: the list never opened");
+                var list = (Control)popup.Child!;
+                var top = list.TranslatePoint(default, win)!.Value.Y;
+                var bottom = top + list.Bounds.Height;
+                var boxTop = box.TranslatePoint(default, win)!.Value.Y;
+                // + 1.5: the list's edge sits a pixel over its pill, as Fluent places it.
+                Assert.True(top >= cardTop && bottom <= boxTop + 1.5,
+                    $"{name}: list at {top:0}..{bottom:0}, its pill at {boxTop:0}, the card {cardTop:0}..{cardBottom:0}, the window 0..910");
+                box.IsDropDownOpen = false;
+                PumpUntil(() => !popup.IsOpen, 1000);
+            }
+        }
+        finally { if (win.IsVisible) { win.Close(); PumpUntil(() => !win.IsVisible); } }
+    }
+
     /// <summary>Esc in a line's edit box puts the text back and keeps the dialog open.</summary>
     [AvaloniaFact]
     public void EscapeWhileEditing_RestoresTheLine_AndKeepsTheDialog()
