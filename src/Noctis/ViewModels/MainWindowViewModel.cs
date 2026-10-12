@@ -575,6 +575,8 @@ public partial class MainWindowViewModel : ViewModelBase
             && App.Services.GetService<IYouTubeMusicLyricsService>() is { } youTubeMusic)
             _lyricsVm.ExtraLyricsSources = Services.Lyrics.OnlineLyricsSource.BuiltIns(musixmatch, kugou, youTubeMusic);
         _lyricsVm.ShowLyricsSearchDialog = MetadataHelper.OpenLyricsSearchDialog;
+        // Lyrics saved inside audio files (GitHub #135) wait until the song is not playing.
+        _lyricsVm.TagWriter = App.Services?.GetService<IDeferredTagWriter>();
         // Lyrics offset nudges (Ctrl+wheel, GitHub #102) confirm in the notice pill, which
         // shows over both the lyrics page and the side panel.
         _lyricsVm.ShowNotice = text => TransientStatus.Show(nameof(PluginNotice), v => PluginNotice = v, text);

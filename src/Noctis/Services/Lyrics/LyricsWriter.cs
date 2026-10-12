@@ -17,9 +17,14 @@ namespace Noctis.Services.Lyrics;
 /// <param name="SidecarWritten">The .lrc next to the file now holds the synced text.</param>
 /// <param name="ReplacedForeignSidecar">A sidecar the app had not written was moved to the trash first.</param>
 /// <param name="KeptForeignSidecar">A sidecar the app had not written could not be trashed, so it was left in place.</param>
-public sealed record LyricsSaveOutcome(bool Wrote, bool SidecarWritten, bool ReplacedForeignSidecar, bool KeptForeignSidecar)
+/// <param name="TagsQueued">The lyrics are on their way into the audio file's tags ("Save lyrics to" includes the file, GitHub #135).
+/// The write itself waits until the song is not playing, so its outcome is not known here.</param>
+public sealed record LyricsSaveOutcome(bool Wrote, bool SidecarWritten, bool ReplacedForeignSidecar, bool KeptForeignSidecar, bool TagsQueued = false)
 {
     public static readonly LyricsSaveOutcome Nothing = new(false, false, false, false);
+
+    /// <summary>The lyrics reached a file or are queued for the audio file's tags.</summary>
+    public bool Saved => SidecarWritten || TagsQueued;
 }
 
 public sealed class LyricsWriter
@@ -31,6 +36,9 @@ public sealed class LyricsWriter
 
     /// <summary>Test hook: moving a sidecar to the trash (defaults to the recycle bin helper).</summary>
     internal Func<string, bool> TrashFile { get; set; } = RecycleBin.TryMoveToTrash;
+
+    /// <summary>Where saves go when the caller does not say: Settings ▸ Lyrics ▸ Save lyrics to (GitHub #135).</summary>
+    public Func<LyricsSaveTarget> SaveTarget { get; set; } = LyricsSaveSettings.CurrentTarget;
 
     public LyricsWriter(IMetadataService metadata, IDeferredTagWriter? tagWriter)
         : this(metadata, tagWriter, AppWrittenSidecarRegistry.Default, Path.Combine(AppPaths.DataRoot, "lyrics_cache")) { }
@@ -61,12 +69,19 @@ public sealed class LyricsWriter
     /// <param name="ttml">Also written as a .ttml sidecar when given (Lyrics Studio's "Also save as TTML").
     /// The lyrics page reads .lyricsfile and .ttml before .elrc and .lrc, so without one a leftover
     /// .ttml or .lyricsfile is removed like a stale .elrc — it would hide what was just saved.</param>
-    public LyricsSaveOutcome SaveDetailed(Track track, string? plain, string? synced, bool embedInTags, bool replaceForeignSidecar, string? ttml = null)
+    /// <param name="target">Where the lyrics go; null = <see cref="SaveTarget"/>. "Inside the audio file" writes the
+    /// tags (synced text with its word timings, plus SYLT for ID3v2) and no .lrc/.elrc; the files the lyrics page
+    /// reads before the tags are removed like stale ones, or they would hide the save. An explicit TTML is still
+    /// written: it is a file the user asked for. <paramref name="embedInTags"/> (Lyrics Studio / bulk "also
+    /// embed") keeps its old meaning for lyrics files only: plain text in the tags.</param>
+    public LyricsSaveOutcome SaveDetailed(Track track, string? plain, string? synced, bool embedInTags, bool replaceForeignSidecar, string? ttml = null,
+        LyricsSaveTarget? target = null)
     {
         var hasSynced = !string.IsNullOrWhiteSpace(synced);
         var hasPlain = !string.IsNullOrWhiteSpace(plain);
         if (!hasSynced && !hasPlain) return LyricsSaveOutcome.Nothing;
         if (!hasPlain && hasSynced) plain = LyricsTextHelper.StripTimestamps(synced);
+        var mode = target ?? SafeTarget();
 
         track.Lyrics = plain ?? string.Empty;
         track.SyncedLyrics = synced ?? string.Empty;
@@ -75,7 +90,20 @@ public sealed class LyricsWriter
         var replaced = false;
         var kept = false;
         var path = track.FilePath;
-        if (hasSynced && !string.IsNullOrWhiteSpace(path) && track.SourceType == SourceType.Local)
+        var isLocal = !string.IsNullOrWhiteSpace(path) && track.SourceType == SourceType.Local;
+        if (hasSynced && isLocal && !mode.WritesSidecars())
+        {
+            // Inside the audio file only: every lyrics file the page reads before the tags would hide them.
+            if (!string.IsNullOrWhiteSpace(ttml))
+                WriteSidecar(Path.ChangeExtension(path, ".ttml"), ttml, replaceForeignSidecar, ref sidecarWritten, ref replaced, ref kept);
+            foreach (var ext in new[] { ".lyricsfile", ".ttml", ".elrc", ".lrc" })
+            {
+                if (ext == ".ttml" && !string.IsNullOrWhiteSpace(ttml)) continue;
+                foreach (var stale in SidecarsOnDisk(path, ext))
+                    RemoveSidecar(stale, replaceForeignSidecar, ref replaced, ref kept);
+            }
+        }
+        else if (hasSynced && isLocal)
         {
             var lrcPath = Path.ChangeExtension(path, ".lrc");
             var elrcPath = Path.ChangeExtension(path, ".elrc");
@@ -106,14 +134,33 @@ public sealed class LyricsWriter
                 RemoveSidecar(stale, replaceForeignSidecar, ref replaced, ref kept);
         }
 
-        if (embedInTags && !string.IsNullOrWhiteSpace(path) && track.SourceType == SourceType.Local)
+        var tagsQueued = false;
+        if (isLocal && mode.WritesTags())
         {
-            if (_tagWriter is not null)
-                _tagWriter.Enqueue(path, "lyrics", () => _metadata.WriteTrackMetadata(track));
-            else
-                Task.Run(() => { try { _metadata.WriteTrackMetadata(track); } catch { } });
+            var (tagPlain, tagSynced) = (plain, synced);
+            QueueTagWrite(path, () => _metadata.WriteLyrics(path, tagPlain, tagSynced));
+            tagsQueued = true;
         }
-        return new LyricsSaveOutcome(true, sidecarWritten, replaced, kept);
+        else if (embedInTags && isLocal)
+        {
+            QueueTagWrite(path, () => _metadata.WriteTrackMetadata(track));
+        }
+        return new LyricsSaveOutcome(true, sidecarWritten, replaced, kept, tagsQueued);
+    }
+
+    private LyricsSaveTarget SafeTarget()
+    {
+        try { return SaveTarget(); }
+        catch { return LyricsSaveTarget.Sidecar; }
+    }
+
+    /// <summary>Tag writes wait (deferred writer) until the file is not the one playing; one per file, the latest wins.</summary>
+    private void QueueTagWrite(string path, Func<bool> write)
+    {
+        if (_tagWriter is not null)
+            _tagWriter.Enqueue(path, "lyrics", () => write());
+        else
+            Task.Run(() => { try { write(); } catch { } });
     }
 
     /// <summary>
@@ -123,14 +170,17 @@ public sealed class LyricsWriter
     /// that already holds exactly what the save writes is left out: re-saving lyrics already on
     /// disk changes nothing.
     /// </summary>
-    internal static List<string> FilesChangedBySave(string audioPath, string synced, string? ttml = null)
+    internal static List<string> FilesChangedBySave(string audioPath, string synced, string? ttml = null,
+        LyricsSaveTarget target = LyricsSaveTarget.Sidecar)
     {
         var changed = new List<string>();
         var isWordLevel = LyricsFormatDetector.Detect(null, synced) == LyricsFormat.Elrc;
+        var files = target.WritesSidecars();
         Check(".lyricsfile", null);
         Check(".ttml", string.IsNullOrWhiteSpace(ttml) ? null : ttml);
-        Check(".elrc", isWordLevel ? synced : null);
-        Check(".lrc", isWordLevel ? LineLevelProjection(synced) : synced);
+        // Inside the audio file only: the .elrc/.lrc go, whatever they hold.
+        Check(".elrc", files && isWordLevel ? synced : null);
+        Check(".lrc", !files ? null : isWordLevel ? LineLevelProjection(synced) : synced);
         return changed;
 
         void Check(string ext, string? written)
@@ -213,12 +263,8 @@ public sealed class LyricsWriter
         track.SyncedLyrics = string.Empty;
 
         if (clearTags && !string.IsNullOrWhiteSpace(path) && track.SourceType == SourceType.Local)
-        {
-            if (_tagWriter is not null)
-                _tagWriter.Enqueue(path, "lyrics", () => _metadata.WriteTrackMetadata(track));
-            else
-                Task.Run(() => { try { _metadata.WriteTrackMetadata(track); } catch { } });
-        }
+            // Every lyrics field: clearing only the main one left SYLT / UNSYNCEDLYRICS to bring them back.
+            QueueTagWrite(path, () => _metadata.WriteLyrics(path, null, null));
     }
 
     /// <summary>Writes one sidecar unless a foreign file sits there and we were not asked to replace it (trash first when we were).</summary>

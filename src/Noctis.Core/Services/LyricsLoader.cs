@@ -16,7 +16,7 @@ public sealed record LoadedLyrics(IReadOnlyList<LyricLine> Lines, bool IsSynced,
 /// <summary>
 /// Finds and parses a track's lyrics without UI or network: sidecars (.ttml, .elrc, .lrc —
 /// the desktop order minus the desktop-only .lyricsfile), then the lyrics store, then an LRC
-/// in the plain field, then ID3v2 SYLT, then plain text. Blocking I/O: call it off the UI
+/// in the plain field, then the file's own tags (SYLT, SYNCEDLYRICS, UNSYNCEDLYRICS), then plain text. Blocking I/O: call it off the UI
 /// thread. The desktop keeps its own probe (it adds .lyricsfile and the online cache).
 /// </summary>
 public static class LyricsLoader
@@ -51,8 +51,19 @@ public static class LyricsLoader
             && FromLrc(plain, LyricsSource.EmbeddedSynced) is { } legacy)
             return legacy;
 
-        if (ReadSylt(track, files) is { Count: > 0 } sylt)
-            return Synced(sylt, LyricsSource.EmbeddedSylt);
+        // The file's own tags, read now: SYLT and SYNCEDLYRICS, and the UNSYNCEDLYRICS-style
+        // aliases a row scanned before GitHub #135 never stored.
+        var embedded = ReadEmbedded(track, files);
+        if (!string.IsNullOrWhiteSpace(embedded.Synced)
+            && FromLrc(embedded.Synced, embedded.SyncedFromSylt ? LyricsSource.EmbeddedSylt : LyricsSource.EmbeddedSynced) is { IsSynced: true } fileSynced)
+            return fileSynced;
+
+        if (string.IsNullOrWhiteSpace(plain) && !string.IsNullOrWhiteSpace(embedded.Text))
+        {
+            if (LrcParser.ContainsTimestamp(embedded.Text) && FromLrc(embedded.Text, LyricsSource.EmbeddedSynced) is { IsSynced: true } timed)
+                return timed;
+            plain = embedded.Text;
+        }
 
         if (!string.IsNullOrWhiteSpace(plain))
             return Plain(LrcParser.SplitPlain(plain), LyricsSource.EmbeddedPlain);
@@ -115,15 +126,15 @@ public static class LyricsLoader
     private static LoadedLyrics Plain(IEnumerable<string> rows, LyricsSource source) =>
         new(rows.Select(r => new LyricLine { Text = LrcParser.SoftWrap(r), IsActive = true }).ToList(), false, source);
 
-    /// <summary>SYLT needs TagLib to pick a reader from the file name; a SAF URI's last
+    /// <summary>The file's tags need TagLib to pick a reader from the file name; a SAF URI's last
     /// segment is the percent-encoded document id, whose tail is the display name on the
     /// external-storage provider. An opaque id has no extension, TagLib refuses it, and the
-    /// read is simply null.</summary>
-    private static List<LyricLine>? ReadSylt(Track track, ITrackFileAccess files)
+    /// read is simply empty.</summary>
+    private static EmbeddedLyricsText ReadEmbedded(Track track, ITrackFileAccess files)
     {
         var stream = files.OpenAudio(track.FilePath);
-        if (stream == null) return null;
+        if (stream == null) return EmbeddedLyricsText.Empty;
         var name = files.AudioFileName(track.FilePath) ?? Path.GetFileName(Uri.UnescapeDataString(track.FilePath));
-        return SyltLyrics.Read(stream, name);
+        return EmbeddedLyrics.ReadStream(stream, name);
     }
 }

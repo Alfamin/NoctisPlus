@@ -1358,6 +1358,10 @@ public partial class LyricsViewModel : ViewModelBase, IDisposable
                 candidates.Add((extraTasks[i].IsCompleted ? extraResults[i] : null, extraSources[i].Name));
             for (var i = 0; i < pluginSources.Count; i++) candidates.Add((pluginResults[i], pluginSources[i].Name));
             var (primary, primarySource, alternate, altSource) = PickBestResult(candidates);
+            // Settings ▸ Lyrics ▸ Preferred lyrics type (GitHub #135): what this pick keeps.
+            var preferred = LyricsSaveOptions.ParsePreferredType(_player.LyricsPreferredType);
+            if (primary != null) primary = ApplyPreferredType(primary, preferred);
+            if (alternate != null) alternate = ApplyPreferredType(alternate, preferred);
             var pluginInstrumental = pluginResults.Any(r => r is { Instrumental: true, HasLyrics: false })
                                      || extraResults.Any(r => r is { Instrumental: true, HasLyrics: false });
             // An extra source that never answered in time counts as errored for the message below.
@@ -1431,6 +1435,36 @@ public partial class LyricsViewModel : ViewModelBase, IDisposable
             if (generation == _searchGeneration)
                 IsSearching = false;
         }
+    }
+
+    /// <summary>
+    /// An online result reduced to the preferred lyrics type (GitHub #135): line-synced drops the
+    /// word timings (Lyricsfile and ELRC word tags), plain drops every timing. Word-synced, the
+    /// default, keeps the result as it is. A result with nothing of the preferred kind keeps what
+    /// it has: line timings are not invented, and plain is always derivable.
+    /// </summary>
+    internal static LrcLibResult ApplyPreferredType(LrcLibResult result, LyricsPreferredType type)
+    {
+        if (type == LyricsPreferredType.WordSynced || !result.HasLyrics) return result;
+        var synced = SyncedToWrite(result);
+        var plain = !string.IsNullOrWhiteSpace(result.PlainLyrics) ? result.PlainLyrics
+            : string.IsNullOrWhiteSpace(synced) ? null : LyricsTextHelper.StripTimestamps(synced);
+        return new LrcLibResult
+        {
+            Id = result.Id,
+            Name = result.Name,
+            TrackName = result.TrackName,
+            ArtistName = result.ArtistName,
+            AlbumName = result.AlbumName,
+            Duration = result.Duration,
+            Instrumental = result.Instrumental,
+            PlainLyrics = plain,
+            SyncedLyrics = type == LyricsPreferredType.LineSynced && !string.IsNullOrWhiteSpace(synced)
+                ? Services.Lyrics.LyricsWriter.LineLevelProjection(synced)
+                : null,
+            Lyricsfile = null,
+            HasWordSync = false,
+        };
     }
 
     /// <summary>
@@ -1733,6 +1767,16 @@ public partial class LyricsViewModel : ViewModelBase, IDisposable
     [RelayCommand]
     private Task SaveLyricsAsTtml() => SaveLyricsToFileCore(asTtml: true);
 
+    /// <summary>The audio file's tags hold lyrics a save of these would replace: not empty, not already
+    /// these, and not lyrics this page put there itself. For the prompt before a save (GitHub #135).</summary>
+    private static bool TagsHoldOtherLyrics(string path, string? plain, string? synced)
+    {
+        if (string.IsNullOrWhiteSpace(path) || !File.Exists(path)) return false;
+        var current = EmbeddedLyrics.ReadFile(path);
+        if (current.IsEmpty || EmbeddedLyrics.Holds(current, plain, synced)) return false;
+        return !(PageEmbeddedLyrics.TryGetValue(path, out var ours) && SameLyricsText(current.Text, ours));
+    }
+
     /// <summary>A .ttml of LRC/ELRC <paramref name="synced"/>: word timings when it has them, line times otherwise; null when nothing is timed.</summary>
     internal static string? BuildTtmlFromSynced(string synced)
     {
@@ -1766,12 +1810,19 @@ public partial class LyricsViewModel : ViewModelBase, IDisposable
             return;
         }
 
+        var mode = SaveTargetSetting;
         try
         {
             // On the writer lane, behind the automatic save of these lyrics that may still be
-            // queued, so the prompt names only files this save really changes.
+            // queued, so the prompt names only files this save really changes — and, when the
+            // lyrics go inside the audio file, lyrics already there that it replaces (#135).
             var changed = new List<string>();
-            await EnqueueLyricsFileWork(() => changed = Services.Lyrics.LyricsWriter.FilesChangedBySave(trackPath, synced, ttml));
+            await EnqueueLyricsFileWork(() =>
+            {
+                changed = Services.Lyrics.LyricsWriter.FilesChangedBySave(trackPath, synced, ttml, mode);
+                if (mode.WritesTags() && TagsHoldOtherLyrics(trackPath, plain, synced))
+                    changed.Add(Localization.Loc.T("Lyrics.SaveReplaceTags"));
+            });
             if (changed.Count > 0)
             {
                 var message = Localization.Loc.T(changed.Count == 1 ? "Lyrics.SaveReplaceOne" : "Lyrics.SaveReplaceMany",
@@ -1781,25 +1832,27 @@ public partial class LyricsViewModel : ViewModelBase, IDisposable
                 if (!confirmed) return;
             }
 
-            var writer = new Services.Lyrics.LyricsWriter(_metadata, null, SidecarRegistry, LyricsCacheDir)
+            var writer = new Services.Lyrics.LyricsWriter(_metadata, TagWriter, SidecarRegistry, LyricsCacheDir)
             {
                 TrashFile = path => TrashSidecarFile(path),
             };
             var outcome = Services.Lyrics.LyricsSaveOutcome.Nothing;
             // Off the UI thread (trashing can wait on the OS) and in order with every other lyrics write.
             await EnqueueLyricsFileWork(() =>
-                outcome = writer.SaveDetailed(track, plain, synced, embedInTags: false, replaceForeignSidecar: true, ttml));
+                outcome = writer.SaveDetailed(track, plain, synced, embedInTags: false, replaceForeignSidecar: true, ttml, mode));
+            // The user confirmed this save: what it put in the tags is the page's to replace or remove later.
+            if (outcome.TagsQueued) PageEmbeddedLyrics[trackPath] = synced;
             DebugLogger.Info(DebugLogger.Category.Lyrics, "SaveLyricsToFile",
-                $"ttml={asTtml}, written={outcome.SidecarWritten}, replacedForeign={outcome.ReplacedForeignSidecar}, keptForeign={outcome.KeptForeignSidecar}");
+                $"ttml={asTtml}, target={mode}, written={outcome.SidecarWritten}, tags={outcome.TagsQueued}, replacedForeign={outcome.ReplacedForeignSidecar}, keptForeign={outcome.KeptForeignSidecar}");
 
             // Show what is on disk now; the reload also ends the online state (and the Save item).
             if (ReferenceEquals(_currentTrack, track))
                 LoadLyricsForTrack(track);
             ShowStatusText(
                 outcome.KeptForeignSidecar ? Localization.Loc.T("Lyrics.SaveKeptOld")
-                : outcome.SidecarWritten ? Localization.Loc.T("Lyrics.Saved")
+                : outcome.Saved ? Localization.Loc.T("Lyrics.Saved")
                 : Localization.Loc.T("Lyrics.SaveFailed"),
-                outcome.SidecarWritten && !outcome.KeptForeignSidecar ? 3000 : 5000);
+                outcome.Saved && !outcome.KeptForeignSidecar ? 3000 : 5000);
         }
         catch (Exception ex)
         {
@@ -1848,6 +1901,11 @@ public partial class LyricsViewModel : ViewModelBase, IDisposable
         var isWordLevel = canWriteSidecar && EnhancedLrcParser.ContainsWordTags(synced);
         var lrcText = isWordLevel ? Services.Lyrics.LyricsWriter.LineLevelProjection(synced!) : synced;
         var stamp = Volatile.Read(ref _lyricsRemovalStamp);
+        // Settings ▸ Lyrics ▸ Save lyrics to (GitHub #135): files beside the song, the audio
+        // file's tags, or both. On an explicit switch, lyrics the page put in the tags for the
+        // previous pick may be replaced; anything else in the tags is the song's own.
+        var mode = SaveTargetSetting;
+        var replaceableTagText = allowReplaceAppSidecar && PageEmbeddedLyrics.TryGetValue(trackPath, out var ownTagText) ? ownTagText : null;
 
         // Everything below runs on the FIFO writer lane, where File.Exists sees the
         // settled state: any earlier queued sidecar write has already landed or been
@@ -1874,6 +1932,12 @@ public partial class LyricsViewModel : ViewModelBase, IDisposable
                 // A RemoveLyrics landed after this persist was queued — writing now
                 // would resurrect what the user just removed.
                 if (Volatile.Read(ref _lyricsRemovalStamp) != stamp) return;
+
+                if (!mode.WritesSidecars())
+                {
+                    PersistOnlineLyricsToTags(track, trackPath, plain, synced, allowReplaceAppSidecar, replaceableTagText, stamp);
+                    return;
+                }
 
                 var sidecarExists = File.Exists(lrcPath);
                 var replaceAppSidecar = canWriteSidecar && sidecarExists && allowReplaceAppSidecar
@@ -1903,6 +1967,9 @@ public partial class LyricsViewModel : ViewModelBase, IDisposable
                         track.Lyrics = plain ?? string.Empty;
                         track.SyncedLyrics = synced ?? string.Empty;
                     });
+                    // "Both": the tags too, where they hold no lyrics of the song's own.
+                    if (mode.WritesTags())
+                        QueueEmbeddedLyrics(trackPath, plain, synced, replaceableTagText, stamp);
                 }
 
                 if (!canWriteSidecar) return;
@@ -1942,6 +2009,38 @@ public partial class LyricsViewModel : ViewModelBase, IDisposable
             }
             catch { /* best effort — sidecar write is non-fatal */ }
         });
+    }
+
+    /// <summary>
+    /// "Save lyrics to: Inside the audio file" (GitHub #135) for found online lyrics: no lyrics file
+    /// is written; the lyrics go into the tags. Any lyrics file the page reads before the tags would
+    /// hide them on the next play: the page's own from an earlier pick goes to the trash on an
+    /// explicit switch, and one of the user's own leaves the song alone (fields and tags), as a
+    /// user's .lrc does for the file-based save. Runs on the lyrics file lane.
+    /// </summary>
+    private void PersistOnlineLyricsToTags(Track track, string trackPath, string? plain, string? synced,
+        bool explicitSwitch, string? replaceableTagText, int stamp)
+    {
+        foreach (var ext in new[] { ".lyricsfile", ".ttml", ".elrc", ".lrc" })
+            foreach (var sidecar in Services.Lyrics.LyricsWriter.SidecarsOnDisk(trackPath, ext))
+            {
+                if (explicitSwitch && SidecarRegistry.Contains(sidecar)
+                    && (TrashSidecarFile(sidecar) || !File.Exists(sidecar)))
+                {
+                    SidecarRegistry.Remove(sidecar);
+                    continue;
+                }
+                DebugLogger.Info(DebugLogger.Category.Lyrics, "Tags.SkipHiddenBySidecar", sidecar);
+                return;
+            }
+
+        Dispatcher.UIThread.Post(() =>
+        {
+            if (Volatile.Read(ref _lyricsRemovalStamp) != stamp) return;
+            track.Lyrics = plain ?? string.Empty;
+            track.SyncedLyrics = synced ?? string.Empty;
+        });
+        QueueEmbeddedLyrics(trackPath, plain, synced, replaceableTagText, stamp);
     }
 
     /// <summary>A file the lyrics page reads before .elrc/.lrc beside the song: any .lyricsfile or
@@ -2001,6 +2100,49 @@ public partial class LyricsViewModel : ViewModelBase, IDisposable
     // tests substitute a failing trash to pin the registry-retention contract.
     internal Func<string, bool> TrashSidecarFile { get; set; } = Helpers.RecycleBin.TryMoveToTrash;
 
+    /// <summary>Writes lyrics into audio files once they are not playing (GitHub #135); set by
+    /// MainWindowViewModel. Null (tests): written right away, in order on the lyrics file lane.</summary>
+    internal IDeferredTagWriter? TagWriter { get; set; }
+
+    /// <summary>Settings ▸ Lyrics ▸ Save lyrics to.</summary>
+    private LyricsSaveTarget SaveTargetSetting => LyricsSaveOptions.ParseTarget(_player.LyricsSaveTarget);
+
+    // Lyrics this page put inside audio files (file path → the text written), so a later source
+    // switch may replace them and Remove may take them back. Lyrics the file had otherwise — the
+    // user's own — are never replaced or removed by the page.
+    private static readonly System.Collections.Concurrent.ConcurrentDictionary<string, string> PageEmbeddedLyrics =
+        new(PathComparison.Comparer);
+
+    /// <summary>Lyrics text as tags compare it: LF line ends, no trailing blank space.</summary>
+    private static bool SameLyricsText(string? a, string? b) =>
+        string.Equals(EmbeddedLyrics.Normalize(a), EmbeddedLyrics.Normalize(b), StringComparison.Ordinal);
+
+    /// <summary>Puts lyrics inside the audio file, but only over no lyrics, or over lyrics this page wrote there
+    /// (<paramref name="replaceable"/>): a song's own tag lyrics are never replaced by an automatic save.</summary>
+    private void QueueEmbeddedLyrics(string path, string? plain, string? synced, string? replaceable, int stamp)
+    {
+        var text = LyricsTextHelper.ContainsTimestamps(synced) ? synced! : plain ?? string.Empty;
+        if (string.IsNullOrWhiteSpace(text)) return;
+        PageEmbeddedLyrics[path] = text;
+        QueueLyricsTagWrite(path, () =>
+        {
+            // A RemoveLyrics since this was queued: it must not bring them back.
+            if (Volatile.Read(ref _lyricsRemovalStamp) != stamp) return;
+            var ok = _metadata.WriteLyrics(path, plain, synced,
+                current => current.IsEmpty || SameLyricsText(current.Text, text)
+                           || (replaceable != null && SameLyricsText(current.Text, replaceable)));
+            DebugLogger.Info(DebugLogger.Category.Lyrics, "Lyrics.Embed", $"written={ok}");
+        });
+    }
+
+    private void QueueLyricsTagWrite(string path, Action write)
+    {
+        if (TagWriter is { } deferred)
+            deferred.Enqueue(path, "lyrics", write);
+        else
+            _ = EnqueueLyricsFileWork(() => { try { write(); } catch { } });
+    }
+
     /// <summary>
     /// Removes the currently displayed online lyrics: clears the cached file,
     /// resets lyrics state, and shows the search button so the user can retry.
@@ -2025,6 +2167,8 @@ public partial class LyricsViewModel : ViewModelBase, IDisposable
         // and the deletes join the lane behind whatever is in flight, so an unawaited
         // write can never land after the delete and resurrect the removed files.
         Interlocked.Increment(ref _lyricsRemovalStamp);
+        // Removed on purpose: the automatic download must not fetch them straight back.
+        _autoDownloadTried.Add(track.Id);
         var trackId = track.Id;
         var trackPath = track.FilePath;
         await EnqueueLyricsFileWork(() =>
@@ -2058,6 +2202,12 @@ public partial class LyricsViewModel : ViewModelBase, IDisposable
                         else
                             DebugLogger.Error(DebugLogger.Category.Error, "Lyrics.SidecarTrashFailed", lrcPath);
                     }
+
+                    // Lyrics the page put inside the audio file (GitHub #135) come out of the tags
+                    // again — only while the tags still hold exactly those, never the song's own.
+                    if (PageEmbeddedLyrics.TryRemove(trackPath, out var embedded))
+                        QueueLyricsTagWrite(trackPath, () => _metadata.WriteLyrics(trackPath, null, null,
+                            current => !current.IsEmpty && SameLyricsText(current.Text, embedded)));
                 }
             }
             catch { }
@@ -2552,6 +2702,10 @@ public partial class LyricsViewModel : ViewModelBase, IDisposable
         {
             RefreshFocusDimming();
         }
+        else if (e.PropertyName == nameof(PlayerViewModel.LyricsAutoDownload))
+        {
+            MaybeAutoDownloadLyrics();
+        }
         // Word-joining flipped: it changes how the sidecar is parsed, not how it is
         // drawn, so the current track has to go back through the load path.
         else if (e.PropertyName == nameof(PlayerViewModel.LyricsJoinSplitWords))
@@ -2790,9 +2944,17 @@ public partial class LyricsViewModel : ViewModelBase, IDisposable
         }
         catch { }
 
-        // Priority 4: embedded metadata is pure in-memory — defer to the UI-thread handler.
+        // Priority 4: the song's own lyrics. The row's fields first: the file's lyrics as scanned,
+        // or lyrics saved for the song since.
         var hasSyncedField = !string.IsNullOrWhiteSpace(track.SyncedLyrics);
         var hasPlainField = !string.IsNullOrWhiteSpace(track.Lyrics);
+        // Without timed lyrics there, the file's tags are read now (GitHub #135): a SYLT frame,
+        // a SYNCEDLYRICS comment or an UNSYNCEDLYRICS alias was never scanned before #135, and
+        // a library is not rescanned until its files change. Before the online cache, which
+        // must not shadow the file's own lyrics.
+        if (!hasSyncedField && !LrcParser.ContainsTimestamp(track.Lyrics)
+            && ProbeEmbeddedTags(track, hasPlainField ? track.Lyrics : null) is { } fromTags)
+            return fromTags;
         if (hasSyncedField || hasPlainField)
             return new LocalLyricsProbe(null, null, "Embedded", FromCache: false);
 
@@ -2822,6 +2984,35 @@ public partial class LyricsViewModel : ViewModelBase, IDisposable
         catch { }
 
         return new LocalLyricsProbe(null, null, "None", FromCache: false);
+    }
+
+    /// <summary>
+    /// The lyrics in the audio file's tags that the row's fields lack: timed lyrics (shown with
+    /// <paramref name="rowPlain"/> on the Plain tab when given), or plain text when the row has
+    /// none. Null when the file adds nothing, or is not a local file that exists.
+    /// </summary>
+    private static LocalLyricsProbe? ProbeEmbeddedTags(Track track, string? rowPlain)
+    {
+        var path = track.FilePath;
+        if (track.SourceType != SourceType.Local || string.IsNullOrWhiteSpace(path) || !File.Exists(path)) return null;
+        var embedded = EmbeddedLyrics.ReadFile(path);
+        if (embedded.IsEmpty) return null;
+
+        var timed = embedded.TimedText;
+        if (!string.IsNullOrWhiteSpace(timed))
+        {
+            var lines = ParseLrcContent(timed);
+            if (lines.Any(l => l.IsSynced))
+            {
+                var plain = !string.IsNullOrWhiteSpace(rowPlain) ? rowPlain : embedded.PlainText;
+                return new LocalLyricsProbe(lines, string.IsNullOrWhiteSpace(plain) ? null : plain, "Embedded:Tags", FromCache: false, timed);
+            }
+        }
+        if (!string.IsNullOrWhiteSpace(rowPlain)) return null;
+        var text = embedded.PlainText;
+        if (string.IsNullOrWhiteSpace(text)) return null;
+        var rows = LrcParser.SplitPlain(text).Select(l => new LyricLine { Text = LrcParser.SoftWrap(l), IsActive = true }).ToList();
+        return rows.Count == 0 ? null : new LocalLyricsProbe(rows, text, "Embedded:Tags", FromCache: false);
     }
 
     private void ApplyLocalLyricsResult(Track track, LocalLyricsProbe probe)
@@ -2900,6 +3091,27 @@ public partial class LyricsViewModel : ViewModelBase, IDisposable
         ShowSearchButton = true;
         AutoSelectTab();
         RefreshActiveLyricPosition();
+        MaybeAutoDownloadLyrics();
+    }
+
+    // Songs the automatic download already searched for this session: a song with no lyrics
+    // online is not searched again every time its lyrics are opened.
+    private readonly HashSet<Guid> _autoDownloadTried = new();
+
+    /// <summary>
+    /// Settings ▸ Lyrics ▸ "Automatically download lyrics" (GitHub #135): when a lyrics view is
+    /// open on a song for which nothing was found — no lyrics file, nothing in its tags, nothing
+    /// cached — search online as the Search Lyrics button would. What it finds is saved per
+    /// "Save lyrics to", by the same path the button's results take; that path never replaces
+    /// lyrics the song already has. Once per song per session.
+    /// </summary>
+    private void MaybeAutoDownloadLyrics()
+    {
+        if (!_player.LyricsAutoDownload || !IsAnyLyricsSurfaceVisible) return;
+        if (_currentTrack is not { } track || !ShowSearchButton || IsSearching || IsPreviewActive) return;
+        if (!_autoDownloadTried.Add(track.Id)) return;
+        DebugLogger.Info(DebugLogger.Category.Lyrics, "AutoDownload", $"title={track.Title}");
+        SearchLyricsCommand.Execute(null);
     }
 
     /// <summary>Applies embedded SyncedLyrics / Lyrics tags to the collections (in-memory, no I/O).</summary>
@@ -3149,7 +3361,7 @@ public partial class LyricsViewModel : ViewModelBase, IDisposable
             return;
         }
 
-        var vm = new LrcEditorViewModel(track, _player, _metadata, synced, plain);
+        var vm = new LrcEditorViewModel(track, _player, _metadata, synced, plain) { TagWriter = TagWriter };
 
         vm.Saved += (_, _) => Dispatcher.UIThread.Post(() =>
         {
@@ -3399,6 +3611,8 @@ public partial class LyricsViewModel : ViewModelBase, IDisposable
             _lyricsSyncTimer.Stop();
         else if (_hasSyncedLyrics && _player.State == Models.PlaybackState.Playing)
             _lyricsSyncTimer.Start();
+        // A lyrics view opening on a song already found to have none.
+        if (visible) MaybeAutoDownloadLyrics();
     }
 
     private bool IsAnyLyricsSurfaceVisible => _visibleLyricsSurfaces > 0;

@@ -107,6 +107,8 @@ public sealed class LyricsBulkService : ILyricsBulkService
     {
         var removed = 0;
         var embed = Safe(() => _settings().LyricsStudioEmbedTags);
+        // Lyrics saved inside the audio files (GitHub #135) live in the tags: clear those too.
+        var tags = embed || Safe(() => LyricsSaveOptions.ParseTarget(_settings().LyricsSaveTarget).WritesTags());
         await Task.Run(() =>
         {
             for (var i = 0; i < tracks.Count; i++)
@@ -115,7 +117,7 @@ public sealed class LyricsBulkService : ILyricsBulkService
                 var t = tracks[i];
                 var had = !string.IsNullOrWhiteSpace(t.Lyrics) || !string.IsNullOrWhiteSpace(t.SyncedLyrics)
                           || (!string.IsNullOrWhiteSpace(t.FilePath) && File.Exists(Path.ChangeExtension(t.FilePath, ".lrc")));
-                _writer.Remove(t, clearTags: embed);
+                _writer.Remove(t, clearTags: tags);
                 if (had) removed++;
                 progress?.Report(new LyricsBulkProgress(i + 1, tracks.Count, t.Title ?? string.Empty, had ? "removed" : "nothing to remove"));
             }

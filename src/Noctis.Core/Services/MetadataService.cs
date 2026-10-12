@@ -2,6 +2,7 @@ using System.Diagnostics;
 using System.Globalization;
 using System.Text.Json;
 using System.Text.RegularExpressions;
+using Noctis.Helpers;
 using Noctis.Models;
 
 namespace Noctis.Services;
@@ -282,6 +283,7 @@ public class MetadataService : IMetadataService
         // Merge featured artists from title into artist field when Performers tag is incomplete
         artist = EnrichArtistFromTitle(artist, title);
 
+        var embeddedLyrics = EmbeddedLyrics.Read(file);
         var track = new Track
         {
             FilePath = filePath,
@@ -304,7 +306,8 @@ public class MetadataService : IMetadataService
             DateAdded = DateTime.UtcNow,
             IsExplicit = DetectExplicit(file),
             Composer = tag.FirstComposer ?? string.Empty,
-            Lyrics = tag.Lyrics ?? string.Empty,
+            // USLT / LYRICS / ©lyr, then the UNSYNCEDLYRICS-style aliases other taggers write (#135).
+            Lyrics = embeddedLyrics.Text,
             Comment = tag.Comment ?? string.Empty,
             Copyright = ReadCopyright(file),
             Label = ExtendedTagIO.ReadLabel(file),
@@ -327,6 +330,12 @@ public class MetadataService : IMetadataService
         };
 
         PopulateReleaseType(track, file);
+
+        // Timed lyrics kept apart from the text field (SYLT, SYNCEDLYRICS) are the file's own
+        // and win over a stored online result (#135). Left unassigned when the file has none,
+        // so a rescan keeps synced lyrics saved for the song earlier.
+        if (!string.IsNullOrWhiteSpace(embeddedLyrics.Synced))
+            track.SyncedLyrics = embeddedLyrics.Synced;
 
         // Untagged files (iTunes WAV rips most notably) fall back to the folder
         // structure for artist/album and the "NN " filename prefix for the track
@@ -605,7 +614,12 @@ public class MetadataService : IMetadataService
                 WriteFullReleaseDate(file, track.ReleaseDate, track.Year);
             }
             tag.Composers = string.IsNullOrWhiteSpace(track.Composer) ? Array.Empty<string>() : new[] { track.Composer };
-            tag.Lyrics = string.IsNullOrWhiteSpace(track.Lyrics) ? null : track.Lyrics;
+            // Only a real lyrics change reaches the file (#135): the row's plain text is the
+            // file's lyrics with their timestamps stripped when those are LRC (Edit Info shows
+            // them so), and rewriting it put plain text over timed lyrics in the tag on any
+            // unrelated save, such as a title fix. Alias fields (UNSYNCEDLYRICS, …) count too.
+            if (!PlainLyricsMatch(EmbeddedLyrics.ReadText(file), track.Lyrics, track.SyncedLyrics))
+                WritePlainLyrics(file, track.Lyrics);
             tag.Comment = string.IsNullOrWhiteSpace(track.Comment) ? null : track.Comment;
             tag.Grouping = string.IsNullOrWhiteSpace(track.Grouping) ? null : track.Grouping;
             tag.Copyright = string.IsNullOrWhiteSpace(track.Copyright) ? null : track.Copyright;
@@ -621,6 +635,66 @@ public class MetadataService : IMetadataService
             ExtendedTagIO.WriteRating(file, track.Rating);
             ExtendedTagIO.WriteIsDisliked(file, track.IsDisliked);
         });
+    }
+
+    /// <summary>The row's plain lyrics say what the file's lyrics text says: equal, or equal once
+    /// the file's LRC stamps are stripped (how the row and Edit Info hold timed tag lyrics), or the
+    /// file's text is the row's synced lyrics (saved inside the file, GitHub #135: the text field
+    /// holds the synced text, and the row's own plain text has no field of its own there).</summary>
+    internal static bool PlainLyricsMatch(string fileText, string? rowText, string? rowSynced = null)
+    {
+        var file = EmbeddedLyrics.Normalize(fileText);
+        var row = EmbeddedLyrics.Normalize(rowText);
+        if (file == row) return true;
+        if (!LyricsTextHelper.ContainsTimestamps(file)) return false;
+        if (file == EmbeddedLyrics.Normalize(rowSynced)) return true;
+        return !LyricsTextHelper.ContainsTimestamps(row)
+            && EmbeddedLyrics.Normalize(LyricsTextHelper.StripTimestamps(file)).Trim() == row.Trim();
+    }
+
+    /// <summary>The plain-lyrics write <see cref="WriteTrackMetadata(Track)"/> has always done (text field
+    /// only, timed fields untouched). New text also replaces the UNSYNCEDLYRICS-style aliases, which
+    /// would otherwise keep the old text readable. An empty row clears only the main field, as
+    /// before: a row scanned before aliases were read is empty while its file is not, and an
+    /// unrelated save must not erase lyrics the app never showed (removals go through WriteLyrics).</summary>
+    private static void WritePlainLyrics(TagLib.File file, string? plain)
+    {
+        var value = string.IsNullOrWhiteSpace(plain) ? null : plain;
+        file.Tag.Lyrics = value;
+        if (value == null) return;
+        if (file.GetTag(TagLib.TagTypes.Xiph, false) is TagLib.Ogg.XiphComment xiph)
+            foreach (var name in new[] { "UNSYNCEDLYRICS", "UNSYNCED LYRICS" })
+                xiph.RemoveField(name);
+        if (file.GetTag(TagLib.TagTypes.Id3v2, false) is TagLib.Id3v2.Tag id3)
+            foreach (var frame in id3.GetFrames<TagLib.Id3v2.UserTextInformationFrame>().ToList())
+                if (frame.Description is { } d && (d.Equals("LYRICS", StringComparison.OrdinalIgnoreCase)
+                    || d.Equals("UNSYNCEDLYRICS", StringComparison.OrdinalIgnoreCase)
+                    || d.Equals("UNSYNCED LYRICS", StringComparison.OrdinalIgnoreCase)))
+                    id3.RemoveFrame(frame);
+    }
+
+    public bool WriteLyrics(string filePath, string? plain, string? synced, Func<EmbeddedLyricsText, bool>? onlyIf = null)
+    {
+        try
+        {
+            if (string.IsNullOrWhiteSpace(filePath) || !File.Exists(filePath)) return false;
+            if ((File.GetAttributes(filePath) & FileAttributes.ReadOnly) != 0)
+            {
+                DebugLog.Write("Metadata", $"Lyrics not written, read-only file: '{filePath}'");
+                return false;
+            }
+            // Read first: an approval check needs the current lyrics, and a file that already
+            // holds these lyrics is not copied and rewritten for nothing.
+            var current = EmbeddedLyrics.ReadFile(filePath);
+            if (onlyIf != null && !onlyIf(current)) return false;
+            if (EmbeddedLyrics.Holds(current, plain, synced)) return true;
+            return SaveTagsAtomically(filePath, file => EmbeddedLyrics.Write(file, plain, synced));
+        }
+        catch (Exception ex)
+        {
+            DebugLog.Write("Metadata", $"Lyrics write failed for '{filePath}': {ex.Message}");
+            return false;
+        }
     }
 
     /// <summary>

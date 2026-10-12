@@ -667,6 +667,94 @@ public partial class SettingsViewModel : ViewModelBase
     /// also applies to the rest of the song playing now.</summary>
     [ObservableProperty] private int _playCountThresholdPercent;
 
+    /// <summary>Settings ▸ Lyrics ▸ Save lyrics to (GitHub #135): "Sidecar", "Embedded" or "Both".</summary>
+    [ObservableProperty] private string _lyricsSaveTarget = nameof(Models.LyricsSaveTarget.Sidecar);
+
+    /// <summary>Settings ▸ Lyrics ▸ Automatically download lyrics (GitHub #135).</summary>
+    [ObservableProperty] private bool _lyricsAutoDownload;
+
+    /// <summary>Settings ▸ Lyrics ▸ Preferred lyrics type (GitHub #135): "WordSynced", "LineSynced" or "Plain".</summary>
+    [ObservableProperty] private string _lyricsPreferredType = nameof(Models.LyricsPreferredType.WordSynced);
+
+    /// <summary>One row of a lyrics saving picker: the stored value and its label.</summary>
+    public sealed record LyricsChoiceOption(string Value, string Label)
+    {
+        public override string ToString() => Label;
+    }
+
+    public IReadOnlyList<LyricsChoiceOption> LyricsSaveTargetOptions
+    {
+        get => _lyricsSaveTargetOptions;
+        private set => SetProperty(ref _lyricsSaveTargetOptions, value);
+    }
+    private IReadOnlyList<LyricsChoiceOption> _lyricsSaveTargetOptions = BuildLyricsSaveTargetOptions();
+
+    private static IReadOnlyList<LyricsChoiceOption> BuildLyricsSaveTargetOptions() =>
+        Enum.GetValues<Models.LyricsSaveTarget>()
+            .Select(t => new LyricsChoiceOption(t.ToString(), Loc.T($"Settings.LyricsSaveTarget.{t}")))
+            .ToList();
+
+    public LyricsChoiceOption? SelectedLyricsSaveTargetOption
+    {
+        get
+        {
+            var current = LyricsSaveOptions.ParseTarget(LyricsSaveTarget).ToString();
+            return LyricsSaveTargetOptions.FirstOrDefault(o => o.Value == current);
+        }
+        set
+        {
+            // A ComboBox nulls its selection while items are rebuilt; ignore that, keep the state.
+            if (value is null) return;
+            LyricsSaveTarget = value.Value;
+        }
+    }
+
+    public IReadOnlyList<LyricsChoiceOption> LyricsPreferredTypeOptions
+    {
+        get => _lyricsPreferredTypeOptions;
+        private set => SetProperty(ref _lyricsPreferredTypeOptions, value);
+    }
+    private IReadOnlyList<LyricsChoiceOption> _lyricsPreferredTypeOptions = BuildLyricsPreferredTypeOptions();
+
+    private static IReadOnlyList<LyricsChoiceOption> BuildLyricsPreferredTypeOptions() =>
+        Enum.GetValues<Models.LyricsPreferredType>()
+            .Select(t => new LyricsChoiceOption(t.ToString(), Loc.T($"Settings.LyricsPreferredType.{t}")))
+            .ToList();
+
+    public LyricsChoiceOption? SelectedLyricsPreferredTypeOption
+    {
+        get
+        {
+            var current = LyricsSaveOptions.ParsePreferredType(LyricsPreferredType).ToString();
+            return LyricsPreferredTypeOptions.FirstOrDefault(o => o.Value == current);
+        }
+        set
+        {
+            if (value is null) return;
+            LyricsPreferredType = value.Value;
+        }
+    }
+
+    partial void OnLyricsSaveTargetChanged(string value)
+    {
+        OnPropertyChanged(nameof(SelectedLyricsSaveTargetOption));
+        ApplyPlayerSettings();
+        if (_settingsLoaded) _ = SaveAsync();
+    }
+
+    partial void OnLyricsAutoDownloadChanged(bool value)
+    {
+        ApplyPlayerSettings();
+        if (_settingsLoaded) _ = SaveAsync();
+    }
+
+    partial void OnLyricsPreferredTypeChanged(string value)
+    {
+        OnPropertyChanged(nameof(SelectedLyricsPreferredTypeOption));
+        ApplyPlayerSettings();
+        if (_settingsLoaded) _ = SaveAsync();
+    }
+
     /// <summary>One row of the "Count a play after" picker.</summary>
     public sealed record PlayCountThresholdOption(int Percent, string Label)
     {
@@ -875,6 +963,10 @@ public partial class SettingsViewModel : ViewModelBase
         RefreshFlowingStyleOptions();
         PlayCountThresholdOptions = BuildPlayCountThresholdOptions();
         OnPropertyChanged(nameof(SelectedPlayCountThresholdOption));
+        LyricsSaveTargetOptions = BuildLyricsSaveTargetOptions();
+        OnPropertyChanged(nameof(SelectedLyricsSaveTargetOption));
+        LyricsPreferredTypeOptions = BuildLyricsPreferredTypeOptions();
+        OnPropertyChanged(nameof(SelectedLyricsPreferredTypeOption));
     }
 
     public VisualizerStyle LyricsVisualizerStyleMode => VisualizerStyles.Parse(LyricsVisualizerStyle);
@@ -2703,6 +2795,9 @@ public partial class SettingsViewModel : ViewModelBase
             LyricsFullScreenFocusEnabled = _settings.LyricsFullScreenFocusEnabled;
             LyricsMinLineOpacity = Math.Clamp(_settings.LyricsMinLineOpacity, 0, 60);
             LyricsJoinSplitWords = _settings.LyricsJoinSplitWords;
+            LyricsSaveTarget = LyricsSaveOptions.ParseTarget(_settings.LyricsSaveTarget).ToString();
+            LyricsAutoDownload = _settings.LyricsAutoDownload;
+            LyricsPreferredType = LyricsSaveOptions.ParsePreferredType(_settings.LyricsPreferredType).ToString();
             LyricsShowTranslations = _settings.LyricsShowTranslations;
             LyricsShowRomanization = _settings.LyricsShowRomanization;
             LyricsShowBackgroundVocals = _settings.LyricsShowBackgroundVocals;
@@ -3175,6 +3270,9 @@ public partial class SettingsViewModel : ViewModelBase
         _settings.LyricsFullScreenFocusEnabled = LyricsFullScreenFocusEnabled;
         _settings.LyricsMinLineOpacity = LyricsMinLineOpacity;
         _settings.LyricsJoinSplitWords = LyricsJoinSplitWords;
+        _settings.LyricsSaveTarget = LyricsSaveOptions.ParseTarget(LyricsSaveTarget).ToString();
+        _settings.LyricsAutoDownload = LyricsAutoDownload;
+        _settings.LyricsPreferredType = LyricsSaveOptions.ParsePreferredType(LyricsPreferredType).ToString();
         _settings.LyricsShowTranslations = LyricsShowTranslations;
         _settings.LyricsShowRomanization = LyricsShowRomanization;
         _settings.LyricsShowBackgroundVocals = LyricsShowBackgroundVocals;
@@ -3483,6 +3581,9 @@ public partial class SettingsViewModel : ViewModelBase
         _player.LyricsFullScreenFocusEnabled = LyricsFullScreenFocusEnabled;
         _player.LyricsMinLineOpacity = LyricsMinLineOpacity;
         _player.LyricsJoinSplitWords = LyricsJoinSplitWords;
+        _player.LyricsSaveTarget = LyricsSaveTarget;
+        _player.LyricsAutoDownload = LyricsAutoDownload;
+        _player.LyricsPreferredType = LyricsPreferredType;
         _player.LyricsShowTranslations = LyricsShowTranslations;
         _player.LyricsShowRomanization = LyricsShowRomanization;
         _player.LyricsShowBackgroundVocals = LyricsShowBackgroundVocals;
@@ -6909,6 +7010,9 @@ public partial class SettingsViewModel : ViewModelBase
             LyricsFullScreenFocusEnabled = defaultSettings.LyricsFullScreenFocusEnabled;
             LyricsMinLineOpacity = defaultSettings.LyricsMinLineOpacity;
             LyricsJoinSplitWords = defaultSettings.LyricsJoinSplitWords;
+            LyricsSaveTarget = defaultSettings.LyricsSaveTarget;
+            LyricsAutoDownload = defaultSettings.LyricsAutoDownload;
+            LyricsPreferredType = defaultSettings.LyricsPreferredType;
             LyricsShowTranslations = defaultSettings.LyricsShowTranslations;
             LyricsShowRomanization = defaultSettings.LyricsShowRomanization;
             LyricsShowBackgroundVocals = defaultSettings.LyricsShowBackgroundVocals;

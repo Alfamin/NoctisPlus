@@ -1157,6 +1157,7 @@ Deezer и TIDAL: вставьте ссылку.</value></data>
 
 При сохранении они будут заменены текстом на экране. Файл текста, созданный не Noctis, сначала отправляется в корзину.</value><comment>Save Lyrics to File prompt in LyricsViewModel; {0} = song title, {1} = quoted file names joined by Lyrics.SaveFilesJoin</comment></data>
   <data name="Lyrics.SaveFilesJoin" xml:space="preserve"><value> и </value><comment>Joins the file names in Lyrics.SaveReplaceMany (keep the spaces)</comment></data>
+  <data name="Lyrics.SaveReplaceTags" xml:space="preserve"><value>текст внутри аудиофайла</value><comment>Save Lyrics to File prompt: joined into {1} of Lyrics.SaveReplaceOne/Many when the save replaces lyrics in the audio file's tags (GitHub #135)</comment></data>
   <data name="Lyrics.Saved" xml:space="preserve"><value>Текст сохранён</value><comment>Lyrics page status after Save Lyrics to File</comment></data>
   <data name="Lyrics.SaveKeptOld" xml:space="preserve"><value>Сохранено · старый файл текста остался, его не удалось переместить в корзину</value><comment>Lyrics page status after Save Lyrics to File</comment></data>
   <data name="Lyrics.SaveFailed" xml:space="preserve"><value>Не удалось сохранить — проверьте права доступа к файлу</value><comment>Lyrics page status after Save Lyrics to File</comment></data>
@@ -2543,6 +2544,19 @@ Deezer и TIDAL: вставьте ссылку.</value></data>
   <data name="Settings.Section.CoverFlow" xml:space="preserve"><value>Cover Flow</value><comment>Settings section label</comment></data>
   <data name="Settings.Section.LyricsPage" xml:space="preserve"><value>Страница текста</value><comment>Settings section label</comment></data>
   <data name="Settings.Section.OnlineLyrics" xml:space="preserve"><value>Тексты из интернета</value><comment>Settings section label</comment></data>
+  <data name="Settings.Section.SavingLyrics" xml:space="preserve"><value>Сохранение текстов</value><comment>Settings section label</comment></data>
+  <data name="Settings.LyricsSaveTarget" xml:space="preserve"><value>Сохранять тексты</value><comment>Settings ▸ Lyrics (GitHub #135), SettingsView.axaml</comment></data>
+  <data name="Settings.LyricsSaveTargetHint" xml:space="preserve"><value>Куда Noctis сохраняет тексты: «Сохранить текст в файл», Lyrics Studio, редактор синхронизации, «Сведения» и тексты, найденные в интернете.</value><comment>Settings ▸ Lyrics (GitHub #135), SettingsView.axaml</comment></data>
+  <data name="Settings.LyricsSaveTarget.Sidecar" xml:space="preserve"><value>Отдельный файл (.lrc)</value><comment>Save lyrics to choice: .lrc/.elrc files beside the song (SettingsViewModel)</comment></data>
+  <data name="Settings.LyricsSaveTarget.Embedded" xml:space="preserve"><value>Внутри аудиофайла</value><comment>Save lyrics to choice: the audio file's own tags (SettingsViewModel)</comment></data>
+  <data name="Settings.LyricsSaveTarget.Both" xml:space="preserve"><value>Оба варианта</value><comment>Save lyrics to choice: files and the audio file's tags (SettingsViewModel)</comment></data>
+  <data name="Settings.LyricsAutoDownload" xml:space="preserve"><value>Автоматически загружать тексты</value><comment>Settings ▸ Lyrics (GitHub #135), SettingsView.axaml</comment></data>
+  <data name="Settings.LyricsAutoDownloadHint" xml:space="preserve"><value>Когда экран текста открыт для песни без текста, искать его в интернете и сохранять найденное. Уже имеющийся у песни текст никогда не заменяется.</value><comment>Settings ▸ Lyrics (GitHub #135), SettingsView.axaml</comment></data>
+  <data name="Settings.LyricsPreferredType" xml:space="preserve"><value>Предпочтительный тип текста</value><comment>Settings ▸ Lyrics (GitHub #135), SettingsView.axaml</comment></data>
+  <data name="Settings.LyricsPreferredTypeHint" xml:space="preserve"><value>Что Noctis сохраняет, когда сам выбирает текст из интернета.</value><comment>Settings ▸ Lyrics (GitHub #135), SettingsView.axaml</comment></data>
+  <data name="Settings.LyricsPreferredType.WordSynced" xml:space="preserve"><value>По словам (лучшее из доступного)</value><comment>Preferred lyrics type choice (SettingsViewModel)</comment></data>
+  <data name="Settings.LyricsPreferredType.LineSynced" xml:space="preserve"><value>По строкам</value><comment>Preferred lyrics type choice (SettingsViewModel)</comment></data>
+  <data name="Settings.LyricsPreferredType.Plain" xml:space="preserve"><value>Обычный текст</value><comment>Preferred lyrics type choice (SettingsViewModel)</comment></data>
   <data name="Settings.Section.LyricsStudio" xml:space="preserve"><value>Студия текстов</value><comment>Settings section label</comment></data>
   <data name="Settings.Section.Playback" xml:space="preserve"><value>Воспроизведение</value><comment>Settings section label</comment></data>
   <data name="Settings.Section.Output" xml:space="preserve"><value>Вывод</value><comment>Settings section label</comment></data>
