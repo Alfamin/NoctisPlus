@@ -2728,7 +2728,7 @@ public partial class LyricsViewModel : ViewModelBase, IDisposable
     }
 
     /// <param name="SyncedText">The source as LRC/ELRC text, for "Save Lyrics to File ▸ TTML"; null for a .ttml or a preview.</param>
-    private readonly record struct LocalLyricsProbe(
+    internal readonly record struct LocalLyricsProbe(
         List<LyricLine>? Lines,
         string? UnsyncedPlain,
         string Source,
@@ -2736,7 +2736,7 @@ public partial class LyricsViewModel : ViewModelBase, IDisposable
         string? SyncedText = null);
 
     /// <summary>Synchronous probe helper — must only be called off the UI thread.</summary>
-    private static LocalLyricsProbe ProbeLocalLyricSources(Track track, bool joinSplitWords, string uiLanguage)
+    internal static LocalLyricsProbe ProbeLocalLyricSources(Track track, bool joinSplitWords, string uiLanguage)
     {
         // Priority 1: .lyricsfile sidecar (word-level, LRCGET v2.0+).
         try

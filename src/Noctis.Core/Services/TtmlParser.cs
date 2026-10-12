@@ -58,6 +58,11 @@ public static class TtmlParser
     {
         if (string.IsNullOrWhiteSpace(content)) return (null, null);
 
+        // An XML declaration must be the very first thing in the document: a leading blank
+        // line, or a BOM character that survived a re-encode, made the reader throw and the
+        // whole file read as "no lyrics" (GitHub #132).
+        content = content.TrimStart().TrimStart('\uFEFF').TrimStart();
+
         XDocument doc;
         try
         {
@@ -89,6 +94,7 @@ public static class TtmlParser
         var transliterations = LayerEntries(root, "transliteration", preferredLanguage);
 
         var lines = new List<LyricLine>();
+        var lineAgents = new List<string[]>();
         // Lines come from the body only — header metadata never renders or reaches the plain text.
         foreach (var p in root.Descendants().Where(e => LocalNameIs(e, "p") && !IsInHead(e)))
         {
@@ -98,15 +104,84 @@ public static class TtmlParser
             {
                 AttachLayers(line, p, translations, transliterations, ignoreFormattingWhitespace);
                 lines.Add(line);
+                lineAgents.Add(AgentIds(p));
             }
         }
 
         if (lines.Count == 0) return (null, null);
 
-        lines.Sort((a, b) => Nullable.Compare(a.Timestamp, b.Timestamp));
+        AssignVoices(root, lines, lineAgents);
+
+        // Stable: List.Sort is introsort, which reordered lines sharing a begin (overlapping
+        // vocals) and every untimed <p> once a file passed 16 lines (GitHub #132).
+        lines = lines.OrderBy(l => l.Timestamp).ToList();
 
         var plain = string.Join('\n', lines.Select(l => l.Text));
         return (lines, plain);
+    }
+
+    /// <summary>
+    /// The TTML as the LRC text the lyrics editors work in, for importing a .ttml file
+    /// (GitHub #132): enhanced LRC (<c>[mm:ss.xx]&lt;mm:ss.xx&gt;word … &lt;end&gt;</c>) for
+    /// word-timed lines, <c>[mm:ss.xx]text</c> for the rest. Duet voices become "v2:"/"v3:"
+    /// markers, background vocals a "[bg: …]" line, and the translation / romanization the
+    /// same-timestamp lines <see cref="LrcParser"/> reads back as those layers. A document
+    /// with no timing at all is its plain lines; null when it does not parse.
+    /// </summary>
+    public static string? ToLrc(string? content, bool joinSplitWords = true, string? preferredLanguage = null)
+    {
+        var (lines, plain) = Parse(content, joinSplitWords, preferredLanguage);
+        if (lines is not { Count: > 0 }) return null;
+        if (!lines.Any(l => l.Timestamp.HasValue)) return plain;
+
+        var sb = new StringBuilder();
+        foreach (var line in lines)
+        {
+            if (line.Timestamp is not { } start)
+            {
+                sb.Append(OneLine(line.Text)).Append('\n');
+                continue;
+            }
+
+            var stamp = "[" + FormatLrcTime(start) + "]" + line.Voice switch
+            {
+                LyricVoice.Voice2 => "v2:",
+                LyricVoice.Group => "v3:",
+                _ => string.Empty,
+            };
+
+            // A background-only paragraph is its adlib words, sung as the line.
+            var words = line.IsBackgroundOnly ? line.BackgroundWords : line.Words;
+            sb.Append(stamp).Append(words is { Count: > 0 } ? ElrcBody(words, line.EndTimestamp) : OneLine(line.Text)).Append('\n');
+
+            if (!line.IsBackgroundOnly && line.BackgroundWords is { Count: > 0 } bg)
+                sb.Append("[bg: ").Append(ElrcBody(bg, line.BackgroundEndTimestamp)).Append("]\n");
+
+            foreach (var companion in LrcParser.CompanionLines(line))
+                sb.Append(stamp).Append(OneLine(companion)).Append('\n');
+        }
+        return sb.ToString().TrimEnd('\n');
+
+        static string OneLine(string text) => text.Replace("\r\n", " ").Replace('\n', ' ').Trim();
+
+        static string ElrcBody(IReadOnlyList<WordTiming> words, TimeSpan? lineEnd)
+        {
+            var body = new StringBuilder();
+            for (var i = 0; i < words.Count; i++)
+            {
+                if (i > 0) body.Append(' ');
+                body.Append('<').Append(FormatLrcTime(words[i].Start)).Append('>').Append(OneLine(words[i].Text));
+            }
+            var end = words[^1].End ?? lineEnd ?? words[^1].Start;
+            return body.Append('<').Append(FormatLrcTime(end)).Append('>').ToString();
+        }
+    }
+
+    /// <summary>mm:ss.xx, the stamp every LRC writer in the app uses.</summary>
+    private static string FormatLrcTime(TimeSpan t)
+    {
+        if (t < TimeSpan.Zero) t = TimeSpan.Zero;
+        return string.Create(CultureInfo.InvariantCulture, $"{(int)t.TotalMinutes:00}:{t.Seconds:00}.{t.Milliseconds / 10:00}");
     }
 
     /// <summary>
@@ -190,6 +265,65 @@ public static class TtmlParser
     }
 
     private static bool IsInHead(XElement e) => e.Ancestors().Any(a => LocalNameIs(a, "head"));
+
+    /// <summary>
+    /// The agent ids (ttm:agent, an IDREFS list) singing a paragraph: its own, else the
+    /// nearest ancestor's (a div can carry the agent for all its lines). Empty when none.
+    /// </summary>
+    private static string[] AgentIds(XElement p)
+    {
+        foreach (var e in p.AncestorsAndSelf())
+        {
+            var attr = e.Attributes().FirstOrDefault(a =>
+                string.Equals(a.Name.LocalName, "agent", StringComparison.OrdinalIgnoreCase));
+            if (attr != null)
+                return attr.Value.Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries).Distinct(StringComparer.Ordinal).ToArray();
+        }
+        return Array.Empty<string>();
+    }
+
+    /// <summary>
+    /// Maps TTML agents onto the lyrics page's duet layout (<see cref="LyricVoice"/>, the same
+    /// one ELRC "v1:"/"v2:"/"v3:" markers drive). The first person singing (in head
+    /// declaration order, then order of appearance for undeclared ids) keeps the normal
+    /// side; the second person takes the opposite side. An agent declared type="group", or
+    /// several agents on one line, is <see cref="LyricVoice.Group"/>. Further persons, and
+    /// lines with no agent, stay on the normal side — so a single-singer file looks exactly
+    /// as it did before agents were read.
+    /// </summary>
+    private static void AssignVoices(XElement root, List<LyricLine> lines, List<string[]> lineAgents)
+    {
+        if (lineAgents.All(a => a.Length == 0)) return;
+
+        var declaredOrder = new Dictionary<string, int>(StringComparer.Ordinal);
+        var groups = new HashSet<string>(StringComparer.Ordinal);
+        foreach (var agent in root.Descendants().Where(e => LocalNameIs(e, "agent") && IsInHead(e)))
+        {
+            if (agent.Attribute(XNamespace.Xml + "id")?.Value.Trim() is not { Length: > 0 } id) continue;
+            declaredOrder.TryAdd(id, declaredOrder.Count);
+            if (string.Equals(agent.Attribute("type")?.Value.Trim(), "group", StringComparison.OrdinalIgnoreCase))
+                groups.Add(id);
+        }
+
+        var persons = lineAgents
+            .Where(a => a.Length == 1 && !groups.Contains(a[0]))
+            .Select((a, appearance) => (Id: a[0], Appearance: appearance))
+            .GroupBy(x => x.Id, StringComparer.Ordinal)
+            .Select(g => (g.Key, Appearance: g.Min(x => x.Appearance)))
+            .OrderBy(x => declaredOrder.TryGetValue(x.Key, out var order) ? order : int.MaxValue)
+            .ThenBy(x => x.Appearance)
+            .Select(x => x.Key)
+            .ToList();
+        var secondPerson = persons.Count > 1 ? persons[1] : null;
+
+        for (var i = 0; i < lines.Count; i++)
+        {
+            var ids = lineAgents[i];
+            lines[i].Voice = ids.Length > 1 || (ids.Length == 1 && groups.Contains(ids[0])) ? LyricVoice.Group
+                : ids.Length == 1 && ids[0] == secondPerson ? LyricVoice.Voice2
+                : LyricVoice.Default;
+        }
+    }
 
     /// <summary>
     /// Maps one Apple layer's &lt;text for="L#"&gt; entries by key. The layer elements
@@ -360,8 +494,10 @@ public static class TtmlParser
                 case XText t when ignoreFormattingWhitespace && IsFormattingWhitespace(t.Value):
                     break;
 
+                // Text wrapped across source lines is one run of words: XML's default
+                // whitespace handling makes the newline + indentation a single space (#132).
                 case XText t:
-                    AppendText(t.Value, targetText, targetWords);
+                    AppendText(CollapseLineBreaks(t.Value), targetText, targetWords);
                     break;
 
                 case XElement el when LocalNameIs(el, "br"):
@@ -478,6 +614,28 @@ public static class TtmlParser
             }
         }
 
+        return sb.ToString();
+    }
+
+    /// <summary>Each whitespace run holding a line break becomes one space; other text is untouched.</summary>
+    private static string CollapseLineBreaks(string s)
+    {
+        if (s.IndexOfAny(new[] { '\n', '\r' }) < 0 || string.IsNullOrWhiteSpace(s)) return s;
+        var sb = new StringBuilder(s.Length);
+        var i = 0;
+        while (i < s.Length)
+        {
+            if (!char.IsWhiteSpace(s[i])) { sb.Append(s[i++]); continue; }
+            var start = i;
+            var hasBreak = false;
+            while (i < s.Length && char.IsWhiteSpace(s[i]))
+            {
+                if (s[i] is '\n' or '\r') hasBreak = true;
+                i++;
+            }
+            if (hasBreak) sb.Append(' ');
+            else sb.Append(s, start, i - start);
+        }
         return sb.ToString();
     }
 
