@@ -125,7 +125,36 @@ public static class ShareCardRenderer
         using var art = LoadArtwork(spec.ArtworkPath);
         using var surface = SKSurface.Create(new SKImageInfo(
             (int)Math.Round(w * scale), (int)Math.Round(h * scale)));
-        var canvas = surface.Canvas;
+        DrawLyricCard(surface.Canvas, spec, w, h, scale, art);
+
+        using var image = surface.Snapshot();
+        using var data = image.Encode(SKEncodedImageFormat.Png, 100);
+        return data.ToArray();
+    }
+
+    /// <summary>
+    /// The live preview's render: the same card as <see cref="RenderLyricCardStyled"/>, drawn
+    /// straight into a BGRA premul bitmap with an already decoded cover (<see cref="LoadCardArtwork"/>).
+    /// No PNG round trip and no cover decode per change: those were most of the preview's
+    /// lag (a 9:16 PNG encode alone ~130 ms). The caller owns the result.
+    /// </summary>
+    public static SKBitmap RenderLyricCardBitmap(LyricCardSpec spec, float scale, SKBitmap? art)
+    {
+        int w = CanvasWidth;
+        int h = spec.Format == ShareCardFormat.Story ? 1920 : 1080;
+        var bitmap = new SKBitmap(new SKImageInfo(
+            (int)Math.Round(w * scale), (int)Math.Round(h * scale), SKColorType.Bgra8888, SKAlphaType.Premul));
+        using var canvas = new SKCanvas(bitmap);
+        DrawLyricCard(canvas, spec, w, h, scale, art);
+        return bitmap;
+    }
+
+    /// <summary>The cover as the card draws it (subsampled, at most 1024 px), decoded once by
+    /// a caller that renders the same card many times. Null without usable artwork.</summary>
+    public static SKBitmap? LoadCardArtwork(string? path) => LoadArtwork(path);
+
+    private static void DrawLyricCard(SKCanvas canvas, LyricCardSpec spec, int w, int h, float scale, SKBitmap? art)
+    {
         canvas.Scale(scale);
 
         using var boldFace = ResolveTypeface(SKFontStyleWeight.Bold);
@@ -142,10 +171,6 @@ public static class ShareCardRenderer
             DrawTextFallback(canvas, chrome.Wrapped[i].Text, chrome.RowX[i], baseline, lyricPaint);
             baseline += chrome.LineHeight;
         }
-
-        using var image = surface.Snapshot();
-        using var data = image.Encode(SKEncodedImageFormat.Png, 100);
-        return data.ToArray();
     }
 
     /// <summary>Geometry the lyric block was laid out with, so per-frame redraws land
@@ -181,12 +206,14 @@ public static class ShareCardRenderer
             canvas.Clear(SKColors.Black);
             DrawBlurredCover(canvas, art!, w, h);
             // Lighter scrim than the legacy card so the cover stays vivid behind legible text.
-            using (var scrim = new SKPaint { Color = new SKColor(0, 0, 0, 0x6E) })
+            // Text: Black frosts the cover light instead (it used to be ignored here: white
+            // text whatever was picked). Auto stays white over the dark scrim.
+            darkText = spec.TextColor == ShareTextColor.Black;
+            using (var scrim = new SKPaint { Color = darkText ? new SKColor(255, 255, 255, 0xA0) : new SKColor(0, 0, 0, 0x6E) })
                 canvas.DrawRect(0, 0, w, h, scrim);
-            darkText = false;
-            fg = SKColors.White;
-            fgSubtle = fg.WithAlpha(205);
-            badgeLetter = new SKColor(0x1B, 0x1B, 0x1B);
+            fg = darkText ? new SKColor(0x14, 0x14, 0x14) : SKColors.White;
+            fgSubtle = fg.WithAlpha((byte)(darkText ? 150 : 205));
+            badgeLetter = darkText ? SKColors.White : new SKColor(0x1B, 0x1B, 0x1B);
         }
         else
         {
@@ -248,7 +275,7 @@ public static class ShareCardRenderer
 
         // Card body: a translucent overlay tone so the background color stays the star —
         // lighter than the bg for light text, deeper for dark text, frosted over artwork.
-        var bodyFill = artworkBlur ? new SKColor(255, 255, 255, 0x22)
+        var bodyFill = artworkBlur && !darkText ? new SKColor(255, 255, 255, 0x22)
                      : darkText ? new SKColor(0, 0, 0, 0x12)
                      : new SKColor(255, 255, 255, 0x16);
         using (var fill = new SKPaint { IsAntialias = true, Color = bodyFill })
@@ -265,7 +292,7 @@ public static class ShareCardRenderer
         // ── Header panel: a deeper tone than the body, so it reads as its own chip ──
         var headRect = new SKRect(boxRect.Left + pad, boxRect.Top + pad,
                                   boxRect.Right - pad, boxRect.Top + pad + headerPanelH);
-        var headFill = artworkBlur ? new SKColor(0, 0, 0, 0x46)
+        var headFill = artworkBlur && !darkText ? new SKColor(0, 0, 0, 0x46)
                      : darkText ? new SKColor(0, 0, 0, 0x16)
                      : new SKColor(0, 0, 0, 0x30);
         using (var fill = new SKPaint { IsAntialias = true, Color = headFill })
@@ -552,7 +579,9 @@ public static class ShareCardRenderer
         public int PixelWidth { get; }
         public int PixelHeight { get; }
 
-        public KaraokeCardAnimator(LyricCardSpec spec, IReadOnlyList<KaraokeLine> karaoke, float scale)
+        /// <param name="art">The cover from <see cref="LoadCardArtwork"/> when the caller keeps
+        /// one (not disposed here); null decodes <see cref="LyricCardSpec.ArtworkPath"/>.</param>
+        public KaraokeCardAnimator(LyricCardSpec spec, IReadOnlyList<KaraokeLine> karaoke, float scale, SKBitmap? art = null)
         {
             _karaoke = karaoke;
             _scale = scale;
@@ -566,7 +595,7 @@ public static class ShareCardRenderer
             _surface = SKSurface.Create(new SKImageInfo(PixelWidth, PixelHeight, SKColorType.Bgra8888, SKAlphaType.Premul));
             var canvas = _surface.Canvas;
 
-            using var art = LoadArtwork(spec.ArtworkPath);
+            using var loaded = art == null ? LoadArtwork(spec.ArtworkPath) : null;
             using var boldFace = ResolveTypeface(SKFontStyleWeight.Bold);
             using var regularFace = ResolveTypeface(SKFontStyleWeight.Normal);
             _lyricFace = ResolveTypeface(
@@ -574,7 +603,7 @@ public static class ShareCardRenderer
 
             canvas.Save();
             canvas.Scale(scale);
-            _chrome = DrawCardBase(canvas, spec, w, h, art, boldFace, regularFace, _lyricFace);
+            _chrome = DrawCardBase(canvas, spec, w, h, art ?? loaded, boldFace, regularFace, _lyricFace);
             canvas.Restore();
             _baseImage = _surface.Snapshot();
 

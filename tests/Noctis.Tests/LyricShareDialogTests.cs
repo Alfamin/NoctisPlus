@@ -91,6 +91,134 @@ public class LyricShareDialogTests
         Assert.True(lit == 0, $"{lit} text pixels below y={bandTop} on the {format} {layout} card");
     }
 
+    /// <summary>
+    /// Bug: on the Artwork background the Text option did nothing. The renderer forced white
+    /// text there whatever was picked, so Black drew the very same card as White. A plain grey
+    /// cover makes it countable: only dark text (and the wordmark) can draw near-black pixels.
+    /// </summary>
+    [Theory]
+    [InlineData(ShareCardLayout.Panel)]
+    [InlineData(ShareCardLayout.Poster)]
+    public void BlackText_AppliesOnTheArtworkBackground(ShareCardLayout layout)
+    {
+        var dir = Path.Combine(Path.GetTempPath(), $"noctis-share-test-{Guid.NewGuid():N}");
+        Directory.CreateDirectory(dir);
+        try
+        {
+            var cover = Path.Combine(dir, "grey.png");
+            using (var grey = new SKBitmap(600, 600))
+            {
+                grey.Erase(new SKColor(0xC8, 0xC8, 0xC8));
+                using var image = SKImage.FromBitmap(grey);
+                using var data = image.Encode(SKEncodedImageFormat.Png, 100);
+                File.WriteAllBytes(cover, data.ToArray());
+            }
+            int Count(ShareTextColor text, Func<int, bool> luma)
+            {
+                var spec = new LyricCardSpec
+                {
+                    Title = "TUTU", Artist = "6ix9ine", ArtworkPath = cover, Layout = layout,
+                    Lines = new[] { "You can't do this", "it drives you crazy" },
+                    Background = ShareBackground.Artwork, TextColor = text,
+                };
+                using var bmp = SKBitmap.Decode(ShareCardRenderer.RenderLyricCardStyled(spec));
+                int n = 0;
+                foreach (var c in bmp.Pixels)
+                    if (luma((c.Red * 2126 + c.Green * 7152 + c.Blue * 722) / 10000)) n++;
+                return n;
+            }
+
+            Assert.True(Count(ShareTextColor.Black, l => l < 50) > 2000, "Black drew no dark text on the artwork card");
+            Assert.True(Count(ShareTextColor.White, l => l > 240) > 2000, "White no longer draws white text on the artwork card");
+            Assert.Equal(0, Count(ShareTextColor.White, l => l < 50));
+        }
+        finally { try { Directory.Delete(dir, true); } catch { } }
+    }
+
+    // ── Live preview ──
+
+    /// <summary>A busy JPEG cover of <paramref name="size"/>² (a hi-res release's size).</summary>
+    private static string WriteCover(string dir, int size)
+    {
+        var path = Path.Combine(dir, "cover.jpg");
+        using var bmp = new SKBitmap(size, size);
+        var rnd = new Random(1);
+        using (var canvas = new SKCanvas(bmp))
+        using (var paint = new SKPaint { IsAntialias = true })
+        {
+            canvas.Clear(new SKColor(30, 60, 120));
+            for (int i = 0; i < 400; i++)
+            {
+                paint.Color = new SKColor((byte)rnd.Next(256), (byte)rnd.Next(256), (byte)rnd.Next(256));
+                canvas.DrawCircle(rnd.Next(size), rnd.Next(size), rnd.Next(size / 20, size / 4), paint);
+            }
+        }
+        using var image = SKImage.FromBitmap(bmp);
+        using var data = image.Encode(SKEncodedImageFormat.Jpeg, 92);
+        File.WriteAllBytes(path, data.ToArray());
+        return path;
+    }
+
+    /// <summary>
+    /// Owner 10-12: a change to Text, Background, Format or Layout took about a second to
+    /// show on the card. Each change waited out the 200 ms typing debounce, then re-decoded
+    /// the cover from disk, drew the card at 1080 px, PNG-encoded it and decoded the PNG back
+    /// (headless, 3000 px cover: 340-530 ms a change). The card has to follow at once.
+    /// </summary>
+    [AvaloniaFact]
+    public void OptionChanges_ReachThePreview_AtOnce()
+    {
+        var dir = Path.Combine(Path.GetTempPath(), $"noctis-share-test-{Guid.NewGuid():N}");
+        Directory.CreateDirectory(dir);
+        var track = Song();
+        track.AlbumArtworkPath = WriteCover(dir, 3000);
+        var vm = new LyricShareViewModel(track, new[]
+        {
+            "You can't do this 'cause you ain't me", "it drives you crazy every single night",
+            "third line here", "fourth line here",
+        }, 0);
+        try
+        {
+            Assert.True(PumpUntil(() => vm.Preview != null, 10000), "preview never rendered");
+            var changes = new (string Name, Action Apply)[]
+            {
+                ("Text: White", () => vm.TextColorIndex = 1),
+                ("Text: Black", () => vm.TextColorIndex = 2),
+                ("Background: Artwork", () => vm.SelectedBackground = vm.BackgroundChoices[0]),
+                ("Format: 9:16", () => vm.FormatIndex = 1),
+                ("Layout: Poster", () => vm.LayoutIndex = 1),
+                ("Background: Navy", () => vm.SelectedBackground = vm.BackgroundChoices.First(c => c.Hex == "#0D2137")),
+                ("Format: 1:1", () => vm.FormatIndex = 0),
+                ("Layout: Card", () => vm.LayoutIndex = 0),
+                ("Background: Auto", () => vm.SelectedBackground = vm.BackgroundChoices[1]),
+            };
+            var times = new List<(string Name, long Ms)>();
+            var shapes = new List<(string Name, bool Story, PixelSize Size)>();
+            foreach (var (name, apply) in changes)
+            {
+                var before = vm.Preview;
+                var sw = Stopwatch.StartNew();
+                apply();
+                Assert.True(PumpUntil(() => vm.IsPreviewCurrent && !ReferenceEquals(vm.Preview, before), 5000),
+                    $"{name} never reached the preview");
+                times.Add((name, sw.ElapsedMilliseconds));
+                shapes.Add((name, vm.IsStory, vm.Preview!.PixelSize));
+            }
+            var report = string.Join(", ", times.Select(t => $"{t.Name} {t.Ms} ms"));
+            var median = times.Select(t => t.Ms).OrderBy(ms => ms).ElementAt(times.Count / 2);
+            Assert.True(median <= 100, $"median {median} ms: {report}");
+            Assert.True(times.Max(t => t.Ms) <= 250, report);
+            // The bitmap that landed is the card for the new options (9:16 is tall).
+            foreach (var (name, story, size) in shapes)
+                Assert.True(story ? size.Height > size.Width : size.Height == size.Width, $"after {name} the preview is {size}");
+        }
+        finally
+        {
+            vm.Detach();
+            try { Directory.Delete(dir, true); } catch { }
+        }
+    }
+
     // ── Clip export ──
 
     /// <summary>Fakes the converter service so ExportClipAsync finds "ffmpeg" (our script).</summary>
@@ -141,7 +269,7 @@ public class LyricShareDialogTests
             var audio = Path.Combine(dir, "song.flac");
             File.WriteAllText(audio, "audio");
             var vm = new LyricShareViewModel(Song(filePath: audio), new[] { "one", "two", "three" }, 0);
-            Assert.True(PumpUntil(() => vm.CurrentPng != null), "preview never rendered");
+            Assert.True(PumpUntil(() => vm.Preview != null), "preview never rendered");
 
             var output = Path.Combine(dir, "clip.mp4");
             var export = vm.ExportClipAsync(output);
@@ -158,6 +286,35 @@ public class LyricShareDialogTests
             App.Services = previous;
             try { Directory.Delete(dir, true); } catch { }
         }
+    }
+
+    /// <summary>
+    /// Bug: closing the dialog while a line's edit box was emptied rendered the card again
+    /// after the dialog was gone. Detach puts the line's text back (EndEdit) while it still
+    /// listens to the lines, so the card re-rendered; with word-timed lyrics that render
+    /// re-armed the 30 Hz karaoke timer, which went on drawing frames for a closed dialog.
+    /// </summary>
+    [AvaloniaFact]
+    public void Closing_WhileALineIsBlanked_DoesNotRenderAgain()
+    {
+        using var persistence = new TestPersistenceService();
+        var player = new PlayerViewModel(new FakeAudioPlayer(), new FakeLibraryService(), persistence, new FakeAnimatedCoverService());
+        var song = Song();
+        player.CurrentTrack = song;
+        var lines = new[] { "one two", "three four", "five six" };
+        var stamps = lines.Select((_, i) => (TimeSpan?)TimeSpan.FromSeconds(i * 5)).ToList();
+        var words = lines.Select((l, i) => (IReadOnlyList<WordTiming>?)l.Split(' ')
+            .Select((w, k) => new WordTiming { Text = w, Start = TimeSpan.FromSeconds(i * 5 + k) }).ToList()).ToList();
+        var vm = new LyricShareViewModel(song, lines, stamps, player, words);
+        Assert.True(PumpUntil(() => vm.AnimatedPreview != null, 5000), "the karaoke preview never started");
+
+        vm.BeginEdit(vm.Lines[0]);
+        vm.Lines[0].Text = "  ";
+        vm.Detach(); // what closing the dialog does
+
+        PumpUntil(() => false, 700);
+        Assert.Equal("one two", vm.Lines[0].Text);
+        Assert.Null(vm.AnimatedPreview);
     }
 
     // ── Playback sync ──
@@ -345,7 +502,8 @@ public class LyricShareDialogTests
         => vm.Lines.Select((l, i) => (l, i)).Where(p => flag(p.l)).Select(p => p.i).ToArray();
 
     /// <summary>Not a bug: names built from titles carry no characters the file system refuses.</summary>
-    [Fact]
+    // AvaloniaFact: the view model posts its first preview render to the UI dispatcher.
+    [AvaloniaFact]
     public void SuggestedNames_HaveNoInvalidCharacters()
     {
         var vm = new LyricShareViewModel(Song("Live: \"Who?\" <A|B>*", "AC/DC"), new[] { "x" }, 0);
@@ -613,6 +771,39 @@ public class LyricShareDialogTests
                 box.IsDropDownOpen = false;
             }
             finally { if (win.IsVisible) { win.Close(); PumpUntil(() => !win.IsVisible); } }
+        }
+    }
+
+    /// <summary>
+    /// Bug: Save Card drew the full-size card (2160 px, PNG) before the save picker opened, so
+    /// a click sat 0.3-0.9 s before anything showed (measured: 1:1 solid ~300 ms, 9:16 artwork
+    /// ~870 ms). The card renders while the picker is up. Headless, the picker cancels at once,
+    /// so the click is done long before the card could have rendered.
+    /// </summary>
+    [AvaloniaFact]
+    public void SaveCard_OpensThePicker_WithoutWaitingForTheRender()
+    {
+        EnsureAppStyles();
+        var dir = Path.Combine(Path.GetTempPath(), $"noctis-share-test-{Guid.NewGuid():N}");
+        Directory.CreateDirectory(dir);
+        var track = Song();
+        track.AlbumArtworkPath = WriteCover(dir, 3000);
+        var vm = new LyricShareViewModel(track, new[] { "one line", "two lines", "three lines" }, 0) { FormatIndex = 1 };
+        vm.SelectedBackground = vm.BackgroundChoices[0];
+        var win = new Noctis.Views.LyricShareDialog(vm) { Width = 1280, Height = 860 };
+        win.Show();
+        try
+        {
+            Assert.True(PumpUntil(() => vm.Preview != null && vm.IsPreviewCurrent, 10000), "preview never rendered");
+            var sw = Stopwatch.StartNew();
+            Named<Button>(win, "SaveCardButton").RaiseEvent(new Avalonia.Interactivity.RoutedEventArgs(Button.ClickEvent));
+            Assert.True(PumpUntil(() => !win.IsBusy, 5000), "Save Card never finished");
+            Assert.True(sw.ElapsedMilliseconds < 150, $"the picker waited {sw.ElapsedMilliseconds} ms for the card");
+        }
+        finally
+        {
+            if (win.IsVisible) { win.Close(); PumpUntil(() => !win.IsVisible); }
+            try { Directory.Delete(dir, true); } catch { }
         }
     }
 
