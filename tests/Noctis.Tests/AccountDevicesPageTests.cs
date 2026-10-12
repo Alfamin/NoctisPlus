@@ -240,7 +240,11 @@ public class AccountDevicesPageTests : IDisposable
             vm.NoctisServerEnabled = true;
             vm.NoctisServerEnabled = false;
             await ServerSettled(vm, expectRunning: false);
-            await Task.Delay(500); // a start that escaped the stop would be listening by now
+            // The switch reads off at once, but the first start may still be finishing on a slow
+            // runner before the queued stop runs: wait for the port to close, then make sure no
+            // start escaped the stop and opened it again.
+            for (var waited = 0; Listening(port) && waited < 5000; waited += 100) await Task.Delay(100);
+            await Task.Delay(500);
             Assert.False(Listening(port));
 
             vm.NoctisServerEnabled = true;
