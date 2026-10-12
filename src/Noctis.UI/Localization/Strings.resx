@@ -2645,4 +2645,7 @@ The lines and their timings are dropped and an empty lyrics box opens for your o
   <data name="Time.HoursAgo" xml:space="preserve"><value>{0} h ago</value><comment>Relative time; {0} = hours</comment></data>
   <data name="Time.OnDate" xml:space="preserve"><value>on {0}</value><comment>Relative time older than a day; {0} = date and time in the app language's short format</comment></data>
   <data name="Phone.ForgetTip" xml:space="preserve"><value>Take this phone off the list. What it synced stays.</value><comment>Tooltip on Remove for a phone that is already signed out</comment></data>
+  <data name="Export.Copied" xml:space="preserve"><value>Copied to clipboard</value><comment>Share card / Wrap status after Copy</comment></data>
+  <data name="Export.ClipboardUnavailable" xml:space="preserve"><value>Clipboard unavailable</value><comment>Share card / Wrap status when there is no clipboard</comment></data>
+  <data name="Export.SaveImageTitle" xml:space="preserve"><value>Save image</value><comment>Title of the save dialog for a share card or Wrap image</comment></data>
 </root>

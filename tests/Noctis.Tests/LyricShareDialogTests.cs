@@ -517,6 +517,34 @@ public class LyricShareDialogTests
         finally { vm.Detach(); }
     }
 
+    /// <summary>A song without an artist: the name starts with the title, not " - ".</summary>
+    [AvaloniaFact]
+    public void SuggestedName_WithoutAnArtist_StartsWithTheTitle()
+    {
+        var vm = new LyricShareViewModel(Song("Intro", ""), new[] { "x" }, 0);
+        try
+        {
+            Assert.Equal("Intro lyrics.png", vm.SuggestedFileName);
+            Assert.Equal("Intro lyrics.mp4", vm.SuggestedVideoFileName);
+        }
+        finally { vm.Detach(); }
+    }
+
+    /// <summary>The export status the dialog shows reads in the app language (it was fixed English).</summary>
+    [AvaloniaFact]
+    public void ExportStatus_ReadsInTheAppLanguage()
+    {
+        try
+        {
+            Noctis.Localization.Loc.Instance.SetCulture("ru");
+            Assert.Equal(Noctis.Localization.Loc.T("ShareLyrics.Saved"), Noctis.Helpers.PngExportHelper.SavedStatus);
+            Assert.NotEqual("Copied to clipboard", Noctis.Helpers.PngExportHelper.CopiedStatus);
+            Assert.StartsWith(Noctis.Localization.Loc.T("ShareLyrics.SaveFailed"), Noctis.Helpers.PngExportHelper.SaveFailedStatus("disk full"));
+            Assert.EndsWith("disk full", Noctis.Helpers.PngExportHelper.SaveFailedStatus("disk full"));
+        }
+        finally { Noctis.Localization.Loc.Instance.SetCulture("en"); }
+    }
+
     /// <summary>Edit in place: Esc puts the text back, an emptied line gets its text back,
     /// Enter keeps the edit; editing a line picks it.</summary>
     [AvaloniaFact]

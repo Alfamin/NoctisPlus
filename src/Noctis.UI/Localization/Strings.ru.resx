@@ -2645,4 +2645,7 @@ Deezer и TIDAL: вставьте ссылку.</value></data>
   <data name="Time.HoursAgo" xml:space="preserve"><value>{0} ч назад</value><comment>Relative time; {0} = hours</comment></data>
   <data name="Time.OnDate" xml:space="preserve"><value>{0}</value><comment>Relative time older than a day; {0} = date and time like '9 Oct, 14:05'</comment></data>
   <data name="Phone.ForgetTip" xml:space="preserve"><value>Убрать телефон из списка. Синхронизированные данные останутся.</value><comment>Tooltip on Remove for a phone that is already signed out</comment></data>
+  <data name="Export.Copied" xml:space="preserve"><value>Скопировано в буфер обмена</value><comment>Share card / Wrap status after Copy</comment></data>
+  <data name="Export.ClipboardUnavailable" xml:space="preserve"><value>Буфер обмена недоступен</value><comment>Share card / Wrap status when there is no clipboard</comment></data>
+  <data name="Export.SaveImageTitle" xml:space="preserve"><value>Сохранить изображение</value><comment>Title of the save dialog for a share card or Wrap image</comment></data>
 </root>

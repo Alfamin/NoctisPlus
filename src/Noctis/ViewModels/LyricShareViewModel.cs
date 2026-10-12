@@ -403,7 +403,10 @@ public partial class LyricShareViewModel : ViewModelBase
     {
         get
         {
-            var name = $"{_track.Artist} - {_track.Title} lyrics";
+            // No artist: the title alone (it read " - Intro lyrics.png").
+            var name = string.IsNullOrWhiteSpace(_track.Artist)
+                ? $"{_track.Title} lyrics"
+                : $"{_track.Artist} - {_track.Title} lyrics";
             foreach (var c in Path.GetInvalidFileNameChars())
                 name = name.Replace(c, '_');
             return name + ".png";
