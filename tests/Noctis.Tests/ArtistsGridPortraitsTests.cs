@@ -118,6 +118,65 @@ public class ArtistsGridPortraitsTests
         }
     }
 
+    /// <summary>Deezer with every artist on it: each search finds the asked-for name.</summary>
+    private sealed class EveryoneFound : HttpMessageHandler
+    {
+        private readonly IReadOnlyList<string> _names;
+        public EveryoneFound(IReadOnlyList<string> names) => _names = names;
+
+        protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken ct)
+        {
+            var url = request.RequestUri!.ToString();
+            if (url.StartsWith("https://api.deezer.com/search/artist", StringComparison.Ordinal))
+            {
+                var query = Uri.UnescapeDataString(request.RequestUri.Query);
+                var name = _names.FirstOrDefault(n => query.Contains(n, StringComparison.OrdinalIgnoreCase));
+                var json = name == null
+                    ? """{ "data": [] }"""
+                    : $$"""{ "data": [ { "name": "{{name}}", "picture_xl": "https://images.example/{{Uri.EscapeDataString(name)}}.jpg" } ] }""";
+                return Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK)
+                {
+                    Content = new StringContent(json, Encoding.UTF8, "application/json")
+                });
+            }
+            return Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK)
+            {
+                Content = new ByteArrayContent(Jpeg()) { Headers = { ContentType = new("image/jpeg") } }
+            });
+        }
+    }
+
+    [AvaloniaFact]
+    public async Task FirstDownloads_ReachTheGridWhileTheSweepIsStillRunning()
+    {
+        // A first sweep downloads a portrait every ~150 ms (paced). The grid's 2 s batch
+        // was restarted by every one of them, so no tile repainted until the whole
+        // sweep was over: minutes on a real library.
+        using var persistence = new TestPersistenceService();
+        var names = Enumerable.Range(0, 40).Select(i => $"Singer {i:D2}").ToList();
+        var images = new ArtistImageService(new HttpClient(new EveryoneFound(names)), persistence);
+        var lib = new FakeLibraryService();
+        lib.ArtistList.AddRange(Instances(names));
+        var vm = new LibraryArtistsViewModel(lib);
+        vm.SetArtistImageService(images);
+
+        // Per Reset: tiles painted with a portrait, and whether the sweep had finished.
+        var resets = new List<(int Painted, bool SweepDone)>();
+        vm.ArtistRows.CollectionChanged += (_, e) =>
+        {
+            if (e.Action != NotifyCollectionChangedAction.Reset) return;
+            resets.Add((vm.ArtistRows.SelectMany(r => r.Artists).Count(a => a.ImagePath != null),
+                lib.ArtistList.All(a => a.ImagePath != null)));
+        };
+
+        vm.IsActive = true;
+        await PumpUntil(() => resets.Any(r => r.SweepDone && r.Painted == names.Count), 20000);
+        _out.WriteLine("resets: " + string.Join(", ", resets.Select(r => $"{r.Painted}{(r.SweepDone ? " (done)" : "")}")));
+
+        Assert.Contains(resets, r => r.SweepDone && r.Painted == names.Count);
+        Assert.Contains(resets, r => !r.SweepDone && r.Painted > 0);
+    }
+
     [AvaloniaFact]
     public async Task ScanPublish_RowsKeepThePortraitsAlreadyShown_BeforeAnySweepRuns()
     {

@@ -242,11 +242,13 @@ public partial class LibraryArtistsViewModel : ViewModelBase, ISearchable, IDisp
 
         _ = _artistImageService.FetchAndCacheAsync(_allArtists, (artist, path) =>
         {
-            // Debounce list rebuild — batch image updates every 2 seconds
+            // Batch image updates every 2 seconds. Not restarted per update: a paced
+            // first sweep lands a portrait every ~150 ms, so restarting the timer held
+            // every tile back until the whole sweep was over (GitHub #137).
             Dispatcher.UIThread.Post(() =>
             {
-                _imageRefreshDebounce.Stop();
-                _imageRefreshDebounce.Start();
+                if (!_imageRefreshDebounce.IsEnabled)
+                    _imageRefreshDebounce.Start();
             });
         });
     }
