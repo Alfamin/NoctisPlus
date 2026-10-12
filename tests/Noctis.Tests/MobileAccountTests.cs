@@ -29,6 +29,7 @@ public class MobileAccountTests
         public NoctisAccount? Account { get; set; }
         public bool IsSignedIn => Account != null;
         public bool IsSyncing { get; set; }
+        public bool WasSignedOutByComputer { get; set; }
         public string? AvatarPath { get; set; }
 
         public event EventHandler? StateChanged;
@@ -300,13 +301,13 @@ public class MobileAccountTests
     }
 
     [Theory]
-    [InlineData(NoctisErrorKind.Unreachable, "Can't reach your computer. Check it's on, Noctis is open, Pair a device is on, and both are on the same Wi-Fi.")]
-    [InlineData(NoctisErrorKind.CertificateChanged, "Your computer's certificate changed while signing in. Try again and check the fingerprint.")]
+    [InlineData(NoctisErrorKind.Unreachable, "Can't reach your computer. Check that Noctis is open on it, Noctis on your phone is turned on, and both are on the same Wi-Fi.")]
+    [InlineData(NoctisErrorKind.CertificateChanged, "Your computer's security code changed while signing in. Try again and check the code.")]
     [InlineData(NoctisErrorKind.BadCredentials, "Wrong email, username or password.")]
     [InlineData(NoctisErrorKind.LockedOut, "Too many failed sign-ins. Wait a few minutes, then try again.")]
-    [InlineData(NoctisErrorKind.SyncDisabled, "Turn on Sync on your computer (Settings → Account & Devices).")]
-    [InlineData(NoctisErrorKind.SignedOut, "This phone was removed on your computer. Sign in again.")]
-    [InlineData(NoctisErrorKind.InvalidAddress, "Enter your computer's address as shown in Pair a device, like 192.168.1.20 or https://192.168.1.20:4747.")]
+    [InlineData(NoctisErrorKind.SyncDisabled, "Sync is off on your computer. Turn on Sync with your phone in Settings, Account & Devices.")]
+    [InlineData(NoctisErrorKind.SignedOut, "Your computer signed this phone out. Sign in again.")]
+    [InlineData(NoctisErrorKind.InvalidAddress, "Enter your computer's address as shown under Connect a phone, like 192.168.1.20 or https://192.168.1.20:4747.")]
     [InlineData(NoctisErrorKind.Server, "Your computer couldn't finish that. Try again in a moment.")]
     public async Task SignIn_EachErrorKind_IsWorded(NoctisErrorKind kind, string message)
     {
@@ -355,7 +356,7 @@ public class MobileAccountTests
         account.SyncError = new NoctisServerException(NoctisErrorKind.CertificateChanged, "pin mismatch");
         await page.SyncNowCommand.ExecuteAsync(null);
 
-        Assert.Equal("Your computer's certificate changed. Sign out and sign in again to trust the new one.", page.ErrorText);
+        Assert.Equal("Your computer's security code changed. Sign out and sign in again to trust the new one.", page.ErrorText);
         Assert.True(page.IsCertificateChanged);
         Assert.False(page.CanUseServer);                                   // Sync and Download hidden
         Assert.True(page.IsSignedIn);                                      // Sign out stays
@@ -363,17 +364,58 @@ public class MobileAccountTests
     }
 
     [Fact]
-    public async Task SyncNow_SyncDisabled_IsWorded()
+    public async Task SyncNow_SyncOffOnTheComputer_IsANoteNotAnError()
     {
+        // The computer's "Sync with your phone" switch is the owner's choice: the songs still
+        // came over (catalog and plays go through), so no red error for it.
         using var rig = MobileFixtures.MakeRig();
         var account = new FakeAccount { Account = FakeAccount.SignedInAs(), SyncError = new NoctisServerException(NoctisErrorKind.SyncDisabled, "50") };
         var page = OpenAccount(ShellWith(rig, account));
 
         await page.SyncNowCommand.ExecuteAsync(null);
 
-        Assert.Equal("Turn on Sync on your computer (Settings → Account & Devices).", page.ErrorText);
+        Assert.False(page.HasError);
         Assert.True(page.CanUseServer);
-        Assert.Equal(string.Empty, page.SyncText);
+        Assert.Equal("Songs updated. Sync is off on your computer.", page.SyncText);
+    }
+
+    [Fact]
+    public void SignedOutByTheComputer_AtAppStart_TheAccountPageSaysWhy()
+    {
+        using var rig = MobileFixtures.MakeRig();
+        var account = new FakeAccount { WasSignedOutByComputer = true };
+        var page = OpenAccount(ShellWith(rig, account));
+
+        Assert.False(page.IsSignedIn);
+        Assert.Equal("Your computer signed this phone out. Sign in again.", page.ErrorText);
+    }
+
+    [Fact]
+    public void SignedOutByTheComputer_WhileThePageIsOpen_TheAccountPageSaysWhy()
+    {
+        using var rig = MobileFixtures.MakeRig();
+        var account = new FakeAccount { Account = FakeAccount.SignedInAs() };
+        var page = OpenAccount(ShellWith(rig, account));
+        Assert.False(page.HasError);
+
+        account.Account = null;
+        account.WasSignedOutByComputer = true;
+        account.RaiseStateChanged();
+
+        Assert.Equal("Your computer signed this phone out. Sign in again.", page.ErrorText);
+    }
+
+    [Fact]
+    public void SignedOutByHand_SaysNothing()
+    {
+        using var rig = MobileFixtures.MakeRig();
+        var account = new FakeAccount { Account = FakeAccount.SignedInAs() };
+        var page = OpenAccount(ShellWith(rig, account));
+
+        account.Account = null;
+        account.RaiseStateChanged();
+
+        Assert.False(page.HasError);
     }
 
     [Fact]
@@ -525,7 +567,7 @@ public class MobileAccountTests
 
         await page.SendSongsCommand.ExecuteAsync(null);
 
-        Assert.Equal("Turn on Sync on your computer (Settings → Account & Devices).", page.ErrorText);
+        Assert.Equal("Sync is off on your computer. Turn on Sync with your phone in Settings, Account & Devices.", page.ErrorText);
         Assert.Equal(string.Empty, page.UploadText);
         Assert.False(page.IsUploading);
     }

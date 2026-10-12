@@ -39,6 +39,8 @@ public sealed partial class AccountPageViewModel : MobilePage
         _account.DownloadProgress += OnDownloadProgress;
         _account.UploadProgress += OnUploadProgress;
         Refresh();
+        // Signed out by the sync at app start (which only logs): say why the form is back.
+        if (!IsSignedIn && _account.WasSignedOutByComputer) ErrorText = Describe(NoctisErrorKind.SignedOut, signedIn: false);
     }
 
     public ShellViewModel Shell { get; }
@@ -231,6 +233,12 @@ public sealed partial class AccountPageViewModel : MobilePage
             var result = await _account.SyncNowAsync();
             SyncText = $"Synced {Count(result.Songs, "song")} and {Count(result.Playlists, "playlist")}";
         }
+        catch (NoctisServerException ex) when (ex.Kind == NoctisErrorKind.SyncDisabled)
+        {
+            // The owner switched sync off on the computer: a choice, not a failure. The songs
+            // still came over (the catalog and plays go through either way).
+            SyncText = "Songs updated. Sync is off on your computer.";
+        }
         catch (Exception ex)
         {
             SyncText = string.Empty;
@@ -408,7 +416,10 @@ public sealed partial class AccountPageViewModel : MobilePage
     private void Refresh()
     {
         var account = _account.Account;
+        var wasSignedIn = IsSignedIn;
         IsSignedIn = _account.IsSignedIn && account != null;
+        if (wasSignedIn && !IsSignedIn && _account.WasSignedOutByComputer)
+            ErrorText = Describe(NoctisErrorKind.SignedOut, signedIn: false);
         var shownName = account == null ? string.Empty : ShownName(account);
         AccountText = account == null ? string.Empty : $"{shownName} on {ServerLabel(account)}";
         DisplayName = shownName;
@@ -461,16 +472,16 @@ public sealed partial class AccountPageViewModel : MobilePage
     internal static string Describe(NoctisErrorKind kind, bool signedIn) => kind switch
     {
         NoctisErrorKind.Unreachable =>
-            "Can't reach your computer. Check it's on, Noctis is open, Pair a device is on, and both are on the same Wi-Fi.",
+            "Can't reach your computer. Check that Noctis is open on it, Noctis on your phone is turned on, and both are on the same Wi-Fi.",
         NoctisErrorKind.CertificateChanged => signedIn
-            ? "Your computer's certificate changed. Sign out and sign in again to trust the new one."
-            : "Your computer's certificate changed while signing in. Try again and check the fingerprint.",
+            ? "Your computer's security code changed. Sign out and sign in again to trust the new one."
+            : "Your computer's security code changed while signing in. Try again and check the code.",
         NoctisErrorKind.BadCredentials => "Wrong email, username or password.",
         NoctisErrorKind.LockedOut => "Too many failed sign-ins. Wait a few minutes, then try again.",
-        NoctisErrorKind.SyncDisabled => "Turn on Sync on your computer (Settings → Account & Devices).",
-        NoctisErrorKind.SignedOut => "This phone was removed on your computer. Sign in again.",
+        NoctisErrorKind.SyncDisabled => "Sync is off on your computer. Turn on Sync with your phone in Settings, Account & Devices.",
+        NoctisErrorKind.SignedOut => "Your computer signed this phone out. Sign in again.",
         NoctisErrorKind.InvalidAddress =>
-            "Enter your computer's address as shown in Pair a device, like 192.168.1.20 or https://192.168.1.20:4747.",
+            "Enter your computer's address as shown under Connect a phone, like 192.168.1.20 or https://192.168.1.20:4747.",
         NoctisErrorKind.StorageFull =>
             "Your phone is almost full, so downloads stopped (1.5 GB is always left free). Remove some downloads or free up space.",
         NoctisErrorKind.FileMissing => "This song's file is missing on your computer.",

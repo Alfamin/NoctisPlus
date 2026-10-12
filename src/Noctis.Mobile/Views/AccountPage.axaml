@@ -144,7 +144,7 @@
                 <StackPanel Name="SignInForm" Spacing="10" IsVisible="{Binding IsFormVisible}">
                     <TextBlock Classes="section" FontSize="16" Text="Sign in to your Noctis desktop" />
                     <TextBlock Classes="subtle" TextWrapping="Wrap"
-                               Text="Turn on the account on your computer: Settings → Account &amp; Devices → Pair a device." />
+                               Text="On your computer, open Noctis and go to Settings, then Account &amp; Devices. Turn on Noctis on your phone and tap Connect a phone." />
                     <!-- The desktop's Create account form, mirrored: rounded fields of one height, the
                          same words (Email or username, Password), an eye on the password, one
                          full-width button. The address stays: nothing finds the computer on its own. -->
@@ -156,7 +156,7 @@
                                          PlaceholderText="https://192.168.1.20:4747"
                                          TextInputOptions.ContentType="Url" TextInputOptions.AutoCapitalization="False"
                                          TextInputOptions.ShowSuggestions="False" />
-                                <TextBlock Classes="field-hint" Text="Shown on your computer under Pair a device." />
+                                <TextBlock Classes="field-hint" Text="Shown on your computer under Connect a phone." />
                             </StackPanel>
                             <StackPanel Spacing="6">
                                 <TextBlock Classes="field-label" Text="Email or username" />
@@ -191,9 +191,9 @@
                 <!-- Trust on first use: the user compares the fingerprint before anything is sent. -->
                 <Border Name="FingerprintCard" Classes="settings-card" IsVisible="{Binding IsConfirmingFingerprint}">
                     <StackPanel Spacing="10">
-                        <TextBlock Classes="section" FontSize="16" Text="Check the fingerprint" />
+                        <TextBlock Classes="section" FontSize="16" Text="Check the security code" />
                         <TextBlock TextWrapping="Wrap"
-                                   Text="Check this matches the fingerprint on your computer (Settings → Account &amp; Devices → Pair a device)." />
+                                   Text="Your computer shows a security code under Connect a phone. Only sign in if it matches this one." />
                         <SelectableTextBlock Name="FingerprintText" Text="{Binding FingerprintDisplay}" TextWrapping="Wrap"
                                              FontFamily="monospace, Consolas, Courier New" FontSize="14" />
                         <StackPanel Orientation="Horizontal" Spacing="8">

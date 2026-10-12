@@ -91,6 +91,11 @@ public interface INoctisAccountService
     bool IsSignedIn { get; }
     bool IsSyncing { get; }
 
+    /// <summary>The computer refused this phone's key (removed there, or its password changed) and
+    /// the phone signed itself out. Cleared by the next sign-in. Lets the Account page say why
+    /// when the sync at app start was the one that found out.</summary>
+    bool WasSignedOutByComputer => false;
+
     /// <summary>The desktop's profile picture as a local file (fetched at sign-in and on each sync,
     /// kept across restarts), or null: signed out, or the desktop has none. A new picture gets a
     /// new path (image caches key by path).</summary>

@@ -239,6 +239,7 @@ public sealed partial class NoctisAccountService : INoctisAccountService, ITrack
             _client?.Dispose();
             _client = null;
             _account = account;
+            _signedOutByComputer = false;
         }
         DebugLog.Write("Account", $"signed in (sync {(result.SyncEnabled ? "on" : "off")} on the desktop)");
         RaiseStateChanged();
@@ -334,6 +335,9 @@ public sealed partial class NoctisAccountService : INoctisAccountService, ITrack
 
     /// <summary>The server rejected the key: forget the account locally (downloads and the
     /// library stay until the user signs in again or signs out).</summary>
+    private volatile bool _signedOutByComputer;
+    public bool WasSignedOutByComputer => _signedOutByComputer;
+
     private void ForgetAccountLocally()
     {
         lock (_gate)
@@ -343,6 +347,7 @@ public sealed partial class NoctisAccountService : INoctisAccountService, ITrack
             _client?.Dispose();
             _client = null;
             _account = null;
+            _signedOutByComputer = true;
         }
         ClearAvatar();
         DebugLog.Write("Account", "the desktop no longer accepts this phone's key; signed out locally");
