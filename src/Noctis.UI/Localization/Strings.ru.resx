@@ -2649,4 +2649,36 @@ Deezer и TIDAL: вставьте ссылку.</value></data>
   <data name="Export.ClipboardUnavailable" xml:space="preserve"><value>Буфер обмена недоступен</value><comment>Share card / Wrap status when there is no clipboard</comment></data>
   <data name="Export.SaveImageTitle" xml:space="preserve"><value>Сохранить изображение</value><comment>Title of the save dialog for a share card or Wrap image</comment></data>
   <data name="Common.Play" xml:space="preserve"><value>прослуш.</value><comment>Word after a play count of exactly 1 (Home and album rows: 1 play)</comment></data>
+  <data name="Shortcuts.Group.Playback" xml:space="preserve"><value>Воспроизведение</value><comment>Settings › Shortcuts (GitHub #131)</comment></data>
+  <data name="Shortcuts.Group.Window" xml:space="preserve"><value>Окно</value><comment>Settings › Shortcuts (GitHub #131)</comment></data>
+  <data name="Shortcuts.Group.Navigation" xml:space="preserve"><value>Навигация</value><comment>Settings › Shortcuts (GitHub #131)</comment></data>
+  <data name="Shortcuts.Group.Library" xml:space="preserve"><value>Медиатека</value><comment>Settings › Shortcuts (GitHub #131)</comment></data>
+  <data name="Shortcuts.NotSet" xml:space="preserve"><value>Не задано</value><comment>Settings › Shortcuts (GitHub #131)</comment></data>
+  <data name="Shortcuts.AlreadyUsedBy" xml:space="preserve"><value>Уже используется: {0}</value><comment>Settings › Shortcuts (GitHub #131)</comment></data>
+  <data name="Shortcuts.Action.PlayPause" xml:space="preserve"><value>Воспроизведение / пауза</value><comment>Settings › Shortcuts (GitHub #131)</comment></data>
+  <data name="Shortcuts.Action.NextTrack" xml:space="preserve"><value>Следующий трек</value><comment>Settings › Shortcuts (GitHub #131)</comment></data>
+  <data name="Shortcuts.Action.PreviousTrack" xml:space="preserve"><value>Предыдущий трек</value><comment>Settings › Shortcuts (GitHub #131)</comment></data>
+  <data name="Shortcuts.Action.VolumeUp" xml:space="preserve"><value>Громче</value><comment>Settings › Shortcuts (GitHub #131)</comment></data>
+  <data name="Shortcuts.Action.VolumeDown" xml:space="preserve"><value>Тише</value><comment>Settings › Shortcuts (GitHub #131)</comment></data>
+  <data name="Shortcuts.Action.ToggleFavorite" xml:space="preserve"><value>Добавить текущий трек в избранное</value><comment>Settings › Shortcuts (GitHub #131)</comment></data>
+  <data name="Shortcuts.Action.ToggleFullscreen" xml:space="preserve"><value>Полноэкранный режим</value><comment>Settings › Shortcuts (GitHub #131)</comment></data>
+  <data name="Shortcuts.Action.SearchLibrary" xml:space="preserve"><value>Поиск в медиатеке</value><comment>Settings › Shortcuts (GitHub #131)</comment></data>
+  <data name="Shortcuts.Action.CommandPalette" xml:space="preserve"><value>Палитра команд</value><comment>Settings › Shortcuts (GitHub #131)</comment></data>
+  <data name="Shortcuts.Action.NewPlaylist" xml:space="preserve"><value>Новый плейлист</value><comment>Settings › Shortcuts (GitHub #131)</comment></data>
+  <data name="Shortcuts.Action.ToggleQueue" xml:space="preserve"><value>Показать / скрыть очередь</value><comment>Settings › Shortcuts (GitHub #131)</comment></data>
+  <data name="Shortcuts.Action.ToggleLyrics" xml:space="preserve"><value>Показать / скрыть текст</value><comment>Settings › Shortcuts (GitHub #131)</comment></data>
+  <data name="Shortcuts.Action.OpenSettings" xml:space="preserve"><value>Открыть настройки</value><comment>Settings › Shortcuts (GitHub #131)</comment></data>
+  <data name="Shortcuts.Action.ScanReplayGain" xml:space="preserve"><value>ReplayGain для выбранных песен</value><comment>Settings › Shortcuts (GitHub #131)</comment></data>
+  <data name="Shortcuts.Action.ToggleShuffle" xml:space="preserve"><value>Перемешивание вкл. / выкл.</value><comment>Settings › Shortcuts (GitHub #131)</comment></data>
+  <data name="Shortcuts.Action.CycleRepeat" xml:space="preserve"><value>Сменить режим повтора</value><comment>Settings › Shortcuts (GitHub #131)</comment></data>
+  <data name="Shortcuts.Action.ToggleMute" xml:space="preserve"><value>Выключить / включить звук</value><comment>Settings › Shortcuts (GitHub #131)</comment></data>
+  <data name="Shortcuts.Action.SeekForward" xml:space="preserve"><value>Перемотать вперёд</value><comment>Settings › Shortcuts (GitHub #131)</comment></data>
+  <data name="Shortcuts.Action.SeekBackward" xml:space="preserve"><value>Перемотать назад</value><comment>Settings › Shortcuts (GitHub #131)</comment></data>
+  <data name="Shortcuts.Action.ToggleMiniPlayer" xml:space="preserve"><value>Мини-плеер</value><comment>Settings › Shortcuts (GitHub #131)</comment></data>
+  <data name="Shortcuts.Action.GoBack" xml:space="preserve"><value>Назад</value><comment>Settings › Shortcuts (GitHub #131)</comment></data>
+  <data name="Shortcuts.Action.GoForward" xml:space="preserve"><value>Вперёд</value><comment>Settings › Shortcuts (GitHub #131)</comment></data>
+  <data name="Shortcuts.Action.GoHome" xml:space="preserve"><value>Перейти на главную</value><comment>Settings › Shortcuts (GitHub #131)</comment></data>
+  <data name="Shortcuts.Action.GoSongs" xml:space="preserve"><value>Перейти к песням</value><comment>Settings › Shortcuts (GitHub #131)</comment></data>
+  <data name="Shortcuts.Action.GoAlbums" xml:space="preserve"><value>Перейти к альбомам</value><comment>Settings › Shortcuts (GitHub #131)</comment></data>
+  <data name="Shortcuts.Action.GoArtists" xml:space="preserve"><value>Перейти к исполнителям</value><comment>Settings › Shortcuts (GitHub #131)</comment></data>
 </root>

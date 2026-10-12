@@ -6552,4 +6552,132 @@
     <value>次播放</value>
     <comment>Word after a play count of exactly 1 (Home and album rows: 1 play)</comment>
   </data>
+  <data name="Shortcuts.Group.Playback" xml:space="preserve">
+    <value>播放</value>
+    <comment>Settings › Shortcuts (GitHub #131)</comment>
+  </data>
+  <data name="Shortcuts.Group.Window" xml:space="preserve">
+    <value>視窗</value>
+    <comment>Settings › Shortcuts (GitHub #131)</comment>
+  </data>
+  <data name="Shortcuts.Group.Navigation" xml:space="preserve">
+    <value>導覽</value>
+    <comment>Settings › Shortcuts (GitHub #131)</comment>
+  </data>
+  <data name="Shortcuts.Group.Library" xml:space="preserve">
+    <value>資料庫</value>
+    <comment>Settings › Shortcuts (GitHub #131)</comment>
+  </data>
+  <data name="Shortcuts.NotSet" xml:space="preserve">
+    <value>未設定</value>
+    <comment>Settings › Shortcuts (GitHub #131)</comment>
+  </data>
+  <data name="Shortcuts.AlreadyUsedBy" xml:space="preserve">
+    <value>已被「{0}」使用</value>
+    <comment>Settings › Shortcuts (GitHub #131)</comment>
+  </data>
+  <data name="Shortcuts.Action.PlayPause" xml:space="preserve">
+    <value>播放 / 暫停</value>
+    <comment>Settings › Shortcuts (GitHub #131)</comment>
+  </data>
+  <data name="Shortcuts.Action.NextTrack" xml:space="preserve">
+    <value>下一首</value>
+    <comment>Settings › Shortcuts (GitHub #131)</comment>
+  </data>
+  <data name="Shortcuts.Action.PreviousTrack" xml:space="preserve">
+    <value>上一首</value>
+    <comment>Settings › Shortcuts (GitHub #131)</comment>
+  </data>
+  <data name="Shortcuts.Action.VolumeUp" xml:space="preserve">
+    <value>提高音量</value>
+    <comment>Settings › Shortcuts (GitHub #131)</comment>
+  </data>
+  <data name="Shortcuts.Action.VolumeDown" xml:space="preserve">
+    <value>降低音量</value>
+    <comment>Settings › Shortcuts (GitHub #131)</comment>
+  </data>
+  <data name="Shortcuts.Action.ToggleFavorite" xml:space="preserve">
+    <value>收藏目前曲目</value>
+    <comment>Settings › Shortcuts (GitHub #131)</comment>
+  </data>
+  <data name="Shortcuts.Action.ToggleFullscreen" xml:space="preserve">
+    <value>切換全螢幕</value>
+    <comment>Settings › Shortcuts (GitHub #131)</comment>
+  </data>
+  <data name="Shortcuts.Action.SearchLibrary" xml:space="preserve">
+    <value>搜尋資料庫</value>
+    <comment>Settings › Shortcuts (GitHub #131)</comment>
+  </data>
+  <data name="Shortcuts.Action.CommandPalette" xml:space="preserve">
+    <value>命令面板</value>
+    <comment>Settings › Shortcuts (GitHub #131)</comment>
+  </data>
+  <data name="Shortcuts.Action.NewPlaylist" xml:space="preserve">
+    <value>新增播放清單</value>
+    <comment>Settings › Shortcuts (GitHub #131)</comment>
+  </data>
+  <data name="Shortcuts.Action.ToggleQueue" xml:space="preserve">
+    <value>顯示 / 隱藏佇列</value>
+    <comment>Settings › Shortcuts (GitHub #131)</comment>
+  </data>
+  <data name="Shortcuts.Action.ToggleLyrics" xml:space="preserve">
+    <value>顯示 / 隱藏歌詞</value>
+    <comment>Settings › Shortcuts (GitHub #131)</comment>
+  </data>
+  <data name="Shortcuts.Action.OpenSettings" xml:space="preserve">
+    <value>開啟設定</value>
+    <comment>Settings › Shortcuts (GitHub #131)</comment>
+  </data>
+  <data name="Shortcuts.Action.ScanReplayGain" xml:space="preserve">
+    <value>為所選歌曲計算 ReplayGain</value>
+    <comment>Settings › Shortcuts (GitHub #131)</comment>
+  </data>
+  <data name="Shortcuts.Action.ToggleShuffle" xml:space="preserve">
+    <value>開啟 / 關閉隨機播放</value>
+    <comment>Settings › Shortcuts (GitHub #131)</comment>
+  </data>
+  <data name="Shortcuts.Action.CycleRepeat" xml:space="preserve">
+    <value>切換重複模式</value>
+    <comment>Settings › Shortcuts (GitHub #131)</comment>
+  </data>
+  <data name="Shortcuts.Action.ToggleMute" xml:space="preserve">
+    <value>靜音 / 取消靜音</value>
+    <comment>Settings › Shortcuts (GitHub #131)</comment>
+  </data>
+  <data name="Shortcuts.Action.SeekForward" xml:space="preserve">
+    <value>快轉</value>
+    <comment>Settings › Shortcuts (GitHub #131)</comment>
+  </data>
+  <data name="Shortcuts.Action.SeekBackward" xml:space="preserve">
+    <value>倒轉</value>
+    <comment>Settings › Shortcuts (GitHub #131)</comment>
+  </data>
+  <data name="Shortcuts.Action.ToggleMiniPlayer" xml:space="preserve">
+    <value>迷你播放器</value>
+    <comment>Settings › Shortcuts (GitHub #131)</comment>
+  </data>
+  <data name="Shortcuts.Action.GoBack" xml:space="preserve">
+    <value>返回</value>
+    <comment>Settings › Shortcuts (GitHub #131)</comment>
+  </data>
+  <data name="Shortcuts.Action.GoForward" xml:space="preserve">
+    <value>前進</value>
+    <comment>Settings › Shortcuts (GitHub #131)</comment>
+  </data>
+  <data name="Shortcuts.Action.GoHome" xml:space="preserve">
+    <value>前往首頁</value>
+    <comment>Settings › Shortcuts (GitHub #131)</comment>
+  </data>
+  <data name="Shortcuts.Action.GoSongs" xml:space="preserve">
+    <value>前往歌曲</value>
+    <comment>Settings › Shortcuts (GitHub #131)</comment>
+  </data>
+  <data name="Shortcuts.Action.GoAlbums" xml:space="preserve">
+    <value>前往專輯</value>
+    <comment>Settings › Shortcuts (GitHub #131)</comment>
+  </data>
+  <data name="Shortcuts.Action.GoArtists" xml:space="preserve">
+    <value>前往演出者</value>
+    <comment>Settings › Shortcuts (GitHub #131)</comment>
+  </data>
 </root>

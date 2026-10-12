@@ -6552,4 +6552,132 @@
     <value>回再生</value>
     <comment>Word after a play count of exactly 1 (Home and album rows: 1 play)</comment>
   </data>
+  <data name="Shortcuts.Group.Playback" xml:space="preserve">
+    <value>再生</value>
+    <comment>Settings › Shortcuts (GitHub #131)</comment>
+  </data>
+  <data name="Shortcuts.Group.Window" xml:space="preserve">
+    <value>ウィンドウ</value>
+    <comment>Settings › Shortcuts (GitHub #131)</comment>
+  </data>
+  <data name="Shortcuts.Group.Navigation" xml:space="preserve">
+    <value>ナビゲーション</value>
+    <comment>Settings › Shortcuts (GitHub #131)</comment>
+  </data>
+  <data name="Shortcuts.Group.Library" xml:space="preserve">
+    <value>ライブラリ</value>
+    <comment>Settings › Shortcuts (GitHub #131)</comment>
+  </data>
+  <data name="Shortcuts.NotSet" xml:space="preserve">
+    <value>未設定</value>
+    <comment>Settings › Shortcuts (GitHub #131)</comment>
+  </data>
+  <data name="Shortcuts.AlreadyUsedBy" xml:space="preserve">
+    <value>{0} で使用中</value>
+    <comment>Settings › Shortcuts (GitHub #131)</comment>
+  </data>
+  <data name="Shortcuts.Action.PlayPause" xml:space="preserve">
+    <value>再生 / 一時停止</value>
+    <comment>Settings › Shortcuts (GitHub #131)</comment>
+  </data>
+  <data name="Shortcuts.Action.NextTrack" xml:space="preserve">
+    <value>次のトラック</value>
+    <comment>Settings › Shortcuts (GitHub #131)</comment>
+  </data>
+  <data name="Shortcuts.Action.PreviousTrack" xml:space="preserve">
+    <value>前のトラック</value>
+    <comment>Settings › Shortcuts (GitHub #131)</comment>
+  </data>
+  <data name="Shortcuts.Action.VolumeUp" xml:space="preserve">
+    <value>音量を上げる</value>
+    <comment>Settings › Shortcuts (GitHub #131)</comment>
+  </data>
+  <data name="Shortcuts.Action.VolumeDown" xml:space="preserve">
+    <value>音量を下げる</value>
+    <comment>Settings › Shortcuts (GitHub #131)</comment>
+  </data>
+  <data name="Shortcuts.Action.ToggleFavorite" xml:space="preserve">
+    <value>再生中のトラックをお気に入りに追加</value>
+    <comment>Settings › Shortcuts (GitHub #131)</comment>
+  </data>
+  <data name="Shortcuts.Action.ToggleFullscreen" xml:space="preserve">
+    <value>全画面表示の切り替え</value>
+    <comment>Settings › Shortcuts (GitHub #131)</comment>
+  </data>
+  <data name="Shortcuts.Action.SearchLibrary" xml:space="preserve">
+    <value>ライブラリを検索</value>
+    <comment>Settings › Shortcuts (GitHub #131)</comment>
+  </data>
+  <data name="Shortcuts.Action.CommandPalette" xml:space="preserve">
+    <value>コマンドパレット</value>
+    <comment>Settings › Shortcuts (GitHub #131)</comment>
+  </data>
+  <data name="Shortcuts.Action.NewPlaylist" xml:space="preserve">
+    <value>新規プレイリスト</value>
+    <comment>Settings › Shortcuts (GitHub #131)</comment>
+  </data>
+  <data name="Shortcuts.Action.ToggleQueue" xml:space="preserve">
+    <value>キューの表示 / 非表示</value>
+    <comment>Settings › Shortcuts (GitHub #131)</comment>
+  </data>
+  <data name="Shortcuts.Action.ToggleLyrics" xml:space="preserve">
+    <value>歌詞の表示 / 非表示</value>
+    <comment>Settings › Shortcuts (GitHub #131)</comment>
+  </data>
+  <data name="Shortcuts.Action.OpenSettings" xml:space="preserve">
+    <value>設定を開く</value>
+    <comment>Settings › Shortcuts (GitHub #131)</comment>
+  </data>
+  <data name="Shortcuts.Action.ScanReplayGain" xml:space="preserve">
+    <value>選択した曲の ReplayGain</value>
+    <comment>Settings › Shortcuts (GitHub #131)</comment>
+  </data>
+  <data name="Shortcuts.Action.ToggleShuffle" xml:space="preserve">
+    <value>シャッフルのオン / オフ</value>
+    <comment>Settings › Shortcuts (GitHub #131)</comment>
+  </data>
+  <data name="Shortcuts.Action.CycleRepeat" xml:space="preserve">
+    <value>リピートモードを切り替え</value>
+    <comment>Settings › Shortcuts (GitHub #131)</comment>
+  </data>
+  <data name="Shortcuts.Action.ToggleMute" xml:space="preserve">
+    <value>ミュート / ミュート解除</value>
+    <comment>Settings › Shortcuts (GitHub #131)</comment>
+  </data>
+  <data name="Shortcuts.Action.SeekForward" xml:space="preserve">
+    <value>早送り</value>
+    <comment>Settings › Shortcuts (GitHub #131)</comment>
+  </data>
+  <data name="Shortcuts.Action.SeekBackward" xml:space="preserve">
+    <value>巻き戻し</value>
+    <comment>Settings › Shortcuts (GitHub #131)</comment>
+  </data>
+  <data name="Shortcuts.Action.ToggleMiniPlayer" xml:space="preserve">
+    <value>ミニプレーヤー</value>
+    <comment>Settings › Shortcuts (GitHub #131)</comment>
+  </data>
+  <data name="Shortcuts.Action.GoBack" xml:space="preserve">
+    <value>戻る</value>
+    <comment>Settings › Shortcuts (GitHub #131)</comment>
+  </data>
+  <data name="Shortcuts.Action.GoForward" xml:space="preserve">
+    <value>進む</value>
+    <comment>Settings › Shortcuts (GitHub #131)</comment>
+  </data>
+  <data name="Shortcuts.Action.GoHome" xml:space="preserve">
+    <value>ホームへ移動</value>
+    <comment>Settings › Shortcuts (GitHub #131)</comment>
+  </data>
+  <data name="Shortcuts.Action.GoSongs" xml:space="preserve">
+    <value>曲へ移動</value>
+    <comment>Settings › Shortcuts (GitHub #131)</comment>
+  </data>
+  <data name="Shortcuts.Action.GoAlbums" xml:space="preserve">
+    <value>アルバムへ移動</value>
+    <comment>Settings › Shortcuts (GitHub #131)</comment>
+  </data>
+  <data name="Shortcuts.Action.GoArtists" xml:space="preserve">
+    <value>アーティストへ移動</value>
+    <comment>Settings › Shortcuts (GitHub #131)</comment>
+  </data>
 </root>

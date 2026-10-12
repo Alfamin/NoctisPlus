@@ -6552,4 +6552,132 @@
     <value>reproducción</value>
     <comment>Word after a play count of exactly 1 (Home and album rows: 1 play)</comment>
   </data>
+  <data name="Shortcuts.Group.Playback" xml:space="preserve">
+    <value>Reproducción</value>
+    <comment>Settings › Shortcuts (GitHub #131)</comment>
+  </data>
+  <data name="Shortcuts.Group.Window" xml:space="preserve">
+    <value>Ventana</value>
+    <comment>Settings › Shortcuts (GitHub #131)</comment>
+  </data>
+  <data name="Shortcuts.Group.Navigation" xml:space="preserve">
+    <value>Navegación</value>
+    <comment>Settings › Shortcuts (GitHub #131)</comment>
+  </data>
+  <data name="Shortcuts.Group.Library" xml:space="preserve">
+    <value>Biblioteca</value>
+    <comment>Settings › Shortcuts (GitHub #131)</comment>
+  </data>
+  <data name="Shortcuts.NotSet" xml:space="preserve">
+    <value>Sin asignar</value>
+    <comment>Settings › Shortcuts (GitHub #131)</comment>
+  </data>
+  <data name="Shortcuts.AlreadyUsedBy" xml:space="preserve">
+    <value>Ya lo usa {0}</value>
+    <comment>Settings › Shortcuts (GitHub #131)</comment>
+  </data>
+  <data name="Shortcuts.Action.PlayPause" xml:space="preserve">
+    <value>Reproducir / Pausa</value>
+    <comment>Settings › Shortcuts (GitHub #131)</comment>
+  </data>
+  <data name="Shortcuts.Action.NextTrack" xml:space="preserve">
+    <value>Siguiente pista</value>
+    <comment>Settings › Shortcuts (GitHub #131)</comment>
+  </data>
+  <data name="Shortcuts.Action.PreviousTrack" xml:space="preserve">
+    <value>Pista anterior</value>
+    <comment>Settings › Shortcuts (GitHub #131)</comment>
+  </data>
+  <data name="Shortcuts.Action.VolumeUp" xml:space="preserve">
+    <value>Subir volumen</value>
+    <comment>Settings › Shortcuts (GitHub #131)</comment>
+  </data>
+  <data name="Shortcuts.Action.VolumeDown" xml:space="preserve">
+    <value>Bajar volumen</value>
+    <comment>Settings › Shortcuts (GitHub #131)</comment>
+  </data>
+  <data name="Shortcuts.Action.ToggleFavorite" xml:space="preserve">
+    <value>Marcar pista actual como favorita</value>
+    <comment>Settings › Shortcuts (GitHub #131)</comment>
+  </data>
+  <data name="Shortcuts.Action.ToggleFullscreen" xml:space="preserve">
+    <value>Pantalla completa</value>
+    <comment>Settings › Shortcuts (GitHub #131)</comment>
+  </data>
+  <data name="Shortcuts.Action.SearchLibrary" xml:space="preserve">
+    <value>Buscar en la biblioteca</value>
+    <comment>Settings › Shortcuts (GitHub #131)</comment>
+  </data>
+  <data name="Shortcuts.Action.CommandPalette" xml:space="preserve">
+    <value>Paleta de comandos</value>
+    <comment>Settings › Shortcuts (GitHub #131)</comment>
+  </data>
+  <data name="Shortcuts.Action.NewPlaylist" xml:space="preserve">
+    <value>Nueva lista</value>
+    <comment>Settings › Shortcuts (GitHub #131)</comment>
+  </data>
+  <data name="Shortcuts.Action.ToggleQueue" xml:space="preserve">
+    <value>Mostrar / ocultar cola</value>
+    <comment>Settings › Shortcuts (GitHub #131)</comment>
+  </data>
+  <data name="Shortcuts.Action.ToggleLyrics" xml:space="preserve">
+    <value>Mostrar / ocultar letra</value>
+    <comment>Settings › Shortcuts (GitHub #131)</comment>
+  </data>
+  <data name="Shortcuts.Action.OpenSettings" xml:space="preserve">
+    <value>Abrir Ajustes</value>
+    <comment>Settings › Shortcuts (GitHub #131)</comment>
+  </data>
+  <data name="Shortcuts.Action.ScanReplayGain" xml:space="preserve">
+    <value>ReplayGain de las canciones seleccionadas</value>
+    <comment>Settings › Shortcuts (GitHub #131)</comment>
+  </data>
+  <data name="Shortcuts.Action.ToggleShuffle" xml:space="preserve">
+    <value>Activar / desactivar aleatorio</value>
+    <comment>Settings › Shortcuts (GitHub #131)</comment>
+  </data>
+  <data name="Shortcuts.Action.CycleRepeat" xml:space="preserve">
+    <value>Cambiar modo de repetición</value>
+    <comment>Settings › Shortcuts (GitHub #131)</comment>
+  </data>
+  <data name="Shortcuts.Action.ToggleMute" xml:space="preserve">
+    <value>Silenciar / activar sonido</value>
+    <comment>Settings › Shortcuts (GitHub #131)</comment>
+  </data>
+  <data name="Shortcuts.Action.SeekForward" xml:space="preserve">
+    <value>Avanzar</value>
+    <comment>Settings › Shortcuts (GitHub #131)</comment>
+  </data>
+  <data name="Shortcuts.Action.SeekBackward" xml:space="preserve">
+    <value>Retroceder</value>
+    <comment>Settings › Shortcuts (GitHub #131)</comment>
+  </data>
+  <data name="Shortcuts.Action.ToggleMiniPlayer" xml:space="preserve">
+    <value>Minirreproductor</value>
+    <comment>Settings › Shortcuts (GitHub #131)</comment>
+  </data>
+  <data name="Shortcuts.Action.GoBack" xml:space="preserve">
+    <value>Atrás</value>
+    <comment>Settings › Shortcuts (GitHub #131)</comment>
+  </data>
+  <data name="Shortcuts.Action.GoForward" xml:space="preserve">
+    <value>Adelante</value>
+    <comment>Settings › Shortcuts (GitHub #131)</comment>
+  </data>
+  <data name="Shortcuts.Action.GoHome" xml:space="preserve">
+    <value>Ir a Inicio</value>
+    <comment>Settings › Shortcuts (GitHub #131)</comment>
+  </data>
+  <data name="Shortcuts.Action.GoSongs" xml:space="preserve">
+    <value>Ir a Canciones</value>
+    <comment>Settings › Shortcuts (GitHub #131)</comment>
+  </data>
+  <data name="Shortcuts.Action.GoAlbums" xml:space="preserve">
+    <value>Ir a Álbumes</value>
+    <comment>Settings › Shortcuts (GitHub #131)</comment>
+  </data>
+  <data name="Shortcuts.Action.GoArtists" xml:space="preserve">
+    <value>Ir a Artistas</value>
+    <comment>Settings › Shortcuts (GitHub #131)</comment>
+  </data>
 </root>

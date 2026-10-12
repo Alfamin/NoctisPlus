@@ -31,8 +31,8 @@ public class ShortcutsSettingsViewModelTests
     {
         var (vm, _) = Build();
         Assert.Equal(ShortcutDefaults.All.Count, vm.Rows.Count);
-        Assert.Equal(new[] { ShortcutDefaults.GroupPlayback, ShortcutDefaults.GroupWindow, ShortcutDefaults.GroupNavigation },
-                     vm.Groups.Select(g => g.Name));
+        Assert.Equal(new[] { ShortcutDefaults.GroupPlayback, ShortcutDefaults.GroupWindow, ShortcutDefaults.GroupNavigation, ShortcutDefaults.GroupLibrary },
+                     vm.Groups.Select(g => g.Id));
         Assert.Equal(ShortcutDefaults.All.Count, vm.Groups.Sum(g => g.Rows.Count));
     }
 

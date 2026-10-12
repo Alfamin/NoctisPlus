@@ -2649,4 +2649,36 @@ The lines and their timings are dropped and an empty lyrics box opens for your o
   <data name="Export.ClipboardUnavailable" xml:space="preserve"><value>Clipboard unavailable</value><comment>Share card / Wrap status when there is no clipboard</comment></data>
   <data name="Export.SaveImageTitle" xml:space="preserve"><value>Save image</value><comment>Title of the save dialog for a share card or Wrap image</comment></data>
   <data name="Common.Play" xml:space="preserve"><value>play</value><comment>Word after a play count of exactly 1 (Home and album rows: 1 play)</comment></data>
+  <data name="Shortcuts.Group.Playback" xml:space="preserve"><value>Playback</value><comment>Settings › Shortcuts (GitHub #131)</comment></data>
+  <data name="Shortcuts.Group.Window" xml:space="preserve"><value>Window</value><comment>Settings › Shortcuts (GitHub #131)</comment></data>
+  <data name="Shortcuts.Group.Navigation" xml:space="preserve"><value>Navigation</value><comment>Settings › Shortcuts (GitHub #131)</comment></data>
+  <data name="Shortcuts.Group.Library" xml:space="preserve"><value>Library</value><comment>Settings › Shortcuts (GitHub #131)</comment></data>
+  <data name="Shortcuts.NotSet" xml:space="preserve"><value>Not set</value><comment>Settings › Shortcuts (GitHub #131)</comment></data>
+  <data name="Shortcuts.AlreadyUsedBy" xml:space="preserve"><value>Already used by {0}</value><comment>Settings › Shortcuts (GitHub #131)</comment></data>
+  <data name="Shortcuts.Action.PlayPause" xml:space="preserve"><value>Play / Pause</value><comment>Settings › Shortcuts (GitHub #131)</comment></data>
+  <data name="Shortcuts.Action.NextTrack" xml:space="preserve"><value>Next track</value><comment>Settings › Shortcuts (GitHub #131)</comment></data>
+  <data name="Shortcuts.Action.PreviousTrack" xml:space="preserve"><value>Previous track</value><comment>Settings › Shortcuts (GitHub #131)</comment></data>
+  <data name="Shortcuts.Action.VolumeUp" xml:space="preserve"><value>Volume up</value><comment>Settings › Shortcuts (GitHub #131)</comment></data>
+  <data name="Shortcuts.Action.VolumeDown" xml:space="preserve"><value>Volume down</value><comment>Settings › Shortcuts (GitHub #131)</comment></data>
+  <data name="Shortcuts.Action.ToggleFavorite" xml:space="preserve"><value>Favorite current track</value><comment>Settings › Shortcuts (GitHub #131)</comment></data>
+  <data name="Shortcuts.Action.ToggleFullscreen" xml:space="preserve"><value>Toggle fullscreen</value><comment>Settings › Shortcuts (GitHub #131)</comment></data>
+  <data name="Shortcuts.Action.SearchLibrary" xml:space="preserve"><value>Search library</value><comment>Settings › Shortcuts (GitHub #131)</comment></data>
+  <data name="Shortcuts.Action.CommandPalette" xml:space="preserve"><value>Command palette</value><comment>Settings › Shortcuts (GitHub #131)</comment></data>
+  <data name="Shortcuts.Action.NewPlaylist" xml:space="preserve"><value>New playlist</value><comment>Settings › Shortcuts (GitHub #131)</comment></data>
+  <data name="Shortcuts.Action.ToggleQueue" xml:space="preserve"><value>Show / hide queue</value><comment>Settings › Shortcuts (GitHub #131)</comment></data>
+  <data name="Shortcuts.Action.ToggleLyrics" xml:space="preserve"><value>Show / hide lyrics</value><comment>Settings › Shortcuts (GitHub #131)</comment></data>
+  <data name="Shortcuts.Action.OpenSettings" xml:space="preserve"><value>Open Settings</value><comment>Settings › Shortcuts (GitHub #131)</comment></data>
+  <data name="Shortcuts.Action.ScanReplayGain" xml:space="preserve"><value>ReplayGain for selected songs</value><comment>Settings › Shortcuts (GitHub #131)</comment></data>
+  <data name="Shortcuts.Action.ToggleShuffle" xml:space="preserve"><value>Shuffle on / off</value><comment>Settings › Shortcuts (GitHub #131)</comment></data>
+  <data name="Shortcuts.Action.CycleRepeat" xml:space="preserve"><value>Change repeat mode</value><comment>Settings › Shortcuts (GitHub #131)</comment></data>
+  <data name="Shortcuts.Action.ToggleMute" xml:space="preserve"><value>Mute / unmute</value><comment>Settings › Shortcuts (GitHub #131)</comment></data>
+  <data name="Shortcuts.Action.SeekForward" xml:space="preserve"><value>Skip forward</value><comment>Settings › Shortcuts (GitHub #131)</comment></data>
+  <data name="Shortcuts.Action.SeekBackward" xml:space="preserve"><value>Skip back</value><comment>Settings › Shortcuts (GitHub #131)</comment></data>
+  <data name="Shortcuts.Action.ToggleMiniPlayer" xml:space="preserve"><value>Mini player</value><comment>Settings › Shortcuts (GitHub #131)</comment></data>
+  <data name="Shortcuts.Action.GoBack" xml:space="preserve"><value>Back</value><comment>Settings › Shortcuts (GitHub #131)</comment></data>
+  <data name="Shortcuts.Action.GoForward" xml:space="preserve"><value>Forward</value><comment>Settings › Shortcuts (GitHub #131)</comment></data>
+  <data name="Shortcuts.Action.GoHome" xml:space="preserve"><value>Go to Home</value><comment>Settings › Shortcuts (GitHub #131)</comment></data>
+  <data name="Shortcuts.Action.GoSongs" xml:space="preserve"><value>Go to Songs</value><comment>Settings › Shortcuts (GitHub #131)</comment></data>
+  <data name="Shortcuts.Action.GoAlbums" xml:space="preserve"><value>Go to Albums</value><comment>Settings › Shortcuts (GitHub #131)</comment></data>
+  <data name="Shortcuts.Action.GoArtists" xml:space="preserve"><value>Go to Artists</value><comment>Settings › Shortcuts (GitHub #131)</comment></data>
 </root>

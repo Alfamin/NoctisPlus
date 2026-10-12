@@ -1045,18 +1045,20 @@ public partial class MainWindow : Window, IPageKeyOverlayHost
 
         try
         {
+            // Gestures mirror Music.app (⌘, settings, ⌘→ next, ⌘← previous) by default, and
+            // follow whatever the user rebinds in Settings › Shortcuts (GitHub #131: the
+            // Settings item used a fixed ⌘, that a rebind left behind, still opening Settings).
+            var shortcuts = vm.Settings.ShortcutService;
+
             var appMenu = new NativeMenu();
             var settings = new NativeMenuItem("Settings…")
             {
-                Gesture = new KeyGesture(Key.OemComma, KeyModifiers.Meta),
+                Gesture = shortcuts.Get(ShortcutAction.OpenSettings),
             };
             settings.Click += (_, _) => vm.OpenSettingsCommand.Execute(null);
             appMenu.Items.Add(settings);
             NativeMenu.SetMenu(Application.Current!, appMenu);
 
-            // Gestures mirror Music.app (⌘→ next, ⌘← previous) by default, and follow
-            // whatever the user rebinds in Settings › Shortcuts.
-            var shortcuts = vm.Settings.ShortcutService;
             var playback = new NativeMenu();
 
             var playPause = new NativeMenuItem("Play / Pause");
@@ -1079,6 +1081,7 @@ public partial class MainWindow : Window, IPageKeyOverlayHost
 
             shortcuts.Changed += (_, _) =>
             {
+                settings.Gesture = shortcuts.Get(ShortcutAction.OpenSettings);
                 next.Gesture = shortcuts.Get(ShortcutAction.NextTrack);
                 previous.Gesture = shortcuts.Get(ShortcutAction.PreviousTrack);
             };
@@ -1839,31 +1842,11 @@ public partial class MainWindow : Window, IPageKeyOverlayHost
     /// does not handle, so the key falls through untouched.</summary>
     private bool ExecuteShortcut(MainWindowViewModel vm, ShortcutAction action)
     {
+        // Transport, volume, shuffle/repeat/mute, seek, favorite, queue.
+        if (PlayerShortcuts.Run(vm.Player, action) is { } ran) return ran;
+
         switch (action)
         {
-            case ShortcutAction.PlayPause:
-                vm.Player.PlayPauseCommand.Execute(null);
-                return true;
-            case ShortcutAction.NextTrack:
-                vm.Player.NextCommand.Execute(null);
-                return true;
-            case ShortcutAction.PreviousTrack:
-                vm.Player.PreviousCommand.Execute(null);
-                return true;
-            // Adjusting while muted means "let me hear it", as the bar's wheel/drag do: a
-            // shortcut step used to change the level silently under the mute (10-08).
-            case ShortcutAction.VolumeUp:
-                vm.Player.UnmuteForAdjust();
-                vm.Player.Volume = Math.Min(100, vm.Player.Volume + 5);
-                return true;
-            case ShortcutAction.VolumeDown:
-                vm.Player.UnmuteForAdjust();
-                vm.Player.Volume = Math.Max(0, vm.Player.Volume - 5);
-                return true;
-            case ShortcutAction.ToggleFavorite:
-                if (vm.Player.CurrentTrack == null) return false;
-                vm.Player.ToggleCurrentTrackFavoriteCommand.Execute(null);
-                return true;
             case ShortcutAction.ToggleFullscreen:
                 ToggleFullScreen();
                 return true;
@@ -1883,18 +1866,74 @@ public partial class MainWindow : Window, IPageKeyOverlayHost
             case ShortcutAction.NewPlaylist:
                 vm.Sidebar.CreatePlaylistCommand.Execute(null);
                 return true;
-            case ShortcutAction.ToggleQueue:
-                // GitHub #86: the island's Queue button is gone while nothing is loaded
-                // (the bar unmounts), so this is the way in to an empty queue.
-                vm.Player.ShowQueueCommand.Execute(null);
-                return true;
             case ShortcutAction.ToggleLyrics:
                 // Same toggle as the island's Lyrics button (GitHub #103).
                 vm.ToggleLyricsCommand.Execute(null);
                 return true;
+            // ── GitHub #131 ──
+            case ShortcutAction.OpenSettings:
+                vm.OpenSettingsCommand.Execute(null);
+                return true;
+            case ShortcutAction.ScanReplayGain:
+            {
+                var tracks = TrackSelection.ForReplayGain(QueueSelectedTracks(vm), PageSelectedTracks(vm), vm.Player.CurrentTrack);
+                if (tracks.Count == 0) return false;
+                _ = MetadataHelper.OpenReplayGainScannerDialog(tracks);
+                return true;
+            }
+            case ShortcutAction.ToggleMiniPlayer:
+                ToggleMiniPlayer();
+                return true;
+            // With the Settings sheet up, Back / Forward close it (it is the page on top);
+            // the Go-to keys close it and land on the page.
+            case ShortcutAction.GoBack:
+                if (vm.IsSettingsModalOpen) vm.CloseSettingsCommand.Execute(null);
+                else vm.GoBackInHistoryCommand.Execute(null);
+                return true;
+            case ShortcutAction.GoForward:
+                if (vm.IsSettingsModalOpen) vm.CloseSettingsCommand.Execute(null);
+                else vm.GoForwardInHistoryCommand.Execute(null);
+                return true;
+            case ShortcutAction.GoHome:
+                return GoToSection(vm, "home");
+            case ShortcutAction.GoSongs:
+                return GoToSection(vm, "songs");
+            case ShortcutAction.GoAlbums:
+                return GoToSection(vm, "albums");
+            case ShortcutAction.GoArtists:
+                return GoToSection(vm, "artists");
             default:
                 return false;
         }
+    }
+
+    private static bool GoToSection(MainWindowViewModel vm, string key)
+    {
+        if (vm.IsSettingsModalOpen) vm.CloseSettingsCommand.Execute(null);
+        vm.NavigateCommand.Execute(key);
+        return true;
+    }
+
+    /// <summary>The queue panel's row selection, only while focus is in the panel.</summary>
+    private IReadOnlyList<Track>? QueueSelectedTracks(MainWindowViewModel vm) =>
+        _queueSelection is { Count: > 0 } selection && IsFocusInQueuePanel()
+            ? TrackSelection.FromIndices(vm.Player.UpNext, selection.Snapshot())
+            : null;
+
+    /// <summary>The Ctrl-selection on the page currently shown, unless the Settings sheet
+    /// covers it.</summary>
+    private IReadOnlyList<Track>? PageSelectedTracks(MainWindowViewModel vm)
+    {
+        if (vm.IsSettingsModalOpen) return null;
+        var host = this.GetVisualDescendants().OfType<ContentControl>().FirstOrDefault(c => c.Classes.Contains("page-host"));
+        if (host == null) return null;
+        foreach (var source in host.GetVisualDescendants().OfType<ITrackSelectionSource>())
+        {
+            if (source is Visual { IsEffectivelyVisible: false }) continue;
+            var tracks = source.GetSelectedTracks();
+            if (tracks.Count > 0) return tracks;
+        }
+        return null;
     }
 
     private void OnWindowKeyDown(object? sender, KeyEventArgs e)

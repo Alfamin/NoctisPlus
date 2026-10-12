@@ -17,11 +17,14 @@ using Microsoft.Extensions.DependencyInjection;
 
 namespace Noctis.Views;
 
-public partial class PlaylistView : UserControl
+public partial class PlaylistView : UserControl, ITrackSelectionSource
 {
     private EventHandler? _pendingScrollRestore;
     // See LibrarySongsView for why this is data-tracked rather than container-tracked.
     private readonly HashSet<Track> _selectedTracks = new();
+
+    /// <summary>The Ctrl-selection, for window shortcuts (GitHub #131 ReplayGain).</summary>
+    public IReadOnlyList<Track> GetSelectedTracks() => _selectedTracks.ToList();
     private TrackContextMenuBuilder? _menuBuilder;
     /// <summary>Culture the menu's strings were read in (they are read once, at Build).</summary>
     private string? _menuCulture;

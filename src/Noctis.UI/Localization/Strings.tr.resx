@@ -1797,4 +1797,36 @@
   <data name="LyricsColor.ArtworkHint" xml:space="preserve"><value>Her şarkının kapağını izler. Hareketi Ayarlar'da, Şarkı Sözleri altında ayarlanır.</value><comment>Artwork mode text in LyricsBackgroundColorDialog.axaml</comment></data>
   <data name="LyricsColor.VideoNote" xml:space="preserve"><value>Bir arka plan videosu açık ve bu arka planın üzerinde görünüyor.</value><comment>Note in LyricsBackgroundColorDialog.axaml while a lyrics background video plays</comment></data>
   <data name="Common.Play" xml:space="preserve"><value>çalma</value><comment>Word after a play count of exactly 1 (Home and album rows: 1 play)</comment></data>
+  <data name="Shortcuts.Group.Playback" xml:space="preserve"><value>Oynatma</value><comment>Settings › Shortcuts (GitHub #131)</comment></data>
+  <data name="Shortcuts.Group.Window" xml:space="preserve"><value>Pencere</value><comment>Settings › Shortcuts (GitHub #131)</comment></data>
+  <data name="Shortcuts.Group.Navigation" xml:space="preserve"><value>Gezinme</value><comment>Settings › Shortcuts (GitHub #131)</comment></data>
+  <data name="Shortcuts.Group.Library" xml:space="preserve"><value>Kitaplık</value><comment>Settings › Shortcuts (GitHub #131)</comment></data>
+  <data name="Shortcuts.NotSet" xml:space="preserve"><value>Atanmadı</value><comment>Settings › Shortcuts (GitHub #131)</comment></data>
+  <data name="Shortcuts.AlreadyUsedBy" xml:space="preserve"><value>Zaten {0} için kullanılıyor</value><comment>Settings › Shortcuts (GitHub #131)</comment></data>
+  <data name="Shortcuts.Action.PlayPause" xml:space="preserve"><value>Oynat / Duraklat</value><comment>Settings › Shortcuts (GitHub #131)</comment></data>
+  <data name="Shortcuts.Action.NextTrack" xml:space="preserve"><value>Sonraki parça</value><comment>Settings › Shortcuts (GitHub #131)</comment></data>
+  <data name="Shortcuts.Action.PreviousTrack" xml:space="preserve"><value>Önceki parça</value><comment>Settings › Shortcuts (GitHub #131)</comment></data>
+  <data name="Shortcuts.Action.VolumeUp" xml:space="preserve"><value>Sesi aç</value><comment>Settings › Shortcuts (GitHub #131)</comment></data>
+  <data name="Shortcuts.Action.VolumeDown" xml:space="preserve"><value>Sesi kıs</value><comment>Settings › Shortcuts (GitHub #131)</comment></data>
+  <data name="Shortcuts.Action.ToggleFavorite" xml:space="preserve"><value>Çalan parçayı favorilere ekle</value><comment>Settings › Shortcuts (GitHub #131)</comment></data>
+  <data name="Shortcuts.Action.ToggleFullscreen" xml:space="preserve"><value>Tam ekranı aç / kapat</value><comment>Settings › Shortcuts (GitHub #131)</comment></data>
+  <data name="Shortcuts.Action.SearchLibrary" xml:space="preserve"><value>Kitaplıkta ara</value><comment>Settings › Shortcuts (GitHub #131)</comment></data>
+  <data name="Shortcuts.Action.CommandPalette" xml:space="preserve"><value>Komut paleti</value><comment>Settings › Shortcuts (GitHub #131)</comment></data>
+  <data name="Shortcuts.Action.NewPlaylist" xml:space="preserve"><value>Yeni çalma listesi</value><comment>Settings › Shortcuts (GitHub #131)</comment></data>
+  <data name="Shortcuts.Action.ToggleQueue" xml:space="preserve"><value>Kuyruğu göster / gizle</value><comment>Settings › Shortcuts (GitHub #131)</comment></data>
+  <data name="Shortcuts.Action.ToggleLyrics" xml:space="preserve"><value>Şarkı sözlerini göster / gizle</value><comment>Settings › Shortcuts (GitHub #131)</comment></data>
+  <data name="Shortcuts.Action.OpenSettings" xml:space="preserve"><value>Ayarları aç</value><comment>Settings › Shortcuts (GitHub #131)</comment></data>
+  <data name="Shortcuts.Action.ScanReplayGain" xml:space="preserve"><value>Seçili şarkılar için ReplayGain</value><comment>Settings › Shortcuts (GitHub #131)</comment></data>
+  <data name="Shortcuts.Action.ToggleShuffle" xml:space="preserve"><value>Karıştırmayı aç / kapat</value><comment>Settings › Shortcuts (GitHub #131)</comment></data>
+  <data name="Shortcuts.Action.CycleRepeat" xml:space="preserve"><value>Tekrar modunu değiştir</value><comment>Settings › Shortcuts (GitHub #131)</comment></data>
+  <data name="Shortcuts.Action.ToggleMute" xml:space="preserve"><value>Sesi kapat / aç</value><comment>Settings › Shortcuts (GitHub #131)</comment></data>
+  <data name="Shortcuts.Action.SeekForward" xml:space="preserve"><value>İleri sar</value><comment>Settings › Shortcuts (GitHub #131)</comment></data>
+  <data name="Shortcuts.Action.SeekBackward" xml:space="preserve"><value>Geri sar</value><comment>Settings › Shortcuts (GitHub #131)</comment></data>
+  <data name="Shortcuts.Action.ToggleMiniPlayer" xml:space="preserve"><value>Mini oynatıcı</value><comment>Settings › Shortcuts (GitHub #131)</comment></data>
+  <data name="Shortcuts.Action.GoBack" xml:space="preserve"><value>Geri</value><comment>Settings › Shortcuts (GitHub #131)</comment></data>
+  <data name="Shortcuts.Action.GoForward" xml:space="preserve"><value>İleri</value><comment>Settings › Shortcuts (GitHub #131)</comment></data>
+  <data name="Shortcuts.Action.GoHome" xml:space="preserve"><value>Ana Sayfa'ya git</value><comment>Settings › Shortcuts (GitHub #131)</comment></data>
+  <data name="Shortcuts.Action.GoSongs" xml:space="preserve"><value>Şarkılar'a git</value><comment>Settings › Shortcuts (GitHub #131)</comment></data>
+  <data name="Shortcuts.Action.GoAlbums" xml:space="preserve"><value>Albümler'e git</value><comment>Settings › Shortcuts (GitHub #131)</comment></data>
+  <data name="Shortcuts.Action.GoArtists" xml:space="preserve"><value>Sanatçılar'a git</value><comment>Settings › Shortcuts (GitHub #131)</comment></data>
 </root>
