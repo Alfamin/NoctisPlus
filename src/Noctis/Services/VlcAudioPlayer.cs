@@ -118,8 +118,9 @@ public class VlcAudioPlayer : IAudioPlayer
     // non-null, LibVLC's own volume is pinned at 100 and only used as the
     // transient fade layer for crossfades. Null on non-Windows / COM failure →
     // the code falls back to the LibVLC (debounced) volume path. See
-    // WindowsSessionVolume for why.
-    private readonly WindowsSessionVolume? _sessionVolume;
+    // WindowsSessionVolume for why. Linux with the gapless engine: the engine's
+    // own output stage (GaplessSink.LevelControl), driven the same way.
+    private readonly IOutputLevel? _sessionVolume;
 
     // Experimental Windows-only per-sample-gain output (NOCTIS_WASAPI=1, off by
     // default). When non-null it OWNS volume — applied click-free at any drag
@@ -162,6 +163,14 @@ public class VlcAudioPlayer : IAudioPlayer
     // _player/_standbyPlayer roles swap around them.
     private bool _gaplessEngine;
     private GaplessSink? _gaplessSink;
+    // --demux=avformat is in force: LibVLC then zeroes a LAME-tagged MP3's first ~27 ms
+    // and keeps its encoder padding, so such files open on the native MP3 demuxer
+    // instead (see ApplyMp3Demux).
+    private readonly bool _avformatDemux;
+    // Media opened on the native MP3 demuxer, whose in-place seeks lose the gapless end
+    // trim (and land seconds off on VBR); Seek() reopens them at the position instead
+    // (see ApplyMp3Demux).
+    private readonly System.Runtime.CompilerServices.ConditionalWeakTable<Media, object> _seekReopensMedia = new();
     private readonly MediaPlayer[] _enginePlayers = new MediaPlayer[2];
     private readonly GaplessTrackSegment?[] _engineSegments = new GaplessTrackSegment?[2];
     // ReplayGain attenuation renders per segment on the engine (EngineSegmentGain):
@@ -235,6 +244,9 @@ public class VlcAudioPlayer : IAudioPlayer
     private string? _standbyPath;
     private long _standbyStartPositionMs = -1;
     private long _standbyPreparedTicksUtc;
+    // Bumped each time PrepareNext stages a track on the standby player, so a deferred
+    // cleanup can tell that the player it was queued for has been re-staged since.
+    private long _standbyPrepareGeneration;
     private bool _standbyPrepared;
     // volatile: Dispose writes this from the UI thread while the volume-ramp worker, the
     // EQ queue, both fade loops and the seek worker read it in spin loops with no barrier.
@@ -541,9 +553,10 @@ public class VlcAudioPlayer : IAudioPlayer
         // Linux AppImage's AppRun sets NOCTIS_BUNDLED_VLC=1). Plain Linux
         // system-libvlc installs keep VLC's native demuxers so a split plugin
         // set still plays.
-        if (ShouldForceAvformatDemux(
-                OperatingSystem.IsLinux(),
-                Environment.GetEnvironmentVariable("NOCTIS_BUNDLED_VLC")))
+        _avformatDemux = ShouldForceAvformatDemux(
+            OperatingSystem.IsLinux(),
+            Environment.GetEnvironmentVariable("NOCTIS_BUNDLED_VLC"));
+        if (_avformatDemux)
             vlcArgs.Add("--demux=avformat");
         // The speex resampler module + its quality flag are not always present
         // in third-party VLC builds (notably the macOS VLC.app distribution).
@@ -691,7 +704,12 @@ public class VlcAudioPlayer : IAudioPlayer
         // launched from Explorer (no terminal environment), which reads as "the
         // fix does nothing". NOCTIS_GAPLESS_ENGINE=0 is the escape hatch; sink
         // creation failure still falls back to the classic path automatically.
-        _gaplessEngine = OperatingSystem.IsWindows() && _wasapiOut == null &&
+        // Linux too (GitHub #127): there the per-track LibVLC outputs opened a new
+        // PulseAudio stream at every track change — a gap on every boundary and a
+        // cut-off tail on Bluetooth. The sink renders into one pulse stream instead;
+        // no pulse server (or libpulse-simple) falls back the same way.
+        _gaplessEngine = IsGaplessEnginePlatform(OperatingSystem.IsWindows(), OperatingSystem.IsLinux()) &&
+                         _wasapiOut == null &&
                          Environment.GetEnvironmentVariable("NOCTIS_GAPLESS_ENGINE") != "0";
         if (_gaplessEngine)
         {
@@ -751,6 +769,11 @@ public class VlcAudioPlayer : IAudioPlayer
                 }
             }
         }
+        // Linux engine: no OS session carries the engine's stream, so the user's level
+        // goes to the sink's own output stage — through the same session-volume paths
+        // Windows uses (ramp, fades, reasserts), with the players pinned at 100 above.
+        if (_sessionVolume == null && _gaplessSink != null && !OperatingSystem.IsWindows())
+            _sessionVolume = _gaplessSink.LevelControl;
 
         // Start the keep-alive immediately: construction happens at app launch,
         // which is exactly the window before the reported first-play stutter.
@@ -835,8 +858,8 @@ public class VlcAudioPlayer : IAudioPlayer
     /// which already accounts for its output latency.
     /// </summary>
     public TimeSpan OutputLatency =>
-        _gaplessEngine && _gaplessSink != null
-            ? TimeSpan.FromMilliseconds(GaplessSink.OutputLatencyMs)
+        _gaplessEngine && _gaplessSink is { } sink
+            ? TimeSpan.FromMilliseconds(sink.CurrentOutputLatencyMs)
             : TimeSpan.Zero;
 
     public long CurrentSessionId => Interlocked.Read(ref _playbackSessionId);
@@ -2590,11 +2613,13 @@ public class VlcAudioPlayer : IAudioPlayer
                 cancel = CancellationToken.None;
 
             Media media;
+            int mp3TailTrimFrames;
             try
             {
                 media = new Media(_libVlc, normalizedPath, isRemote ? FromType.FromLocation : FromType.FromPath);
                 if (!isRemote)
                     ApplyReadAhead(media);
+                mp3TailTrimFrames = ApplyMp3Demux(media, normalizedPath, startPositionMs);
                 // Off the engine the playback-speed button is LibVLC's rate; only
                 // media opened with time-stretch keep their pitch at ≠ 1×.
                 if (!_gaplessEngine)
@@ -2675,6 +2700,7 @@ public class VlcAudioPlayer : IAudioPlayer
                 _standbyPath = normalizedPath;
                 _standbyStartPositionMs = startPositionMs;
                 Interlocked.Exchange(ref _standbyPreparedTicksUtc, DateTime.UtcNow.Ticks);
+                Interlocked.Increment(ref _standbyPrepareGeneration);
                 _standbyPrepared = true;
                 // Gapless (no crossfade) pre-rolls the standby below: park it at
                 // the session-open level on EVERY path, never 0 — the paused
@@ -2727,7 +2753,7 @@ public class VlcAudioPlayer : IAudioPlayer
                     // input decodes nothing — VLC 3 source-verified), no volume
                     // dance (the OS session owns the sink's stream).
                     _engineStagedPath = normalizedPath;
-                    EngineBeginSegment(_standbyPlayer, Math.Max(0, startPositionMs), normalizedPath);
+                    EngineBeginSegment(_standbyPlayer, Math.Max(0, startPositionMs), normalizedPath, mp3TailTrimFrames);
                     _standbyPlayer.Play(media);
                     if (startPositionMs > 0)
                     {
@@ -3240,6 +3266,7 @@ public class VlcAudioPlayer : IAudioPlayer
             var pendingMs = Interlocked.Exchange(ref _pendingSeekMs, -1);
             if (pendingMs > 0)
                 _currentMedia.AddOption(FormattableString.Invariant($":start-time={pendingMs / 1000.0:0.###}"));
+            var mp3TailTrimFrames = isPathless ? 0 : ApplyMp3Demux(_currentMedia, filePath, pendingMs);
 
             // Exclusive mode: open/reuse the device sink at this track's source
             // rate and pin the output format before the aout starts.
@@ -3258,7 +3285,7 @@ public class VlcAudioPlayer : IAudioPlayer
                 // EngineBeginSegment stores the base in both the segment and
                 // _enginePendingBaseMs, so an input-open flush re-bases to the
                 // same value the :start-time open actually begins at.
-                EngineBeginSegment(_player, Math.Max(0, pendingMs), filePath);
+                EngineBeginSegment(_player, Math.Max(0, pendingMs), filePath, mp3TailTrimFrames);
                 // Pause parks the sink; a fresh play must un-park it (pause → pick
                 // a new track otherwise renders into a paused stream: silence with
                 // a moving timeline, track after track). Paused restarts stay
@@ -4006,6 +4033,7 @@ public class VlcAudioPlayer : IAudioPlayer
 
     private void QueueInactivePlayerCleanup(MediaPlayer inactivePlayer, Media? inactiveMedia, long sessionId, int extraDelayMs = 0)
     {
+        var prepareGeneration = Interlocked.Read(ref _standbyPrepareGeneration);
         ThreadPool.QueueUserWorkItem(_ =>
         {
             var cleanupStart = Environment.TickCount64;
@@ -4014,6 +4042,23 @@ public class VlcAudioPlayer : IAudioPlayer
                 Thread.Sleep(DeferredCleanupDelayMs + Math.Max(0, extraDelayMs));
                 if (_disposed) return;
                 DebugLogger.Info(DebugLogger.Category.Playback, "AutoMix.CleanupStart", $"session={sessionId}");
+
+                // A track shorter than the view model's prepare lead plus this delay has its
+                // successor staged on THIS player before the cleanup runs (PrepareNext reuses
+                // the standby and stops the old input itself). Stopping it here then killed
+                // the staged track: silence at the next boundary on the engine (GitHub #127
+                // harness: the staged track went silent half a second in), a cold open on the
+                // classic path. Only the old media is retired then.
+                if (CleanupTargetRestaged(ReferenceEquals(inactivePlayer, _standbyPlayer),
+                        ReferenceEquals(inactivePlayer, _player), _standbyPrepared,
+                        prepareGeneration, Interlocked.Read(ref _standbyPrepareGeneration)))
+                {
+                    try { inactiveMedia?.Dispose(); }
+                    catch (Exception ex) { DebugLogger.Warn(DebugLogger.Category.Playback, "AutoMix.CleanupStep", $"Dispose: {ex.GetType().Name}"); }
+                    DebugLogger.Info(DebugLogger.Category.Playback, "AutoMix.CleanupKeptRestaged",
+                        $"session={sessionId}, elapsedMs={Environment.TickCount64 - cleanupStart}");
+                    return;
+                }
 
                 // CRITICAL: do NOT zero this player's Volume on the OS-session path. On
                 // Windows mmdevice MediaPlayer.Volume IS the shared process audio session
@@ -4462,7 +4507,7 @@ public class VlcAudioPlayer : IAudioPlayer
     /// whatever the sink is rendering. Call BEFORE the player's Play().
     /// <paramref name="path"/> is the input it carries (its ReplayGain level).
     /// </summary>
-    private void EngineBeginSegment(MediaPlayer player, long basePositionMs, string path)
+    private void EngineBeginSegment(MediaPlayer player, long basePositionMs, string path, int tailTrimFrames)
     {
         var sink = _gaplessSink;
         if (sink == null) return;
@@ -4473,9 +4518,46 @@ public class VlcAudioPlayer : IAudioPlayer
         var seg = new GaplessTrackSegment(
             sink.SampleRate, sink.Channels, slot, capacitySeconds: 20, Math.Max(0, basePositionMs));
         seg.Gain = EngineSegmentGain(slot, path);
+        seg.TailTrimFrames = tailTrimFrames;
         Volatile.Write(ref _engineRgInput[slot], Tuple.Create(seg, path));
         Volatile.Write(ref _engineSegments[slot], seg);
         sink.Provider.Enqueue(seg);
+    }
+
+    /// <summary>
+    /// Opens a LAME-tagged MP3 the way it plays gapless (GitHub #127). Under the forced
+    /// avformat demuxer LibVLC 3 decodes such a file without its Info frame: the first
+    /// ~27 ms come out as zeros and the encoder padding stays on the end (harness 10-11,
+    /// VLC 3.0.20 and 3.0.23 alike) — a 30-60 ms hole at every boundary even when the
+    /// engine splices sample-exact. LibVLC's own MP3 demuxer hands mpg123 the Info frame,
+    /// which then trims delay and padding exactly, so a file opened from its start goes
+    /// through it. Opened at a position it stays on avformat, and Seek() reopens a native
+    /// one at the position: the native demuxer seeks a VBR file by average bitrate,
+    /// landing 1-3 s off (harness: 1.3 s at 90 s, 3 s at 30 s), and after any in-place
+    /// seek mpg123 no longer trims the end (harness: a 32 ms hole at the next boundary).
+    /// On avformat the engine cuts the padding itself. Returns the frames to cut from the
+    /// end of the engine segment.
+    /// </summary>
+    private int ApplyMp3Demux(Media media, string path, long startMs)
+    {
+        if (!_avformatDemux || IsPathlessMedia(path) ||
+            !string.Equals(Path.GetExtension(path), ".mp3", StringComparison.OrdinalIgnoreCase) ||
+            !Mp3GaplessInfo.TryRead(path, out var info))
+            return 0;
+        if (UseNativeMp3Demux(_avformatDemux, hasGaplessInfo: true, startMs))
+        {
+            media.AddOption(":demux=es");
+            // An in-place seek would lose the end trim (and land seconds off on VBR):
+            // Seek() reopens it at the position instead.
+            _seekReopensMedia.AddOrUpdate(media, info);
+            DebugLogger.Info(DebugLogger.Category.Playback, "Mp3.GaplessOpen",
+                $"path={LogName(path)}, demux=es, vbr={info.Vbr}, delay={info.EncoderDelay}, padding={info.EncoderPadding}");
+            return 0;
+        }
+        var frames = _gaplessSink is { } sink ? info.TailTrimFrames(sink.SampleRate) : 0;
+        DebugLogger.Info(DebugLogger.Category.Playback, "Mp3.GaplessOpen",
+            $"path={LogName(path)}, demux=avformat, startMs={startMs}, tailTrimFrames={frames}");
+        return frames;
     }
 
     /// <summary>
@@ -4998,6 +5080,26 @@ public class VlcAudioPlayer : IAudioPlayer
             _restartPausedRequest = _isPaused;
             DebugLogger.Info(DebugLogger.Category.Playback, "Seek.Restart",
                 $"reason=startRegion, vlcState={state}, targetMs={clampedMs}, opensPaused={_isPaused}");
+            Play(_currentMediaPath, _currentFallbackPath);
+            return;
+        }
+
+        // An MP3 playing on the native MP3 demuxer (the gapless open, see ApplyMp3Demux)
+        // keeps its end padding after an in-place seek, and a VBR one lands seconds off the
+        // target with the timeline showing the target. Reopen it at the position instead:
+        // an open at a position goes through avformat (exact seeks, padding cut by the engine).
+        if (_seekReopensMedia.TryGetValue(_currentMedia, out _) &&
+            !string.IsNullOrEmpty(_currentMediaPath))
+        {
+            lock (_seekGate)
+            {
+                _latestSeekMs = -1;
+            }
+            _positionTimer.Stop();
+            Interlocked.Exchange(ref _pendingSeekMs, clampedMs > 0 ? clampedMs : -1);
+            _restartPausedRequest = _isPaused;
+            DebugLogger.Info(DebugLogger.Category.Playback, "Seek.Restart",
+                $"reason=gaplessMp3, vlcState={state}, targetMs={clampedMs}, opensPaused={_isPaused}");
             Play(_currentMediaPath, _currentFallbackPath);
             return;
         }
@@ -5987,6 +6089,34 @@ public class VlcAudioPlayer : IAudioPlayer
     /// </summary>
     internal static bool ShouldForceAvformatDemux(bool isLinux, string? bundledVlcEnv)
         => !isLinux || bundledVlcEnv == "1";
+
+    /// <summary>
+    /// Platforms the gapless splice engine has an output for: WASAPI on Windows, a
+    /// PulseAudio stream on Linux (GitHub #127). macOS keeps the per-track LibVLC output.
+    /// Pure; internal for tests.
+    /// </summary>
+    internal static bool IsGaplessEnginePlatform(bool isWindows, bool isLinux) => isWindows || isLinux;
+
+    /// <summary>
+    /// Whether an MP3 opens on LibVLC's own MP3 demuxer instead of the forced avformat one:
+    /// only with avformat forced (otherwise it is already the native one), only for a file
+    /// with a LAME tag (the native demuxer is what trims it; files without one keep the
+    /// avformat seek fix), and only from the start (its VBR seeks are bitrate estimates).
+    /// Pure; internal for tests.
+    /// </summary>
+    internal static bool UseNativeMp3Demux(bool avformatForced, bool hasGaplessInfo, long startMs)
+        => avformatForced && hasGaplessInfo && startMs <= 0;
+
+    /// <summary>
+    /// Whether a deferred cleanup's player was re-staged by PrepareNext after the cleanup
+    /// was queued (<paramref name="generationAtQueue"/> vs <paramref name="generationNow"/>):
+    /// it is the standby again holding the prepared next track, or that track was already
+    /// swapped in and the player is the active one. Either way it carries audio that must
+    /// not be stopped. Pure; internal for tests.
+    /// </summary>
+    internal static bool CleanupTargetRestaged(bool isStandby, bool isActive, bool standbyPrepared,
+        long generationAtQueue, long generationNow)
+        => generationNow != generationAtQueue && (isActive || (isStandby && standbyPrepared));
 
     /// <summary>
     /// Read-ahead for media opened after a delivery gap of <paramref name="gapMs"/> was

@@ -194,11 +194,31 @@ public sealed class GaplessTrackSegment
         }
     }
 
+    /// <summary>
+    /// Frames at the very end of the input that are not part of the track: an MP3's
+    /// encoder padding when LibVLC decoded it without trimming (see Mp3GaplessInfo).
+    /// Cut from the ring when the input ends, so the next segment follows the last real
+    /// sample. Set before the input ends; 0 = keep everything.
+    /// </summary>
+    public int TailTrimFrames { get; set; }
+
     /// <summary>VLC drain callback: no further samples, play out what is buffered.</summary>
     public void MarkEndOfStream()
     {
         lock (_gate)
         {
+            if (!_endOfStream && !_abandoned)
+            {
+                // Only what is still in the ring can go; a tail the renderer already
+                // took (an underrun-starved end) stays as heard.
+                var trim = Math.Min(_count, Math.Max(0, TailTrimFrames) * Channels);
+                trim -= trim % Channels;
+                if (trim > 0)
+                {
+                    _count -= trim;
+                    _writeIdx = (_writeIdx - trim + _ring.Length) % _ring.Length;
+                }
+            }
             _endOfStream = true;
             Monitor.PulseAll(_gate);
         }
