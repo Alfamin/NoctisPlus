@@ -136,6 +136,32 @@ public class AccountFeaturesEnabledTests : IDisposable
         Assert.Equal(id, (await persistence.LoadSettingsAsync()).SyncDeviceId); // what the next launch reads
     }
 
+    /// <summary>
+    /// Bug: the sync ledger keeps every phone that ever synced, and nothing ever removed one, so a
+    /// phone whose key is gone (signed out on the phone, here, or by a password change) stayed
+    /// listed for good: the owner's dev data kept "samsung SM-S911U1" (10-11), and a reinstall
+    /// (a new device id) adds another. Its row had no way off the list.
+    /// </summary>
+    [AvaloniaFact]
+    public async Task ASignedOutPhone_CanBeTakenOffTheList()
+    {
+        var persistence = new PersistenceService(_root);
+        await persistence.SaveSettingsAsync(new AppSettings { SyncEnabled = true, SyncDeviceId = "thispc000001" });
+        var settings = await persistence.LoadSettingsAsync();
+        var sync = new Noctis.Services.Sync.LibrarySyncService(() => settings, persistence);
+        var vm = new SettingsViewModel(persistence, new FakeLibraryService(), new NoOpPlayHistoryService()) { SyncServiceOverride = sync };
+        await vm.LoadAsync();
+        await sync.GetChangesAsync(0, "phone-a-0001", "samsung SM-S911U1"); // it synced; it has no key now
+        vm.SelectedSettingsTab = SettingsViewModel.TabAccountDevices;
+        var row = Assert.Single(vm.PhoneDevices);
+        Assert.False(row.IsSignedIn);
+
+        vm.RemoveSignedInDeviceCommand.Execute(row);
+
+        Assert.Empty(vm.PhoneDevices);
+        Assert.Empty(sync.Devices());
+    }
+
     [Fact]
     public void CreateAccount_ShortPasswordOrNoEmail_SaysWhatToFix()
     {

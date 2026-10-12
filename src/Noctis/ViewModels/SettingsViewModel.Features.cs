@@ -175,7 +175,7 @@ public partial class SettingsViewModel
             rows.Add(new PhoneDeviceRow(key.DeviceName, status, key));
         }
         foreach (var s in synced.Where(s => !keys.Any(k => Same(k.DeviceId, s.Id))))
-            rows.Add(new PhoneDeviceRow(string.IsNullOrWhiteSpace(s.Name) ? s.Id : s.Name, Localization.Loc.T("Phone.SignedOut"), null));
+            rows.Add(new PhoneDeviceRow(string.IsNullOrWhiteSpace(s.Name) ? s.Id : s.Name, Localization.Loc.T("Phone.SignedOut"), null, s.Id));
         return rows;
     }
 
@@ -223,18 +223,24 @@ public partial class SettingsViewModel
         if (AccountFeatures.Enabled && !SyncEnabled && !_syncTurnedOffByUser) SyncEnabled = true;
     }
 
-    /// <summary>Signs the device out: its key stops working on its next request.</summary>
+    /// <summary>Signs the device out: its key stops working on its next request. A phone already
+    /// signed out leaves the list instead (the ledger never dropped one, so they piled up); what
+    /// it synced stays.</summary>
     [RelayCommand]
     private void RemoveSignedInDevice(PhoneDeviceRow row)
     {
-        if (row.Key is not { } key) return;
-        try { ServerUsers.RevokeDevice(key.User, key.DeviceId); }
+        try
+        {
+            if (row.Key is { } key) ServerUsers.RevokeDevice(key.User, key.DeviceId);
+            else if (row.LedgerId is { } id) Sync?.ForgetDevice(id);
+            else return;
+        }
         catch (Exception ex) { ShowServerUserError(ex.Message); }
         RefreshPhoneDevices();
     }
 
-    /// <summary>One phone in the list. No <see cref="Key"/> = the ledger knows it but it is signed out.</summary>
-    public sealed record PhoneDeviceRow(string Name, string StatusText, ServerDevice? Key)
+    /// <summary>One phone in the list. No <see cref="Key"/> = the ledger knows it (as <see cref="LedgerId"/>) but it is signed out.</summary>
+    public sealed record PhoneDeviceRow(string Name, string StatusText, ServerDevice? Key, string? LedgerId = null)
     {
         public bool IsSignedIn => Key is not null;
     }

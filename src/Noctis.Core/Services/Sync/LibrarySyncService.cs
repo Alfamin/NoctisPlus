@@ -43,6 +43,9 @@ public interface ILibrarySyncService : ITrackStateRecorder
 
     IReadOnlyList<SyncDevice> Devices();
 
+    /// <summary>Takes a device off <see cref="Devices"/> (one signed out for good). What it synced stays.</summary>
+    void ForgetDevice(string deviceId);
+
     /// <summary>Puts every track that carries user state into the ledger (first enable / re-seed).</summary>
     Task SeedAsync(IEnumerable<Track> tracks, IReadOnlyList<Playlist> playlists);
 
@@ -321,6 +324,12 @@ public sealed class LibrarySyncService : ILibrarySyncService
 
     public IReadOnlyList<SyncDevice> Devices() =>
         File.Exists(StorePath) ? Store.Devices() : Array.Empty<SyncDevice>();
+
+    public void ForgetDevice(string deviceId)
+    {
+        if (!File.Exists(StorePath) || !Store.RemoveDevice(deviceId)) return;
+        Changed?.Invoke(this, EventArgs.Empty);
+    }
 
     private static T Safe<T>(Func<T> read, T fallback)
     {
