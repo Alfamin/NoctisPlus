@@ -13,11 +13,14 @@ using Noctis.ViewModels;
 
 namespace Noctis.Views;
 
-public partial class HomeView : UserControl
+public partial class HomeView : UserControl, ITrackSelectionSource
 {
     private EventHandler? _pendingScrollRestore;
 
     private readonly HashSet<Button> _selectedTiles = new();
+
+    /// <summary>The Ctrl-selection, for window shortcuts (GitHub #131 ReplayGain).</summary>
+    public IReadOnlyList<Track> GetSelectedTracks() => TrackSelection.FromAlbums(MultiSelectHelper.GetSelectedData<Album>(_selectedTiles));
 
     /// <summary>Below this width Last Played drops under Most Played.</summary>
     private const double HeroTwoColumnMinWidth = 1100;

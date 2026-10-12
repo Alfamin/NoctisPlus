@@ -6552,4 +6552,132 @@
     <value>مرة تشغيل</value>
     <comment>Word after a play count of exactly 1 (Home and album rows: 1 play)</comment>
   </data>
+  <data name="Shortcuts.Group.Playback" xml:space="preserve">
+    <value>التشغيل</value>
+    <comment>Settings › Shortcuts (GitHub #131)</comment>
+  </data>
+  <data name="Shortcuts.Group.Window" xml:space="preserve">
+    <value>النافذة</value>
+    <comment>Settings › Shortcuts (GitHub #131)</comment>
+  </data>
+  <data name="Shortcuts.Group.Navigation" xml:space="preserve">
+    <value>التنقل</value>
+    <comment>Settings › Shortcuts (GitHub #131)</comment>
+  </data>
+  <data name="Shortcuts.Group.Library" xml:space="preserve">
+    <value>المكتبة</value>
+    <comment>Settings › Shortcuts (GitHub #131)</comment>
+  </data>
+  <data name="Shortcuts.NotSet" xml:space="preserve">
+    <value>غير معيّن</value>
+    <comment>Settings › Shortcuts (GitHub #131)</comment>
+  </data>
+  <data name="Shortcuts.AlreadyUsedBy" xml:space="preserve">
+    <value>مستخدم بالفعل لـ {0}</value>
+    <comment>Settings › Shortcuts (GitHub #131)</comment>
+  </data>
+  <data name="Shortcuts.Action.PlayPause" xml:space="preserve">
+    <value>تشغيل / إيقاف مؤقت</value>
+    <comment>Settings › Shortcuts (GitHub #131)</comment>
+  </data>
+  <data name="Shortcuts.Action.NextTrack" xml:space="preserve">
+    <value>المقطع التالي</value>
+    <comment>Settings › Shortcuts (GitHub #131)</comment>
+  </data>
+  <data name="Shortcuts.Action.PreviousTrack" xml:space="preserve">
+    <value>المقطع السابق</value>
+    <comment>Settings › Shortcuts (GitHub #131)</comment>
+  </data>
+  <data name="Shortcuts.Action.VolumeUp" xml:space="preserve">
+    <value>رفع الصوت</value>
+    <comment>Settings › Shortcuts (GitHub #131)</comment>
+  </data>
+  <data name="Shortcuts.Action.VolumeDown" xml:space="preserve">
+    <value>خفض الصوت</value>
+    <comment>Settings › Shortcuts (GitHub #131)</comment>
+  </data>
+  <data name="Shortcuts.Action.ToggleFavorite" xml:space="preserve">
+    <value>إضافة المقطع الحالي إلى المفضلة</value>
+    <comment>Settings › Shortcuts (GitHub #131)</comment>
+  </data>
+  <data name="Shortcuts.Action.ToggleFullscreen" xml:space="preserve">
+    <value>تبديل ملء الشاشة</value>
+    <comment>Settings › Shortcuts (GitHub #131)</comment>
+  </data>
+  <data name="Shortcuts.Action.SearchLibrary" xml:space="preserve">
+    <value>البحث في المكتبة</value>
+    <comment>Settings › Shortcuts (GitHub #131)</comment>
+  </data>
+  <data name="Shortcuts.Action.CommandPalette" xml:space="preserve">
+    <value>لوحة الأوامر</value>
+    <comment>Settings › Shortcuts (GitHub #131)</comment>
+  </data>
+  <data name="Shortcuts.Action.NewPlaylist" xml:space="preserve">
+    <value>قائمة تشغيل جديدة</value>
+    <comment>Settings › Shortcuts (GitHub #131)</comment>
+  </data>
+  <data name="Shortcuts.Action.ToggleQueue" xml:space="preserve">
+    <value>إظهار / إخفاء قائمة الانتظار</value>
+    <comment>Settings › Shortcuts (GitHub #131)</comment>
+  </data>
+  <data name="Shortcuts.Action.ToggleLyrics" xml:space="preserve">
+    <value>إظهار / إخفاء الكلمات</value>
+    <comment>Settings › Shortcuts (GitHub #131)</comment>
+  </data>
+  <data name="Shortcuts.Action.OpenSettings" xml:space="preserve">
+    <value>فتح الإعدادات</value>
+    <comment>Settings › Shortcuts (GitHub #131)</comment>
+  </data>
+  <data name="Shortcuts.Action.ScanReplayGain" xml:space="preserve">
+    <value>ReplayGain للأغاني المحددة</value>
+    <comment>Settings › Shortcuts (GitHub #131)</comment>
+  </data>
+  <data name="Shortcuts.Action.ToggleShuffle" xml:space="preserve">
+    <value>تشغيل / إيقاف الترتيب العشوائي</value>
+    <comment>Settings › Shortcuts (GitHub #131)</comment>
+  </data>
+  <data name="Shortcuts.Action.CycleRepeat" xml:space="preserve">
+    <value>تغيير وضع التكرار</value>
+    <comment>Settings › Shortcuts (GitHub #131)</comment>
+  </data>
+  <data name="Shortcuts.Action.ToggleMute" xml:space="preserve">
+    <value>كتم / إلغاء كتم الصوت</value>
+    <comment>Settings › Shortcuts (GitHub #131)</comment>
+  </data>
+  <data name="Shortcuts.Action.SeekForward" xml:space="preserve">
+    <value>تقديم</value>
+    <comment>Settings › Shortcuts (GitHub #131)</comment>
+  </data>
+  <data name="Shortcuts.Action.SeekBackward" xml:space="preserve">
+    <value>إرجاع</value>
+    <comment>Settings › Shortcuts (GitHub #131)</comment>
+  </data>
+  <data name="Shortcuts.Action.ToggleMiniPlayer" xml:space="preserve">
+    <value>المشغل المصغّر</value>
+    <comment>Settings › Shortcuts (GitHub #131)</comment>
+  </data>
+  <data name="Shortcuts.Action.GoBack" xml:space="preserve">
+    <value>رجوع</value>
+    <comment>Settings › Shortcuts (GitHub #131)</comment>
+  </data>
+  <data name="Shortcuts.Action.GoForward" xml:space="preserve">
+    <value>تقدّم</value>
+    <comment>Settings › Shortcuts (GitHub #131)</comment>
+  </data>
+  <data name="Shortcuts.Action.GoHome" xml:space="preserve">
+    <value>الانتقال إلى الرئيسية</value>
+    <comment>Settings › Shortcuts (GitHub #131)</comment>
+  </data>
+  <data name="Shortcuts.Action.GoSongs" xml:space="preserve">
+    <value>الانتقال إلى الأغاني</value>
+    <comment>Settings › Shortcuts (GitHub #131)</comment>
+  </data>
+  <data name="Shortcuts.Action.GoAlbums" xml:space="preserve">
+    <value>الانتقال إلى الألبومات</value>
+    <comment>Settings › Shortcuts (GitHub #131)</comment>
+  </data>
+  <data name="Shortcuts.Action.GoArtists" xml:space="preserve">
+    <value>الانتقال إلى الفنانين</value>
+    <comment>Settings › Shortcuts (GitHub #131)</comment>
+  </data>
 </root>
