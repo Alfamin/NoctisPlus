@@ -47,6 +47,13 @@ public class Album : ObservableObject
     /// <summary>Genre (from the first track that has one).</summary>
     public string Genre { get; set; } = "Unknown";
 
+    /// <summary>The album's genres for the header line, each one separate like the artist
+    /// page's GENRE fact ("Alternative Rock · Alt-Pop · Indie", GitHub #136); empty for the
+    /// "Unknown" placeholder.</summary>
+    public string GenreDisplay => string.Equals(Genre?.Trim(), "Unknown", StringComparison.OrdinalIgnoreCase)
+        ? string.Empty
+        : Track.DotGenres(Genre);
+
     /// <summary>Number of tracks in this album.</summary>
     public int TrackCount { get; set; }
 
@@ -382,6 +389,18 @@ public class Album : ObservableObject
         foreach (var t in tracks)
             if (t.Year > 0) return t.Year;
         return 0;
+    }
+
+    /// <summary>
+    /// Album genre from its tracks in album order: the first tagged track's, as
+    /// <see cref="Genre"/> documents. The first track's alone left an album whose opener is
+    /// untagged (a bonus intro, an undated WAV copy) with no genre at all.
+    /// </summary>
+    public static string ResolveGenre(IReadOnlyList<Track> tracks)
+    {
+        foreach (var t in tracks)
+            if (!string.IsNullOrWhiteSpace(t.Genre)) return t.Genre;
+        return string.Empty;
     }
 
     /// <summary>"12 tracks" / "1 track" for the album header's facts line.</summary>
