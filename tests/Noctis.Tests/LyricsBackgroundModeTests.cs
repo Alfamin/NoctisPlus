@@ -148,6 +148,34 @@ public class LyricsBackgroundModeTests : IDisposable
     }
 
     /// <summary>
+    /// Bug: a saved colour that doesn't parse (a hand-edited settings.json) was kept as the
+    /// "custom colour" anyway. Nothing could be drawn for it, and as a custom colour it also
+    /// stopped the background from ever following the artwork again: the next song's cover
+    /// changed nothing until another colour was picked.
+    /// </summary>
+    [AvaloniaFact]
+    public void UnreadableSavedColor_FallsBackToAuto()
+    {
+        var store = new SettingsStore
+        {
+            Current = new AppSettings { LyricsShowArtworkBackground = false, LyricsBackgroundColorHex = "#GGGGGG" },
+        };
+        var player = NewPlayer();
+        var vm = NewVm(player, store);
+        Assert.True(vm.IsColorModeSolid);
+
+        // Next song: Solid·Auto shows its cover's colour (warmed, so it applies at once).
+        var cover = Cover("#3366CC");
+        var vibrant = Color.Parse(ShareCardRenderer.GetVibrantColorHex(cover));
+        player.CurrentArtPath = cover;
+        player.AlbumArt = new WriteableBitmap(new PixelSize(1, 1), new Vector(96, 96), PixelFormat.Bgra8888, AlphaFormat.Premul);
+        Dispatcher.UIThread.RunJobs();
+        Assert.IsType<SolidColorBrush>(vm.FullBackgroundBrush, exactMatch: false);
+        Assert.Equal(vibrant, ColorOf(vm.FullBackgroundBrush));
+        Assert.Equal("", vm.ActiveSwatchKey);
+    }
+
+    /// <summary>
     /// Bug: a plugin Flowing style (Settings ▸ Appearance ▸ Flowing Lyrics Background ▸ Style)
     /// kept its layer on the page after switching the background to Solid or Gradient. The
     /// built-in Drift and Kawarp styles stop outside Artwork mode; the plugin layer, which

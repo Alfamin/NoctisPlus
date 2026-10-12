@@ -1002,38 +1002,40 @@ public partial class LyricsViewModel : ViewModelBase, IDisposable
                     UpdateAdaptiveBackground(_player.AlbumArt);
             }
 
-            if (!string.IsNullOrEmpty(settings.LyricsBackgroundColorHex))
+            var saved = settings.LyricsBackgroundColorHex;
+            if (!string.IsNullOrEmpty(saved))
             {
-                _selectedColorHex = settings.LyricsBackgroundColorHex;
-                ActiveSwatchKey = _selectedColorHex;
-
-                if (_selectedColorHex.StartsWith("grad:"))
+                if (saved.StartsWith("grad:"))
                 {
-                    var parts = _selectedColorHex[5..].Split(',');
-                    if (parts.Length >= 2)
+                    var parts = saved[5..].Split(',');
+                    if (parts.Length >= 2 && Color.TryParse(parts[0], out var c1) && Color.TryParse(parts[1], out var c2))
                     {
-                        var c1 = Color.Parse(parts[0]);
-                        var c2 = Color.Parse(parts[1]);
+                        _selectedColorHex = saved;
+                        ActiveSwatchKey = saved;
                         FullBackgroundBrush = DominantColorExtractor.GenerateGradientBrush(c1, c2);
                         LyricsBackgroundBrush = FullBackgroundBrush;
                         IsColorModeSolid = false;
                         IsColorModeGradient = true;
                         UpdateForegroundsForBackground(FullBackgroundBrush);
-                    }
-                    else
-                    {
-                        _selectedColorHex = null;
-                        ActiveSwatchKey = "";
+                        return;
                     }
                 }
-                else
+                else if (Color.TryParse(saved, out var color))
                 {
-                    var color = Color.Parse(_selectedColorHex);
+                    _selectedColorHex = saved;
+                    ActiveSwatchKey = saved;
                     var brush = new SolidColorBrush(color);
                     FullBackgroundBrush = brush;
                     LyricsBackgroundBrush = brush;
                     UpdateForegroundsForBackground(brush);
+                    return;
                 }
+
+                // Unreadable (a hand-edited settings.json): stay on Auto. Kept as the custom
+                // colour it drew nothing and stopped the background following the artwork.
+                _selectedColorHex = null;
+                ActiveSwatchKey = "";
+                UpdateAdaptiveBackground(_player.AlbumArt);
             }
         }
         catch (Exception ex)
