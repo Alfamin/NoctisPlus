@@ -375,6 +375,127 @@ public class ArtistImageServiceTests
         Assert.Equal(0x11, File.ReadAllBytes(service.GetCachedImagePath(artist.Id))[8]);
     }
 
+    // ── GitHub #137: a portrait already on disk never waits behind network work ──
+
+    /// <summary>A service whose every Deezer request hangs until <c>Release</c>, so a sweep
+    /// that reaches the network holds the fetch gate for as long as the test wants.</summary>
+    private static (ArtistImageService Service, Task NetworkReached, Action Release) HungNetworkService(
+        TestPersistenceService persistence)
+    {
+        var reached = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var release = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var handler = new StubHttpMessageHandler(async _ =>
+        {
+            reached.TrySetResult();
+            await release.Task;
+            return JsonResponse("""{ "data": [] }""");
+        });
+        return (new ArtistImageService(new HttpClient(handler), persistence), reached.Task, () => release.TrySetResult());
+    }
+
+    /// <summary>A cached portrait whose last check is a day old: the sweep re-asks Deezer.</summary>
+    private static string CachedRefreshDue(ArtistImageService service, TestPersistenceService persistence, Artist artist)
+    {
+        var path = service.GetCachedImagePath(artist.Id);
+        File.WriteAllBytes(path, ImageBytes(0x11));
+        AgeSidecar(ArtworkDir(persistence), artist.Id, $"https://images.example/{artist.Name}.jpg");
+        return path;
+    }
+
+    [Fact]
+    public async Task FetchAndCacheAsync_CachedPortraitSurfacesWhileAnotherSweepWaitsOnTheNetwork()
+    {
+        // The Artists tab's full-library sweep holds the gate while it re-checks a
+        // day-old portrait; Home's own call for an artist already on disk must not wait.
+        using var persistence = new TestPersistenceService();
+        var (service, networkReached, release) = HungNetworkService(persistence);
+        var busy = new Artist { Id = Guid.NewGuid(), Name = "Busy" };
+        CachedRefreshDue(service, persistence, busy);
+        var sweep = service.FetchAndCacheAsync(new[] { busy });
+        await networkReached.WaitAsync(TimeSpan.FromSeconds(10));
+
+        var home = new Artist { Id = Guid.NewGuid(), Name = "Home" };
+        var homePath = service.GetCachedImagePath(home.Id);
+        File.WriteAllBytes(homePath, ImageBytes(0x22));
+        File.WriteAllText(Path.Combine(ArtworkDir(persistence), $"{home.Id}.src"), Sidecar("https://images.example/home.jpg"));
+        var ready = new TaskCompletionSource<string>(TaskCreationOptions.RunContinuationsAsynchronously);
+        var homeFetch = service.FetchAndCacheAsync(new[] { home }, (_, p) => ready.TrySetResult(p));
+
+        try
+        {
+            var first = await Task.WhenAny(ready.Task, Task.Delay(TimeSpan.FromSeconds(5)));
+            Assert.Same(ready.Task, first);
+            Assert.Equal(homePath, await ready.Task);
+            Assert.Equal(homePath, home.ImagePath);
+            Assert.False(sweep.IsCompleted);
+        }
+        finally
+        {
+            release();
+            await Task.WhenAll(sweep, homeFetch);
+        }
+    }
+
+    [Fact]
+    public async Task FetchAndCacheAsync_EveryCachedPortraitSurfacesBeforeTheFirstRefresh()
+    {
+        // One sweep, name order: "Zed" is on disk too, and used to stay blank until
+        // every earlier artist's paced refresh had come back.
+        using var persistence = new TestPersistenceService();
+        var (service, networkReached, release) = HungNetworkService(persistence);
+        var abba = new Artist { Id = Guid.NewGuid(), Name = "Abba" };
+        var zed = new Artist { Id = Guid.NewGuid(), Name = "Zed" };
+        var abbaPath = CachedRefreshDue(service, persistence, abba);
+        var zedPath = CachedRefreshDue(service, persistence, zed);
+
+        var sweep = service.FetchAndCacheAsync(new[] { abba, zed });
+        try
+        {
+            await networkReached.WaitAsync(TimeSpan.FromSeconds(10));
+            Assert.Equal(abbaPath, abba.ImagePath);
+            Assert.Equal(zedPath, zed.ImagePath);
+        }
+        finally
+        {
+            release();
+            await sweep;
+        }
+    }
+
+    [Fact]
+    public async Task FetchAndCacheAsync_RemovedPortraitStaysBlankWhileAnotherSweepWaits()
+    {
+        using var persistence = new TestPersistenceService();
+        var (service, networkReached, release) = HungNetworkService(persistence);
+        var busy = new Artist { Id = Guid.NewGuid(), Name = "Busy" };
+        CachedRefreshDue(service, persistence, busy);
+        var sweep = service.FetchAndCacheAsync(new[] { busy });
+        await networkReached.WaitAsync(TimeSpan.FromSeconds(10));
+
+        // A file left behind by a fetch that raced the removal must not resurface.
+        var removed = new Artist { Id = Guid.NewGuid(), Name = "Removed" };
+        var removedPath = service.GetCachedImagePath(removed.Id);
+        File.WriteAllBytes(removedPath, ImageBytes(0x33));
+        File.WriteAllText(Path.Combine(ArtworkDir(persistence), $"{removed.Id}.removed"), string.Empty);
+        removed.ImagePath = removedPath;
+        var reported = false;
+        var fetch = service.FetchAndCacheAsync(new[] { removed }, (_, _) => reported = true);
+
+        try
+        {
+            var deadline = Environment.TickCount64 + 5000;
+            while (removed.ImagePath != null && Environment.TickCount64 < deadline)
+                await Task.Delay(10);
+            Assert.Null(removed.ImagePath);
+            Assert.False(reported);
+        }
+        finally
+        {
+            release();
+            await Task.WhenAll(sweep, fetch);
+        }
+    }
+
     private static byte[] ImageBytes(byte fill)
     {
         var bytes = new byte[6 * 1024];
