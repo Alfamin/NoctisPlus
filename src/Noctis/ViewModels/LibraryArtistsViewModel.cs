@@ -185,9 +185,22 @@ public partial class LibraryArtistsViewModel : ViewModelBase, ISearchable, IDisp
         }
         _isDirty = false;
 
+        // A scan publish (every 1.5 s while scanning) hands over new Artist objects with no
+        // ImagePath. Keep the portrait the previous object had, in memory: the rows below
+        // used to be built from the empty ones and blanked every tile until a sweep
+        // surfaced them again (GitHub #137). The two sweeps below still correct it.
+        var shownPaths = new Dictionary<Guid, string>(_allArtists.Count);
+        foreach (var artist in _allArtists)
+            if (artist.ImagePath != null)
+                shownPaths[artist.Id] = artist.ImagePath;
+
         _allArtists = _library.Artists.ToList();
         foreach (var artist in _allArtists)
+        {
             artist.IsFavorite = _favoriteArtists.IsFavorite(artist.Name);
+            if (artist.ImagePath == null && shownPaths.TryGetValue(artist.Id, out var path))
+                artist.ImagePath = path;
+        }
         ApplyFilter(_currentFilter);
 
         // Clearing ImagePath for portraits whose file has gone missing used to be a
