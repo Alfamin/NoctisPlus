@@ -156,6 +156,28 @@ public class LocalApiServerTests
     }
 
     [AvaloniaFact]
+    public async Task Lockout_RefusesWrongTokens_ButNotTheRightOne()
+    {
+        // Wrong tokens can come from anyone who can reach 127.0.0.1 without the token
+        // file: a web page the user visits, another account on this PC. A flood of them
+        // must not lock the user's own Stream Deck / OBS overlay out of the API.
+        using var h = new Harness(authLimit: 3);
+        using var anon = new HttpClient { BaseAddress = h.Http.BaseAddress };
+        for (var i = 0; i < 3; i++)
+            Assert.Equal(HttpStatusCode.Unauthorized, (await anon.GetAsync("/api/v1/status?token=bad")).StatusCode);
+        Assert.Equal(HttpStatusCode.TooManyRequests, (await anon.GetAsync("/api/v1/status?token=bad")).StatusCode);
+
+        using var get = await h.Http.GetAsync("/api/v1/status");
+        Assert.Equal(HttpStatusCode.OK, get.StatusCode);
+        var (post, json, _) = await h.PostAsync("/api/v1/playback/toggle");
+        Assert.Equal(HttpStatusCode.OK, post);
+        Assert.True(json.GetProperty("ok").GetBoolean());
+
+        // Wrong ones stay throttled while the lockout runs.
+        Assert.Equal(HttpStatusCode.TooManyRequests, (await anon.GetAsync("/api/v1/status?token=bad")).StatusCode);
+    }
+
+    [AvaloniaFact]
     public async Task SetToken_RejectsTheOldToken()
     {
         using var h = new Harness();
@@ -717,5 +739,39 @@ public class LocalApiTokenStoreTests : IDisposable
         var token = new LocalApiTokenStore(_dir).LoadOrCreateToken();
         Assert.Equal(64, token.Length);
         Assert.Equal(token, new LocalApiTokenStore(_dir).ReadToken());
+    }
+
+    [Fact]
+    public async Task TempFile_IsOwnerOnly_FromItsFirstByte_OnUnix()
+    {
+        if (OperatingSystem.IsWindows()) return; // per-user %APPDATA% ACL; no POSIX mode to check
+        // The temp file used to get the umask's mode (0644 almost everywhere) and was
+        // chmod'ed 600 only after the token was already written into it, so another
+        // account on the machine polling the data folder could read the token in
+        // between. Watch the temp file across many writes: never group/world-readable.
+        var store = new LocalApiTokenStore(_dir);
+        var tmp = store.FilePath + ".tmp";
+        var seenReadable = 0;
+        using var cts = new CancellationTokenSource();
+        var observer = Task.Run(() =>
+        {
+            if (OperatingSystem.IsWindows()) return;
+            while (!cts.IsCancellationRequested)
+            {
+                try
+                {
+                    if ((File.GetUnixFileMode(tmp) & (UnixFileMode.GroupRead | UnixFileMode.OtherRead)) != 0)
+                        seenReadable++;
+                }
+                catch (IOException) { /* not there at this instant */ }
+            }
+        });
+        store.LoadOrCreateToken();
+        for (var i = 0; i < 500; i++) store.Regenerate();
+        cts.Cancel();
+        await observer;
+
+        Assert.Equal(0, seenReadable);
+        Assert.Equal(UnixFileMode.UserRead | UnixFileMode.UserWrite, File.GetUnixFileMode(store.FilePath));
     }
 }

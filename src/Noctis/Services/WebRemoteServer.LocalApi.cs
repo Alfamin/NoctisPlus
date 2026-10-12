@@ -119,13 +119,17 @@ public sealed partial class WebRemoteServer
         if (!path.StartsWith("/api/v1/", StringComparison.Ordinal))
             return Error(404, "not_found", "Unknown route. The Local API lives under /api/v1/.");
 
-        var retryAfter = LockoutSecondsRemaining();
-        if (retryAfter > 0)
-            return Error(429, "rate_limited", "Too many failed authentication attempts. Try again later.",
-                $"Retry-After: {retryAfter}\r\n");
-
         if (!IsLocalAuthorized(headers, query))
         {
+            // The lockout only ever answers wrong tokens. Checked after the token, not
+            // before: wrong tokens don't need the token file (any web page the user
+            // visits can send them to 127.0.0.1, so can another account on this PC), and
+            // a lockout that also refused the right one let them cut the user's own
+            // Stream Deck / overlay off the API for as long as they kept sending.
+            var retryAfter = LockoutSecondsRemaining();
+            if (retryAfter > 0)
+                return Error(429, "rate_limited", "Too many failed authentication attempts. Try again later.",
+                    $"Retry-After: {retryAfter}\r\n");
             RecordAuthFailure();
             return Error(401, "unauthorized",
                 "Missing or wrong token. Send 'Authorization: Bearer <token>' or '?token=<token>' (see local-api.json).",
