@@ -160,6 +160,35 @@ public class LyricShareDialogTests
         }
     }
 
+    /// <summary>
+    /// Bug: closing the dialog while a line's edit box was emptied rendered the card again
+    /// after the dialog was gone. Detach puts the line's text back (EndEdit) while it still
+    /// listens to the lines, so the card re-rendered; with word-timed lyrics that render
+    /// re-armed the 30 Hz karaoke timer, which went on drawing frames for a closed dialog.
+    /// </summary>
+    [AvaloniaFact]
+    public void Closing_WhileALineIsBlanked_DoesNotRenderAgain()
+    {
+        using var persistence = new TestPersistenceService();
+        var player = new PlayerViewModel(new FakeAudioPlayer(), new FakeLibraryService(), persistence, new FakeAnimatedCoverService());
+        var song = Song();
+        player.CurrentTrack = song;
+        var lines = new[] { "one two", "three four", "five six" };
+        var stamps = lines.Select((_, i) => (TimeSpan?)TimeSpan.FromSeconds(i * 5)).ToList();
+        var words = lines.Select((l, i) => (IReadOnlyList<WordTiming>?)l.Split(' ')
+            .Select((w, k) => new WordTiming { Text = w, Start = TimeSpan.FromSeconds(i * 5 + k) }).ToList()).ToList();
+        var vm = new LyricShareViewModel(song, lines, stamps, player, words);
+        Assert.True(PumpUntil(() => vm.AnimatedPreview != null, 5000), "the karaoke preview never started");
+
+        vm.BeginEdit(vm.Lines[0]);
+        vm.Lines[0].Text = "  ";
+        vm.Detach(); // what closing the dialog does
+
+        PumpUntil(() => false, 700);
+        Assert.Equal("one two", vm.Lines[0].Text);
+        Assert.Null(vm.AnimatedPreview);
+    }
+
     // ── Playback sync ──
 
     /// <summary>

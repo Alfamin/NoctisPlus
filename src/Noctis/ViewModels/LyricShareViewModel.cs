@@ -1210,13 +1210,16 @@ public partial class LyricShareViewModel : ViewModelBase
         // so closing the dialog mid-export left thousands of frames still rendering.
         CancelExport();
         _previewDebounceCts?.Cancel();
+        // Stop listening first: putting a blanked line back (EndEdit) re-rendered the card
+        // after close, and with word timings re-armed the karaoke timer for a closed dialog.
         foreach (var line in Lines)
+        {
+            line.PropertyChanged -= OnLineChanged;
             line.EndEdit(keep: true);
+        }
 
         TeardownAnimator();
         if (_player != null)
             _player.PropertyChanged -= OnPlayerPropertyChanged;
-        foreach (var line in Lines)
-            line.PropertyChanged -= OnLineChanged;
     }
 }
