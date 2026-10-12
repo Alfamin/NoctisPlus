@@ -2304,7 +2304,7 @@ public class LibraryService : ILibraryService
                         Name = first.Album,
                         Artist = !string.IsNullOrWhiteSpace(first.AlbumArtist) ? first.AlbumArtist : first.Artist,
                         Year = Album.ResolveYear(albumTracks),
-                        Genre = first.Genre,
+                        Genre = Album.ResolveGenre(albumTracks),
                         TrackCount = albumTracks.Count,
                         TotalDuration = TimeSpan.FromTicks(albumTracks.Sum(t => t.Duration.Ticks)),
                         ArtworkPath = hasArt ? artworkPaths[first.AlbumId] : null,
@@ -3664,9 +3664,9 @@ public class LibraryService : ILibraryService
                         Name = entry.Name,
                         Artist = entry.Artist,
                         // From the tracks, not the cached value, so a cache written while
-                        // the year came from the first track alone heals on the next launch.
+                        // the year (or genre) came from the first track alone heals on the next launch.
                         Year = Album.ResolveYear(albumTracks),
-                        Genre = entry.Genre,
+                        Genre = Album.ResolveGenre(albumTracks),
                         TrackCount = entry.TrackCount,
                         TotalDuration = TimeSpan.FromTicks(entry.TotalDurationTicks),
                         ArtworkPath = entry.ArtworkPath,

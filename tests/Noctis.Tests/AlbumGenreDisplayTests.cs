@@ -83,6 +83,17 @@ public class AlbumGenreDisplayTests
     }
 
     [Fact]
+    public void ResolveGenre_TakesTheFirstTaggedTrack_InAlbumOrder()
+    {
+        static Track T(string genre) => new() { Title = "t", Genre = genre };
+        Assert.Equal("Rock; Pop", Album.ResolveGenre(new[] { T("Rock; Pop"), T("Jazz") }));
+        // An untagged opener no longer leaves the whole album without a genre.
+        Assert.Equal("Indie", Album.ResolveGenre(new[] { T(""), T("  "), T("Indie"), T("Jazz") }));
+        Assert.Equal(string.Empty, Album.ResolveGenre(new[] { T(""), T("") }));
+        Assert.Equal(string.Empty, Album.ResolveGenre(Array.Empty<Track>()));
+    }
+
+    [Fact]
     public void HeaderLine_ShowsEachGenre_ThenYearTracksLength()
     {
         var album = MakeAlbum(ReporterGenre);

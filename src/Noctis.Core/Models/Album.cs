@@ -391,6 +391,18 @@ public class Album : ObservableObject
         return 0;
     }
 
+    /// <summary>
+    /// Album genre from its tracks in album order: the first tagged track's, as
+    /// <see cref="Genre"/> documents. The first track's alone left an album whose opener is
+    /// untagged (a bonus intro, an undated WAV copy) with no genre at all.
+    /// </summary>
+    public static string ResolveGenre(IReadOnlyList<Track> tracks)
+    {
+        foreach (var t in tracks)
+            if (!string.IsNullOrWhiteSpace(t.Genre)) return t.Genre;
+        return string.Empty;
+    }
+
     /// <summary>"12 tracks" / "1 track" for the album header's facts line.</summary>
     public string TrackCountText => TrackCount == 1 ? "1 track" : $"{TrackCount} tracks";
 
