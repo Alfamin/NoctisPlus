@@ -1249,7 +1249,7 @@
   <data name="Playlist.EditPlaylist" xml:space="preserve"><value>Çalma Listesini Düzenle</value><comment>Header in PlaylistView.axaml</comment></data>
   <data name="Playlist.DeletePlaylist" xml:space="preserve"><value>Çalma Listesini Sil</value><comment>Header in PlaylistView.axaml</comment></data>
   <data name="Playlist.ChangeDisplayedOrderManualTip" xml:space="preserve"><value>Görüntülenen sırayı değiştir. Elle, kaydedilmiş çalma listesi sıranızdır.</value><comment>ToolTip.Tip in PlaylistView.axaml</comment></data>
-  <data name="Playlist.Text" xml:space="preserve"><value></value><comment>Text in PlaylistView.axaml</comment></data>
+  <data name="Playlist.Text" xml:space="preserve"><value>&#xE70D;</value><comment>Text in PlaylistView.axaml</comment></data>
   <data name="Playlist.ManualPlaylistOrder" xml:space="preserve"><value>Elle (çalma listesi sırası)</value><comment>Header in PlaylistView.axaml</comment></data>
   <data name="Playlist.Title" xml:space="preserve"><value>Başlık</value><comment>Header in PlaylistView.axaml</comment></data>
   <data name="Playlist.Artist" xml:space="preserve"><value>Sanatçı</value><comment>Header in PlaylistView.axaml</comment></data>
@@ -1259,17 +1259,17 @@
   <data name="Playlist.ReleaseDateOldest" xml:space="preserve"><value>Yayın Tarihi (En Eski)</value><comment>Header in PlaylistView.axaml</comment></data>
   <data name="Playlist.ReleaseDateNewest" xml:space="preserve"><value>Yayın Tarihi (En Yeni)</value><comment>Header in PlaylistView.axaml</comment></data>
   <data name="Playlist.FEATUREDARTISTS" xml:space="preserve"><value>ÖNE ÇIKAN SANATÇILAR</value><comment>Text in PlaylistView.axaml</comment></data>
-  <data name="Playlist.Text2" xml:space="preserve"><value></value><comment>Text in PlaylistView.axaml</comment></data>
+  <data name="Playlist.Text2" xml:space="preserve"><value>&#xE76C;</value><comment>Text in PlaylistView.axaml</comment></data>
   <data name="Playlist.SUGGESTED" xml:space="preserve"><value>ÖNERİLEN</value><comment>Text in PlaylistView.axaml</comment></data>
   <data name="Playlist.FromLibraryBasedArtistsTip" xml:space="preserve"><value>Kitaplığından, bu çalma listesindeki sanatçılara göre</value><comment>ToolTip.Tip in PlaylistView.axaml</comment></data>
   <data name="Playlist.RefreshSuggestionsTip" xml:space="preserve"><value>Önerileri yenile</value><comment>ToolTip.Tip in PlaylistView.axaml</comment></data>
-  <data name="Playlist.Text3" xml:space="preserve"><value></value><comment>Text in PlaylistView.axaml</comment></data>
+  <data name="Playlist.Text3" xml:space="preserve"><value>&#xE72C;</value><comment>Text in PlaylistView.axaml</comment></data>
   <data name="Playlist.ExplicitTip" xml:space="preserve"><value>Müstehcen</value><comment>ToolTip.Tip in PlaylistView.axaml</comment></data>
   <data name="Playlist.AddPlaylistTip" xml:space="preserve"><value>Bu çalma listesine ekle</value><comment>ToolTip.Tip in PlaylistView.axaml</comment></data>
   <data name="Playlist.Added" xml:space="preserve"><value>Eklendi</value><comment>Text in PlaylistView.axaml</comment></data>
   <data name="Playlist.Favorite" xml:space="preserve"><value>Favori</value><comment>Text in PlaylistView.axaml</comment></data>
   <data name="Playlist.Time" xml:space="preserve"><value>Süre</value><comment>Text in PlaylistView.axaml</comment></data>
-  <data name="Playlist.Text4" xml:space="preserve"><value></value><comment>Text in PlaylistView.axaml</comment></data>
+  <data name="Playlist.Text4" xml:space="preserve"><value>&#xE784;</value><comment>Text in PlaylistView.axaml</comment></data>
   <data name="Playlist.Kicker" xml:space="preserve"><value>ÇALMA LİSTESİ</value><comment>Hero kicker in PlaylistView.axaml</comment></data>
   <data name="Playlist.PlayFromHereTip" xml:space="preserve"><value>Buradan çal</value><comment>ToolTip.Tip in PlaylistView.axaml</comment></data>
   <data name="Playlist.AddedLast7DaysTip" xml:space="preserve"><value>Son 7 günde eklendi</value><comment>ToolTip.Tip in PlaylistView.axaml</comment></data>

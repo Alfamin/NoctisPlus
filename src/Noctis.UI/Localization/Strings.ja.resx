@@ -853,7 +853,7 @@
     <comment>Text in SettingsView.axaml</comment>
   </data>
   <data name="Settings.TintBarsCurrentCover" xml:space="preserve">
-    <value>カバーカラーでバーを色付けします。format@@0オフにすると、バーが白くなります。</value>
+    <value>カバーカラーでバーを色付けします。オフにすると、バーが白くなります。</value>
     <comment>Text in SettingsView.axaml</comment>
   </data>
   <data name="Settings.FrequencyBarsRisingFromTip" xml:space="preserve">
@@ -1257,7 +1257,7 @@
     <comment>ToolTip.Tip in SettingsView.axaml</comment>
   </data>
   <data name="Settings.IfPhoneBlocksLink" xml:space="preserve">
-    <value>携帯電話がリンクを安全でないとフラグを立てた場合は、format@@0 を選択します。リモートはプレーンな HTTP を使用します。</value>
+    <value>携帯電話がリンクを安全でないと警告した場合は、「続行」を選択してください。リモートはプレーンな HTTP を使用します。</value>
     <comment>Text in SettingsView.axaml</comment>
   </data>
   <data name="Settings.OPENPHONE" xml:space="preserve">
@@ -5988,7 +5988,7 @@
     <comment>Review pane empty state</comment>
   </data>
   <data name="LyricsStudio.ReviewEmptyBody" xml:space="preserve">
-    <value>曲を選択し、format@@0を押します。</value>
+    <value>リストから曲を選択してください。歌詞のある曲は「開始」を押すとタイミングを付けられます。歌詞のない曲は貼り付け用のボックスが開きます。</value>
     <comment>Review pane empty state</comment>
   </data>
   <data name="LyricsStudio.Upgrade" xml:space="preserve">
