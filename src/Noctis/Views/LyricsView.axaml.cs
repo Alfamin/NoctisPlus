@@ -43,9 +43,8 @@ public partial class LyricsView : UserControl
 
     /// <summary>True while this view is counted in the VM's visible-surface tally.</summary>
     private bool _countedAsVisible;
-    private bool _swatchScrollersWired;
-    private DispatcherTimer? _colorPickerDismissTimer;
-    private const double ColorPickerAutoDismissSeconds = 3;
+    /// <summary>The Background Color pop-up while it is up (one at a time).</summary>
+    private LyricsBackgroundColorDialog? _colorDialog;
     private bool _isNarrowMode;
     private DispatcherTimer? _resizeRecenterTimer;
     private Window? _hostWindow;
@@ -93,15 +92,6 @@ public partial class LyricsView : UserControl
         LyricsTimelineSlider.SizeChanged += (_, _) => UpdateTimelineSliderVisual();
         DispatcherTimer.RunOnce(UpdateTimelineSliderVisual, TimeSpan.FromMilliseconds(10));
 
-        // Mouse wheel → horizontal scroll for color swatch pickers.
-        // The scrollers live inside a Flyout and are not realized until first open,
-        // so wire them lazily on Flyout.Opened instead of at construction time.
-        if (LyricsColorPickerHost?.Flyout is Avalonia.Controls.Flyout colorPickerFlyout)
-        {
-            colorPickerFlyout.Opened += OnColorPickerFlyoutOpened;
-            colorPickerFlyout.Closed += OnColorPickerFlyoutClosed;
-        }
-
         // After a min/maximize/restore the lyrics rewrap; re-anchor the active line on the
         // very next layout pass (guarded by the flag) so it snaps into place instead of
         // sitting at a stale offset for the ~200ms the resize-settle timer would take.
@@ -140,62 +130,6 @@ public partial class LyricsView : UserControl
         if (!vm.IsSyncTabSelected || vm.IsAutoFollowPaused || vm.ActiveLineIndex < 0) return;
 
         JumpToActiveLineWhenReady(vm.ActiveLineIndex);
-    }
-
-    private void OnColorPickerFlyoutOpened(object? sender, EventArgs e)
-    {
-        if (!_swatchScrollersWired)
-        {
-            if (SolidSwatchScroller != null)
-                SolidSwatchScroller.PointerWheelChanged += OnSwatchWheelScroll;
-            if (GradientSwatchScroller != null)
-                GradientSwatchScroller.PointerWheelChanged += OnSwatchWheelScroll;
-
-            // Any interaction inside the picker resets the auto-dismiss countdown so it only
-            // closes once the user has stopped fiddling with it (handledEventsToo so swatch/mode
-            // button clicks still count).
-            if (ColorPickerContent != null)
-            {
-                ColorPickerContent.AddHandler(PointerPressedEvent, OnColorPickerInteraction, RoutingStrategies.Tunnel, handledEventsToo: true);
-                ColorPickerContent.AddHandler(PointerMovedEvent, OnColorPickerInteraction, RoutingStrategies.Tunnel, handledEventsToo: true);
-                ColorPickerContent.AddHandler(PointerWheelChangedEvent, OnColorPickerInteraction, RoutingStrategies.Tunnel, handledEventsToo: true);
-            }
-
-            _swatchScrollersWired = true;
-        }
-
-        RestartColorPickerDismissTimer();
-    }
-
-    private void OnColorPickerFlyoutClosed(object? sender, EventArgs e) => StopColorPickerDismissTimer();
-
-    private void OnColorPickerInteraction(object? sender, RoutedEventArgs e) => RestartColorPickerDismissTimer();
-
-    private void RestartColorPickerDismissTimer()
-    {
-        StopColorPickerDismissTimer();
-        _colorPickerDismissTimer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(ColorPickerAutoDismissSeconds) };
-        _colorPickerDismissTimer.Tick += (_, _) =>
-        {
-            StopColorPickerDismissTimer();
-            LyricsColorPickerHost?.Flyout?.Hide();
-        };
-        _colorPickerDismissTimer.Start();
-    }
-
-    private void StopColorPickerDismissTimer()
-    {
-        _colorPickerDismissTimer?.Stop();
-        _colorPickerDismissTimer = null;
-    }
-
-    private void OnSwatchWheelScroll(object? sender, PointerWheelEventArgs e)
-    {
-        if (sender is not ScrollViewer sv) return;
-        e.Handled = true;
-        var maxX = sv.Extent.Width - sv.Viewport.Width;
-        if (maxX <= 0) return;
-        sv.Offset = sv.Offset.WithX(Math.Clamp(sv.Offset.X - e.Delta.Y * 60, 0, maxX));
     }
 
     protected override void OnAttachedToVisualTree(VisualTreeAttachmentEventArgs e)
@@ -561,12 +495,32 @@ public partial class LyricsView : UserControl
         host.Opacity = to;
     }
 
+    /// <summary>
+    /// The player bar's ⋯ ▸ Background Color: the centred pill pop-up over this page's window,
+    /// on this page's view model, so each pick repaints the page behind it. Posted so the menu
+    /// that asked has closed first.
+    /// </summary>
     private void OnOpenBackgroundColorRequested()
     {
-        Dispatcher.UIThread.Post(() =>
+        Dispatcher.UIThread.Post(() => _ = ShowBackgroundColorDialogAsync());
+    }
+
+    private async Task ShowBackgroundColorDialogAsync()
+    {
+        if (_colorDialog != null || DataContext is not LyricsViewModel vm
+            || TopLevel.GetTopLevel(this) is not Window owner || !owner.IsVisible)
+            return;
+        var dialog = new LyricsBackgroundColorDialog { DataContext = vm };
+        _colorDialog = dialog;
+        try
         {
-            LyricsColorPickerHost?.Flyout?.ShowAt(LyricsColorPickerHost);
-        });
+            DialogHelper.SizeToOwner(dialog, owner);
+            await dialog.ShowDialog(owner);
+        }
+        finally
+        {
+            _colorDialog = null;
+        }
     }
 
     private void OnViewModelPropertyChanged(object? sender, System.ComponentModel.PropertyChangedEventArgs e)
@@ -688,14 +642,16 @@ public partial class LyricsView : UserControl
     // parked too — no point animating layers nobody can see.
     // The Style setting decides WHICH flowing background draws: the built-in Drift layers,
     // or one plugin visual layer (Kawarp, …) that replaces them. A selected plugin that is not
-    // loaded/enabled falls back to Drift so the toggle never shows nothing.
+    // loaded/enabled falls back to Drift so the toggle never shows nothing. Like Drift and
+    // Kawarp, a plugin layer belongs to the Artwork mode: over Solid or Gradient it would
+    // hide the colour the user picked.
     private void UpdateFlowAnimationState(LyricsViewModel vm)
     {
         var flowing = vm.Player.LyricsFlowingLightEnabled
                       && string.IsNullOrEmpty(vm.Player.LyricsBackgroundMediaPath);
         var style = FlowingStyles.Normalize(vm.Player.LyricsFlowingStyle);
         var kawarp = flowing && vm.IsColorModeArtwork && FlowingStyles.IsKawarp(style);
-        var plugin = flowing && !kawarp ? SelectedPluginLayer(vm) : null;
+        var plugin = flowing && vm.IsColorModeArtwork && !kawarp ? SelectedPluginLayer(vm) : null;
         var builtIn = flowing && !kawarp && plugin is null;
 
         FlowLayerHost.IsVisible = builtIn;

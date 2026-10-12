@@ -30,6 +30,9 @@ public partial class ColorSwatch : ObservableObject
     public bool IsAuto { get; }
 
     [ObservableProperty] private IBrush _preview;
+
+    /// <summary>The choice the background shows now (the picker rings it).</summary>
+    [ObservableProperty] private bool _isSelected;
 }
 
 /// <summary>
@@ -54,15 +57,23 @@ public partial class LyricsViewModel : ViewModelBase, IDisposable
     [ObservableProperty] private bool _isColorModeGradient;
     [ObservableProperty] private string _activeSwatchKey = "";
 
-    private static readonly List<ColorSwatch> _solidColorSwatches = BuildSolidSwatches();
-    private static readonly List<ColorSwatch> _gradientSwatches = BuildGradientSwatches();
-
-    /// <summary>"Auto" swatch — its preview tracks the current track's artwork-derived color.</summary>
+    /// <summary>"Auto" swatches, first in each grid. Their previews track the current track's
+    /// artwork: the vibrant color Solid·Auto shows and the gradient Gradient·Auto shows.</summary>
     private readonly ColorSwatch _autoSwatch =
         new("", "Auto", new SolidColorBrush(DefaultAdaptiveColor), isAuto: true);
+    private readonly ColorSwatch _autoGradientSwatch =
+        new("", "Auto", CreateDefaultUnifiedBrush(), isAuto: true);
 
     public IReadOnlyList<ColorSwatch> SolidSwatches { get; }
-    public List<ColorSwatch> GradientSwatches => _gradientSwatches;
+    public IReadOnlyList<ColorSwatch> GradientSwatches { get; }
+
+    partial void OnActiveSwatchKeyChanged(string value) => UpdateSwatchSelection();
+
+    private void UpdateSwatchSelection()
+    {
+        foreach (var swatch in SolidSwatches.Concat(GradientSwatches))
+            swatch.IsSelected = swatch.Key == ActiveSwatchKey;
+    }
 
     private static List<ColorSwatch> BuildSolidSwatches()
     {
@@ -576,7 +587,7 @@ public partial class LyricsViewModel : ViewModelBase, IDisposable
     /// <summary>
     /// Raised when the user requests the background color picker to open from outside the
     /// lyrics view's own bar (e.g. from the standard PlaybackBar's ⋯ menu).
-    /// The lyrics view's code-behind subscribes and calls Flyout.ShowAt on the hidden host button.
+    /// The lyrics view's code-behind subscribes and opens LyricsBackgroundColorDialog over its window.
     /// </summary>
     public event Action? OpenBackgroundColorRequested;
 
@@ -611,10 +622,11 @@ public partial class LyricsViewModel : ViewModelBase, IDisposable
         _persistence = persistence;
         _library = library;
 
-        // "Auto" first, then the fixed color swatches.
-        var solid = new List<ColorSwatch>(_solidColorSwatches.Count + 1) { _autoSwatch };
-        solid.AddRange(_solidColorSwatches);
-        SolidSwatches = solid;
+        // "Auto" first, then the fixed swatches. Built per view model: each one carries
+        // its own selected state.
+        SolidSwatches = BuildSolidSwatches().Prepend(_autoSwatch).ToList();
+        GradientSwatches = BuildGradientSwatches().Prepend(_autoGradientSwatch).ToList();
+        UpdateSwatchSelection();
 
         // Dedicated sync timer — polls player position and drives line highlighting.
         // Fixed 100ms cadence; word-level sweep is frame-driven via the render-clock
@@ -713,9 +725,10 @@ public partial class LyricsViewModel : ViewModelBase, IDisposable
     private Color? _averageArtworkColor;
 
     /// <summary>The scrim painted over the blurred artwork in artwork mode
-    /// (Rectangle Fill="#66000000" in LyricsView.axaml). Keep in sync if that changes —
-    /// it shifts the visible luminance enough to matter for the readability threshold.</summary>
-    private const double ArtworkScrimAlpha = 0x66 / 255.0;
+    /// (Rectangle Fill="#99000000" in LyricsView.axaml, LyricsPanelView.axaml and the mini
+    /// player). Keep in sync if that changes — it shifts the visible luminance enough to
+    /// matter for the readability threshold.</summary>
+    private const double ArtworkScrimAlpha = 0x99 / 255.0;
 
     private int _adaptiveBackgroundGeneration;
 
@@ -787,6 +800,19 @@ public partial class LyricsViewModel : ViewModelBase, IDisposable
         _autoSwatch.Preview = new SolidColorBrush(vibrant ?? (artPath != null
             ? DominantColorExtractor.GetOrExtractDominantColor(artPath, albumArt!)
             : DominantColorExtractor.ExtractDominantColor(albumArt)));
+        // The gradient one previews what Gradient·Auto draws. Here only from the path-keyed
+        // palette cache; art without a file gets it below, along with its palette.
+        if (albumArt == null)
+            _autoGradientSwatch.Preview = CreateDefaultUnifiedBrush();
+        else if (artPath != null)
+        {
+            try
+            {
+                var (d, s) = DominantColorExtractor.GetOrExtractPalette(artPath, albumArt);
+                _autoGradientSwatch.Preview = DominantColorExtractor.GenerateUnifiedBrush(d, s);
+            }
+            catch { /* keeps the last preview */ }
+        }
 
         // Don't override when a custom background color is selected
         if (_selectedColorHex != null) return;
@@ -811,9 +837,11 @@ public partial class LyricsViewModel : ViewModelBase, IDisposable
             LyricsBackgroundBrush = right;
             // Solid·Auto shows the artwork's vibrant color as a true solid; the unified
             // gradient's hue-shifted stops drifted visibly away from the cover's color.
+            var unified = DominantColorExtractor.GenerateUnifiedBrush(dominant, secondary);
+            _autoGradientSwatch.Preview = unified;
             FullBackgroundBrush = IsColorModeSolid && vibrant is { } v
                 ? new SolidColorBrush(v)
-                : DominantColorExtractor.GenerateUnifiedBrush(dominant, secondary);
+                : unified;
             UpdateMeshColors(dominant, secondary);
             _averageArtworkColor = artPath != null
                 ? DominantColorExtractor.GetOrExtractAverageColor(artPath, albumArt)
@@ -1001,37 +1029,40 @@ public partial class LyricsViewModel : ViewModelBase, IDisposable
                     UpdateAdaptiveBackground(_player.AlbumArt);
             }
 
-            if (!string.IsNullOrEmpty(settings.LyricsBackgroundColorHex))
+            var saved = settings.LyricsBackgroundColorHex;
+            if (!string.IsNullOrEmpty(saved))
             {
-                _selectedColorHex = settings.LyricsBackgroundColorHex;
-                ActiveSwatchKey = _selectedColorHex;
-
-                if (_selectedColorHex.StartsWith("grad:"))
+                if (saved.StartsWith("grad:"))
                 {
-                    var parts = _selectedColorHex[5..].Split(',');
-                    if (parts.Length >= 2)
+                    var parts = saved[5..].Split(',');
+                    if (parts.Length >= 2 && Color.TryParse(parts[0], out var c1) && Color.TryParse(parts[1], out var c2))
                     {
-                        var c1 = Color.Parse(parts[0]);
-                        var c2 = Color.Parse(parts[1]);
+                        _selectedColorHex = saved;
+                        ActiveSwatchKey = saved;
                         FullBackgroundBrush = DominantColorExtractor.GenerateGradientBrush(c1, c2);
                         LyricsBackgroundBrush = FullBackgroundBrush;
                         IsColorModeSolid = false;
                         IsColorModeGradient = true;
-                    }
-                    else
-                    {
-                        _selectedColorHex = null;
-                        ActiveSwatchKey = "";
+                        UpdateForegroundsForBackground(FullBackgroundBrush);
+                        return;
                     }
                 }
-                else
+                else if (Color.TryParse(saved, out var color))
                 {
-                    var color = Color.Parse(_selectedColorHex);
+                    _selectedColorHex = saved;
+                    ActiveSwatchKey = saved;
                     var brush = new SolidColorBrush(color);
                     FullBackgroundBrush = brush;
                     LyricsBackgroundBrush = brush;
                     UpdateForegroundsForBackground(brush);
+                    return;
                 }
+
+                // Unreadable (a hand-edited settings.json): stay on Auto. Kept as the custom
+                // colour it drew nothing and stopped the background following the artwork.
+                _selectedColorHex = null;
+                ActiveSwatchKey = "";
+                UpdateAdaptiveBackground(_player.AlbumArt);
             }
         }
         catch (Exception ex)
