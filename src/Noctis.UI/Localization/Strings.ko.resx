@@ -6505,4 +6505,47 @@
     <value>이 휴대폰을 목록에서 뺍니다. 동기화한 내용은 그대로 남습니다.</value>
     <comment>Tooltip on Remove for a phone that is already signed out</comment>
   </data>
+  <data name="Export.Copied" xml:space="preserve">
+    <value>클립보드에 복사했습니다</value>
+    <comment>Share card / Wrap status after Copy</comment>
+  </data>
+  <data name="Export.ClipboardUnavailable" xml:space="preserve">
+    <value>클립보드를 사용할 수 없습니다</value>
+    <comment>Share card / Wrap status when there is no clipboard</comment>
+  </data>
+  <data name="Export.SaveImageTitle" xml:space="preserve">
+    <value>이미지 저장</value>
+    <comment>Title of the save dialog for a share card or Wrap image</comment>
+  </data>
+  <data name="Common.Done" xml:space="preserve">
+    <value>완료</value>
+  </data>
+  <data name="LyricsColor.Subtitle" xml:space="preserve">
+    <value>고르는 대로 가사 페이지가 바뀝니다.</value>
+    <comment>One-line purpose under the title in LyricsBackgroundColorDialog.axaml</comment>
+  </data>
+  <data name="LyricsColor.Auto" xml:space="preserve">
+    <value>자동, 앨범 아트 기준</value>
+    <comment>Tooltip of the first swatch in LyricsBackgroundColorDialog.axaml (follows each song's cover)</comment>
+  </data>
+  <data name="LyricsColor.Colors" xml:space="preserve">
+    <value>색상</value>
+    <comment>Label above the solid swatches in LyricsBackgroundColorDialog.axaml</comment>
+  </data>
+  <data name="LyricsColor.Gradients" xml:space="preserve">
+    <value>그라데이션</value>
+    <comment>Label above the gradient swatches in LyricsBackgroundColorDialog.axaml</comment>
+  </data>
+  <data name="LyricsColor.ArtworkTitle" xml:space="preserve">
+    <value>흐린 앨범 아트</value>
+    <comment>Artwork mode heading in LyricsBackgroundColorDialog.axaml</comment>
+  </data>
+  <data name="LyricsColor.ArtworkHint" xml:space="preserve">
+    <value>곡마다 앨범 아트를 따릅니다. 움직임은 설정의 가사에서 바꿀 수 있습니다.</value>
+    <comment>Artwork mode text in LyricsBackgroundColorDialog.axaml</comment>
+  </data>
+  <data name="LyricsColor.VideoNote" xml:space="preserve">
+    <value>배경 동영상이 켜져 있어 이 배경 위에 표시됩니다.</value>
+    <comment>Note in LyricsBackgroundColorDialog.axaml while a lyrics background video plays</comment>
+  </data>
 </root>

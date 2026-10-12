@@ -6505,4 +6505,47 @@
     <value>يزيل هذا الهاتف من القائمة. يبقى ما تمت مزامنته.</value>
     <comment>Tooltip on Remove for a phone that is already signed out</comment>
   </data>
+  <data name="Export.Copied" xml:space="preserve">
+    <value>تم النسخ إلى الحافظة</value>
+    <comment>Share card / Wrap status after Copy</comment>
+  </data>
+  <data name="Export.ClipboardUnavailable" xml:space="preserve">
+    <value>الحافظة غير متاحة</value>
+    <comment>Share card / Wrap status when there is no clipboard</comment>
+  </data>
+  <data name="Export.SaveImageTitle" xml:space="preserve">
+    <value>حفظ الصورة</value>
+    <comment>Title of the save dialog for a share card or Wrap image</comment>
+  </data>
+  <data name="Common.Done" xml:space="preserve">
+    <value>تم</value>
+  </data>
+  <data name="LyricsColor.Subtitle" xml:space="preserve">
+    <value>تتغير صفحة الكلمات أثناء اختيارك.</value>
+    <comment>One-line purpose under the title in LyricsBackgroundColorDialog.axaml</comment>
+  </data>
+  <data name="LyricsColor.Auto" xml:space="preserve">
+    <value>تلقائي، من صورة الألبوم</value>
+    <comment>Tooltip of the first swatch in LyricsBackgroundColorDialog.axaml (follows each song's cover)</comment>
+  </data>
+  <data name="LyricsColor.Colors" xml:space="preserve">
+    <value>الألوان</value>
+    <comment>Label above the solid swatches in LyricsBackgroundColorDialog.axaml</comment>
+  </data>
+  <data name="LyricsColor.Gradients" xml:space="preserve">
+    <value>التدرجات</value>
+    <comment>Label above the gradient swatches in LyricsBackgroundColorDialog.axaml</comment>
+  </data>
+  <data name="LyricsColor.ArtworkTitle" xml:space="preserve">
+    <value>صورة ألبوم مموّهة</value>
+    <comment>Artwork mode heading in LyricsBackgroundColorDialog.axaml</comment>
+  </data>
+  <data name="LyricsColor.ArtworkHint" xml:space="preserve">
+    <value>يتبع غلاف كل أغنية. تُضبط حركته في الإعدادات، ضمن كلمات الأغاني.</value>
+    <comment>Artwork mode text in LyricsBackgroundColorDialog.axaml</comment>
+  </data>
+  <data name="LyricsColor.VideoNote" xml:space="preserve">
+    <value>فيديو الخلفية مُفعّل ويظهر فوق هذه الخلفية.</value>
+    <comment>Note in LyricsBackgroundColorDialog.axaml while a lyrics background video plays</comment>
+  </data>
 </root>
