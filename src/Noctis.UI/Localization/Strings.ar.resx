@@ -6548,4 +6548,8 @@
     <value>فيديو الخلفية مُفعّل ويظهر فوق هذه الخلفية.</value>
     <comment>Note in LyricsBackgroundColorDialog.axaml while a lyrics background video plays</comment>
   </data>
+  <data name="Common.Play" xml:space="preserve">
+    <value>مرة تشغيل</value>
+    <comment>Word after a play count of exactly 1 (Home and album rows: 1 play)</comment>
+  </data>
 </root>

@@ -179,6 +179,13 @@
                                                            Opacity="0.75"
                                                            VerticalAlignment="Center" />
                                                 <TextBlock Text="{loc:T LibraryAlbums.Plays}"
+                                                           IsVisible="{Binding Track.PlayCount, Converter={x:Static conv:PlayCountConverters.IsNotOne}}"
+                                                           FontSize="11"
+                                                           FontWeight="SemiBold"
+                                                           Opacity="0.55"
+                                                           VerticalAlignment="Center" />
+                                                <TextBlock Text="{loc:T Common.Play}"
+                                                           IsVisible="{Binding Track.PlayCount, Converter={x:Static conv:PlayCountConverters.IsOne}}"
                                                            FontSize="11"
                                                            FontWeight="SemiBold"
                                                            Opacity="0.55"

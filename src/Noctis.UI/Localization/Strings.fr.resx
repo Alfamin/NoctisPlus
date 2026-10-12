@@ -6548,4 +6548,8 @@
     <value>Une vidéo d'arrière-plan est active et s'affiche par-dessus ce fond.</value>
     <comment>Note in LyricsBackgroundColorDialog.axaml while a lyrics background video plays</comment>
   </data>
+  <data name="Common.Play" xml:space="preserve">
+    <value>lecture</value>
+    <comment>Word after a play count of exactly 1 (Home and album rows: 1 play)</comment>
+  </data>
 </root>

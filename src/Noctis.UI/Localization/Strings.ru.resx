@@ -2648,4 +2648,5 @@ Deezer и TIDAL: вставьте ссылку.</value></data>
   <data name="Export.Copied" xml:space="preserve"><value>Скопировано в буфер обмена</value><comment>Share card / Wrap status after Copy</comment></data>
   <data name="Export.ClipboardUnavailable" xml:space="preserve"><value>Буфер обмена недоступен</value><comment>Share card / Wrap status when there is no clipboard</comment></data>
   <data name="Export.SaveImageTitle" xml:space="preserve"><value>Сохранить изображение</value><comment>Title of the save dialog for a share card or Wrap image</comment></data>
+  <data name="Common.Play" xml:space="preserve"><value>прослуш.</value><comment>Word after a play count of exactly 1 (Home and album rows: 1 play)</comment></data>
 </root>

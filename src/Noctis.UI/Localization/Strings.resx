@@ -2648,4 +2648,5 @@ The lines and their timings are dropped and an empty lyrics box opens for your o
   <data name="Export.Copied" xml:space="preserve"><value>Copied to clipboard</value><comment>Share card / Wrap status after Copy</comment></data>
   <data name="Export.ClipboardUnavailable" xml:space="preserve"><value>Clipboard unavailable</value><comment>Share card / Wrap status when there is no clipboard</comment></data>
   <data name="Export.SaveImageTitle" xml:space="preserve"><value>Save image</value><comment>Title of the save dialog for a share card or Wrap image</comment></data>
+  <data name="Common.Play" xml:space="preserve"><value>play</value><comment>Word after a play count of exactly 1 (Home and album rows: 1 play)</comment></data>
 </root>
