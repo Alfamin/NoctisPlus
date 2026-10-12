@@ -342,6 +342,44 @@ public class NoctisServerTests : IAsyncLifetime
     }
 
     [Fact]
+    public void Certificate_KeyFile_DoesNotOpenThePfx_OnWindows_AndAPlainKeyFileIsProtectedInPlace()
+    {
+        if (!OperatingSystem.IsWindows()) return; // DPAPI: elsewhere the key file stays owner-only plain text
+
+        // A fresh install: the two files copied elsewhere (another user, a backup) are not the server's identity.
+        var dir = Path.Combine(_dir, "cert-dpapi");
+        using var first = ServerCertificate.LoadOrCreate(dir);
+        var fp = ServerCertificate.Fingerprint(first);
+        var pfx = Path.Combine(dir, ServerCertificate.FileName);
+        var keyFile = Path.Combine(dir, ServerCertificate.KeyFileName);
+        var stored = File.ReadAllText(keyFile).Trim();
+        Assert.ThrowsAny<System.Security.Cryptography.CryptographicException>(() =>
+            System.Security.Cryptography.X509Certificates.X509CertificateLoader.LoadPkcs12FromFile(pfx, stored,
+                System.Security.Cryptography.X509Certificates.X509KeyStorageFlags.EphemeralKeySet).Dispose());
+        using var second = ServerCertificate.LoadOrCreate(dir);
+        Assert.Equal(fp, ServerCertificate.Fingerprint(second)); // still the same certificate (the phone's pin holds)
+
+        // An install from before: the password in plain text beside the PFX. Loaded as before
+        // (same certificate, so no re-pairing), and protected on the way.
+        var legacy = Path.Combine(_dir, "cert-legacy");
+        Directory.CreateDirectory(legacy);
+        const string password = "legacy-password";
+        string legacyFp;
+        using (var created = ServerCertificate.Create())
+        {
+            legacyFp = ServerCertificate.Fingerprint(created);
+            File.WriteAllBytes(Path.Combine(legacy, ServerCertificate.FileName),
+                created.Export(System.Security.Cryptography.X509Certificates.X509ContentType.Pkcs12, password));
+        }
+        File.WriteAllText(Path.Combine(legacy, ServerCertificate.KeyFileName), password);
+        using var migrated = ServerCertificate.LoadOrCreate(legacy);
+        Assert.Equal(legacyFp, ServerCertificate.Fingerprint(migrated));
+        Assert.NotEqual(password, File.ReadAllText(Path.Combine(legacy, ServerCertificate.KeyFileName)).Trim());
+        using var again = ServerCertificate.LoadOrCreate(legacy);
+        Assert.Equal(legacyFp, ServerCertificate.Fingerprint(again));
+    }
+
+    [Fact]
     public async Task AnUnhandledRequestError_NeverShowsAStackTrace_EvenInADevelopmentEnvironment()
     {
         // ASP.NET Core adds its developer exception page (stack trace, source paths) when the
