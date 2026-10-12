@@ -121,6 +121,33 @@ public class LyricsBackgroundModeTests : IDisposable
     }
 
     /// <summary>
+    /// Bug: a saved gradient came back at startup without its text palette. Restoring a
+    /// solid colour re-picks the palette for it; the gradient branch did not, so the page
+    /// kept the one picked for the cover in Artwork mode (here the medium one for a white
+    /// cover) over a dark gradient, unlike picking that same gradient by hand.
+    /// </summary>
+    [AvaloniaFact]
+    public void SavedGradient_RestoresWithItsOwnTextPalette()
+    {
+        const string key = "grad:#0F2027,#2C5364"; // Deep Sea
+        var cover = Cover("#FFFFFF");
+        var store = new SettingsStore
+        {
+            Current = new AppSettings { LyricsShowArtworkBackground = false, LyricsBackgroundColorHex = key },
+        };
+        var restored = NewVm(NewPlayer(cover), store);
+        Assert.True(restored.IsColorModeGradient);
+
+        var picked = NewVm(NewPlayer(cover));
+        picked.SelectColorModeGradientCommand.Execute(null);
+        picked.SetBackgroundColorCommand.Execute(key);
+
+        Assert.Equal(Color.Parse("#33FFFFFF"), ColorOf(picked.LyricsBtnBg));
+        Assert.Equal(ColorOf(picked.LyricsBtnBg), ColorOf(restored.LyricsBtnBg));
+        Assert.Equal(ColorOf(picked.LyricsSecondaryFg), ColorOf(restored.LyricsSecondaryFg));
+    }
+
+    /// <summary>
     /// Bug: a plugin Flowing style (Settings ▸ Appearance ▸ Flowing Lyrics Background ▸ Style)
     /// kept its layer on the page after switching the background to Solid or Gradient. The
     /// built-in Drift and Kawarp styles stop outside Artwork mode; the plugin layer, which

@@ -1018,6 +1018,7 @@ public partial class LyricsViewModel : ViewModelBase, IDisposable
                         LyricsBackgroundBrush = FullBackgroundBrush;
                         IsColorModeSolid = false;
                         IsColorModeGradient = true;
+                        UpdateForegroundsForBackground(FullBackgroundBrush);
                     }
                     else
                     {
