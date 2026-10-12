@@ -85,6 +85,7 @@ public class AccountDevicesPageTests : IDisposable
     [AvaloniaFact]
     public async Task LastSyncedLine_FollowsTheLedger_AndIsEmptyWhileSyncIsOff()
     {
+        Assert.SkipUnless(AccountFeatures.Enabled, "account features are parked (AccountFeatures off)");
         var persistence = new PersistenceService(_root);
         await persistence.SaveSettingsAsync(new AppSettings { SyncEnabled = true, SyncDeviceId = "thispc000001" });
         var settings = await persistence.LoadSettingsAsync();
@@ -109,6 +110,7 @@ public class AccountDevicesPageTests : IDisposable
     [AvaloniaFact]
     public async Task ConnectAPhone_NoLongerTurnsSyncOnBehindTheUsersBack()
     {
+        Assert.SkipUnless(AccountFeatures.Enabled, "account features are parked (AccountFeatures off)");
         var port = FreePort();
         var persistence = new PersistenceService(_root);
         await persistence.SaveSettingsAsync(new AppSettings { NoctisServerEnabled = true, NoctisServerPort = port, SyncTurnedOffByUser = true });
@@ -129,6 +131,7 @@ public class AccountDevicesPageTests : IDisposable
     [AvaloniaFact]
     public async Task PhoneSwitch_TurnsSyncOnWithIt_UnlessTheUserSwitchedSyncOff()
     {
+        Assert.SkipUnless(AccountFeatures.Enabled, "account features are parked (AccountFeatures off)");
         var persistence = new PersistenceService(_root);
         await persistence.SaveSettingsAsync(new AppSettings { NoctisServerPort = FreePort() });
         var vm = new SettingsViewModel(persistence, new FakeLibraryService(), new NoOpPlayHistoryService());
@@ -152,6 +155,7 @@ public class AccountDevicesPageTests : IDisposable
     [AvaloniaFact]
     public async Task PhoneSwitchOff_FoldsThePairingDetailsAway()
     {
+        Assert.SkipUnless(AccountFeatures.Enabled, "account features are parked (AccountFeatures off)");
         var persistence = new PersistenceService(_root);
         await persistence.SaveSettingsAsync(new AppSettings { NoctisServerEnabled = true, NoctisServerPort = FreePort() });
         var vm = new SettingsViewModel(persistence, new FakeLibraryService(), new NoOpPlayHistoryService());
@@ -186,6 +190,7 @@ public class AccountDevicesPageTests : IDisposable
     [AvaloniaFact]
     public async Task CreateAccount_DoesNotMakeAnApiKey()
     {
+        Assert.SkipUnless(AccountFeatures.Enabled, "account features are parked (AccountFeatures off)");
         var persistence = new PersistenceService(_root);
         var vm = new SettingsViewModel(persistence, new FakeLibraryService(), new NoOpPlayHistoryService());
         await vm.LoadAsync();
@@ -201,6 +206,7 @@ public class AccountDevicesPageTests : IDisposable
     [AvaloniaFact]
     public async Task DeleteAccount_AsksFirst()
     {
+        Assert.SkipUnless(AccountFeatures.Enabled, "account features are parked (AccountFeatures off)");
         var persistence = new PersistenceService(_root);
         var vm = new SettingsViewModel(persistence, new FakeLibraryService(), new NoOpPlayHistoryService());
         await vm.LoadAsync();

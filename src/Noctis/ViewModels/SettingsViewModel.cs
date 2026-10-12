@@ -2811,7 +2811,7 @@ public partial class SettingsViewModel : ViewModelBase
             WebRemoteEnabled = _settings.WebRemoteEnabled;
             LocalApiEnabled = _settings.LocalApiEnabled;
             NoctisServerPort = _settings.NoctisServerPort;
-            NoctisServerEnabled = _settings.NoctisServerEnabled;
+            NoctisServerEnabled = AccountFeatures.Enabled && _settings.NoctisServerEnabled;
             ShowArtworkColumn = _settings.ShowArtworkColumn;
             ShowGenreColumn = _settings.ShowGenreColumn;
             ShowRatingColumn = _settings.ShowRatingColumn;
@@ -3282,7 +3282,7 @@ public partial class SettingsViewModel : ViewModelBase
         _settings.RestoreLastTrackOnStartup = RestoreLastTrackOnStartup;
         _settings.WebRemoteEnabled = WebRemoteEnabled;
         _settings.LocalApiEnabled = LocalApiEnabled;
-        _settings.NoctisServerEnabled = NoctisServerEnabled;
+        if (AccountFeatures.Enabled) _settings.NoctisServerEnabled = NoctisServerEnabled;
         _settings.NoctisServerPort = NoctisServerPort;
         _settings.ShowArtworkColumn = ShowArtworkColumn;
         _settings.ShowGenreColumn = ShowGenreColumn;

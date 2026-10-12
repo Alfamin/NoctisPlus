@@ -32,12 +32,10 @@ public class AccountFeaturesEnabledTests : IDisposable
         public Task FlushAsync() => Task.CompletedTask;
     }
 
-    [Fact]
-    public void Switch_IsOn() => Assert.True(AccountFeatures.Enabled);
-
     [AvaloniaFact]
     public async Task StoredSyncFlag_IsHonoured_AndTheToggleSavesIt()
     {
+        Assert.SkipUnless(AccountFeatures.Enabled, "account features are parked (AccountFeatures off)");
         var persistence = new PersistenceService(_root);
         await persistence.SaveSettingsAsync(new AppSettings { SyncEnabled = true });
 
@@ -58,6 +56,7 @@ public class AccountFeaturesEnabledTests : IDisposable
     [AvaloniaFact]
     public async Task CreateAccount_MakesThePrimaryAccount()
     {
+        Assert.SkipUnless(AccountFeatures.Enabled, "account features are parked (AccountFeatures off)");
         var persistence = new PersistenceService(_root);
         var vm = new SettingsViewModel(persistence, new FakeLibraryService(), new NoOpPlayHistoryService());
         await vm.LoadAsync();
@@ -75,6 +74,7 @@ public class AccountFeaturesEnabledTests : IDisposable
     [AvaloniaFact]
     public async Task IssuedApiKey_StartsHidden_TheEyeShowsIt_AndANewKeyHidesItAgain()
     {
+        Assert.SkipUnless(AccountFeatures.Enabled, "account features are parked (AccountFeatures off)");
         var persistence = new PersistenceService(_root);
         var vm = new SettingsViewModel(persistence, new FakeLibraryService(), new NoOpPlayHistoryService());
         await vm.LoadAsync();
