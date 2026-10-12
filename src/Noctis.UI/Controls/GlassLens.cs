@@ -322,12 +322,16 @@ public static class GlassLens
             using var paint = new SKPaint
             {
                 Shader = shader,
-                Color = new SKColor(255, 255, 255, (byte)Math.Round(Math.Clamp(alpha, 0f, 1f) * 255)),
+                Color = new SKColor(255, 255, 255, GlassBlur.AlphaByte(alpha)),
+                // Replaces what lies beneath rather than covering it (see GlassBlur.ClearForFrost).
+                BlendMode = SKBlendMode.Plus,
             };
+            var rect = SKRect.Create(region.Left, region.Top, region.Width, region.Height);
             canvas.Save();
             canvas.SetMatrix(SKMatrix.Identity);
             canvas.ClipPath(clip, SKClipOperation.Intersect, antialias: true);
-            canvas.DrawRect(SKRect.Create(region.Left, region.Top, region.Width, region.Height), paint);
+            GlassBlur.ClearForFrost(canvas, rect, alpha);
+            canvas.DrawRect(rect, paint);
             canvas.Restore();
             return true;
         }

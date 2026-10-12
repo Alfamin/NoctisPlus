@@ -450,14 +450,39 @@ public static class GlassBlur
         canvas.SetMatrix(SKMatrix.Identity);
         canvas.ClipPath(clip, SKClipOperation.Intersect, antialias: true);
         using var filter = SKImageFilter.CreateBlur(sigma, sigma, SKShaderTileMode.Clamp);
+        var dst = SKRect.Create(at.Left, at.Top, at.Width, at.Height);
         using var paint = new SKPaint
         {
             ImageFilter = filter,
             FilterQuality = SKFilterQuality.Low,
-            Color = new SKColor(255, 255, 255, (byte)Math.Round(alpha * 255)),
+            Color = new SKColor(255, 255, 255, AlphaByte(alpha)),
+            BlendMode = SKBlendMode.Plus,
         };
-        canvas.DrawImage(source, SKRect.Create(source.Width, source.Height), SKRect.Create(at.Left, at.Top, at.Width, at.Height), paint);
+        ClearForFrost(canvas, dst, alpha);
+        canvas.DrawImage(source, SKRect.Create(source.Width, source.Height), dst, paint);
         canvas.Restore();
+    }
+
+    internal static byte AlphaByte(float alpha) => (byte)Math.Round(Math.Clamp(alpha, 0f, 1f) * 255);
+
+    /// <summary>
+    /// The first half of drawing the frost so it REPLACES the pixels it blurs instead of
+    /// lying over them (GitHub #133): scales what is under <paramref name="rect"/> (within the
+    /// canvas clip) by 1 - <paramref name="alpha"/>; the frost then goes on with
+    /// <see cref="SKBlendMode.Plus"/> at <paramref name="alpha"/>, so the result is
+    /// lerp(beneath, frost, alpha) — at full strength the frost alone.
+    ///
+    /// A plain source-over draw only hid what was beneath where the frost came out opaque.
+    /// With Liquid Glass the window itself is translucent (the page surfaces paint at ~35%
+    /// so the OS blur shows through), so the frost of a page area is translucent too, and the
+    /// un-blurred page under it stayed visible through it: big text on the bare page (the
+    /// Home section headings) read crisply through the island, while covers and other opaque
+    /// content were hidden by their own opaque frost and looked blurred.
+    /// </summary>
+    internal static void ClearForFrost(SKCanvas canvas, SKRect rect, float alpha)
+    {
+        using var clear = new SKPaint { Color = new SKColor(0, 0, 0, AlphaByte(alpha)), BlendMode = SKBlendMode.DstOut };
+        canvas.DrawRect(rect, clear);
     }
 }
 
