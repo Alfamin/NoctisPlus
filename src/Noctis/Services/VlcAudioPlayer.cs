@@ -1682,6 +1682,22 @@ public class VlcAudioPlayer : IAudioPlayer
 
     public bool ExclusiveModeActive => _exclusiveOut is { IsExclusive: true };
 
+    /// <summary>
+    /// The players are wired into an NAudio chain with a <see cref="BeatTapProvider"/>:
+    /// the gapless engine's sink, the exclusive-mode callbacks (whose sink, exclusive or
+    /// shared fallback, is tapped) or the experimental NOCTIS_WASAPI sink. False on the
+    /// classic path — LibVLC's own output to the system mixer — which is what Windows
+    /// shared mode plays through once an output-mode rebuild (an Exclusive Mode toggle,
+    /// also the one a persisted "on" makes at startup) has retired the engine, or when the
+    /// engine sink never opened. Nothing taps the meters there; the side feed must.
+    /// </summary>
+    public bool OutputTapsMeters =>
+        !_disposed && OutputTapsMetersFor(_wasapiOut != null, _outputModeExclusiveBuilt,
+            Volatile.Read(ref _gaplessEngine) && _gaplessSink != null);
+
+    internal static bool OutputTapsMetersFor(bool wasapiSink, bool exclusiveBuilt, bool engineLive)
+        => wasapiSink || exclusiveBuilt || engineLive;
+
     public string OutputDescription
     {
         get

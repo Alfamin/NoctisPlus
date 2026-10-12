@@ -70,6 +70,11 @@ public interface IAudioPlayer : IDisposable
     /// <summary>True while audio is actually flowing through an exclusive-mode device stream.</summary>
     bool ExclusiveModeActive { get; }
 
+    /// <summary>True while the active output chain feeds the shared level meters (visualizer,
+    /// beat pulse) from the PCM it renders. False when the native output plays the audio
+    /// unseen, so a side decode has to feed them instead.</summary>
+    bool OutputTapsMeters => false;
+
     /// <summary>True only when the equalizer actually alters the signal. An enabled
     /// equalizer sitting on a flat curve is bypassed, so it does not count.</summary>
     bool EqualizerActive { get; }

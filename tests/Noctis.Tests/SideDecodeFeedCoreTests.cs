@@ -176,12 +176,135 @@ public class SideDecodeFeedCoreTests
     }
 
     [Theory]
-    [InlineData(true, null, false)]   // Windows: the render-chain tap feeds the meters
-    [InlineData(true, "1", true)]     // dev override to exercise the side feed on Windows
-    [InlineData(false, null, true)]   // Linux/macOS: LibVLC owns the output, side feed needed
-    [InlineData(false, "0", false)]   // escape hatch
-    public void ShouldRun_OffWindowsUnlessDisabled(bool isWindows, string? env, bool expected)
-        => Assert.Equal(expected, SideDecodeMeterFeed.ShouldRun(isWindows, env));
+    [InlineData(null, true)]   // every platform: the thread decides per tick
+    [InlineData("1", true)]
+    [InlineData("0", false)]   // escape hatch
+    public void ShouldRun_OnEveryPlatformUnlessDisabled(string? env, bool expected)
+        => Assert.Equal(expected, SideDecodeMeterFeed.ShouldRun(env));
+
+    [Theory]
+    [InlineData(null, false, true)]   // LibVLC's own output (Windows shared without the engine, macOS)
+    [InlineData(null, true, false)]   // engine / exclusive sink taps the meters: never a second writer
+    [InlineData("1", true, true)]     // dev override
+    [InlineData("0", false, false)]   // escape hatch
+    public void ShouldFeed_OnlyWhileTheOutputDoesNotTapTheMeters(string? env, bool outputTaps, bool expected)
+        => Assert.Equal(expected, SideDecodeMeterFeed.ShouldFeed(env, outputTaps));
+
+    // Discord (1.6.2, Windows): "Exclusive OFF = dead Visualizer". An Exclusive Mode toggle
+    // (or a persisted "on" applied at startup) rebuilds the players and retires the gapless
+    // engine until restart, so shared mode then plays through LibVLC's own output, with no
+    // tap. The old gate kept the side feed off on Windows whatever the output was.
+    [Theory]
+    [InlineData(false, false, false, false)] // engine retired by a rebuild, exclusive off: no tap
+    [InlineData(false, false, true, true)]   // gapless engine live
+    [InlineData(false, true, false, true)]   // exclusive callbacks (exclusive or shared-fallback sink)
+    [InlineData(true, false, false, true)]   // NOCTIS_WASAPI experimental sink
+    public void VlcPlayer_OutputTapsMeters_OnlyOnTheTappedChains(bool wasapiSink, bool exclusiveBuilt, bool engineLive, bool expected)
+        => Assert.Equal(expected, VlcAudioPlayer.OutputTapsMetersFor(wasapiSink, exclusiveBuilt, engineLive));
+
+    private sealed class FeedRig : IDisposable
+    {
+        public readonly FakeAudioPlayer Player = new();
+        public readonly Source Src = new() { LengthSeconds = 120 };
+        public readonly SpectrumMeter Spectrum = new(() => 0);
+        public readonly BeatMeter Beat = new(() => 0);
+        public readonly SideDecodeMeterFeed Feed;
+        public readonly string File = Path.Combine(Path.GetTempPath(), "noctis-sidefeed-" + Guid.NewGuid().ToString("N") + ".flac");
+        public double Now;
+
+        public FeedRig(string? env = null)
+        {
+            System.IO.File.WriteAllBytes(File, new byte[16]);
+            Feed = new SideDecodeMeterFeed(Player, () => "ffmpeg", (_, _, frame) => Src.Open(frame),
+                Spectrum, Beat, env, () => Now);
+        }
+
+        /// <summary>Plays on for <paramref name="ms"/>, ticking every 20 ms.</summary>
+        public void Run(double ms)
+        {
+            for (double t = 0; t < ms; t += 20)
+            {
+                Player.Position += TimeSpan.FromMilliseconds(20);
+                Now += 20;
+                Feed.Tick();
+            }
+        }
+
+        public void Dispose()
+        {
+            Feed.Dispose();
+            try { System.IO.File.Delete(File); } catch { }
+        }
+    }
+
+    [Fact]
+    public void Tick_SharedOutputWithoutTap_FeedsTheMeters()
+    {
+        using var rig = new FeedRig();
+        rig.Player.OutputTapsMeters = false; // Windows shared after the engine was retired
+        rig.Player.Play(rig.File);
+
+        rig.Run(600);
+
+        Assert.Single(rig.Src.Opens);
+        var bands = new float[Bands];
+        Assert.True(rig.Spectrum.TryRead(0, bands));
+        Assert.Equal(BandOf(1000), ArgMax(bands));
+        Assert.True(rig.Beat.IsLive(0));
+    }
+
+    [Fact]
+    public void Tick_WhileTheOutputTapsTheMeters_StandsAside()
+    {
+        using var rig = new FeedRig();
+        rig.Player.OutputTapsMeters = true; // gapless engine / exclusive sink
+        rig.Player.Play(rig.File);
+
+        rig.Run(600);
+
+        Assert.Empty(rig.Src.Opens);
+        Assert.False(rig.Spectrum.IsLive(0));
+        Assert.False(rig.Beat.IsLive(0));
+    }
+
+    [Fact]
+    public void Tick_TapLostMidTrack_TakesOverAtTheHeardSpot_AndYieldsWhenItReturns()
+    {
+        using var rig = new FeedRig();
+        rig.Player.OutputTapsMeters = true;
+        rig.Player.Play(rig.File);
+        rig.Player.Position = TimeSpan.FromSeconds(30);
+        rig.Run(200);
+        Assert.Empty(rig.Src.Opens);
+
+        // Exclusive Mode toggled off: the rebuilt players play through LibVLC's own output.
+        rig.Player.OutputTapsMeters = false;
+        rig.Run(200);
+
+        Assert.Single(rig.Src.Opens);
+        var opened = rig.Src.Opens[0];
+        Assert.InRange(opened, Frames(30_000), Frames(30_200 + SideDecodeFeedCore.LookaheadMs));
+        Assert.True(rig.Spectrum.IsLive(0));
+
+        // Exclusive back on: the sink's tap owns the meters again; the decode is dropped.
+        rig.Player.OutputTapsMeters = true;
+        rig.Feed.Tick();
+        Assert.Equal(1, rig.Src.Disposed);
+        rig.Run(200);
+        Assert.Single(rig.Src.Opens);
+    }
+
+    [Fact]
+    public void Tick_DevOverride_FeedsEvenWithTheTap()
+    {
+        using var rig = new FeedRig(env: "1");
+        rig.Player.OutputTapsMeters = true;
+        rig.Player.Play(rig.File);
+
+        rig.Run(200);
+
+        Assert.Single(rig.Src.Opens);
+    }
 }
 
 /// <summary>
