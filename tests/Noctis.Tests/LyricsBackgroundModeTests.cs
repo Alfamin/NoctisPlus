@@ -148,6 +148,25 @@ public class LyricsBackgroundModeTests : IDisposable
     }
 
     /// <summary>
+    /// Bug (seen live 10-12): picking Magenta Fire (#4B134F to #C94B4B) put a green band in
+    /// the middle of the lyrics page. The middle stop averaged the two hues straight, (296° +
+    /// 0°) / 2 = 148°, which is green, instead of going the short way round through pink.
+    /// Every preset whose colours sit either side of red came out wrong the same way.
+    /// </summary>
+    [Fact]
+    public void Gradient_MiddleStop_TakesTheShortWayRoundTheHueWheel()
+    {
+        var magentaFire = DominantColorExtractor.GenerateGradientBrush(Color.Parse("#4B134F"), Color.Parse("#C94B4B"));
+        var mid = magentaFire.GradientStops[2].Color;
+        Assert.True(mid.G < mid.R && mid.G < mid.B, $"middle stop {mid} should be pink, not green");
+
+        // Hues on the same side are unchanged: Deep Sea stays blue in the middle.
+        var deepSea = DominantColorExtractor.GenerateGradientBrush(Color.Parse("#0F2027"), Color.Parse("#2C5364"));
+        var sea = deepSea.GradientStops[2].Color;
+        Assert.True(sea.B > sea.R && sea.B >= sea.G, $"middle stop {sea} should stay blue");
+    }
+
+    /// <summary>
     /// Bug: Gradient on Auto came back as Solid on Auto after a restart. Auto saves no swatch,
     /// and with no swatch the load fell back to Solid: nothing recorded which mode was chosen.
     /// </summary>

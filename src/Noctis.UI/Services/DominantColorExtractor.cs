@@ -557,7 +557,13 @@ public static class DominantColorExtractor
 
         var stop0 = HslToColor(h1, s1 * 0.60, 0.08);
         var stop1 = HslToColor(h1, s1 * 0.85, 0.18);
-        var stop2 = HslToColor((h1 + h2) / 2.0, (s1 + s2) / 2.0 * 0.80, 0.20);
+        // Middle hue the short way round the wheel: a straight average of 296° and 0°
+        // (Magenta Fire) gave 148°, a green band between magenta and red.
+        var dh = h2 - h1;
+        if (dh > 0.5) dh -= 1.0; else if (dh < -0.5) dh += 1.0;
+        var hMid = h1 + dh / 2.0;
+        if (hMid < 0) hMid += 1.0; else if (hMid >= 1.0) hMid -= 1.0;
+        var stop2 = HslToColor(hMid, (s1 + s2) / 2.0 * 0.80, 0.20);
         var stop3 = HslToColor(h2, s2 * 0.85, 0.18);
         var stop4 = HslToColor(h2, s2 * 0.60, 0.08);
 
