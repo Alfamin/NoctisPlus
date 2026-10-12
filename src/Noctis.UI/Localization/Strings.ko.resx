@@ -1249,7 +1249,7 @@
     <comment>Text in SettingsView.axaml</comment>
   </data>
   <data name="Settings.ControlPlaybackFromPhone" xml:space="preserve">
-    <value>같은 네트워크의 휴대폰에서 재생을 제어합니다. 암호화되지 않으므로 신뢰할 수 없는 Wi-Fi는 피하세요.</value>
+    <value>휴대폰 브라우저에서 재생을 제어하세요. 앱은 필요 없습니다. 신뢰할 수 있는 Wi-Fi에서만 사용하세요.</value>
     <comment>Text in SettingsView.axaml</comment>
   </data>
   <data name="Settings.TapEnlargeTip" xml:space="preserve">
@@ -1257,7 +1257,7 @@
     <comment>ToolTip.Tip in SettingsView.axaml</comment>
   </data>
   <data name="Settings.IfPhoneBlocksLink" xml:space="preserve">
-    <value>휴대폰이 링크를 안전하지 않다고 표시하면 계속을 선택하세요. 리모컨은 일반 HTTP를 사용합니다.</value>
+    <value>휴대폰에 링크가 안전하지 않다고 나오면 계속을 탭하세요.</value>
     <comment>Text in SettingsView.axaml</comment>
   </data>
   <data name="Settings.OPENPHONE" xml:space="preserve">
@@ -1273,7 +1273,7 @@
     <comment>Text in SettingsView.axaml</comment>
   </data>
   <data name="Settings.WaitingPhoneScanCode" xml:space="preserve">
-    <value>휴대폰을 기다리는 중입니다. 코드를 스캔하거나 탭하여 확대하세요.</value>
+    <value>휴대폰을 기다리는 중입니다. 코드를 탭하면 크게 볼 수 있습니다.</value>
     <comment>Text in SettingsView.axaml</comment>
   </data>
   <data name="Settings.PhoneConnected" xml:space="preserve">
@@ -5387,10 +5387,10 @@
     <value>포트</value>
   </data>
   <data name="Server.AddressLabel" xml:space="preserve">
-    <value>서버 주소</value>
+    <value>주소</value>
   </data>
   <data name="Server.FingerprintLabel" xml:space="preserve">
-    <value>인증서 지문 (SHA-256) — 휴대폰이 신뢰 여부를 물을 때 비교하세요</value>
+    <value>보안 코드</value>
   </data>
   <data name="Server.Waiting" xml:space="preserve">
     <value>기기 연결을 기다리는 중…</value>
@@ -5420,7 +5420,7 @@
     <value>API 키 대상</value>
   </data>
   <data name="Server.ApiKeyOnce" xml:space="preserve">
-    <value>지금 복사하세요. 한 번만 표시되며 새 키가 이를 대체합니다.</value>
+    <value>지금 복사하세요. 다시 볼 수 없습니다.</value>
   </data>
   <data name="Server.Done" xml:space="preserve">
     <value>완료</value>
@@ -5676,7 +5676,7 @@
     <comment>No-account state title</comment>
   </data>
   <data name="AccountSync.CreateHelp" xml:space="preserve">
-    <value>기기들이 이 계정으로 로그인해 둘러보고, 재생하고, 동기화합니다. 비밀번호는 해시로 저장되며 이 컴퓨터를 벗어나지 않습니다.</value>
+    <value>휴대폰에서 이 계정으로 로그인합니다. 비밀번호는 이 PC 밖으로 나가지 않습니다.</value>
     <comment>No-account state help</comment>
   </data>
   <data name="AccountSync.Name" xml:space="preserve">
@@ -5692,7 +5692,7 @@
     <comment>Create form button</comment>
   </data>
   <data name="AccountSync.PairDevice" xml:space="preserve">
-    <value>기기 연결</value>
+    <value>휴대폰 연결</value>
     <comment>Account card button</comment>
   </data>
   <data name="AccountSync.NewApiKey" xml:space="preserve">
@@ -5712,7 +5712,7 @@
     <comment>Change password button</comment>
   </data>
   <data name="AccountSync.Remove" xml:space="preserve">
-    <value>제거</value>
+    <value>로그아웃</value>
     <comment>Account card button</comment>
   </data>
   <data name="AccountSync.PairHelp" xml:space="preserve">
@@ -5744,15 +5744,15 @@
     <comment>Other accounts card help</comment>
   </data>
   <data name="Sync.Title" xml:space="preserve">
-    <value>기기 간 동기화</value>
+    <value>휴대폰과 동기화</value>
     <comment>Sync card title</comment>
   </data>
   <data name="Sync.Description" xml:space="preserve">
-    <value>즐겨찾기, 평가, 재생 횟수, 재생목록이 로그인한 모든 기기에서 동일하게 유지됩니다. 가장 최근 변경이 우선합니다.</value>
+    <value>즐겨찾기, 평점, 재생 횟수, 재생목록이 휴대폰과 이 PC에서 똑같이 유지됩니다.</value>
     <comment>Sync card description</comment>
   </data>
   <data name="Sync.DeviceName" xml:space="preserve">
-    <value>이 기기</value>
+    <value>이 PC의 이름</value>
     <comment>Sync card row label</comment>
   </data>
   <data name="Sync.WhatSyncs" xml:space="preserve">
@@ -6364,5 +6364,141 @@
   </data>
   <data name="Settings.Group.More" xml:space="preserve">
     <value>더 보기</value>
+  </data>
+  <data name="AccountSync.PairPhoneHint" xml:space="preserve">
+    <value>휴대폰의 Noctis 앱에서 설정을 열고 계정으로 이동하세요. 이 주소를 입력하고 이메일 또는 사용자 이름과 비밀번호로 로그인하세요.</value>
+    <comment>Pairing block help above the address and fingerprint</comment>
+  </data>
+  <data name="AccountSync.SignedInDevices" xml:space="preserve">
+    <value>내 휴대폰</value>
+    <comment>Account card list label</comment>
+  </data>
+  <data name="AccountSync.NoSignedInDevices" xml:space="preserve">
+    <value>아직 연결된 휴대폰이 없습니다.</value>
+    <comment>Account card list empty state</comment>
+  </data>
+  <data name="Settings.LocalApiDesc" xml:space="preserve">
+    <value>Stream Deck이나 OBS 같은 이 PC의 앱이 지금 재생 중인 곡을 확인하고 Noctis를 제어할 수 있습니다.</value>
+    <comment>Text in SettingsView.axaml</comment>
+  </data>
+  <data name="Settings.LocalApiWarning" xml:space="preserve">
+    <value>이 토큰이 있는 앱은 Noctis를 제어하고 라이브러리를 읽을 수 있습니다. 신뢰하는 앱에만 주세요.</value>
+    <comment>Text in SettingsView.axaml</comment>
+  </data>
+  <data name="Settings.LocalApiDiscovery" xml:space="preserve">
+    <value>앱은 Noctis 데이터 폴더의 local-api.json에서도 토큰을 읽을 수 있습니다.</value>
+    <comment>Text in SettingsView.axaml</comment>
+  </data>
+  <data name="Settings.Section.PhoneApp" xml:space="preserve">
+    <value>휴대폰 앱</value>
+    <comment>Settings section label, Account &amp; Devices tab</comment>
+  </data>
+  <data name="Settings.Section.RemoteControl" xml:space="preserve">
+    <value>원격 제어</value>
+    <comment>Settings section label, Account &amp; Devices tab</comment>
+  </data>
+  <data name="Settings.Section.PcApps" xml:space="preserve">
+    <value>이 PC의 앱</value>
+    <comment>Settings section label, Account &amp; Devices tab (Local API)</comment>
+  </data>
+  <data name="Phone.Title" xml:space="preserve">
+    <value>휴대폰에서 Noctis 사용</value>
+    <comment>Phone app card title; its switch turns Noctis Server on/off</comment>
+  </data>
+  <data name="Phone.Description" xml:space="preserve">
+    <value>이 라이브러리를 휴대폰에서 스트리밍하고 다운로드하세요.</value>
+    <comment>Phone app card subtitle</comment>
+  </data>
+  <data name="Phone.NeedsAccount" xml:space="preserve">
+    <value>먼저 위에서 계정을 만드세요.</value>
+    <comment>Phone app card, shown when there is no account</comment>
+  </data>
+  <data name="Phone.CodeHint" xml:space="preserve">
+    <value>휴대폰에도 이 코드가 표시됩니다. 두 코드가 같을 때만 로그인하세요.</value>
+    <comment>Under the certificate security code in the pairing panel</comment>
+  </data>
+  <data name="Phone.Synced" xml:space="preserve">
+    <value>{0} 동기화됨</value>
+    <comment>Phone list row status; {0} = 'just now', '5 min ago', '3 h ago' or 'on 9 Oct, 14:05'</comment>
+  </data>
+  <data name="Phone.Connected" xml:space="preserve">
+    <value>{0} 연결됨</value>
+    <comment>Phone list row status when sync is off or the phone never synced; {0} = relative time</comment>
+  </data>
+  <data name="Phone.SignedOut" xml:space="preserve">
+    <value>로그아웃됨</value>
+    <comment>Phone list row status: the sync data knows this phone but it no longer has a sign-in key</comment>
+  </data>
+  <data name="Phone.LastSynced" xml:space="preserve">
+    <value>마지막 동기화: {0}</value>
+    <comment>Under the sync switch; {0} = relative time</comment>
+  </data>
+  <data name="Phone.NotSyncedYet" xml:space="preserve">
+    <value>아직 동기화되지 않음</value>
+    <comment>Under the sync switch when no phone has synced</comment>
+  </data>
+  <data name="Phone.SyncFailed" xml:space="preserve">
+    <value>동기화 데이터를 읽지 못했습니다: {0}</value>
+    <comment>Under the sync switch; {0} = error message</comment>
+  </data>
+  <data name="Phone.SignOutTip" xml:space="preserve">
+    <value>이 휴대폰을 로그아웃합니다. 다시 연결하려면 비밀번호가 필요합니다.</value>
+    <comment>Tooltip on a phone's Sign out button</comment>
+  </data>
+  <data name="Phone.OtherAppsTitle" xml:space="preserve">
+    <value>다른 음악 앱</value>
+    <comment>Phone app card row title (Subsonic apps)</comment>
+  </data>
+  <data name="Phone.OtherAppsDesc" xml:space="preserve">
+    <value>Symfonium 같은 Subsonic 앱은 이메일과 API 키로 로그인할 수 있습니다.</value>
+    <comment>Phone app card row text</comment>
+  </data>
+  <data name="Phone.NewApiKeyTip" xml:space="preserve">
+    <value>새 키를 만듭니다. 이전 키를 쓰는 앱에는 새 키가 필요합니다.</value>
+    <comment>Tooltip on New API key</comment>
+  </data>
+  <data name="AccountSync.ShowPasswordTip" xml:space="preserve">
+    <value>비밀번호 표시 또는 숨기기</value>
+    <comment>Eye button tooltip in password boxes</comment>
+  </data>
+  <data name="AccountSync.ShowKeyTip" xml:space="preserve">
+    <value>키 표시 또는 숨기기</value>
+    <comment>Eye button tooltip on the API key</comment>
+  </data>
+  <data name="AccountSync.ChangePasswordNote" xml:space="preserve">
+    <value>휴대폰이 로그아웃되며 새 비밀번호로 다시 로그인해야 합니다.</value>
+    <comment>Under the change password box</comment>
+  </data>
+  <data name="AccountSync.DeleteAccountTip" xml:space="preserve">
+    <value>계정 삭제</value>
+    <comment>Tooltip on the account's trash button</comment>
+  </data>
+  <data name="AccountSync.DeleteTitle" xml:space="preserve">
+    <value>계정을 삭제할까요?</value>
+    <comment>Delete account confirmation title</comment>
+  </data>
+  <data name="AccountSync.DeleteBody" xml:space="preserve">
+    <value>휴대폰이 로그아웃되며 새 계정을 만들 때까지 연결할 수 없습니다. 이 PC의 음악과 라이브러리는 그대로 유지됩니다.</value>
+    <comment>Delete account confirmation text</comment>
+  </data>
+  <data name="AccountSync.DeleteConfirm" xml:space="preserve">
+    <value>계정 삭제</value>
+    <comment>Delete account confirmation button</comment>
+  </data>
+  <data name="Time.JustNow" xml:space="preserve">
+    <value>방금</value>
+    <comment>Relative time, used after 'Synced', 'Connected', 'Last synced'</comment>
+  </data>
+  <data name="Time.MinutesAgo" xml:space="preserve">
+    <value>{0}분 전</value>
+    <comment>Relative time; {0} = minutes</comment>
+  </data>
+  <data name="Time.HoursAgo" xml:space="preserve">
+    <value>{0}시간 전</value>
+    <comment>Relative time; {0} = hours</comment>
+  </data>
+  <data name="Time.OnDate" xml:space="preserve">
+    <value>{0}</value>
+    <comment>Relative time older than a day; {0} = date and time like '9 Oct, 14:05'</comment>
   </data>
 </root>

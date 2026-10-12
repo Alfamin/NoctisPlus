@@ -446,24 +446,24 @@ Deezer и TIDAL: вставьте ссылку.</value></data>
   <data name="Settings.PreAmpDB" xml:space="preserve"><value>Предусиление (дБ)</value><comment>Text in SettingsView.axaml</comment></data>
   <data name="Settings.REMOTECONTROL" xml:space="preserve"><value>ДИСТАНЦИОННОЕ УПРАВЛЕНИЕ</value><comment>Text in SettingsView.axaml</comment></data>
   <data name="Settings.WebRemote" xml:space="preserve"><value>Веб-пульт</value><comment>Text in SettingsView.axaml</comment></data>
-  <data name="Settings.ControlPlaybackFromPhone" xml:space="preserve"><value>Управляйте воспроизведением с телефона в локальной сети. Соединение не шифруется, поэтому избегайте недоверенных сетей Wi-Fi.</value><comment>Text in SettingsView.axaml</comment></data>
+  <data name="Settings.ControlPlaybackFromPhone" xml:space="preserve"><value>Управляйте музыкой из браузера на телефоне. Приложение не нужно. Используйте только в надёжной сети Wi-Fi.</value><comment>Text in SettingsView.axaml</comment></data>
   <data name="Settings.TapEnlargeTip" xml:space="preserve"><value>Нажмите, чтобы увеличить</value><comment>ToolTip.Tip in SettingsView.axaml</comment></data>
-  <data name="Settings.IfPhoneBlocksLink" xml:space="preserve"><value>Если телефон помечает ссылку как небезопасную, выберите «Продолжить». Пульт использует обычный HTTP.</value><comment>Text in SettingsView.axaml</comment></data>
+  <data name="Settings.IfPhoneBlocksLink" xml:space="preserve"><value>Если телефон пишет, что ссылка небезопасна, нажмите «Продолжить».</value><comment>Text in SettingsView.axaml</comment></data>
   <data name="Settings.OPENPHONE" xml:space="preserve"><value>ОТКРОЙТЕ НА ТЕЛЕФОНЕ</value><comment>Text in SettingsView.axaml</comment></data>
   <data name="Settings.CopyFullLinkIncludingTip" xml:space="preserve"><value>Скопировать полную ссылку вместе с ключом доступа</value><comment>ToolTip.Tip in SettingsView.axaml</comment></data>
   <data name="Settings.Copy" xml:space="preserve"><value>Копировать</value><comment>Text in SettingsView.axaml</comment></data>
-  <data name="Settings.WaitingPhoneScanCode" xml:space="preserve"><value>Ожидание телефона. Отсканируйте код или нажмите на него, чтобы увеличить.</value><comment>Text in SettingsView.axaml</comment></data>
+  <data name="Settings.WaitingPhoneScanCode" xml:space="preserve"><value>Ожидание телефона. Нажмите на код, чтобы увеличить его.</value><comment>Text in SettingsView.axaml</comment></data>
   <data name="Settings.PhoneConnected" xml:space="preserve"><value>Телефон подключён</value><comment>Text in SettingsView.axaml</comment></data>
   <data name="Settings.LocalApi" xml:space="preserve"><value>Локальный API</value><comment>Text in SettingsView.axaml</comment></data>
-  <data name="Settings.LocalApiDesc" xml:space="preserve"><value>Позволяет приложениям на этом ПК (Stream Deck, оверлеям OBS, скриптам) видеть, что играет, и управлять воспроизведением. Доступен только с этого ПК.</value><comment>Text in SettingsView.axaml</comment></data>
+  <data name="Settings.LocalApiDesc" xml:space="preserve"><value>Позволяет приложениям на этом ПК, например Stream Deck или OBS, видеть, что играет, и управлять Noctis.</value><comment>Text in SettingsView.axaml</comment></data>
   <data name="Settings.LocalApiAddress" xml:space="preserve"><value>АДРЕС</value><comment>Text in SettingsView.axaml</comment></data>
   <data name="Settings.LocalApiToken" xml:space="preserve"><value>ТОКЕН</value><comment>Text in SettingsView.axaml</comment></data>
   <data name="Settings.LocalApiShowToken" xml:space="preserve"><value>Показать</value><comment>Reveals the Local API token</comment></data>
   <data name="Settings.LocalApiHideToken" xml:space="preserve"><value>Скрыть</value><comment>Masks the Local API token</comment></data>
   <data name="Settings.LocalApiRegenerate" xml:space="preserve"><value>Создать новый токен</value><comment>Text in SettingsView.axaml</comment></data>
   <data name="Settings.LocalApiRegenerateTip" xml:space="preserve"><value>Создать новый токен. Приложения со старым токеном перестанут работать, пока вы не передадите им новый.</value><comment>ToolTip.Tip in SettingsView.axaml</comment></data>
-  <data name="Settings.LocalApiWarning" xml:space="preserve"><value>Любая программа на этом ПК, у которой есть токен, может управлять воспроизведением и читать вашу медиатеку. Передавайте его только доверенным приложениям, а при утечке создайте новый.</value><comment>Text in SettingsView.axaml</comment></data>
-  <data name="Settings.LocalApiDiscovery" xml:space="preserve"><value>Приложения могут найти адрес и токен в файле local-api.json в папке данных Noctis.</value><comment>Text in SettingsView.axaml</comment></data>
+  <data name="Settings.LocalApiWarning" xml:space="preserve"><value>Любое приложение с этим токеном может управлять Noctis и читать вашу медиатеку. Давайте его только приложениям, которым доверяете.</value><comment>Text in SettingsView.axaml</comment></data>
+  <data name="Settings.LocalApiDiscovery" xml:space="preserve"><value>Приложения также могут взять его из файла local-api.json в папке данных Noctis.</value><comment>Text in SettingsView.axaml</comment></data>
   <data name="Settings.ACCOUNTS" xml:space="preserve"><value>АККАУНТЫ</value><comment>Text in SettingsView.axaml</comment></data>
   <data name="Settings.DiscordRichPresence" xml:space="preserve"><value>Discord Rich Presence</value><comment>Text in SettingsView.axaml</comment></data>
   <data name="Settings.ShowCurrentSongDiscord" xml:space="preserve"><value>Показывать текущую песню в Discord.</value><comment>Text in SettingsView.axaml</comment></data>
@@ -2155,8 +2155,8 @@ Deezer и TIDAL: вставьте ссылку.</value></data>
   <data name="Server.Title" xml:space="preserve"><value>Сервер Noctis</value></data>
   <data name="Server.Description" xml:space="preserve"><value>Позволяет телефону и другим устройствам просматривать и воспроизводить эту медиатеку. Работает с любым приложением Subsonic и мобильным приложением Noctis через HTTPS.</value></data>
   <data name="Server.Port" xml:space="preserve"><value>Порт</value></data>
-  <data name="Server.AddressLabel" xml:space="preserve"><value>АДРЕС СЕРВЕРА</value></data>
-  <data name="Server.FingerprintLabel" xml:space="preserve"><value>ОТПЕЧАТОК СЕРТИФИКАТА (SHA-256) — сверьте, когда телефон попросит ему доверять</value></data>
+  <data name="Server.AddressLabel" xml:space="preserve"><value>АДРЕС</value></data>
+  <data name="Server.FingerprintLabel" xml:space="preserve"><value>КОД БЕЗОПАСНОСТИ</value></data>
   <data name="Server.Waiting" xml:space="preserve"><value>Ожидание подключения устройства…</value></data>
   <data name="Server.Connected" xml:space="preserve"><value>Подключено:</value></data>
   <data name="Server.Accounts" xml:space="preserve"><value>Аккаунты</value></data>
@@ -2166,7 +2166,7 @@ Deezer и TIDAL: вставьте ссылку.</value></data>
   <data name="Server.NewApiKey" xml:space="preserve"><value>Новый API-ключ</value></data>
   <data name="Server.Remove" xml:space="preserve"><value>Удалить</value></data>
   <data name="Server.ApiKeyFor" xml:space="preserve"><value>API-ключ для</value></data>
-  <data name="Server.ApiKeyOnce" xml:space="preserve"><value>Скопируйте его сейчас. Он показывается один раз, а новый ключ заменит его.</value></data>
+  <data name="Server.ApiKeyOnce" xml:space="preserve"><value>Скопируйте его сейчас. Больше вы его не увидите.</value></data>
   <data name="Server.Done" xml:space="preserve"><value>Готово</value></data>
   <data name="Server.UserName" xml:space="preserve"><value>Имя пользователя</value></data>
   <data name="Server.Password" xml:space="preserve"><value>Пароль (не менее 8 символов)</value></data>
@@ -2317,16 +2317,16 @@ Deezer и TIDAL: вставьте ссылку.</value></data>
 
   <data name="AccountSync.YourAccount" xml:space="preserve"><value>ВАШ АККАУНТ</value><comment>Account &amp; Sync section title</comment></data>
   <data name="AccountSync.CreateTitle" xml:space="preserve"><value>Создайте аккаунт</value><comment>No-account state title</comment></data>
-  <data name="AccountSync.CreateHelp" xml:space="preserve"><value>С ним ваши устройства входят, чтобы просматривать, воспроизводить и синхронизировать музыку. Пароль хранится в виде хеша и никогда не покидает этот компьютер.</value><comment>No-account state help</comment></data>
+  <data name="AccountSync.CreateHelp" xml:space="preserve"><value>Ваш телефон будет входить под этим аккаунтом. Пароль никогда не покидает этот ПК.</value><comment>No-account state help</comment></data>
   <data name="AccountSync.Name" xml:space="preserve"><value>Имя</value><comment>Create form watermark</comment></data>
   <data name="AccountSync.Password" xml:space="preserve"><value>Пароль (не менее 8 символов)</value><comment>Create form watermark</comment></data>
   <data name="AccountSync.Create" xml:space="preserve"><value>Создать</value><comment>Create form button</comment></data>
-  <data name="AccountSync.PairDevice" xml:space="preserve"><value>Подключить устройство</value><comment>Account card button</comment></data>
+  <data name="AccountSync.PairDevice" xml:space="preserve"><value>Подключить телефон</value><comment>Account card button</comment></data>
   <data name="AccountSync.NewApiKey" xml:space="preserve"><value>Новый API-ключ</value><comment>Account card button</comment></data>
   <data name="AccountSync.ChangePassword" xml:space="preserve"><value>Сменить пароль</value><comment>Account card button</comment></data>
   <data name="AccountSync.NewPassword" xml:space="preserve"><value>Новый пароль (не менее 8 символов)</value><comment>Change password watermark</comment></data>
   <data name="AccountSync.Save" xml:space="preserve"><value>Сохранить</value><comment>Change password button</comment></data>
-  <data name="AccountSync.Remove" xml:space="preserve"><value>Удалить</value><comment>Account card button</comment></data>
+  <data name="AccountSync.Remove" xml:space="preserve"><value>Выйти</value><comment>Account card button</comment></data>
   <data name="AccountSync.PairHelp" xml:space="preserve"><value>Откройте на телефоне Noctis или любое приложение Subsonic, отсканируйте код или введите адрес и войдите.</value><comment>Pairing block help</comment></data>
   <data name="AccountSync.ServerOffHelp" xml:space="preserve"><value>Устройства подключаются через сервер Noctis на этом компьютере. Сейчас он выключен.</value><comment>Pairing block when the server is off</comment></data>
   <data name="AccountSync.TurnOnServer" xml:space="preserve"><value>Включить сервер Noctis</value><comment>Pairing block button</comment></data>
@@ -2334,13 +2334,13 @@ Deezer и TIDAL: вставьте ссылку.</value></data>
   <data name="AccountSync.OtherAccounts" xml:space="preserve"><value>ДРУГИЕ АККАУНТЫ</value><comment>Account &amp; Sync section title</comment></data>
   <data name="AccountSync.OtherTitle" xml:space="preserve"><value>Семья и гости</value><comment>Other accounts card title</comment></data>
   <data name="AccountSync.OtherHelp" xml:space="preserve"><value>Дополнительные аккаунты, которые могут входить со своих устройств.</value><comment>Other accounts card help</comment></data>
-  <data name="AccountSync.PairPhoneHint" xml:space="preserve"><value>На телефоне: «Настройки → Аккаунт», введите этот адрес, свой email или имя пользователя и пароль и убедитесь, что отпечаток совпадает.</value><comment>Pairing block help above the address and fingerprint</comment></data>
-  <data name="AccountSync.SignedInDevices" xml:space="preserve"><value>ПОДКЛЮЧЁННЫЕ УСТРОЙСТВА</value><comment>Account card list label</comment></data>
-  <data name="AccountSync.NoSignedInDevices" xml:space="preserve"><value>Пока ни одно устройство не выполнило вход.</value><comment>Account card list empty state</comment></data>
+  <data name="AccountSync.PairPhoneHint" xml:space="preserve"><value>В приложении Noctis на телефоне откройте «Настройки», затем «Аккаунт». Введите этот адрес и войдите, указав email или имя пользователя и пароль.</value><comment>Pairing block help above the address and fingerprint</comment></data>
+  <data name="AccountSync.SignedInDevices" xml:space="preserve"><value>ВАШИ ТЕЛЕФОНЫ</value><comment>Account card list label</comment></data>
+  <data name="AccountSync.NoSignedInDevices" xml:space="preserve"><value>Телефоны пока не подключены.</value><comment>Account card list empty state</comment></data>
 
-  <data name="Sync.Title" xml:space="preserve"><value>Синхронизация между устройствами</value><comment>Sync card title</comment></data>
-  <data name="Sync.Description" xml:space="preserve"><value>Избранное, оценки, число прослушиваний и плейлисты одинаковы на всех устройствах, где выполнен вход. Побеждает самое новое изменение.</value><comment>Sync card description</comment></data>
-  <data name="Sync.DeviceName" xml:space="preserve"><value>Это устройство</value><comment>Sync card row label</comment></data>
+  <data name="Sync.Title" xml:space="preserve"><value>Синхронизация с телефоном</value><comment>Sync card title</comment></data>
+  <data name="Sync.Description" xml:space="preserve"><value>Избранное, оценки, счётчики прослушиваний и плейлисты одинаковы на телефоне и на этом ПК.</value><comment>Sync card description</comment></data>
+  <data name="Sync.DeviceName" xml:space="preserve"><value>Имя этого ПК</value><comment>Sync card row label</comment></data>
   <data name="Sync.WhatSyncs" xml:space="preserve"><value>Музыкальные файлы остаются на месте. Нужен включённый сервер Noctis.</value><comment>Sync card footnote</comment></data>
 
   <data name="LyricsStudioSettings.ModelSection" xml:space="preserve"><value>МОДЕЛЬ ДЛЯ ТЕКСТОВ</value><comment>Lyrics Studio tab section title</comment></data>
@@ -2608,4 +2608,32 @@ Deezer и TIDAL: вставьте ссылку.</value></data>
   <data name="Menu.RemoveBadge" xml:space="preserve"><value>Убрать значок</value><comment>v2 right-click menu, Badge submenu</comment></data>
   <data name="Menu.RateTip" xml:space="preserve"><value>Оценка {0} из 5</value><comment>v2 right-click menu rating star tooltip; {0} = number of stars</comment></data>
   <data name="Menu.ClearRating" xml:space="preserve"><value>Сбросить оценку</value><comment>v2 right-click menu rating row clear button tooltip</comment></data>
+  <data name="Settings.Section.PhoneApp" xml:space="preserve"><value>Приложение для телефона</value><comment>Settings section label, Account &amp; Devices tab</comment></data>
+  <data name="Settings.Section.RemoteControl" xml:space="preserve"><value>Удалённое управление</value><comment>Settings section label, Account &amp; Devices tab</comment></data>
+  <data name="Settings.Section.PcApps" xml:space="preserve"><value>Приложения на этом ПК</value><comment>Settings section label, Account &amp; Devices tab (Local API)</comment></data>
+  <data name="Phone.Title" xml:space="preserve"><value>Noctis на телефоне</value><comment>Phone app card title; its switch turns Noctis Server on/off</comment></data>
+  <data name="Phone.Description" xml:space="preserve"><value>Слушайте и скачивайте эту медиатеку на телефоне.</value><comment>Phone app card subtitle</comment></data>
+  <data name="Phone.NeedsAccount" xml:space="preserve"><value>Сначала создайте аккаунт выше.</value><comment>Phone app card, shown when there is no account</comment></data>
+  <data name="Phone.CodeHint" xml:space="preserve"><value>Телефон покажет такой же код. Входите, только если коды совпадают.</value><comment>Under the certificate security code in the pairing panel</comment></data>
+  <data name="Phone.Synced" xml:space="preserve"><value>Синхронизирован {0}</value><comment>Phone list row status; {0} = 'just now', '5 min ago', '3 h ago' or 'on 9 Oct, 14:05'</comment></data>
+  <data name="Phone.Connected" xml:space="preserve"><value>Подключён {0}</value><comment>Phone list row status when sync is off or the phone never synced; {0} = relative time</comment></data>
+  <data name="Phone.SignedOut" xml:space="preserve"><value>Выход выполнен</value><comment>Phone list row status: the sync data knows this phone but it no longer has a sign-in key</comment></data>
+  <data name="Phone.LastSynced" xml:space="preserve"><value>Последняя синхронизация: {0}</value><comment>Under the sync switch; {0} = relative time</comment></data>
+  <data name="Phone.NotSyncedYet" xml:space="preserve"><value>Ещё не синхронизировано</value><comment>Under the sync switch when no phone has synced</comment></data>
+  <data name="Phone.SyncFailed" xml:space="preserve"><value>Не удалось прочитать данные синхронизации: {0}</value><comment>Under the sync switch; {0} = error message</comment></data>
+  <data name="Phone.SignOutTip" xml:space="preserve"><value>Выйти из аккаунта на этом телефоне. Чтобы снова подключиться, понадобится пароль.</value><comment>Tooltip on a phone's Sign out button</comment></data>
+  <data name="Phone.OtherAppsTitle" xml:space="preserve"><value>Другие музыкальные приложения</value><comment>Phone app card row title (Subsonic apps)</comment></data>
+  <data name="Phone.OtherAppsDesc" xml:space="preserve"><value>Приложения Subsonic, например Symfonium, могут входить по email и API-ключу.</value><comment>Phone app card row text</comment></data>
+  <data name="Phone.NewApiKeyTip" xml:space="preserve"><value>Создаёт новый ключ. Приложениям со старым ключом понадобится новый.</value><comment>Tooltip on New API key</comment></data>
+  <data name="AccountSync.ShowPasswordTip" xml:space="preserve"><value>Показать или скрыть пароль</value><comment>Eye button tooltip in password boxes</comment></data>
+  <data name="AccountSync.ShowKeyTip" xml:space="preserve"><value>Показать или скрыть ключ</value><comment>Eye button tooltip on the API key</comment></data>
+  <data name="AccountSync.ChangePasswordNote" xml:space="preserve"><value>Телефоны выйдут из аккаунта, и им понадобится новый пароль.</value><comment>Under the change password box</comment></data>
+  <data name="AccountSync.DeleteAccountTip" xml:space="preserve"><value>Удалить аккаунт</value><comment>Tooltip on the account's trash button</comment></data>
+  <data name="AccountSync.DeleteTitle" xml:space="preserve"><value>Удалить аккаунт?</value><comment>Delete account confirmation title</comment></data>
+  <data name="AccountSync.DeleteBody" xml:space="preserve"><value>Телефоны выйдут из аккаунта и не смогут подключиться, пока вы не создадите новый. Музыка и медиатека на этом ПК останутся без изменений.</value><comment>Delete account confirmation text</comment></data>
+  <data name="AccountSync.DeleteConfirm" xml:space="preserve"><value>Удалить аккаунт</value><comment>Delete account confirmation button</comment></data>
+  <data name="Time.JustNow" xml:space="preserve"><value>только что</value><comment>Relative time, used after 'Synced', 'Connected', 'Last synced'</comment></data>
+  <data name="Time.MinutesAgo" xml:space="preserve"><value>{0} мин назад</value><comment>Relative time; {0} = minutes</comment></data>
+  <data name="Time.HoursAgo" xml:space="preserve"><value>{0} ч назад</value><comment>Relative time; {0} = hours</comment></data>
+  <data name="Time.OnDate" xml:space="preserve"><value>{0}</value><comment>Relative time older than a day; {0} = date and time like '9 Oct, 14:05'</comment></data>
 </root>

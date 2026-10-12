@@ -1249,7 +1249,7 @@
     <comment>Text in SettingsView.axaml</comment>
   </data>
   <data name="Settings.ControlPlaybackFromPhone" xml:space="preserve">
-    <value>控制您在本地网络上的手机回放。未加密，所以可以避免不受信任的Wi-Fi。</value>
+    <value>用手机浏览器控制正在播放的内容，无需安装应用。请只在可信的 Wi-Fi 上使用。</value>
     <comment>Text in SettingsView.axaml</comment>
   </data>
   <data name="Settings.TapEnlargeTip" xml:space="preserve">
@@ -1257,7 +1257,7 @@
     <comment>ToolTip.Tip in SettingsView.axaml</comment>
   </data>
   <data name="Settings.IfPhoneBlocksLink" xml:space="preserve">
-    <value>如果您的手机将链接标记为不安全，请选择继续。远程使用纯HTTP。</value>
+    <value>如果手机提示链接不安全，请点按“继续”。</value>
     <comment>Text in SettingsView.axaml</comment>
   </data>
   <data name="Settings.OPENPHONE" xml:space="preserve">
@@ -1273,7 +1273,7 @@
     <comment>Text in SettingsView.axaml</comment>
   </data>
   <data name="Settings.WaitingPhoneScanCode" xml:space="preserve">
-    <value>等待手机连接。扫描二维码,或点按放大。</value>
+    <value>正在等待手机。点按二维码即可放大。</value>
     <comment>Text in SettingsView.axaml</comment>
   </data>
   <data name="Settings.PhoneConnected" xml:space="preserve">
@@ -5387,10 +5387,10 @@
     <value>端口</value>
   </data>
   <data name="Server.AddressLabel" xml:space="preserve">
-    <value>服务器地址</value>
+    <value>地址</value>
   </data>
   <data name="Server.FingerprintLabel" xml:space="preserve">
-    <value>证书指纹 (SHA-256) — 手机询问是否信任时请核对</value>
+    <value>安全码</value>
   </data>
   <data name="Server.Waiting" xml:space="preserve">
     <value>等待设备连接…</value>
@@ -5420,7 +5420,7 @@
     <value>API 密钥归属</value>
   </data>
   <data name="Server.ApiKeyOnce" xml:space="preserve">
-    <value>现在复制它。它会显示一次，并且一个新的密钥替换它。</value>
+    <value>请立即复制。之后将无法再次查看。</value>
   </data>
   <data name="Server.Done" xml:space="preserve">
     <value>完成</value>
@@ -5676,7 +5676,7 @@
     <comment>No-account state title</comment>
   </data>
   <data name="AccountSync.CreateHelp" xml:space="preserve">
-    <value>您的设备使用此登录以浏览、播放和同步。密码被隐藏并且永远不会离开此计算机。</value>
+    <value>您的手机用这个账户登录。密码不会离开这台电脑。</value>
     <comment>No-account state help</comment>
   </data>
   <data name="AccountSync.Name" xml:space="preserve">
@@ -5692,7 +5692,7 @@
     <comment>Create form button</comment>
   </data>
   <data name="AccountSync.PairDevice" xml:space="preserve">
-    <value>配对设备</value>
+    <value>连接手机</value>
     <comment>Account card button</comment>
   </data>
   <data name="AccountSync.NewApiKey" xml:space="preserve">
@@ -5712,7 +5712,7 @@
     <comment>Change password button</comment>
   </data>
   <data name="AccountSync.Remove" xml:space="preserve">
-    <value>删除</value>
+    <value>退出登录</value>
     <comment>Account card button</comment>
   </data>
   <data name="AccountSync.PairHelp" xml:space="preserve">
@@ -5744,15 +5744,15 @@
     <comment>Other accounts card help</comment>
   </data>
   <data name="Sync.Title" xml:space="preserve">
-    <value>您的设备之间同步</value>
+    <value>与手机同步</value>
     <comment>Sync card title</comment>
   </data>
   <data name="Sync.Description" xml:space="preserve">
-    <value>收藏、评分、游戏计数和播放列表在每个登录设备上保持不变。最新的更改获胜。</value>
+    <value>收藏、评分、播放次数和播放列表会在手机和这台电脑上保持一致。</value>
     <comment>Sync card description</comment>
   </data>
   <data name="Sync.DeviceName" xml:space="preserve">
-    <value>此设备</value>
+    <value>这台电脑的名称</value>
     <comment>Sync card row label</comment>
   </data>
   <data name="Sync.WhatSyncs" xml:space="preserve">
@@ -6364,5 +6364,141 @@
   </data>
   <data name="Settings.Group.More" xml:space="preserve">
     <value>更多</value>
+  </data>
+  <data name="AccountSync.PairPhoneHint" xml:space="preserve">
+    <value>在手机上的 Noctis 应用中，打开“设置”，再进入“账户”。输入这个地址，然后用您的邮箱或用户名和密码登录。</value>
+    <comment>Pairing block help above the address and fingerprint</comment>
+  </data>
+  <data name="AccountSync.SignedInDevices" xml:space="preserve">
+    <value>您的手机</value>
+    <comment>Account card list label</comment>
+  </data>
+  <data name="AccountSync.NoSignedInDevices" xml:space="preserve">
+    <value>还没有连接手机。</value>
+    <comment>Account card list empty state</comment>
+  </data>
+  <data name="Settings.LocalApiDesc" xml:space="preserve">
+    <value>让这台电脑上的应用（如 Stream Deck 或 OBS）查看正在播放的内容并控制 Noctis。</value>
+    <comment>Text in SettingsView.axaml</comment>
+  </data>
+  <data name="Settings.LocalApiWarning" xml:space="preserve">
+    <value>任何持有此令牌的应用都能控制 Noctis 并读取您的媒体库。请只交给您信任的应用。</value>
+    <comment>Text in SettingsView.axaml</comment>
+  </data>
+  <data name="Settings.LocalApiDiscovery" xml:space="preserve">
+    <value>应用也可以从 Noctis 数据文件夹中的 local-api.json 读取令牌。</value>
+    <comment>Text in SettingsView.axaml</comment>
+  </data>
+  <data name="Settings.Section.PhoneApp" xml:space="preserve">
+    <value>手机应用</value>
+    <comment>Settings section label, Account &amp; Devices tab</comment>
+  </data>
+  <data name="Settings.Section.RemoteControl" xml:space="preserve">
+    <value>远程控制</value>
+    <comment>Settings section label, Account &amp; Devices tab</comment>
+  </data>
+  <data name="Settings.Section.PcApps" xml:space="preserve">
+    <value>这台电脑上的应用</value>
+    <comment>Settings section label, Account &amp; Devices tab (Local API)</comment>
+  </data>
+  <data name="Phone.Title" xml:space="preserve">
+    <value>在手机上使用 Noctis</value>
+    <comment>Phone app card title; its switch turns Noctis Server on/off</comment>
+  </data>
+  <data name="Phone.Description" xml:space="preserve">
+    <value>在手机上在线播放和下载这个媒体库。</value>
+    <comment>Phone app card subtitle</comment>
+  </data>
+  <data name="Phone.NeedsAccount" xml:space="preserve">
+    <value>请先在上方创建账户。</value>
+    <comment>Phone app card, shown when there is no account</comment>
+  </data>
+  <data name="Phone.CodeHint" xml:space="preserve">
+    <value>手机上也会显示这个安全码。两者一致时再登录。</value>
+    <comment>Under the certificate security code in the pairing panel</comment>
+  </data>
+  <data name="Phone.Synced" xml:space="preserve">
+    <value>{0}同步</value>
+    <comment>Phone list row status; {0} = 'just now', '5 min ago', '3 h ago' or 'on 9 Oct, 14:05'</comment>
+  </data>
+  <data name="Phone.Connected" xml:space="preserve">
+    <value>{0}连接</value>
+    <comment>Phone list row status when sync is off or the phone never synced; {0} = relative time</comment>
+  </data>
+  <data name="Phone.SignedOut" xml:space="preserve">
+    <value>已退出登录</value>
+    <comment>Phone list row status: the sync data knows this phone but it no longer has a sign-in key</comment>
+  </data>
+  <data name="Phone.LastSynced" xml:space="preserve">
+    <value>上次同步：{0}</value>
+    <comment>Under the sync switch; {0} = relative time</comment>
+  </data>
+  <data name="Phone.NotSyncedYet" xml:space="preserve">
+    <value>尚未同步</value>
+    <comment>Under the sync switch when no phone has synced</comment>
+  </data>
+  <data name="Phone.SyncFailed" xml:space="preserve">
+    <value>无法读取同步数据：{0}</value>
+    <comment>Under the sync switch; {0} = error message</comment>
+  </data>
+  <data name="Phone.SignOutTip" xml:space="preserve">
+    <value>让这部手机退出登录。再次连接时需要输入密码。</value>
+    <comment>Tooltip on a phone's Sign out button</comment>
+  </data>
+  <data name="Phone.OtherAppsTitle" xml:space="preserve">
+    <value>其他音乐应用</value>
+    <comment>Phone app card row title (Subsonic apps)</comment>
+  </data>
+  <data name="Phone.OtherAppsDesc" xml:space="preserve">
+    <value>Symfonium 等 Subsonic 应用可以用您的邮箱和 API 密钥登录。</value>
+    <comment>Phone app card row text</comment>
+  </data>
+  <data name="Phone.NewApiKeyTip" xml:space="preserve">
+    <value>生成新密钥。使用旧密钥的应用需要换成新密钥。</value>
+    <comment>Tooltip on New API key</comment>
+  </data>
+  <data name="AccountSync.ShowPasswordTip" xml:space="preserve">
+    <value>显示或隐藏密码</value>
+    <comment>Eye button tooltip in password boxes</comment>
+  </data>
+  <data name="AccountSync.ShowKeyTip" xml:space="preserve">
+    <value>显示或隐藏密钥</value>
+    <comment>Eye button tooltip on the API key</comment>
+  </data>
+  <data name="AccountSync.ChangePasswordNote" xml:space="preserve">
+    <value>您的手机会退出登录，需要用新密码重新登录。</value>
+    <comment>Under the change password box</comment>
+  </data>
+  <data name="AccountSync.DeleteAccountTip" xml:space="preserve">
+    <value>删除账户</value>
+    <comment>Tooltip on the account's trash button</comment>
+  </data>
+  <data name="AccountSync.DeleteTitle" xml:space="preserve">
+    <value>要删除您的账户吗？</value>
+    <comment>Delete account confirmation title</comment>
+  </data>
+  <data name="AccountSync.DeleteBody" xml:space="preserve">
+    <value>您的手机会退出登录，在您创建新账户之前都无法连接。这台电脑上的音乐和媒体库保持不变。</value>
+    <comment>Delete account confirmation text</comment>
+  </data>
+  <data name="AccountSync.DeleteConfirm" xml:space="preserve">
+    <value>删除账户</value>
+    <comment>Delete account confirmation button</comment>
+  </data>
+  <data name="Time.JustNow" xml:space="preserve">
+    <value>刚刚</value>
+    <comment>Relative time, used after 'Synced', 'Connected', 'Last synced'</comment>
+  </data>
+  <data name="Time.MinutesAgo" xml:space="preserve">
+    <value>{0} 分钟前</value>
+    <comment>Relative time; {0} = minutes</comment>
+  </data>
+  <data name="Time.HoursAgo" xml:space="preserve">
+    <value>{0} 小时前</value>
+    <comment>Relative time; {0} = hours</comment>
+  </data>
+  <data name="Time.OnDate" xml:space="preserve">
+    <value>{0}</value>
+    <comment>Relative time older than a day; {0} = date and time like '9 Oct, 14:05'</comment>
   </data>
 </root>

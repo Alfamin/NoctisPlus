@@ -1249,7 +1249,7 @@
     <comment>Text in SettingsView.axaml</comment>
   </data>
   <data name="Settings.ControlPlaybackFromPhone" xml:space="preserve">
-    <value>ローカルネットワーク上の端末から再生を制御します。暗号化されていないので、信頼できないWi-Fiは避けてください。</value>
+    <value>スマートフォンのブラウザから再生を操作できます。アプリは不要です。信頼できるWi-Fiでのみ使ってください。</value>
     <comment>Text in SettingsView.axaml</comment>
   </data>
   <data name="Settings.TapEnlargeTip" xml:space="preserve">
@@ -1257,7 +1257,7 @@
     <comment>ToolTip.Tip in SettingsView.axaml</comment>
   </data>
   <data name="Settings.IfPhoneBlocksLink" xml:space="preserve">
-    <value>携帯電話がリンクを安全でないと警告した場合は、「続行」を選択してください。リモートはプレーンな HTTP を使用します。</value>
+    <value>スマートフォンでリンクが安全でないと表示されたら、「続行」をタップしてください。</value>
     <comment>Text in SettingsView.axaml</comment>
   </data>
   <data name="Settings.OPENPHONE" xml:space="preserve">
@@ -1273,7 +1273,7 @@
     <comment>Text in SettingsView.axaml</comment>
   </data>
   <data name="Settings.WaitingPhoneScanCode" xml:space="preserve">
-    <value>スマートフォンを待っています。コードをスキャンするか、タップして拡大してください。</value>
+    <value>スマートフォンを待っています。コードをタップすると大きく表示されます。</value>
     <comment>Text in SettingsView.axaml</comment>
   </data>
   <data name="Settings.PhoneConnected" xml:space="preserve">
@@ -5387,10 +5387,10 @@
     <value>ポート</value>
   </data>
   <data name="Server.AddressLabel" xml:space="preserve">
-    <value>サーバーアドレス</value>
+    <value>アドレス</value>
   </data>
   <data name="Server.FingerprintLabel" xml:space="preserve">
-    <value>証明書のフィンガープリント (SHA-256) — スマートフォンが信頼を求めたときに照合してください</value>
+    <value>セキュリティコード</value>
   </data>
   <data name="Server.Waiting" xml:space="preserve">
     <value>デバイスの接続を待っています…</value>
@@ -5420,7 +5420,7 @@
     <value>API キーの対象</value>
   </data>
   <data name="Server.ApiKeyOnce" xml:space="preserve">
-    <value>今すぐコピーします。それは一度表示され、新しいキーがそれを置き換えます。</value>
+    <value>今すぐコピーしてください。あとから表示することはできません。</value>
   </data>
   <data name="Server.Done" xml:space="preserve">
     <value>完了</value>
@@ -5676,7 +5676,7 @@
     <comment>No-account state title</comment>
   </data>
   <data name="AccountSync.CreateHelp" xml:space="preserve">
-    <value>お使いのデバイスは、閲覧、再生、同期するためにこれでサインインします。パスワードはハッシュ化され、このコンピュータを離れることはありません。</value>
+    <value>スマートフォンからはこのアカウントでログインします。パスワードがこのPCの外に出ることはありません。</value>
     <comment>No-account state help</comment>
   </data>
   <data name="AccountSync.Name" xml:space="preserve">
@@ -5692,7 +5692,7 @@
     <comment>Create form button</comment>
   </data>
   <data name="AccountSync.PairDevice" xml:space="preserve">
-    <value>デバイスをペアリングする</value>
+    <value>スマートフォンを接続</value>
     <comment>Account card button</comment>
   </data>
   <data name="AccountSync.NewApiKey" xml:space="preserve">
@@ -5712,7 +5712,7 @@
     <comment>Change password button</comment>
   </data>
   <data name="AccountSync.Remove" xml:space="preserve">
-    <value>削除</value>
+    <value>ログアウト</value>
     <comment>Account card button</comment>
   </data>
   <data name="AccountSync.PairHelp" xml:space="preserve">
@@ -5744,15 +5744,15 @@
     <comment>Other accounts card help</comment>
   </data>
   <data name="Sync.Title" xml:space="preserve">
-    <value>端末間で同期</value>
+    <value>スマートフォンと同期</value>
     <comment>Sync card title</comment>
   </data>
   <data name="Sync.Description" xml:space="preserve">
-    <value>お気に入り、評価、プレイカウント、プレイリストはサインインしたすべてのデバイスで同じままになります。最新の変更が勝利します。</value>
+    <value>お気に入り、評価、再生回数、プレイリストがスマートフォンとこのPCで同じになります。</value>
     <comment>Sync card description</comment>
   </data>
   <data name="Sync.DeviceName" xml:space="preserve">
-    <value>このデバイス</value>
+    <value>このPCの名前</value>
     <comment>Sync card row label</comment>
   </data>
   <data name="Sync.WhatSyncs" xml:space="preserve">
@@ -6364,5 +6364,141 @@
   </data>
   <data name="Settings.Group.More" xml:space="preserve">
     <value>その他</value>
+  </data>
+  <data name="AccountSync.PairPhoneHint" xml:space="preserve">
+    <value>スマートフォンのNoctisアプリで「設定」から「アカウント」を開きます。このアドレスを入力し、メールアドレスまたはユーザー名とパスワードでログインしてください。</value>
+    <comment>Pairing block help above the address and fingerprint</comment>
+  </data>
+  <data name="AccountSync.SignedInDevices" xml:space="preserve">
+    <value>お使いのスマートフォン</value>
+    <comment>Account card list label</comment>
+  </data>
+  <data name="AccountSync.NoSignedInDevices" xml:space="preserve">
+    <value>まだスマートフォンは接続されていません。</value>
+    <comment>Account card list empty state</comment>
+  </data>
+  <data name="Settings.LocalApiDesc" xml:space="preserve">
+    <value>Stream DeckやOBSなど、このPCのアプリが再生中の曲を確認したり、Noctisを操作したりできます。</value>
+    <comment>Text in SettingsView.axaml</comment>
+  </data>
+  <data name="Settings.LocalApiWarning" xml:space="preserve">
+    <value>このトークンを持つアプリは、Noctisを操作したりライブラリを読み取ったりできます。信頼できるアプリにだけ渡してください。</value>
+    <comment>Text in SettingsView.axaml</comment>
+  </data>
+  <data name="Settings.LocalApiDiscovery" xml:space="preserve">
+    <value>アプリはNoctisのデータフォルダーにあるlocal-api.jsonからも読み取れます。</value>
+    <comment>Text in SettingsView.axaml</comment>
+  </data>
+  <data name="Settings.Section.PhoneApp" xml:space="preserve">
+    <value>スマートフォンアプリ</value>
+    <comment>Settings section label, Account &amp; Devices tab</comment>
+  </data>
+  <data name="Settings.Section.RemoteControl" xml:space="preserve">
+    <value>リモート操作</value>
+    <comment>Settings section label, Account &amp; Devices tab</comment>
+  </data>
+  <data name="Settings.Section.PcApps" xml:space="preserve">
+    <value>このPCのアプリ</value>
+    <comment>Settings section label, Account &amp; Devices tab (Local API)</comment>
+  </data>
+  <data name="Phone.Title" xml:space="preserve">
+    <value>スマートフォンでNoctisを使う</value>
+    <comment>Phone app card title; its switch turns Noctis Server on/off</comment>
+  </data>
+  <data name="Phone.Description" xml:space="preserve">
+    <value>このライブラリをスマートフォンでストリーミング再生したり、ダウンロードしたりできます。</value>
+    <comment>Phone app card subtitle</comment>
+  </data>
+  <data name="Phone.NeedsAccount" xml:space="preserve">
+    <value>先に上でアカウントを作成してください。</value>
+    <comment>Phone app card, shown when there is no account</comment>
+  </data>
+  <data name="Phone.CodeHint" xml:space="preserve">
+    <value>スマートフォンにも同じコードが表示されます。一致する場合のみログインしてください。</value>
+    <comment>Under the certificate security code in the pairing panel</comment>
+  </data>
+  <data name="Phone.Synced" xml:space="preserve">
+    <value>同期：{0}</value>
+    <comment>Phone list row status; {0} = 'just now', '5 min ago', '3 h ago' or 'on 9 Oct, 14:05'</comment>
+  </data>
+  <data name="Phone.Connected" xml:space="preserve">
+    <value>接続：{0}</value>
+    <comment>Phone list row status when sync is off or the phone never synced; {0} = relative time</comment>
+  </data>
+  <data name="Phone.SignedOut" xml:space="preserve">
+    <value>ログアウト済み</value>
+    <comment>Phone list row status: the sync data knows this phone but it no longer has a sign-in key</comment>
+  </data>
+  <data name="Phone.LastSynced" xml:space="preserve">
+    <value>最終同期：{0}</value>
+    <comment>Under the sync switch; {0} = relative time</comment>
+  </data>
+  <data name="Phone.NotSyncedYet" xml:space="preserve">
+    <value>まだ同期していません</value>
+    <comment>Under the sync switch when no phone has synced</comment>
+  </data>
+  <data name="Phone.SyncFailed" xml:space="preserve">
+    <value>同期データを読み込めませんでした：{0}</value>
+    <comment>Under the sync switch; {0} = error message</comment>
+  </data>
+  <data name="Phone.SignOutTip" xml:space="preserve">
+    <value>このスマートフォンをログアウトさせます。再接続にはパスワードが必要です。</value>
+    <comment>Tooltip on a phone's Sign out button</comment>
+  </data>
+  <data name="Phone.OtherAppsTitle" xml:space="preserve">
+    <value>ほかの音楽アプリ</value>
+    <comment>Phone app card row title (Subsonic apps)</comment>
+  </data>
+  <data name="Phone.OtherAppsDesc" xml:space="preserve">
+    <value>SymfoniumなどのSubsonicアプリは、メールアドレスとAPIキーでログインできます。</value>
+    <comment>Phone app card row text</comment>
+  </data>
+  <data name="Phone.NewApiKeyTip" xml:space="preserve">
+    <value>新しいキーを作成します。古いキーを使っているアプリには新しいキーが必要です。</value>
+    <comment>Tooltip on New API key</comment>
+  </data>
+  <data name="AccountSync.ShowPasswordTip" xml:space="preserve">
+    <value>パスワードを表示または非表示</value>
+    <comment>Eye button tooltip in password boxes</comment>
+  </data>
+  <data name="AccountSync.ShowKeyTip" xml:space="preserve">
+    <value>キーを表示または非表示</value>
+    <comment>Eye button tooltip on the API key</comment>
+  </data>
+  <data name="AccountSync.ChangePasswordNote" xml:space="preserve">
+    <value>スマートフォンはログアウトされ、新しいパスワードが必要になります。</value>
+    <comment>Under the change password box</comment>
+  </data>
+  <data name="AccountSync.DeleteAccountTip" xml:space="preserve">
+    <value>アカウントを削除</value>
+    <comment>Tooltip on the account's trash button</comment>
+  </data>
+  <data name="AccountSync.DeleteTitle" xml:space="preserve">
+    <value>アカウントを削除しますか？</value>
+    <comment>Delete account confirmation title</comment>
+  </data>
+  <data name="AccountSync.DeleteBody" xml:space="preserve">
+    <value>スマートフォンはログアウトされ、新しいアカウントを作成するまで接続できなくなります。このPCの音楽とライブラリはそのまま残ります。</value>
+    <comment>Delete account confirmation text</comment>
+  </data>
+  <data name="AccountSync.DeleteConfirm" xml:space="preserve">
+    <value>アカウントを削除</value>
+    <comment>Delete account confirmation button</comment>
+  </data>
+  <data name="Time.JustNow" xml:space="preserve">
+    <value>たった今</value>
+    <comment>Relative time, used after 'Synced', 'Connected', 'Last synced'</comment>
+  </data>
+  <data name="Time.MinutesAgo" xml:space="preserve">
+    <value>{0}分前</value>
+    <comment>Relative time; {0} = minutes</comment>
+  </data>
+  <data name="Time.HoursAgo" xml:space="preserve">
+    <value>{0}時間前</value>
+    <comment>Relative time; {0} = hours</comment>
+  </data>
+  <data name="Time.OnDate" xml:space="preserve">
+    <value>{0}</value>
+    <comment>Relative time older than a day; {0} = date and time like '9 Oct, 14:05'</comment>
   </data>
 </root>

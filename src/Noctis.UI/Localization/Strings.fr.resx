@@ -1249,7 +1249,7 @@
     <comment>Text in SettingsView.axaml</comment>
   </data>
   <data name="Settings.ControlPlaybackFromPhone" xml:space="preserve">
-    <value>Contrôlez la lecture de votre téléphone sur le réseau local. Non chiffré, donc évitez les accès Wi-Fi non approuvés.</value>
+    <value>Contrôlez la lecture depuis le navigateur de votre téléphone. Aucune application à installer. À utiliser uniquement sur un Wi-Fi de confiance.</value>
     <comment>Text in SettingsView.axaml</comment>
   </data>
   <data name="Settings.TapEnlargeTip" xml:space="preserve">
@@ -1257,7 +1257,7 @@
     <comment>ToolTip.Tip in SettingsView.axaml</comment>
   </data>
   <data name="Settings.IfPhoneBlocksLink" xml:space="preserve">
-    <value>Si votre téléphone marque le lien comme non sécurisé, choisissez Continuer. La télécommande utilise en clair HTTP.</value>
+    <value>Si votre téléphone indique que le lien n'est pas sécurisé, touchez Continuer.</value>
     <comment>Text in SettingsView.axaml</comment>
   </data>
   <data name="Settings.OPENPHONE" xml:space="preserve">
@@ -1273,7 +1273,7 @@
     <comment>Text in SettingsView.axaml</comment>
   </data>
   <data name="Settings.WaitingPhoneScanCode" xml:space="preserve">
-    <value>En attente d'un téléphone. Scannez le code ou touchez-le pour l'agrandir.</value>
+    <value>En attente d'un téléphone. Touchez le code pour l'agrandir.</value>
     <comment>Text in SettingsView.axaml</comment>
   </data>
   <data name="Settings.PhoneConnected" xml:space="preserve">
@@ -5387,10 +5387,10 @@
     <value>Port</value>
   </data>
   <data name="Server.AddressLabel" xml:space="preserve">
-    <value>ADRESSE DU SERVEUR</value>
+    <value>ADRESSE</value>
   </data>
   <data name="Server.FingerprintLabel" xml:space="preserve">
-    <value>EMPREINTE DU CERTIFICAT (SHA-256) — comparez-la lorsque votre téléphone demande à lui faire confiance</value>
+    <value>CODE DE SÉCURITÉ</value>
   </data>
   <data name="Server.Waiting" xml:space="preserve">
     <value>En attente de la connexion d'un appareil…</value>
@@ -5420,7 +5420,7 @@
     <value>Clé API pour</value>
   </data>
   <data name="Server.ApiKeyOnce" xml:space="preserve">
-    <value>Copiez-le maintenant. Il est affiché une fois, et une nouvelle clé le remplace.</value>
+    <value>Copiez-la maintenant. Vous ne la reverrez plus.</value>
   </data>
   <data name="Server.Done" xml:space="preserve">
     <value>Terminé</value>
@@ -5676,7 +5676,7 @@
     <comment>No-account state title</comment>
   </data>
   <data name="AccountSync.CreateHelp" xml:space="preserve">
-    <value>Vos appareils se connectent avec cela pour naviguer, jouer et synchroniser. Le mot de passe est stocké haché et ne quitte jamais cet ordinateur.</value>
+    <value>Votre téléphone se connecte avec ce compte. Votre mot de passe ne quitte jamais ce PC.</value>
     <comment>No-account state help</comment>
   </data>
   <data name="AccountSync.Name" xml:space="preserve">
@@ -5692,7 +5692,7 @@
     <comment>Create form button</comment>
   </data>
   <data name="AccountSync.PairDevice" xml:space="preserve">
-    <value>Associer un appareil</value>
+    <value>Connecter un téléphone</value>
     <comment>Account card button</comment>
   </data>
   <data name="AccountSync.NewApiKey" xml:space="preserve">
@@ -5712,7 +5712,7 @@
     <comment>Change password button</comment>
   </data>
   <data name="AccountSync.Remove" xml:space="preserve">
-    <value>Retirer</value>
+    <value>Déconnecter</value>
     <comment>Account card button</comment>
   </data>
   <data name="AccountSync.PairHelp" xml:space="preserve">
@@ -5744,15 +5744,15 @@
     <comment>Other accounts card help</comment>
   </data>
   <data name="Sync.Title" xml:space="preserve">
-    <value>Synchroniser entre vos appareils</value>
+    <value>Synchroniser avec votre téléphone</value>
     <comment>Sync card title</comment>
   </data>
   <data name="Sync.Description" xml:space="preserve">
-    <value>Les favoris, les évaluations, le nombre de parties et les playlists restent les mêmes sur chaque appareil connecté. Le dernier changement gagne.</value>
+    <value>Vos favoris, notes, nombres d'écoutes et listes de lecture sont les mêmes sur votre téléphone et sur ce PC.</value>
     <comment>Sync card description</comment>
   </data>
   <data name="Sync.DeviceName" xml:space="preserve">
-    <value>Cet appareil</value>
+    <value>Nom de ce PC</value>
     <comment>Sync card row label</comment>
   </data>
   <data name="Sync.WhatSyncs" xml:space="preserve">
@@ -6364,5 +6364,141 @@
   </data>
   <data name="Settings.Group.More" xml:space="preserve">
     <value>Plus</value>
+  </data>
+  <data name="AccountSync.PairPhoneHint" xml:space="preserve">
+    <value>Dans l'application Noctis de votre téléphone, ouvrez Paramètres, puis Compte. Saisissez cette adresse et connectez-vous avec votre e-mail ou nom d'utilisateur et votre mot de passe.</value>
+    <comment>Pairing block help above the address and fingerprint</comment>
+  </data>
+  <data name="AccountSync.SignedInDevices" xml:space="preserve">
+    <value>VOS TÉLÉPHONES</value>
+    <comment>Account card list label</comment>
+  </data>
+  <data name="AccountSync.NoSignedInDevices" xml:space="preserve">
+    <value>Aucun téléphone connecté pour l'instant.</value>
+    <comment>Account card list empty state</comment>
+  </data>
+  <data name="Settings.LocalApiDesc" xml:space="preserve">
+    <value>Permet aux applications de ce PC, comme Stream Deck ou OBS, de voir ce qui est en lecture et de contrôler Noctis.</value>
+    <comment>Text in SettingsView.axaml</comment>
+  </data>
+  <data name="Settings.LocalApiWarning" xml:space="preserve">
+    <value>Toute application qui a ce jeton peut contrôler Noctis et lire votre bibliothèque. Ne le donnez qu'à des applications de confiance.</value>
+    <comment>Text in SettingsView.axaml</comment>
+  </data>
+  <data name="Settings.LocalApiDiscovery" xml:space="preserve">
+    <value>Les applications peuvent aussi le lire dans local-api.json, dans le dossier de données de Noctis.</value>
+    <comment>Text in SettingsView.axaml</comment>
+  </data>
+  <data name="Settings.Section.PhoneApp" xml:space="preserve">
+    <value>Application mobile</value>
+    <comment>Settings section label, Account &amp; Devices tab</comment>
+  </data>
+  <data name="Settings.Section.RemoteControl" xml:space="preserve">
+    <value>Télécommande</value>
+    <comment>Settings section label, Account &amp; Devices tab</comment>
+  </data>
+  <data name="Settings.Section.PcApps" xml:space="preserve">
+    <value>Applications de ce PC</value>
+    <comment>Settings section label, Account &amp; Devices tab (Local API)</comment>
+  </data>
+  <data name="Phone.Title" xml:space="preserve">
+    <value>Noctis sur votre téléphone</value>
+    <comment>Phone app card title; its switch turns Noctis Server on/off</comment>
+  </data>
+  <data name="Phone.Description" xml:space="preserve">
+    <value>Écoutez et téléchargez cette bibliothèque sur votre téléphone.</value>
+    <comment>Phone app card subtitle</comment>
+  </data>
+  <data name="Phone.NeedsAccount" xml:space="preserve">
+    <value>Créez d'abord votre compte ci-dessus.</value>
+    <comment>Phone app card, shown when there is no account</comment>
+  </data>
+  <data name="Phone.CodeHint" xml:space="preserve">
+    <value>Votre téléphone affiche aussi ce code. Ne vous connectez que si les deux sont identiques.</value>
+    <comment>Under the certificate security code in the pairing panel</comment>
+  </data>
+  <data name="Phone.Synced" xml:space="preserve">
+    <value>Synchronisé {0}</value>
+    <comment>Phone list row status; {0} = 'just now', '5 min ago', '3 h ago' or 'on 9 Oct, 14:05'</comment>
+  </data>
+  <data name="Phone.Connected" xml:space="preserve">
+    <value>Connecté {0}</value>
+    <comment>Phone list row status when sync is off or the phone never synced; {0} = relative time</comment>
+  </data>
+  <data name="Phone.SignedOut" xml:space="preserve">
+    <value>Déconnecté</value>
+    <comment>Phone list row status: the sync data knows this phone but it no longer has a sign-in key</comment>
+  </data>
+  <data name="Phone.LastSynced" xml:space="preserve">
+    <value>Dernière synchronisation {0}</value>
+    <comment>Under the sync switch; {0} = relative time</comment>
+  </data>
+  <data name="Phone.NotSyncedYet" xml:space="preserve">
+    <value>Pas encore synchronisé</value>
+    <comment>Under the sync switch when no phone has synced</comment>
+  </data>
+  <data name="Phone.SyncFailed" xml:space="preserve">
+    <value>Impossible de lire les données de synchronisation : {0}</value>
+    <comment>Under the sync switch; {0} = error message</comment>
+  </data>
+  <data name="Phone.SignOutTip" xml:space="preserve">
+    <value>Déconnecter ce téléphone. Il lui faudra votre mot de passe pour se reconnecter.</value>
+    <comment>Tooltip on a phone's Sign out button</comment>
+  </data>
+  <data name="Phone.OtherAppsTitle" xml:space="preserve">
+    <value>Autres applications de musique</value>
+    <comment>Phone app card row title (Subsonic apps)</comment>
+  </data>
+  <data name="Phone.OtherAppsDesc" xml:space="preserve">
+    <value>Les applications Subsonic comme Symfonium peuvent se connecter avec votre e-mail et une clé API.</value>
+    <comment>Phone app card row text</comment>
+  </data>
+  <data name="Phone.NewApiKeyTip" xml:space="preserve">
+    <value>Crée une nouvelle clé. Les applications qui utilisent l'ancienne auront besoin de la nouvelle.</value>
+    <comment>Tooltip on New API key</comment>
+  </data>
+  <data name="AccountSync.ShowPasswordTip" xml:space="preserve">
+    <value>Afficher ou masquer le mot de passe</value>
+    <comment>Eye button tooltip in password boxes</comment>
+  </data>
+  <data name="AccountSync.ShowKeyTip" xml:space="preserve">
+    <value>Afficher ou masquer la clé</value>
+    <comment>Eye button tooltip on the API key</comment>
+  </data>
+  <data name="AccountSync.ChangePasswordNote" xml:space="preserve">
+    <value>Vos téléphones seront déconnectés et auront besoin du nouveau mot de passe.</value>
+    <comment>Under the change password box</comment>
+  </data>
+  <data name="AccountSync.DeleteAccountTip" xml:space="preserve">
+    <value>Supprimer le compte</value>
+    <comment>Tooltip on the account's trash button</comment>
+  </data>
+  <data name="AccountSync.DeleteTitle" xml:space="preserve">
+    <value>Supprimer votre compte ?</value>
+    <comment>Delete account confirmation title</comment>
+  </data>
+  <data name="AccountSync.DeleteBody" xml:space="preserve">
+    <value>Vos téléphones seront déconnectés et ne pourront plus se connecter tant que vous n'aurez pas créé un nouveau compte. Votre musique et votre bibliothèque sur ce PC restent telles quelles.</value>
+    <comment>Delete account confirmation text</comment>
+  </data>
+  <data name="AccountSync.DeleteConfirm" xml:space="preserve">
+    <value>Supprimer le compte</value>
+    <comment>Delete account confirmation button</comment>
+  </data>
+  <data name="Time.JustNow" xml:space="preserve">
+    <value>à l'instant</value>
+    <comment>Relative time, used after 'Synced', 'Connected', 'Last synced'</comment>
+  </data>
+  <data name="Time.MinutesAgo" xml:space="preserve">
+    <value>il y a {0} min</value>
+    <comment>Relative time; {0} = minutes</comment>
+  </data>
+  <data name="Time.HoursAgo" xml:space="preserve">
+    <value>il y a {0} h</value>
+    <comment>Relative time; {0} = hours</comment>
+  </data>
+  <data name="Time.OnDate" xml:space="preserve">
+    <value>le {0}</value>
+    <comment>Relative time older than a day; {0} = date and time like '9 Oct, 14:05'</comment>
   </data>
 </root>
