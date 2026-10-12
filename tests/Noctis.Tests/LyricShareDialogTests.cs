@@ -91,6 +91,50 @@ public class LyricShareDialogTests
         Assert.True(lit == 0, $"{lit} text pixels below y={bandTop} on the {format} {layout} card");
     }
 
+    /// <summary>
+    /// Bug: on the Artwork background the Text option did nothing. The renderer forced white
+    /// text there whatever was picked, so Black drew the very same card as White. A plain grey
+    /// cover makes it countable: only dark text (and the wordmark) can draw near-black pixels.
+    /// </summary>
+    [Theory]
+    [InlineData(ShareCardLayout.Panel)]
+    [InlineData(ShareCardLayout.Poster)]
+    public void BlackText_AppliesOnTheArtworkBackground(ShareCardLayout layout)
+    {
+        var dir = Path.Combine(Path.GetTempPath(), $"noctis-share-test-{Guid.NewGuid():N}");
+        Directory.CreateDirectory(dir);
+        try
+        {
+            var cover = Path.Combine(dir, "grey.png");
+            using (var grey = new SKBitmap(600, 600))
+            {
+                grey.Erase(new SKColor(0xC8, 0xC8, 0xC8));
+                using var image = SKImage.FromBitmap(grey);
+                using var data = image.Encode(SKEncodedImageFormat.Png, 100);
+                File.WriteAllBytes(cover, data.ToArray());
+            }
+            int Count(ShareTextColor text, Func<int, bool> luma)
+            {
+                var spec = new LyricCardSpec
+                {
+                    Title = "TUTU", Artist = "6ix9ine", ArtworkPath = cover, Layout = layout,
+                    Lines = new[] { "You can't do this", "it drives you crazy" },
+                    Background = ShareBackground.Artwork, TextColor = text,
+                };
+                using var bmp = SKBitmap.Decode(ShareCardRenderer.RenderLyricCardStyled(spec));
+                int n = 0;
+                foreach (var c in bmp.Pixels)
+                    if (luma((c.Red * 2126 + c.Green * 7152 + c.Blue * 722) / 10000)) n++;
+                return n;
+            }
+
+            Assert.True(Count(ShareTextColor.Black, l => l < 50) > 2000, "Black drew no dark text on the artwork card");
+            Assert.True(Count(ShareTextColor.White, l => l > 240) > 2000, "White no longer draws white text on the artwork card");
+            Assert.Equal(0, Count(ShareTextColor.White, l => l < 50));
+        }
+        finally { try { Directory.Delete(dir, true); } catch { } }
+    }
+
     // ── Live preview ──
 
     /// <summary>A busy JPEG cover of <paramref name="size"/>² (a hi-res release's size).</summary>

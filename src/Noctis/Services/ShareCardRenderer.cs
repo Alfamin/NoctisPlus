@@ -206,12 +206,14 @@ public static class ShareCardRenderer
             canvas.Clear(SKColors.Black);
             DrawBlurredCover(canvas, art!, w, h);
             // Lighter scrim than the legacy card so the cover stays vivid behind legible text.
-            using (var scrim = new SKPaint { Color = new SKColor(0, 0, 0, 0x6E) })
+            // Text: Black frosts the cover light instead (it used to be ignored here: white
+            // text whatever was picked). Auto stays white over the dark scrim.
+            darkText = spec.TextColor == ShareTextColor.Black;
+            using (var scrim = new SKPaint { Color = darkText ? new SKColor(255, 255, 255, 0xA0) : new SKColor(0, 0, 0, 0x6E) })
                 canvas.DrawRect(0, 0, w, h, scrim);
-            darkText = false;
-            fg = SKColors.White;
-            fgSubtle = fg.WithAlpha(205);
-            badgeLetter = new SKColor(0x1B, 0x1B, 0x1B);
+            fg = darkText ? new SKColor(0x14, 0x14, 0x14) : SKColors.White;
+            fgSubtle = fg.WithAlpha((byte)(darkText ? 150 : 205));
+            badgeLetter = darkText ? SKColors.White : new SKColor(0x1B, 0x1B, 0x1B);
         }
         else
         {
@@ -273,7 +275,7 @@ public static class ShareCardRenderer
 
         // Card body: a translucent overlay tone so the background color stays the star —
         // lighter than the bg for light text, deeper for dark text, frosted over artwork.
-        var bodyFill = artworkBlur ? new SKColor(255, 255, 255, 0x22)
+        var bodyFill = artworkBlur && !darkText ? new SKColor(255, 255, 255, 0x22)
                      : darkText ? new SKColor(0, 0, 0, 0x12)
                      : new SKColor(255, 255, 255, 0x16);
         using (var fill = new SKPaint { IsAntialias = true, Color = bodyFill })
@@ -290,7 +292,7 @@ public static class ShareCardRenderer
         // ── Header panel: a deeper tone than the body, so it reads as its own chip ──
         var headRect = new SKRect(boxRect.Left + pad, boxRect.Top + pad,
                                   boxRect.Right - pad, boxRect.Top + pad + headerPanelH);
-        var headFill = artworkBlur ? new SKColor(0, 0, 0, 0x46)
+        var headFill = artworkBlur && !darkText ? new SKColor(0, 0, 0, 0x46)
                      : darkText ? new SKColor(0, 0, 0, 0x16)
                      : new SKColor(0, 0, 0, 0x30);
         using (var fill = new SKPaint { IsAntialias = true, Color = headFill })
