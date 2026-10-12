@@ -247,7 +247,9 @@ public class ArtistImageService
         // request), so Home's six artists waited behind the Artists tab's full-library
         // sweep and an artist late in the name order waited for every earlier refresh:
         // pictures that were already cached stayed blank for minutes.
-        SurfaceCachedImages(artists, onImageReady);
+        // On the thread pool: Task.Yield resumes on the caller's context, which for the
+        // Home and Artists tabs is the UI thread, and this is one stat per artist.
+        await Task.Run(() => SurfaceCachedImages(artists, onImageReady)).ConfigureAwait(false);
 
         await _fetchGate.WaitAsync().ConfigureAwait(false);
 
