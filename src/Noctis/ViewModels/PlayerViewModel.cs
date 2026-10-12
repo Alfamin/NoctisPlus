@@ -281,7 +281,11 @@ public partial class PlayerViewModel : ViewModelBase
     /// loaded when the queue runs out, so Previous still has somewhere to go. Off by default.</summary>
     [ObservableProperty] private bool _keepPlayedInQueue;
 
-    partial void OnKeepPlayedInQueueChanged(bool value) => OnPropertyChanged(nameof(ShowPlayedInQueue));
+    partial void OnKeepPlayedInQueueChanged(bool value)
+    {
+        OnPropertyChanged(nameof(ShowPlayedInQueue));
+        RebuildQueueRows(); // GitHub #134: the panel's rows gain or lose the played songs
+    }
 
     // ── Signal path / quality badge (Roon-style) ──
     /// <summary>Overall chain quality: "Bit-perfect", "Hi-Res Lossless", "Lossless", "Enhanced", "Lossy".</summary>
@@ -650,6 +654,7 @@ public partial class PlayerViewModel : ViewModelBase
         UpNext.CollectionChanged += (_, _) => { if (!_suppressHasContentNotify) OnPropertyChanged(nameof(HasContent)); };
         History.CollectionChanged += (_, _) => { if (!_suppressHasContentNotify) OnPropertyChanged(nameof(HasContent)); };
         History.CollectionChanged += (_, _) => SyncPlayedTracks();
+        InitQueueRows(); // GitHub #134: the Queue panel's rows
         // HasContent is raised after every queue/history change, batch ones included.
         PropertyChanged += (_, e) =>
         {
@@ -2303,6 +2308,7 @@ public partial class PlayerViewModel : ViewModelBase
         }
         if (newValue != null) newValue.IsNowPlaying = true;
         SyncNowPlayingFlags();
+        OnCurrentTrackChangedForRows(oldValue, newValue);
         DebugLogger.Info(DebugLogger.Category.Playback, "CurrentTrack.Changed",
             $"old={oldValue?.Title ?? "<null>"} new={newValue?.Title ?? "<null>"}");
     }

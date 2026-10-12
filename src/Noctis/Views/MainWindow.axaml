@@ -880,10 +880,41 @@
                                 <Setter Property="Background" Value="{DynamicResource AccentButtonBackground}"/>
                                 <Setter Property="Foreground" Value="{DynamicResource AccentForegroundBrush}"/>
                             </Style>
+                            <!-- GitHub #134: the header's Clear Played, a quiet chip next to the title. -->
+                            <Style Selector="Button.queue-clear-played">
+                                <Setter Property="Background" Value="{DynamicResource TrackListHoverBrush}"/>
+                                <Setter Property="Foreground" Value="{DynamicResource QueueDrawerForeground}"/>
+                                <Setter Property="BorderThickness" Value="0"/>
+                            </Style>
+                            <Style Selector="Button.queue-clear-played:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+                                <Setter Property="Background" Value="{DynamicResource TrackListMultiSelectBrush}"/>
+                                <Setter Property="Foreground" Value="{DynamicResource QueueDrawerForeground}"/>
+                            </Style>
+                            <Style Selector="Button.queue-clear-played:disabled">
+                                <Setter Property="Opacity" Value="0.4"/>
+                            </Style>
+                            <Style Selector="Button.queue-clear-played:disabled /template/ ContentPresenter#PART_ContentPresenter">
+                                <Setter Property="Background" Value="{DynamicResource TrackListHoverBrush}"/>
+                                <Setter Property="Foreground" Value="{DynamicResource QueueDrawerForeground}"/>
+                            </Style>
                         </DockPanel.Styles>
-                        <!-- Compact header: "Queue • N" -->
-                        <StackPanel DockPanel.Dock="Top" Margin="20,16,12,6"
-                                    Orientation="Horizontal" Spacing="7"
+                        <!-- Compact header: "Queue • N", and with Keep Played Songs on a
+                             Clear Played button at the right end (GitHub #134). -->
+                        <DockPanel DockPanel.Dock="Top" Margin="20,16,16,6">
+                        <Button x:Name="QueueClearPlayedButton"
+                                DockPanel.Dock="Right"
+                                Classes="queue-clear-played"
+                                Content="{loc:T Queue.ClearPlayed}"
+                                Click="OnQueueClearPlayedClick"
+                                IsVisible="{Binding Player.KeepPlayedInQueue}"
+                                IsEnabled="{Binding Player.HasPlayedQueueRows}"
+                                Padding="11,4"
+                                FontSize="12"
+                                FontWeight="SemiBold"
+                                CornerRadius="999"
+                                VerticalAlignment="Center"
+                                Cursor="Hand" />
+                        <StackPanel Orientation="Horizontal" Spacing="7"
                                     VerticalAlignment="Center">
                             <TextBlock Text="{loc:T Main.Queue}"
                                        FontSize="18"
@@ -898,6 +929,7 @@
                                        Margin="0,2,0,0"
                                        IsVisible="{Binding !!Player.UpNext.Count}" />
                         </StackPanel>
+                        </DockPanel>
 
                         <!-- Accent action pills: Close dismisses the popup, Clear empties the
                              queue (same confirm-guarded handler the old ghost button used).
@@ -929,100 +961,14 @@
                                     Cursor="Hand" />
                         </Grid>
 
-                        <!-- GitHub #124 (Settings ▸ Playback ▸ Keep Played Songs): what played,
-                             oldest first, so the queue reads played → Now Playing → Up Next.
-                             Dimmed, shorter rows, at most ~3½ rows tall so Up Next keeps the
-                             room; code-behind keeps it scrolled to the newest. Double-click
-                             plays a row, as in Up Next. -->
-                        <StackPanel x:Name="QueuePlayed"
-                                    DockPanel.Dock="Top"
-                                    Margin="0,0,0,6"
-                                    IsVisible="{Binding Player.ShowPlayedInQueue}">
-                            <StackPanel.Styles>
-                                <Style Selector="Border.queue-played-row">
-                                    <Setter Property="Background" Value="Transparent"/>
-                                    <Setter Property="Opacity" Value="0.55"/>
-                                    <Setter Property="Transitions">
-                                        <Transitions>
-                                            <BrushTransition Property="Background" Duration="0:0:0.12"/>
-                                            <DoubleTransition Property="Opacity" Duration="0:0:0.12"/>
-                                        </Transitions>
-                                    </Setter>
-                                </Style>
-                                <Style Selector="Border.queue-played-row:pointerover">
-                                    <Setter Property="Background" Value="{DynamicResource TrackListHoverBrush}"/>
-                                    <Setter Property="Opacity" Value="0.85"/>
-                                </Style>
-                            </StackPanel.Styles>
-                            <TextBlock Text="{loc:T Queue.Played}"
-                                       FontSize="11"
-                                       FontWeight="SemiBold"
-                                       Foreground="{DynamicResource QueueDrawerForeground}"
-                                       Opacity="0.55"
-                                       Margin="24,0,12,4" />
-                            <ScrollViewer x:Name="QueuePlayedScroll"
-                                          MaxHeight="156"
-                                          HorizontalScrollBarVisibility="Disabled"
-                                          VerticalScrollBarVisibility="Hidden">
-                                <ItemsControl x:Name="QueuePlayedList"
-                                              ItemsSource="{Binding Player.PlayedTracks}">
-                                    <ItemsControl.ItemTemplate>
-                                        <DataTemplate x:DataType="m:Track">
-                                            <Border Classes="queue-played-row"
-                                                    Margin="12,1,12,1"
-                                                    Padding="8,3"
-                                                    CornerRadius="10"
-                                                    Cursor="Hand"
-                                                    DoubleTapped="OnQueuePlayedDoubleTapped">
-                                                <Grid ColumnDefinitions="Auto,*,Auto" Height="40">
-                                                    <Border Grid.Column="0"
-                                                            Width="34" Height="34"
-                                                            CornerRadius="6"
-                                                            ClipToBounds="True"
-                                                            VerticalAlignment="Center"
-                                                            Margin="0,0,10,0">
-                                                        <controls:CachedImage SourcePath="{Binding AlbumArtworkPath}"
-                                                                              RenderOptions.BitmapInterpolationMode="HighQuality"
-                                                                              Stretch="UniformToFill" />
-                                                    </Border>
-                                                    <StackPanel Grid.Column="1" VerticalAlignment="Center" Margin="0,0,8,0">
-                                                        <!-- No MaxWidth: the star column already bounds it, and a
-                                                             stretched TextBlock narrower than its slot is centred,
-                                                             which set the title off from the artist line. -->
-                                                        <TextBlock Text="{Binding TitleDisplay}"
-                                                                   Classes="one-line-explicit-title"
-                                                                   FontSize="12"
-                                                                   FontWeight="SemiBold"
-                                                                   Foreground="{DynamicResource QueueDrawerForeground}" />
-                                                        <TextBlock Text="{Binding ArtistDisplay}"
-                                                                   FontSize="11"
-                                                                   Foreground="{DynamicResource QueueDrawerForeground}"
-                                                                   Opacity="0.7"
-                                                                   TextTrimming="CharacterEllipsis"
-                                                                   MaxLines="1" />
-                                                    </StackPanel>
-                                                    <TextBlock Grid.Column="2"
-                                                               Text="{Binding DurationFormatted}"
-                                                               FontSize="11"
-                                                               Foreground="{DynamicResource QueueDrawerForeground}"
-                                                               Opacity="0.7"
-                                                               TextAlignment="Right"
-                                                               VerticalAlignment="Center"
-                                                               Margin="4,0,4,0" />
-                                                </Grid>
-                                            </Border>
-                                        </DataTemplate>
-                                    </ItemsControl.ItemTemplate>
-                                </ItemsControl>
-                            </ScrollViewer>
-                        </StackPanel>
-
                         <!-- GitHub #85: the playing track, pinned above the list. Outside the
                              ListBox so UpNext indices, drag slots and row numbers are unchanged.
                              Same card as a queue row, marked the way Home marks its playing row
-                             (accent fill, accent-foreground text); duration in the number slot. -->
+                             (accent fill, accent-foreground text); duration in the number slot.
+                             GitHub #134: with Keep Played Songs on the playing track is a row of the
+                             list instead, in place between the played songs and Up Next. -->
+                        <Panel DockPanel.Dock="Top" IsVisible="{Binding !Player.KeepPlayedInQueue}">
                         <StackPanel x:Name="QueueNowPlaying"
-                                    DockPanel.Dock="Top"
                                     IsVisible="{Binding Player.CurrentTrack, Converter={x:Static ObjectConverters.IsNotNull}}">
                             <TextBlock Text="{loc:T Queue.NowPlaying}"
                                        FontSize="11"
@@ -1099,12 +1045,16 @@
                                 </Grid>
                             </Border>
                         </StackPanel>
+                        </Panel>
 
-                        <!-- Queue track list (virtualized, drag-reorder enabled) -->
+                        <!-- Queue track list (virtualized, drag-reorder enabled). GitHub #134: its
+                             rows are Player.QueueRows — Up Next, or with Keep Played Songs on the
+                             played songs, the playing one and Up Next as one list. The code-behind
+                             stamps queue-played / queue-current on the row containers. -->
                         <Grid x:Name="QueueListWrapper">
                             <ListBox x:Name="QueuePopupListBox"
                                      Classes="queue-popup"
-                                     ItemsSource="{Binding Player.UpNext}"
+                                     ItemsSource="{Binding Player.QueueRows}"
                                      Background="Transparent"
                                      BorderThickness="0"
                                      Margin="0,6,0,8"
@@ -1143,6 +1093,41 @@
                                     <Style Selector="ListBoxItem.ctrl-selected Border.queue-row">
                                         <Setter Property="Background" Value="{DynamicResource TrackListMultiSelectBrush}"/>
                                     </Style>
+                                    <!-- GitHub #134 (Keep Played Songs). Played rows: same size, a
+                                         little dimmed, a check in the number slot. -->
+                                    <Style Selector="TextBlock.queue-fg">
+                                        <Setter Property="Foreground" Value="{DynamicResource QueueDrawerForeground}"/>
+                                    </Style>
+                                    <Style Selector="Grid.queue-row-content">
+                                        <Setter Property="Transitions">
+                                            <Transitions>
+                                                <DoubleTransition Property="Opacity" Duration="0:0:0.12"/>
+                                            </Transitions>
+                                        </Setter>
+                                    </Style>
+                                    <Style Selector="controls|LineIcon.queue-played-mark, controls|LineIcon.queue-current-mark">
+                                        <Setter Property="IsVisible" Value="False"/>
+                                    </Style>
+                                    <Style Selector="ListBoxItem.queue-played Grid.queue-row-content">
+                                        <Setter Property="Opacity" Value="0.6"/>
+                                    </Style>
+                                    <Style Selector="ListBoxItem.queue-played Border.queue-row:pointerover Grid.queue-row-content">
+                                        <Setter Property="Opacity" Value="0.9"/>
+                                    </Style>
+                                    <Style Selector="ListBoxItem.queue-played controls|LineIcon.queue-played-mark">
+                                        <Setter Property="IsVisible" Value="True"/>
+                                    </Style>
+                                    <!-- The playing row: the accent card the pinned Now Playing row uses,
+                                         a speaker in the number slot. Last, so it wins over hover. -->
+                                    <Style Selector="ListBoxItem.queue-current Border.queue-row">
+                                        <Setter Property="Background" Value="{DynamicResource AccentButtonBackground}"/>
+                                    </Style>
+                                    <Style Selector="ListBoxItem.queue-current TextBlock.queue-fg">
+                                        <Setter Property="Foreground" Value="{DynamicResource AccentForegroundBrush}"/>
+                                    </Style>
+                                    <Style Selector="ListBoxItem.queue-current controls|LineIcon.queue-current-mark">
+                                        <Setter Property="IsVisible" Value="True"/>
+                                    </Style>
                                 </ListBox.Styles>
                                 <ListBox.ItemTemplate>
                                     <DataTemplate x:DataType="m:Track">
@@ -1161,6 +1146,7 @@
                                             <Border.ContextMenu>
                                                 <ContextMenu>
                                                     <MenuItem Header="{loc:T Main.RemoveFromQueue}"
+                                                              Classes="queue-menu-remove"
                                                               Click="OnQueueRemoveClick">
                                                         <MenuItem.Icon>
                                                             <controls:LineIcon Classes="mv2-icon" Data="{StaticResource MenuLineQueueRemove}"/>
@@ -1173,9 +1159,19 @@
                                                             <controls:LineIcon Classes="mv2-icon" Data="{StaticResource MenuLineReplayGain}"/>
                                                         </MenuItem.Icon>
                                                     </MenuItem>
+                                                    <!-- GitHub #134: on played rows (Keep Played Songs). -->
+                                                    <MenuItem Header="{loc:T Queue.ClearPlayed}"
+                                                              Classes="queue-menu-clear-played"
+                                                              IsVisible="False"
+                                                              Click="OnQueueClearPlayedClick">
+                                                        <MenuItem.Icon>
+                                                            <controls:LineIcon Classes="mv2-icon" Data="{StaticResource MenuLineTrash}"/>
+                                                        </MenuItem.Icon>
+                                                    </MenuItem>
                                                 </ContextMenu>
                                             </Border.ContextMenu>
                                         <Grid ColumnDefinitions="Auto,*,Auto" Height="48"
+                                              Classes="queue-row-content"
                                               Background="Transparent">
 
                                             <!-- Album art thumbnail -->
@@ -1194,10 +1190,9 @@
                                                 <Grid ColumnDefinitions="Auto,Auto">
                                                     <TextBlock Grid.Column="0"
                                                                Text="{Binding TitleDisplay}"
-                                                               Classes="one-line-explicit-title"
+                                                               Classes="one-line-explicit-title queue-fg"
                                                                FontSize="13"
                                                                FontWeight="SemiBold"
-                                                               Foreground="{DynamicResource QueueDrawerForeground}"
                                                                MaxWidth="165" />
                                                     <Border Grid.Column="1"
                                                             Classes="explicit-badge compact"
@@ -1221,9 +1216,9 @@
                                                             CornerRadius="2"
                                                             Padding="2,0,3,0">
                                                         <TextBlock Text="{Binding ArtistDisplay}"
+                                                                   Classes="queue-fg"
                                                                    FontSize="11"
                                                                    FontWeight="SemiBold"
-                                                                   Foreground="{DynamicResource QueueDrawerForeground}"
                                                                    Opacity="0.55"
                                                                    TextTrimming="CharacterEllipsis"
                                                                    MaxLines="1" />
@@ -1231,17 +1226,32 @@
                                                 </Button>
                                             </StackPanel>
                                             <!-- Queue position (stamped from code-behind; virtualization
-                                                 recycles rows, so there is no per-item index to bind). -->
-                                            <TextBlock Grid.Column="2"
-                                                       x:Name="QueueRowNumber"
-                                                       FontSize="14"
-                                                       FontWeight="SemiBold"
-                                                       Foreground="{DynamicResource QueueDrawerForeground}"
-                                                       Opacity="0.4"
-                                                       MinWidth="20"
-                                                       TextAlignment="Right"
-                                                       VerticalAlignment="Center"
-                                                       Margin="4,0,4,0" />
+                                                 recycles rows, so there is no per-item index to bind).
+                                                 GitHub #134: played rows show a check, the playing row
+                                                 a speaker, instead of a number. -->
+                                            <Panel Grid.Column="2" MinWidth="20" Margin="4,0,4,0"
+                                                   VerticalAlignment="Center">
+                                                <TextBlock x:Name="QueueRowNumber"
+                                                           Classes="queue-fg"
+                                                           FontSize="14"
+                                                           FontWeight="SemiBold"
+                                                           Opacity="0.4"
+                                                           TextAlignment="Right"
+                                                           VerticalAlignment="Center" />
+                                                <controls:LineIcon Classes="queue-played-mark"
+                                                                   Data="{StaticResource MenuLineCheck}"
+                                                                   Foreground="{DynamicResource QueueDrawerForeground}"
+                                                                   Width="16" Height="16"
+                                                                   Opacity="0.7"
+                                                                   HorizontalAlignment="Right"
+                                                                   VerticalAlignment="Center" />
+                                                <controls:LineIcon Classes="queue-current-mark"
+                                                                   Data="{StaticResource MenuLineVolume}"
+                                                                   Foreground="{DynamicResource AccentForegroundBrush}"
+                                                                   Width="18" Height="18"
+                                                                   HorizontalAlignment="Right"
+                                                                   VerticalAlignment="Center" />
+                                            </Panel>
                                         </Grid>
                                         </Border>
                                     </DataTemplate>
@@ -1249,8 +1259,11 @@
                             </ListBox>
 
                             <!-- GitHub #92: empty-queue hint. Not hit-testable, so a library row
-                                 dragged over it still lands on the ListBox (OnQueueDrop). -->
-                            <StackPanel IsVisible="{Binding !Player.UpNext.Count}"
+                                 dragged over it still lands on the ListBox (OnQueueDrop).
+                                 GitHub #134: only when there is nothing at all (it showed under a
+                                 playing song and its played songs whenever Up Next was empty). -->
+                            <StackPanel x:Name="QueueEmptyHint"
+                                        IsVisible="{Binding Player.IsQueueEmpty}"
                                         IsHitTestVisible="False"
                                         VerticalAlignment="Top"
                                         Margin="32,40,32,0"
@@ -1265,6 +1278,27 @@
                                            FontSize="12"
                                            Foreground="{DynamicResource QueueDrawerForeground}"
                                            Opacity="0.45"
+                                           TextWrapping="Wrap"
+                                           TextAlignment="Center" />
+                            </StackPanel>
+
+                            <!-- GitHub #134: a song is playing (pinned above) and Up Next is empty. -->
+                            <StackPanel x:Name="QueueNothingUpNext"
+                                        IsVisible="{Binding Player.ShowQueueNothingUpNext}"
+                                        IsHitTestVisible="False"
+                                        VerticalAlignment="Top"
+                                        Margin="32,28,32,0"
+                                        Spacing="6">
+                                <TextBlock Text="{loc:T Main.QueueNothingUpNextTitle}"
+                                           FontSize="13"
+                                           FontWeight="SemiBold"
+                                           Foreground="{DynamicResource QueueDrawerForeground}"
+                                           Opacity="0.6"
+                                           TextAlignment="Center" />
+                                <TextBlock Text="{loc:T Main.QueueNothingUpNextHint}"
+                                           FontSize="12"
+                                           Foreground="{DynamicResource QueueDrawerForeground}"
+                                           Opacity="0.4"
                                            TextWrapping="Wrap"
                                            TextAlignment="Center" />
                             </StackPanel>
