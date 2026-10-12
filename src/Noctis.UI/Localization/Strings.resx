@@ -2513,7 +2513,7 @@ The lines and their timings are dropped and an empty lyrics box opens for your o
   <data name="Settings.Desc.Audio" xml:space="preserve"><value>Playback, output, analysis and the equalizer.</value><comment>Settings page description</comment></data>
   <data name="Settings.Desc.Library" xml:space="preserve"><value>Media folders, scanning, how artists and albums are organised, and library tools.</value><comment>Settings page description</comment></data>
   <data name="Settings.Desc.Advanced" xml:space="preserve"><value>Storage, helper programs, updates and reset.</value><comment>Settings page description</comment></data>
-  <data name="Settings.Desc.AccountDevices" xml:space="preserve"><value>Your account, sync between devices, and Web Remote.</value><comment>Settings page description</comment></data>
+  <data name="Settings.Desc.AccountDevices" xml:space="preserve"><value>Your account, your phone and remote control.</value><comment>Settings page description</comment></data>
   <data name="Settings.Desc.Integrations" xml:space="preserve"><value>Discord, scrobbling, TIDAL and music servers.</value><comment>Settings page description</comment></data>
   <data name="Settings.Desc.Plugins" xml:space="preserve"><value>Add extra features to Noctis.</value><comment>Settings page description</comment></data>
   <data name="Settings.Desc.Statistics" xml:space="preserve"><value>Your library and listening at a glance.</value><comment>Settings page description</comment></data>

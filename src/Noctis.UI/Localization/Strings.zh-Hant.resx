@@ -6096,7 +6096,7 @@
     <comment>Settings page description</comment>
   </data>
   <data name="Settings.Desc.AccountDevices" xml:space="preserve">
-    <value>您的帳戶、裝置之間的同步和Web Remote。</value>
+    <value>你的帳戶、手機和遠端控制。</value>
     <comment>Settings page description</comment>
   </data>
   <data name="Settings.Desc.Integrations" xml:space="preserve">

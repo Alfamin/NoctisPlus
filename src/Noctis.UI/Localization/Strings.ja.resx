@@ -6096,7 +6096,7 @@
     <comment>Settings page description</comment>
   </data>
   <data name="Settings.Desc.AccountDevices" xml:space="preserve">
-    <value>アカウント、デバイス間の同期、および Web リモート。</value>
+    <value>アカウント、スマホ、リモート操作。</value>
     <comment>Settings page description</comment>
   </data>
   <data name="Settings.Desc.Integrations" xml:space="preserve">

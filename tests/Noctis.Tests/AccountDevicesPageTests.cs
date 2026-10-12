@@ -171,6 +171,19 @@ public class AccountDevicesPageTests : IDisposable
     }
 
     [AvaloniaFact]
+    public void SecurityCode_ShowsEightBytesALine_LikeThePhone()
+    {
+        var vm = new SettingsViewModel(new PersistenceService(_root), new FakeLibraryService(), new NoOpPlayHistoryService());
+        var bytes = Enumerable.Range(0, 32).Select(i => i.ToString("X2")).ToArray();
+        vm.NoctisServerFingerprint = string.Join(":", bytes);
+
+        var lines = vm.NoctisServerFingerprintDisplay.Split('\n');
+        Assert.Equal(4, lines.Length);
+        Assert.Equal("00:01:02:03:04:05:06:07", lines[0]);
+        Assert.Equal("18:19:1A:1B:1C:1D:1E:1F", lines[3]);
+    }
+
+    [AvaloniaFact]
     public async Task CreateAccount_DoesNotMakeAnApiKey()
     {
         var persistence = new PersistenceService(_root);

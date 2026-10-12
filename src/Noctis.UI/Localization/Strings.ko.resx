@@ -6096,7 +6096,7 @@
     <comment>Settings page description</comment>
   </data>
   <data name="Settings.Desc.AccountDevices" xml:space="preserve">
-    <value>계정, 기기 간 동기화, 웹 리모컨.</value>
+    <value>계정, 휴대폰, 원격 제어.</value>
     <comment>Settings page description</comment>
   </data>
   <data name="Settings.Desc.Integrations" xml:space="preserve">

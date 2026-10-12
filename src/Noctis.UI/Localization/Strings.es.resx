@@ -6096,7 +6096,7 @@
     <comment>Settings page description</comment>
   </data>
   <data name="Settings.Desc.AccountDevices" xml:space="preserve">
-    <value>Su cuenta, sincronización entre dispositivos y Web Remote.</value>
+    <value>Tu cuenta, tu teléfono y el control remoto.</value>
     <comment>Settings page description</comment>
   </data>
   <data name="Settings.Desc.Integrations" xml:space="preserve">

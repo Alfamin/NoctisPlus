@@ -1093,7 +1093,11 @@ public partial class SettingsViewModel : ViewModelBase
     /// <summary>https://ip:port while running; empty when off.</summary>
     [ObservableProperty, NotifyPropertyChangedFor(nameof(IsPhoneCardOpen))] private string _noctisServerUrl = string.Empty;
     /// <summary>SHA-256 fingerprint of the server certificate — what a phone pins when it accepts the self-signed cert.</summary>
-    [ObservableProperty] private string _noctisServerFingerprint = string.Empty;
+    [ObservableProperty, NotifyPropertyChangedFor(nameof(NoctisServerFingerprintDisplay))] private string _noctisServerFingerprint = string.Empty;
+    /// <summary>Eight bytes to a line, the way the phone shows it, so the two read line by line
+    /// (wrapped to the card's width it broke inside a byte: "57:1" / "6:CC").</summary>
+    public string NoctisServerFingerprintDisplay =>
+        string.Join("\n", NoctisServerFingerprint.Split(':').Chunk(8).Select(line => string.Join(":", line)));
     [ObservableProperty] private Avalonia.Media.Imaging.Bitmap? _noctisServerQr;
     [ObservableProperty] private bool _noctisServerStartFailed;
     [ObservableProperty] private string _noctisServerError = string.Empty;

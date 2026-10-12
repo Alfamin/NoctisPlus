@@ -4982,7 +4982,9 @@
             <!-- Coming soon while AccountFeatures is off: the card stays visible so the feature is
                  discoverable, but every control is disabled. -->
             <Border Classes="setting-row" Classes.parked="{Binding !AccountFeaturesEnabled}" IsEnabled="{Binding AccountFeaturesEnabled}">
-                <StackPanel Spacing="14">
+                <!-- No spacing: a folded section keeps the panel's spacing, which left an empty band
+                     under the buttons; the error slot carries its own margin. -->
+                <StackPanel>
                     <!-- No account yet: a short form, one field per line, one Create button. Enter in
                          the password box creates too. -->
                     <controls:CollapsibleContent IsOpen="{Binding !HasPrimaryAccount}" Lift="10" Motion="Glide">
@@ -5036,7 +5038,7 @@
                     <!-- Account exists: only what belongs to the account itself. Pairing, devices
                          and the API key for other apps live in the Phone app card below. -->
                     <controls:CollapsibleContent IsOpen="{Binding HasPrimaryAccount}" Lift="10" Motion="Glide">
-                    <StackPanel Spacing="14">
+                    <StackPanel>
                         <WrapPanel x:Name="AccountActions" ItemSpacing="8" LineSpacing="8">
                             <Button Classes="pill-action account-action" Command="{Binding ToggleChangePasswordCommand}">
                                 <StackPanel Orientation="Horizontal" Spacing="7">
@@ -5052,7 +5054,7 @@
 
                         <!-- Change password (inline) -->
                         <controls:CollapsibleContent IsOpen="{Binding IsChangePasswordVisible}" Lift="10" Motion="Glide">
-                        <StackPanel Spacing="8">
+                        <StackPanel Spacing="8" Margin="0,14,0,0">
                             <Grid ColumnDefinitions="*,Auto,Auto" ColumnSpacing="8" MaxWidth="560" HorizontalAlignment="Left">
                                 <TextBox Grid.Column="0" Text="{Binding ChangePasswordValue}" PasswordChar="•" RevealPassword="{Binding IsPasswordRevealed}"
                                          Watermark="{loc:T AccountSync.NewPassword}" CornerRadius="999" Padding="14,8,4,8" BorderThickness="1.5" MinHeight="0" MinWidth="260">
@@ -5083,12 +5085,12 @@
                     </StackPanel>
                     </controls:CollapsibleContent>
 
-                    <!-- Fixed-height slot: the message appearing and leaving must not reflow the
-                         card (it read as the page shaking). -->
-                    <Panel MinHeight="18">
-                        <TextBlock Text="{Binding ServerUserError}" FontSize="12" Foreground="#FF6B6B" TextWrapping="Wrap"
-                                   IsVisible="{Binding ServerUserError, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"/>
-                    </Panel>
+                    <!-- The message glides in and out: a plain show/hide reflowed the card in one
+                         jump (it read as the page shaking), and a fixed empty slot left a band
+                         under the buttons. -->
+                    <controls:CollapsibleContent IsOpen="{Binding ServerUserError, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" Lift="6" Motion="Glide">
+                        <TextBlock Text="{Binding ServerUserError}" FontSize="12" Foreground="#FF6B6B" TextWrapping="Wrap" Margin="0,10,0,0"/>
+                    </controls:CollapsibleContent>
                 </StackPanel>
             </Border>
             </StackPanel>
@@ -5148,8 +5150,8 @@
                                 </StackPanel>
                                 <TextBlock Text="{loc:T Server.FingerprintLabel}" FontSize="10" Opacity="0.5" Margin="0,4,0,0"/>
                                 <!-- What the phone shows before it trusts this computer: big enough to compare. -->
-                                <SelectableTextBlock Text="{Binding NoctisServerFingerprint}" FontSize="13" FontWeight="SemiBold"
-                                                     FontFamily="Consolas,Menlo,monospace" TextWrapping="Wrap"/>
+                                <SelectableTextBlock Text="{Binding NoctisServerFingerprintDisplay}" FontSize="13" FontWeight="SemiBold"
+                                                     FontFamily="Consolas,Menlo,monospace" LineHeight="19"/>
                                 <TextBlock Text="{loc:T Phone.CodeHint}" FontSize="11" Opacity="0.55" TextWrapping="Wrap"/>
                                 </StackPanel>
                             </StackPanel>

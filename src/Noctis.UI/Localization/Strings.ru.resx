@@ -2513,7 +2513,7 @@ Deezer и TIDAL: вставьте ссылку.</value></data>
   <data name="Settings.Desc.Audio" xml:space="preserve"><value>Воспроизведение, вывод, анализ и эквалайзер.</value><comment>Settings page description</comment></data>
   <data name="Settings.Desc.Library" xml:space="preserve"><value>Папки с медиафайлами, сканирование, упорядочивание исполнителей и альбомов, инструменты медиатеки.</value><comment>Settings page description</comment></data>
   <data name="Settings.Desc.Advanced" xml:space="preserve"><value>Хранилище, вспомогательные программы, обновления и сброс.</value><comment>Settings page description</comment></data>
-  <data name="Settings.Desc.AccountDevices" xml:space="preserve"><value>Ваш аккаунт, синхронизация между устройствами и веб-пульт.</value><comment>Settings page description</comment></data>
+  <data name="Settings.Desc.AccountDevices" xml:space="preserve"><value>Ваш аккаунт, телефон и удалённое управление.</value><comment>Settings page description</comment></data>
   <data name="Settings.Desc.Integrations" xml:space="preserve"><value>Discord, скробблинг, TIDAL и музыкальные серверы.</value><comment>Settings page description</comment></data>
   <data name="Settings.Desc.Plugins" xml:space="preserve"><value>Дополнительные возможности для Noctis.</value><comment>Settings page description</comment></data>
   <data name="Settings.Desc.Statistics" xml:space="preserve"><value>Краткий обзор медиатеки и прослушиваний.</value><comment>Settings page description</comment></data>

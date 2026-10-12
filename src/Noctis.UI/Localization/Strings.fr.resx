@@ -6096,7 +6096,7 @@
     <comment>Settings page description</comment>
   </data>
   <data name="Settings.Desc.AccountDevices" xml:space="preserve">
-    <value>Votre compte, la synchronisation entre vos appareils et votre télécommande Web.</value>
+    <value>Votre compte, votre téléphone et le contrôle à distance.</value>
     <comment>Settings page description</comment>
   </data>
   <data name="Settings.Desc.Integrations" xml:space="preserve">

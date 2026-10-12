@@ -6096,7 +6096,7 @@
     <comment>Settings page description</comment>
   </data>
   <data name="Settings.Desc.AccountDevices" xml:space="preserve">
-    <value>الحساب الخاص بك، المزامنة بين الأجهزة، و الويب عن بعد.</value>
+    <value>حسابك وهاتفك والتحكم عن بُعد.</value>
     <comment>Settings page description</comment>
   </data>
   <data name="Settings.Desc.Integrations" xml:space="preserve">
