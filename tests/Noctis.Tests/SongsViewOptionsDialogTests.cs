@@ -523,6 +523,7 @@ public class SongsViewOptionsLocalizationTests : IDisposable
             Assert.Equal(Loc.T(menuKeys[option.Key]), option.Label);
         // Turkish, not the English literal the list used to carry.
         Assert.NotEqual("Date Added", vm.SortOptions.Single(o => o.Key == "Date Added").Label);
+        Loc.Instance.SetCulture("en"); // back on the UI thread; a Dispose reset runs off it
     }
 
     /// <summary>The longest shipped column label (French "Fréquence d'échantillonnage") wraps
@@ -554,6 +555,10 @@ public class SongsViewOptionsLocalizationTests : IDisposable
             Assert.Equal(Loc.T("SongsViewOptions.SampleRate"), sampleRate.Content);
             Assert.NotEqual("Sample Rate", sampleRate.Content);
         }
-        finally { SongsViewOptionsDialogTests.CloseAndWait(win); }
+        finally
+        {
+            SongsViewOptionsDialogTests.CloseAndWait(win);
+            Loc.Instance.SetCulture("en"); // back on the UI thread; a Dispose reset runs off it
+        }
     }
 }

@@ -601,6 +601,7 @@ public class ContentPackLanguageTests : IDisposable
         host.SetEnabled(host.Plugins.Single(), false);
         Assert.Equal("Home", Loc.T("Nav.Home"));
         Assert.DoesNotContain("en-XA", Loc.Supported);
+        Loc.Instance.SetCulture("en"); // back on the UI thread; a Dispose reset runs off it
     }
 
     [AvaloniaFact]
@@ -625,5 +626,6 @@ public class ContentPackLanguageTests : IDisposable
         Assert.Equal(Loc.SystemLanguage, vm.LanguageChoice!.Code);
         Assert.DoesNotContain(vm.LanguageOptions, o => o.Code == "en-XA");
         Assert.Equal("Home", Loc.T("Nav.Home"));
+        Loc.Instance.SetCulture("en"); // back on the UI thread; a Dispose reset runs off it
     }
 }

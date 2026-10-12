@@ -20,9 +20,8 @@ namespace Noctis.Tests;
 /// Choice, because each handler set it before the closing guard), and the texts come from
 /// the translations (the constructor used to overwrite them with English literals).
 /// </summary>
-public class RemoveFromLibraryDialogTests : IDisposable
+public class RemoveFromLibraryDialogTests
 {
-    public void Dispose() => Loc.Instance.SetCulture("en");
 
     private static bool PumpUntil(Func<bool> condition, int budgetMs = 3000)
     {
@@ -93,16 +92,22 @@ public class RemoveFromLibraryDialogTests : IDisposable
     [AvaloniaFact]
     public void Texts_FollowTheUiLanguage()
     {
+        // English goes back on the UI thread: a Dispose reset ran off it and reached other
+        // tests' leftover bindings.
         Loc.Instance.SetCulture("es");
-        var (dialog, _) = Open(3);
-        var trash = dialog.GetVisualDescendants().OfType<Button>().Single(b => b.Name == "TrashButton");
+        try
+        {
+            var (dialog, _) = Open(3);
+            var trash = dialog.GetVisualDescendants().OfType<Button>().Single(b => b.Name == "TrashButton");
 
-        var expected = Loc.T(OperatingSystem.IsWindows() ? "RemoveFromLibrary.MoveRecycleBin" : "RemoveFromLibrary.MoveTrash");
-        Assert.Equal(expected, trash.Content);
-        if (OperatingSystem.IsWindows())
-            Assert.NotEqual("Move to Recycle Bin", expected); // Spanish ships this key translated
+            var expected = Loc.T(OperatingSystem.IsWindows() ? "RemoveFromLibrary.MoveRecycleBin" : "RemoveFromLibrary.MoveTrash");
+            Assert.Equal(expected, trash.Content);
+            if (OperatingSystem.IsWindows())
+                Assert.NotEqual("Move to Recycle Bin", expected); // Spanish ships this key translated
 
-        dialog.Close();
-        PumpUntil(() => !dialog.IsVisible);
+            dialog.Close();
+            PumpUntil(() => !dialog.IsVisible);
+        }
+        finally { Loc.Instance.SetCulture("en"); }
     }
 }

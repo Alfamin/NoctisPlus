@@ -16,14 +16,15 @@ namespace Noctis.Tests;
 /// translation file only contains keys that exist in English.
 /// </summary>
 [Collection("Localization")] // Loc.Instance is process-wide: these tests must not interleave
-public class LocalizationTests : IDisposable
+// No constructor/Dispose reset: those run off the headless UI thread, and a culture switch from
+// there reaches leftover {loc:T} bindings and Relabel handlers of other tests' views ("a different
+// thread owns it"). Each test that switches the culture puts English back on the UI thread.
+public class LocalizationTests
 {
-    public LocalizationTests() => Loc.Instance.SetCulture("en");
-    public void Dispose() => Loc.Instance.SetCulture("en");
-
-    [Fact]
+    [AvaloniaFact]
     public void English_IsTheDefault_AndMissingKeysShowTheKey()
     {
+        Loc.Instance.SetCulture("en");
         Assert.Equal("Home", Loc.T("Nav.Home"));
         Assert.Equal("Nope.Missing", Loc.T("Nope.Missing"));
         Assert.Equal("Home", Loc.Instance["Nav.Home"]);
@@ -40,18 +41,23 @@ public class LocalizationTests : IDisposable
         var cultureEvents = 0;
         Loc.Instance.CultureChanged += (_, _) => cultureEvents++;
 
-        Loc.Instance.SetCulture("es");
-        Assert.Equal("Inicio", Loc.T("Nav.Home"));
-        Assert.Contains("Item", raised); // the CLR indexer name: what Avalonia's indexer binding listens for
-        Assert.Equal(1, cultureEvents);
+        Loc.Instance.SetCulture("en");
+        try
+        {
+            Loc.Instance.SetCulture("es");
+            Assert.Equal("Inicio", Loc.T("Nav.Home"));
+            Assert.Contains("Item", raised); // the CLR indexer name: what Avalonia's indexer binding listens for
+            Assert.Equal(1, cultureEvents);
 
-        // Same culture again is a no-op.
-        Loc.Instance.SetCulture("es");
-        Assert.Equal(1, cultureEvents);
+            // Same culture again is a no-op.
+            Loc.Instance.SetCulture("es");
+            Assert.Equal(1, cultureEvents);
 
-        // Unknown culture name → OS language, never a crash.
-        Loc.Instance.SetCulture("zz-NOPE");
-        Assert.NotNull(Loc.Instance.Culture);
+            // Unknown culture name → OS language, never a crash.
+            Loc.Instance.SetCulture("zz-NOPE");
+            Assert.NotNull(Loc.Instance.Culture);
+        }
+        finally { Loc.Instance.SetCulture("en"); }
     }
 
     [Fact]
@@ -140,9 +146,13 @@ public class LocalizationTests : IDisposable
     [AvaloniaFact]
     public void Russian_LoadsFromItsSatelliteAssembly()
     {
-        Loc.Instance.SetCulture("ru");
-        Assert.Equal("Главная", Loc.T("Nav.Home"));
-        Assert.Equal("Песен: 12", Loc.T("QueueToast.SongCount", 12));
+        try
+        {
+            Loc.Instance.SetCulture("ru");
+            Assert.Equal("Главная", Loc.T("Nav.Home"));
+            Assert.Equal("Песен: 12", Loc.T("QueueToast.SongCount", 12));
+        }
+        finally { Loc.Instance.SetCulture("en"); }
     }
 
     /// <summary>
