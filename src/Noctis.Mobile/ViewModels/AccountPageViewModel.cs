@@ -294,6 +294,10 @@ public sealed partial class AccountPageViewModel : MobilePage
         if (!_account.IsSignedIn) return;
         ErrorText = string.Empty;
         using var cts = new CancellationTokenSource();
+        // A send this page did not start (running when it opened) shows "Stop sending" too: the
+        // service hands back the running send, and a cancelled token stops it. Uncancelled, the
+        // tap joined the send instead and only a second tap stopped it.
+        if (_account.IsUploading) cts.Cancel();
         _uploadCts = cts;
         IsUploading = true;
         UploadText = "Checking what your computer has…";

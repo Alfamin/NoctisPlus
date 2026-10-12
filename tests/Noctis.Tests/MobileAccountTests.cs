@@ -596,6 +596,28 @@ public class MobileAccountTests
         Assert.False(page.HasError);
     }
 
+    [Fact]
+    public async Task SendSongs_PageReopenedMidSend_StopSendingStopsIt()
+    {
+        using var rig = MobileFixtures.MakeRig();
+        var account = new FakeAccount { Account = FakeAccount.SignedInAs(), UploadGate = new TaskCompletionSource() };
+        var shell = ShellWith(rig, account);
+        var first = OpenAccount(shell);
+        var send = first.SendSongsCommand.ExecuteAsync(null);
+
+        // The Account page left and opened again while the send runs: it offers to stop it.
+        var page = new AccountPageViewModel(shell, account);
+        Assert.Equal("Stop sending", page.UploadLabel);
+
+        var stop = page.SendSongsCommand.ExecuteAsync(null);
+
+        Assert.True(stop.IsCompleted);                                         // stopped, not waiting on the send
+        await stop;
+        Assert.Equal("Stopped. Tap again to send the rest.", page.UploadText);
+        account.UploadGate.SetResult();
+        await send;
+    }
+
     [Theory]
     [InlineData(0, 0, 0, 3, "Everything is already on your computer")]
     [InlineData(0, 0, 0, 0, "No songs on this phone to send")]
