@@ -1417,7 +1417,7 @@ Deezer и TIDAL: вставьте ссылку.</value></data>
   <data name="Metadata.PlainLyrics" xml:space="preserve"><value>Обычный текст</value><comment>Header in MetadataWindow.axaml</comment></data>
   <data name="Metadata.Enable" xml:space="preserve"><value>Включить</value><comment>Text in MetadataWindow.axaml</comment></data>
   <data name="Metadata.ImportFile" xml:space="preserve"><value>Импортировать файл</value><comment>Content in MetadataWindow.axaml</comment></data>
-  <data name="Metadata.LoadTxtPlainLrcTip" xml:space="preserve"><value>Загрузить с диска файл текста .txt (обычный) или .lrc (синхронизированный)</value><comment>ToolTip.Tip in MetadataWindow.axaml</comment></data>
+  <data name="Metadata.LoadTxtPlainLrcTip" xml:space="preserve"><value>Загрузить с диска файл текста .txt (обычный) или .lrc, .elrc, .ttml (синхронизированный)</value><comment>ToolTip.Tip in MetadataWindow.axaml</comment></data>
   <data name="Metadata.ShareLyrics" xml:space="preserve"><value>Поделиться текстом</value><comment>Content in MetadataWindow.axaml</comment></data>
   <data name="Metadata.SyncedLyrics" xml:space="preserve"><value>Синхронизированный текст</value><comment>Header in MetadataWindow.axaml</comment></data>
   <data name="Metadata.LinesCarryPerWordTip" xml:space="preserve"><value>Строки содержат метки времени для каждого слова; переключитесь на «Исходный», чтобы их увидеть</value><comment>ToolTip.Tip in MetadataWindow.axaml</comment></data>
@@ -1427,7 +1427,7 @@ Deezer и TIDAL: вставьте ссылку.</value></data>
   <data name="Metadata.Copied" xml:space="preserve"><value>Скопировано!</value><comment>Text in MetadataWindow.axaml</comment></data>
   <data name="Metadata.CopyLyrics" xml:space="preserve"><value>Копировать текст</value><comment>Content in MetadataWindow.axaml</comment></data>
   <data name="Metadata.CopySyncedLyricsLRCTip" xml:space="preserve"><value>Скопировать синхронизированный текст (LRC с метками времени) в буфер обмена</value><comment>ToolTip.Tip in MetadataWindow.axaml</comment></data>
-  <data name="Metadata.LoadLrcSyncedTxtTip" xml:space="preserve"><value>Загрузить с диска файл текста .lrc (синхронизированный) или .txt (обычный)</value><comment>ToolTip.Tip in MetadataWindow.axaml</comment></data>
+  <data name="Metadata.LoadLrcSyncedTxtTip" xml:space="preserve"><value>Загрузить с диска файл текста .lrc, .elrc, .ttml (синхронизированный) или .txt (обычный)</value><comment>ToolTip.Tip in MetadataWindow.axaml</comment></data>
   <data name="Metadata.SearchLyrics" xml:space="preserve"><value>Найти текст</value><comment>Content in MetadataWindow.axaml</comment></data>
   <data name="Metadata.NoSyncedLyricsYet" xml:space="preserve"><value>Синхронизированного текста пока нет. Добавьте его через «Найти текст».</value><comment>Text in MetadataWindow.axaml</comment></data>
   <data name="Metadata.TimestampLyrics" xml:space="preserve"><value>Метки времени</value><comment>Header in MetadataWindow.axaml</comment></data>
@@ -2447,7 +2447,7 @@ Deezer и TIDAL: вставьте ссылку.</value></data>
   <data name="LyricsStudio.TranscriptBanner" xml:space="preserve"><value>Экспериментальная расшифровка. Пение часто распознаётся плохо, поэтому исправьте слова ниже, затем нажмите «Выровнять текст», чтобы расставить тайминг.</value><comment>Lyrics box banner after a transcription</comment></data>
   <data name="LyricsStudio.PasteWatermark" xml:space="preserve"><value>Вставьте сюда текст, по одной строке на каждую спетую строку…</value><comment>Lyrics box watermark</comment></data>
   <data name="LyricsStudio.ImportFile" xml:space="preserve"><value>Импортировать файл…</value><comment>Lyrics box button</comment></data>
-  <data name="LyricsStudio.ImportFileTip" xml:space="preserve"><value>Загрузить текст из файла .txt, .lrc или .elrc (метки времени отбрасываются и расставляются заново)</value><comment>Tooltip</comment></data>
+  <data name="LyricsStudio.ImportFileTip" xml:space="preserve"><value>Загрузить текст из файла .txt, .lrc, .elrc или .ttml (метки времени отбрасываются и расставляются заново)</value><comment>Tooltip</comment></data>
   <data name="LyricsStudio.TranscribeDraft" xml:space="preserve"><value>Распознать на слух · Экспериментально</value><comment>Lyrics box button: transcribe the song into the box</comment></data>
   <data name="LyricsStudio.TranscribeDraftTip" xml:space="preserve"><value>Lullaby записывает то, что слышит. Пение часто распознаётся плохо: исправьте слова до выравнивания.</value><comment>Tooltip "Lullaby" is the model's name: keep it untranslated.</comment></data>
   <data name="LyricsStudio.Align" xml:space="preserve"><value>Выровнять текст</value><comment>Lyrics box primary button</comment></data>

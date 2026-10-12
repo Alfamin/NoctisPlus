@@ -1150,7 +1150,7 @@ public partial class LyricsStudioViewModel : ViewModelBase
         RaiseStartState();
     }
 
-    /// <summary>Loads a lyrics file (.txt, or .lrc/.elrc whose timestamps are dropped) into the lyrics box.</summary>
+    /// <summary>Loads a lyrics file (.txt, or .lrc/.elrc/.ttml whose timestamps are dropped) into the lyrics box.</summary>
     [RelayCommand]
     private async Task ImportLyricsFile()
     {
@@ -1160,7 +1160,7 @@ public partial class LyricsStudioViewModel : ViewModelBase
         if (string.IsNullOrWhiteSpace(path)) return;
         try
         {
-            var lines = LyricsStudioEngine.FirstText(await File.ReadAllTextAsync(path));
+            var lines = LyricsStudioEngine.ImportText(await File.ReadAllTextAsync(path), path);
             if (lines is null) { item.StatusText = $"“{Path.GetFileName(path)}” has no lyrics in it."; return; }
             item.DraftText = string.Join('\n', lines);
             item.IsTranscriptDraft = false;

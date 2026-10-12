@@ -98,7 +98,7 @@ public partial class LyricsStudioPanel : UserControl
             line.RevertRowText(keepError: true);
     }
 
-    /// <summary>The lyrics box's Import: one lyrics file (.txt, .lrc or .elrc), or null when cancelled.</summary>
+    /// <summary>The lyrics box's Import: one lyrics file (.txt, .lrc, .elrc or .ttml), or null when cancelled.</summary>
     private async System.Threading.Tasks.Task<string?> PickLyricsFileAsync()
     {
         if (TopLevel.GetTopLevel(this)?.StorageProvider is not { } storage) return null;
@@ -108,7 +108,7 @@ public partial class LyricsStudioPanel : UserControl
             AllowMultiple = false,
             FileTypeFilter = new[]
             {
-                new FilePickerFileType("Lyrics") { Patterns = new[] { "*.txt", "*.lrc", "*.elrc" } },
+                new FilePickerFileType("Lyrics") { Patterns = new[] { "*.txt", "*.lrc", "*.elrc", "*.ttml" } },
                 FilePickerFileTypes.All,
             },
         });

@@ -306,4 +306,15 @@ public class TtmlIssue132Tests
         Assert.Equal("a\nb", TtmlParser.ToLrc("<tt xmlns=\"http://www.w3.org/ns/ttml\"><body><p>a</p><p>b</p></body></tt>"));
         Assert.Null(TtmlParser.ToLrc("<tt><p>unclosed"));
     }
+
+    [Fact]
+    public void StudioImport_Ttml_GivesTheSungLines()
+    {
+        Assert.Equal(
+            new[] { "Feel the breeze in my fingers out the window", "Close your eyes and I'll take you where the wind blows" },
+            Noctis.Services.LyricsStudio.LyricsStudioEngine.ImportText(IssueExample));
+        // Non-TTML imports keep today's behaviour (timestamps stripped).
+        Assert.Equal(new[] { "one", "two" },
+            Noctis.Services.LyricsStudio.LyricsStudioEngine.ImportText("[00:01.00]one\n[00:02.00]two"));
+    }
 }

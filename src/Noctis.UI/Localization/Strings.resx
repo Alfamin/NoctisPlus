@@ -1417,7 +1417,7 @@ Saving replaces them with the lyrics on screen. A lyrics file Noctis didn't writ
   <data name="Metadata.PlainLyrics" xml:space="preserve"><value>Plain Lyrics</value><comment>Header in MetadataWindow.axaml</comment></data>
   <data name="Metadata.Enable" xml:space="preserve"><value>Enable</value><comment>Text in MetadataWindow.axaml</comment></data>
   <data name="Metadata.ImportFile" xml:space="preserve"><value>Import file</value><comment>Content in MetadataWindow.axaml</comment></data>
-  <data name="Metadata.LoadTxtPlainLrcTip" xml:space="preserve"><value>Load a .txt (plain) or .lrc (synced) lyrics file from disk</value><comment>ToolTip.Tip in MetadataWindow.axaml</comment></data>
+  <data name="Metadata.LoadTxtPlainLrcTip" xml:space="preserve"><value>Load a .txt (plain) or .lrc, .elrc, .ttml (synced) lyrics file from disk</value><comment>ToolTip.Tip in MetadataWindow.axaml</comment></data>
   <data name="Metadata.ShareLyrics" xml:space="preserve"><value>Share lyrics</value><comment>Content in MetadataWindow.axaml</comment></data>
   <data name="Metadata.SyncedLyrics" xml:space="preserve"><value>Synced Lyrics</value><comment>Header in MetadataWindow.axaml</comment></data>
   <data name="Metadata.LinesCarryPerWordTip" xml:space="preserve"><value>Lines carry per-word timing tags; switch to Raw to see them</value><comment>ToolTip.Tip in MetadataWindow.axaml</comment></data>
@@ -1427,7 +1427,7 @@ Saving replaces them with the lyrics on screen. A lyrics file Noctis didn't writ
   <data name="Metadata.Copied" xml:space="preserve"><value>Copied!</value><comment>Text in MetadataWindow.axaml</comment></data>
   <data name="Metadata.CopyLyrics" xml:space="preserve"><value>Copy lyrics</value><comment>Content in MetadataWindow.axaml</comment></data>
   <data name="Metadata.CopySyncedLyricsLRCTip" xml:space="preserve"><value>Copy the synced lyrics (LRC with timestamps) to the clipboard</value><comment>ToolTip.Tip in MetadataWindow.axaml</comment></data>
-  <data name="Metadata.LoadLrcSyncedTxtTip" xml:space="preserve"><value>Load an .lrc (synced) or .txt (plain) lyrics file from disk</value><comment>ToolTip.Tip in MetadataWindow.axaml</comment></data>
+  <data name="Metadata.LoadLrcSyncedTxtTip" xml:space="preserve"><value>Load an .lrc, .elrc, .ttml (synced) or .txt (plain) lyrics file from disk</value><comment>ToolTip.Tip in MetadataWindow.axaml</comment></data>
   <data name="Metadata.SearchLyrics" xml:space="preserve"><value>Search lyrics</value><comment>Content in MetadataWindow.axaml</comment></data>
   <data name="Metadata.NoSyncedLyricsYet" xml:space="preserve"><value>No synced lyrics yet. Use “Search lyrics” to add them.</value><comment>Text in MetadataWindow.axaml</comment></data>
   <data name="Metadata.TimestampLyrics" xml:space="preserve"><value>Timestamp Lyrics</value><comment>Header in MetadataWindow.axaml</comment></data>
@@ -2447,7 +2447,7 @@ The lines and their timings are dropped and an empty lyrics box opens for your o
   <data name="LyricsStudio.TranscriptBanner" xml:space="preserve"><value>Experimental transcript. Sung vocals often transcribe poorly, so fix the words below, then press Align lyrics to time them.</value><comment>Lyrics box banner after a transcription</comment></data>
   <data name="LyricsStudio.PasteWatermark" xml:space="preserve"><value>Paste the lyrics here, one line per sung line…</value><comment>Lyrics box watermark</comment></data>
   <data name="LyricsStudio.ImportFile" xml:space="preserve"><value>Import file…</value><comment>Lyrics box button</comment></data>
-  <data name="LyricsStudio.ImportFileTip" xml:space="preserve"><value>Load lyrics from a .txt, .lrc or .elrc file (timestamps are dropped and re-timed)</value><comment>Tooltip</comment></data>
+  <data name="LyricsStudio.ImportFileTip" xml:space="preserve"><value>Load lyrics from a .txt, .lrc, .elrc or .ttml file (timestamps are dropped and re-timed)</value><comment>Tooltip</comment></data>
   <data name="LyricsStudio.TranscribeDraft" xml:space="preserve"><value>Listen instead · Experimental</value><comment>Lyrics box button: transcribe the song into the box</comment></data>
   <data name="LyricsStudio.TranscribeDraftTip" xml:space="preserve"><value>Lullaby writes down what it hears. Sung vocals often transcribe poorly: fix the words before aligning.</value><comment>Tooltip "Lullaby" is the model's name: keep it untranslated.</comment></data>
   <data name="LyricsStudio.Align" xml:space="preserve"><value>Align lyrics</value><comment>Lyrics box primary button</comment></data>

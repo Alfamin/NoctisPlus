@@ -2034,9 +2034,9 @@ public partial class MetadataViewModel : ViewModelBase
     private void ClearSyncedLineTimestamp(SyncedLyricEditorLine? line) => line?.ClearTimestamp();
 
     /// <summary>
-    /// "Import file" on the lyrics tabs (Discord ask, 2026-08-31): pick an .lrc or .txt
-    /// and load it as the track's lyrics, for the many songs no provider has. Nothing is
-    /// written until Save, which then takes the usual sidecar/tag path.
+    /// "Import file" on the lyrics tabs (Discord ask, 2026-08-31): pick an .lrc, .elrc, .ttml
+    /// or .txt and load it as the track's lyrics, for the many songs no provider has. Nothing
+    /// is written until Save, which then takes the usual sidecar/tag path.
     /// </summary>
     [RelayCommand]
     private async Task ImportLyricsFile(Avalonia.Visual visual)
@@ -2050,7 +2050,7 @@ public partial class MetadataViewModel : ViewModelBase
             AllowMultiple = false,
             FileTypeFilter = new[]
             {
-                new FilePickerFileType("Lyrics") { Patterns = new[] { "*.lrc", "*.txt" } },
+                new FilePickerFileType("Lyrics") { Patterns = new[] { "*.lrc", "*.elrc", "*.ttml", "*.txt" } },
                 new FilePickerFileType("All files") { Patterns = new[] { "*" } }
             }
         });
@@ -2078,10 +2078,16 @@ public partial class MetadataViewModel : ViewModelBase
     /// Routes imported text by content, not extension: timestamped lines become the synced
     /// lyrics (a .txt full of [mm:ss] tags is still LRC), anything else becomes the plain
     /// lyrics. Both tabs' Enable toggles flip on so the Save gate sees the import.
+    /// A TTML file (GitHub #132) is converted to the (enhanced) LRC the editor works in first,
+    /// never pasted as XML; one that will not parse gives its words as plain lyrics.
     /// </summary>
     internal void ImportLyricsText(string text, string fileName)
     {
-        var normalized = (text ?? string.Empty).Replace("\r\n", "\n").Trim();
+        text ??= string.Empty;
+        if (fileName.EndsWith(".ttml", StringComparison.OrdinalIgnoreCase) || TtmlParser.LooksLikeTtml(text))
+            text = TtmlParser.ToLrc(text) ?? string.Join("\n", LyricsLoader.RawTextLines(text));
+
+        var normalized = text.Replace("\r\n", "\n").Trim();
         if (normalized.Length == 0)
         {
             SyncedLyricsSearchStatus = $"{fileName} is empty.";
