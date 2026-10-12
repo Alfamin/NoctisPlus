@@ -294,6 +294,10 @@ public sealed partial class AccountPageViewModel : MobilePage
         if (!_account.IsSignedIn) return;
         ErrorText = string.Empty;
         using var cts = new CancellationTokenSource();
+        // A send this page did not start (running when it opened) shows "Stop sending" too: the
+        // service hands back the running send, and a cancelled token stops it. Uncancelled, the
+        // tap joined the send instead and only a second tap stopped it.
+        if (_account.IsUploading) cts.Cancel();
         _uploadCts = cts;
         IsUploading = true;
         UploadText = "Checking what your computer has…";
@@ -417,6 +421,10 @@ public sealed partial class AccountPageViewModel : MobilePage
 
     private void OnUploadProgress(object? sender, NoctisUploadProgress progress) => _marshal(() =>
     {
+        // The send's last report is posted before its task completes, but the page's await
+        // resumes first: landing after the result it put "Sent 40 of 40" over the summary and
+        // the label back on "Stop sending". A send that is over has nothing left to report.
+        if (_uploadCts is null && !_account.IsUploading) return;
         IsUploading = true;
         UploadText = DescribeUploadProgress(progress);
     });

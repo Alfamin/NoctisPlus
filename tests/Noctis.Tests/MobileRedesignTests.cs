@@ -209,6 +209,22 @@ public class MobileRedesignTests
     }
 
     [Fact]
+    public void SongList_OwnOrderDescending_ThenOwnOrderAgain_UnlightsTheSortButton()
+    {
+        var (rig, page) = SongList();
+        using var _ = rig;
+        page.ChooseDirection(descending: true);
+        Assert.True(page.IsSorted);
+        var raised = new List<string?>();
+        page.PropertyChanged += (_, e) => raised.Add(e.PropertyName);
+
+        page.ChooseSort(page.SortChoices[0]);                  // the list's own order again: ascending, Sort unchanged
+
+        Assert.False(page.IsSorted);
+        Assert.Contains(nameof(SongListPageViewModel.IsSorted), raised);   // the button's Classes.on binding hears it
+    }
+
+    [Fact]
     public void SongList_FavouritesFilter_AndInListSearch_NarrowWhatPlays()
     {
         var (rig, page) = SongList();

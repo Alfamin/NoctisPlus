@@ -596,6 +596,57 @@ public class MobileAccountTests
         Assert.False(page.HasError);
     }
 
+    /// <summary>
+    /// The service reports each song from its own thread and the page's Marshal posts the report
+    /// to the UI thread; the page's await of the send resumes ahead of such a post (Avalonia runs
+    /// the continuation first, probed headless). The last report then landed after the summary.
+    /// </summary>
+    [Fact]
+    public async Task SendSongs_LastProgressLandingAfterTheResult_KeepsTheSummary()
+    {
+        using var rig = MobileFixtures.MakeRig();
+        var account = new FakeAccount { Account = FakeAccount.SignedInAs(), UploadGate = new TaskCompletionSource() };
+        var posted = new List<Action>();
+        var shell = new ShellViewModel(rig.Shell.Library, rig.Shell.Player, rig.Shell.Lyrics)
+        {
+            Account = account,
+            Marshal = posted.Add,
+            TintFactory = rig.Shell.TintFactory,
+        };
+        var page = OpenAccount(shell);
+
+        var send = page.SendSongsCommand.ExecuteAsync(null);
+        account.UploadGate.SetResult();
+        await send;
+        foreach (var post in posted.ToList()) post();                         // the reports, landing late
+
+        Assert.Equal("Sent 40 · 2 already on your computer · 1 failed", page.UploadText);
+        Assert.False(page.IsUploading);
+        Assert.Equal("Send phone songs to computer", page.UploadLabel);
+    }
+
+    [Fact]
+    public async Task SendSongs_PageReopenedMidSend_StopSendingStopsIt()
+    {
+        using var rig = MobileFixtures.MakeRig();
+        var account = new FakeAccount { Account = FakeAccount.SignedInAs(), UploadGate = new TaskCompletionSource() };
+        var shell = ShellWith(rig, account);
+        var first = OpenAccount(shell);
+        var send = first.SendSongsCommand.ExecuteAsync(null);
+
+        // The Account page left and opened again while the send runs: it offers to stop it.
+        var page = new AccountPageViewModel(shell, account);
+        Assert.Equal("Stop sending", page.UploadLabel);
+
+        var stop = page.SendSongsCommand.ExecuteAsync(null);
+
+        Assert.True(stop.IsCompleted);                                         // stopped, not waiting on the send
+        await stop;
+        Assert.Equal("Stopped. Tap again to send the rest.", page.UploadText);
+        account.UploadGate.SetResult();
+        await send;
+    }
+
     [Theory]
     [InlineData(0, 0, 0, 3, "Everything is already on your computer")]
     [InlineData(0, 0, 0, 0, "No songs on this phone to send")]
