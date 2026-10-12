@@ -1,4 +1,7 @@
 using Avalonia;
+using Avalonia.Automation;
+using Avalonia.Automation.Peers;
+using Avalonia.Automation.Provider;
 using Avalonia.Controls;
 using Avalonia.Data;
 using Avalonia.Input;
@@ -23,6 +26,7 @@ public partial class LottieToggle : UserControl
     public LottieToggle()
     {
         InitializeComponent();
+        Focusable = true;
     }
 
     private static IBrush ResolveResourceBrush(string key, string fallbackHex)
@@ -70,6 +74,50 @@ public partial class LottieToggle : UserControl
             IsChecked = !IsChecked;
             e.Handled = true;
         }
+    }
+
+    // Keyboard: Space / Enter flip the switch like a ToggleButton. It used to take mouse
+    // presses only — not focusable, so Settings' switches were unreachable by keyboard.
+    protected override void OnKeyDown(KeyEventArgs e)
+    {
+        base.OnKeyDown(e);
+        if (e.Handled || e.KeyModifiers != KeyModifiers.None) return;
+        if (e.Key is Key.Space or Key.Enter)
+        {
+            IsChecked = !IsChecked;
+            e.Handled = true;
+        }
+    }
+
+    // Screen readers / UI Automation: a toggle with an on/off state. The default
+    // UserControl peer exposed a nameless Custom element with no state and no way to flip it.
+    protected override AutomationPeer OnCreateAutomationPeer() => new LottieTogglePeer(this);
+
+    private sealed class LottieTogglePeer : ControlAutomationPeer, IToggleProvider
+    {
+        public LottieTogglePeer(LottieToggle owner) : base(owner)
+        {
+            owner.PropertyChanged += (_, e) =>
+            {
+                if (e.Property == IsCheckedProperty)
+                    RaisePropertyChangedEvent(TogglePatternIdentifiers.ToggleStateProperty,
+                        ToState(e.GetOldValue<bool>()), ToState(e.GetNewValue<bool>()));
+            };
+        }
+
+        private LottieToggle Toggle_ => (LottieToggle)Owner;
+
+        public ToggleState ToggleState => ToState(Toggle_.IsChecked);
+
+        public void Toggle()
+        {
+            if (!IsEnabled()) throw new ElementNotEnabledException();
+            Toggle_.IsChecked = !Toggle_.IsChecked;
+        }
+
+        protected override AutomationControlType GetAutomationControlTypeCore() => AutomationControlType.CheckBox;
+
+        private static ToggleState ToState(bool on) => on ? ToggleState.On : ToggleState.Off;
     }
 
     private void UpdateVisualState()

@@ -99,6 +99,44 @@ public class NoctisServerAccountTests : IAsyncLifetime
 
     private static int ErrorCode(JsonElement r) => r.GetProperty("error").GetProperty("code").GetInt32();
 
+    // ── Sign in by email or username (owner 10-11) ──
+
+    [Fact]
+    public async Task SignIn_TheDesktopsProfileName_SignsInToTheMainAccount_AndReturnsItsEmail()
+    {
+        _lib.ProfileName = "notheartached";
+
+        var (r, _) = await SignIn(user: "NotHeartached");          // any case, as a keyboard capitalises it
+
+        Assert.Equal("ok", r.GetProperty("status").GetString());
+        Assert.Equal("alice", r.GetProperty("noctisSignIn").GetProperty("user").GetString());
+    }
+
+    [Fact]
+    public async Task SignIn_TheAccountNameInAnotherCase_ReturnsTheStoredSpelling()
+    {
+        var (r, _) = await SignIn(user: "ALICE");
+        Assert.Equal("alice", r.GetProperty("noctisSignIn").GetProperty("user").GetString());
+    }
+
+    [Fact]
+    public async Task SignIn_TheProfileNameWithAWrongPassword_OrAnUnknownName_IsRefused()
+    {
+        _lib.ProfileName = "notheartached";
+        Assert.Equal(40, ErrorCode((await SignIn(user: "notheartached", password: "wrong password")).Body));
+        Assert.Equal(40, ErrorCode((await SignIn(user: "somebody")).Body));
+    }
+
+    [Fact]
+    public async Task SignIn_AnAccountNamedLikeTheProfile_WinsOverTheAlias()
+    {
+        _users.Create("bob", "another pass");
+        _lib.ProfileName = "bob";                                  // "bob" is a real account: it means that account
+
+        var (r, _) = await SignIn(user: "bob", password: "another pass");
+        Assert.Equal("bob", r.GetProperty("noctisSignIn").GetProperty("user").GetString());
+    }
+
     [Fact]
     public async Task SignIn_IssuesADeviceKey_ThatWorksForGetUserAndStream()
     {
@@ -195,6 +233,30 @@ public class NoctisServerAccountTests : IAsyncLifetime
         var responses = await Task.WhenAll(Enumerable.Range(0, 24).Select(_ => SignIn(password: "wrong one")));
         Assert.Equal(LoginThrottle.MaxFailures, responses.Count(r => r.Response.StatusCode == HttpStatusCode.OK));
         Assert.Equal(24 - LoginThrottle.MaxFailures, responses.Count(r => r.Response.StatusCode == HttpStatusCode.TooManyRequests));
+    }
+
+    [Fact]
+    public async Task LoginBrake_CountsTheProfileNameAlias_AgainstTheAccountItMeans()
+    {
+        // The profile name signs in to the main account, so guesses under it are guesses at
+        // that account's password: one brake for both names, not eight guesses under each.
+        _lib.ProfileName = "notheartached";
+        for (var i = 0; i < LoginThrottle.MaxFailures; i++) await SignIn(user: "NotHeartached", password: "wrong one");
+
+        var (r, res) = await SignIn(user: "alice"); // the right password: locked all the same
+        Assert.Equal(HttpStatusCode.TooManyRequests, res.StatusCode);
+        Assert.Equal(40, ErrorCode(r));
+    }
+
+    [Fact]
+    public async Task PasswordChecks_RunAFewAtATime_SoAFloodOfMadeUpNamesCannotPegTheCpu()
+    {
+        // Every password request costs one PBKDF2 (100k rounds, tens of ms of CPU) — for unknown
+        // names too, so timing does not reveal accounts. The login brake is per name, so a flood
+        // of made-up names is never throttled: without a cap it ran one PBKDF2 per thread at once.
+        var responses = await Task.WhenAll(Enumerable.Range(0, 32).Select(i => SignIn(user: $"nobody-{i}", password: "wrong one")));
+        Assert.All(responses, r => Assert.Equal(40, ErrorCode(r.Body)));
+        Assert.InRange(_server.PeakPasswordChecks, 1, NoctisServer.MaxConcurrentPasswordChecks);
     }
 
     [Fact]
@@ -363,6 +425,68 @@ public class NoctisServerAccountTests : IAsyncLifetime
         Assert.Equal(70, ErrorCode(Envelope(await refused.Content.ReadAsStringAsync(TestContext.Current.CancellationToken))));
     }
 
+    private async Task<HttpResponseMessage> Avatar(string? key, string query = "")
+    {
+        var req = new HttpRequestMessage(HttpMethod.Get, $"rest/getAvatar.view?f=json{query}");
+        if (key is not null) req.Headers.Add(NoctisServer.KeyHeader, key);
+        return await _http.SendAsync(req, TestContext.Current.CancellationToken);
+    }
+
+    [Fact]
+    public async Task GetAvatar_ServesTheProfilePicture_ToItsOwnAccount()
+    {
+        var picture = Path.Combine(_dir, "avatar-20261011.png");
+        var bytes = new byte[] { 0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A, 1, 2, 3 };
+        File.WriteAllBytes(picture, bytes);
+        _lib.Avatar = picture;
+        var key = await SignInKey();
+
+        foreach (var query in new[] { "&username=alice", "&username=ALICE", "" })
+        {
+            var res = await Avatar(key, query);
+            Assert.Equal(HttpStatusCode.OK, res.StatusCode);
+            Assert.Equal("image/png", res.Content.Headers.ContentType!.MediaType);
+            Assert.Equal(bytes, await res.Content.ReadAsByteArrayAsync(TestContext.Current.CancellationToken));
+            Assert.True(res.Headers.CacheControl?.NoCache); // a new pick must reach the phone at once
+        }
+        lock (_lib.AvatarAsks) Assert.All(_lib.AvatarAsks, name => Assert.Equal("alice", name));
+
+        // .bmp is one of the desktop picker's types: served as a picture, not refused.
+        var bmp = Path.Combine(_dir, "avatar-1.bmp");
+        File.WriteAllBytes(bmp, new byte[] { 0x42, 0x4D, 1, 2 });
+        _lib.Avatar = bmp;
+        Assert.Equal("image/bmp", (await Avatar(key)).Content.Headers.ContentType!.MediaType);
+    }
+
+    [Fact]
+    public async Task GetAvatar_NoPicture_AnotherAccount_OrNotAPicture_Is70_AndNeedsAuth()
+    {
+        var key = await SignInKey();
+        async Task<int> Code(HttpResponseMessage res) =>
+            ErrorCode(Envelope(await res.Content.ReadAsStringAsync(TestContext.Current.CancellationToken)));
+
+        _lib.Avatar = null;
+        Assert.Equal(70, await Code(await Avatar(key, "&username=alice")));
+
+        var picture = Path.Combine(_dir, "avatar-2.jpg");
+        File.WriteAllBytes(picture, new byte[] { 0xFF, 0xD8, 0xFF, 0xE0 });
+        _lib.Avatar = picture;
+        // Another account's name never gets this account's (the owner's) picture.
+        Assert.Equal(70, await Code(await Avatar(key, "&username=bob")));
+        // The setting can name any file: anything but a picture is refused.
+        var notAPicture = Path.Combine(_dir, "notes.txt");
+        File.WriteAllText(notAPicture, "secret");
+        _lib.Avatar = notAPicture;
+        Assert.Equal(70, await Code(await Avatar(key)));
+
+        // Same auth as every other method: no key, no picture.
+        _lib.Avatar = picture;
+        var anonymous = Envelope(await (await Avatar(null)).Content.ReadAsStringAsync(TestContext.Current.CancellationToken));
+        Assert.Equal("failed", anonymous.GetProperty("status").GetString());
+        var badKey = Envelope(await (await Avatar("nk_not-a-key")).Content.ReadAsStringAsync(TestContext.Current.CancellationToken));
+        Assert.Equal(40, ErrorCode(badKey));
+    }
+
     [Fact]
     public async Task CoverResizer_RefusesOversizedSources()
     {
@@ -422,6 +546,11 @@ public class NoctisServerAccountTests : IAsyncLifetime
 
         public Task<LibrarySnapshot> SnapshotAsync() => Task.FromResult(new LibrarySnapshot(Tracks.ToList(), new List<Album> { _album }, new List<Artist> { new() { Id = Guid.NewGuid(), Name = "X" } }, new List<Playlist>()));
         public string? ArtworkPath(Guid albumId) => albumId == _album.Id ? _cover : null;
+        public string? ProfileName { get; set; }
+        /// <summary>The desktop's profile picture; null = none.</summary>
+        public string? Avatar { get; set; }
+        public List<string> AvatarAsks { get; } = new();
+        public string? AvatarPath(string userName) { lock (AvatarAsks) AvatarAsks.Add(userName); return Avatar; }
         public Task SetStarredAsync(IReadOnlyList<Guid> trackIds, IReadOnlyList<Guid> albumIds, IReadOnlyList<Guid> artistIds, bool starred) => Task.CompletedTask;
         public Task ScrobbleAsync(Guid trackId) => ScrobbleAsync(trackId, DateTime.UtcNow);
         public Task ScrobbleAsync(Guid trackId, DateTime playedUtc) { lock (Scrobbles) Scrobbles.Add((trackId, playedUtc)); return Task.CompletedTask; }

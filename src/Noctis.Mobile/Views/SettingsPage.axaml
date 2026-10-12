@@ -5,33 +5,267 @@
              x:Class="Noctis.Mobile.Views.SettingsPage"
              x:DataType="vm:SettingsPageViewModel">
 
+    <!-- Each section is one rounded card: a header (the desktop Settings rail's icon for that
+         section, accent-tinted, and its name) over rows of icon + label + control, split by thin
+         inset lines. Rows are at least 56 dp tall; every button is a round-ended pill. -->
+
+    <UserControl.Resources>
+        <!-- Row glyphs Noctis.UI's icon set has no shape for, drawn on its 24-grid in the same
+             outline weight as the Rail icons. -->
+        <!-- Half-filled circle: the System / Dark / Light choice. -->
+        <StreamGeometry x:Key="SettingsThemeGlyph">M12 22c5.523 0 10-4.477 10-10S17.523 2 12 2 2 6.477 2 12s4.477 10 10 10Zm0-1.5v-17a8.5 8.5 0 0 1 0 17Z</StreamGeometry>
+        <!-- Crescent: which dark style. -->
+        <StreamGeometry x:Key="SettingsMoonGlyph">M10.46 3.64A8.5 8.5 0 1 0 20.36 13.54A7 7 0 0 1 10.46 3.64Z</StreamGeometry>
+        <!-- A Latin capital: romanized lyrics. -->
+        <StreamGeometry x:Key="SettingsLetterGlyph">M11.05 4h1.9l5.3 15h-1.6l-1.5-4.3H8.85L7.35 19H5.75ZM9.35 13.2h5.2L12 5.9Z</StreamGeometry>
+        <!-- Small and large capital: lyrics text size. -->
+        <StreamGeometry x:Key="SettingsTextSizeGlyph">M14.3 4h1.9l5.3 15h-1.6l-1.5-4.3H12.1L10.6 19H9ZM12.6 13.2h5.2L15.25 5.9ZM4.92 10.75h1.04l2.92 8.25H8l-.83-2.37H3.71L2.88 19H2ZM3.98 15.81H6.84L5.44 11.8Z</StreamGeometry>
+    </UserControl.Resources>
+
     <UserControl.Styles>
-        <!-- Segmented pickers: a ListBox laid out horizontally, each item a pill. -->
+        <!-- Cards and their headers -->
+        <Style Selector="Border.settings-card">
+            <Setter Property="Background" Value="{DynamicResource HomeCardBackground}" />
+            <Setter Property="CornerRadius" Value="20" />
+            <Setter Property="ClipToBounds" Value="True" />
+        </Style>
+        <Style Selector="Grid.section-head">
+            <Setter Property="Margin" Value="16,14,16,4" />
+        </Style>
+        <Style Selector="Border.section-badge">
+            <Setter Property="Width" Value="32" />
+            <Setter Property="Height" Value="32" />
+            <Setter Property="CornerRadius" Value="10" />
+            <Setter Property="ClipToBounds" Value="True" />
+        </Style>
+        <!-- The badge's fill is the accent at low strength, so it follows the accent and theme. -->
+        <Style Selector="Border.section-badge > Panel > Border.badge-fill">
+            <Setter Property="Background" Value="{DynamicResource AccentColorBrush}" />
+            <Setter Property="Opacity" Value="0.18" />
+        </Style>
+        <Style Selector="Border.section-badge views|GridIcon">
+            <Setter Property="Width" Value="20" />
+            <Setter Property="Height" Value="20" />
+            <Setter Property="Foreground" Value="{DynamicResource AccentColorBrush}" />
+            <Setter Property="HorizontalAlignment" Value="Center" />
+            <Setter Property="VerticalAlignment" Value="Center" />
+        </Style>
+        <Style Selector="TextBlock.section-title">
+            <Setter Property="FontSize" Value="17" />
+            <Setter Property="FontWeight" Value="Bold" />
+            <Setter Property="Margin" Value="12,0,0,0" />
+            <Setter Property="VerticalAlignment" Value="Center" />
+        </Style>
+
+        <!-- Rows -->
+        <Style Selector="Grid.setting-row">
+            <Setter Property="MinHeight" Value="56" />
+            <Setter Property="Margin" Value="16,0" />
+        </Style>
+        <!-- Every row icon is a GridIcon: drawn at its 24-grid size, so all of them match in size
+             and sit on the same centre line (PathIcon stretched each glyph's own bounds). -->
+        <Style Selector="views|GridIcon.row-icon">
+            <Setter Property="Width" Value="24" />
+            <Setter Property="Height" Value="24" />
+            <Setter Property="Margin" Value="0,0,16,0" />
+            <Setter Property="VerticalAlignment" Value="Center" />
+            <Setter Property="Foreground" Value="{DynamicResource SecondaryTextBrush}" />
+        </Style>
+        <Style Selector="TextBlock.row-label">
+            <Setter Property="FontSize" Value="15" />
+            <Setter Property="VerticalAlignment" Value="Center" />
+            <Setter Property="TextWrapping" Value="Wrap" />
+        </Style>
+        <Style Selector="TextBlock.row-value">
+            <Setter Property="FontSize" Value="14" />
+            <Setter Property="Foreground" Value="{DynamicResource SecondaryTextBrush}" />
+            <Setter Property="VerticalAlignment" Value="Center" />
+            <Setter Property="Margin" Value="12,0,0,0" />
+        </Style>
+        <!-- Thin line between rows, starting under the label (16 margin + 24 icon + 16 gap). -->
+        <Style Selector="Border.row-separator">
+            <Setter Property="Height" Value="1" />
+            <Setter Property="Margin" Value="56,0,0,0" />
+            <Setter Property="Background" Value="#26808080" />
+        </Style>
+        <!-- A pill inside a card: the card's own fill would hide the shared pill's background. -->
+        <Style Selector="Border.settings-card Button.pill">
+            <Setter Property="Background" Value="#26808080" />
+            <Setter Property="Padding" Value="16,0" />
+        </Style>
+        <Style Selector="Border.settings-card Button.pill views|GridIcon">
+            <Setter Property="Width" Value="20" />
+            <Setter Property="Height" Value="20" />
+            <Setter Property="VerticalAlignment" Value="Center" />
+            <Setter Property="Margin" Value="0,0,8,0" />
+        </Style>
+
+        <!-- On/off rows: the whole row is the toggle (a 56 dp target), drawn as label + switch. -->
+        <Style Selector="ToggleButton.switch-row">
+            <Setter Property="Background" Value="Transparent" />
+            <Setter Property="BorderThickness" Value="0" />
+            <Setter Property="Padding" Value="16,0" />
+            <Setter Property="MinHeight" Value="56" />
+            <Setter Property="HorizontalAlignment" Value="Stretch" />
+            <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+            <Setter Property="Template">
+                <ControlTemplate>
+                    <Border Background="Transparent" Padding="{TemplateBinding Padding}">
+                        <Grid ColumnDefinitions="*,Auto">
+                            <ContentPresenter Content="{TemplateBinding Content}" VerticalAlignment="Center" />
+                            <Border Name="PART_Track" Grid.Column="1" Width="50" Height="30" CornerRadius="15"
+                                    Margin="12,0,0,0" VerticalAlignment="Center">
+                                <Border Name="PART_Knob" Width="24" Height="24" CornerRadius="12" Margin="3"
+                                        HorizontalAlignment="Left" Background="White" />
+                            </Border>
+                        </Grid>
+                    </Border>
+                </ControlTemplate>
+            </Setter>
+        </Style>
+        <Style Selector="ToggleButton.switch-row /template/ Border#PART_Track">
+            <Setter Property="Background" Value="#4D808080" />
+            <Setter Property="Transitions">
+                <Transitions>
+                    <BrushTransition Property="Background" Duration="0:0:0.18" />
+                </Transitions>
+            </Setter>
+        </Style>
+        <Style Selector="ToggleButton.switch-row:checked /template/ Border#PART_Track">
+            <Setter Property="Background" Value="{DynamicResource AccentColorBrush}" />
+        </Style>
+        <Style Selector="ToggleButton.switch-row /template/ Border#PART_Knob">
+            <Setter Property="RenderTransform" Value="translateX(0px)" />
+            <Setter Property="Transitions">
+                <Transitions>
+                    <TransformOperationsTransition Property="RenderTransform" Duration="0:0:0.18">
+                        <TransformOperationsTransition.Easing><CubicEaseOut /></TransformOperationsTransition.Easing>
+                    </TransformOperationsTransition>
+                </Transitions>
+            </Setter>
+        </Style>
+        <Style Selector="ToggleButton.switch-row:checked /template/ Border#PART_Knob">
+            <Setter Property="RenderTransform" Value="translateX(20px)" />
+        </Style>
+        <Style Selector="ToggleButton.switch-row:pressed">
+            <Setter Property="Opacity" Value="0.6" />
+        </Style>
+
+        <!-- Segmented choices (theme, dark style): equal pills on a pill track; the chosen one
+             turns accent. Fluent's ListBoxItem repaints its presenter on pointerover/pressed
+             (a touch), and Noctis.UI's Styles.axaml clears every ListBoxItem's selected look,
+             so every state is set here. -->
+        <Style Selector="Border.segment-track">
+            <Setter Property="Background" Value="#1F808080" />
+            <Setter Property="CornerRadius" Value="22" />
+            <Setter Property="Padding" Value="4" />
+            <Setter Property="Margin" Value="16,0,16,14" />
+        </Style>
         <Style Selector="ListBox.segments">
             <Setter Property="Background" Value="Transparent" />
+            <Setter Property="Padding" Value="0" />
         </Style>
         <Style Selector="ListBox.segments ListBoxItem">
-            <Setter Property="CornerRadius" Value="16" />
-            <Setter Property="Padding" Value="14,7" />
-            <Setter Property="Margin" Value="0,0,8,8" />
-            <Setter Property="Background" Value="{DynamicResource HomeCardBackground}" />
+            <Setter Property="CornerRadius" Value="18" />
+            <Setter Property="MinHeight" Value="36" />
+            <Setter Property="Padding" Value="6,0" />
+            <Setter Property="Margin" Value="0" />
+            <Setter Property="FontSize" Value="14" />
+            <Setter Property="FontWeight" Value="SemiBold" />
+            <Setter Property="HorizontalContentAlignment" Value="Center" />
+            <Setter Property="VerticalContentAlignment" Value="Center" />
+            <Setter Property="Background" Value="Transparent" />
         </Style>
-        <Style Selector="ListBox.segments ListBoxItem:selected /template/ ContentPresenter#PART_ContentPresenter">
+        <Style Selector="ListBox.segments ListBoxItem /template/ ContentPresenter#PART_ContentPresenter, ListBox.segments ListBoxItem:pointerover /template/ ContentPresenter#PART_ContentPresenter, ListBox.segments ListBoxItem:pressed /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Background" Value="Transparent" />
+            <Setter Property="Foreground" Value="{DynamicResource PrimaryTextBrush}" />
+            <Setter Property="CornerRadius" Value="18" />
+        </Style>
+        <Style Selector="ListBox.segments ListBoxItem:selected /template/ ContentPresenter#PART_ContentPresenter, ListBox.segments ListBoxItem:selected:pointerover /template/ ContentPresenter#PART_ContentPresenter, ListBox.segments ListBoxItem:selected:pressed /template/ ContentPresenter#PART_ContentPresenter, ListBox.segments ListBoxItem:selected:focus /template/ ContentPresenter#PART_ContentPresenter">
             <Setter Property="Background" Value="{DynamicResource AccentColorBrush}" />
             <Setter Property="Foreground" Value="{DynamicResource AccentForegroundBrush}" />
         </Style>
+
+        <!-- Accent swatches: a dot each; the chosen one gets a ring and a tick. -->
+        <Style Selector="ListBox.swatches">
+            <Setter Property="Background" Value="Transparent" />
+            <Setter Property="Padding" Value="0" />
+            <Setter Property="Margin" Value="10,0,10,10" />
+        </Style>
         <Style Selector="ListBox.swatches ListBoxItem">
-            <Setter Property="Padding" Value="3" />
-            <Setter Property="Margin" Value="0,0,6,6" />
-            <Setter Property="CornerRadius" Value="20" />
+            <Setter Property="Padding" Value="0" />
+            <Setter Property="Margin" Value="0" />
+            <Setter Property="Width" Value="44" />
+            <Setter Property="Height" Value="44" />
+            <Setter Property="Background" Value="Transparent" />
         </Style>
-        <Style Selector="ListBox.swatches ListBoxItem:selected /template/ ContentPresenter#PART_ContentPresenter">
-            <Setter Property="Background" Value="{DynamicResource PrimaryTextBrush}" />
+        <Style Selector="ListBox.swatches ListBoxItem /template/ ContentPresenter#PART_ContentPresenter, ListBox.swatches ListBoxItem:pointerover /template/ ContentPresenter#PART_ContentPresenter, ListBox.swatches ListBoxItem:pressed /template/ ContentPresenter#PART_ContentPresenter, ListBox.swatches ListBoxItem:selected /template/ ContentPresenter#PART_ContentPresenter, ListBox.swatches ListBoxItem:selected:pointerover /template/ ContentPresenter#PART_ContentPresenter, ListBox.swatches ListBoxItem:selected:pressed /template/ ContentPresenter#PART_ContentPresenter, ListBox.swatches ListBoxItem:selected:focus /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Background" Value="Transparent" />
         </Style>
-        <Style Selector="Border.settings-card">
-            <Setter Property="Background" Value="{DynamicResource HomeCardBackground}" />
-            <Setter Property="CornerRadius" Value="14" />
-            <Setter Property="Padding" Value="16,12" />
+        <Style Selector="ListBox.swatches Ellipse.swatch-ring, ListBox.swatches PathIcon.swatch-tick">
+            <Setter Property="Opacity" Value="0" />
+        </Style>
+        <Style Selector="ListBox.swatches ListBoxItem:selected Ellipse.swatch-ring, ListBox.swatches ListBoxItem:selected PathIcon.swatch-tick">
+            <Setter Property="Opacity" Value="1" />
+        </Style>
+
+        <!-- Library: a folder whose access was lost reads as a warning. -->
+        <Style Selector="TextBlock.folder-lost">
+            <Setter Property="FontSize" Value="13" />
+            <Setter Property="Foreground" Value="#E5484D" />
+            <Setter Property="TextWrapping" Value="Wrap" />
+        </Style>
+        <!-- The Windows Settings slider (SettingsView's accent-slider): an 8 dp round-ended track,
+             the accent filling up to a round thumb, the rest a soft grey. -->
+        <Style Selector="Slider.accent-slider">
+            <Setter Property="Foreground" Value="{DynamicResource AccentColorBrush}" />
+            <Setter Property="Height" Value="32" />
+            <Setter Property="BorderThickness" Value="0" />
+            <Setter Property="Background" Value="Transparent" />
+            <Setter Property="TickPlacement" Value="None" />
+        </Style>
+        <Style Selector="Slider.accent-slider /template/ Track">
+            <Setter Property="Height" Value="8" />
+        </Style>
+        <Style Selector="Slider.accent-slider /template/ RepeatButton">
+            <Setter Property="Template">
+                <ControlTemplate>
+                    <Border />
+                </ControlTemplate>
+            </Setter>
+        </Style>
+        <!-- 1 dp under the thumb, as on Windows: the ends meet the circle without a notch. -->
+        <Style Selector="Slider.accent-slider /template/ RepeatButton#PART_DecreaseButton">
+            <Setter Property="Margin" Value="0,0,-1,0" />
+        </Style>
+        <Style Selector="Slider.accent-slider /template/ RepeatButton#PART_IncreaseButton">
+            <Setter Property="Margin" Value="-1,0,0,0" />
+        </Style>
+        <Style Selector="Slider.accent-slider /template/ RepeatButton /template/ Border">
+            <Setter Property="Background" Value="{DynamicResource AccentColorBrush}" />
+            <Setter Property="Height" Value="8" />
+        </Style>
+        <Style Selector="Slider.accent-slider /template/ RepeatButton#PART_DecreaseButton /template/ Border">
+            <Setter Property="CornerRadius" Value="4,0,0,4" />
+        </Style>
+        <Style Selector="Slider.accent-slider /template/ RepeatButton#PART_IncreaseButton /template/ Border">
+            <Setter Property="Background" Value="#73808080" />
+            <Setter Property="CornerRadius" Value="0,4,4,0" />
+        </Style>
+        <Style Selector="Slider.accent-slider /template/ Thumb">
+            <Setter Property="Background" Value="{DynamicResource AccentColorBrush}" />
+            <Setter Property="BorderThickness" Value="0" />
+            <Setter Property="Width" Value="22" />
+            <Setter Property="Height" Value="22" />
+            <Setter Property="Template">
+                <ControlTemplate>
+                    <Border Width="{TemplateBinding Width}" Height="{TemplateBinding Height}"
+                            Background="{TemplateBinding Background}" CornerRadius="999" />
+                </ControlTemplate>
+            </Setter>
+        </Style>
+        <Style Selector="views|GridIcon.row-icon.lost">
+            <Setter Property="Foreground" Value="#E5484D" />
         </Style>
     </UserControl.Styles>
 
@@ -44,61 +278,139 @@
         </Grid>
 
         <ScrollViewer Classes="page-scroll" Grid.Row="1" HorizontalScrollBarVisibility="Disabled">
-            <StackPanel Margin="16,4,16,32" Spacing="14">
-                <!-- Only where the head wires an account service (Shell.Account). -->
-                <TextBlock Classes="section" FontSize="16" Text="Account" IsVisible="{Binding Shell.HasAccount}" />
-                <Border Classes="settings-card" Padding="4" IsVisible="{Binding Shell.HasAccount}">
-                    <Button Name="AccountRow" Classes="row" Command="{Binding Shell.OpenAccountCommand}" Padding="12,10">
-                        <Grid ColumnDefinitions="Auto,*,Auto">
-                            <PathIcon Data="{DynamicResource PhPerson}" Width="22" Height="22" />
-                            <TextBlock Grid.Column="1" Name="AccountRowLabel" Margin="12,0,8,0" VerticalAlignment="Center"
-                                       TextWrapping="Wrap" Text="{Binding AccountRowText}" />
-                            <PathIcon Grid.Column="2" Data="{DynamicResource PhChevronRight}" Width="20" Height="20" Opacity="0.6" />
-                        </Grid>
-                    </Button>
-                </Border>
+            <StackPanel Margin="16,4,16,32" Spacing="16">
 
-                <TextBlock Classes="section" FontSize="16" Text="Library" />
-                <Border Classes="settings-card">
-                    <StackPanel Spacing="8">
-                        <ItemsControl Name="FolderList" ItemsSource="{Binding FolderLabels}">
-                            <ItemsControl.ItemTemplate>
-                                <DataTemplate x:DataType="x:String">
-                                    <Grid ColumnDefinitions="Auto,*" Margin="0,4">
-                                        <PathIcon Data="{DynamicResource FolderIcon}" Width="16" Height="16" VerticalAlignment="Top" Margin="0,2,8,0" />
-                                        <TextBlock Grid.Column="1" Text="{Binding}" TextWrapping="Wrap" />
-                                    </Grid>
-                                </DataTemplate>
-                            </ItemsControl.ItemTemplate>
-                        </ItemsControl>
-                        <StackPanel Orientation="Horizontal" Spacing="8">
-                            <Button Name="AddFolderButton" Classes="pill" Content="Add folder" Command="{Binding Shell.Library.AddFolderCommand}" />
-                            <Button Name="RescanButton" Classes="pill" Content="Rescan" Command="{Binding Shell.Library.RescanCommand}" />
-                        </StackPanel>
+                <!-- Account: only where the head wires an account service (Shell.Account). -->
+                <Border Name="AccountCard" Classes="settings-card" IsVisible="{Binding Shell.HasAccount}">
+                    <StackPanel>
+                        <Grid Classes="section-head" ColumnDefinitions="Auto,*">
+                            <Border Classes="section-badge">
+                                <Panel>
+                                    <Border Classes="badge-fill" />
+                                    <views:GridIcon Data="{DynamicResource RailPersonIcon}" />
+                                </Panel>
+                            </Border>
+                            <TextBlock Grid.Column="1" Classes="section-title" Text="Account" />
+                        </Grid>
+                        <Button Name="AccountRow" Classes="row" Command="{Binding Shell.OpenAccountCommand}" Padding="0,0,0,4">
+                            <Grid Classes="setting-row" ColumnDefinitions="Auto,*,Auto">
+                                <views:GridIcon Classes="row-icon" Data="{DynamicResource PersonIcon}" />
+                                <TextBlock Grid.Column="1" Name="AccountRowLabel" Classes="row-label" Text="{Binding AccountRowText}" />
+                                <PathIcon Grid.Column="2" Data="{DynamicResource PhChevronRight}" Width="20" Height="20" Opacity="0.6"
+                                          Margin="12,0,0,0" VerticalAlignment="Center" />
+                            </Grid>
+                        </Button>
                     </StackPanel>
                 </Border>
 
-                <TextBlock Classes="section" FontSize="16" Text="Appearance" />
-                <Border Classes="settings-card">
-                    <StackPanel Spacing="6">
-                        <ListBox Name="AppearanceList" Classes="segments" ItemsSource="{Binding Appearances}" SelectedItem="{Binding Appearance}">
-                            <ListBox.ItemsPanel>
-                                <ItemsPanelTemplate>
-                                    <WrapPanel />
-                                </ItemsPanelTemplate>
-                            </ListBox.ItemsPanel>
-                        </ListBox>
-                        <TextBlock Classes="subtle" Text="Dark theme" />
-                        <ListBox Name="DarkThemeList" Classes="segments" ItemsSource="{Binding DarkThemes}" SelectedItem="{Binding DarkTheme}">
-                            <ListBox.ItemsPanel>
-                                <ItemsPanelTemplate>
-                                    <WrapPanel />
-                                </ItemsPanelTemplate>
-                            </ListBox.ItemsPanel>
-                        </ListBox>
-                        <TextBlock Classes="subtle" Text="Accent" />
-                        <ListBox Name="AccentList" Classes="swatches" Background="Transparent"
-                                 ItemsSource="{Binding AccentChoices}" SelectedItem="{Binding SelectedAccent}">
+                <!-- Library: on Android, folders are how local music gets in. -->
+                <Border Name="LibraryCard" Classes="settings-card">
+                    <StackPanel>
+                        <Grid Classes="section-head" ColumnDefinitions="Auto,*">
+                            <Border Classes="section-badge">
+                                <Panel>
+                                    <Border Classes="badge-fill" />
+                                    <views:GridIcon Data="{DynamicResource RailFolderIcon}" />
+                                </Panel>
+                            </Border>
+                            <TextBlock Grid.Column="1" Classes="section-title" Text="Library" />
+                        </Grid>
+                        <ItemsControl Name="FolderList" ItemsSource="{Binding FolderRows}">
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate x:DataType="vm:SettingsFolder">
+                                    <StackPanel>
+                                        <Grid Classes="setting-row" ColumnDefinitions="Auto,*">
+                                            <views:GridIcon Classes="row-icon" Classes.lost="{Binding AccessLost}" Data="{DynamicResource FolderIcon}" />
+                                            <StackPanel Grid.Column="1" VerticalAlignment="Center" Margin="0,8">
+                                                <TextBlock Classes="row-label" Text="{Binding Name}" />
+                                                <TextBlock Classes="folder-lost" IsVisible="{Binding AccessLost}"
+                                                           Text="Access lost. Add this folder again to play its songs." />
+                                            </StackPanel>
+                                        </Grid>
+                                        <Border Classes="row-separator" />
+                                    </StackPanel>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                        <StackPanel IsVisible="{Binding !Shell.Library.HasFolders}">
+                            <Grid Name="NoFoldersRow" Classes="setting-row" ColumnDefinitions="Auto,*">
+                                <views:GridIcon Classes="row-icon" Data="{DynamicResource FolderIcon}" />
+                                <TextBlock Grid.Column="1" Classes="row-label" Foreground="{DynamicResource SecondaryTextBrush}"
+                                           Text="No music folders yet" />
+                            </Grid>
+                            <Border Classes="row-separator" />
+                        </StackPanel>
+                        <TextBlock Name="ScanStatusLabel" Classes="subtle" Margin="16,10,16,0" TextWrapping="Wrap"
+                                   Text="{Binding Shell.Library.StatusText}"
+                                   IsVisible="{Binding Shell.Library.StatusText, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
+                        <UniformGrid Columns="2" Margin="12,12,12,14">
+                            <Button Name="AddFolderButton" Classes="pill" Margin="4,0" HorizontalAlignment="Stretch"
+                                    Command="{Binding Shell.Library.AddFolderCommand}">
+                                <StackPanel Orientation="Horizontal">
+                                    <views:GridIcon Data="{DynamicResource AddIcon}" />
+                                    <TextBlock Text="Add folder" VerticalAlignment="Center" />
+                                </StackPanel>
+                            </Button>
+                            <Button Name="RescanButton" Classes="pill" Margin="4,0" HorizontalAlignment="Stretch"
+                                    Command="{Binding Shell.Library.RescanCommand}">
+                                <StackPanel Orientation="Horizontal">
+                                    <views:GridIcon Data="{DynamicResource SyncIcon}" />
+                                    <TextBlock Text="Rescan" VerticalAlignment="Center" />
+                                </StackPanel>
+                            </Button>
+                        </UniformGrid>
+                    </StackPanel>
+                </Border>
+
+                <!-- Appearance: System / Dark / Light first, then the dark style and the accent. -->
+                <Border Name="AppearanceCard" Classes="settings-card">
+                    <StackPanel>
+                        <Grid Classes="section-head" ColumnDefinitions="Auto,*">
+                            <Border Classes="section-badge">
+                                <Panel>
+                                    <Border Classes="badge-fill" />
+                                    <views:GridIcon Data="{DynamicResource RailPaletteIcon}" />
+                                </Panel>
+                            </Border>
+                            <TextBlock Grid.Column="1" Classes="section-title" Text="Appearance" />
+                        </Grid>
+                        <Grid Classes="setting-row" ColumnDefinitions="Auto,*">
+                            <views:GridIcon Classes="row-icon" Data="{StaticResource SettingsThemeGlyph}" />
+                            <TextBlock Grid.Column="1" Classes="row-label" Text="Theme" />
+                        </Grid>
+                        <Border Classes="segment-track">
+                            <ListBox Name="AppearanceList" Classes="segments" ItemsSource="{Binding Appearances}" SelectedItem="{Binding Appearance}">
+                                <ListBox.ItemsPanel>
+                                    <ItemsPanelTemplate>
+                                        <UniformGrid Rows="1" />
+                                    </ItemsPanelTemplate>
+                                </ListBox.ItemsPanel>
+                            </ListBox>
+                        </Border>
+                        <StackPanel Name="DarkThemeSection" IsVisible="{Binding ShowsDarkThemes}">
+                            <Border Classes="row-separator" />
+                            <Grid Classes="setting-row" ColumnDefinitions="Auto,*">
+                                <views:GridIcon Classes="row-icon" Data="{StaticResource SettingsMoonGlyph}" />
+                                <TextBlock Grid.Column="1" Classes="row-label" Text="Dark style" />
+                            </Grid>
+                            <Border Classes="segment-track">
+                                <ListBox Name="DarkThemeList" Classes="segments" ItemsSource="{Binding DarkThemes}" SelectedItem="{Binding DarkTheme}">
+                                    <ListBox.ItemsPanel>
+                                        <ItemsPanelTemplate>
+                                            <UniformGrid Rows="1" />
+                                        </ItemsPanelTemplate>
+                                    </ListBox.ItemsPanel>
+                                </ListBox>
+                            </Border>
+                        </StackPanel>
+                        <Border Classes="row-separator" />
+                        <Grid Classes="setting-row" ColumnDefinitions="Auto,*">
+                            <!-- The row's icon is the accent itself. -->
+                            <Ellipse Width="18" Height="18" Margin="3,0,19,0" VerticalAlignment="Center"
+                                     Fill="{DynamicResource AccentColorBrush}" />
+                            <TextBlock Grid.Column="1" Classes="row-label" Text="Accent colour" />
+                        </Grid>
+                        <ListBox Name="AccentList" Classes="swatches" ItemsSource="{Binding AccentChoices}" SelectedItem="{Binding SelectedAccent}">
                             <ListBox.ItemsPanel>
                                 <ItemsPanelTemplate>
                                     <WrapPanel />
@@ -106,38 +418,97 @@
                             </ListBox.ItemsPanel>
                             <ListBox.ItemTemplate>
                                 <DataTemplate x:DataType="vm:AccentSwatch">
-                                    <Ellipse Width="30" Height="30" Fill="{Binding Brush}" />
+                                    <Panel Width="36" Height="36" AutomationProperties.Name="{Binding Name}">
+                                        <Ellipse Classes="swatch-ring" Stroke="{DynamicResource PrimaryTextBrush}" StrokeThickness="2" />
+                                        <Ellipse Width="28" Height="28" Fill="{Binding Brush}" />
+                                        <PathIcon Classes="swatch-tick" Data="{DynamicResource CheckmarkIcon}" Width="14" Height="14"
+                                                  Foreground="{DynamicResource AccentForegroundBrush}" />
+                                    </Panel>
                                 </DataTemplate>
                             </ListBox.ItemTemplate>
                         </ListBox>
                     </StackPanel>
                 </Border>
 
-                <TextBlock Classes="section" FontSize="16" Text="Lyrics" />
-                <Border Classes="settings-card">
-                    <StackPanel Spacing="4">
-                        <ToggleSwitch Name="TranslationSwitch" Content="Show translations" IsChecked="{Binding Shell.Lyrics.ShowTranslation}" />
-                        <ToggleSwitch Name="RomajiSwitch" Content="Show romanization" IsChecked="{Binding Shell.Lyrics.ShowRomanization}" />
-                        <TextBlock Classes="subtle" Text="Text size" Margin="0,6,0,0" />
-                        <Slider Name="LyricsSizeSlider" Minimum="0.8" Maximum="1.6" TickFrequency="0.1" IsSnapToTickEnabled="True"
-                                Value="{Binding LyricsTextScale}" />
+                <!-- Lyrics -->
+                <Border Name="LyricsCard" Classes="settings-card">
+                    <StackPanel>
+                        <Grid Classes="section-head" ColumnDefinitions="Auto,*">
+                            <Border Classes="section-badge">
+                                <Panel>
+                                    <Border Classes="badge-fill" />
+                                    <views:GridIcon Data="{DynamicResource RailLyricsIcon}" />
+                                </Panel>
+                            </Border>
+                            <TextBlock Grid.Column="1" Classes="section-title" Text="Lyrics" />
+                        </Grid>
+                        <ToggleButton Name="TranslationSwitch" Classes="switch-row" AutomationProperties.Name="Show translations" IsChecked="{Binding Shell.Lyrics.ShowTranslation}">
+                            <Grid ColumnDefinitions="Auto,*">
+                                <views:GridIcon Classes="row-icon" Data="{DynamicResource GlobeIcon}" />
+                                <TextBlock Grid.Column="1" Classes="row-label" Text="Show translations" />
+                            </Grid>
+                        </ToggleButton>
+                        <Border Classes="row-separator" />
+                        <ToggleButton Name="RomajiSwitch" Classes="switch-row" AutomationProperties.Name="Show romanization" IsChecked="{Binding Shell.Lyrics.ShowRomanization}">
+                            <Grid ColumnDefinitions="Auto,*">
+                                <views:GridIcon Classes="row-icon" Data="{StaticResource SettingsLetterGlyph}" />
+                                <TextBlock Grid.Column="1" Classes="row-label" Text="Show romanization" />
+                            </Grid>
+                        </ToggleButton>
+                        <Border Classes="row-separator" />
+                        <Grid Classes="setting-row" ColumnDefinitions="Auto,*,Auto">
+                            <views:GridIcon Classes="row-icon" Data="{StaticResource SettingsTextSizeGlyph}" />
+                            <TextBlock Grid.Column="1" Classes="row-label" Text="Text size" />
+                            <TextBlock Grid.Column="2" Name="LyricsSizeLabel" Classes="row-value"
+                                       Text="{Binding LyricsTextScale, StringFormat={}{0:P0}}" />
+                        </Grid>
+                        <Slider Name="LyricsSizeSlider" Classes="accent-slider" Margin="16,-4,16,12" Minimum="0.8" Maximum="1.6" TickFrequency="0.1"
+                                IsSnapToTickEnabled="True" Value="{Binding LyricsTextScale}" />
                     </StackPanel>
                 </Border>
 
-                <TextBlock Classes="section" FontSize="16" Text="Playback" />
-                <Border Classes="settings-card">
-                    <ToggleSwitch Name="GaplessSwitch" Content="Gapless playback" IsChecked="{Binding Gapless}" />
+                <!-- Advanced: the log, for a bug report. -->
+                <Border Name="AdvancedCard" Classes="settings-card">
+                    <StackPanel>
+                        <Grid Classes="section-head" ColumnDefinitions="Auto,*">
+                            <Border Classes="section-badge">
+                                <Panel>
+                                    <Border Classes="badge-fill" />
+                                    <views:GridIcon Data="{DynamicResource RailWrenchIcon}" />
+                                </Panel>
+                            </Border>
+                            <TextBlock Grid.Column="1" Classes="section-title" Text="Advanced" />
+                        </Grid>
+                        <Grid Classes="setting-row" ColumnDefinitions="Auto,*,Auto" Margin="16,0,16,6">
+                            <views:GridIcon Classes="row-icon" Data="{DynamicResource ClipboardIcon}" />
+                            <StackPanel Grid.Column="1" VerticalAlignment="Center" Margin="0,8">
+                                <TextBlock Classes="row-label" Text="Logs" />
+                                <TextBlock Name="ExportStatusLabel" Classes="subtle" TextWrapping="Wrap" Text="{Binding ExportStatus}"
+                                           IsVisible="{Binding ExportStatus, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
+                            </StackPanel>
+                            <Button Grid.Column="2" Name="ExportLogsButton" Classes="pill" Margin="12,0,0,0"
+                                    Content="Export" Command="{Binding ExportLogsCommand}" />
+                        </Grid>
+                    </StackPanel>
                 </Border>
 
-                <TextBlock Classes="section" FontSize="16" Text="About" />
-                <Border Classes="settings-card">
-                    <StackPanel Spacing="8">
-                        <TextBlock Name="VersionLabel" Text="{Binding VersionText}" />
-                        <TextBlock Name="PrivacyNote" Classes="subtle" TextWrapping="Wrap" Text="Noctis collects nothing. The app talks to your own computer only when you sign in to your Noctis account, looks up album descriptions on Last.fm, sending only the artist and album name, and looks up artist photos on Deezer, sending only the artist's name." />
-                        <StackPanel Orientation="Horizontal" Spacing="10">
-                            <Button Name="ExportLogsButton" Classes="pill" Content="Export logs" Command="{Binding ExportLogsCommand}" />
-                            <TextBlock Name="ExportStatusLabel" Classes="subtle" VerticalAlignment="Center" Text="{Binding ExportStatus}" />
-                        </StackPanel>
+                <!-- About -->
+                <Border Name="AboutCard" Classes="settings-card">
+                    <StackPanel>
+                        <Grid Classes="section-head" ColumnDefinitions="Auto,*">
+                            <Border Classes="section-badge">
+                                <Panel>
+                                    <Border Classes="badge-fill" />
+                                    <views:GridIcon Data="{DynamicResource RailInfoIcon}" />
+                                </Panel>
+                            </Border>
+                            <TextBlock Grid.Column="1" Classes="section-title" Text="About" />
+                        </Grid>
+                        <Grid Classes="setting-row" ColumnDefinitions="Auto,*,Auto">
+                            <views:GridIcon Classes="row-icon" Data="{DynamicResource TagIcon}" />
+                            <TextBlock Grid.Column="1" Classes="row-label" Text="Version" />
+                            <TextBlock Grid.Column="2" Name="VersionLabel" Classes="row-value" Text="{Binding VersionText}" />
+                        </Grid>
                     </StackPanel>
                 </Border>
             </StackPanel>

@@ -8,11 +8,20 @@ namespace Noctis.Services.Sync;
 /// The sync ledger: the newest known state of every synced item, stamped with who wrote it
 /// and when, plus a monotonically increasing change sequence so a device can ask "what
 /// changed since N". Conflict rule is last-writer-wins on <c>updated_utc</c> (ties broken by
-/// device id so every replica converges to the same answer) — the same simple model Joplin
+/// device id so every replica converges to the same answer; a stored stamp past the clock by
+/// more than <see cref="MaxClockSkew"/> loses to any write) — the same simple model Joplin
 /// uses per note. One SQLite file, same idiom as <see cref="Server.ServerUserStore"/>.
 /// </summary>
 public sealed class SyncStore
 {
+    /// <summary>
+    /// How far past this computer's clock a stamp may be. Pushes are clamped to it on the way in
+    /// (<see cref="LibrarySyncService.ClampStamp"/>); the desktop's own writes are not, so a row
+    /// written under a wrong clock could otherwise hold its item against every later edit, from
+    /// any device, until real time caught up with it.
+    /// </summary>
+    public static readonly TimeSpan MaxClockSkew = TimeSpan.FromMinutes(2);
+
     private readonly string _connectionString;
     private readonly object _writeGate = new();
 
@@ -75,8 +84,9 @@ public sealed class SyncStore
 
     /// <summary>
     /// Applies an incoming state if it is newer than what is stored (or equal-time from a
-    /// "greater" device id, so replicas agree). Returns true when the ledger changed; the
-    /// item then carries a fresh sequence number.
+    /// "greater" device id, so replicas agree), or if the stored stamp is past the clock by more
+    /// than <see cref="MaxClockSkew"/>. Returns true when the ledger changed; the item then
+    /// carries a fresh sequence number.
     /// </summary>
     public bool Upsert(string kind, string id, string payload, DateTime updatedUtc, string device)
     {
@@ -99,7 +109,9 @@ public sealed class SyncStore
                     var storedUtc = ParseUtc(r.GetString(0));
                     var storedDevice = r.GetString(1);
                     var storedPayload = r.GetString(2);
-                    var newer = updatedUtc > storedUtc
+                    // A stamp from a wrong clock is no claim on the item: any write replaces it.
+                    var stale = storedUtc > DateTime.UtcNow + MaxClockSkew;
+                    var newer = stale || updatedUtc > storedUtc
                                 || (updatedUtc == storedUtc && string.CompareOrdinal(device, storedDevice) > 0 && payload != storedPayload);
                     if (!newer) return false;
                 }
@@ -217,6 +229,20 @@ public sealed class SyncStore
             cmd.Parameters.AddWithValue("$t", DateTime.UtcNow.ToString("O", CultureInfo.InvariantCulture));
             cmd.Parameters.AddWithValue("$s", lastSeq);
             cmd.ExecuteNonQuery();
+        }
+    }
+
+    /// <summary>Drops a device from the device list (its items stay). False when it was not listed.</summary>
+    public bool RemoveDevice(string id)
+    {
+        if (string.IsNullOrWhiteSpace(id)) return false;
+        lock (_writeGate)
+        {
+            using var con = Open();
+            using var cmd = con.CreateCommand();
+            cmd.CommandText = "DELETE FROM devices WHERE id = $i";
+            cmd.Parameters.AddWithValue("$i", id.Trim());
+            return cmd.ExecuteNonQuery() > 0;
         }
     }
 

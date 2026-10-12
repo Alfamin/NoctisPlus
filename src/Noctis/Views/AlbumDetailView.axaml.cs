@@ -15,13 +15,16 @@ using Noctis.ViewModels;
 
 namespace Noctis.Views;
 
-public partial class AlbumDetailView : UserControl
+public partial class AlbumDetailView : UserControl, ITrackSelectionSource
 {
     private EventHandler? _pendingScrollRestore;
     private System.ComponentModel.PropertyChangedEventHandler? _bgHandler;
     private AlbumDetailViewModel? _trackedVm;
     // Multi-select tracked by Track (data) so it survives container recycling.
     private readonly HashSet<Track> _selectedTracks = new();
+
+    /// <summary>The Ctrl-selection, for window shortcuts (GitHub #131 ReplayGain).</summary>
+    public IReadOnlyList<Track> GetSelectedTracks() => _selectedTracks.ToList();
 
     // One shared track menu for the whole page, bound to a row on open — the
     // per-row XAML menus (context menu + 3-dot flyout, ~35 items and ~14 bitmap

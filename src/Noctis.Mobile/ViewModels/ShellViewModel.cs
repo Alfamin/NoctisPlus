@@ -87,9 +87,23 @@ public sealed partial class ShellViewModel : ObservableObject
             _account = value;
             if (value == null) return;
             value.PlaylistsChanged += OnAccountPlaylistsChanged;
+            value.StateChanged += OnAccountStateChanged;
+            _profileAvatarPath = AccountAvatarPath();
         }
     }
     private readonly INoctisAccountService? _account;
+
+    /// <summary>The signed-in desktop's profile picture for the profile button (ProfileButton);
+    /// null when signed out or the desktop has none (the person glyph shows).</summary>
+    [ObservableProperty] private string? _profileAvatarPath;
+
+    private string? AccountAvatarPath() => _account is { IsSignedIn: true } a ? a.AvatarPath : null;
+
+    /// <summary>StateChanged fires on every download step too: hop to the UI thread only for a new picture.</summary>
+    private void OnAccountStateChanged(object? sender, EventArgs e)
+    {
+        if (AccountAvatarPath() != ProfileAvatarPath) Marshal(() => ProfileAvatarPath = AccountAvatarPath());
+    }
 
     /// <summary>
     /// A sync writes the desktop's playlists straight into playlists.json and sign-out drops them,
@@ -287,6 +301,48 @@ public sealed partial class ShellViewModel : ObservableObject
             OnPropertyChanged(nameof(IsMiniBarExpandedVisible));
             OnPropertyChanged(nameof(IsMiniBarInlineVisible));
         }
+        if (e.PropertyName is nameof(NowPlayingViewModel.CurrentTrack))
+            MiniTint.Load(Player.CurrentTrack?.AlbumArtworkPath);
+    }
+
+    // ── Mini player: the elapsed part of the song fills the capsule in the cover's colour ──
+
+    /// <summary>The playing cover's colour (created on first use: <see cref="TintFactory"/> is an init property).</summary>
+    public PageTint MiniTint
+    {
+        get
+        {
+            if (_miniTint != null) return _miniTint;
+            _miniTint = TintFactory();
+            _miniTint.PropertyChanged += (_, e) =>
+            {
+                if (e.PropertyName is nameof(PageTint.TintColor)) UpdateMiniProgressBrushes();
+            };
+            return _miniTint;
+        }
+    }
+    private PageTint? _miniTint;
+
+    /// <summary>The elapsed fill: the cover's colour, soft, so the title stays readable on it.</summary>
+    [ObservableProperty] private Avalonia.Media.IBrush _miniProgressFill = new Avalonia.Media.Immutable.ImmutableSolidColorBrush(Avalonia.Media.Color.FromArgb(0x26, 0xFF, 0xFF, 0xFF));
+
+    /// <summary>The thin line along the fill's bottom edge: the same colour, strong.</summary>
+    [ObservableProperty] private Avalonia.Media.IBrush _miniProgressLine = new Avalonia.Media.Immutable.ImmutableSolidColorBrush(Avalonia.Media.Color.FromArgb(0x99, 0xFF, 0xFF, 0xFF));
+
+    private void UpdateMiniProgressBrushes()
+    {
+        // No cover (or none read yet): a neutral white that works on both glass themes.
+        var c = MiniTint.TintColor ?? Avalonia.Media.Colors.White;
+        var neutral = MiniTint.TintColor == null;
+        // A dark cover's edge colour vanishes on the dark glass: lift it toward white until it reads.
+        var luminance = (0.2126 * c.R + 0.7152 * c.G + 0.0722 * c.B) / 255;
+        if (luminance < 0.45)
+        {
+            var t = (0.45 - luminance) / (1 - luminance);
+            c = Avalonia.Media.Color.FromRgb((byte)(c.R + (255 - c.R) * t), (byte)(c.G + (255 - c.G) * t), (byte)(c.B + (255 - c.B) * t));
+        }
+        MiniProgressFill = new Avalonia.Media.Immutable.ImmutableSolidColorBrush(Avalonia.Media.Color.FromArgb((byte)(neutral ? 0x26 : 0x59), c.R, c.G, c.B));
+        MiniProgressLine = new Avalonia.Media.Immutable.ImmutableSolidColorBrush(Avalonia.Media.Color.FromArgb((byte)(neutral ? 0x99 : 0xE6), c.R, c.G, c.B));
     }
 
     /// <summary>A started track's play reached the log: the Library's play-log rails re-read it,
@@ -470,7 +526,7 @@ public sealed partial class ShellViewModel : ObservableObject
     private void OpenPlaylist(Playlist? playlist)
     {
         if (playlist == null) return;
-        Navigate(new SongListPageViewModel(this, playlist.Name, () => ResolvePlaylist(playlist)));
+        Navigate(new SongListPageViewModel(this, playlist.Name, () => ResolvePlaylist(playlist), playlist));
     }
 
     /// <summary>A playlist's tracks in saved order; ids no longer in the library are skipped.</summary>
@@ -561,6 +617,13 @@ public sealed partial class ShellViewModel : ObservableObject
             DebugLog.Write("Library", $"Favourite save failed: {ex.Message}");
         }
         Library.Service.NotifyFavoritesChanged(tracks.ToList());
+    }
+
+    /// <summary>A song row's heart: one tap favourites or unfavourites that song.</summary>
+    [RelayCommand]
+    private async Task ToggleTrackFavouriteAsync(Track? track)
+    {
+        if (track != null) await SetFavouriteAsync(new[] { track }, !track.IsFavorite);
     }
 
     [RelayCommand]

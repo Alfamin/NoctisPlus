@@ -3,9 +3,6 @@ using System.IO;
 using System.Linq;
 using System.Net;
 using System.Text.RegularExpressions;
-using Avalonia.Controls;
-using Avalonia.Headless.XUnit;
-using Noctis.Mobile.Views;
 using Noctis.Services;
 using Xunit;
 
@@ -13,9 +10,9 @@ namespace Noctis.Tests;
 
 /// <summary>
 /// What the phone tells people about its network use follows the code: the Android privacy
-/// policy names every service the phone asks (the hosts are read from the code), Settings →
-/// About says the same in one sentence, and the website's copy of the policy is the
-/// Markdown word for word (checked when the website checkout sits beside this one).
+/// policy names every service the phone asks (the hosts are read from the code), and the
+/// website's copy of the policy is the Markdown word for word (checked when the website
+/// checkout sits beside this one).
 /// </summary>
 public class MobilePrivacyTextTests
 {
@@ -46,15 +43,6 @@ public class MobilePrivacyTextTests
         Assert.Contains("https://www.last.fm/legal/privacy", policy);
         Assert.Contains("It connects to three\nplaces.", policy);
         Assert.Contains("artist photos, favourites", policy);                 // the backup list
-    }
-
-    [AvaloniaFact]
-    public void SettingsAbout_SaysWhatEachLookupSends()
-    {
-        var page = new SettingsPage();
-        var note = page.FindControl<TextBlock>("PrivacyNote")!.Text!;
-        Assert.Contains("album descriptions on Last.fm, sending only the artist and album name", note);
-        Assert.Contains("artist photos on Deezer, sending only the artist's name", note);
     }
 
     /// <summary>The site's page (website/src/pages/privacy/android.astro in the Noctis-website

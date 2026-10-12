@@ -82,6 +82,33 @@ public class LibraryServerAdapterHeadlessTests
     }
 
     [Fact]
+    public void AvatarPath_IsTheCurrentProfilePicture_WhileItExists()
+    {
+        var dir = System.IO.Path.Combine(System.IO.Path.GetTempPath(), "noctis-avatar-" + Guid.NewGuid().ToString("N"));
+        System.IO.Directory.CreateDirectory(dir);
+        try
+        {
+            var picture = System.IO.Path.Combine(dir, "avatar-1.png");
+            System.IO.File.WriteAllBytes(picture, new byte[] { 0x89, 0x50, 0x4E, 0x47 });
+            string? setting = picture;
+            using var persistence = new TestPersistenceService();
+            var adapter = new LibraryServerAdapter(new FakeLibraryService(), persistence, new CountingPlayHistory(), avatarPath: () => setting);
+
+            Assert.Equal(picture, adapter.AvatarPath("alice"));
+            setting = System.IO.Path.Combine(dir, "gone.png");   // read per call: a new pick shows at once
+            Assert.Null(adapter.AvatarPath("alice"));
+            setting = string.Empty;                              // the desktop's "no picture"
+            Assert.Null(adapter.AvatarPath("alice"));
+            // The headless host passes nothing: no avatar.
+            Assert.Null(new LibraryServerAdapter(new FakeLibraryService(), persistence, new CountingPlayHistory()).AvatarPath("alice"));
+        }
+        finally
+        {
+            try { System.IO.Directory.Delete(dir, true); } catch { }
+        }
+    }
+
+    [Fact]
     public async Task Playlists_RoundTrip_ThroughThePersistenceStore()
     {
         var library = new FakeLibraryService();
@@ -96,6 +123,24 @@ public class LibraryServerAdapterHeadlessTests
         Assert.Equal("Road trip", Assert.Single(snapshot.Playlists).Name);
         Assert.True(await adapter.DeletePlaylistAsync(created.Id));
         Assert.Empty((await adapter.SnapshotAsync()).Playlists);
+    }
+
+    [Fact]
+    public async Task SongsFromAPhone_AskTheHostForTheirFolder_AndImport_OnTheLibrarysThread()
+    {
+        using var persistence = new TestPersistenceService();
+        // The headless host passes no folder: phones cannot send songs to it.
+        Assert.Null(await new LibraryServerAdapter(new FakeLibraryService(), persistence, new CountingPlayHistory())
+            .UploadRootAsync(TestContext.Current.CancellationToken));
+
+        var marshalled = 0;
+        var adapter = new LibraryServerAdapter(new FakeLibraryService(), persistence, new CountingPlayHistory(),
+            marshal: async work => { Interlocked.Increment(ref marshalled); await work(); },
+            uploadRoot: _ => Task.FromResult<string?>(@"C:\Music\Noctis Imports"));
+
+        Assert.Equal(@"C:\Music\Noctis Imports", await adapter.UploadRootAsync(TestContext.Current.CancellationToken));
+        await adapter.ImportUploadedAsync(@"C:\Music\Noctis Imports\Phone\a.mp3", TestContext.Current.CancellationToken);
+        Assert.Equal(2, marshalled);   // the desktop's marshal is the UI thread: settings and library writes live there
     }
 
     /// <summary>The shared fake forgets playlists; this one keeps them like the real store.</summary>

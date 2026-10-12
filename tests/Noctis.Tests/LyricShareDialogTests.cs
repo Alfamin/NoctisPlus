@@ -91,6 +91,134 @@ public class LyricShareDialogTests
         Assert.True(lit == 0, $"{lit} text pixels below y={bandTop} on the {format} {layout} card");
     }
 
+    /// <summary>
+    /// Bug: on the Artwork background the Text option did nothing. The renderer forced white
+    /// text there whatever was picked, so Black drew the very same card as White. A plain grey
+    /// cover makes it countable: only dark text (and the wordmark) can draw near-black pixels.
+    /// </summary>
+    [Theory]
+    [InlineData(ShareCardLayout.Panel)]
+    [InlineData(ShareCardLayout.Poster)]
+    public void BlackText_AppliesOnTheArtworkBackground(ShareCardLayout layout)
+    {
+        var dir = Path.Combine(Path.GetTempPath(), $"noctis-share-test-{Guid.NewGuid():N}");
+        Directory.CreateDirectory(dir);
+        try
+        {
+            var cover = Path.Combine(dir, "grey.png");
+            using (var grey = new SKBitmap(600, 600))
+            {
+                grey.Erase(new SKColor(0xC8, 0xC8, 0xC8));
+                using var image = SKImage.FromBitmap(grey);
+                using var data = image.Encode(SKEncodedImageFormat.Png, 100);
+                File.WriteAllBytes(cover, data.ToArray());
+            }
+            int Count(ShareTextColor text, Func<int, bool> luma)
+            {
+                var spec = new LyricCardSpec
+                {
+                    Title = "TUTU", Artist = "6ix9ine", ArtworkPath = cover, Layout = layout,
+                    Lines = new[] { "You can't do this", "it drives you crazy" },
+                    Background = ShareBackground.Artwork, TextColor = text,
+                };
+                using var bmp = SKBitmap.Decode(ShareCardRenderer.RenderLyricCardStyled(spec));
+                int n = 0;
+                foreach (var c in bmp.Pixels)
+                    if (luma((c.Red * 2126 + c.Green * 7152 + c.Blue * 722) / 10000)) n++;
+                return n;
+            }
+
+            Assert.True(Count(ShareTextColor.Black, l => l < 50) > 2000, "Black drew no dark text on the artwork card");
+            Assert.True(Count(ShareTextColor.White, l => l > 240) > 2000, "White no longer draws white text on the artwork card");
+            Assert.Equal(0, Count(ShareTextColor.White, l => l < 50));
+        }
+        finally { try { Directory.Delete(dir, true); } catch { } }
+    }
+
+    // ── Live preview ──
+
+    /// <summary>A busy JPEG cover of <paramref name="size"/>² (a hi-res release's size).</summary>
+    private static string WriteCover(string dir, int size)
+    {
+        var path = Path.Combine(dir, "cover.jpg");
+        using var bmp = new SKBitmap(size, size);
+        var rnd = new Random(1);
+        using (var canvas = new SKCanvas(bmp))
+        using (var paint = new SKPaint { IsAntialias = true })
+        {
+            canvas.Clear(new SKColor(30, 60, 120));
+            for (int i = 0; i < 400; i++)
+            {
+                paint.Color = new SKColor((byte)rnd.Next(256), (byte)rnd.Next(256), (byte)rnd.Next(256));
+                canvas.DrawCircle(rnd.Next(size), rnd.Next(size), rnd.Next(size / 20, size / 4), paint);
+            }
+        }
+        using var image = SKImage.FromBitmap(bmp);
+        using var data = image.Encode(SKEncodedImageFormat.Jpeg, 92);
+        File.WriteAllBytes(path, data.ToArray());
+        return path;
+    }
+
+    /// <summary>
+    /// Owner 10-12: a change to Text, Background, Format or Layout took about a second to
+    /// show on the card. Each change waited out the 200 ms typing debounce, then re-decoded
+    /// the cover from disk, drew the card at 1080 px, PNG-encoded it and decoded the PNG back
+    /// (headless, 3000 px cover: 340-530 ms a change). The card has to follow at once.
+    /// </summary>
+    [AvaloniaFact]
+    public void OptionChanges_ReachThePreview_AtOnce()
+    {
+        var dir = Path.Combine(Path.GetTempPath(), $"noctis-share-test-{Guid.NewGuid():N}");
+        Directory.CreateDirectory(dir);
+        var track = Song();
+        track.AlbumArtworkPath = WriteCover(dir, 3000);
+        var vm = new LyricShareViewModel(track, new[]
+        {
+            "You can't do this 'cause you ain't me", "it drives you crazy every single night",
+            "third line here", "fourth line here",
+        }, 0);
+        try
+        {
+            Assert.True(PumpUntil(() => vm.Preview != null, 10000), "preview never rendered");
+            var changes = new (string Name, Action Apply)[]
+            {
+                ("Text: White", () => vm.TextColorIndex = 1),
+                ("Text: Black", () => vm.TextColorIndex = 2),
+                ("Background: Artwork", () => vm.SelectedBackground = vm.BackgroundChoices[0]),
+                ("Format: 9:16", () => vm.FormatIndex = 1),
+                ("Layout: Poster", () => vm.LayoutIndex = 1),
+                ("Background: Navy", () => vm.SelectedBackground = vm.BackgroundChoices.First(c => c.Hex == "#0D2137")),
+                ("Format: 1:1", () => vm.FormatIndex = 0),
+                ("Layout: Card", () => vm.LayoutIndex = 0),
+                ("Background: Auto", () => vm.SelectedBackground = vm.BackgroundChoices[1]),
+            };
+            var times = new List<(string Name, long Ms)>();
+            var shapes = new List<(string Name, bool Story, PixelSize Size)>();
+            foreach (var (name, apply) in changes)
+            {
+                var before = vm.Preview;
+                var sw = Stopwatch.StartNew();
+                apply();
+                Assert.True(PumpUntil(() => vm.IsPreviewCurrent && !ReferenceEquals(vm.Preview, before), 5000),
+                    $"{name} never reached the preview");
+                times.Add((name, sw.ElapsedMilliseconds));
+                shapes.Add((name, vm.IsStory, vm.Preview!.PixelSize));
+            }
+            var report = string.Join(", ", times.Select(t => $"{t.Name} {t.Ms} ms"));
+            var median = times.Select(t => t.Ms).OrderBy(ms => ms).ElementAt(times.Count / 2);
+            Assert.True(median <= 100, $"median {median} ms: {report}");
+            Assert.True(times.Max(t => t.Ms) <= 250, report);
+            // The bitmap that landed is the card for the new options (9:16 is tall).
+            foreach (var (name, story, size) in shapes)
+                Assert.True(story ? size.Height > size.Width : size.Height == size.Width, $"after {name} the preview is {size}");
+        }
+        finally
+        {
+            vm.Detach();
+            try { Directory.Delete(dir, true); } catch { }
+        }
+    }
+
     // ── Clip export ──
 
     /// <summary>Fakes the converter service so ExportClipAsync finds "ffmpeg" (our script).</summary>
@@ -141,7 +269,7 @@ public class LyricShareDialogTests
             var audio = Path.Combine(dir, "song.flac");
             File.WriteAllText(audio, "audio");
             var vm = new LyricShareViewModel(Song(filePath: audio), new[] { "one", "two", "three" }, 0);
-            Assert.True(PumpUntil(() => vm.CurrentPng != null), "preview never rendered");
+            Assert.True(PumpUntil(() => vm.Preview != null), "preview never rendered");
 
             var output = Path.Combine(dir, "clip.mp4");
             var export = vm.ExportClipAsync(output);
@@ -158,6 +286,35 @@ public class LyricShareDialogTests
             App.Services = previous;
             try { Directory.Delete(dir, true); } catch { }
         }
+    }
+
+    /// <summary>
+    /// Bug: closing the dialog while a line's edit box was emptied rendered the card again
+    /// after the dialog was gone. Detach puts the line's text back (EndEdit) while it still
+    /// listens to the lines, so the card re-rendered; with word-timed lyrics that render
+    /// re-armed the 30 Hz karaoke timer, which went on drawing frames for a closed dialog.
+    /// </summary>
+    [AvaloniaFact]
+    public void Closing_WhileALineIsBlanked_DoesNotRenderAgain()
+    {
+        using var persistence = new TestPersistenceService();
+        var player = new PlayerViewModel(new FakeAudioPlayer(), new FakeLibraryService(), persistence, new FakeAnimatedCoverService());
+        var song = Song();
+        player.CurrentTrack = song;
+        var lines = new[] { "one two", "three four", "five six" };
+        var stamps = lines.Select((_, i) => (TimeSpan?)TimeSpan.FromSeconds(i * 5)).ToList();
+        var words = lines.Select((l, i) => (IReadOnlyList<WordTiming>?)l.Split(' ')
+            .Select((w, k) => new WordTiming { Text = w, Start = TimeSpan.FromSeconds(i * 5 + k) }).ToList()).ToList();
+        var vm = new LyricShareViewModel(song, lines, stamps, player, words);
+        Assert.True(PumpUntil(() => vm.AnimatedPreview != null, 5000), "the karaoke preview never started");
+
+        vm.BeginEdit(vm.Lines[0]);
+        vm.Lines[0].Text = "  ";
+        vm.Detach(); // what closing the dialog does
+
+        PumpUntil(() => false, 700);
+        Assert.Equal("one two", vm.Lines[0].Text);
+        Assert.Null(vm.AnimatedPreview);
     }
 
     // ── Playback sync ──
@@ -285,8 +442,68 @@ public class LyricShareDialogTests
         finally { vm.Detach(); }
     }
 
+    /// <summary>Owner 10-12: picked neighbours read as one block in the list. Each picked line
+    /// knows whether the line above / below is picked too, through taps, Clear and playback
+    /// sync, and its row carries that as join-up / join-down.</summary>
+    [AvaloniaFact]
+    public void PickedNeighbours_JoinIntoOneRun()
+    {
+        EnsureAppStyles();
+        var vm = new LyricShareViewModel(Song(), Enumerable.Range(0, 8).Select(i => $"line {i}").ToList(), 0);
+        var win = new Noctis.Views.LyricShareDialog(vm) { Width = 1280, Height = 860 };
+        win.Show();
+        try
+        {
+            // Opens with lines 0-3 picked: one run.
+            Assert.Equal(new[] { 1, 2, 3 }, Indexes(vm, l => l.JoinsPrevious));
+            Assert.Equal(new[] { 0, 1, 2 }, Indexes(vm, l => l.JoinsNext));
+
+            vm.ToggleLine(vm.Lines[2]); // splits it: 0-1 and 3
+            vm.ToggleLine(vm.Lines[5]); // a lone pick
+            Assert.Equal(new[] { 1 }, Indexes(vm, l => l.JoinsPrevious));
+            Assert.Equal(new[] { 0 }, Indexes(vm, l => l.JoinsNext));
+
+            vm.ToggleLine(vm.Lines[4]); // bridges 3 and 5
+            Assert.Equal(new[] { 1, 4, 5 }, Indexes(vm, l => l.JoinsPrevious));
+            Assert.Equal(new[] { 0, 3, 4 }, Indexes(vm, l => l.JoinsNext));
+
+            var list = Named<ItemsControl>(win, "LineItems");
+            Assert.True(PumpUntil(() => list.Bounds.Width > 0));
+            Panel Row(int i) => Avalonia.VisualTree.VisualExtensions.GetVisualDescendants(list).OfType<Panel>()
+                .First(p => p.Classes.Contains("sl-line") && ReferenceEquals(p.DataContext, vm.Lines[i]));
+            Assert.Equal(new[] { true, true }, new[] { Row(4).Classes.Contains("join-up"), Row(4).Classes.Contains("join-down") });
+            Assert.Equal(new[] { true, false }, new[] { Row(5).Classes.Contains("join-up"), Row(5).Classes.Contains("join-down") });
+            Assert.Equal(new[] { false, false }, new[] { Row(6).Classes.Contains("join-up"), Row(6).Classes.Contains("join-down") });
+
+            vm.ClearSelectionCommand.Execute(null);
+            Assert.DoesNotContain(vm.Lines, l => l.JoinsPrevious || l.JoinsNext);
+        }
+        finally { if (win.IsVisible) { win.Close(); PumpUntil(() => !win.IsVisible); } }
+
+        // Follow playback picks a window of lines in bulk; the run follows it.
+        using var persistence = new TestPersistenceService();
+        var player = new PlayerViewModel(new FakeAudioPlayer(), new FakeLibraryService(), persistence, new FakeAnimatedCoverService());
+        var song = Song();
+        player.CurrentTrack = song;
+        var stamps = Enumerable.Range(0, 10).Select(i => (TimeSpan?)TimeSpan.FromSeconds(i * 10)).ToList();
+        var synced = new LyricShareViewModel(song, Enumerable.Range(0, 10).Select(i => $"line {i}").ToList(), stamps, player);
+        try
+        {
+            player.Position = TimeSpan.FromSeconds(45);
+            Dispatcher.UIThread.RunJobs();
+            Assert.Equal(new[] { 4, 5, 6, 7 }, Selected(synced));
+            Assert.Equal(new[] { 5, 6, 7 }, Indexes(synced, l => l.JoinsPrevious));
+            Assert.Equal(new[] { 4, 5, 6 }, Indexes(synced, l => l.JoinsNext));
+        }
+        finally { synced.Detach(); }
+    }
+
+    private static int[] Indexes(LyricShareViewModel vm, Func<SelectableLyricLine, bool> flag)
+        => vm.Lines.Select((l, i) => (l, i)).Where(p => flag(p.l)).Select(p => p.i).ToArray();
+
     /// <summary>Not a bug: names built from titles carry no characters the file system refuses.</summary>
-    [Fact]
+    // AvaloniaFact: the view model posts its first preview render to the UI dispatcher.
+    [AvaloniaFact]
     public void SuggestedNames_HaveNoInvalidCharacters()
     {
         var vm = new LyricShareViewModel(Song("Live: \"Who?\" <A|B>*", "AC/DC"), new[] { "x" }, 0);
@@ -298,6 +515,34 @@ public class LyricShareDialogTests
             Assert.Equal(-1, vm.SuggestedVideoFileName.IndexOfAny(Path.GetInvalidFileNameChars()));
         }
         finally { vm.Detach(); }
+    }
+
+    /// <summary>A song without an artist: the name starts with the title, not " - ".</summary>
+    [AvaloniaFact]
+    public void SuggestedName_WithoutAnArtist_StartsWithTheTitle()
+    {
+        var vm = new LyricShareViewModel(Song("Intro", ""), new[] { "x" }, 0);
+        try
+        {
+            Assert.Equal("Intro lyrics.png", vm.SuggestedFileName);
+            Assert.Equal("Intro lyrics.mp4", vm.SuggestedVideoFileName);
+        }
+        finally { vm.Detach(); }
+    }
+
+    /// <summary>The export status the dialog shows reads in the app language (it was fixed English).</summary>
+    [AvaloniaFact]
+    public void ExportStatus_ReadsInTheAppLanguage()
+    {
+        try
+        {
+            Noctis.Localization.Loc.Instance.SetCulture("ru");
+            Assert.Equal(Noctis.Localization.Loc.T("ShareLyrics.Saved"), Noctis.Helpers.PngExportHelper.SavedStatus);
+            Assert.NotEqual("Copied to clipboard", Noctis.Helpers.PngExportHelper.CopiedStatus);
+            Assert.StartsWith(Noctis.Localization.Loc.T("ShareLyrics.SaveFailed"), Noctis.Helpers.PngExportHelper.SaveFailedStatus("disk full"));
+            Assert.EndsWith("disk full", Noctis.Helpers.PngExportHelper.SaveFailedStatus("disk full"));
+        }
+        finally { Noctis.Localization.Loc.Instance.SetCulture("en"); }
     }
 
     /// <summary>Edit in place: Esc puts the text back, an emptied line gets its text back,
@@ -432,6 +677,162 @@ public class LyricShareDialogTests
             }
             finally { if (win.IsVisible) { win.Close(); PumpUntil(() => !win.IsVisible); } }
         });
+    }
+
+    /// <summary>
+    /// Bug (owner 10-12 screenshot): the option lists opened below their pills, which sit at
+    /// the card's foot, so the Background list (320 px) hung 233 px under the card, down to
+    /// the window's bottom edge, its last row cut off there; in a 910 px window it ran 98 px
+    /// past the edge. On Windows the list is its own popup window, bounded by the screen and
+    /// not by the dialog, so nothing pulled it back in: the constraint is switched off here
+    /// to place it the same way. Every list opens upward now, inside the card.
+    /// </summary>
+    [AvaloniaFact]
+    public void OptionLists_OpenUpward_InsideTheCard()
+    {
+        EnsureAppStyles();
+        var vm = new LyricShareViewModel(Song(), Enumerable.Range(0, 12).Select(i => $"line {i}").ToList(), 0);
+        var win = new Noctis.Views.LyricShareDialog(vm) { Width = 1154, Height = 910 };
+        win.Show();
+        try
+        {
+            var host = Avalonia.VisualTree.VisualExtensions.GetVisualDescendants(win).OfType<Noctis.Controls.PillDialogHost>().Single();
+            Assert.True(PumpUntil(() => host.Card is { Opacity: > 0.999 }), "open animation never settled");
+            var card = host.Card!;
+            var cardTop = card.TranslatePoint(default, win)!.Value.Y;
+            var cardBottom = cardTop + card.Bounds.Height;
+            foreach (var name in new[] { "LayoutBox", "FormatBox", "TextColorBox", "BackgroundBox" })
+            {
+                var box = Named<ComboBox>(win, name);
+                var popup = Avalonia.VisualTree.VisualExtensions.GetVisualDescendants(box)
+                    .OfType<Avalonia.Controls.Primitives.Popup>().Single(p => p.Name == "PART_Popup");
+                popup.PlacementConstraintAdjustment = Avalonia.Controls.Primitives.PopupPositioning.PopupPositionerConstraintAdjustment.None;
+                box.IsDropDownOpen = true;
+                Assert.True(PumpUntil(() => popup.IsOpen && popup.Child is Control { Bounds.Height: > 0 }), $"{name}: the list never opened");
+                var list = (Control)popup.Child!;
+                var top = list.TranslatePoint(default, win)!.Value.Y;
+                var bottom = top + list.Bounds.Height;
+                var boxTop = box.TranslatePoint(default, win)!.Value.Y;
+                // + 1.5: the list's edge sits a pixel over its pill, as Fluent places it.
+                Assert.True(top >= cardTop && bottom <= boxTop + 1.5,
+                    $"{name}: list at {top:0}..{bottom:0}, its pill at {boxTop:0}, the card {cardTop:0}..{cardBottom:0}, the window 0..910");
+                box.IsDropDownOpen = false;
+                PumpUntil(() => !popup.IsOpen, 1000);
+            }
+        }
+        finally { if (win.IsVisible) { win.Close(); PumpUntil(() => !win.IsVisible); } }
+    }
+
+    /// <summary>
+    /// Bug: a double-click to edit a line moved its text about 8 px right and grew the row by
+    /// about 19 px. TextBox.sl-edit (Padding 12,6 and MinHeight 0, under a -12,-6 margin so the
+    /// text stays put) lived in Window.Styles, but PillDialogHost adds PillDialog.axaml to its
+    /// own Styles, nearer the box, so pill-area's Padding 18,14 and MinHeight 40 won.
+    /// </summary>
+    [AvaloniaFact]
+    public void EditBox_KeepsTheLineInPlace()
+    {
+        EnsureAppStyles();
+        var vm = new LyricShareViewModel(Song(), new[] { "alpha line", "beta line" }, 0);
+        var win = new Noctis.Views.LyricShareDialog(vm) { Width = 1280, Height = 860 };
+        win.Show();
+        try
+        {
+            var host = Avalonia.VisualTree.VisualExtensions.GetVisualDescendants(win).OfType<Noctis.Controls.PillDialogHost>().Single();
+            Assert.True(PumpUntil(() => host.Card is { Opacity: > 0.999 }), "open animation never settled");
+            var list = Named<ItemsControl>(win, "LineItems");
+            var row = Avalonia.VisualTree.VisualExtensions.GetVisualDescendants(list).OfType<Panel>()
+                .First(p => p.Classes.Contains("sl-line") && ReferenceEquals(p.DataContext, vm.Lines[1]));
+            var text = Avalonia.VisualTree.VisualExtensions.GetVisualDescendants(row).OfType<TextBlock>().Single(t => t.Classes.Contains("sl-text"));
+            var x0 = text.TranslatePoint(default, row)!.Value.X;
+            var h0 = row.Bounds.Height;
+
+            vm.BeginEdit(vm.Lines[1]);
+            var box = Avalonia.VisualTree.VisualExtensions.GetVisualDescendants(row).OfType<TextBox>().Single();
+            Assert.True(PumpUntil(() => box.IsVisible && box.Bounds.Height > 0));
+            PumpUntil(() => false, 50);
+            var presenter = Avalonia.VisualTree.VisualExtensions.GetVisualDescendants(box).OfType<Avalonia.Controls.Presenters.TextPresenter>().First();
+            var x1 = presenter.TranslatePoint(default, row)!.Value.X;
+            Assert.True(Math.Abs(x1 - x0) <= 2, $"the text moved {x1 - x0:0.0} px (padding {box.Padding})");
+            Assert.True(row.Bounds.Height - h0 <= 4, $"the row grew {row.Bounds.Height - h0:0.0} px (min height {box.MinHeight})");
+        }
+        finally { if (win.IsVisible) { win.Close(); PumpUntil(() => !win.IsVisible); } }
+    }
+
+    /// <summary>
+    /// Bug: the Background swatches' ring was a fixed white (#40FFFFFF), so on the Light
+    /// theme's pale list the pale swatches had no edge: Mist (#E4ECF4) and Cream (#F5E6CC) sat
+    /// on the #F2F2F2 list at about 1.07:1 and 1.1:1 and all but vanished. The ring has to
+    /// stand off the list on both themes: darker on Light, lighter on Dark.
+    /// </summary>
+    [AvaloniaFact]
+    public void SwatchRings_StandOffTheList_OnBothThemes()
+    {
+        EnsureAppStyles();
+        foreach (var variant in new[] { Avalonia.Styling.ThemeVariant.Light, Avalonia.Styling.ThemeVariant.Dark })
+        {
+            var vm = new LyricShareViewModel(Song(), new[] { "one" }, 0);
+            var win = new Noctis.Views.LyricShareDialog(vm) { RequestedThemeVariant = variant, Width = 1280, Height = 860 };
+            win.Show();
+            try
+            {
+                var box = Named<ComboBox>(win, "BackgroundBox");
+                var popup = Avalonia.VisualTree.VisualExtensions.GetVisualDescendants(box)
+                    .OfType<Avalonia.Controls.Primitives.Popup>().Single(p => p.Name == "PART_Popup");
+                box.IsDropDownOpen = true;
+                Assert.True(PumpUntil(() => popup.IsOpen && popup.Child is Control { Bounds.Height: > 0 }), "the list never opened");
+                var list = (Border)popup.Child!;
+                var under = AccentTestHarness.ColorOf(list.Background);
+                var rings = Avalonia.VisualTree.VisualExtensions.GetVisualDescendants(list).OfType<Border>()
+                    .Where(b => b.DataContext is ShareBackgroundChoice && b.Width == 16).ToList();
+                Assert.NotEmpty(rings);
+                foreach (var ring in rings)
+                {
+                    var c = AccentTestHarness.ColorOf(ring.BorderBrush);
+                    double a = c.A / 255.0;
+                    double Lum(double r, double g, double b) => (0.2126 * r + 0.7152 * g + 0.0722 * b) / 255;
+                    var drawn = Lum(a * c.R + (1 - a) * under.R, a * c.G + (1 - a) * under.G, a * c.B + (1 - a) * under.B);
+                    var delta = drawn - Lum(under.R, under.G, under.B);
+                    Assert.True(variant == Avalonia.Styling.ThemeVariant.Light ? delta < -0.05 : delta > 0.05,
+                        $"{variant}: ring {c} on the {under} list shifts it by {delta:0.000}");
+                }
+                box.IsDropDownOpen = false;
+            }
+            finally { if (win.IsVisible) { win.Close(); PumpUntil(() => !win.IsVisible); } }
+        }
+    }
+
+    /// <summary>
+    /// Bug: Save Card drew the full-size card (2160 px, PNG) before the save picker opened, so
+    /// a click sat 0.3-0.9 s before anything showed (measured: 1:1 solid ~300 ms, 9:16 artwork
+    /// ~870 ms). The card renders while the picker is up. Headless, the picker cancels at once,
+    /// so the click is done long before the card could have rendered.
+    /// </summary>
+    [AvaloniaFact]
+    public void SaveCard_OpensThePicker_WithoutWaitingForTheRender()
+    {
+        EnsureAppStyles();
+        var dir = Path.Combine(Path.GetTempPath(), $"noctis-share-test-{Guid.NewGuid():N}");
+        Directory.CreateDirectory(dir);
+        var track = Song();
+        track.AlbumArtworkPath = WriteCover(dir, 3000);
+        var vm = new LyricShareViewModel(track, new[] { "one line", "two lines", "three lines" }, 0) { FormatIndex = 1 };
+        vm.SelectedBackground = vm.BackgroundChoices[0];
+        var win = new Noctis.Views.LyricShareDialog(vm) { Width = 1280, Height = 860 };
+        win.Show();
+        try
+        {
+            Assert.True(PumpUntil(() => vm.Preview != null && vm.IsPreviewCurrent, 10000), "preview never rendered");
+            var sw = Stopwatch.StartNew();
+            Named<Button>(win, "SaveCardButton").RaiseEvent(new Avalonia.Interactivity.RoutedEventArgs(Button.ClickEvent));
+            Assert.True(PumpUntil(() => !win.IsBusy, 5000), "Save Card never finished");
+            Assert.True(sw.ElapsedMilliseconds < 150, $"the picker waited {sw.ElapsedMilliseconds} ms for the card");
+        }
+        finally
+        {
+            if (win.IsVisible) { win.Close(); PumpUntil(() => !win.IsVisible); }
+            try { Directory.Delete(dir, true); } catch { }
+        }
     }
 
     /// <summary>Esc in a line's edit box puts the text back and keeps the dialog open.</summary>

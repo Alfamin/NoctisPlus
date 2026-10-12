@@ -15,7 +15,7 @@ using Noctis.ViewModels;
 
 namespace Noctis.Views;
 
-public partial class LibrarySongsView : UserControl
+public partial class LibrarySongsView : UserControl, ITrackSelectionSource
 {
     private LibrarySongsViewModel? _vm;
     private EventHandler? _pendingScrollRestore;
@@ -26,6 +26,9 @@ public partial class LibrarySongsView : UserControl
     // ctrl-selected class onto a different track when the user scrolls or
     // tabs back to the page. See MultiSelectHelper's "Data-tracked variants".
     private readonly HashSet<Track> _selectedTracks = new();
+
+    /// <summary>The Ctrl-selection, for window shortcuts (GitHub #131 ReplayGain).</summary>
+    public IReadOnlyList<Track> GetSelectedTracks() => _selectedTracks.ToList();
     private TrackContextMenuBuilder? _menuBuilder;
     /// <summary>Culture the menu's strings were read in (they are read once, at Build).</summary>
     private string? _menuCulture;

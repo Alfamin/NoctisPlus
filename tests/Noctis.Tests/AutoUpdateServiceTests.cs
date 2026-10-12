@@ -184,6 +184,25 @@ public class AutoUpdateLaunchInstallTests : IDisposable
         Assert.Equal(0, p.LaunchAttempts);
     }
 
+    /// <summary>A two-part tag ("v99.1") parses with Build -1; Version.ToString(3) threw on it, so the
+    /// verified download was never queued.</summary>
+    [Fact]
+    public async Task Schedule_TwoPartTag_IsQueuedAsThreePartVersion()
+    {
+        var file = Path.Combine(_dir, "installer.bin");
+        await File.WriteAllTextAsync(file, "verified bytes", TestContext.Current.CancellationToken);
+        var store = new AutoUpdateStore(_dir);
+
+        var update = new UpdateInfo
+        {
+            TagName = "v99.1", Version = UpdateService.ParseTag("v99.1")!,
+            ReleaseUrl = "https://github.com/heartached/Noctis/releases/tag/v99.1"
+        };
+        await Service().ScheduleAutoInstallAsync(update, file, store);
+
+        Assert.Equal("99.1.0", store.Load()!.Pending!.ToVersion);
+    }
+
     /// <summary>Re-queueing the same release keeps its failures: an installer that never starts
     /// (or a file that keeps vanishing) can't reset the count by downloading again, so the third
     /// failure blocks the tag instead of re-downloading forever.</summary>

@@ -12,7 +12,8 @@
                 Height="{Binding $self.Bounds.Width}" Margin="0,0,0,4">
             <Panel>
                 <PathIcon Data="{DynamicResource AlbumsIcon}" Width="30" Height="30" Opacity="0.4" />
-                <controls:CachedImage SourcePath="{Binding ArtworkPath}" DecodeWidth="384" Stretch="UniformToFill" />
+                <!-- Decoded at exactly the pixels it is drawn at: a bucketed decode was resampled again on draw. -->
+                <controls:CachedImage SourcePath="{Binding ArtworkPath}" DecodeWidth="768" PixelExact="True" Stretch="UniformToFill" />
             </Panel>
         </Border>
         <TextBlock Classes="row-title" FontSize="13" FontWeight="SemiBold" Text="{Binding Title}" />

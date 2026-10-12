@@ -1249,7 +1249,7 @@
     <comment>Text in SettingsView.axaml</comment>
   </data>
   <data name="Settings.ControlPlaybackFromPhone" xml:space="preserve">
-    <value>التحكم في التشغيل من هاتفك على الشبكة المحلية. غير مشفرة، لذلك تجنب Wi-Fi.</value>
+    <value>تحكّم فيما يُشغَّل من متصفح هاتفك. لا حاجة إلى تطبيق. استخدمه فقط على شبكة Wi-Fi تثق بها.</value>
     <comment>Text in SettingsView.axaml</comment>
   </data>
   <data name="Settings.TapEnlargeTip" xml:space="preserve">
@@ -1257,7 +1257,7 @@
     <comment>ToolTip.Tip in SettingsView.axaml</comment>
   </data>
   <data name="Settings.IfPhoneBlocksLink" xml:space="preserve">
-    <value>إذا كان هاتفك يعرف الرابط بأنه غير آمن، اختر المتابعة. يستخدم جهاز التحكم عن بعد HTTP عادي.</value>
+    <value>إذا قال هاتفك إن الرابط غير آمن، فاضغط على متابعة.</value>
     <comment>Text in SettingsView.axaml</comment>
   </data>
   <data name="Settings.OPENPHONE" xml:space="preserve">
@@ -1273,7 +1273,7 @@
     <comment>Text in SettingsView.axaml</comment>
   </data>
   <data name="Settings.WaitingPhoneScanCode" xml:space="preserve">
-    <value>بانتظار هاتف. امسح الرمز أو انقر عليه لتكبيره.</value>
+    <value>بانتظار هاتف. انقر على الرمز لتكبيره.</value>
     <comment>Text in SettingsView.axaml</comment>
   </data>
   <data name="Settings.PhoneConnected" xml:space="preserve">
@@ -5387,10 +5387,10 @@
     <value>المنفذ</value>
   </data>
   <data name="Server.AddressLabel" xml:space="preserve">
-    <value>عنوان الخادم</value>
+    <value>العنوان</value>
   </data>
   <data name="Server.FingerprintLabel" xml:space="preserve">
-    <value>بصمة الشهادة (SHA-256) — قارنها عندما يطلب هاتفك الوثوق بها</value>
+    <value>رمز الأمان</value>
   </data>
   <data name="Server.Waiting" xml:space="preserve">
     <value>بانتظار اتصال جهاز…</value>
@@ -5420,7 +5420,7 @@
     <value>مفتاح API الخاص بـ</value>
   </data>
   <data name="Server.ApiKeyOnce" xml:space="preserve">
-    <value>انسخها الآن. تظهر مرة واحدة ، ويستبدل مفتاح جديد.</value>
+    <value>انسخه الآن. لن تراه مرة أخرى.</value>
   </data>
   <data name="Server.Done" xml:space="preserve">
     <value>تم</value>
@@ -5676,7 +5676,7 @@
     <comment>No-account state title</comment>
   </data>
   <data name="AccountSync.CreateHelp" xml:space="preserve">
-    <value>أجهزة تسجيل الدخول الخاصة بك بهذا التصفح والتشغيل والمزامنة. يتم تخزين كلمة المرور ولا تترك هذا الكمبيوتر.</value>
+    <value>يسجّل هاتفك الدخول بهذا الحساب. كلمة المرور لا تغادر هذا الكمبيوتر أبدًا.</value>
     <comment>No-account state help</comment>
   </data>
   <data name="AccountSync.Name" xml:space="preserve">
@@ -5692,7 +5692,7 @@
     <comment>Create form button</comment>
   </data>
   <data name="AccountSync.PairDevice" xml:space="preserve">
-    <value>إقران جهاز</value>
+    <value>توصيل هاتف</value>
     <comment>Account card button</comment>
   </data>
   <data name="AccountSync.NewApiKey" xml:space="preserve">
@@ -5712,7 +5712,7 @@
     <comment>Change password button</comment>
   </data>
   <data name="AccountSync.Remove" xml:space="preserve">
-    <value>إزالة</value>
+    <value>تسجيل الخروج</value>
     <comment>Account card button</comment>
   </data>
   <data name="AccountSync.PairHelp" xml:space="preserve">
@@ -5728,7 +5728,7 @@
     <comment>Pairing block button</comment>
   </data>
   <data name="AccountSync.SyncSection" xml:space="preserve">
-    <value>سفينة</value>
+    <value>المزامنة</value>
     <comment>Account &amp; Sync section title</comment>
   </data>
   <data name="AccountSync.OtherAccounts" xml:space="preserve">
@@ -5744,15 +5744,15 @@
     <comment>Other accounts card help</comment>
   </data>
   <data name="Sync.Title" xml:space="preserve">
-    <value>المزامنة بين أجهزتك</value>
+    <value>المزامنة مع هاتفك</value>
     <comment>Sync card title</comment>
   </data>
   <data name="Sync.Description" xml:space="preserve">
-    <value>المفضلة، التقييمات، العد و قوائم التشغيل تبقى كما هي على كل جهاز مسجل الدخول. يفوز أحدث تغيير.</value>
+    <value>تبقى المفضلة والتقييمات وعدد مرات التشغيل وقوائم التشغيل متطابقة على هاتفك وهذا الكمبيوتر.</value>
     <comment>Sync card description</comment>
   </data>
   <data name="Sync.DeviceName" xml:space="preserve">
-    <value>هذا الجهاز</value>
+    <value>اسم هذا الكمبيوتر</value>
     <comment>Sync card row label</comment>
   </data>
   <data name="Sync.WhatSyncs" xml:space="preserve">
@@ -6096,7 +6096,7 @@
     <comment>Settings page description</comment>
   </data>
   <data name="Settings.Desc.AccountDevices" xml:space="preserve">
-    <value>الحساب الخاص بك، المزامنة بين الأجهزة، و الويب عن بعد.</value>
+    <value>حسابك وهاتفك والتحكم عن بُعد.</value>
     <comment>Settings page description</comment>
   </data>
   <data name="Settings.Desc.Integrations" xml:space="preserve">
@@ -6364,5 +6364,320 @@
   </data>
   <data name="Settings.Group.More" xml:space="preserve">
     <value>المزيد</value>
+  </data>
+  <data name="AccountSync.PairPhoneHint" xml:space="preserve">
+    <value>في تطبيق Noctis على هاتفك، افتح الإعدادات ثم الحساب. أدخل هذا العنوان وسجّل الدخول ببريدك الإلكتروني أو اسم المستخدم وكلمة المرور.</value>
+    <comment>Pairing block help above the address and fingerprint</comment>
+  </data>
+  <data name="AccountSync.SignedInDevices" xml:space="preserve">
+    <value>هواتفك</value>
+    <comment>Account card list label</comment>
+  </data>
+  <data name="AccountSync.NoSignedInDevices" xml:space="preserve">
+    <value>لا يوجد هاتف متصل بعد.</value>
+    <comment>Account card list empty state</comment>
+  </data>
+  <data name="Settings.LocalApiDesc" xml:space="preserve">
+    <value>يتيح للتطبيقات على هذا الكمبيوتر، مثل Stream Deck أو OBS، معرفة ما يُشغَّل الآن والتحكم في Noctis.</value>
+    <comment>Text in SettingsView.axaml</comment>
+  </data>
+  <data name="Settings.LocalApiWarning" xml:space="preserve">
+    <value>أي تطبيق لديه رمز الوصول هذا يمكنه التحكم في Noctis وقراءة مكتبتك. لا تعطه إلا للتطبيقات التي تثق بها.</value>
+    <comment>Text in SettingsView.axaml</comment>
+  </data>
+  <data name="Settings.LocalApiDiscovery" xml:space="preserve">
+    <value>يمكن للتطبيقات أيضًا قراءته من الملف local-api.json في مجلد بيانات Noctis.</value>
+    <comment>Text in SettingsView.axaml</comment>
+  </data>
+  <data name="Settings.Section.PhoneApp" xml:space="preserve">
+    <value>تطبيق الهاتف</value>
+    <comment>Settings section label, Account &amp; Devices tab</comment>
+  </data>
+  <data name="Settings.Section.RemoteControl" xml:space="preserve">
+    <value>التحكم عن بُعد</value>
+    <comment>Settings section label, Account &amp; Devices tab</comment>
+  </data>
+  <data name="Settings.Section.PcApps" xml:space="preserve">
+    <value>التطبيقات على هذا الكمبيوتر</value>
+    <comment>Settings section label, Account &amp; Devices tab (Local API)</comment>
+  </data>
+  <data name="Phone.Title" xml:space="preserve">
+    <value>Noctis على هاتفك</value>
+    <comment>Phone app card title; its switch turns Noctis Server on/off</comment>
+  </data>
+  <data name="Phone.Description" xml:space="preserve">
+    <value>استمع إلى هذه المكتبة ونزّلها على هاتفك.</value>
+    <comment>Phone app card subtitle</comment>
+  </data>
+  <data name="Phone.NeedsAccount" xml:space="preserve">
+    <value>أنشئ حسابك في الأعلى أولًا.</value>
+    <comment>Phone app card, shown when there is no account</comment>
+  </data>
+  <data name="Phone.CodeHint" xml:space="preserve">
+    <value>يظهر هذا الرمز على هاتفك أيضًا. لا تسجّل الدخول إلا إذا تطابق الرمزان.</value>
+    <comment>Under the certificate security code in the pairing panel</comment>
+  </data>
+  <data name="Phone.Synced" xml:space="preserve">
+    <value>تمت المزامنة {0}</value>
+    <comment>Phone list row status; {0} = 'just now', '5 min ago', '3 h ago' or 'on 9 Oct, 14:05'</comment>
+  </data>
+  <data name="Phone.Connected" xml:space="preserve">
+    <value>تم الاتصال {0}</value>
+    <comment>Phone list row status when sync is off or the phone never synced; {0} = relative time</comment>
+  </data>
+  <data name="Phone.SignedOut" xml:space="preserve">
+    <value>تم تسجيل الخروج</value>
+    <comment>Phone list row status: the sync data knows this phone but it no longer has a sign-in key</comment>
+  </data>
+  <data name="Phone.LastSynced" xml:space="preserve">
+    <value>آخر مزامنة {0}</value>
+    <comment>Under the sync switch; {0} = relative time</comment>
+  </data>
+  <data name="Phone.NotSyncedYet" xml:space="preserve">
+    <value>لم تتم المزامنة بعد</value>
+    <comment>Under the sync switch when no phone has synced</comment>
+  </data>
+  <data name="Phone.SyncFailed" xml:space="preserve">
+    <value>تعذّرت قراءة بيانات المزامنة: {0}</value>
+    <comment>Under the sync switch; {0} = error message</comment>
+  </data>
+  <data name="Phone.SignOutTip" xml:space="preserve">
+    <value>تسجيل خروج هذا الهاتف. سيحتاج إلى كلمة المرور ليتصل مجددًا.</value>
+    <comment>Tooltip on a phone's Sign out button</comment>
+  </data>
+  <data name="Phone.OtherAppsTitle" xml:space="preserve">
+    <value>تطبيقات موسيقى أخرى</value>
+    <comment>Phone app card row title (Subsonic apps)</comment>
+  </data>
+  <data name="Phone.OtherAppsDesc" xml:space="preserve">
+    <value>يمكن لتطبيقات Subsonic مثل Symfonium تسجيل الدخول ببريدك الإلكتروني ومفتاح API.</value>
+    <comment>Phone app card row text</comment>
+  </data>
+  <data name="Phone.NewApiKeyTip" xml:space="preserve">
+    <value>ينشئ مفتاحًا جديدًا. التطبيقات التي تستخدم المفتاح القديم ستحتاج إلى الجديد.</value>
+    <comment>Tooltip on New API key</comment>
+  </data>
+  <data name="AccountSync.ShowPasswordTip" xml:space="preserve">
+    <value>إظهار كلمة المرور أو إخفاؤها</value>
+    <comment>Eye button tooltip in password boxes</comment>
+  </data>
+  <data name="AccountSync.ShowKeyTip" xml:space="preserve">
+    <value>إظهار المفتاح أو إخفاؤه</value>
+    <comment>Eye button tooltip on the API key</comment>
+  </data>
+  <data name="AccountSync.ChangePasswordNote" xml:space="preserve">
+    <value>سيتم تسجيل خروج هواتفك، وستحتاج إلى كلمة المرور الجديدة.</value>
+    <comment>Under the change password box</comment>
+  </data>
+  <data name="AccountSync.DeleteAccountTip" xml:space="preserve">
+    <value>حذف الحساب</value>
+    <comment>Tooltip on the account's trash button</comment>
+  </data>
+  <data name="AccountSync.DeleteTitle" xml:space="preserve">
+    <value>حذف حسابك؟</value>
+    <comment>Delete account confirmation title</comment>
+  </data>
+  <data name="AccountSync.DeleteBody" xml:space="preserve">
+    <value>سيتم تسجيل خروج هواتفك ولن تتمكن من الاتصال حتى تنشئ حسابًا جديدًا. تبقى موسيقاك ومكتبتك على هذا الكمبيوتر كما هي.</value>
+    <comment>Delete account confirmation text</comment>
+  </data>
+  <data name="AccountSync.DeleteConfirm" xml:space="preserve">
+    <value>حذف الحساب</value>
+    <comment>Delete account confirmation button</comment>
+  </data>
+  <data name="Time.JustNow" xml:space="preserve">
+    <value>الآن</value>
+    <comment>Relative time, used after 'Synced', 'Connected', 'Last synced'</comment>
+  </data>
+  <data name="Time.MinutesAgo" xml:space="preserve">
+    <value>منذ {0} دقيقة</value>
+    <comment>Relative time; {0} = minutes</comment>
+  </data>
+  <data name="Time.HoursAgo" xml:space="preserve">
+    <value>منذ {0} ساعة</value>
+    <comment>Relative time; {0} = hours</comment>
+  </data>
+  <data name="Time.OnDate" xml:space="preserve">
+    <value>في {0}</value>
+    <comment>Relative time older than a day; {0} = date and time like '9 Oct, 14:05'</comment>
+  </data>
+  <data name="Phone.ForgetTip" xml:space="preserve">
+    <value>يزيل هذا الهاتف من القائمة. يبقى ما تمت مزامنته.</value>
+    <comment>Tooltip on Remove for a phone that is already signed out</comment>
+  </data>
+  <data name="Export.Copied" xml:space="preserve">
+    <value>تم النسخ إلى الحافظة</value>
+    <comment>Share card / Wrap status after Copy</comment>
+  </data>
+  <data name="Export.ClipboardUnavailable" xml:space="preserve">
+    <value>الحافظة غير متاحة</value>
+    <comment>Share card / Wrap status when there is no clipboard</comment>
+  </data>
+  <data name="Export.SaveImageTitle" xml:space="preserve">
+    <value>حفظ الصورة</value>
+    <comment>Title of the save dialog for a share card or Wrap image</comment>
+  </data>
+  <data name="Common.Done" xml:space="preserve">
+    <value>تم</value>
+  </data>
+  <data name="LyricsColor.Subtitle" xml:space="preserve">
+    <value>تتغير صفحة الكلمات أثناء اختيارك.</value>
+    <comment>One-line purpose under the title in LyricsBackgroundColorDialog.axaml</comment>
+  </data>
+  <data name="LyricsColor.Auto" xml:space="preserve">
+    <value>تلقائي، من صورة الألبوم</value>
+    <comment>Tooltip of the first swatch in LyricsBackgroundColorDialog.axaml (follows each song's cover)</comment>
+  </data>
+  <data name="LyricsColor.Colors" xml:space="preserve">
+    <value>الألوان</value>
+    <comment>Label above the solid swatches in LyricsBackgroundColorDialog.axaml</comment>
+  </data>
+  <data name="LyricsColor.Gradients" xml:space="preserve">
+    <value>التدرجات</value>
+    <comment>Label above the gradient swatches in LyricsBackgroundColorDialog.axaml</comment>
+  </data>
+  <data name="LyricsColor.ArtworkTitle" xml:space="preserve">
+    <value>صورة ألبوم مموّهة</value>
+    <comment>Artwork mode heading in LyricsBackgroundColorDialog.axaml</comment>
+  </data>
+  <data name="LyricsColor.ArtworkHint" xml:space="preserve">
+    <value>يتبع غلاف كل أغنية. تُضبط حركته في الإعدادات، ضمن كلمات الأغاني.</value>
+    <comment>Artwork mode text in LyricsBackgroundColorDialog.axaml</comment>
+  </data>
+  <data name="LyricsColor.VideoNote" xml:space="preserve">
+    <value>فيديو الخلفية مُفعّل ويظهر فوق هذه الخلفية.</value>
+    <comment>Note in LyricsBackgroundColorDialog.axaml while a lyrics background video plays</comment>
+  </data>
+  <data name="Common.Play" xml:space="preserve">
+    <value>مرة تشغيل</value>
+    <comment>Word after a play count of exactly 1 (Home and album rows: 1 play)</comment>
+  </data>
+  <data name="Shortcuts.Group.Playback" xml:space="preserve">
+    <value>التشغيل</value>
+    <comment>Settings › Shortcuts (GitHub #131)</comment>
+  </data>
+  <data name="Shortcuts.Group.Window" xml:space="preserve">
+    <value>النافذة</value>
+    <comment>Settings › Shortcuts (GitHub #131)</comment>
+  </data>
+  <data name="Shortcuts.Group.Navigation" xml:space="preserve">
+    <value>التنقل</value>
+    <comment>Settings › Shortcuts (GitHub #131)</comment>
+  </data>
+  <data name="Shortcuts.Group.Library" xml:space="preserve">
+    <value>المكتبة</value>
+    <comment>Settings › Shortcuts (GitHub #131)</comment>
+  </data>
+  <data name="Shortcuts.NotSet" xml:space="preserve">
+    <value>غير معيّن</value>
+    <comment>Settings › Shortcuts (GitHub #131)</comment>
+  </data>
+  <data name="Shortcuts.AlreadyUsedBy" xml:space="preserve">
+    <value>مستخدم بالفعل لـ {0}</value>
+    <comment>Settings › Shortcuts (GitHub #131)</comment>
+  </data>
+  <data name="Shortcuts.Action.PlayPause" xml:space="preserve">
+    <value>تشغيل / إيقاف مؤقت</value>
+    <comment>Settings › Shortcuts (GitHub #131)</comment>
+  </data>
+  <data name="Shortcuts.Action.NextTrack" xml:space="preserve">
+    <value>المقطع التالي</value>
+    <comment>Settings › Shortcuts (GitHub #131)</comment>
+  </data>
+  <data name="Shortcuts.Action.PreviousTrack" xml:space="preserve">
+    <value>المقطع السابق</value>
+    <comment>Settings › Shortcuts (GitHub #131)</comment>
+  </data>
+  <data name="Shortcuts.Action.VolumeUp" xml:space="preserve">
+    <value>رفع الصوت</value>
+    <comment>Settings › Shortcuts (GitHub #131)</comment>
+  </data>
+  <data name="Shortcuts.Action.VolumeDown" xml:space="preserve">
+    <value>خفض الصوت</value>
+    <comment>Settings › Shortcuts (GitHub #131)</comment>
+  </data>
+  <data name="Shortcuts.Action.ToggleFavorite" xml:space="preserve">
+    <value>إضافة المقطع الحالي إلى المفضلة</value>
+    <comment>Settings › Shortcuts (GitHub #131)</comment>
+  </data>
+  <data name="Shortcuts.Action.ToggleFullscreen" xml:space="preserve">
+    <value>تبديل ملء الشاشة</value>
+    <comment>Settings › Shortcuts (GitHub #131)</comment>
+  </data>
+  <data name="Shortcuts.Action.SearchLibrary" xml:space="preserve">
+    <value>البحث في المكتبة</value>
+    <comment>Settings › Shortcuts (GitHub #131)</comment>
+  </data>
+  <data name="Shortcuts.Action.CommandPalette" xml:space="preserve">
+    <value>لوحة الأوامر</value>
+    <comment>Settings › Shortcuts (GitHub #131)</comment>
+  </data>
+  <data name="Shortcuts.Action.NewPlaylist" xml:space="preserve">
+    <value>قائمة تشغيل جديدة</value>
+    <comment>Settings › Shortcuts (GitHub #131)</comment>
+  </data>
+  <data name="Shortcuts.Action.ToggleQueue" xml:space="preserve">
+    <value>إظهار / إخفاء قائمة الانتظار</value>
+    <comment>Settings › Shortcuts (GitHub #131)</comment>
+  </data>
+  <data name="Shortcuts.Action.ToggleLyrics" xml:space="preserve">
+    <value>إظهار / إخفاء الكلمات</value>
+    <comment>Settings › Shortcuts (GitHub #131)</comment>
+  </data>
+  <data name="Shortcuts.Action.OpenSettings" xml:space="preserve">
+    <value>فتح الإعدادات</value>
+    <comment>Settings › Shortcuts (GitHub #131)</comment>
+  </data>
+  <data name="Shortcuts.Action.ScanReplayGain" xml:space="preserve">
+    <value>ReplayGain للأغاني المحددة</value>
+    <comment>Settings › Shortcuts (GitHub #131)</comment>
+  </data>
+  <data name="Shortcuts.Action.ToggleShuffle" xml:space="preserve">
+    <value>تشغيل / إيقاف الترتيب العشوائي</value>
+    <comment>Settings › Shortcuts (GitHub #131)</comment>
+  </data>
+  <data name="Shortcuts.Action.CycleRepeat" xml:space="preserve">
+    <value>تغيير وضع التكرار</value>
+    <comment>Settings › Shortcuts (GitHub #131)</comment>
+  </data>
+  <data name="Shortcuts.Action.ToggleMute" xml:space="preserve">
+    <value>كتم / إلغاء كتم الصوت</value>
+    <comment>Settings › Shortcuts (GitHub #131)</comment>
+  </data>
+  <data name="Shortcuts.Action.SeekForward" xml:space="preserve">
+    <value>تقديم</value>
+    <comment>Settings › Shortcuts (GitHub #131)</comment>
+  </data>
+  <data name="Shortcuts.Action.SeekBackward" xml:space="preserve">
+    <value>إرجاع</value>
+    <comment>Settings › Shortcuts (GitHub #131)</comment>
+  </data>
+  <data name="Shortcuts.Action.ToggleMiniPlayer" xml:space="preserve">
+    <value>المشغل المصغّر</value>
+    <comment>Settings › Shortcuts (GitHub #131)</comment>
+  </data>
+  <data name="Shortcuts.Action.GoBack" xml:space="preserve">
+    <value>رجوع</value>
+    <comment>Settings › Shortcuts (GitHub #131)</comment>
+  </data>
+  <data name="Shortcuts.Action.GoForward" xml:space="preserve">
+    <value>تقدّم</value>
+    <comment>Settings › Shortcuts (GitHub #131)</comment>
+  </data>
+  <data name="Shortcuts.Action.GoHome" xml:space="preserve">
+    <value>الانتقال إلى الرئيسية</value>
+    <comment>Settings › Shortcuts (GitHub #131)</comment>
+  </data>
+  <data name="Shortcuts.Action.GoSongs" xml:space="preserve">
+    <value>الانتقال إلى الأغاني</value>
+    <comment>Settings › Shortcuts (GitHub #131)</comment>
+  </data>
+  <data name="Shortcuts.Action.GoAlbums" xml:space="preserve">
+    <value>الانتقال إلى الألبومات</value>
+    <comment>Settings › Shortcuts (GitHub #131)</comment>
+  </data>
+  <data name="Shortcuts.Action.GoArtists" xml:space="preserve">
+    <value>الانتقال إلى الفنانين</value>
+    <comment>Settings › Shortcuts (GitHub #131)</comment>
   </data>
 </root>

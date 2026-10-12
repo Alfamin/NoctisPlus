@@ -40,6 +40,21 @@ public partial class SettingsViewModel : ViewModelBase
     private bool _autoDownloadRunning;
     private bool _autoDownloadPrerelease; // the running automatic download is a pre-release
     private bool _autoDownloadCancelled; // Cancel on an automatic download: no retry until the next launch
+    private string? _autoWaitStatusText; // the "downloads automatically after …" line last shown
+    private long _autoUpdateRetryTicks; // UTC ticks of AutoUpdateRetryAtUtc, 0 = none (read by the recheck loop's thread)
+
+    /// <summary>When the recheck loop should ask GitHub before its daily check: the end of a known
+    /// release's soak or download backoff, or soon after a failed check. Null = the daily check.</summary>
+    internal DateTimeOffset? AutoUpdateRetryAtUtc
+    {
+        get
+        {
+            var ticks = Interlocked.Read(ref _autoUpdateRetryTicks);
+            return ticks == 0 ? null : new DateTimeOffset(ticks, TimeSpan.Zero);
+        }
+        private set => Interlocked.Exchange(ref _autoUpdateRetryTicks, value?.UtcTicks ?? 0);
+    }
+
     private AutoUpdateStore? _autoStore;
     // Under the persistence root (not AppPaths) so tests stay isolated; the same folder in the app.
     private AutoUpdateStore AutoStore => _autoStore ??= new(_persistence.DataDirectory);
@@ -652,6 +667,94 @@ public partial class SettingsViewModel : ViewModelBase
     /// also applies to the rest of the song playing now.</summary>
     [ObservableProperty] private int _playCountThresholdPercent;
 
+    /// <summary>Settings ▸ Lyrics ▸ Save lyrics to (GitHub #135): "Sidecar", "Embedded" or "Both".</summary>
+    [ObservableProperty] private string _lyricsSaveTarget = nameof(Models.LyricsSaveTarget.Sidecar);
+
+    /// <summary>Settings ▸ Lyrics ▸ Automatically download lyrics (GitHub #135).</summary>
+    [ObservableProperty] private bool _lyricsAutoDownload;
+
+    /// <summary>Settings ▸ Lyrics ▸ Preferred lyrics type (GitHub #135): "WordSynced", "LineSynced" or "Plain".</summary>
+    [ObservableProperty] private string _lyricsPreferredType = nameof(Models.LyricsPreferredType.WordSynced);
+
+    /// <summary>One row of a lyrics saving picker: the stored value and its label.</summary>
+    public sealed record LyricsChoiceOption(string Value, string Label)
+    {
+        public override string ToString() => Label;
+    }
+
+    public IReadOnlyList<LyricsChoiceOption> LyricsSaveTargetOptions
+    {
+        get => _lyricsSaveTargetOptions;
+        private set => SetProperty(ref _lyricsSaveTargetOptions, value);
+    }
+    private IReadOnlyList<LyricsChoiceOption> _lyricsSaveTargetOptions = BuildLyricsSaveTargetOptions();
+
+    private static IReadOnlyList<LyricsChoiceOption> BuildLyricsSaveTargetOptions() =>
+        Enum.GetValues<Models.LyricsSaveTarget>()
+            .Select(t => new LyricsChoiceOption(t.ToString(), Loc.T($"Settings.LyricsSaveTarget.{t}")))
+            .ToList();
+
+    public LyricsChoiceOption? SelectedLyricsSaveTargetOption
+    {
+        get
+        {
+            var current = LyricsSaveOptions.ParseTarget(LyricsSaveTarget).ToString();
+            return LyricsSaveTargetOptions.FirstOrDefault(o => o.Value == current);
+        }
+        set
+        {
+            // A ComboBox nulls its selection while items are rebuilt; ignore that, keep the state.
+            if (value is null) return;
+            LyricsSaveTarget = value.Value;
+        }
+    }
+
+    public IReadOnlyList<LyricsChoiceOption> LyricsPreferredTypeOptions
+    {
+        get => _lyricsPreferredTypeOptions;
+        private set => SetProperty(ref _lyricsPreferredTypeOptions, value);
+    }
+    private IReadOnlyList<LyricsChoiceOption> _lyricsPreferredTypeOptions = BuildLyricsPreferredTypeOptions();
+
+    private static IReadOnlyList<LyricsChoiceOption> BuildLyricsPreferredTypeOptions() =>
+        Enum.GetValues<Models.LyricsPreferredType>()
+            .Select(t => new LyricsChoiceOption(t.ToString(), Loc.T($"Settings.LyricsPreferredType.{t}")))
+            .ToList();
+
+    public LyricsChoiceOption? SelectedLyricsPreferredTypeOption
+    {
+        get
+        {
+            var current = LyricsSaveOptions.ParsePreferredType(LyricsPreferredType).ToString();
+            return LyricsPreferredTypeOptions.FirstOrDefault(o => o.Value == current);
+        }
+        set
+        {
+            if (value is null) return;
+            LyricsPreferredType = value.Value;
+        }
+    }
+
+    partial void OnLyricsSaveTargetChanged(string value)
+    {
+        OnPropertyChanged(nameof(SelectedLyricsSaveTargetOption));
+        ApplyPlayerSettings();
+        if (_settingsLoaded) _ = SaveAsync();
+    }
+
+    partial void OnLyricsAutoDownloadChanged(bool value)
+    {
+        ApplyPlayerSettings();
+        if (_settingsLoaded) _ = SaveAsync();
+    }
+
+    partial void OnLyricsPreferredTypeChanged(string value)
+    {
+        OnPropertyChanged(nameof(SelectedLyricsPreferredTypeOption));
+        ApplyPlayerSettings();
+        if (_settingsLoaded) _ = SaveAsync();
+    }
+
     /// <summary>One row of the "Count a play after" picker.</summary>
     public sealed record PlayCountThresholdOption(int Percent, string Label)
     {
@@ -860,6 +963,10 @@ public partial class SettingsViewModel : ViewModelBase
         RefreshFlowingStyleOptions();
         PlayCountThresholdOptions = BuildPlayCountThresholdOptions();
         OnPropertyChanged(nameof(SelectedPlayCountThresholdOption));
+        LyricsSaveTargetOptions = BuildLyricsSaveTargetOptions();
+        OnPropertyChanged(nameof(SelectedLyricsSaveTargetOption));
+        LyricsPreferredTypeOptions = BuildLyricsPreferredTypeOptions();
+        OnPropertyChanged(nameof(SelectedLyricsPreferredTypeOption));
     }
 
     public VisualizerStyle LyricsVisualizerStyleMode => VisualizerStyles.Parse(LyricsVisualizerStyle);
@@ -1088,12 +1195,16 @@ public partial class SettingsViewModel : ViewModelBase
     private string ServerDataDirectory => Path.Combine(_persistence.DataDirectory, "server");
     private ServerUserStore ServerUsers => _serverUsers ??= new ServerUserStore(Path.Combine(ServerDataDirectory, "users.db"));
 
-    [ObservableProperty] private bool _noctisServerEnabled;
+    [ObservableProperty, NotifyPropertyChangedFor(nameof(IsPhoneCardOpen))] private bool _noctisServerEnabled;
     [ObservableProperty] private int _noctisServerPort = 4747;
     /// <summary>https://ip:port while running; empty when off.</summary>
-    [ObservableProperty] private string _noctisServerUrl = string.Empty;
+    [ObservableProperty, NotifyPropertyChangedFor(nameof(IsPhoneCardOpen))] private string _noctisServerUrl = string.Empty;
     /// <summary>SHA-256 fingerprint of the server certificate — what a phone pins when it accepts the self-signed cert.</summary>
-    [ObservableProperty] private string _noctisServerFingerprint = string.Empty;
+    [ObservableProperty, NotifyPropertyChangedFor(nameof(NoctisServerFingerprintDisplay))] private string _noctisServerFingerprint = string.Empty;
+    /// <summary>Eight bytes to a line, the way the phone shows it, so the two read line by line
+    /// (wrapped to the card's width it broke inside a byte: "57:1" / "6:CC").</summary>
+    public string NoctisServerFingerprintDisplay =>
+        string.Join("\n", NoctisServerFingerprint.Split(':').Chunk(8).Select(line => string.Join(":", line)));
     [ObservableProperty] private Avalonia.Media.Imaging.Bitmap? _noctisServerQr;
     [ObservableProperty] private bool _noctisServerStartFailed;
     [ObservableProperty] private string _noctisServerError = string.Empty;
@@ -1110,12 +1221,53 @@ public partial class SettingsViewModel : ViewModelBase
     [ObservableProperty] private string _issuedApiKeyUser = string.Empty;
     [ObservableProperty] private string _serverUserError = string.Empty;
     public bool HasIssuedApiKey => IssuedApiKey.Length > 0;
+
+    /// <summary>Drives the key panel's fold. Separate from <see cref="HasIssuedApiKey"/> so Done
+    /// folds the panel shut with the key still in it (as Web Remote keeps its URL) and the key
+    /// is cleared once the fold is over: emptying it first made the panel jump, then fold.</summary>
+    [ObservableProperty] private bool _isIssuedApiKeyOpen;
+
+    /// <summary>The panel's close (CollapsibleContent's Glide close, 240 ms) plus a margin.</summary>
+    internal static TimeSpan IssuedApiKeyClearDelay { get; set; } = TimeSpan.FromMilliseconds(320);
+
     public bool HasServerUsers => ServerUsersList.Count > 0;
-    partial void OnIssuedApiKeyChanged(string value) => OnPropertyChanged(nameof(HasIssuedApiKey));
+
+    /// <summary>The key shows as dots until the eye is pressed: it is a password, and Settings
+    /// is on screen during calls and screen shares. Each new key starts hidden again.</summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(DisplayedApiKey))]
+    private bool _isIssuedApiKeyRevealed;
+
+    [ObservableProperty] private bool _issuedApiKeyCopied;
+
+    /// <summary>What the key box shows: the key, or its prefix and a row of dots.</summary>
+    public string DisplayedApiKey => IsIssuedApiKeyRevealed || IssuedApiKey.Length == 0
+        ? IssuedApiKey
+        : IssuedApiKey[..Math.Min(3, IssuedApiKey.Length)] + new string('•', 24);
+
+    partial void OnIssuedApiKeyChanged(string value)
+    {
+        // Cleared straight (the account removed, the tab left): the panel closes with it.
+        IsIssuedApiKeyOpen = value.Length > 0;
+        IsIssuedApiKeyRevealed = false;
+        IssuedApiKeyCopied = false;
+        OnPropertyChanged(nameof(HasIssuedApiKey));
+        OnPropertyChanged(nameof(DisplayedApiKey));
+    }
+
+    [RelayCommand]
+    private void ToggleIssuedApiKeyReveal() => IsIssuedApiKeyRevealed = !IsIssuedApiKeyRevealed;
 
     partial void OnNoctisServerEnabledChanged(bool value)
     {
-        if (_settingsLoaded) _ = SaveAsync();
+        if (_settingsLoaded)
+        {
+            // The phone card's switch: sync comes on with it (unless switched off before), and
+            // turning it off folds the pairing details away with the server.
+            if (value) TurnOnSyncByDefault();
+            else IsPairingVisible = false;
+            _ = SaveAsync();
+        }
         _ = UpdateNoctisServerStateAsync();
     }
 
@@ -1127,7 +1279,23 @@ public partial class SettingsViewModel : ViewModelBase
         if (NoctisServerEnabled) _ = UpdateNoctisServerStateAsync(restart: true);
     }
 
+    /// <summary>One start/stop at a time: the phone card's switch flipped on, off, on used to
+    /// let the first start finish after the stop (it awaits the certificate off the UI thread),
+    /// leaving the server listening under a switch that read off. Each pass reads the switch
+    /// once it holds the gate, so the last flip wins.</summary>
+    private readonly SemaphoreSlim _noctisServerGate = new(1, 1);
+
     private async Task UpdateNoctisServerStateAsync(bool restart = false)
+    {
+        await _noctisServerGate.WaitAsync();
+        try
+        {
+            await UpdateNoctisServerStateCoreAsync(restart);
+        }
+        finally { _noctisServerGate.Release(); }
+    }
+
+    private async Task UpdateNoctisServerStateCoreAsync(bool restart)
     {
         try
         {
@@ -1152,7 +1320,15 @@ public partial class SettingsViewModel : ViewModelBase
                 // threads hop onto the dispatcher (the headless host serialises instead).
                 var adapter = new LibraryServerAdapter(_library, _persistence, _playHistory,
                     () => App.Services?.GetService<MainWindowViewModel>()?.Sidebar.LoadPlaylistsAsync() ?? Task.CompletedTask,
-                    marshal: work => Dispatcher.UIThread.CheckAccess() ? work() : Dispatcher.UIThread.InvokeAsync(work));
+                    marshal: work => Dispatcher.UIThread.CheckAccess() ? work() : Dispatcher.UIThread.InvokeAsync(work),
+                    // getAvatar: the profile picture, so a signed-in phone shows the same face
+                    // (one reference read per request, safe off the UI thread).
+                    avatarPath: () => ProfileAvatarPath,
+                    // Sign-in by the profile name ("Username"), as well as the account's email.
+                    profileName: () => ProfileName,
+                    // Songs a phone sends go where dropped files go (Noctis Imports), then into the library.
+                    uploadRoot: ct => App.Services?.GetService<MainWindowViewModel>()?.EnsureManagedImportRootAsync(ct)
+                                      ?? Task.FromResult<string?>(null));
                 // Covers shrink to what the phone asks for (cached under server/covers); the
                 // desktop's server is for the home network, so other addresses get a 403.
                 var covers = new ServerCoverResizer(Path.Combine(ServerDataDirectory, "covers"));
@@ -1170,7 +1346,7 @@ public partial class SettingsViewModel : ViewModelBase
                     LyricsCacheDirectory = LyricsViewModel.LyricsCacheDir,
                 };
                 _noctisServer.ClientAuthenticated += (_, user) => Dispatcher.UIThread.Post(() => OnNoctisServerClient(user));
-                _noctisServer.DevicesChanged += (_, _) => Dispatcher.UIThread.Post(RefreshSignedInDevices);
+                _noctisServer.DevicesChanged += (_, _) => Dispatcher.UIThread.Post(RefreshPhoneDevices);
             }
             if (!_noctisServer.IsRunning)
             {
@@ -1198,9 +1374,15 @@ public partial class SettingsViewModel : ViewModelBase
     /// <summary>App exit: stop listening so the port is released and in-flight streams end cleanly.</summary>
     public async Task StopNoctisServerAsync()
     {
-        if (_noctisServer is null) return;
-        try { await _noctisServer.StopAsync(); }
-        catch (Exception ex) { DebugLogger.Error(DebugLogger.Category.Error, "Server", $"stop: {ex.Message}"); }
+        // After any start still in flight, so that start cannot finish after this stop.
+        await _noctisServerGate.WaitAsync();
+        try
+        {
+            if (_noctisServer is null) return;
+            try { await _noctisServer.StopAsync(); }
+            catch (Exception ex) { DebugLogger.Error(DebugLogger.Category.Error, "Server", $"stop: {ex.Message}"); }
+        }
+        finally { _noctisServerGate.Release(); }
     }
 
     private void OnNoctisServerClient(string user)
@@ -1232,10 +1414,10 @@ public partial class SettingsViewModel : ViewModelBase
         }
         catch (Exception ex) { ShowServerUserError(ex.Message); }
         // Deleting an account or changing its password signs its devices out.
-        RefreshSignedInDevices();
+        RefreshPhoneDevices();
     }
 
-    /// <summary>Account errors ("Invalid user name or password.") leave on their own like
+    /// <summary>Account errors ("Use a password of at least 8 characters.") leave on their own like
     /// every other confirmation text in Settings (<see cref="TransientStatus"/>).</summary>
     private void ShowServerUserError(string message)
         => TransientStatus.Show(nameof(ServerUserError), v => ServerUserError = v, message);
@@ -1247,10 +1429,10 @@ public partial class SettingsViewModel : ViewModelBase
         ServerUserError = string.Empty;
         try
         {
+            // No API key up front: the phone trades the password for its own device key, and a
+            // key nobody asked for (shown once, in a card that may be folded) is just a live
+            // credential lying around. "New API key" makes one for a Subsonic app when needed.
             ServerUsers.Create(NewServerUserName, NewServerUserPassword, isAdmin: ServerUsersList.Count == 0);
-            var key = ServerUsers.RegenerateApiKey(NewServerUserName.Trim());
-            IssuedApiKeyUser = NewServerUserName.Trim();
-            IssuedApiKey = key;
             NewServerUserName = string.Empty;
             NewServerUserPassword = string.Empty;
             RefreshServerUsers();
@@ -1259,8 +1441,16 @@ public partial class SettingsViewModel : ViewModelBase
     }
 
     [RelayCommand]
-    private void DeleteServerUser(ServerUser user)
+    private async Task DeleteServerUserAsync(ServerUser user)
     {
+        // The trash button sits beside Change password, and deleting also drops every phone's
+        // key (ServerUserStore.Delete): one stray click used to sign every phone out.
+        var answer = await ShowPluginDialog(new Views.ConfirmationRequest(
+            Loc.T("AccountSync.DeleteBody"),
+            Title: Loc.T("AccountSync.DeleteTitle"),
+            ConfirmText: Loc.T("AccountSync.DeleteConfirm"),
+            Width: 420));
+        if (!answer.Confirmed) return;
         ServerUserError = string.Empty;
         try
         {
@@ -1285,7 +1475,16 @@ public partial class SettingsViewModel : ViewModelBase
     }
 
     [RelayCommand]
-    private void HideIssuedApiKey() { IssuedApiKey = string.Empty; IssuedApiKeyUser = string.Empty; }
+    private async Task HideIssuedApiKeyAsync()
+    {
+        IsIssuedApiKeyOpen = false;
+        var key = IssuedApiKey;
+        await Task.Delay(IssuedApiKeyClearDelay);
+        // A key issued while the panel was closing is a new one: leave it.
+        if (IsIssuedApiKeyOpen || IssuedApiKey != key) return;
+        IssuedApiKey = string.Empty;
+        IssuedApiKeyUser = string.Empty;
+    }
 
     [RelayCommand]
     private async Task CopyNoctisServerUrlAsync()
@@ -1307,7 +1506,10 @@ public partial class SettingsViewModel : ViewModelBase
             as Avalonia.Controls.ApplicationLifetimes.IClassicDesktopStyleApplicationLifetime)
             ?.MainWindow?.Clipboard;
         if (clipboard is null || IssuedApiKey.Length == 0) return;
-        try { await clipboard.SetTextAsync(IssuedApiKey); } catch { }
+        try { await clipboard.SetTextAsync(IssuedApiKey); } catch { return; }
+        IssuedApiKeyCopied = true;
+        await Task.Delay(1500);
+        IssuedApiKeyCopied = false;
     }
 
     // ── Web remote ──
@@ -2593,6 +2795,9 @@ public partial class SettingsViewModel : ViewModelBase
             LyricsFullScreenFocusEnabled = _settings.LyricsFullScreenFocusEnabled;
             LyricsMinLineOpacity = Math.Clamp(_settings.LyricsMinLineOpacity, 0, 60);
             LyricsJoinSplitWords = _settings.LyricsJoinSplitWords;
+            LyricsSaveTarget = LyricsSaveOptions.ParseTarget(_settings.LyricsSaveTarget).ToString();
+            LyricsAutoDownload = _settings.LyricsAutoDownload;
+            LyricsPreferredType = LyricsSaveOptions.ParsePreferredType(_settings.LyricsPreferredType).ToString();
             LyricsShowTranslations = _settings.LyricsShowTranslations;
             LyricsShowRomanization = _settings.LyricsShowRomanization;
             LyricsShowBackgroundVocals = _settings.LyricsShowBackgroundVocals;
@@ -2606,7 +2811,7 @@ public partial class SettingsViewModel : ViewModelBase
             WebRemoteEnabled = _settings.WebRemoteEnabled;
             LocalApiEnabled = _settings.LocalApiEnabled;
             NoctisServerPort = _settings.NoctisServerPort;
-            NoctisServerEnabled = _settings.NoctisServerEnabled;
+            NoctisServerEnabled = AccountFeatures.Enabled && _settings.NoctisServerEnabled;
             ShowArtworkColumn = _settings.ShowArtworkColumn;
             ShowGenreColumn = _settings.ShowGenreColumn;
             ShowRatingColumn = _settings.ShowRatingColumn;
@@ -2914,6 +3119,9 @@ public partial class SettingsViewModel : ViewModelBase
         nameof(AppSettings.CommunityPluginsEnabled),
         nameof(AppSettings.PluginPermissionGrants),
         nameof(AppSettings.PluginSettingValues),
+        // Made once at load straight onto _settings (LoadFeatureSettings): pulled back from a
+        // file without one, the first save emptied it and the ledger got a new id per launch.
+        nameof(AppSettings.SyncDeviceId),
     };
 
     private async Task MergeExternalSettingChangesAsync()
@@ -3062,6 +3270,9 @@ public partial class SettingsViewModel : ViewModelBase
         _settings.LyricsFullScreenFocusEnabled = LyricsFullScreenFocusEnabled;
         _settings.LyricsMinLineOpacity = LyricsMinLineOpacity;
         _settings.LyricsJoinSplitWords = LyricsJoinSplitWords;
+        _settings.LyricsSaveTarget = LyricsSaveOptions.ParseTarget(LyricsSaveTarget).ToString();
+        _settings.LyricsAutoDownload = LyricsAutoDownload;
+        _settings.LyricsPreferredType = LyricsSaveOptions.ParsePreferredType(LyricsPreferredType).ToString();
         _settings.LyricsShowTranslations = LyricsShowTranslations;
         _settings.LyricsShowRomanization = LyricsShowRomanization;
         _settings.LyricsShowBackgroundVocals = LyricsShowBackgroundVocals;
@@ -3071,7 +3282,7 @@ public partial class SettingsViewModel : ViewModelBase
         _settings.RestoreLastTrackOnStartup = RestoreLastTrackOnStartup;
         _settings.WebRemoteEnabled = WebRemoteEnabled;
         _settings.LocalApiEnabled = LocalApiEnabled;
-        _settings.NoctisServerEnabled = NoctisServerEnabled;
+        if (AccountFeatures.Enabled) _settings.NoctisServerEnabled = NoctisServerEnabled;
         _settings.NoctisServerPort = NoctisServerPort;
         _settings.ShowArtworkColumn = ShowArtworkColumn;
         _settings.ShowGenreColumn = ShowGenreColumn;
@@ -3370,6 +3581,9 @@ public partial class SettingsViewModel : ViewModelBase
         _player.LyricsFullScreenFocusEnabled = LyricsFullScreenFocusEnabled;
         _player.LyricsMinLineOpacity = LyricsMinLineOpacity;
         _player.LyricsJoinSplitWords = LyricsJoinSplitWords;
+        _player.LyricsSaveTarget = LyricsSaveTarget;
+        _player.LyricsAutoDownload = LyricsAutoDownload;
+        _player.LyricsPreferredType = LyricsPreferredType;
         _player.LyricsShowTranslations = LyricsShowTranslations;
         _player.LyricsShowRomanization = LyricsShowRomanization;
         _player.LyricsShowBackgroundVocals = LyricsShowBackgroundVocals;
@@ -6796,6 +7010,9 @@ public partial class SettingsViewModel : ViewModelBase
             LyricsFullScreenFocusEnabled = defaultSettings.LyricsFullScreenFocusEnabled;
             LyricsMinLineOpacity = defaultSettings.LyricsMinLineOpacity;
             LyricsJoinSplitWords = defaultSettings.LyricsJoinSplitWords;
+            LyricsSaveTarget = defaultSettings.LyricsSaveTarget;
+            LyricsAutoDownload = defaultSettings.LyricsAutoDownload;
+            LyricsPreferredType = defaultSettings.LyricsPreferredType;
             LyricsShowTranslations = defaultSettings.LyricsShowTranslations;
             LyricsShowRomanization = defaultSettings.LyricsShowRomanization;
             LyricsShowBackgroundVocals = defaultSettings.LyricsShowBackgroundVocals;
@@ -7019,6 +7236,7 @@ public partial class SettingsViewModel : ViewModelBase
         // queued in an earlier session (a newer release may replace it); manual mode keeps the old rule.
         if (!AutoUpdateActive && (IsUpdateAvailable || IsReadyToInstall)) return;
         if (AutoUpdateActive && IsReadyToInstall && !IsAutoInstallPending) return;
+        AutoUpdateRetryAtUtc = null; // this check settles it; set again below when waiting helps
 
         try
         {
@@ -7067,8 +7285,9 @@ public partial class SettingsViewModel : ViewModelBase
                         }
                     }
                     string why;
+                    var now = DateTimeOffset.UtcNow;
                     if (_autoDownloadCancelled) why = "cancelled this session";
-                    else if (AutoUpdatePolicy.ShouldAutoDownload(state, update, DateTimeOffset.UtcNow, out why))
+                    else if (AutoUpdatePolicy.ShouldAutoDownload(state, update, now, out why))
                     {
                         if (state?.Pending is not null)
                         {
@@ -7078,8 +7297,21 @@ public partial class SettingsViewModel : ViewModelBase
                         _ = DownloadUpdateCoreAsync(update, automatic: true);
                         return;
                     }
-                    DebugLog.Write("Updater", $"Auto-update: {update.TagName} not downloaded automatically ({why}).");
+                    // Still soaking or backing off: ask again the moment that ends, not a day after this
+                    // check — a session opened during the soak otherwise never downloads it (GitHub #130).
+                    var retry = _autoDownloadCancelled ? null : AutoUpdatePolicy.RetryAt(state, update, now);
+                    AutoUpdateRetryAtUtc = retry;
+                    DebugLog.Write("Updater", $"Auto-update: {update.TagName} not downloaded automatically ({why})" +
+                        (retry is { } at ? $"; next check {at.LocalDateTime:g}." : "."));
                     if (IsReadyToInstall) return; // keep the queued older build; it installs first
+                    // Says when, so a known update with "Update automatically" on doesn't look stuck.
+                    var waitText = retry is { } when
+                        ? $"{update.TagName} is available. It downloads automatically after {when.LocalDateTime:g} " +
+                          "and installs the next time you open Noctis."
+                        : null;
+                    if (waitText is not null) UpdateStatusText = waitText;
+                    else if (UpdateStatusText == _autoWaitStatusText) UpdateStatusText = "";
+                    _autoWaitStatusText = waitText;
                 }
 
                 LatestVersionTag = update.TagName;
@@ -7088,9 +7320,12 @@ public partial class SettingsViewModel : ViewModelBase
                 IsUpdateAvailable = true;
             });
         }
-        catch
+        catch (Exception ex)
         {
-            // Silent: no toast, no status text, no error banner on startup.
+            // Silent: no toast, no status text, no error banner on startup. Auto-update retries soon,
+            // so a check made before the network is up (launch at login) isn't lost for a day.
+            if (AutoUpdateActive) AutoUpdateRetryAtUtc = DateTimeOffset.UtcNow + AutoUpdatePolicy.FailedCheckRetry;
+            DebugLog.Write("Updater", $"Update check failed ({ex.GetType().Name}: {ex.Message}).");
         }
     }
 
@@ -7331,6 +7566,8 @@ public partial class SettingsViewModel : ViewModelBase
         {
             var state = AutoUpdatePolicy.RecordDownloadFailure(AutoStore.Load(), update.TagName, now, hard);
             AutoStore.Save(state);
+            // The backoff ends within the session; the recheck loop retries then instead of a day later.
+            AutoUpdateRetryAtUtc = state.Blocked ? null : now + AutoUpdatePolicy.BackoffAfter(state.Failures);
             var next = state.Blocked
                 ? "blocked"
                 : $"next try after {(now + AutoUpdatePolicy.BackoffAfter(state.Failures)).LocalDateTime:g}";

@@ -355,13 +355,13 @@
   <data name="Settings.PreAmpDB" xml:space="preserve"><value>Ön yükseltme (dB)</value><comment>Text in SettingsView.axaml</comment></data>
   <data name="Settings.REMOTECONTROL" xml:space="preserve"><value>UZAKTAN KUMANDA</value><comment>Text in SettingsView.axaml</comment></data>
   <data name="Settings.WebRemote" xml:space="preserve"><value>Web Kumandası</value><comment>Text in SettingsView.axaml</comment></data>
-  <data name="Settings.ControlPlaybackFromPhone" xml:space="preserve"><value>Yerel ağdaki telefonundan oynatmayı kontrol et. Şifrelenmemiştir; güvenilmeyen Wi-Fi'dan kaçın.</value><comment>Text in SettingsView.axaml</comment></data>
+  <data name="Settings.ControlPlaybackFromPhone" xml:space="preserve"><value>Çalanı telefonunun tarayıcısından yönet. Uygulama gerekmez. Yalnızca güvendiğin Wi-Fi ağlarında kullan.</value><comment>Text in SettingsView.axaml</comment></data>
   <data name="Settings.TapEnlargeTip" xml:space="preserve"><value>Büyütmek için dokun</value><comment>ToolTip.Tip in SettingsView.axaml</comment></data>
-  <data name="Settings.IfPhoneBlocksLink" xml:space="preserve"><value>Telefonun bağlantıyı güvensiz olarak işaretlerse Devam'ı seç. Kumanda düz HTTP kullanır.</value><comment>Text in SettingsView.axaml</comment></data>
+  <data name="Settings.IfPhoneBlocksLink" xml:space="preserve"><value>Telefonun bağlantının güvenli olmadığını söylerse Devam'a dokun.</value><comment>Text in SettingsView.axaml</comment></data>
   <data name="Settings.OPENPHONE" xml:space="preserve"><value>TELEFONUNDA AÇ</value><comment>Text in SettingsView.axaml</comment></data>
   <data name="Settings.CopyFullLinkIncludingTip" xml:space="preserve"><value>Erişim anahtarı dahil tam bağlantıyı kopyala</value><comment>ToolTip.Tip in SettingsView.axaml</comment></data>
   <data name="Settings.Copy" xml:space="preserve"><value>Kopyala</value><comment>Text in SettingsView.axaml</comment></data>
-  <data name="Settings.WaitingPhoneScanCode" xml:space="preserve"><value>Telefon bekleniyor. Kodu tara veya büyütmek için dokun.</value><comment>Text in SettingsView.axaml</comment></data>
+  <data name="Settings.WaitingPhoneScanCode" xml:space="preserve"><value>Telefon bekleniyor. Büyütmek için koda dokun.</value><comment>Text in SettingsView.axaml</comment></data>
   <data name="Settings.PhoneConnected" xml:space="preserve"><value>Telefon bağlandı</value><comment>Text in SettingsView.axaml</comment></data>
   <data name="Settings.ACCOUNTS" xml:space="preserve"><value>HESAPLAR</value><comment>Text in SettingsView.axaml</comment></data>
   <data name="Settings.DiscordRichPresence" xml:space="preserve"><value>Discord Rich Presence</value><comment>Text in SettingsView.axaml</comment></data>
@@ -1249,7 +1249,7 @@
   <data name="Playlist.EditPlaylist" xml:space="preserve"><value>Çalma Listesini Düzenle</value><comment>Header in PlaylistView.axaml</comment></data>
   <data name="Playlist.DeletePlaylist" xml:space="preserve"><value>Çalma Listesini Sil</value><comment>Header in PlaylistView.axaml</comment></data>
   <data name="Playlist.ChangeDisplayedOrderManualTip" xml:space="preserve"><value>Görüntülenen sırayı değiştir. Elle, kaydedilmiş çalma listesi sıranızdır.</value><comment>ToolTip.Tip in PlaylistView.axaml</comment></data>
-  <data name="Playlist.Text" xml:space="preserve"><value></value><comment>Text in PlaylistView.axaml</comment></data>
+  <data name="Playlist.Text" xml:space="preserve"><value>&#xE70D;</value><comment>Text in PlaylistView.axaml</comment></data>
   <data name="Playlist.ManualPlaylistOrder" xml:space="preserve"><value>Elle (çalma listesi sırası)</value><comment>Header in PlaylistView.axaml</comment></data>
   <data name="Playlist.Title" xml:space="preserve"><value>Başlık</value><comment>Header in PlaylistView.axaml</comment></data>
   <data name="Playlist.Artist" xml:space="preserve"><value>Sanatçı</value><comment>Header in PlaylistView.axaml</comment></data>
@@ -1259,17 +1259,17 @@
   <data name="Playlist.ReleaseDateOldest" xml:space="preserve"><value>Yayın Tarihi (En Eski)</value><comment>Header in PlaylistView.axaml</comment></data>
   <data name="Playlist.ReleaseDateNewest" xml:space="preserve"><value>Yayın Tarihi (En Yeni)</value><comment>Header in PlaylistView.axaml</comment></data>
   <data name="Playlist.FEATUREDARTISTS" xml:space="preserve"><value>ÖNE ÇIKAN SANATÇILAR</value><comment>Text in PlaylistView.axaml</comment></data>
-  <data name="Playlist.Text2" xml:space="preserve"><value></value><comment>Text in PlaylistView.axaml</comment></data>
+  <data name="Playlist.Text2" xml:space="preserve"><value>&#xE76C;</value><comment>Text in PlaylistView.axaml</comment></data>
   <data name="Playlist.SUGGESTED" xml:space="preserve"><value>ÖNERİLEN</value><comment>Text in PlaylistView.axaml</comment></data>
   <data name="Playlist.FromLibraryBasedArtistsTip" xml:space="preserve"><value>Kitaplığından, bu çalma listesindeki sanatçılara göre</value><comment>ToolTip.Tip in PlaylistView.axaml</comment></data>
   <data name="Playlist.RefreshSuggestionsTip" xml:space="preserve"><value>Önerileri yenile</value><comment>ToolTip.Tip in PlaylistView.axaml</comment></data>
-  <data name="Playlist.Text3" xml:space="preserve"><value></value><comment>Text in PlaylistView.axaml</comment></data>
+  <data name="Playlist.Text3" xml:space="preserve"><value>&#xE72C;</value><comment>Text in PlaylistView.axaml</comment></data>
   <data name="Playlist.ExplicitTip" xml:space="preserve"><value>Müstehcen</value><comment>ToolTip.Tip in PlaylistView.axaml</comment></data>
   <data name="Playlist.AddPlaylistTip" xml:space="preserve"><value>Bu çalma listesine ekle</value><comment>ToolTip.Tip in PlaylistView.axaml</comment></data>
   <data name="Playlist.Added" xml:space="preserve"><value>Eklendi</value><comment>Text in PlaylistView.axaml</comment></data>
   <data name="Playlist.Favorite" xml:space="preserve"><value>Favori</value><comment>Text in PlaylistView.axaml</comment></data>
   <data name="Playlist.Time" xml:space="preserve"><value>Süre</value><comment>Text in PlaylistView.axaml</comment></data>
-  <data name="Playlist.Text4" xml:space="preserve"><value></value><comment>Text in PlaylistView.axaml</comment></data>
+  <data name="Playlist.Text4" xml:space="preserve"><value>&#xE784;</value><comment>Text in PlaylistView.axaml</comment></data>
   <data name="Playlist.Kicker" xml:space="preserve"><value>ÇALMA LİSTESİ</value><comment>Hero kicker in PlaylistView.axaml</comment></data>
   <data name="Playlist.PlayFromHereTip" xml:space="preserve"><value>Buradan çal</value><comment>ToolTip.Tip in PlaylistView.axaml</comment></data>
   <data name="Playlist.AddedLast7DaysTip" xml:space="preserve"><value>Son 7 günde eklendi</value><comment>ToolTip.Tip in PlaylistView.axaml</comment></data>
@@ -1484,8 +1484,8 @@
   <data name="Server.Title" xml:space="preserve"><value>Noctis Sunucusu</value></data>
   <data name="Server.Description" xml:space="preserve"><value>Telefonun ve diğer cihazların bu kitaplığa göz atıp çalmasına izin ver. HTTPS üzerinden her Subsonic uygulaması ve Noctis mobil uygulamasıyla çalışır.</value></data>
   <data name="Server.Port" xml:space="preserve"><value>Port</value></data>
-  <data name="Server.AddressLabel" xml:space="preserve"><value>SUNUCU ADRESİ</value></data>
-  <data name="Server.FingerprintLabel" xml:space="preserve"><value>SERTİFİKA PARMAK İZİ (SHA-256) — telefonun güvenmeyi sorduğunda karşılaştır</value></data>
+  <data name="Server.AddressLabel" xml:space="preserve"><value>ADRES</value></data>
+  <data name="Server.FingerprintLabel" xml:space="preserve"><value>GÜVENLİK KODU</value></data>
   <data name="Server.Waiting" xml:space="preserve"><value>Bir cihazın bağlanması bekleniyor…</value></data>
   <data name="Server.Connected" xml:space="preserve"><value>Bağlı:</value></data>
   <data name="Server.Accounts" xml:space="preserve"><value>Hesaplar</value></data>
@@ -1495,7 +1495,7 @@
   <data name="Server.NewApiKey" xml:space="preserve"><value>Yeni API anahtarı</value></data>
   <data name="Server.Remove" xml:space="preserve"><value>Kaldır</value></data>
   <data name="Server.ApiKeyFor" xml:space="preserve"><value>API anahtarı:</value></data>
-  <data name="Server.ApiKeyOnce" xml:space="preserve"><value>Şimdi kopyala. Yalnızca bir kez gösterilir ve yeni bir anahtar onun yerini alır.</value></data>
+  <data name="Server.ApiKeyOnce" xml:space="preserve"><value>Şimdi kopyala. Bir daha göremezsin.</value></data>
   <data name="Server.Done" xml:space="preserve"><value>Bitti</value></data>
   <data name="Server.UserName" xml:space="preserve"><value>Kullanıcı adı</value></data>
   <data name="Server.Password" xml:space="preserve"><value>Parola (8+ karakter)</value></data>
@@ -1570,16 +1570,16 @@
 
   <data name="AccountSync.YourAccount" xml:space="preserve"><value>HESABIN</value><comment>Account &amp; Sync section title</comment></data>
   <data name="AccountSync.CreateTitle" xml:space="preserve"><value>Hesabını oluştur</value><comment>No-account state title</comment></data>
-  <data name="AccountSync.CreateHelp" xml:space="preserve"><value>Cihazların göz atmak, çalmak ve eşitlemek için bununla oturum açar. Parola karma olarak saklanır ve bu bilgisayardan asla çıkmaz.</value><comment>No-account state help</comment></data>
+  <data name="AccountSync.CreateHelp" xml:space="preserve"><value>Telefonun bu hesapla oturum açar. Parolan bu bilgisayardan hiç çıkmaz.</value><comment>No-account state help</comment></data>
   <data name="AccountSync.Name" xml:space="preserve"><value>Ad</value><comment>Create form watermark</comment></data>
   <data name="AccountSync.Password" xml:space="preserve"><value>Parola (8+ karakter)</value><comment>Create form watermark</comment></data>
   <data name="AccountSync.Create" xml:space="preserve"><value>Oluştur</value><comment>Create form button</comment></data>
-  <data name="AccountSync.PairDevice" xml:space="preserve"><value>Cihaz eşleştir</value><comment>Account card button</comment></data>
+  <data name="AccountSync.PairDevice" xml:space="preserve"><value>Telefon bağla</value><comment>Account card button</comment></data>
   <data name="AccountSync.NewApiKey" xml:space="preserve"><value>Yeni API anahtarı</value><comment>Account card button</comment></data>
   <data name="AccountSync.ChangePassword" xml:space="preserve"><value>Parolayı değiştir</value><comment>Account card button</comment></data>
   <data name="AccountSync.NewPassword" xml:space="preserve"><value>Yeni parola (8+ karakter)</value><comment>Change password watermark</comment></data>
   <data name="AccountSync.Save" xml:space="preserve"><value>Kaydet</value><comment>Change password button</comment></data>
-  <data name="AccountSync.Remove" xml:space="preserve"><value>Kaldır</value><comment>Account card button</comment></data>
+  <data name="AccountSync.Remove" xml:space="preserve"><value>Oturumu kapat</value><comment>Account card button</comment></data>
   <data name="AccountSync.PairHelp" xml:space="preserve"><value>Telefonunda Noctis'i veya herhangi bir Subsonic uygulamasını aç, kodu tara ya da adresi yaz ve oturum aç.</value><comment>Pairing block help</comment></data>
   <data name="AccountSync.ServerOffHelp" xml:space="preserve"><value>Cihazlar bu bilgisayardaki Noctis Sunucusu üzerinden bağlanır. Şu anda kapalı.</value><comment>Pairing block when the server is off</comment></data>
   <data name="AccountSync.TurnOnServer" xml:space="preserve"><value>Noctis Sunucusunu aç</value><comment>Pairing block button</comment></data>
@@ -1588,9 +1588,9 @@
   <data name="AccountSync.OtherTitle" xml:space="preserve"><value>Aile ve misafirler</value><comment>Other accounts card title</comment></data>
   <data name="AccountSync.OtherHelp" xml:space="preserve"><value>Kendi cihazlarından oturum açabilen ek hesaplar.</value><comment>Other accounts card help</comment></data>
 
-  <data name="Sync.Title" xml:space="preserve"><value>Cihazların arasında eşitle</value><comment>Sync card title</comment></data>
-  <data name="Sync.Description" xml:space="preserve"><value>Favoriler, puanlar, çalma sayıları ve çalma listeleri oturum açılmış her cihazda aynı kalır. En yeni değişiklik kazanır.</value><comment>Sync card description</comment></data>
-  <data name="Sync.DeviceName" xml:space="preserve"><value>Bu cihaz</value><comment>Sync card row label</comment></data>
+  <data name="Sync.Title" xml:space="preserve"><value>Telefonunla eşitle</value><comment>Sync card title</comment></data>
+  <data name="Sync.Description" xml:space="preserve"><value>Favoriler, puanlar, çalma sayıları ve çalma listeleri telefonunda ve bu bilgisayarda aynı kalır.</value><comment>Sync card description</comment></data>
+  <data name="Sync.DeviceName" xml:space="preserve"><value>Bu bilgisayarın adı</value><comment>Sync card row label</comment></data>
   <data name="Sync.WhatSyncs" xml:space="preserve"><value>Müzik dosyaları olduğu yerde kalır. Noctis Sunucusunun açık olması gerekir.</value><comment>Sync card footnote</comment></data>
 
   <data name="LyricsStudioSettings.ModelSection" xml:space="preserve"><value>KONUŞMA MODELİ</value><comment>Lyrics Studio tab section title</comment></data>
@@ -1678,7 +1678,7 @@
   <data name="Settings.Desc.Audio" xml:space="preserve"><value>Oynatma, çıkış, analiz ve ekolayzer.</value><comment>Settings page description</comment></data>
   <data name="Settings.Desc.Library" xml:space="preserve"><value>Medya klasörleri, tarama, sanatçı ve albümlerin düzeni ve kitaplık araçları.</value><comment>Settings page description</comment></data>
   <data name="Settings.Desc.Advanced" xml:space="preserve"><value>Depolama, yardımcı programlar, güncellemeler ve sıfırlama.</value><comment>Settings page description</comment></data>
-  <data name="Settings.Desc.AccountDevices" xml:space="preserve"><value>Hesabın, cihazlar arası eşitleme ve Web Kumandası.</value><comment>Settings page description</comment></data>
+  <data name="Settings.Desc.AccountDevices" xml:space="preserve"><value>Hesabınız, telefonunuz ve uzaktan kumanda.</value><comment>Settings page description</comment></data>
   <data name="Settings.Desc.Integrations" xml:space="preserve"><value>Discord, scrobble, TIDAL ve müzik sunucuları.</value><comment>Settings page description</comment></data>
   <data name="Settings.Desc.Plugins" xml:space="preserve"><value>Kurulu eklentiler.</value><comment>Settings page description</comment></data>
   <data name="Settings.Desc.Statistics" xml:space="preserve"><value>Kitaplığın ve dinlemelerin bir bakışta.</value><comment>Settings page description</comment></data>
@@ -1750,4 +1750,83 @@
   <data name="Settings.Group.Library" xml:space="preserve"><value>Kitaplık</value><comment>Settings rail</comment></data>
   <data name="Settings.Group.Connect" xml:space="preserve"><value>Bağlantı</value><comment>Settings rail</comment></data>
   <data name="Settings.Group.More" xml:space="preserve"><value>Daha Fazla</value><comment>Settings rail</comment></data>
+  <data name="AccountSync.PairPhoneHint" xml:space="preserve"><value>Telefonundaki Noctis uygulamasında Ayarlar'ı, ardından Hesap'ı aç. Bu adresi gir ve e-posta adresin ya da kullanıcı adın ve parolanla oturum aç.</value><comment>Pairing block help above the address and fingerprint</comment></data>
+  <data name="AccountSync.SignedInDevices" xml:space="preserve"><value>TELEFONLARIN</value><comment>Account card list label</comment></data>
+  <data name="AccountSync.NoSignedInDevices" xml:space="preserve"><value>Henüz bağlı telefon yok.</value><comment>Account card list empty state</comment></data>
+  <data name="Settings.LocalApiDesc" xml:space="preserve"><value>Stream Deck veya OBS gibi bu bilgisayardaki uygulamaların çalanı görmesini ve Noctis'i yönetmesini sağlar.</value><comment>Text in SettingsView.axaml</comment></data>
+  <data name="Settings.LocalApiWarning" xml:space="preserve"><value>Bu belirteci olan her uygulama Noctis'i yönetebilir ve kitaplığını okuyabilir. Yalnızca güvendiğin uygulamalara ver.</value><comment>Text in SettingsView.axaml</comment></data>
+  <data name="Settings.LocalApiDiscovery" xml:space="preserve"><value>Uygulamalar bunu Noctis veri klasöründeki local-api.json dosyasından da okuyabilir.</value><comment>Text in SettingsView.axaml</comment></data>
+  <data name="Settings.Section.PhoneApp" xml:space="preserve"><value>Telefon uygulaması</value><comment>Settings section label, Account &amp; Devices tab</comment></data>
+  <data name="Settings.Section.RemoteControl" xml:space="preserve"><value>Uzaktan kumanda</value><comment>Settings section label, Account &amp; Devices tab</comment></data>
+  <data name="Settings.Section.PcApps" xml:space="preserve"><value>Bu bilgisayardaki uygulamalar</value><comment>Settings section label, Account &amp; Devices tab (Local API)</comment></data>
+  <data name="Phone.Title" xml:space="preserve"><value>Telefonunda Noctis</value><comment>Phone app card title; its switch turns Noctis Server on/off</comment></data>
+  <data name="Phone.Description" xml:space="preserve"><value>Bu kitaplığı telefonunda dinle ve indir.</value><comment>Phone app card subtitle</comment></data>
+  <data name="Phone.NeedsAccount" xml:space="preserve"><value>Önce yukarıdan hesabını oluştur.</value><comment>Phone app card, shown when there is no account</comment></data>
+  <data name="Phone.CodeHint" xml:space="preserve"><value>Telefonun da bu kodu gösterir. Yalnızca kodlar aynıysa oturum aç.</value><comment>Under the certificate security code in the pairing panel</comment></data>
+  <data name="Phone.Synced" xml:space="preserve"><value>Son eşitleme: {0}</value><comment>Phone list row status; {0} = 'just now', '5 min ago', '3 h ago' or 'on 9 Oct, 14:05'</comment></data>
+  <data name="Phone.Connected" xml:space="preserve"><value>Son bağlantı: {0}</value><comment>Phone list row status when sync is off or the phone never synced; {0} = relative time</comment></data>
+  <data name="Phone.SignedOut" xml:space="preserve"><value>Oturum kapatıldı</value><comment>Phone list row status: the sync data knows this phone but it no longer has a sign-in key</comment></data>
+  <data name="Phone.LastSynced" xml:space="preserve"><value>Son eşitleme: {0}</value><comment>Under the sync switch; {0} = relative time</comment></data>
+  <data name="Phone.NotSyncedYet" xml:space="preserve"><value>Henüz eşitlenmedi</value><comment>Under the sync switch when no phone has synced</comment></data>
+  <data name="Phone.SyncFailed" xml:space="preserve"><value>Eşitleme verileri okunamadı: {0}</value><comment>Under the sync switch; {0} = error message</comment></data>
+  <data name="Phone.SignOutTip" xml:space="preserve"><value>Bu telefonun oturumunu kapat. Yeniden bağlanmak için parolan gerekir.</value><comment>Tooltip on a phone's Sign out button</comment></data>
+  <data name="Phone.OtherAppsTitle" xml:space="preserve"><value>Diğer müzik uygulamaları</value><comment>Phone app card row title (Subsonic apps)</comment></data>
+  <data name="Phone.OtherAppsDesc" xml:space="preserve"><value>Symfonium gibi Subsonic uygulamaları e-posta adresin ve bir API anahtarıyla oturum açabilir.</value><comment>Phone app card row text</comment></data>
+  <data name="Phone.NewApiKeyTip" xml:space="preserve"><value>Yeni bir anahtar oluşturur. Eski anahtarı kullanan uygulamaların yenisine ihtiyacı olur.</value><comment>Tooltip on New API key</comment></data>
+  <data name="AccountSync.ShowPasswordTip" xml:space="preserve"><value>Parolayı göster veya gizle</value><comment>Eye button tooltip in password boxes</comment></data>
+  <data name="AccountSync.ShowKeyTip" xml:space="preserve"><value>Anahtarı göster veya gizle</value><comment>Eye button tooltip on the API key</comment></data>
+  <data name="AccountSync.ChangePasswordNote" xml:space="preserve"><value>Telefonlarının oturumu kapanır, yeniden bağlanmak için yeni parola gerekir.</value><comment>Under the change password box</comment></data>
+  <data name="AccountSync.DeleteAccountTip" xml:space="preserve"><value>Hesabı sil</value><comment>Tooltip on the account's trash button</comment></data>
+  <data name="AccountSync.DeleteTitle" xml:space="preserve"><value>Hesabın silinsin mi?</value><comment>Delete account confirmation title</comment></data>
+  <data name="AccountSync.DeleteBody" xml:space="preserve"><value>Telefonlarının oturumu kapanır ve yeni bir hesap oluşturana kadar bağlanamaz. Bu bilgisayardaki müziğin ve kitaplığın olduğu gibi kalır.</value><comment>Delete account confirmation text</comment></data>
+  <data name="AccountSync.DeleteConfirm" xml:space="preserve"><value>Hesabı sil</value><comment>Delete account confirmation button</comment></data>
+  <data name="Time.JustNow" xml:space="preserve"><value>az önce</value><comment>Relative time, used after 'Synced', 'Connected', 'Last synced'</comment></data>
+  <data name="Time.MinutesAgo" xml:space="preserve"><value>{0} dk önce</value><comment>Relative time; {0} = minutes</comment></data>
+  <data name="Time.HoursAgo" xml:space="preserve"><value>{0} sa önce</value><comment>Relative time; {0} = hours</comment></data>
+  <data name="Time.OnDate" xml:space="preserve"><value>{0}</value><comment>Relative time older than a day; {0} = date and time like '9 Oct, 14:05'</comment></data>
+  <data name="Phone.ForgetTip" xml:space="preserve"><value>Bu telefonu listeden kaldırır. Eşitlediği veriler kalır.</value><comment>Tooltip on Remove for a phone that is already signed out</comment></data>
+  <data name="Export.Copied" xml:space="preserve"><value>Panoya kopyalandı</value><comment>Share card / Wrap status after Copy</comment></data>
+  <data name="Export.ClipboardUnavailable" xml:space="preserve"><value>Pano kullanılamıyor</value><comment>Share card / Wrap status when there is no clipboard</comment></data>
+  <data name="Export.SaveImageTitle" xml:space="preserve"><value>Görseli kaydet</value><comment>Title of the save dialog for a share card or Wrap image</comment></data>
+  <data name="Common.Done" xml:space="preserve"><value>Tamam</value></data>
+  <data name="LyricsColor.Subtitle" xml:space="preserve"><value>Şarkı sözü sayfası seçtikçe değişir.</value><comment>One-line purpose under the title in LyricsBackgroundColorDialog.axaml</comment></data>
+  <data name="LyricsColor.Auto" xml:space="preserve"><value>Otomatik, kapaktan</value><comment>Tooltip of the first swatch in LyricsBackgroundColorDialog.axaml (follows each song's cover)</comment></data>
+  <data name="LyricsColor.Colors" xml:space="preserve"><value>Renkler</value><comment>Label above the solid swatches in LyricsBackgroundColorDialog.axaml</comment></data>
+  <data name="LyricsColor.Gradients" xml:space="preserve"><value>Gradyanlar</value><comment>Label above the gradient swatches in LyricsBackgroundColorDialog.axaml</comment></data>
+  <data name="LyricsColor.ArtworkTitle" xml:space="preserve"><value>Bulanık albüm kapağı</value><comment>Artwork mode heading in LyricsBackgroundColorDialog.axaml</comment></data>
+  <data name="LyricsColor.ArtworkHint" xml:space="preserve"><value>Her şarkının kapağını izler. Hareketi Ayarlar'da, Şarkı Sözleri altında ayarlanır.</value><comment>Artwork mode text in LyricsBackgroundColorDialog.axaml</comment></data>
+  <data name="LyricsColor.VideoNote" xml:space="preserve"><value>Bir arka plan videosu açık ve bu arka planın üzerinde görünüyor.</value><comment>Note in LyricsBackgroundColorDialog.axaml while a lyrics background video plays</comment></data>
+  <data name="Common.Play" xml:space="preserve"><value>çalma</value><comment>Word after a play count of exactly 1 (Home and album rows: 1 play)</comment></data>
+  <data name="Shortcuts.Group.Playback" xml:space="preserve"><value>Oynatma</value><comment>Settings › Shortcuts (GitHub #131)</comment></data>
+  <data name="Shortcuts.Group.Window" xml:space="preserve"><value>Pencere</value><comment>Settings › Shortcuts (GitHub #131)</comment></data>
+  <data name="Shortcuts.Group.Navigation" xml:space="preserve"><value>Gezinme</value><comment>Settings › Shortcuts (GitHub #131)</comment></data>
+  <data name="Shortcuts.Group.Library" xml:space="preserve"><value>Kitaplık</value><comment>Settings › Shortcuts (GitHub #131)</comment></data>
+  <data name="Shortcuts.NotSet" xml:space="preserve"><value>Atanmadı</value><comment>Settings › Shortcuts (GitHub #131)</comment></data>
+  <data name="Shortcuts.AlreadyUsedBy" xml:space="preserve"><value>Zaten {0} için kullanılıyor</value><comment>Settings › Shortcuts (GitHub #131)</comment></data>
+  <data name="Shortcuts.Action.PlayPause" xml:space="preserve"><value>Oynat / Duraklat</value><comment>Settings › Shortcuts (GitHub #131)</comment></data>
+  <data name="Shortcuts.Action.NextTrack" xml:space="preserve"><value>Sonraki parça</value><comment>Settings › Shortcuts (GitHub #131)</comment></data>
+  <data name="Shortcuts.Action.PreviousTrack" xml:space="preserve"><value>Önceki parça</value><comment>Settings › Shortcuts (GitHub #131)</comment></data>
+  <data name="Shortcuts.Action.VolumeUp" xml:space="preserve"><value>Sesi aç</value><comment>Settings › Shortcuts (GitHub #131)</comment></data>
+  <data name="Shortcuts.Action.VolumeDown" xml:space="preserve"><value>Sesi kıs</value><comment>Settings › Shortcuts (GitHub #131)</comment></data>
+  <data name="Shortcuts.Action.ToggleFavorite" xml:space="preserve"><value>Çalan parçayı favorilere ekle</value><comment>Settings › Shortcuts (GitHub #131)</comment></data>
+  <data name="Shortcuts.Action.ToggleFullscreen" xml:space="preserve"><value>Tam ekranı aç / kapat</value><comment>Settings › Shortcuts (GitHub #131)</comment></data>
+  <data name="Shortcuts.Action.SearchLibrary" xml:space="preserve"><value>Kitaplıkta ara</value><comment>Settings › Shortcuts (GitHub #131)</comment></data>
+  <data name="Shortcuts.Action.CommandPalette" xml:space="preserve"><value>Komut paleti</value><comment>Settings › Shortcuts (GitHub #131)</comment></data>
+  <data name="Shortcuts.Action.NewPlaylist" xml:space="preserve"><value>Yeni çalma listesi</value><comment>Settings › Shortcuts (GitHub #131)</comment></data>
+  <data name="Shortcuts.Action.ToggleQueue" xml:space="preserve"><value>Kuyruğu göster / gizle</value><comment>Settings › Shortcuts (GitHub #131)</comment></data>
+  <data name="Shortcuts.Action.ToggleLyrics" xml:space="preserve"><value>Şarkı sözlerini göster / gizle</value><comment>Settings › Shortcuts (GitHub #131)</comment></data>
+  <data name="Shortcuts.Action.OpenSettings" xml:space="preserve"><value>Ayarları aç</value><comment>Settings › Shortcuts (GitHub #131)</comment></data>
+  <data name="Shortcuts.Action.ScanReplayGain" xml:space="preserve"><value>Seçili şarkılar için ReplayGain</value><comment>Settings › Shortcuts (GitHub #131)</comment></data>
+  <data name="Shortcuts.Action.ToggleShuffle" xml:space="preserve"><value>Karıştırmayı aç / kapat</value><comment>Settings › Shortcuts (GitHub #131)</comment></data>
+  <data name="Shortcuts.Action.CycleRepeat" xml:space="preserve"><value>Tekrar modunu değiştir</value><comment>Settings › Shortcuts (GitHub #131)</comment></data>
+  <data name="Shortcuts.Action.ToggleMute" xml:space="preserve"><value>Sesi kapat / aç</value><comment>Settings › Shortcuts (GitHub #131)</comment></data>
+  <data name="Shortcuts.Action.SeekForward" xml:space="preserve"><value>İleri sar</value><comment>Settings › Shortcuts (GitHub #131)</comment></data>
+  <data name="Shortcuts.Action.SeekBackward" xml:space="preserve"><value>Geri sar</value><comment>Settings › Shortcuts (GitHub #131)</comment></data>
+  <data name="Shortcuts.Action.ToggleMiniPlayer" xml:space="preserve"><value>Mini oynatıcı</value><comment>Settings › Shortcuts (GitHub #131)</comment></data>
+  <data name="Shortcuts.Action.GoBack" xml:space="preserve"><value>Geri</value><comment>Settings › Shortcuts (GitHub #131)</comment></data>
+  <data name="Shortcuts.Action.GoForward" xml:space="preserve"><value>İleri</value><comment>Settings › Shortcuts (GitHub #131)</comment></data>
+  <data name="Shortcuts.Action.GoHome" xml:space="preserve"><value>Ana Sayfa'ya git</value><comment>Settings › Shortcuts (GitHub #131)</comment></data>
+  <data name="Shortcuts.Action.GoSongs" xml:space="preserve"><value>Şarkılar'a git</value><comment>Settings › Shortcuts (GitHub #131)</comment></data>
+  <data name="Shortcuts.Action.GoAlbums" xml:space="preserve"><value>Albümler'e git</value><comment>Settings › Shortcuts (GitHub #131)</comment></data>
+  <data name="Shortcuts.Action.GoArtists" xml:space="preserve"><value>Sanatçılar'a git</value><comment>Settings › Shortcuts (GitHub #131)</comment></data>
 </root>

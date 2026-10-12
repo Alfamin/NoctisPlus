@@ -342,6 +342,74 @@ public class NoctisServerTests : IAsyncLifetime
     }
 
     [Fact]
+    public void Certificate_KeyFile_DoesNotOpenThePfx_OnWindows_AndAPlainKeyFileIsProtectedInPlace()
+    {
+        if (!OperatingSystem.IsWindows()) return; // DPAPI: elsewhere the key file stays owner-only plain text
+
+        // A fresh install: the two files copied elsewhere (another user, a backup) are not the server's identity.
+        var dir = Path.Combine(_dir, "cert-dpapi");
+        using var first = ServerCertificate.LoadOrCreate(dir);
+        var fp = ServerCertificate.Fingerprint(first);
+        var pfx = Path.Combine(dir, ServerCertificate.FileName);
+        var keyFile = Path.Combine(dir, ServerCertificate.KeyFileName);
+        var stored = File.ReadAllText(keyFile).Trim();
+        Assert.ThrowsAny<System.Security.Cryptography.CryptographicException>(() =>
+            System.Security.Cryptography.X509Certificates.X509CertificateLoader.LoadPkcs12FromFile(pfx, stored,
+                System.Security.Cryptography.X509Certificates.X509KeyStorageFlags.EphemeralKeySet).Dispose());
+        using var second = ServerCertificate.LoadOrCreate(dir);
+        Assert.Equal(fp, ServerCertificate.Fingerprint(second)); // still the same certificate (the phone's pin holds)
+
+        // An install from before: the password in plain text beside the PFX. Loaded as before
+        // (same certificate, so no re-pairing), and protected on the way.
+        var legacy = Path.Combine(_dir, "cert-legacy");
+        Directory.CreateDirectory(legacy);
+        const string password = "legacy-password";
+        string legacyFp;
+        using (var created = ServerCertificate.Create())
+        {
+            legacyFp = ServerCertificate.Fingerprint(created);
+            File.WriteAllBytes(Path.Combine(legacy, ServerCertificate.FileName),
+                created.Export(System.Security.Cryptography.X509Certificates.X509ContentType.Pkcs12, password));
+        }
+        File.WriteAllText(Path.Combine(legacy, ServerCertificate.KeyFileName), password);
+        using var migrated = ServerCertificate.LoadOrCreate(legacy);
+        Assert.Equal(legacyFp, ServerCertificate.Fingerprint(migrated));
+        Assert.NotEqual(password, File.ReadAllText(Path.Combine(legacy, ServerCertificate.KeyFileName)).Trim());
+        using var again = ServerCertificate.LoadOrCreate(legacy);
+        Assert.Equal(legacyFp, ServerCertificate.Fingerprint(again));
+
+        // Protected once, then left alone: DPAPI output differs on every call, so comparing a
+        // fresh blob with the stored one rewrote the file on every server start.
+        var once = File.ReadAllText(Path.Combine(legacy, ServerCertificate.KeyFileName));
+        using var third = ServerCertificate.LoadOrCreate(legacy);
+        Assert.Equal(once, File.ReadAllText(Path.Combine(legacy, ServerCertificate.KeyFileName)));
+    }
+
+    [Fact]
+    public async Task AnUnhandledRequestError_NeverShowsAStackTrace_EvenInADevelopmentEnvironment()
+    {
+        // ASP.NET Core adds its developer exception page (stack trace, source paths) when the
+        // process runs with ASPNETCORE_ENVIRONMENT=Development, as a dev box may; the server
+        // answers the network, so it must never pick that up.
+        var previous = Environment.GetEnvironmentVariable("ASPNETCORE_ENVIRONMENT");
+        Environment.SetEnvironmentVariable("ASPNETCORE_ENVIRONMENT", "Development");
+        var server = new NoctisServer(_lib, _users, "test");
+        try { await server.StartAsync(0, certificate: null, bindAddress: IPAddress.Loopback); }
+        finally { Environment.SetEnvironmentVariable("ASPNETCORE_ENVIRONMENT", previous); }
+        try
+        {
+            using var http = new HttpClient { BaseAddress = new Uri($"http://127.0.0.1:{server.Port}/") };
+            // 1025 form values: past the form reader's limit, which throws before the handler's own try.
+            var fields = Enumerable.Range(0, 1025).Select(_ => new KeyValuePair<string, string>("id", "x"));
+            var res = await http.PostAsync("rest/ping.view?f=json", new FormUrlEncodedContent(fields), TestContext.Current.CancellationToken);
+            var body = await res.Content.ReadAsStringAsync(TestContext.Current.CancellationToken);
+            Assert.DoesNotContain("Exception", body);
+            Assert.DoesNotContain("   at ", body);
+        }
+        finally { await server.StopAsync(); }
+    }
+
+    [Fact]
     public async Task Https_Handshake_Succeeds_WithFreshAndReloadedCertificate()
     {
         // Schannel refuses ephemeral private keys for a server credential: Kestrel still starts,

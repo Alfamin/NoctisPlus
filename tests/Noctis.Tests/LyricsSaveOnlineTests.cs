@@ -1,3 +1,4 @@
+using System.Xml.Linq;
 using Avalonia.Headless.XUnit;
 using Avalonia.Threading;
 using Noctis.Helpers;
@@ -373,7 +374,231 @@ public class LyricsSaveOnlineTests
         finally { Cleanup(local.Track); Cleanup(remote.Track); }
     }
 
+    // ── Save Lyrics to File ▸ TTML (Discord, nutf!xx: "ttml preferred") ──
+
+    private static readonly XNamespace TtNs = "http://www.w3.org/ns/ttml";
+
+    [AvaloniaFact]
+    public async Task SaveTtml_WordSynced_WritesWordSpansThatReadBack_AndThePageShowsTheTtml()
+    {
+        var h = Mount();
+        try
+        {
+            await ShowPickOverOwnTtmlAsync(h, Result(synced: Elrc));
+            Assert.True(h.Vm.CanSaveTtmlToFile);
+
+            await h.Vm.SaveLyricsAsTtmlCommand.ExecuteAsync(null);
+            await DrainWriterLaneAsync();
+
+            // The song's own, different .ttml is named, then trashed before the new one lands.
+            var prompt = Assert.Single(h.Prompts);
+            Assert.Contains($"“{Name(h.Track, ".ttml")}”", prompt);
+            Assert.Contains(Name(h.Track, ".ttml"), h.Trashed);
+            Assert.True(AppWrittenSidecarRegistry.Default.Contains(Sidecar(h.Track, ".ttml")));
+            // Same as LRC besides: the .elrc and its line-level .lrc.
+            Assert.Equal(Elrc, Read(Sidecar(h.Track, ".elrc")));
+            Assert.Equal("[00:01.00]word timed", Read(Sidecar(h.Track, ".lrc")));
+
+            var text = File.ReadAllText(Sidecar(h.Track, ".ttml"));
+            var p = Assert.Single(XDocument.Parse(text).Descendants(TtNs + "p"));
+            Assert.Equal("00:00:01.000", p.Attribute("begin")!.Value);
+            Assert.Equal("00:00:02.000", p.Attribute("end")!.Value);
+            Assert.Contains("itunes:timing=\"Word\"", text);
+
+            var (lines, _) = TtmlParser.Parse(text);
+            var line = Assert.Single(lines!);
+            Assert.Equal(TimeSpan.FromSeconds(1), line.Timestamp);
+            Assert.Equal(new[] { "word@1000-1500", "timed@1500-2000" },
+                line.Words!.Select(w => $"{w.Text.Trim()}@{w.Start.TotalMilliseconds}-{w.End!.Value.TotalMilliseconds}"));
+
+            // The page re-reads the files and shows the .ttml (it out-ranks .elrc/.lrc); a
+            // .ttml on the page offers no further TTML save.
+            await PumpUntilAsync(() => h.Vm.LyricLines.Any(l => l.Text.Contains("word") && l.Words is { Count: > 0 }));
+            Assert.DoesNotContain(h.Vm.LyricLines, l => l.Text == "my ttml line");
+            Assert.False(h.Vm.CanSaveTtmlToFile);
+            Assert.False(h.Vm.CanSaveToFile);
+        }
+        finally { Cleanup(h.Track); }
+    }
+
+    [AvaloniaFact]
+    public async Task SaveTtml_LineSynced_WritesLineTimes_AndNoElrc()
+    {
+        const string twoLines = "[00:01.00]line timed\n[00:03.50]second line";
+        var h = Mount();
+        try
+        {
+            h.Vm.SearchLyricsForTrack(h.Track);
+            await PumpUntilAsync(() => h.Vm.ShowSearchButton || h.Vm.LyricsSourceName.Length > 0);
+            h.Vm.ApplySearchedLyrics(h.Track, Result(synced: twoLines), "LRCLIB");
+            await DrainWriterLaneAsync();
+            Assert.True(h.Vm.CanSaveTtmlToFile);
+
+            await h.Vm.SaveLyricsAsTtmlCommand.ExecuteAsync(null);
+            await DrainWriterLaneAsync();
+
+            Assert.Empty(h.Prompts); // the .lrc already holds these lines; the .ttml is new
+            Assert.Equal(twoLines, Read(Sidecar(h.Track, ".lrc")));
+            Assert.False(File.Exists(Sidecar(h.Track, ".elrc")));
+            var text = File.ReadAllText(Sidecar(h.Track, ".ttml"));
+            Assert.Contains("itunes:timing=\"Line\"", text);
+            var ps = XDocument.Parse(text).Descendants(TtNs + "p").ToList();
+            Assert.Equal(new[] { "00:00:01.000", "00:00:03.500" }, ps.Select(p => p.Attribute("begin")!.Value));
+            Assert.Equal("00:00:03.500", ps[0].Attribute("end")!.Value);
+
+            var (lines, _) = TtmlParser.Parse(text);
+            Assert.Equal(new[] { "line timed", "second line" }, lines!.Select(l => l.Text));
+            Assert.Equal(new TimeSpan?[] { TimeSpan.FromSeconds(1), TimeSpan.FromSeconds(3.5) }, lines.Select(l => l.Timestamp));
+            Assert.All(lines, l => Assert.False(l.Words is { Count: > 0 }));
+        }
+        finally { Cleanup(h.Track); }
+    }
+
+    /// <summary>
+    /// The automatic save already put most found lyrics in an .lrc, and LRC Save is only for
+    /// online lyrics: the song's own synced lyrics get TTML too. Its .lrc stays as it is — not
+    /// rewritten, not sent to the Recycle Bin, not asked about.
+    /// </summary>
+    [AvaloniaFact]
+    public async Task SaveTtml_OfTheSongsOwnLrc_AddsTheTtml_LeavesTheUsersLrcAlone()
+    {
+        const string own = "[00:05.00]my own line\n[00:07.00]next one";
+        var h = Mount();
+        File.WriteAllText(Sidecar(h.Track, ".lrc"), own);
+        try
+        {
+            h.Vm.SearchLyricsForTrack(h.Track);
+            await PumpUntilAsync(() => h.Vm.CanSaveTtmlToFile);
+            Assert.True(h.Vm.CanSaveTtmlToFile);
+            Assert.False(h.Vm.CanSaveToFile); // LRC stays an online-lyrics save
+
+            // LRC does nothing for the song's own lyrics.
+            await h.Vm.SaveLyricsToFileCommand.ExecuteAsync(null);
+            await DrainWriterLaneAsync();
+            Assert.False(File.Exists(Sidecar(h.Track, ".ttml")));
+
+            await h.Vm.SaveLyricsAsTtmlCommand.ExecuteAsync(null);
+            await DrainWriterLaneAsync();
+
+            Assert.Empty(h.Prompts);
+            Assert.Empty(h.Trashed);
+            Assert.Equal(own, Read(Sidecar(h.Track, ".lrc")));
+            Assert.False(AppWrittenSidecarRegistry.Default.Contains(Sidecar(h.Track, ".lrc")));
+            var (lines, _) = TtmlParser.Parse(File.ReadAllText(Sidecar(h.Track, ".ttml")));
+            Assert.Equal(new[] { "my own line", "next one" }, lines!.Select(l => l.Text));
+            Assert.Equal(new TimeSpan?[] { TimeSpan.FromSeconds(5), TimeSpan.FromSeconds(7) }, lines.Select(l => l.Timestamp));
+            await PumpUntilAsync(() => !h.Vm.CanSaveTtmlToFile);
+            Assert.False(h.Vm.CanSaveTtmlToFile);
+        }
+        finally { Cleanup(h.Track); }
+    }
+
+    [AvaloniaFact]
+    public async Task CanSaveTtml_NotForPlainLyrics_NorLyricsReadFromATtml()
+    {
+        var plain = Mount();
+        var fromTtml = Mount();
+        try
+        {
+            // The song's own plain lyrics: no times to put in a .ttml.
+            plain.Track.Lyrics = "just words\nno times";
+            plain.Vm.SearchLyricsForTrack(plain.Track);
+            await PumpUntilAsync(() => plain.Vm.UnsyncedLines.Any(l => l.Text == "just words"));
+            Assert.False(plain.Vm.CanSaveTtmlToFile);
+            await plain.Vm.SaveLyricsAsTtmlCommand.ExecuteAsync(null);
+            await DrainWriterLaneAsync();
+            Assert.False(File.Exists(Sidecar(plain.Track, ".ttml")));
+
+            // Plain online lyrics neither.
+            plain.Vm.ApplySearchedLyrics(plain.Track, Result(plain: "just words"), "Genius");
+            Assert.False(plain.Vm.CanSaveTtmlToFile);
+            Assert.False(plain.Vm.CanSaveToFile);
+
+            // Synced online lyrics: both formats.
+            plain.Vm.ApplySearchedLyrics(plain.Track, Result(synced: Lrc), "LRCLIB");
+            Assert.True(plain.Vm.CanSaveTtmlToFile);
+            Assert.True(plain.Vm.CanSaveToFile);
+
+            // The page already reads a .ttml: nothing to make.
+            File.WriteAllText(Sidecar(fromTtml.Track, ".ttml"), Ttml("my ttml line"));
+            fromTtml.Vm.SearchLyricsForTrack(fromTtml.Track);
+            await PumpUntilAsync(() => fromTtml.Vm.LyricLines.Any(l => l.Text == "my ttml line"));
+            Assert.False(fromTtml.Vm.CanSaveTtmlToFile);
+        }
+        finally { Cleanup(plain.Track); Cleanup(fromTtml.Track); }
+    }
+
+    /// <summary>What the lyrics page shows from an .elrc is what it shows from the .ttml made of it: lines, word times, ad-lib rows.</summary>
+    [Fact]
+    public void BuildTtmlFromSynced_ReadsBackAsTheElrcReads()
+    {
+        const string elrc = """
+            [ar:Someone]
+            [00:20.00]<00:20.00>Come <00:20.30>take <00:20.60>it <00:21.00>(Yeah)<00:21.50>
+            [00:22.00]<00:22.00>It's <00:22.30>my <00:22.60>year<00:23.00>
+            [00:23.10]<00:23.10>(Uh-huh, <00:23.40>uh-huh)<00:23.80>
+            [00:25.00]A line with no word times
+            [62:03.25]<62:03.25>Late<62:04.00>
+            """;
+        var ttml = LyricsViewModel.BuildTtmlFromSynced(elrc);
+        Assert.NotNull(ttml);
+        XDocument.Parse(ttml!);
+
+        var fromElrc = LyricsViewModel.ParseLrcContent(elrc);
+        var (fromTtml, _) = TtmlParser.Parse(ttml!);
+        static string[] Row(IReadOnlyList<WordTiming>? words) =>
+            words?.Select(w => $"{w.Text.Trim()}@{w.Start.TotalMilliseconds}").ToArray() ?? Array.Empty<string>();
+        Assert.NotNull(fromTtml);
+        // Line text of a line with an ad-lib differs by design (the ELRC keeps "(Yeah)" in it,
+        // TTML only in the background row), so lines compare by their timed rows.
+        Assert.Equal(fromElrc.Count, fromTtml!.Count);
+        Assert.Equal(fromElrc.Select(l => l.Timestamp), fromTtml.Select(l => l.Timestamp));
+        Assert.Equal("A line with no word times", fromTtml[2].Text.Trim());
+        for (var i = 0; i < fromElrc.Count; i++)
+        {
+            Assert.Equal(Row(fromElrc[i].Words), Row(fromTtml[i].Words));
+            Assert.Equal(Row(fromElrc[i].BackgroundWords), Row(fromTtml[i].BackgroundWords));
+        }
+        Assert.Equal(new[] { "(Uh-huh,@23100", "uh-huh)@23400" }, Row(fromTtml[1].BackgroundWords));
+
+        Assert.Null(LyricsViewModel.BuildTtmlFromSynced("just words, no times"));
+    }
+
     // ── Player-bar Options menu ──
+
+    [AvaloniaFact]
+    public void PlayerMenu_SaveLyricsTtml_FollowsTheLyricsPage()
+    {
+        var player = new PlayerViewModel(
+            new FakeAudioPlayer(), new FakeLibraryService(),
+            new TestPersistenceService(), new FakeAnimatedCoverService());
+        var lrc = 0;
+        var ttml = 0;
+
+        player.SetLyricsPageActions(() => { }, () => { }, () => { }, () => { }, () => { }, true, false, true, true,
+            saveLyrics: () => lrc++, canSaveLyrics: false, saveLyricsTtml: () => ttml++, canSaveLyricsTtml: false);
+        Assert.False(player.HasSaveLyricsMenu); // plain lyrics: no Save submenu at all
+
+        // The song's own synced lyrics: the submenu with TTML only.
+        player.UpdateLyricsPageState(true, false, true, true, canSaveLyrics: false, canSaveLyricsTtml: true);
+        Assert.True(player.HasSaveLyricsMenu);
+        Assert.False(player.CanSaveLyricsToFile);
+        Assert.True(player.CanSaveLyricsAsTtml);
+        player.SaveCurrentTrackLyricsAsTtmlCommand.Execute(null);
+        Assert.Equal((0, 1), (lrc, ttml));
+
+        // Synced online lyrics: both.
+        player.UpdateLyricsPageState(true, false, true, true, canSaveLyrics: true, canSaveLyricsTtml: true);
+        Assert.True(player.CanSaveLyricsToFile);
+        player.SaveCurrentTrackLyricsCommand.Execute(null);
+        Assert.Equal((1, 1), (lrc, ttml));
+
+        player.ClearLyricsPageActions();
+        Assert.False(player.HasSaveLyricsMenu);
+        Assert.False(player.CanSaveLyricsAsTtml);
+        player.SaveCurrentTrackLyricsAsTtmlCommand.Execute(null);
+        Assert.Equal((1, 1), (lrc, ttml));
+    }
 
     [AvaloniaFact]
     public void PlayerMenu_SaveLyrics_FollowsTheLyricsPage()

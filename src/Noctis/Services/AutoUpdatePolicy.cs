@@ -108,6 +108,11 @@ internal static class AutoUpdatePolicy
     public const int MaxLaunchAttempts = 2;
     public static readonly TimeSpan PostponeFor = TimeSpan.FromHours(24);
     public static readonly TimeSpan RecheckInterval = TimeSpan.FromHours(24);
+    /// <summary>A check that failed (offline right after login, GitHub down) is retried this soon.</summary>
+    public static readonly TimeSpan FailedCheckRetry = TimeSpan.FromMinutes(30);
+    /// <summary>The recheck loop wakes at least this often and compares wall-clock time, so a sleep or
+    /// hibernate can't push a due check back by the time the machine was off.</summary>
+    public static readonly TimeSpan RecheckWake = TimeSpan.FromHours(1);
     /// <summary>Nothing shows until Inno's window appears (or, on Linux, the silent swap ends), so a
     /// second click this soon after an install started must not start another one over it.</summary>
     public static readonly TimeSpan InstallRunningWindow = TimeSpan.FromMinutes(5);
@@ -164,6 +169,34 @@ internal static class AutoUpdatePolicy
 
         reason = "eligible";
         return true;
+    }
+
+    /// <summary>
+    /// When a release <see cref="ShouldAutoDownload"/> turned down only for timing (the soak, or the
+    /// backoff after a failed download) becomes eligible; null when nothing will change by waiting
+    /// (no installer, a warning, blocked, or already eligible). The recheck loop asks again then,
+    /// instead of up to a day later (GitHub #130).
+    /// </summary>
+    public static DateTimeOffset? RetryAt(AutoUpdateState? s, UpdateInfo u, DateTimeOffset now)
+    {
+        if (u.InstallerApiUrl is null || u.WarningText is not null) return null;
+        if (u.PublishedAt is not { } published) return null;
+        var sameTag = s is not null && s.Tag == u.TagName;
+        if (sameTag && s!.Blocked) return null;
+
+        var at = published + SoakPeriod;
+        if (sameTag && s!.Failures > 0 && s.LastAttemptUtc is { } last && last + BackoffAfter(s.Failures) > at)
+            at = last + BackoffAfter(s.Failures);
+        // Past the soak and backoff, a missing SHA256SUMS is left to the daily check.
+        return at > now ? at : null;
+    }
+
+    /// <summary>When the recheck loop asks GitHub next: a day after the last check, or sooner at
+    /// <paramref name="retryAtUtc"/>. A retry at or before the last check was already used.</summary>
+    public static DateTimeOffset NextCheckDue(DateTimeOffset lastCheckUtc, DateTimeOffset? retryAtUtc)
+    {
+        var daily = lastCheckUtc + RecheckInterval;
+        return retryAtUtc is { } retry && retry > lastCheckUtc && retry < daily ? retry : daily;
     }
 
     public static TimeSpan BackoffAfter(int failures) =>

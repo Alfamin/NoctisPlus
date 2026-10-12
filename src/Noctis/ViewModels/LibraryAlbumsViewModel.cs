@@ -524,7 +524,7 @@ public partial class LibraryAlbumsViewModel : ViewModelBase, ISearchable, IDispo
         // rows on first paint — otherwise the grid flashes the previous (unfiltered)
         // album list for a frame before the async rebuild's UI post lands.
         Interlocked.Increment(ref _rebuildGeneration);
-        var rows = BuildFilteredRows(_allAlbums, ArtistFilterName, _currentFilter, GridColumns, ReleaseTypeFilter, QualityFilter, AlbumSortMode, AlbumSortAscending);
+        var rows = BuildFilteredRows(_allAlbums, ArtistFilterName, _currentFilter, GridColumns, ReleaseTypeFilter, QualityFilter, AlbumSortMode, AlbumSortAscending, AlbumSortNewestFirst);
         FilteredAlbumRows.ReplaceAll(rows);
     }
 
@@ -569,7 +569,7 @@ public partial class LibraryAlbumsViewModel : ViewModelBase, ISearchable, IDispo
         OnPropertyChanged(nameof(HasActiveFilter));
 
         Interlocked.Increment(ref _rebuildGeneration);
-        var rows = BuildFilteredRows(_allAlbums, ArtistFilterName, _currentFilter, GridColumns, ReleaseTypeFilter, QualityFilter, AlbumSortMode, AlbumSortAscending);
+        var rows = BuildFilteredRows(_allAlbums, ArtistFilterName, _currentFilter, GridColumns, ReleaseTypeFilter, QualityFilter, AlbumSortMode, AlbumSortAscending, AlbumSortNewestFirst);
         FilteredAlbumRows.ReplaceAll(rows);
     }
 

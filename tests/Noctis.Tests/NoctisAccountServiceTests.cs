@@ -218,6 +218,94 @@ public class NoctisAccountServiceTests : IAsyncLifetime
         Assert.Equal(_art, File.ReadAllBytes(_phonePersistence.GetArtworkPath(AlbumA)));
     }
 
+    // ── The desktop's profile picture ────────────────────────────────────
+
+    private string DeskAvatar(string name, byte[] bytes)
+    {
+        var path = Path.Combine(_dir, name);
+        File.WriteAllBytes(path, bytes);
+        return path;
+    }
+
+    private string[] PhoneAvatarFiles() => Directory.GetFiles(AccountDir, "avatar-*");
+
+    [Fact]
+    public async Task Avatar_ArrivesWithSignIn_ChangesWithASync_SurvivesARestart_AndLeavesWithSignOut()
+    {
+        var ct = TestContext.Current.CancellationToken;
+        var first = new byte[] { 0x89, 0x50, 0x4E, 0x47, 1, 1, 1 };
+        _desk.Avatar = DeskAvatar("avatar-a.png", first);
+
+        var svc = Restart();
+        var changes = 0;
+        svc.StateChanged += (_, _) => Interlocked.Increment(ref changes);
+        var fingerprint = await svc.ProbeFingerprintAsync(_url, ct);
+        await svc.SignInAsync(_url, "alice", "correct horse", fingerprint, ct);
+        await svc.AvatarRefresh;
+        var firstPath = svc.AvatarPath;
+        Assert.NotNull(firstPath);
+        Assert.Equal(first, File.ReadAllBytes(firstPath!));
+        Assert.Equal(Path.GetFullPath(AccountDir), Path.GetDirectoryName(Path.GetFullPath(firstPath!)));
+        Assert.True(changes >= 2);                       // signed in, then the picture arrived
+
+        // The phone starts again: the picture is there before any network call.
+        var restarted = Restart();
+        Assert.Equal(firstPath, restarted.AvatarPath);
+
+        // An unchanged picture keeps its path (nothing reloads); a new one gets a new path.
+        await svc.SyncNowAsync(ct);
+        Assert.Equal(firstPath, svc.AvatarPath);
+        var second = new byte[] { 0xFF, 0xD8, 0xFF, 0xE0, 2, 2 };
+        _desk.Avatar = DeskAvatar("avatar-b.jpg", second);
+        await svc.SyncNowAsync(ct);
+        Assert.NotEqual(firstPath, svc.AvatarPath);
+        Assert.Equal(second, File.ReadAllBytes(svc.AvatarPath!));
+        Assert.Equal(new[] { svc.AvatarPath }, PhoneAvatarFiles());   // the old one is gone, no temp left
+
+        // The desktop removed its picture: the phone drops it too.
+        _desk.Avatar = null;
+        await svc.SyncNowAsync(ct);
+        Assert.Null(svc.AvatarPath);
+        Assert.Empty(PhoneAvatarFiles());
+
+        _desk.Avatar = DeskAvatar("avatar-c.png", first);
+        await svc.SyncNowAsync(ct);
+        Assert.NotNull(svc.AvatarPath);
+        await svc.SignOutAsync(removeDownloads: false, ct);
+        Assert.Null(svc.AvatarPath);
+        Assert.Empty(PhoneAvatarFiles());
+        Assert.Null(Restart().AvatarPath);
+    }
+
+    [Fact]
+    public async Task Avatar_ThatFailsToDownload_NeverFailsSignInOrSync()
+    {
+        var ct = TestContext.Current.CancellationToken;
+        _desk.Avatar = DeskAvatar("avatar-a.png", new byte[] { 0x89, 0x50, 0x4E, 0x47, 9 });
+        var avatarFails = true;
+        var svc = WithHandler(r => avatarFails && r.RequestUri!.AbsolutePath.EndsWith("getAvatar.view", StringComparison.Ordinal));
+        var fingerprint = await svc.ProbeFingerprintAsync(_url, ct);
+
+        await svc.SignInAsync(_url, "alice", "correct horse", fingerprint, ct);
+        await svc.AvatarRefresh;
+        Assert.True(svc.IsSignedIn);
+        Assert.Null(svc.AvatarPath);
+
+        var result = await svc.SyncNowAsync(ct);
+        Assert.Equal(3, result.Songs);
+        Assert.Null(svc.AvatarPath);
+        Assert.Empty(PhoneAvatarFiles());
+
+        // A failed fetch keeps the picture already shown; the next good one brings it.
+        avatarFails = false;
+        await svc.SyncNowAsync(ct);
+        var shown = svc.AvatarPath;
+        Assert.NotNull(shown);
+        avatarFails = true;
+        await svc.SyncNowAsync(ct);
+        Assert.Equal(shown, svc.AvatarPath);
+    }
+
     [Fact]
     public async Task SyncBeforeThePhoneLibraryHasLoaded_WaitsForIt_AndKeepsTheLocalSongs()
     {
@@ -378,6 +466,32 @@ public class NoctisAccountServiceTests : IAsyncLifetime
     }
 
     [Fact]
+    public async Task Covers_AreNotFetched_WhenThePhoneHasNoRoomLeft()
+    {
+        await SignedInAsync();
+        // Covers are written for every album the catalog lists, each up to its own cap: with the
+        // phone at the reserve they must stop like downloads do, instead of filling the volume.
+        var svc = new NoctisAccountService(_phoneLibrary, _phonePersistence, NoctisHandlers.Sockets, AccountDir, OfflineDir,
+            "Test Phone", _recorder, marshal: a => a())
+        {
+            FreeSpace = _ => NoctisAccountService.StorageReserveBytes - 1,
+        };
+
+        var result = await svc.SyncNowAsync(TestContext.Current.CancellationToken);
+
+        Assert.Equal(3, result.Songs);                      // the rest of the sync still goes
+        Assert.Equal(1, result.Playlists);
+        Assert.False(File.Exists(_phonePersistence.GetArtworkPath(AlbumA)));
+        lock (_coverSizes) Assert.Empty(_coverSizes);       // not even asked for
+        Assert.True(svc.IsSignedIn);
+
+        // Room again: the next sync fetches them.
+        var roomy = Restart();
+        await roomy.SyncNowAsync(TestContext.Current.CancellationToken);
+        Assert.Equal(_art, File.ReadAllBytes(_phonePersistence.GetArtworkPath(AlbumA)));
+    }
+
+    [Fact]
     public async Task Downloads_StopWithStorageFull_WhenTheReserveRunsOutMidDownload()
     {
         await SignedInAsync();
@@ -435,6 +549,29 @@ public class NoctisAccountServiceTests : IAsyncLifetime
         Assert.False(svc.IsDownloaded(Phone(_t2)));
         Assert.Equal(new NoctisDownloadProgress(0, 2, 1, 2L * _audio.Length), last);
         Assert.Empty(Directory.GetFiles(OfflineDir, "*.part"));
+    }
+
+    [Fact]
+    public async Task ADownloadOfASongWhoseFileIsGoneOnTheComputer_CountsAsMissing_NotAsAServerError()
+    {
+        // The owner's log (10-11): every "Download everything" item failed as "download: Server (HTTP 200)";
+        // the desktop listed songs whose files no longer exist and answered error 70 for each.
+        var ct = TestContext.Current.CancellationToken;
+        var svc = await SignedInAsync();
+        await svc.SyncNowAsync(ct);
+        _t2.FilePath = Path.Combine(_dir, "deleted since.flac");               // gone after the phone's catalog
+        NoctisDownloadProgress? last = null;
+        svc.DownloadProgress += (_, p) => last = p;
+
+        await svc.DownloadAllAsync(ct);
+
+        Assert.Equal(new NoctisDownloadProgress(0, 2, 1, 2L * _audio.Length, Missing: 1), last);
+        Assert.False(svc.IsDownloaded(Phone(_t2)));
+        Assert.Equal(NoctisErrorKind.FileMissing, NoctisServerClient.MapError(70, signingIn: false, "download").Kind);
+        Assert.Equal(NoctisErrorKind.Server, NoctisServerClient.MapError(70, signingIn: false, "getSong").Kind);
+        // The next catalog leaves it out, so the phone stops offering it.
+        await svc.SyncNowAsync(ct);
+        Assert.Null(_phoneLibrary.GetTrackById(_t2.Id));
     }
 
     [Fact]
@@ -971,6 +1108,10 @@ public class NoctisAccountServiceTests : IAsyncLifetime
         }
 
         public string? ArtworkPath(Guid albumId) => albumId == AlbumA ? _art : null;
+
+        /// <summary>The desktop's profile picture (getAvatar); null = none.</summary>
+        public string? Avatar { get; set; }
+        public string? AvatarPath(string userName) => Avatar;
 
         public Task SetStarredAsync(IReadOnlyList<Guid> trackIds, IReadOnlyList<Guid> albumIds, IReadOnlyList<Guid> artistIds, bool starred)
         {

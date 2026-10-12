@@ -11,7 +11,7 @@
     <UserControl.Resources>
         <!-- One rail tile: three covers across with the fourth peeking, like Apple's Library. -->
         <DataTemplate x:Key="RailTileTemplate" x:DataType="vm:RailItem">
-            <Button Classes="row" Width="112" VerticalAlignment="Top"
+            <Button Classes="row" Width="140" VerticalAlignment="Top"
                     views:LongPress.Command="{Binding $parent[views:ShellView].((vm:ShellViewModel)DataContext).OpenRailItemSheetCommand}"
                     Command="{Binding $parent[views:LibraryPage].((vm:ShellViewModel)DataContext).OpenRailItemCommand}"
                     CommandParameter="{Binding}">
@@ -262,18 +262,26 @@
                             <PathIcon Data="{DynamicResource LibMoreIcon}" />
                             <Button.Flyout>
                                 <MenuFlyout Placement="BottomEdgeAlignedRight">
-                                    <MenuItem Header="Add Folder…" Command="{Binding Library.AddFolderCommand}" />
-                                    <MenuItem Header="Rescan Library" Command="{Binding Library.RescanCommand}" />
-                                    <MenuItem Header="Settings" Command="{Binding OpenSettingsCommand}" />
+                                    <!-- The Windows app's own glyphs for the same three actions. -->
+                                    <MenuItem Header="Add Folder…" Command="{Binding Library.AddFolderCommand}">
+                                        <MenuItem.Icon><PathIcon Data="{DynamicResource FolderIcon}" Width="18" Height="18" /></MenuItem.Icon>
+                                    </MenuItem>
+                                    <MenuItem Header="Rescan Library" Command="{Binding Library.RescanCommand}">
+                                        <MenuItem.Icon><PathIcon Data="{DynamicResource SyncIcon}" Width="18" Height="18" /></MenuItem.Icon>
+                                    </MenuItem>
+                                    <MenuItem Header="Settings" Command="{Binding OpenSettingsCommand}">
+                                        <MenuItem.Icon><PathIcon Data="{DynamicResource SettingsIcon}" Width="18" Height="18" /></MenuItem.Icon>
+                                    </MenuItem>
                                 </MenuFlyout>
                             </Button.Flyout>
                         </Button>
                     </StackPanel>
                 </controls:GlassPanel>
+                <!-- The one profile button in the app: the desktop account's picture once signed in. -->
                 <controls:GlassPanel Name="LibraryProfileGlass" Classes="header-glass">
-                    <Button Name="LibraryProfileButton" Classes="glass-round" Command="{Binding OpenSettingsCommand}">
-                        <PathIcon Data="{DynamicResource PhPerson}" />
-                    </Button>
+                    <views:ProfileButton Name="LibraryProfile" AvatarPath="{Binding ProfileAvatarPath}"
+                                         Command="{Binding OpenSettingsCommand}"
+                                         HorizontalAlignment="Center" VerticalAlignment="Center" />
                 </controls:GlassPanel>
             </StackPanel>
             <Button Grid.Column="1" Name="LibraryEditDoneButton" Classes="edit-done" Command="{Binding LibraryRows.DoneCommand}">

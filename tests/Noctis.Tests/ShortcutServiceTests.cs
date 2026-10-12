@@ -223,4 +223,79 @@ public class ShortcutServiceTests
         Assert.Equal(ShortcutAction.NextTrack, s.TryMatch(Press(Key.Right, KeyModifiers.Meta)));
         Assert.Null(s.TryMatch(Press(Key.Right, KeyModifiers.Control)));
     }
+
+    /// <summary>
+    /// Settings saved before a default existed can already hold that chord on another
+    /// action: Ctrl+Shift+L on Play/Pause from before GitHub #103 gave it to Lyrics. Load
+    /// kept both, so one key belonged to two actions: the earlier one in display order won
+    /// and the tab listed the chord twice. The user's own binding wins; the newer default
+    /// stays out of the way until the key is free again.
+    /// </summary>
+    [Fact]
+    public void Load_OverrideOnANewerDefault_ShadowsThatDefault_UntilFreed()
+    {
+        var ctrlShiftL = new KeyGesture(Key.L, KeyModifiers.Control | KeyModifiers.Shift);
+        var s = Win();
+        s.Load(new AppSettings { Shortcuts = new Dictionary<string, string> { ["PlayPause"] = "Ctrl+Shift+L" } });
+
+        Assert.Equal(ctrlShiftL, s.Get(ShortcutAction.PlayPause));
+        Assert.Null(s.Get(ShortcutAction.ToggleLyrics));
+        Assert.Equal(ShortcutAction.PlayPause, s.TryMatch(Press(Key.L, KeyModifiers.Control | KeyModifiers.Shift)));
+        Assert.Null(s.FindConflict(new KeyGesture(Key.F9), ShortcutAction.ToggleLyrics));
+
+        s.Reset(ShortcutAction.PlayPause);
+        Assert.Equal(ctrlShiftL, s.Get(ShortcutAction.ToggleLyrics));
+        Assert.Equal(ShortcutAction.ToggleLyrics, s.TryMatch(Press(Key.L, KeyModifiers.Control | KeyModifiers.Shift)));
+    }
+
+    // ── GitHub #131 ──
+
+    [Fact]
+    public void EveryAction_HasADistinctDefault_OnMacToo()
+    {
+        var mac = new ShortcutService(isMac: true);
+        var gestures = new List<KeyGesture>();
+        foreach (var a in Enum.GetValues<ShortcutAction>()) gestures.Add(mac.Get(a)!);
+        Assert.Equal(gestures.Count, new HashSet<KeyGesture>(gestures).Count);
+    }
+
+    /// <summary>Every action rebound at once (to its macOS default, which no Windows default
+    /// uses) survives Save → Load, including the OemComma / bracket / digit keys.</summary>
+    [Fact]
+    public void EveryAction_Rebound_RoundTripsThroughSaveAndLoad()
+    {
+        var a = Win();
+        foreach (var d in ShortcutDefaults.All)
+            a.Set(d.Action, ShortcutDefaults.For(d.Action, isMac: true));
+        var settings = new AppSettings();
+        a.SaveTo(settings);
+
+        var b = Win();
+        b.Load(settings);
+        foreach (var d in ShortcutDefaults.All)
+        {
+            Assert.Equal(ShortcutDefaults.For(d.Action, isMac: true), b.Get(d.Action));
+            Assert.Equal(a.IsDefault(d.Action), b.IsDefault(d.Action));
+        }
+    }
+
+    [Fact]
+    public void Issue131_Keys_MatchTheirActions()
+    {
+        var s = Win();
+        Assert.Equal(ShortcutAction.OpenSettings, s.TryMatch(Press(Key.OemComma, KeyModifiers.Control)));
+        Assert.Equal(ShortcutAction.ScanReplayGain, s.TryMatch(Press(Key.R, KeyModifiers.Control | KeyModifiers.Shift)));
+        Assert.Equal(ShortcutAction.CycleRepeat, s.TryMatch(Press(Key.R, KeyModifiers.Control)));
+        Assert.Equal(ShortcutAction.SeekForward, s.TryMatch(Press(Key.Right, KeyModifiers.Shift)));
+        Assert.Equal(ShortcutAction.NextTrack, s.TryMatch(Press(Key.Right, KeyModifiers.Control)));
+        Assert.Equal(ShortcutAction.GoBack, s.TryMatch(Press(Key.Left, KeyModifiers.Alt)));
+        Assert.Equal(ShortcutAction.ToggleMute, s.TryMatch(Press(Key.Down, KeyModifiers.Control | KeyModifiers.Shift)));
+        Assert.Equal(ShortcutAction.VolumeDown, s.TryMatch(Press(Key.Down, KeyModifiers.Control)));
+        Assert.Equal(ShortcutAction.GoArtists, s.TryMatch(Press(Key.D4, KeyModifiers.Control)));
+
+        var mac = new ShortcutService(isMac: true);
+        Assert.Equal(ShortcutAction.OpenSettings, mac.TryMatch(Press(Key.OemComma, KeyModifiers.Meta)));
+        Assert.Equal(ShortcutAction.GoBack, mac.TryMatch(Press(Key.OemOpenBrackets, KeyModifiers.Meta)));
+        Assert.Null(mac.TryMatch(Press(Key.OemComma, KeyModifiers.Control)));
+    }
 }

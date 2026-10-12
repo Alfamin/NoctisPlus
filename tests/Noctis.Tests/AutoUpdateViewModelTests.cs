@@ -223,6 +223,59 @@ public class AutoUpdateViewModelTests : IDisposable
         Assert.Null(s.Pending);
         Assert.False(vm.IsReadyToInstall);
         Assert.Contains("Use the Update button", vm.UpdateStatusText);
+        Assert.Null(vm.AutoUpdateRetryAtUtc); // blocked: waiting changes nothing
+    }
+
+    /// <summary>GitHub #130: a release still in its 24 h soak is not downloaded, but the recheck is
+    /// set for the end of the soak (not a day later) and the About line says when it will update.</summary>
+    [AvaloniaFact]
+    public async Task SoakingRelease_SetsARetryAtTheEndOfTheSoak_AndSaysWhen()
+    {
+        var api = new FakeGitHub("v99.0.0") { Age = TimeSpan.FromHours(2) };
+        var vm = await CreateAsync(api, autoOn: true);
+
+        await vm.CheckForUpdateSilentAsync();
+        Dispatcher.UIThread.RunJobs();
+
+        Assert.Equal(0, api.InstallerRequests);
+        Assert.True(vm.IsUpdateAvailable);
+        var retry = Assert.IsType<DateTimeOffset>(vm.AutoUpdateRetryAtUtc);
+        var expected = DateTimeOffset.UtcNow + TimeSpan.FromHours(22);
+        Assert.InRange(retry, expected - TimeSpan.FromMinutes(1), expected + TimeSpan.FromMinutes(1));
+        Assert.Contains("downloads automatically after", vm.UpdateStatusText);
+
+        // Once it has soaked, the next check downloads and queues it, and the retry is cleared.
+        api.Age = TimeSpan.FromDays(2);
+        await QueueAsync(vm);
+        Assert.Null(vm.AutoUpdateRetryAtUtc);
+        Assert.Contains("installs the next time", vm.UpdateStatusText);
+    }
+
+    /// <summary>A check that fails (offline right after login) is retried within the hour, not a day later.</summary>
+    [AvaloniaFact]
+    public async Task FailedCheck_RetriesSoon_WhenAutoUpdateIsOn()
+    {
+        var api = new FakeGitHub("v99.0.0") { FailChecks = true };
+        var vm = await CreateAsync(api, autoOn: true);
+
+        await vm.CheckForUpdateSilentAsync();
+        Dispatcher.UIThread.RunJobs();
+
+        var retry = Assert.IsType<DateTimeOffset>(vm.AutoUpdateRetryAtUtc);
+        var expected = DateTimeOffset.UtcNow + AutoUpdatePolicy.FailedCheckRetry;
+        Assert.InRange(retry, expected - TimeSpan.FromMinutes(1), expected + TimeSpan.FromMinutes(1));
+        Assert.False(vm.IsUpdateAvailable);
+    }
+
+    [AvaloniaFact]
+    public async Task FailedCheck_NoRetry_WhenAutoUpdateIsOff()
+    {
+        var vm = await CreateAsync(new FakeGitHub("v99.0.0") { FailChecks = true }, autoOn: false);
+
+        await vm.CheckForUpdateSilentAsync();
+        Dispatcher.UIThread.RunJobs();
+
+        Assert.Null(vm.AutoUpdateRetryAtUtc);
     }
 
     [AvaloniaFact]
@@ -325,6 +378,10 @@ public class AutoUpdateViewModelTests : IDisposable
         public bool PartialThenHang;
         /// <summary>With <see cref="PartialThenHang"/>: the first bytes wait for this.</summary>
         public TaskCompletionSource? HeadGate;
+        /// <summary>How long ago the release was published (default: soaked).</summary>
+        public TimeSpan Age = TimeSpan.FromDays(2);
+        /// <summary>The release list request fails (offline, GitHub down).</summary>
+        public bool FailChecks;
 
         private string AssetName => $"Noctis-{tag}-Setup.exe";
 
@@ -334,6 +391,7 @@ public class AutoUpdateViewModelTests : IDisposable
             if (url.StartsWith("https://api.github.com/repos/heartached/Noctis/releases?", StringComparison.Ordinal))
             {
                 Interlocked.Increment(ref ReleaseChecks);
+                if (FailChecks) return new HttpResponseMessage(HttpStatusCode.ServiceUnavailable);
                 return Ok(new StringContent(ReleasesJson()));
             }
             if (url == SumsUrl)
@@ -392,7 +450,7 @@ public class AutoUpdateViewModelTests : IDisposable
             {
                 tag_name = tag, prerelease, draft = false, body = "Fixes.",
                 html_url = $"https://github.com/heartached/Noctis/releases/tag/{tag}",
-                published_at = DateTimeOffset.UtcNow.AddDays(-2),
+                published_at = DateTimeOffset.UtcNow - Age,
                 assets = new[]
                 {
                     new { name = AssetName, url = AssetUrl, browser_download_url = "https://github.com/x", size = (long)Payload.Length },

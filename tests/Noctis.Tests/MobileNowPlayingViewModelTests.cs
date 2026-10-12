@@ -169,18 +169,21 @@ public class MobileNowPlayingViewModelTests : IDisposable
         Assert.Equal(new[] { t[1], t[2], t[3] }, restored.UpNext);
     }
 
+    /// <summary>The phone is always gapless (owner, 10-11): a player left with gapless off is
+    /// switched on when the transport is built, before anything plays.</summary>
     [Fact]
-    public void SetGapless_False_CancelsInsteadOfPreparing()
+    public void Construction_TurnsGaplessOn_AndTheNextTrackIsPrepared()
     {
         var t = Tracks(3);
-        var (vm, player, _, _) = Make(t);
-        vm.SetGapless(false);
+        var player = new FakeAudioPlayer();
+        player.SetGapless(false);
+        var library = new FakeLibraryService();
+        library.TrackList.AddRange(t);
+        var vm = new NowPlayingViewModel(player, library, new PersistenceService(_root), marshal: a => a());
 
+        Assert.True(player.GaplessEnabled);
         vm.PlayTracks(t, 0);
-
-        Assert.False(player.GaplessEnabled);
-        Assert.Empty(player.PreparedPaths);
-        Assert.True(player.CancelledCount > 0);
+        Assert.Equal(new[] { t[1].FilePath }, player.PreparedPaths);
     }
 
     [Fact]

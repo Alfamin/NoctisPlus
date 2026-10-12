@@ -1,0 +1,271 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:loc="using:Noctis.Localization"
+        xmlns:vm="using:Noctis.ViewModels"
+        xmlns:controls="using:Noctis.Controls"
+        x:Class="Noctis.Views.LyricsBackgroundColorDialog"
+        x:DataType="vm:LyricsViewModel"
+        Title="{loc:T PlaybackBar.BackgroundColor}"
+        CanResize="False"
+        WindowDecorations="None"
+        TransparencyLevelHint="Transparent"
+        Background="Transparent"
+        ShowInTaskbar="False"
+        WindowStartupLocation="CenterOwner">
+
+    <Window.Styles>
+        <!-- Small muted label above a grid, inset like the other pill pop-ups' labels. -->
+        <Style Selector="TextBlock.lc-label">
+            <Setter Property="FontSize" Value="12" />
+            <Setter Property="Opacity" Value="0.5" />
+            <Setter Property="Margin" Value="4,0,0,8" />
+        </Style>
+
+        <!-- Segmented pill: View Options' Ascending / Descending recipe (vo-seg), three
+             equal parts. The chosen one is at full strength over one shared filled pill
+             (SegIndicator) that slides to it; the labels fade between strengths. -->
+        <Style Selector="RadioButton.lc-seg">
+            <Setter Property="MinHeight" Value="34" />
+            <Setter Property="HorizontalAlignment" Value="Stretch" />
+            <Setter Property="FontSize" Value="13" />
+            <Setter Property="FontWeight" Value="SemiBold" />
+            <Setter Property="Cursor" Value="Hand" />
+            <Setter Property="Background" Value="Transparent" />
+            <Setter Property="Opacity" Value="0.6" />
+            <Setter Property="Transitions">
+                <Transitions>
+                    <DoubleTransition Property="Opacity" Duration="0:0:0.18" />
+                </Transitions>
+            </Setter>
+            <Setter Property="Template">
+                <ControlTemplate>
+                    <Border Background="{TemplateBinding Background}" CornerRadius="999">
+                        <ContentPresenter x:Name="PART_ContentPresenter"
+                                          Content="{TemplateBinding Content}"
+                                          ContentTemplate="{TemplateBinding ContentTemplate}"
+                                          HorizontalAlignment="Center"
+                                          VerticalAlignment="Center" />
+                    </Border>
+                </ControlTemplate>
+            </Setter>
+        </Style>
+        <Style Selector="RadioButton.lc-seg:pointerover">
+            <Setter Property="Opacity" Value="0.85" />
+        </Style>
+        <Style Selector="RadioButton.lc-seg:checked">
+            <Setter Property="Opacity" Value="1" />
+        </Style>
+
+        <!-- Swatch: a 32px dot in a 44px cell. The ring around it shows the current choice
+             in the accent colour, and a faint one on hover. Names come up as the tooltip.
+             The ring sits 2px inside the swatch: drawn on its edge, a grid row (exactly the
+             swatch's height) clipped its soft edge flat at the top and bottom on a scaled
+             display. -->
+        <Style Selector="Button.lc-swatch" x:DataType="vm:ColorSwatch">
+            <Setter Property="Width" Value="44" />
+            <Setter Property="Height" Value="44" />
+            <Setter Property="Padding" Value="0" />
+            <Setter Property="Cursor" Value="Hand" />
+            <Setter Property="HorizontalAlignment" Value="Center" />
+            <Setter Property="ToolTip.Tip" Value="{Binding Name}" />
+            <Setter Property="AutomationProperties.Name" Value="{Binding Name}" />
+            <Setter Property="Template">
+                <ControlTemplate>
+                    <!-- No layout rounding on the ring or the dot: at 125% their insets (2 and
+                         6) are 2.5 and 7.5 device pixels, and rounding half to even took them
+                         opposite ways, so the ring sat a pixel off its dot. -->
+                    <Panel Background="Transparent">
+                        <Ellipse x:Name="Ring" StrokeThickness="2" Stroke="Transparent" Margin="2"
+                                 UseLayoutRounding="False" />
+                        <ContentPresenter Content="{TemplateBinding Content}"
+                                          HorizontalAlignment="Center"
+                                          VerticalAlignment="Center"
+                                          UseLayoutRounding="False" />
+                    </Panel>
+                </ControlTemplate>
+            </Setter>
+        </Style>
+        <Style Selector="Button.lc-swatch.auto">
+            <Setter Property="ToolTip.Tip" Value="{loc:T LyricsColor.Auto}" />
+            <Setter Property="AutomationProperties.Name" Value="{loc:T LyricsColor.Auto}" />
+        </Style>
+        <Style Selector="Button.lc-swatch:pointerover /template/ Ellipse#Ring">
+            <Setter Property="Stroke" Value="{DynamicResource SystemControlForegroundBaseLowBrush}" />
+        </Style>
+        <Style Selector="Button.lc-swatch.selected /template/ Ellipse#Ring">
+            <Setter Property="Stroke" Value="{DynamicResource AccentColorBrush}" />
+        </Style>
+
+        <!-- The dot: its own colour, with a hairline so pale swatches stay visible on the
+             Light theme's white card. -->
+        <Style Selector="Ellipse.lc-dot">
+            <Setter Property="Width" Value="32" />
+            <Setter Property="Height" Value="32" />
+            <Setter Property="StrokeThickness" Value="1" />
+            <Setter Property="Stroke" Value="{DynamicResource SystemControlForegroundBaseLowBrush}" />
+        </Style>
+    </Window.Styles>
+
+    <!-- The shared rounded pop-up (PillDialogHost): card in the middle, open/close
+         animation, Esc / Done / a click outside close it. The app behind is blurred like
+         under every other pop-up; a pick repaints the lyrics page and the blur is re-taken
+         right after it (code-behind), so the new colour shows through. -->
+    <controls:PillDialogHost x:Name="Host">
+
+        <Grid x:Name="PickerCard" Width="560" RowDefinitions="Auto,Auto,Auto">
+
+            <!-- Header: the menu's palette glyph, title, one-line purpose. -->
+            <Border Grid.Row="0"
+                    Padding="28,22,28,16"
+                    BorderBrush="{DynamicResource SystemControlForegroundBaseLowBrush}"
+                    BorderThickness="0,0,0,1">
+                <Grid ColumnDefinitions="56,16,*">
+                    <Border Grid.Column="0" Width="56" Height="56" CornerRadius="18" Classes="pill-well">
+                        <controls:LineIcon Data="{DynamicResource MenuLinePalette}" Width="24" Height="24"
+                                           Foreground="{DynamicResource SystemControlForegroundBaseHighBrush}"
+                                           Opacity="0.6"
+                                           HorizontalAlignment="Center" VerticalAlignment="Center" />
+                    </Border>
+                    <StackPanel Grid.Column="2" Spacing="2" VerticalAlignment="Center">
+                        <TextBlock Text="{loc:T PlaybackBar.BackgroundColor}" FontSize="18" FontWeight="Bold"
+                                   TextTrimming="CharacterEllipsis" />
+                        <TextBlock Text="{loc:T LyricsColor.Subtitle}"
+                                   FontSize="13" Opacity="0.7" TextTrimming="CharacterEllipsis" />
+                    </StackPanel>
+                </Grid>
+            </Border>
+
+            <StackPanel Grid.Row="1" Margin="28,20,28,24" Spacing="20">
+
+                <!-- 1. The mode. Each one runs the command the old pill buttons ran. -->
+                <Border Classes="pill-well" CornerRadius="999" Padding="5">
+                    <Panel>
+                    <Border x:Name="SegIndicator" CornerRadius="999" HorizontalAlignment="Left" IsHitTestVisible="False"
+                            Background="{DynamicResource PillFieldBackgroundPointerOver}" />
+                    <UniformGrid x:Name="SegmentGrid" Columns="3">
+                        <RadioButton x:Name="ArtworkSegment" Classes="lc-seg" GroupName="LyricsColorMode"
+                                     Content="{loc:T Lyrics.Artwork}"
+                                     ToolTip.Tip="{loc:T Lyrics.ShowBlurredAlbumArtworkTip}"
+                                     IsChecked="{Binding IsColorModeArtwork, Mode=OneWay}"
+                                     Command="{Binding SelectColorModeArtworkCommand}" />
+                        <RadioButton x:Name="SolidSegment" Classes="lc-seg" GroupName="LyricsColorMode"
+                                     Content="{loc:T Lyrics.Solid}"
+                                     IsChecked="{Binding IsColorModeSolid, Mode=OneWay}"
+                                     Command="{Binding SelectColorModeSolidCommand}" />
+                        <RadioButton x:Name="GradientSegment" Classes="lc-seg" GroupName="LyricsColorMode"
+                                     Content="{loc:T Lyrics.Gradient}"
+                                     IsChecked="{Binding IsColorModeGradient, Mode=OneWay}"
+                                     Command="{Binding SelectColorModeGradientCommand}" />
+                    </UniformGrid>
+                    </Panel>
+                </Border>
+
+                <!-- 2. Only the chosen mode's choices. One height for all three, so the card
+                     doesn't jump while switching. -->
+                <Panel MinHeight="156">
+
+                    <!-- Artwork: nothing to pick here; what it does and where its motion is set. -->
+                    <Border x:Name="ArtworkPanel" Classes="pill-well" Padding="16" VerticalAlignment="Top"
+                            IsVisible="{Binding IsColorModeArtwork}">
+                        <Grid ColumnDefinitions="72,16,*">
+                            <Border Grid.Column="0" Width="72" Height="72" CornerRadius="14" ClipToBounds="True"
+                                    Background="{DynamicResource PillFieldBackgroundPointerOver}">
+                                <Image Source="{Binding Player.AlbumArt}" Stretch="UniformToFill" />
+                            </Border>
+                            <StackPanel Grid.Column="2" Spacing="4" VerticalAlignment="Center">
+                                <TextBlock Text="{loc:T LyricsColor.ArtworkTitle}" FontSize="14" FontWeight="SemiBold"
+                                           TextWrapping="Wrap" />
+                                <TextBlock Text="{loc:T LyricsColor.ArtworkHint}" FontSize="12.5" Opacity="0.65"
+                                           TextWrapping="Wrap" />
+                            </StackPanel>
+                        </Grid>
+                    </Border>
+
+                    <!-- Solid: Auto (the cover's own colour) first, then the named colours. -->
+                    <StackPanel x:Name="SolidPanel" IsVisible="{Binding IsColorModeSolid}">
+                        <TextBlock Classes="lc-label" Text="{loc:T LyricsColor.Colors}" />
+                        <ItemsControl x:Name="SolidGrid" ItemsSource="{Binding SolidSwatches}">
+                            <ItemsControl.ItemsPanel>
+                                <ItemsPanelTemplate>
+                                    <UniformGrid Columns="11" />
+                                </ItemsPanelTemplate>
+                            </ItemsControl.ItemsPanel>
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate x:DataType="vm:ColorSwatch">
+                                    <Button Classes="lc-swatch"
+                                            Classes.auto="{Binding IsAuto}"
+                                            Classes.selected="{Binding IsSelected}"
+                                            Command="{Binding $parent[Window].((vm:LyricsViewModel)DataContext).SetBackgroundColorCommand}"
+                                            CommandParameter="{Binding Key}">
+                                        <Panel>
+                                            <Ellipse Classes="lc-dot" Fill="{Binding Preview}" />
+                                            <TextBlock Text="A" FontSize="13" FontWeight="Bold" Foreground="White"
+                                                       HorizontalAlignment="Center" VerticalAlignment="Center"
+                                                       IsVisible="{Binding IsAuto}">
+                                                <TextBlock.Effect>
+                                                    <DropShadowEffect OffsetX="0" OffsetY="0" BlurRadius="4" Color="#99000000" />
+                                                </TextBlock.Effect>
+                                            </TextBlock>
+                                        </Panel>
+                                    </Button>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                    </StackPanel>
+
+                    <!-- Gradient: Auto (the cover's own gradient) first, then the named ones. -->
+                    <StackPanel x:Name="GradientPanel" IsVisible="{Binding IsColorModeGradient}">
+                        <TextBlock Classes="lc-label" Text="{loc:T LyricsColor.Gradients}" />
+                        <ItemsControl x:Name="GradientGrid" ItemsSource="{Binding GradientSwatches}">
+                            <ItemsControl.ItemsPanel>
+                                <ItemsPanelTemplate>
+                                    <UniformGrid Columns="11" />
+                                </ItemsPanelTemplate>
+                            </ItemsControl.ItemsPanel>
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate x:DataType="vm:ColorSwatch">
+                                    <Button Classes="lc-swatch"
+                                            Classes.auto="{Binding IsAuto}"
+                                            Classes.selected="{Binding IsSelected}"
+                                            Command="{Binding $parent[Window].((vm:LyricsViewModel)DataContext).SetBackgroundColorCommand}"
+                                            CommandParameter="{Binding Key}">
+                                        <Panel>
+                                            <Ellipse Classes="lc-dot" Fill="{Binding Preview}" />
+                                            <TextBlock Text="A" FontSize="13" FontWeight="Bold" Foreground="White"
+                                                       HorizontalAlignment="Center" VerticalAlignment="Center"
+                                                       IsVisible="{Binding IsAuto}">
+                                                <TextBlock.Effect>
+                                                    <DropShadowEffect OffsetX="0" OffsetY="0" BlurRadius="4" Color="#99000000" />
+                                                </TextBlock.Effect>
+                                            </TextBlock>
+                                        </Panel>
+                                    </Button>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                    </StackPanel>
+                </Panel>
+
+                <!-- A background video plays over every mode: say so, or a pick looks like it
+                     did nothing. -->
+                <TextBlock x:Name="VideoNote"
+                           Text="{loc:T LyricsColor.VideoNote}"
+                           FontSize="12.5" Opacity="0.65" TextWrapping="Wrap" Margin="4,0,0,0"
+                           IsVisible="{Binding Player.LyricsBackgroundMediaPath, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
+            </StackPanel>
+
+            <!-- Footer: every pick applies at once, so Done just closes. -->
+            <Border Grid.Row="2"
+                    Padding="28,14"
+                    BorderBrush="{DynamicResource SystemControlForegroundBaseLowBrush}"
+                    BorderThickness="0,1,0,0">
+                <Button x:Name="DoneButton"
+                        HorizontalAlignment="Right"
+                        Classes="pill-primary"
+                        Content="{loc:T Common.Done}"
+                        MinWidth="108"
+                        Click="OnDoneClick" />
+            </Border>
+        </Grid>
+    </controls:PillDialogHost>
+</Window>

@@ -7,13 +7,28 @@ using System.Threading.Tasks;
 using Avalonia.Input;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
+using Noctis.Localization;
 using Noctis.Models;
 using Noctis.Services;
 
 namespace Noctis.ViewModels;
 
-/// <summary>One section of the Shortcuts tab (Playback, Window, …).</summary>
-public sealed record ShortcutGroup(string Name, IReadOnlyList<ShortcutRowViewModel> Rows);
+/// <summary>One section of the Shortcuts tab (Playback, Window, …). <see cref="Id"/> is the
+/// stable <see cref="ShortcutDefaults"/> group id; <see cref="Name"/> is its localized title.</summary>
+public sealed class ShortcutGroup : ObservableObject
+{
+    public ShortcutGroup(string id, IReadOnlyList<ShortcutRowViewModel> rows)
+    {
+        Id = id;
+        Rows = rows;
+    }
+
+    public string Id { get; }
+    public string Name => Loc.T(ShortcutDefaults.GroupKey(Id));
+    public IReadOnlyList<ShortcutRowViewModel> Rows { get; }
+
+    internal void Relabel() => OnPropertyChanged(nameof(Name));
+}
 
 /// <summary>
 /// Turns a gesture into the key caps the chip draws: <c>Ctrl+Right</c> → ["Ctrl", "→"].
@@ -77,8 +92,10 @@ public sealed partial class ShortcutRowViewModel : ObservableObject
     private readonly bool _isMac;
     private CancellationTokenSource? _conflictClearCts;
 
+    private readonly ShortcutDescriptor _descriptor;
+
     public ShortcutAction Action { get; }
-    public string Label { get; }
+    public string Label => _descriptor.Label;
     public string Group { get; }
 
     [ObservableProperty] private IReadOnlyList<string> _gestureParts = Array.Empty<string>();
@@ -94,19 +111,26 @@ public sealed partial class ShortcutRowViewModel : ObservableObject
         _owner = owner;
         _service = service;
         _isMac = isMac;
+        _descriptor = descriptor;
         Action = descriptor.Action;
-        Label = descriptor.Label;
         Group = descriptor.Group;
         Refresh();
     }
 
     partial void OnConflictMessageChanged(string? value) => OnPropertyChanged(nameof(HasConflict));
 
+    /// <summary>A live language switch: re-read the label and the "Not set" chip text.</summary>
+    internal void Relabel()
+    {
+        OnPropertyChanged(nameof(Label));
+        Refresh();
+    }
+
     internal void Refresh()
     {
         var gesture = _service.Get(Action);
         IsUnbound = gesture is null;
-        GestureParts = gesture is null ? new[] { "Not set" } : ShortcutKeyFormatter.Parts(gesture, _isMac);
+        GestureParts = gesture is null ? new[] { Loc.T("Shortcuts.NotSet") } : ShortcutKeyFormatter.Parts(gesture, _isMac);
         IsDefault = _service.IsDefault(Action);
     }
 
@@ -174,7 +198,7 @@ public sealed partial class ShortcutRowViewModel : ObservableObject
     private void ShowConflict(ShortcutAction other)
     {
         var label = ShortcutDefaults.All.First(d => d.Action == other).Label;
-        ConflictMessage = $"Already used by {label}";
+        ConflictMessage = Loc.T("Shortcuts.AlreadyUsedBy", label);
 
         _conflictClearCts?.Cancel();
         var cts = _conflictClearCts = new CancellationTokenSource();
@@ -216,6 +240,11 @@ public sealed partial class ShortcutsSettingsViewModel : ObservableObject
         _service.Changed += (_, _) =>
         {
             foreach (var row in Rows) row.Refresh();
+        };
+        Loc.Instance.CultureChanged += (_, _) =>
+        {
+            foreach (var group in Groups) group.Relabel();
+            foreach (var row in Rows) row.Relabel();
         };
     }
 

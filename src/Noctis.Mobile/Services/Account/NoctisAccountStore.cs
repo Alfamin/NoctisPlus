@@ -39,12 +39,22 @@ internal sealed class NoctisPendingState
     public List<PendingPlay> Plays { get; set; } = new();
 }
 
+/// <summary>The phone's own songs already sent to (or found on) the computer of one server + user,
+/// so the next "Send phone songs to computer" skips them.</summary>
+internal sealed class NoctisUploadState
+{
+    public string ServerUrl { get; set; } = string.Empty;
+    public string UserName { get; set; } = string.Empty;
+    /// <summary>Library track ids (Guid "N") of the songs sent.</summary>
+    public HashSet<string> Sent { get; set; } = new(StringComparer.OrdinalIgnoreCase);
+}
+
 /// <summary>
 /// The account's files in the platform's no-backup directory (Android NoBackupFilesDir; tests a
 /// temp folder): <c>device.json</c> (this install's id, kept across sign-outs),
 /// <c>account.json</c> (server, user, device key, pinned fingerprint — never the password),
-/// <c>sync.json</c> (checkpoint + last agreed state) and <c>pending.json</c> (unpushed edits and
-/// queued plays). Every write goes to a temp file first and is then moved over the old one, so a
+/// <c>sync.json</c> (checkpoint + last agreed state), <c>pending.json</c> (unpushed edits and
+/// queued plays) and <c>uploads.json</c> (phone songs already sent). Every write goes to a temp file first and is then moved over the old one, so a
 /// crash mid-write leaves the previous version. Unreadable files read as empty.
 /// </summary>
 public sealed class NoctisAccountStore
@@ -68,6 +78,7 @@ public sealed class NoctisAccountStore
     private string AccountPath => Path.Combine(Directory, "account.json");
     private string SyncPath => Path.Combine(Directory, "sync.json");
     private string PendingPath => Path.Combine(Directory, "pending.json");
+    private string UploadsPath => Path.Combine(Directory, "uploads.json");
 
     /// <summary>This install's device id: 16 random bytes as hex, created on first use and kept for good.</summary>
     public string LoadOrCreateDeviceId()
@@ -118,13 +129,23 @@ public sealed class NoctisAccountStore
         lock (_writeGate) WriteAtomic(PendingPath, json);
     }
 
-    /// <summary>Sign-out: forgets the checkpoint, the agreed state and anything unsent. The device id stays.</summary>
+    internal NoctisUploadState LoadUploads() => Read<NoctisUploadState>(UploadsPath) ?? new NoctisUploadState();
+
+    internal void SaveUploads(NoctisUploadState uploads)
+    {
+        var json = JsonSerializer.Serialize(uploads, Json);
+        lock (_writeGate) WriteAtomic(UploadsPath, json);
+    }
+
+    /// <summary>Sign-out: forgets the checkpoint, the agreed state, anything unsent and the record of
+    /// songs sent (the computer's own check finds them again). The device id stays.</summary>
     internal void DeleteSyncData()
     {
         lock (_writeGate)
         {
             NoctisServerClient.TryDelete(SyncPath);
             NoctisServerClient.TryDelete(PendingPath);
+            NoctisServerClient.TryDelete(UploadsPath);
         }
     }
 

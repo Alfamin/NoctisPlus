@@ -11,11 +11,23 @@ namespace Noctis.Helpers;
 /// </summary>
 public static class PngExportHelper
 {
-    public static async Task<string?> SavePngAsync(TopLevel topLevel, byte[] png, string suggestedFileName)
+    // The status text the dialogs show as is: in the app language (it was fixed English).
+    internal static string SavedStatus => Localization.Loc.T("ShareLyrics.Saved");
+    internal static string CopiedStatus => Localization.Loc.T("Export.Copied");
+    internal static string SaveFailedStatus(string? reason = null) =>
+        reason is null ? Localization.Loc.T("ShareLyrics.SaveFailed") : $"{Localization.Loc.T("ShareLyrics.SaveFailed")}: {reason}";
+    internal static string CopyFailedStatus(string reason) => $"{Localization.Loc.T("ShareLyrics.CopyFailed")}: {reason}";
+
+    public static Task<string?> SavePngAsync(TopLevel topLevel, byte[] png, string suggestedFileName)
+        => SavePngAsync(topLevel, Task.FromResult<byte[]?>(png), suggestedFileName);
+
+    /// <summary>As above for an image still rendering: the picker opens at once and the bytes
+    /// are awaited only once a file is chosen (null bytes: the render failed).</summary>
+    public static async Task<string?> SavePngAsync(TopLevel topLevel, Task<byte[]?> pngTask, string suggestedFileName)
     {
         var file = await topLevel.StorageProvider.SaveFilePickerAsync(new FilePickerSaveOptions
         {
-            Title = "Save image",
+            Title = Localization.Loc.T("Export.SaveImageTitle"),
             SuggestedFileName = suggestedFileName,
             DefaultExtension = "png",
             FileTypeChoices = new[] { FilePickerFileTypes.ImagePng },
@@ -25,20 +37,22 @@ public static class PngExportHelper
 
         try
         {
+            if (await pngTask is not { } png)
+                return SaveFailedStatus();
             await using var stream = await file.OpenWriteAsync();
             await stream.WriteAsync(png);
-            return "Saved";
+            return SavedStatus;
         }
         catch (Exception ex)
         {
-            return $"Save failed: {ex.Message}";
+            return SaveFailedStatus(ex.Message);
         }
     }
 
     public static async Task<string?> CopyPngAsync(TopLevel topLevel, byte[] png, string fileName)
     {
         if (topLevel.Clipboard is not { } clipboard)
-            return "Clipboard unavailable";
+            return Localization.Loc.T("Export.ClipboardUnavailable");
 
         try
         {
@@ -70,11 +84,11 @@ public static class PngExportHelper
                 transfer.Add(DataTransferItem.CreateFile(tempFile));
 
             await clipboard.SetDataAsync(transfer);
-            return "Copied to clipboard";
+            return CopiedStatus;
         }
         catch (Exception ex)
         {
-            return $"Copy failed: {ex.Message}";
+            return CopyFailedStatus(ex.Message);
         }
     }
 

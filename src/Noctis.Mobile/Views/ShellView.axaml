@@ -117,9 +117,6 @@
             <Grid Name="PlaylistsRoot" RowDefinitions="Auto,*" IsVisible="{Binding IsPlaylistsRootVisible}">
                 <Grid Grid.Row="0" ColumnDefinitions="*,Auto" Margin="20,12,12,8">
                     <TextBlock Name="PlaylistsTitle" Classes="title" Text="{loc:T Nav.Playlists}" />
-                    <Button Grid.Column="1" Classes="icon" VerticalAlignment="Top" Command="{Binding OpenSettingsCommand}">
-                        <PathIcon Data="{DynamicResource PhPerson}" />
-                    </Button>
                 </Grid>
                 <ContentControl Grid.Row="1" Name="PlaylistsHost" Content="{Binding PlaylistsRoot}"
                                 HorizontalContentAlignment="Stretch" VerticalContentAlignment="Stretch" />
@@ -127,9 +124,8 @@
             <Grid Name="FavoritesRoot" RowDefinitions="Auto,*" IsVisible="{Binding IsFavoritesRootVisible}">
                 <Grid Grid.Row="0" ColumnDefinitions="*,Auto" Margin="20,12,12,8">
                     <TextBlock Name="FavoritesTitle" Classes="title" Text="{loc:T Nav.Favorites}" />
-                    <Button Grid.Column="1" Classes="icon" VerticalAlignment="Top" Command="{Binding OpenSettingsCommand}">
-                        <PathIcon Data="{DynamicResource PhPerson}" />
-                    </Button>
+                    <!-- The profile lives on Library alone; here, the list's tools. -->
+                    <views:ListTools Grid.Column="1" VerticalAlignment="Center" DataContext="{Binding FavoritesRoot}" />
                 </Grid>
                 <ContentControl Grid.Row="1" Name="FavoritesHost" Content="{Binding FavoritesRoot}"
                                 HorizontalContentAlignment="Stretch" VerticalContentAlignment="Stretch" />
@@ -237,6 +233,15 @@
                 <controls:GlassPanel Name="MiniBar" Classes="liquid" CornerRadius="30" VerticalAlignment="Bottom"
                                      IsVisible="{Binding IsMiniBarVisible}">
                     <Panel>
+                        <!-- The elapsed part of the song, filled in the cover's colour with a bright
+                             edge along the bottom: progress at a glance, as the full player shows it. -->
+                        <Border Name="MiniProgress" CornerRadius="30" ClipToBounds="True" IsHitTestVisible="False">
+                            <views:FractionPanel Fraction="{Binding Player.ProgressFraction}">
+                                <Border Name="MiniProgressFill" Background="{Binding MiniProgressFill}" />
+                                <Border Name="MiniProgressLine" Background="{Binding MiniProgressLine}" Height="2.5"
+                                        VerticalAlignment="Bottom" />
+                            </views:FractionPanel>
+                        </Border>
                         <Border Background="{DynamicResource GlassBarSheen}" CornerRadius="30" IsHitTestVisible="False" />
                         <Grid ColumnDefinitions="*,Auto,Auto" Margin="13,0,6,0">
                             <!-- Stretch both ways: Fluent sets Left/Center, which shrank the tap target

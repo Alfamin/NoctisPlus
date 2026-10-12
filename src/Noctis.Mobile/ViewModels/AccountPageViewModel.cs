@@ -1,3 +1,4 @@
+using System.Text;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using Noctis.Mobile.Services.Account;
@@ -7,7 +8,9 @@ namespace Noctis.Mobile.ViewModels;
 
 /// <summary>
 /// Settings → Account: signs the phone in to the owner's Noctis desktop and, once signed in,
-/// shows the link with Sync now, Download everything, the downloads' size and Sign out.
+/// shows the account (the desktop's profile picture and name, the email, PC, last sync) over Sync
+/// now, Download everything, Send phone songs to computer, the downloads' size, Remove all
+/// downloads and Sign out.
 /// Sign-in is two steps: the address is probed for the server certificate's fingerprint,
 /// which the user compares with the one on the computer, and only a confirmed fingerprint
 /// is signed in with (and pinned by the service). Every call goes through
@@ -22,8 +25,11 @@ public sealed partial class AccountPageViewModel : MobilePage
     private readonly Action<Action> _marshal;
     private string? _probedUrl;
     private bool _syncRunning;
+    /// <summary>This page started a sync whose Done/Failed has not arrived yet (see OnSyncProgress).</summary>
+    private bool _ownSyncEndPending;
     private bool _downloadRunning;
     private NoctisDownloadProgress? _lastDownload;
+    private CancellationTokenSource? _uploadCts;
 
     public AccountPageViewModel(ShellViewModel shell, INoctisAccountService account)
     {
@@ -33,7 +39,10 @@ public sealed partial class AccountPageViewModel : MobilePage
         _account.StateChanged += OnStateChanged;
         _account.SyncProgress += OnSyncProgress;
         _account.DownloadProgress += OnDownloadProgress;
+        _account.UploadProgress += OnUploadProgress;
         Refresh();
+        // Signed out by the sync at app start (which only logs): say why the form is back.
+        if (!IsSignedIn && _account.WasSignedOutByComputer) ErrorText = Describe(NoctisErrorKind.SignedOut, signedIn: false);
     }
 
     public ShellViewModel Shell { get; }
@@ -59,7 +68,7 @@ public sealed partial class AccountPageViewModel : MobilePage
     public bool IsFormVisible => !IsSignedIn && !IsConfirmingFingerprint;
 
     [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(IsIdle), nameof(CanSync), nameof(CanDownload))]
+    [NotifyPropertyChangedFor(nameof(IsIdle), nameof(CanSync), nameof(CanDownload), nameof(CanUpload))]
     private bool _isBusy;
 
     public bool IsIdle => !IsBusy;
@@ -91,6 +100,35 @@ public sealed partial class AccountPageViewModel : MobilePage
 
     /// <summary>"owner on Studio PC".</summary>
     [ObservableProperty] private string _accountText = string.Empty;
+
+    /// <summary>The header: the desktop's profile name, large (the account's email when it has none).</summary>
+    [ObservableProperty] private string _displayName = string.Empty;
+
+    /// <summary>The header's smaller line under the name: the account's email, when the name shown is not it.</summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(HasEmailText))]
+    private string _emailText = string.Empty;
+
+    public bool HasEmailText => EmailText.Length > 0;
+
+    /// <summary>The header's second line: "on Studio PC".</summary>
+    [ObservableProperty] private string _serverText = string.Empty;
+
+    /// <summary>The desktop's profile picture (a local file the service cached), or null.</summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(HasAvatar), nameof(ShowInitials), nameof(ShowPersonGlyph))]
+    private string? _avatarPath;
+
+    public bool HasAvatar => !string.IsNullOrEmpty(AvatarPath);
+
+    /// <summary>No picture: the accent circle shows these ("OW" for "owner", "JD" for "John Doe").</summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(ShowInitials), nameof(ShowPersonGlyph))]
+    private string _initials = string.Empty;
+
+    public bool ShowInitials => !HasAvatar && Initials.Length > 0;
+    public bool ShowPersonGlyph => !HasAvatar && Initials.Length == 0;
+
     [ObservableProperty] private string _lastSyncText = string.Empty;
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(CanSync))]
@@ -106,8 +144,24 @@ public sealed partial class AccountPageViewModel : MobilePage
     public bool CanDownload => IsIdle && !IsDownloading;
     [ObservableProperty] private string _downloadText = string.Empty;
 
-    /// <summary>"Downloaded: 12 songs · 340 MB".</summary>
+    /// <summary>A send of the phone's songs runs (from this page, or one still running when it opened).</summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(UploadLabel))]
+    private bool _isUploading;
+
+    /// <summary>The send row's status: "Sending 3 of 40", then "Sent 40 · 2 already on your computer · 1 failed".</summary>
+    [ObservableProperty] private string _uploadText = string.Empty;
+
+    /// <summary>The send row's label: a second tap while sending stops it (what was sent stays sent).</summary>
+    public string UploadLabel => IsUploading ? "Stop sending" : "Send phone songs to computer";
+
+    public bool CanUpload => IsIdle;
+
+    /// <summary>"Downloaded: 12 songs · 340 MB" (the Downloaded row's spoken name).</summary>
     [ObservableProperty] private string _storageText = string.Empty;
+
+    /// <summary>The Downloaded row's value: "12 songs · 340 MB".</summary>
+    [ObservableProperty] private string _storageValue = string.Empty;
 
     [ObservableProperty] private bool _isConfirmingSignOut;
     [ObservableProperty] private bool _alsoRemoveDownloads;
@@ -128,7 +182,7 @@ public sealed partial class AccountPageViewModel : MobilePage
         }
         if (UserName.Trim().Length == 0 || Password.Length == 0)
         {
-            ErrorText = "Enter your account name and password.";
+            ErrorText = "Enter your email or username and your password.";
             return;
         }
         ServerAddress = url;
@@ -174,12 +228,19 @@ public sealed partial class AccountPageViewModel : MobilePage
         if (!_account.IsSignedIn || _syncRunning || _account.IsSyncing) return;
         ErrorText = string.Empty;
         _syncRunning = true;
+        _ownSyncEndPending = true;
         IsSyncing = true;
         SyncText = "Syncing…";
         try
         {
             var result = await _account.SyncNowAsync();
             SyncText = $"Synced {Count(result.Songs, "song")} and {Count(result.Playlists, "playlist")}";
+        }
+        catch (NoctisServerException ex) when (ex.Kind == NoctisErrorKind.SyncDisabled)
+        {
+            // The owner switched sync off on the computer: a choice, not a failure. The songs
+            // still came over (the catalog and plays go through either way).
+            SyncText = "Songs updated. Sync is off on your computer.";
         }
         catch (Exception ex)
         {
@@ -217,6 +278,46 @@ public sealed partial class AccountPageViewModel : MobilePage
             // Nothing to fetch raises no progress: the counts would never replace "Starting…".
             if (_lastDownload == null) DownloadText = finished ? "Downloads finished" : string.Empty;
             RefreshDownloads();
+        }
+    }
+
+    /// <summary>Sends the phone's own songs the computer lacks; tapped again while sending, stops.
+    /// Concurrent executions allowed: that second tap must reach the command to stop the first.</summary>
+    [RelayCommand(AllowConcurrentExecutions = true)]
+    private async Task SendSongsAsync()
+    {
+        if (_uploadCts is { } running)
+        {
+            running.Cancel();
+            return;
+        }
+        if (!_account.IsSignedIn) return;
+        ErrorText = string.Empty;
+        using var cts = new CancellationTokenSource();
+        // A send this page did not start (running when it opened) shows "Stop sending" too: the
+        // service hands back the running send, and a cancelled token stops it. Uncancelled, the
+        // tap joined the send instead and only a second tap stopped it.
+        if (_account.IsUploading) cts.Cancel();
+        _uploadCts = cts;
+        IsUploading = true;
+        UploadText = "Checking what your computer has…";
+        try
+        {
+            UploadText = DescribeUpload(await _account.SendLocalSongsAsync(cts.Token));
+        }
+        catch (OperationCanceledException)
+        {
+            UploadText = "Stopped. Tap again to send the rest.";
+        }
+        catch (Exception ex)
+        {
+            UploadText = string.Empty;
+            ShowError(ex);
+        }
+        finally
+        {
+            _uploadCts = null;
+            IsUploading = _account.IsUploading;
         }
     }
 
@@ -296,10 +397,15 @@ public sealed partial class AccountPageViewModel : MobilePage
         // The finished text comes from the result (or the error); a late Done/Failed must not overwrite it.
         if (progress.Stage is NoctisSyncStage.Done or NoctisSyncStage.Failed or NoctisSyncStage.Idle)
         {
-            if (!_syncRunning && progress.Stage == NoctisSyncStage.Done) SyncText = "Sync finished";
+            // This page's own sync ends with one Done or Failed. It is posted before the task
+            // completes, but on a phone it can land after the page's catch already reset
+            // _syncRunning, so it is matched by flag: it read as a background sync failing
+            // and replaced the page's own text ("Songs updated…") with "didn't finish".
+            if (_ownSyncEndPending && progress.Stage != NoctisSyncStage.Idle) _ownSyncEndPending = false;
+            else if (!_syncRunning && progress.Stage == NoctisSyncStage.Done) SyncText = "Sync finished";
             // A background sync (the one at app start) that failed left its last stage up
             // ("Getting covers… 812 of 1332") with no error; this page's own syncs show theirs.
-            if (!_syncRunning && progress.Stage == NoctisSyncStage.Failed) SyncText = "The last sync didn't finish. Tap Sync now to try again.";
+            else if (!_syncRunning && progress.Stage == NoctisSyncStage.Failed) SyncText = "The last sync didn't finish. Tap Sync now to try again.";
             IsSyncing = _syncRunning || _account.IsSyncing;
             return;
         }
@@ -313,13 +419,34 @@ public sealed partial class AccountPageViewModel : MobilePage
         RefreshDownloads();
     });
 
+    private void OnUploadProgress(object? sender, NoctisUploadProgress progress) => _marshal(() =>
+    {
+        // The send's last report is posted before its task completes, but the page's await
+        // resumes first: landing after the result it put "Sent 40 of 40" over the summary and
+        // the label back on "Stop sending". A send that is over has nothing left to report.
+        if (_uploadCts is null && !_account.IsUploading) return;
+        IsUploading = true;
+        UploadText = DescribeUploadProgress(progress);
+    });
+
     private void Refresh()
     {
         var account = _account.Account;
+        var wasSignedIn = IsSignedIn;
         IsSignedIn = _account.IsSignedIn && account != null;
-        AccountText = account == null ? string.Empty : $"{account.UserName} on {ServerLabel(account)}";
+        if (wasSignedIn && !IsSignedIn && _account.WasSignedOutByComputer)
+            ErrorText = Describe(NoctisErrorKind.SignedOut, signedIn: false);
+        var shownName = account == null ? string.Empty : ShownName(account);
+        AccountText = account == null ? string.Empty : $"{shownName} on {ServerLabel(account)}";
+        DisplayName = shownName;
+        EmailText = account != null && !string.Equals(shownName, account.UserName, StringComparison.OrdinalIgnoreCase)
+            ? account.UserName : string.Empty;
+        ServerText = account == null ? string.Empty : $"on {ServerLabel(account)}";
+        Initials = InitialsOf(shownName);
+        AvatarPath = IsSignedIn ? _account.AvatarPath : null;
         LastSyncText = account?.LastSyncUtc is { } synced ? $"Last synced {FormatWhen(synced)}" : "Not synced yet";
         IsSyncing = _syncRunning || _account.IsSyncing;
+        IsUploading = _uploadCts != null || _account.IsUploading;
         if (!IsSignedIn)
         {
             IsCertificateChanged = false;
@@ -331,11 +458,15 @@ public sealed partial class AccountPageViewModel : MobilePage
 
     private void RefreshDownloads()
     {
-        StorageText = $"Downloaded: {Count(_account.DownloadedCount, "song")} · {FormatBytes(_account.DownloadedBytes)}";
+        StorageValue = $"{Count(_account.DownloadedCount, "song")} · {FormatBytes(_account.DownloadedBytes)}";
+        StorageText = $"Downloaded: {StorageValue}";
         var pending = _lastDownload is { Pending: > 0 };
         IsDownloading = _downloadRunning || pending;
         if (_lastDownload is not { } p) return;
-        var failed = p.Failed > 0 ? $" · {p.Failed} failed" : string.Empty;
+        // Songs whose file is gone from the computer are told apart: a retry cannot fetch them.
+        var otherFailures = p.Failed - p.Missing;
+        var failed = (p.Missing > 0 ? $" · {p.Missing} missing on your computer" : string.Empty)
+                     + (otherFailures > 0 ? $" · {otherFailures} failed" : string.Empty);
         DownloadText = pending
             ? $"Downloading {p.Completed} of {p.Completed + p.Pending}{failed}"
             : _downloadRunning ? DownloadText : $"Downloads finished{failed}";
@@ -346,6 +477,7 @@ public sealed partial class AccountPageViewModel : MobilePage
         _account.StateChanged -= OnStateChanged;
         _account.SyncProgress -= OnSyncProgress;
         _account.DownloadProgress -= OnDownloadProgress;
+        _account.UploadProgress -= OnUploadProgress;
         Password = string.Empty;
     }
 
@@ -356,18 +488,19 @@ public sealed partial class AccountPageViewModel : MobilePage
     internal static string Describe(NoctisErrorKind kind, bool signedIn) => kind switch
     {
         NoctisErrorKind.Unreachable =>
-            "Can't reach your computer. Check it's on, Noctis is open, Pair a device is on, and both are on the same Wi-Fi.",
+            "Can't reach your computer. Check that Noctis is open on it, Noctis on your phone is turned on, and both are on the same Wi-Fi.",
         NoctisErrorKind.CertificateChanged => signedIn
-            ? "Your computer's certificate changed. Sign out and sign in again to trust the new one."
-            : "Your computer's certificate changed while signing in. Try again and check the fingerprint.",
-        NoctisErrorKind.BadCredentials => "Wrong account name or password.",
+            ? "Your computer's security code changed. Sign out and sign in again to trust the new one."
+            : "Your computer's security code changed while signing in. Try again and check the code.",
+        NoctisErrorKind.BadCredentials => "Wrong email, username or password.",
         NoctisErrorKind.LockedOut => "Too many failed sign-ins. Wait a few minutes, then try again.",
-        NoctisErrorKind.SyncDisabled => "Turn on Sync on your computer (Settings → Account & Devices).",
-        NoctisErrorKind.SignedOut => "This phone was removed on your computer. Sign in again.",
+        NoctisErrorKind.SyncDisabled => "Sync is off on your computer. Turn on Sync with your phone in Settings, Account & Devices.",
+        NoctisErrorKind.SignedOut => "Your computer signed this phone out. Sign in again.",
         NoctisErrorKind.InvalidAddress =>
-            "Enter your computer's address as shown in Pair a device, like 192.168.1.20 or https://192.168.1.20:4747.",
+            "Enter your computer's address as shown under Connect a phone, like 192.168.1.20 or https://192.168.1.20:4747.",
         NoctisErrorKind.StorageFull =>
             "Your phone is almost full, so downloads stopped (1.5 GB is always left free). Remove some downloads or free up space.",
+        NoctisErrorKind.FileMissing => "This song's file is missing on your computer.",
         _ => "Your computer couldn't finish that. Try again in a moment.",
     };
 
@@ -417,11 +550,46 @@ public sealed partial class AccountPageViewModel : MobilePage
         return bytes.Length < 2 ? fingerprint : string.Join("\n", bytes.Chunk(8).Select(line => string.Join(":", line)));
     }
 
+    /// <summary>"Sending 3 of 40" (the song going out now); "Checking what your computer has…" before.</summary>
+    internal static string DescribeUploadProgress(NoctisUploadProgress progress) =>
+        progress.Total <= 0 ? "Checking what your computer has…"
+        : progress.Done >= progress.Total ? $"Sent {progress.Total} of {progress.Total}"
+        : $"Sending {progress.Done + 1} of {progress.Total}";
+
+    /// <summary>"Sent 40 · 2 already on your computer · 1 failed"; a send with nothing to do says why.</summary>
+    internal static string DescribeUpload(NoctisUploadResult result)
+    {
+        if (result.Sent + result.AlreadyThere + result.Failed == 0)
+            return result.Previously > 0 ? "Everything is already on your computer" : "No songs on this phone to send";
+        var text = new StringBuilder($"Sent {result.Sent}");
+        if (result.AlreadyThere > 0) text.Append($" · {result.AlreadyThere} already on your computer");
+        if (result.Failed > 0) text.Append($" · {result.Failed} failed");
+        return text.ToString();
+    }
+
+    /// <summary>The account's name as shown: the desktop's profile name, else the email it signed in with.</summary>
+    internal static string ShownName(NoctisAccount account) =>
+        string.IsNullOrWhiteSpace(account.DisplayName) ? account.UserName : account.DisplayName!;
+
     /// <summary>The desktop's own name when it gave one, else the address's host.</summary>
     internal static string ServerLabel(NoctisAccount account) =>
         !string.IsNullOrWhiteSpace(account.ServerName) ? account.ServerName
         : Uri.TryCreate(account.ServerUrl, UriKind.Absolute, out var uri) ? uri.Host
         : account.ServerUrl;
+
+    /// <summary>Up to two letters for the avatar fallback: the first letters of the first two
+    /// words ("John Doe" → "JD"), else the first two of one word ("owner" → "OW"); empty for none.</summary>
+    internal static string InitialsOf(string? name)
+    {
+        var words = (name ?? string.Empty).Split([' ', '.', '_', '-'], StringSplitOptions.RemoveEmptyEntries);
+        var letters = words.Length >= 2
+            ? new[] { FirstLetter(words[0]), FirstLetter(words[1]) }
+            : words.Length == 1 ? words[0].EnumerateRunes().Where(Rune.IsLetterOrDigit).Take(2).Select(r => r.ToString()).ToArray()
+            : Array.Empty<string?>();
+        return string.Concat(letters.Where(l => l != null)).ToUpperInvariant();
+
+        static string? FirstLetter(string word) => word.EnumerateRunes().Where(Rune.IsLetterOrDigit).Select(r => r.ToString()).FirstOrDefault();
+    }
 
     internal static string FormatBytes(long bytes) =>
         bytes >= 1L << 30 ? $"{bytes / (double)(1L << 30):0.0} GB" : $"{bytes / (double)(1L << 20):0} MB";

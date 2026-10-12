@@ -281,7 +281,11 @@ public partial class PlayerViewModel : ViewModelBase
     /// loaded when the queue runs out, so Previous still has somewhere to go. Off by default.</summary>
     [ObservableProperty] private bool _keepPlayedInQueue;
 
-    partial void OnKeepPlayedInQueueChanged(bool value) => OnPropertyChanged(nameof(ShowPlayedInQueue));
+    partial void OnKeepPlayedInQueueChanged(bool value)
+    {
+        OnPropertyChanged(nameof(ShowPlayedInQueue));
+        RebuildQueueRows(); // GitHub #134: the panel's rows gain or lose the played songs
+    }
 
     // ── Signal path / quality badge (Roon-style) ──
     /// <summary>Overall chain quality: "Bit-perfect", "Hi-Res Lossless", "Lossless", "Enhanced", "Lossy".</summary>
@@ -464,6 +468,12 @@ public partial class PlayerViewModel : ViewModelBase
     [ObservableProperty] private bool _lyricsShowTranslations = true;
     [ObservableProperty] private bool _lyricsShowRomanization = true;
     [ObservableProperty] private bool _lyricsShowBackgroundVocals = true;
+    /// <summary>Where the lyrics page saves lyrics ("Sidecar" / "Embedded" / "Both", GitHub #135). Driven by Settings.</summary>
+    [ObservableProperty] private string _lyricsSaveTarget = nameof(Models.LyricsSaveTarget.Sidecar);
+    /// <summary>Search online when a lyrics view opens on a song with none (GitHub #135). Driven by Settings.</summary>
+    [ObservableProperty] private bool _lyricsAutoDownload;
+    /// <summary>What an automatic online pick keeps ("WordSynced" / "LineSynced" / "Plain", GitHub #135). Driven by Settings.</summary>
+    [ObservableProperty] private string _lyricsPreferredType = nameof(Models.LyricsPreferredType.WordSynced);
 
     // ── Lyrics page integration (flags + pass-through commands set up by MainWindowViewModel) ──
 
@@ -472,8 +482,16 @@ public partial class PlayerViewModel : ViewModelBase
     [ObservableProperty] private bool _isLyricsPlainActive;
     [ObservableProperty] private bool _isLyricsSyncedAvailable;
     [ObservableProperty] private bool _canShareLyrics;
-    /// <summary>The lyrics page shows synced online lyrics of a local file (GitHub #115).</summary>
-    [ObservableProperty] private bool _canSaveLyricsToFile;
+    /// <summary>The lyrics page shows synced online lyrics of a local file (GitHub #115): Save Lyrics to File ▸ LRC.</summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(HasSaveLyricsMenu))]
+    private bool _canSaveLyricsToFile;
+    /// <summary>The lyrics page shows time-synced lyrics a .ttml can be made of: Save Lyrics to File ▸ TTML.</summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(HasSaveLyricsMenu))]
+    private bool _canSaveLyricsAsTtml;
+    /// <summary>Shows the Save Lyrics to File submenu: one of its formats can be saved.</summary>
+    public bool HasSaveLyricsMenu => CanSaveLyricsToFile || CanSaveLyricsAsTtml;
 
     /// <summary>
     /// Path to the current track's artwork file (or null if none).
@@ -493,6 +511,7 @@ public partial class PlayerViewModel : ViewModelBase
     private Action? _removeLyrics;
     private Action? _shareLyrics;
     private Action? _saveLyrics;
+    private Action? _saveLyricsTtml;
 
     /// <summary>Also the play/pause button's accessible name (AccessibleNames), so localized.</summary>
     public string PlayPauseTooltip => Localization.Loc.T(State == PlaybackState.Playing ? "PlaybackBar.Pause" : "PlaybackBar.Play");
@@ -641,6 +660,7 @@ public partial class PlayerViewModel : ViewModelBase
         UpNext.CollectionChanged += (_, _) => { if (!_suppressHasContentNotify) OnPropertyChanged(nameof(HasContent)); };
         History.CollectionChanged += (_, _) => { if (!_suppressHasContentNotify) OnPropertyChanged(nameof(HasContent)); };
         History.CollectionChanged += (_, _) => SyncPlayedTracks();
+        InitQueueRows(); // GitHub #134: the Queue panel's rows
         // HasContent is raised after every queue/history change, batch ones included.
         PropertyChanged += (_, e) =>
         {
@@ -1181,6 +1201,9 @@ public partial class PlayerViewModel : ViewModelBase
     [RelayCommand]
     private void SaveCurrentTrackLyrics() => _saveLyrics?.Invoke();
 
+    [RelayCommand]
+    private void SaveCurrentTrackLyricsAsTtml() => _saveLyricsTtml?.Invoke();
+
     /// <summary>
     /// Called by MainWindowViewModel when the lyrics view becomes the current view.
     /// Wires the three pass-through commands and seeds the active-state flags.
@@ -1196,7 +1219,9 @@ public partial class PlayerViewModel : ViewModelBase
         bool isSyncedAvailable,
         bool canShare,
         Action? saveLyrics = null,
-        bool canSaveLyrics = false)
+        bool canSaveLyrics = false,
+        Action? saveLyricsTtml = null,
+        bool canSaveLyricsTtml = false)
     {
         _selectLyricsSynced = selectSynced;
         _selectLyricsPlain = selectPlain;
@@ -1204,11 +1229,13 @@ public partial class PlayerViewModel : ViewModelBase
         _removeLyrics = removeLyrics;
         _shareLyrics = shareLyrics;
         _saveLyrics = saveLyrics;
+        _saveLyricsTtml = saveLyricsTtml;
         IsLyricsSyncedActive = isSyncedActive;
         IsLyricsPlainActive = isPlainActive;
         IsLyricsSyncedAvailable = isSyncedAvailable;
         CanShareLyrics = canShare;
         CanSaveLyricsToFile = canSaveLyrics;
+        CanSaveLyricsAsTtml = canSaveLyricsTtml;
         IsLyricsPageActive = true;
     }
 
@@ -1223,25 +1250,29 @@ public partial class PlayerViewModel : ViewModelBase
         _removeLyrics = null;
         _shareLyrics = null;
         _saveLyrics = null;
+        _saveLyricsTtml = null;
         IsLyricsPageActive = false;
         IsLyricsSyncedActive = false;
         IsLyricsPlainActive = false;
         IsLyricsSyncedAvailable = false;
         CanShareLyrics = false;
         CanSaveLyricsToFile = false;
+        CanSaveLyricsAsTtml = false;
     }
 
     /// <summary>
     /// Called by MainWindowViewModel whenever the lyrics view's Synced/Plain selection
     /// or synced-availability changes, to keep the menu's checkmarks accurate.
     /// </summary>
-    public void UpdateLyricsPageState(bool isSyncedActive, bool isPlainActive, bool isSyncedAvailable, bool canShare, bool canSaveLyrics = false)
+    public void UpdateLyricsPageState(bool isSyncedActive, bool isPlainActive, bool isSyncedAvailable, bool canShare, bool canSaveLyrics = false,
+        bool canSaveLyricsTtml = false)
     {
         IsLyricsSyncedActive = isSyncedActive;
         IsLyricsPlainActive = isPlainActive;
         IsLyricsSyncedAvailable = isSyncedAvailable;
         CanShareLyrics = canShare;
         CanSaveLyricsToFile = canSaveLyrics;
+        CanSaveLyricsAsTtml = canSaveLyricsTtml;
     }
 
     /// <summary>Sets the sidebar ViewModel for playlist access.</summary>
@@ -1815,14 +1846,54 @@ public partial class PlayerViewModel : ViewModelBase
         return landAt;
     }
 
-    /// <summary>Plays the track at the given index in UpNext, discarding prior queue items.</summary>
+    /// <summary>
+    /// Plays the track at <paramref name="index"/> in UpNext, the way that many Next presses
+    /// would: the playing song becomes the newest played one and the songs jumped over leave
+    /// Up Next (with Keep Played Songs on they stay in the list, above the new song, as
+    /// played). Shuffle, Repeat All's cycle and radio carry on — this used to restart the
+    /// queue from the clicked row through ReplaceQueueAndPlay, which switched Shuffle off,
+    /// cut Repeat All down to the rows from there on and ended radio (GitHub #134).
+    /// </summary>
     public void PlayFromUpNextAt(int index)
     {
         if (index < 0 || index >= UpNext.Count) return;
-        CancelAutoMixTransition("queue changed");
+        DebugLogger.Info(DebugLogger.Category.Playback, "PlayFromUpNextAt", $"index={index}, queueLen={UpNext.Count}");
+        CancelAutoMixTransition("user skipped");
         MarkQueueChanged();
-        var remaining = UpNext.Skip(index).ToList();
-        ReplaceQueueAndPlay(remaining, 0);
+
+        var target = UpNext[index];
+        _deferPlayedSync = true;
+        try
+        {
+            if (CurrentTrack != null)
+            {
+                History.Insert(0, CurrentTrack);
+                _queueHistoryDepth++;
+            }
+            if (KeepPlayedInQueue)
+            {
+                for (var i = 0; i < index; i++)
+                {
+                    History.Insert(0, UpNext[0]);
+                    UpNext.RemoveAt(0);
+                    _queueHistoryDepth++;
+                }
+                UpNext.RemoveAt(0);
+            }
+            else if (index == 0)
+            {
+                UpNext.RemoveAt(0);
+            }
+            else
+            {
+                UpNext.ReplaceAll(UpNext.Skip(index + 1).ToList());
+            }
+            TrimHistory();
+        }
+        finally { _deferPlayedSync = false; }
+        SyncPlayedTracks();
+        PlayTrack(target);
+        RefillRadioIfNeeded();
     }
 
     /// <summary>
@@ -2243,6 +2314,7 @@ public partial class PlayerViewModel : ViewModelBase
         }
         if (newValue != null) newValue.IsNowPlaying = true;
         SyncNowPlayingFlags();
+        OnCurrentTrackChangedForRows(oldValue, newValue);
         DebugLogger.Info(DebugLogger.Category.Playback, "CurrentTrack.Changed",
             $"old={oldValue?.Title ?? "<null>"} new={newValue?.Title ?? "<null>"}");
     }

@@ -22,7 +22,7 @@ internal sealed class FakeAudioPlayer : IAudioPlayer
 
     public PlaybackState State { get; private set; } = PlaybackState.Stopped;
     public TimeSpan Duration { get; set; } = TimeSpan.FromMinutes(3);
-    public TimeSpan Position => TimeSpan.Zero;
+    public TimeSpan Position { get; set; } = TimeSpan.Zero;
     public TimeSpan OutputLatency { get; set; } = TimeSpan.Zero;
     public long CurrentSessionId { get; private set; }
     public int Volume { get; set; }
@@ -30,6 +30,8 @@ internal sealed class FakeAudioPlayer : IAudioPlayer
     public long PendingSeekMs { get; set; } = -1;
     public bool IsMuted { get; set; }
     public bool ExclusiveModeActive => false;
+    /// <summary>Settable so a test can play an output chain that taps the meters itself.</summary>
+    public bool OutputTapsMeters { get; set; }
     public bool EqualizerActive { get; set; }
     public string OutputDescription => "test";
     public double ReplayGainAppliedDb => 0;

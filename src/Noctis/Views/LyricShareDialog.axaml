@@ -22,64 +22,113 @@
             <Setter Property="VerticalAlignment" Value="Center" />
         </Style>
 
-        <!-- ── Lyric line rows: a tap picks a line, the picked ones are filled accent pills
-             with a tick; no wall of empty check circles. ── -->
+        <!-- ── Lyric line rows: a tap picks a line. Picked lines sit on a soft accent tint with
+             the app's small round tick, and picked neighbours join into one block (owner 10-12:
+             the filled bars with an edge stripe read heavy). Hover is the menus' quiet pill. ── -->
         <Style Selector="Panel.sl-line">
             <Setter Property="Background" Value="Transparent" />
             <Setter Property="Cursor" Value="Hand" />
             <Setter Property="Margin" Value="0,0,0,2" />
         </Style>
+        <Style Selector="Panel.sl-line > Border.sl-hover, Panel.sl-line > Border.sl-fill">
+            <Setter Property="CornerRadius" Value="18" />
+            <Setter Property="Opacity" Value="0" />
+        </Style>
+        <Style Selector="Panel.sl-line > Border.sl-hover">
+            <Setter Property="Background" Value="{DynamicResource MenuV2HoverBrush}" />
+            <Setter Property="Transitions">
+                <Transitions>
+                    <DoubleTransition Property="Opacity" Duration="0:0:0.12" />
+                </Transitions>
+            </Setter>
+        </Style>
+        <Style Selector="Panel.sl-line:not(.selected):pointerover > Border.sl-hover">
+            <Setter Property="Opacity" Value="1" />
+        </Style>
+        <!-- Picked: the accent at a seventh of its strength (the strength of the menus' tinted
+             danger hover), a little more under the pointer. -->
         <Style Selector="Panel.sl-line > Border.sl-fill">
-            <Setter Property="CornerRadius" Value="16" />
-            <Setter Property="Background" Value="Transparent" />
-        </Style>
-        <Style Selector="Panel.sl-line:pointerover > Border.sl-fill">
-            <Setter Property="Background" Value="{DynamicResource PillFieldBackgroundPointerOver}" />
-        </Style>
-        <!-- Picked: the accent at a fifth of its strength under the row. -->
-        <Style Selector="Panel.sl-line.selected > Border.sl-fill">
             <Setter Property="Background" Value="{DynamicResource AccentColorBrush}" />
-            <Setter Property="Opacity" Value="0.2" />
+            <Setter Property="Transitions">
+                <Transitions>
+                    <DoubleTransition Property="Opacity" Duration="0:0:0.18" Easing="CubicEaseOut" />
+                    <CornerRadiusTransition Property="CornerRadius" Duration="0:0:0.18" Easing="CubicEaseOut" />
+                </Transitions>
+            </Setter>
+        </Style>
+        <Style Selector="Panel.sl-line.selected > Border.sl-fill">
+            <Setter Property="Opacity" Value="0.14" />
         </Style>
         <Style Selector="Panel.sl-line.selected:pointerover > Border.sl-fill">
-            <Setter Property="Opacity" Value="0.28" />
+            <Setter Property="Opacity" Value="0.2" />
+        </Style>
+        <!-- A run of picked neighbours reads as one block: the inner corners square off and
+             the fill bridges the 2 px gap to the row below (JoinsPrevious / JoinsNext). -->
+        <Style Selector="Panel.sl-line.join-up > Border.sl-fill">
+            <Setter Property="CornerRadius" Value="0,0,18,18" />
+        </Style>
+        <Style Selector="Panel.sl-line.join-down > Border.sl-fill">
+            <Setter Property="CornerRadius" Value="18,18,0,0" />
+            <Setter Property="Margin" Value="0,0,0,-2" />
+        </Style>
+        <Style Selector="Panel.sl-line.join-up.join-down > Border.sl-fill">
+            <Setter Property="CornerRadius" Value="0" />
         </Style>
         <Style Selector="Panel.sl-line TextBlock.sl-text">
             <Setter Property="FontSize" Value="14" />
             <Setter Property="TextWrapping" Value="Wrap" />
             <Setter Property="VerticalAlignment" Value="Center" />
             <Setter Property="Opacity" Value="0.7" />
+            <Setter Property="Transitions">
+                <Transitions>
+                    <DoubleTransition Property="Opacity" Duration="0:0:0.18" />
+                </Transitions>
+            </Setter>
         </Style>
         <Style Selector="Panel.sl-line.selected TextBlock.sl-text">
             <Setter Property="Opacity" Value="1" />
         </Style>
-        <!-- The line playing now (Follow playback): a short accent bar at the row's left. -->
+        <!-- The line playing now (Follow playback): a small accent dot in the row's margin. -->
         <Style Selector="Border.sl-now">
-            <Setter Property="Width" Value="3" />
-            <Setter Property="Height" Value="16" />
-            <Setter Property="CornerRadius" Value="2" />
+            <Setter Property="Width" Value="6" />
+            <Setter Property="Height" Value="6" />
+            <Setter Property="CornerRadius" Value="3" />
             <Setter Property="Margin" Value="5,0,0,0" />
             <Setter Property="HorizontalAlignment" Value="Left" />
             <Setter Property="VerticalAlignment" Value="Center" />
             <Setter Property="Background" Value="{DynamicResource AccentColorBrush}" />
+            <Setter Property="Opacity" Value="0" />
+            <Setter Property="Transitions">
+                <Transitions>
+                    <DoubleTransition Property="Opacity" Duration="0:0:0.18" />
+                </Transitions>
+            </Setter>
         </Style>
+        <Style Selector="Panel.sl-line.now > Border.sl-now">
+            <Setter Property="Opacity" Value="1" />
+        </Style>
+        <!-- The tick: the round accent check of the app's pill checkboxes, popped in when the
+             line is picked. Always laid out, so picking a line never re-wraps its text. -->
         <Style Selector="Border.sl-tick">
-            <Setter Property="Width" Value="20" />
-            <Setter Property="Height" Value="20" />
-            <Setter Property="CornerRadius" Value="10" />
+            <Setter Property="Width" Value="18" />
+            <Setter Property="Height" Value="18" />
+            <Setter Property="CornerRadius" Value="9" />
             <Setter Property="Margin" Value="10,0,0,0" />
             <Setter Property="VerticalAlignment" Value="Center" />
             <Setter Property="Background" Value="{DynamicResource AccentColorBrush}" />
+            <Setter Property="Opacity" Value="0" />
+            <Setter Property="RenderTransform" Value="scale(0.6)" />
+            <Setter Property="Transitions">
+                <Transitions>
+                    <DoubleTransition Property="Opacity" Duration="0:0:0.16" Easing="CubicEaseOut" />
+                    <TransformOperationsTransition Property="RenderTransform" Duration="0:0:0.2" Easing="CubicEaseOut" />
+                </Transitions>
+            </Setter>
         </Style>
-        <Style Selector="TextBox.sl-edit">
-            <Setter Property="MinHeight" Value="0" />
-            <Setter Property="Padding" Value="12,6" />
-            <Setter Property="Margin" Value="-12,-6,0,-6" />
-            <Setter Property="FontSize" Value="14" />
-            <Setter Property="TextWrapping" Value="Wrap" />
-            <Setter Property="AcceptsReturn" Value="False" />
+        <Style Selector="Panel.sl-line.selected Border.sl-tick">
+            <Setter Property="Opacity" Value="1" />
+            <Setter Property="RenderTransform" Value="scale(1)" />
         </Style>
-
         <!-- A stray white glyph (the Fluent scrollbar's line-up arrow) showed at the top of
              the line list at rest: the bar stays hidden until the list is hovered. -->
         <Style Selector="ScrollViewer.sl-lines /template/ ScrollBar:vertical">
@@ -92,6 +141,14 @@
         </Style>
         <Style Selector="ScrollViewer.sl-lines:pointerover /template/ ScrollBar:vertical">
             <Setter Property="Opacity" Value="1" />
+        </Style>
+
+        <!-- The option lists open upward, into the card. Opened below, they hung under the
+             card from its foot (Background's: 233 px) and ran past the window's bottom edge,
+             cut off there: on Windows a list is its own popup bounded by the screen, not by
+             this dialog. Same template-part style as Lyrics Studio's ComboBox.open-up. -->
+        <Style Selector="ComboBox.pill-field /template/ Popup#PART_Popup">
+            <Setter Property="Placement" Value="TopEdgeAlignedLeft" />
         </Style>
 
         <!-- Quiet pills fade when off instead of Fluent's grey box. -->
@@ -197,13 +254,30 @@
                               HorizontalScrollBarVisibility="Disabled"
                               VerticalScrollBarVisibility="Auto">
                     <ItemsControl x:Name="LineItems" ItemsSource="{Binding Lines}" Margin="0,0,12,0">
+                        <!-- The edit box keeps the line where it was: its padding cancels its
+                             margin. Here, not in Window.Styles: PillDialogHost's own pill-area
+                             style (Padding 18,14, MinHeight 40) sits nearer and won there. -->
+                        <ItemsControl.Styles>
+                            <Style Selector="TextBox.sl-edit">
+                                <Setter Property="MinHeight" Value="0" />
+                                <Setter Property="Padding" Value="12,6" />
+                                <Setter Property="Margin" Value="-12,-6,0,-6" />
+                                <Setter Property="FontSize" Value="14" />
+                                <Setter Property="TextWrapping" Value="Wrap" />
+                                <Setter Property="AcceptsReturn" Value="False" />
+                            </Style>
+                        </ItemsControl.Styles>
                         <ItemsControl.ItemTemplate>
                             <DataTemplate x:DataType="vm:SelectableLyricLine">
                                 <Panel Classes="sl-line"
                                        Classes.selected="{Binding IsSelected}"
+                                       Classes.join-up="{Binding JoinsPrevious}"
+                                       Classes.join-down="{Binding JoinsNext}"
+                                       Classes.now="{Binding IsCurrent}"
                                        ToolTip.Tip="{loc:T ShareLyrics.LineTip}">
+                                    <Border Classes="sl-hover" />
                                     <Border Classes="sl-fill" />
-                                    <Border Classes="sl-now" IsVisible="{Binding IsCurrent}" />
+                                    <Border Classes="sl-now" />
                                     <Grid ColumnDefinitions="*,Auto" Margin="16,9,10,9">
                                         <TextBlock Classes="sl-text"
                                                    Text="{Binding Text}"
@@ -211,10 +285,10 @@
                                         <TextBox Classes="pill-area sl-edit"
                                                  Text="{Binding Text, Mode=TwoWay}"
                                                  IsVisible="{Binding IsEditing}" />
-                                        <Border Grid.Column="1" Classes="sl-tick" IsVisible="{Binding IsSelected}">
+                                        <Border Grid.Column="1" Classes="sl-tick">
                                             <Path Data="M 0 3.5 L 3 7 L 9 0"
                                                   Stroke="{DynamicResource AccentForegroundBrush}"
-                                                  StrokeThickness="1.6"
+                                                  StrokeThickness="1.5"
                                                   StrokeLineCap="Round"
                                                   HorizontalAlignment="Center"
                                                   VerticalAlignment="Center" />
@@ -291,10 +365,12 @@
                           MaxDropDownHeight="320">
                     <ComboBox.ItemTemplate>
                         <DataTemplate x:DataType="vm:ShareBackgroundChoice">
+                            <!-- The ring follows the theme: a fixed white one vanished with the
+                                 pale swatches (Mist, Cream) on the Light theme's pale list. -->
                             <StackPanel Orientation="Horizontal" Spacing="9">
                                 <Border Width="16" Height="16" CornerRadius="8"
                                         Background="{Binding Preview}"
-                                        BorderBrush="#40FFFFFF" BorderThickness="1"
+                                        BorderBrush="{DynamicResource GlassPillBorder}" BorderThickness="1"
                                         VerticalAlignment="Center" />
                                 <TextBlock Text="{Binding Name}" VerticalAlignment="Center"
                                            TextTrimming="CharacterEllipsis" />

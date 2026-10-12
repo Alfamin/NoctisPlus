@@ -14,13 +14,16 @@ using Noctis.ViewModels;
 
 namespace Noctis.Views;
 
-public partial class FavoritesView : UserControl
+public partial class FavoritesView : UserControl, ITrackSelectionSource
 {
     private EventHandler? _pendingScrollRestore;
     // Track selection by the FavoriteItem itself (not the tile Button) so row
     // virtualization recycling the tiles on scroll doesn't drop the ctrl-selected
     // highlight. See MultiSelectHelper's "Data-tracked album-tile variants".
     private readonly HashSet<FavoriteItem> _selectedItems = new();
+
+    /// <summary>The Ctrl-selection, for window shortcuts (GitHub #131 ReplayGain).</summary>
+    public IReadOnlyList<Track> GetSelectedTracks() => FavoritesViewModel.ExpandToTracks(_selectedItems);
 
     public FavoritesView()
     {

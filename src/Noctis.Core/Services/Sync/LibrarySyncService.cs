@@ -43,6 +43,9 @@ public interface ILibrarySyncService : ITrackStateRecorder
 
     IReadOnlyList<SyncDevice> Devices();
 
+    /// <summary>Takes a device off <see cref="Devices"/> (one signed out for good). What it synced stays.</summary>
+    void ForgetDevice(string deviceId);
+
     /// <summary>Puts every track that carries user state into the ledger (first enable / re-seed).</summary>
     Task SeedAsync(IEnumerable<Track> tracks, IReadOnlyList<Playlist> playlists);
 
@@ -127,13 +130,18 @@ public sealed class LibrarySyncService : ILibrarySyncService
         var device = DeviceId;
         await Task.Run(() =>
         {
+            var known = Store.All(SyncKinds.Track).ToDictionary(i => i.Id, i => i.Payload, StringComparer.Ordinal);
             foreach (var t in tracks)
             {
                 if (t is null || t.SourceType != SourceType.Local) continue;
-                if (!t.IsFavorite && t.Rating == 0 && !t.IsDisliked && t.PlayCount == 0) continue;
                 var id = t.Id.ToString("N");
-                if (Store.Get(SyncKinds.Track, id) is not null) continue;
-                Store.Upsert(SyncKinds.Track, id, SyncJson.Serialize(TrackSyncState.From(t)), now, device);
+                var payload = SyncJson.Serialize(TrackSyncState.From(t));
+                // A song the ledger has is brought up to date: sync was off while it changed
+                // (unfavourited, re-rated), so nothing recorded that. A new one only with state.
+                if (known.TryGetValue(id, out var stored)
+                        ? stored == payload
+                        : !t.IsFavorite && t.Rating == 0 && !t.IsDisliked && t.PlayCount == 0) continue;
+                Store.Upsert(SyncKinds.Track, id, payload, now, device);
             }
             RefreshPlaylists(playlists);
         });
@@ -200,8 +208,8 @@ public sealed class LibrarySyncService : ILibrarySyncService
     /// <summary>Earliest stamp a device may send; older ones are raised to it.</summary>
     public static readonly DateTime OldestStamp = new(2000, 1, 1, 0, 0, 0, DateTimeKind.Utc);
 
-    /// <summary>How far past this computer's clock a device's stamp may be. A far-future stamp would win last-writer-wins forever.</summary>
-    public static readonly TimeSpan MaxClockSkew = TimeSpan.FromMinutes(2);
+    /// <summary>How far past this computer's clock a device's stamp may be (the store's rule: a stamp past it never holds an item).</summary>
+    public static readonly TimeSpan MaxClockSkew = SyncStore.MaxClockSkew;
 
     public const int MaxPlaylistTracks = 10_000, MaxPlaylistName = 200, MaxPlaylistDescription = 2000;
 
@@ -316,6 +324,12 @@ public sealed class LibrarySyncService : ILibrarySyncService
 
     public IReadOnlyList<SyncDevice> Devices() =>
         File.Exists(StorePath) ? Store.Devices() : Array.Empty<SyncDevice>();
+
+    public void ForgetDevice(string deviceId)
+    {
+        if (!File.Exists(StorePath) || !Store.RemoveDevice(deviceId)) return;
+        Changed?.Invoke(this, EventArgs.Empty);
+    }
 
     private static T Safe<T>(Func<T> read, T fallback)
     {

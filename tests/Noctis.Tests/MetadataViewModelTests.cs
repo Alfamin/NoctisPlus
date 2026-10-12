@@ -614,6 +614,47 @@ public class MetadataViewModelTests
         Assert.Equal(Plain, album[0].Lyrics);
     }
 
+    // ── Import file: a .ttml (GitHub #132) is converted, never pasted as XML ──
+
+    [Fact]
+    public async Task MetadataImport_Ttml_LandsAsSyncedLyrics()
+    {
+        var track = new Track { Id = Guid.NewGuid(), Title = "T", Artist = "A", Album = "X", FilePath = "C:/nowhere/t.flac" };
+        using var p = new TestPersistenceService();
+        var vm = new MetadataViewModel(track, new FakeMetadataService(),
+            new FakeLibraryService { TrackList = new List<Track> { track } }, p, new FakeAnimatedCoverService(),
+            albumScoped: false, albumTracks: null);
+        await vm.InitializeAsync();
+
+        vm.ImportLyricsText(TtmlIssue132Tests.IssueExample, "song.ttml");
+
+        Assert.True(vm.HasCustomSyncedLyrics);
+        Assert.Equal(TtmlParser.ToLrc(TtmlIssue132Tests.IssueExample), vm.SyncedLyrics);
+        Assert.Equal(2, vm.SyncedLyricLines.Count);
+        Assert.Equal("Imported song.ttml", vm.SyncedLyricsSearchStatus);
+        Assert.DoesNotContain("<", vm.SyncedLyrics);
+
+        // Word-timed TTML keeps its word timings in the editor.
+        vm.ImportLyricsText(TtmlIssue132Tests.WordTimed, "words.ttml");
+        Assert.True(vm.HasWordTimedLines);
+    }
+
+    [Fact]
+    public async Task MetadataImport_UnparsableTtml_FallsBackToItsWordsAsPlainLyrics()
+    {
+        var track = new Track { Id = Guid.NewGuid(), Title = "T", Artist = "A", Album = "X", FilePath = "C:/nowhere/t.flac" };
+        using var p = new TestPersistenceService();
+        var vm = new MetadataViewModel(track, new FakeMetadataService(),
+            new FakeLibraryService { TrackList = new List<Track> { track } }, p, new FakeAnimatedCoverService(),
+            albumScoped: false, albumTracks: null);
+        await vm.InitializeAsync();
+
+        vm.ImportLyricsText("<tt><body><p>first line</p><p>second", "broken.ttml");
+
+        Assert.Equal("first line\nsecond", vm.Lyrics);
+        Assert.DoesNotContain("<", vm.Lyrics);
+    }
+
     // ── Multi-select rename: lyric sidecars follow the audio file ──
 
     [Fact]

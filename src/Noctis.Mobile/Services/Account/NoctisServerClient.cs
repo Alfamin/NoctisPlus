@@ -15,7 +15,13 @@ internal sealed record RemoteSong(
     string Suffix, int Track, int Disc, int Year, string Genre, int BitRate, int SamplingRate,
     int UserRating, bool Starred, int PlayCount, DateTime? Created);
 
-internal sealed record SignInResult(string ApiKey, string? User, string? Server, bool SyncEnabled);
+internal sealed record SignInResult(string ApiKey, string? User, string? Server, bool SyncEnabled, string? DisplayName = null);
+
+/// <summary>What noctisUploadTrack did with a song: added it, or found the same file already there.</summary>
+internal enum UploadOutcome { Added, AlreadyThere }
+
+/// <summary>A local song as noctisHasTracks compares it with the desktop's library.</summary>
+internal sealed record SongIdentity(string Title, string Artist, int DurationSeconds);
 
 /// <summary>One ledger item as pulled. The payload stays raw JSON: callers validate it field by field.</summary>
 internal sealed record PulledItem(string Kind, string Id, JsonElement Payload, DateTime UpdatedUtc, string Device, long Seq);
@@ -192,7 +198,30 @@ internal sealed partial class NoctisServerClient : IDisposable
         var key = Str(s, "apiKey");
         if (string.IsNullOrWhiteSpace(key) || key.Length > 256 || key.Any(c => c < 0x21 || c > 0x7E))
             throw new NoctisServerException(NoctisErrorKind.Server, "The server sent an unusable device key.");
-        return new SignInResult(key, Cap(Str(s, "user"), 64), Cap(Str(s, "server"), 100), Bool(s, "syncEnabled"));
+        return new SignInResult(key, Cap(Str(s, "user"), 64), Cap(Str(s, "server"), 100), Bool(s, "syncEnabled"),
+            CleanDisplayName(Str(s, "displayName")));
+    }
+
+    /// <summary>getNoctisSyncStatus: the desktop's profile name (null when it has none) and the
+    /// computer's name as sign-in gave it (null when it gives none). Answers with sync on or off;
+    /// an older desktop without the profile name also gives null for it.</summary>
+    public async Task<(string? DisplayName, string? ServerName)> GetDisplayNameAsync(CancellationToken ct)
+    {
+        var r = await GetJsonAsync("getNoctisSyncStatus", Array.Empty<KeyValuePair<string, string>>(), ct).ConfigureAwait(false);
+        if (!r.TryGetProperty("noctisSync", out var s) || s.ValueKind != JsonValueKind.Object) return (null, null);
+        var server = Cap(Str(s, "name"), 100);
+        return (CleanDisplayName(Str(s, "displayName")), string.IsNullOrWhiteSpace(server) ? null : server);
+    }
+
+    /// <summary>A name from the desktop as shown in the header: control and format characters
+    /// (bidi overrides, zero-width) dropped, trimmed, at most 64; null when nothing is left.</summary>
+    internal static string? CleanDisplayName(string? raw)
+    {
+        if (raw is null) return null;
+        var clean = new string(raw.Where(c => !char.IsControl(c)
+            && char.GetUnicodeCategory(c) != UnicodeCategory.Format).ToArray()).Trim();
+        if (clean.Length > 64) clean = clean[..64].TrimEnd();
+        return clean.Length == 0 ? null : clean;
     }
 
     /// <summary>noctisSignOut: revokes this device's key.</summary>
@@ -295,23 +324,36 @@ internal sealed partial class NoctisServerClient : IDisposable
     /// getCoverArt at <see cref="CoverSize"/> into <paramref name="destination"/> (written beside
     /// it, then moved over it). False when the server has no cover for the album.
     /// </summary>
-    public async Task<bool> DownloadCoverAsync(Guid albumId, string destination, CancellationToken ct)
-    {
-        using var timeout = CancellationTokenSource.CreateLinkedTokenSource(ct);
-        timeout.CancelAfter(ApiTimeout);
-        using var request = Request(HttpMethod.Get, "getCoverArt", new KeyValuePair<string, string>[]
+    public Task<bool> DownloadCoverAsync(Guid albumId, string destination, CancellationToken ct) =>
+        DownloadImageAsync("getCoverArt", new KeyValuePair<string, string>[]
         {
             new("id", NoctisRemoteIds.ToServerAlbumId(albumId)),
             new("size", CoverSize.ToString(CultureInfo.InvariantCulture)),
-        });
-        using var response = await SendAsync(request, HttpCompletionOption.ResponseHeadersRead, "cover", timeout.Token, ct).ConfigureAwait(false);
+        }, destination, "cover", ct);
+
+    /// <summary>
+    /// getAvatar: <paramref name="userName"/>'s profile picture (the desktop's) into
+    /// <paramref name="destination"/>, written beside it then moved over it. False when the
+    /// desktop has none, or is older than getAvatar (its "unknown method" is a server error too).
+    /// </summary>
+    public Task<bool> GetAvatarAsync(string userName, string destination, CancellationToken ct) =>
+        DownloadImageAsync("getAvatar", new KeyValuePair<string, string>[] { new("username", userName) }, destination, "avatar", ct);
+
+    /// <summary>One picture endpoint into a file; false when the server answers with an error envelope.</summary>
+    private async Task<bool> DownloadImageAsync(string endpoint, IEnumerable<KeyValuePair<string, string>> query, string destination,
+        string what, CancellationToken ct)
+    {
+        using var timeout = CancellationTokenSource.CreateLinkedTokenSource(ct);
+        timeout.CancelAfter(ApiTimeout);
+        using var request = Request(HttpMethod.Get, endpoint, query);
+        using var response = await SendAsync(request, HttpCompletionOption.ResponseHeadersRead, what, timeout.Token, ct).ConfigureAwait(false);
         try
         {
-            await ThrowIfEnvelopeAsync(response, "cover", timeout.Token, ct).ConfigureAwait(false);
+            await ThrowIfEnvelopeAsync(response, what, timeout.Token, ct).ConfigureAwait(false);
         }
         catch (NoctisServerException ex) when (ex.Kind == NoctisErrorKind.Server)
         {
-            return false; // 70 not found: the album has no art
+            return false; // 70 not found: no picture
         }
         var dir = Path.GetDirectoryName(destination)!;
         Directory.CreateDirectory(dir);
@@ -328,12 +370,12 @@ internal sealed partial class NoctisServerClient : IDisposable
         catch (OperationCanceledException) when (!ct.IsCancellationRequested)
         {
             TryDelete(tmp);
-            throw Log(Unreachable(), "cover", 0);
+            throw Log(Unreachable(), what, 0);
         }
         catch (Exception ex) when (ex is IOException or HttpRequestException)
         {
             TryDelete(tmp);
-            throw Log(Unreachable(), "cover", 0);
+            throw Log(Unreachable(), what, 0);
         }
     }
 
@@ -459,6 +501,123 @@ internal sealed partial class NoctisServerClient : IDisposable
         return PostFormAsync("scrobble", form, signingIn: false, withKey: true, ct);
     }
 
+    // ── The phone's songs → the computer ─────────────────────────────────
+
+    /// <summary>Songs per noctisHasTracks call: the server takes up to 300, but the form must also
+    /// stay under its 1 MB body limit with long titles percent-encoded (≤ 100 × 1000 × 9 bytes).</summary>
+    public const int HasTracksBatch = 100;
+
+    /// <summary>The server's cap on one song (NoctisServer.MaxUploadBytes): bigger ones are not sent.</summary>
+    public const long MaxUploadBytes = 500L * 1024 * 1024;
+
+    /// <summary>After the last byte is sent: the desktop adds the song to its library before it answers.</summary>
+    private static readonly TimeSpan UploadAnswerTimeout = TimeSpan.FromMinutes(2);
+
+    /// <summary>noctisHasTracks (form POST): for each song, in order, whether the desktop's library
+    /// already has it (same title and artist, lengths within 2 s).</summary>
+    public async Task<bool[]> HasTracksAsync(IReadOnlyList<SongIdentity> songs, CancellationToken ct)
+    {
+        var form = new List<KeyValuePair<string, string>>(songs.Count * 3);
+        foreach (var song in songs)
+        {
+            form.Add(new("title", Cap(song.Title, MaxStringLength) ?? string.Empty));
+            form.Add(new("artist", Cap(song.Artist, MaxStringLength) ?? string.Empty));
+            form.Add(new("duration", Math.Max(0, song.DurationSeconds).ToString(CultureInfo.InvariantCulture)));
+        }
+        var r = await PostFormAsync("noctisHasTracks", form, signingIn: false, withKey: true, ct).ConfigureAwait(false);
+        var have = new bool[songs.Count];
+        if (r.TryGetProperty("noctisHasTracks", out var h) && h.ValueKind == JsonValueKind.Object
+            && h.TryGetProperty("have", out var answers) && answers.ValueKind == JsonValueKind.Array)
+        {
+            var i = 0;
+            foreach (var answer in answers.EnumerateArray())
+            {
+                if (i >= have.Length) break;
+                have[i++] = answer.ValueKind == JsonValueKind.True;
+            }
+        }
+        return have;
+    }
+
+    /// <summary>
+    /// noctisUploadTrack: sends <paramref name="source"/> as the POST body under
+    /// <paramref name="fileName"/>, read once as it goes out (never held whole in memory). Like a
+    /// download there is no deadline for the whole song, but a send that moves nothing for
+    /// <see cref="StallTimeout"/> fails as Unreachable. A source that cannot be read fails as an
+    /// <see cref="IOException"/> (that song only), not as the computer being unreachable.
+    /// </summary>
+    /// <param name="length">The song's size in bytes (sent as Content-Length), or -1 when unknown.</param>
+    public async Task<UploadOutcome> UploadTrackAsync(Stream source, long length, string fileName, CancellationToken ct)
+    {
+        using var stall = CancellationTokenSource.CreateLinkedTokenSource(ct);
+        stall.CancelAfter(StallTimeout);
+        var body = new WatchdogStream(source,
+            onBytes: () => stall.CancelAfter(StallTimeout),
+            onEnd: () => stall.CancelAfter(UploadAnswerTimeout));
+        using var request = Request(HttpMethod.Post, "noctisUploadTrack", new KeyValuePair<string, string>[] { new("name", fileName) });
+        request.Content = new StreamContent(body, 81920);
+        request.Content.Headers.ContentType = new System.Net.Http.Headers.MediaTypeHeaderValue("application/octet-stream");
+        if (length >= 0) request.Content.Headers.ContentLength = length;
+        JsonElement r;
+        try
+        {
+            using var response = await SendAsync(request, HttpCompletionOption.ResponseContentRead, "upload", stall.Token, ct).ConfigureAwait(false);
+            r = await ReadEnvelopeAsync(response, "upload", signingIn: false, stall.Token, ct).ConfigureAwait(false);
+        }
+        catch (NoctisServerException ex) when (ex.Kind == NoctisErrorKind.Unreachable && body.SourceFailed)
+        {
+            throw new IOException("The song could not be read on the phone.");
+        }
+        var status = r.TryGetProperty("noctisUpload", out var u) ? Str(u, "status") : null;
+        return status switch
+        {
+            "added" => UploadOutcome.Added,
+            "exists" => UploadOutcome.AlreadyThere,
+            _ => throw Log(new NoctisServerException(NoctisErrorKind.Server, "The computer did not take the song."), "upload", 200),
+        };
+    }
+
+    /// <summary>
+    /// The upload body: reads straight through to the song's stream and re-arms the stall timer on
+    /// every read that brings bytes. Remembers a failed read, which HttpClient reports as a failed
+    /// request. Does not own the stream (the caller disposes it).
+    /// </summary>
+    private sealed class WatchdogStream(Stream inner, Action onBytes, Action onEnd) : Stream
+    {
+        public bool SourceFailed { get; private set; }
+
+        public override bool CanRead => true;
+        public override bool CanSeek => false;
+        public override bool CanWrite => false;
+        public override long Length => throw new NotSupportedException();
+        public override long Position { get => throw new NotSupportedException(); set => throw new NotSupportedException(); }
+        public override void Flush() { }
+        public override long Seek(long offset, SeekOrigin origin) => throw new NotSupportedException();
+        public override void SetLength(long value) => throw new NotSupportedException();
+        public override void Write(byte[] buffer, int offset, int count) => throw new NotSupportedException();
+
+        public override int Read(byte[] buffer, int offset, int count)
+        {
+            try { return Seen(inner.Read(buffer, offset, count)); }
+            catch (Exception ex) when (ex is not OperationCanceledException) { SourceFailed = true; throw; }
+        }
+
+        public override async ValueTask<int> ReadAsync(Memory<byte> buffer, CancellationToken ct = default)
+        {
+            try { return Seen(await inner.ReadAsync(buffer, ct).ConfigureAwait(false)); }
+            catch (Exception ex) when (ex is not OperationCanceledException) { SourceFailed = true; throw; }
+        }
+
+        public override Task<int> ReadAsync(byte[] buffer, int offset, int count, CancellationToken ct) =>
+            ReadAsync(buffer.AsMemory(offset, count), ct).AsTask();
+
+        private int Seen(int read)
+        {
+            if (read > 0) onBytes(); else onEnd();
+            return read;
+        }
+    }
+
     // ── Plumbing ─────────────────────────────────────────────────────────
 
     private HttpRequestMessage Request(HttpMethod method, string endpoint, IEnumerable<KeyValuePair<string, string>> query, bool withKey = true)
@@ -544,7 +703,7 @@ internal sealed partial class NoctisServerClient : IDisposable
             throw Log(new NoctisServerException(NoctisErrorKind.Server, $"The server answered HTTP {(int)response.StatusCode}."), what, (int)response.StatusCode);
         try
         {
-            return ParseEnvelope(body, signingIn);
+            return ParseEnvelope(body, signingIn, what);
         }
         catch (NoctisServerException ex)
         {
@@ -575,7 +734,7 @@ internal sealed partial class NoctisServerClient : IDisposable
         throw Log(new NoctisServerException(NoctisErrorKind.Server, "The server sent no file."), what, (int)response.StatusCode);
     }
 
-    internal static JsonElement ParseEnvelope(string body, bool signingIn)
+    internal static JsonElement ParseEnvelope(string body, bool signingIn, string? what = null)
     {
         JsonElement root;
         try
@@ -591,12 +750,15 @@ internal sealed partial class NoctisServerClient : IDisposable
             throw new NoctisServerException(NoctisErrorKind.Server, "The server did not answer like a Noctis server.");
         if (Str(r, "status") == "ok") return r;
         var code = r.TryGetProperty("error", out var err) ? Int(err, "code") : 0;
-        throw MapError(code, signingIn);
+        throw MapError(code, signingIn, what);
     }
 
-    internal static NoctisServerException MapError(int code, bool signingIn) => code switch
+    /// <param name="what">The call ("download", …): a 70 on a download is a song whose file is gone
+    /// from the computer, which the Account page counts apart from other failures.</param>
+    internal static NoctisServerException MapError(int code, bool signingIn, string? what = null) => code switch
     {
         40 or 41 when signingIn => new(NoctisErrorKind.BadCredentials, "Wrong user name or password."),
+        70 when what == "download" => new(NoctisErrorKind.FileMissing, "This song's file is missing on your computer."),
         40 or 41 => new(NoctisErrorKind.SignedOut, "This phone was signed out on the desktop. Sign in again."),
         50 => new(NoctisErrorKind.SyncDisabled, "Sync is turned off on the desktop (Settings → Account & Devices)."),
         _ => new(NoctisErrorKind.Server, $"The server refused the request (error {code})."),

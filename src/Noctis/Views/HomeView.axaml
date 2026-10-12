@@ -138,6 +138,14 @@
                                                        VerticalAlignment="Center" />
                                             <TextBlock Classes="chart-plays"
                                                        Text="{loc:T Home.Plays}"
+                                                       IsVisible="{Binding Track.PlayCount, Converter={x:Static conv:PlayCountConverters.IsNotOne}}"
+                                                       FontSize="12"
+                                                       FontWeight="SemiBold"
+                                                       Opacity="0.55"
+                                                       VerticalAlignment="Center" />
+                                            <TextBlock Classes="chart-plays"
+                                                       Text="{loc:T Common.Play}"
+                                                       IsVisible="{Binding Track.PlayCount, Converter={x:Static conv:PlayCountConverters.IsOne}}"
                                                        FontSize="12"
                                                        FontWeight="SemiBold"
                                                        Opacity="0.55"

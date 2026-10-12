@@ -1890,6 +1890,9 @@ public partial class MetadataViewModel : ViewModelBase
     /// <summary>Moves a lyrics sidecar to the OS trash; replaceable in tests (as on LyricsWriter).</summary>
     internal Func<string, bool> TrashFile { get; init; } = Helpers.RecycleBin.TryMoveToTrash;
 
+    /// <summary>Settings ▸ Lyrics ▸ Save lyrics to (GitHub #135); replaceable in tests.</summary>
+    internal Func<LyricsSaveTarget> LyricsSaveTarget { get; init; } = Services.Lyrics.LyricsSaveSettings.CurrentTarget;
+
     /// <summary>The synced lyrics being saved differ from the ones this dialog loaded (searched, imported, edited, shifted).</summary>
     private bool SyncedLyricsWereChanged =>
         !string.IsNullOrWhiteSpace(_track.SyncedLyrics) &&
@@ -1917,6 +1920,13 @@ public partial class MetadataViewModel : ViewModelBase
                 catch { /* best effort, as the .lrc write */ }
             }
     }
+
+    /// <summary>The plain lyrics differ from the ones this dialog loaded, in a way the tags would show:
+    /// without synced lyrics (which take the tag's text field when there are any).</summary>
+    private bool PlainLyricsWereChangedForTags =>
+        string.IsNullOrWhiteSpace(_track.SyncedLyrics)
+        && !string.Equals(NormalizeNewlines(_track.Lyrics).Trim(), NormalizeNewlines(_loadedPlainLyrics).Trim(), StringComparison.Ordinal)
+        && !(string.IsNullOrWhiteSpace(_track.Lyrics) && _plainSidecarUnreadable);
 
     /// <summary>True when the user cleared plain lyrics that were genuinely loaded.</summary>
     private bool PlainLyricsWereRemoved =>
@@ -2034,9 +2044,9 @@ public partial class MetadataViewModel : ViewModelBase
     private void ClearSyncedLineTimestamp(SyncedLyricEditorLine? line) => line?.ClearTimestamp();
 
     /// <summary>
-    /// "Import file" on the lyrics tabs (Discord ask, 2026-08-31): pick an .lrc or .txt
-    /// and load it as the track's lyrics, for the many songs no provider has. Nothing is
-    /// written until Save, which then takes the usual sidecar/tag path.
+    /// "Import file" on the lyrics tabs (Discord ask, 2026-08-31): pick an .lrc, .elrc, .ttml
+    /// or .txt and load it as the track's lyrics, for the many songs no provider has. Nothing
+    /// is written until Save, which then takes the usual sidecar/tag path.
     /// </summary>
     [RelayCommand]
     private async Task ImportLyricsFile(Avalonia.Visual visual)
@@ -2050,7 +2060,7 @@ public partial class MetadataViewModel : ViewModelBase
             AllowMultiple = false,
             FileTypeFilter = new[]
             {
-                new FilePickerFileType("Lyrics") { Patterns = new[] { "*.lrc", "*.txt" } },
+                new FilePickerFileType("Lyrics") { Patterns = new[] { "*.lrc", "*.elrc", "*.ttml", "*.txt" } },
                 new FilePickerFileType("All files") { Patterns = new[] { "*" } }
             }
         });
@@ -2078,10 +2088,16 @@ public partial class MetadataViewModel : ViewModelBase
     /// Routes imported text by content, not extension: timestamped lines become the synced
     /// lyrics (a .txt full of [mm:ss] tags is still LRC), anything else becomes the plain
     /// lyrics. Both tabs' Enable toggles flip on so the Save gate sees the import.
+    /// A TTML file (GitHub #132) is converted to the (enhanced) LRC the editor works in first,
+    /// never pasted as XML; one that will not parse gives its words as plain lyrics.
     /// </summary>
     internal void ImportLyricsText(string text, string fileName)
     {
-        var normalized = (text ?? string.Empty).Replace("\r\n", "\n").Trim();
+        text ??= string.Empty;
+        if (fileName.EndsWith(".ttml", StringComparison.OrdinalIgnoreCase) || TtmlParser.LooksLikeTtml(text))
+            text = TtmlParser.ToLrc(text) ?? string.Join("\n", LyricsLoader.RawTextLines(text));
+
+        var normalized = text.Replace("\r\n", "\n").Trim();
         if (normalized.Length == 0)
         {
             SyncedLyricsSearchStatus = $"{fileName} is empty.";
@@ -2651,6 +2667,11 @@ public partial class MetadataViewModel : ViewModelBase
             _track.IsExplicit = advFields.ItunesAdvisory == 1;
         }
 
+        // Settings ▸ Lyrics ▸ Save lyrics to (GitHub #135): lyrics files beside the song (the
+        // default), the audio file's tags, or both.
+        LyricsSaveTarget lyricsTarget;
+        try { lyricsTarget = LyricsSaveTarget(); } catch { lyricsTarget = Models.LyricsSaveTarget.Sidecar; }
+
         // Write synced lyrics to sidecar .lrc file (single-track only, as above).
         // Deletion is gated on an explicit user removal and never happens when the
         // sidecar failed to load — and it goes to the trash, not File.Delete, so a
@@ -2662,7 +2683,12 @@ public partial class MetadataViewModel : ViewModelBase
                 var lrcPath = Path.ChangeExtension(_track.FilePath, ".lrc");
                 if (!string.IsNullOrWhiteSpace(_track.SyncedLyrics))
                 {
-                    await File.WriteAllTextAsync(lrcPath, _track.SyncedLyrics);
+                    // Only a real change creates the file, and only when lyrics files are wanted:
+                    // synced lyrics loaded from the song's tags (LRC in its lyrics tag, a SYLT)
+                    // used to gain a .lrc beside the song on any save, a title fix included. One
+                    // already there is kept up to date, as before — it is read before the tags.
+                    if (File.Exists(lrcPath) || (SyncedLyricsWereChanged && lyricsTarget.WritesSidecars()))
+                        await File.WriteAllTextAsync(lrcPath, _track.SyncedLyrics);
                     if (SyncedLyricsWereChanged)
                         await Task.Run(() => TrashSidecarsAboveLrc(_track.FilePath));
                 }
@@ -2676,16 +2702,30 @@ public partial class MetadataViewModel : ViewModelBase
             catch { /* Best effort — sidecar write is non-fatal */ }
         }
 
+        // Lyrics inside the audio file: the synced text (word timings kept) in its lyrics tag,
+        // plus SYLT for ID3v2, or the plain text. Only on a real lyrics change.
+        if (!_albumScoped && lyricsTarget.WritesTags()
+            && (SyncedLyricsWereChanged || SyncedLyricsWereRemoved || PlainLyricsWereChangedForTags))
+        {
+            var path = _track.FilePath;
+            var plain = _track.Lyrics;
+            var synced = _track.SyncedLyrics;
+            if (!await Task.Run(() => _metadata.WriteLyrics(path, plain, synced)))
+                AddFailedWrite(failedWrites, path);
+        }
+
         // Write plain lyrics to sidecar .txt file.
         // Only write when the plain text actually changed: LoadFromTrack fills this
         // field from the *embedded* tag when no .txt exists, so an unconditional write
         // created a new file in the user's music folder after editing an unrelated field.
+        // Lyrics saved inside the file only (#135) create no .txt; one already there is kept current.
         if (!_albumScoped)
         {
             try
             {
                 var txtPath = Path.ChangeExtension(_track.FilePath, ".txt");
-                var plainChanged = !string.Equals(_track.Lyrics, _loadedPlainLyrics, StringComparison.Ordinal);
+                var plainChanged = !string.Equals(_track.Lyrics, _loadedPlainLyrics, StringComparison.Ordinal)
+                                   && lyricsTarget.WritesSidecars();
                 if (!string.IsNullOrWhiteSpace(_track.Lyrics) && (plainChanged || File.Exists(txtPath)))
                     await File.WriteAllTextAsync(txtPath, _track.Lyrics);
                 else if (PlainLyricsWereRemoved && File.Exists(txtPath))

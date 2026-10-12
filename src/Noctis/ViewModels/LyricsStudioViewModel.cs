@@ -970,6 +970,12 @@ public partial class LyricsStudioViewModel : ViewModelBase
         _runCts?.Cancel();
     }
 
+    private LyricsSaveTarget SafeSaveTarget()
+    {
+        try { return _writer.SaveTarget(); }
+        catch { return LyricsSaveTarget.Sidecar; }
+    }
+
     [RelayCommand]
     private async Task Save()
     {
@@ -978,7 +984,9 @@ public partial class LyricsStudioViewModel : ViewModelBase
         // Never replace lyrics without asking: sidecar files, and with "write into the file's tags"
         // on, the lyrics already stored in the audio file's tags too.
         var existing = ExistingLyricsFiles(item.Track);
-        if (EmbedTags && (!string.IsNullOrWhiteSpace(item.Track.Lyrics) || !string.IsNullOrWhiteSpace(item.Track.SyncedLyrics)))
+        // Settings ▸ Lyrics ▸ Save lyrics to (GitHub #135) may put them inside the file too.
+        var intoTags = EmbedTags || SafeSaveTarget().WritesTags();
+        if (intoTags && (!string.IsNullOrWhiteSpace(item.Track.Lyrics) || !string.IsNullOrWhiteSpace(item.Track.SyncedLyrics)))
             existing.Add("lyrics in the audio file's tags");
         if (existing.Count > 0 && !await ConfirmAsync(
                 $"“{item.Title}” already has {string.Join(" and ", existing)}.\n\nSaving replaces {(existing.Count == 1 ? "it" : "them")} with the lyrics on screen. A lyrics file Noctis didn't write goes to the Recycle Bin first."))
@@ -1150,7 +1158,7 @@ public partial class LyricsStudioViewModel : ViewModelBase
         RaiseStartState();
     }
 
-    /// <summary>Loads a lyrics file (.txt, or .lrc/.elrc whose timestamps are dropped) into the lyrics box.</summary>
+    /// <summary>Loads a lyrics file (.txt, or .lrc/.elrc/.ttml whose timestamps are dropped) into the lyrics box.</summary>
     [RelayCommand]
     private async Task ImportLyricsFile()
     {
@@ -1160,7 +1168,7 @@ public partial class LyricsStudioViewModel : ViewModelBase
         if (string.IsNullOrWhiteSpace(path)) return;
         try
         {
-            var lines = LyricsStudioEngine.FirstText(await File.ReadAllTextAsync(path));
+            var lines = LyricsStudioEngine.ImportText(await File.ReadAllTextAsync(path), path);
             if (lines is null) { item.StatusText = $"“{Path.GetFileName(path)}” has no lyrics in it."; return; }
             item.DraftText = string.Join('\n', lines);
             item.IsTranscriptDraft = false;

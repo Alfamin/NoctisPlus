@@ -557,7 +557,7 @@ public partial class FavoritesViewModel : ViewModelBase, ISearchable, IDisposabl
         await MetadataHelper.OpenReplayGainScannerDialog(tracks);
     }
 
-    private static List<Track> ExpandToTracks(IEnumerable<FavoriteItem> items)
+    internal static List<Track> ExpandToTracks(IEnumerable<FavoriteItem> items)
     {
         var tracks = new List<Track>();
         foreach (var fi in items)

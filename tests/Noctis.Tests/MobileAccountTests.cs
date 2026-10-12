@@ -29,9 +29,15 @@ public class MobileAccountTests
         public NoctisAccount? Account { get; set; }
         public bool IsSignedIn => Account != null;
         public bool IsSyncing { get; set; }
+        public bool WasSignedOutByComputer { get; set; }
+        public string? AvatarPath { get; set; }
 
         public event EventHandler? StateChanged;
+
+        public void RaiseStateChanged() => StateChanged?.Invoke(this, EventArgs.Empty);
         public event EventHandler<NoctisSyncProgress>? SyncProgress;
+        /// <summary>A progress event the way a phone delivers it: posted, so it can land after the sync's task already completed.</summary>
+        public void RaiseLateProgress(NoctisSyncStage stage) => SyncProgress?.Invoke(this, new NoctisSyncProgress(stage, 0, 0));
         public event EventHandler<NoctisDownloadProgress>? DownloadProgress;
         public event EventHandler? PlaylistsChanged { add { } remove { } }
 
@@ -76,6 +82,7 @@ public class MobileAccountTests
         {
             SignOuts.Add(removeDownloads);
             Account = null;
+            AvatarPath = null;
             if (removeDownloads) DownloadedIds.Clear();
             StateChanged?.Invoke(this, EventArgs.Empty);
             return Task.CompletedTask;
@@ -135,6 +142,32 @@ public class MobileAccountTests
         }
 
         public string? ResolvePlaybackUri(string filePath) => null;
+
+        public void RaiseDownloadProgress(NoctisDownloadProgress progress) => DownloadProgress?.Invoke(this, progress);
+
+        public bool IsUploading { get; set; }
+        public event EventHandler<NoctisUploadProgress>? UploadProgress;
+        public NoctisUploadResult UploadResult { get; set; } = new(40, 2, 1, 0);
+        public Exception? UploadError { get; set; }
+        public int UploadCalls { get; private set; }
+
+        /// <summary>Set: the send reports "2 of 40 done" then waits for this (or the token) before finishing.</summary>
+        public TaskCompletionSource? UploadGate { get; set; }
+
+        public async Task<NoctisUploadResult> SendLocalSongsAsync(CancellationToken ct = default)
+        {
+            UploadCalls++;
+            IsUploading = true;
+            try
+            {
+                if (UploadError != null) throw UploadError;
+                UploadProgress?.Invoke(this, new NoctisUploadProgress(0, 0));
+                UploadProgress?.Invoke(this, new NoctisUploadProgress(2, 40));
+                if (UploadGate != null) await UploadGate.Task.WaitAsync(ct);
+                return UploadResult;
+            }
+            finally { IsUploading = false; }
+        }
     }
 
     private static Track RemoteSong(string title)
@@ -270,13 +303,13 @@ public class MobileAccountTests
     }
 
     [Theory]
-    [InlineData(NoctisErrorKind.Unreachable, "Can't reach your computer. Check it's on, Noctis is open, Pair a device is on, and both are on the same Wi-Fi.")]
-    [InlineData(NoctisErrorKind.CertificateChanged, "Your computer's certificate changed while signing in. Try again and check the fingerprint.")]
-    [InlineData(NoctisErrorKind.BadCredentials, "Wrong account name or password.")]
+    [InlineData(NoctisErrorKind.Unreachable, "Can't reach your computer. Check that Noctis is open on it, Noctis on your phone is turned on, and both are on the same Wi-Fi.")]
+    [InlineData(NoctisErrorKind.CertificateChanged, "Your computer's security code changed while signing in. Try again and check the code.")]
+    [InlineData(NoctisErrorKind.BadCredentials, "Wrong email, username or password.")]
     [InlineData(NoctisErrorKind.LockedOut, "Too many failed sign-ins. Wait a few minutes, then try again.")]
-    [InlineData(NoctisErrorKind.SyncDisabled, "Turn on Sync on your computer (Settings → Account & Devices).")]
-    [InlineData(NoctisErrorKind.SignedOut, "This phone was removed on your computer. Sign in again.")]
-    [InlineData(NoctisErrorKind.InvalidAddress, "Enter your computer's address as shown in Pair a device, like 192.168.1.20 or https://192.168.1.20:4747.")]
+    [InlineData(NoctisErrorKind.SyncDisabled, "Sync is off on your computer. Turn on Sync with your phone in Settings, Account & Devices.")]
+    [InlineData(NoctisErrorKind.SignedOut, "Your computer signed this phone out. Sign in again.")]
+    [InlineData(NoctisErrorKind.InvalidAddress, "Enter your computer's address as shown under Connect a phone, like 192.168.1.20 or https://192.168.1.20:4747.")]
     [InlineData(NoctisErrorKind.Server, "Your computer couldn't finish that. Try again in a moment.")]
     public async Task SignIn_EachErrorKind_IsWorded(NoctisErrorKind kind, string message)
     {
@@ -325,7 +358,7 @@ public class MobileAccountTests
         account.SyncError = new NoctisServerException(NoctisErrorKind.CertificateChanged, "pin mismatch");
         await page.SyncNowCommand.ExecuteAsync(null);
 
-        Assert.Equal("Your computer's certificate changed. Sign out and sign in again to trust the new one.", page.ErrorText);
+        Assert.Equal("Your computer's security code changed. Sign out and sign in again to trust the new one.", page.ErrorText);
         Assert.True(page.IsCertificateChanged);
         Assert.False(page.CanUseServer);                                   // Sync and Download hidden
         Assert.True(page.IsSignedIn);                                      // Sign out stays
@@ -333,17 +366,103 @@ public class MobileAccountTests
     }
 
     [Fact]
-    public async Task SyncNow_SyncDisabled_IsWorded()
+    public async Task SyncNow_SyncOffOnTheComputer_IsANoteNotAnError()
     {
+        // The computer's "Sync with your phone" switch is the owner's choice: the songs still
+        // came over (catalog and plays go through), so no red error for it.
         using var rig = MobileFixtures.MakeRig();
         var account = new FakeAccount { Account = FakeAccount.SignedInAs(), SyncError = new NoctisServerException(NoctisErrorKind.SyncDisabled, "50") };
         var page = OpenAccount(ShellWith(rig, account));
 
         await page.SyncNowCommand.ExecuteAsync(null);
 
-        Assert.Equal("Turn on Sync on your computer (Settings → Account & Devices).", page.ErrorText);
+        Assert.False(page.HasError);
         Assert.True(page.CanUseServer);
+        Assert.Equal("Songs updated. Sync is off on your computer.", page.SyncText);
+    }
+
+    [Theory]
+    [InlineData(NoctisSyncStage.Done)]    // what the service now raises when sync is off on the computer
+    [InlineData(NoctisSyncStage.Failed)]  // what it raised before
+    public async Task SyncNow_SyncOffOnTheComputer_TheLateEndOfThatSyncKeepsTheNote(NoctisSyncStage lateEnd)
+    {
+        // On the emulator the sync's own end arrived after the page's catch had run and
+        // replaced "Songs updated…" with "The last sync didn't finish. Tap Sync now to try again."
+        using var rig = MobileFixtures.MakeRig();
+        var account = new FakeAccount { Account = FakeAccount.SignedInAs(), SyncError = new NoctisServerException(NoctisErrorKind.SyncDisabled, "50") };
+        var page = OpenAccount(ShellWith(rig, account));
+
+        await page.SyncNowCommand.ExecuteAsync(null);
+        account.RaiseLateProgress(lateEnd);
+
+        Assert.Equal("Songs updated. Sync is off on your computer.", page.SyncText);
+        Assert.False(page.HasError);
+    }
+
+    [Fact]
+    public async Task SyncNow_Failed_TheLateEndOfThatSyncKeepsTheErrorAlone()
+    {
+        using var rig = MobileFixtures.MakeRig();
+        var account = new FakeAccount { Account = FakeAccount.SignedInAs(), SyncError = new NoctisServerException(NoctisErrorKind.Unreachable, "x") };
+        var page = OpenAccount(ShellWith(rig, account));
+
+        await page.SyncNowCommand.ExecuteAsync(null);
+        account.RaiseLateProgress(NoctisSyncStage.Failed);
+
+        Assert.True(page.HasError);
         Assert.Equal(string.Empty, page.SyncText);
+    }
+
+    [Fact]
+    public async Task ABackgroundSyncFailing_AfterThePagesOwnSync_StillSaysSo()
+    {
+        using var rig = MobileFixtures.MakeRig();
+        var account = new FakeAccount { Account = FakeAccount.SignedInAs() };
+        var page = OpenAccount(ShellWith(rig, account));
+        await page.SyncNowCommand.ExecuteAsync(null);   // the fake raises its Done during the sync
+
+        account.RaiseLateProgress(NoctisSyncStage.Failed); // a later sync the page did not start
+
+        Assert.Equal("The last sync didn't finish. Tap Sync now to try again.", page.SyncText);
+    }
+
+    [Fact]
+    public void SignedOutByTheComputer_AtAppStart_TheAccountPageSaysWhy()
+    {
+        using var rig = MobileFixtures.MakeRig();
+        var account = new FakeAccount { WasSignedOutByComputer = true };
+        var page = OpenAccount(ShellWith(rig, account));
+
+        Assert.False(page.IsSignedIn);
+        Assert.Equal("Your computer signed this phone out. Sign in again.", page.ErrorText);
+    }
+
+    [Fact]
+    public void SignedOutByTheComputer_WhileThePageIsOpen_TheAccountPageSaysWhy()
+    {
+        using var rig = MobileFixtures.MakeRig();
+        var account = new FakeAccount { Account = FakeAccount.SignedInAs() };
+        var page = OpenAccount(ShellWith(rig, account));
+        Assert.False(page.HasError);
+
+        account.Account = null;
+        account.WasSignedOutByComputer = true;
+        account.RaiseStateChanged();
+
+        Assert.Equal("Your computer signed this phone out. Sign in again.", page.ErrorText);
+    }
+
+    [Fact]
+    public void SignedOutByHand_SaysNothing()
+    {
+        using var rig = MobileFixtures.MakeRig();
+        var account = new FakeAccount { Account = FakeAccount.SignedInAs() };
+        var page = OpenAccount(ShellWith(rig, account));
+
+        account.Account = null;
+        account.RaiseStateChanged();
+
+        Assert.False(page.HasError);
     }
 
     [Fact]
@@ -418,6 +537,196 @@ public class MobileAccountTests
         Assert.False(page.IsDownloading);
         Assert.Equal("Downloads finished · 1 failed", page.DownloadText);
         Assert.Equal("Downloaded: 2 songs · 10 MB", page.StorageText);
+    }
+
+    [Fact]
+    public void DownloadResult_TellsSongsMissingOnTheComputer_ApartFromOtherFailures()
+    {
+        using var rig = MobileFixtures.MakeRig();
+        var account = new FakeAccount { Account = FakeAccount.SignedInAs() };
+        var page = OpenAccount(ShellWith(rig, account));
+
+        account.RaiseDownloadProgress(new NoctisDownloadProgress(0, 0, 77, 0, Missing: 77));
+        Assert.Equal("Downloads finished · 77 missing on your computer", page.DownloadText);
+
+        account.RaiseDownloadProgress(new NoctisDownloadProgress(3, 1, 3, 0, Missing: 2));
+        Assert.Equal("Downloading 1 of 4 · 2 missing on your computer · 1 failed", page.DownloadText);
+        Assert.Equal("This song's file is missing on your computer.", AccountPageViewModel.Describe(NoctisErrorKind.FileMissing, true));
+    }
+
+    [Fact]
+    public async Task SendSongs_ShowsProgress_ThenTheCounts()
+    {
+        using var rig = MobileFixtures.MakeRig();
+        var account = new FakeAccount { Account = FakeAccount.SignedInAs(), UploadGate = new TaskCompletionSource() };
+        var page = OpenAccount(ShellWith(rig, account));
+        Assert.Equal("Send phone songs to computer", page.UploadLabel);
+        Assert.True(page.CanUpload);
+
+        var send = page.SendSongsCommand.ExecuteAsync(null);
+        Assert.True(page.IsUploading);
+        Assert.Equal("Sending 3 of 40", page.UploadText);                     // two done, the third going out
+        Assert.Equal("Stop sending", page.UploadLabel);
+
+        account.UploadGate.SetResult();
+        await send;
+
+        Assert.Equal(1, account.UploadCalls);
+        Assert.False(page.IsUploading);
+        Assert.Equal("Sent 40 · 2 already on your computer · 1 failed", page.UploadText);
+        Assert.Equal("Send phone songs to computer", page.UploadLabel);
+        Assert.False(page.HasError);
+    }
+
+    [Fact]
+    public async Task SendSongs_TappedAgainWhileSending_Stops_AndSaysTheRestWaits()
+    {
+        using var rig = MobileFixtures.MakeRig();
+        var account = new FakeAccount { Account = FakeAccount.SignedInAs(), UploadGate = new TaskCompletionSource() };
+        var page = OpenAccount(ShellWith(rig, account));
+
+        var send = page.SendSongsCommand.ExecuteAsync(null);
+        Assert.True(page.SendSongsCommand.CanExecute(null));                  // the second tap reaches the command
+        await page.SendSongsCommand.ExecuteAsync(null);
+        await send;
+
+        Assert.Equal(1, account.UploadCalls);
+        Assert.False(page.IsUploading);
+        Assert.Equal("Stopped. Tap again to send the rest.", page.UploadText);
+        Assert.False(page.HasError);
+    }
+
+    /// <summary>
+    /// The service reports each song from its own thread and the page's Marshal posts the report
+    /// to the UI thread; the page's await of the send resumes ahead of such a post (Avalonia runs
+    /// the continuation first, probed headless). The last report then landed after the summary.
+    /// </summary>
+    [Fact]
+    public async Task SendSongs_LastProgressLandingAfterTheResult_KeepsTheSummary()
+    {
+        using var rig = MobileFixtures.MakeRig();
+        var account = new FakeAccount { Account = FakeAccount.SignedInAs(), UploadGate = new TaskCompletionSource() };
+        var posted = new List<Action>();
+        var shell = new ShellViewModel(rig.Shell.Library, rig.Shell.Player, rig.Shell.Lyrics)
+        {
+            Account = account,
+            Marshal = posted.Add,
+            TintFactory = rig.Shell.TintFactory,
+        };
+        var page = OpenAccount(shell);
+
+        var send = page.SendSongsCommand.ExecuteAsync(null);
+        account.UploadGate.SetResult();
+        await send;
+        foreach (var post in posted.ToList()) post();                         // the reports, landing late
+
+        Assert.Equal("Sent 40 · 2 already on your computer · 1 failed", page.UploadText);
+        Assert.False(page.IsUploading);
+        Assert.Equal("Send phone songs to computer", page.UploadLabel);
+    }
+
+    [Fact]
+    public async Task SendSongs_PageReopenedMidSend_StopSendingStopsIt()
+    {
+        using var rig = MobileFixtures.MakeRig();
+        var account = new FakeAccount { Account = FakeAccount.SignedInAs(), UploadGate = new TaskCompletionSource() };
+        var shell = ShellWith(rig, account);
+        var first = OpenAccount(shell);
+        var send = first.SendSongsCommand.ExecuteAsync(null);
+
+        // The Account page left and opened again while the send runs: it offers to stop it.
+        var page = new AccountPageViewModel(shell, account);
+        Assert.Equal("Stop sending", page.UploadLabel);
+
+        var stop = page.SendSongsCommand.ExecuteAsync(null);
+
+        Assert.True(stop.IsCompleted);                                         // stopped, not waiting on the send
+        await stop;
+        Assert.Equal("Stopped. Tap again to send the rest.", page.UploadText);
+        account.UploadGate.SetResult();
+        await send;
+    }
+
+    [Theory]
+    [InlineData(0, 0, 0, 3, "Everything is already on your computer")]
+    [InlineData(0, 0, 0, 0, "No songs on this phone to send")]
+    [InlineData(5, 0, 0, 2, "Sent 5")]
+    [InlineData(0, 4, 0, 0, "Sent 0 · 4 already on your computer")]
+    [InlineData(1, 0, 2, 0, "Sent 1 · 2 failed")]
+    public void SendSongs_Result_IsWorded(int sent, int already, int failed, int previously, string text)
+        => Assert.Equal(text, AccountPageViewModel.DescribeUpload(new NoctisUploadResult(sent, already, failed, previously)));
+
+    [Fact]
+    public async Task SendSongs_SyncOffOnTheComputer_IsWorded()
+    {
+        using var rig = MobileFixtures.MakeRig();
+        var account = new FakeAccount { Account = FakeAccount.SignedInAs(), UploadError = new NoctisServerException(NoctisErrorKind.SyncDisabled, "50") };
+        var page = OpenAccount(ShellWith(rig, account));
+
+        await page.SendSongsCommand.ExecuteAsync(null);
+
+        Assert.Equal("Sync is off on your computer. Turn on Sync with your phone in Settings, Account & Devices.", page.ErrorText);
+        Assert.Equal(string.Empty, page.UploadText);
+        Assert.False(page.IsUploading);
+    }
+
+    [Fact]
+    public void Header_ShowsTheDesktopsProfileName_WithTheEmailSmallerUnderIt()
+    {
+        using var rig = MobileFixtures.MakeRig();
+        var account = new FakeAccount { Account = FakeAccount.SignedInAs("owner@example.com") with { DisplayName = "notheartached" } };
+        var shell = ShellWith(rig, account);
+        var settings = new SettingsPageViewModel(shell);
+        var page = OpenAccount(shell);
+
+        Assert.Equal("notheartached", page.DisplayName);
+        Assert.Equal("owner@example.com", page.EmailText);
+        Assert.True(page.HasEmailText);
+        Assert.Equal("NO", page.Initials);
+        Assert.Equal("Signed in as notheartached · Studio PC", settings.AccountRowText);
+
+        // No profile name (an older desktop, or none set): the email is the name, shown once.
+        account.Account = account.Account! with { DisplayName = null };
+        account.RaiseStateChanged();
+        Assert.Equal("owner@example.com", page.DisplayName);
+        Assert.False(page.HasEmailText);
+        Assert.Equal("OC", page.Initials);                                     // "owner@example" + "com", as before
+        settings.OnClosed();
+    }
+
+    [AvaloniaFact]
+    public void Header_View_ShowsTheNameLarge_AndTheEmailLine_AndTheSendRow()
+    {
+        using var rig = MobileFixtures.MakeRig();
+        var account = new FakeAccount { Account = FakeAccount.SignedInAs("owner@example.com") with { DisplayName = "notheartached" } };
+        var shell = ShellWith(rig, account);
+        var window = MobileFixtures.Mount(shell, out var view);
+        shell.OpenAccountCommand.Execute(null);
+        window.UpdateLayout();
+
+        var page = MobileFixtures.Find<AccountPage>(view);
+        var name = MobileFixtures.Named<TextBlock>(page, "AccountNameLabel");
+        var email = MobileFixtures.Named<TextBlock>(page, "EmailLabel");
+        Assert.Equal("notheartached", name.Text);
+        Assert.True(email.IsEffectivelyVisible);
+        Assert.Equal("owner@example.com", email.Text);
+        Assert.True(email.FontSize < name.FontSize);
+
+        var row = MobileFixtures.Named<Button>(page, "SendSongsButton");
+        Assert.True(row.IsEffectivelyVisible);
+        Assert.True(row.IsEnabled);
+        Assert.Equal("Send phone songs to computer", MobileFixtures.Named<TextBlock>(page, "SendSongsLabel").Text);
+        Assert.False(MobileFixtures.Named<TextBlock>(page, "UploadLabel").IsEffectivelyVisible);   // no status yet
+
+        account.UploadGate = new TaskCompletionSource();
+        row.Command!.Execute(null);
+        window.UpdateLayout();
+        Assert.Equal("Stop sending", MobileFixtures.Named<TextBlock>(page, "SendSongsLabel").Text);
+        var status = MobileFixtures.Named<TextBlock>(page, "UploadLabel");
+        Assert.True(status.IsEffectivelyVisible);
+        Assert.Equal("Sending 3 of 40", status.Text);
+        account.UploadGate.SetResult();
+        window.Close();
     }
 
     [Fact]
@@ -736,6 +1045,184 @@ public class MobileAccountTests
 
         Assert.Contains("redact-marker-91c2 apiKey=***", exporter.Text);
         Assert.DoesNotContain("nk_leakme123", exporter.Text);
+    }
+
+    // ── The desktop's profile picture: Account header, ProfileButton ──
+
+    /// <summary>A real 64×64 PNG in a fresh temp folder (the caller deletes the folder).</summary>
+    private static string MakePicture(out string dir)
+    {
+        dir = System.IO.Path.Combine(System.IO.Path.GetTempPath(), "noctis-avatar-" + Guid.NewGuid().ToString("N"));
+        System.IO.Directory.CreateDirectory(dir);
+        var path = System.IO.Path.Combine(dir, "avatar-0123456789abcdef.img");
+        using var bmp = new SkiaSharp.SKBitmap(64, 64);
+        bmp.Erase(new SkiaSharp.SKColor(40, 120, 200));
+        using var img = SkiaSharp.SKImage.FromBitmap(bmp);
+        using var png = img.Encode(SkiaSharp.SKEncodedImageFormat.Png, 100);
+        System.IO.File.WriteAllBytes(path, png.ToArray());
+        return path;
+    }
+
+    [Theory]
+    [InlineData("owner", "OW")]
+    [InlineData("John Doe", "JD")]
+    [InlineData("jane.smith", "JS")]
+    [InlineData("x", "X")]
+    [InlineData("élodie", "ÉL")]
+    [InlineData("  ", "")]
+    [InlineData(null, "")]
+    public void Initials_ForTheAvatarFallback(string? name, string expected)
+        => Assert.Equal(expected, AccountPageViewModel.InitialsOf(name));
+
+    [Fact]
+    public void ShellProfileAvatarPath_FollowsTheAccount()
+    {
+        using var rig = MobileFixtures.MakeRig();
+        var account = new FakeAccount { Account = FakeAccount.SignedInAs(), AvatarPath = "/data/account/avatar-1.img" };
+        var shell = ShellWith(rig, account);
+        Assert.Equal("/data/account/avatar-1.img", shell.ProfileAvatarPath);   // from the first frame
+
+        account.AvatarPath = "/data/account/avatar-2.img";                     // a sync brought a new picture
+        account.RaiseStateChanged();
+        Assert.Equal("/data/account/avatar-2.img", shell.ProfileAvatarPath);
+
+        account.Account = null;                                                // signed out: the glyph again
+        account.RaiseStateChanged();
+        Assert.Null(shell.ProfileAvatarPath);
+
+        Assert.Null(ShellWith(rig, null).ProfileAvatarPath);                   // no account service at all
+    }
+
+    [Fact]
+    public async Task AccountPage_Header_ShowsTheAvatar_ElseInitials()
+    {
+        using var rig = MobileFixtures.MakeRig();
+        var account = new FakeAccount { Account = FakeAccount.SignedInAs("owner", "Studio PC") };
+        var page = OpenAccount(ShellWith(rig, account));
+        Assert.Equal("owner", page.DisplayName);
+        Assert.Equal("on Studio PC", page.ServerText);
+        Assert.Equal("0 songs · 0 MB", page.StorageValue);
+        Assert.False(page.HasAvatar);
+        Assert.True(page.ShowInitials);
+        Assert.Equal("OW", page.Initials);
+
+        account.AvatarPath = "/data/account/avatar-1.img";
+        account.RaiseStateChanged();
+        Assert.True(page.HasAvatar);
+        Assert.Equal("/data/account/avatar-1.img", page.AvatarPath);
+        Assert.False(page.ShowInitials);
+        Assert.False(page.ShowPersonGlyph);
+
+        await account.SignOutAsync(removeDownloads: false);
+        Assert.False(page.IsSignedIn);
+        Assert.Null(page.AvatarPath);
+    }
+
+    [AvaloniaFact]
+    public void AccountPage_SignedIn_ShowsTheHeaderPicture_AndTheRows()
+    {
+        var picture = MakePicture(out var dir);
+        try
+        {
+            using var rig = MobileFixtures.MakeRig();
+            var account = new FakeAccount { Account = FakeAccount.SignedInAs(), AvatarPath = picture };
+            var shell = ShellWith(rig, account);
+            var window = MobileFixtures.Mount(shell, out var view);
+            shell.OpenAccountCommand.Execute(null);
+            window.UpdateLayout();
+
+            var page = MobileFixtures.Find<AccountPage>(view);
+            Assert.True(MobileFixtures.Named<StackPanel>(page, "SignedInPanel").IsEffectivelyVisible);
+            var image = MobileFixtures.Named<Noctis.Controls.CachedImage>(page, "AvatarImage");
+            Assert.True(image.IsEffectivelyVisible);
+            Assert.Equal(picture, image.SourcePath);
+            Assert.False(MobileFixtures.Named<TextBlock>(page, "AvatarInitials").IsEffectivelyVisible);
+            var circle = MobileFixtures.Named<Border>(page, "AvatarCircle");
+            Assert.Equal(96, circle.Bounds.Width);
+            Assert.True(circle.ClipToBounds);
+
+            // Every action row is a full-width touch target of at least 52 dp.
+            foreach (var name in new[] { "SyncNowButton", "DownloadAllButton", "SendSongsButton", "RemoveDownloadsButton", "SignOutButton" })
+            {
+                var row = MobileFixtures.Named<Button>(page, name);
+                Assert.True(row.IsEffectivelyVisible, name);
+                Assert.True(row.Bounds.Height >= 52, $"{name} is {row.Bounds.Height} dp");
+                Assert.NotNull(row.Command);
+            }
+            Assert.Equal("0 songs · 0 MB", MobileFixtures.Named<TextBlock>(page, "StorageLabel").Text);
+
+            // Remove all downloads still asks first, inline.
+            MobileFixtures.Named<Button>(page, "RemoveDownloadsButton").Command!.Execute(null);
+            window.UpdateLayout();
+            Assert.True(MobileFixtures.Named<StackPanel>(page, "RemoveDownloadsConfirm").IsEffectivelyVisible);
+
+            // No picture: the initials on the accent circle.
+            account.AvatarPath = null;
+            account.RaiseStateChanged();
+            window.UpdateLayout();
+            Assert.False(image.IsEffectivelyVisible);
+            Assert.True(MobileFixtures.Named<TextBlock>(page, "AvatarInitials").IsEffectivelyVisible);
+            window.Close();
+        }
+        finally
+        {
+            try { System.IO.Directory.Delete(dir, true); } catch { }
+        }
+    }
+
+    [AvaloniaFact]
+    public void ProfileButton_ShowsTheAvatar_WhenSet_ElseTheGlyph_AndOpensSettings()
+    {
+        var picture = MakePicture(out var dir);
+        try
+        {
+            using var rig = MobileFixtures.MakeRig();
+            var account = new FakeAccount { Account = FakeAccount.SignedInAs() };
+            var shell = ShellWith(rig, account);
+            var button = new ProfileButton { DataContext = shell };
+            button.Bind(ProfileButton.AvatarPathProperty, new Avalonia.Data.Binding(nameof(ShellViewModel.ProfileAvatarPath)));
+            button.Bind(ProfileButton.CommandProperty, new Avalonia.Data.Binding(nameof(ShellViewModel.OpenSettingsCommand)));
+            var window = new Window { Width = 200, Height = 200, Content = button };
+            window.Show();
+            window.UpdateLayout();
+
+            var image = MobileFixtures.Named<Noctis.Controls.CachedImage>(button, "AvatarImage");
+            var glyph = MobileFixtures.Named<PathIcon>(button, "AvatarGlyph");
+            Assert.False(button.HasAvatar);
+            Assert.True(glyph.IsEffectivelyVisible);
+            Assert.False(image.IsEffectivelyVisible);
+
+            account.AvatarPath = picture;
+            account.RaiseStateChanged();
+            window.UpdateLayout();
+            Assert.Equal(picture, shell.ProfileAvatarPath);
+            Assert.True(button.HasAvatar);
+            Assert.True(image.IsEffectivelyVisible);
+            Assert.Equal(picture, image.SourcePath);
+            Assert.False(glyph.IsEffectivelyVisible);
+            var clip = MobileFixtures.Named<Border>(button, "AvatarClip");
+            Assert.True(clip.ClipToBounds);
+            Assert.Equal(clip.Bounds.Width / 2, clip.CornerRadius.TopLeft);   // a circle
+
+            // A tap opens Settings.
+            var root = MobileFixtures.Named<Button>(button, "ProfileButtonRoot");
+            root.Command!.Execute(root.CommandParameter);
+            Assert.IsType<SettingsPageViewModel>(shell.CurrentPage);
+
+            // Signed out: the glyph again.
+            account.Account = null;
+            account.RaiseStateChanged();
+            window.UpdateLayout();
+            Assert.Null(shell.ProfileAvatarPath);
+            Assert.True(glyph.IsEffectivelyVisible);
+            Assert.False(image.IsEffectivelyVisible);
+            Assert.Null(image.SourcePath);
+            window.Close();
+        }
+        finally
+        {
+            try { System.IO.Directory.Delete(dir, true); } catch { }
+        }
     }
 
     private sealed class CapturingExporter : ILogExporter

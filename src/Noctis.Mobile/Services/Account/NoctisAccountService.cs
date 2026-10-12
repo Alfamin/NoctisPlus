@@ -85,14 +85,14 @@ public sealed partial class NoctisAccountService : INoctisAccountService, ITrack
     private readonly SemaphoreSlim _downloadSlots = new(DownloadConcurrency, DownloadConcurrency);
     private readonly List<Task> _downloadRuns = new();
     private CancellationTokenSource _downloadCts = new();
-    private int _dlPending, _dlCompleted, _dlFailed;
+    private int _dlPending, _dlCompleted, _dlFailed, _dlMissing;
 
     /// <summary>Song suffixes from this process's last catalog (download file extensions).</summary>
     private readonly ConcurrentDictionary<Guid, string> _suffixes = new();
     private readonly ConcurrentDictionary<Guid, long> _sizes = new();
 
-    /// <summary>Space downloads always leave free on the phone: "Download everything" on a desktop
-    /// library can be far larger than the phone (the owner's is ~306 GB).</summary>
+    /// <summary>Space downloads and covers always leave free on the phone: "Download everything" on a
+    /// desktop library can be far larger than the phone (the owner's is ~306 GB).</summary>
     internal const long StorageReserveBytes = 1536L * 1024 * 1024;
 
     /// <summary>Free bytes on the volume holding a path; tests substitute a full phone.</summary>
@@ -167,6 +167,7 @@ public sealed partial class NoctisAccountService : INoctisAccountService, ITrack
         _sync = _store.LoadSyncState();
         _pending = _store.LoadPending();
         IndexDownloads();
+        LoadCachedAvatar();
         stateRecorder?.Attach(this);
     }
 
@@ -222,6 +223,7 @@ public sealed partial class NoctisAccountService : INoctisAccountService, ITrack
             DeviceId = _deviceId,
             DeviceName = DeviceName,
             ServerName = result.Server ?? string.Empty,
+            DisplayName = result.DisplayName,
         };
         lock (_gate)
         {
@@ -237,9 +239,11 @@ public sealed partial class NoctisAccountService : INoctisAccountService, ITrack
             _client?.Dispose();
             _client = null;
             _account = account;
+            _signedOutByComputer = false;
         }
         DebugLog.Write("Account", $"signed in (sync {(result.SyncEnabled ? "on" : "off")} on the desktop)");
         RaiseStateChanged();
+        StartAvatarRefresh();
     }
 
     private static bool SameIdentity(string url, string user, NoctisAccount account) =>
@@ -260,6 +264,7 @@ public sealed partial class NoctisAccountService : INoctisAccountService, ITrack
             try { await running.ConfigureAwait(false); } catch { /* cancelled or failed: irrelevant now */ }
         }
         await StopDownloadsAsync().ConfigureAwait(false);
+        await StopUploadsAsync().ConfigureAwait(false);
 
         NoctisServerClient? client;
         List<Guid> syncedPlaylists;
@@ -296,6 +301,7 @@ public sealed partial class NoctisAccountService : INoctisAccountService, ITrack
             _client = null;
             _account = null;
         }
+        ClearAvatar();
         RaiseStateChanged();
 
         var playlistsRemoved = await Task.Run(async () =>
@@ -329,6 +335,9 @@ public sealed partial class NoctisAccountService : INoctisAccountService, ITrack
 
     /// <summary>The server rejected the key: forget the account locally (downloads and the
     /// library stay until the user signs in again or signs out).</summary>
+    private volatile bool _signedOutByComputer;
+    public bool WasSignedOutByComputer => _signedOutByComputer;
+
     private void ForgetAccountLocally()
     {
         lock (_gate)
@@ -338,7 +347,9 @@ public sealed partial class NoctisAccountService : INoctisAccountService, ITrack
             _client?.Dispose();
             _client = null;
             _account = null;
+            _signedOutByComputer = true;
         }
+        ClearAvatar();
         DebugLog.Write("Account", "the desktop no longer accepts this phone's key; signed out locally");
         RaiseStateChanged();
     }
@@ -387,7 +398,9 @@ public sealed partial class NoctisAccountService : INoctisAccountService, ITrack
         }
         catch (Exception ex)
         {
-            RaiseSyncProgress(NoctisSyncStage.Failed, 0, 0);
+            // Sync switched off on the computer still ran to the end (catalog, covers, plays):
+            // it reads as finished, not as "didn't finish, try again".
+            RaiseSyncProgress(ex is NoctisServerException { Kind: NoctisErrorKind.SyncDisabled } ? NoctisSyncStage.Done : NoctisSyncStage.Failed, 0, 0);
             if (ex is NoctisServerException { Kind: NoctisErrorKind.SignedOut }) ForgetAccountLocally();
             DebugLog.Write("Account", $"sync failed: {(ex is NoctisServerException n ? n.Kind.ToString() : ex.GetType().Name)}");
             throw;
@@ -443,10 +456,22 @@ public sealed partial class NoctisAccountService : INoctisAccountService, ITrack
         // 5. Plays.
         var plays = await SendPlaysAsync(client, ct).ConfigureAwait(false);
 
+        // 6. The desktop's profile picture and name (best effort: never fail the sync).
+        await RefreshAvatarAsync(ct).ConfigureAwait(false);
+        var (nameKnown, displayName, serverName) = await FetchDisplayNameAsync(client, ct).ConfigureAwait(false);
+
         NoctisAccount? updated;
         lock (_gate)
         {
-            updated = _account is null ? null : _account with { LastSyncUtc = UtcNow };
+            // An unanswered ask keeps the name shown; an answer without one clears it (the desktop's was removed).
+            // The computer's name follows a rename in its Settings (sign-in only had the old one).
+            updated = _account is null ? null
+                : _account with
+                {
+                    LastSyncUtc = UtcNow,
+                    DisplayName = nameKnown ? displayName : _account.DisplayName,
+                    ServerName = serverName ?? _account.ServerName,
+                };
             if (updated is not null)
             {
                 _store.SaveAccount(updated);
@@ -455,7 +480,7 @@ public sealed partial class NoctisAccountService : INoctisAccountService, ITrack
         }
         RaiseStateChanged();
 
-        // 6. Lyrics for downloaded songs that have none saved (after LastSyncUtc, so they count as current).
+        // 7. Lyrics for downloaded songs that have none saved (after LastSyncUtc, so they count as current).
         await PrefetchDownloadedLyricsAsync(ct).ConfigureAwait(false);
         if (syncOff is not null) throw syncOff;
         return new NoctisSyncResult(tracks.Count, playlistCount, pulled, pushed, plays);
@@ -645,6 +670,10 @@ public sealed partial class NoctisAccountService : INoctisAccountService, ITrack
         var done = 0;
         var written = 0;
         var failed = 0;
+        var full = false;
+        // The catalog decides how many covers are written (one per album, each capped on its
+        // own), so they keep the downloads' reserve too, or a desktop could fill the phone with them.
+        var coverDir = Path.GetDirectoryName(_persistence.GetArtworkPath(due[0])) ?? _offlineDir;
         // Covers are not worth a sync: a cover that fails (a timeout, a dropped connection) is
         // skipped and asked again next sync, and the favourites, playlists and plays still go.
         // Many failures mean the desktop is gone; stop asking and let the next stage say so.
@@ -654,6 +683,12 @@ public sealed partial class NoctisAccountService : INoctisAccountService, ITrack
             await Parallel.ForEachAsync(due, new ParallelOptions { MaxDegreeOfParallelism = CoverConcurrency, CancellationToken = stage.Token },
                 async (albumId, token) =>
                 {
+                    if (FreeSpace(coverDir) < StorageReserveBytes)
+                    {
+                        full = true;
+                        stage.Cancel();
+                        return;
+                    }
                     try
                     {
                         if (await client.DownloadCoverAsync(albumId, _persistence.GetArtworkPath(albumId), token).ConfigureAwait(false))
@@ -672,12 +707,29 @@ public sealed partial class NoctisAccountService : INoctisAccountService, ITrack
                     RaiseSyncProgress(NoctisSyncStage.Covers, Interlocked.Increment(ref done), due.Count);
                 }).ConfigureAwait(false);
         }
-        catch (OperationCanceledException) when (!ct.IsCancellationRequested) { /* gave up after CoverFailureLimit */ }
+        catch (OperationCanceledException) when (!ct.IsCancellationRequested) { /* gave up after CoverFailureLimit, or the phone is full */ }
         finally
         {
-            if (failed > 0) DebugLog.Write("Account", $"covers: {written} saved, {failed} failed{(stage.IsCancellationRequested && !ct.IsCancellationRequested ? ", stopped asking" : "")}");
+            if (full) DebugLog.Write("Account", $"covers: {written} saved, then stopped: the phone is too full (the reserve stays free)");
+            else if (failed > 0) DebugLog.Write("Account", $"covers: {written} saved, {failed} failed{(stage.IsCancellationRequested && !ct.IsCancellationRequested ? ", stopped asking" : "")}");
             // Rebuild so albums pick the new files up.
             if (written > 0) _library.NotifyMetadataChanged();
+        }
+    }
+
+    /// <summary>The desktop's profile name for the header and the computer's name (getNoctisSyncStatus).
+    /// Known = false when the ask failed (unreachable, a desktop without it): the names shown stay.</summary>
+    private static async Task<(bool Known, string? Name, string? ServerName)> FetchDisplayNameAsync(NoctisServerClient client, CancellationToken ct)
+    {
+        try
+        {
+            var (name, server) = await client.GetDisplayNameAsync(ct).ConfigureAwait(false);
+            return (true, name, server);
+        }
+        catch (NoctisServerException ex)
+        {
+            DebugLog.Write("Account", $"profile name not fetched: {ex.Kind}");
+            return (false, null, null);
         }
     }
 
@@ -1171,10 +1223,11 @@ public sealed partial class NoctisAccountService : INoctisAccountService, ITrack
         {
             Interlocked.Exchange(ref _dlCompleted, 0);
             Interlocked.Exchange(ref _dlFailed, 0);
+            Interlocked.Exchange(ref _dlMissing, 0);
         }
         RaiseDownloadProgress();
         NoctisServerException? fatal = null;
-        int done = 0, failed = 0;
+        int done = 0, failed = 0, missing = 0;
 
         async Task Worker()
         {
@@ -1203,6 +1256,15 @@ public sealed partial class NoctisAccountService : INoctisAccountService, ITrack
                         Interlocked.Increment(ref failed);
                         try { linked.Cancel(); } catch (ObjectDisposedException) { }
                     }
+                    catch (NoctisServerException ex) when (ex.Kind == NoctisErrorKind.FileMissing)
+                    {
+                        // The desktop lists the song but its file is gone: nothing to retry here,
+                        // and the page says so apart from failures that a retry may fix.
+                        Interlocked.Increment(ref _dlMissing);
+                        Interlocked.Increment(ref _dlFailed);
+                        Interlocked.Increment(ref missing);
+                        Interlocked.Increment(ref failed);
+                    }
                     catch (Exception ex)
                     {
                         Interlocked.Increment(ref _dlFailed);
@@ -1220,9 +1282,14 @@ public sealed partial class NoctisAccountService : INoctisAccountService, ITrack
         }
 
         await Task.WhenAll(Enumerable.Range(0, DownloadConcurrency).Select(_ => Worker())).ConfigureAwait(false);
+        // Once more with every worker done: two workers' last reports can arrive out of order, the
+        // later one read before the other finished (a test saw Pending = 1 as the last report of a
+        // finished batch), and the page takes Pending > 0 as "still downloading".
+        RaiseDownloadProgress();
         // One line per batch, so a download that silently did nothing is visible in the log.
+        var missingNote = Volatile.Read(ref missing) is > 0 and var m ? $" ({m} missing on the computer)" : "";
         DebugLog.Write("Account", $"downloads: {ids.Count} asked, {Volatile.Read(ref done)} done, " +
-            $"{Volatile.Read(ref failed)} failed{(token.IsCancellationRequested ? ", cancelled" : "")}");
+            $"{Volatile.Read(ref failed)} failed{missingNote}{(token.IsCancellationRequested ? ", cancelled" : "")}");
         RaiseStateChanged();
         if (fatal is not null)
         {
@@ -1329,6 +1396,7 @@ public sealed partial class NoctisAccountService : INoctisAccountService, ITrack
         try { await Task.WhenAll(runs).ConfigureAwait(false); } catch { /* cancelled */ }
         Interlocked.Exchange(ref _dlCompleted, 0);
         Interlocked.Exchange(ref _dlFailed, 0);
+        Interlocked.Exchange(ref _dlMissing, 0);
     }
 
     private void DeleteAllDownloadFiles()
@@ -1423,7 +1491,7 @@ public sealed partial class NoctisAccountService : INoctisAccountService, ITrack
 
     private void RaiseDownloadProgress() =>
         DownloadProgress?.Invoke(this, new NoctisDownloadProgress(Math.Max(0, Volatile.Read(ref _dlPending)),
-            Volatile.Read(ref _dlCompleted), Volatile.Read(ref _dlFailed), DownloadedBytes));
+            Volatile.Read(ref _dlCompleted), Volatile.Read(ref _dlFailed), DownloadedBytes, Volatile.Read(ref _dlMissing)));
 
     private sealed class InlineProgress(Action<int> report) : IProgress<int>
     {

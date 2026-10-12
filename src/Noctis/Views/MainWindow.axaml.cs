@@ -297,14 +297,6 @@ public partial class MainWindow : Window, IPageKeyOverlayHost
         Win10DarkTitleBar.Apply(this);
         ActualThemeVariantChanged += (_, _) => Win10DarkTitleBar.Apply(this);
 
-        // GitHub #124: the queue's played list keeps its newest song (the one just before
-        // Now Playing) in view as songs are added and when the panel first lays it out.
-        QueuePlayedScroll.PropertyChanged += (_, e) =>
-        {
-            if (e.Property == ScrollViewer.ExtentProperty)
-                QueuePlayedScroll.ScrollToEnd();
-        };
-
         // Initialize the application once the window is fully loaded.
         //
         // The whole body is guarded. This is an async void handler running *inside*
@@ -627,22 +619,22 @@ public partial class MainWindow : Window, IPageKeyOverlayHost
                 // nothing to toggle by name any more.
 
                 // Queue row position numbers: rows are virtualized and recycled, so
-                // there is no per-item index to bind — stamp the 1-based position when
-                // a container is prepared and re-stamp the visible rows whenever the
-                // queue mutates (reorder / remove / insert).
+                // there is no per-item index to bind — stamp the 1-based position (and,
+                // GitHub #134, the played / playing state) when a container is prepared
+                // and re-stamp the visible rows whenever the rows change.
                 var queueList = this.FindControl<ListBox>("QueuePopupListBox");
                 if (queueList != null)
                 {
                     // GitHub #85: the row selection is keyed by index, so it is re-mapped on
                     // every queue change and re-applied to recycled containers as they prepare.
-                    var queueSelection = _queueSelection = new QueueRowSelection<Track>(vm.Player.UpNext);
+                    var queueSelection = _queueSelection = new QueueRowSelection<Track>(vm.Player.QueueRows);
                     queueList.ContainerPrepared += (_, e) =>
                     {
-                        SetQueueRowNumber(e.Container, e.Index);
+                        QueuePanelRows.Stamp(queueList, e.Container, e.Index, vm.Player);
                         e.Container.Classes.Set(QueueSelectedClass, queueSelection.Contains(e.Index));
                     };
                     var queueRowsSyncPending = false;
-                    vm.Player.UpNext.CollectionChanged += (_, e) =>
+                    vm.Player.QueueRows.CollectionChanged += (_, e) =>
                     {
                         queueSelection.Apply(e);
                         // One re-stamp per burst: a block remove / move raises an event per row (audit U03).
@@ -651,7 +643,7 @@ public partial class MainWindow : Window, IPageKeyOverlayHost
                         Dispatcher.UIThread.Post(() =>
                         {
                             queueRowsSyncPending = false;
-                            RenumberQueueRows(queueList);
+                            QueuePanelRows.StampRealized(queueList, vm.Player);
                             SyncQueueSelectionVisuals(queueList);
                         }, DispatcherPriority.Loaded);
                     };
@@ -1045,18 +1037,20 @@ public partial class MainWindow : Window, IPageKeyOverlayHost
 
         try
         {
+            // Gestures mirror Music.app (⌘, settings, ⌘→ next, ⌘← previous) by default, and
+            // follow whatever the user rebinds in Settings › Shortcuts (GitHub #131: the
+            // Settings item used a fixed ⌘, that a rebind left behind, still opening Settings).
+            var shortcuts = vm.Settings.ShortcutService;
+
             var appMenu = new NativeMenu();
             var settings = new NativeMenuItem("Settings…")
             {
-                Gesture = new KeyGesture(Key.OemComma, KeyModifiers.Meta),
+                Gesture = shortcuts.Get(ShortcutAction.OpenSettings),
             };
             settings.Click += (_, _) => vm.OpenSettingsCommand.Execute(null);
             appMenu.Items.Add(settings);
             NativeMenu.SetMenu(Application.Current!, appMenu);
 
-            // Gestures mirror Music.app (⌘→ next, ⌘← previous) by default, and follow
-            // whatever the user rebinds in Settings › Shortcuts.
-            var shortcuts = vm.Settings.ShortcutService;
             var playback = new NativeMenu();
 
             var playPause = new NativeMenuItem("Play / Pause");
@@ -1079,6 +1073,7 @@ public partial class MainWindow : Window, IPageKeyOverlayHost
 
             shortcuts.Changed += (_, _) =>
             {
+                settings.Gesture = shortcuts.Get(ShortcutAction.OpenSettings);
                 next.Gesture = shortcuts.Get(ShortcutAction.NextTrack);
                 previous.Gesture = shortcuts.Get(ShortcutAction.PreviousTrack);
             };
@@ -1403,7 +1398,15 @@ public partial class MainWindow : Window, IPageKeyOverlayHost
     {
         _queuePopupStateHandler = (_, e) =>
         {
+            // GitHub #134: with Keep Played Songs on the playing song is a row of the list;
+            // keep it in sight as songs change and when the panel opens.
+            if (e.PropertyName is nameof(PlayerViewModel.CurrentTrack) or nameof(PlayerViewModel.KeepPlayedInQueue))
+            {
+                ScheduleQueueScrollToCurrent();
+                return;
+            }
             if (e.PropertyName != nameof(PlayerViewModel.IsQueuePopupOpen)) return;
+            if (vm.Player.IsQueuePopupOpen) ScheduleQueueScrollToCurrent();
 
             // Queue popup and lyrics panel share the right edge — mutual exclusion.
             if (vm.Player.IsQueuePopupOpen)
@@ -1418,6 +1421,26 @@ public partial class MainWindow : Window, IPageKeyOverlayHost
                 () => DataContext is MainWindowViewModel m && !m.Player.IsQueuePopupOpen);
         };
         vm.Player.PropertyChanged += _queuePopupStateHandler;
+    }
+
+    private bool _queueScrollToCurrentPending;
+
+    /// <summary>GitHub #134: once the rows settle, scroll the open queue list so the playing
+    /// row is second from the top. Not while a row is dragged or a band is drawn.</summary>
+    private void ScheduleQueueScrollToCurrent()
+    {
+        if (_queueScrollToCurrentPending) return;
+        _queueScrollToCurrentPending = true;
+        Dispatcher.UIThread.Post(() =>
+        {
+            _queueScrollToCurrentPending = false;
+            if (DataContext is not MainWindowViewModel { Player: { IsQueuePopupOpen: true } player }
+                || player.QueueCurrentRow < 0
+                || _queueDragActive || _queueBandActive || QueueLiquid is { IsSettling: true }
+                || this.FindControl<ListBox>("QueuePopupListBox") is not { } listBox)
+                return;
+            QueuePanelRows.ScrollRowNearTop(listBox, player.QueueCurrentRow);
+        }, DispatcherPriority.Background);
     }
 
     private void InitializeTaskbarButtons(MainWindowViewModel vm)
@@ -1839,31 +1862,11 @@ public partial class MainWindow : Window, IPageKeyOverlayHost
     /// does not handle, so the key falls through untouched.</summary>
     private bool ExecuteShortcut(MainWindowViewModel vm, ShortcutAction action)
     {
+        // Transport, volume, shuffle/repeat/mute, seek, favorite, queue.
+        if (PlayerShortcuts.Run(vm.Player, action) is { } ran) return ran;
+
         switch (action)
         {
-            case ShortcutAction.PlayPause:
-                vm.Player.PlayPauseCommand.Execute(null);
-                return true;
-            case ShortcutAction.NextTrack:
-                vm.Player.NextCommand.Execute(null);
-                return true;
-            case ShortcutAction.PreviousTrack:
-                vm.Player.PreviousCommand.Execute(null);
-                return true;
-            // Adjusting while muted means "let me hear it", as the bar's wheel/drag do: a
-            // shortcut step used to change the level silently under the mute (10-08).
-            case ShortcutAction.VolumeUp:
-                vm.Player.UnmuteForAdjust();
-                vm.Player.Volume = Math.Min(100, vm.Player.Volume + 5);
-                return true;
-            case ShortcutAction.VolumeDown:
-                vm.Player.UnmuteForAdjust();
-                vm.Player.Volume = Math.Max(0, vm.Player.Volume - 5);
-                return true;
-            case ShortcutAction.ToggleFavorite:
-                if (vm.Player.CurrentTrack == null) return false;
-                vm.Player.ToggleCurrentTrackFavoriteCommand.Execute(null);
-                return true;
             case ShortcutAction.ToggleFullscreen:
                 ToggleFullScreen();
                 return true;
@@ -1883,18 +1886,74 @@ public partial class MainWindow : Window, IPageKeyOverlayHost
             case ShortcutAction.NewPlaylist:
                 vm.Sidebar.CreatePlaylistCommand.Execute(null);
                 return true;
-            case ShortcutAction.ToggleQueue:
-                // GitHub #86: the island's Queue button is gone while nothing is loaded
-                // (the bar unmounts), so this is the way in to an empty queue.
-                vm.Player.ShowQueueCommand.Execute(null);
-                return true;
             case ShortcutAction.ToggleLyrics:
                 // Same toggle as the island's Lyrics button (GitHub #103).
                 vm.ToggleLyricsCommand.Execute(null);
                 return true;
+            // ── GitHub #131 ──
+            case ShortcutAction.OpenSettings:
+                vm.OpenSettingsCommand.Execute(null);
+                return true;
+            case ShortcutAction.ScanReplayGain:
+            {
+                var tracks = TrackSelection.ForReplayGain(QueueSelectedTracks(vm), PageSelectedTracks(vm), vm.Player.CurrentTrack);
+                if (tracks.Count == 0) return false;
+                _ = MetadataHelper.OpenReplayGainScannerDialog(tracks);
+                return true;
+            }
+            case ShortcutAction.ToggleMiniPlayer:
+                ToggleMiniPlayer();
+                return true;
+            // With the Settings sheet up, Back / Forward close it (it is the page on top);
+            // the Go-to keys close it and land on the page.
+            case ShortcutAction.GoBack:
+                if (vm.IsSettingsModalOpen) vm.CloseSettingsCommand.Execute(null);
+                else vm.GoBackInHistoryCommand.Execute(null);
+                return true;
+            case ShortcutAction.GoForward:
+                if (vm.IsSettingsModalOpen) vm.CloseSettingsCommand.Execute(null);
+                else vm.GoForwardInHistoryCommand.Execute(null);
+                return true;
+            case ShortcutAction.GoHome:
+                return GoToSection(vm, "home");
+            case ShortcutAction.GoSongs:
+                return GoToSection(vm, "songs");
+            case ShortcutAction.GoAlbums:
+                return GoToSection(vm, "albums");
+            case ShortcutAction.GoArtists:
+                return GoToSection(vm, "artists");
             default:
                 return false;
         }
+    }
+
+    private static bool GoToSection(MainWindowViewModel vm, string key)
+    {
+        if (vm.IsSettingsModalOpen) vm.CloseSettingsCommand.Execute(null);
+        vm.NavigateCommand.Execute(key);
+        return true;
+    }
+
+    /// <summary>The queue panel's row selection, only while focus is in the panel.</summary>
+    private IReadOnlyList<Track>? QueueSelectedTracks(MainWindowViewModel vm) =>
+        _queueSelection is { Count: > 0 } selection && IsFocusInQueuePanel()
+            ? TrackSelection.FromIndices(vm.Player.UpNext, selection.Snapshot())
+            : null;
+
+    /// <summary>The Ctrl-selection on the page currently shown, unless the Settings sheet
+    /// covers it.</summary>
+    private IReadOnlyList<Track>? PageSelectedTracks(MainWindowViewModel vm)
+    {
+        if (vm.IsSettingsModalOpen) return null;
+        var host = this.GetVisualDescendants().OfType<ContentControl>().FirstOrDefault(c => c.Classes.Contains("page-host"));
+        if (host == null) return null;
+        foreach (var source in host.GetVisualDescendants().OfType<ITrackSelectionSource>())
+        {
+            if (source is Visual { IsEffectivelyVisible: false }) continue;
+            var tracks = source.GetSelectedTracks();
+            if (tracks.Count > 0) return tracks;
+        }
+        return null;
     }
 
     private void OnWindowKeyDown(object? sender, KeyEventArgs e)
@@ -2001,6 +2060,13 @@ public partial class MainWindow : Window, IPageKeyOverlayHost
         vm.Player.ClearQueue();
     }
 
+    /// <summary>GitHub #134: Clear Played (the header chip and the played rows' menu).</summary>
+    private void OnQueueClearPlayedClick(object? sender, RoutedEventArgs e)
+    {
+        if (DataContext is not MainWindowViewModel vm) return;
+        vm.Player.ClearPlayed();
+    }
+
     private void OnQueueItemDoubleTapped(object? sender, Avalonia.Input.TappedEventArgs e)
     {
         if (DataContext is not MainWindowViewModel vm) return;
@@ -2010,20 +2076,9 @@ public partial class MainWindow : Window, IPageKeyOverlayHost
         if (index < 0) return;
 
         // Play the tapped track but keep the popup open, so the user can keep
-        // browsing/queuing without it dismissing out from under them.
-        vm.Player.PlayFromUpNextAt(index);
-    }
-
-    /// <summary>GitHub #124: double-click a played row to play it again. The row's container
-    /// index, not IndexOf, so a song that played twice plays the copy that was clicked.</summary>
-    private void OnQueuePlayedDoubleTapped(object? sender, Avalonia.Input.TappedEventArgs e)
-    {
-        if (DataContext is not MainWindowViewModel vm) return;
-        if (sender is not Control row || row.Parent is not Control container) return;
-        var index = QueuePlayedList.IndexFromContainer(container);
-        if (index < 0) return;
-        e.Handled = true;
-        vm.Player.PlayPlayedAt(index);
+        // browsing/queuing without it dismissing out from under them. By row (GitHub
+        // #134): a played row plays again, an Up Next row plays from there.
+        vm.Player.PlayQueueRow(index);
     }
 
     private void OnQueueRemoveClick(object? sender, RoutedEventArgs e)
@@ -2032,37 +2087,41 @@ public partial class MainWindow : Window, IPageKeyOverlayHost
         if (sender is not MenuItem menuItem) return;
 
         // The MenuItem's DataContext is the Track from the DataTemplate. The row it was
-        // opened on was recorded by index (UpNext.IndexOf resolves a track queued twice to
-        // its first copy); the IndexOf fallback covers a queue that shifted meanwhile.
+        // opened on was recorded by index (IndexOf resolves a track queued twice to its
+        // first copy); the IndexOf fallback covers a queue that shifted meanwhile.
         if (menuItem.DataContext is not Track track) return;
-        var upNext = vm.Player.UpNext;
-        var index = _queueContextRow >= 0 && _queueContextRow < upNext.Count
-                    && ReferenceEquals(upNext[_queueContextRow], track)
-            ? _queueContextRow
-            : upNext.IndexOf(track);
+        var index = QueueContextRowFor(vm.Player, track);
         if (index < 0) return;
 
-        // GitHub #85: on a selected row, the menu removes the whole selection.
+        // GitHub #85: on a selected row, the menu removes the whole selection. By row
+        // (GitHub #134): played rows can be removed too; the playing one never is.
         if (_queueSelection is { } selection && selection.Contains(index))
-            vm.Player.RemoveManyFromQueue(selection.Snapshot());
+            vm.Player.RemoveQueueRows(selection.Snapshot());
         else
-            vm.Player.RemoveFromQueue(index);
+            vm.Player.RemoveQueueRows(new[] { index });
+    }
+
+    /// <summary>The row the open context menu belongs to, or -1.</summary>
+    private int QueueContextRowFor(PlayerViewModel player, Track track)
+    {
+        var rows = player.QueueRows;
+        return _queueContextRow >= 0 && _queueContextRow < rows.Count
+               && ReferenceEquals(rows[_queueContextRow], track)
+            ? _queueContextRow
+            : rows.IndexOf(track);
     }
 
     private async void OnQueueScanReplayGainClick(object? sender, RoutedEventArgs e)
     {
         if (DataContext is not MainWindowViewModel vm) return;
         if (sender is not MenuItem { DataContext: Track track }) return;
-        var upNext = vm.Player.UpNext;
-        var index = _queueContextRow >= 0 && _queueContextRow < upNext.Count
-                    && ReferenceEquals(upNext[_queueContextRow], track)
-            ? _queueContextRow
-            : upNext.IndexOf(track);
+        var rows = vm.Player.QueueRows;
+        var index = QueueContextRowFor(vm.Player, track);
 
         // GitHub #105: on a selected row the scan covers the whole selection (Ctrl+A in
         // the panel = the whole queue). The dialog drops repeats of a track queued twice.
         var tracks = index >= 0 && _queueSelection is { } selection && selection.Contains(index)
-            ? selection.Snapshot().Where(i => i < upNext.Count).Select(i => upNext[i]).ToList()
+            ? selection.Snapshot().Where(i => i < rows.Count).Select(i => rows[i]).ToList()
             : new List<Track> { track };
         try { await MetadataHelper.OpenReplayGainScannerDialog(tracks); }
         catch (Exception ex) { DebugLog.Write("ReplayGain", $"Queue scan failed to open: {ex.Message}"); }
@@ -2105,6 +2164,17 @@ public partial class MainWindow : Window, IPageKeyOverlayHost
         _queueContextRow = sender is Control row && this.FindControl<ListBox>("QueuePopupListBox") is { } listBox
             ? QueueRowIndex(listBox, row)
             : -1;
+
+        // GitHub #134: the playing row can't be removed; played rows offer Clear Played.
+        if (sender is Control { ContextMenu: { } menu } && DataContext is MainWindowViewModel vm)
+        {
+            var kind = _queueContextRow >= 0 ? vm.Player.GetQueueRowKind(_queueContextRow) : QueueRowKind.Upcoming;
+            foreach (var item in menu.Items.OfType<MenuItem>())
+            {
+                if (item.Classes.Contains("queue-menu-remove")) item.IsVisible = kind != QueueRowKind.Current;
+                else if (item.Classes.Contains("queue-menu-clear-played")) item.IsVisible = kind == QueueRowKind.Played;
+            }
+        }
     }
 
     private bool IsFocusInQueuePanel() =>
@@ -2135,7 +2205,7 @@ public partial class MainWindow : Window, IPageKeyOverlayHost
         else if (e.Key == Key.Delete && e.KeyModifiers == KeyModifiers.None)
         {
             if (selection.Count == 0) return;
-            vm.Player.RemoveManyFromQueue(selection.Snapshot());
+            vm.Player.RemoveQueueRows(selection.Snapshot());
             selection.Clear();
         }
         else
@@ -2160,31 +2230,6 @@ public partial class MainWindow : Window, IPageKeyOverlayHost
 
     private const double QueueDragThreshold = 6.0;
 
-    /// <summary>Stamps the 1-based queue position into a (possibly recycled) row container.</summary>
-    private static void SetQueueRowNumber(Control container, int index)
-    {
-        // Deferred: the row's template may not be applied yet when the container is prepared.
-        Dispatcher.UIThread.Post(() =>
-        {
-            var tb = container.GetVisualDescendants().OfType<TextBlock>()
-                              .FirstOrDefault(t => t.Name == "QueueRowNumber");
-            if (tb != null) tb.Text = (index + 1).ToString();
-        }, DispatcherPriority.Loaded);
-    }
-
-    /// <summary>Re-stamps positions on the realized rows after the queue mutates.</summary>
-    private static void RenumberQueueRows(ListBox listBox)
-    {
-        foreach (var container in listBox.GetRealizedContainers())
-        {
-            var i = listBox.IndexFromContainer(container);
-            if (i < 0) continue;
-            var tb = container.GetVisualDescendants().OfType<TextBlock>()
-                              .FirstOrDefault(t => t.Name == "QueueRowNumber");
-            if (tb != null) tb.Text = (i + 1).ToString();
-        }
-    }
-
     private Point _queueDragStartPos;
     private bool _queueDragActive;
     private Track? _queueDragTrack;
@@ -2199,11 +2244,11 @@ public partial class MainWindow : Window, IPageKeyOverlayHost
     private int QueueDragSourceIndex(PlayerViewModel player, ListBox listBox)
     {
         if (_queueDragTrack is not { } track) return -1;
-        var upNext = player.UpNext;
+        var rows = player.QueueRows;
         if (_queueDragRow is { } row && QueueRowIndex(listBox, row) is var i and >= 0
-            && i < upNext.Count && ReferenceEquals(upNext[i], track))
+            && i < rows.Count && ReferenceEquals(rows[i], track))
             return i;
-        return upNext.IndexOf(track);
+        return rows.IndexOf(track);
     }
 
     private LiquidReorder? QueueLiquid
@@ -2249,6 +2294,13 @@ public partial class MainWindow : Window, IPageKeyOverlayHost
                 return;
             }
         }
+
+        // GitHub #134: the playing row (Keep Played Songs) stays put; the rest move around it.
+        if (DataContext is MainWindowViewModel { Player: var player }
+            && this.FindControl<ListBox>("QueuePopupListBox") is { } list
+            && QueueRowIndex(list, rowControl) is var pressed and >= 0
+            && player.GetQueueRowKind(pressed) == QueueRowKind.Current)
+            return;
 
         _queueDragTrack = track;
         _queueDragRow = rowControl;
@@ -2366,7 +2418,7 @@ public partial class MainWindow : Window, IPageKeyOverlayHost
             ResetQueueDragState();
             return;
         }
-        var to = Math.Clamp(liquid.TargetIndex, 0, Math.Max(0, vm.Player.UpNext.Count - 1));
+        var to = Math.Clamp(liquid.TargetIndex, 0, Math.Max(0, vm.Player.QueueRows.Count - 1));
         liquid.SourceIndex = from;
         liquid.TargetIndex = to;
 
@@ -2378,7 +2430,7 @@ public partial class MainWindow : Window, IPageKeyOverlayHost
         var selection = _queueSelection;
         var wasSelected = selection?.Contains(from) == true;
         var block = wasSelected && selection!.Count > 1 ? selection.Snapshot() : null;
-        var blockTracks = block?.Select(i => vm.Player.UpNext[i]).ToList();
+        var blockTracks = block?.Select(i => vm.Player.QueueRows[i]).ToList();
         var insertIndex = to > from ? to + 1 : to;
 
         // The landing spot is the target slot's layout position (its row is sliding away
@@ -2389,19 +2441,22 @@ public partial class MainWindow : Window, IPageKeyOverlayHost
         _queueDragRow = null;
         liquid.Settle(landing, () =>
         {
-            var upNext = vm.Player.UpNext;
+            // By row (GitHub #134): with Keep Played Songs on, played rows and Up Next rows
+            // move around the playing one, which stays put (MoveQueueRows skips it).
+            var rows = vm.Player.QueueRows;
             if (block != null && blockTracks != null)
             {
                 var unchanged = Enumerable.Range(0, block.Length)
-                    .All(k => block[k] < upNext.Count && ReferenceEquals(upNext[block[k]], blockTracks[k]));
+                    .All(k => block[k] < rows.Count && ReferenceEquals(rows[block[k]], blockTracks[k]));
                 if (!unchanged) return;
-                var landAt = vm.Player.MoveBlockInQueue(block, insertIndex);
-                if (landAt >= 0) selection?.Select(Enumerable.Range(landAt, block.Length));
+                var moving = block.Where(r => vm.Player.GetQueueRowKind(r) != QueueRowKind.Current).ToArray();
+                var landAt = vm.Player.MoveQueueRows(moving, insertIndex);
+                if (landAt >= 0) selection?.Select(Enumerable.Range(landAt, moving.Length));
             }
             // By reference at the row, not IndexOf: a track queued twice is two rows.
-            else if (from != to && from < upNext.Count && ReferenceEquals(upNext[from], track))
+            else if (from != to && from < rows.Count && ReferenceEquals(rows[from], track))
             {
-                vm.Player.MoveInQueue(from, to);
+                vm.Player.MoveQueueRow(from, to);
                 // The move is a remove + insert, which drops the row from the selection.
                 if (wasSelected) selection?.SelectOnly(to);
             }

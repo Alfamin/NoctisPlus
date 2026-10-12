@@ -15,7 +15,7 @@ using Noctis.ViewModels;
 
 namespace Noctis.Views;
 
-public partial class LibraryAlbumsView : UserControl
+public partial class LibraryAlbumsView : UserControl, ITrackSelectionSource
 {
     private LibraryAlbumsViewModel? _vm;
     private EventHandler? _pendingScrollRestore;
@@ -25,6 +25,9 @@ public partial class LibraryAlbumsView : UserControl
     // virtualization recycling the tile Buttons on scroll doesn't drop the
     // ctrl-selected highlight. See MultiSelectHelper's "Data-tracked album-tile variants".
     private readonly HashSet<Album> _selectedAlbums = new();
+
+    /// <summary>The Ctrl-selection, for window shortcuts (GitHub #131 ReplayGain).</summary>
+    public IReadOnlyList<Track> GetSelectedTracks() => TrackSelection.FromAlbums(_selectedAlbums);
 
     public LibraryAlbumsView()
     {

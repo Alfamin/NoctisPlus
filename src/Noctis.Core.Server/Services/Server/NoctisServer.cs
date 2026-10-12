@@ -32,6 +32,23 @@ public sealed partial class NoctisServer : IAsyncDisposable
     private readonly LoginThrottle _throttle = new();
     private WebApplication? _app;
 
+    /// <summary>
+    /// Most password checks (PBKDF2, 100k rounds: tens of ms of CPU each, for unknown names too)
+    /// in flight at once. The login brake is per address and name, so a flood of made-up names
+    /// is never throttled; without this cap it ran one PBKDF2 per thread and pegged the CPU.
+    /// Keys (device, account) are looked up by hash and never wait here.
+    /// </summary>
+    public const int MaxConcurrentPasswordChecks = 2;
+
+    /// <summary>How long a password check waits for a slot before the request is turned away (503).</summary>
+    private static readonly TimeSpan PasswordQueueTimeout = TimeSpan.FromSeconds(10);
+
+    private readonly SemaphoreSlim _passwordGate = new(MaxConcurrentPasswordChecks, MaxConcurrentPasswordChecks);
+
+    /// <summary>Most password checks seen in flight at once (test seam for the cap).</summary>
+    internal int PeakPasswordChecks => _peakPasswordChecks;
+    private int _passwordChecks, _peakPasswordChecks;
+
     /// <param name="coverResizer">
     /// Makes a <c>getCoverArt&amp;size=N</c> copy: (album id, source path, longest side, ct) → path
     /// of a cached JPEG, or null when the cover cannot be shrunk safely. Null (the headless host)
@@ -110,12 +127,19 @@ public sealed partial class NoctisServer : IAsyncDisposable
     {
         if (_app is not null) return;
 
-        var builder = WebApplication.CreateSlimBuilder(new WebApplicationOptions { ApplicationName = "Noctis" });
+        // Production whatever the process environment says: in "Development" (a dev box's
+        // ASPNETCORE_ENVIRONMENT) the host adds its developer exception page, which would hand
+        // stack traces and source paths to whoever sends a request the pipeline chokes on.
+        var builder = WebApplication.CreateSlimBuilder(new WebApplicationOptions
+        {
+            ApplicationName = "Noctis",
+            EnvironmentName = Microsoft.Extensions.Hosting.Environments.Production,
+        });
         builder.Logging.ClearProviders();
         builder.WebHost.ConfigureKestrel(k =>
         {
             k.AddServerHeader = false;
-            k.Limits.MaxRequestBodySize = 1024 * 1024; // form posts only; audio flows the other way
+            k.Limits.MaxRequestBodySize = 1024 * 1024; // form posts; noctisUploadTrack raises it for its own body
             k.Listen(bindAddress ?? IPAddress.Any, port, listen =>
             {
                 if (certificate is not null) listen.UseHttps(certificate);
@@ -196,17 +220,20 @@ public sealed partial class NoctisServer : IAsyncDisposable
         if (method.EndsWith(".view", StringComparison.OrdinalIgnoreCase)) method = method[..^5];
         // The sign-in reply carries a new key: no cache (or proxy) may keep it.
         if (method.Equals("noctisSignIn", StringComparison.OrdinalIgnoreCase)) ctx.Response.Headers.CacheControl = "no-store";
-        var p = await ReadParamsAsync(ctx).ConfigureAwait(false);
-        var format = p.Get("f");
-        // Parked sign-in: refused before auth, so no password is checked for it.
-        if (!DeviceSignInEnabled && IsDeviceSignInMethod(method))
-        {
-            await WriteAsync(ctx, SubsonicResponse.Error(SubsonicResponse.ErrGeneric, $"Unknown method '{method}'", format, _serverVersion), 200).ConfigureAwait(false);
-            return;
-        }
-
+        string? format = null;
         try
         {
+            // Inside the try: a form the reader refuses (too many values) is an error reply
+            // like any other, never an unhandled exception for the host to render.
+            var p = await ReadParamsAsync(ctx).ConfigureAwait(false);
+            format = p.Get("f");
+            // Parked sign-in: refused before auth, so no password is checked for it.
+            if (!DeviceSignInEnabled && IsDeviceSignInMethod(method))
+            {
+                await WriteAsync(ctx, SubsonicResponse.Error(SubsonicResponse.ErrGeneric, $"Unknown method '{method}'", format, _serverVersion), 200).ConfigureAwait(false);
+                return;
+            }
+
             if (!NoAuthMethods.Contains(method))
             {
                 var apiKey = ApiKeyOf(ctx, p);
@@ -218,36 +245,68 @@ public sealed partial class NoctisServer : IAsyncDisposable
                     return;
                 }
 
-                // Brute-force brake per remote address + account name: after repeated bad
-                // logins for a name, that name is refused for a while, before its password is
-                // even checked. Keyed by name too because behind the documented reverse proxy
-                // every client shares the proxy's address, and one bad client must not lock out
-                // every account. API keys are 256-bit random (not guessable), so a request that
-                // carries one is never throttled. The attempt is reserved (counted) BEFORE the
-                // password is verified, so parallel requests cannot each get a free guess.
-                var client = ctx.Connection.RemoteIpAddress?.ToString() ?? "unknown";
-                var name = apiKey is null ? p.Get("u") : null;
-                var throttleKey = name is null ? null : LoginThrottle.Key(client, name);
-                var lockedNow = false;
-                if (throttleKey is not null && !_throttle.TryReserve(throttleKey, out var retryAfter, out lockedNow))
+                // A password check waits for one of the few slots (MaxConcurrentPasswordChecks)
+                // before anything else, so a refusal below holds no brake reservation. A flood
+                // that keeps the slots busy this long is turned away, not queued without end.
+                var checkingPassword = apiKey is null;
+                if (checkingPassword && !await _passwordGate.WaitAsync(PasswordQueueTimeout, ctx.RequestAborted).ConfigureAwait(false))
                 {
-                    ctx.Response.Headers.RetryAfter = ((int)Math.Ceiling(retryAfter.TotalSeconds)).ToString();
-                    await WriteAsync(ctx, SubsonicResponse.Error(SubsonicResponse.ErrWrongCredentials,
-                        "Too many failed login attempts. Try again later.", format, _serverVersion), 429).ConfigureAwait(false);
+                    ctx.Response.Headers.RetryAfter = "5";
+                    await WriteAsync(ctx, SubsonicResponse.Error(SubsonicResponse.ErrGeneric,
+                        "The server is busy checking passwords. Try again in a moment.", format, _serverVersion), 503).ConfigureAwait(false);
                     return;
                 }
+                try
+                {
+                    if (checkingPassword)
+                    {
+                        var inFlight = Interlocked.Increment(ref _passwordChecks);
+                        for (var peak = _peakPasswordChecks; inFlight > peak; peak = _peakPasswordChecks)
+                            if (Interlocked.CompareExchange(ref _peakPasswordChecks, inFlight, peak) == peak) break;
+                    }
 
-                var (user, device, error, errorMessage) = Authenticate(p, apiKey);
-                if (user is null)
-                {
-                    if (lockedNow) DebugLogger.Warn(DebugLogger.Category.State, "Server", $"login lockout for {client}");
-                    await WriteAsync(ctx, SubsonicResponse.Error(error, errorMessage, format, _serverVersion), 200).ConfigureAwait(false);
-                    return;
+                    // Brute-force brake per remote address + account name: after repeated bad
+                    // logins for a name, that name is refused for a while, before its password is
+                    // even checked. Keyed by name too because behind the documented reverse proxy
+                    // every client shares the proxy's address, and one bad client must not lock out
+                    // every account. API keys are 256-bit random (not guessable), so a request that
+                    // carries one is never throttled. The attempt is reserved (counted) BEFORE the
+                    // password is verified, so parallel requests cannot each get a free guess.
+                    // Keyed by the account the name means (ResolveSignInName), so the profile
+                    // name is not a second set of guesses at the main account.
+                    var client = ctx.Connection.RemoteIpAddress?.ToString() ?? "unknown";
+                    var name = checkingPassword ? p.Get("u") : null;
+                    var signInName = name is null ? null : ResolveSignInName(name);
+                    var throttleKey = signInName is null ? null : LoginThrottle.Key(client, signInName);
+                    var lockedNow = false;
+                    if (throttleKey is not null && !_throttle.TryReserve(throttleKey, out var retryAfter, out lockedNow))
+                    {
+                        ctx.Response.Headers.RetryAfter = ((int)Math.Ceiling(retryAfter.TotalSeconds)).ToString();
+                        await WriteAsync(ctx, SubsonicResponse.Error(SubsonicResponse.ErrWrongCredentials,
+                            "Too many failed login attempts. Try again later.", format, _serverVersion), 429).ConfigureAwait(false);
+                        return;
+                    }
+
+                    var (user, device, error, errorMessage) = Authenticate(p, apiKey, signInName);
+                    if (user is null)
+                    {
+                        if (lockedNow) DebugLogger.Warn(DebugLogger.Category.State, "Server", $"login lockout for {client}");
+                        await WriteAsync(ctx, SubsonicResponse.Error(error, errorMessage, format, _serverVersion), 200).ConfigureAwait(false);
+                        return;
+                    }
+                    if (throttleKey is not null) _throttle.RecordSuccess(throttleKey);
+                    ClientAuthenticated?.Invoke(this, user.Name);
+                    ctx.Items["user"] = user;
+                    if (device is not null) ctx.Items["device"] = device;
                 }
-                if (throttleKey is not null) _throttle.RecordSuccess(throttleKey);
-                ClientAuthenticated?.Invoke(this, user.Name);
-                ctx.Items["user"] = user;
-                if (device is not null) ctx.Items["device"] = device;
+                finally
+                {
+                    if (checkingPassword)
+                    {
+                        Interlocked.Decrement(ref _passwordChecks);
+                        _passwordGate.Release();
+                    }
+                }
             }
 
             if (await TryHandleBinaryAsync(ctx, method, p).ConfigureAwait(false)) return;
@@ -263,6 +322,15 @@ public sealed partial class NoctisServer : IAsyncDisposable
         catch (SubsonicException ex)
         {
             await WriteAsync(ctx, SubsonicResponse.Error(ex.Code, ex.Message, format, _serverVersion), 200).ConfigureAwait(false);
+        }
+        catch (OperationCanceledException) when (ctx.RequestAborted.IsCancellationRequested)
+        {
+            // The client hung up (while waiting for a password slot, say): nobody to answer.
+        }
+        catch (BadHttpRequestException ex)
+        {
+            // Kestrel's own verdict (a body over the limit is 413): its status, our envelope.
+            await WriteAsync(ctx, SubsonicResponse.Error(SubsonicResponse.ErrGeneric, "Bad request", format, _serverVersion), ex.StatusCode).ConfigureAwait(false);
         }
         catch (Exception ex)
         {
@@ -282,8 +350,76 @@ public sealed partial class NoctisServer : IAsyncDisposable
 
     // ── Auth ────────────────────────────────────────────────────────────────
 
-    /// <summary>The requesting user; <c>Device</c> is set when the API key is a signed-in device's key.</summary>
-    private (ServerUser? User, ServerDevice? Device, int Error, string Message) Authenticate(Params p, string? apiKey)
+    /// <summary>
+    /// The account a sign-in name means: an account's own name (its email, any case), or the
+    /// desktop's profile name ("Username" in Settings), which stands for the main account (the
+    /// admin, else the first). Anything else is passed on unchanged and fails in Verify, which
+    /// takes the same time either way.
+    /// </summary>
+    internal string ResolveSignInName(string name)
+    {
+        var typed = name.Trim();
+        var users = _users.List();
+        // The stored spelling, so the phone keeps the account's own name whatever case was typed.
+        if (users.FirstOrDefault(x => string.Equals(x.Name, typed, StringComparison.OrdinalIgnoreCase)) is { } match) return match.Name;
+        var profile = _library.ProfileName?.Trim();
+        if (string.IsNullOrEmpty(profile) || !string.Equals(profile, typed, StringComparison.OrdinalIgnoreCase)) return typed;
+        return (users.FirstOrDefault(x => x.IsAdmin) ?? users.FirstOrDefault())?.Name ?? typed;
+    }
+
+    /// <summary>The desktop's profile name for the phone's account header, or null when it has none.
+    /// The desktop keeps one profile, so every account on it shows the owner's name (as the picture).</summary>
+    private string? DisplayName() => _library.ProfileName?.Trim() is { Length: > 0 } name ? name : null;
+
+    /// <summary>
+    /// How long a song file's "is it on disk" answer is reused. The library can list songs whose
+    /// file was deleted or moved outside Noctis; the server leaves those out of what it lists (a
+    /// phone offered them could neither stream nor download them: download answered 70 for each).
+    /// A File.Exists costs ~50–160 µs on a warm Windows disk (measured 10-11: 7000 files in
+    /// 340 ms–1.1 s), and a phone's catalog read is ~16 requests, so the answers are kept for a
+    /// minute instead of re-asked per request: one pass per catalog read.
+    /// </summary>
+    internal TimeSpan FileCheckMaxAge { get; set; } = TimeSpan.FromMinutes(1);
+
+    private readonly object _fileCheckGate = new();
+    private readonly Dictionary<string, bool> _fileExists = new(StringComparer.Ordinal);
+    private DateTime _fileChecksAtUtc;
+
+    /// <summary>
+    /// The snapshot without songs whose file is gone, and without albums left with none. Keyed by
+    /// path, so a new or relinked song is checked when first seen. A whole library missing (an
+    /// unplugged drive) lists nothing; the phone keeps what it has when a catalog comes back empty.
+    /// </summary>
+    internal LibrarySnapshot Playable(LibrarySnapshot snap)
+    {
+        var tracks = new List<Track>(snap.Tracks.Count);
+        lock (_fileCheckGate)
+        {
+            var now = DateTime.UtcNow;
+            if (now - _fileChecksAtUtc >= FileCheckMaxAge)
+            {
+                _fileExists.Clear();
+                _fileChecksAtUtc = now;
+            }
+            foreach (var t in snap.Tracks)
+            {
+                var path = t.FilePath ?? string.Empty;
+                if (!_fileExists.TryGetValue(path, out var exists))
+                    _fileExists[path] = exists = path.Length > 0 && File.Exists(path);
+                if (exists) tracks.Add(t);
+            }
+        }
+        if (tracks.Count == snap.Tracks.Count) return snap;
+        var listed = tracks.Select(t => t.AlbumId).ToHashSet();
+        var hadSongs = snap.Tracks.Select(t => t.AlbumId).ToHashSet();
+        var albums = snap.Albums.Where(a => listed.Contains(a.Id) || !hadSongs.Contains(a.Id)).ToList();
+        return snap with { Tracks = tracks, Albums = albums };
+    }
+
+    /// <summary>The requesting user; <c>Device</c> is set when the API key is a signed-in device's key.
+    /// <paramref name="signInName"/> is <c>u</c> as <see cref="ResolveSignInName"/> read it (the caller
+    /// keyed the login brake by it); null when there is no <c>u</c>.</summary>
+    private (ServerUser? User, ServerDevice? Device, int Error, string Message) Authenticate(Params p, string? apiKey, string? signInName)
     {
         var u = p.Get("u");
         var pw = p.Get("p");
@@ -307,11 +443,11 @@ public sealed partial class NoctisServer : IAsyncDisposable
             try { pw = System.Text.Encoding.UTF8.GetString(Convert.FromHexString(pw[4..])); }
             catch (FormatException) { return (null, null, SubsonicResponse.ErrWrongCredentials, "Wrong username or password"); }
         }
-        var user = _users.Verify(u, pw);
+        var user = _users.Verify(signInName ?? ResolveSignInName(u), pw);
         return user is null ? (null, null, SubsonicResponse.ErrWrongCredentials, "Wrong username or password") : (user, null, 0, "");
     }
 
-    // ── Binary endpoints: stream / download / getCoverArt ───────────────────
+    // ── Binary endpoints: stream / download / getCoverArt / getAvatar ───────
 
     private async Task<bool> TryHandleBinaryAsync(HttpContext ctx, string method, Params p)
     {
@@ -380,6 +516,23 @@ public sealed partial class NoctisServer : IAsyncDisposable
                 await Results.File(path, ContentTypeFor(path)).ExecuteAsync(ctx).ConfigureAwait(false);
                 return true;
             }
+            case "getavatar":
+            {
+                // The caller's own picture only: another account's name is 70, never the owner's
+                // picture handed to whoever asks. No username = the caller (Subsonic requires it;
+                // the phone sends it, a lenient default costs nothing).
+                var user = (ServerUser)ctx.Items["user"]!;
+                var name = p.Get("username");
+                if (name is not null && !name.Equals(user.Name, StringComparison.OrdinalIgnoreCase)) throw NotFound();
+                var path = _library.AvatarPath(user.Name) ?? throw NotFound();
+                // The setting can name any file on the PC: serve it only as a picture.
+                var contentType = ContentTypeFor(path);
+                if (!contentType.StartsWith("image/", StringComparison.Ordinal)) throw NotFound();
+                // A changed picture keeps no name the phone could cache by: always revalidate.
+                ctx.Response.Headers.CacheControl = "private, no-cache";
+                await Results.File(path, contentType).ExecuteAsync(ctx).ConfigureAwait(false);
+                return true;
+            }
         }
         return false;
     }
@@ -390,6 +543,7 @@ public sealed partial class NoctisServer : IAsyncDisposable
         ".ogg" or ".oga" => "audio/ogg", ".opus" => "audio/ogg", ".wav" => "audio/wav", ".wma" => "audio/x-ms-wma",
         ".aif" or ".aiff" => "audio/aiff", ".ape" => "audio/x-ape", ".wv" => "audio/x-wavpack", ".dsf" => "audio/x-dsf",
         ".jpg" or ".jpeg" => "image/jpeg", ".png" => "image/png", ".webp" => "image/webp", ".gif" => "image/gif",
+        ".bmp" => "image/bmp", // the desktop's profile picture picker offers .bmp
         _ => "application/octet-stream",
     };
 
@@ -429,17 +583,21 @@ public sealed partial class NoctisServer : IAsyncDisposable
                 var key = _users.IssueDeviceKey(user.Name, deviceId, deviceName);
                 DebugLogger.Info(DebugLogger.Category.State, "Server", $"device signed in: {deviceName}");
                 DevicesChanged?.Invoke(this, EventArgs.Empty);
-                return new JsonObject
+                var signIn = new JsonObject
                 {
-                    ["noctisSignIn"] = new JsonObject
-                    {
-                        ["apiKey"] = key,
-                        ["user"] = user.Name,
-                        ["server"] = _sync?.DeviceName ?? Environment.MachineName,
-                        ["syncEnabled"] = _sync is { IsEnabled: true },
-                    },
+                    ["apiKey"] = key,
+                    ["user"] = user.Name,
+                    ["server"] = _sync?.DeviceName ?? Environment.MachineName,
+                    ["syncEnabled"] = _sync is { IsEnabled: true },
                 };
+                if (DisplayName() is { } displayName) signIn["displayName"] = displayName;
+                return new JsonObject { ["noctisSignIn"] = signIn };
             }
+            // Songs sent from the phone (NoctisServer.Upload.cs): body streamed to disk, not to a snapshot.
+            case "noctisuploadtrack":
+                return await UploadTrackAsync(p, ctx).ConfigureAwait(false);
+            case "noctishastracks":
+                return await HasTracksAsync(p, ctx).ConfigureAwait(false);
             case "noctissignout":
             {
                 if (ctx.Items["device"] is not ServerDevice device)
@@ -450,7 +608,7 @@ public sealed partial class NoctisServer : IAsyncDisposable
             }
         }
 
-        var snap = await _library.SnapshotAsync().ConfigureAwait(false);
+        var snap = Playable(await _library.SnapshotAsync().ConfigureAwait(false));
         var view = new LibraryView(snap);
 
         switch (method.ToLowerInvariant())
@@ -679,6 +837,8 @@ public sealed partial class NoctisServer : IAsyncDisposable
                             ["lastSeq"] = d.LastSeq,
                         }).ToArray()),
                 };
+                // The phone reads it each sync (sync on or off), so a renamed profile reaches it.
+                if (DisplayName() is { } displayName) status["displayName"] = displayName;
                 return new JsonObject { ["noctisSync"] = status };
             }
             case "getnoctissyncchanges":

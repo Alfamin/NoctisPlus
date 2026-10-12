@@ -118,6 +118,23 @@ public sealed class SyncStoreTests : IDisposable
     }
 
     [Fact]
+    public void AStoredStampPastTheClock_DoesNotBlockLaterWrites()
+    {
+        // A row stamped under a wrong clock (pushes are clamped on the way in, the desktop's own
+        // writes are not) would otherwise win last-writer-wins until real time caught up with it:
+        // every later edit, from any device, silently lost for years.
+        var now = DateTime.UtcNow;
+        Assert.True(_store.Upsert(SyncKinds.Track, "a", "wrong-clock", now.AddYears(10), "desktop"));
+        Assert.True(_store.Upsert(SyncKinds.Track, "a", "fixed", now, "phone"));
+        Assert.Equal("fixed", _store.Get(SyncKinds.Track, "a")!.Payload);
+
+        // Within the allowed skew the usual rule holds: an older write still loses.
+        Assert.True(_store.Upsert(SyncKinds.Track, "b", "near", now + SyncStore.MaxClockSkew - TimeSpan.FromSeconds(30), "phone"));
+        Assert.False(_store.Upsert(SyncKinds.Track, "b", "older", now, "desktop"));
+        Assert.Equal("near", _store.Get(SyncKinds.Track, "b")!.Payload);
+    }
+
+    [Fact]
     public void SamePayloadSameTime_IsIdempotent()
     {
         Assert.True(_store.Upsert(SyncKinds.Track, "a", "x", T0, "d"));

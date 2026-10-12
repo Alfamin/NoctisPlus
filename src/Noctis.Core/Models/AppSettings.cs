@@ -318,6 +318,9 @@ public class AppSettings
     /// <summary>Sync favorites / ratings / play counts / playlists with devices that log into the Noctis server.</summary>
     public bool SyncEnabled { get; set; }
 
+    /// <summary>The user switched sync off: letting phones connect again later leaves it off.</summary>
+    public bool SyncTurnedOffByUser { get; set; }
+
     /// <summary>How this computer shows up in other devices' sync status. Empty = machine name.</summary>
     public string SyncDeviceName { get; set; } = string.Empty;
 
@@ -764,6 +767,10 @@ public class AppSettings
     /// When false, the chosen solid/gradient color shows through instead.</summary>
     public bool LyricsShowArtworkBackground { get; set; } = true;
 
+    /// <summary>With the artwork background off: Gradient (true) or Solid. A picked swatch says
+    /// it too, but Auto saves none, so without this Gradient on Auto came back as Solid.</summary>
+    public bool LyricsBackgroundGradient { get; set; }
+
     /// <summary>Whether the blurred artwork background drifts and pulses with the beat
     /// behind the lyrics (page, side panel and mini player; issue #22). Only applies
     /// while the artwork mode is active.
@@ -856,6 +863,17 @@ public class AppSettings
 
     /// <summary>Show the background-vocal (adlib) row under lyric lines.</summary>
     public bool LyricsShowBackgroundVocals { get; set; } = true;
+
+    /// <summary>Where saved lyrics go: "Sidecar" (.lrc / .elrc files beside the song, the default),
+    /// "Embedded" (the audio file's tags) or "Both". See <see cref="LyricsSaveOptions.ParseTarget"/> (GitHub #135).</summary>
+    public string LyricsSaveTarget { get; set; } = nameof(Models.LyricsSaveTarget.Sidecar);
+
+    /// <summary>Search online by itself when the lyrics view opens on a song with no lyrics (GitHub #135).</summary>
+    public bool LyricsAutoDownload { get; set; }
+
+    /// <summary>What an automatic online pick keeps: "WordSynced" (the richest, the default),
+    /// "LineSynced" or "Plain". See <see cref="LyricsSaveOptions.ParsePreferredType"/> (GitHub #135).</summary>
+    public string LyricsPreferredType { get; set; } = nameof(Models.LyricsPreferredType.WordSynced);
 
     // ── Lyrics providers ──
 

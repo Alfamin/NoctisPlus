@@ -8,9 +8,10 @@ using Xunit;
 namespace Noctis.Tests;
 
 /// <summary>
-/// v1.5.8 ships the account and sync cards as Coming soon (<see cref="AccountFeatures"/> off):
-/// a SyncEnabled flag or an account left by an earlier test build activates nothing, and no
-/// command can create an account or turn sync on.
+/// While the account features are parked (<see cref="AccountFeatures"/> off, as in v1.5.8 and
+/// again from v1.6.3), the Account and Phone app cards are Coming soon: a SyncEnabled or
+/// NoctisServerEnabled flag left by an earlier build activates nothing, and no command can
+/// create an account or turn sync on. Skipped when the features ship.
 /// </summary>
 public class AccountFeaturesParkedTests : IDisposable
 {
@@ -32,12 +33,10 @@ public class AccountFeaturesParkedTests : IDisposable
         public Task FlushAsync() => Task.CompletedTask;
     }
 
-    [Fact]
-    public void Switch_IsOffForThisRelease() => Assert.False(AccountFeatures.Enabled);
-
     [AvaloniaFact]
     public async Task StoredSyncFlag_StaysOff_AndNothingTurnsItOn()
     {
+        Assert.SkipWhen(AccountFeatures.Enabled, "account features are on");
         var persistence = new PersistenceService(_root);
         await persistence.SaveSettingsAsync(new AppSettings { SyncEnabled = true });
 
@@ -58,6 +57,7 @@ public class AccountFeaturesParkedTests : IDisposable
     [AvaloniaFact]
     public async Task CreateAccount_CannotExecute_AndCreatesNothing()
     {
+        Assert.SkipWhen(AccountFeatures.Enabled, "account features are on");
         var persistence = new PersistenceService(_root);
         var vm = new SettingsViewModel(persistence, new FakeLibraryService(), new NoOpPlayHistoryService());
         await vm.LoadAsync();
@@ -70,5 +70,21 @@ public class AccountFeaturesParkedTests : IDisposable
         vm.CreatePrimaryAccountCommand.Execute(null); // Execute does not consult CanExecute
         Assert.False(vm.HasPrimaryAccount);
         Assert.Empty(new ServerUserStore(Path.Combine(persistence.DataDirectory, "server", "users.db")).List());
+    }
+
+    [AvaloniaFact]
+    public async Task StoredServerFlag_StartsNoServer_AndIsKeptForLater()
+    {
+        Assert.SkipWhen(AccountFeatures.Enabled, "account features are on");
+        var persistence = new PersistenceService(_root);
+        await persistence.SaveSettingsAsync(new AppSettings { NoctisServerEnabled = true });
+
+        var vm = new SettingsViewModel(persistence, new FakeLibraryService(), new NoOpPlayHistoryService());
+        await vm.LoadAsync();
+        Assert.False(vm.NoctisServerEnabled);
+        Assert.False(vm.IsPhoneCardOpen);
+
+        await vm.SaveAsync();
+        Assert.True((await persistence.LoadSettingsAsync()).NoctisServerEnabled);
     }
 }

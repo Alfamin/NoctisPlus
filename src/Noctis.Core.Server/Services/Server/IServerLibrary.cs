@@ -26,6 +26,24 @@ public interface IServerLibrary : Sync.ISyncApplier
     /// <summary>Path of the album's cover file, or null.</summary>
     string? ArtworkPath(Guid albumId);
 
+    /// <summary>Path of <paramref name="userName"/>'s profile picture, or null (getAvatar then answers
+    /// 70). The desktop keeps one profile, so every account on it gets the owner's picture.</summary>
+    string? AvatarPath(string userName) => null;
+
+    /// <summary>The desktop's profile name ("Username" in Settings), or null. A phone may sign in
+    /// with it instead of the account's email: the desktop keeps one profile, so it names the
+    /// main account.</summary>
+    string? ProfileName => null;
+
+    /// <summary>The folder songs sent from a phone (noctisUploadTrack) go under, created if
+    /// needed: the desktop's "Noctis Imports", the same place a dropped file is moved to. Null =
+    /// this host takes no songs (the call then answers error 0).</summary>
+    Task<string?> UploadRootAsync(CancellationToken ct) => Task.FromResult<string?>(null);
+
+    /// <summary>Adds a file noctisUploadTrack just wrote under <see cref="UploadRootAsync"/> to the
+    /// library, the way a dropped file is added (then it lists, streams and syncs like any other).</summary>
+    Task ImportUploadedAsync(string path, CancellationToken ct) => Task.CompletedTask;
+
     /// <summary>Stars/unstars tracks (albums and artists star every track they contain). Persists user state.</summary>
     Task SetStarredAsync(IReadOnlyList<Guid> trackIds, IReadOnlyList<Guid> albumIds, IReadOnlyList<Guid> artistIds, bool starred);
 

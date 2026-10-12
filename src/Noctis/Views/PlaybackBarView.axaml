@@ -1408,14 +1408,28 @@
                                             <controls:LineIcon Classes="mv2-icon" Data="{StaticResource MenuLineSearch}"/>
                                         </MenuItem.Icon>
                                     </MenuItem>
-                                    <!-- Lyrics page, online lyrics shown (GitHub #115): save them next to the
-                                         song under its name, replacing its lyrics files (asks first). -->
+                                    <!-- Lyrics page (GitHub #115): save the lyrics next to the song under its
+                                         name, replacing its lyrics files (asks first). LRC for online lyrics;
+                                         TTML (Discord, nutf!xx) for any time-synced lyrics not read from a .ttml. -->
                                     <MenuItem Header="{loc:T PlaybackBar.SaveLyrics}"
-                                              Command="{Binding SaveCurrentTrackLyricsCommand}"
-                                              IsVisible="{Binding CanSaveLyricsToFile}">
+                                              IsVisible="{Binding HasSaveLyricsMenu}">
                                         <MenuItem.Icon>
                                             <controls:LineIcon Classes="mv2-icon" Data="{StaticResource MenuLineSave}"/>
                                         </MenuItem.Icon>
+                                        <MenuItem Header="{loc:T PlaybackBar.SaveLyricsLrc}"
+                                                  Command="{Binding SaveCurrentTrackLyricsCommand}"
+                                                  IsVisible="{Binding CanSaveLyricsToFile}">
+                                            <MenuItem.Icon>
+                                                <controls:LineIcon Classes="mv2-icon" Data="{StaticResource MenuLineText}"/>
+                                            </MenuItem.Icon>
+                                        </MenuItem>
+                                        <MenuItem Header="{loc:T PlaybackBar.SaveLyricsTtml}"
+                                                  Command="{Binding SaveCurrentTrackLyricsAsTtmlCommand}"
+                                                  IsEnabled="{Binding CanSaveLyricsAsTtml}">
+                                            <MenuItem.Icon>
+                                                <controls:LineIcon Classes="mv2-icon" Data="{StaticResource MenuLineLyrics}"/>
+                                            </MenuItem.Icon>
+                                        </MenuItem>
                                     </MenuItem>
                                     <MenuItem Header="{loc:T PlaybackBar.ShareLyrics}"
                                               Command="{Binding ShareCurrentTrackLyricsCommand}"

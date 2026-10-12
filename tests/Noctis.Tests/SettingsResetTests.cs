@@ -114,6 +114,11 @@ public class SettingsResetTests : IDisposable
         await vm.SaveAsync();
         var afterReset = await persistence.LoadSettingsAsync();
 
-        Assert.Empty(DifferingProperties(afterReset, await FreshInstallSaveAsync()));
+        // Except the sync id: made once per install, at random (a fresh install has its own), and
+        // kept through a reset so phones still see the same computer in the sync ledger.
+        var fresh = await FreshInstallSaveAsync();
+        Assert.Equal(new[] { nameof(AppSettings.SyncDeviceId) }, DifferingProperties(afterReset, fresh));
+        Assert.False(string.IsNullOrWhiteSpace(afterReset.SyncDeviceId));
+        Assert.False(string.IsNullOrWhiteSpace(fresh.SyncDeviceId));
     }
 }

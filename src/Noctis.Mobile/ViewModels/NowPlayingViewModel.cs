@@ -34,7 +34,6 @@ public sealed partial class NowPlayingViewModel : ObservableObject, IDisposable
 
     private PlaybackQueue _queue = new();
     private DateTime _lastSaveUtc = DateTime.MinValue;
-    private bool _gapless = true;
     private int _consecutiveErrors;
     private bool _seeking;
     private int _seekIdleTicks;
@@ -60,6 +59,10 @@ public sealed partial class NowPlayingViewModel : ObservableObject, IDisposable
         _player.TrackEnded += OnPlayerTrackEnded;
         _player.PlaybackError += OnPlayerError;
         _library.LibraryUpdated += OnLibraryUpdated;
+        // The phone always plays gaplessly (owner, 10-11): there is no switch, and a desktop
+        // settings.json saying otherwise is ignored, so the player is put in gapless mode
+        // here, before the saved queue or any track can reach it.
+        _player.SetGapless(true);
 
         _volume = volume;
         if (_volume != null)
@@ -178,13 +181,6 @@ public sealed partial class NowPlayingViewModel : ObservableObject, IDisposable
         _syncingVolume = true;
         VolumeLevel = _volume!.Level;
         _syncingVolume = false;
-    }
-
-    public void SetGapless(bool enabled)
-    {
-        _gapless = enabled;
-        _player.SetGapless(enabled);
-        PrepareUpcoming();
     }
 
     /// <summary>Replace the queue with <paramref name="tracks"/> and start at <paramref name="startIndex"/>.
@@ -451,7 +447,7 @@ public sealed partial class NowPlayingViewModel : ObservableObject, IDisposable
         // every natural end ExoPlayer auto-advances into that queued item and its audio
         // reaches the speaker before TrackEnded fires and our Play(current) restarts the loop
         // — an audible blip of the next track on every repeat.
-        if (!_gapless || RepeatMode == RepeatMode.One || _queue.UpNext.Count == 0 || CurrentTrack == null)
+        if (RepeatMode == RepeatMode.One || _queue.UpNext.Count == 0 || CurrentTrack == null)
         {
             _player.CancelPreparedNext();
             return;

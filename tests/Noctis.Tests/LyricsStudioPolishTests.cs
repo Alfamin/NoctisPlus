@@ -400,6 +400,9 @@ public class LyricsStudioPolishTests : IDisposable
             var shut = row.Bounds.Height;
             vm.ReviewLines[0].IsExpanded = true;
             Settle(win);
+            // Pin the frame directly: with the transition armed, the write would glide from
+            // wherever the wall-clock open had reached, which on a slow runner is a few px in.
+            strip.Transitions = null;
             strip.Reveal = 0.001; // the frame before the fold lands
             Settle(win);
             Assert.True(row.Bounds.Height - shut <= 1.0, $"the row jumps {row.Bounds.Height - shut:F1}px as the fold lands");

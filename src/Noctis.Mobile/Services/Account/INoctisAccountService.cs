@@ -23,6 +23,10 @@ public sealed record NoctisAccount
     public required string DeviceName { get; init; }
     /// <summary>The desktop's name as the server reported it.</summary>
     public string ServerName { get; init; } = "";
+    /// <summary>The desktop's profile name ("Username" in its Settings), shown over the account's
+    /// email; null when the desktop has none, or for an account saved before it was sent.
+    /// Refreshed on every sync.</summary>
+    public string? DisplayName { get; init; }
     public DateTime? LastSyncUtc { get; init; }
 
     /// <summary>Never prints <see cref="DeviceKey"/> (a record's generated ToString would).</summary>
@@ -46,6 +50,8 @@ public enum NoctisErrorKind
     Server,
     /// <summary>The phone is too full to download more (a reserve is always left free).</summary>
     StorageFull,
+    /// <summary>The desktop lists the song but its file is gone from the computer (download error 70).</summary>
+    FileMissing,
 }
 
 public sealed class NoctisServerException(NoctisErrorKind kind, string message, Exception? inner = null)
@@ -60,7 +66,17 @@ public sealed record NoctisSyncProgress(NoctisSyncStage Stage, int Done, int Tot
 
 public sealed record NoctisSyncResult(int Songs, int Playlists, int StateChangesPulled, int StateChangesPushed, int PlaysSent);
 
-public sealed record NoctisDownloadProgress(int Pending, int Completed, int Failed, long BytesUsed);
+/// <param name="Missing">Of <paramref name="Failed"/>, the songs whose file is missing on the computer.</param>
+public sealed record NoctisDownloadProgress(int Pending, int Completed, int Failed, long BytesUsed, int Missing = 0);
+
+/// <summary>Sending the phone's own songs to the computer: <paramref name="Done"/> of <paramref name="Total"/> handled.</summary>
+public sealed record NoctisUploadProgress(int Done, int Total);
+
+/// <param name="Sent">Songs the computer added.</param>
+/// <param name="AlreadyThere">Songs the computer already had (same song, or the same file).</param>
+/// <param name="Failed">Songs that could not be read or sent; the next press tries them again.</param>
+/// <param name="Previously">Songs sent by an earlier press, not asked about again.</param>
+public sealed record NoctisUploadResult(int Sent, int AlreadyThere, int Failed, int Previously);
 
 /// <summary>
 /// Builds the HTTP handler the account service talks through. The service passes a
@@ -75,7 +91,17 @@ public interface INoctisAccountService
     bool IsSignedIn { get; }
     bool IsSyncing { get; }
 
-    /// <summary>Raised (any thread) when Account, IsSyncing or download state changes.</summary>
+    /// <summary>The computer refused this phone's key (removed there, or its password changed) and
+    /// the phone signed itself out. Cleared by the next sign-in. Lets the Account page say why
+    /// when the sync at app start was the one that found out.</summary>
+    bool WasSignedOutByComputer => false;
+
+    /// <summary>The desktop's profile picture as a local file (fetched at sign-in and on each sync,
+    /// kept across restarts), or null: signed out, or the desktop has none. A new picture gets a
+    /// new path (image caches key by path).</summary>
+    string? AvatarPath { get; }
+
+    /// <summary>Raised (any thread) when Account, IsSyncing, AvatarPath or download state changes.</summary>
     event EventHandler? StateChanged;
     event EventHandler<NoctisSyncProgress>? SyncProgress;
     event EventHandler<NoctisDownloadProgress>? DownloadProgress;
@@ -113,6 +139,22 @@ public interface INoctisAccountService
     Task DownloadAllAsync(CancellationToken ct = default);
     Task RemoveDownloadsAsync(IEnumerable<Track> tracks);
     Task RemoveAllDownloadsAsync();
+
+    // ── The phone's own songs → the computer ──
+
+    /// <summary>A send of the phone's songs is running.</summary>
+    bool IsUploading { get; }
+
+    /// <summary>Raised (any thread) after each song of a send.</summary>
+    event EventHandler<NoctisUploadProgress>? UploadProgress;
+
+    /// <summary>
+    /// Sends the phone's own songs (not the desktop's) that the computer does not have yet, one at
+    /// a time, into its library. Songs sent before (remembered per account) are skipped, so a
+    /// cancelled or failed send resumes on the next call. One send at a time: a call while one
+    /// runs gets the running one, and cancelling its token stops that one too.
+    /// </summary>
+    Task<NoctisUploadResult> SendLocalSongsAsync(CancellationToken ct = default);
 
     /// <summary>
     /// For the player: the local file of a downloaded desktop song, else its authenticated

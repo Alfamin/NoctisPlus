@@ -575,6 +575,8 @@ public partial class MainWindowViewModel : ViewModelBase
             && App.Services.GetService<IYouTubeMusicLyricsService>() is { } youTubeMusic)
             _lyricsVm.ExtraLyricsSources = Services.Lyrics.OnlineLyricsSource.BuiltIns(musixmatch, kugou, youTubeMusic);
         _lyricsVm.ShowLyricsSearchDialog = MetadataHelper.OpenLyricsSearchDialog;
+        // Lyrics saved inside audio files (GitHub #135) wait until the song is not playing.
+        _lyricsVm.TagWriter = App.Services?.GetService<IDeferredTagWriter>();
         // Lyrics offset nudges (Ctrl+wheel, GitHub #102) confirm in the notice pill, which
         // shows over both the lyrics page and the side panel.
         _lyricsVm.ShowNotice = text => TransientStatus.Show(nameof(PluginNotice), v => PluginNotice = v, text);
@@ -845,10 +847,18 @@ public partial class MainWindowViewModel : ViewModelBase
                 Debug.WriteLine($"[Update] Silent check failed: {ex.Message}");
             }
 
-            // Tray users who keep Noctis running for days still pick up a release while auto-update is on.
+            // Tray users who keep Noctis running for days still pick up a release while auto-update is on:
+            // daily, or sooner when a known release's soak or backoff ends or a check failed (GitHub #130).
+            var lastCheck = DateTimeOffset.UtcNow;
             while (true)
             {
-                await Task.Delay(AutoUpdatePolicy.RecheckInterval);
+                var wait = AutoUpdatePolicy.NextCheckDue(lastCheck, Settings.AutoUpdateRetryAtUtc) - DateTimeOffset.UtcNow;
+                if (wait > TimeSpan.Zero)
+                {
+                    await Task.Delay(wait < AutoUpdatePolicy.RecheckWake ? wait : AutoUpdatePolicy.RecheckWake);
+                    continue;
+                }
+                lastCheck = DateTimeOffset.UtcNow;
                 try { if (Settings.AutoInstallUpdates) await Settings.CheckForUpdateSilentAsync(); }
                 catch (Exception ex) { Debug.WriteLine($"[Update] Periodic check failed: {ex.Message}"); }
             }
@@ -2651,7 +2661,9 @@ public partial class MainWindowViewModel : ViewModelBase
             isSyncedAvailable: _lyricsVm.HasSyncedLyricsAvailable,
             canShare: _lyricsVm.ShareAvailable,
             saveLyrics: () => _lyricsVm.SaveLyricsToFileCommand.Execute(null),
-            canSaveLyrics: _lyricsVm.CanSaveToFile);
+            canSaveLyrics: _lyricsVm.CanSaveToFile,
+            saveLyricsTtml: () => _lyricsVm.SaveLyricsAsTtmlCommand.Execute(null),
+            canSaveLyricsTtml: _lyricsVm.CanSaveTtmlToFile);
 
         _lyricsVm.PropertyChanged -= OnLyricsVmPropertyChanged;
         _lyricsVm.PropertyChanged += OnLyricsVmPropertyChanged;
@@ -2669,14 +2681,16 @@ public partial class MainWindowViewModel : ViewModelBase
             || e.PropertyName == nameof(LyricsViewModel.IsUnsyncTabSelected)
             || e.PropertyName == nameof(LyricsViewModel.HasSyncedLyricsAvailable)
             || e.PropertyName == nameof(LyricsViewModel.ShareAvailable)
-            || e.PropertyName == nameof(LyricsViewModel.CanSaveToFile))
+            || e.PropertyName == nameof(LyricsViewModel.CanSaveToFile)
+            || e.PropertyName == nameof(LyricsViewModel.CanSaveTtmlToFile))
         {
             Player.UpdateLyricsPageState(
                 isSyncedActive: _lyricsVm.IsSyncTabSelected,
                 isPlainActive: _lyricsVm.IsUnsyncTabSelected,
                 isSyncedAvailable: _lyricsVm.HasSyncedLyricsAvailable,
                 canShare: _lyricsVm.ShareAvailable,
-                canSaveLyrics: _lyricsVm.CanSaveToFile);
+                canSaveLyrics: _lyricsVm.CanSaveToFile,
+                canSaveLyricsTtml: _lyricsVm.CanSaveTtmlToFile);
         }
     }
 
@@ -2853,7 +2867,10 @@ public partial class MainWindowViewModel : ViewModelBase
                 ManagedImportFolderName,
                 StringComparison.OrdinalIgnoreCase));
 
-    private async Task<string?> EnsureManagedImportRootAsync(CancellationToken ct)
+    /// <summary>The managed imports folder (created, and added to the music folders, when
+    /// missing); null when it cannot be made. Drops are moved here, and songs a phone sends
+    /// (the Noctis server's noctisUploadTrack) land under it too.</summary>
+    internal async Task<string?> EnsureManagedImportRootAsync(CancellationToken ct)
     {
         try
         {

@@ -220,18 +220,23 @@ public sealed partial class LibraryViewModel : ObservableObject
     /// (desktop parity with SidebarViewModel.AddTracksToPlaylist: both apps share playlists.json).</summary>
     public Task AddToPlaylistAsync(Playlist playlist, IReadOnlyList<Track> tracks)
     {
-        Append(playlist, tracks);
-        return EditPlaylistAsync(playlist, p => Append(p, tracks));
+        var now = DateTime.UtcNow;
+        Append(playlist, tracks, now);
+        return EditPlaylistAsync(playlist, p => Append(p, tracks, now));
     }
 
-    private static void Append(Playlist playlist, IReadOnlyList<Track> tracks)
+    /// <summary>Desktop parity (SidebarViewModel.AddTracksToPlaylist): each added song is stamped
+    /// with when it joined, which the playlist page's Date Added sort reads.</summary>
+    private static void Append(Playlist playlist, IReadOnlyList<Track> tracks, DateTime now)
     {
         var existing = new HashSet<Guid>(playlist.TrackIds);
         foreach (var t in tracks)
         {
-            if (existing.Add(t.Id)) playlist.TrackIds.Add(t.Id);
+            if (!existing.Add(t.Id)) continue;
+            playlist.TrackIds.Add(t.Id);
+            playlist.TrackAddedAt[t.Id] = now;
         }
-        playlist.ModifiedAt = DateTime.UtcNow;
+        playlist.ModifiedAt = now;
     }
 
     /// <summary>Applies an edit of one playlist to the copy in playlists.json now, found by id

@@ -98,6 +98,7 @@ public class LanguageLiveSwitchTests
     [InlineData("en", "English")]
     [InlineData("es", "Español (Spanish)")]
     [InlineData("ko", "한국어 (Korean)")]
+    [InlineData("ru", "Русский (Russian)")]
     [InlineData("tr", "Türkçe (Turkish)")]
     [InlineData("zh-Hans", "中文（简体） (Chinese, Simplified)")]
     public void LanguageEntries_ShowNativeThenEnglishName(string code, string expected)
