@@ -740,4 +740,38 @@ public class LocalApiTokenStoreTests : IDisposable
         Assert.Equal(64, token.Length);
         Assert.Equal(token, new LocalApiTokenStore(_dir).ReadToken());
     }
+
+    [Fact]
+    public async Task TempFile_IsOwnerOnly_FromItsFirstByte_OnUnix()
+    {
+        if (OperatingSystem.IsWindows()) return; // per-user %APPDATA% ACL; no POSIX mode to check
+        // The temp file used to get the umask's mode (0644 almost everywhere) and was
+        // chmod'ed 600 only after the token was already written into it, so another
+        // account on the machine polling the data folder could read the token in
+        // between. Watch the temp file across many writes: never group/world-readable.
+        var store = new LocalApiTokenStore(_dir);
+        var tmp = store.FilePath + ".tmp";
+        var seenReadable = 0;
+        using var cts = new CancellationTokenSource();
+        var observer = Task.Run(() =>
+        {
+            if (OperatingSystem.IsWindows()) return;
+            while (!cts.IsCancellationRequested)
+            {
+                try
+                {
+                    if ((File.GetUnixFileMode(tmp) & (UnixFileMode.GroupRead | UnixFileMode.OtherRead)) != 0)
+                        seenReadable++;
+                }
+                catch (IOException) { /* not there at this instant */ }
+            }
+        });
+        store.LoadOrCreateToken();
+        for (var i = 0; i < 500; i++) store.Regenerate();
+        cts.Cancel();
+        await observer;
+
+        Assert.Equal(0, seenReadable);
+        Assert.Equal(UnixFileMode.UserRead | UnixFileMode.UserWrite, File.GetUnixFileMode(store.FilePath));
+    }
 }

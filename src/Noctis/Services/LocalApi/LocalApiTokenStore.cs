@@ -101,14 +101,19 @@ public sealed class LocalApiTokenStore
             ["updatedUtc"] = DateTime.UtcNow.ToString("O"),
         };
 
-        // Temp + move: a tool polling the file never reads half of it.
+        // Temp + move: a tool polling the file never reads half of it. On Unix the temp
+        // file is created owner-only, not chmod'ed after the write: created with the
+        // umask's mode (0644 almost everywhere) it held the token world-readable until
+        // the chmod, and another account on the machine could read it in between.
         var tmp = FilePath + ".tmp";
-        File.WriteAllText(tmp, doc.ToJsonString(WriteOptions));
+        var options = new FileStreamOptions { Mode = FileMode.Create, Access = FileAccess.Write, Share = FileShare.Read };
         if (!OperatingSystem.IsWindows())
         {
-            try { File.SetUnixFileMode(tmp, UnixFileMode.UserRead | UnixFileMode.UserWrite); }
-            catch { /* best effort on filesystems without POSIX modes */ }
+            options.UnixCreateMode = UnixFileMode.UserRead | UnixFileMode.UserWrite;
+            try { File.Delete(tmp); } catch { } // the mode only applies to a newly created file
         }
+        using (var writer = new StreamWriter(new FileStream(tmp, options)))
+            writer.Write(doc.ToJsonString(WriteOptions));
         File.Move(tmp, FilePath, overwrite: true);
     }
 }
