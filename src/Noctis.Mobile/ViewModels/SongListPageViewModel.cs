@@ -111,7 +111,11 @@ public sealed partial class SongListPageViewModel : MobilePage, ISortable
     [NotifyPropertyChangedFor(nameof(IsSorted))]
     private SongSort _sort = SongSort.Default;
 
-    [ObservableProperty] private bool _isDescending;
+    // Notifies IsSorted itself: choosing the list's own order again while it was reversed
+    // changes only the direction, and the button stayed lit.
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(IsSorted))]
+    private bool _isDescending;
 
     /// <summary>The sort button lights up away from the list's own order.</summary>
     public bool IsSorted => Sort != SongSort.Default || IsDescending;
@@ -131,7 +135,6 @@ public sealed partial class SongListPageViewModel : MobilePage, ISortable
     public void ChooseDirection(bool descending)
     {
         IsDescending = descending;
-        OnPropertyChanged(nameof(IsSorted));
         Apply();
     }
 
