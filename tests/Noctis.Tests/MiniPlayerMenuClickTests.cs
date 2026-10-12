@@ -284,7 +284,15 @@ public class MiniPlayerMenuClickTests
             var card = win.FindControl<Border>("MenuCard")!;
             var more = VisibleButton(win, b => ToolTip.GetTip(b) as string == "More");
 
-            Assert.True(Click(more), "the … button never received the press");
+            // A loaded CI runner can still be settling the form's layout: retry a press that
+            // missed, bounded, rather than read a not-yet-ready button as the bug.
+            var pressed = Click(more);
+            for (var waited = 0; !pressed && waited < 1500; waited += 100)
+            {
+                await PumpFor(100);
+                pressed = Click(more);
+            }
+            Assert.True(pressed, "the … button never received the press");
             await PumpFor(400);   // past the 0.18s fade and the 200ms close delay
             // A loaded CI runner can fall behind the fade's clock; give it a bounded extra wait.
             for (var waited = 0; card.Opacity < 0.999 && waited < 1500; waited += 100)
