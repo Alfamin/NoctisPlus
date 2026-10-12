@@ -58,7 +58,7 @@ public class AccountDevicesPageTests : IDisposable
         Assert.Equal(3, rows.Count);
         Assert.Equal(("Pixel 9", "Synced 4 h ago", true), (rows[0].Name, rows[0].StatusText, rows[0].IsSignedIn));
         // Signed in, never synced: when it was last used (here: when it signed in).
-        Assert.Equal(("Tablet", "Connected on " + Now.AddDays(-1).ToLocalTime().ToString("d MMM, HH:mm", Noctis.Localization.Loc.Instance.Culture), true),
+        Assert.Equal(("Tablet", "Connected on " + Now.AddDays(-1).ToLocalTime().ToString("g", Noctis.Localization.Loc.Instance.Culture), true),
             (rows[1].Name, rows[1].StatusText, rows[1].IsSignedIn));
         // The ledger knows it but its key is gone: listed as signed out, no Sign out button.
         Assert.Equal(("samsung SM-S911U1", "Signed out", false), (rows[2].Name, rows[2].StatusText, rows[2].IsSignedIn));

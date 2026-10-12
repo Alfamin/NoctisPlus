@@ -2635,5 +2635,5 @@ The lines and their timings are dropped and an empty lyrics box opens for your o
   <data name="Time.JustNow" xml:space="preserve"><value>just now</value><comment>Relative time, used after 'Synced', 'Connected', 'Last synced'</comment></data>
   <data name="Time.MinutesAgo" xml:space="preserve"><value>{0} min ago</value><comment>Relative time; {0} = minutes</comment></data>
   <data name="Time.HoursAgo" xml:space="preserve"><value>{0} h ago</value><comment>Relative time; {0} = hours</comment></data>
-  <data name="Time.OnDate" xml:space="preserve"><value>on {0}</value><comment>Relative time older than a day; {0} = date and time like '9 Oct, 14:05'</comment></data>
+  <data name="Time.OnDate" xml:space="preserve"><value>on {0}</value><comment>Relative time older than a day; {0} = date and time in the app language's short format</comment></data>
 </root>

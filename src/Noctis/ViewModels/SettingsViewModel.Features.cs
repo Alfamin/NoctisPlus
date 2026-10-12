@@ -179,14 +179,15 @@ public partial class SettingsViewModel
         return rows;
     }
 
-    /// <summary>"just now", "5 min ago", "3 h ago", or "on 9 Oct, 14:05".</summary>
+    /// <summary>"just now", "5 min ago", "3 h ago", or "on 10/9/2026 2:05 PM" in the app language's own date order.</summary>
     internal static string Ago(DateTime utc, DateTime nowUtc)
     {
         var ago = nowUtc - utc;
         if (ago < TimeSpan.FromMinutes(1)) return Localization.Loc.T("Time.JustNow");
         if (ago < TimeSpan.FromHours(1)) return Localization.Loc.T("Time.MinutesAgo", (int)ago.TotalMinutes);
         if (ago < TimeSpan.FromDays(1)) return Localization.Loc.T("Time.HoursAgo", (int)ago.TotalHours);
-        return Localization.Loc.T("Time.OnDate", utc.ToLocalTime().ToString("d MMM, HH:mm", Localization.Loc.Instance.Culture));
+        // "g": a fixed "d MMM" read "9 10月" in Japanese and Chinese.
+        return Localization.Loc.T("Time.OnDate", utc.ToLocalTime().ToString("g", Localization.Loc.Instance.Culture));
     }
 
     /// <summary>"5 min ago" goes stale while the page stays open: re-read once a minute while
