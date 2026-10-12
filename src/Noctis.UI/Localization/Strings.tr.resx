@@ -1784,4 +1784,5 @@
   <data name="Time.MinutesAgo" xml:space="preserve"><value>{0} dk önce</value><comment>Relative time; {0} = minutes</comment></data>
   <data name="Time.HoursAgo" xml:space="preserve"><value>{0} sa önce</value><comment>Relative time; {0} = hours</comment></data>
   <data name="Time.OnDate" xml:space="preserve"><value>{0}</value><comment>Relative time older than a day; {0} = date and time like '9 Oct, 14:05'</comment></data>
+  <data name="Phone.ForgetTip" xml:space="preserve"><value>Bu telefonu listeden kaldırır. Eşitlediği veriler kalır.</value><comment>Tooltip on Remove for a phone that is already signed out</comment></data>
 </root>

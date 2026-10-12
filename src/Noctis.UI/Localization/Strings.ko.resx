@@ -6501,4 +6501,8 @@
     <value>{0}</value>
     <comment>Relative time older than a day; {0} = date and time like '9 Oct, 14:05'</comment>
   </data>
+  <data name="Phone.ForgetTip" xml:space="preserve">
+    <value>이 휴대폰을 목록에서 뺍니다. 동기화한 내용은 그대로 남습니다.</value>
+    <comment>Tooltip on Remove for a phone that is already signed out</comment>
+  </data>
 </root>

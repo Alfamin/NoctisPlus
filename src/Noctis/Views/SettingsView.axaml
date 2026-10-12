@@ -5181,6 +5181,13 @@
                                                     CommandParameter="{Binding}">
                                                 <TextBlock Text="{loc:T AccountSync.Remove}" FontSize="11" Foreground="#FF6B6B"/>
                                             </Button>
+                                            <!-- Signed out already: only takes it off the list (the ledger keeps what it synced). -->
+                                            <Button Grid.Column="3" Classes="pill-action" Cursor="Hand" IsVisible="{Binding !IsSignedIn}"
+                                                    ToolTip.Tip="{loc:T Phone.ForgetTip}"
+                                                    Command="{Binding $parent[UserControl].((vm:SettingsViewModel)DataContext).RemoveSignedInDeviceCommand}"
+                                                    CommandParameter="{Binding}">
+                                                <TextBlock Text="{loc:T Server.Remove}" FontSize="11"/>
+                                            </Button>
                                         </Grid>
                                     </DataTemplate>
                                 </ItemsControl.ItemTemplate>
