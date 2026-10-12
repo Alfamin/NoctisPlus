@@ -241,6 +241,16 @@ public class ArtistImageService
         // on the UI thread before the tab could paint.
         await Task.Yield();
 
+        // Portraits already on disk are surfaced before queueing for the gate (GitHub #137).
+        // The loop below holds the gate through all of its network work (a paced re-check
+        // of every portrait older than RefreshInterval, up to DownloadTimeout per stalled
+        // request), so Home's six artists waited behind the Artists tab's full-library
+        // sweep and an artist late in the name order waited for every earlier refresh:
+        // pictures that were already cached stayed blank for minutes.
+        // On the thread pool: Task.Yield resumes on the caller's context, which for the
+        // Home and Artists tabs is the UI thread, and this is one stat per artist.
+        await Task.Run(() => SurfaceCachedImages(artists, onImageReady)).ConfigureAwait(false);
+
         await _fetchGate.WaitAsync().ConfigureAwait(false);
 
         try
@@ -348,6 +358,32 @@ public class ArtistImageService
         finally
         {
             _fetchGate.Release();
+        }
+    }
+
+    /// <summary>
+    /// Points each artist at its cached portrait, or clears it for one the user removed,
+    /// reporting every newly surfaced path. Local files only, never the network; runs
+    /// off the caller's thread. The gated loop re-checks all of it, so a removal or a
+    /// download landing in between is still honored there.
+    /// </summary>
+    private void SurfaceCachedImages(IReadOnlyList<Artist> artists, Action<Artist, string>? onImageReady)
+    {
+        foreach (var artist in artists)
+        {
+            if (File.Exists(GetRemovedMarkerPath(artist.Id)))
+            {
+                if (artist.ImagePath != null)
+                    artist.ImagePath = null;
+                continue;
+            }
+
+            var cachedPath = GetCachedImagePath(artist.Id);
+            if (artist.ImagePath != cachedPath && File.Exists(cachedPath))
+            {
+                artist.ImagePath = cachedPath;
+                onImageReady?.Invoke(artist, cachedPath);
+            }
         }
     }
 

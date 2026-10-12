@@ -185,9 +185,22 @@ public partial class LibraryArtistsViewModel : ViewModelBase, ISearchable, IDisp
         }
         _isDirty = false;
 
+        // A scan publish (every 1.5 s while scanning) hands over new Artist objects with no
+        // ImagePath. Keep the portrait the previous object had, in memory: the rows below
+        // used to be built from the empty ones and blanked every tile until a sweep
+        // surfaced them again (GitHub #137). The two sweeps below still correct it.
+        var shownPaths = new Dictionary<Guid, string>(_allArtists.Count);
+        foreach (var artist in _allArtists)
+            if (artist.ImagePath != null)
+                shownPaths[artist.Id] = artist.ImagePath;
+
         _allArtists = _library.Artists.ToList();
         foreach (var artist in _allArtists)
+        {
             artist.IsFavorite = _favoriteArtists.IsFavorite(artist.Name);
+            if (artist.ImagePath == null && shownPaths.TryGetValue(artist.Id, out var path))
+                artist.ImagePath = path;
+        }
         ApplyFilter(_currentFilter);
 
         // Clearing ImagePath for portraits whose file has gone missing used to be a
@@ -229,11 +242,13 @@ public partial class LibraryArtistsViewModel : ViewModelBase, ISearchable, IDisp
 
         _ = _artistImageService.FetchAndCacheAsync(_allArtists, (artist, path) =>
         {
-            // Debounce list rebuild — batch image updates every 2 seconds
+            // Batch image updates every 2 seconds. Not restarted per update: a paced
+            // first sweep lands a portrait every ~150 ms, so restarting the timer held
+            // every tile back until the whole sweep was over (GitHub #137).
             Dispatcher.UIThread.Post(() =>
             {
-                _imageRefreshDebounce.Stop();
-                _imageRefreshDebounce.Start();
+                if (!_imageRefreshDebounce.IsEnabled)
+                    _imageRefreshDebounce.Start();
             });
         });
     }
