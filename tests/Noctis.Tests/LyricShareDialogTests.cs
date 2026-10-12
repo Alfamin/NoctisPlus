@@ -285,6 +285,65 @@ public class LyricShareDialogTests
         finally { vm.Detach(); }
     }
 
+    /// <summary>Owner 10-12: picked neighbours read as one block in the list. Each picked line
+    /// knows whether the line above / below is picked too, through taps, Clear and playback
+    /// sync, and its row carries that as join-up / join-down.</summary>
+    [AvaloniaFact]
+    public void PickedNeighbours_JoinIntoOneRun()
+    {
+        EnsureAppStyles();
+        var vm = new LyricShareViewModel(Song(), Enumerable.Range(0, 8).Select(i => $"line {i}").ToList(), 0);
+        var win = new Noctis.Views.LyricShareDialog(vm) { Width = 1280, Height = 860 };
+        win.Show();
+        try
+        {
+            // Opens with lines 0-3 picked: one run.
+            Assert.Equal(new[] { 1, 2, 3 }, Indexes(vm, l => l.JoinsPrevious));
+            Assert.Equal(new[] { 0, 1, 2 }, Indexes(vm, l => l.JoinsNext));
+
+            vm.ToggleLine(vm.Lines[2]); // splits it: 0-1 and 3
+            vm.ToggleLine(vm.Lines[5]); // a lone pick
+            Assert.Equal(new[] { 1 }, Indexes(vm, l => l.JoinsPrevious));
+            Assert.Equal(new[] { 0 }, Indexes(vm, l => l.JoinsNext));
+
+            vm.ToggleLine(vm.Lines[4]); // bridges 3 and 5
+            Assert.Equal(new[] { 1, 4, 5 }, Indexes(vm, l => l.JoinsPrevious));
+            Assert.Equal(new[] { 0, 3, 4 }, Indexes(vm, l => l.JoinsNext));
+
+            var list = Named<ItemsControl>(win, "LineItems");
+            Assert.True(PumpUntil(() => list.Bounds.Width > 0));
+            Panel Row(int i) => Avalonia.VisualTree.VisualExtensions.GetVisualDescendants(list).OfType<Panel>()
+                .First(p => p.Classes.Contains("sl-line") && ReferenceEquals(p.DataContext, vm.Lines[i]));
+            Assert.Equal(new[] { true, true }, new[] { Row(4).Classes.Contains("join-up"), Row(4).Classes.Contains("join-down") });
+            Assert.Equal(new[] { true, false }, new[] { Row(5).Classes.Contains("join-up"), Row(5).Classes.Contains("join-down") });
+            Assert.Equal(new[] { false, false }, new[] { Row(6).Classes.Contains("join-up"), Row(6).Classes.Contains("join-down") });
+
+            vm.ClearSelectionCommand.Execute(null);
+            Assert.DoesNotContain(vm.Lines, l => l.JoinsPrevious || l.JoinsNext);
+        }
+        finally { if (win.IsVisible) { win.Close(); PumpUntil(() => !win.IsVisible); } }
+
+        // Follow playback picks a window of lines in bulk; the run follows it.
+        using var persistence = new TestPersistenceService();
+        var player = new PlayerViewModel(new FakeAudioPlayer(), new FakeLibraryService(), persistence, new FakeAnimatedCoverService());
+        var song = Song();
+        player.CurrentTrack = song;
+        var stamps = Enumerable.Range(0, 10).Select(i => (TimeSpan?)TimeSpan.FromSeconds(i * 10)).ToList();
+        var synced = new LyricShareViewModel(song, Enumerable.Range(0, 10).Select(i => $"line {i}").ToList(), stamps, player);
+        try
+        {
+            player.Position = TimeSpan.FromSeconds(45);
+            Dispatcher.UIThread.RunJobs();
+            Assert.Equal(new[] { 4, 5, 6, 7 }, Selected(synced));
+            Assert.Equal(new[] { 5, 6, 7 }, Indexes(synced, l => l.JoinsPrevious));
+            Assert.Equal(new[] { 4, 5, 6 }, Indexes(synced, l => l.JoinsNext));
+        }
+        finally { synced.Detach(); }
+    }
+
+    private static int[] Indexes(LyricShareViewModel vm, Func<SelectableLyricLine, bool> flag)
+        => vm.Lines.Select((l, i) => (l, i)).Where(p => flag(p.l)).Select(p => p.i).ToArray();
+
     /// <summary>Not a bug: names built from titles carry no characters the file system refuses.</summary>
     [Fact]
     public void SuggestedNames_HaveNoInvalidCharacters()

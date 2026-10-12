@@ -44,6 +44,13 @@ public partial class SelectableLyricLine : ObservableObject
     [ObservableProperty]
     private bool _isCurrent;
 
+    /// <summary>Picked, and so is the line above / below: the list draws the run as one block.</summary>
+    [ObservableProperty]
+    private bool _joinsPrevious;
+
+    [ObservableProperty]
+    private bool _joinsNext;
+
     /// <summary>Playback timestamp for this line, when the source lyrics were synced.</summary>
     public TimeSpan? Timestamp { get; }
 
@@ -241,10 +248,23 @@ public partial class LyricShareViewModel : ViewModelBase
 
     private void RaiseSelectionChanged()
     {
+        UpdateSelectionRuns();
         OnPropertyChanged(nameof(SelectedCount));
         OnPropertyChanged(nameof(HasSelection));
         OnPropertyChanged(nameof(SelectionSummary));
         OnPropertyChanged(nameof(CanExportVideo));
+    }
+
+    /// <summary>Marks the picked lines that touch another picked line, so the list draws each
+    /// run of neighbours as one block rather than a stack of separate bars.</summary>
+    private void UpdateSelectionRuns()
+    {
+        for (int i = 0; i < Lines.Count; i++)
+        {
+            var line = Lines[i];
+            line.JoinsPrevious = line.IsSelected && i > 0 && Lines[i - 1].IsSelected;
+            line.JoinsNext = line.IsSelected && i + 1 < Lines.Count && Lines[i + 1].IsSelected;
+        }
     }
 
     /// <summary>A tap on a row: picks or drops the line (the 8-line cap still applies).</summary>
@@ -477,6 +497,7 @@ public partial class LyricShareViewModel : ViewModelBase
             int start = Math.Clamp(preselectIndex, 0, Lines.Count - 1);
             for (int i = start; i < Math.Min(start + 4, Lines.Count); i++)
                 Lines[i].IsSelected = true;
+            UpdateSelectionRuns();
         }
 
         foreach (var line in Lines)
