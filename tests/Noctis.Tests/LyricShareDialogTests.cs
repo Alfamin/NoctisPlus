@@ -710,11 +710,17 @@ public class LyricShareDialogTests
                 box.IsDropDownOpen = true;
                 Assert.True(PumpUntil(() => popup.IsOpen && popup.Child is Control { Bounds.Height: > 0 }), $"{name}: the list never opened");
                 var list = (Control)popup.Child!;
-                var top = list.TranslatePoint(default, win)!.Value.Y;
-                var bottom = top + list.Bounds.Height;
-                var boxTop = box.TranslatePoint(default, win)!.Value.Y;
-                // + 1.5: the list's edge sits a pixel over its pill, as Fluent places it.
-                Assert.True(top >= cardTop && bottom <= boxTop + 1.5,
+                double top = 0, bottom = 0, boxTop = 0;
+                bool Fits()
+                {
+                    top = list.TranslatePoint(default, win)!.Value.Y;
+                    bottom = top + list.Bounds.Height;
+                    boxTop = box.TranslatePoint(default, win)!.Value.Y;
+                    // + 1.5: the list's edge sits a pixel over its pill, as Fluent places it.
+                    return top >= cardTop && bottom <= boxTop + 1.5;
+                }
+                // The list pops in: on a loaded runner the first frames read it mid-flight.
+                Assert.True(PumpUntil(Fits, 1500),
                     $"{name}: list at {top:0}..{bottom:0}, its pill at {boxTop:0}, the card {cardTop:0}..{cardBottom:0}, the window 0..910");
                 box.IsDropDownOpen = false;
                 PumpUntil(() => !popup.IsOpen, 1000);

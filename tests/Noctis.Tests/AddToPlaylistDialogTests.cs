@@ -563,6 +563,7 @@ public class AddToPlaylistDialogLocalizationTests : IDisposable
         Assert.NotEqual("Add to Playlist", vm.DialogTitle);
         vm.ShowCreateCommand.Execute(null);
         Assert.Equal(Loc.T("AddToPlaylist.CreateNewPlaylist"), vm.DialogTitle);
+        Loc.Instance.SetCulture("en"); // back on the UI thread; a Dispose reset runs off it
     }
 
     [AvaloniaFact]
