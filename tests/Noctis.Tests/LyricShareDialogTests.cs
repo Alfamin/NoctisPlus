@@ -285,6 +285,65 @@ public class LyricShareDialogTests
         finally { vm.Detach(); }
     }
 
+    /// <summary>Owner 10-12: picked neighbours read as one block in the list. Each picked line
+    /// knows whether the line above / below is picked too, through taps, Clear and playback
+    /// sync, and its row carries that as join-up / join-down.</summary>
+    [AvaloniaFact]
+    public void PickedNeighbours_JoinIntoOneRun()
+    {
+        EnsureAppStyles();
+        var vm = new LyricShareViewModel(Song(), Enumerable.Range(0, 8).Select(i => $"line {i}").ToList(), 0);
+        var win = new Noctis.Views.LyricShareDialog(vm) { Width = 1280, Height = 860 };
+        win.Show();
+        try
+        {
+            // Opens with lines 0-3 picked: one run.
+            Assert.Equal(new[] { 1, 2, 3 }, Indexes(vm, l => l.JoinsPrevious));
+            Assert.Equal(new[] { 0, 1, 2 }, Indexes(vm, l => l.JoinsNext));
+
+            vm.ToggleLine(vm.Lines[2]); // splits it: 0-1 and 3
+            vm.ToggleLine(vm.Lines[5]); // a lone pick
+            Assert.Equal(new[] { 1 }, Indexes(vm, l => l.JoinsPrevious));
+            Assert.Equal(new[] { 0 }, Indexes(vm, l => l.JoinsNext));
+
+            vm.ToggleLine(vm.Lines[4]); // bridges 3 and 5
+            Assert.Equal(new[] { 1, 4, 5 }, Indexes(vm, l => l.JoinsPrevious));
+            Assert.Equal(new[] { 0, 3, 4 }, Indexes(vm, l => l.JoinsNext));
+
+            var list = Named<ItemsControl>(win, "LineItems");
+            Assert.True(PumpUntil(() => list.Bounds.Width > 0));
+            Panel Row(int i) => Avalonia.VisualTree.VisualExtensions.GetVisualDescendants(list).OfType<Panel>()
+                .First(p => p.Classes.Contains("sl-line") && ReferenceEquals(p.DataContext, vm.Lines[i]));
+            Assert.Equal(new[] { true, true }, new[] { Row(4).Classes.Contains("join-up"), Row(4).Classes.Contains("join-down") });
+            Assert.Equal(new[] { true, false }, new[] { Row(5).Classes.Contains("join-up"), Row(5).Classes.Contains("join-down") });
+            Assert.Equal(new[] { false, false }, new[] { Row(6).Classes.Contains("join-up"), Row(6).Classes.Contains("join-down") });
+
+            vm.ClearSelectionCommand.Execute(null);
+            Assert.DoesNotContain(vm.Lines, l => l.JoinsPrevious || l.JoinsNext);
+        }
+        finally { if (win.IsVisible) { win.Close(); PumpUntil(() => !win.IsVisible); } }
+
+        // Follow playback picks a window of lines in bulk; the run follows it.
+        using var persistence = new TestPersistenceService();
+        var player = new PlayerViewModel(new FakeAudioPlayer(), new FakeLibraryService(), persistence, new FakeAnimatedCoverService());
+        var song = Song();
+        player.CurrentTrack = song;
+        var stamps = Enumerable.Range(0, 10).Select(i => (TimeSpan?)TimeSpan.FromSeconds(i * 10)).ToList();
+        var synced = new LyricShareViewModel(song, Enumerable.Range(0, 10).Select(i => $"line {i}").ToList(), stamps, player);
+        try
+        {
+            player.Position = TimeSpan.FromSeconds(45);
+            Dispatcher.UIThread.RunJobs();
+            Assert.Equal(new[] { 4, 5, 6, 7 }, Selected(synced));
+            Assert.Equal(new[] { 5, 6, 7 }, Indexes(synced, l => l.JoinsPrevious));
+            Assert.Equal(new[] { 4, 5, 6 }, Indexes(synced, l => l.JoinsNext));
+        }
+        finally { synced.Detach(); }
+    }
+
+    private static int[] Indexes(LyricShareViewModel vm, Func<SelectableLyricLine, bool> flag)
+        => vm.Lines.Select((l, i) => (l, i)).Where(p => flag(p.l)).Select(p => p.i).ToArray();
+
     /// <summary>Not a bug: names built from titles carry no characters the file system refuses.</summary>
     [Fact]
     public void SuggestedNames_HaveNoInvalidCharacters()
@@ -432,6 +491,129 @@ public class LyricShareDialogTests
             }
             finally { if (win.IsVisible) { win.Close(); PumpUntil(() => !win.IsVisible); } }
         });
+    }
+
+    /// <summary>
+    /// Bug (owner 10-12 screenshot): the option lists opened below their pills, which sit at
+    /// the card's foot, so the Background list (320 px) hung 233 px under the card, down to
+    /// the window's bottom edge, its last row cut off there; in a 910 px window it ran 98 px
+    /// past the edge. On Windows the list is its own popup window, bounded by the screen and
+    /// not by the dialog, so nothing pulled it back in: the constraint is switched off here
+    /// to place it the same way. Every list opens upward now, inside the card.
+    /// </summary>
+    [AvaloniaFact]
+    public void OptionLists_OpenUpward_InsideTheCard()
+    {
+        EnsureAppStyles();
+        var vm = new LyricShareViewModel(Song(), Enumerable.Range(0, 12).Select(i => $"line {i}").ToList(), 0);
+        var win = new Noctis.Views.LyricShareDialog(vm) { Width = 1154, Height = 910 };
+        win.Show();
+        try
+        {
+            var host = Avalonia.VisualTree.VisualExtensions.GetVisualDescendants(win).OfType<Noctis.Controls.PillDialogHost>().Single();
+            Assert.True(PumpUntil(() => host.Card is { Opacity: > 0.999 }), "open animation never settled");
+            var card = host.Card!;
+            var cardTop = card.TranslatePoint(default, win)!.Value.Y;
+            var cardBottom = cardTop + card.Bounds.Height;
+            foreach (var name in new[] { "LayoutBox", "FormatBox", "TextColorBox", "BackgroundBox" })
+            {
+                var box = Named<ComboBox>(win, name);
+                var popup = Avalonia.VisualTree.VisualExtensions.GetVisualDescendants(box)
+                    .OfType<Avalonia.Controls.Primitives.Popup>().Single(p => p.Name == "PART_Popup");
+                popup.PlacementConstraintAdjustment = Avalonia.Controls.Primitives.PopupPositioning.PopupPositionerConstraintAdjustment.None;
+                box.IsDropDownOpen = true;
+                Assert.True(PumpUntil(() => popup.IsOpen && popup.Child is Control { Bounds.Height: > 0 }), $"{name}: the list never opened");
+                var list = (Control)popup.Child!;
+                var top = list.TranslatePoint(default, win)!.Value.Y;
+                var bottom = top + list.Bounds.Height;
+                var boxTop = box.TranslatePoint(default, win)!.Value.Y;
+                // + 1.5: the list's edge sits a pixel over its pill, as Fluent places it.
+                Assert.True(top >= cardTop && bottom <= boxTop + 1.5,
+                    $"{name}: list at {top:0}..{bottom:0}, its pill at {boxTop:0}, the card {cardTop:0}..{cardBottom:0}, the window 0..910");
+                box.IsDropDownOpen = false;
+                PumpUntil(() => !popup.IsOpen, 1000);
+            }
+        }
+        finally { if (win.IsVisible) { win.Close(); PumpUntil(() => !win.IsVisible); } }
+    }
+
+    /// <summary>
+    /// Bug: a double-click to edit a line moved its text about 8 px right and grew the row by
+    /// about 19 px. TextBox.sl-edit (Padding 12,6 and MinHeight 0, under a -12,-6 margin so the
+    /// text stays put) lived in Window.Styles, but PillDialogHost adds PillDialog.axaml to its
+    /// own Styles, nearer the box, so pill-area's Padding 18,14 and MinHeight 40 won.
+    /// </summary>
+    [AvaloniaFact]
+    public void EditBox_KeepsTheLineInPlace()
+    {
+        EnsureAppStyles();
+        var vm = new LyricShareViewModel(Song(), new[] { "alpha line", "beta line" }, 0);
+        var win = new Noctis.Views.LyricShareDialog(vm) { Width = 1280, Height = 860 };
+        win.Show();
+        try
+        {
+            var host = Avalonia.VisualTree.VisualExtensions.GetVisualDescendants(win).OfType<Noctis.Controls.PillDialogHost>().Single();
+            Assert.True(PumpUntil(() => host.Card is { Opacity: > 0.999 }), "open animation never settled");
+            var list = Named<ItemsControl>(win, "LineItems");
+            var row = Avalonia.VisualTree.VisualExtensions.GetVisualDescendants(list).OfType<Panel>()
+                .First(p => p.Classes.Contains("sl-line") && ReferenceEquals(p.DataContext, vm.Lines[1]));
+            var text = Avalonia.VisualTree.VisualExtensions.GetVisualDescendants(row).OfType<TextBlock>().Single(t => t.Classes.Contains("sl-text"));
+            var x0 = text.TranslatePoint(default, row)!.Value.X;
+            var h0 = row.Bounds.Height;
+
+            vm.BeginEdit(vm.Lines[1]);
+            var box = Avalonia.VisualTree.VisualExtensions.GetVisualDescendants(row).OfType<TextBox>().Single();
+            Assert.True(PumpUntil(() => box.IsVisible && box.Bounds.Height > 0));
+            PumpUntil(() => false, 50);
+            var presenter = Avalonia.VisualTree.VisualExtensions.GetVisualDescendants(box).OfType<Avalonia.Controls.Presenters.TextPresenter>().First();
+            var x1 = presenter.TranslatePoint(default, row)!.Value.X;
+            Assert.True(Math.Abs(x1 - x0) <= 2, $"the text moved {x1 - x0:0.0} px (padding {box.Padding})");
+            Assert.True(row.Bounds.Height - h0 <= 4, $"the row grew {row.Bounds.Height - h0:0.0} px (min height {box.MinHeight})");
+        }
+        finally { if (win.IsVisible) { win.Close(); PumpUntil(() => !win.IsVisible); } }
+    }
+
+    /// <summary>
+    /// Bug: the Background swatches' ring was a fixed white (#40FFFFFF), so on the Light
+    /// theme's pale list the pale swatches had no edge: Mist (#E4ECF4) and Cream (#F5E6CC) sat
+    /// on the #F2F2F2 list at about 1.07:1 and 1.1:1 and all but vanished. The ring has to
+    /// stand off the list on both themes: darker on Light, lighter on Dark.
+    /// </summary>
+    [AvaloniaFact]
+    public void SwatchRings_StandOffTheList_OnBothThemes()
+    {
+        EnsureAppStyles();
+        foreach (var variant in new[] { Avalonia.Styling.ThemeVariant.Light, Avalonia.Styling.ThemeVariant.Dark })
+        {
+            var vm = new LyricShareViewModel(Song(), new[] { "one" }, 0);
+            var win = new Noctis.Views.LyricShareDialog(vm) { RequestedThemeVariant = variant, Width = 1280, Height = 860 };
+            win.Show();
+            try
+            {
+                var box = Named<ComboBox>(win, "BackgroundBox");
+                var popup = Avalonia.VisualTree.VisualExtensions.GetVisualDescendants(box)
+                    .OfType<Avalonia.Controls.Primitives.Popup>().Single(p => p.Name == "PART_Popup");
+                box.IsDropDownOpen = true;
+                Assert.True(PumpUntil(() => popup.IsOpen && popup.Child is Control { Bounds.Height: > 0 }), "the list never opened");
+                var list = (Border)popup.Child!;
+                var under = AccentTestHarness.ColorOf(list.Background);
+                var rings = Avalonia.VisualTree.VisualExtensions.GetVisualDescendants(list).OfType<Border>()
+                    .Where(b => b.DataContext is ShareBackgroundChoice && b.Width == 16).ToList();
+                Assert.NotEmpty(rings);
+                foreach (var ring in rings)
+                {
+                    var c = AccentTestHarness.ColorOf(ring.BorderBrush);
+                    double a = c.A / 255.0;
+                    double Lum(double r, double g, double b) => (0.2126 * r + 0.7152 * g + 0.0722 * b) / 255;
+                    var drawn = Lum(a * c.R + (1 - a) * under.R, a * c.G + (1 - a) * under.G, a * c.B + (1 - a) * under.B);
+                    var delta = drawn - Lum(under.R, under.G, under.B);
+                    Assert.True(variant == Avalonia.Styling.ThemeVariant.Light ? delta < -0.05 : delta > 0.05,
+                        $"{variant}: ring {c} on the {under} list shifts it by {delta:0.000}");
+                }
+                box.IsDropDownOpen = false;
+            }
+            finally { if (win.IsVisible) { win.Close(); PumpUntil(() => !win.IsVisible); } }
+        }
     }
 
     /// <summary>Esc in a line's edit box puts the text back and keeps the dialog open.</summary>
