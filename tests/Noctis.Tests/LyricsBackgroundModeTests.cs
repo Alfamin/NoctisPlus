@@ -148,6 +148,31 @@ public class LyricsBackgroundModeTests : IDisposable
     }
 
     /// <summary>
+    /// Bug: Gradient on Auto came back as Solid on Auto after a restart. Auto saves no swatch,
+    /// and with no swatch the load fell back to Solid: nothing recorded which mode was chosen.
+    /// </summary>
+    [AvaloniaFact]
+    public void GradientAuto_SurvivesARestart()
+    {
+        var store = new SettingsStore();
+        var cover = Cover("#3366CC");
+        var picked = NewVm(NewPlayer(cover), store);
+        picked.SelectColorModeGradientCommand.Execute(null);
+        Assert.True(picked.IsColorModeGradient);
+        Assert.Equal("", store.Current.LyricsBackgroundColorHex); // Auto: no swatch saved
+
+        var restored = NewVm(NewPlayer(cover), store);
+        Assert.True(restored.IsColorModeGradient);
+        Assert.False(restored.IsColorModeSolid);
+
+        // And Solid on Auto still comes back as Solid.
+        restored.SelectColorModeSolidCommand.Execute(null);
+        var again = NewVm(NewPlayer(cover), store);
+        Assert.True(again.IsColorModeSolid);
+        Assert.False(again.IsColorModeGradient);
+    }
+
+    /// <summary>
     /// Bug: a saved colour that doesn't parse (a hand-edited settings.json) was kept as the
     /// "custom colour" anyway. Nothing could be drawn for it, and as a custom colour it also
     /// stopped the background from ever following the artwork again: the next song's cover

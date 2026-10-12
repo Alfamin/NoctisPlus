@@ -767,6 +767,10 @@ public class AppSettings
     /// When false, the chosen solid/gradient color shows through instead.</summary>
     public bool LyricsShowArtworkBackground { get; set; } = true;
 
+    /// <summary>With the artwork background off: Gradient (true) or Solid. A picked swatch says
+    /// it too, but Auto saves none, so without this Gradient on Auto came back as Solid.</summary>
+    public bool LyricsBackgroundGradient { get; set; }
+
     /// <summary>Whether the blurred artwork background drifts and pulses with the beat
     /// behind the lyrics (page, side panel and mini player; issue #22). Only applies
     /// while the artwork mode is active.

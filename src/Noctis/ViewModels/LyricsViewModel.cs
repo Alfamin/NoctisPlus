@@ -915,7 +915,7 @@ public partial class LyricsViewModel : ViewModelBase, IDisposable
             UpdateAdaptiveBackground(_player.AlbumArt);
         else
             RefreshLyricsForegrounds();
-        await PersistArtworkBackgroundPreferenceAsync(false);
+        await PersistArtworkBackgroundPreferenceAsync(false, gradient: false);
     }
 
     [RelayCommand]
@@ -929,16 +929,18 @@ public partial class LyricsViewModel : ViewModelBase, IDisposable
             UpdateAdaptiveBackground(_player.AlbumArt);
         else
             RefreshLyricsForegrounds();
-        await PersistArtworkBackgroundPreferenceAsync(false);
+        await PersistArtworkBackgroundPreferenceAsync(false, gradient: true);
     }
 
-    private async Task PersistArtworkBackgroundPreferenceAsync(bool showArtwork)
+    private async Task PersistArtworkBackgroundPreferenceAsync(bool showArtwork, bool? gradient = null)
     {
         try
         {
             var settings = await _persistence.LoadSettingsAsync();
-            if (settings.LyricsShowArtworkBackground == showArtwork) return;
+            if (settings.LyricsShowArtworkBackground == showArtwork
+                && (gradient is null || settings.LyricsBackgroundGradient == gradient)) return;
             settings.LyricsShowArtworkBackground = showArtwork;
+            if (gradient is { } g) settings.LyricsBackgroundGradient = g;
             await _persistence.SaveSettingsAsync(settings);
         }
         catch { }
@@ -1021,10 +1023,12 @@ public partial class LyricsViewModel : ViewModelBase, IDisposable
             }
             else if (!IsColorModeSolid && !IsColorModeGradient)
             {
-                // Color mode but no sub-mode persisted: default to Solid. With no saved
-                // swatch the background stays on Auto — recompute it for Solid mode
-                // (vibrant solid) since the constructor derived it in artwork mode.
-                IsColorModeSolid = true;
+                // The sub-mode the user chose (LyricsBackgroundGradient; a saved swatch below
+                // overrides it). With no saved swatch the background stays on Auto — recompute
+                // it for that mode (vibrant solid or unified gradient) since the constructor
+                // derived it in artwork mode.
+                IsColorModeGradient = settings.LyricsBackgroundGradient;
+                IsColorModeSolid = !settings.LyricsBackgroundGradient;
                 if (string.IsNullOrEmpty(settings.LyricsBackgroundColorHex))
                     UpdateAdaptiveBackground(_player.AlbumArt);
             }
@@ -1051,6 +1055,9 @@ public partial class LyricsViewModel : ViewModelBase, IDisposable
                 {
                     _selectedColorHex = saved;
                     ActiveSwatchKey = saved;
+                    // A solid swatch is Solid mode whatever the mode flag says.
+                    IsColorModeSolid = !IsColorModeArtwork;
+                    IsColorModeGradient = false;
                     var brush = new SolidColorBrush(color);
                     FullBackgroundBrush = brush;
                     LyricsBackgroundBrush = brush;
