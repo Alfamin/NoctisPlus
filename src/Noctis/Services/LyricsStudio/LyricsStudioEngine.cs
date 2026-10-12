@@ -207,6 +207,22 @@ public sealed class LyricsStudioEngine : ILyricsStudioEngine
         return (null, LyricsStudioSource.Transcription);
     }
 
+    /// <summary>
+    /// The lines of an imported lyrics file for the lyrics box: a TTML file's sung lines
+    /// (GitHub #132 — its markup, translations and timing are not lyrics to align; one that
+    /// will not parse gives its readable text), anything else through <see cref="FirstText"/>.
+    /// </summary>
+    internal static List<string>? ImportText(string text, string? fileName = null)
+    {
+        var isTtml = fileName?.EndsWith(".ttml", StringComparison.OrdinalIgnoreCase) == true || TtmlParser.LooksLikeTtml(text);
+        if (!isTtml) return FirstText(text);
+
+        var (lines, _) = TtmlParser.Parse(text);
+        var sung = lines?.Select(l => l.Text.Replace('\n', ' ').Trim()).Where(t => t.Length > 0).ToList()
+                   ?? LyricsLoader.RawTextLines(text);
+        return sung.Count > 0 ? sung : null;
+    }
+
     /// <summary>Plain lines from the first non-empty text; timestamps are stripped so synced text can be re-timed.</summary>
     internal static List<string>? FirstText(params string?[] candidates)
     {
