@@ -270,6 +270,30 @@ public class NoctisServerSyncTests : IAsyncLifetime
     }
 
     [Fact]
+    public async Task ALedgerRowStampedUnderAWrongClock_StillTakesAPhonesLaterEdit()
+    {
+        // The desktop stamps its own rows with its clock, unclamped; a playlist whose ModifiedAt
+        // (playlists.json) is years ahead goes into the ledger as it is.
+        var far = new DateTime(2100, 1, 1, 0, 0, 0, DateTimeKind.Utc);
+        var desk = new Playlist { Name = "Desk mix", TrackIds = { TrackA }, ModifiedAt = far };
+        _persistence.Playlists.Add(desk);
+        var mix = PulledItems(await Get("getNoctisSyncChanges", "since=0&device=phone-001")).Single(i => i.GetProperty("kind").GetString() == "playlist");
+        Assert.Equal(far, mix.GetProperty("updatedUtc").GetDateTime().ToUniversalTime());
+
+        // The phone renames it now. Its push is clamped to the clock, so without the store's
+        // tolerance it would lose to the far-future row forever (and the phone, which treats a
+        // push as agreed, would never retry).
+        var now = DateTime.UtcNow;
+        var r = await Push(new
+        {
+            device = "phone-001",
+            items = new[] { new { kind = "playlist", id = desk.Id.ToString("N"), updatedUtc = now.ToString("O"), payload = new { name = "Phone mix", trackIds = new[] { TrackA }, modifiedAt = now.ToString("O") } } },
+        });
+        Assert.Equal(1, r.GetProperty("noctisSync").GetProperty("applied").GetInt32());
+        Assert.Equal("Phone mix", _lib.Playlists.Single(p => p.Id == desk.Id).Name);
+    }
+
+    [Fact]
     public async Task Push_Validates_AndStoresPayloadsReSerialized()
     {
         var now = DateTime.UtcNow;

@@ -91,8 +91,8 @@ public sealed partial class NoctisAccountService : INoctisAccountService, ITrack
     private readonly ConcurrentDictionary<Guid, string> _suffixes = new();
     private readonly ConcurrentDictionary<Guid, long> _sizes = new();
 
-    /// <summary>Space downloads always leave free on the phone: "Download everything" on a desktop
-    /// library can be far larger than the phone (the owner's is ~306 GB).</summary>
+    /// <summary>Space downloads and covers always leave free on the phone: "Download everything" on a
+    /// desktop library can be far larger than the phone (the owner's is ~306 GB).</summary>
     internal const long StorageReserveBytes = 1536L * 1024 * 1024;
 
     /// <summary>Free bytes on the volume holding a path; tests substitute a full phone.</summary>
@@ -657,6 +657,10 @@ public sealed partial class NoctisAccountService : INoctisAccountService, ITrack
         var done = 0;
         var written = 0;
         var failed = 0;
+        var full = false;
+        // The catalog decides how many covers are written (one per album, each capped on its
+        // own), so they keep the downloads' reserve too, or a desktop could fill the phone with them.
+        var coverDir = Path.GetDirectoryName(_persistence.GetArtworkPath(due[0])) ?? _offlineDir;
         // Covers are not worth a sync: a cover that fails (a timeout, a dropped connection) is
         // skipped and asked again next sync, and the favourites, playlists and plays still go.
         // Many failures mean the desktop is gone; stop asking and let the next stage say so.
@@ -666,6 +670,12 @@ public sealed partial class NoctisAccountService : INoctisAccountService, ITrack
             await Parallel.ForEachAsync(due, new ParallelOptions { MaxDegreeOfParallelism = CoverConcurrency, CancellationToken = stage.Token },
                 async (albumId, token) =>
                 {
+                    if (FreeSpace(coverDir) < StorageReserveBytes)
+                    {
+                        full = true;
+                        stage.Cancel();
+                        return;
+                    }
                     try
                     {
                         if (await client.DownloadCoverAsync(albumId, _persistence.GetArtworkPath(albumId), token).ConfigureAwait(false))
@@ -684,10 +694,11 @@ public sealed partial class NoctisAccountService : INoctisAccountService, ITrack
                     RaiseSyncProgress(NoctisSyncStage.Covers, Interlocked.Increment(ref done), due.Count);
                 }).ConfigureAwait(false);
         }
-        catch (OperationCanceledException) when (!ct.IsCancellationRequested) { /* gave up after CoverFailureLimit */ }
+        catch (OperationCanceledException) when (!ct.IsCancellationRequested) { /* gave up after CoverFailureLimit, or the phone is full */ }
         finally
         {
-            if (failed > 0) DebugLog.Write("Account", $"covers: {written} saved, {failed} failed{(stage.IsCancellationRequested && !ct.IsCancellationRequested ? ", stopped asking" : "")}");
+            if (full) DebugLog.Write("Account", $"covers: {written} saved, then stopped: the phone is too full (the reserve stays free)");
+            else if (failed > 0) DebugLog.Write("Account", $"covers: {written} saved, {failed} failed{(stage.IsCancellationRequested && !ct.IsCancellationRequested ? ", stopped asking" : "")}");
             // Rebuild so albums pick the new files up.
             if (written > 0) _library.NotifyMetadataChanged();
         }
