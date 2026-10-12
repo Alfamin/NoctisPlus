@@ -359,6 +359,54 @@ public class LyricsBackgroundColorDialogTests : IDisposable
     // ── Shots ──
 
     /// <summary>
+    /// Bug (owner screenshot 10-12, a 125% display): the ring sat about a pixel up and left of
+    /// its dot, so one side of the gap looked higher. Both are inset from the swatch by whole
+    /// logical pixels (2 and 6), which are 2.5 and 7.5 device pixels at 125%, and layout
+    /// rounding (round half to even) took them to 2 and 8: opposite ways. Ring and dot now
+    /// share one centre at fractional scales too, in both grids.
+    /// </summary>
+    [AvaloniaFact]
+    public void SwatchRingAndDot_ShareOneCentre_OnAScaledDisplay()
+    {
+        EnsureAppStyles();
+        var (vm, _, _) = MakeViewModel();
+        var (owner, _) = ShowPage(vm);
+        try
+        {
+            var dialog = OpenFromMenu(vm, owner);
+            // The owner's display: 125%. The headless window takes it like a monitor change.
+            var impl = dialog.PlatformImpl!;
+            impl.GetType().GetProperty("RenderScaling")!.SetValue(impl, 1.25);
+            ((Action<double>?)impl.GetType().GetProperty("ScalingChanged")!.GetValue(impl))?.Invoke(1.25);
+            Pump(100);
+            Assert.Equal(1.25, dialog.RenderScaling);
+
+            foreach (var (mode, grid) in new (Action, string)[]
+                     {
+                         (() => vm.SelectColorModeSolidCommand.Execute(null), "SolidGrid"),
+                         (() => vm.SelectColorModeGradientCommand.Execute(null), "GradientGrid"),
+                     })
+            {
+                mode();
+                Assert.True(PumpUntil(() => Named<ItemsControl>(dialog, grid).IsEffectivelyVisible));
+                Pump(300);
+                foreach (var swatch in Swatches(dialog, grid))
+                {
+                    var ring = swatch.GetVisualDescendants().OfType<Avalonia.Controls.Shapes.Ellipse>().Single(e => e.Name == "Ring");
+                    var dot = swatch.GetVisualDescendants().OfType<Avalonia.Controls.Shapes.Ellipse>().Single(e => e.Classes.Contains("lc-dot"));
+                    var ringCentre = ring.TranslatePoint(new Point(ring.Bounds.Width / 2, ring.Bounds.Height / 2), swatch)!.Value;
+                    var dotCentre = dot.TranslatePoint(new Point(dot.Bounds.Width / 2, dot.Bounds.Height / 2), swatch)!.Value;
+                    Assert.True(Math.Abs(ringCentre.X - dotCentre.X) < 0.01 && Math.Abs(ringCentre.Y - dotCentre.Y) < 0.01,
+                        $"{grid}: ring centre {ringCentre} vs dot centre {dotCentre}");
+                }
+            }
+            dialog.Close();
+            PumpUntil(() => !dialog.IsVisible);
+        }
+        finally { owner.Close(); }
+    }
+
+    /// <summary>
     /// Switching Artwork / Solid / Gradient animates (owner 10-12): one pill behind the three
     /// labels slides to the chosen one, and the chosen mode's choices fade in instead of
     /// popping. The first open shows everything in place, with no animation.

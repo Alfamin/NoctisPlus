@@ -71,11 +71,16 @@
             <Setter Property="AutomationProperties.Name" Value="{Binding Name}" />
             <Setter Property="Template">
                 <ControlTemplate>
+                    <!-- No layout rounding on the ring or the dot: at 125% their insets (2 and
+                         6) are 2.5 and 7.5 device pixels, and rounding half to even took them
+                         opposite ways, so the ring sat a pixel off its dot. -->
                     <Panel Background="Transparent">
-                        <Ellipse x:Name="Ring" StrokeThickness="2" Stroke="Transparent" Margin="2" />
+                        <Ellipse x:Name="Ring" StrokeThickness="2" Stroke="Transparent" Margin="2"
+                                 UseLayoutRounding="False" />
                         <ContentPresenter Content="{TemplateBinding Content}"
                                           HorizontalAlignment="Center"
-                                          VerticalAlignment="Center" />
+                                          VerticalAlignment="Center"
+                                          UseLayoutRounding="False" />
                     </Panel>
                 </ControlTemplate>
             </Setter>
