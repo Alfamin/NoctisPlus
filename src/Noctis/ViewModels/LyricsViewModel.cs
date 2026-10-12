@@ -713,9 +713,10 @@ public partial class LyricsViewModel : ViewModelBase, IDisposable
     private Color? _averageArtworkColor;
 
     /// <summary>The scrim painted over the blurred artwork in artwork mode
-    /// (Rectangle Fill="#66000000" in LyricsView.axaml). Keep in sync if that changes —
-    /// it shifts the visible luminance enough to matter for the readability threshold.</summary>
-    private const double ArtworkScrimAlpha = 0x66 / 255.0;
+    /// (Rectangle Fill="#99000000" in LyricsView.axaml, LyricsPanelView.axaml and the mini
+    /// player). Keep in sync if that changes — it shifts the visible luminance enough to
+    /// matter for the readability threshold.</summary>
+    private const double ArtworkScrimAlpha = 0x99 / 255.0;
 
     private int _adaptiveBackgroundGeneration;
 
