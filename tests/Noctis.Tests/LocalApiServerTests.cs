@@ -156,6 +156,28 @@ public class LocalApiServerTests
     }
 
     [AvaloniaFact]
+    public async Task Lockout_RefusesWrongTokens_ButNotTheRightOne()
+    {
+        // Wrong tokens can come from anyone who can reach 127.0.0.1 without the token
+        // file: a web page the user visits, another account on this PC. A flood of them
+        // must not lock the user's own Stream Deck / OBS overlay out of the API.
+        using var h = new Harness(authLimit: 3);
+        using var anon = new HttpClient { BaseAddress = h.Http.BaseAddress };
+        for (var i = 0; i < 3; i++)
+            Assert.Equal(HttpStatusCode.Unauthorized, (await anon.GetAsync("/api/v1/status?token=bad")).StatusCode);
+        Assert.Equal(HttpStatusCode.TooManyRequests, (await anon.GetAsync("/api/v1/status?token=bad")).StatusCode);
+
+        using var get = await h.Http.GetAsync("/api/v1/status");
+        Assert.Equal(HttpStatusCode.OK, get.StatusCode);
+        var (post, json, _) = await h.PostAsync("/api/v1/playback/toggle");
+        Assert.Equal(HttpStatusCode.OK, post);
+        Assert.True(json.GetProperty("ok").GetBoolean());
+
+        // Wrong ones stay throttled while the lockout runs.
+        Assert.Equal(HttpStatusCode.TooManyRequests, (await anon.GetAsync("/api/v1/status?token=bad")).StatusCode);
+    }
+
+    [AvaloniaFact]
     public async Task SetToken_RejectsTheOldToken()
     {
         using var h = new Harness();

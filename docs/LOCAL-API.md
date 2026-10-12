@@ -111,7 +111,7 @@ Every error has the same shape:
 | 409 | `nothing_playing` | Seeking with no current track. |
 | 411 | `length_required` | A chunked request body. |
 | 413 | `payload_too_large` | A body over 16 KB. |
-| 429 | `rate_limited` | Too many failed logins (10 per minute). Wait for `Retry-After` seconds. |
+| 429 | `rate_limited` | A wrong token after too many failed logins (10 per minute). Wait for `Retry-After` seconds. The right token keeps working. |
 | 503 | `too_many_streams` | Already 8 open event streams. |
 | 500 | `internal_error` | Something failed inside Noctis. |
 
@@ -367,7 +367,9 @@ curl -N -H "Authorization: Bearer $TOKEN" "http://127.0.0.1:9421/api/v1/events"
   listener with its own per-session key.
 - **Token on every request**, compared in constant time. It's 256 random bits,
   stored only in `local-api.json` in your user profile, never in settings.json. After
-  10 failed attempts in a minute, authentication locks for 30 s.
+  10 failed attempts in a minute, wrong tokens are refused with `429` for 30 s; the
+  right token still works, so a flood of bad guesses (from a web page, or another
+  account on the PC) can't lock your own tools out.
 - **DNS rebinding and CSRF.** A website can't read the token, and requests whose
   `Host` isn't a loopback name are refused. Browsers that enforce Private Network
   Access also block public sites from reaching `127.0.0.1`, and the API doesn't opt
