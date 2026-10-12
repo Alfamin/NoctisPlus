@@ -398,7 +398,7 @@ Deezer и TIDAL: вставьте ссылку.</value></data>
   <data name="Settings.Autoplay" xml:space="preserve"><value>Автовоспроизведение</value><comment>Text in SettingsView.axaml</comment></data>
   <data name="Settings.WhenQueueEndsKeep" xml:space="preserve"><value>Когда очередь закончится, продолжать похожими песнями.</value><comment>Text in SettingsView.axaml</comment></data>
   <data name="Settings.KeepPlayedInQueue" xml:space="preserve"><value>Сохранять прослушанные песни</value><comment>Text in SettingsView.axaml</comment></data>
-  <data name="Settings.KeepPlayedInQueueHint" xml:space="preserve"><value>Показывать прослушанные песни над «Сейчас играет» в очереди и оставлять последнюю песню загруженной, когда очередь закончится.</value><comment>Text in SettingsView.axaml</comment></data>
+  <data name="Settings.KeepPlayedInQueueHint" xml:space="preserve"><value>Прослушанные песни остаются в списке очереди над текущей, а последняя песня остаётся загруженной, когда очередь закончится.</value><comment>Text in SettingsView.axaml</comment></data>
   <data name="Queue.Played" xml:space="preserve"><value>Прослушано</value><comment>Text in MainWindow.axaml</comment></data>
   <data name="MiniPlayer.Played" xml:space="preserve"><value>Прослушано</value><comment>Text in MiniPlayerWindow.axaml</comment></data>
   <data name="Settings.ExplicitContent" xml:space="preserve"><value>Ненормативный контент</value><comment>Text in SettingsView.axaml</comment></data>
@@ -1251,6 +1251,9 @@ Deezer и TIDAL: вставьте ссылку.</value></data>
   <data name="Main.NothingPlaying" xml:space="preserve"><value>Ничего не играет</value><comment>Idle island text in MainWindow.axaml (GitHub #92)</comment></data>
   <data name="Main.QueueEmptyTitle" xml:space="preserve"><value>Очередь пуста</value><comment>Queue popup empty state in MainWindow.axaml</comment></data>
   <data name="Main.QueueEmptyHint" xml:space="preserve"><value>Перетащите сюда песни или выберите «Играть следующим» / «В очередь» у любой песни.</value><comment>Queue popup empty state in MainWindow.axaml</comment></data>
+  <data name="Main.QueueNothingUpNextTitle" xml:space="preserve"><value>Дальше ничего нет</value><comment>Queue popup in MainWindow.axaml (GitHub #134)</comment></data>
+  <data name="Main.QueueNothingUpNextHint" xml:space="preserve"><value>Перетащите сюда песни или выберите «Играть следующим» / «В очередь», чтобы музыка не останавливалась.</value><comment>Queue popup in MainWindow.axaml (GitHub #134)</comment></data>
+  <data name="Queue.ClearPlayed" xml:space="preserve"><value>Очистить прослушанные</value><comment>Queue popup header button and row menu in MainWindow.axaml (GitHub #134)</comment></data>
   <data name="Main.RemoveFromQueue" xml:space="preserve"><value>Удалить из очереди</value><comment>Header in MainWindow.axaml</comment></data>
   <data name="Main.ScanReplayGain" xml:space="preserve"><value>Сканировать ReplayGain</value><comment>Queue row menu in MainWindow.axaml</comment></data>
   <data name="Main.ExplicitTip" xml:space="preserve"><value>Ненормативная лексика</value><comment>ToolTip.Tip in MainWindow.axaml</comment></data>

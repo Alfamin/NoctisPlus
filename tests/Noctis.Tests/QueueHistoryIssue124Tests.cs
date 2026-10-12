@@ -291,33 +291,6 @@ public class QueueHistoryIssue124Tests
         Assert.False(store.Saved?.KeepPlayedInQueue ?? true);
     }
 
-    /// <summary>Panel wiring (MainWindow is not mountable headlessly): the played list sits
-    /// above Now Playing, outside the Up Next ListBox (its indices and drag slots unchanged),
-    /// shows only with the setting, and plays the clicked row by container index.</summary>
-    [Fact]
-    public void QueuePanel_PlayedSection_SitsAboveNowPlaying_AndIsWired()
-    {
-        var root = new DirectoryInfo(AppContext.BaseDirectory);
-        while (root != null && !File.Exists(Path.Combine(root.FullName, "Noctis.sln"))) root = root.Parent;
-        Assert.NotNull(root);
-        var xaml = File.ReadAllText(Path.Combine(root!.FullName, "src", "Noctis", "Views", "MainWindow.axaml"));
-        var code = File.ReadAllText(Path.Combine(root.FullName, "src", "Noctis", "Views", "MainWindow.axaml.cs"));
-
-        var played = xaml.IndexOf("x:Name=\"QueuePlayed\"", StringComparison.Ordinal);
-        var nowPlaying = xaml.IndexOf("x:Name=\"QueueNowPlaying\"", StringComparison.Ordinal);
-        var list = xaml.IndexOf("x:Name=\"QueuePopupListBox\"", StringComparison.Ordinal);
-        Assert.True(played > 0 && played < nowPlaying && nowPlaying < list);
-
-        var section = xaml.Substring(played, nowPlaying - played);
-        Assert.Contains("IsVisible=\"{Binding Player.ShowPlayedInQueue}\"", section);
-        Assert.Contains("ItemsSource=\"{Binding Player.PlayedTracks}\"", section);
-        Assert.Contains("{loc:T Queue.Played}", section);
-        Assert.Contains("DoubleTapped=\"OnQueuePlayedDoubleTapped\"", section);
-        Assert.Contains("MaxHeight=", section); // never crowds Up Next out
-        Assert.Contains("QueuePlayedList.IndexFromContainer", code);
-        Assert.Contains("vm.Player.PlayPlayedAt(index)", code);
-    }
-
     [AvaloniaFact]
     public void PlayPlayedAt_ASongThatPlayedTwice_PlaysTheClickedCopy()
     {
