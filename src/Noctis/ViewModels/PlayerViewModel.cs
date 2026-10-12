@@ -1835,14 +1835,54 @@ public partial class PlayerViewModel : ViewModelBase
         return landAt;
     }
 
-    /// <summary>Plays the track at the given index in UpNext, discarding prior queue items.</summary>
+    /// <summary>
+    /// Plays the track at <paramref name="index"/> in UpNext, the way that many Next presses
+    /// would: the playing song becomes the newest played one and the songs jumped over leave
+    /// Up Next (with Keep Played Songs on they stay in the list, above the new song, as
+    /// played). Shuffle, Repeat All's cycle and radio carry on — this used to restart the
+    /// queue from the clicked row through ReplaceQueueAndPlay, which switched Shuffle off,
+    /// cut Repeat All down to the rows from there on and ended radio (GitHub #134).
+    /// </summary>
     public void PlayFromUpNextAt(int index)
     {
         if (index < 0 || index >= UpNext.Count) return;
-        CancelAutoMixTransition("queue changed");
+        DebugLogger.Info(DebugLogger.Category.Playback, "PlayFromUpNextAt", $"index={index}, queueLen={UpNext.Count}");
+        CancelAutoMixTransition("user skipped");
         MarkQueueChanged();
-        var remaining = UpNext.Skip(index).ToList();
-        ReplaceQueueAndPlay(remaining, 0);
+
+        var target = UpNext[index];
+        _deferPlayedSync = true;
+        try
+        {
+            if (CurrentTrack != null)
+            {
+                History.Insert(0, CurrentTrack);
+                _queueHistoryDepth++;
+            }
+            if (KeepPlayedInQueue)
+            {
+                for (var i = 0; i < index; i++)
+                {
+                    History.Insert(0, UpNext[0]);
+                    UpNext.RemoveAt(0);
+                    _queueHistoryDepth++;
+                }
+                UpNext.RemoveAt(0);
+            }
+            else if (index == 0)
+            {
+                UpNext.RemoveAt(0);
+            }
+            else
+            {
+                UpNext.ReplaceAll(UpNext.Skip(index + 1).ToList());
+            }
+            TrimHistory();
+        }
+        finally { _deferPlayedSync = false; }
+        SyncPlayedTracks();
+        PlayTrack(target);
+        RefillRadioIfNeeded();
     }
 
     /// <summary>
