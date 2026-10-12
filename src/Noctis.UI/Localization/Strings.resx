@@ -446,24 +446,24 @@ Deezer and TIDAL: paste the link.</value></data>
   <data name="Settings.PreAmpDB" xml:space="preserve"><value>Pre-amp (dB)</value><comment>Text in SettingsView.axaml</comment></data>
   <data name="Settings.REMOTECONTROL" xml:space="preserve"><value>REMOTE CONTROL</value><comment>Text in SettingsView.axaml</comment></data>
   <data name="Settings.WebRemote" xml:space="preserve"><value>Web Remote</value><comment>Text in SettingsView.axaml</comment></data>
-  <data name="Settings.ControlPlaybackFromPhone" xml:space="preserve"><value>Control playback from your phone on the local network. Unencrypted, so avoid untrusted Wi-Fi.</value><comment>Text in SettingsView.axaml</comment></data>
+  <data name="Settings.ControlPlaybackFromPhone" xml:space="preserve"><value>Control what's playing from your phone's browser. No app needed. Only use it on Wi-Fi you trust.</value><comment>Text in SettingsView.axaml</comment></data>
   <data name="Settings.TapEnlargeTip" xml:space="preserve"><value>Tap to enlarge</value><comment>ToolTip.Tip in SettingsView.axaml</comment></data>
-  <data name="Settings.IfPhoneBlocksLink" xml:space="preserve"><value>If your phone flags the link as insecure, choose Continue. The remote uses plain HTTP.</value><comment>Text in SettingsView.axaml</comment></data>
+  <data name="Settings.IfPhoneBlocksLink" xml:space="preserve"><value>If your phone says the link isn't secure, tap Continue.</value><comment>Text in SettingsView.axaml</comment></data>
   <data name="Settings.OPENPHONE" xml:space="preserve"><value>OPEN ON YOUR PHONE</value><comment>Text in SettingsView.axaml</comment></data>
   <data name="Settings.CopyFullLinkIncludingTip" xml:space="preserve"><value>Copy the full link, including the access key</value><comment>ToolTip.Tip in SettingsView.axaml</comment></data>
   <data name="Settings.Copy" xml:space="preserve"><value>Copy</value><comment>Text in SettingsView.axaml</comment></data>
-  <data name="Settings.WaitingPhoneScanCode" xml:space="preserve"><value>Waiting for a phone. Scan the code or tap it to enlarge.</value><comment>Text in SettingsView.axaml</comment></data>
+  <data name="Settings.WaitingPhoneScanCode" xml:space="preserve"><value>Waiting for a phone. Tap the code to make it bigger.</value><comment>Text in SettingsView.axaml</comment></data>
   <data name="Settings.PhoneConnected" xml:space="preserve"><value>Phone connected</value><comment>Text in SettingsView.axaml</comment></data>
   <data name="Settings.LocalApi" xml:space="preserve"><value>Local API</value><comment>Text in SettingsView.axaml</comment></data>
-  <data name="Settings.LocalApiDesc" xml:space="preserve"><value>Let apps on this PC, like Stream Deck, OBS overlays and scripts, see what's playing and control playback. Only reachable from this PC.</value><comment>Text in SettingsView.axaml</comment></data>
+  <data name="Settings.LocalApiDesc" xml:space="preserve"><value>Lets apps on this PC, like Stream Deck or OBS, see what's playing and control Noctis.</value><comment>Text in SettingsView.axaml</comment></data>
   <data name="Settings.LocalApiAddress" xml:space="preserve"><value>ADDRESS</value><comment>Text in SettingsView.axaml</comment></data>
   <data name="Settings.LocalApiToken" xml:space="preserve"><value>TOKEN</value><comment>Text in SettingsView.axaml</comment></data>
   <data name="Settings.LocalApiShowToken" xml:space="preserve"><value>Show</value><comment>Reveals the Local API token</comment></data>
   <data name="Settings.LocalApiHideToken" xml:space="preserve"><value>Hide</value><comment>Masks the Local API token</comment></data>
   <data name="Settings.LocalApiRegenerate" xml:space="preserve"><value>Regenerate token</value><comment>Text in SettingsView.axaml</comment></data>
   <data name="Settings.LocalApiRegenerateTip" xml:space="preserve"><value>Make a new token. Apps using the old one stop working until you give them the new one.</value><comment>ToolTip.Tip in SettingsView.axaml</comment></data>
-  <data name="Settings.LocalApiWarning" xml:space="preserve"><value>Any program on this PC that has the token can control playback and read your library. Only share it with apps you trust, and regenerate it if it leaks.</value><comment>Text in SettingsView.axaml</comment></data>
-  <data name="Settings.LocalApiDiscovery" xml:space="preserve"><value>Apps can find the address and token in local-api.json in the Noctis data folder.</value><comment>Text in SettingsView.axaml</comment></data>
+  <data name="Settings.LocalApiWarning" xml:space="preserve"><value>Any app with this token can control Noctis and read your library. Only give it to apps you trust.</value><comment>Text in SettingsView.axaml</comment></data>
+  <data name="Settings.LocalApiDiscovery" xml:space="preserve"><value>Apps can also read it from local-api.json in the Noctis data folder.</value><comment>Text in SettingsView.axaml</comment></data>
   <data name="Settings.ACCOUNTS" xml:space="preserve"><value>ACCOUNTS</value><comment>Text in SettingsView.axaml</comment></data>
   <data name="Settings.DiscordRichPresence" xml:space="preserve"><value>Discord Rich Presence</value><comment>Text in SettingsView.axaml</comment></data>
   <data name="Settings.ShowCurrentSongDiscord" xml:space="preserve"><value>Show your current song on Discord.</value><comment>Text in SettingsView.axaml</comment></data>
@@ -2155,8 +2155,8 @@ Quote phrases: album:"ok computer" · Years: year:1990-1999, year:&gt;2000</valu
   <data name="Server.Title" xml:space="preserve"><value>Noctis Server</value></data>
   <data name="Server.Description" xml:space="preserve"><value>Let your phone and other devices browse and play this library. Works with any Subsonic app and the Noctis mobile app, over HTTPS.</value></data>
   <data name="Server.Port" xml:space="preserve"><value>Port</value></data>
-  <data name="Server.AddressLabel" xml:space="preserve"><value>SERVER ADDRESS</value></data>
-  <data name="Server.FingerprintLabel" xml:space="preserve"><value>CERTIFICATE FINGERPRINT (SHA-256) — compare when your phone asks to trust it</value></data>
+  <data name="Server.AddressLabel" xml:space="preserve"><value>ADDRESS</value></data>
+  <data name="Server.FingerprintLabel" xml:space="preserve"><value>SECURITY CODE</value></data>
   <data name="Server.Waiting" xml:space="preserve"><value>Waiting for a device to connect…</value></data>
   <data name="Server.Connected" xml:space="preserve"><value>Connected:</value></data>
   <data name="Server.Accounts" xml:space="preserve"><value>Accounts</value></data>
@@ -2166,7 +2166,7 @@ Quote phrases: album:"ok computer" · Years: year:1990-1999, year:&gt;2000</valu
   <data name="Server.NewApiKey" xml:space="preserve"><value>New API key</value></data>
   <data name="Server.Remove" xml:space="preserve"><value>Remove</value></data>
   <data name="Server.ApiKeyFor" xml:space="preserve"><value>API key for</value></data>
-  <data name="Server.ApiKeyOnce" xml:space="preserve"><value>Copy it now. It is shown once, and a new key replaces it.</value></data>
+  <data name="Server.ApiKeyOnce" xml:space="preserve"><value>Copy it now. You won't see it again.</value></data>
   <data name="Server.Done" xml:space="preserve"><value>Done</value></data>
   <data name="Server.UserName" xml:space="preserve"><value>User name</value></data>
   <data name="Server.Password" xml:space="preserve"><value>Password (8+ characters)</value></data>
@@ -2317,16 +2317,16 @@ Quote phrases: album:"ok computer" · Years: year:1990-1999, year:&gt;2000</valu
 
   <data name="AccountSync.YourAccount" xml:space="preserve"><value>YOUR ACCOUNT</value><comment>Account &amp; Sync section title</comment></data>
   <data name="AccountSync.CreateTitle" xml:space="preserve"><value>Create your account</value><comment>No-account state title</comment></data>
-  <data name="AccountSync.CreateHelp" xml:space="preserve"><value>Your devices sign in with this to browse, play and sync. The password is stored hashed and never leaves this computer.</value><comment>No-account state help</comment></data>
+  <data name="AccountSync.CreateHelp" xml:space="preserve"><value>Your phone signs in with this. Your password never leaves this PC.</value><comment>No-account state help</comment></data>
   <data name="AccountSync.Name" xml:space="preserve"><value>Name</value><comment>Create form watermark</comment></data>
   <data name="AccountSync.Password" xml:space="preserve"><value>Password (8+ characters)</value><comment>Create form watermark</comment></data>
   <data name="AccountSync.Create" xml:space="preserve"><value>Create</value><comment>Create form button</comment></data>
-  <data name="AccountSync.PairDevice" xml:space="preserve"><value>Pair a device</value><comment>Account card button</comment></data>
+  <data name="AccountSync.PairDevice" xml:space="preserve"><value>Connect a phone</value><comment>Account card button</comment></data>
   <data name="AccountSync.NewApiKey" xml:space="preserve"><value>New API key</value><comment>Account card button</comment></data>
   <data name="AccountSync.ChangePassword" xml:space="preserve"><value>Change password</value><comment>Account card button</comment></data>
   <data name="AccountSync.NewPassword" xml:space="preserve"><value>New password (8+ characters)</value><comment>Change password watermark</comment></data>
   <data name="AccountSync.Save" xml:space="preserve"><value>Save</value><comment>Change password button</comment></data>
-  <data name="AccountSync.Remove" xml:space="preserve"><value>Remove</value><comment>Account card button</comment></data>
+  <data name="AccountSync.Remove" xml:space="preserve"><value>Sign out</value><comment>Account card button</comment></data>
   <data name="AccountSync.PairHelp" xml:space="preserve"><value>On your phone, open Noctis or any Subsonic app, scan the code or type the address, and sign in.</value><comment>Pairing block help</comment></data>
   <data name="AccountSync.ServerOffHelp" xml:space="preserve"><value>Devices connect through Noctis Server on this computer. It is off.</value><comment>Pairing block when the server is off</comment></data>
   <data name="AccountSync.TurnOnServer" xml:space="preserve"><value>Turn on Noctis Server</value><comment>Pairing block button</comment></data>
@@ -2334,13 +2334,13 @@ Quote phrases: album:"ok computer" · Years: year:1990-1999, year:&gt;2000</valu
   <data name="AccountSync.OtherAccounts" xml:space="preserve"><value>OTHER ACCOUNTS</value><comment>Account &amp; Sync section title</comment></data>
   <data name="AccountSync.OtherTitle" xml:space="preserve"><value>Family and guests</value><comment>Other accounts card title</comment></data>
   <data name="AccountSync.OtherHelp" xml:space="preserve"><value>Extra accounts that can sign in from their own devices.</value><comment>Other accounts card help</comment></data>
-  <data name="AccountSync.PairPhoneHint" xml:space="preserve"><value>On your phone: Settings → Account, enter this address, your email or username and your password, and check the fingerprint matches.</value><comment>Pairing block help above the address and fingerprint</comment></data>
-  <data name="AccountSync.SignedInDevices" xml:space="preserve"><value>SIGNED-IN DEVICES</value><comment>Account card list label</comment></data>
-  <data name="AccountSync.NoSignedInDevices" xml:space="preserve"><value>No device has signed in yet.</value><comment>Account card list empty state</comment></data>
+  <data name="AccountSync.PairPhoneHint" xml:space="preserve"><value>In the Noctis app on your phone, go to Settings, then Account. Enter this address and sign in with your email or username and password.</value><comment>Pairing block help above the address and fingerprint</comment></data>
+  <data name="AccountSync.SignedInDevices" xml:space="preserve"><value>YOUR PHONES</value><comment>Account card list label</comment></data>
+  <data name="AccountSync.NoSignedInDevices" xml:space="preserve"><value>No phone connected yet.</value><comment>Account card list empty state</comment></data>
 
-  <data name="Sync.Title" xml:space="preserve"><value>Sync between your devices</value><comment>Sync card title</comment></data>
-  <data name="Sync.Description" xml:space="preserve"><value>Favourites, ratings, play counts and playlists stay the same on every signed-in device. The newest change wins.</value><comment>Sync card description</comment></data>
-  <data name="Sync.DeviceName" xml:space="preserve"><value>This device</value><comment>Sync card row label</comment></data>
+  <data name="Sync.Title" xml:space="preserve"><value>Sync with your phone</value><comment>Sync card title</comment></data>
+  <data name="Sync.Description" xml:space="preserve"><value>Favourites, ratings, play counts and playlists match on your phone and this PC.</value><comment>Sync card description</comment></data>
+  <data name="Sync.DeviceName" xml:space="preserve"><value>Name of this PC</value><comment>Sync card row label</comment></data>
   <data name="Sync.WhatSyncs" xml:space="preserve"><value>Music files stay where they are. Needs Noctis Server to be on.</value><comment>Sync card footnote</comment></data>
 
   <data name="LyricsStudioSettings.ModelSection" xml:space="preserve"><value>LYRICS MODEL</value><comment>Lyrics Studio tab section title</comment></data>
@@ -2608,4 +2608,32 @@ The lines and their timings are dropped and an empty lyrics box opens for your o
   <data name="Menu.RemoveBadge" xml:space="preserve"><value>Remove badge</value><comment>v2 right-click menu, Badge submenu</comment></data>
   <data name="Menu.RateTip" xml:space="preserve"><value>Rate {0} of 5</value><comment>v2 right-click menu rating star tooltip; {0} = number of stars</comment></data>
   <data name="Menu.ClearRating" xml:space="preserve"><value>Clear rating</value><comment>v2 right-click menu rating row clear button tooltip</comment></data>
+  <data name="Settings.Section.PhoneApp" xml:space="preserve"><value>Phone app</value><comment>Settings section label, Account &amp; Devices tab</comment></data>
+  <data name="Settings.Section.RemoteControl" xml:space="preserve"><value>Remote control</value><comment>Settings section label, Account &amp; Devices tab</comment></data>
+  <data name="Settings.Section.PcApps" xml:space="preserve"><value>Apps on this PC</value><comment>Settings section label, Account &amp; Devices tab (Local API)</comment></data>
+  <data name="Phone.Title" xml:space="preserve"><value>Noctis on your phone</value><comment>Phone app card title; its switch turns Noctis Server on/off</comment></data>
+  <data name="Phone.Description" xml:space="preserve"><value>Stream and download this library on your phone.</value><comment>Phone app card subtitle</comment></data>
+  <data name="Phone.NeedsAccount" xml:space="preserve"><value>Create your account above first.</value><comment>Phone app card, shown when there is no account</comment></data>
+  <data name="Phone.CodeHint" xml:space="preserve"><value>Your phone shows this code too. Only sign in if they match.</value><comment>Under the certificate security code in the pairing panel</comment></data>
+  <data name="Phone.Synced" xml:space="preserve"><value>Synced {0}</value><comment>Phone list row status; {0} = 'just now', '5 min ago', '3 h ago' or 'on 9 Oct, 14:05'</comment></data>
+  <data name="Phone.Connected" xml:space="preserve"><value>Connected {0}</value><comment>Phone list row status when sync is off or the phone never synced; {0} = relative time</comment></data>
+  <data name="Phone.SignedOut" xml:space="preserve"><value>Signed out</value><comment>Phone list row status: the sync data knows this phone but it no longer has a sign-in key</comment></data>
+  <data name="Phone.LastSynced" xml:space="preserve"><value>Last synced {0}</value><comment>Under the sync switch; {0} = relative time</comment></data>
+  <data name="Phone.NotSyncedYet" xml:space="preserve"><value>Not synced yet</value><comment>Under the sync switch when no phone has synced</comment></data>
+  <data name="Phone.SyncFailed" xml:space="preserve"><value>Couldn't read the sync data: {0}</value><comment>Under the sync switch; {0} = error message</comment></data>
+  <data name="Phone.SignOutTip" xml:space="preserve"><value>Sign this phone out. It needs your password to connect again.</value><comment>Tooltip on a phone's Sign out button</comment></data>
+  <data name="Phone.OtherAppsTitle" xml:space="preserve"><value>Other music apps</value><comment>Phone app card row title (Subsonic apps)</comment></data>
+  <data name="Phone.OtherAppsDesc" xml:space="preserve"><value>Subsonic apps like Symfonium can sign in with your email and an API key.</value><comment>Phone app card row text</comment></data>
+  <data name="Phone.NewApiKeyTip" xml:space="preserve"><value>Makes a new key. Apps using the old one need the new one.</value><comment>Tooltip on New API key</comment></data>
+  <data name="AccountSync.ShowPasswordTip" xml:space="preserve"><value>Show or hide the password</value><comment>Eye button tooltip in password boxes</comment></data>
+  <data name="AccountSync.ShowKeyTip" xml:space="preserve"><value>Show or hide the key</value><comment>Eye button tooltip on the API key</comment></data>
+  <data name="AccountSync.ChangePasswordNote" xml:space="preserve"><value>Your phones get signed out and need the new password.</value><comment>Under the change password box</comment></data>
+  <data name="AccountSync.DeleteAccountTip" xml:space="preserve"><value>Delete account</value><comment>Tooltip on the account's trash button</comment></data>
+  <data name="AccountSync.DeleteTitle" xml:space="preserve"><value>Delete your account?</value><comment>Delete account confirmation title</comment></data>
+  <data name="AccountSync.DeleteBody" xml:space="preserve"><value>Your phones get signed out and can't connect until you make a new account. Your music and library on this PC stay as they are.</value><comment>Delete account confirmation text</comment></data>
+  <data name="AccountSync.DeleteConfirm" xml:space="preserve"><value>Delete account</value><comment>Delete account confirmation button</comment></data>
+  <data name="Time.JustNow" xml:space="preserve"><value>just now</value><comment>Relative time, used after 'Synced', 'Connected', 'Last synced'</comment></data>
+  <data name="Time.MinutesAgo" xml:space="preserve"><value>{0} min ago</value><comment>Relative time; {0} = minutes</comment></data>
+  <data name="Time.HoursAgo" xml:space="preserve"><value>{0} h ago</value><comment>Relative time; {0} = hours</comment></data>
+  <data name="Time.OnDate" xml:space="preserve"><value>on {0}</value><comment>Relative time older than a day; {0} = date and time like '9 Oct, 14:05'</comment></data>
 </root>

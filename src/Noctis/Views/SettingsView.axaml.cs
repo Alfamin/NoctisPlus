@@ -364,8 +364,11 @@ public partial class SettingsView : UserControl
                 Dispatcher.UIThread.Post(LogStyleProbe, DispatcherPriority.Background);
                 break;
 
-            // Web Remote / Local API turned on: their body glides open below the fold
-            // (Local API is the page's last card), so follow the card down as it grows.
+            // Phone app / Web Remote / Local API turned on: their body glides open below the
+            // fold (Local API is the page's last card), so follow the card down as it grows.
+            case nameof(SettingsViewModel.IsPhoneCardOpen):
+                if (_trackedViewModel?.IsPhoneCardOpen == true) FollowReveal(PhoneCard, PhoneBody);
+                break;
             case nameof(SettingsViewModel.IsWebRemoteCardOpen):
                 if (_trackedViewModel?.IsWebRemoteCardOpen == true) FollowReveal(WebRemoteCard, WebRemoteBody);
                 break;

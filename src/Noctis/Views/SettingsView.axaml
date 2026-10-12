@@ -4919,6 +4919,8 @@
             </StackPanel>
 
             <StackPanel x:Name="AccountSyncTabPanel" Classes="tab-page" IsVisible="{Binding IsAccountDevicesTabVisible}" Spacing="4">
+            <!-- Four groups, one job each: the account, the phone app (server, pairing, devices,
+                 sync), the browser remote, and the API for apps on this PC. -->
             <TextBlock Classes="section-title" Text="{loc:T Settings.Section.YourAccount}" Margin="0,2,0,8"/>
             <Border Classes="setting-card group-card">
             <StackPanel>
@@ -5014,7 +5016,7 @@
                                     <KeyBinding Gesture="Enter" Command="{Binding CreatePrimaryAccountCommand}"/>
                                 </TextBox.KeyBindings>
                                 <TextBox.InnerRightContent>
-                                    <Button Classes="account-icon-btn" Command="{Binding TogglePasswordRevealCommand}" ToolTip.Tip="Show or hide the password">
+                                    <Button Classes="account-icon-btn" Command="{Binding TogglePasswordRevealCommand}" ToolTip.Tip="{loc:T AccountSync.ShowPasswordTip}">
                                         <Panel>
                                             <PathIcon Data="{StaticResource AccountEyeIcon}" IsVisible="{Binding !IsPasswordRevealed}"/>
                                             <PathIcon Data="{StaticResource AccountEyeOffIcon}" IsVisible="{Binding IsPasswordRevealed}"/>
@@ -5031,169 +5033,56 @@
                     </StackPanel>
                     </controls:CollapsibleContent>
 
-                    <!-- Account exists -->
+                    <!-- Account exists: only what belongs to the account itself. Pairing, devices
+                         and the API key for other apps live in the Phone app card below. -->
                     <controls:CollapsibleContent IsOpen="{Binding HasPrimaryAccount}" Lift="10" Motion="Glide">
                     <StackPanel Spacing="14">
-                        <!-- The account's actions, one row of icon pills (the picture and the account
-                             name are the profile row above: one avatar, not two). -->
                         <WrapPanel x:Name="AccountActions" ItemSpacing="8" LineSpacing="8">
-                            <Button Classes="accent-btn account-action" Command="{Binding TogglePairingCommand}"
-                                    Background="{DynamicResource AccentButtonBackground}" Foreground="{DynamicResource AccentForegroundBrush}">
-                                <StackPanel Orientation="Horizontal" Spacing="7">
-                                    <PathIcon Data="{StaticResource AccountPhoneIcon}" Foreground="{DynamicResource AccentForegroundBrush}"/>
-                                    <TextBlock Text="{loc:T AccountSync.PairDevice}" FontWeight="SemiBold"/>
-                                </StackPanel>
-                            </Button>
                             <Button Classes="pill-action account-action" Command="{Binding ToggleChangePasswordCommand}">
                                 <StackPanel Orientation="Horizontal" Spacing="7">
                                     <PathIcon Data="{StaticResource AccountLockIcon}"/>
                                     <TextBlock Text="{loc:T AccountSync.ChangePassword}"/>
                                 </StackPanel>
                             </Button>
-                            <Button Classes="pill-action account-action" Command="{Binding RegenerateServerApiKeyCommand}" CommandParameter="{Binding PrimaryAccount}">
-                                <StackPanel Orientation="Horizontal" Spacing="7">
-                                    <PathIcon Data="{StaticResource AccountKeyIcon}"/>
-                                    <TextBlock Text="{loc:T AccountSync.NewApiKey}"/>
-                                </StackPanel>
-                            </Button>
                             <Button x:Name="AccountRemoveButton" Classes="pill-action account-action account-remove" Command="{Binding DeleteServerUserCommand}" CommandParameter="{Binding PrimaryAccount}"
-                                    ToolTip.Tip="{loc:T AccountSync.Remove}">
+                                    ToolTip.Tip="{loc:T AccountSync.DeleteAccountTip}">
                                 <PathIcon Data="{StaticResource TrashIcon}" Foreground="#FF6B6B"/>
                             </Button>
                         </WrapPanel>
 
                         <!-- Change password (inline) -->
                         <controls:CollapsibleContent IsOpen="{Binding IsChangePasswordVisible}" Lift="10" Motion="Glide">
-                        <Grid ColumnDefinitions="*,Auto,Auto" ColumnSpacing="8" MaxWidth="560" HorizontalAlignment="Left">
-                            <TextBox Grid.Column="0" Text="{Binding ChangePasswordValue}" PasswordChar="•" RevealPassword="{Binding IsPasswordRevealed}"
-                                     Watermark="{loc:T AccountSync.NewPassword}" CornerRadius="999" Padding="14,8,4,8" BorderThickness="1.5" MinHeight="0" MinWidth="260">
-                                <TextBox.InnerRightContent>
-                                    <Button Classes="account-icon-btn" Command="{Binding TogglePasswordRevealCommand}" ToolTip.Tip="Show or hide the password">
-                                        <Panel>
-                                            <PathIcon Data="{StaticResource AccountEyeIcon}" IsVisible="{Binding !IsPasswordRevealed}"/>
-                                            <PathIcon Data="{StaticResource AccountEyeOffIcon}" IsVisible="{Binding IsPasswordRevealed}"/>
-                                        </Panel>
-                                    </Button>
-                                </TextBox.InnerRightContent>
-                            </TextBox>
-                            <Button Grid.Column="1" Classes="accent-btn account-action" Command="{Binding ChangePrimaryPasswordCommand}"
-                                    Background="{DynamicResource AccentButtonBackground}" Foreground="{DynamicResource AccentForegroundBrush}">
-                                <TextBlock Text="{loc:T AccountSync.Save}" FontWeight="SemiBold"/>
-                            </Button>
-                            <Button Grid.Column="2" Classes="pill-action account-action" Command="{Binding ToggleChangePasswordCommand}">
-                                <TextBlock Text="{loc:T Settings.Cancel}"/>
-                            </Button>
-                        </Grid>
-                        </controls:CollapsibleContent>
-
-                        <!-- Pairing: address + QR + fingerprint, or the switch to turn the server on -->
-                        <controls:CollapsibleContent IsOpen="{Binding IsPairingVisible}" Lift="10" Motion="Glide">
-                        <Border Background="#18000000" CornerRadius="12" Padding="14,12">
-                            <StackPanel Spacing="10">
-                                <StackPanel Spacing="10" IsVisible="{Binding NoctisServerUrl, Converter={x:Static StringConverters.IsNotNullOrEmpty}}">
-                                    <TextBlock Text="{loc:T AccountSync.PairPhoneHint}" FontSize="12" Opacity="0.75" TextWrapping="Wrap"/>
-                                    <Grid ColumnDefinitions="Auto,*">
-                                        <Border Grid.Column="0" CornerRadius="8" ClipToBounds="True" VerticalAlignment="Top"
-                                                IsVisible="{Binding NoctisServerQr, Converter={x:Static ObjectConverters.IsNotNull}}">
-                                            <Image Source="{Binding NoctisServerQr}" Width="96" Height="96"/>
-                                        </Border>
-                                        <StackPanel Grid.Column="1" Margin="14,0,0,0" Spacing="4" VerticalAlignment="Center">
-                                            <TextBlock Text="{loc:T Server.AddressLabel}" FontSize="10" Opacity="0.5"/>
-                                            <StackPanel Orientation="Horizontal" Spacing="8">
-                                                <SelectableTextBlock Text="{Binding NoctisServerUrl}" FontSize="14" FontWeight="SemiBold" VerticalAlignment="Center"/>
-                                                <Button Classes="pill-action" Command="{Binding CopyNoctisServerUrlCommand}">
-                                                    <TextBlock Text="{loc:T Settings.Copy}" FontSize="11"/>
-                                                </Button>
-                                                <TextBlock Text="{loc:T Settings.Copied}" FontSize="11" Foreground="{DynamicResource AccentColorBrush}" VerticalAlignment="Center" IsVisible="{Binding NoctisServerUrlCopied}"/>
-                                            </StackPanel>
-                                            <TextBlock Text="{loc:T Server.FingerprintLabel}" FontSize="10" Opacity="0.5" Margin="0,4,0,0" TextWrapping="Wrap"/>
-                                            <!-- What the phone shows before it trusts this computer: big enough to compare. -->
-                                            <SelectableTextBlock Text="{Binding NoctisServerFingerprint}" FontSize="13" FontWeight="SemiBold"
-                                                                 FontFamily="Consolas,Menlo,monospace" TextWrapping="Wrap"/>
-                                        </StackPanel>
-                                    </Grid>
-                                </StackPanel>
-                                <StackPanel Spacing="8" IsVisible="{Binding NoctisServerUrl, Converter={x:Static StringConverters.IsNullOrEmpty}}">
-                                    <TextBlock Text="{loc:T AccountSync.ServerOffHelp}" FontSize="12" Opacity="0.6" TextWrapping="Wrap"/>
-                                    <Button Classes="accent-btn" Command="{Binding TurnOnNoctisServerCommand}" Padding="16,8" CornerRadius="999" Cursor="Hand" HorizontalAlignment="Left"
-                                            Background="{DynamicResource AccentButtonBackground}" Foreground="{DynamicResource AccentForegroundBrush}">
-                                        <TextBlock Text="{loc:T AccountSync.TurnOnServer}" FontSize="12" FontWeight="SemiBold"/>
-                                    </Button>
-                                    <TextBlock Text="{Binding NoctisServerError}" FontSize="12" Foreground="#FF6B6B" TextWrapping="Wrap" IsVisible="{Binding NoctisServerStartFailed}"/>
-                                </StackPanel>
-                            </StackPanel>
-                        </Border>
-                        </controls:CollapsibleContent>
-
-                        <!-- Signed-in devices: each phone that signed in has its own key; Remove signs it out. -->
-                        <StackPanel Spacing="6">
-                            <TextBlock Text="{loc:T AccountSync.SignedInDevices}" FontSize="10" Opacity="0.5"/>
-                            <TextBlock Text="{loc:T AccountSync.NoSignedInDevices}" FontSize="12" Opacity="0.5" TextWrapping="Wrap"
-                                       IsVisible="{Binding !HasSignedInDevices}"/>
-                            <ItemsControl ItemsSource="{Binding SignedInDevices}" IsVisible="{Binding HasSignedInDevices}">
-                                <ItemsControl.ItemsPanel>
-                                    <ItemsPanelTemplate><StackPanel Spacing="4"/></ItemsPanelTemplate>
-                                </ItemsControl.ItemsPanel>
-                                <ItemsControl.ItemTemplate>
-                                    <DataTemplate x:DataType="vm:SettingsViewModel+SignedInDeviceRow">
-                                        <Grid ColumnDefinitions="Auto,*,Auto,Auto" ColumnSpacing="8">
-                                            <Ellipse Grid.Column="0" Width="6" Height="6" Fill="#4DC26B" VerticalAlignment="Center"/>
-                                            <TextBlock Grid.Column="1" Text="{Binding Name}" FontSize="12" FontWeight="SemiBold" VerticalAlignment="Center" TextTrimming="CharacterEllipsis"/>
-                                            <TextBlock Grid.Column="2" Text="{Binding LastUsedText}" FontSize="11" Opacity="0.55" VerticalAlignment="Center"/>
-                                            <Button Grid.Column="3" Classes="pill-action" Cursor="Hand"
-                                                    Command="{Binding $parent[UserControl].((vm:SettingsViewModel)DataContext).RemoveSignedInDeviceCommand}"
-                                                    CommandParameter="{Binding}">
-                                                <TextBlock Text="{loc:T AccountSync.Remove}" FontSize="11" Foreground="#FF6B6B"/>
-                                            </Button>
-                                        </Grid>
-                                    </DataTemplate>
-                                </ItemsControl.ItemTemplate>
-                            </ItemsControl>
+                        <StackPanel Spacing="8">
+                            <Grid ColumnDefinitions="*,Auto,Auto" ColumnSpacing="8" MaxWidth="560" HorizontalAlignment="Left">
+                                <TextBox Grid.Column="0" Text="{Binding ChangePasswordValue}" PasswordChar="•" RevealPassword="{Binding IsPasswordRevealed}"
+                                         Watermark="{loc:T AccountSync.NewPassword}" CornerRadius="999" Padding="14,8,4,8" BorderThickness="1.5" MinHeight="0" MinWidth="260">
+                                    <TextBox.KeyBindings>
+                                        <KeyBinding Gesture="Enter" Command="{Binding ChangePrimaryPasswordCommand}"/>
+                                    </TextBox.KeyBindings>
+                                    <TextBox.InnerRightContent>
+                                        <Button Classes="account-icon-btn" Command="{Binding TogglePasswordRevealCommand}" ToolTip.Tip="{loc:T AccountSync.ShowPasswordTip}">
+                                            <Panel>
+                                                <PathIcon Data="{StaticResource AccountEyeIcon}" IsVisible="{Binding !IsPasswordRevealed}"/>
+                                                <PathIcon Data="{StaticResource AccountEyeOffIcon}" IsVisible="{Binding IsPasswordRevealed}"/>
+                                            </Panel>
+                                        </Button>
+                                    </TextBox.InnerRightContent>
+                                </TextBox>
+                                <Button Grid.Column="1" Classes="accent-btn account-action" Command="{Binding ChangePrimaryPasswordCommand}"
+                                        Background="{DynamicResource AccentButtonBackground}" Foreground="{DynamicResource AccentForegroundBrush}">
+                                    <TextBlock Text="{loc:T AccountSync.Save}" FontWeight="SemiBold"/>
+                                </Button>
+                                <Button Grid.Column="2" Classes="pill-action account-action" Command="{Binding ToggleChangePasswordCommand}">
+                                    <TextBlock Text="{loc:T Settings.Cancel}"/>
+                                </Button>
+                            </Grid>
+                            <!-- ServerUserStore.ChangePassword drops every device key: say so before Save. -->
+                            <TextBlock Text="{loc:T AccountSync.ChangePasswordNote}" FontSize="11.5" Opacity="0.55" TextWrapping="Wrap"/>
                         </StackPanel>
+                        </controls:CollapsibleContent>
                     </StackPanel>
                     </controls:CollapsibleContent>
 
-                    <!-- Freshly issued key: shown once, never stored in clear. Hidden behind dots until
-                     the eye is pressed; Copy works either way. -->
-                    <controls:CollapsibleContent IsOpen="{Binding IsIssuedApiKeyOpen}" Lift="10" Motion="Glide">
-                    <Border x:Name="ApiKeyPanel" Background="#18000000" CornerRadius="14" Padding="14,12">
-                        <StackPanel Spacing="10">
-                            <StackPanel Orientation="Horizontal" Spacing="8">
-                                <PathIcon Data="{StaticResource AccountKeyIcon}" Width="14" Height="14" Opacity="0.75" VerticalAlignment="Center"/>
-                                <TextBlock FontSize="13" FontWeight="SemiBold" VerticalAlignment="Center">
-                                    <Run Text="{loc:T Server.ApiKeyFor}"/> <Run Text="{Binding IssuedApiKeyUser}"/>
-                                </TextBlock>
-                            </StackPanel>
-                            <Border Background="#22808080" CornerRadius="999" Padding="16,4,6,4" HorizontalAlignment="Left" MaxWidth="560">
-                                <Grid ColumnDefinitions="*,Auto,Auto" ColumnSpacing="2">
-                                    <SelectableTextBlock x:Name="ApiKeyText" Text="{Binding DisplayedApiKey}" FontSize="13" FontFamily="Consolas,Menlo,monospace"
-                                                         VerticalAlignment="Center" TextTrimming="CharacterEllipsis" MinWidth="220"/>
-                                    <Button Grid.Column="1" x:Name="ApiKeyRevealButton" Classes="account-icon-btn" Command="{Binding ToggleIssuedApiKeyRevealCommand}"
-                                            ToolTip.Tip="Show or hide the key">
-                                        <Panel>
-                                            <PathIcon Data="{StaticResource AccountEyeIcon}" IsVisible="{Binding !IsIssuedApiKeyRevealed}"/>
-                                            <PathIcon Data="{StaticResource AccountEyeOffIcon}" IsVisible="{Binding IsIssuedApiKeyRevealed}"/>
-                                        </Panel>
-                                    </Button>
-                                    <Button Grid.Column="2" x:Name="ApiKeyCopyButton" Classes="account-icon-btn" Command="{Binding CopyIssuedApiKeyCommand}"
-                                            ToolTip.Tip="{loc:T Settings.Copy}">
-                                        <Panel>
-                                            <PathIcon Data="{StaticResource CopyIcon}" IsVisible="{Binding !IssuedApiKeyCopied}"/>
-                                            <PathIcon Data="{StaticResource CheckmarkIcon}" IsVisible="{Binding IssuedApiKeyCopied}"
-                                                      Foreground="{DynamicResource AccentColorBrush}"/>
-                                        </Panel>
-                                    </Button>
-                                </Grid>
-                            </Border>
-                            <Grid ColumnDefinitions="*,Auto" ColumnSpacing="12">
-                                <TextBlock Text="{loc:T Server.ApiKeyOnce}" FontSize="11.5" Opacity="0.6" TextWrapping="Wrap" VerticalAlignment="Center"/>
-                                <Button Grid.Column="1" Classes="pill-action account-action" Command="{Binding HideIssuedApiKeyCommand}">
-                                    <TextBlock Text="{loc:T Server.Done}"/>
-                                </Button>
-                            </Grid>
-                        </StackPanel>
-                    </Border>
-                    </controls:CollapsibleContent>
                     <!-- Fixed-height slot: the message appearing and leaving must not reflow the
                          card (it read as the page shaking). -->
                     <Panel MinHeight="18">
@@ -5205,58 +5094,192 @@
             </StackPanel>
             </Border>
 
-            <Border Classes="setting-card group-card" Margin="0,14,0,10">
+            <!-- Phone app: the switch is Noctis Server itself (phones and Subsonic apps connect
+                 through it), so turning it off really stops the server. Pairing, the devices,
+                 sync and the PC's name only show while it runs. -->
+            <TextBlock Classes="section-title" Text="{loc:T Settings.Section.PhoneApp}" Margin="0,16,0,8"/>
+            <Border x:Name="PhoneCard" Classes="setting-card group-card">
             <StackPanel>
-            <!-- Coming soon: see the account card above. -->
             <Border Classes="setting-row" Classes.parked="{Binding !AccountFeaturesEnabled}" IsEnabled="{Binding AccountFeaturesEnabled}">
-                <StackPanel Spacing="12">
+                <StackPanel>
                     <Grid ColumnDefinitions="*,Auto">
                         <StackPanel Grid.Column="0" Spacing="2">
                             <StackPanel Orientation="Horizontal" Spacing="8">
-                                <TextBlock Text="{loc:T Sync.Title}" FontSize="15" FontWeight="SemiBold" VerticalAlignment="Center"/>
+                                <TextBlock Text="{loc:T Phone.Title}" FontSize="15" FontWeight="SemiBold" VerticalAlignment="Center"/>
                                 <Border Background="{DynamicResource AccentColorBrush}" CornerRadius="999" Padding="7,2" VerticalAlignment="Center"
                                         IsVisible="{Binding !AccountFeaturesEnabled}">
                                     <TextBlock Text="{loc:T Settings.ComingSoon}" FontSize="10" FontWeight="SemiBold"
                                                Foreground="{DynamicResource AccentForegroundBrush}"/>
                                 </Border>
                             </StackPanel>
-                            <TextBlock Text="{loc:T Sync.Description}" FontSize="12" Opacity="0.5" TextWrapping="Wrap"/>
+                            <TextBlock Text="{loc:T Phone.Description}" FontSize="12" Opacity="0.5" TextWrapping="Wrap"/>
                         </StackPanel>
-                        <controls:LottieToggle Grid.Column="1" IsChecked="{Binding SyncEnabled}" VerticalAlignment="Center"/>
+                        <controls:LottieToggle x:Name="PhoneServerToggle" Grid.Column="1" IsChecked="{Binding NoctisServerEnabled}" VerticalAlignment="Center"/>
                     </Grid>
-                    <Border Background="#18000000" CornerRadius="10" Padding="12,10">
-                        <StackPanel Spacing="8">
-                            <TextBlock Text="{Binding SyncStatusText}" FontSize="12" Opacity="0.8" TextWrapping="Wrap"/>
-                            <controls:CollapsibleContent IsOpen="{Binding HasSyncDevices}" Lift="6">
-                            <ItemsControl ItemsSource="{Binding SyncDevices}">
+                    <TextBlock Text="{loc:T Phone.NeedsAccount}" FontSize="12" Opacity="0.6" TextWrapping="Wrap" Margin="0,8,0,0"
+                               IsVisible="{Binding !HasPrimaryAccount}"/>
+                    <TextBlock Text="{Binding NoctisServerError}" FontSize="12" Foreground="#FF6B6B" TextWrapping="Wrap" Margin="0,8,0,0"
+                               IsVisible="{Binding NoctisServerStartFailed}"/>
+
+                    <controls:CollapsibleContent x:Name="PhoneBody" IsOpen="{Binding IsPhoneCardOpen}" Lift="10" Motion="Glide">
+                    <StackPanel Spacing="14" Margin="0,14,0,0">
+                        <!-- Connect a phone: the address and the security code. No QR here: the
+                             phone app types the address (it has no scanner), and a camera app
+                             would only open the server's address in a browser. -->
+                        <Button Classes="accent-btn account-action" Command="{Binding TogglePairingCommand}" HorizontalAlignment="Left"
+                                Background="{DynamicResource AccentButtonBackground}" Foreground="{DynamicResource AccentForegroundBrush}">
+                            <StackPanel Orientation="Horizontal" Spacing="7">
+                                <PathIcon Data="{StaticResource AccountPhoneIcon}" Foreground="{DynamicResource AccentForegroundBrush}"/>
+                                <TextBlock Text="{loc:T AccountSync.PairDevice}" FontWeight="SemiBold"/>
+                            </StackPanel>
+                        </Button>
+                        <controls:CollapsibleContent IsOpen="{Binding IsPairingVisible}" Lift="10" Motion="Glide">
+                        <Border x:Name="PairingPanel" Background="#18000000" CornerRadius="12" Padding="14,12">
+                            <StackPanel Spacing="10">
+                                <TextBlock Text="{loc:T AccountSync.PairPhoneHint}" FontSize="12" Opacity="0.75" TextWrapping="Wrap"/>
+                                <StackPanel Spacing="4">
+                                    <TextBlock Text="{loc:T Server.AddressLabel}" FontSize="10" Opacity="0.5"/>
+                                    <StackPanel Orientation="Horizontal" Spacing="8">
+                                        <SelectableTextBlock Text="{Binding NoctisServerUrl}" FontSize="14" FontWeight="SemiBold" VerticalAlignment="Center"/>
+                                        <Button Classes="pill-action" Command="{Binding CopyNoctisServerUrlCommand}">
+                                            <TextBlock Text="{loc:T Settings.Copy}" FontSize="11"/>
+                                        </Button>
+                                        <TextBlock Text="{loc:T Settings.Copied}" FontSize="11" Foreground="{DynamicResource AccentColorBrush}" VerticalAlignment="Center" IsVisible="{Binding NoctisServerUrlCopied}"/>
+                                </StackPanel>
+                                <TextBlock Text="{loc:T Server.FingerprintLabel}" FontSize="10" Opacity="0.5" Margin="0,4,0,0"/>
+                                <!-- What the phone shows before it trusts this computer: big enough to compare. -->
+                                <SelectableTextBlock Text="{Binding NoctisServerFingerprint}" FontSize="13" FontWeight="SemiBold"
+                                                     FontFamily="Consolas,Menlo,monospace" TextWrapping="Wrap"/>
+                                <TextBlock Text="{loc:T Phone.CodeHint}" FontSize="11" Opacity="0.55" TextWrapping="Wrap"/>
+                                </StackPanel>
+                            </StackPanel>
+                        </Border>
+                        </controls:CollapsibleContent>
+
+                        <!-- One list for every phone: signed in or not, and when it last synced
+                             (the server's device keys joined with the sync ledger's devices). -->
+                        <StackPanel x:Name="PhoneDevicesList" Spacing="6">
+                            <TextBlock Text="{loc:T AccountSync.SignedInDevices}" FontSize="10" Opacity="0.5"/>
+                            <TextBlock Text="{loc:T AccountSync.NoSignedInDevices}" FontSize="12" Opacity="0.5" TextWrapping="Wrap"
+                                       IsVisible="{Binding !HasPhoneDevices}"/>
+                            <ItemsControl ItemsSource="{Binding PhoneDevices}" IsVisible="{Binding HasPhoneDevices}">
                                 <ItemsControl.ItemsPanel>
                                     <ItemsPanelTemplate><StackPanel Spacing="4"/></ItemsPanelTemplate>
                                 </ItemsControl.ItemsPanel>
                                 <ItemsControl.ItemTemplate>
-                                    <DataTemplate x:DataType="vm:SettingsViewModel+SyncDeviceRow">
-                                        <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="8">
-                                            <Ellipse Grid.Column="0" Width="6" Height="6" Fill="#4DC26B" VerticalAlignment="Center"/>
-                                            <TextBlock Grid.Column="1" Text="{Binding Name}" FontSize="12" FontWeight="SemiBold" VerticalAlignment="Center"/>
-                                            <TextBlock Grid.Column="2" Text="{Binding LastSeenText}" FontSize="11" Opacity="0.55" VerticalAlignment="Center"/>
+                                    <DataTemplate x:DataType="vm:SettingsViewModel+PhoneDeviceRow">
+                                        <Grid ColumnDefinitions="Auto,*,Auto,Auto" ColumnSpacing="8" MinHeight="26">
+                                            <Panel Grid.Column="0" VerticalAlignment="Center">
+                                                <Ellipse Width="6" Height="6" Fill="#4DC26B" IsVisible="{Binding IsSignedIn}"/>
+                                                <Ellipse Width="6" Height="6" Fill="#808080" IsVisible="{Binding !IsSignedIn}"/>
+                                            </Panel>
+                                            <TextBlock Grid.Column="1" Text="{Binding Name}" FontSize="12" FontWeight="SemiBold" VerticalAlignment="Center" TextTrimming="CharacterEllipsis"/>
+                                            <TextBlock Grid.Column="2" Text="{Binding StatusText}" FontSize="11" Opacity="0.55" VerticalAlignment="Center"/>
+                                            <Button Grid.Column="3" Classes="pill-action" Cursor="Hand" IsVisible="{Binding IsSignedIn}"
+                                                    ToolTip.Tip="{loc:T Phone.SignOutTip}"
+                                                    Command="{Binding $parent[UserControl].((vm:SettingsViewModel)DataContext).RemoveSignedInDeviceCommand}"
+                                                    CommandParameter="{Binding}">
+                                                <TextBlock Text="{loc:T AccountSync.Remove}" FontSize="11" Foreground="#FF6B6B"/>
+                                            </Button>
                                         </Grid>
                                     </DataTemplate>
                                 </ItemsControl.ItemTemplate>
                             </ItemsControl>
-                            </controls:CollapsibleContent>
                         </StackPanel>
-                    </Border>
-                    <Grid Classes="sub-setting" ColumnDefinitions="140,*" IsEnabled="{Binding SyncEnabled}">
-                        <TextBlock Grid.Column="0" Text="{loc:T Sync.DeviceName}" VerticalAlignment="Center"/>
-                        <TextBox Grid.Column="1" Text="{Binding SyncDeviceName}" MaxWidth="320" HorizontalAlignment="Left" MinWidth="220"
-                                 CornerRadius="999" Padding="14,8" BorderThickness="1.5" MinHeight="0"/>
-                    </Grid>
-                    <TextBlock Text="{loc:T Sync.WhatSyncs}" FontSize="11" Opacity="0.5" TextWrapping="Wrap"/>
+
+                        <!-- Sync: whether a phone that connects also shares favourites, ratings,
+                             play counts and playlists, and when that last happened. -->
+                        <Border Background="#18000000" CornerRadius="10" Padding="12,10">
+                            <StackPanel Spacing="10">
+                                <Grid ColumnDefinitions="*,Auto" ColumnSpacing="12">
+                                    <StackPanel Grid.Column="0" Spacing="2">
+                                        <TextBlock Text="{loc:T Sync.Title}" FontSize="13" FontWeight="SemiBold"/>
+                                        <TextBlock Text="{loc:T Sync.Description}" FontSize="12" Opacity="0.55" TextWrapping="Wrap"/>
+                                    </StackPanel>
+                                    <controls:LottieToggle x:Name="PhoneSyncToggle" Grid.Column="1" IsChecked="{Binding SyncEnabled}" VerticalAlignment="Center"/>
+                                </Grid>
+                                <StackPanel Orientation="Horizontal" Spacing="6"
+                                            IsVisible="{Binding SyncStatusText, Converter={x:Static StringConverters.IsNotNullOrEmpty}}">
+                                    <PathIcon Data="{StaticResource SyncIcon}" Width="11" Height="11" Opacity="0.6" VerticalAlignment="Center"/>
+                                    <TextBlock x:Name="LastSyncedLabel" Text="{Binding SyncStatusText}" FontSize="11.5" Opacity="0.7"
+                                               VerticalAlignment="Center" TextWrapping="Wrap"/>
+                                </StackPanel>
+                            </StackPanel>
+                        </Border>
+
+                        <Grid Classes="sub-setting" ColumnDefinitions="140,*">
+                            <TextBlock Grid.Column="0" Text="{loc:T Sync.DeviceName}" VerticalAlignment="Center"/>
+                            <TextBox Grid.Column="1" Text="{Binding SyncDeviceName}" MaxWidth="320" HorizontalAlignment="Left" MinWidth="220"
+                                     CornerRadius="999" Padding="14,8" BorderThickness="1.5" MinHeight="0"/>
+                        </Grid>
+
+                        <!-- Subsonic apps (Symfonium and the like) sign in with the email and the
+                             account's API key; a new key replaces the old one. -->
+                        <Grid ColumnDefinitions="*,Auto" ColumnSpacing="12" IsVisible="{Binding HasPrimaryAccount}">
+                            <StackPanel Grid.Column="0" Spacing="2" VerticalAlignment="Center">
+                                <TextBlock Text="{loc:T Phone.OtherAppsTitle}" FontSize="13" FontWeight="SemiBold"/>
+                                <TextBlock Text="{loc:T Phone.OtherAppsDesc}" FontSize="12" Opacity="0.55" TextWrapping="Wrap"/>
+                            </StackPanel>
+                            <Button Grid.Column="1" Classes="pill-action account-action" VerticalAlignment="Center"
+                                    Command="{Binding RegenerateServerApiKeyCommand}" CommandParameter="{Binding PrimaryAccount}"
+                                    ToolTip.Tip="{loc:T Phone.NewApiKeyTip}">
+                                <StackPanel Orientation="Horizontal" Spacing="7">
+                                    <PathIcon Data="{StaticResource AccountKeyIcon}"/>
+                                    <TextBlock Text="{loc:T AccountSync.NewApiKey}"/>
+                                </StackPanel>
+                            </Button>
+                        </Grid>
+
+                        <!-- Freshly issued key: shown once, never stored in clear. Hidden behind dots until
+                             the eye is pressed; Copy works either way. -->
+                        <controls:CollapsibleContent IsOpen="{Binding IsIssuedApiKeyOpen}" Lift="10" Motion="Glide">
+                        <Border x:Name="ApiKeyPanel" Background="#18000000" CornerRadius="14" Padding="14,12">
+                            <StackPanel Spacing="10">
+                                <StackPanel Orientation="Horizontal" Spacing="8">
+                                    <PathIcon Data="{StaticResource AccountKeyIcon}" Width="14" Height="14" Opacity="0.75" VerticalAlignment="Center"/>
+                                    <TextBlock FontSize="13" FontWeight="SemiBold" VerticalAlignment="Center">
+                                        <Run Text="{loc:T Server.ApiKeyFor}"/> <Run Text="{Binding IssuedApiKeyUser}"/>
+                                    </TextBlock>
+                                </StackPanel>
+                                <Border Background="#22808080" CornerRadius="999" Padding="16,4,6,4" HorizontalAlignment="Left" MaxWidth="560">
+                                    <Grid ColumnDefinitions="*,Auto,Auto" ColumnSpacing="2">
+                                        <SelectableTextBlock x:Name="ApiKeyText" Text="{Binding DisplayedApiKey}" FontSize="13" FontFamily="Consolas,Menlo,monospace"
+                                                             VerticalAlignment="Center" TextTrimming="CharacterEllipsis" MinWidth="220"/>
+                                        <Button Grid.Column="1" x:Name="ApiKeyRevealButton" Classes="account-icon-btn" Command="{Binding ToggleIssuedApiKeyRevealCommand}"
+                                                ToolTip.Tip="{loc:T AccountSync.ShowKeyTip}">
+                                            <Panel>
+                                                <PathIcon Data="{StaticResource AccountEyeIcon}" IsVisible="{Binding !IsIssuedApiKeyRevealed}"/>
+                                                <PathIcon Data="{StaticResource AccountEyeOffIcon}" IsVisible="{Binding IsIssuedApiKeyRevealed}"/>
+                                            </Panel>
+                                        </Button>
+                                        <Button Grid.Column="2" x:Name="ApiKeyCopyButton" Classes="account-icon-btn" Command="{Binding CopyIssuedApiKeyCommand}"
+                                                ToolTip.Tip="{loc:T Settings.Copy}">
+                                            <Panel>
+                                                <PathIcon Data="{StaticResource CopyIcon}" IsVisible="{Binding !IssuedApiKeyCopied}"/>
+                                                <PathIcon Data="{StaticResource CheckmarkIcon}" IsVisible="{Binding IssuedApiKeyCopied}"
+                                                          Foreground="{DynamicResource AccentColorBrush}"/>
+                                            </Panel>
+                                        </Button>
+                                    </Grid>
+                                </Border>
+                                <Grid ColumnDefinitions="*,Auto" ColumnSpacing="12">
+                                    <TextBlock Text="{loc:T Server.ApiKeyOnce}" FontSize="11.5" Opacity="0.6" TextWrapping="Wrap" VerticalAlignment="Center"/>
+                                    <Button Grid.Column="1" Classes="pill-action account-action" Command="{Binding HideIssuedApiKeyCommand}">
+                                        <TextBlock Text="{loc:T Server.Done}"/>
+                                    </Button>
+                                </Grid>
+                            </StackPanel>
+                        </Border>
+                        </controls:CollapsibleContent>
+                    </StackPanel>
+                    </controls:CollapsibleContent>
                 </StackPanel>
             </Border>
             </StackPanel>
             </Border>
 
-            <Border x:Name="WebRemoteCard" Classes="setting-card group-card" Margin="0,14,0,10">
+            <TextBlock Classes="section-title" Text="{loc:T Settings.Section.RemoteControl}" Margin="0,16,0,8"/>
+            <Border x:Name="WebRemoteCard" Classes="setting-card group-card">
             <StackPanel>
             <Border Classes="setting-row">
                 <StackPanel Spacing="10">
@@ -5345,7 +5368,8 @@
 
             <!-- Local API: loopback automation for Stream Deck / OBS / scripts (docs/LOCAL-API.md).
                  The token is masked until revealed, like the remote's key. -->
-            <Border x:Name="LocalApiCard" Classes="setting-card group-card" Margin="0,4,0,10">
+            <TextBlock Classes="section-title" Text="{loc:T Settings.Section.PcApps}" Margin="0,16,0,8"/>
+            <Border x:Name="LocalApiCard" Classes="setting-card group-card" Margin="0,0,0,10">
             <StackPanel>
             <Border Classes="setting-row">
                 <StackPanel Spacing="10">

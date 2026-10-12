@@ -318,6 +318,9 @@ public class AppSettings
     /// <summary>Sync favorites / ratings / play counts / playlists with devices that log into the Noctis server.</summary>
     public bool SyncEnabled { get; set; }
 
+    /// <summary>The user switched sync off: letting phones connect again later leaves it off.</summary>
+    public bool SyncTurnedOffByUser { get; set; }
+
     /// <summary>How this computer shows up in other devices' sync status. Empty = machine name.</summary>
     public string SyncDeviceName { get; set; } = string.Empty;
 

@@ -44,11 +44,14 @@ public partial class SettingsViewModel
     private ILibrarySyncService? _sync;
     private ILibrarySyncService? Sync => _sync ??= ResolveSync();
 
+    /// <summary>Tests hand in a ledger; the app resolves it from <see cref="App.Services"/>.</summary>
+    internal ILibrarySyncService? SyncServiceOverride { get => _sync; set => _sync = value; }
+
     private ILibrarySyncService? ResolveSync()
     {
         var sync = App.Services?.GetService<ILibrarySyncService>();
         if (sync is not null)
-            sync.Changed += (_, _) => Dispatcher.UIThread.Post(RefreshSyncStatus);
+            sync.Changed += (_, _) => Dispatcher.UIThread.Post(RefreshPhoneDevices);
         return sync;
     }
 
@@ -58,10 +61,9 @@ public partial class SettingsViewModel
 
     [ObservableProperty] private bool _syncEnabled;
     [ObservableProperty] private string _syncDeviceName = string.Empty;
+    /// <summary>The line under the sync switch: "Last synced 4 h ago", "Not synced yet", empty while off.</summary>
     [ObservableProperty] private string _syncStatusText = string.Empty;
     [ObservableProperty] private string _syncDeviceIdText = string.Empty;
-    public ObservableCollection<SyncDeviceRow> SyncDevices { get; } = new();
-    public bool HasSyncDevices => SyncDevices.Count > 0;
 
     /// <summary>The account this computer's owner uses on their devices: the first admin, else the first account.</summary>
     public ServerUser? PrimaryAccount => ServerUsersList.FirstOrDefault(u => u.IsAdmin) ?? ServerUsersList.FirstOrDefault();
@@ -92,6 +94,7 @@ public partial class SettingsViewModel
         if (!AccountFeatures.Enabled) { if (value) SyncEnabled = false; return; }
         if (!_settingsLoaded) return;
         _settings.SyncEnabled = value;
+        _syncTurnedOffByUser = !value;
         _ = SaveAsync();
         if (value)
         {
@@ -108,7 +111,7 @@ public partial class SettingsViewModel
                 catch (Exception ex) { DebugLogger.Warn(DebugLogger.Category.State, "Sync.SeedFailed", ex.Message); }
             });
         }
-        RefreshSyncStatus();
+        RefreshPhoneDevices();
     }
 
     partial void OnSyncDeviceNameChanged(string value)
@@ -118,92 +121,122 @@ public partial class SettingsViewModel
         QueueSettingsSave();
     }
 
-    private const string SyncOffText = "Off. Turn on to share favourites, ratings, play counts and playlists with your other devices.";
+    // ── Phone app: one list of phones, and when they last synced ──
 
-    private void RefreshSyncStatus()
-    {
-        SyncDeviceIdText = Sync?.DeviceId ?? string.Empty;
-        SyncDevices.Clear();
-        // No ledger (parked, see Program's AccountFeatures gate): the card still reads as off.
-        if (Sync is not { } sync) { SyncStatusText = AccountFeatures.Enabled ? string.Empty : SyncOffText; OnPropertyChanged(nameof(HasSyncDevices)); return; }
-        try
-        {
-            var devices = sync.Devices().Where(d => !string.Equals(d.Id, sync.DeviceId, StringComparison.OrdinalIgnoreCase)).ToList();
-            foreach (var d in devices) SyncDevices.Add(new SyncDeviceRow(d));
-            if (!SyncEnabled) SyncStatusText = SyncOffText;
-            else if (!NoctisServerEnabled) SyncStatusText = "Waiting for Noctis Server — devices sync through it. Turn it on below.";
-            else if (devices.Count == 0) SyncStatusText = "On. No device has synced yet — sign in from the Noctis app on your phone.";
-            else SyncStatusText = $"On · {devices.Count} device{(devices.Count == 1 ? "" : "s")} · {sync.CurrentSeq} changes in the ledger";
-        }
-        catch (Exception ex)
-        {
-            SyncStatusText = $"Sync ledger unavailable — {ex.Message}";
-        }
-        OnPropertyChanged(nameof(HasSyncDevices));
-    }
+    public ObservableCollection<PhoneDeviceRow> PhoneDevices { get; } = new();
+    public bool HasPhoneDevices => PhoneDevices.Count > 0;
+
+    /// <summary>The phone card's body (pairing, devices, sync): the server is on and listening.</summary>
+    public bool IsPhoneCardOpen => NoctisServerEnabled && NoctisServerUrl.Length > 0;
 
     /// <summary>
-    /// "Pair a device": everything the phone needs, in one click — the server on (it is how the
-    /// phone connects) and sync on (with its first-enable seeding), then the address and the
-    /// certificate fingerprint to type/compare on the phone.
+    /// Phones signed in with a device key, each with when it last synced, then phones the sync
+    /// ledger still knows but whose key is gone (signed out, removed, or a password change). The
+    /// two used to be separate lists in separate cards and could disagree (a phone "Synced 4 h
+    /// ago" under "No device has signed in yet"). Also sets the "Last synced" line.
     /// </summary>
+    private void RefreshPhoneDevices()
+    {
+        IReadOnlyList<ServerDevice> keys = Array.Empty<ServerDevice>();
+        try { keys = ServerUsers.Devices(); }
+        catch (Exception ex) { ShowServerUserError(ex.Message); }
+
+        IReadOnlyList<SyncDevice> synced = Array.Empty<SyncDevice>();
+        string? ledgerError = null;
+        if (Sync is { } sync)
+        {
+            SyncDeviceIdText = sync.DeviceId;
+            try { synced = sync.Devices().Where(d => !string.Equals(d.Id, sync.DeviceId, StringComparison.OrdinalIgnoreCase)).ToList(); }
+            catch (Exception ex) { ledgerError = ex.Message; }
+        }
+
+        var now = DateTime.UtcNow;
+        PhoneDevices.Clear();
+        foreach (var row in BuildPhoneDeviceRows(keys, synced, SyncEnabled, now)) PhoneDevices.Add(row);
+        OnPropertyChanged(nameof(HasPhoneDevices));
+        SyncStatusText = ledgerError is not null ? Localization.Loc.T("Phone.SyncFailed", ledgerError)
+            : !SyncEnabled ? string.Empty
+            : synced.Count == 0 ? Localization.Loc.T("Phone.NotSyncedYet")
+            : Localization.Loc.T("Phone.LastSynced", Ago(synced.Max(d => d.LastSeenUtc), now));
+    }
+
+    internal static IReadOnlyList<PhoneDeviceRow> BuildPhoneDeviceRows(
+        IReadOnlyList<ServerDevice> keys, IReadOnlyList<SyncDevice> synced, bool syncOn, DateTime nowUtc)
+    {
+        // A phone's ledger id is the device id it signed in with (NoctisServer: keyDevice.DeviceId).
+        static bool Same(string a, string b) => string.Equals(a, b, StringComparison.OrdinalIgnoreCase);
+        var rows = new List<PhoneDeviceRow>();
+        foreach (var key in keys)
+        {
+            var ledger = synced.FirstOrDefault(s => Same(s.Id, key.DeviceId));
+            var status = syncOn && ledger is not null
+                ? Localization.Loc.T("Phone.Synced", Ago(ledger.LastSeenUtc, nowUtc))
+                : Localization.Loc.T("Phone.Connected", Ago(key.LastUsedUtc ?? key.CreatedUtc, nowUtc));
+            rows.Add(new PhoneDeviceRow(key.DeviceName, status, key));
+        }
+        foreach (var s in synced.Where(s => !keys.Any(k => Same(k.DeviceId, s.Id))))
+            rows.Add(new PhoneDeviceRow(string.IsNullOrWhiteSpace(s.Name) ? s.Id : s.Name, Localization.Loc.T("Phone.SignedOut"), null));
+        return rows;
+    }
+
+    /// <summary>"just now", "5 min ago", "3 h ago", or "on 9 Oct, 14:05".</summary>
+    internal static string Ago(DateTime utc, DateTime nowUtc)
+    {
+        var ago = nowUtc - utc;
+        if (ago < TimeSpan.FromMinutes(1)) return Localization.Loc.T("Time.JustNow");
+        if (ago < TimeSpan.FromHours(1)) return Localization.Loc.T("Time.MinutesAgo", (int)ago.TotalMinutes);
+        if (ago < TimeSpan.FromDays(1)) return Localization.Loc.T("Time.HoursAgo", (int)ago.TotalHours);
+        return Localization.Loc.T("Time.OnDate", utc.ToLocalTime().ToString("d MMM, HH:mm", Localization.Loc.Instance.Culture));
+    }
+
+    /// <summary>"5 min ago" goes stale while the page stays open: re-read once a minute while
+    /// the Account &amp; Devices tab is showing (OnFeatureTabOpened starts and stops it).</summary>
+    private DispatcherTimer? _phoneDevicesTicker;
+
+    private void SetPhoneDevicesTicker(bool on)
+    {
+        if (!on) { _phoneDevicesTicker?.Stop(); return; }
+        _phoneDevicesTicker ??= new DispatcherTimer(TimeSpan.FromMinutes(1), DispatcherPriority.Background,
+            (_, _) => { if (IsAccountDevicesTabVisible) RefreshPhoneDevices(); else _phoneDevicesTicker?.Stop(); });
+        _phoneDevicesTicker.Start();
+    }
+
+    /// <summary>"Connect a phone": shows the address, the QR and the security code to compare on
+    /// the phone. It no longer turns sync on behind the user's back: that is the switch under
+    /// the devices (and it comes on with the server the first time, see TurnOnSyncByDefault).</summary>
     [RelayCommand(CanExecute = nameof(AccountFeaturesEnabled))]
     private void TogglePairing()
     {
         IsPairingVisible = !IsPairingVisible;
         if (!IsPairingVisible) return;
-        if (!SyncEnabled) SyncEnabled = true;
         if (!NoctisServerEnabled) NoctisServerEnabled = true;
-        RefreshSignedInDevices();
+        RefreshPhoneDevices();
     }
 
-    // ── Signed-in devices (phones that signed in with the account; each has its own key) ──
+    /// <summary>The user switched sync off (kept here, not only on _settings: SaveAsync re-bases
+    /// _settings on the file and writes back only what this view model owns).</summary>
+    private bool _syncTurnedOffByUser;
 
-    public ObservableCollection<SignedInDeviceRow> SignedInDevices { get; } = new();
-    public bool HasSignedInDevices => SignedInDevices.Count > 0;
-
-    private void RefreshSignedInDevices()
+    /// <summary>Phones let in: sync comes on with them unless the user switched it off before.</summary>
+    private void TurnOnSyncByDefault()
     {
-        SignedInDevices.Clear();
-        try
-        {
-            foreach (var d in ServerUsers.Devices()) SignedInDevices.Add(new SignedInDeviceRow(d));
-        }
-        catch (Exception ex) { ShowServerUserError(ex.Message); }
-        OnPropertyChanged(nameof(HasSignedInDevices));
+        if (AccountFeatures.Enabled && !SyncEnabled && !_syncTurnedOffByUser) SyncEnabled = true;
     }
 
     /// <summary>Signs the device out: its key stops working on its next request.</summary>
     [RelayCommand]
-    private void RemoveSignedInDevice(SignedInDeviceRow row)
+    private void RemoveSignedInDevice(PhoneDeviceRow row)
     {
-        try { ServerUsers.RevokeDevice(row.Device.User, row.Device.DeviceId); }
+        if (row.Key is not { } key) return;
+        try { ServerUsers.RevokeDevice(key.User, key.DeviceId); }
         catch (Exception ex) { ShowServerUserError(ex.Message); }
-        RefreshSignedInDevices();
+        RefreshPhoneDevices();
     }
 
-    public sealed record SignedInDeviceRow(ServerDevice Device)
+    /// <summary>One phone in the list. No <see cref="Key"/> = the ledger knows it but it is signed out.</summary>
+    public sealed record PhoneDeviceRow(string Name, string StatusText, ServerDevice? Key)
     {
-        public string Name => Device.DeviceName;
-        public string LastUsedText
-        {
-            get
-            {
-                var at = Device.LastUsedUtc ?? Device.CreatedUtc;
-                var ago = DateTime.UtcNow - at;
-                if (ago < TimeSpan.FromMinutes(1)) return $"{Device.User} · Used just now";
-                if (ago < TimeSpan.FromHours(1)) return $"{Device.User} · Used {(int)ago.TotalMinutes} min ago";
-                if (ago < TimeSpan.FromDays(1)) return $"{Device.User} · Used {(int)ago.TotalHours} h ago";
-                return $"{Device.User} · Used {at.ToLocalTime():d MMM, HH:mm}";
-            }
-        }
-    }
-
-    [RelayCommand]
-    private void TurnOnNoctisServer()
-    {
-        NoctisServerEnabled = true;
-        IsPairingVisible = true;
+        public bool IsSignedIn => Key is not null;
     }
 
     [RelayCommand]
@@ -241,23 +274,7 @@ public partial class SettingsViewModel
     private void CreatePrimaryAccount()
     {
         AddServerUserCommand.Execute(null);
-        RefreshSyncStatus();
-    }
-
-    public sealed record SyncDeviceRow(SyncDevice Device)
-    {
-        public string Name => string.IsNullOrWhiteSpace(Device.Name) ? Device.Id : Device.Name;
-        public string LastSeenText
-        {
-            get
-            {
-                var ago = DateTime.UtcNow - Device.LastSeenUtc;
-                if (ago < TimeSpan.FromMinutes(1)) return "Synced just now";
-                if (ago < TimeSpan.FromHours(1)) return $"Synced {(int)ago.TotalMinutes} min ago";
-                if (ago < TimeSpan.FromDays(1)) return $"Synced {(int)ago.TotalHours} h ago";
-                return $"Synced {Device.LastSeenUtc.ToLocalTime():d MMM, HH:mm}";
-            }
-        }
+        RefreshPhoneDevices();
     }
 
     // ── YouTube downloads (Library tab) ──
@@ -469,6 +486,7 @@ public partial class SettingsViewModel
         if (string.IsNullOrWhiteSpace(_settings.SyncDeviceId))
             _settings.SyncDeviceId = Guid.NewGuid().ToString("N")[..12];
         SyncEnabled = AccountFeatures.Enabled && _settings.SyncEnabled;
+        _syncTurnedOffByUser = _settings.SyncTurnedOffByUser;
         SyncDeviceName = string.IsNullOrWhiteSpace(_settings.SyncDeviceName) ? Environment.MachineName : _settings.SyncDeviceName;
 
         YouTubeDownloadFolder = _settings.YouTubeDownloadFolder ?? string.Empty;
@@ -488,6 +506,7 @@ public partial class SettingsViewModel
     {
         _settings.UpmixMode = UpmixMode ?? "Off";
         if (AccountFeatures.Enabled) _settings.SyncEnabled = SyncEnabled;
+        _settings.SyncTurnedOffByUser = _syncTurnedOffByUser;
         _settings.SyncDeviceName = SyncDeviceName ?? string.Empty;
         _settings.YouTubeDownloadFolder = YouTubeDownloadFolder ?? string.Empty;
         _settings.YtDlpPath = YtDlpPath ?? string.Empty;
@@ -503,10 +522,10 @@ public partial class SettingsViewModel
     /// <summary>Tab opened: refresh what the tab shows.</summary>
     private void OnFeatureTabOpened(string tab)
     {
+        SetPhoneDevicesTicker(tab == TabAccountDevices);
         if (tab == TabAccountDevices)
         {
-            RefreshServerUsers();
-            RefreshSyncStatus();
+            RefreshServerUsers(); // also the phone list
         }
         else if (tab == TabLibrary)
         {

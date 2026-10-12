@@ -1088,10 +1088,10 @@ public partial class SettingsViewModel : ViewModelBase
     private string ServerDataDirectory => Path.Combine(_persistence.DataDirectory, "server");
     private ServerUserStore ServerUsers => _serverUsers ??= new ServerUserStore(Path.Combine(ServerDataDirectory, "users.db"));
 
-    [ObservableProperty] private bool _noctisServerEnabled;
+    [ObservableProperty, NotifyPropertyChangedFor(nameof(IsPhoneCardOpen))] private bool _noctisServerEnabled;
     [ObservableProperty] private int _noctisServerPort = 4747;
     /// <summary>https://ip:port while running; empty when off.</summary>
-    [ObservableProperty] private string _noctisServerUrl = string.Empty;
+    [ObservableProperty, NotifyPropertyChangedFor(nameof(IsPhoneCardOpen))] private string _noctisServerUrl = string.Empty;
     /// <summary>SHA-256 fingerprint of the server certificate — what a phone pins when it accepts the self-signed cert.</summary>
     [ObservableProperty] private string _noctisServerFingerprint = string.Empty;
     [ObservableProperty] private Avalonia.Media.Imaging.Bitmap? _noctisServerQr;
@@ -1149,7 +1149,14 @@ public partial class SettingsViewModel : ViewModelBase
 
     partial void OnNoctisServerEnabledChanged(bool value)
     {
-        if (_settingsLoaded) _ = SaveAsync();
+        if (_settingsLoaded)
+        {
+            // The phone card's switch: sync comes on with it (unless switched off before), and
+            // turning it off folds the pairing details away with the server.
+            if (value) TurnOnSyncByDefault();
+            else IsPairingVisible = false;
+            _ = SaveAsync();
+        }
         _ = UpdateNoctisServerStateAsync();
     }
 
@@ -1161,7 +1168,23 @@ public partial class SettingsViewModel : ViewModelBase
         if (NoctisServerEnabled) _ = UpdateNoctisServerStateAsync(restart: true);
     }
 
+    /// <summary>One start/stop at a time: the phone card's switch flipped on, off, on used to
+    /// let the first start finish after the stop (it awaits the certificate off the UI thread),
+    /// leaving the server listening under a switch that read off. Each pass reads the switch
+    /// once it holds the gate, so the last flip wins.</summary>
+    private readonly SemaphoreSlim _noctisServerGate = new(1, 1);
+
     private async Task UpdateNoctisServerStateAsync(bool restart = false)
+    {
+        await _noctisServerGate.WaitAsync();
+        try
+        {
+            await UpdateNoctisServerStateCoreAsync(restart);
+        }
+        finally { _noctisServerGate.Release(); }
+    }
+
+    private async Task UpdateNoctisServerStateCoreAsync(bool restart)
     {
         try
         {
@@ -1212,7 +1235,7 @@ public partial class SettingsViewModel : ViewModelBase
                     LyricsCacheDirectory = LyricsViewModel.LyricsCacheDir,
                 };
                 _noctisServer.ClientAuthenticated += (_, user) => Dispatcher.UIThread.Post(() => OnNoctisServerClient(user));
-                _noctisServer.DevicesChanged += (_, _) => Dispatcher.UIThread.Post(RefreshSignedInDevices);
+                _noctisServer.DevicesChanged += (_, _) => Dispatcher.UIThread.Post(RefreshPhoneDevices);
             }
             if (!_noctisServer.IsRunning)
             {
@@ -1240,9 +1263,15 @@ public partial class SettingsViewModel : ViewModelBase
     /// <summary>App exit: stop listening so the port is released and in-flight streams end cleanly.</summary>
     public async Task StopNoctisServerAsync()
     {
-        if (_noctisServer is null) return;
-        try { await _noctisServer.StopAsync(); }
-        catch (Exception ex) { DebugLogger.Error(DebugLogger.Category.Error, "Server", $"stop: {ex.Message}"); }
+        // After any start still in flight, so that start cannot finish after this stop.
+        await _noctisServerGate.WaitAsync();
+        try
+        {
+            if (_noctisServer is null) return;
+            try { await _noctisServer.StopAsync(); }
+            catch (Exception ex) { DebugLogger.Error(DebugLogger.Category.Error, "Server", $"stop: {ex.Message}"); }
+        }
+        finally { _noctisServerGate.Release(); }
     }
 
     private void OnNoctisServerClient(string user)
@@ -1274,7 +1303,7 @@ public partial class SettingsViewModel : ViewModelBase
         }
         catch (Exception ex) { ShowServerUserError(ex.Message); }
         // Deleting an account or changing its password signs its devices out.
-        RefreshSignedInDevices();
+        RefreshPhoneDevices();
     }
 
     /// <summary>Account errors ("Use a password of at least 8 characters.") leave on their own like
@@ -1289,10 +1318,10 @@ public partial class SettingsViewModel : ViewModelBase
         ServerUserError = string.Empty;
         try
         {
+            // No API key up front: the phone trades the password for its own device key, and a
+            // key nobody asked for (shown once, in a card that may be folded) is just a live
+            // credential lying around. "New API key" makes one for a Subsonic app when needed.
             ServerUsers.Create(NewServerUserName, NewServerUserPassword, isAdmin: ServerUsersList.Count == 0);
-            var key = ServerUsers.RegenerateApiKey(NewServerUserName.Trim());
-            IssuedApiKeyUser = NewServerUserName.Trim();
-            IssuedApiKey = key;
             NewServerUserName = string.Empty;
             NewServerUserPassword = string.Empty;
             RefreshServerUsers();
@@ -1301,8 +1330,16 @@ public partial class SettingsViewModel : ViewModelBase
     }
 
     [RelayCommand]
-    private void DeleteServerUser(ServerUser user)
+    private async Task DeleteServerUserAsync(ServerUser user)
     {
+        // The trash button sits beside Change password, and deleting also drops every phone's
+        // key (ServerUserStore.Delete): one stray click used to sign every phone out.
+        var answer = await ShowPluginDialog(new Views.ConfirmationRequest(
+            Loc.T("AccountSync.DeleteBody"),
+            Title: Loc.T("AccountSync.DeleteTitle"),
+            ConfirmText: Loc.T("AccountSync.DeleteConfirm"),
+            Width: 420));
+        if (!answer.Confirmed) return;
         ServerUserError = string.Empty;
         try
         {
