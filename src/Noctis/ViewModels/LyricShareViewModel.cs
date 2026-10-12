@@ -100,7 +100,6 @@ public partial class LyricShareViewModel : ViewModelBase
     private readonly Track _track;
     private readonly PlayerViewModel? _player;
     private readonly string _autoColorHex;
-    private int _renderGeneration;
     private int _currentSyncIndex = -1;
     private bool _syncUpdatingSelection;
 
@@ -324,11 +323,9 @@ public partial class LyricShareViewModel : ViewModelBase
     /// <summary>Preview renders at half card resolution — crisp at dialog size, cheap per frame.</summary>
     private const float PreviewAnimatorScale = 0.5f;
 
-    /// <summary>Skia scale for the on-screen preview render (export uses CardExportScale).</summary>
-    private const float PreviewRenderScale = 1f;
-
-    /// <summary>Decode width for the preview bitmap — it fills a ~320px box.</summary>
-    private const int PreviewDecodeWidth = 480;
+    /// <summary>Skia scale for the on-screen still (export uses CardExportScale): 540 px wide,
+    /// as the karaoke overlay, for a ~310 px box.</summary>
+    private const float PreviewRenderScale = 0.5f;
 
     /// <summary>Same small lead as the lyrics page so the sweep matches the vocal.</summary>
     private const double PreviewWordLookaheadSeconds = 0.08;
@@ -394,9 +391,6 @@ public partial class LyricShareViewModel : ViewModelBase
             return name != null ? $"Solid · {name}" : "Solid";
         }
     }
-
-    /// <summary>Last rendered PNG — what Save/Copy exports.</summary>
-    public byte[]? CurrentPng { get; private set; }
 
     public string TrackTitle => _track.Title;
     public string TrackArtist => _track.ArtistDisplay;
@@ -760,45 +754,53 @@ public partial class LyricShareViewModel : ViewModelBase
         RefreshPreview();          // re-render even if the value is unchanged
     }
 
-    // Trailing-edge debounce for the preview.
+    // The live preview: one render at a time, the newest state wins. A change marks the card
+    // stale; it is drawn right after the current UI work (an option sets several flags in a
+    // row, each landing here: drawn once, from the final state), or, while a render runs,
+    // the moment that render lands.
     //
     // The editable lyric line is a TwoWay TextBox binding with no UpdateSourceTrigger, so
-    // Avalonia pushes to the source on every keystroke — and each push started a fresh
-    // Task.Run rendering a 2160x2160 (or 2160x3840) Skia surface, PNG-encoded at quality
-    // 100 and re-decoded. Nothing serialized them: typing ten characters kicked off ten
-    // concurrent ~33 MB-surface renders and threw away nine.
-    private const int PreviewDebounceMs = 200;
-    private CancellationTokenSource? _previewDebounceCts;
+    // every keystroke lands here; unserialized, ten characters started ten concurrent
+    // renders. A 200 ms trailing debounce stood in for this, and every option click waited
+    // it out too, before a render that decoded the cover again, drew 1080 px, PNG-encoded it
+    // and decoded the PNG back (owner 10-12: options took "about a second"; headless with a
+    // 3000 px cover, 360-760 ms a change). Now no timer, the cover is decoded once, and the
+    // card is drawn at preview size straight into the bitmap.
+    private bool _previewRendering;
+    private bool _previewStale;
+    private bool _previewPosted;
+    private bool _detached;
+
+    /// <summary>The cover, decoded by the first render and reused by every later one. Only
+    /// the running render touches it; freed by Detach, or by a render landing after it.</summary>
+    private SkiaSharp.SKBitmap? _previewArt;
+    private bool _previewArtLoaded;
 
     private void RefreshPreview()
     {
-        _previewDebounceCts?.Cancel();
-        _previewDebounceCts?.Dispose();
-        var cts = new CancellationTokenSource();
-        _previewDebounceCts = cts;
-
-        _ = DebouncedRefreshAsync(cts.Token);
+        _previewStale = true;
+        if (_previewRendering || _previewPosted) return;
+        _previewPosted = true;
+        Dispatcher.UIThread.Post(StartPreviewRender);
     }
 
-    private async Task DebouncedRefreshAsync(CancellationToken token)
+    /// <summary>True when the card shown is drawn from the current options (tests).</summary>
+    internal bool IsPreviewCurrent => !_previewStale && !_previewRendering;
+
+    private void StartPreviewRender()
     {
-        try
-        {
-            await Task.Delay(PreviewDebounceMs, token);
-            if (token.IsCancellationRequested) return;
-            RefreshPreviewCore();
-        }
-        catch (OperationCanceledException) { /* superseded by a newer edit */ }
+        _previewPosted = false;
+        if (_detached || _previewRendering || !_previewStale) return;
+        _previewStale = false;
+        RefreshPreviewCore();
     }
 
     private void RefreshPreviewCore()
     {
-        var generation = ++_renderGeneration;
         var selectedLines = CardSelection();
         var selected = selectedLines.Select(l => l.Text).ToList();
         if (selected.Count == 0)
         {
-            CurrentPng = null;
             var old = Preview;
             Preview = null;
             // Deferred, as below: the last frame may still reference it.
@@ -812,44 +814,66 @@ public partial class LyricShareViewModel : ViewModelBase
             && selectedLines.Any(l => l.Words is { Count: > 0 });
         var karaoke = animate ? BuildKaraokeLines(selectedLines) : null;
 
+        _previewRendering = true;
+        // Captured here: the worker must not be the first to read Dispatcher.UIThread
+        // (lazily created on whichever thread asks, as in each headless test's fresh app).
+        var dispatcher = Dispatcher.UIThread;
         Task.Run(() =>
         {
+            Bitmap? bitmap = null;
+            ShareCardRenderer.KaraokeCardAnimator? animator = null;
             try
             {
-                // Render the on-screen preview at 1x. It is displayed in a ~320x480 box,
-                // but was rendered at CardExportScale and the decoded 2160x2160 (18.7 MB)
-                // or 2160x3840 (33.2 MB) bitmap was then held for the dialog's lifetime.
-                // The export path (Save/Copy) still renders at full scale on demand.
-                var png = ShareCardRenderer.RenderLyricCardStyled(spec, PreviewRenderScale);
-                var animator = karaoke != null
-                    ? new ShareCardRenderer.KaraokeCardAnimator(spec, karaoke, PreviewAnimatorScale)
-                    : null;
-                using var ms = new MemoryStream(png);
-                var bitmap = Bitmap.DecodeToWidth(ms, PreviewDecodeWidth);
-                Dispatcher.UIThread.Post(() =>
+                if (!_previewArtLoaded)
                 {
-                    if (generation != _renderGeneration)
-                    {
-                        bitmap.Dispose();
-                        animator?.Dispose();
-                        return;
-                    }
-                    var old = Preview;
-                    CurrentPng = png;
-                    Preview = bitmap;
-                    // Deferred: the previous bitmap can still be referenced by the last
-                    // committed render frame in this same UI turn. AnimatedCoverImage
-                    // defers every bitmap disposal for exactly this reason.
-                    if (old != null) Dispatcher.UIThread.Post(old.Dispose);
-                    SwapAnimator(animator);
-                });
+                    _previewArt = ShareCardRenderer.LoadCardArtwork(spec.ArtworkPath);
+                    _previewArtLoaded = true;
+                }
+                // Preview size only: it fills a ~310 px box. Save/Copy render at full
+                // scale on demand (RenderExportPngAsync).
+                using (var card = ShareCardRenderer.RenderLyricCardBitmap(spec, PreviewRenderScale, _previewArt))
+                {
+                    var preview = new WriteableBitmap(new PixelSize(card.Width, card.Height),
+                        new Vector(96, 96), PixelFormat.Bgra8888, AlphaFormat.Premul);
+                    using (var fb = preview.Lock())
+                    using (var pixels = card.PeekPixels())
+                        pixels.ReadPixels(card.Info, fb.Address, fb.RowBytes);
+                    bitmap = preview;
+                }
+                if (karaoke != null)
+                    animator = new ShareCardRenderer.KaraokeCardAnimator(spec, karaoke, PreviewAnimatorScale, _previewArt);
             }
             catch (Exception ex)
             {
                 DebugLogger.Log(DebugLogger.Category.Lyrics, DebugLogger.Level.Error,
                     "Share card render failed", ex.Message);
             }
+            dispatcher.Post(() => OnPreviewRendered(bitmap, animator));
         });
+    }
+
+    /// <summary>Shows a finished render (UI thread), then draws again when the card changed meanwhile.</summary>
+    private void OnPreviewRendered(Bitmap? bitmap, ShareCardRenderer.KaraokeCardAnimator? animator)
+    {
+        _previewRendering = false;
+        if (_detached || bitmap == null)
+        {
+            bitmap?.Dispose();
+            animator?.Dispose();
+            if (_detached) { _previewArt?.Dispose(); _previewArt = null; return; }
+        }
+        else
+        {
+            var old = Preview;
+            Preview = bitmap;
+            // Deferred: the previous bitmap can still be referenced by the last
+            // committed render frame in this same UI turn. AnimatedCoverImage
+            // defers every bitmap disposal for exactly this reason.
+            if (old != null) Dispatcher.UIThread.Post(old.Dispose);
+            SwapAnimator(animator);
+        }
+
+        StartPreviewRender();   // the options changed while this one rendered
     }
 
     /// <summary>Installs the freshly built animator (or tears everything down when null),
@@ -1035,9 +1059,9 @@ public partial class LyricShareViewModel : ViewModelBase
     /// <summary>
     /// Renders the card at full export resolution, on demand.
     ///
-    /// <see cref="CurrentPng"/> is now the preview-resolution image (it fills a ~320px
-    /// box and used to be held at up to 33 MB for the dialog's lifetime), so the Save and
-    /// Copy paths must re-render rather than reuse it.
+    /// <see cref="Preview"/> is a preview-size bitmap (it fills a ~310px box and used to
+    /// be held at up to 33 MB for the dialog's lifetime), so the Save and Copy paths
+    /// render their own.
     /// </summary>
     public async Task<byte[]?> RenderExportPngAsync()
     {
@@ -1100,8 +1124,8 @@ public partial class LyricShareViewModel : ViewModelBase
 
             if (!(KaraokeEnabled && KaraokeAvailable))
             {
-                // Base-resolution still: the clip is 1080p-bound, so reusing the 2×
-                // supersampled CurrentPng would only quadruple the encode cost.
+                // Base-resolution still: the clip is 1080p-bound, so the 2× supersampled
+                // export card would only quadruple the encode cost.
                 var still = await Task.Run(() => ShareCardRenderer.RenderLyricCardStyled(spec), token);
                 (ok, error) = await ShareClipRenderer.RenderAsync(ffmpeg, still, _track.FilePath, outputPath, timing, token);
             }
@@ -1204,12 +1228,13 @@ public partial class LyricShareViewModel : ViewModelBase
     /// <summary>Unsubscribes from the player so the dialog can be garbage-collected.</summary>
     public void Detach()
     {
-        ++_renderGeneration;   // stale in-flight preview renders dispose instead of re-installing
+        // A preview render still running disposes what it made (and the cover) when it lands.
+        _detached = true;
+        if (!_previewRendering) { _previewArt?.Dispose(); _previewArt = null; }
 
         // Stop a running export. Detach() previously tore down only the preview animator,
         // so closing the dialog mid-export left thousands of frames still rendering.
         CancelExport();
-        _previewDebounceCts?.Cancel();
         // Stop listening first: putting a blanked line back (EndEdit) re-rendered the card
         // after close, and with word timings re-armed the karaoke timer for a closed dialog.
         foreach (var line in Lines)

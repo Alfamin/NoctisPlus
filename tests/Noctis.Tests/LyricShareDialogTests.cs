@@ -91,6 +91,90 @@ public class LyricShareDialogTests
         Assert.True(lit == 0, $"{lit} text pixels below y={bandTop} on the {format} {layout} card");
     }
 
+    // ── Live preview ──
+
+    /// <summary>A busy JPEG cover of <paramref name="size"/>² (a hi-res release's size).</summary>
+    private static string WriteCover(string dir, int size)
+    {
+        var path = Path.Combine(dir, "cover.jpg");
+        using var bmp = new SKBitmap(size, size);
+        var rnd = new Random(1);
+        using (var canvas = new SKCanvas(bmp))
+        using (var paint = new SKPaint { IsAntialias = true })
+        {
+            canvas.Clear(new SKColor(30, 60, 120));
+            for (int i = 0; i < 400; i++)
+            {
+                paint.Color = new SKColor((byte)rnd.Next(256), (byte)rnd.Next(256), (byte)rnd.Next(256));
+                canvas.DrawCircle(rnd.Next(size), rnd.Next(size), rnd.Next(size / 20, size / 4), paint);
+            }
+        }
+        using var image = SKImage.FromBitmap(bmp);
+        using var data = image.Encode(SKEncodedImageFormat.Jpeg, 92);
+        File.WriteAllBytes(path, data.ToArray());
+        return path;
+    }
+
+    /// <summary>
+    /// Owner 10-12: a change to Text, Background, Format or Layout took about a second to
+    /// show on the card. Each change waited out the 200 ms typing debounce, then re-decoded
+    /// the cover from disk, drew the card at 1080 px, PNG-encoded it and decoded the PNG back
+    /// (headless, 3000 px cover: 340-530 ms a change). The card has to follow at once.
+    /// </summary>
+    [AvaloniaFact]
+    public void OptionChanges_ReachThePreview_AtOnce()
+    {
+        var dir = Path.Combine(Path.GetTempPath(), $"noctis-share-test-{Guid.NewGuid():N}");
+        Directory.CreateDirectory(dir);
+        var track = Song();
+        track.AlbumArtworkPath = WriteCover(dir, 3000);
+        var vm = new LyricShareViewModel(track, new[]
+        {
+            "You can't do this 'cause you ain't me", "it drives you crazy every single night",
+            "third line here", "fourth line here",
+        }, 0);
+        try
+        {
+            Assert.True(PumpUntil(() => vm.Preview != null, 10000), "preview never rendered");
+            var changes = new (string Name, Action Apply)[]
+            {
+                ("Text: White", () => vm.TextColorIndex = 1),
+                ("Text: Black", () => vm.TextColorIndex = 2),
+                ("Background: Artwork", () => vm.SelectedBackground = vm.BackgroundChoices[0]),
+                ("Format: 9:16", () => vm.FormatIndex = 1),
+                ("Layout: Poster", () => vm.LayoutIndex = 1),
+                ("Background: Navy", () => vm.SelectedBackground = vm.BackgroundChoices.First(c => c.Hex == "#0D2137")),
+                ("Format: 1:1", () => vm.FormatIndex = 0),
+                ("Layout: Card", () => vm.LayoutIndex = 0),
+                ("Background: Auto", () => vm.SelectedBackground = vm.BackgroundChoices[1]),
+            };
+            var times = new List<(string Name, long Ms)>();
+            var shapes = new List<(string Name, bool Story, PixelSize Size)>();
+            foreach (var (name, apply) in changes)
+            {
+                var before = vm.Preview;
+                var sw = Stopwatch.StartNew();
+                apply();
+                Assert.True(PumpUntil(() => vm.IsPreviewCurrent && !ReferenceEquals(vm.Preview, before), 5000),
+                    $"{name} never reached the preview");
+                times.Add((name, sw.ElapsedMilliseconds));
+                shapes.Add((name, vm.IsStory, vm.Preview!.PixelSize));
+            }
+            var report = string.Join(", ", times.Select(t => $"{t.Name} {t.Ms} ms"));
+            var median = times.Select(t => t.Ms).OrderBy(ms => ms).ElementAt(times.Count / 2);
+            Assert.True(median <= 100, $"median {median} ms: {report}");
+            Assert.True(times.Max(t => t.Ms) <= 250, report);
+            // The bitmap that landed is the card for the new options (9:16 is tall).
+            foreach (var (name, story, size) in shapes)
+                Assert.True(story ? size.Height > size.Width : size.Height == size.Width, $"after {name} the preview is {size}");
+        }
+        finally
+        {
+            vm.Detach();
+            try { Directory.Delete(dir, true); } catch { }
+        }
+    }
+
     // ── Clip export ──
 
     /// <summary>Fakes the converter service so ExportClipAsync finds "ffmpeg" (our script).</summary>
@@ -141,7 +225,7 @@ public class LyricShareDialogTests
             var audio = Path.Combine(dir, "song.flac");
             File.WriteAllText(audio, "audio");
             var vm = new LyricShareViewModel(Song(filePath: audio), new[] { "one", "two", "three" }, 0);
-            Assert.True(PumpUntil(() => vm.CurrentPng != null), "preview never rendered");
+            Assert.True(PumpUntil(() => vm.Preview != null), "preview never rendered");
 
             var output = Path.Combine(dir, "clip.mp4");
             var export = vm.ExportClipAsync(output);
@@ -374,7 +458,8 @@ public class LyricShareDialogTests
         => vm.Lines.Select((l, i) => (l, i)).Where(p => flag(p.l)).Select(p => p.i).ToArray();
 
     /// <summary>Not a bug: names built from titles carry no characters the file system refuses.</summary>
-    [Fact]
+    // AvaloniaFact: the view model posts its first preview render to the UI dispatcher.
+    [AvaloniaFact]
     public void SuggestedNames_HaveNoInvalidCharacters()
     {
         var vm = new LyricShareViewModel(Song("Live: \"Who?\" <A|B>*", "AC/DC"), new[] { "x" }, 0);

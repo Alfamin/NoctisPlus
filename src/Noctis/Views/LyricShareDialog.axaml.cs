@@ -142,7 +142,7 @@ public partial class LyricShareDialog : Window
         _busy = true;
         try
         {
-            // Re-render at export resolution — CurrentPng is the small preview image.
+            // Re-render at export resolution — the preview is a small bitmap.
             if (await vm.RenderExportPngAsync() is not { } png) return;
             var status = await PngExportHelper.SavePngAsync(this, png, vm.SuggestedFileName);
             if (status != null)
@@ -163,7 +163,7 @@ public partial class LyricShareDialog : Window
         _busy = true;
         try
         {
-            // Same full-resolution re-render as Save — CurrentPng is only the small preview.
+            // Same full-resolution re-render as Save — the preview is only a small bitmap.
             if (await vm.RenderExportPngAsync() is not { } png) return;
             var status = await PngExportHelper.CopyPngAsync(this, png, vm.SuggestedFileName);
             if (status != null)

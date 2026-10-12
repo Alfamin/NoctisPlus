@@ -125,7 +125,36 @@ public static class ShareCardRenderer
         using var art = LoadArtwork(spec.ArtworkPath);
         using var surface = SKSurface.Create(new SKImageInfo(
             (int)Math.Round(w * scale), (int)Math.Round(h * scale)));
-        var canvas = surface.Canvas;
+        DrawLyricCard(surface.Canvas, spec, w, h, scale, art);
+
+        using var image = surface.Snapshot();
+        using var data = image.Encode(SKEncodedImageFormat.Png, 100);
+        return data.ToArray();
+    }
+
+    /// <summary>
+    /// The live preview's render: the same card as <see cref="RenderLyricCardStyled"/>, drawn
+    /// straight into a BGRA premul bitmap with an already decoded cover (<see cref="LoadCardArtwork"/>).
+    /// No PNG round trip and no cover decode per change: those were most of the preview's
+    /// lag (a 9:16 PNG encode alone ~130 ms). The caller owns the result.
+    /// </summary>
+    public static SKBitmap RenderLyricCardBitmap(LyricCardSpec spec, float scale, SKBitmap? art)
+    {
+        int w = CanvasWidth;
+        int h = spec.Format == ShareCardFormat.Story ? 1920 : 1080;
+        var bitmap = new SKBitmap(new SKImageInfo(
+            (int)Math.Round(w * scale), (int)Math.Round(h * scale), SKColorType.Bgra8888, SKAlphaType.Premul));
+        using var canvas = new SKCanvas(bitmap);
+        DrawLyricCard(canvas, spec, w, h, scale, art);
+        return bitmap;
+    }
+
+    /// <summary>The cover as the card draws it (subsampled, at most 1024 px), decoded once by
+    /// a caller that renders the same card many times. Null without usable artwork.</summary>
+    public static SKBitmap? LoadCardArtwork(string? path) => LoadArtwork(path);
+
+    private static void DrawLyricCard(SKCanvas canvas, LyricCardSpec spec, int w, int h, float scale, SKBitmap? art)
+    {
         canvas.Scale(scale);
 
         using var boldFace = ResolveTypeface(SKFontStyleWeight.Bold);
@@ -142,10 +171,6 @@ public static class ShareCardRenderer
             DrawTextFallback(canvas, chrome.Wrapped[i].Text, chrome.RowX[i], baseline, lyricPaint);
             baseline += chrome.LineHeight;
         }
-
-        using var image = surface.Snapshot();
-        using var data = image.Encode(SKEncodedImageFormat.Png, 100);
-        return data.ToArray();
     }
 
     /// <summary>Geometry the lyric block was laid out with, so per-frame redraws land
@@ -552,7 +577,9 @@ public static class ShareCardRenderer
         public int PixelWidth { get; }
         public int PixelHeight { get; }
 
-        public KaraokeCardAnimator(LyricCardSpec spec, IReadOnlyList<KaraokeLine> karaoke, float scale)
+        /// <param name="art">The cover from <see cref="LoadCardArtwork"/> when the caller keeps
+        /// one (not disposed here); null decodes <see cref="LyricCardSpec.ArtworkPath"/>.</param>
+        public KaraokeCardAnimator(LyricCardSpec spec, IReadOnlyList<KaraokeLine> karaoke, float scale, SKBitmap? art = null)
         {
             _karaoke = karaoke;
             _scale = scale;
@@ -566,7 +593,7 @@ public static class ShareCardRenderer
             _surface = SKSurface.Create(new SKImageInfo(PixelWidth, PixelHeight, SKColorType.Bgra8888, SKAlphaType.Premul));
             var canvas = _surface.Canvas;
 
-            using var art = LoadArtwork(spec.ArtworkPath);
+            using var loaded = art == null ? LoadArtwork(spec.ArtworkPath) : null;
             using var boldFace = ResolveTypeface(SKFontStyleWeight.Bold);
             using var regularFace = ResolveTypeface(SKFontStyleWeight.Normal);
             _lyricFace = ResolveTypeface(
@@ -574,7 +601,7 @@ public static class ShareCardRenderer
 
             canvas.Save();
             canvas.Scale(scale);
-            _chrome = DrawCardBase(canvas, spec, w, h, art, boldFace, regularFace, _lyricFace);
+            _chrome = DrawCardBase(canvas, spec, w, h, art ?? loaded, boldFace, regularFace, _lyricFace);
             canvas.Restore();
             _baseImage = _surface.Snapshot();
 
