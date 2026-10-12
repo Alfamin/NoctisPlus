@@ -40,6 +40,21 @@ public partial class SettingsViewModel : ViewModelBase
     private bool _autoDownloadRunning;
     private bool _autoDownloadPrerelease; // the running automatic download is a pre-release
     private bool _autoDownloadCancelled; // Cancel on an automatic download: no retry until the next launch
+    private string? _autoWaitStatusText; // the "downloads automatically after …" line last shown
+    private long _autoUpdateRetryTicks; // UTC ticks of AutoUpdateRetryAtUtc, 0 = none (read by the recheck loop's thread)
+
+    /// <summary>When the recheck loop should ask GitHub before its daily check: the end of a known
+    /// release's soak or download backoff, or soon after a failed check. Null = the daily check.</summary>
+    internal DateTimeOffset? AutoUpdateRetryAtUtc
+    {
+        get
+        {
+            var ticks = Interlocked.Read(ref _autoUpdateRetryTicks);
+            return ticks == 0 ? null : new DateTimeOffset(ticks, TimeSpan.Zero);
+        }
+        private set => Interlocked.Exchange(ref _autoUpdateRetryTicks, value?.UtcTicks ?? 0);
+    }
+
     private AutoUpdateStore? _autoStore;
     // Under the persistence root (not AppPaths) so tests stay isolated; the same folder in the app.
     private AutoUpdateStore AutoStore => _autoStore ??= new(_persistence.DataDirectory);
@@ -7117,6 +7132,7 @@ public partial class SettingsViewModel : ViewModelBase
         // queued in an earlier session (a newer release may replace it); manual mode keeps the old rule.
         if (!AutoUpdateActive && (IsUpdateAvailable || IsReadyToInstall)) return;
         if (AutoUpdateActive && IsReadyToInstall && !IsAutoInstallPending) return;
+        AutoUpdateRetryAtUtc = null; // this check settles it; set again below when waiting helps
 
         try
         {
@@ -7165,8 +7181,9 @@ public partial class SettingsViewModel : ViewModelBase
                         }
                     }
                     string why;
+                    var now = DateTimeOffset.UtcNow;
                     if (_autoDownloadCancelled) why = "cancelled this session";
-                    else if (AutoUpdatePolicy.ShouldAutoDownload(state, update, DateTimeOffset.UtcNow, out why))
+                    else if (AutoUpdatePolicy.ShouldAutoDownload(state, update, now, out why))
                     {
                         if (state?.Pending is not null)
                         {
@@ -7176,8 +7193,21 @@ public partial class SettingsViewModel : ViewModelBase
                         _ = DownloadUpdateCoreAsync(update, automatic: true);
                         return;
                     }
-                    DebugLog.Write("Updater", $"Auto-update: {update.TagName} not downloaded automatically ({why}).");
+                    // Still soaking or backing off: ask again the moment that ends, not a day after this
+                    // check — a session opened during the soak otherwise never downloads it (GitHub #130).
+                    var retry = _autoDownloadCancelled ? null : AutoUpdatePolicy.RetryAt(state, update, now);
+                    AutoUpdateRetryAtUtc = retry;
+                    DebugLog.Write("Updater", $"Auto-update: {update.TagName} not downloaded automatically ({why})" +
+                        (retry is { } at ? $"; next check {at.LocalDateTime:g}." : "."));
                     if (IsReadyToInstall) return; // keep the queued older build; it installs first
+                    // Says when, so a known update with "Update automatically" on doesn't look stuck.
+                    var waitText = retry is { } when
+                        ? $"{update.TagName} is available. It downloads automatically after {when.LocalDateTime:g} " +
+                          "and installs the next time you open Noctis."
+                        : null;
+                    if (waitText is not null) UpdateStatusText = waitText;
+                    else if (UpdateStatusText == _autoWaitStatusText) UpdateStatusText = "";
+                    _autoWaitStatusText = waitText;
                 }
 
                 LatestVersionTag = update.TagName;
@@ -7186,9 +7216,12 @@ public partial class SettingsViewModel : ViewModelBase
                 IsUpdateAvailable = true;
             });
         }
-        catch
+        catch (Exception ex)
         {
-            // Silent: no toast, no status text, no error banner on startup.
+            // Silent: no toast, no status text, no error banner on startup. Auto-update retries soon,
+            // so a check made before the network is up (launch at login) isn't lost for a day.
+            if (AutoUpdateActive) AutoUpdateRetryAtUtc = DateTimeOffset.UtcNow + AutoUpdatePolicy.FailedCheckRetry;
+            DebugLog.Write("Updater", $"Update check failed ({ex.GetType().Name}: {ex.Message}).");
         }
     }
 
@@ -7429,6 +7462,8 @@ public partial class SettingsViewModel : ViewModelBase
         {
             var state = AutoUpdatePolicy.RecordDownloadFailure(AutoStore.Load(), update.TagName, now, hard);
             AutoStore.Save(state);
+            // The backoff ends within the session; the recheck loop retries then instead of a day later.
+            AutoUpdateRetryAtUtc = state.Blocked ? null : now + AutoUpdatePolicy.BackoffAfter(state.Failures);
             var next = state.Blocked
                 ? "blocked"
                 : $"next try after {(now + AutoUpdatePolicy.BackoffAfter(state.Failures)).LocalDateTime:g}";
