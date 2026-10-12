@@ -382,6 +382,30 @@ public class NoctisServerSyncTests : IAsyncLifetime
         Assert.Equal("ok", (await Get("getNoctisSyncChanges", "since=0&device=alices-phone-1")).GetProperty("status").GetString());
     }
 
+    /// <summary>
+    /// Bug: with sync off the desktop records nothing, and turning it back on only seeded songs
+    /// the ledger had never seen, so a song unfavourited (or re-rated) meanwhile kept its old state
+    /// in the ledger and every phone kept showing it.
+    /// </summary>
+    [Fact]
+    public async Task TurningSyncBackOn_ReseedsSongsThatChangedWhileItWasOff()
+    {
+        var track = new Track { Id = Guid.NewGuid(), Title = "Beta", Artist = "X", Album = "A", FilePath = Path.Combine(_dir, "b.mp3"), IsFavorite = true, Rating = 4 };
+        _sync.RecordTrackStates(new[] { track });
+
+        _settings.SyncEnabled = false;
+        track.IsFavorite = false;
+        track.Rating = 2;
+        _sync.RecordTrackStates(new[] { track });                       // off: not recorded
+        _settings.SyncEnabled = true;
+        await _sync.SeedAsync(new[] { track }, Array.Empty<Playlist>()); // what turning it on runs
+
+        var item = (await _sync.GetChangesAsync(0, "phone-003", "Tablet")).Items.Single(i => i.Id == track.Id.ToString("N"));
+        var state = SyncJson.Deserialize<TrackSyncState>(item.Payload)!;
+        Assert.False(state.Favorite);
+        Assert.Equal(2, state.Rating);
+    }
+
     private sealed class FakeLibrary : IServerLibrary
     {
         public List<Track> Tracks { get; }

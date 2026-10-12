@@ -252,6 +252,23 @@ public class NoctisAccountUploadTests : IAsyncLifetime
 
     // ── The desktop's profile name ──
 
+    /// <summary>
+    /// Bug: the computer's name ("on Test PC" under the account) was taken at sign-in only, so
+    /// renaming the computer in Settings → Sync never reached a phone already signed in.
+    /// </summary>
+    [Fact]
+    public async Task ComputerName_ArrivesAtSignIn_AndFollowsARenameOnSync()
+    {
+        var svc = await SignedInAsync();
+        Assert.Equal("Test PC", svc.Account!.ServerName);
+
+        _deskSettings.SyncDeviceName = "Studio PC";
+        await svc.SyncNowAsync(Ct);
+
+        Assert.Equal("Studio PC", svc.Account!.ServerName);
+        Assert.Equal("Studio PC", Restart().Account!.ServerName);                  // persisted
+    }
+
     [Fact]
     public async Task DisplayName_ArrivesAtSignIn_FollowsARenameOnSync_AndOldAccountsWithoutItStillLoad()
     {

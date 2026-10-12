@@ -3005,6 +3005,9 @@ public partial class SettingsViewModel : ViewModelBase
         nameof(AppSettings.CommunityPluginsEnabled),
         nameof(AppSettings.PluginPermissionGrants),
         nameof(AppSettings.PluginSettingValues),
+        // Made once at load straight onto _settings (LoadFeatureSettings): pulled back from a
+        // file without one, the first save emptied it and the ledger got a new id per launch.
+        nameof(AppSettings.SyncDeviceId),
     };
 
     private async Task MergeExternalSettingChangesAsync()

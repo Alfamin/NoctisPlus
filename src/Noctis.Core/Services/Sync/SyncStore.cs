@@ -232,6 +232,20 @@ public sealed class SyncStore
         }
     }
 
+    /// <summary>Drops a device from the device list (its items stay). False when it was not listed.</summary>
+    public bool RemoveDevice(string id)
+    {
+        if (string.IsNullOrWhiteSpace(id)) return false;
+        lock (_writeGate)
+        {
+            using var con = Open();
+            using var cmd = con.CreateCommand();
+            cmd.CommandText = "DELETE FROM devices WHERE id = $i";
+            cmd.Parameters.AddWithValue("$i", id.Trim());
+            return cmd.ExecuteNonQuery() > 0;
+        }
+    }
+
     public IReadOnlyList<SyncDevice> Devices()
     {
         using var con = Open();
