@@ -27,6 +27,11 @@ namespace Noctis.Services;
 // both rebuild the output on the current default endpoint, reusing the same
 // provider chain (NAudio inserts a DMO resampler when the new device's mix
 // format differs, so the VLC-facing format stays fixed).
+//
+// Linux (GitHub #127) runs the same chain into one PulseAudio stream
+// (PulseSimpleWavePlayer) at a fixed engine rate. There is no session handle on
+// that stream, so the user's volume is applied in the chain (OutputLevelProvider,
+// see LevelControl), and the sound server follows default-sink changes itself.
 public sealed class GaplessSink : IDisposable
 {
     private readonly object _gate = new();
@@ -35,6 +40,7 @@ public sealed class GaplessSink : IDisposable
     private readonly WaveFileWriter? _tap; // NOCTIS_ENGINE_TAP diagnostic capture
     private readonly ISampleProvider _renderSource;
     private readonly MuteGateProvider _muteGate;
+    private readonly OutputLevelProvider _level;
 
     /// <summary>User mute, applied post-buffer in the render chain (instant, click-free).
     /// Survives output rebuilds: the gate is upstream of the WasapiOut that gets replaced.</summary>
@@ -107,11 +113,22 @@ public sealed class GaplessSink : IDisposable
     private GaplessSink()
     {
         var openStart = Stopwatch.GetTimestamp();
-        using var enumerator = new MMDeviceEnumerator();
-        using var device = enumerator.GetDefaultAudioEndpoint(DataFlow.Render, Role.Multimedia);
-        var mix = device.AudioClient.MixFormat;
+        WaveFormat mix;
+        if (OperatingSystem.IsWindows())
+        {
+            using var enumerator = new MMDeviceEnumerator();
+            using var device = enumerator.GetDefaultAudioEndpoint(DataFlow.Render, Role.Multimedia);
+            mix = device.AudioClient.MixFormat;
+            _deviceId = device.ID;
+        }
+        else
+        {
+            // Linux: the PulseAudio / PipeWire server mixes and resamples for whatever
+            // sink is current (and moves the stream when the default sink changes), so
+            // the engine runs at a fixed rate instead of reading a device format.
+            mix = WaveFormat.CreateIeeeFloatWaveFormat(LinuxEngineSampleRate, 2);
+        }
         (SampleRate, Channels) = EngineFormat(mix.SampleRate);
-        _deviceId = device.ID;
         // 200ms pre-buffer before a FRESH segment renders (kills the input-start
         // buzz of chopping ramping delivery against silence); the gapless splice
         // is unaffected — a staged segment holds seconds and passes instantly.
@@ -136,6 +153,11 @@ public sealed class GaplessSink : IDisposable
         // muted player shows a still backdrop, stamped with this sink's output depth
         // so the visual beat lands when the audible one does.
         renderSource = new BeatTapProvider(renderSource, OutputLatencyMs);
+        // The user's volume where no OS session carries it (Linux, see LevelControl).
+        // After the beat tap, like the Windows session level, so the visuals do not
+        // follow the slider. A pass-through at level 1, which Windows never leaves.
+        _level = new OutputLevelProvider(renderSource);
+        renderSource = _level;
         var tap = Environment.GetEnvironmentVariable("NOCTIS_ENGINE_TAP");
         if (!string.IsNullOrEmpty(tap))
         {
@@ -165,7 +187,7 @@ public sealed class GaplessSink : IDisposable
         _out.Play();
         DebugLogger.Info(DebugLogger.Category.Playback, "GaplessEngine.SinkOpened",
             $"elapsedMs={Stopwatch.GetElapsedTime(openStart).TotalMilliseconds:0}, {DescribeFormats(mix)}, " +
-            $"output={(NullWavePlayer.SilentMode ? "null" : "wasapi")}");
+            $"output={OutputName}");
         // Straight to the session log, whatever Developer Mode says: a report of choppy audio
         // needs the device rate, and Ardhito's 10-08 log only let it be inferred from the gaps.
         DebugLog.Write("Audio", $"engine output: {DescribeFormats(mix)}");
@@ -186,6 +208,54 @@ public sealed class GaplessSink : IDisposable
     /// <summary>Requested WasapiOut buffer depth. Also the lead of the segment's
     /// consumed-frame position over the speaker (see VlcAudioPlayer.OutputLatency).</summary>
     public const int OutputLatencyMs = 100;
+
+    /// <summary>
+    /// Engine rate on Linux, where no device mix format is read. CD rate, the rate of nearly
+    /// every MP3 and CD rip: LibVLC resamples each input on its own, so at any other rate
+    /// every track boundary carried a resampler restart (harness: a 7-sample step at each
+    /// seam at 48 kHz). The sound server resamples the one continuous stream to its sink.
+    /// </summary>
+    internal const int LinuxEngineSampleRate = 44100;
+
+    /// <summary>
+    /// The output's latency now: the sound server's figure for the Linux stream (it
+    /// includes the sink, a Bluetooth one too), the requested buffer depth otherwise.
+    /// </summary>
+    public int CurrentOutputLatencyMs
+    {
+        get
+        {
+            IWavePlayer current;
+            lock (_gate) current = _out;
+            return current is PulseSimpleWavePlayer { LatencyMs: { } ms } ? ms : OutputLatencyMs;
+        }
+    }
+
+    private static string OutputName =>
+        NullWavePlayer.SilentMode ? "null" : OperatingSystem.IsWindows() ? "wasapi" : "pulse";
+
+    /// <summary>
+    /// The user's volume as an <see cref="IOutputLevel"/> applied in this sink's render
+    /// chain, for platforms without an OS session handle on the engine's stream (Linux).
+    /// </summary>
+    internal IOutputLevel LevelControl => new SinkLevel(_level);
+
+    private sealed class SinkLevel(OutputLevelProvider level) : IOutputLevel
+    {
+        // The stage is always the one rendering, rebuilds included (it sits upstream
+        // of the output that gets replaced).
+        public bool HoldsActiveSession => true;
+
+        public bool SetLevel(double value)
+        {
+            level.Level = (float)Math.Clamp(value, 0.0, 1.0);
+            return true;
+        }
+
+        public void Invalidate() { }
+
+        public void Dispose() { }
+    }
 
     /// <summary>
     /// The engine (VLC-facing) format for the startup device's mix rate. It stays fixed for the
@@ -228,6 +298,7 @@ public sealed class GaplessSink : IDisposable
     /// <summary>Channels in the default device's mix format, or 2 when it cannot be read.</summary>
     private static int DeviceMixChannels()
     {
+        if (!OperatingSystem.IsWindows()) return 2;
         try
         {
             using var enumerator = new MMDeviceEnumerator();
@@ -243,7 +314,9 @@ public sealed class GaplessSink : IDisposable
         // player with no device behind it (see NullWavePlayer).
         IWavePlayer wasapiOut = NullWavePlayer.SilentMode
             ? new NullWavePlayer()
-            : new WasapiOut(AudioClientShareMode.Shared, useEventSync: true, latency: OutputLatencyMs);
+            : OperatingSystem.IsWindows()
+                ? new WasapiOut(AudioClientShareMode.Shared, useEventSync: true, latency: OutputLatencyMs)
+                : new PulseSimpleWavePlayer(OutputLatencyMs);
         try
         {
             ISampleProvider render = _renderSource;
@@ -313,6 +386,8 @@ public sealed class GaplessSink : IDisposable
 
     private string DefaultDeviceFormats()
     {
+        if (!OperatingSystem.IsWindows())
+            return $"mix=server, engine={SampleRate}Hz/{Channels}ch";
         try
         {
             using var enumerator = new MMDeviceEnumerator();
@@ -332,8 +407,10 @@ public sealed class GaplessSink : IDisposable
     // the default, so the engine must too.
     private void CheckDefaultDevice()
     {
-        // Silent test mode has no device to follow.
-        if (_disposed || NullWavePlayer.SilentMode || Volatile.Read(ref _rebuilding) == 1) return;
+        // Silent test mode has no device to follow; on Linux the sound server moves the
+        // stream to a new default sink itself.
+        if (_disposed || NullWavePlayer.SilentMode || !OperatingSystem.IsWindows() ||
+            Volatile.Read(ref _rebuilding) == 1) return;
         string currentId;
         try
         {
@@ -374,13 +451,16 @@ public sealed class GaplessSink : IDisposable
                 {
                     newOut = CreateOutput();
                     string? id = null;
-                    try
+                    if (OperatingSystem.IsWindows())
                     {
-                        using var enumerator = new MMDeviceEnumerator();
-                        using var device = enumerator.GetDefaultAudioEndpoint(DataFlow.Render, Role.Multimedia);
-                        id = device.ID;
+                        try
+                        {
+                            using var enumerator = new MMDeviceEnumerator();
+                            using var device = enumerator.GetDefaultAudioEndpoint(DataFlow.Render, Role.Multimedia);
+                            id = device.ID;
+                        }
+                        catch { /* watch just compares against null → no false trigger */ }
                     }
-                    catch { /* watch just compares against null → no false trigger */ }
                     // New render thread: re-apply priority + MMCSS on first read.
                     _probe.RearmBoost();
                     // The new session opens at its own level, not the user's: render silence
@@ -695,10 +775,13 @@ public sealed class GaplessSink : IDisposable
                 try
                 {
                     System.Threading.Thread.CurrentThread.Priority = System.Threading.ThreadPriority.Highest;
-                    uint taskIndex = 0;
-                    var handle = AvSetMmThreadCharacteristics("Pro Audio", ref taskIndex);
-                    DebugLogger.Info(DebugLogger.Category.Playback, "GaplessEngine.RenderBoost",
-                        $"mmcss={(handle != IntPtr.Zero ? "ok" : "failed")}");
+                    if (OperatingSystem.IsWindows())
+                    {
+                        uint taskIndex = 0;
+                        var handle = AvSetMmThreadCharacteristics("Pro Audio", ref taskIndex);
+                        DebugLogger.Info(DebugLogger.Category.Playback, "GaplessEngine.RenderBoost",
+                            $"mmcss={(handle != IntPtr.Zero ? "ok" : "failed")}");
+                    }
                 }
                 catch { /* boost is best-effort */ }
             }

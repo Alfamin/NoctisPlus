@@ -28,7 +28,7 @@ namespace Noctis.Services;
 /// Windows-only. <see cref="TryCreate"/> returns null on other platforms.
 /// </summary>
 [SupportedOSPlatform("windows")]
-internal sealed class WindowsSessionVolume
+internal sealed class WindowsSessionVolume : IOutputLevel
 {
     private const long RefreshTtlMs = 750;
     private const uint CLSCTX_ALL = 23;

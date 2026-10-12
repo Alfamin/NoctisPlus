@@ -118,8 +118,9 @@ public class VlcAudioPlayer : IAudioPlayer
     // non-null, LibVLC's own volume is pinned at 100 and only used as the
     // transient fade layer for crossfades. Null on non-Windows / COM failure →
     // the code falls back to the LibVLC (debounced) volume path. See
-    // WindowsSessionVolume for why.
-    private readonly WindowsSessionVolume? _sessionVolume;
+    // WindowsSessionVolume for why. Linux with the gapless engine: the engine's
+    // own output stage (GaplessSink.LevelControl), driven the same way.
+    private readonly IOutputLevel? _sessionVolume;
 
     // Experimental Windows-only per-sample-gain output (NOCTIS_WASAPI=1, off by
     // default). When non-null it OWNS volume — applied click-free at any drag
@@ -703,7 +704,12 @@ public class VlcAudioPlayer : IAudioPlayer
         // launched from Explorer (no terminal environment), which reads as "the
         // fix does nothing". NOCTIS_GAPLESS_ENGINE=0 is the escape hatch; sink
         // creation failure still falls back to the classic path automatically.
-        _gaplessEngine = OperatingSystem.IsWindows() && _wasapiOut == null &&
+        // Linux too (GitHub #127): there the per-track LibVLC outputs opened a new
+        // PulseAudio stream at every track change — a gap on every boundary and a
+        // cut-off tail on Bluetooth. The sink renders into one pulse stream instead;
+        // no pulse server (or libpulse-simple) falls back the same way.
+        _gaplessEngine = IsGaplessEnginePlatform(OperatingSystem.IsWindows(), OperatingSystem.IsLinux()) &&
+                         _wasapiOut == null &&
                          Environment.GetEnvironmentVariable("NOCTIS_GAPLESS_ENGINE") != "0";
         if (_gaplessEngine)
         {
@@ -763,6 +769,11 @@ public class VlcAudioPlayer : IAudioPlayer
                 }
             }
         }
+        // Linux engine: no OS session carries the engine's stream, so the user's level
+        // goes to the sink's own output stage — through the same session-volume paths
+        // Windows uses (ramp, fades, reasserts), with the players pinned at 100 above.
+        if (_sessionVolume == null && _gaplessSink != null && !OperatingSystem.IsWindows())
+            _sessionVolume = _gaplessSink.LevelControl;
 
         // Start the keep-alive immediately: construction happens at app launch,
         // which is exactly the window before the reported first-play stutter.
@@ -847,8 +858,8 @@ public class VlcAudioPlayer : IAudioPlayer
     /// which already accounts for its output latency.
     /// </summary>
     public TimeSpan OutputLatency =>
-        _gaplessEngine && _gaplessSink != null
-            ? TimeSpan.FromMilliseconds(GaplessSink.OutputLatencyMs)
+        _gaplessEngine && _gaplessSink is { } sink
+            ? TimeSpan.FromMilliseconds(sink.CurrentOutputLatencyMs)
             : TimeSpan.Zero;
 
     public long CurrentSessionId => Interlocked.Read(ref _playbackSessionId);
@@ -6078,6 +6089,13 @@ public class VlcAudioPlayer : IAudioPlayer
     /// </summary>
     internal static bool ShouldForceAvformatDemux(bool isLinux, string? bundledVlcEnv)
         => !isLinux || bundledVlcEnv == "1";
+
+    /// <summary>
+    /// Platforms the gapless splice engine has an output for: WASAPI on Windows, a
+    /// PulseAudio stream on Linux (GitHub #127). macOS keeps the per-track LibVLC output.
+    /// Pure; internal for tests.
+    /// </summary>
+    internal static bool IsGaplessEnginePlatform(bool isWindows, bool isLinux) => isWindows || isLinux;
 
     /// <summary>
     /// Whether an MP3 opens on LibVLC's own MP3 demuxer instead of the forced avformat one:
