@@ -249,6 +249,17 @@ public class NoctisServerAccountTests : IAsyncLifetime
     }
 
     [Fact]
+    public async Task PasswordChecks_RunAFewAtATime_SoAFloodOfMadeUpNamesCannotPegTheCpu()
+    {
+        // Every password request costs one PBKDF2 (100k rounds, tens of ms of CPU) — for unknown
+        // names too, so timing does not reveal accounts. The login brake is per name, so a flood
+        // of made-up names is never throttled: without a cap it ran one PBKDF2 per thread at once.
+        var responses = await Task.WhenAll(Enumerable.Range(0, 32).Select(i => SignIn(user: $"nobody-{i}", password: "wrong one")));
+        Assert.All(responses, r => Assert.Equal(40, ErrorCode(r.Body)));
+        Assert.InRange(_server.PeakPasswordChecks, 1, NoctisServer.MaxConcurrentPasswordChecks);
+    }
+
+    [Fact]
     public async Task SignInAgain_FromTheSameDevice_ReplacesItsKey()
     {
         var first = await SignInKey();

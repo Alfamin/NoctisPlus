@@ -32,6 +32,23 @@ public sealed partial class NoctisServer : IAsyncDisposable
     private readonly LoginThrottle _throttle = new();
     private WebApplication? _app;
 
+    /// <summary>
+    /// Most password checks (PBKDF2, 100k rounds: tens of ms of CPU each, for unknown names too)
+    /// in flight at once. The login brake is per address and name, so a flood of made-up names
+    /// is never throttled; without this cap it ran one PBKDF2 per thread and pegged the CPU.
+    /// Keys (device, account) are looked up by hash and never wait here.
+    /// </summary>
+    public const int MaxConcurrentPasswordChecks = 2;
+
+    /// <summary>How long a password check waits for a slot before the request is turned away (503).</summary>
+    private static readonly TimeSpan PasswordQueueTimeout = TimeSpan.FromSeconds(10);
+
+    private readonly SemaphoreSlim _passwordGate = new(MaxConcurrentPasswordChecks, MaxConcurrentPasswordChecks);
+
+    /// <summary>Most password checks seen in flight at once (test seam for the cap).</summary>
+    internal int PeakPasswordChecks => _peakPasswordChecks;
+    private int _passwordChecks, _peakPasswordChecks;
+
     /// <param name="coverResizer">
     /// Makes a <c>getCoverArt&amp;size=N</c> copy: (album id, source path, longest side, ct) → path
     /// of a cached JPEG, or null when the cover cannot be shrunk safely. Null (the headless host)
@@ -228,39 +245,68 @@ public sealed partial class NoctisServer : IAsyncDisposable
                     return;
                 }
 
-                // Brute-force brake per remote address + account name: after repeated bad
-                // logins for a name, that name is refused for a while, before its password is
-                // even checked. Keyed by name too because behind the documented reverse proxy
-                // every client shares the proxy's address, and one bad client must not lock out
-                // every account. API keys are 256-bit random (not guessable), so a request that
-                // carries one is never throttled. The attempt is reserved (counted) BEFORE the
-                // password is verified, so parallel requests cannot each get a free guess.
-                // Keyed by the account the name means (ResolveSignInName), so the profile
-                // name is not a second set of guesses at the main account.
-                var client = ctx.Connection.RemoteIpAddress?.ToString() ?? "unknown";
-                var name = apiKey is null ? p.Get("u") : null;
-                var signInName = name is null ? null : ResolveSignInName(name);
-                var throttleKey = signInName is null ? null : LoginThrottle.Key(client, signInName);
-                var lockedNow = false;
-                if (throttleKey is not null && !_throttle.TryReserve(throttleKey, out var retryAfter, out lockedNow))
+                // A password check waits for one of the few slots (MaxConcurrentPasswordChecks)
+                // before anything else, so a refusal below holds no brake reservation. A flood
+                // that keeps the slots busy this long is turned away, not queued without end.
+                var checkingPassword = apiKey is null;
+                if (checkingPassword && !await _passwordGate.WaitAsync(PasswordQueueTimeout, ctx.RequestAborted).ConfigureAwait(false))
                 {
-                    ctx.Response.Headers.RetryAfter = ((int)Math.Ceiling(retryAfter.TotalSeconds)).ToString();
-                    await WriteAsync(ctx, SubsonicResponse.Error(SubsonicResponse.ErrWrongCredentials,
-                        "Too many failed login attempts. Try again later.", format, _serverVersion), 429).ConfigureAwait(false);
+                    ctx.Response.Headers.RetryAfter = "5";
+                    await WriteAsync(ctx, SubsonicResponse.Error(SubsonicResponse.ErrGeneric,
+                        "The server is busy checking passwords. Try again in a moment.", format, _serverVersion), 503).ConfigureAwait(false);
                     return;
                 }
+                try
+                {
+                    if (checkingPassword)
+                    {
+                        var inFlight = Interlocked.Increment(ref _passwordChecks);
+                        for (var peak = _peakPasswordChecks; inFlight > peak; peak = _peakPasswordChecks)
+                            if (Interlocked.CompareExchange(ref _peakPasswordChecks, inFlight, peak) == peak) break;
+                    }
 
-                var (user, device, error, errorMessage) = Authenticate(p, apiKey, signInName);
-                if (user is null)
-                {
-                    if (lockedNow) DebugLogger.Warn(DebugLogger.Category.State, "Server", $"login lockout for {client}");
-                    await WriteAsync(ctx, SubsonicResponse.Error(error, errorMessage, format, _serverVersion), 200).ConfigureAwait(false);
-                    return;
+                    // Brute-force brake per remote address + account name: after repeated bad
+                    // logins for a name, that name is refused for a while, before its password is
+                    // even checked. Keyed by name too because behind the documented reverse proxy
+                    // every client shares the proxy's address, and one bad client must not lock out
+                    // every account. API keys are 256-bit random (not guessable), so a request that
+                    // carries one is never throttled. The attempt is reserved (counted) BEFORE the
+                    // password is verified, so parallel requests cannot each get a free guess.
+                    // Keyed by the account the name means (ResolveSignInName), so the profile
+                    // name is not a second set of guesses at the main account.
+                    var client = ctx.Connection.RemoteIpAddress?.ToString() ?? "unknown";
+                    var name = checkingPassword ? p.Get("u") : null;
+                    var signInName = name is null ? null : ResolveSignInName(name);
+                    var throttleKey = signInName is null ? null : LoginThrottle.Key(client, signInName);
+                    var lockedNow = false;
+                    if (throttleKey is not null && !_throttle.TryReserve(throttleKey, out var retryAfter, out lockedNow))
+                    {
+                        ctx.Response.Headers.RetryAfter = ((int)Math.Ceiling(retryAfter.TotalSeconds)).ToString();
+                        await WriteAsync(ctx, SubsonicResponse.Error(SubsonicResponse.ErrWrongCredentials,
+                            "Too many failed login attempts. Try again later.", format, _serverVersion), 429).ConfigureAwait(false);
+                        return;
+                    }
+
+                    var (user, device, error, errorMessage) = Authenticate(p, apiKey, signInName);
+                    if (user is null)
+                    {
+                        if (lockedNow) DebugLogger.Warn(DebugLogger.Category.State, "Server", $"login lockout for {client}");
+                        await WriteAsync(ctx, SubsonicResponse.Error(error, errorMessage, format, _serverVersion), 200).ConfigureAwait(false);
+                        return;
+                    }
+                    if (throttleKey is not null) _throttle.RecordSuccess(throttleKey);
+                    ClientAuthenticated?.Invoke(this, user.Name);
+                    ctx.Items["user"] = user;
+                    if (device is not null) ctx.Items["device"] = device;
                 }
-                if (throttleKey is not null) _throttle.RecordSuccess(throttleKey);
-                ClientAuthenticated?.Invoke(this, user.Name);
-                ctx.Items["user"] = user;
-                if (device is not null) ctx.Items["device"] = device;
+                finally
+                {
+                    if (checkingPassword)
+                    {
+                        Interlocked.Decrement(ref _passwordChecks);
+                        _passwordGate.Release();
+                    }
+                }
             }
 
             if (await TryHandleBinaryAsync(ctx, method, p).ConfigureAwait(false)) return;
@@ -276,6 +322,10 @@ public sealed partial class NoctisServer : IAsyncDisposable
         catch (SubsonicException ex)
         {
             await WriteAsync(ctx, SubsonicResponse.Error(ex.Code, ex.Message, format, _serverVersion), 200).ConfigureAwait(false);
+        }
+        catch (OperationCanceledException) when (ctx.RequestAborted.IsCancellationRequested)
+        {
+            // The client hung up (while waiting for a password slot, say): nobody to answer.
         }
         catch (BadHttpRequestException ex)
         {
