@@ -13,7 +13,8 @@ namespace Noctis.Controls;
 /// from notch to notch. Bind the setting to <see cref="SteppedValue"/>, not Value: the thumb
 /// (Value) is never rounded, SteppedValue is Value rounded to <see cref="Step"/>, and a
 /// setting change from elsewhere (load, reset, double-tap default) moves the thumb only when
-/// it lands on a different step than the one the thumb is already within.
+/// it lands on a different step than the one the thumb is already within. Shared (Noctis.UI)
+/// so the phone's Settings sliders glide the same way (10-13).
 /// </summary>
 public class SmoothSlider : Slider
 {
@@ -56,15 +57,25 @@ public class SmoothSlider : Slider
         else if (change.Property == SteppedValueProperty)
         {
             if (Snap(Value) != Snap(SteppedValue))
-                Sync(() => SetCurrentValue(ValueProperty, SteppedValue));
+                Sync(() => PlaceThumb(SteppedValue));
         }
         else if (change.Property == MinimumProperty || change.Property == MaximumProperty)
         {
             // A range set after the setting arrived (attribute order) re-places the thumb.
             if (Snap(Value) != Snap(SteppedValue))
-                Sync(() => SetCurrentValue(ValueProperty, SteppedValue));
+                Sync(() => PlaceThumb(SteppedValue));
         }
     }
+
+    /// <summary>
+    /// Puts the thumb on a setting that arrived from outside, as a local value (10-13). A value
+    /// set with SetCurrentValue does not survive a style re-evaluation: attaching the slider to
+    /// the tree (its implicit theme) or detaching it put Value back to its coerced default, the
+    /// Minimum, and the Value → SteppedValue sync above then wrote that Minimum into the setting
+    /// (the phone's Settings set the lyrics text size to 80 % when opened and when closed).
+    /// Drags still move Value through SetCurrentValue on top of this local value.
+    /// </summary>
+    private void PlaceThumb(double value) => SetValue(ValueProperty, value);
 
     private void Sync(Action set)
     {

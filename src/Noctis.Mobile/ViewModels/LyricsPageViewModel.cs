@@ -32,9 +32,8 @@ public sealed partial class LyricsPageViewModel : ObservableObject, IDisposable
     private readonly LyricsTimeline _timeline;
     private readonly LyricsPlaybackClock _clock = new();
     private int _generation;
-    private double _minOpacity = AppSettings.LyricsMinLineOpacityDefault / 100.0;
-    private bool _joinSplitWords;
     private bool _settingsLoaded;
+    private int _opacitySaveGeneration;
     private bool _disposed;
 
     public LyricsPageViewModel(IAudioPlayer player, NowPlayingViewModel nowPlaying, ITrackFileAccess files,
@@ -70,6 +69,15 @@ public sealed partial class LyricsPageViewModel : ObservableObject, IDisposable
     [ObservableProperty] private bool _hasRomanizations;
     [ObservableProperty] private bool _showTranslation = true;
     [ObservableProperty] private bool _showRomanization = true;
+
+    /// <summary>The background-vocal (adlib) row under a line, as the desktop's setting.</summary>
+    [ObservableProperty] private bool _showBackgroundVocals = true;
+
+    /// <summary>Floor for the dimmed lines, in percent (0–60), as the desktop's Minimum Line Opacity.</summary>
+    [ObservableProperty] private int _minLineOpacity = AppSettings.LyricsMinLineOpacityDefault;
+
+    /// <summary>One unbroken word for a word TTML splits into timed syllables (desktop issue #32).</summary>
+    [ObservableProperty] private bool _joinSplitWords;
     [ObservableProperty, NotifyPropertyChangedFor(nameof(StatusText))] private bool _isRawFallback;
 
     /// <summary>Android's system font scale. Avalonia scales by density only, so the head
@@ -98,6 +106,10 @@ public sealed partial class LyricsPageViewModel : ObservableObject, IDisposable
 
     public static double NowMs() => Stopwatch.GetTimestamp() * 1000.0 / Stopwatch.Frequency;
 
+    /// <summary>A slider's settings save waits this long after its last step, so a drag writes
+    /// settings.json once, not once per step.</summary>
+    internal static TimeSpan SliderSaveDelay { get; set; } = TimeSpan.FromMilliseconds(350);
+
     /// <summary>Settings first (layer toggles, opacity floor, split-word joining), then the current track.</summary>
     public async Task InitializeAsync()
     {
@@ -106,8 +118,9 @@ public sealed partial class LyricsPageViewModel : ObservableObject, IDisposable
             var settings = await _persistence.LoadSettingsAsync();
             ShowTranslation = settings.LyricsShowTranslations;
             ShowRomanization = settings.LyricsShowRomanization;
-            _minOpacity = Math.Clamp(settings.LyricsMinLineOpacity, 0, 60) / 100.0;
-            _joinSplitWords = settings.LyricsJoinSplitWords;
+            ShowBackgroundVocals = settings.LyricsShowBackgroundVocals;
+            MinLineOpacity = Math.Clamp(settings.LyricsMinLineOpacity, 0, 60);
+            JoinSplitWords = settings.LyricsJoinSplitWords;
             TextScale = Math.Clamp(settings.MobileLyricsTextScale, 0.8, 1.6);
         }
         catch (Exception ex)
@@ -122,8 +135,39 @@ public sealed partial class LyricsPageViewModel : ObservableObject, IDisposable
 
     partial void OnShowRomanizationChanged(bool value) => PersistLayerToggles();
 
-    /// <summary>The latest layer-toggle save; tests await it instead of racing the file write.</summary>
+    partial void OnShowBackgroundVocalsChanged(bool value) => PersistLayerToggles();
+
+    /// <summary>Re-floors the shown lines in place (the desktop's RefreshFocusDimming); the save
+    /// waits for the slider to settle.</summary>
+    partial void OnMinLineOpacityChanged(int value)
+    {
+        if (IsSynced && Lines.Count > 0) ApplyOpacities(ActiveLineIndex);
+        if (!_settingsLoaded) return;
+        var generation = ++_opacitySaveGeneration;
+        PendingSave = SaveAfterSliderSettlesAsync(generation);
+    }
+
+    /// <summary>Joining changes how the TTML is parsed, not how it is drawn: the current track
+    /// goes back through the load path, as on the desktop.</summary>
+    partial void OnJoinSplitWordsChanged(bool value)
+    {
+        if (!_settingsLoaded) return;
+        PersistLayerToggles();
+        _ = LoadAsync(_nowPlaying.CurrentTrack);
+    }
+
+    private async Task SaveAfterSliderSettlesAsync(int generation)
+    {
+        await Task.Delay(SliderSaveDelay);
+        if (generation != Volatile.Read(ref _opacitySaveGeneration)) return;   // a later step saves
+        await SaveLayerTogglesAsync();
+    }
+
+    /// <summary>The latest lyrics-settings save; tests await it instead of racing the file write.</summary>
     internal Task PendingSave { get; private set; } = Task.CompletedTask;
+
+    /// <summary>settings.json writes so far; tests count them.</summary>
+    internal int SaveCount;
 
     private void PersistLayerToggles()
     {
@@ -138,7 +182,11 @@ public sealed partial class LyricsPageViewModel : ObservableObject, IDisposable
             var settings = await _persistence.LoadSettingsAsync();
             settings.LyricsShowTranslations = ShowTranslation;
             settings.LyricsShowRomanization = ShowRomanization;
+            settings.LyricsShowBackgroundVocals = ShowBackgroundVocals;
+            settings.LyricsMinLineOpacity = MinLineOpacity;
+            settings.LyricsJoinSplitWords = JoinSplitWords;
             await _persistence.SaveSettingsAsync(settings);
+            Interlocked.Increment(ref SaveCount);
         }
         catch (Exception ex)
         {
@@ -182,7 +230,7 @@ public sealed partial class LyricsPageViewModel : ObservableObject, IDisposable
         }
 
         IsLoading = true;
-        var join = _joinSplitWords;
+        var join = JoinSplitWords;
         var prepare = PrepareTrack;
         LoadedLyrics result;
         try
@@ -267,7 +315,7 @@ public sealed partial class LyricsPageViewModel : ObservableObject, IDisposable
             }
             var distance = LyricsTimeline.DistanceToNearestActive(i, active, lit);
             var ramp = distance < OpacityRamp.Length ? OpacityRamp[distance] : 0;
-            Lines[i].LineOpacity = Math.Max(ramp, _minOpacity);
+            Lines[i].LineOpacity = Math.Max(ramp, Math.Clamp(MinLineOpacity, 0, 60) / 100.0);
         }
     }
 

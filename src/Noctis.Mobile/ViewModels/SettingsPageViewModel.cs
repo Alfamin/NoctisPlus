@@ -298,6 +298,12 @@ public sealed partial class SettingsPageViewModel : MobilePage
     /// <summary>The tail of the save chain; tests await it.</summary>
     internal Task PendingSave { get; private set; } = Task.CompletedTask;
 
+    /// <summary>settings.json writes so far; tests count them.</summary>
+    internal int SaveCount;
+
+    private int _textScaleSaveGeneration;
+    private Task _saveChain = Task.CompletedTask;
+
     public Task LoadAsync() => Loaded = LoadCoreAsync();
 
     private async Task LoadCoreAsync()
@@ -336,10 +342,21 @@ public sealed partial class SettingsPageViewModel : MobilePage
         OnPropertyChanged(nameof(AppearanceValue));
     }
 
+    /// <summary>The lyrics follow each step at once; settings.json is written once the slider
+    /// settles (<see cref="LyricsPageViewModel.SliderSaveDelay"/>), not once per step of a drag.</summary>
     partial void OnLyricsTextScaleChanged(double value)
     {
         Shell.Lyrics.TextScale = value;
-        if (!_loading) QueueSave();
+        if (_loading) return;
+        var generation = ++_textScaleSaveGeneration;
+        PendingSave = SaveAfterSliderSettlesAsync(generation);
+    }
+
+    private async Task SaveAfterSliderSettlesAsync(int generation)
+    {
+        await Task.Delay(LyricsPageViewModel.SliderSaveDelay);
+        if (generation != Volatile.Read(ref _textScaleSaveGeneration)) return;   // a later step saves
+        await QueueSave();
     }
 
     private void ThemeChanged()
@@ -349,8 +366,10 @@ public sealed partial class SettingsPageViewModel : MobilePage
         QueueSave();
     }
 
-    private void QueueSave() =>
-        PendingSave = PendingSave.ContinueWith(_ => SaveAsync(), TaskScheduler.Default).Unwrap();
+    /// <summary>Saves one after another. Its own chain, not <see cref="PendingSave"/>: a slider's
+    /// delayed save is PendingSave while it waits, and must not queue behind itself.</summary>
+    private Task QueueSave() =>
+        PendingSave = _saveChain = _saveChain.ContinueWith(_ => SaveAsync(), TaskScheduler.Default).Unwrap();
 
     private async Task SaveAsync()
     {
@@ -365,6 +384,7 @@ public sealed partial class SettingsPageViewModel : MobilePage
             settings.AccentPresetName = AccentName;
             settings.MobileLyricsTextScale = LyricsTextScale;
             await Shell.Library.Persistence.SaveSettingsAsync(settings);
+            Interlocked.Increment(ref SaveCount);
         }
         catch (Exception ex)
         {
