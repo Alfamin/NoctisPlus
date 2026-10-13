@@ -1678,6 +1678,7 @@ public partial class PlaybackBarView : UserControl
 
         var track = vm.CurrentTrack;
         BindViewArtist(vm, track);
+        BindChapters(vm);
 
         LyricsBackgroundClearMenuItem.IsVisible = track != null &&
             LyricsBackgroundOverrides.HasOverride(LyricsBackgroundOverrides.KeyForTrack(track));
@@ -1710,6 +1711,38 @@ public partial class PlaybackBarView : UserControl
             });
         if (TrackContextMenuBuilder.ArtistPhotoSource is { } source)
             ArtistAvatarsLoaded = LoadArtistAvatarsAsync(generation, names, photos, source);
+    }
+
+    /// <summary>
+    /// Chapters ▸ (audiobooks): one row per chapter — its title, its start time muted on the
+    /// right — seeking there on click, with the chapter under the playhead ticked like the
+    /// speed and timer menus' current choice. Visibility follows HasChapters (XAML).
+    /// </summary>
+    private void BindChapters(PlayerViewModel vm)
+    {
+        var item = ChaptersMenuItem;
+        item.Items.Clear();
+        if (!vm.HasChapters) return;
+        var chapters = vm.Chapters;
+        var current = TrackChapter.IndexAt(chapters, vm.Position);
+        for (var i = 0; i < chapters.Count; i++)
+        {
+            var chapter = chapters[i];
+            var title = new TextBlock
+            {
+                Text = chapter.Title.Length > 0 ? chapter.Title : Loc.T("PlaybackBar.ChapterNumber", i + 1),
+                MaxWidth = 320, TextTrimming = TextTrimming.CharacterEllipsis, MaxLines = 1,
+            };
+            var start = new TextBlock { Text = PlayerViewModel.FormatTime(chapter.Start), Opacity = 0.6, Margin = new Thickness(16, 0, 0, 0) };
+            Grid.SetColumn(start, 1);
+            var header = new Grid { ColumnDefinitions = new ColumnDefinitions("*,Auto") };
+            header.Children.Add(title);
+            header.Children.Add(start);
+            var row = new MenuItem { Header = header, Command = vm.SeekToChapterCommand, CommandParameter = chapter };
+            if (i == current)
+                row.Icon = new LineIcon { Data = MenuV2.FindGeometry(this, "MenuLineCheck"), Classes = { "mv2-icon", "mv2-check" } };
+            item.Items.Add(row);
+        }
     }
 
     private int _artistAvatarGeneration;

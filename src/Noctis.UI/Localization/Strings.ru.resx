@@ -1665,6 +1665,8 @@ Deezer и TIDAL: вставьте ссылку.</value></data>
   <data name="PlaybackBar.RemoveLyrics" xml:space="preserve"><value>Удалить текст</value><comment>Header in PlaybackBarView.axaml</comment></data>
   <data name="PlaybackBar.ShowFolder" xml:space="preserve"><value>Показать папку</value><comment>Header in PlaybackBarView.axaml</comment></data>
   <data name="PlaybackBar.SleepTimer" xml:space="preserve"><value>Таймер сна</value><comment>Header in PlaybackBarView.axaml</comment></data>
+  <data name="PlaybackBar.Chapters" xml:space="preserve"><value>Главы</value><comment>Submenu in the player bar's more menu (PlaybackBarView.axaml) listing the chapters of the playing audiobook (.m4b); a chapter jumps there</comment></data>
+  <data name="PlaybackBar.ChapterNumber" xml:space="preserve"><value>Глава {0}</value><comment>Row under Chapters for a chapter the file gives no title; {0} = chapter number</comment></data>
   <data name="PlaybackBar.StopAfterCurrentTrack" xml:space="preserve"><value>Остановить после текущего трека</value><comment>Header in PlaybackBarView.axaml</comment></data>
   <data name="PlaybackBar.RemoveFromLibrary" xml:space="preserve"><value>Удалить из медиатеки</value><comment>Header in PlaybackBarView.axaml</comment></data>
   <data name="PlaybackBar.LyricsDisplay" xml:space="preserve"><value>Отображение текста</value><comment>Header in PlaybackBarView.axaml</comment></data>

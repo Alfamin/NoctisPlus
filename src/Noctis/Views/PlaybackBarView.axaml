@@ -1493,6 +1493,15 @@
                                     </MenuItem>
                                 </MenuItem>
                                 <Separator />
+                                <!-- Audiobook chapters (.m4b, Discord Luwi): one row per chapter, filled
+                                     per open (BindChapters); shown only when the file has two or more. -->
+                                <MenuItem x:Name="ChaptersMenuItem"
+                                          Header="{loc:T PlaybackBar.Chapters}"
+                                          IsVisible="{Binding HasChapters}">
+                                    <MenuItem.Icon>
+                                        <controls:LineIcon Classes="mv2-icon" Data="{StaticResource MenuLineChapters}"/>
+                                    </MenuItem.Icon>
+                                </MenuItem>
                                 <MenuItem Header="{loc:T PlaybackBar.SleepTimer}"
                                           x:Name="SleepTimerMenuItem">
                                     <MenuItem.Icon>
