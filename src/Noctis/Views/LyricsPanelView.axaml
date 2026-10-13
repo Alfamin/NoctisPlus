@@ -356,8 +356,10 @@
                     </ItemsControl.MinWidth>
                     <ItemsControl.ItemTemplate>
                         <DataTemplate x:DataType="m:LyricLine">
+                            <!-- Reads its line (UIA read "Avalonia.Controls.StackPanel", 10-13). -->
                             <Button Background="Transparent"
                                     Classes="panel-lyric-line-btn"
+                                    AutomationProperties.Name="{Binding Converter={x:Static helpers:AccessibleNames.ItemName}}"
                                     Classes.active="{Binding IsActive}"
                                     BorderThickness="0"
                                     Padding="0"

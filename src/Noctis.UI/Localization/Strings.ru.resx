@@ -1682,6 +1682,7 @@ Deezer и TIDAL: вставьте ссылку.</value></data>
   <data name="PlaybackBar.QueueTip" xml:space="preserve"><value>Очередь</value><comment>ToolTip.Tip in PlaybackBarView.axaml</comment></data>
   <data name="PlaybackBar.LyricsTip" xml:space="preserve"><value>Текст</value><comment>ToolTip.Tip in PlaybackBarView.axaml</comment></data>
   <data name="PlaybackBar.VolumeTip" xml:space="preserve"><value>Громкость</value><comment>ToolTip.Tip in PlaybackBarView.axaml</comment></data>
+  <data name="PlaybackBar.Seek" xml:space="preserve"><value>Позиция воспроизведения</value><comment>Accessible name of the seek bars (island, lyrics page timeline, mini player)</comment></data>
 
   <!-- PlaylistDescriptionDialog.axaml (auto-migrated) -->
   <data name="PlaylistDescription.PlaylistDescription" xml:space="preserve"><value>Описание плейлиста</value><comment>Title in PlaylistDescriptionDialog.axaml</comment></data>

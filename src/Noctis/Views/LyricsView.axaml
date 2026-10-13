@@ -623,9 +623,12 @@
                          scrolls); a multi-artist credit renders one link per name, like the
                          album page (Discord, aaron 09-21: "Kanye West, GLC, Consequence" was
                          one button that always opened the first name). -->
+                    <!-- Named by the text it shows: the marquee inside read as
+                         "Noctis.Controls.MarqueeTextBlock" (UIA 10-13). -->
                     <Button x:Name="ArtistLinkButton"
                             Classes="link-btn"
                             Command="{Binding ViewArtistCommand}"
+                            AutomationProperties.Name="{Binding Player.CurrentTrack.ArtistDisplay}"
                             HorizontalAlignment="Center"
                             IsVisible="{Binding !HasMultipleArtists}">
                         <controls:MarqueeTextBlock x:Name="ArtistMarquee"
@@ -670,6 +673,7 @@
                     <Button x:Name="AlbumLinkButton"
                             Classes="link-btn"
                             Command="{Binding ViewAlbumCommand}"
+                            AutomationProperties.Name="{Binding Player.CurrentTrack.Album}"
                             HorizontalAlignment="Center"
                             IsVisible="{Binding Player.CurrentTrack.Album, Converter={x:Static StringConverters.IsNotNullOrEmpty}}">
                         <controls:MarqueeTextBlock x:Name="AlbumMarquee"
@@ -815,6 +819,7 @@
                         </Canvas>
                         <Slider x:Name="LyricsTimelineSlider"
                                 Classes="lyrics-timeline-slider"
+                                AutomationProperties.Name="{loc:T PlaybackBar.Seek}"
                                 Value="{Binding Player.PositionFraction, Mode=TwoWay}"
                                 Minimum="0"
                                 Maximum="1"
@@ -838,7 +843,8 @@
                             Padding="10,5"
                             Height="30" MinHeight="30"
                             IsVisible="{Binding HasAlternateLyrics}"
-                            Command="{Binding SwitchToAlternateLyricsCommand}">
+                            Command="{Binding SwitchToAlternateLyricsCommand}"
+                            AutomationProperties.Name="{Binding AlternateLyricsLabel}">
                         <StackPanel Orientation="Horizontal" Spacing="5">
                             <!-- Swap arrows, not the paperclip (AttachIcon) this used to borrow. -->
                             <controls:LineIcon Data="{DynamicResource PageLineSwapSource}"
@@ -1028,8 +1034,10 @@
                         </ItemsControl.MinWidth>
                         <ItemsControl.ItemTemplate>
                             <DataTemplate x:DataType="m:LyricLine">
+                                <!-- Reads its line (UIA read "Avalonia.Controls.StackPanel", 10-13). -->
                                 <Button Background="Transparent"
                                         Classes="lyric-line-btn"
+                                        AutomationProperties.Name="{Binding Converter={x:Static helpers:AccessibleNames.ItemName}}"
                                         Classes.active="{Binding IsActive}"
                                         BorderThickness="0"
                                         Padding="0"
@@ -1295,7 +1303,8 @@
                     Margin="0,0,0,30"
                     ZIndex="2"
                     IsVisible="{Binding IsAutoFollowPaused}"
-                    Command="{Binding ResumeAutoFollowCommand}">
+                    Command="{Binding ResumeAutoFollowCommand}"
+                    AutomationProperties.Name="{loc:T Lyrics.Follow}">
                 <StackPanel Orientation="Horizontal" Spacing="6">
                     <!-- A locate crosshair, not the clipboard (ClipboardIcon is Paste). -->
                     <controls:LineIcon Data="{DynamicResource PageLineFollow}"

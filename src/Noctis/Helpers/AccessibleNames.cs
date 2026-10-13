@@ -64,10 +64,12 @@ public static class AccessibleNames
     public static readonly IValueConverter ItemName = new FuncValueConverter<object?, string?>(NameOfItem);
 
     /// <summary>A song reads "title, artist" (<see cref="Track.ToString"/>), a chart row its
-    /// song, a folder "name, N songs"; anything else its ToString().</summary>
+    /// song, a folder "name, N songs", a lyric line its words ("..." when it has none, like
+    /// the intro); anything else its ToString().</summary>
     public static string? NameOfItem(object? item) => item switch
     {
         TopSongRow row => row.Track.ToString(),
+        LyricLine line => string.IsNullOrWhiteSpace(line.Text) ? "..." : line.Text,
         FolderNode folder => $"{folder.DisplayName}, "
                              + (folder.TotalTrackCount == 1
                                  ? Loc.T("DescriptionDialog.Song")
