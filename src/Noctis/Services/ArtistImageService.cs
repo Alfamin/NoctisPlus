@@ -35,14 +35,20 @@ public class ArtistImageService
 
         // Defer the placeholder purge off the DI resolution path so it doesn't
         // enumerate the artwork directory on the UI thread during startup.
-        _ = Task.Run(PurgeLastFmPlaceholders);
+        PlaceholderPurge = Task.Run(PurgePlaceholders);
     }
+
+    /// <summary>The startup placeholder purge (tests await it).</summary>
+    internal Task PlaceholderPurge { get; }
 
     /// <summary>
     /// One-time cleanup: remove old Last.fm placeholder images (all ≤5KB, same generic star icon)
-    /// so they get re-fetched from Deezer with real artist photos.
+    /// so they get re-fetched from Deezer with real artist photos, and Deezer's grey "no photo"
+    /// silhouettes cached before downloads recognised them (10-12), so those artists get the
+    /// app's own placeholder. Only a file of the silhouette's exact length is read, and a
+    /// user-picked portrait is never touched.
     /// </summary>
-    private void PurgeLastFmPlaceholders()
+    private void PurgePlaceholders()
     {
         try
         {
@@ -51,6 +57,11 @@ public class ArtistImageService
                 var info = new FileInfo(file);
                 if (info.Length > 0 && info.Length <= 5120)
                     info.Delete();
+                else if (!File.Exists(Path.ChangeExtension(file, ".custom")) && DeezerArtistPhotos.IsNoPhotoFile(file))
+                {
+                    info.Delete();
+                    TryDelete(Path.ChangeExtension(file, ".src"));
+                }
             }
         }
         catch { }
@@ -448,8 +459,8 @@ public class ArtistImageService
             return false;
         WriteFanCount(artistId, match.Fans);
 
-        var imageData = await DownloadImageBytesAsync(match.ImageUrl, token).ConfigureAwait(false);
-        if (imageData == null)
+        // Deezer's silhouette is no photo: the no-match path takes over.
+        if ((await DownloadImageBytesAsync(match.ImageUrl, token).ConfigureAwait(false)).Bytes is not { } imageData)
             return false;
 
         await WriteImageAtomicAsync(cachedPath, imageData, token).ConfigureAwait(false);
@@ -530,9 +541,15 @@ public class ArtistImageService
             return false;
         }
 
-        var imageData = await DownloadImageBytesAsync(imageUrl, token).ConfigureAwait(false);
-        if (imageData == null)
+        var download = await DownloadImageBytesAsync(imageUrl, token).ConfigureAwait(false);
+        if (download.Bytes is not { } imageData)
+        {
+            // Deezer's silhouette: keep the portrait we have, and record the URL so the next
+            // sweep finds it unchanged instead of downloading the silhouette again.
+            if (download.NoPhoto)
+                WriteSourceMarker(artistId, imageUrl);
             return false;
+        }
 
         WriteSourceMarker(artistId, imageUrl);
 
@@ -551,7 +568,7 @@ public class ArtistImageService
     /// <summary>Deezer's 1800px size for a 1000px photo URL (see <see cref="DeezerArtistPhotos.UpgradeSize"/>).</summary>
     internal static string UpgradeDeezerSize(string imageUrl) => DeezerArtistPhotos.UpgradeSize(imageUrl);
 
-    private Task<byte[]?> DownloadImageBytesAsync(string imageUrl, CancellationToken token)
+    private Task<DeezerArtistPhotos.ImageDownload> DownloadImageBytesAsync(string imageUrl, CancellationToken token)
         => _deezer.DownloadImageAsync(imageUrl, token);
 
     /// <summary>

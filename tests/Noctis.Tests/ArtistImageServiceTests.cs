@@ -496,6 +496,137 @@ public class ArtistImageServiceTests
         }
     }
 
+    // ── Deezer's "no photo" silhouette (10-12) ──
+
+    /// <summary>Deezer's grey silhouette, as its CDN served it on 10-12 for every photo hash
+    /// it no longer has: 1800 px (44,631 bytes) and 1000 px (32,022 bytes).</summary>
+    private static byte[] NoPhotoBytes(int size)
+        => File.ReadAllBytes(Path.Combine(AppContext.BaseDirectory, "Fixtures", "Deezer", $"no-photo-{size}.jpg"));
+
+    /// <summary>"Xavier Mayne" on 10-12: the API lists hash f0bb52af… in every picture_* field,
+    /// and the CDN answers each size with a 302 to the empty hash (the MD5 of ""), which serves
+    /// the silhouette.</summary>
+    private const string DeadHashPhoto = "https://cdn-images.dzcdn.net/images/artist/f0bb52af04768d99c366fd295f2cc156/1000x1000-000000-80-0-0.jpg";
+
+    /// <summary>The search answers with <paramref name="imageUrl"/>; any CDN request is answered
+    /// the way HttpClient reports a followed redirect to the silhouette (the request's URI
+    /// rewritten to the empty hash), unless <paramref name="reportRedirect"/> is false.</summary>
+    private static StubHttpMessageHandler NoPhotoHandler(string name, string imageUrl, List<string> cdnRequests, bool reportRedirect = true)
+        => new(request =>
+        {
+            var url = request.RequestUri!.ToString();
+            if (url.StartsWith("https://api.deezer.com/search/artist", StringComparison.Ordinal))
+                return JsonResponse($$"""{ "data": [ { "id": 14335143, "name": "{{name}}", "nb_fan": 660, "picture_xl": "{{imageUrl}}" } ] }""");
+            cdnRequests.Add(url);
+            var size = url.Contains("/1800x1800-", StringComparison.Ordinal) ? 1800 : 1000;
+            if (reportRedirect)
+                request.RequestUri = new Uri($"https://cdn-images.dzcdn.net/images/artist/d41d8cd98f00b204e9800998ecf8427e/{size}x{size}-000000-80-0-0.jpg");
+            return new HttpResponseMessage(HttpStatusCode.OK)
+            {
+                RequestMessage = request,
+                Content = new ByteArrayContent(NoPhotoBytes(size)) { Headers = { ContentType = new("image/jpeg") } }
+            };
+        });
+
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]   // a handler that does not report the final URL: the bytes still tell
+    public async Task FetchAndCacheAsync_DeezersSilhouetteIsNoPhoto(bool reportRedirect)
+    {
+        using var persistence = new TestPersistenceService();
+        var cdn = new List<string>();
+        var service = new ArtistImageService(new HttpClient(NoPhotoHandler("Xavier Mayne", DeadHashPhoto, cdn, reportRedirect)), persistence);
+        var artist = new Artist { Id = Guid.NewGuid(), Name = "Xavier Mayne" };
+
+        await service.FetchAndCacheAsync(new[] { artist });
+
+        Assert.Null(artist.ImagePath);
+        Assert.False(File.Exists(service.GetCachedImagePath(artist.Id)));
+        // Asked once at 1800 px; the silhouette is the answer at every size, so no 1000 px retry.
+        Assert.Equal(DeezerArtistPhotos.UpgradeSize(DeadHashPhoto), cdn.Single());
+    }
+
+    [Fact]
+    public async Task FetchAndCacheAsync_SilhouetteFallsBackToThePrimaryArtistsPortrait()
+    {
+        using var persistence = new TestPersistenceService();
+        var cdn = new List<string>();
+        var service = new ArtistImageService(new HttpClient(NoPhotoHandler("Yesir feat. Xavier Mayne", DeadHashPhoto, cdn)), persistence);
+        var primary = new Artist { Id = Guid.NewGuid(), Name = "Yesir" };
+        var primaryPath = service.GetCachedImagePath(primary.Id);
+        File.WriteAllBytes(primaryPath, ImageBytes(0x11));
+        File.WriteAllText(Path.Combine(ArtworkDir(persistence), $"{primary.Id}.src"), Sidecar("https://images.example/yesir.jpg"));
+        var collab = new Artist { Id = Guid.NewGuid(), Name = "Yesir feat. Xavier Mayne" };
+
+        await service.FetchAndCacheAsync(new[] { primary, collab });
+
+        Assert.Equal(primaryPath, collab.ImagePath);
+        Assert.False(File.Exists(service.GetCachedImagePath(collab.Id)));
+    }
+
+    [Fact]
+    public async Task FetchAndCacheAsync_SilhouetteKeepsTheCachedPortrait_AndIsNotDownloadedAgain()
+    {
+        using var persistence = new TestPersistenceService();
+        var cdn = new List<string>();
+        var service = new ArtistImageService(new HttpClient(NoPhotoHandler("Xavier Mayne", DeadHashPhoto, cdn)), persistence);
+        var artist = new Artist { Id = Guid.NewGuid(), Name = "Xavier Mayne" };
+        var cachedPath = service.GetCachedImagePath(artist.Id);
+        File.WriteAllBytes(cachedPath, ImageBytes(0x11));
+        AgeSidecar(ArtworkDir(persistence), artist.Id, "https://images.example/old.jpg");
+
+        await service.FetchAndCacheAsync(new[] { artist });
+
+        Assert.Single(cdn);
+        Assert.Equal(0x11, File.ReadAllBytes(cachedPath)[8]);
+        // The check is stamped, so the next due sweep finds the URL unchanged.
+        var src = Path.Combine(ArtworkDir(persistence), $"{artist.Id}.src");
+        Assert.Equal(DeezerArtistPhotos.UpgradeSize(DeadHashPhoto), SidecarUrl(ArtworkDir(persistence), artist.Id));
+        File.SetLastWriteTimeUtc(src, DateTime.UtcNow - ArtistImageService.RefreshInterval - TimeSpan.FromHours(1));
+
+        await service.FetchAndCacheAsync(new[] { artist });
+
+        Assert.Single(cdn);
+        Assert.Equal(0x11, File.ReadAllBytes(cachedPath)[8]);
+    }
+
+    [Fact]
+    public async Task Startup_PurgesCachedSilhouettes_ButNotCustomPortraitsOrLookalikes()
+    {
+        using var persistence = new TestPersistenceService();
+        var dir = ArtworkDir(persistence);
+        Directory.CreateDirectory(dir);
+        var silhouette = Guid.NewGuid();
+        var silhouette1000 = Guid.NewGuid();
+        var custom = Guid.NewGuid();
+        var sameLength = Guid.NewGuid();
+        File.WriteAllBytes(Path.Combine(dir, $"{silhouette}.jpg"), NoPhotoBytes(1800));
+        File.WriteAllText(Path.Combine(dir, $"{silhouette}.src"), Sidecar(DeezerArtistPhotos.UpgradeSize(DeadHashPhoto)));
+        File.WriteAllBytes(Path.Combine(dir, $"{silhouette1000}.jpg"), NoPhotoBytes(1000));
+        File.WriteAllBytes(Path.Combine(dir, $"{custom}.jpg"), NoPhotoBytes(1800));
+        File.WriteAllText(Path.Combine(dir, $"{custom}.custom"), string.Empty);
+        var lookalike = NoPhotoBytes(1800);
+        lookalike[^3] ^= 0xFF;
+        File.WriteAllBytes(Path.Combine(dir, $"{sameLength}.jpg"), lookalike);
+
+        var service = new ArtistImageService(new HttpClient(new StubHttpMessageHandler(_ => JsonResponse("""{ "data": [] }"""))), persistence);
+        await service.PlaceholderPurge;
+
+        Assert.False(File.Exists(Path.Combine(dir, $"{silhouette}.jpg")));
+        Assert.False(File.Exists(Path.Combine(dir, $"{silhouette}.src")));
+        Assert.False(File.Exists(Path.Combine(dir, $"{silhouette1000}.jpg")));
+        Assert.True(File.Exists(Path.Combine(dir, $"{custom}.jpg")));
+        Assert.True(File.Exists(Path.Combine(dir, $"{sameLength}.jpg")));
+    }
+
+    [Fact]
+    public void IsPlaceholderUrl_KnowsTheEmptyHash()
+    {
+        Assert.True(DeezerArtistPhotos.IsPlaceholderUrl("https://cdn-images.dzcdn.net/images/artist//1000x1000-000000-80-0-0.jpg"));
+        Assert.True(DeezerArtistPhotos.IsPlaceholderUrl("https://cdn-images.dzcdn.net/images/artist/d41d8cd98f00b204e9800998ecf8427e/1800x1800-000000-80-0-0.jpg"));
+        Assert.False(DeezerArtistPhotos.IsPlaceholderUrl(DeadHashPhoto));
+    }
+
     private static byte[] ImageBytes(byte fill)
     {
         var bytes = new byte[6 * 1024];
