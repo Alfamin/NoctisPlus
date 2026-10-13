@@ -153,6 +153,133 @@ public class MobileAppearanceTests
         });
     }
 
+    /// <summary>
+    /// Every theme × every accent: text, accent labels and glyphs, and glyphs on accent fills
+    /// keep their contrast on the surfaces they sit on (WCAG ratios: 4.5 for body text, 3 for
+    /// accent text, grey notes and glyphs). Before the guards Emerald / Tangerine labels read
+    /// 2.2-2.4:1 on Light's white cards, white on a Tangerine Play pill 2.4:1, and an Indigo
+    /// check or selected outline 1.5:1 on Smoke's cards.
+    /// </summary>
+    [AvaloniaFact]
+    public void EveryThemeAndAccent_KeepsItsContrast()
+    {
+        var app = Application.Current!;
+        var before = app.RequestedThemeVariant;
+        var styles = new StyleInclude(new Uri("avares://Noctis.Mobile/")) { Source = new Uri("avares://Noctis.UI/Assets/Styles.axaml") };
+        var addedFont = !app.Resources.ContainsKey("InterSemiBold");
+        if (addedFont) app.Resources["InterSemiBold"] = FontFamily.Default;   // Styles.axaml asks for it
+        app.Styles.Add(styles);
+        var theme = new MobileTheme();
+        var failures = new System.Collections.Generic.List<string>();
+        try
+        {
+            foreach (var name in Themes)
+            {
+                var variant = name == "Light" ? ThemeVariant.Light : ThemeVariant.Dark;
+                foreach (var accent in SettingsPageViewModel.Accents)
+                {
+                    theme.Apply(app, name, accent.Hex);
+                    Color Get(string key)
+                    {
+                        Assert.True(app.TryGetResource(key, variant, out var value), $"{name}: no {key}");
+                        return value is Color c ? c : ((ISolidColorBrush)value!).Color;
+                    }
+                    var surfaces = new[] { "PhoneBackgroundBrush", "PhoneGroupedBackgroundBrush", "PhoneCardBrush" }.Select(k => (k, Get(k))).ToList();
+                    void Check(string fg, Color text, Color under, string underName, double min)
+                    {
+                        var ratio = MobileTheme.ContrastRatio(Over(text, under), under);
+                        if (ratio < min) failures.Add($"{name}/{accent.Name}: {fg} on {underName} {ratio:0.00} < {min}");
+                    }
+                    foreach (var (k, s) in surfaces)
+                    {
+                        Check("PrimaryTextBrush", Get("PrimaryTextBrush"), s, k, 4.5);
+                        Check("SecondaryTextBrush", Get("SecondaryTextBrush"), s, k, 3);
+                        Check("PhoneSecondaryTextBrush", Get("PhoneSecondaryTextBrush"), s, k, 3);
+                        Check("AccentTextBrush", Get("AccentTextBrush"), s, k, 3);
+                        Check("AccentTextExactBrush", Get("AccentTextExactBrush"), s, k, 3);
+                    }
+                    Check("AccentForegroundBrush", Get("AccentForegroundBrush"), Get("AccentColorBrush"), "AccentColorBrush", 3);
+                    Check("ToggleButtonForegroundChecked", Get("ToggleButtonForegroundChecked"), Get("AccentColorBrush"), "AccentColorBrush", 3);
+                }
+            }
+        }
+        finally
+        {
+            theme.Remove(app);
+            app.Styles.Remove(styles);
+            if (addedFont) app.Resources.Remove("InterSemiBold");
+            app.RequestedThemeVariant = before;
+        }
+        Assert.True(failures.Count == 0, string.Join("\n", failures));
+    }
+
+    /// <summary>Crimson, the default, already clears every floor: the guards leave it exactly
+    /// as the desktop builds it, on Light and on Ink.</summary>
+    [AvaloniaFact]
+    public void Guards_LeaveCrimsonUntouched()
+    {
+        var app = Application.Current!;
+        var before = app.RequestedThemeVariant;
+        var theme = new MobileTheme();
+        try
+        {
+            foreach (var (name, variant) in new[] { ("Light", ThemeVariant.Light), ("Ink", ThemeVariant.Dark) })
+            {
+                theme.Apply(app, name, MobileTheme.DefaultAccent);
+                var desktop = Noctis.Helpers.AccentPalette.Build(Color.Parse(MobileTheme.DefaultAccent), name == "Light");
+                foreach (var key in new[] { "AccentTextBrush", "AccentTextExactBrush", "AccentForegroundBrush" })
+                {
+                    Assert.True(app.Resources.TryGetResource(key, variant, out var value));
+                    Assert.Equal(((ISolidColorBrush)desktop[key]!).Color, ((ISolidColorBrush)value!).Color);
+                }
+            }
+        }
+        finally
+        {
+            theme.Remove(app);
+            app.RequestedThemeVariant = before;
+        }
+    }
+
+    /// <summary>Glyphs, labels and outlines drawn on a page or card take the guarded accent
+    /// (AccentTextExactBrush), never the raw AccentColorBrush, which is for fills: an Indigo
+    /// check, row icon or selected Look outline read 1.5-1.9:1 on the dark cards. Sliders keep
+    /// it (Fluent paints the slider's fill from its Foreground).</summary>
+    [Fact]
+    public void PhoneViews_DrawNoGlyphOrOutlineInTheRawAccent()
+    {
+        var views = new DirectoryInfo(Path.Combine(RepoRoot(), "src", "Noctis.Mobile", "Views"));
+        var offenders = new System.Collections.Generic.List<string>();
+        const string raw = "\\{DynamicResource AccentColorBrush\\}";
+        foreach (var file in views.GetFiles("*.axaml"))
+        {
+            var text = File.ReadAllText(file.FullName);
+            foreach (Match style in Regex.Matches(text, "<Style Selector=\"([^\"]*)\">(.*?)</Style>", RegexOptions.Singleline))
+                if (!style.Groups[1].Value.Contains("Slider")
+                    && Regex.IsMatch(style.Groups[2].Value, $"Property=\"(Foreground|BorderBrush|Stroke)\" Value=\"{raw}\""))
+                    offenders.Add($"{file.Name}: {style.Groups[1].Value}");
+            foreach (Match attr in Regex.Matches(text, $"\\s(Foreground|BorderBrush|Stroke)=\"{raw}\""))
+                offenders.Add($"{file.Name}: {attr.Value.Trim()}");
+        }
+        Assert.Empty(offenders);
+    }
+
+    private static string RepoRoot()
+    {
+        var dir = new DirectoryInfo(AppContext.BaseDirectory);
+        while (dir != null && !Directory.Exists(Path.Combine(dir.FullName, "src", "Noctis.Mobile")))
+            dir = dir.Parent;
+        return dir?.FullName ?? throw new DirectoryNotFoundException("repo root");
+    }
+
+    /// <summary>A translucent brush as it lands on an opaque surface.</summary>
+    private static Color Over(Color top, Color under)
+    {
+        var a = top.A / 255.0;
+        byte Mix(byte t, byte u) => (byte)Math.Round(t * a + u * (1 - a));
+        return Color.FromRgb(Mix(top.R, under.R), Mix(top.G, under.G), Mix(top.B, under.B));
+    }
+
     private static async Task WithAppearancePane(MobileFixtures.Rig rig, Action<SettingsPage, SettingsPageViewModel, Window> check)
     {
         var app = Application.Current!;

@@ -139,7 +139,7 @@
             <Setter Property="RenderTransform" Value="scale(0.96)" />
         </Style>
         <Style Selector="Button.look-tile.selected">
-            <Setter Property="BorderBrush" Value="{DynamicResource AccentColorBrush}" />
+            <Setter Property="BorderBrush" Value="{DynamicResource AccentTextExactBrush}" />
         </Style>
         <Style Selector="Button.look-tile:pointerover /template/ ContentPresenter#PART_ContentPresenter, Button.look-tile:pressed /template/ ContentPresenter#PART_ContentPresenter">
             <Setter Property="Background" Value="{Binding $parent[Button].Background}" />
@@ -195,7 +195,7 @@
             <Setter Property="Height" Value="22" />
             <Setter Property="Margin" Value="12,0,0,0" />
             <Setter Property="VerticalAlignment" Value="Center" />
-            <Setter Property="Foreground" Value="{DynamicResource AccentColorBrush}" />
+            <Setter Property="Foreground" Value="{DynamicResource AccentTextExactBrush}" />
             <Setter Property="Opacity" Value="0" />
         </Style>
         <Style Selector="ListBox.check-list ListBoxItem:selected views|GridIcon.check">
