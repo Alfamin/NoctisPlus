@@ -346,6 +346,12 @@ public sealed partial class LibraryViewModel : ObservableObject
     /// <summary>Whether <paramref name="folder"/> is still readable; see IFolderPicker.HasAccess.</summary>
     public bool HasAccess(string folder) => _picker.HasAccess(folder);
 
+    /// <summary>
+    /// Desktop parity (SettingsViewModel.AddFolderPath): the same folder again is silent (and
+    /// rescans, which is how a folder whose access was lost comes back); a folder inside one
+    /// already listed, or around one, is refused with a note, as the scan would list its songs
+    /// twice (a SAF song's path carries the folder it was found through).
+    /// </summary>
     [RelayCommand]
     private async Task AddFolderAsync()
     {
@@ -353,33 +359,125 @@ public sealed partial class LibraryViewModel : ObservableObject
         if (string.IsNullOrWhiteSpace(picked)) return;
 
         var settings = await _persistence.LoadSettingsAsync();
-        if (!settings.MusicFolders.Contains(picked))
+        if (!settings.MusicFolders.Any(f => FolderKey(f) == FolderKey(picked)))
         {
+            if (settings.MusicFolders.FirstOrDefault(f => IsInside(picked, f)) is { } covering)
+            {
+                RefusePick(picked, $"Already covered by “{FolderName(covering)}”.");
+                return;
+            }
+            if (settings.MusicFolders.FirstOrDefault(f => IsInside(f, picked)) is { } inner)
+            {
+                RefusePick(picked, $"“{FolderName(inner)}” is inside that folder. Remove it first.");
+                return;
+            }
             settings.MusicFolders.Add(picked);
             await SaveSettingsAsync(settings, "Folder");
         }
         SetFolders(settings.MusicFolders);
-        await ScanAsync(settings.MusicFolders);
+        await ScanAsync();
+    }
+
+    /// <summary>
+    /// Desktop parity (SettingsViewModel.RemoveFolder): the folder leaves the list and a rescan
+    /// takes its songs out of the library (removing the last one empties it). The files stay
+    /// where they are; the phone gives up its access to the folder.
+    /// </summary>
+    public async Task RemoveFolderAsync(string folder)
+    {
+        var settings = await _persistence.LoadSettingsAsync();
+        if (settings.MusicFolders.RemoveAll(f => f == folder) == 0) return;
+        await SaveSettingsAsync(settings, "Folder");
+        SetFolders(settings.MusicFolders);
+        _picker.ReleaseAccess(folder);
+        await ScanAsync(evenWithoutFolders: true);
+    }
+
+    /// <summary>A refused pick: say why (cleared after a while, as on the desktop) and give the
+    /// access just granted back, as nothing will use it.</summary>
+    private void RefusePick(string picked, string why)
+    {
+        _picker.ReleaseAccess(picked);
+        StatusText = why;
+        _ = ClearStatusLaterAsync(why);
+    }
+
+    private async Task ClearStatusLaterAsync(string text)
+    {
+        await Task.Delay(TimeSpan.FromSeconds(6)).ConfigureAwait(false);
+        _marshal(() =>
+        {
+            if (StatusText == text) StatusText = string.Empty;
+        });
+    }
+
+    /// <summary>What identifies a folder: a SAF tree URI's provider and its document id
+    /// ("content://…/tree/primary%3AMusic%2FTones" → "content://…", "primary:Music/Tones");
+    /// anything else as a plain path.</summary>
+    internal static (string Scope, string Path) FolderKey(string folder)
+    {
+        var tree = folder.IndexOf("/tree/", StringComparison.Ordinal);
+        if (tree < 0) return (string.Empty, folder.Replace('\\', '/').TrimEnd('/'));
+        return (folder[..tree], Uri.UnescapeDataString(folder[(tree + "/tree/".Length)..]).TrimEnd('/'));
+    }
+
+    /// <summary>True when <paramref name="folder"/> is below <paramref name="root"/> (not the
+    /// same folder). "primary:Music/Tones" is under "primary:Music" and under a whole card
+    /// ("1234-ABCD:"); "primary:MusicVideos" is not under "primary:Music".</summary>
+    internal static bool IsInside(string folder, string root)
+    {
+        var (folderScope, folderPath) = FolderKey(folder);
+        var (rootScope, rootPath) = FolderKey(root);
+        if (folderScope != rootScope || folderPath.Length <= rootPath.Length
+            || !folderPath.StartsWith(rootPath, StringComparison.Ordinal)) return false;
+        return rootPath.EndsWith(':') || folderPath[rootPath.Length] == '/';
+    }
+
+    /// <summary>A folder's own name for a note ("Tones").</summary>
+    private static string FolderName(string folder)
+    {
+        var path = FolderKey(folder).Path;
+        var cut = Math.Max(path.LastIndexOf('/'), path.LastIndexOf(':'));
+        return cut >= 0 && cut < path.Length - 1 ? path[(cut + 1)..] : path;
     }
 
     [RelayCommand]
-    private async Task RescanAsync()
-    {
-        var settings = await _persistence.LoadSettingsAsync();
-        if (settings.MusicFolders.Count == 0) return;
-        await ScanAsync(settings.MusicFolders);
-    }
+    private Task RescanAsync() => ScanAsync();
 
-    private async Task ScanAsync(IEnumerable<string> folders)
+    /// <summary>Set when a scan is asked for while one runs: the running one goes again once it
+    /// ends, so a folder added or removed mid-scan is never left out of (or in) the library.</summary>
+    private bool _scanAgain;
+
+    /// <summary>The last folder was removed: a pass with no folders must still run, to take its
+    /// songs out. Any other scan with none does nothing (a settings read that came back empty
+    /// must never empty the library).</summary>
+    private bool _scanWithoutFolders;
+
+    /// <summary>Scans the folders in the settings as they are when each pass starts.</summary>
+    private async Task ScanAsync(bool evenWithoutFolders = false)
     {
-        if (IsScanning) return;
+        _scanWithoutFolders |= evenWithoutFolders;
+        if (IsScanning)
+        {
+            _scanAgain = true;
+            return;
+        }
         IsScanning = true;
-        NeedsReconnect = false;
         ScanProgress = 0;
-        StatusText = "Scanning…";
         try
         {
-            await _library.ScanAsync(folders);
+            do
+            {
+                _scanAgain = false;
+                // Each pass judges the folders afresh.
+                NeedsReconnect = false;
+                StatusText = "Scanning…";
+                var folders = (await _persistence.LoadSettingsAsync()).MusicFolders.ToList();
+                if (folders.Count == 0 && !_scanWithoutFolders) break;
+                _scanWithoutFolders = false;
+                await _library.ScanAsync(folders);
+            }
+            while (_scanAgain);
             if (StatusText == "Scanning…") StatusText = string.Empty; // ScanAborted may have replaced it
         }
         catch (Exception ex)

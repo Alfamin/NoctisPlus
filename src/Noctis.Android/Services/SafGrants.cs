@@ -33,4 +33,19 @@ internal static class SafGrants
     /// said the folder was fine while every scan of it failed.</summary>
     internal static bool IsCoveredBy(string uri, string granted) =>
         uri.Equals(granted, StringComparison.Ordinal) || uri.StartsWith(granted + "/", StringComparison.Ordinal);
+
+    /// <summary>Drops the app's persisted read grant on <paramref name="uri"/>, if it has one.</summary>
+    public static void Release(Context context, string uri)
+    {
+        if (!uri.StartsWith("content://", StringComparison.OrdinalIgnoreCase)) return;
+        try
+        {
+            context.ContentResolver?.ReleasePersistableUriPermission(global::Android.Net.Uri.Parse(uri)!, ActivityFlags.GrantReadUriPermission);
+        }
+        catch (Exception ex)
+        {
+            // No grant to release (never taken, already gone): nothing to do.
+            Noctis.Services.DebugLog.Write("Library", $"Releasing the grant on {uri} failed: {ex.Message}");
+        }
+    }
 }

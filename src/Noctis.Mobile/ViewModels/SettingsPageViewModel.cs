@@ -17,9 +17,10 @@ public sealed record AccentSwatch(string Name, string Hex)
     public IBrush Brush { get; } = new ImmutableSolidColorBrush(Color.Parse(Hex));
 }
 
-/// <summary>One configured music folder as Settings lists it: the name the user would give it
-/// ("Music/Tones") and whether the phone lost its access (its songs stay listed, none plays).</summary>
-public sealed record SettingsFolder(string Name, bool AccessLost)
+/// <summary>One configured music folder as Settings lists it: the root as saved (a SAF tree
+/// URI), the name the user would give it ("Music/Tones") and whether the phone lost its access
+/// (its songs stay listed, none plays).</summary>
+public sealed record SettingsFolder(string Root, string Name, bool AccessLost)
 {
     /// <summary>The row's label: the folder's own name ("Tones").</summary>
     public string Title
@@ -139,6 +140,7 @@ public sealed partial class SettingsPageViewModel : MobilePage
     partial void OnPaneChanged(SettingsPane value)
     {
         if (value != SettingsPane.Main) ShownSubPane = value;
+        else FolderToRemove = null;   // a question left open on Music Folders does not wait there
     }
 
     [RelayCommand] private void OpenPane(SettingsPane pane) => Pane = pane;
@@ -158,8 +160,37 @@ public sealed partial class SettingsPageViewModel : MobilePage
     /// <summary>The configured roots as the user would name them ("Music/Tones"), not SAF URIs,
     /// each flagged when its access was lost: its songs stay listed but none of them plays.</summary>
     public IReadOnlyList<SettingsFolder> FolderRows => Shell.Library.Folders
-        .Select(f => new SettingsFolder(FolderDisplay(f), !Shell.Library.HasAccess(f)))
+        .Select(f => new SettingsFolder(f, FolderDisplay(f), !Shell.Library.HasAccess(f)))
         .ToList();
+
+    /// <summary>The folder whose Remove was tapped: the page asks before it goes.</summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(IsConfirmingRemoveFolder), nameof(RemoveFolderQuestion))]
+    private SettingsFolder? _folderToRemove;
+
+    public bool IsConfirmingRemoveFolder => FolderToRemove != null;
+
+    public string RemoveFolderQuestion => FolderToRemove is { } folder
+        ? $"Remove “{folder.Title}”? Its songs leave your library on this phone. The files stay where they are."
+        : string.Empty;
+
+    [RelayCommand] private void AskRemoveFolder(SettingsFolder folder) => FolderToRemove = folder;
+
+    [RelayCommand] private void CancelRemoveFolder() => FolderToRemove = null;
+
+    [RelayCommand]
+    private async Task ConfirmRemoveFolderAsync()
+    {
+        if (FolderToRemove is not { } folder) return;
+        FolderToRemove = null;
+        await Shell.Library.RemoveFolderAsync(folder.Root);
+    }
+
+    /// <summary>Under Add Folder: why a pick was refused, or the scan's status, else what the
+    /// folders are for the app.</summary>
+    public string FoldersFootnote => !string.IsNullOrEmpty(Shell.Library.StatusText)
+        ? Shell.Library.StatusText
+        : "Noctis can read only the folders you choose here.";
 
     /// <summary>The Music Folders row's value: how many there are.</summary>
     public string FoldersValue => Shell.Library.Folders.Count == 0 ? "None" : Shell.Library.Folders.Count.ToString();
@@ -409,6 +440,7 @@ public sealed partial class SettingsPageViewModel : MobilePage
             case nameof(LibraryViewModel.StatusText):
                 OnPropertyChanged(nameof(CanRescan));
                 OnPropertyChanged(nameof(RescanFootnote));
+                OnPropertyChanged(nameof(FoldersFootnote));
                 break;
             // A scan stopped on a dead grant: ask each folder again whether it is readable.
             case nameof(LibraryViewModel.NeedsReconnect):
