@@ -129,4 +129,33 @@ public class LyricsStudioRoundTripTests : IDisposable
         Assert.Equal(new[] { "(oh", "oh)" }, ttml![0].BackgroundWords?.Select(w => w.Text.Trim()));
         Assert.Equal(TimeSpan.FromSeconds(2.4), ttml[0].BackgroundWords![1].Start);
     }
+
+    [Fact]
+    public void ReTimedBySpeech_KeepsTheSecondSinger_AndTheBackgroundVocal_MovedWithTheLine()
+    {
+        // The speech model times only the sung text, and CarryCompanions gave back only the
+        // romaji / translation: a re-timed duet lost its "v2:" lines and its background vocals.
+        const string duet =
+            "[00:01.00]<00:01.00>Paper <00:01.50>lanterns<00:02.00>\n" +
+            "[bg: <00:02.00>(oh <00:02.40>oh)<00:03.00>]\n" +
+            "[00:04.00]v2:<00:04.00>Silver <00:04.60>moon<00:05.00>\n" +
+            "[00:06.00]Quiet harbor";
+        var source = ExistingLyricsLoader.ParseTimed(duet);
+        var deltas = new[] { 0.5, -0.2, 0.3 };
+        var retimed = source.Select((l, i) =>
+        {
+            var d = TimeSpan.FromSeconds(deltas[i]);
+            return new AlignedLine(l.Text, l.Start + d, l.End + d,
+                l.Words.Select(w => new AlignedWord(w.Text, w.Start + d, w.End + d)).ToList(), 0.9, false);
+        }).ToList();
+
+        var carried = ExistingLyricsLoader.CarryCompanions(source, retimed);
+
+        Assert.Equal(new[] { LyricVoice.Default, LyricVoice.Voice2, LyricVoice.Default }, carried.Select(l => l.Voice));
+        Assert.Equal(new[] { "(oh", "oh)" }, carried[0].Background?.Select(w => w.Text.Trim()));
+        Assert.Equal(new[] { 2.5, 2.9 }, carried[0].Background!.Select(w => w.Start.TotalSeconds));
+        Assert.Equal(3.5, carried[0].Background![^1].End.TotalSeconds);
+        Assert.Null(carried[1].Background);
+        Assert.Same(retimed[2], carried[2]);
+    }
 }

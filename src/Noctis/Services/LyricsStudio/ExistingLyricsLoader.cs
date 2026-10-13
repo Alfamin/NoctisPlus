@@ -276,29 +276,46 @@ public static partial class ExistingLyricsLoader
     }
 
     /// <summary>
-    /// Gives re-timed lines back the <see cref="AlignedLine.Companions"/> of the source lines
-    /// they were timed from: the engine aligns only the sung text, so without this a re-time
-    /// and save dropped the romaji and translation (GitHub #116). Matched in order by text.
+    /// Gives re-timed lines back what the source lines they were timed from carried besides the
+    /// sung text: the <see cref="AlignedLine.Companions"/>, the duet <see cref="AlignedLine.Voice"/>
+    /// and the <see cref="AlignedLine.Background"/> vocal. The engine aligns only the sung text,
+    /// so without this a re-time and save dropped the romaji and translation (GitHub #116), put
+    /// every line in the first singer's place and lost the adlibs. Nothing times the background
+    /// vocal, so it moves by as much as its line did — as the review's line shift moves it.
+    /// Matched in order by text.
     /// </summary>
     public static IReadOnlyList<AlignedLine> CarryCompanions(IReadOnlyList<AlignedLine> source, IReadOnlyList<AlignedLine> timed)
     {
-        if (!source.Any(l => l.Companions is { Count: > 0 })) return timed;
+        if (!source.Any(l => l.Companions is { Count: > 0 } || l.Background is { Count: > 0 } || l.Voice != LyricVoice.Default))
+            return timed;
         var result = new List<AlignedLine>(timed.Count);
         var j = 0;
         foreach (var line in timed)
         {
             var k = j;
             while (k < source.Count && !string.Equals(source[k].Text.Trim(), line.Text.Trim(), StringComparison.Ordinal)) k++;
-            if (k < source.Count)
+            if (k >= source.Count)
             {
-                j = k + 1;
-                if (source[k].Companions is { Count: > 0 } companions && line.Companions is null)
-                {
-                    result.Add(line with { Companions = companions });
-                    continue;
-                }
+                result.Add(line);
+                continue;
             }
-            result.Add(line);
+            j = k + 1;
+            var from = source[k];
+            var carried = line;
+            if (from.Companions is { Count: > 0 } companions && line.Companions is null)
+                carried = carried with { Companions = companions };
+            if (from.Voice != LyricVoice.Default && line.Voice == LyricVoice.Default)
+                carried = carried with { Voice = from.Voice };
+            if (from.Background is { Count: > 0 } background && line.Background is null)
+            {
+                var delta = line.Start - from.Start;
+                carried = carried with
+                {
+                    Background = background.Select(w => new AlignedWord(w.Text,
+                        TimeSpan.FromTicks(Math.Max(0, (w.Start + delta).Ticks)), TimeSpan.FromTicks(Math.Max(0, (w.End + delta).Ticks)))).ToList(),
+                };
+            }
+            result.Add(carried);
         }
         return result;
     }
