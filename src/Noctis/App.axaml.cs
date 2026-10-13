@@ -204,6 +204,12 @@ public partial class App : Application
             var sideFeed = Services!.GetRequiredService<Noctis.Services.AudioAnalysis.SideDecodeMeterFeed>();
             sideFeed.Start();
 
+            // A tag save of the playing track (Windows refuses to replace an open file): the
+            // player and the side decode let go of it for the rename and reopen it after.
+            if (Services!.GetRequiredService<IAudioPlayer>() is IOpenFileHolder playerHolder)
+                OpenFileHolders.Register(playerHolder);
+            OpenFileHolders.Register(sideFeed);
+
             // Clear temp export directories orphaned by a previous crash/kill.
             _ = Task.Run(Helpers.PngExportHelper.SweepStaleTempDirs);
 
