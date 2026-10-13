@@ -28,7 +28,7 @@ namespace Noctis.Services.AudioAnalysis;
 /// The pure media-time logic lives in <see cref="SideDecodeFeedCore"/> (unit-tested);
 /// this class owns the thread, the player polling and the ffmpeg process.
 /// </summary>
-public sealed class SideDecodeMeterFeed : IDisposable
+public sealed class SideDecodeMeterFeed : IDisposable, IOpenFileHolder
 {
     /// <summary>Decode rate: Nyquist must clear <see cref="SpectrumMeter.MaxHz"/>; the
     /// meters' block/window sizes were tuned around 44.1/48 kHz.</summary>
@@ -52,6 +52,11 @@ public sealed class SideDecodeMeterFeed : IDisposable
     private string? _ffmpegExe;
     private bool _isLocalFile;
     private bool? _feeding; // last ShouldFeed verdict, for the transition log
+
+    // Tick runs on the feed thread, Release on a tag save's thread: both touch the decode.
+    private readonly object _tickGate = new();
+    // The track a tag save has released: not decoded again until its reopen.
+    private string? _releasedPath;
 
     public SideDecodeMeterFeed(IAudioPlayer player, IAudioConverterService ffmpeg)
         : this(player, ffmpeg.GetFfmpegPath, (exe, path, frame) => FfmpegPcmPipe.Open(exe, path, frame, SampleRate),
@@ -104,7 +109,8 @@ public sealed class SideDecodeMeterFeed : IDisposable
             {
                 try
                 {
-                    Tick();
+                    lock (_tickGate)
+                        Tick();
                 }
                 catch (Exception ex)
                 {
@@ -158,6 +164,13 @@ public sealed class SideDecodeMeterFeed : IDisposable
             }
         }
 
+        if (_releasedPath != null && string.Equals(_releasedPath, _mediaPath, StringComparison.Ordinal))
+        {
+            _core.Reset();
+            _clock.Reset();
+            return;
+        }
+
         if (_player.State == PlaybackState.Playing && _isLocalFile && _ffmpegExe != null)
         {
             var raw = _player.Position.TotalMilliseconds;
@@ -168,6 +181,42 @@ public sealed class SideDecodeMeterFeed : IDisposable
         {
             // Paused/stopped: no feed, the meters go non-live and the bars rest.
             _clock.Reset();
+        }
+    }
+
+    /// <summary>
+    /// <see cref="IOpenFileHolder"/>: ffmpeg keeps the decoded track open, through a pause
+    /// too (it sits blocked on the full pipe), and on Windows that refuses the rename of a
+    /// tag save of the playing track. Drops the decode of <paramref name="path"/> (ffmpeg is
+    /// killed) and keeps it dropped until the returned reopen; the next tick then decodes
+    /// from the heard spot again.
+    /// </summary>
+    public Action? Release(string path)
+    {
+        lock (_tickGate)
+        {
+            var current = _mediaPath;
+            if (current == null || !SameFile(current, path)) return null;
+            _releasedPath = current;
+            _core.Reset();
+            _clock.Reset();
+        }
+        return () =>
+        {
+            lock (_tickGate)
+                _releasedPath = null;
+        };
+    }
+
+    private static bool SameFile(string a, string b)
+    {
+        try
+        {
+            return string.Equals(Path.GetFullPath(a), Path.GetFullPath(b), Noctis.Helpers.PathComparison.Comparison);
+        }
+        catch
+        {
+            return false;
         }
     }
 
@@ -390,6 +439,9 @@ internal static class FfmpegPcmPipe
             if (disposing)
             {
                 try { if (!_process.HasExited) _process.Kill(true); } catch { }
+                // Kill only starts the termination; ffmpeg's handle on the track closes
+                // when it is gone (a tag save renames over the track right after).
+                try { _process.WaitForExit(1000); } catch { }
                 try { _stdout.Dispose(); } catch { }
                 try { _process.Dispose(); } catch { }
             }

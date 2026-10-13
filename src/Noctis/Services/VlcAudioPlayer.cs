@@ -15,7 +15,7 @@ namespace Noctis.Services;
 ///   - All VLC state-changing calls go through ThreadPool to avoid blocking UI.
 ///   - A SemaphoreSlim serializes Play/Stop to prevent overlapping operations.
 /// </summary>
-public class VlcAudioPlayer : IAudioPlayer
+public class VlcAudioPlayer : IAudioPlayer, IOpenFileHolder
 {
     private const int SeekThrottleMs = 50;
     // A backward seek to the very start desyncs LibVLC's mmdevice/WASAPI output
@@ -349,6 +349,14 @@ public class VlcAudioPlayer : IAudioPlayer
     // When that restart happens while paused, the new input must open paused too —
     // otherwise dragging the slider to the beginning while paused starts playback.
     private volatile bool _restartPausedRequest;
+
+    // A file-release reopen (Release) opens the input at the heard position with
+    // :start-time; on LibVLC's own output the clock reads 0 until the input is there,
+    // which the timeline would show as a jump to 0:00 and back. Ticks of that session
+    // below the position are held back until the deadline (ticks, UTC).
+    private long _reopenFloorSession = -1;
+    private long _reopenFloorMs;
+    private long _reopenFloorUntilTicks;
 
     private long _playbackSessionId;
     private long _lastPlayStartTicksUtc;
@@ -5005,6 +5013,129 @@ public class VlcAudioPlayer : IAudioPlayer
         });
     }
 
+    // How long a tag save waits for the playback lock before giving up on releasing the
+    // file (a holder is at most an 8 s header parse).
+    private const int ReleaseLockTimeoutMs = 10000;
+
+    /// <summary>
+    /// <see cref="IOpenFileHolder"/>: a tag save of the playing (or staged next) track on
+    /// Windows cannot rename its copy over a file LibVLC has open. LibVLC's handle shares
+    /// delete, so on NTFS a POSIX rename replaces it without this; FAT, exFAT and network
+    /// shares refuse that rename, and there this player lets go of the file instead: it
+    /// stops the input on that file and returns the reopen at the heard position, paused
+    /// when it was paused, the way a restart seek reopens a track. The
+    /// playback lock stays held until the reopen, so a pause, skip or stop made meanwhile
+    /// lands on the reopened track. Null when this player does not have the file open.
+    /// </summary>
+    public Action? Release(string path)
+    {
+        if (_disposed || string.IsNullOrWhiteSpace(path) || IsPathlessMedia(path)) return null;
+        string full;
+        try { full = Path.GetFullPath(path); }
+        catch { return null; }
+        if (!IsSameFile(_currentMediaPath, full) && !IsSameFile(_standbyPath, full)) return null;
+
+        try
+        {
+            if (!_playbackLock.Wait(ReleaseLockTimeoutMs)) return null;
+        }
+        catch (ObjectDisposedException) { return null; }
+
+        var keepLock = false;
+        try
+        {
+            if (_disposed) return null;
+            // A crossfade in flight runs its own workers on the current player: leave it be.
+            var current = _currentMedia != null && !_transitionInFlight && IsSameFile(_currentMediaPath, full);
+            var staged = _standbyPrepared && _standbyMedia != null && IsSameFile(_standbyPath, full);
+            if (!current && !staged) return null;
+
+            // Any staged next track is staged again afterwards: the reopen below is a fresh
+            // open, and a fresh open drops the standby.
+            var restagePath = _standbyPrepared ? _standbyPath : null;
+            var restageStartMs = _standbyStartPositionMs;
+            var reopenPath = _currentMediaPath;
+            var reopenFallback = _currentFallbackPath;
+            var wasPaused = _isPaused;
+            var positionMs = current ? HeardPositionMs() : 0;
+
+            if (current)
+            {
+                CancelSkipCts();
+                ResetEndReachedPending();
+                lock (_seekGate) { _latestSeekMs = -1; }
+                _positionTimer.Stop();
+                if (_gaplessEngine)
+                    EngineClearAll(); // unblock the writers before the Stop below joins them
+            }
+            ReleasePreparedNext();
+            if (current)
+            {
+                _player.Stop();
+                var oldMedia = _currentMedia;
+                _currentMedia = null;
+                oldMedia?.Dispose();
+            }
+            DebugLogger.Info(DebugLogger.Category.Playback, "FileRelease.Released",
+                $"path={LogName(full)}, current={current}, staged={staged}, positionMs={positionMs}, paused={wasPaused}");
+
+            keepLock = true;
+            return () =>
+            {
+                try
+                {
+                    if (current && !_disposed && reopenPath != null)
+                    {
+                        Interlocked.Exchange(ref _pendingSeekMs, positionMs > 0 ? positionMs : -1);
+                        // PlayInternal's session; the lock keeps any other open out.
+                        Interlocked.Exchange(ref _reopenFloorMs, positionMs);
+                        Interlocked.Exchange(ref _reopenFloorUntilTicks, DateTime.UtcNow.AddSeconds(3).Ticks);
+                        Interlocked.Exchange(ref _reopenFloorSession, CurrentSessionId + 1);
+                        PlayInternal(reopenPath, startPaused: wasPaused, reopenFallback);
+                        DebugLogger.Info(DebugLogger.Category.Playback, "FileRelease.Reopened",
+                            $"path={LogName(reopenPath)}, positionMs={positionMs}, paused={wasPaused}");
+                    }
+                }
+                finally
+                {
+                    try { _playbackLock.Release(); } catch (ObjectDisposedException) { }
+                }
+                if (restagePath != null && !_disposed && !wasPaused)
+                    PrepareNext(restagePath, restageStartMs);
+            };
+        }
+        finally
+        {
+            if (!keepLock)
+            {
+                try { _playbackLock.Release(); } catch (ObjectDisposedException) { }
+            }
+        }
+    }
+
+    private static bool IsSameFile(string? path, string fullPath)
+    {
+        if (string.IsNullOrEmpty(path) || IsPathlessMedia(path)) return false;
+        try { return string.Equals(Path.GetFullPath(path), fullPath, Helpers.PathComparison.Comparison); }
+        catch { return false; }
+    }
+
+    /// <summary>The position the listener is at, as the position timer reports it: on the
+    /// engine the sink's consumed frames (VLC's clock runs a ring ahead of the speaker).</summary>
+    private long HeardPositionMs()
+    {
+        try
+        {
+            if (_gaplessEngine && _gaplessSink?.Provider.ActiveSegment is { } seg)
+                return seg.Source is int slot && slot == EngineSlotOf(_player) ? seg.PositionMs : 0;
+            return Math.Max(0, _player.Time);
+        }
+        catch
+        {
+            return 0;
+        }
+    }
+
     public void Seek(TimeSpan position)
     {
         if (_disposed) return;
@@ -5421,6 +5552,13 @@ public class VlcAudioPlayer : IAudioPlayer
                     : 0;
             else
                 time = _player.Time;
+            if (time >= 0 && sessionId == Interlocked.Read(ref _reopenFloorSession))
+            {
+                if (time + 500 < Interlocked.Read(ref _reopenFloorMs) &&
+                    DateTime.UtcNow.Ticks < Interlocked.Read(ref _reopenFloorUntilTicks))
+                    return; // the reopened input is not at its position yet
+                Interlocked.Exchange(ref _reopenFloorSession, -1);
+            }
             if (time >= 0)
             {
                 // Track the last known good length during normal playback.
