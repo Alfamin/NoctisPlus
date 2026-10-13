@@ -118,8 +118,21 @@ internal static class MobileFixtures
     /// </summary>
     private static void RunBlocking(Func<Task> work) => Task.Run(work).GetAwaiter().GetResult();
 
+    /// <summary>The phone's surface palette (MobileTheme.Apply merges it on the device): the
+    /// floating chrome's glass tint and rim come from it. Merged once per headless app; it adds
+    /// only Phone* keys.</summary>
+    internal static void EnsurePhonePalette()
+    {
+        var merged = Avalonia.Application.Current!.Resources.MergedDictionaries;
+        if (merged.OfType<Avalonia.Controls.ResourceDictionary>().Any(d => d.ThemeDictionaries.Count > 0
+                && d.ThemeDictionaries.Values.OfType<Avalonia.Controls.ResourceDictionary>().Any(t => t.ContainsKey("PhoneChromeBrush"))))
+            return;
+        merged.Add(Noctis.Mobile.Services.MobileTheme.BuildPalette());
+    }
+
     internal static Window Mount(ShellViewModel shell, out ShellView view, double width = 412, double height = 915)
     {
+        EnsurePhonePalette();
         view = new ShellView { DataContext = shell };
         var window = new Window { Width = width, Height = height, Content = view };
         window.Show();

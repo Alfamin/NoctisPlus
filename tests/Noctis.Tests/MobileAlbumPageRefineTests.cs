@@ -342,7 +342,8 @@ public class MobileAlbumPageRefineTests
         Assert.Equal(0, big.Opacity, 2);
         Assert.Equal(1, small.Opacity, 2);
         var smallBox = BoundsIn(small, view);
-        Assert.Equal(view.Bounds.Width / 2, smallBox.Center.X, 1);
+        // Within a pixel: layout rounding puts an odd-width title half a pixel off centre.
+        Assert.InRange(smallBox.Center.X, view.Bounds.Width / 2 - 1, view.Bounds.Width / 2 + 1);
         var back = BoundsIn(MobileFixtures.Named<Button>(page, "BackButton"), view);
         Assert.InRange(smallBox.Center.Y, back.Center.Y - 1, back.Center.Y + 1);
         Assert.True(smallBox.Left >= back.Right);

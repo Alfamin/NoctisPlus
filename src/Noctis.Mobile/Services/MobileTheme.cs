@@ -25,38 +25,50 @@ public sealed class MobileTheme
     private ResourceDictionary? _palette;
 
     /// <summary>
-    /// The phone's own surface palette (iOS-style grouped pages, cards, hairlines, floating
-    /// chrome), keyed per variant so the always-dark scopes (Now Playing, Lyrics) pick the Dark set.
+    /// The phone's own surface palette (iOS-style pages, grouped pages, cards, hairlines,
+    /// floating chrome), keyed per variant so the always-dark scopes (Now Playing, Lyrics) pick
+    /// the Dark set. Ink and Dark take Apple's pure black; Smoke and Midnight keep their own
+    /// slate and blue-black, with surfaces stepped up from them the same way.
+    /// The chrome brush is the Liquid Glass tint (translucent: what passes beneath shows
+    /// through it), its outline the hairline rim every floating pill carries, and the selected
+    /// brush the tab bar's inner capsule: a grey on light glass, darker than the pill on dark.
     /// </summary>
-    public static ResourceDictionary BuildPalette()
+    public static ResourceDictionary BuildPalette(string? darkTheme = null)
     {
         static SolidColorBrush B(string hex) => new(Color.Parse(hex));
+        static ResourceDictionary Dark(string page, string grouped, string card, string separator, string fill,
+            string chrome, string secondary, string chevron) => new()
+        {
+            ["PhoneBackgroundBrush"] = B(page),
+            ["PhoneGroupedBackgroundBrush"] = B(grouped),
+            ["PhoneCardBrush"] = B(card),
+            ["PhoneSeparatorBrush"] = B(separator),
+            ["PhoneFillBrush"] = B(fill),
+            ["PhoneChromeBrush"] = B(chrome),
+            ["PhoneChromeOutlineBrush"] = B("#30FFFFFF"),
+            ["PhoneChromeSelectedBrush"] = B("#99000000"),
+            ["PhoneSecondaryTextBrush"] = B(secondary),
+            ["PhoneChevronBrush"] = B(chevron),
+        };
         var palette = new ResourceDictionary();
         palette.ThemeDictionaries[ThemeVariant.Light] = new ResourceDictionary
         {
             ["PhoneBackgroundBrush"] = B("#FFFFFF"),
             ["PhoneGroupedBackgroundBrush"] = B("#F2F2F7"),
             ["PhoneCardBrush"] = B("#FFFFFF"),
-            ["PhoneSeparatorBrush"] = B("#E3E3E6"),
+            ["PhoneSeparatorBrush"] = B("#D8D8DC"),
             ["PhoneFillBrush"] = B("#1F767680"),
-            ["PhoneChromeBrush"] = B("#E6FAFAFA"),
-            ["PhoneChromeOutlineBrush"] = B("#14000000"),
-            ["PhoneChromeSelectedBrush"] = B("#14000000"),
+            ["PhoneChromeBrush"] = B("#99FAFAFA"),
+            ["PhoneChromeOutlineBrush"] = B("#21000000"),
+            ["PhoneChromeSelectedBrush"] = B("#12000000"),
             ["PhoneSecondaryTextBrush"] = B("#8A8A8E"),
             ["PhoneChevronBrush"] = B("#C4C4C7"),
         };
-        palette.ThemeDictionaries[ThemeVariant.Dark] = new ResourceDictionary
+        palette.ThemeDictionaries[ThemeVariant.Dark] = darkTheme switch
         {
-            ["PhoneBackgroundBrush"] = B("#000000"),
-            ["PhoneGroupedBackgroundBrush"] = B("#1C1C1E"),
-            ["PhoneCardBrush"] = B("#2C2C2E"),
-            ["PhoneSeparatorBrush"] = B("#3A3A3C"),
-            ["PhoneFillBrush"] = B("#1C1C1E"),
-            ["PhoneChromeBrush"] = B("#E6232325"),
-            ["PhoneChromeOutlineBrush"] = B("#26FFFFFF"),
-            ["PhoneChromeSelectedBrush"] = B("#B3000000"),
-            ["PhoneSecondaryTextBrush"] = B("#8D8D93"),
-            ["PhoneChevronBrush"] = B("#5A5A5E"),
+            "Smoke" => Dark("#22242C", "#2A2D38", "#343844", "#3E4250", "#2A2D38", "#B3343844", "#9A9EAB", "#5E6270"),
+            "Midnight" => Dark("#0E1322", "#161D31", "#1E2740", "#2A3552", "#1A2238", "#B31E2740", "#8A93AD", "#4A5372"),
+            _ => Dark("#000000", "#1C1C1E", "#2C2C2E", "#38383A", "#1C1C1E", "#B32C2C2F", "#8D8D93", "#5A5A5E"),
         };
         return palette;
     }
@@ -105,7 +117,7 @@ public sealed class MobileTheme
             app.Resources.MergedDictionaries.Add(_lightText);
         }
 
-        _palette = BuildPalette();
+        _palette = BuildPalette(light ? null : themeName);
         app.Resources.MergedDictionaries.Add(_palette);
 
         var color = !string.IsNullOrWhiteSpace(accentHex) && Color.TryParse(accentHex, out var parsed)

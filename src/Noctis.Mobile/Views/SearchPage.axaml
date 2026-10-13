@@ -9,16 +9,19 @@
     <Grid RowDefinitions="Auto,Auto,Auto,*">
         <!-- The title, with the sort menu in the header's glass pill (as Library's tools are), so
              the chip row below has the full width to scroll in. -->
-        <Grid Grid.Row="0" ColumnDefinitions="*,Auto" Margin="20,12,16,8">
-            <TextBlock Classes="title" Text="Search" VerticalAlignment="Center" />
+        <Grid Grid.Row="0" ColumnDefinitions="*,Auto,Auto" Classes="tab-header">
+            <TextBlock Classes="title" Text="Search" />
             <controls:GlassPanel Grid.Column="1" Name="SortGlass" Classes="header-glass" IsVisible="{Binding HasQuery}">
                 <Button Name="SortButton" Classes="glass-round" Classes.on="{Binding IsSorted}" Click="OnSortClick">
                     <PathIcon Data="{DynamicResource PhSort}" />
                 </Button>
             </controls:GlassPanel>
+            <views:ProfileButton Grid.Column="2" Name="SearchProfile" Margin="10,0,0,0" VerticalAlignment="Center"
+                                 AvatarPath="{Binding Shell.ProfileAvatarPath}" Command="{Binding Shell.OpenSettingsCommand}" />
         </Grid>
-        <TextBox Grid.Row="1" Name="SearchBox" Margin="16,0,16,8" Text="{Binding Query}"
-                 PlaceholderText="Artists, songs, albums, playlists" CornerRadius="12" />
+        <!-- Apple's search field: a filled capsule with the magnifier, no border (MobileStyles). -->
+        <TextBox Grid.Row="1" Name="SearchBox" Classes="search-field" Margin="16,0,16,12" Text="{Binding Query}"
+                 PlaceholderText="Artists, songs, albums, playlists" />
 
         <!-- A chip per kind of result, with its icon, right under the box. -->
         <ScrollViewer Grid.Row="2" Name="ScopeBar" HorizontalScrollBarVisibility="Hidden" VerticalScrollBarVisibility="Disabled"
@@ -71,7 +74,7 @@
             <StackPanel Margin="12,0,12,24" Spacing="14">
                 <!-- The artist the query names: their photo, Play and Shuffle, and their most played songs. -->
                 <Border Name="FeaturedCard" Classes="card" CornerRadius="18" Padding="12" IsVisible="{Binding HasFeatured}"
-                        Background="{DynamicResource HomeCardBackground}">
+                        Background="{DynamicResource PhoneGroupedBackgroundBrush}">
                     <StackPanel Spacing="10">
                         <Grid ColumnDefinitions="Auto,*,Auto">
                             <Button Classes="row" Name="FeaturedArtistButton" Grid.ColumnSpan="2"

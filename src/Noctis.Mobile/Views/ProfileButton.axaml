@@ -1,24 +1,26 @@
-<UserControl xmlns="https://github.com/avaloniaui"
-             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-             xmlns:controls="using:Noctis.Controls"
-             x:Class="Noctis.Mobile.Views.ProfileButton">
-    <!-- The profile button for a page header: the signed-in desktop's picture in a circle, else
-         the person glyph. Code-behind drives both from AvatarPath and Command, so the control
-         works under any DataContext (ShellViewModel or a page with a Shell). -->
-    <UserControl.Styles>
+<controls:GlassPanel xmlns="https://github.com/avaloniaui"
+                     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+                     xmlns:controls="using:Noctis.Controls"
+                     x:Class="Noctis.Mobile.Views.ProfileButton"
+                     Classes="header-glass">
+    <!-- The profile button for a tab page's header: a round glass button (Apple's avatar circle,
+         its thin rim included) holding the signed-in desktop's picture, else the person glyph.
+         Code-behind drives both from AvatarPath and Command, so the control works under any
+         DataContext (ShellViewModel or a page with a Shell). -->
+    <controls:GlassPanel.Styles>
         <Style Selector="Border.avatar">
-            <Setter Property="Width" Value="34" />
-            <Setter Property="Height" Value="34" />
-            <Setter Property="CornerRadius" Value="17" />
+            <Setter Property="Width" Value="40" />
+            <Setter Property="Height" Value="40" />
+            <Setter Property="CornerRadius" Value="20" />
             <Setter Property="ClipToBounds" Value="True" />
-            <Setter Property="Background" Value="{DynamicResource HomeCardBackground}" />
+            <Setter Property="Background" Value="{DynamicResource PhoneFillBrush}" />
             <Setter Property="HorizontalAlignment" Value="Center" />
             <Setter Property="VerticalAlignment" Value="Center" />
         </Style>
-    </UserControl.Styles>
+    </controls:GlassPanel.Styles>
 
-    <!-- "icon" (MobileStyles): 44 dp round touch target, transparent, Apple-style press dim. -->
-    <Button Name="ProfileButtonRoot" Classes="icon" AutomationProperties.Name="Profile and settings">
+    <!-- "glass-round" (MobileStyles): the circle's full 44 dp touch target, Apple-style press dim. -->
+    <Button Name="ProfileButtonRoot" Classes="glass-round" AutomationProperties.Name="Profile and settings">
         <Panel>
             <PathIcon Name="AvatarGlyph" Data="{DynamicResource PhPerson}" />
             <Border Name="AvatarClip" Classes="avatar" IsVisible="False">
@@ -26,4 +28,4 @@
             </Border>
         </Panel>
     </Button>
-</UserControl>
+</controls:GlassPanel>

@@ -95,9 +95,74 @@ public class MobileGlassDropletTests
         PumpUntil(() => pill.Lift == 0);
         Assert.Equal(0, pill.Lift);
         Assert.False(pill.HasLens);
-        var slot = view.FindControl<Panel>("ChromeHost")!.Bounds.Width / 4;
-        PumpUntil(() => Math.Abs((host.RenderTransform?.Value.M31 ?? 0) - (2 * slot + 4)) < 0.5);
-        Assert.Equal(2 * slot + 4, host.RenderTransform!.Value.M31, 1);
+        var bar = view.FindControl<Panel>("ChromeHost")!.Bounds.Width;
+        var target = ShellView.SelectionPillX(bar, 2);
+        Assert.Equal(2 * bar / 4 - 2, target, 1);     // a little wider than its tab, centred on it
+        PumpUntil(() => Math.Abs((host.RenderTransform?.Value.M31 ?? 0) - target) < 0.5);
+        Assert.Equal(target, host.RenderTransform!.Value.M31, 1);
+        window.Close();
+    }
+
+    /// <summary>Apple's selected-tab capsule overhangs its tab a little but stays inside the bar's
+    /// rounded ends on the first and last tab.</summary>
+    [Fact]
+    public void TheSelectedTabCapsule_StaysInsideTheBarsEnds()
+    {
+        const double bar = 380;
+        var width = ShellView.SelectionPillWidth(bar);
+        Assert.True(width > bar / 4);
+        Assert.Equal(4, ShellView.SelectionPillX(bar, 0));
+        Assert.Equal(bar - width - 4, ShellView.SelectionPillX(bar, 3), 3);
+        Assert.Equal(bar / 4 - 2, ShellView.SelectionPillX(bar, 1), 3);
+    }
+
+    /// <summary>The expanded bar: a full-width tab pill with the mini player's own capsule 8 dp above it.</summary>
+    [AvaloniaFact]
+    public void TheMiniPlayer_IsItsOwnCapsule_JustAboveTheTabs_AndFoldsIntoOneRow()
+    {
+        var songs = Enumerable.Range(0, 3).Select(i => MobileFixtures.Song("Song " + i)).ToArray();
+        using var rig = MobileFixtures.MakeRig(songs);
+        var window = MobileFixtures.Mount(rig.Shell, out var view);
+        rig.Shell.Player.PlayTracks(songs, 0);
+        window.UpdateLayout();
+        var tabs = view.FindControl<GlassPanel>("TabCapsule")!;
+        var mini = view.FindControl<GlassPanel>("MiniBar")!;
+
+        Assert.Equal(tabs.Bounds.Width, mini.Bounds.Width, 1);
+        var gap = tabs.TranslatePoint(new Point(0, 0), view)!.Value.Y - mini.TranslatePoint(new Point(0, mini.Bounds.Height), view)!.Value.Y;
+        Assert.Equal(8, gap, 1);
+        Assert.Equal(62, tabs.Bounds.Height, 1);
+        Assert.True(view.FindControl<Button>("MiniNextButton")!.IsEffectivelyEnabled);   // songs left to skip to
+
+        rig.Shell.IsTabBarCollapsed = true;
+        PumpUntil(() => Math.Abs(view.FindControl<GlassPanel>("TabCapsule")!.Bounds.Width - mini.Bounds.Height) < 0.5, 2);
+        window.UpdateLayout();
+        // One row: the current tab's circle, the mini player, the Search circle, all one height.
+        var search = view.FindControl<GlassPanel>("SearchBubble")!;
+        Assert.Equal(mini.Bounds.Height, tabs.Bounds.Height, 1);
+        Assert.Equal(mini.Bounds.Height, search.Bounds.Height, 1);
+        Assert.True(search.IsHitTestVisible);
+        Assert.Equal(tabs.TranslatePoint(new Point(0, 0), view)!.Value.Y, mini.TranslatePoint(new Point(0, 0), view)!.Value.Y, 1);
+        window.Close();
+    }
+
+    [AvaloniaFact]
+    public void TheMiniPlayersNext_GreysOut_OnTheLastSong()
+    {
+        var songs = Enumerable.Range(0, 2).Select(i => MobileFixtures.Song("Song " + i)).ToArray();
+        using var rig = MobileFixtures.MakeRig(songs);
+        var window = MobileFixtures.Mount(rig.Shell, out var view);
+        rig.Shell.Player.PlayTracks(songs, 1);
+        window.UpdateLayout();
+        var next = view.FindControl<Button>("MiniNextButton")!;
+        Assert.False(rig.Shell.Player.HasNext);
+        Assert.False(next.IsEffectivelyEnabled);
+        Assert.True(next.Classes.Contains("unavailable"));
+
+        rig.Shell.Player.PlayNext(songs[0]);
+        window.UpdateLayout();
+        Assert.True(next.IsEffectivelyEnabled);
+        Assert.False(next.Classes.Contains("unavailable"));
         window.Close();
     }
 

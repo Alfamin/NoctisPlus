@@ -103,12 +103,17 @@ public partial class ShellView : UserControl
     }
 
     // ---- Glass tab bar -------------------------------------------------------------------
-    // Expanded: the mini player capsule over a full-width tab capsule. Folded (scrolled down):
-    // one row of a round current-tab button, the mini player and a round Search button. Sizes
-    // are set here and the transitions attached once below animate every change between them.
+    // Expanded: the mini player capsule over a full-width tab capsule, 8 dp apart (Apple Music,
+    // iOS 26). Folded (scrolled down): one row of a round current-tab button, the mini player
+    // and a round Search button, all the mini player's height. Sizes are set here and the
+    // transitions attached once below animate every change between them.
 
-    private const double TabHeight = 62, MiniHeight = 58, Bubble = 58, Gap = 10;
-    private const double ChromeSideMargin = 14, ChromeBottomMargin = 8;
+    private const double TabHeight = 62, MiniHeight = 52, Bubble = 52, Gap = 8, FoldGap = 12;
+    private const double ChromeBottomMargin = 8;
+
+    /// <summary>The selected tab's inner capsule: a little wider than its tab (Apple's), kept
+    /// this far inside the pill's ends.</summary>
+    private const double PillInset = 4, PillOverhang = 2;
     private static readonly TimeSpan Morph = TimeSpan.FromMilliseconds(380);
     private static readonly TimeSpan Quick = TimeSpan.FromMilliseconds(200);
 
@@ -219,6 +224,16 @@ public partial class ShellView : UserControl
         _settleTimer.Start();
     }
 
+    internal static double SelectionPillWidth(double barWidth) => barWidth / 4 + 2 * PillOverhang;
+
+    /// <summary>Where the selected tab's capsule sits: centred on its tab, but never closer than
+    /// <see cref="PillInset"/> to the bar's rounded ends.</summary>
+    internal static double SelectionPillX(double barWidth, int index)
+    {
+        var x = index * (barWidth / 4) - PillOverhang;
+        return Math.Clamp(x, PillInset, Math.Max(PillInset, barWidth - SelectionPillWidth(barWidth) - PillInset));
+    }
+
     /// <summary>How tall the expanded chrome stands (mini player + tabs, or tabs alone).</summary>
     internal static double ExpandedChromeHeight(bool miniVisible) => miniVisible ? TabHeight + Gap + MiniHeight : TabHeight;
 
@@ -261,7 +276,7 @@ public partial class ShellView : UserControl
         SearchBubble.IsHitTestVisible = folded;
 
         MiniBar.Height = MiniHeight;
-        MiniBar.Margin = folded ? new Thickness(Bubble + Gap, 0, Bubble + Gap, 0) : new Thickness(0, 0, 0, TabHeight + Gap);
+        MiniBar.Margin = folded ? new Thickness(Bubble + FoldGap, 0, Bubble + FoldGap, 0) : new Thickness(0, 0, 0, TabHeight + Gap);
         MiniNextButton.IsVisible = !folded;
 
         var slot = width / 4;
@@ -272,9 +287,10 @@ public partial class ShellView : UserControl
             MobileTab.Playlists => 2,
             _ => 3,
         };
-        SelectionPill.Width = slot - 8;
-        SelectionPill.Height = TabHeight - 10;
-        var pillX = TransformOperations.Parse($"translateX({(index * slot + 4).ToString(System.Globalization.CultureInfo.InvariantCulture)}px)");
+        var pillWidth = SelectionPillWidth(width);
+        SelectionPill.Width = pillWidth;
+        SelectionPill.Height = TabHeight - 2 * PillInset;
+        var pillX = TransformOperations.Parse($"translateX({SelectionPillX(width, index).ToString(System.Globalization.CultureInfo.InvariantCulture)}px)");
         if (_transitionsOn && index != _pillIndex && _pillIndex >= 0) LiftSelectionPill();
         _pillIndex = index;
         SelectionPillHost.RenderTransform = pillX;
