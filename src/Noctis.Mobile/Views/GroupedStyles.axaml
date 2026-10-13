@@ -177,6 +177,10 @@
     <Style Selector="Button.row:disabled">
         <Setter Property="Opacity" Value="0.45" />
     </Style>
+    <!-- Fluent fills a disabled button's presenter grey: a greyed row stays on its card's colour. -->
+    <Style Selector="Button.row:disabled /template/ ContentPresenter#PART_ContentPresenter">
+        <Setter Property="Background" Value="Transparent" />
+    </Style>
     <!-- One accent text row filling its card ("Join Apple Music"). -->
     <Style Selector="Button.accent-card">
         <Setter Property="MinHeight" Value="52" />

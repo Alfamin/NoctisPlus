@@ -180,10 +180,17 @@ public class MobileShellViewTests
         window.AddHandler(InputElement.KeyDownEvent, (_, e) => lastHandled = e.Handled, handledEventsToo: true);
 
         shell.OpenSettingsCommand.Execute(null);
-        await Assert.IsType<SettingsPageViewModel>(shell.CurrentPage).Loaded;
+        var settings = Assert.IsType<SettingsPageViewModel>(shell.CurrentPage);
+        await settings.Loaded;
+        settings.OpenPaneCommand.Execute(SettingsPane.Lyrics);   // the text size lives on Settings → Lyrics
         window.UpdateLayout();
         var slider = view.GetVisualDescendants().OfType<Slider>().Single(s => s.Name == "LyricsSizeSlider");
         Assert.True(slider.Focus());
+
+        window.KeyPressQwerty(PhysicalKey.Escape, RawInputModifiers.None);
+        Assert.Same(settings, shell.CurrentPage);          // out of Lyrics, back on Settings' top level
+        Assert.Equal(SettingsPane.Main, settings.Pane);
+        Assert.True(lastHandled);
 
         window.KeyPressQwerty(PhysicalKey.Escape, RawInputModifiers.None);
         Assert.Null(shell.CurrentPage);                    // Settings closed

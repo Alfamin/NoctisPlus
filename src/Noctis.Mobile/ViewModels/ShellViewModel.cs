@@ -428,7 +428,7 @@ public sealed partial class ShellViewModel : ObservableObject
 
     /// <summary>
     /// Android Back: the topmost thing closes first — the long-press sheet, Queue, Lyrics, Now
-    /// Playing, then pushed pages, then a non-start tab returns to Library. The Library rows'
+    /// Playing, then pushed pages (a page's own inner page first), then a non-start tab returns to Library. The Library rows'
     /// Edit mode then finishes (as Done would). Returns whether the press was consumed; only at
     /// the Library root does the activity fall through to the system default (finish).
     /// </summary>
@@ -438,6 +438,7 @@ public sealed partial class ShellViewModel : ObservableObject
         if (IsQueueOpen) { IsQueueOpen = false; return true; }
         if (IsLyricsOpen) { IsLyricsOpen = false; return true; }
         if (IsNowPlayingOpen) { IsNowPlayingOpen = false; return true; }
+        if (CurrentPage?.TryGoBackWithin() == true) return true;
         if (GoBack()) return true;
         if (SelectedTab != MobileTab.Library) { SelectedTab = MobileTab.Library; return true; }
         if (_libraryRows is { IsEditing: true } rows) { rows.FinishEditing(); return true; }
