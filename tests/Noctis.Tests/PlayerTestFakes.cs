@@ -109,11 +109,24 @@ internal sealed class FakeLibraryService : ILibraryService
 
     public List<string> ScannedFolders { get; } = new();
 
+    /// <summary>Each scan's folders, one entry per ScanAsync call.</summary>
+    public List<List<string>> ScanPasses { get; } = new();
+
+    /// <summary>When set, a scan stays running until the test completes it.</summary>
+    public TaskCompletionSource? HoldScan { get; set; }
+
     public Task ScanAsync(IEnumerable<string> folders, CancellationToken ct = default)
     {
-        ScannedFolders.AddRange(folders);
+        var list = folders.ToList();
+        ScannedFolders.AddRange(list);
+        ScanPasses.Add(list);
         if (AbortScanWithRoots is { } roots)
             ScanAborted?.Invoke(this, roots);
+        if (HoldScan is { } hold)
+        {
+            HoldScan = null;
+            return hold.Task;
+        }
         return Task.CompletedTask;
     }
     public Task PauseActiveScanForShutdownAsync(TimeSpan timeout) => Task.CompletedTask;

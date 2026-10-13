@@ -226,8 +226,8 @@
             <Setter Property="Opacity" Value="1" />
         </Style>
 
-        <!-- Music Folders: a folder whose access was lost reads as a warning. -->
-        <Style Selector="TextBlock.folder-lost">
+        <!-- Music Folders: a folder whose access was lost, or that the last scan could not reach, reads as a warning. -->
+        <Style Selector="TextBlock.folder-lost, TextBlock.folder-unavailable">
             <Setter Property="FontSize" Value="13.5" />
             <Setter Property="Foreground" Value="#E5484D" />
             <Setter Property="TextWrapping" Value="Wrap" />
@@ -235,6 +235,51 @@
         </Style>
         <Style Selector="ItemsControl#FolderList ContentPresenter:nth-child(1) Border.row-separator">
             <Setter Property="IsVisible" Value="False" />
+        </Style>
+        <!-- A folder's Remove: a red bin at the row's end, a full finger wide. -->
+        <Style Selector="Button.folder-remove">
+            <Setter Property="Width" Value="44" />
+            <Setter Property="Height" Value="44" />
+            <Setter Property="Padding" Value="0" />
+            <Setter Property="Margin" Value="8,0,-10,0" />
+            <Setter Property="Background" Value="Transparent" />
+            <Setter Property="BorderThickness" Value="0" />
+            <Setter Property="VerticalAlignment" Value="Center" />
+            <Setter Property="HorizontalContentAlignment" Value="Center" />
+            <Setter Property="VerticalContentAlignment" Value="Center" />
+        </Style>
+        <Style Selector="Button.folder-remove views|GridIcon">
+            <Setter Property="Width" Value="22" />
+            <Setter Property="Height" Value="22" />
+            <Setter Property="Foreground" Value="#E5484D" />
+        </Style>
+        <Style Selector="Button.folder-remove:pointerover /template/ ContentPresenter#PART_ContentPresenter, Button.folder-remove:pressed /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Background" Value="Transparent" />
+        </Style>
+        <Style Selector="Button.folder-remove:pressed">
+            <Setter Property="Opacity" Value="0.5" />
+        </Style>
+        <!-- Removing a folder asks first (AccountPage's "are you sure?" card): the question, then its rows. -->
+        <Style Selector="TextBlock.confirm-text">
+            <Setter Property="FontSize" Value="15" />
+            <Setter Property="TextWrapping" Value="Wrap" />
+            <Setter Property="Margin" Value="16,14,16,10" />
+        </Style>
+        <Style Selector="Border.confirm-separator">
+            <Setter Property="Height" Value="0.5" />
+            <Setter Property="Margin" Value="16,0" />
+            <Setter Property="Background" Value="{DynamicResource PhoneSeparatorBrush}" />
+        </Style>
+        <Style Selector="Button.confirm-row">
+            <Setter Property="MinHeight" Value="52" />
+            <Setter Property="Padding" Value="16,0" />
+        </Style>
+        <Style Selector="Button.confirm-row TextBlock">
+            <Setter Property="FontSize" Value="17" />
+            <Setter Property="VerticalAlignment" Value="Center" />
+        </Style>
+        <Style Selector="Button.confirm-row.danger TextBlock">
+            <Setter Property="Foreground" Value="#E5484D" />
         </Style>
 
         <!-- The Windows Settings slider (SettingsView's accent-slider): an 8 dp round-ended track,
@@ -464,7 +509,7 @@
 
                 <ScrollViewer Name="SubScroll" Classes="page-scroll" HorizontalScrollBarVisibility="Disabled" IsVisible="False">
                     <Panel>
-                        <!-- Music Folders: each folder, then Add Folder. -->
+                        <!-- Music Folders: each folder with its Remove, then Add Folder, then Scan on Startup. -->
                         <StackPanel Name="FoldersPane" Classes="grouped-content" IsVisible="{Binding ShowsFoldersPane}">
                             <StackPanel>
                                 <Border Name="FoldersCard" Classes="group-card">
@@ -474,13 +519,21 @@
                                                 <DataTemplate x:DataType="vm:SettingsFolder">
                                                     <StackPanel>
                                                         <Border Classes="row-separator plain" />
-                                                        <Grid Classes="setting-row">
+                                                        <Grid Classes="setting-row" ColumnDefinitions="*,Auto">
                                                             <StackPanel VerticalAlignment="Center" Margin="0,10">
                                                                 <TextBlock Classes="row-label" Text="{Binding Title}" />
                                                                 <TextBlock Classes="row-sub" Text="{Binding Name}" IsVisible="{Binding ShowsPath}" />
                                                                 <TextBlock Classes="folder-lost" IsVisible="{Binding AccessLost}"
                                                                            Text="Access lost. Add this folder again to play its songs." />
+                                                                <TextBlock Classes="folder-unavailable" IsVisible="{Binding Unavailable}"
+                                                                           Text="Not available. Reconnect its storage, then rescan." />
                                                             </StackPanel>
+                                                            <Button Grid.Column="1" Classes="folder-remove"
+                                                                    Command="{Binding $parent[ItemsControl].((vm:SettingsPageViewModel)DataContext).AskRemoveFolderCommand}"
+                                                                    CommandParameter="{Binding}"
+                                                                    AutomationProperties.Name="{Binding Title, StringFormat='Remove {0}'}">
+                                                                <views:GridIcon Data="{DynamicResource PhTrash}" />
+                                                            </Button>
                                                         </Grid>
                                                     </StackPanel>
                                                 </DataTemplate>
@@ -494,16 +547,40 @@
                                 </Border>
                                 <TextBlock Classes="group-footnote" Text="Your library on this phone is the music in these folders." />
                             </StackPanel>
+                            <!-- Remove asks first. -->
+                            <Border Name="RemoveFolderCard" Classes="group-card" IsVisible="{Binding IsConfirmingRemoveFolder}">
+                                <StackPanel>
+                                    <TextBlock Name="RemoveFolderQuestion" Classes="confirm-text" Text="{Binding RemoveFolderQuestion}" />
+                                    <Border Classes="confirm-separator" />
+                                    <Button Name="ConfirmRemoveFolderButton" Classes="row confirm-row danger" Command="{Binding ConfirmRemoveFolderCommand}">
+                                        <TextBlock Text="Remove Folder" FontWeight="SemiBold" />
+                                    </Button>
+                                    <Border Classes="confirm-separator" />
+                                    <Button Name="CancelRemoveFolderButton" Classes="row confirm-row" Command="{Binding CancelRemoveFolderCommand}">
+                                        <TextBlock Text="Cancel" />
+                                    </Button>
+                                </StackPanel>
+                            </Border>
                             <StackPanel>
                                 <Border Classes="group-card">
-                                    <Button Name="AddFolderButton" Classes="row accent-row" Command="{Binding Shell.Library.AddFolderCommand}">
+                                    <Button Name="AddFolderButton" Classes="row accent-row" Command="{Binding Shell.Library.AddFolderCommand}"
+                                            AutomationProperties.Name="Add Folder">
                                         <Grid Classes="setting-row" ColumnDefinitions="Auto,*">
                                             <views:GridIcon Classes="row-icon" Data="{DynamicResource AddIcon}" />
                                             <TextBlock Grid.Column="1" Classes="row-label" Text="Add Folder" />
                                         </Grid>
                                     </Button>
                                 </Border>
-                                <TextBlock Classes="group-footnote" Text="Noctis can read only the folders you choose here." />
+                                <TextBlock Name="FoldersFootnoteLabel" Classes="group-footnote" Text="{Binding FoldersFootnote}" />
+                            </StackPanel>
+                            <StackPanel>
+                                <Border Classes="group-card">
+                                    <ToggleButton Name="ScanOnStartupSwitch" Classes="switch-row" AutomationProperties.Name="Scan on Startup"
+                                                  IsChecked="{Binding Shell.Library.ScanOnStartup}">
+                                        <TextBlock Classes="row-label" Text="Scan on Startup" />
+                                    </ToggleButton>
+                                </Border>
+                                <TextBlock Classes="group-footnote" Text="Looks for new songs in these folders each time Noctis opens." />
                             </StackPanel>
                         </StackPanel>
 

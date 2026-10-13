@@ -256,7 +256,69 @@ public class MobileSettingsTests
         var page = (SettingsPageViewModel)rig.Shell.CurrentPage!;
         await page.Loaded;
 
-        Assert.Equal(new[] { new SettingsFolder("Music/Tones", false), new SettingsFolder("Music/Beats", true) }, page.FolderRows);
+        Assert.Equal(new[] { new SettingsFolder(tones, "Music/Tones", false), new SettingsFolder(beats, "Music/Beats", true) }, page.FolderRows);
+    }
+
+    /// <summary>Device 10-13: with the SD card taken out, a rescan said "1 folder(s) unavailable"
+    /// and no row said which. The scan's unreachable folder is now marked on its row (its grant
+    /// is fine, so not "Access lost"), named in the note, and the top level shows the dot; a scan
+    /// that reaches it again clears all three.</summary>
+    [AvaloniaFact]
+    public async Task AFolderTheScanCouldNotReach_IsMarked_UntilItIsBack()
+    {
+        const string card = "content://com.android.externalstorage.documents/tree/A00C-1602%3AMusic";
+        var picker = new MobileFixtures.NoPicker();
+        picker.Storage[card] = "SD card";
+        using var rig = MobileFixtures.MakeRig(picker: picker, seed: async p =>
+        {
+            var s = await p.LoadSettingsAsync();
+            s.MusicFolders.AddRange(new[] { Tones, card });
+            await p.SaveSettingsAsync(s);
+        });
+        rig.Shell.OpenSettingsCommand.Execute(null);
+        var page = (SettingsPageViewModel)rig.Shell.CurrentPage!;
+        await page.Loaded;
+
+        rig.Library.AbortScanWithRoots = new[] { card };
+        await rig.Shell.Library.RescanCommand.ExecuteAsync(null);
+
+        Assert.Equal(new[] { false, true }, page.FolderRows.Select(f => f.Unavailable));
+        Assert.All(page.FolderRows, f => Assert.False(f.AccessLost));
+        Assert.True(page.HasLostFolder);
+        Assert.Equal("“Music” is unavailable. Reconnect it and rescan.", page.FoldersFootnote);
+
+        rig.Library.AbortScanWithRoots = null;
+        await rig.Shell.Library.RescanCommand.ExecuteAsync(null);
+        Assert.All(page.FolderRows, f => Assert.False(f.Unavailable));
+        Assert.False(page.HasLostFolder);
+        Assert.Equal("Noctis can read only the folders you choose here.", page.FoldersFootnote);
+    }
+
+    /// <summary>Device 10-13: a virtual SD card's Music read just "Music", the same as the phone's
+    /// own Music folder. A folder on a card now says which card, and a whole card is its name.</summary>
+    [AvaloniaFact]
+    public async Task AFolderOnACard_SaysWhichCard()
+    {
+        const string music = "content://com.android.externalstorage.documents/tree/primary%3AMusic";
+        const string cardMusic = "content://com.android.externalstorage.documents/tree/A00C-1602%3AMusic";
+        const string card = "content://com.android.externalstorage.documents/tree/B11D-2713%3A";
+        var picker = new MobileFixtures.NoPicker();
+        picker.Storage[cardMusic] = "SD card";
+        picker.Storage[card] = "USB drive";
+        using var rig = MobileFixtures.MakeRig(picker: picker, seed: async p =>
+        {
+            var s = await p.LoadSettingsAsync();
+            s.MusicFolders.AddRange(new[] { music, cardMusic, card });
+            await p.SaveSettingsAsync(s);
+        });
+
+        rig.Shell.OpenSettingsCommand.Execute(null);
+        var page = (SettingsPageViewModel)rig.Shell.CurrentPage!;
+        await page.Loaded;
+
+        Assert.Equal(new[] { ("Music", false), ("Music", true), ("USB drive", false) },
+            page.FolderRows.Select(f => (f.Title, f.ShowsPath)));
+        Assert.Equal(new[] { "Music", "SD card/Music", "USB drive" }, page.FolderRows.Select(f => f.Name));
     }
 
     [AvaloniaFact]
@@ -277,7 +339,7 @@ public class MobileSettingsTests
 
         var page = MobileFixtures.Find<SettingsPage>(view);
         var vm = (SettingsPageViewModel)page.DataContext!;
-        Assert.Equal(new[] { new SettingsFolder("Music/Tones", false) }, vm.FolderRows);
+        Assert.Equal(new[] { new SettingsFolder("content://com.android.externalstorage.documents/tree/primary%3AMusic%2FTones", "Music/Tones", false) }, vm.FolderRows);
         Assert.True(MobileFixtures.Named<Button>(page, "ExportLogsButton").IsEffectivelyVisible);
 
         // Music Folders: the folder's own name, where it is in grey under it.
@@ -609,6 +671,76 @@ public class MobileSettingsTests
             Assert.NotNull(add.GetVisualDescendants().OfType<GridIcon>().Single().Data);
             Assert.Contains(add.GetVisualDescendants().OfType<TextBlock>(), t => t.Text == "Add Folder");
         });
+    }
+
+    /// <summary>Desktop parity (Settings › Library's ✕ per folder): each folder row ends in a red
+    /// bin, named for the screen reader. A tap asks first; Cancel keeps the folder; Remove Folder
+    /// takes it out, and the top level's count and warning dot follow at once. Add Folder is named
+    /// too (TalkBack read it as "Avalonia.Controls.Grid"), and a refused pick's note shows under it.</summary>
+    [AvaloniaFact]
+    public async Task Settings_MusicFolders_RemoveAsksFirst_ThenTheFolderGoes()
+    {
+        var picker = new MobileFixtures.NoPicker();
+        picker.Lost.Add(Beats);
+        using var rig = await RigWithFolders(picker, Tones, Beats);
+        var app = Application.Current!;
+        var icons = new ResourceInclude(new Uri("avares://Noctis.Mobile/")) { Source = new Uri("avares://Noctis.UI/Assets/Icons.axaml") };
+        app.Resources.MergedDictionaries.Add(icons);
+        var window = MobileFixtures.Mount(rig.Shell, out var view);
+        try
+        {
+            rig.Shell.OpenSettingsCommand.Execute(null);
+            var vm = (SettingsPageViewModel)rig.Shell.CurrentPage!;
+            await vm.Loaded;
+            vm.OpenPaneCommand.Execute(SettingsPane.Folders);
+            Settle(window);
+            var page = MobileFixtures.Find<SettingsPage>(view);
+
+            Assert.Equal("Add Folder", Avalonia.Automation.AutomationProperties.GetName(MobileFixtures.Named<Button>(page, "AddFolderButton")));
+            Assert.Equal("Noctis can read only the folders you choose here.", MobileFixtures.Named<TextBlock>(page, "FoldersFootnoteLabel").Text);
+            var bins = page.GetVisualDescendants().OfType<Button>().Where(b => b.Classes.Contains("folder-remove")).ToList();
+            Assert.Equal(new[] { "Remove Tones", "Remove Beats" }, bins.Select(Avalonia.Automation.AutomationProperties.GetName));
+            Assert.All(bins, b => Assert.True(b.Bounds.Width >= 44 && b.Bounds.Height >= 44));
+            var card = MobileFixtures.Named<Border>(page, "RemoveFolderCard");
+            Assert.False(card.IsEffectivelyVisible);
+
+            bins[1].Command!.Execute(bins[1].CommandParameter);
+            window.UpdateLayout();
+            Assert.True(card.IsEffectivelyVisible);
+            Assert.Equal("Remove “Beats”? Its songs leave your library on this phone. The files stay where they are.",
+                MobileFixtures.Named<TextBlock>(page, "RemoveFolderQuestion").Text);
+
+            MobileFixtures.Named<Button>(page, "CancelRemoveFolderButton").Command!.Execute(null);
+            window.UpdateLayout();
+            Assert.False(card.IsEffectivelyVisible);
+            Assert.Equal(2, vm.FolderRows.Count);
+
+            bins[1].Command!.Execute(bins[1].CommandParameter);
+            await vm.ConfirmRemoveFolderCommand.ExecuteAsync(null);
+            window.UpdateLayout();
+            Assert.False(card.IsEffectivelyVisible);
+            Assert.Equal(new[] { Tones }, (await rig.Persistence.LoadSettingsAsync()).MusicFolders);
+            Assert.Equal(new[] { Tones }, rig.Library.ScanPasses.Last());
+            Assert.Equal(new[] { "Tones", "Music/Tones" },
+                MobileFixtures.Named<ItemsControl>(page, "FolderList").GetVisualDescendants().OfType<TextBlock>()
+                    .Where(t => t.IsEffectivelyVisible).Select(t => t.Text));
+            Assert.Equal("1", MobileFixtures.Named<TextBlock>(page, "FoldersValueLabel").Text);
+            Assert.False(vm.HasLostFolder);
+
+            rig.Shell.Library.StatusText = "Already covered by “Music”.";
+            window.UpdateLayout();
+            Assert.Equal("Already covered by “Music”.", MobileFixtures.Named<TextBlock>(page, "FoldersFootnoteLabel").Text);
+
+            // Leaving the page drops a question left open.
+            vm.AskRemoveFolderCommand.Execute(vm.FolderRows[0]);
+            vm.ShowMainCommand.Execute(null);
+            Assert.False(vm.IsConfirmingRemoveFolder);
+        }
+        finally
+        {
+            window.Close();
+            app.Resources.MergedDictionaries.Remove(icons);
+        }
     }
 
     /// <summary>Rescan Library is one accent row on the top level. With no folder it is greyed,
