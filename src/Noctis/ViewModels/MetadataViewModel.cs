@@ -1747,6 +1747,7 @@ public partial class MetadataViewModel : ViewModelBase
         if (IsSearchingAnimatedCover) return;
 
         IsSearchingAnimatedCover = true;
+        var generation = ++_animatedSearchGeneration;
         AnimatedSearchStatus = "Searching…";
         AnimatedArtworkSearchResults.Clear();
         HasAnimatedArtworkSearchResults = false;
@@ -1809,7 +1810,7 @@ public partial class MetadataViewModel : ViewModelBase
             // Download the lowest-bitrate variant in the background to drive the
             // live preview inside the popup. The user keeps a snappy UI; the
             // preview swaps in when ready.
-            _ = LoadAnimatedPreviewAsync(variants);
+            _ = LoadAnimatedPreviewAsync(variants, generation);
         }
         catch (Exception ex)
         {
@@ -2268,7 +2269,12 @@ public partial class MetadataViewModel : ViewModelBase
         }
     }
 
-    private async Task LoadAnimatedPreviewAsync(IReadOnlyList<ITunesArtworkService.AnimatedArtworkVariant> variants)
+    // Bumped by every animated-artwork search. The preview download runs in the background
+    // and can outlive its search; it may only write to the dialog while its search is current.
+    private int _animatedSearchGeneration;
+
+    private async Task LoadAnimatedPreviewAsync(
+        IReadOnlyList<ITunesArtworkService.AnimatedArtworkVariant> variants, int generation)
     {
         if (variants.Count == 0) return;
 
@@ -2281,8 +2287,9 @@ public partial class MetadataViewModel : ViewModelBase
 
         try
         {
-            var path = await DownloadAnimatedVariantAsync(preview);
-            if (string.IsNullOrWhiteSpace(path) || !IsAnimatedArtworkSearchOpen)
+            var path = await DownloadAnimatedVariantAsync(preview, generation);
+            if (string.IsNullOrWhiteSpace(path) || !IsAnimatedArtworkSearchOpen ||
+                generation != _animatedSearchGeneration)
             {
                 if (!string.IsNullOrWhiteSpace(path)) TryDeleteFile(path);
                 return;
@@ -2339,8 +2346,13 @@ public partial class MetadataViewModel : ViewModelBase
         }
     }
 
-    private async Task<string?> DownloadAnimatedVariantAsync(ITunesArtworkService.AnimatedArtworkVariant variant)
+    /// <param name="generation">The search a background preview belongs to; its failure is only
+    /// reported while that search is still the current one. Null for a user's own pick.</param>
+    private async Task<string?> DownloadAnimatedVariantAsync(
+        ITunesArtworkService.AnimatedArtworkVariant variant, int? generation = null)
     {
+        bool Current() => generation == null || generation == _animatedSearchGeneration;
+
         var tempPath = Path.Combine(Path.GetTempPath(), $"noctis-animatedcover-{Guid.NewGuid():N}.mp4");
         if (!variant.IsHls)
         {
@@ -2348,7 +2360,7 @@ public partial class MetadataViewModel : ViewModelBase
                 maxBytes: ITunesArtworkService.MaxAnimatedCoverBytes);
             if (data is null or { Length: 0 })
             {
-                AnimatedSearchStatus = "Animated cover download failed.";
+                if (Current()) AnimatedSearchStatus = "Animated cover download failed.";
                 return null;
             }
 
@@ -2358,7 +2370,7 @@ public partial class MetadataViewModel : ViewModelBase
 
         if (!await _itunes!.DownloadHlsVariantAsMp4Async(variant, tempPath))
         {
-            AnimatedSearchStatus = "Could not download Apple Music animated artwork.";
+            if (Current()) AnimatedSearchStatus = "Could not download Apple Music animated artwork.";
             return null;
         }
 

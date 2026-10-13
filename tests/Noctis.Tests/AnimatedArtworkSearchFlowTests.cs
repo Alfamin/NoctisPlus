@@ -119,9 +119,57 @@ public class AnimatedArtworkSearchFlowTests
             Fixture("search-happier-than-ever-billie-eilish.html"))[0]);
     }
 
-    private sealed class StubHandler(Func<HttpRequestMessage, HttpResponseMessage> respond) : HttpMessageHandler
+    [Fact]
+    public async Task ALatePreviewFromAnEarlierSearchDoesNotTouchTheNextOne()
     {
+        // Each search with results starts a background preview download. Nothing tied it to its
+        // search, so when it finished after the next search had begun it still wrote to the
+        // dialog: its failure replaced the new "No animated artwork found." (and a success
+        // would have put the old album's loop in the new card).
+        var previewRequested = new TaskCompletionSource();
+        var releasePreview = new TaskCompletionSource();
+        var previewAnswered = new TaskCompletionSource();
+        var http = new HttpClient(new StubHandler(async request =>
+        {
+            var url = request.RequestUri!.ToString();
+            if (url.EndsWith(".m3u8", StringComparison.Ordinal) && !url.EndsWith("_default.m3u8", StringComparison.Ordinal))
+            {
+                previewRequested.TrySetResult();
+                await releasePreview.Task;
+                previewAnswered.TrySetResult();
+                return new HttpResponseMessage(HttpStatusCode.NotFound);
+            }
+            return Route(request);
+        }));
+        var track = new Track { Title = "x", Artist = "Someone Else", Album = "Unrelated", FilePath = "C:\\nope.mp3" };
+        var vm = new MetadataViewModel(track, new MetadataService(), new FakeLibraryService(), new TestPersistenceService(),
+            new FakeAnimatedCoverService(), itunes: new ITunesArtworkService(http));
+
+        vm.AnimatedSearchInput = "Happier Than Ever";
+        await vm.SearchAnimatedCoverCommand.ExecuteAsync(null);
+        Assert.True(vm.HasAnimatedArtworkSearchResults);
+        await previewRequested.Task.WaitAsync(TimeSpan.FromSeconds(5));
+
+        vm.AnimatedSearchInput = "HIT ME HARD AND SOFT Billie Eilish";
+        await vm.SearchAnimatedCoverCommand.ExecuteAsync(null);
+        Assert.Equal("No animated artwork found.", vm.AnimatedSearchStatus);
+
+        releasePreview.SetResult();
+        await previewAnswered.Task.WaitAsync(TimeSpan.FromSeconds(5));
+        await Task.Delay(300); // let the stale preview's continuation run, if it is going to
+
+        Assert.Equal("No animated artwork found.", vm.AnimatedSearchStatus);
+        Assert.Null(vm.AnimatedPreviewPath);
+    }
+
+    private sealed class StubHandler(Func<HttpRequestMessage, Task<HttpResponseMessage>> respond) : HttpMessageHandler
+    {
+        public StubHandler(Func<HttpRequestMessage, HttpResponseMessage> respond)
+            : this(request => Task.FromResult(respond(request)))
+        {
+        }
+
         protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken ct)
-            => Task.FromResult(respond(request));
+            => respond(request);
     }
 }
