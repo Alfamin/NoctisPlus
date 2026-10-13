@@ -27,9 +27,15 @@
         <Setter Property="AllowAutoHide" Value="True" />
     </Style>
 
-    <!-- Text -->
+    <!-- Text. Noctis.UI's Styles.axaml sets every TextBlock to the Inter SemiBold face (the
+         desktop's look), a single-weight family, so no FontWeight below Bold could show on the
+         phone: list labels, rows and captions all read semibold where Apple's are regular. The
+         phone sets the full Inter family (WithInterFont) back, so each weight is its own. -->
+    <Style Selector="TextBlock">
+        <Setter Property="FontFamily" Value="fonts:Inter#Inter, $Default" />
+    </Style>
     <Style Selector="TextBlock.title">
-        <Setter Property="FontSize" Value="32" />
+        <Setter Property="FontSize" Value="34" />
         <Setter Property="FontWeight" Value="Bold" />
     </Style>
     <Style Selector="TextBlock.section">
@@ -38,7 +44,7 @@
     </Style>
     <Style Selector="TextBlock.subtle">
         <Setter Property="FontSize" Value="13" />
-        <Setter Property="Foreground" Value="{DynamicResource SecondaryTextBrush}" />
+        <Setter Property="Foreground" Value="{DynamicResource PhoneSecondaryTextBrush}" />
     </Style>
     <Style Selector="TextBlock.row-title">
         <Setter Property="FontSize" Value="15" />
@@ -47,7 +53,7 @@
     </Style>
     <Style Selector="TextBlock.row-sub">
         <Setter Property="FontSize" Value="13" />
-        <Setter Property="Foreground" Value="{DynamicResource SecondaryTextBrush}" />
+        <Setter Property="Foreground" Value="{DynamicResource PhoneSecondaryTextBrush}" />
         <Setter Property="TextTrimming" Value="CharacterEllipsis" />
     </Style>
 
@@ -69,11 +75,11 @@
 
     <!-- Surfaces -->
     <Style Selector="Border.card">
-        <Setter Property="Background" Value="{DynamicResource HomeCardBackground}" />
+        <Setter Property="Background" Value="{DynamicResource PhoneGroupedBackgroundBrush}" />
         <Setter Property="CornerRadius" Value="14" />
     </Style>
     <Style Selector="Border.art">
-        <Setter Property="Background" Value="{DynamicResource HomeCardBackground}" />
+        <Setter Property="Background" Value="{DynamicResource PhoneFillBrush}" />
         <Setter Property="CornerRadius" Value="8" />
         <Setter Property="ClipToBounds" Value="True" />
     </Style>
@@ -131,7 +137,7 @@
     </Style>
     <!-- Pills: a full 44 dp touch target with round ends, semibold label, centred content. -->
     <Style Selector="Button.pill">
-        <Setter Property="Background" Value="{DynamicResource HomeCardBackground}" />
+        <Setter Property="Background" Value="{DynamicResource PhoneFillBrush}" />
         <Setter Property="BorderThickness" Value="0" />
         <Setter Property="CornerRadius" Value="22" />
         <Setter Property="Padding" Value="20,0" />
@@ -163,7 +169,7 @@
     </Style>
     <!-- Library chips: an icon pill; the selected one turns accent and its name slides out. -->
     <Style Selector="Button.chip">
-        <Setter Property="Background" Value="{DynamicResource HomeCardBackground}" />
+        <Setter Property="Background" Value="{DynamicResource PhoneFillBrush}" />
         <Setter Property="BorderThickness" Value="0" />
         <Setter Property="CornerRadius" Value="18" />
         <Setter Property="Padding" Value="13,0" />
@@ -225,7 +231,7 @@
     </Style>
     <!-- Text chips (Search's scopes): the library chip's shape with a label that always shows. -->
     <Style Selector="Button.text-chip">
-        <Setter Property="Background" Value="{DynamicResource HomeCardBackground}" />
+        <Setter Property="Background" Value="{DynamicResource PhoneFillBrush}" />
         <Setter Property="BorderThickness" Value="0" />
         <Setter Property="CornerRadius" Value="18" />
         <Setter Property="Padding" Value="16,0" />
@@ -297,17 +303,19 @@
         <Setter Property="Width" Value="26" />
         <Setter Property="Height" Value="26" />
         <Setter Property="Margin" Value="-1,-5,-7,-7" />
-        <Setter Property="Foreground" Value="{DynamicResource SecondaryTextBrush}" />
+        <Setter Property="Foreground" Value="{DynamicResource PhoneChevronBrush}" />
     </Style>
     <Style Selector="Button.section-header TextBlock.section">
         <Setter Property="VerticalAlignment" Value="Center" />
     </Style>
 
     <!-- Liquid Glass (iOS 26) on the phone's floating chrome: the tab capsule, the mini
-         player, the folded Search bubble, the Queue's control pill. A light frost, so what
+         player, the folded round buttons, the Queue's control pill. A light frost, so what
          passes beneath stays recognisable; a rim that refracts it like the curved edge of a
-         lens (GlassPanel.Refraction); a rim light and a soft shadow. The tints, edge and sheen
-         are ShellView's theme resources. -->
+         lens (GlassPanel.Refraction); a hairline outline all the way round (Apple's: a faint
+         dark rim on light glass, a faint light one on dark), a soft rim light and shadow. The
+         tint and outline are the palette's (MobileTheme.BuildPalette), the luminance range
+         ShellView's theme resources. -->
     <Style Selector="controls|GlassPanel.liquid">
         <Setter Property="UseAppGlass" Value="False" />
         <Setter Property="IsGlassActive" Value="True" />
@@ -315,12 +323,12 @@
         <Setter Property="Refraction" Value="20" />
         <Setter Property="RefractionAmount" Value="26" />
         <Setter Property="Saturation" Value="1.3" />
-        <Setter Property="Specular" Value="0.8" />
+        <Setter Property="Specular" Value="0.35" />
         <Setter Property="BackdropMinLuminance" Value="{DynamicResource GlassBarMinLuminance}" />
         <Setter Property="BackdropMaxLuminance" Value="{DynamicResource GlassBarMaxLuminance}" />
-        <Setter Property="BoxShadow" Value="0 4 18 0 #29000000" />
-        <Setter Property="Background" Value="{DynamicResource GlassBarTint}" />
-        <Setter Property="EdgeBrush" Value="{DynamicResource GlassBarEdge}" />
+        <Setter Property="BoxShadow" Value="0 6 20 0 #1F000000" />
+        <Setter Property="Background" Value="{DynamicResource PhoneChromeBrush}" />
+        <Setter Property="EdgeBrush" Value="{DynamicResource PhoneChromeOutlineBrush}" />
         <Setter Property="EdgeThickness" Value="1" />
     </Style>
     <!-- A round bubble bends light over a shorter rim. -->
@@ -329,7 +337,7 @@
         <Setter Property="RefractionAmount" Value="21" />
     </Style>
 
-    <!-- Round Liquid Glass buttons in a page header (Library … and profile). -->
+    <!-- Liquid Glass in a page header: the tools pill and the profile circle (Apple's 44 pt). -->
     <Style Selector="controls|GlassPanel.header-glass">
         <Setter Property="UseAppGlass" Value="False" />
         <Setter Property="IsGlassActive" Value="True" />
@@ -337,15 +345,15 @@
         <Setter Property="Refraction" Value="11" />
         <Setter Property="RefractionAmount" Value="14" />
         <Setter Property="Saturation" Value="1.3" />
-        <Setter Property="Specular" Value="0.8" />
+        <Setter Property="Specular" Value="0.35" />
         <Setter Property="BackdropMinLuminance" Value="{DynamicResource GlassBarMinLuminance}" />
         <Setter Property="BackdropMaxLuminance" Value="{DynamicResource GlassBarMaxLuminance}" />
-        <Setter Property="BoxShadow" Value="0 2 10 0 #22000000" />
-        <Setter Property="Width" Value="40" />
-        <Setter Property="Height" Value="40" />
-        <Setter Property="CornerRadius" Value="20" />
-        <Setter Property="Background" Value="{DynamicResource GlassBarTint}" />
-        <Setter Property="EdgeBrush" Value="{DynamicResource GlassBarEdge}" />
+        <Setter Property="BoxShadow" Value="0 3 12 0 #14000000" />
+        <Setter Property="Width" Value="44" />
+        <Setter Property="Height" Value="44" />
+        <Setter Property="CornerRadius" Value="22" />
+        <Setter Property="Background" Value="{DynamicResource PhoneChromeBrush}" />
+        <Setter Property="EdgeBrush" Value="{DynamicResource PhoneChromeOutlineBrush}" />
         <Setter Property="EdgeThickness" Value="1" />
         <Setter Property="VerticalAlignment" Value="Center" />
     </Style>
@@ -353,9 +361,9 @@
         <Setter Property="Background" Value="Transparent" />
         <Setter Property="BorderThickness" Value="0" />
         <Setter Property="Padding" Value="0" />
-        <Setter Property="Width" Value="40" />
-        <Setter Property="Height" Value="40" />
-        <Setter Property="CornerRadius" Value="20" />
+        <Setter Property="Width" Value="44" />
+        <Setter Property="Height" Value="44" />
+        <Setter Property="CornerRadius" Value="22" />
         <Setter Property="HorizontalContentAlignment" Value="Center" />
         <Setter Property="VerticalContentAlignment" Value="Center" />
     </Style>
@@ -415,17 +423,19 @@
         <Setter Property="VerticalContentAlignment" Value="Center" />
     </Style>
     <!-- Tab colours sit on the icon and label themselves, so Fluent's presenter Foreground
-         swap on :pointerover cannot reach them. -->
+         swap on :pointerover cannot reach them. Apple's bar: filled glyphs in the text colour,
+         small medium labels, the selected tab in the accent. -->
     <Style Selector="Button.tab PathIcon">
         <Setter Property="Width" Value="26" />
         <Setter Property="Height" Value="26" />
-        <Setter Property="Margin" Value="-2" />
-        <Setter Property="Foreground" Value="{DynamicResource SecondaryTextBrush}" />
+        <Setter Property="Margin" Value="-1" />
+        <Setter Property="Foreground" Value="{DynamicResource PrimaryTextBrush}" />
     </Style>
     <Style Selector="Button.tab TextBlock">
-        <Setter Property="FontSize" Value="11" />
+        <Setter Property="FontSize" Value="10.5" />
+        <Setter Property="FontWeight" Value="Medium" />
         <Setter Property="HorizontalAlignment" Value="Center" />
-        <Setter Property="Foreground" Value="{DynamicResource SecondaryTextBrush}" />
+        <Setter Property="Foreground" Value="{DynamicResource PrimaryTextBrush}" />
     </Style>
     <Style Selector="Button.tab.selected PathIcon">
         <Setter Property="Foreground" Value="{DynamicResource AccentTextBrush}" />
@@ -433,18 +443,60 @@
     <Style Selector="Button.tab.selected TextBlock">
         <Setter Property="Foreground" Value="{DynamicResource AccentTextBrush}" />
     </Style>
-    <!-- Glass tab bar: an outline icon, swapped for its filled twin on the selected tab. -->
-    <Style Selector="Button.tab PathIcon.on">
-        <Setter Property="IsVisible" Value="False" />
+    <!-- The folded bar's round buttons: one glyph, a touch smaller. -->
+    <Style Selector="Button.tab.bubble PathIcon">
+        <Setter Property="Width" Value="25" />
+        <Setter Property="Height" Value="25" />
     </Style>
-    <Style Selector="Button.tab.selected PathIcon.on">
-        <Setter Property="IsVisible" Value="True" />
+
+    <!-- The mini player's Play and Next: Apple's filled glyphs; Next greys out with nothing
+         after the current song. -->
+    <Style Selector="Button.icon.mini">
+        <Setter Property="Width" Value="42" />
     </Style>
-    <Style Selector="Button.tab.selected PathIcon.off">
-        <Setter Property="IsVisible" Value="False" />
+    <Style Selector="Button.icon.mini PathIcon">
+        <Setter Property="Width" Value="28" />
+        <Setter Property="Height" Value="28" />
     </Style>
-    <Style Selector="Button.tab TextBlock">
-        <Setter Property="FontWeight" Value="Medium" />
+    <Style Selector="Button.icon.mini.unavailable PathIcon">
+        <Setter Property="Foreground" Value="{DynamicResource PrimaryTextBrush}" />
+        <Setter Property="Opacity" Value="0.3" />
+    </Style>
+
+    <!-- A tab page's header (Library, Favorites, Playlists, Search): the large title, then the
+         page's glass tools and the profile circle at the right. -->
+    <Style Selector="Grid.tab-header">
+        <Setter Property="Margin" Value="20,8,16,10" />
+        <Setter Property="MinHeight" Value="48" />
+    </Style>
+    <Style Selector="Grid.tab-header TextBlock.title">
+        <Setter Property="VerticalAlignment" Value="Center" />
+    </Style>
+
+    <!-- Apple's search field: a filled capsule, the magnifier at its start, no border and no
+         accent ring on focus (Fluent's TextBox draws both through its template's border, at
+         rest, on hover and on focus). -->
+    <Style Selector="TextBox.search-field">
+        <Setter Property="Background" Value="{DynamicResource PhoneFillBrush}" />
+        <Setter Property="BorderThickness" Value="0" />
+        <Setter Property="CornerRadius" Value="19" />
+        <Setter Property="MinHeight" Value="38" />
+        <Setter Property="Padding" Value="6,0,12,0" />
+        <Setter Property="FontSize" Value="16" />
+        <Setter Property="VerticalContentAlignment" Value="Center" />
+        <Setter Property="InnerLeftContent">
+            <Template>
+                <PathIcon Data="{DynamicResource PhSearch}" Width="19" Height="19" Margin="12,0,0,0"
+                          Foreground="{DynamicResource PhoneSecondaryTextBrush}" />
+            </Template>
+        </Setter>
+    </Style>
+    <Style Selector="TextBox.search-field:pointerover /template/ Border#PART_BorderElement, TextBox.search-field:focus /template/ Border#PART_BorderElement">
+        <Setter Property="Background" Value="{DynamicResource PhoneFillBrush}" />
+        <Setter Property="BorderThickness" Value="0" />
+    </Style>
+    <Style Selector="TextBox.search-field /template/ TextBlock#PART_Watermark, TextBox.search-field /template/ TextBlock#PART_FloatingWatermark">
+        <Setter Property="Foreground" Value="{DynamicResource PhoneSecondaryTextBrush}" />
     </Style>
 
     <!-- A tab page's main list: content scrolls under the floating glass bar, so the list
