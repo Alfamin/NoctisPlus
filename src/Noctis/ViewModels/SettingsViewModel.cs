@@ -2481,6 +2481,11 @@ public partial class SettingsViewModel : ViewModelBase
             {
                 ScanProgress = count;
                 ScanStatusText = $"Scanning Library {count:N0}";
+                // A scan Settings didn't start (Scan on Startup, the folder watcher) never
+                // reaches RunScanCoreAsync's closing status, so its count stayed up for the
+                // rest of the session.
+                if (!IsScanning)
+                    _ = ClearExternalScanStatusWhenDoneAsync();
             });
         };
 
@@ -6546,6 +6551,31 @@ public partial class SettingsViewModel : ViewModelBase
             var cts = new CancellationTokenSource();
             _scanStatusClearCts = cts;
             _ = ClearScanStatusAfterDelay(cts.Token);
+        }
+    }
+
+    /// <summary>True while a wait for a scan Settings didn't start is already running.</summary>
+    private bool _externalScanClearArmed;
+
+    /// <summary>
+    /// Clears the progress line of a scan Settings didn't start once the library stops
+    /// scanning. One wait per scan; a scan Settings starts in the meantime owns the line.
+    /// </summary>
+    private async Task ClearExternalScanStatusWhenDoneAsync()
+    {
+        if (_externalScanClearArmed) return;
+        _externalScanClearArmed = true;
+        try
+        {
+            do await Task.Delay(1000);
+            while (_library.IsScanning && !IsScanning);
+
+            if (!IsScanning && ScanStatusText.StartsWith("Scanning Library", StringComparison.Ordinal))
+                ScanStatusText = "";
+        }
+        finally
+        {
+            _externalScanClearArmed = false;
         }
     }
 

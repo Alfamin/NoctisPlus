@@ -97,6 +97,7 @@ internal sealed class FakeLibraryService : ILibraryService
     public event EventHandler<int>? ScanProgress;
 
     public void RaiseLibraryUpdated() => LibraryUpdated?.Invoke(this, EventArgs.Empty);
+    public void RaiseScanProgress(int count) => ScanProgress?.Invoke(this, count);
     public bool IsPublishingPartial { get; set; }
     public event EventHandler? FavoritesChanged;
     public event EventHandler<List<string>>? MusicFoldersChanged;
