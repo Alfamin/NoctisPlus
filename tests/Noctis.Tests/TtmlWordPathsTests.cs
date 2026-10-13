@@ -275,6 +275,26 @@ public class TtmlWordPathsTests : IDisposable
             LyricsStudioEngine.ImportText(WordTtml, "song.ttml"));
     }
 
+    [Fact]
+    public void Studio_ExistingLyrics_ReadsAWordTimedTtmlBesideTheSong()
+    {
+        // The lyrics page shows this .ttml and the Studio's format check counts it as word
+        // timed, so selecting the song must show its timings, not start from nothing.
+        var path = Song();
+        File.WriteAllText(Path.ChangeExtension(path, ".ttml"), WordTtml);
+        var track = new Track { Id = Guid.NewGuid(), FilePath = path, Title = "song" };
+
+        Assert.Equal(LyricsFormat.Elrc, ExistingLyricsLoader.DetectFormat(track));
+        var existing = ExistingLyricsLoader.Load(track);
+
+        Assert.NotNull(existing);
+        Assert.Equal(LyricsFormat.Elrc, existing!.Format);
+        Assert.Equal(new[] { "Paper lanterns drifting", "Silver marmalade", "Quiet harbor" }, existing.Lines.Select(l => l.Text));
+        Assert.Equal(new[] { "Paper", "lanterns", "drifting" }, existing.Lines[0].Words.Select(w => w.Text));
+        Assert.Equal(TimeSpan.FromSeconds(1.4), existing.Lines[0].Words[1].Start);
+        Assert.Equal(new[] { LyricVoice.Default, LyricVoice.Voice2, LyricVoice.Default }, existing.Lines.Select(l => l.Voice));
+    }
+
     // ── (e) TTML kept in the audio file's lyrics tag ──
 
     [Theory]

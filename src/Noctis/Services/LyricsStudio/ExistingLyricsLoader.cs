@@ -13,7 +13,7 @@ public sealed record ExistingLyrics(LyricsFormat Format, IReadOnlyList<AlignedLi
 
 /// <summary>
 /// Finds and parses the synced lyrics a track already carries, in the order Lyrics Studio
-/// trusts them: a <c>.elrc</c> sidecar, then a <c>.lrc</c> sidecar, then the embedded/stored
+/// trusts them: a <c>.ttml</c> sidecar, then a <c>.elrc</c>, then a <c>.lrc</c>, then the embedded/stored
 /// synced text. Plain (untimed) lyrics are not "existing synced lyrics" and return null.
 /// </summary>
 public static partial class ExistingLyricsLoader
@@ -35,6 +35,14 @@ public static partial class ExistingLyricsLoader
         var path = track.FilePath;
         if (!string.IsNullOrWhiteSpace(path))
         {
+            // A .ttml first, as on the lyrics page and in DetectFormat: a song whose only timed
+            // lyrics were a word-timed .ttml showed nothing here, and Start re-timed it from
+            // LRCLIB or a transcript instead of its own words.
+            var ttml = FindSidecar(path, TtmlExtensions);
+            if (ttml is not null && TryRead(ttml, out var ttmlText)
+                && TtmlParser.ToLrc(ttmlText) is { } ttmlLrc && ParseTimed(ttmlLrc) is { Count: > 0 } ttmlLines)
+                return new ExistingLyrics(HasWordTimings(ttmlLines) ? LyricsFormat.Elrc : LyricsFormat.Lrc, ttmlLines, ".ttml file", ttml);
+
             var elrc = FindSidecar(path, ElrcExtensions);
             if (elrc is not null && TryParseFile(elrc, out var elrcLines))
                 return new ExistingLyrics(HasWordTimings(elrcLines) ? LyricsFormat.Elrc : LyricsFormat.Lrc, elrcLines, ".elrc file", elrc);
