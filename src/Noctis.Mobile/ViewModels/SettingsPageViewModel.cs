@@ -69,6 +69,29 @@ public sealed partial class SettingsPageViewModel : MobilePage
         ? $"Signed in as {AccountPageViewModel.ShownName(account)} · {AccountPageViewModel.ServerLabel(account)}"
         : "Sign in to your Noctis desktop";
 
+    // The profile card at the top: the signed-in account the way the Account page shows it.
+
+    private bool IsSignedIn => Shell.Account is { IsSignedIn: true, Account: not null };
+
+    /// <summary>The card's bold line: the account's name, or the invitation to sign in.</summary>
+    public string AccountTitle => IsSignedIn ? AccountPageViewModel.ShownName(Shell.Account!.Account!) : "Sign in to your Noctis desktop";
+
+    /// <summary>The card's grey line: the computer it syncs with, or what signing in brings.</summary>
+    public string AccountSubtitle => IsSignedIn
+        ? $"{AccountPageViewModel.ServerLabel(Shell.Account!.Account!)} · Sync and downloads"
+        : "Sync with your computer";
+
+    /// <summary>The desktop's profile picture (a cached local file), or null.</summary>
+    public string? AccountAvatarPath => IsSignedIn ? Shell.Account!.AvatarPath : null;
+
+    public bool HasAccountAvatar => !string.IsNullOrEmpty(AccountAvatarPath);
+
+    /// <summary>No picture: initials on the accent ("OW"); signed out, the person glyph.</summary>
+    public string AccountInitials => IsSignedIn ? AccountPageViewModel.InitialsOf(AccountTitle) : string.Empty;
+
+    public bool ShowAccountInitials => !HasAccountAvatar && AccountInitials.Length > 0;
+    public bool ShowAccountGlyph => !HasAccountAvatar && AccountInitials.Length == 0;
+
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(ShowsDarkThemes))]
     private string _appearance = "System";
@@ -175,7 +198,12 @@ public sealed partial class SettingsPageViewModel : MobilePage
 
     private void OnFoldersChanged(object? sender, NotifyCollectionChangedEventArgs e) => OnPropertyChanged(nameof(FolderRows));
 
-    private void OnAccountChanged(object? sender, EventArgs e) => Shell.Marshal(() => OnPropertyChanged(nameof(AccountRowText)));
+    private void OnAccountChanged(object? sender, EventArgs e) => Shell.Marshal(() =>
+    {
+        foreach (var name in new[] { nameof(AccountRowText), nameof(AccountTitle), nameof(AccountSubtitle), nameof(AccountAvatarPath),
+                     nameof(HasAccountAvatar), nameof(AccountInitials), nameof(ShowAccountInitials), nameof(ShowAccountGlyph) })
+            OnPropertyChanged(name);
+    });
 
     public override void OnClosed()
     {

@@ -363,6 +363,61 @@ public class MobileAccountTests
         Assert.False(page.CanUseServer);                                   // Sync and Download hidden
         Assert.True(page.IsSignedIn);                                      // Sign out stays
         Assert.False(page.IsSyncing);
+        // The profile card's computer row and the send tile stay on screen, so they turn off.
+        Assert.False(page.CanSync);
+        Assert.False(page.CanUpload);
+    }
+
+    /// <summary>Remove all downloads and Sign out each ask first; asking one closes the other,
+    /// so two red confirm buttons never stand open together.</summary>
+    [Fact]
+    public void ConfirmQuestions_AreOneAtATime()
+    {
+        using var rig = MobileFixtures.MakeRig();
+        var page = OpenAccount(ShellWith(rig, new FakeAccount { Account = FakeAccount.SignedInAs() }));
+
+        page.AskRemoveDownloadsCommand.Execute(null);
+        Assert.True(page.IsConfirmingRemoveDownloads);
+        page.AskSignOutCommand.Execute(null);
+        Assert.True(page.IsConfirmingSignOut);
+        Assert.False(page.IsConfirmingRemoveDownloads);
+        page.AskRemoveDownloadsCommand.Execute(null);
+        Assert.True(page.IsConfirmingRemoveDownloads);
+        Assert.False(page.IsConfirmingSignOut);
+    }
+
+    /// <summary>Settings' profile card: the account's name, its computer, initials (no picture);
+    /// signed out, the invitation and the person glyph. It follows sign-in and sign-out.</summary>
+    [Fact]
+    public async Task SettingsProfileCard_ShowsTheAccount_AndFollowsSignInAndOut()
+    {
+        using var rig = MobileFixtures.MakeRig();
+        var account = new FakeAccount();
+        var settings = new SettingsPageViewModel(ShellWith(rig, account));
+
+        Assert.Equal("Sign in to your Noctis desktop", settings.AccountTitle);
+        Assert.Equal("Sync with your computer", settings.AccountSubtitle);
+        Assert.True(settings.ShowAccountGlyph);
+        Assert.False(settings.ShowAccountInitials);
+
+        await account.SignInAsync("https://192.168.1.20:4747", "John Doe", "pw", Fingerprint);
+        Assert.Equal("John Doe", settings.AccountTitle);
+        Assert.Equal("Studio PC · Sync and downloads", settings.AccountSubtitle);
+        Assert.Equal("JD", settings.AccountInitials);
+        Assert.True(settings.ShowAccountInitials);
+        Assert.False(settings.HasAccountAvatar);
+
+        account.AvatarPath = "/data/avatar.png";
+        account.RaiseStateChanged();
+        Assert.Equal("/data/avatar.png", settings.AccountAvatarPath);
+        Assert.False(settings.ShowAccountInitials);
+        Assert.False(settings.ShowAccountGlyph);
+
+        await account.SignOutAsync(removeDownloads: false);
+        Assert.Equal("Sign in to your Noctis desktop", settings.AccountTitle);
+        Assert.Null(settings.AccountAvatarPath);
+        Assert.True(settings.ShowAccountGlyph);
+        settings.OnClosed();
     }
 
     [Fact]
@@ -715,7 +770,8 @@ public class MobileAccountTests
         var row = MobileFixtures.Named<Button>(page, "SendSongsButton");
         Assert.True(row.IsEffectivelyVisible);
         Assert.True(row.IsEnabled);
-        Assert.Equal("Send phone songs to computer", MobileFixtures.Named<TextBlock>(page, "SendSongsLabel").Text);
+        Assert.Equal("Send to computer", MobileFixtures.Named<TextBlock>(page, "SendSongsLabel").Text);   // the tile's short label
+        Assert.Equal("Send phone songs to computer", Avalonia.Automation.AutomationProperties.GetName(row));
         Assert.False(MobileFixtures.Named<TextBlock>(page, "UploadLabel").IsEffectivelyVisible);   // no status yet
 
         account.UploadGate = new TaskCompletionSource();
@@ -1138,10 +1194,10 @@ public class MobileAccountTests
             Assert.Equal(picture, image.SourcePath);
             Assert.False(MobileFixtures.Named<TextBlock>(page, "AvatarInitials").IsEffectivelyVisible);
             var circle = MobileFixtures.Named<Border>(page, "AvatarCircle");
-            Assert.Equal(96, circle.Bounds.Width);
+            Assert.Equal(56, circle.Bounds.Width);
             Assert.True(circle.ClipToBounds);
 
-            // Every action row is a full-width touch target of at least 52 dp.
+            // Every action (row or tile) is a touch target of at least 52 dp.
             foreach (var name in new[] { "SyncNowButton", "DownloadAllButton", "SendSongsButton", "RemoveDownloadsButton", "SignOutButton" })
             {
                 var row = MobileFixtures.Named<Button>(page, name);
