@@ -285,4 +285,58 @@ public class LyricsRestampTests : IDisposable
         Assert.Equal(new[] { S(5), S(5.5) }, lines[0].Words!.Select(w => w.Start));
         Assert.Equal(new[] { S(35.1), S(35.6) }, lines[1].Words!.Select(w => w.Start));
     }
+
+    // ── Bug: a word-timed line saved without a stamp kept its tags and its [bg: …] line ──
+
+    [AvaloniaFact]
+    public async Task TapSync_ClearingAWordTimedLine_SavesItAndItsBackgroundVocalAsPlainText()
+    {
+        // Untimed rows go to the end of the file: its raw "<00:01.00>" tags showed as lyric
+        // text, and its "[bg: …]" line was glued to the last timed line of the song.
+        var (editor, _) = TapSync(Elrc);
+        editor.ClearTimestampCommand.Execute(editor.Lines[0]);
+
+        await editor.SaveCommand.ExecuteAsync(null);
+        var saved = (await File.ReadAllTextAsync(SidecarPath)).ReplaceLineEndings("\n");
+
+        Assert.Equal(
+            "[00:04.00]v2:<00:04.00>Silver <00:04.60>moon<00:05.00>\n" +
+            "[00:06.00]Quiet harbor\n" +
+            "Paper lanterns\n" +
+            "(oh oh)\n", saved);
+        var lines = Parsed(saved);
+        Assert.All(lines, l => Assert.Null(l.BackgroundWords));
+        Assert.Equal(new[] { "Silver moon", "Quiet harbor", "Paper lanterns", "(oh oh)" }, lines.Select(l => l.Text));
+    }
+
+    [Fact]
+    public async Task EditInfo_ClearingAWordTimedLine_WritesItAndItsBackgroundVocalAsPlainText()
+    {
+        const string Lrc =
+            "[00:01.00]First light\n" +
+            "[00:04.00]<00:04.00>Second <00:04.50>wind<00:05.00>\n" +
+            "[bg: <00:05.00>(ah)<00:05.50>]\n" +
+            "[00:06.00]Third day";
+        // What was written before: the reader hangs a "[bg: …]" line on the last stamped line
+        // above it, so the cleared line's "(ah)" became First light's background vocal.
+        var before = Parsed("[00:01.00]First light\n<00:04.00>Second <00:04.50>wind<00:05.00>\n[bg: <00:05.00>(ah)<00:05.50>]\n[00:06.00]Third day");
+        Assert.Equal("(ah)", Assert.Single(before[0].BackgroundWords!).Text.Trim());
+
+        var vm = await EditInfo(Lrc);
+        vm.SyncedLyricLines[1].ClearTimestamp();
+
+        Assert.Equal("[00:01.00]First light\nSecond wind\n(ah)\n[00:06.00]Third day", vm.SyncedLyrics);
+        var lines = Parsed(vm.SyncedLyrics);
+        Assert.All(lines, l => Assert.Null(l.BackgroundWords));
+    }
+
+    [Fact]
+    public async Task EditInfo_ClearedThenStampedAgain_KeepsTheWordTiming()
+    {
+        var vm = await EditInfo(Elrc);
+        vm.SyncedLyricLines[0].ClearTimestamp();
+        vm.SyncedLyricLines[0].TimestampText = "0:01.50";
+
+        AssertLineOneAt(Parsed(vm.SyncedLyrics)[0], 1.5);
+    }
 }

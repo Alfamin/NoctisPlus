@@ -47,11 +47,11 @@ public partial class SyncedLyricEditorLine : ObservableObject
     private readonly TimeSpan? _wordAnchor;
 
     /// <summary><see cref="Text"/> as written back: its word tags moved as far as its stamp was.</summary>
-    public string SavedText => LrcEditorViewModel.WordsAtStamp(Text, _wordAnchor, Timestamp);
+    public string SavedText => Timestamp is null ? LrcEditorViewModel.UntimedText(Text) : LrcEditorViewModel.WordsAtStamp(Text, _wordAnchor, Timestamp);
 
     /// <summary><see cref="BackgroundLines"/> as written back: their word tags moved with the line.</summary>
     public IReadOnlyList<string>? SavedBackgroundLines =>
-        BackgroundLines?.Select(b => LrcEditorViewModel.WordsAtStamp(b, _wordAnchor, Timestamp)).ToList();
+        BackgroundLines?.Select(b => Timestamp is null ? LrcEditorViewModel.UntimedBackground(b) : LrcEditorViewModel.WordsAtStamp(b, _wordAnchor, Timestamp)).ToList();
 
     /// <summary>
     /// Lyric text with inline enhanced-LRC word tags (&lt;mm:ss.xx&gt;) stripped, so

@@ -51,11 +51,11 @@ public partial class LrcEditorLine : ObservableObject
     }
 
     /// <summary><see cref="Text"/> as saved: its word tags moved as far as its stamp was.</summary>
-    public string SavedText => LrcEditorViewModel.WordsAtStamp(Text, _wordAnchor, Timestamp);
+    public string SavedText => Timestamp is null ? LrcEditorViewModel.UntimedText(Text) : LrcEditorViewModel.WordsAtStamp(Text, _wordAnchor, Timestamp);
 
     /// <summary><see cref="BackgroundLines"/> as saved: their word tags moved with the line.</summary>
     public IReadOnlyList<string>? SavedBackgroundLines =>
-        BackgroundLines?.Select(b => LrcEditorViewModel.WordsAtStamp(b, _wordAnchor, Timestamp)).ToList();
+        BackgroundLines?.Select(b => Timestamp is null ? LrcEditorViewModel.UntimedBackground(b) : LrcEditorViewModel.WordsAtStamp(b, _wordAnchor, Timestamp)).ToList();
 
     /// <summary>
     /// Row display: duet voice markers ("v1:"/"v2:") and inline enhanced-LRC word
@@ -277,6 +277,32 @@ public partial class LrcEditorViewModel : ViewModelBase
     /// </summary>
     public static string WordsAtStamp(string text, TimeSpan? anchor, TimeSpan? stamp) =>
         anchor is { } from && stamp is { } to ? LyricsTextHelper.ShiftWordTimestamps(text, to - from) : text;
+
+    /// <summary>
+    /// A row written without a stamp: word tags (and the voice marker that rides them) mean
+    /// nothing there — the reader showed the raw "&lt;00:01.00&gt;" as lyric text. Their times
+    /// stay on the row, so stamping it again in the same session still moves them.
+    /// Rows without word tags (plain lyrics waiting to be timed) are written as they are.
+    /// </summary>
+    public static string UntimedText(string text)
+    {
+        var (body, _) = EnhancedLrcParser.StripVoiceMarker(text);
+        var plain = EnhancedLrcParser.StripWordTags(body);
+        return plain == body ? text : Regex.Replace(plain, @"\s{2,}", " ").Trim();
+    }
+
+    /// <summary>
+    /// The "[bg: …]" line of a row written without a stamp, as a plain line of its own: the
+    /// reader hangs a "[bg: …]" line on the last stamped line above it, so it became the
+    /// background vocal of another line.
+    /// </summary>
+    public static string UntimedBackground(string line)
+    {
+        var body = line.Trim();
+        if (body.StartsWith("[bg:", StringComparison.Ordinal)) body = body[4..];
+        if (body.EndsWith(']')) body = body[..^1];
+        return Regex.Replace(EnhancedLrcParser.StripWordTags(body), @"\s{2,}", " ").Trim();
+    }
 
     private static TimeSpan ToTime(Match match)
     {
