@@ -336,20 +336,22 @@ public class MobileSettingsTests
     }
 
     /// <summary>Owner 10-11: every section is a rounded card headed by the desktop Settings
-    /// rail's icon for it, and the gapless switch is gone (the phone is always gapless).</summary>
+    /// rail's icon for it, and the gapless switch is gone (the phone is always gapless).
+    /// 10-12, Apple's account sheet: the head sits over its card, which has 24 dp corners.</summary>
     [AvaloniaFact]
     public async Task Settings_IsRoundedCards_EachHeadedByItsDesktopIcon_WithNoGaplessSwitch()
     {
         using var rig = MobileFixtures.MakeRig();
         await WithMountedSettings(rig, (page, _, _) =>
         {
-            var cards = page.GetVisualDescendants().OfType<Border>()
-                .Where(b => b.Classes.Contains("settings-card") && b.IsEffectivelyVisible).ToList();
-            var heads = cards.Select(c =>
+            var sections = page.GetVisualDescendants().OfType<StackPanel>()
+                .Where(s => s.Classes.Contains("settings-section") && s.IsEffectivelyVisible).ToList();
+            var heads = sections.Select(s =>
             {
-                var title = c.GetVisualDescendants().OfType<TextBlock>().First(t => t.Classes.Contains("section-title")).Text;
-                var badge = c.GetVisualDescendants().OfType<Border>().First(b => b.Classes.Contains("section-badge"));
-                return (Title: title, Icon: badge.GetVisualDescendants().OfType<GridIcon>().Single().Data, Corner: c.CornerRadius.TopLeft);
+                var head = s.Children.OfType<Grid>().First(g => g.Classes.Contains("group-head"));
+                var title = head.Children.OfType<TextBlock>().Single(t => t.Classes.Contains("group-title")).Text;
+                var card = s.Children.OfType<Border>().Single(b => b.Classes.Contains("group-card"));
+                return (Title: title, Icon: head.Children.OfType<GridIcon>().Single().Data, Corner: card.CornerRadius.TopLeft);
             }).ToList();
 
             // No account service in this rig: the Account card stays hidden.
@@ -360,7 +362,7 @@ public class MobileSettingsTests
                 Assert.True(Application.Current!.TryGetResource(keys[i], null, out var geometry), keys[i]);
                 Assert.Same(geometry, heads[i].Icon);
             }
-            Assert.All(heads, h => Assert.Equal(20, h.Corner));
+            Assert.All(heads, h => Assert.Equal(24, h.Corner));
 
             Assert.DoesNotContain(page.GetVisualDescendants().OfType<Control>(), c => c.Name == "GaplessSwitch");
             Assert.DoesNotContain(page.GetVisualDescendants().OfType<TextBlock>(), t => t.Text?.Contains("Gapless", StringComparison.OrdinalIgnoreCase) == true);
@@ -406,10 +408,43 @@ public class MobileSettingsTests
         });
     }
 
-    /// <summary>The library card lists each folder by name, says in place when its access was
-    /// lost, and offers Add folder and Rescan as icon pills.</summary>
+    /// <summary>Apple's grouped look: every hairline starts under the row's label and stops 16 dp
+    /// short of the card's right edge (they ran to the edge before), and the round close button
+    /// in the header goes back.</summary>
     [AvaloniaFact]
-    public async Task Settings_LibraryCard_ShowsTheLostFolder_AndTheTwoActionPills()
+    public async Task Settings_Hairlines_AreInsetOnBothSides_AndTheCloseButtonGoesBack()
+    {
+        using var rig = MobileFixtures.MakeRig(seed: async p =>
+        {
+            var s = await p.LoadSettingsAsync();
+            s.MusicFolders.Add("content://com.android.externalstorage.documents/tree/primary%3AMusic%2FTones");
+            await p.SaveSettingsAsync(s);
+        });
+        await WithMountedSettings(rig, (page, _, window) =>
+        {
+            var lines = page.GetVisualDescendants().OfType<Border>()
+                .Where(b => b.Classes.Contains("row-separator") && b.IsEffectivelyVisible).ToList();
+            Assert.True(lines.Count >= 5, $"{lines.Count} hairlines");
+            Assert.All(lines, line =>
+            {
+                var card = line.GetVisualAncestors().OfType<Border>().First(b => b.Classes.Contains("group-card"));
+                var left = line.TranslatePoint(new Point(0, 0), card)!.Value.X;
+                Assert.Equal(56, left, 1);
+                Assert.Equal(card.Bounds.Width - 16, left + line.Bounds.Width, 1);
+            });
+
+            var close = MobileFixtures.Named<Button>(page, "CloseButton");
+            Assert.True(close.Bounds.Width >= 44 && close.Bounds.Height >= 44);
+            close.Command!.Execute(close.CommandParameter);
+            window.UpdateLayout();
+            Assert.IsNotType<SettingsPageViewModel>(rig.Shell.CurrentPage);
+        });
+    }
+
+    /// <summary>The library card lists each folder by name, says in place when its access was
+    /// lost, and offers Add folder and Rescan as accent icon rows.</summary>
+    [AvaloniaFact]
+    public async Task Settings_LibraryCard_ShowsTheLostFolder_AndTheTwoActionRows()
     {
         const string tones = "content://com.android.externalstorage.documents/tree/primary%3AMusic%2FTones";
         const string beats = "content://com.android.externalstorage.documents/tree/primary%3AMusic%2FBeats";
@@ -431,10 +466,10 @@ public class MobileSettingsTests
 
             foreach (var (name, label) in new[] { ("AddFolderButton", "Add folder"), ("RescanButton", "Rescan") })
             {
-                var pill = MobileFixtures.Named<Button>(page, name);
-                Assert.Contains("pill", pill.Classes);
-                Assert.NotNull(pill.GetVisualDescendants().OfType<GridIcon>().Single().Data);
-                Assert.Contains(pill.GetVisualDescendants().OfType<TextBlock>(), t => t.Text == label);
+                var row = MobileFixtures.Named<Button>(page, name);
+                Assert.Contains("accent-row", row.Classes);
+                Assert.NotNull(row.GetVisualDescendants().OfType<GridIcon>().Single().Data);
+                Assert.Contains(row.GetVisualDescendants().OfType<TextBlock>(), t => t.Text == label);
             }
         });
     }
