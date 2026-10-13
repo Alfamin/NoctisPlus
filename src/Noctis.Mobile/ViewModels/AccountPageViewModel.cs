@@ -85,7 +85,7 @@ public sealed partial class AccountPageViewModel : MobilePage
     // ── Signed in ──
 
     [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(IsSignedOut), nameof(IsFormVisible), nameof(CanUseServer))]
+    [NotifyPropertyChangedFor(nameof(IsSignedOut), nameof(IsFormVisible), nameof(CanUseServer), nameof(CanSync), nameof(CanUpload))]
     private bool _isSignedIn;
 
     public bool IsSignedOut => !IsSignedIn;
@@ -93,7 +93,7 @@ public sealed partial class AccountPageViewModel : MobilePage
     /// <summary>The pinned certificate no longer matches: the only way on is Sign out and a new,
     /// confirmed sign-in — never a silent re-trust — so Sync and Download are hidden.</summary>
     [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(CanUseServer))]
+    [NotifyPropertyChangedFor(nameof(CanUseServer), nameof(CanSync), nameof(CanUpload))]
     private bool _isCertificateChanged;
 
     public bool CanUseServer => IsSignedIn && !IsCertificateChanged;
@@ -113,6 +113,9 @@ public sealed partial class AccountPageViewModel : MobilePage
 
     /// <summary>The header's second line: "on Studio PC".</summary>
     [ObservableProperty] private string _serverText = string.Empty;
+
+    /// <summary>The profile card's computer row: "Studio PC".</summary>
+    [ObservableProperty] private string _computerName = string.Empty;
 
     /// <summary>The desktop's profile picture (a local file the service cached), or null.</summary>
     [ObservableProperty]
@@ -139,14 +142,15 @@ public sealed partial class AccountPageViewModel : MobilePage
     private bool _isDownloading;
 
     /// <summary>Sync now / Download everything: not while one already runs, and not while
-    /// signing in or out (a download started mid-sign-out ran on until the revoked key failed it).</summary>
-    public bool CanSync => IsIdle && !IsSyncing;
+    /// signing in or out (a download started mid-sign-out ran on until the revoked key failed it).
+    /// Sync also not once the computer's certificate changed: only Sign out leads on from there.</summary>
+    public bool CanSync => IsIdle && !IsSyncing && CanUseServer;
     public bool CanDownload => IsIdle && !IsDownloading;
     [ObservableProperty] private string _downloadText = string.Empty;
 
     /// <summary>A send of the phone's songs runs (from this page, or one still running when it opened).</summary>
     [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(UploadLabel))]
+    [NotifyPropertyChangedFor(nameof(UploadLabel), nameof(UploadTileLabel))]
     private bool _isUploading;
 
     /// <summary>The send row's status: "Sending 3 of 40", then "Sent 40 · 2 already on your computer · 1 failed".</summary>
@@ -155,7 +159,11 @@ public sealed partial class AccountPageViewModel : MobilePage
     /// <summary>The send row's label: a second tap while sending stops it (what was sent stays sent).</summary>
     public string UploadLabel => IsUploading ? "Stop sending" : "Send phone songs to computer";
 
-    public bool CanUpload => IsIdle;
+    /// <summary>The send tile's short label (its spoken name stays <see cref="UploadLabel"/>).</summary>
+    public string UploadTileLabel => IsUploading ? "Stop sending" : "Send to computer";
+
+    /// <summary>Not while signing in or out, nor once the computer's certificate changed.</summary>
+    public bool CanUpload => IsIdle && CanUseServer;
 
     /// <summary>"Downloaded: 12 songs · 340 MB" (the Downloaded row's spoken name).</summary>
     [ObservableProperty] private string _storageText = string.Empty;
@@ -442,6 +450,7 @@ public sealed partial class AccountPageViewModel : MobilePage
         EmailText = account != null && !string.Equals(shownName, account.UserName, StringComparison.OrdinalIgnoreCase)
             ? account.UserName : string.Empty;
         ServerText = account == null ? string.Empty : $"on {ServerLabel(account)}";
+        ComputerName = account == null ? string.Empty : ServerLabel(account);
         Initials = InitialsOf(shownName);
         AvatarPath = IsSignedIn ? _account.AvatarPath : null;
         LastSyncText = account?.LastSyncUtc is { } synced ? $"Last synced {FormatWhen(synced)}" : "Not synced yet";
