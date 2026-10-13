@@ -2948,12 +2948,16 @@ public partial class LyricsViewModel : ViewModelBase, IDisposable
         // or lyrics saved for the song since.
         var hasSyncedField = !string.IsNullOrWhiteSpace(track.SyncedLyrics);
         var hasPlainField = !string.IsNullOrWhiteSpace(track.Lyrics);
+        // A whole TTML document as the song's lyrics text (pasted into a tagger's lyrics field,
+        // GitHub #132) is Apple's timed lyrics, not words to print: it showed as its markup.
+        if (!hasSyncedField && ProbeTtmlText(track.Lyrics, joinSplitWords, uiLanguage) is { } ttmlField)
+            return ttmlField;
         // Without timed lyrics there, the file's tags are read now (GitHub #135): a SYLT frame,
         // a SYNCEDLYRICS comment or an UNSYNCEDLYRICS alias was never scanned before #135, and
         // a library is not rescanned until its files change. Before the online cache, which
         // must not shadow the file's own lyrics.
         if (!hasSyncedField && !LrcParser.ContainsTimestamp(track.Lyrics)
-            && ProbeEmbeddedTags(track, hasPlainField ? track.Lyrics : null) is { } fromTags)
+            && ProbeEmbeddedTags(track, hasPlainField ? track.Lyrics : null, joinSplitWords, uiLanguage) is { } fromTags)
             return fromTags;
         if (hasSyncedField || hasPlainField)
             return new LocalLyricsProbe(null, null, "Embedded", FromCache: false);
@@ -2991,12 +2995,15 @@ public partial class LyricsViewModel : ViewModelBase, IDisposable
     /// <paramref name="rowPlain"/> on the Plain tab when given), or plain text when the row has
     /// none. Null when the file adds nothing, or is not a local file that exists.
     /// </summary>
-    private static LocalLyricsProbe? ProbeEmbeddedTags(Track track, string? rowPlain)
+    private static LocalLyricsProbe? ProbeEmbeddedTags(Track track, string? rowPlain, bool joinSplitWords, string uiLanguage)
     {
         var path = track.FilePath;
         if (track.SourceType != SourceType.Local || string.IsNullOrWhiteSpace(path) || !File.Exists(path)) return null;
         var embedded = EmbeddedLyrics.ReadFile(path);
         if (embedded.IsEmpty) return null;
+
+        if (string.IsNullOrWhiteSpace(rowPlain) && ProbeTtmlText(embedded.Text, joinSplitWords, uiLanguage) is { } ttml)
+            return ttml;
 
         var timed = embedded.TimedText;
         if (!string.IsNullOrWhiteSpace(timed))
@@ -3013,6 +3020,20 @@ public partial class LyricsViewModel : ViewModelBase, IDisposable
         if (string.IsNullOrWhiteSpace(text)) return null;
         var rows = LrcParser.SplitPlain(text).Select(l => new LyricLine { Text = LrcParser.SoftWrap(l), IsActive = true }).ToList();
         return rows.Count == 0 ? null : new LocalLyricsProbe(rows, text, "Embedded:Tags", FromCache: false);
+    }
+
+    /// <summary>
+    /// Lyrics text that is a TTML document, read as a .ttml beside the song would be (word and
+    /// line timing, singers, layers); its LRC form backs "Save Lyrics to File". Null when the
+    /// text is not TTML or does not parse.
+    /// </summary>
+    private static LocalLyricsProbe? ProbeTtmlText(string? text, bool joinSplitWords, string uiLanguage)
+    {
+        if (!TtmlParser.LooksLikeTtml(text)) return null;
+        var (lines, plain) = TtmlParser.Parse(text, joinSplitWords, uiLanguage);
+        if (lines is not { Count: > 0 }) return null;
+        return new LocalLyricsProbe(lines, plain, "Embedded:Ttml", FromCache: false,
+            TtmlParser.ToLrc(text, joinSplitWords, uiLanguage));
     }
 
     private void ApplyLocalLyricsResult(Track track, LocalLyricsProbe probe)
