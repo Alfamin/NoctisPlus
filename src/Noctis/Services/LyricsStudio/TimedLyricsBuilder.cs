@@ -1,5 +1,6 @@
 using System.Text;
 using System.Text.RegularExpressions;
+using Noctis.Models;
 
 namespace Noctis.Services.LyricsStudio;
 
@@ -170,7 +171,12 @@ public static partial class TimedLyricsBuilder
         sb.Append("<tt xmlns=\"http://www.w3.org/ns/ttml\" xmlns:ttm=\"http://www.w3.org/ns/ttml#metadata\"")
           .Append(" xmlns:itunes=\"http://music.apple.com/lyric-ttml-internal\"")
           .Append(" itunes:timing=\"").Append(paragraphs.Any(p => p.Line.Words.Count > 0) ? "Word" : "Line").Append("\">\n");
-        sb.Append("  <head><metadata/></head>\n");
+        // Duet voices as Apple's agents, the ids TtmlParser maps back onto the same layout:
+        // v1 the first singer, v2 the second, v1000 both. Files without voices carry none.
+        var duet = paragraphs.Any(p => p.Line.Voice != LyricVoice.Default);
+        sb.Append(duet
+            ? "  <head><metadata><ttm:agent type=\"person\" xml:id=\"v1\"/><ttm:agent type=\"person\" xml:id=\"v2\"/><ttm:agent type=\"group\" xml:id=\"v1000\"/></metadata></head>\n"
+            : "  <head><metadata/></head>\n");
         if (paragraphs.Count == 0)
             return sb.Append("  <body/>\n</tt>").ToString();
 
@@ -181,7 +187,10 @@ public static partial class TimedLyricsBuilder
         {
             var (line, main, background) = paragraphs[i];
             sb.Append("      <p begin=\"").Append(FormatTtmlTime(line.Start)).Append("\" end=\"").Append(FormatTtmlTime(ends[i]))
-              .Append("\" itunes:key=\"L").Append(i + 1).Append("\">");
+              .Append("\" itunes:key=\"L").Append(i + 1).Append('"');
+            if (duet)
+                sb.Append(" ttm:agent=\"").Append(line.Voice switch { LyricVoice.Voice2 => "v2", LyricVoice.Group => "v1000", _ => "v1" }).Append('"');
+            sb.Append('>');
             if (line.Words.Count == 0)
                 sb.Append(XmlText(line.Text.Trim()));
             AppendWordSpans(sb, main);

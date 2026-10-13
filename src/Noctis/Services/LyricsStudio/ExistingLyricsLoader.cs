@@ -224,7 +224,7 @@ public static partial class ExistingLyricsLoader
         var result = new List<AlignedLine>(raw.Count);
         for (var i = 0; i < raw.Count; i++)
         {
-            var (start, plain, words, _) = raw[i];
+            var (start, plain, words, voice) = raw[i];
             var nextStart = i + 1 < raw.Count ? raw[i + 1].Start : (TimeSpan?)null;
             var aligned = new List<AlignedWord>();
             if (words is { Count: > 0 })
@@ -245,6 +245,7 @@ public static partial class ExistingLyricsLoader
             result.Add(new AlignedLine(plain, start, lineEnd, aligned, Confidence: 1, Interpolated: false)
             {
                 Companions = companions[i],
+                Voice = voice,
             });
         }
         return result;

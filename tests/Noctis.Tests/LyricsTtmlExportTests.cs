@@ -120,6 +120,32 @@ public class LyricsTtmlExportTests : IDisposable
         Assert.Empty(Row(fromTtml[3].BackgroundWords)); // unmatched "(" leaves the line alone
     }
 
+    /// <summary>
+    /// "Save Lyrics to File ▸ TTML" of a duet: the page reads the .ttml before the .lrc, so a
+    /// file without agents turned the duet layout into plain left-aligned lines after the save.
+    /// </summary>
+    [Fact]
+    public void SaveAsTtml_OfADuet_ReadsBackWithTheSameVoices()
+    {
+        const string synced =
+            "[00:01.00]v1:<00:01.00>first <00:01.50>voice<00:02.00>\n" +
+            "[00:02.00]v2:<00:02.00>second <00:02.50>voice<00:03.00>\n" +
+            "[00:03.00]v3:both together\n" +
+            "[00:04.00]no marker";
+
+        var ttml = LyricsViewModel.BuildTtmlFromSynced(synced)!;
+        var (lines, _) = TtmlParser.Parse(ttml);
+
+        Assert.Equal(LyricsViewModel.ParseLrcContent(synced).Select(l => l.Voice), lines!.Select(l => l.Voice));
+        Assert.Equal(new[] { LyricVoice.Default, LyricVoice.Voice2, LyricVoice.Group, LyricVoice.Default }, lines!.Select(l => l.Voice));
+    }
+
+    [Fact]
+    public void BuildTtml_WithoutVoices_WritesNoAgents()
+    {
+        Assert.DoesNotContain("agent", TimedLyricsBuilder.BuildTtml(Song()));
+    }
+
     [Fact]
     public void BuildTtml_LineLevelOnly_SaysLine_AndEmptyIsStillValid()
     {
