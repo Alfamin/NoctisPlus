@@ -1349,6 +1349,8 @@ Deezer и TIDAL: вставьте ссылку.</value></data>
   <data name="Metadata.UseWorkMovement" xml:space="preserve"><value>Произведение и часть</value><comment>Content in MetadataWindow.axaml</comment></data>
   <data name="Metadata.WorkName" xml:space="preserve"><value>произведение</value><comment>Text in MetadataWindow.axaml</comment></data>
   <data name="Metadata.Movement" xml:space="preserve"><value>часть</value><comment>Text in MetadataWindow.axaml</comment></data>
+  <data name="Metadata.MovementCount" xml:space="preserve"><value>число частей</value><comment>Accessible name of the "of" box beside the movement number in MetadataWindow.axaml</comment></data>
+  <data name="Metadata.MovementTitle" xml:space="preserve"><value>название части</value><comment>Accessible name of the movement title box in MetadataWindow.axaml (its visible label is just "title")</comment></data>
   <data name="Metadata.Album2" xml:space="preserve"><value>альбом</value><comment>Text in MetadataWindow.axaml</comment></data>
   <data name="Metadata.AlbumCompilation" xml:space="preserve"><value>Альбом — сборник</value><comment>Content in MetadataWindow.axaml</comment></data>
   <data name="Metadata.MarksContentAsExplicitTip" xml:space="preserve"><value>Помечает содержимое как ненормативное (тег iTunes advisory). Настройка «Ненормативный контент» использует его, чтобы пропускать песни.</value><comment>ToolTip.Tip in MetadataWindow.axaml</comment></data>

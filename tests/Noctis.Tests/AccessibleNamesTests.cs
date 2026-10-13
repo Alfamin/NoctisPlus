@@ -561,6 +561,84 @@ public class AccessibleNamesTests
         Assert.Equal("Play", NameOf(text));
     }
 
+    /// <summary>Every input an editor exposes: the button-like controls of
+    /// <see cref="Unnamed"/> plus text boxes, combo boxes, sliders and switches.</summary>
+    private static List<string> UnnamedInputs(IEnumerable<Control> controls)
+        => Unnamed(controls).Concat(controls
+                .Where(c => c is TextBox or ComboBox or Slider or Noctis.Controls.LottieToggle)
+                .Where(c => AutomationProperties.GetAccessibilityView(c) != AccessibilityView.Raw)
+                // A plain combo box's template keeps a hidden PART_EditableTextBox; never shown, never read.
+                .Where(c => c.TemplatedParent is null || c.IsVisible)
+                .Select(c => (Control: c, Name: NameOf(c)))
+                .Where(x => IsJunk(x.Name))
+                .Select(x => Describe(x.Control, x.Name)))
+            .ToList();
+
+    /// <summary>Edit Info (UIA on the live dialog, 10-13): the section list read
+    /// "Avalonia.Controls.ScrollViewer" / "Avalonia.Controls.DockPanel", Save read
+    /// "Avalonia.Controls.Panel", and every field was a nameless Edit next to its label.
+    /// Walks every section and requires each row, button and field to carry a real name.</summary>
+    [AvaloniaFact]
+    public async Task EditInfo_SectionsSaveAndEveryFieldAreNamed()
+    {
+        AddToPlaylistDialogTests.EnsureAppStyles();
+        var track = Song("Head Like A Hole");
+        track.Lyrics = "No you can't take it";
+        track.SyncedLyrics = "[00:01.00]No you can't take it\n[00:03.50]No you can't take that away from me";
+        var lib = new FakeLibraryService();
+        lib.TrackList.Add(track);
+        var vm = new MetadataViewModel(track, new SearchPopupsShotsTests.OkTags(), lib, new TestPersistenceService(),
+            new FakeAnimatedCoverService(), metadataSearch: new MetadataSearchPanelTests.FakeSearch());
+        var win = new MetadataWindow(vm) { Width = 1100, Height = 820 };
+        win.Show();
+        try
+        {
+            var load = vm.InitializeAsync();
+            await PumpUntil(() => load.IsCompleted);
+            vm.CustomTags.Add(new CustomTagItem { Key = "MOOD", Value = "Angry" });
+            Pump(win);
+
+            var tabs = win.FindControl<TabControl>("MetaTabControl")!;
+            var sections = tabs.Items.OfType<TabItem>().Where(t => t.IsVisible).ToList();
+            Assert.True(sections.Count >= 8, $"only {sections.Count} sections shown");
+            foreach (var section in sections)
+                Assert.Equal((string)section.Header!, NameOf(section));
+
+            var save = win.GetVisualDescendants().OfType<Button>().Single(b => b.Command == vm.SaveCommand);
+            Assert.Equal(Loc.T("Metadata.Save"), NameOf(save));
+
+            // Title, the first field on Details.
+            var title = win.GetLogicalDescendants().OfType<TextBox>()
+                .First(t => t.Text == "Head Like A Hole" && t.FindLogicalAncestorOfType<TabItem>() == sections[0]);
+            Assert.Equal(Loc.T("Metadata.Title"), NameOf(title));
+
+            // Every section's content, presented (templated parts such as the genre box's
+            // editable text box only exist while their section is shown).
+            var search = win.FindControl<Control>("SearchPanelView")!;
+            foreach (var section in sections)
+            {
+                tabs.SelectedItem = section;
+                Pump(win);
+                var controls = win.GetVisualDescendants().OfType<Control>()
+                    .Concat(win.GetLogicalDescendants().OfType<Control>())
+                    .Distinct()
+                    .Where(c => c != search && !c.GetLogicalAncestors().Contains(search))
+                    // The slider's own track halves (every Slider in the app; not this dialog's).
+                    .Where(c => c.TemplatedParent is not Slider)
+                    .ToList();
+                if (Equals(section.Header, Loc.T("Metadata.TimestampLyrics")))
+                    Assert.Contains(controls.OfType<TextBox>(), t => NameOf(t) == Loc.T("Metadata.TypeTimestampMmSsTip"));
+                var unnamed = UnnamedInputs(controls);
+                Assert.True(unnamed.Count == 0,
+                    $"{section.Header}: {unnamed.Count} unnamed:\n" + string.Join('\n', unnamed));
+            }
+        }
+        finally
+        {
+            win.Close();
+        }
+    }
+
     [Fact]
     public void NavItem_ReadsAsItsLabel()
     {

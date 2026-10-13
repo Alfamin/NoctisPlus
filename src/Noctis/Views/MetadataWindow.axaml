@@ -46,6 +46,9 @@
 
         <!-- Sidebar tab rows: full-width vertical list, accent bar + tint when selected -->
         <Style Selector="TabItem">
+            <!-- Screen readers read a section by its title; unnamed, the TabItem peer fell
+                 back to its content's type ("Avalonia.Controls.ScrollViewer", UIA 10-13). -->
+            <Setter Property="AutomationProperties.Name" Value="{Binding $self.Header}" />
             <Setter Property="Margin" Value="0,1" />
             <Setter Property="MinHeight" Value="34" />
             <Setter Property="HorizontalAlignment" Value="Stretch" />
@@ -96,6 +99,12 @@
                     </StackPanel>
                 </ControlTemplate>
             </Setter>
+        </Style>
+
+        <!-- The genre box is editable, so focus lands on its inner text box: name that too
+             (UIA read it as a nameless Edit, 10-13). -->
+        <Style Selector="ComboBox#GenreCombo /template/ TextBox#PART_EditableTextBox">
+            <Setter Property="AutomationProperties.Name" Value="{loc:T Metadata.Genre}" />
         </Style>
 
         <!-- Header "Find online" pill: an accent ring while its panel is open (it toggles). -->
@@ -432,9 +441,12 @@
                         Command="{Binding CancelCommand}"
                         MinWidth="108"
                         Margin="0,0,10,0" />
+                <!-- Named outright: its label sits in a Panel, which the peer read as
+                     "Avalonia.Controls.Panel" (UIA 10-13). -->
                 <Button Grid.Column="2"
                         Classes="pill-primary"
                         Command="{Binding SaveCommand}"
+                        AutomationProperties.Name="{loc:T Metadata.Save}"
                         MinWidth="108">
                     <Panel>
                         <TextBlock Text="{loc:T Metadata.Save}"
@@ -500,6 +512,7 @@
                                         Command="{Binding UndoSearchApplyCommand}" />
                                 <Button Grid.Column="3" Classes="pill-secondary" MinHeight="30" Width="30" Padding="0"
                                         Margin="6,0,0,0"
+                                        ToolTip.Tip="{loc:T Common.Close}"
                                         Command="{Binding DismissSearchAppliedCommand}">
                                     <controls:LineIcon Data="{StaticResource MenuLineClose}" Width="16" Height="16" />
                                 </Button>
@@ -509,7 +522,7 @@
                         <!-- Title (per-track; hidden when editing a whole album) -->
                         <StackPanel Spacing="4" IsVisible="{Binding ShowTrackFields}">
                             <TextBlock Text="{loc:T Metadata.Title}" FontSize="12" Opacity="0.5" />
-                            <TextBox Classes="pill-field" Text="{Binding Title, UpdateSourceTrigger=PropertyChanged}" />
+                            <TextBox Classes="pill-field" AutomationProperties.Name="{loc:T Metadata.Title}" Text="{Binding Title, UpdateSourceTrigger=PropertyChanged}" />
                         </StackPanel>
 
                         <!-- Use Work & Movement: the fields glide open under the toggle (same
@@ -524,22 +537,22 @@
                                     <!-- Work Name -->
                                     <StackPanel Spacing="4">
                                         <TextBlock Text="{loc:T Metadata.WorkName}" FontSize="12" Opacity="0.5" />
-                                        <TextBox Classes="pill-field" Text="{Binding WorkName, UpdateSourceTrigger=PropertyChanged}" />
+                                        <TextBox Classes="pill-field" AutomationProperties.Name="{loc:T Metadata.WorkName}" Text="{Binding WorkName, UpdateSourceTrigger=PropertyChanged}" />
                                     </StackPanel>
 
                                     <!-- Movement index + count + title -->
                                     <Grid ColumnDefinitions="Auto,8,Auto,16,*">
                                         <StackPanel Grid.Column="0" Spacing="4">
                                             <TextBlock Text="{loc:T Metadata.Movement}" FontSize="12" Opacity="0.5" />
-                                            <TextBox Classes="pill-field" Text="{Binding MovementNumber, UpdateSourceTrigger=PropertyChanged}" Width="80" />
+                                            <TextBox Classes="pill-field" AutomationProperties.Name="{loc:T Metadata.Movement}" Text="{Binding MovementNumber, UpdateSourceTrigger=PropertyChanged}" Width="80" />
                                         </StackPanel>
                                         <StackPanel Grid.Column="2" Spacing="4">
                                             <TextBlock Text="of" FontSize="12" Opacity="0.5" />
-                                            <TextBox Classes="pill-field" Text="{Binding MovementCount, UpdateSourceTrigger=PropertyChanged}" Width="80" />
+                                            <TextBox Classes="pill-field" AutomationProperties.Name="{loc:T Metadata.MovementCount}" Text="{Binding MovementCount, UpdateSourceTrigger=PropertyChanged}" Width="80" />
                                         </StackPanel>
                                         <StackPanel Grid.Column="4" Spacing="4">
                                             <TextBlock Text="{loc:T Metadata.Title}" FontSize="12" Opacity="0.5" />
-                                            <TextBox Classes="pill-field" Text="{Binding MovementName, UpdateSourceTrigger=PropertyChanged}" />
+                                            <TextBox Classes="pill-field" AutomationProperties.Name="{loc:T Metadata.MovementTitle}" Text="{Binding MovementName, UpdateSourceTrigger=PropertyChanged}" />
                                         </StackPanel>
                                     </Grid>
                                 </StackPanel>
@@ -549,7 +562,7 @@
                         <!-- Album -->
                         <StackPanel Spacing="4">
                             <TextBlock Text="{loc:T Metadata.Album2}" FontSize="12" Opacity="0.5" />
-                            <TextBox Classes="pill-field" Text="{Binding Album, UpdateSourceTrigger=PropertyChanged}" Watermark="{Binding AlbumWatermark}" />
+                            <TextBox Classes="pill-field" AutomationProperties.Name="{loc:T Metadata.Album2}" Text="{Binding Album, UpdateSourceTrigger=PropertyChanged}" Watermark="{Binding AlbumWatermark}" />
                         </StackPanel>
 
                         <!-- Flags in one row: compilation / explicit / show composer -->
@@ -574,21 +587,21 @@
                             <!-- Album Artist | Artist -->
                             <StackPanel Grid.Row="0" Grid.Column="0" Spacing="4" Margin="0,0,0,16">
                                 <TextBlock Text="{loc:T Metadata.AlbumArtist}" FontSize="12" Opacity="0.5" />
-                                <TextBox Classes="pill-field" Text="{Binding AlbumArtist, UpdateSourceTrigger=PropertyChanged}" Watermark="{Binding AlbumArtistWatermark}" />
+                                <TextBox Classes="pill-field" AutomationProperties.Name="{loc:T Metadata.AlbumArtist}" Text="{Binding AlbumArtist, UpdateSourceTrigger=PropertyChanged}" Watermark="{Binding AlbumArtistWatermark}" />
                             </StackPanel>
                             <StackPanel Grid.Row="0" Grid.Column="2" Spacing="4" Margin="0,0,0,16">
                                 <TextBlock Text="{loc:T Metadata.Artist}" FontSize="12" Opacity="0.5" />
-                                <TextBox Classes="pill-field" Text="{Binding Artist, UpdateSourceTrigger=PropertyChanged}" Watermark="{Binding ArtistWatermark}" />
+                                <TextBox Classes="pill-field" AutomationProperties.Name="{loc:T Metadata.Artist}" Text="{Binding Artist, UpdateSourceTrigger=PropertyChanged}" Watermark="{Binding ArtistWatermark}" />
                             </StackPanel>
 
                             <!-- Composer | Grouping -->
                             <StackPanel Grid.Row="1" Grid.Column="0" Spacing="4" Margin="0,0,0,16">
                                 <TextBlock Text="{loc:T Metadata.Composer}" FontSize="12" Opacity="0.5" />
-                                <TextBox Classes="pill-field" Text="{Binding Composer, UpdateSourceTrigger=PropertyChanged}" Watermark="{Binding ComposerWatermark}" />
+                                <TextBox Classes="pill-field" AutomationProperties.Name="{loc:T Metadata.Composer}" Text="{Binding Composer, UpdateSourceTrigger=PropertyChanged}" Watermark="{Binding ComposerWatermark}" />
                             </StackPanel>
                             <StackPanel Grid.Row="1" Grid.Column="2" Spacing="4" Margin="0,0,0,16">
                                 <TextBlock Text="{loc:T Metadata.Grouping}" FontSize="12" Opacity="0.5" />
-                                <TextBox Classes="pill-field" Text="{Binding Grouping, UpdateSourceTrigger=PropertyChanged}" Watermark="{Binding GroupingWatermark}" />
+                                <TextBox Classes="pill-field" AutomationProperties.Name="{loc:T Metadata.Grouping}" Text="{Binding Grouping, UpdateSourceTrigger=PropertyChanged}" Watermark="{Binding GroupingWatermark}" />
                             </StackPanel>
 
                             <!-- Genre | Year -->
@@ -599,6 +612,7 @@
                                      leaves SelectedItem null, which must not clear Genre. -->
                                 <ComboBox x:Name="GenreCombo"
                                           Classes="pill-field"
+                                          AutomationProperties.Name="{loc:T Metadata.Genre}"
                                           FontWeight="Normal"
                                           IsEditable="True"
                                           ItemsSource="{Binding GenreOptions}"
@@ -609,31 +623,31 @@
                             </StackPanel>
                             <StackPanel Grid.Row="2" Grid.Column="2" Spacing="4" Margin="0,0,0,16">
                                 <TextBlock Text="{loc:T Metadata.Year}" FontSize="12" Opacity="0.5" />
-                                <TextBox Classes="pill-field" Text="{Binding Year, UpdateSourceTrigger=PropertyChanged}" Watermark="{Binding YearWatermark}" />
+                                <TextBox Classes="pill-field" AutomationProperties.Name="{loc:T Metadata.Year}" Text="{Binding Year, UpdateSourceTrigger=PropertyChanged}" Watermark="{Binding YearWatermark}" />
                             </StackPanel>
 
                             <!-- Track x of y | Disc x of y -->
                             <StackPanel Grid.Row="3" Grid.Column="0" Spacing="4" Margin="0,0,0,16">
                                 <TextBlock Text="{loc:T Metadata.Track}" FontSize="12" Opacity="0.5" />
                                 <Grid ColumnDefinitions="*,Auto,*">
-                                    <TextBox Grid.Column="0" Classes="pill-field" Text="{Binding TrackNumber, UpdateSourceTrigger=PropertyChanged}" Watermark="{Binding TrackNumberWatermark}" />
+                                    <TextBox Grid.Column="0" Classes="pill-field" AutomationProperties.Name="{loc:T Metadata.Track}" Text="{Binding TrackNumber, UpdateSourceTrigger=PropertyChanged}" Watermark="{Binding TrackNumberWatermark}" />
                                     <TextBlock Grid.Column="1" Text="of" FontSize="12" Opacity="0.5" VerticalAlignment="Center" Margin="10,0" />
-                                    <TextBox Grid.Column="2" Classes="pill-field" Text="{Binding TrackCount, UpdateSourceTrigger=PropertyChanged}" Watermark="{Binding TrackCountWatermark}" />
+                                    <TextBox Grid.Column="2" Classes="pill-field" AutomationProperties.Name="{loc:T MetadataSearch.F.TrackCount}" Text="{Binding TrackCount, UpdateSourceTrigger=PropertyChanged}" Watermark="{Binding TrackCountWatermark}" />
                                 </Grid>
                             </StackPanel>
                             <StackPanel Grid.Row="3" Grid.Column="2" Spacing="4" Margin="0,0,0,16">
                                 <TextBlock Text="{loc:T Metadata.Disc}" FontSize="12" Opacity="0.5" />
                                 <Grid ColumnDefinitions="*,Auto,*">
-                                    <TextBox Grid.Column="0" Classes="pill-field" Text="{Binding DiscNumber, UpdateSourceTrigger=PropertyChanged}" Watermark="{Binding DiscNumberWatermark}" />
+                                    <TextBox Grid.Column="0" Classes="pill-field" AutomationProperties.Name="{loc:T Metadata.Disc}" Text="{Binding DiscNumber, UpdateSourceTrigger=PropertyChanged}" Watermark="{Binding DiscNumberWatermark}" />
                                     <TextBlock Grid.Column="1" Text="of" FontSize="12" Opacity="0.5" VerticalAlignment="Center" Margin="10,0" />
-                                    <TextBox Grid.Column="2" Classes="pill-field" Text="{Binding DiscCount, UpdateSourceTrigger=PropertyChanged}" Watermark="{Binding DiscCountWatermark}" />
+                                    <TextBox Grid.Column="2" Classes="pill-field" AutomationProperties.Name="{loc:T MetadataSearch.F.DiscCount}" Text="{Binding DiscCount, UpdateSourceTrigger=PropertyChanged}" Watermark="{Binding DiscCountWatermark}" />
                                 </Grid>
                             </StackPanel>
 
                             <!-- BPM | Play count -->
                             <StackPanel Grid.Row="4" Grid.Column="0" Spacing="4">
                                 <TextBlock Text="{loc:T Metadata.Bpm}" FontSize="12" Opacity="0.5" />
-                                <TextBox Classes="pill-field" Text="{Binding Bpm, UpdateSourceTrigger=PropertyChanged}" Watermark="{Binding BpmWatermark}" />
+                                <TextBox Classes="pill-field" AutomationProperties.Name="{loc:T Metadata.Bpm}" Text="{Binding Bpm, UpdateSourceTrigger=PropertyChanged}" Watermark="{Binding BpmWatermark}" />
                             </StackPanel>
                             <StackPanel Grid.Row="4" Grid.Column="2" Spacing="4">
                                 <TextBlock Text="{loc:T Metadata.PlayCount}" FontSize="12" Opacity="0.5" />
@@ -654,7 +668,7 @@
                         <Grid ColumnDefinitions="*,20,*" IsVisible="{Binding ShowTrackFields}">
                             <StackPanel Grid.Column="0" Spacing="4">
                                 <TextBlock Text="{loc:T Metadata.Performer}" FontSize="12" Opacity="0.5" />
-                                <TextBox Classes="pill-field" Text="{Binding Performer, UpdateSourceTrigger=PropertyChanged}" />
+                                <TextBox Classes="pill-field" AutomationProperties.Name="{loc:T Metadata.Performer}" Text="{Binding Performer, UpdateSourceTrigger=PropertyChanged}" />
                             </StackPanel>
                             <StackPanel Grid.Column="2" Spacing="6">
                                 <TextBlock Text="{loc:T Metadata.Rating}" FontSize="12" Opacity="0.5" />
@@ -678,6 +692,7 @@
                         <StackPanel Spacing="4">
                             <TextBlock Text="{loc:T Metadata.Comment}" FontSize="12" Opacity="0.5" />
                             <TextBox Classes="pill-field"
+                                     AutomationProperties.Name="{loc:T Metadata.Comment}"
                                      Text="{Binding Comment, UpdateSourceTrigger=PropertyChanged}" Watermark="{Binding CommentWatermark}" />
                         </StackPanel>
                     </StackPanel>
@@ -698,23 +713,23 @@
                         <Grid ColumnDefinitions="*,20,*" RowDefinitions="Auto,Auto,Auto">
                             <StackPanel Grid.Row="0" Grid.Column="0" Spacing="4" Margin="0,0,0,14">
                                 <TextBlock Text="{loc:T Metadata.TitleSort}" FontSize="12" Opacity="0.5" />
-                                <TextBox Classes="pill-field" Text="{Binding TitleSort}" />
+                                <TextBox Classes="pill-field" AutomationProperties.Name="{loc:T Metadata.TitleSort}" Text="{Binding TitleSort}" />
                             </StackPanel>
                             <StackPanel Grid.Row="0" Grid.Column="2" Spacing="4" Margin="0,0,0,14">
                                 <TextBlock Text="{loc:T Metadata.ArtistSort}" FontSize="12" Opacity="0.5" />
-                                <TextBox Classes="pill-field" Text="{Binding ArtistSort}" />
+                                <TextBox Classes="pill-field" AutomationProperties.Name="{loc:T Metadata.ArtistSort}" Text="{Binding ArtistSort}" />
                             </StackPanel>
                             <StackPanel Grid.Row="1" Grid.Column="0" Spacing="4" Margin="0,0,0,14">
                                 <TextBlock Text="{loc:T Metadata.AlbumSort}" FontSize="12" Opacity="0.5" />
-                                <TextBox Classes="pill-field" Text="{Binding AlbumSort}" />
+                                <TextBox Classes="pill-field" AutomationProperties.Name="{loc:T Metadata.AlbumSort}" Text="{Binding AlbumSort}" />
                             </StackPanel>
                             <StackPanel Grid.Row="1" Grid.Column="2" Spacing="4" Margin="0,0,0,14">
                                 <TextBlock Text="{loc:T Metadata.AlbumArtistSort}" FontSize="12" Opacity="0.5" />
-                                <TextBox Classes="pill-field" Text="{Binding AlbumArtistSort}" />
+                                <TextBox Classes="pill-field" AutomationProperties.Name="{loc:T Metadata.AlbumArtistSort}" Text="{Binding AlbumArtistSort}" />
                             </StackPanel>
                             <StackPanel Grid.Row="2" Grid.Column="0" Grid.ColumnSpan="3" Spacing="4">
                                 <TextBlock Text="{loc:T Metadata.ComposerSort}" FontSize="12" Opacity="0.5" />
-                                <TextBox Classes="pill-field" Text="{Binding ComposerSort}" />
+                                <TextBox Classes="pill-field" AutomationProperties.Name="{loc:T Metadata.ComposerSort}" Text="{Binding ComposerSort}" />
                             </StackPanel>
                         </Grid>
 
@@ -725,19 +740,19 @@
                         <Grid ColumnDefinitions="*,20,*" RowDefinitions="Auto,Auto">
                             <StackPanel Grid.Row="0" Grid.Column="0" Spacing="4" Margin="0,0,0,14">
                                 <TextBlock Text="{loc:T Metadata.Conductor}" FontSize="12" Opacity="0.5" />
-                                <TextBox Classes="pill-field" Text="{Binding Conductor}" />
+                                <TextBox Classes="pill-field" AutomationProperties.Name="{loc:T Metadata.Conductor}" Text="{Binding Conductor}" />
                             </StackPanel>
                             <StackPanel Grid.Row="0" Grid.Column="2" Spacing="4" Margin="0,0,0,14">
                                 <TextBlock Text="{loc:T Metadata.Lyricist}" FontSize="12" Opacity="0.5" />
-                                <TextBox Classes="pill-field" Text="{Binding Lyricist}" />
+                                <TextBox Classes="pill-field" AutomationProperties.Name="{loc:T Metadata.Lyricist}" Text="{Binding Lyricist}" />
                             </StackPanel>
                             <StackPanel Grid.Row="1" Grid.Column="0" Spacing="4" Margin="0,0,0,0">
                                 <TextBlock Text="{loc:T Metadata.PublisherLabel}" FontSize="12" Opacity="0.5" />
-                                <TextBox Classes="pill-field" Text="{Binding Publisher}" />
+                                <TextBox Classes="pill-field" AutomationProperties.Name="{loc:T Metadata.PublisherLabel}" Text="{Binding Publisher}" />
                             </StackPanel>
                             <StackPanel Grid.Row="1" Grid.Column="2" Spacing="4" Margin="0,0,0,0">
                                 <TextBlock Text="{loc:T Metadata.EncodedBy}" FontSize="12" Opacity="0.5" />
-                                <TextBox Classes="pill-field" Text="{Binding EncodedBy}" />
+                                <TextBox Classes="pill-field" AutomationProperties.Name="{loc:T Metadata.EncodedBy}" Text="{Binding EncodedBy}" />
                             </StackPanel>
                         </Grid>
 
@@ -748,15 +763,15 @@
                         <Grid ColumnDefinitions="*,16,*,16,*">
                             <StackPanel Grid.Column="0" Spacing="4" Margin="0,0,0,0">
                                 <TextBlock Text="{loc:T Metadata.ISRC}" FontSize="12" Opacity="0.5" />
-                                <TextBox Classes="pill-field" Text="{Binding Isrc}" />
+                                <TextBox Classes="pill-field" AutomationProperties.Name="{loc:T Metadata.ISRC}" Text="{Binding Isrc}" />
                             </StackPanel>
                             <StackPanel Grid.Column="2" Spacing="4" Margin="0,0,0,0">
                                 <TextBlock Text="{loc:T Metadata.CatalogNumber}" FontSize="12" Opacity="0.5" />
-                                <TextBox Classes="pill-field" Text="{Binding CatalogNumber}" />
+                                <TextBox Classes="pill-field" AutomationProperties.Name="{loc:T Metadata.CatalogNumber}" Text="{Binding CatalogNumber}" />
                             </StackPanel>
                             <StackPanel Grid.Column="4" Spacing="4" Margin="0,0,0,0">
                                 <TextBlock Text="{loc:T Metadata.BarcodeUPC}" FontSize="12" Opacity="0.5" />
-                                <TextBox Classes="pill-field" Text="{Binding Barcode}" />
+                                <TextBox Classes="pill-field" AutomationProperties.Name="{loc:T Metadata.BarcodeUPC}" Text="{Binding Barcode}" />
                             </StackPanel>
                         </Grid>
 
@@ -768,6 +783,7 @@
                             <StackPanel Grid.Row="0" Grid.Column="0" Spacing="4" Margin="0,0,0,14">
                                 <TextBlock Text="{loc:T Metadata.ITunesAdvisory}" FontSize="12" Opacity="0.5" />
                                 <ComboBox Classes="pill-field"
+                                          AutomationProperties.Name="{loc:T Metadata.ITunesAdvisory}"
                                           ItemsSource="{x:Static vm:MetadataViewModel.AdvisoryOptions}"
                                           SelectedItem="{Binding SelectedAdvisory}"
                                           HorizontalAlignment="Stretch">
@@ -788,23 +804,23 @@
                             </StackPanel>
                             <StackPanel Grid.Row="0" Grid.Column="2" Spacing="4" Margin="0,0,0,14">
                                 <TextBlock Text="{loc:T Metadata.Language}" FontSize="12" Opacity="0.5" />
-                                <TextBox Classes="pill-field" Text="{Binding Language}" />
+                                <TextBox Classes="pill-field" AutomationProperties.Name="{loc:T Metadata.Language}" Text="{Binding Language}" />
                             </StackPanel>
                             <StackPanel Grid.Row="1" Grid.Column="0" Spacing="4" Margin="0,0,0,14">
                                 <TextBlock Text="{loc:T Metadata.Mood}" FontSize="12" Opacity="0.5" />
-                                <TextBox Classes="pill-field" Text="{Binding Mood}" />
+                                <TextBox Classes="pill-field" AutomationProperties.Name="{loc:T Metadata.Mood}" Text="{Binding Mood}" />
                             </StackPanel>
                             <StackPanel Grid.Row="1" Grid.Column="2" Spacing="4" Margin="0,0,0,14">
                                 <TextBlock Text="{loc:T Metadata.ReleaseDate}" FontSize="12" Opacity="0.5" />
-                                <TextBox Classes="pill-field" Text="{Binding AdvReleaseDate}" />
+                                <TextBox Classes="pill-field" AutomationProperties.Name="{loc:T Metadata.ReleaseDate}" Text="{Binding AdvReleaseDate}" />
                             </StackPanel>
                             <StackPanel Grid.Row="2" Grid.Column="0" Grid.ColumnSpan="3" Spacing="4" Margin="0,0,0,14">
                                 <TextBlock Text="{loc:T Metadata.Description}" FontSize="12" Opacity="0.5" />
-                                <TextBox Classes="pill-field" Text="{Binding AdvDescription}" />
+                                <TextBox Classes="pill-field" AutomationProperties.Name="{loc:T Metadata.Description}" Text="{Binding AdvDescription}" />
                             </StackPanel>
                             <StackPanel Grid.Row="3" Grid.Column="0" Grid.ColumnSpan="3" Spacing="4">
                                 <TextBlock Text="{loc:T Metadata.Copyright}" FontSize="12" Opacity="0.5" />
-                                <TextBox Classes="pill-field" Text="{Binding Copyright}" />
+                                <TextBox Classes="pill-field" AutomationProperties.Name="{loc:T Metadata.Copyright}" Text="{Binding Copyright}" />
                             </StackPanel>
                         </Grid>
 
@@ -848,10 +864,12 @@
                                     <Grid ColumnDefinitions="*,8,2*,8,Auto" Margin="0,0,0,8">
                                         <TextBox Grid.Column="0"
                                                  Classes="pill-field"
+                                                 AutomationProperties.Name="{loc:T Metadata.Key}"
                                                  Text="{Binding Key}"
                                                  Watermark="{loc:T Metadata.Key}" />
                                         <TextBox Grid.Column="2"
                                                  Classes="pill-field"
+                                                 AutomationProperties.Name="{loc:T Metadata.Value}"
                                                  Text="{Binding Value}"
                                                  Watermark="{loc:T Metadata.Value}" />
                                         <!-- Vector ✕ (MenuLineClose): the "✕" character isn't in
@@ -859,6 +877,7 @@
                                         <Button Grid.Column="4"
                                                 Command="{Binding $parent[ItemsControl].((vm:MetadataViewModel)DataContext).RemoveCustomTagCommand}"
                                                 CommandParameter="{Binding}"
+                                                ToolTip.Tip="{loc:T Metadata.Remove}"
                                                 Width="30" Height="30"
                                                 Padding="0"
                                                 HorizontalContentAlignment="Center"
@@ -1143,6 +1162,7 @@
                                 Margin="18,0,0,0">
                         <Button x:Name="SearchAnimatedArtworkButton"
                                 Command="{Binding SearchAnimatedCoverCommand}"
+                                AutomationProperties.Name="{loc:T Metadata.SearchAnimatedArtwork}"
                                 Classes="accent-pill"
                                 HorizontalAlignment="Stretch"
                                 Padding="14,7"
@@ -1160,6 +1180,7 @@
                         <!-- Type an album name to search for, or paste a link to skip search -->
                         <StackPanel Spacing="4" IsVisible="{Binding !HasAnimatedCover}">
                             <TextBox Classes="pill-field"
+                                     AutomationProperties.Name="{loc:T Metadata.AlbumNameAppleMusic}"
                                      Text="{Binding AnimatedSearchInput, Mode=TwoWay}"
                                      Watermark="{loc:T Metadata.AlbumNameAppleMusic}"
                                      FontSize="12">
@@ -1387,6 +1408,7 @@
                                        FontWeight="SemiBold"
                                        VerticalAlignment="Center" />
                             <controls:LottieToggle IsChecked="{Binding HasCustomLyrics}"
+                                                   AutomationProperties.Name="{loc:T Metadata.Enable}"
                                                    VerticalAlignment="Center" />
                         </StackPanel>
                     </Grid>
@@ -1418,6 +1440,7 @@
                     </StackPanel>
 
                     <TextBox Classes="pill-area"
+                             AutomationProperties.Name="{loc:T Metadata.PlainLyrics}"
                              Text="{Binding Lyrics}"
                              AcceptsReturn="True"
                              TextWrapping="Wrap"
@@ -1485,6 +1508,7 @@
                                        FontWeight="SemiBold"
                                        VerticalAlignment="Center" />
                             <controls:LottieToggle IsChecked="{Binding HasCustomSyncedLyrics}"
+                                                   AutomationProperties.Name="{loc:T Metadata.Enable}"
                                                    VerticalAlignment="Center" />
                         </StackPanel>
                     </Grid>
@@ -1612,6 +1636,7 @@
 
                             <!-- Raw: untouched LRC text with timing tags -->
                             <TextBox IsVisible="{Binding #SyncedRawToggle.IsChecked}"
+                                     AutomationProperties.Name="{loc:T Metadata.SyncedLyrics}"
                                      Text="{Binding SyncedLyrics}"
                                      IsReadOnly="True"
                                      AcceptsReturn="True"
@@ -1695,6 +1720,7 @@
                                     Padding="12,4" CornerRadius="999" Cursor="Hand"
                                     FontWeight="SemiBold" FontSize="12"/>
                             <TextBox Text="{Binding ShiftAllSeconds, Mode=TwoWay}"
+                                     AutomationProperties.Name="{loc:T Metadata.SecondsShiftByTip}"
                                      Classes="pill-field"
                                      FontFamily="Consolas, Menlo, Monaco, Courier New, monospace"
                                      Width="64" MinHeight="0" Padding="10,6,10,4"
@@ -1757,6 +1783,7 @@
                                                                 Margin="0,3" />
                                                         <TextBox Grid.Column="1"
                                                                  Text="{Binding TimestampText, Mode=TwoWay, UpdateSourceTrigger=LostFocus}"
+                                                                 AutomationProperties.Name="{loc:T Metadata.TypeTimestampMmSsTip}"
                                                                  Watermark="--:--.--"
                                                                  FontFamily="Consolas, Menlo, Monaco, Courier New, monospace"
                                                                  FontSize="12"
@@ -1783,12 +1810,14 @@
                                                             <Button Classes="synced-nudge"
                                                                     Content="−"
                                                                     ToolTip.Tip="{loc:T Metadata.Nudge01sEarlierTip}"
+                                                                    AutomationProperties.Name="{loc:T Metadata.Nudge01sEarlierTip}"
                                                                     IsEnabled="{Binding HasTimestamp}"
                                                                     Command="{Binding $parent[Window].((vm:MetadataViewModel)DataContext).NudgeSyncedLineBackCommand}"
                                                                     CommandParameter="{Binding}" />
                                                             <Button Classes="synced-nudge"
                                                                     Content="+"
                                                                     ToolTip.Tip="{loc:T Metadata.Nudge01sLaterTip}"
+                                                                    AutomationProperties.Name="{loc:T Metadata.Nudge01sLaterTip}"
                                                                     IsEnabled="{Binding HasTimestamp}"
                                                                     Command="{Binding $parent[Window].((vm:MetadataViewModel)DataContext).NudgeSyncedLineForwardCommand}"
                                                                     CommandParameter="{Binding}" />
@@ -1827,6 +1856,7 @@
                         <StackPanel Grid.Column="0" Spacing="4">
                             <TextBlock Text="{loc:T Metadata.MediaKind}" FontSize="12" Opacity="0.5" />
                             <ComboBox Classes="pill-field"
+                                      AutomationProperties.Name="{loc:T Metadata.MediaKind}"
                                       ItemsSource="{x:Static vm:MetadataViewModel.AvailableMediaKinds}"
                                       SelectedItem="{Binding MediaKind}"
                                       HorizontalAlignment="Stretch" />
@@ -1835,6 +1865,7 @@
                         <StackPanel Grid.Column="2" Spacing="4">
                             <TextBlock Text="{loc:T Metadata.ReleaseType}" FontSize="12" Opacity="0.5" />
                             <ComboBox Classes="pill-field"
+                                      AutomationProperties.Name="{loc:T Metadata.ReleaseType}"
                                       ItemsSource="{x:Static vm:MetadataViewModel.AvailableReleaseTypes}"
                                       SelectedItem="{Binding ReleaseTypeOverride}"
                                       HorizontalAlignment="Stretch" />
@@ -1852,11 +1883,13 @@
                                 <CheckBox Classes="metadata-pill-checkbox"
                                           Grid.Column="0"
                                           IsChecked="{Binding HasStartTime}"
+                                          AutomationProperties.Name="{loc:T Metadata.Start}"
                                           Padding="0" Margin="0,0,8,0" MinWidth="0"
                                           VerticalAlignment="Center" />
                                 <TextBox Classes="pill-field"
                                          Grid.Column="1"
                                          Text="{Binding StartTime}"
+                                         AutomationProperties.Name="{loc:T Metadata.Start}"
                                          IsEnabled="{Binding HasStartTime}"
                                          VerticalAlignment="Center" />
                             </Grid>
@@ -1867,11 +1900,13 @@
                                 <CheckBox Classes="metadata-pill-checkbox"
                                           Grid.Column="0"
                                           IsChecked="{Binding HasStopTime}"
+                                          AutomationProperties.Name="{loc:T Metadata.Stop}"
                                           Padding="0" Margin="0,0,8,0" MinWidth="0"
                                           VerticalAlignment="Center" />
                                 <TextBox Classes="pill-field"
                                          Grid.Column="1"
                                          Text="{Binding StopTime}"
+                                         AutomationProperties.Name="{loc:T Metadata.Stop}"
                                          IsEnabled="{Binding HasStopTime}"
                                          VerticalAlignment="Center" />
                             </Grid>
@@ -1926,6 +1961,7 @@
                                     </Canvas>
                                     <Slider x:Name="VolumeAdjustSlider"
                                             Classes="volume-horizontal"
+                                            AutomationProperties.Name="{loc:T Metadata.VolumeAdjust}"
                                             Value="{Binding VolumeAdjust, Mode=TwoWay}"
                                             Minimum="-100" Maximum="100"
                                             HorizontalAlignment="Stretch"
@@ -1944,6 +1980,7 @@
                         <StackPanel Grid.Column="2" Spacing="4">
                             <TextBlock Text="{loc:T Metadata.Equalizer}" FontSize="12" Opacity="0.5" />
                             <ComboBox Classes="pill-field"
+                                      AutomationProperties.Name="{loc:T Metadata.Equalizer}"
                                       ItemsSource="{Binding EqPresetOptions}"
                                       SelectedItem="{Binding SelectedEqPreset}"
                                       HorizontalAlignment="Stretch" />
@@ -1959,6 +1996,7 @@
                         <TextBlock Text="{loc:T Metadata.TokensArtistAlbumartistAlbum}"
                                    FontSize="11" Opacity="0.55" TextWrapping="Wrap" />
                         <TextBox Classes="pill-field"
+                                 AutomationProperties.Name="{loc:T Metadata.RenameFilesByPattern}"
                                  Text="{Binding RenamePattern}"
                                  IsEnabled="{Binding ApplyRename}" />
                         <Border Background="#10FFFFFF" CornerRadius="8" Padding="10"

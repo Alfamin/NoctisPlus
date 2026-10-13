@@ -1349,6 +1349,8 @@ Saving replaces them with the lyrics on screen. A lyrics file Noctis didn't writ
   <data name="Metadata.UseWorkMovement" xml:space="preserve"><value>Use Work &amp; Movement</value><comment>Content in MetadataWindow.axaml</comment></data>
   <data name="Metadata.WorkName" xml:space="preserve"><value>work name</value><comment>Text in MetadataWindow.axaml</comment></data>
   <data name="Metadata.Movement" xml:space="preserve"><value>movement</value><comment>Text in MetadataWindow.axaml</comment></data>
+  <data name="Metadata.MovementCount" xml:space="preserve"><value>movement count</value><comment>Accessible name of the "of" box beside the movement number in MetadataWindow.axaml</comment></data>
+  <data name="Metadata.MovementTitle" xml:space="preserve"><value>movement title</value><comment>Accessible name of the movement title box in MetadataWindow.axaml (its visible label is just "title")</comment></data>
   <data name="Metadata.Album2" xml:space="preserve"><value>album</value><comment>Text in MetadataWindow.axaml</comment></data>
   <data name="Metadata.AlbumCompilation" xml:space="preserve"><value>Album is compilation</value><comment>Content in MetadataWindow.axaml</comment></data>
   <data name="Metadata.MarksContentAsExplicitTip" xml:space="preserve"><value>Marks the content as explicit (iTunes advisory tag). The Explicit Content setting uses this to skip songs.</value><comment>ToolTip.Tip in MetadataWindow.axaml</comment></data>
