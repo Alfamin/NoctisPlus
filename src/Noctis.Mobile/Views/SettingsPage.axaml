@@ -549,7 +549,11 @@
                             </StackPanel>
                         </StackPanel>
 
-                        <!-- Lyrics: the extra lines, then the text size. -->
+                        <!-- Lyrics: the desktop's lyrics display settings that the phone's lyrics
+                             page honours: the extra lines, the text size and the dimmed lines'
+                             floor, then joining split words. (The desktop's online sources,
+                             backgrounds, visualizer and fullscreen focus have nothing to act
+                             on here.) -->
                         <StackPanel Name="LyricsPane" Classes="grouped-content" IsVisible="{Binding ShowsLyricsPane}">
                             <StackPanel>
                                 <Border Name="LyricsCard" Classes="group-card">
@@ -563,22 +567,48 @@
                                                       IsChecked="{Binding Shell.Lyrics.ShowRomanization}">
                                             <TextBlock Classes="row-label" Text="Show Romanization" />
                                         </ToggleButton>
+                                        <Border Classes="row-separator plain" />
+                                        <ToggleButton Name="BackgroundVocalsSwitch" Classes="switch-row" AutomationProperties.Name="Show Background Vocals"
+                                                      IsChecked="{Binding Shell.Lyrics.ShowBackgroundVocals}">
+                                            <TextBlock Classes="row-label" Text="Show Background Vocals" />
+                                        </ToggleButton>
                                     </StackPanel>
                                 </Border>
-                                <TextBlock Classes="group-footnote" Text="Shown under a line when the song's lyrics have them." />
+                                <TextBlock Classes="group-footnote" Text="Shown under a line, in smaller text, when the song's lyrics have them." />
                             </StackPanel>
-                            <Border Name="LyricsSizeCard" Classes="group-card">
-                                <StackPanel>
-                                    <Grid Classes="setting-row" ColumnDefinitions="*,Auto">
-                                        <TextBlock Classes="row-label" Text="Text Size" />
-                                        <TextBlock Grid.Column="1" Name="LyricsSizeLabel" Classes="row-value"
-                                                   Text="{Binding LyricsTextScale, StringFormat={}{0:P0}}" />
-                                    </Grid>
-                                    <controls:SmoothSlider Name="LyricsSizeSlider" Classes="accent-slider" Margin="7,-12,7,6"
-                                                           Minimum="0.8" Maximum="1.6" Step="0.1" SteppedValue="{Binding LyricsTextScale}"
-                                                           AutomationProperties.Name="Lyrics text size" />
-                                </StackPanel>
-                            </Border>
+                            <StackPanel>
+                                <Border Name="LyricsSizeCard" Classes="group-card">
+                                    <StackPanel>
+                                        <Grid Classes="setting-row" ColumnDefinitions="*,Auto">
+                                            <TextBlock Classes="row-label" Text="Text Size" />
+                                            <TextBlock Grid.Column="1" Name="LyricsSizeLabel" Classes="row-value"
+                                                       Text="{Binding LyricsTextScale, StringFormat={}{0:P0}}" />
+                                        </Grid>
+                                        <controls:SmoothSlider Name="LyricsSizeSlider" Classes="accent-slider" Margin="7,-12,7,6"
+                                                               Minimum="0.8" Maximum="1.6" Step="0.1" SteppedValue="{Binding LyricsTextScale}"
+                                                               AutomationProperties.Name="Lyrics text size" />
+                                        <Border Classes="row-separator plain" />
+                                        <Grid Classes="setting-row" ColumnDefinitions="*,Auto">
+                                            <TextBlock Classes="row-label" Text="Minimum Line Opacity" />
+                                            <TextBlock Grid.Column="1" Name="LyricsOpacityLabel" Classes="row-value"
+                                                       Text="{Binding Shell.Lyrics.MinLineOpacity, StringFormat={}{0}%}" />
+                                        </Grid>
+                                        <controls:SmoothSlider Name="LyricsOpacitySlider" Classes="accent-slider" Margin="7,-12,7,6"
+                                                               Minimum="0" Maximum="60" Step="1" SteppedValue="{Binding Shell.Lyrics.MinLineOpacity}"
+                                                               AutomationProperties.Name="Minimum line opacity" />
+                                    </StackPanel>
+                                </Border>
+                                <TextBlock Classes="group-footnote" Text="Keeps every line faintly visible, so you can tap any line to jump there. 0% hides lines far from the current one." />
+                            </StackPanel>
+                            <StackPanel>
+                                <Border Classes="group-card">
+                                    <ToggleButton Name="JoinWordsSwitch" Classes="switch-row" AutomationProperties.Name="Join Split Words"
+                                                  IsChecked="{Binding Shell.Lyrics.JoinSplitWords}">
+                                        <TextBlock Classes="row-label" Text="Join Split Words" />
+                                    </ToggleButton>
+                                </Border>
+                                <TextBlock Classes="group-footnote" Text="Keeps words whole when TTML lyrics split them into syllables." />
+                            </StackPanel>
                         </StackPanel>
                     </Panel>
                 </ScrollViewer>

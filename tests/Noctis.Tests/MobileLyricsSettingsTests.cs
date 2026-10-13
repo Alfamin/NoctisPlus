@@ -24,6 +24,30 @@ public class MobileLyricsSettingsTests : IDisposable
     private readonly string _root = Path.Combine(Path.GetTempPath(), "NoctisTests", Guid.NewGuid().ToString("N"));
     public void Dispose() { try { Directory.Delete(_root, recursive: true); } catch { } }
 
+    private const string SplitWordTtml = """
+        <tt xmlns="http://www.w3.org/ns/ttml" xmlns:ttm="http://www.w3.org/ns/ttml#metadata">
+          <body><div>
+            <p begin="00:01.000" end="00:04.000">
+              <span begin="00:01.000" end="00:01.400">Is </span>
+              <span begin="00:01.400" end="00:01.800">a </span>
+              <span begin="00:01.800" end="00:02.100">com</span>
+              <span begin="00:02.100" end="00:02.400">pro</span>
+              <span begin="00:02.400" end="00:03.400">mise</span>
+            </p>
+            <p begin="00:05.000" end="00:07.000"><span begin="00:05.000" end="00:07.000">end</span></p>
+          </div></body>
+        </tt>
+        """;
+
+    private const string BackgroundTtml = """
+        <tt xmlns="http://www.w3.org/ns/ttml" xmlns:ttm="http://www.w3.org/ns/ttml#metadata">
+          <body><div>
+            <p begin="1.000" end="3.000"><span begin="1.000" end="2.000">lead</span><span ttm:role="x-bg"><span begin="2.000" end="2.800">(adlib)</span></span></p>
+            <p begin="4.000" end="5.000"><span begin="4.000" end="5.000">next</span></p>
+          </div></body>
+        </tt>
+        """;
+
     private static Track NewTrack(string name) =>
         new() { Id = Guid.NewGuid(), Title = name, FilePath = $"content://x/{name}", Duration = TimeSpan.FromSeconds(60) };
 
@@ -168,5 +192,146 @@ public class MobileLyricsSettingsTests : IDisposable
             Assert.Equal(saves + 1, vm.SaveCount);
             Assert.Equal(vm.LyricsTextScale, (await rig.Persistence.LoadSettingsAsync()).MobileLyricsTextScale, 6);
         });
+    }
+
+    /// <summary>Every row is wired: each switch flips its lyrics setting (and the top-level Lyrics
+    /// row's value), the opacity slider moves the floor.</summary>
+    [AvaloniaFact]
+    public async Task LyricsRows_DriveTheLyricsSettings()
+    {
+        using var rig = MobileFixtures.MakeRig();
+        await OnLyricsPage(rig, (page, vm, window) =>
+        {
+            var lyrics = rig.Shell.Lyrics;
+            MobileFixtures.Named<ToggleButton>(page, "TranslationSwitch").IsChecked = false;
+            Assert.False(lyrics.ShowTranslation);
+            Assert.Equal("Romanization on", vm.LyricsValue);
+            MobileFixtures.Named<ToggleButton>(page, "RomajiSwitch").IsChecked = false;
+            Assert.False(lyrics.ShowRomanization);
+            Assert.Equal("Off", vm.LyricsValue);
+            MobileFixtures.Named<ToggleButton>(page, "BackgroundVocalsSwitch").IsChecked = false;
+            Assert.False(lyrics.ShowBackgroundVocals);
+            MobileFixtures.Named<ToggleButton>(page, "JoinWordsSwitch").IsChecked = true;
+            Assert.True(lyrics.JoinSplitWords);
+
+            var opacity = MobileFixtures.Named<SmoothSlider>(page, "LyricsOpacitySlider");
+            Assert.Equal(AppSettings.LyricsMinLineOpacityDefault, opacity.SteppedValue);
+            opacity.Value = 40.4;
+            window.UpdateLayout();
+            Assert.Equal(40, lyrics.MinLineOpacity);
+            Assert.Equal("40%", MobileFixtures.Named<TextBlock>(page, "LyricsOpacityLabel").Text);
+            return Task.CompletedTask;
+        });
+    }
+
+    [AvaloniaFact]
+    public async Task BackgroundVocals_Switch_HidesTheAdlibRow_OnTheLyricsPage()
+    {
+        using var rig = MobileFixtures.MakeRig();
+        var files = new FakeTrackFiles { Sidecars = { [".ttml"] = BackgroundTtml } };
+        var lyrics = new LyricsPageViewModel(rig.Player, rig.Shell.Player, files, rig.Persistence, work => Task.FromResult(work()));
+        var shell = new ShellViewModel(rig.Shell.Library, rig.Shell.Player, lyrics) { TintFactory = rig.Shell.TintFactory };
+        var window = MobileFixtures.Mount(shell, out var view);
+        try
+        {
+            shell.Player.PlayTracks(new[] { NewTrack("bg") }, 0);
+            await WaitForAsync(() => lyrics.HasLyrics);
+            shell.OpenNowPlayingCommand.Execute(null);
+            shell.ToggleLyricsCommand.Execute(null);
+            window.UpdateLayout();
+            var page = MobileFixtures.Find<LyricsPage>(view);
+            TextBlock Adlib() => page.GetVisualDescendants().OfType<TextBlock>().First(t => t.Text == "(adlib)");
+            Assert.True(Adlib().IsEffectivelyVisible);
+
+            lyrics.ShowBackgroundVocals = false;
+            window.UpdateLayout();
+            Assert.False(Adlib().IsEffectivelyVisible);
+            Assert.Contains(page.GetVisualDescendants().OfType<TextBlock>(), t => t.Text == "lead" && t.IsEffectivelyVisible);
+
+            lyrics.ShowBackgroundVocals = true;
+            window.UpdateLayout();
+            Assert.True(Adlib().IsEffectivelyVisible);
+        }
+        finally
+        {
+            window.Close();
+        }
+    }
+
+    /// <summary>The new rows persist across a restart, read from the desktop's own settings keys.</summary>
+    [Fact]
+    public async Task BackgroundVocals_OpacityFloor_JoinWords_Persist()
+    {
+        var (vm, _, _, _, persistence) = MakeLyrics();
+        await vm.InitializeAsync();
+        Assert.True(vm.ShowBackgroundVocals);
+        Assert.Equal(AppSettings.LyricsMinLineOpacityDefault, vm.MinLineOpacity);
+        Assert.False(vm.JoinSplitWords);
+
+        vm.ShowBackgroundVocals = false;
+        await vm.PendingSave;
+        vm.JoinSplitWords = true;
+        await vm.PendingSave;
+        vm.MinLineOpacity = 33;
+        await vm.PendingSave;
+
+        var saved = await persistence.LoadSettingsAsync();
+        Assert.False(saved.LyricsShowBackgroundVocals);
+        Assert.True(saved.LyricsJoinSplitWords);
+        Assert.Equal(33, saved.LyricsMinLineOpacity);
+
+        var (again, _, _, _, _) = MakeLyrics();
+        await again.InitializeAsync();
+        Assert.False(again.ShowBackgroundVocals);
+        Assert.True(again.JoinSplitWords);
+        Assert.Equal(33, again.MinLineOpacity);
+    }
+
+    /// <summary>The floor re-applies to the shown lines at once (as the desktop's re-floor does), and
+    /// a slider drag across many steps writes settings.json once.</summary>
+    [Fact]
+    public async Task MinLineOpacity_RefloorsTheShownLines_AndADragSavesOnce()
+    {
+        var (vm, np, player, files, persistence) = MakeLyrics();
+        files.Sidecars[".ttml"] = MobileLyricsViewModelTests.IssueTtml;
+        await vm.InitializeAsync();
+        np.PlayTracks(new[] { NewTrack("a") }, 0);
+        await WaitForAsync(() => vm.HasLyrics);
+        player.RaisePositionChanged(TimeSpan.FromSeconds(2.5));
+        vm.OnFrame(1000);
+        Assert.Equal(0, vm.ActiveLineIndex);
+        Assert.Equal(0.55, vm.Lines[1].LineOpacity, 6);          // the ramp, one line away
+
+        var saves = vm.SaveCount;
+        for (var v = 16; v <= 60; v++) vm.MinLineOpacity = v;     // a drag up to 60 %
+        Assert.Equal(0.60, vm.Lines[1].LineOpacity, 6);
+        Assert.Equal(1.0, vm.Lines[0].LineOpacity, 6);
+        await vm.PendingSave;
+        Assert.Equal(saves + 1, vm.SaveCount);
+        Assert.Equal(60, (await persistence.LoadSettingsAsync()).LyricsMinLineOpacity);
+
+        vm.MinLineOpacity = 0;
+        Assert.Equal(0.55, vm.Lines[1].LineOpacity, 6);
+        await vm.PendingSave;
+    }
+
+    /// <summary>Joining changes the parse: flipping it re-reads the playing song's lyrics.</summary>
+    [Fact]
+    public async Task JoinSplitWords_Flipped_ReparsesThePlayingSong()
+    {
+        var (vm, np, _, files, _) = MakeLyrics();
+        files.Sidecars[".ttml"] = SplitWordTtml;
+        await vm.InitializeAsync();
+        np.PlayTracks(new[] { NewTrack("j") }, 0);
+        await WaitForAsync(() => vm.HasLyrics);
+        Assert.Equal("Is a com pro mise", vm.Lines[0].Text);
+
+        vm.JoinSplitWords = true;
+        await WaitForAsync(() => vm.Lines.Count > 0 && vm.Lines[0].Text == "Is a compromise");
+        Assert.Equal(3, vm.Lines[0].Words!.Count);
+
+        vm.JoinSplitWords = false;
+        await WaitForAsync(() => vm.Lines.Count > 0 && vm.Lines[0].Text == "Is a com pro mise");
+        await vm.PendingSave;
     }
 }

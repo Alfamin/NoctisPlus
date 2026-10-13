@@ -108,8 +108,14 @@
                                     </ItemsControl.ItemsPanel>
                                 </ItemsControl>
                                 <ItemsControl ItemsSource="{Binding BackgroundWords}" Classes="word-layer" Classes.active="{Binding IsActive}"
-                                              IsVisible="{Binding ShowBackgroundWords}" ItemTemplate="{StaticResource WordCell}"
+                                              ItemTemplate="{StaticResource WordCell}"
                                               FontSize="{Binding $parent[UserControl].((vm:ShellViewModel)DataContext).Lyrics.LayerFontSize}">
+                                    <ItemsControl.IsVisible>
+                                        <MultiBinding Converter="{x:Static BoolConverters.And}">
+                                            <Binding Path="ShowBackgroundWords" />
+                                            <Binding Path="$parent[UserControl].((vm:ShellViewModel)DataContext).Lyrics.ShowBackgroundVocals" />
+                                        </MultiBinding>
+                                    </ItemsControl.IsVisible>
                                     <ItemsControl.ItemsPanel>
                                         <ItemsPanelTemplate>
                                             <WrapPanel Orientation="Horizontal" />
