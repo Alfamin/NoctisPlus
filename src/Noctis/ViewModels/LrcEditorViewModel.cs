@@ -12,10 +12,12 @@ namespace Noctis.ViewModels;
 /// <summary>One editable lyric line in the LRC editor.</summary>
 public partial class LrcEditorLine : ObservableObject
 {
-    public LrcEditorLine(TimeSpan? timestamp, string text)
+    /// <param name="wordAnchor">The time the word tags in <paramref name="text"/> were written
+    /// for, when not <paramref name="timestamp"/> (a later stamp of a stack).</param>
+    public LrcEditorLine(TimeSpan? timestamp, string text, TimeSpan? wordAnchor = null)
     {
         _timestamp = timestamp;
-        _wordAnchor = timestamp;
+        _wordAnchor = wordAnchor ?? timestamp;
         Text = text;
         var (body, _) = EnhancedLrcParser.StripVoiceMarker(text);
         DisplayText = Regex.Replace(EnhancedLrcParser.StripWordTags(body), @"\s{2,}", " ").Trim();
@@ -114,8 +116,8 @@ public partial class LrcEditorViewModel : ViewModelBase
         var source = !string.IsNullOrWhiteSpace(syncedLyrics) ? syncedLyrics : plainLyrics;
         var (rows, background) = SplitBackgroundLines(source ?? string.Empty);
         for (var i = 0; i < rows.Count; i++)
-            Lines.Add(new LrcEditorLine(rows[i].Time, rows[i].Text) { BackgroundLines = background.GetValueOrDefault(i) });
-        var owners = CompanionOwners(rows);
+            Lines.Add(new LrcEditorLine(rows[i].Time, rows[i].Text, rows[i].WordAnchor) { BackgroundLines = background.GetValueOrDefault(i) });
+        var owners = CompanionOwners(rows.Select(r => (r.Time, r.Text)).ToList());
         for (var i = 0; i < owners.Length; i++)
             if (owners[i] >= 0) (Lines[owners[i]].Companions ??= new List<LrcEditorLine>()).Add(Lines[i]);
 
@@ -131,9 +133,18 @@ public partial class LrcEditorViewModel : ViewModelBase
     /// leading [mm:ss.xx] tag come back with a null timestamp; blank lines are
     /// dropped. A line with a stack of tags becomes one entry per tag.
     /// </summary>
-    public static List<(TimeSpan? Time, string Text)> ParseLrc(string text)
+    public static List<(TimeSpan? Time, string Text)> ParseLrc(string text) =>
+        ParseRows(text).Select(r => (r.Time, r.Text)).ToList();
+
+    /// <summary>
+    /// <see cref="ParseLrc"/> with each row's word anchor: the time its inline word tags were
+    /// written for. That is the row's own stamp, except in a stack ("[00:05.00][00:35.00]…"),
+    /// whose word tags are timed for its first stamp — the 0:35 row written out on its own
+    /// line kept 0:05 word times, and swept before it came up.
+    /// </summary>
+    private static List<(TimeSpan? Time, string Text, TimeSpan? WordAnchor)> ParseRows(string text)
     {
-        var result = new List<(TimeSpan?, string)>();
+        var result = new List<(TimeSpan?, string, TimeSpan?)>();
 
         // Drop the empty elements Split produces for a trailing newline before iterating,
         // so a file ending in "\n" doesn't gain phantom blank rows.
@@ -153,7 +164,7 @@ public partial class LrcEditorViewModel : ViewModelBase
             // any row collapsed every verse/chorus break in the saved text.
             if (string.IsNullOrWhiteSpace(line))
             {
-                result.Add((null, string.Empty));
+                result.Add((null, string.Empty, null));
                 continue;
             }
 
@@ -162,7 +173,7 @@ public partial class LrcEditorViewModel : ViewModelBase
             {
                 // Skip LRC metadata tags like [ar:], [ti:], [offset:]
                 if (Regex.IsMatch(line, @"^\s*\[[a-zA-Z]+:.*\]\s*$")) continue;
-                result.Add((null, line.Trim()));
+                result.Add((null, line.Trim(), null));
                 continue;
             }
 
@@ -178,7 +189,7 @@ public partial class LrcEditorViewModel : ViewModelBase
                 content = content[m.Length..];
             }
             foreach (var time in times)
-                result.Add((time, content.Trim()));
+                result.Add((time, content.Trim(), times[0]));
         }
         return result;
     }
@@ -190,7 +201,7 @@ public partial class LrcEditorViewModel : ViewModelBase
     /// background vocal (a TTML import's x-bg spans among them). Both editors — this one and
     /// Edit Info's Timestamp Lyrics — keep them on the row and write them back under it.
     /// </summary>
-    public static (List<(TimeSpan? Time, string Text)> Rows, Dictionary<int, List<string>> Background) SplitBackgroundLines(string text)
+    public static (List<(TimeSpan? Time, string Text, TimeSpan? WordAnchor)> Rows, Dictionary<int, List<string>> Background) SplitBackgroundLines(string text)
     {
         var background = new Dictionary<int, List<string>>();
         var kept = new List<string>();
@@ -210,7 +221,7 @@ public partial class LrcEditorViewModel : ViewModelBase
             if (string.IsNullOrWhiteSpace(line)) blanks++;
             else { rows += blanks + ParseLrc(line).Count; blanks = 0; }
         }
-        return (ParseLrc(string.Join('\n', kept)), background);
+        return (ParseRows(string.Join('\n', kept)), background);
     }
 
     /// <summary>

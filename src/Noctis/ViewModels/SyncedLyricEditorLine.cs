@@ -18,10 +18,12 @@ public partial class SyncedLyricEditorLine : ObservableObject
     /// <summary>Raised on any user edit so the owner can regenerate the LRC text.</summary>
     public event Action? Changed;
 
-    public SyncedLyricEditorLine(TimeSpan? timestamp, string text)
+    /// <param name="wordAnchor">The time the word tags in <paramref name="text"/> were written
+    /// for, when not <paramref name="timestamp"/> (a later stamp of a stack).</param>
+    public SyncedLyricEditorLine(TimeSpan? timestamp, string text, TimeSpan? wordAnchor = null)
     {
         _timestamp = timestamp;
-        _wordAnchor = timestamp;
+        _wordAnchor = wordAnchor ?? timestamp;
         Text = text;
         // Duet voice markers ("v1:"/"v2:"/"v3:") are layout syntax, not lyric text —
         // strip them for display like the word tags; Save round-trips the raw Text.

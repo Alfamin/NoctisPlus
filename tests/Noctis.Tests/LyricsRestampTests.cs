@@ -253,4 +253,36 @@ public class LyricsRestampTests : IDisposable
 
         Assert.Equal(new TimeSpan?[] { S(1.1), S(1), S(1), S(3) }, vm.SyncedLyricLines.Select(l => l.Timestamp));
     }
+
+    // ── Bug: a stack of stamps on a word-timed line left the later rows' words at the first time ──
+
+    // "[a][b]words": the same words sung at both times, word tags written for the first.
+    private const string Stacked =
+        "[00:05.00][00:35.00]<00:05.00>Made <00:05.50>up<00:06.00>\n" +
+        "[00:40.00]End";
+
+    [Fact]
+    public async Task EditInfo_TouchingAStackedWordTimedLine_TimesEachRowsWordsAtItsOwnStamp()
+    {
+        // The editor splits the stack into one row per stamp and any touch writes them out one
+        // per line; the 0:35 row kept word tags timed for 0:05, so it swept before it came up.
+        var vm = await EditInfo(Stacked);
+        vm.SyncedLyricLines[^1].Nudge(forward: true);
+
+        Assert.Contains("[00:35.00]<00:35.00>Made <00:35.50>up<00:36.00>", vm.SyncedLyrics);
+        var lines = Parsed(vm.SyncedLyrics);
+        Assert.Equal(new[] { S(35), S(35.5) }, lines[1].Words!.Select(w => w.Start));
+    }
+
+    [AvaloniaFact]
+    public async Task TapSync_SavingAStackedWordTimedLine_TimesEachRowsWordsAtItsOwnStamp()
+    {
+        var (editor, _) = TapSync(Stacked);
+        editor.NudgeForwardCommand.Execute(editor.Lines[1]);
+
+        var lines = await SaveAndRead(editor);
+
+        Assert.Equal(new[] { S(5), S(5.5) }, lines[0].Words!.Select(w => w.Start));
+        Assert.Equal(new[] { S(35.1), S(35.6) }, lines[1].Words!.Select(w => w.Start));
+    }
 }

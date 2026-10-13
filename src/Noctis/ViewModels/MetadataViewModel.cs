@@ -2020,11 +2020,11 @@ public partial class MetadataViewModel : ViewModelBase
         var (rows, background) = LrcEditorViewModel.SplitBackgroundLines(source ?? string.Empty);
         for (var i = 0; i < rows.Count; i++)
         {
-            var line = new SyncedLyricEditorLine(rows[i].Time, rows[i].Text) { BackgroundLines = background.GetValueOrDefault(i) };
+            var line = new SyncedLyricEditorLine(rows[i].Time, rows[i].Text, rows[i].WordAnchor) { BackgroundLines = background.GetValueOrDefault(i) };
             line.Changed += OnSyncedLineChanged;
             SyncedLyricLines.Add(line);
         }
-        var owners = LrcEditorViewModel.CompanionOwners(rows);
+        var owners = LrcEditorViewModel.CompanionOwners(rows.Select(r => (r.Time, r.Text)).ToList());
         for (var i = 0; i < owners.Length; i++)
             if (owners[i] >= 0) (SyncedLyricLines[owners[i]].Companions ??= new List<SyncedLyricEditorLine>()).Add(SyncedLyricLines[i]);
 
