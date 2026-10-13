@@ -2036,9 +2036,9 @@ public partial class MetadataViewModel : ViewModelBase
     {
         SyncedLyrics = string.Join("\n", SyncedLyricLines.Select(l =>
             (l.Timestamp is { } t
-                ? $"[{LrcEditorViewModel.FormatTimestamp(t)}]{l.Text}"
-                : l.Text)
-            + (l.BackgroundLines is { Count: > 0 } bg ? "\n" + string.Join("\n", bg) : string.Empty)));
+                ? $"[{LrcEditorViewModel.FormatTimestamp(t)}]{l.SavedText}"
+                : l.SavedText)
+            + (l.SavedBackgroundLines is { Count: > 0 } bg ? "\n" + string.Join("\n", bg) : string.Empty)));
 
         // Manually timing lines counts as having custom synced lyrics. Save gates
         // the synced write on HasCustomSyncedLyrics, which stays false when the

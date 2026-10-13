@@ -3,6 +3,7 @@ using System.Text;
 using System.Text.RegularExpressions;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
+using Noctis.Helpers;
 using Noctis.Models;
 using Noctis.Services;
 
@@ -14,10 +15,14 @@ public partial class LrcEditorLine : ObservableObject
     public LrcEditorLine(TimeSpan? timestamp, string text)
     {
         _timestamp = timestamp;
+        _wordAnchor = timestamp;
         Text = text;
         var (body, _) = EnhancedLrcParser.StripVoiceMarker(text);
         DisplayText = Regex.Replace(EnhancedLrcParser.StripWordTags(body), @"\s{2,}", " ").Trim();
     }
+
+    // The stamp the row's word tags were timed against: a re-stamp moves them by the difference.
+    private readonly TimeSpan? _wordAnchor;
 
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(TimestampLabel))]
@@ -29,6 +34,13 @@ public partial class LrcEditorLine : ObservableObject
     /// <summary>The "[bg: …]" background-vocal lines written under this line. They have no row
     /// of their own; save writes them back after this line.</summary>
     public IReadOnlyList<string>? BackgroundLines { get; init; }
+
+    /// <summary><see cref="Text"/> as saved: its word tags moved as far as its stamp was.</summary>
+    public string SavedText => LrcEditorViewModel.WordsAtStamp(Text, _wordAnchor, Timestamp);
+
+    /// <summary><see cref="BackgroundLines"/> as saved: their word tags moved with the line.</summary>
+    public IReadOnlyList<string>? SavedBackgroundLines =>
+        BackgroundLines?.Select(b => LrcEditorViewModel.WordsAtStamp(b, _wordAnchor, Timestamp)).ToList();
 
     /// <summary>
     /// Row display: duet voice markers ("v1:"/"v2:") and inline enhanced-LRC word
@@ -185,6 +197,15 @@ public partial class LrcEditorViewModel : ViewModelBase
         return (ParseLrc(string.Join('\n', kept)), background);
     }
 
+    /// <summary>
+    /// A word-timed line's text once its stamp moved from <paramref name="anchor"/> to
+    /// <paramref name="stamp"/>: every "&lt;mm:ss.xx&gt;" word tag moved by the same amount
+    /// (clamped at zero). Re-stamping moved only the "[mm:ss.xx]", so after save the words
+    /// swept before the line came up, or after a gap. Unchanged when either time is missing.
+    /// </summary>
+    public static string WordsAtStamp(string text, TimeSpan? anchor, TimeSpan? stamp) =>
+        anchor is { } from && stamp is { } to ? LyricsTextHelper.ShiftWordTimestamps(text, to - from) : text;
+
     private static TimeSpan ToTime(Match match)
     {
         var minutes = int.Parse(match.Groups[1].Value);
@@ -310,9 +331,9 @@ public partial class LrcEditorViewModel : ViewModelBase
         // A line's "[bg: …]" vocals go out right under it, wherever the time sort puts it.
         var content = Lines
             .Where(l => !string.IsNullOrWhiteSpace(l.Text))
-            .Select(l => (l.Timestamp, l.BackgroundLines is { Count: > 0 } bg
-                ? l.Text + Environment.NewLine + string.Join(Environment.NewLine, bg)
-                : l.Text))
+            .Select(l => (l.Timestamp, l.SavedBackgroundLines is { Count: > 0 } bg
+                ? l.SavedText + Environment.NewLine + string.Join(Environment.NewLine, bg)
+                : l.SavedText))
             .ToList();
 
         if (!content.Any(l => l.Timestamp.HasValue))

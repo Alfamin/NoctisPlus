@@ -72,23 +72,39 @@ public static class LyricsTextHelper
     public static string ShiftAllTimestamps(string? lrc, TimeSpan offset)
     {
         if (string.IsNullOrEmpty(lrc) || offset == TimeSpan.Zero) return lrc ?? string.Empty;
+        return AnyTimeTagRegex.Replace(lrc, m => ShiftTag(m, offset));
+    }
 
-        return AnyTimeTagRegex.Replace(lrc, m =>
+    // Inline word tags only (<mm:ss.xx>), with the same groups as AnyTimeTagRegex.
+    private static readonly Regex WordTimeTagRegex =
+        new(@"(?<open><)(?<min>\d{1,3}):(?<sec>\d{2})(?:[.:](?<frac>\d{1,3}))?(?<close>>)", RegexOptions.Compiled);
+
+    /// <summary>
+    /// Moves the inline word tags (&lt;mm:ss.xx&gt;) in one line of LRC by <paramref name="offset"/>,
+    /// leaving its "[mm:ss.xx]" stamp alone: the words of a line whose stamp an editor moved
+    /// (a "[bg: …]" line's words too). Clamped at zero, which keeps the words in order.
+    /// </summary>
+    public static string ShiftWordTimestamps(string? text, TimeSpan offset)
+    {
+        if (string.IsNullOrEmpty(text) || offset == TimeSpan.Zero) return text ?? string.Empty;
+        return WordTimeTagRegex.Replace(text, m => ShiftTag(m, offset));
+    }
+
+    private static string ShiftTag(Match m, TimeSpan offset)
+    {
+        var minutes = int.Parse(m.Groups["min"].Value);
+        var seconds = int.Parse(m.Groups["sec"].Value);
+        var fracText = m.Groups["frac"].Value;
+        var millis = fracText.Length switch
         {
-            var minutes = int.Parse(m.Groups["min"].Value);
-            var seconds = int.Parse(m.Groups["sec"].Value);
-            var fracText = m.Groups["frac"].Value;
-            var millis = fracText.Length switch
-            {
-                0 => 0,
-                1 => int.Parse(fracText) * 100,
-                2 => int.Parse(fracText) * 10,
-                _ => int.Parse(fracText[..3]),
-            };
-            var time = new TimeSpan(0, 0, minutes, seconds, millis) + offset;
-            if (time < TimeSpan.Zero) time = TimeSpan.Zero;
-            return $"{m.Groups["open"].Value}{(int)time.TotalMinutes:00}:{time.Seconds:00}.{time.Milliseconds / 10:00}{m.Groups["close"].Value}";
-        });
+            0 => 0,
+            1 => int.Parse(fracText) * 100,
+            2 => int.Parse(fracText) * 10,
+            _ => int.Parse(fracText[..3]),
+        };
+        var time = new TimeSpan(0, 0, minutes, seconds, millis) + offset;
+        if (time < TimeSpan.Zero) time = TimeSpan.Zero;
+        return $"{m.Groups["open"].Value}{(int)time.TotalMinutes:00}:{time.Seconds:00}.{time.Milliseconds / 10:00}{m.Groups["close"].Value}";
     }
 
     public static string StripTimestamps(string? lrcContent)

@@ -21,6 +21,7 @@ public partial class SyncedLyricEditorLine : ObservableObject
     public SyncedLyricEditorLine(TimeSpan? timestamp, string text)
     {
         _timestamp = timestamp;
+        _wordAnchor = timestamp;
         Text = text;
         // Duet voice markers ("v1:"/"v2:"/"v3:") are layout syntax, not lyric text —
         // strip them for display like the word tags; Save round-trips the raw Text.
@@ -35,6 +36,16 @@ public partial class SyncedLyricEditorLine : ObservableObject
     /// <summary>The "[bg: …]" background-vocal lines written under this line. They have no row
     /// of their own; the text rebuilt from the rows writes them back after this line.</summary>
     public IReadOnlyList<string>? BackgroundLines { get; init; }
+
+    // The stamp the row's word tags were timed against: a re-stamp moves them by the difference.
+    private readonly TimeSpan? _wordAnchor;
+
+    /// <summary><see cref="Text"/> as written back: its word tags moved as far as its stamp was.</summary>
+    public string SavedText => LrcEditorViewModel.WordsAtStamp(Text, _wordAnchor, Timestamp);
+
+    /// <summary><see cref="BackgroundLines"/> as written back: their word tags moved with the line.</summary>
+    public IReadOnlyList<string>? SavedBackgroundLines =>
+        BackgroundLines?.Select(b => LrcEditorViewModel.WordsAtStamp(b, _wordAnchor, Timestamp)).ToList();
 
     /// <summary>
     /// Lyric text with inline enhanced-LRC word tags (&lt;mm:ss.xx&gt;) stripped, so
