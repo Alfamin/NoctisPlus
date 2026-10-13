@@ -246,6 +246,15 @@ public static class TtmlParser
         var lineText = text.ToString().Trim();
         var bgLineText = bgText.ToString().Trim();
 
+        // Untimed text ahead of the first timed span (mixed content) is a word of its own from
+        // the line's begin, like an ELRC line's untagged first word. The word row replaces the
+        // line text on screen, so text left out of it was never shown.
+        if (words.Count > 0 && layers.LeadText is { } lead && lead.Trim().Length > 0)
+        {
+            var first = words[0].Start;
+            words.Insert(0, new WordTiming { Text = lead.TrimStart(), Start = start is { } s && s < first ? s : first, End = first });
+        }
+
         // Too many words to be a real karaoke line (each realizes its own cell): keep the
         // text, drop word timing. An oversized background row is dropped, as in
         // EnhancedLrcParser.AppendBackground.
@@ -548,6 +557,7 @@ public static class TtmlParser
                         var wordText = el.Value;
                         if (wordText.Length > 0)
                         {
+                            if (!isBg && words.Count == 0) layers.LeadText ??= text.ToString();
                             spanText.Append(wordText);
                             spanWords.Add(new WordTiming
                             {
@@ -581,6 +591,8 @@ public static class TtmlParser
     {
         public string? Translation;
         public string? Romanization;
+        /// <summary>The line text written before its first timed word (often empty).</summary>
+        public string? LeadText;
     }
 
     private static LayerRole? AuxiliaryRole(XElement el)
