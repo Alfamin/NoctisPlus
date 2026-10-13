@@ -281,9 +281,12 @@
             <Setter Property="Height" Value="26" />
             <Setter Property="Template">
                 <ControlTemplate>
+                    <!-- A hairline rim and a firmer shadow: the white thumb on Light's white
+                         card was white on white, only a faint shadow showing it. -->
                     <Border Width="{TemplateBinding Width}" Height="{TemplateBinding Height}"
                             Background="{TemplateBinding Background}" CornerRadius="999"
-                            BoxShadow="0 2 6 0 #33000000" />
+                            BorderBrush="{DynamicResource PhoneChromeOutlineBrush}" BorderThickness="1"
+                            BoxShadow="0 1 5 0 #4D000000" />
                 </ControlTemplate>
             </Setter>
         </Style>
