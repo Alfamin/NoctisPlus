@@ -939,12 +939,16 @@
              under it from both sides; on a dimmed slider (parent off) the see-through thumb showed
              those overlapping ends, so the slider looked broken apart. Exactly edge-to-edge left a
              notch at each join instead (an 8px bar's corners sit 0.94px outside the 18px circle),
-             so 1px: the corners land on the circle, and the sliver under it is too thin to show. -->
+             so 1px: the corners land on the circle, and the sliver under it is too thin to show.
+             The bar's outer ends start half a thumb in (10-12): at the minimum the fill still
+             peeked out left of the thumb as a little red square, and at the maximum the track
+             right of it. Starting at the thumb's centre at either end, the bar is always
+             under the thumb there, at any display scaling. -->
         <Style Selector="Slider.accent-slider /template/ RepeatButton#PART_DecreaseButton">
-            <Setter Property="Margin" Value="0,0,-1,0"/>
+            <Setter Property="Margin" Value="9,0,-1,0"/>
         </Style>
         <Style Selector="Slider.accent-slider /template/ RepeatButton#PART_IncreaseButton">
-            <Setter Property="Margin" Value="-1,0,0,0"/>
+            <Setter Property="Margin" Value="-1,0,9,0"/>
         </Style>
         <Style Selector="Slider.accent-slider /template/ RepeatButton /template/ Border">
             <Setter Property="Background" Value="{DynamicResource SystemControlHighlightAccentBrush}"/>
@@ -2424,9 +2428,9 @@
                                    FontSize="12" Opacity="0.5" TextWrapping="Wrap"/>
                     </StackPanel>
                     <Grid ColumnDefinitions="*,Auto">
-                        <Slider x:Name="AlbumPageTintStrengthSlider" Grid.Column="0" Classes="accent-slider"
-                                Minimum="0" Maximum="100" TickFrequency="1" IsSnapToTickEnabled="True"
-                                Value="{Binding AlbumPageTintStrength, Mode=TwoWay}" VerticalAlignment="Center"
+                        <controls:SmoothSlider x:Name="AlbumPageTintStrengthSlider" Grid.Column="0" Classes="accent-slider" Step="1"
+                                Minimum="0" Maximum="100"
+                                SteppedValue="{Binding AlbumPageTintStrength, Mode=TwoWay}" VerticalAlignment="Center"
                                 DoubleTapped="OnAlbumPageTintStrengthSliderDoubleTapped"/>
                         <TextBlock Grid.Column="1" Text="{Binding AlbumPageTintStrength, StringFormat='{}{0}%'}" FontSize="12" Opacity="0.7"
                                    VerticalAlignment="Center" Margin="12,0,0,0" MinWidth="36" TextAlignment="Right"/>
@@ -2976,24 +2980,24 @@
                     <StackPanel Spacing="8" Margin="0,12,0,0">
                         <Grid ColumnDefinitions="110,*,Auto">
                             <TextBlock Grid.Column="0" Text="{loc:T Settings.DriftMovement}" FontSize="12" Opacity="0.7" VerticalAlignment="Center"/>
-                            <Slider Grid.Column="1" Classes="accent-slider" Minimum="0" Maximum="300" TickFrequency="1" IsSnapToTickEnabled="True"
-                                    Value="{Binding LyricsDriftMovement, Mode=TwoWay}" VerticalAlignment="Center"
+                            <controls:SmoothSlider Grid.Column="1" Classes="accent-slider" Step="1" Minimum="0" Maximum="300"
+                                    SteppedValue="{Binding LyricsDriftMovement, Mode=TwoWay}" VerticalAlignment="Center"
                                     DoubleTapped="OnDriftMovementSliderDoubleTapped"/>
                             <TextBlock Grid.Column="2" Text="{Binding LyricsDriftMovement, StringFormat='{}{0}%'}" FontSize="12" Opacity="0.7"
                                        VerticalAlignment="Center" Margin="12,0,0,0" MinWidth="36" TextAlignment="Right"/>
                         </Grid>
                         <Grid ColumnDefinitions="110,*,Auto">
                             <TextBlock Grid.Column="0" Text="{loc:T Settings.DriftSaturation}" FontSize="12" Opacity="0.7" VerticalAlignment="Center"/>
-                            <Slider Grid.Column="1" Classes="accent-slider" Minimum="0" Maximum="200" TickFrequency="1" IsSnapToTickEnabled="True"
-                                    Value="{Binding LyricsDriftSaturation, Mode=TwoWay}" VerticalAlignment="Center"
+                            <controls:SmoothSlider Grid.Column="1" Classes="accent-slider" Step="1" Minimum="0" Maximum="200"
+                                    SteppedValue="{Binding LyricsDriftSaturation, Mode=TwoWay}" VerticalAlignment="Center"
                                     DoubleTapped="OnDriftSaturationSliderDoubleTapped"/>
                             <TextBlock Grid.Column="2" Text="{Binding LyricsDriftSaturation, StringFormat='{}{0}%'}" FontSize="12" Opacity="0.7"
                                        VerticalAlignment="Center" Margin="12,0,0,0" MinWidth="36" TextAlignment="Right"/>
                         </Grid>
                         <Grid ColumnDefinitions="110,*,Auto">
                             <TextBlock Grid.Column="0" Text="{loc:T Settings.DriftBlur}" FontSize="12" Opacity="0.7" VerticalAlignment="Center"/>
-                            <Slider Grid.Column="1" Classes="accent-slider" Minimum="0" Maximum="200" TickFrequency="1" IsSnapToTickEnabled="True"
-                                    Value="{Binding LyricsDriftBlur, Mode=TwoWay}" VerticalAlignment="Center"
+                            <controls:SmoothSlider Grid.Column="1" Classes="accent-slider" Step="1" Minimum="0" Maximum="200"
+                                    SteppedValue="{Binding LyricsDriftBlur, Mode=TwoWay}" VerticalAlignment="Center"
                                     DoubleTapped="OnDriftBlurSliderDoubleTapped"/>
                             <TextBlock Grid.Column="2" Text="{Binding LyricsDriftBlur, StringFormat='{}{0}%'}" FontSize="12" Opacity="0.7"
                                        VerticalAlignment="Center" Margin="12,0,0,0" MinWidth="36" TextAlignment="Right"/>
@@ -3005,15 +3009,15 @@
                     <StackPanel Spacing="8" Margin="0,12,0,0">
                         <Grid ColumnDefinitions="110,*,Auto">
                             <TextBlock Grid.Column="0" Text="{loc:T Settings.KawarpWarp}" FontSize="12" Opacity="0.7" VerticalAlignment="Center"/>
-                            <Slider Grid.Column="1" Classes="accent-slider" Minimum="0" Maximum="3" TickFrequency="0.1" IsSnapToTickEnabled="True"
-                                    Value="{Binding LyricsKawarpWarp, Mode=TwoWay}" VerticalAlignment="Center"/>
+                            <controls:SmoothSlider Grid.Column="1" Classes="accent-slider" Step="0.1" Minimum="0" Maximum="3"
+                                    SteppedValue="{Binding LyricsKawarpWarp, Mode=TwoWay}" VerticalAlignment="Center"/>
                             <TextBlock Grid.Column="2" Text="{Binding LyricsKawarpWarp, StringFormat='{}{0:0.0}'}" FontSize="12" Opacity="0.7"
                                        VerticalAlignment="Center" Margin="12,0,0,0" MinWidth="28" TextAlignment="Right"/>
                         </Grid>
                         <Grid ColumnDefinitions="110,*,Auto">
                             <TextBlock Grid.Column="0" Text="{loc:T Settings.KawarpBlur}" FontSize="12" Opacity="0.7" VerticalAlignment="Center"/>
-                            <Slider Grid.Column="1" Classes="accent-slider" Minimum="1" Maximum="16" TickFrequency="1" IsSnapToTickEnabled="True"
-                                    Value="{Binding LyricsKawarpBlur, Mode=TwoWay}" VerticalAlignment="Center"/>
+                            <controls:SmoothSlider Grid.Column="1" Classes="accent-slider" Step="1" Minimum="1" Maximum="16"
+                                    SteppedValue="{Binding LyricsKawarpBlur, Mode=TwoWay}" VerticalAlignment="Center"/>
                             <TextBlock Grid.Column="2" Text="{Binding LyricsKawarpBlur}" FontSize="12" Opacity="0.7"
                                        VerticalAlignment="Center" Margin="12,0,0,0" MinWidth="28" TextAlignment="Right"/>
                         </Grid>
@@ -3114,8 +3118,8 @@
                         <TextBlock Text="{loc:T Settings.LyricsMinLineOpacityHint}"
                                    FontSize="12" Opacity="0.5" TextWrapping="Wrap"/>
                     </StackPanel>
-                    <Slider x:Name="LyricsMinLineOpacitySlider" Grid.Column="1" Classes="accent-slider" Minimum="0" Maximum="60" TickFrequency="1" IsSnapToTickEnabled="True"
-                            Value="{Binding LyricsMinLineOpacity, Mode=TwoWay}" VerticalAlignment="Center" Margin="16,0,0,0"
+                    <controls:SmoothSlider x:Name="LyricsMinLineOpacitySlider" Grid.Column="1" Classes="accent-slider" Step="1" Minimum="0" Maximum="60"
+                            SteppedValue="{Binding LyricsMinLineOpacity, Mode=TwoWay}" VerticalAlignment="Center" Margin="16,0,0,0"
                             DoubleTapped="OnLyricsMinLineOpacitySliderDoubleTapped"/>
                     <TextBlock Grid.Column="2" Text="{Binding LyricsMinLineOpacity, StringFormat='{}{0}%'}" FontSize="12" Opacity="0.7"
                                VerticalAlignment="Center" Margin="12,0,0,0" MinWidth="36" TextAlignment="Right"/>
@@ -3488,11 +3492,10 @@
                         <StackPanel Classes="sub-setting" Spacing="6" Margin="2,10,0,0">
                             <TextBlock Text="{loc:T Settings.FadeDuration}" FontSize="13" FontWeight="SemiBold"/>
                             <Grid ColumnDefinitions="*,Auto">
-                                <Slider Grid.Column="0"
-                                        Classes="accent-slider"
+                                <controls:SmoothSlider Grid.Column="0"
+                                        Classes="accent-slider" Step="50"
                                         Minimum="100" Maximum="2000"
-                                        TickFrequency="50" IsSnapToTickEnabled="True"
-                                        Value="{Binding PlayPauseFadeMs, Mode=TwoWay}"
+                                        SteppedValue="{Binding PlayPauseFadeMs, Mode=TwoWay}"
                                         VerticalAlignment="Center"/>
                                 <TextBlock Grid.Column="1"
                                            Text="{Binding PlayPauseFadeMs, StringFormat='{}{0:0} ms'}"

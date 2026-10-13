@@ -158,7 +158,9 @@ public class AlbumPageTintStrengthTests : IDisposable
             Assert.NotNull(slider);
             Assert.Equal(0, slider.Minimum);
             Assert.Equal(100, slider.Maximum);
-            Assert.True(slider.IsSnapToTickEnabled);
+            // Whole percents for the setting, a gliding thumb (10-12).
+            Assert.Equal(1, Assert.IsType<Noctis.Controls.SmoothSlider>(slider).Step);
+            Assert.False(slider.IsSnapToTickEnabled);
             var fold = slider.GetLogicalAncestors().OfType<CollapsibleContent>().First();
             Assert.False(fold.IsOpen);
 
