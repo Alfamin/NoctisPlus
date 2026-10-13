@@ -224,6 +224,7 @@
                                              so the swatch keeps its original resting position. -->
                                         <controls:ColorPickerFlyout Grid.Column="0"
                                                                     Hex="{Binding MainHex, Mode=TwoWay}"
+                                                                    AutomationProperties.Name="{loc:T ThemeEditor.MainBackground}"
                                                                     SwatchSize="26"
                                                                     Margin="-3"
                                                                     VerticalAlignment="Center"/>
@@ -240,6 +241,7 @@
                                     <Grid ColumnDefinitions="Auto,*,Auto" Height="44">
                                         <controls:ColorPickerFlyout Grid.Column="0"
                                                                     Hex="{Binding SidebarHex, Mode=TwoWay}"
+                                                                    AutomationProperties.Name="{loc:T ThemeEditor.SidebarSelection}"
                                                                     SwatchSize="26"
                                                                     Margin="-3"
                                                                     VerticalAlignment="Center"/>
@@ -256,6 +258,7 @@
                                     <Grid ColumnDefinitions="Auto,*,Auto" Height="44">
                                         <controls:ColorPickerFlyout Grid.Column="0"
                                                                     Hex="{Binding AccentHex, Mode=TwoWay}"
+                                                                    AutomationProperties.Name="{loc:T ThemeEditor.Accent}"
                                                                     SwatchSize="26"
                                                                     Margin="-3"
                                                                     VerticalAlignment="Center"/>

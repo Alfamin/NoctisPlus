@@ -87,6 +87,8 @@ Deezer and TIDAL: paste the link.</value></data>
   <data name="Common.Close" xml:space="preserve"><value>Close</value></data>
   <data name="Common.Create" xml:space="preserve"><value>Create</value></data>
   <data name="Common.Done" xml:space="preserve"><value>Done</value></data>
+  <data name="Common.Increase" xml:space="preserve"><value>Increase</value><comment>Accessible name of a number box's up button</comment></data>
+  <data name="Common.Decrease" xml:space="preserve"><value>Decrease</value><comment>Accessible name of a number box's down button</comment></data>
 
   <!-- Top bar -->
   <data name="Tab.Library" xml:space="preserve"><value>Library</value><comment>Header before any section is chosen</comment></data>
@@ -288,6 +290,7 @@ Deezer and TIDAL: paste the link.</value></data>
   <data name="Settings.SongProgressTaskbar" xml:space="preserve"><value>Song Progress on Taskbar</value><comment>Text in SettingsView.axaml</comment></data>
   <data name="Settings.ShowHowFarAlong" xml:space="preserve"><value>Show song progress on the taskbar button. Amber while paused.</value><comment>Text in SettingsView.axaml</comment></data>
   <data name="Settings.AutomaticAlbumCoverSize" xml:space="preserve"><value>Automatic Album Cover Size</value><comment>Text in SettingsView.axaml</comment></data>
+  <data name="Settings.AlbumCoverSize" xml:space="preserve"><value>Album cover size</value><comment>Accessible name of the cover size slider (Smaller / Larger) in SettingsView.axaml</comment></data>
   <data name="Settings.FiveCoversPerRow" xml:space="preserve"><value>Five covers per row. Turn off to pick your own cover size.</value><comment>Text in SettingsView.axaml</comment></data>
   <data name="Settings.Smaller" xml:space="preserve"><value>Smaller</value><comment>Text in SettingsView.axaml</comment></data>
   <data name="Settings.Larger" xml:space="preserve"><value>Larger</value><comment>Text in SettingsView.axaml</comment></data>
@@ -412,6 +415,7 @@ Deezer and TIDAL: paste the link.</value></data>
   <data name="Settings.Equalizer" xml:space="preserve"><value>Equalizer</value><comment>Text in SettingsView.axaml</comment></data>
   <data name="Settings.ParametricEQTuneEach" xml:space="preserve"><value>Tune each band's frequency, gain and width.</value><comment>Text in SettingsView.axaml</comment></data>
   <data name="Settings.Preamp" xml:space="preserve"><value>Preamp</value><comment>Text in SettingsView.axaml</comment></data>
+  <data name="Settings.EqPreset" xml:space="preserve"><value>Equalizer preset</value><comment>Accessible name of the equalizer preset picker in SettingsView.axaml</comment></data>
   <data name="Settings.LevelBeforeEQLowerTip" xml:space="preserve"><value>Level before the EQ — lower it if boosted bands distort. Double-tap to reset.</value><comment>ToolTip.Tip in SettingsView.axaml</comment></data>
   <data name="Settings.FREQUENCY" xml:space="preserve"><value>FREQUENCY</value><comment>Text in SettingsView.axaml</comment></data>
   <data name="Settings.GAIN" xml:space="preserve"><value>GAIN</value><comment>Text in SettingsView.axaml</comment></data>

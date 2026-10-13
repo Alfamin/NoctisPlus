@@ -486,6 +486,49 @@ public class AccessibleNamesSweepTests
     }
 
     [AvaloniaFact]
+    public async Task SettingsView_EveryTab()
+    {
+        EnsureAppStyles();
+        var vm = new SettingsViewModel(new TestPersistenceService(), new FakeLibraryService(), new FakeHistoryLog());
+        await vm.LoadAsync();
+        var view = new SettingsView { DataContext = vm };
+        var window = Show(view, 1100, 900);
+        var found = new List<string>();
+        try
+        {
+            foreach (var tab in new[]
+                     {
+                         SettingsViewModel.TabGeneral, SettingsViewModel.TabAppearance, SettingsViewModel.TabAudio,
+                         SettingsViewModel.TabLibrary, SettingsViewModel.TabShortcuts, SettingsViewModel.TabStatistics,
+                         SettingsViewModel.TabIntegrations, SettingsViewModel.TabPlugins, SettingsViewModel.TabAbout,
+                         SettingsViewModel.TabAccountDevices, SettingsViewModel.TabPlayer, SettingsViewModel.TabLyrics,
+                         SettingsViewModel.TabAdvanced,
+                     })
+            {
+                vm.SelectedSettingsTab = tab;
+                Pump(window);
+                // The shown section, rows that only appear in another state (signed in, a
+                // feature on) included, plus the rail and the search box.
+                var page = view.GetLogicalDescendants().OfType<Control>().Single(c => c.Classes.Contains("tab-page") && c.IsEffectivelyVisible);
+                found.AddRange(Offenders($"Settings ({tab})", All(page), includeHidden: true));
+                // A switch reads the label its row shows (not just any name).
+                foreach (var toggle in All(page).OfType<LottieToggle>())
+                    if (VisibleLabel(toggle) is { } label && label.StartsWith("label:", StringComparison.Ordinal)
+                        && NameOf(toggle) != label["label:".Length..])
+                        found.Add(Describe($"Settings ({tab})", toggle, NameOf(toggle), label));
+                found.AddRange(Offenders($"Settings ({tab})", All(view).Where(c => c != page && !c.GetLogicalAncestors().Contains(page)
+                                                                                    && !c.Classes.Contains("tab-page")
+                                                                                    && !c.GetLogicalAncestors().OfType<Control>().Any(a => a.Classes.Contains("tab-page")))));
+            }
+        }
+        finally
+        {
+            window.Close();
+        }
+        AssertNone(found);
+    }
+
+    [AvaloniaFact]
     public void Statistics_BothTabs()
     {
         EnsureAppStyles();

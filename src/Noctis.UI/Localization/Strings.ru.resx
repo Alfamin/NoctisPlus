@@ -87,6 +87,8 @@ Deezer и TIDAL: вставьте ссылку.</value></data>
   <data name="Common.Close" xml:space="preserve"><value>Закрыть</value></data>
   <data name="Common.Create" xml:space="preserve"><value>Создать</value></data>
   <data name="Common.Done" xml:space="preserve"><value>Готово</value></data>
+  <data name="Common.Increase" xml:space="preserve"><value>Увеличить</value><comment>Accessible name of a number box's up button</comment></data>
+  <data name="Common.Decrease" xml:space="preserve"><value>Уменьшить</value><comment>Accessible name of a number box's down button</comment></data>
 
   <!-- Top bar -->
   <data name="Tab.Library" xml:space="preserve"><value>Медиатека</value><comment>Header before any section is chosen</comment></data>
@@ -288,6 +290,7 @@ Deezer и TIDAL: вставьте ссылку.</value></data>
   <data name="Settings.SongProgressTaskbar" xml:space="preserve"><value>Прогресс песни на панели задач</value><comment>Text in SettingsView.axaml</comment></data>
   <data name="Settings.ShowHowFarAlong" xml:space="preserve"><value>Показывать прогресс песни на кнопке в панели задач. На паузе — янтарным.</value><comment>Text in SettingsView.axaml</comment></data>
   <data name="Settings.AutomaticAlbumCoverSize" xml:space="preserve"><value>Автоматический размер обложек</value><comment>Text in SettingsView.axaml</comment></data>
+  <data name="Settings.AlbumCoverSize" xml:space="preserve"><value>Размер обложек альбомов</value><comment>Accessible name of the cover size slider (Smaller / Larger) in SettingsView.axaml</comment></data>
   <data name="Settings.FiveCoversPerRow" xml:space="preserve"><value>Пять обложек в ряду. Выключите, чтобы задать размер самостоятельно.</value><comment>Text in SettingsView.axaml</comment></data>
   <data name="Settings.Smaller" xml:space="preserve"><value>Меньше</value><comment>Text in SettingsView.axaml</comment></data>
   <data name="Settings.Larger" xml:space="preserve"><value>Больше</value><comment>Text in SettingsView.axaml</comment></data>
@@ -412,6 +415,7 @@ Deezer и TIDAL: вставьте ссылку.</value></data>
   <data name="Settings.Equalizer" xml:space="preserve"><value>Эквалайзер</value><comment>Text in SettingsView.axaml</comment></data>
   <data name="Settings.ParametricEQTuneEach" xml:space="preserve"><value>Настройте частоту, усиление и ширину каждой полосы.</value><comment>Text in SettingsView.axaml</comment></data>
   <data name="Settings.Preamp" xml:space="preserve"><value>Предусиление</value><comment>Text in SettingsView.axaml</comment></data>
+  <data name="Settings.EqPreset" xml:space="preserve"><value>Пресет эквалайзера</value><comment>Accessible name of the equalizer preset picker in SettingsView.axaml</comment></data>
   <data name="Settings.LevelBeforeEQLowerTip" xml:space="preserve"><value>Уровень перед эквалайзером — понизьте, если усиленные полосы искажаются. Двойной щелчок — сброс.</value><comment>ToolTip.Tip in SettingsView.axaml</comment></data>
   <data name="Settings.FREQUENCY" xml:space="preserve"><value>ЧАСТОТА</value><comment>Text in SettingsView.axaml</comment></data>
   <data name="Settings.GAIN" xml:space="preserve"><value>УСИЛЕНИЕ</value><comment>Text in SettingsView.axaml</comment></data>

@@ -1266,6 +1266,14 @@
         <Setter Property="HorizontalAlignment" Value="Right" />
         <Setter Property="AutomationProperties.Name" Value="{loc:T Main.OptionsTip}" />
     </Style>
+    <!-- Every number box's spin buttons (Fluent's ButtonSpinner template): icon-only, so they
+         read "Avalonia.Controls.PathIcon" without a name. -->
+    <Style Selector="ButtonSpinner /template/ RepeatButton#PART_IncreaseButton">
+        <Setter Property="AutomationProperties.Name" Value="{loc:T Common.Increase}" />
+    </Style>
+    <Style Selector="ButtonSpinner /template/ RepeatButton#PART_DecreaseButton">
+        <Setter Property="AutomationProperties.Name" Value="{loc:T Common.Decrease}" />
+    </Style>
     <Style Selector="Button.album-tile:pointerover Button.tile-play, Button.album-tile:pointerover Button.tile-more">
         <Setter Property="Opacity" Value="1" />
     </Style>
