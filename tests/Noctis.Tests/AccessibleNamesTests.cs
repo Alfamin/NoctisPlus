@@ -2,7 +2,10 @@ using Avalonia;
 using Avalonia.Automation;
 using Avalonia.Automation.Peers;
 using Avalonia.Controls;
+using Avalonia.Automation.Provider;
+using Avalonia.Headless;
 using Avalonia.Headless.XUnit;
+using Avalonia.Input;
 using Avalonia.LogicalTree;
 using Avalonia.Threading;
 using Avalonia.VisualTree;
@@ -578,8 +581,8 @@ public class AccessibleNamesTests
     /// "Avalonia.Controls.ScrollViewer" / "Avalonia.Controls.DockPanel", Save read
     /// "Avalonia.Controls.Panel", and every field was a nameless Edit next to its label.
     /// Walks every section and requires each row, button and field to carry a real name.</summary>
-    [AvaloniaFact]
-    public async Task EditInfo_SectionsSaveAndEveryFieldAreNamed()
+    /// <summary>The Edit Info dialog on one song with plain and synced lyrics, loaded.</summary>
+    private static async Task<(MetadataViewModel Vm, MetadataWindow Win)> OpenEditInfo()
     {
         AddToPlaylistDialogTests.EnsureAppStyles();
         var track = Song("Head Like A Hole");
@@ -591,10 +594,18 @@ public class AccessibleNamesTests
             new FakeAnimatedCoverService(), metadataSearch: new MetadataSearchPanelTests.FakeSearch());
         var win = new MetadataWindow(vm) { Width = 1100, Height = 820 };
         win.Show();
+        var load = vm.InitializeAsync();
+        await PumpUntil(() => load.IsCompleted);
+        Pump(win);
+        return (vm, win);
+    }
+
+    [AvaloniaFact]
+    public async Task EditInfo_SectionsSaveAndEveryFieldAreNamed()
+    {
+        var (vm, win) = await OpenEditInfo();
         try
         {
-            var load = vm.InitializeAsync();
-            await PumpUntil(() => load.IsCompleted);
             vm.CustomTags.Add(new CustomTagItem { Key = "MOOD", Value = "Angry" });
             Pump(win);
 
@@ -632,6 +643,45 @@ public class AccessibleNamesTests
                 Assert.True(unnamed.Count == 0,
                     $"{section.Header}: {unnamed.Count} unnamed:\n" + string.Join('\n', unnamed));
             }
+        }
+        finally
+        {
+            win.Close();
+        }
+    }
+
+    /// <summary>Edit Info's rating took only a mouse click: the stars were not focusable,
+    /// ignored keys and gave UI Automation no name and no value to read or set.</summary>
+    [AvaloniaFact]
+    public async Task EditInfo_RatingIsSetByKeyboardAndAutomation()
+    {
+        var (vm, win) = await OpenEditInfo();
+        try
+        {
+            var stars = win.GetLogicalDescendants().OfType<Noctis.Controls.RatingStars>().Distinct().Single();
+            Assert.Equal(Loc.T("Metadata.Rating"), NameOf(stars));
+            Assert.Equal(0, vm.Rating);
+
+            Assert.True(stars.Focus(NavigationMethod.Tab), "the rating takes no keyboard focus");
+            Pump(win);
+            win.KeyPressQwerty(PhysicalKey.ArrowRight, RawInputModifiers.None);
+            win.KeyPressQwerty(PhysicalKey.ArrowRight, RawInputModifiers.None);
+            win.KeyPressQwerty(PhysicalKey.ArrowRight, RawInputModifiers.None);
+            Assert.Equal(3, vm.Rating);
+            win.KeyPressQwerty(PhysicalKey.ArrowLeft, RawInputModifiers.None);
+            Assert.Equal(2, vm.Rating);
+            win.KeyPressQwerty(PhysicalKey.End, RawInputModifiers.None);
+            Assert.Equal(5, vm.Rating);
+            win.KeyPressQwerty(PhysicalKey.Home, RawInputModifiers.None);
+            Assert.Equal(0, vm.Rating);
+
+            var range = Assert.IsAssignableFrom<IRangeValueProvider>(ControlAutomationPeer.CreatePeerForElement(stars));
+            Assert.False(range.IsReadOnly);
+            Assert.Equal(0, range.Minimum);
+            Assert.Equal(5, range.Maximum);
+            range.SetValue(4);
+            Assert.Equal(4, vm.Rating);
+            Assert.Equal(4, range.Value);
         }
         finally
         {

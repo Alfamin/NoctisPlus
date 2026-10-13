@@ -675,6 +675,8 @@
                                 <StackPanel Orientation="Horizontal" Spacing="18" VerticalAlignment="Center" MinHeight="36">
                                     <controls:RatingStars Value="{Binding Rating, Mode=TwoWay}"
                                                           IsInteractive="True"
+                                                          Focusable="True"
+                                                          AutomationProperties.Name="{loc:T Metadata.Rating}"
                                                           StarSize="18"
                                                           StarSpacing="4"
                                                           Cursor="Hand"
