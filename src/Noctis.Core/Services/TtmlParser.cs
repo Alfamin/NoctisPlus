@@ -157,12 +157,25 @@ public static class TtmlParser
             if (!line.IsBackgroundOnly && line.BackgroundWords is { Count: > 0 } bg)
                 sb.Append("[bg: ").Append(ElrcBody(bg, line.BackgroundEndTimestamp)).Append("]\n");
 
+            // The LRC reader takes a word-timed "(…)" line as an adlib of the line before it and
+            // gives it no layers: its translation or romanization at the same stamp would come
+            // back as a sung line of its own, so an adlib's layers are not written.
+            if (words is { Count: > 0 } && IsFullyParenthesized(line.Text)) continue;
+
             foreach (var companion in LrcParser.CompanionLines(line))
                 sb.Append(stamp).Append(OneLine(companion)).Append('\n');
         }
         return sb.ToString().TrimEnd('\n');
 
         static string OneLine(string text) => text.Replace("\r\n", " ").Replace('\n', ' ').Trim();
+
+        // EnhancedLrcParser.IsBackgroundCandidate's text rule.
+        static bool IsFullyParenthesized(string text)
+        {
+            text = text.Trim();
+            if (text.Length < 2 || text[0] is not ('(' or '（') || text[^1] is not (')' or '）')) return false;
+            return !text[1..^1].Any(c => c is '(' or ')' or '（' or '）');
+        }
 
         static string ElrcBody(IReadOnlyList<WordTiming> words, TimeSpan? lineEnd)
         {
