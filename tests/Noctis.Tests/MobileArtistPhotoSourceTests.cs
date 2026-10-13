@@ -197,6 +197,38 @@ public class MobileArtistPhotoSourceTests : IDisposable
         while ((seen = Volatile.Read(ref target)) < value && Interlocked.CompareExchange(ref target, value, seen) != seen) { }
     }
 
+    private static byte[] NoPhotoBytes()
+        => File.ReadAllBytes(Path.Combine(AppContext.BaseDirectory, "Fixtures", "Deezer", "no-photo-1000.jpg"));
+
+    /// <summary>10-12: a photo hash Deezer no longer has is redirected to its grey silhouette.
+    /// That is no photo: nothing is saved, and the name is left alone like a miss.</summary>
+    [Fact]
+    public async Task DeezersSilhouette_IsAMiss_AndACachedOneIsDropped()
+    {
+        var handler = new Handler(r =>
+        {
+            if (r.RequestUri!.ToString().StartsWith(DeezerArtistPhotos.SearchUrl, StringComparison.Ordinal))
+                return Json($$"""{ "data": [ { "id": 7, "name": "Xavier Mayne", "nb_fan": 660, "picture_xl": "{{DeezerPhoto}}" } ] }""");
+            r.RequestUri = new Uri("https://cdn-images.dzcdn.net/images/artist/d41d8cd98f00b204e9800998ecf8427e/1000x1000-000000-80-0-0.jpg");
+            return new HttpResponseMessage(HttpStatusCode.OK)
+            {
+                RequestMessage = r,
+                Content = new ByteArrayContent(NoPhotoBytes()) { Headers = { ContentType = new("image/jpeg") } }
+            };
+        });
+        var source = Source(handler);
+
+        Assert.Null(await source.GetPhotoAsync("Xavier Mayne", CancellationToken.None));
+        Assert.Empty(Directory.GetFiles(_dir, "*.jpg"));
+        Assert.Single(Directory.GetFiles(_dir, "*.miss"));
+        Assert.Null(await source.GetPhotoAsync("Xavier Mayne", CancellationToken.None));
+        Assert.Equal(1, handler.Searches);
+
+        // One saved before the fix is not served.
+        File.WriteAllBytes(Path.Combine(_dir, DeezerArtistPhotoSource.Key("Yesir") + ".jpg"), NoPhotoBytes());
+        Assert.Null(Source(handler).CachedPhoto("Yesir"));
+    }
+
     /// <summary>The shared lookup tells "Deezer has no such artist" from "no answer".</summary>
     [Fact]
     public async Task TheSharedLookup_SaysWhetherDeezerAnswered()
