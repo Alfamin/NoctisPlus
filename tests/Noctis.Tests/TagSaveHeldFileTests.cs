@@ -219,6 +219,23 @@ public class TagSaveHeldFileTests : IDisposable
         Assert.Equal(new[] { "release a", "release b", "release c", "action", "reopen c", "reopen a" }, order);
     }
 
+    [Fact]
+    public void Save_OfAReadOnlyFile_FailsAndLeavesNoCopyBehind()
+    {
+        var path = MultiGenreTagTests.CreateM4a(_dir);
+        File.SetAttributes(path, File.GetAttributes(path) | FileAttributes.ReadOnly);
+        try
+        {
+            Assert.ThrowsAny<Exception>(() =>
+                MetadataService.SaveTagsAtomicallyOrThrow(path, f => f.Tag.Lyrics = "new words"));
+            Assert.Equal(new[] { path }, Directory.GetFiles(_dir));
+        }
+        finally
+        {
+            File.SetAttributes(path, FileAttributes.Normal);
+        }
+    }
+
     private sealed class Holder(string name, List<string> order, bool holds) : IOpenFileHolder
     {
         public int Releases;

@@ -778,7 +778,18 @@ public class MetadataService : IMetadataService
         }
         catch
         {
-            try { if (File.Exists(tempPath)) File.Delete(tempPath); } catch { }
+            try
+            {
+                if (File.Exists(tempPath))
+                {
+                    // File.Copy carries a read-only original's attribute over to the copy,
+                    // and File.Delete refuses a read-only file: every failed save of a
+                    // read-only track left a full .noctis-* copy beside it.
+                    File.SetAttributes(tempPath, FileAttributes.Normal);
+                    File.Delete(tempPath);
+                }
+            }
+            catch { }
             throw;
         }
     }
