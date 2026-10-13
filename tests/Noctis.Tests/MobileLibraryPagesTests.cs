@@ -192,4 +192,45 @@ public class MobileLibraryPagesTests
         Assert.False(MobileFixtures.Named<TextBlock>(view, "StatusLine").IsVisible);   // the card carries the text
         window.Close();
     }
+
+    /// <summary>The Playlists tab: "1 song", not "1 songs"; the header pill searches and sorts
+    /// the list, pinned playlists first throughout.</summary>
+    [AvaloniaFact]
+    public void PlaylistsTab_CountsInTheSingular_AndItsToolsSearchAndSort()
+    {
+        var a = MobileFixtures.Song("Alpha");
+        var b = MobileFixtures.Song("Beta");
+        var one = new Playlist { Name = "Solo", TrackIds = { a.Id }, ModifiedAt = DateTime.UtcNow.AddDays(-1) };
+        var two = new Playlist { Name = "Duo", TrackIds = { a.Id, b.Id }, ModifiedAt = DateTime.UtcNow.AddDays(-3) };
+        var pinned = new Playlist { Name = "Zed", IsPinned = true, ModifiedAt = DateTime.UtcNow.AddDays(-9) };
+        using var rig = MobileFixtures.MakeRig(new[] { a, b }, seed: WithFolder(one, two, pinned));
+        var window = MobileFixtures.Mount(rig.Shell, out var view);
+        rig.Shell.SelectTabCommand.Execute(MobileTab.Playlists);
+        window.UpdateLayout();
+
+        var page = rig.Shell.PlaylistsRoot;
+        Assert.Equal(new[] { "Zed", "Duo", "Solo" }, page.Rows.Select(r => r.Name));
+        Assert.Equal(new[] { "0 songs", "2 songs", "1 song" }, page.Rows.Select(r => r.Subtitle));
+        var root = view.FindControl<Grid>("PlaylistsRoot")!;
+        var shown = root.GetVisualDescendants().OfType<TextBlock>().Where(t => t.IsEffectivelyVisible).Select(t => t.Text).ToList();
+        Assert.Contains("1 song", shown);
+        Assert.DoesNotContain("1 songs", shown);
+        // The tab's header carries the tools pill, as Favorites' does.
+        var tools = root.GetVisualDescendants().OfType<PlaylistTools>().Single(t => t.IsEffectivelyVisible);
+        Assert.Same(page, tools.DataContext);
+
+        page.ChooseSort(page.SortChoices.Single(c => c.Label == "Recently Updated"));
+        Assert.True(page.IsSorted);
+        Assert.Equal(new[] { "Zed", "Solo", "Duo" }, page.Playlists.Select(p => p.Name));
+        page.ChooseSort(page.SortChoices.Single(c => c.Label == "Title"));
+
+        page.ToggleSearchCommand.Execute(null);
+        page.FilterText = "so";
+        Assert.Equal(new[] { "Solo" }, page.Playlists.Select(p => p.Name));
+        page.FilterText = "nothing";
+        Assert.True(page.ShowNoMatches);
+        page.ToggleSearchCommand.Execute(null);                  // closing the search clears it
+        Assert.Equal(3, page.Playlists.Count);
+        window.Close();
+    }
 }

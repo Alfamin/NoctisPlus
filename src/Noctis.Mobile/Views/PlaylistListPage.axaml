@@ -2,37 +2,52 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:vm="using:Noctis.Mobile.ViewModels"
              xmlns:views="using:Noctis.Mobile.Views"
-             xmlns:models="using:Noctis.Models"
+             xmlns:controls="using:Noctis.Controls"
              x:Class="Noctis.Mobile.Views.PlaylistListPage"
              x:DataType="vm:PlaylistListPageViewModel">
-    <Grid RowDefinitions="Auto,*">
-        <Grid Grid.Row="0" ColumnDefinitions="Auto,*" Margin="8,4,20,4" IsVisible="{Binding !IsEmbedded}">
+    <Grid RowDefinitions="Auto,Auto,*">
+        <Grid Grid.Row="0" ColumnDefinitions="Auto,*,Auto" Margin="8,4,16,4" IsVisible="{Binding !IsEmbedded}">
             <Button Classes="icon" Command="{Binding Shell.NavigateBackCommand}">
                 <PathIcon Data="{DynamicResource PhBack}" />
             </Button>
             <TextBlock Grid.Column="1" Classes="title" FontSize="26" Text="{Binding Title}" VerticalAlignment="Center" />
+            <!-- Embedded (the Playlists tab), the tab's own header carries the same pill. -->
+            <views:PlaylistTools Grid.Column="2" Margin="8,0,0,0" VerticalAlignment="Center" />
         </Grid>
 
-        <ScrollViewer Classes="page-scroll" Grid.Row="1" views:ScrollMemory.IsEnabled="True" HorizontalScrollBarVisibility="Disabled">
-          <StackPanel Margin="12,0,12,16">
+        <TextBox Grid.Row="1" Name="PlaylistSearchBox" Margin="16,0,16,8" CornerRadius="12" PlaceholderText="Search in playlists"
+                 Text="{Binding FilterText}" IsVisible="{Binding IsSearchOpen}" />
+
+        <ScrollViewer Classes="page-scroll" Grid.Row="2" views:ScrollMemory.IsEnabled="True" HorizontalScrollBarVisibility="Disabled">
+          <StackPanel Margin="0,0,0,16">
             <TextBlock Name="EmptyText" Classes="subtle" TextWrapping="Wrap" TextAlignment="Center"
                        Text="No playlists yet. Long-press a song to start one." HorizontalAlignment="Center"
                        Margin="20,24,20,0" IsVisible="{Binding !HasPlaylists}" />
-            <ItemsControl Name="PlaylistList" ItemsSource="{Binding Playlists}">
+            <TextBlock Name="NoMatchesText" Classes="subtle" Text="No playlists match" HorizontalAlignment="Center"
+                       Margin="20,24,20,0" IsVisible="{Binding ShowNoMatches}" />
+            <!-- Apple's playlist list: a cover, the name and the song count, a hairline from the
+                 text to the edge. -->
+            <ItemsControl Name="PlaylistList" ItemsSource="{Binding Rows}">
                 <ItemsControl.ItemTemplate>
-                    <DataTemplate x:DataType="models:Playlist">
+                    <DataTemplate x:DataType="vm:PlaylistRow">
                         <Button Classes="row"
                                 views:LongPress.Command="{Binding $parent[views:ShellView].((vm:ShellViewModel)DataContext).OpenPlaylistSheetCommand}"
+                                views:LongPress.CommandParameter="{Binding Playlist}"
                                 Command="{Binding $parent[views:PlaylistListPage].((vm:PlaylistListPageViewModel)DataContext).OpenCommand}"
-                                CommandParameter="{Binding}">
-                            <Grid ColumnDefinitions="Auto,*" Height="64" Margin="8,0">
-                                <Border Classes="art" Width="48" Height="48">
-                                    <PathIcon Data="{DynamicResource PlaylistsIcon}" Width="20" Height="20" Opacity="0.6" />
+                                CommandParameter="{Binding Playlist}">
+                            <Grid ColumnDefinitions="Auto,*,Auto" Height="72" Margin="20,0,16,0">
+                                <Border Classes="art" Width="56" Height="56">
+                                    <Panel>
+                                        <PathIcon Data="{DynamicResource PlaylistsIcon}" Width="22" Height="22" Opacity="0.5" />
+                                        <controls:CachedImage SourcePath="{Binding ArtworkPath}" DecodeWidth="168" Stretch="UniformToFill" />
+                                    </Panel>
                                 </Border>
-                                <StackPanel Grid.Column="1" Margin="12,0,8,0" VerticalAlignment="Center">
+                                <StackPanel Grid.Column="1" Margin="14,0,8,0" VerticalAlignment="Center" Spacing="1">
                                     <TextBlock Classes="row-title" Text="{Binding Name}" />
-                                    <TextBlock Classes="row-sub" Text="{Binding TrackIds.Count, StringFormat='{}{0} songs'}" />
+                                    <TextBlock Classes="row-sub" Text="{Binding Subtitle}" />
                                 </StackPanel>
+                                <PathIcon Grid.Column="2" Classes="list-chevron" Data="{DynamicResource PhChevronRight}" />
+                                <Border Grid.Column="1" Grid.ColumnSpan="2" Classes="hairline" Margin="14,0,-16,0" />
                             </Grid>
                         </Button>
                     </DataTemplate>

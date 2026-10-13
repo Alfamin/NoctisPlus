@@ -51,6 +51,22 @@
         <Setter Property="TextTrimming" Value="CharacterEllipsis" />
     </Style>
 
+    <!-- A list row's hairline, from the text to the edge (Apple's inset separator), and its
+         small grey chevron. -->
+    <Style Selector="Border.hairline">
+        <Setter Property="Height" Value="0.5" />
+        <Setter Property="VerticalAlignment" Value="Bottom" />
+        <Setter Property="Background" Value="{DynamicResource PhoneSeparatorBrush}" />
+        <Setter Property="IsHitTestVisible" Value="False" />
+    </Style>
+    <Style Selector="PathIcon.list-chevron">
+        <Setter Property="Width" Value="19" />
+        <Setter Property="Height" Value="19" />
+        <Setter Property="Margin" Value="0,0,-5,0" />
+        <Setter Property="VerticalAlignment" Value="Center" />
+        <Setter Property="Foreground" Value="{DynamicResource PhoneChevronBrush}" />
+    </Style>
+
     <!-- Surfaces -->
     <Style Selector="Border.card">
         <Setter Property="Background" Value="{DynamicResource HomeCardBackground}" />

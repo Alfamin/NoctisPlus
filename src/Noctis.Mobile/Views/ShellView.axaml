@@ -117,6 +117,7 @@
             <Grid Name="PlaylistsRoot" RowDefinitions="Auto,*" IsVisible="{Binding IsPlaylistsRootVisible}">
                 <Grid Grid.Row="0" ColumnDefinitions="*,Auto" Margin="20,12,12,8">
                     <TextBlock Name="PlaylistsTitle" Classes="title" Text="{loc:T Nav.Playlists}" />
+                    <views:PlaylistTools Grid.Column="1" VerticalAlignment="Center" DataContext="{Binding PlaylistsRoot}" />
                 </Grid>
                 <ContentControl Grid.Row="1" Name="PlaylistsHost" Content="{Binding PlaylistsRoot}"
                                 HorizontalContentAlignment="Stretch" VerticalContentAlignment="Stretch" />

@@ -1,0 +1,21 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:Noctis.Mobile.ViewModels"
+             xmlns:controls="using:Noctis.Controls"
+             x:Class="Noctis.Mobile.Views.PlaylistTools"
+             x:DataType="vm:PlaylistListPageViewModel">
+    <!-- The playlist list's tools, in the same glass pill as a song list's (ListTools): search in
+         the list and sort it. Each lights up while it changes what is shown. -->
+    <controls:GlassPanel Name="PlaylistToolsGlass" Classes="header-glass" Width="NaN" IsVisible="{Binding HasPlaylists}">
+        <StackPanel Orientation="Horizontal" Margin="4,0">
+            <Button Name="PlaylistSearchButton" Classes="glass-round" Classes.on="{Binding IsSearchOpen}"
+                    Command="{Binding ToggleSearchCommand}" AutomationProperties.Name="Search playlists">
+                <PathIcon Data="{DynamicResource PhSearch}" />
+            </Button>
+            <Button Name="PlaylistSortButton" Classes="glass-round" Classes.on="{Binding IsSorted}" Click="OnSortClick"
+                    AutomationProperties.Name="Sort playlists">
+                <PathIcon Data="{DynamicResource PhSort}" />
+            </Button>
+        </StackPanel>
+    </controls:GlassPanel>
+</UserControl>
