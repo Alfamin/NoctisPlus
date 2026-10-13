@@ -237,10 +237,18 @@
         </Style>
 
         <!-- The Windows Settings slider (SettingsView's accent-slider): an 8 dp round-ended track,
-             the accent filling up to a round thumb, the rest a soft grey. -->
+             the accent filling up to a round thumb, the rest a soft grey. A SmoothSlider, as on
+             the desktop: the thumb follows the finger, the setting moves in whole steps.
+             The thumb is a 44 dp touch box with the 26 dp circle centred in it (10-13): the
+             circle's shadow was cut to a square at the circle's own edges (the thumb clips to
+             its bounds), so the box leaves the shadow 9 dp on every side. The slider sits 7 dp
+             outside the row's 16 dp inset so the circle still lines up with the text at either
+             end. Each bar's outer end sits 10 dp in, as far in as its inner end tucks under the
+             circle, so at the minimum the accent bar is 0 wide (at 9 dp it was 1 dp, a red sliver
+             left of the circle) and at the maximum the grey one is. -->
         <Style Selector="Slider.accent-slider">
             <Setter Property="Foreground" Value="{DynamicResource AccentColorBrush}" />
-            <Setter Property="Height" Value="32" />
+            <Setter Property="Height" Value="44" />
             <Setter Property="BorderThickness" Value="0" />
             <Setter Property="Background" Value="Transparent" />
             <Setter Property="TickPlacement" Value="None" />
@@ -255,12 +263,13 @@
                 </ControlTemplate>
             </Setter>
         </Style>
-        <!-- 1 dp under the thumb, as on Windows: the ends meet the circle without a notch. -->
+        <!-- 1 dp under the circle, as on Windows: the ends meet it without a notch. The circle
+             sits 9 dp inside the thumb's box, so the inner ends reach 10 dp into the box. -->
         <Style Selector="Slider.accent-slider /template/ RepeatButton#PART_DecreaseButton">
-            <Setter Property="Margin" Value="0,0,-1,0" />
+            <Setter Property="Margin" Value="10,0,-10,0" />
         </Style>
         <Style Selector="Slider.accent-slider /template/ RepeatButton#PART_IncreaseButton">
-            <Setter Property="Margin" Value="-1,0,0,0" />
+            <Setter Property="Margin" Value="-10,0,10,0" />
         </Style>
         <Style Selector="Slider.accent-slider /template/ RepeatButton /template/ Border">
             <Setter Property="Background" Value="{DynamicResource AccentColorBrush}" />
@@ -276,13 +285,15 @@
         <Style Selector="Slider.accent-slider /template/ Thumb">
             <Setter Property="Background" Value="White" />
             <Setter Property="BorderThickness" Value="0" />
-            <Setter Property="Width" Value="26" />
-            <Setter Property="Height" Value="26" />
+            <Setter Property="Width" Value="44" />
+            <Setter Property="Height" Value="44" />
             <Setter Property="Template">
                 <ControlTemplate>
-                    <Border Width="{TemplateBinding Width}" Height="{TemplateBinding Height}"
-                            Background="{TemplateBinding Background}" CornerRadius="999"
-                            BoxShadow="0 2 6 0 #33000000" />
+                    <Panel Background="Transparent">
+                        <Border Name="PART_Circle" Width="26" Height="26" HorizontalAlignment="Center" VerticalAlignment="Center"
+                                Background="{TemplateBinding Background}" CornerRadius="999"
+                                BoxShadow="0 2 6 0 #33000000" />
+                    </Panel>
                 </ControlTemplate>
             </Setter>
         </Style>
@@ -556,16 +567,16 @@
                                 </Border>
                                 <TextBlock Classes="group-footnote" Text="Shown under a line when the song's lyrics have them." />
                             </StackPanel>
-                            <Border Classes="group-card">
+                            <Border Name="LyricsSizeCard" Classes="group-card">
                                 <StackPanel>
                                     <Grid Classes="setting-row" ColumnDefinitions="*,Auto">
                                         <TextBlock Classes="row-label" Text="Text Size" />
                                         <TextBlock Grid.Column="1" Name="LyricsSizeLabel" Classes="row-value"
                                                    Text="{Binding LyricsTextScale, StringFormat={}{0:P0}}" />
                                     </Grid>
-                                    <Slider Name="LyricsSizeSlider" Classes="accent-slider" Margin="16,-6,16,12" Minimum="0.8" Maximum="1.6" TickFrequency="0.1"
-                                            IsSnapToTickEnabled="True" Value="{Binding LyricsTextScale}"
-                                            AutomationProperties.Name="Lyrics text size" />
+                                    <controls:SmoothSlider Name="LyricsSizeSlider" Classes="accent-slider" Margin="7,-12,7,6"
+                                                           Minimum="0.8" Maximum="1.6" Step="0.1" SteppedValue="{Binding LyricsTextScale}"
+                                                           AutomationProperties.Name="Lyrics text size" />
                                 </StackPanel>
                             </Border>
                         </StackPanel>

@@ -98,6 +98,10 @@ public sealed partial class LyricsPageViewModel : ObservableObject, IDisposable
 
     public static double NowMs() => Stopwatch.GetTimestamp() * 1000.0 / Stopwatch.Frequency;
 
+    /// <summary>A slider's settings save waits this long after its last step, so a drag writes
+    /// settings.json once, not once per step.</summary>
+    internal static TimeSpan SliderSaveDelay { get; set; } = TimeSpan.FromMilliseconds(350);
+
     /// <summary>Settings first (layer toggles, opacity floor, split-word joining), then the current track.</summary>
     public async Task InitializeAsync()
     {
