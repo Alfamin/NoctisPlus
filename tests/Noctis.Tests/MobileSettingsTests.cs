@@ -622,6 +622,11 @@ public class MobileSettingsTests
             {
                 var rescan = MobileFixtures.Named<Button>(page, "RescanButton");
                 Assert.False(rescan.IsEffectivelyEnabled);
+                // Greyed, not grey-filled: Fluent's disabled presenter fill painted the card grey.
+                var presenter = rescan.GetVisualDescendants().OfType<Avalonia.Controls.Presenters.ContentPresenter>()
+                    .First(p => p.Name == "PART_ContentPresenter");
+                Assert.True(presenter.Background is null || ((ISolidColorBrush)presenter.Background).Color.A == 0,
+                    $"disabled row filled {presenter.Background}");
                 Assert.Equal("Add a music folder to scan it.", MobileFixtures.Named<TextBlock>(page, "ScanStatusLabel").Text);
                 Assert.True(MobileFixtures.Named<TextBlock>(page, "ScanStatusLabel").IsEffectivelyVisible);
                 Assert.Equal("None", MobileFixtures.Named<TextBlock>(page, "FoldersValueLabel").Text);
