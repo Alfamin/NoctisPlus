@@ -202,7 +202,8 @@
             <Setter Property="Opacity" Value="1" />
         </Style>
 
-        <!-- Accent swatches: an even grid of dots; the chosen one gets a ring and a tick. -->
+        <!-- Accent swatches: nine dots, five over four centred under them, each cell a full
+             touch target (a fifth of the card by 48); the chosen one gets a ring and a tick. -->
         <Style Selector="ListBox.swatches">
             <Setter Property="Margin" Value="8,10" />
         </Style>
@@ -519,14 +520,16 @@
                                     <ListBox Name="AccentList" Classes="swatches" ItemsSource="{Binding AccentChoices}" SelectedItem="{Binding SelectedAccent}">
                                         <ListBox.ItemsPanel>
                                             <ItemsPanelTemplate>
-                                                <UniformGrid Columns="7" />
+                                                <views:CenteredRowsPanel Columns="5" />
                                             </ItemsPanelTemplate>
                                         </ListBox.ItemsPanel>
                                         <ListBox.ItemTemplate>
                                             <DataTemplate x:DataType="vm:AccentSwatch">
                                                 <Panel Width="38" Height="38" AutomationProperties.Name="{Binding Name}">
                                                     <Ellipse Classes="swatch-ring" Stroke="{DynamicResource PrimaryTextBrush}" StrokeThickness="2" />
-                                                    <Ellipse Width="30" Height="30" Fill="{Binding Brush}" />
+                                                    <!-- The hairline rim keeps a pale swatch (Gold) round on a white card. -->
+                                                    <Ellipse Width="30" Height="30" Fill="{Binding Brush}"
+                                                             Stroke="{DynamicResource PhoneChromeOutlineBrush}" StrokeThickness="1" />
                                                     <PathIcon Classes="swatch-tick" Data="{DynamicResource CheckmarkIcon}" Width="14" Height="14"
                                                               Foreground="{DynamicResource AccentForegroundBrush}" />
                                                 </Panel>

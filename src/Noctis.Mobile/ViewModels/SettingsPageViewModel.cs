@@ -76,19 +76,22 @@ public sealed record LookPreview(IBrush Page, IBrush Card, IBrush Line)
 /// </summary>
 public sealed partial class SettingsPageViewModel : MobilePage
 {
-    /// <summary>A phone-sized subset of the desktop presets.</summary>
+    /// <summary>Nine of the desktop presets, one per hue around the wheel (red, orange, yellow,
+    /// green, teal, blue, indigo, purple, pink), Crimson first as the default: five over four.</summary>
     public static IReadOnlyList<AccentSwatch> Accents { get; } = new AccentSwatch[]
     {
-        new("Crimson", "#E74856"), new("Scarlet", "#FF3B30"), new("Coral", "#FF6F61"), new("Rose", "#E754B5"),
-        new("Violet", "#874CF2"), new("Indigo", "#4338CA"), new("Cerulean", "#2A7FCF"), new("Sky", "#39B5F0"),
-        new("Teal", "#0FA3B1"), new("Emerald", "#12C76F"), new("Amber", "#FDB84D"), new("Tangerine", "#FF8547"),
-        new("Silver", "#B8BCC4"),
+        new("Crimson", "#E74856"), new("Tangerine", "#FF8547"), new("Gold", "#F4D24B"), new("Emerald", "#12C76F"),
+        new("Teal", "#0FA3B1"), new("Cerulean", "#2A7FCF"), new("Indigo", "#4338CA"), new("Orchid", "#C45CE0"),
+        new("Rose", "#E754B5"),
     };
 
     private const string SignInTitle = "Sign in to your computer";
 
     private bool _loading;
     private string _accentHex = MobileTheme.DefaultAccent;
+    // The saved accent's name when it is not one of the nine ("Scarlet", picked on an earlier
+    // phone build or on the desktop): kept, shown and saved back as it was.
+    private string? _savedAccentName;
 
     public SettingsPageViewModel(ShellViewModel shell)
     {
@@ -186,8 +189,11 @@ public sealed partial class SettingsPageViewModel : MobilePage
         ? "Used whenever Noctis is dark."
         : "Dark Style applies when Look is System or Dark.";
 
-    /// <summary>The accent's preset name ("Crimson"), or "Custom" for a colour picked on the desktop.</summary>
-    public string AccentName => Accents.FirstOrDefault(a => string.Equals(a.Hex, _accentHex, StringComparison.OrdinalIgnoreCase))?.Name ?? "Custom";
+    /// <summary>The accent's preset name ("Crimson"); a saved accent outside the nine keeps the
+    /// name it was saved with ("Scarlet"), else "Custom" (a colour picked on the desktop).</summary>
+    public string AccentName =>
+        Accents.FirstOrDefault(a => string.Equals(a.Hex, _accentHex, StringComparison.OrdinalIgnoreCase))?.Name
+        ?? (string.IsNullOrWhiteSpace(_savedAccentName) || Accents.Any(a => a.Name == _savedAccentName) ? "Custom" : _savedAccentName);
 
     /// <summary>The Appearance row's value: the dark style where it applies, then the accent ("Ink · Crimson").</summary>
     public string AppearanceValue => ShowsDarkThemes ? $"{DarkTheme} · {AccentName}" : AccentName;
@@ -303,6 +309,7 @@ public sealed partial class SettingsPageViewModel : MobilePage
             Appearance = MobileTheme.Appearances.Contains(settings.MobileAppearance) ? settings.MobileAppearance : "System";
             DarkTheme = MobileTheme.DarkThemes.Contains(settings.Theme) ? settings.Theme : "Ink";
             _accentHex = string.IsNullOrWhiteSpace(settings.AccentColorHex) ? MobileTheme.DefaultAccent : settings.AccentColorHex;
+            _savedAccentName = settings.AccentPresetName;
             AccentChanged();
             SelectedAccent = Accents.FirstOrDefault(a => string.Equals(a.Hex, _accentHex, StringComparison.OrdinalIgnoreCase));
             LyricsTextScale = Math.Clamp(settings.MobileLyricsTextScale, 0.8, 1.6);
@@ -355,7 +362,7 @@ public sealed partial class SettingsPageViewModel : MobilePage
             // An explicit pick: the desktop's v1→v2 migration must never rewrite a chosen "Dark".
             settings.ThemeV2Migrated = true;
             settings.AccentColorHex = _accentHex;
-            settings.AccentPresetName = Accents.FirstOrDefault(a => string.Equals(a.Hex, _accentHex, StringComparison.OrdinalIgnoreCase))?.Name ?? "Custom";
+            settings.AccentPresetName = AccentName;
             settings.MobileLyricsTextScale = LyricsTextScale;
             await Shell.Library.Persistence.SaveSettingsAsync(settings);
         }
