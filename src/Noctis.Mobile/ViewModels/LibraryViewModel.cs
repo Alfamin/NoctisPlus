@@ -326,6 +326,9 @@ public sealed partial class LibraryViewModel : ObservableObject
     public void ApplySettings(AppSettings settings)
     {
         SetFolders(settings.MusicFolders);
+        _applyingSettings = true;
+        ScanOnStartup = settings.ScanOnStartup;
+        _applyingSettings = false;
         _pinnedAlbumIds = settings.PinnedAlbumIds.ToList();
         _pinnedArtistNames = settings.PinnedArtistNames.ToList();
         _pinnedTrackIds = settings.PinnedTrackIds.ToList();
@@ -453,6 +456,35 @@ public sealed partial class LibraryViewModel : ObservableObject
 
     [RelayCommand]
     private Task RescanAsync() => ScanAsync();
+
+    /// <summary>Desktop parity (Settings › Library › Scan on Startup, AppSettings.ScanOnStartup):
+    /// each launch rescans the folders, so songs copied onto the phone since show up without a
+    /// Rescan. Unchanged songs are not read again.</summary>
+    [ObservableProperty] private bool _scanOnStartup = true;
+
+    private bool _applyingSettings;
+
+    partial void OnScanOnStartupChanged(bool value)
+    {
+        if (!_applyingSettings) _ = SaveScanOnStartupAsync(value);
+    }
+
+    private async Task SaveScanOnStartupAsync(bool value)
+    {
+        try
+        {
+            var settings = await _persistence.LoadSettingsAsync();
+            settings.ScanOnStartup = value;
+            await SaveSettingsAsync(settings, "Scan on startup");
+        }
+        catch (Exception ex)
+        {
+            DebugLog.Write("Library", $"Scan on startup save failed: {ex.Message}");
+        }
+    }
+
+    /// <summary>The host calls this once the library has loaded at launch.</summary>
+    public Task ScanAtStartupAsync() => ScanOnStartup && HasFolders ? ScanAsync() : Task.CompletedTask;
 
     /// <summary>Set when a scan is asked for while one runs: the running one goes again once it
     /// ends, so a folder added or removed mid-scan is never left out of (or in) the library.</summary>

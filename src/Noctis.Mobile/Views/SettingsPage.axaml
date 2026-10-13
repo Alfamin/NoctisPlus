@@ -493,7 +493,7 @@
 
                 <ScrollViewer Name="SubScroll" Classes="page-scroll" HorizontalScrollBarVisibility="Disabled" IsVisible="False">
                     <Panel>
-                        <!-- Music Folders: each folder with its Remove, then Add Folder. -->
+                        <!-- Music Folders: each folder with its Remove, then Add Folder, then Scan on Startup. -->
                         <StackPanel Name="FoldersPane" Classes="grouped-content" IsVisible="{Binding ShowsFoldersPane}">
                             <StackPanel>
                                 <Border Name="FoldersCard" Classes="group-card">
@@ -556,6 +556,15 @@
                                     </Button>
                                 </Border>
                                 <TextBlock Name="FoldersFootnoteLabel" Classes="group-footnote" Text="{Binding FoldersFootnote}" />
+                            </StackPanel>
+                            <StackPanel>
+                                <Border Classes="group-card">
+                                    <ToggleButton Name="ScanOnStartupSwitch" Classes="switch-row" AutomationProperties.Name="Scan on Startup"
+                                                  IsChecked="{Binding Shell.Library.ScanOnStartup}">
+                                        <TextBlock Classes="row-label" Text="Scan on Startup" />
+                                    </ToggleButton>
+                                </Border>
+                                <TextBlock Classes="group-footnote" Text="Looks for new songs in these folders each time Noctis opens." />
                             </StackPanel>
                         </StackPanel>
 

@@ -133,6 +133,31 @@ public class MobileLibraryViewModelTests : IDisposable
         Assert.Single(library.ScanPasses);
     }
 
+    /// <summary>Desktop parity (Scan on Startup): on by default, a launch rescans the folders; off
+    /// (saved to settings.json), it does not; with no folder there is nothing to scan.</summary>
+    [Fact]
+    public async Task ScanOnStartup_ScansAtLaunchWhenOn_AndIsSaved()
+    {
+        var (vm, library, _, persistence) = await WithFolders(Tones);
+        Assert.True(vm.ScanOnStartup);
+
+        await vm.ScanAtStartupAsync();
+        Assert.Equal(new[] { Tones }, library.ScanPasses.Single());
+
+        vm.ScanOnStartup = false;
+        for (var waited = 0; (await persistence.LoadSettingsAsync()).ScanOnStartup && waited < 5000; waited += 10) await Task.Delay(10);
+        Assert.False((await persistence.LoadSettingsAsync()).ScanOnStartup);
+        await vm.ScanAtStartupAsync();
+        Assert.Single(library.ScanPasses);
+
+        var emptyLibrary = new FakeLibraryService();
+        var empty = new LibraryViewModel(emptyLibrary, new PersistenceService(Path.Combine(_root, "empty")), new ScriptedPicker(), marshal: a => a());
+        await empty.InitializeAsync();
+        Assert.True(empty.ScanOnStartup);
+        await empty.ScanAtStartupAsync();
+        Assert.Empty(emptyLibrary.ScanPasses);
+    }
+
     /// <summary>A folder added or removed while a scan runs: the scan goes again with the folders
     /// as they are now (it used to return at once, and the new folder's songs never came).</summary>
     [Fact]
