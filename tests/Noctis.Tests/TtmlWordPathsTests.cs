@@ -265,6 +265,24 @@ public class TtmlWordPathsTests : IDisposable
         AssertLineSync(PageLines(track));
     }
 
+    [Fact]
+    public async Task EditInfo_RetimingOneLine_KeepsTheBackgroundVocals()
+    {
+        // The Timestamp Lyrics rows are rebuilt into the text on any touch. The "[bg: …]" line
+        // under a sung line has no stamp of its own and was taken for a header tag ([ar:],
+        // [ti:]) and left out of the rows — so nudging any line dropped every background vocal.
+        var (vm, track) = await OpenEditInfo(Song(), LyricsSaveTarget.Sidecar);
+        vm.ImportLyricsText(WordTtml, "song.ttml");
+        Assert.Contains("[bg: ", vm.SyncedLyrics);
+
+        vm.SyncedLyricLines.Last(l => l.HasTimestamp).Nudge(forward: true);
+        await vm.SaveCommand.ExecuteAsync(null);
+
+        Assert.Contains("[00:08.10]", track.SyncedLyrics);
+        var lines = Sung(PageLines(track));
+        Assert.Equal(new[] { "(oh", "oh)" }, lines[0].BackgroundWords!.Select(w => w.Text.Trim()));
+    }
+
     // ── (d) Lyrics Studio ──
 
     [Fact]
