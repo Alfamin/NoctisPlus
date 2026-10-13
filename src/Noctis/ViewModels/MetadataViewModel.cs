@@ -2020,10 +2020,13 @@ public partial class MetadataViewModel : ViewModelBase
         var (rows, background) = LrcEditorViewModel.SplitBackgroundLines(source ?? string.Empty);
         for (var i = 0; i < rows.Count; i++)
         {
-            var line = new SyncedLyricEditorLine(rows[i].Time, rows[i].Text) { BackgroundLines = background.GetValueOrDefault(i) };
+            var line = new SyncedLyricEditorLine(rows[i].Time, rows[i].Text, rows[i].WordAnchor) { BackgroundLines = background.GetValueOrDefault(i) };
             line.Changed += OnSyncedLineChanged;
             SyncedLyricLines.Add(line);
         }
+        var owners = LrcEditorViewModel.CompanionOwners(rows.Select(r => (r.Time, r.Text)).ToList());
+        for (var i = 0; i < owners.Length; i++)
+            if (owners[i] >= 0) (SyncedLyricLines[owners[i]].Companions ??= new List<SyncedLyricEditorLine>()).Add(SyncedLyricLines[i]);
 
         HasSyncedLines = SyncedLyricLines.Count > 0;
         HasWordTimedLines = SyncedLyricLines.Any(l => l.HasWordTiming);
@@ -2036,9 +2039,9 @@ public partial class MetadataViewModel : ViewModelBase
     {
         SyncedLyrics = string.Join("\n", SyncedLyricLines.Select(l =>
             (l.Timestamp is { } t
-                ? $"[{LrcEditorViewModel.FormatTimestamp(t)}]{l.Text}"
-                : l.Text)
-            + (l.BackgroundLines is { Count: > 0 } bg ? "\n" + string.Join("\n", bg) : string.Empty)));
+                ? $"[{LrcEditorViewModel.FormatTimestamp(t)}]{l.SavedText}"
+                : l.SavedText)
+            + (l.SavedBackgroundLines is { Count: > 0 } bg ? "\n" + string.Join("\n", bg) : string.Empty)));
 
         // Manually timing lines counts as having custom synced lyrics. Save gates
         // the synced write on HasCustomSyncedLyrics, which stays false when the
