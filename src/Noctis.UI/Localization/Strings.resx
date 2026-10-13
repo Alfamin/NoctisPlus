@@ -87,6 +87,8 @@ Deezer and TIDAL: paste the link.</value></data>
   <data name="Common.Close" xml:space="preserve"><value>Close</value></data>
   <data name="Common.Create" xml:space="preserve"><value>Create</value></data>
   <data name="Common.Done" xml:space="preserve"><value>Done</value></data>
+  <data name="Common.Increase" xml:space="preserve"><value>Increase</value><comment>Accessible name of a number box's up button</comment></data>
+  <data name="Common.Decrease" xml:space="preserve"><value>Decrease</value><comment>Accessible name of a number box's down button</comment></data>
 
   <!-- Top bar -->
   <data name="Tab.Library" xml:space="preserve"><value>Library</value><comment>Header before any section is chosen</comment></data>
@@ -288,6 +290,7 @@ Deezer and TIDAL: paste the link.</value></data>
   <data name="Settings.SongProgressTaskbar" xml:space="preserve"><value>Song Progress on Taskbar</value><comment>Text in SettingsView.axaml</comment></data>
   <data name="Settings.ShowHowFarAlong" xml:space="preserve"><value>Show song progress on the taskbar button. Amber while paused.</value><comment>Text in SettingsView.axaml</comment></data>
   <data name="Settings.AutomaticAlbumCoverSize" xml:space="preserve"><value>Automatic Album Cover Size</value><comment>Text in SettingsView.axaml</comment></data>
+  <data name="Settings.AlbumCoverSize" xml:space="preserve"><value>Album cover size</value><comment>Accessible name of the cover size slider (Smaller / Larger) in SettingsView.axaml</comment></data>
   <data name="Settings.FiveCoversPerRow" xml:space="preserve"><value>Five covers per row. Turn off to pick your own cover size.</value><comment>Text in SettingsView.axaml</comment></data>
   <data name="Settings.Smaller" xml:space="preserve"><value>Smaller</value><comment>Text in SettingsView.axaml</comment></data>
   <data name="Settings.Larger" xml:space="preserve"><value>Larger</value><comment>Text in SettingsView.axaml</comment></data>
@@ -412,6 +415,7 @@ Deezer and TIDAL: paste the link.</value></data>
   <data name="Settings.Equalizer" xml:space="preserve"><value>Equalizer</value><comment>Text in SettingsView.axaml</comment></data>
   <data name="Settings.ParametricEQTuneEach" xml:space="preserve"><value>Tune each band's frequency, gain and width.</value><comment>Text in SettingsView.axaml</comment></data>
   <data name="Settings.Preamp" xml:space="preserve"><value>Preamp</value><comment>Text in SettingsView.axaml</comment></data>
+  <data name="Settings.EqPreset" xml:space="preserve"><value>Equalizer preset</value><comment>Accessible name of the equalizer preset picker in SettingsView.axaml</comment></data>
   <data name="Settings.LevelBeforeEQLowerTip" xml:space="preserve"><value>Level before the EQ — lower it if boosted bands distort. Double-tap to reset.</value><comment>ToolTip.Tip in SettingsView.axaml</comment></data>
   <data name="Settings.FREQUENCY" xml:space="preserve"><value>FREQUENCY</value><comment>Text in SettingsView.axaml</comment></data>
   <data name="Settings.GAIN" xml:space="preserve"><value>GAIN</value><comment>Text in SettingsView.axaml</comment></data>
@@ -872,7 +876,9 @@ Deezer and TIDAL: paste the link.</value></data>
   <data name="CreateSmartPlaylist.To" xml:space="preserve"><value>To...</value><comment>Watermark in CreateSmartPlaylistDialog.axaml</comment></data>
   <data name="CreateSmartPlaylist.AddRule" xml:space="preserve"><value>Add rule</value><comment>Text in CreateSmartPlaylistDialog.axaml</comment></data>
   <data name="CreateSmartPlaylist.Limit" xml:space="preserve"><value>Limit to</value><comment>Content in CreateSmartPlaylistDialog.axaml</comment></data>
+  <data name="CreateSmartPlaylist.LimitCount" xml:space="preserve"><value>Number of tracks</value><comment>Accessible name of the limit number box in CreateSmartPlaylistDialog.axaml</comment></data>
   <data name="CreateSmartPlaylist.TracksSortedBy" xml:space="preserve"><value>tracks, sorted by</value><comment>Text in CreateSmartPlaylistDialog.axaml</comment></data>
+  <data name="CreateSmartPlaylist.SortBy" xml:space="preserve"><value>Sort by</value><comment>Accessible name of the sort box in CreateSmartPlaylistDialog.axaml (its visible lead-in is "tracks, sorted by")</comment></data>
   <data name="CreateSmartPlaylist.Subtitle" xml:space="preserve"><value>Fills itself from rules you set</value><comment>One-line purpose under the title in CreateSmartPlaylistDialog.axaml</comment></data>
   <data name="CreateSmartPlaylist.Name" xml:space="preserve"><value>Name</value><comment>Field label in CreateSmartPlaylistDialog.axaml</comment></data>
   <data name="CreateSmartPlaylist.Description" xml:space="preserve"><value>Description</value><comment>Field label in CreateSmartPlaylistDialog.axaml</comment></data>
@@ -1682,6 +1688,7 @@ Saving replaces them with the lyrics on screen. A lyrics file Noctis didn't writ
   <data name="PlaybackBar.QueueTip" xml:space="preserve"><value>Queue</value><comment>ToolTip.Tip in PlaybackBarView.axaml</comment></data>
   <data name="PlaybackBar.LyricsTip" xml:space="preserve"><value>Lyrics</value><comment>ToolTip.Tip in PlaybackBarView.axaml</comment></data>
   <data name="PlaybackBar.VolumeTip" xml:space="preserve"><value>Volume</value><comment>ToolTip.Tip in PlaybackBarView.axaml</comment></data>
+  <data name="PlaybackBar.Seek" xml:space="preserve"><value>Playback position</value><comment>Accessible name of the seek bars (island, lyrics page timeline, mini player)</comment></data>
 
   <!-- PlaylistDescriptionDialog.axaml (auto-migrated) -->
   <data name="PlaylistDescription.PlaylistDescription" xml:space="preserve"><value>Playlist Description</value><comment>Title in PlaylistDescriptionDialog.axaml</comment></data>
@@ -2456,6 +2463,7 @@ The lines and their timings are dropped and an empty lyrics box opens for your o
   <data name="LyricsStudio.ComposeCheck" xml:space="preserve"><value>Check the lyrics below, one line per sung line, then press Align lyrics.</value><comment>Lyrics box hint when text is present</comment></data>
   <data name="LyricsStudio.TranscriptBanner" xml:space="preserve"><value>Experimental transcript. Sung vocals often transcribe poorly, so fix the words below, then press Align lyrics to time them.</value><comment>Lyrics box banner after a transcription</comment></data>
   <data name="LyricsStudio.PasteWatermark" xml:space="preserve"><value>Paste the lyrics here, one line per sung line…</value><comment>Lyrics box watermark</comment></data>
+  <data name="LyricsStudio.LyricsBox" xml:space="preserve"><value>Lyrics</value><comment>Accessible name of the lyrics box (its watermark disappears once text is in)</comment></data>
   <data name="LyricsStudio.ImportFile" xml:space="preserve"><value>Import file…</value><comment>Lyrics box button</comment></data>
   <data name="LyricsStudio.ImportFileTip" xml:space="preserve"><value>Load lyrics from a .txt, .lrc, .elrc or .ttml file (timestamps are dropped and re-timed)</value><comment>Tooltip</comment></data>
   <data name="LyricsStudio.TranscribeDraft" xml:space="preserve"><value>Listen instead · Experimental</value><comment>Lyrics box button: transcribe the song into the box</comment></data>

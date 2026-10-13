@@ -1438,6 +1438,10 @@ public partial class LyricsStudioViewModel : ViewModelBase
 
         public Track Track { get; }
 
+        /// <summary>A queue row reads its song, "title, artist" (it read
+        /// "Noctis.ViewModels.LyricsStudioViewModel+StudioItem").</summary>
+        public override string ToString() => Track.ToString();
+
         /// <summary>What the song has right now — .elrc / .lrc sidecars and embedded tags, LRC and ELRC told apart.</summary>
         [ObservableProperty]
         [NotifyPropertyChangedFor(nameof(StateText))]

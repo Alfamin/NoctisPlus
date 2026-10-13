@@ -197,6 +197,9 @@
             <Setter Property="Foreground" Value="{DynamicResource MiniDrawerTextSoft}"/>
         </Style>
         <Style Selector="Slider.mini-seek">
+            <!-- Every design's seek bar reads what it is; unnamed, its peer had no name
+                 at all beside the "0:00" time label. -->
+            <Setter Property="AutomationProperties.Name" Value="{loc:T PlaybackBar.Seek}"/>
             <Setter Property="Height" Value="16"/>
             <Setter Property="ClipToBounds" Value="True"/>
             <Setter Property="Foreground" Value="{DynamicResource AccentColorBrush}"/>

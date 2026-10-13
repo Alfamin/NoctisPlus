@@ -1293,6 +1293,7 @@
                                old 6px strip made a seek near the art open the Mini Player. -->
                           <Slider Value="{Binding PositionFraction, Mode=TwoWay}"
                                   Classes="seek-slider"
+                                  AutomationProperties.Name="{loc:T PlaybackBar.Seek}"
                                   Minimum="0" Maximum="1"
                                   Focusable="False"
                                   Height="14"

@@ -87,6 +87,8 @@ Deezer и TIDAL: вставьте ссылку.</value></data>
   <data name="Common.Close" xml:space="preserve"><value>Закрыть</value></data>
   <data name="Common.Create" xml:space="preserve"><value>Создать</value></data>
   <data name="Common.Done" xml:space="preserve"><value>Готово</value></data>
+  <data name="Common.Increase" xml:space="preserve"><value>Увеличить</value><comment>Accessible name of a number box's up button</comment></data>
+  <data name="Common.Decrease" xml:space="preserve"><value>Уменьшить</value><comment>Accessible name of a number box's down button</comment></data>
 
   <!-- Top bar -->
   <data name="Tab.Library" xml:space="preserve"><value>Медиатека</value><comment>Header before any section is chosen</comment></data>
@@ -288,6 +290,7 @@ Deezer и TIDAL: вставьте ссылку.</value></data>
   <data name="Settings.SongProgressTaskbar" xml:space="preserve"><value>Прогресс песни на панели задач</value><comment>Text in SettingsView.axaml</comment></data>
   <data name="Settings.ShowHowFarAlong" xml:space="preserve"><value>Показывать прогресс песни на кнопке в панели задач. На паузе — янтарным.</value><comment>Text in SettingsView.axaml</comment></data>
   <data name="Settings.AutomaticAlbumCoverSize" xml:space="preserve"><value>Автоматический размер обложек</value><comment>Text in SettingsView.axaml</comment></data>
+  <data name="Settings.AlbumCoverSize" xml:space="preserve"><value>Размер обложек альбомов</value><comment>Accessible name of the cover size slider (Smaller / Larger) in SettingsView.axaml</comment></data>
   <data name="Settings.FiveCoversPerRow" xml:space="preserve"><value>Пять обложек в ряду. Выключите, чтобы задать размер самостоятельно.</value><comment>Text in SettingsView.axaml</comment></data>
   <data name="Settings.Smaller" xml:space="preserve"><value>Меньше</value><comment>Text in SettingsView.axaml</comment></data>
   <data name="Settings.Larger" xml:space="preserve"><value>Больше</value><comment>Text in SettingsView.axaml</comment></data>
@@ -412,6 +415,7 @@ Deezer и TIDAL: вставьте ссылку.</value></data>
   <data name="Settings.Equalizer" xml:space="preserve"><value>Эквалайзер</value><comment>Text in SettingsView.axaml</comment></data>
   <data name="Settings.ParametricEQTuneEach" xml:space="preserve"><value>Настройте частоту, усиление и ширину каждой полосы.</value><comment>Text in SettingsView.axaml</comment></data>
   <data name="Settings.Preamp" xml:space="preserve"><value>Предусиление</value><comment>Text in SettingsView.axaml</comment></data>
+  <data name="Settings.EqPreset" xml:space="preserve"><value>Пресет эквалайзера</value><comment>Accessible name of the equalizer preset picker in SettingsView.axaml</comment></data>
   <data name="Settings.LevelBeforeEQLowerTip" xml:space="preserve"><value>Уровень перед эквалайзером — понизьте, если усиленные полосы искажаются. Двойной щелчок — сброс.</value><comment>ToolTip.Tip in SettingsView.axaml</comment></data>
   <data name="Settings.FREQUENCY" xml:space="preserve"><value>ЧАСТОТА</value><comment>Text in SettingsView.axaml</comment></data>
   <data name="Settings.GAIN" xml:space="preserve"><value>УСИЛЕНИЕ</value><comment>Text in SettingsView.axaml</comment></data>
@@ -872,7 +876,9 @@ Deezer и TIDAL: вставьте ссылку.</value></data>
   <data name="CreateSmartPlaylist.To" xml:space="preserve"><value>До...</value><comment>Watermark in CreateSmartPlaylistDialog.axaml</comment></data>
   <data name="CreateSmartPlaylist.AddRule" xml:space="preserve"><value>Добавить правило</value><comment>Text in CreateSmartPlaylistDialog.axaml</comment></data>
   <data name="CreateSmartPlaylist.Limit" xml:space="preserve"><value>Ограничить до</value><comment>Content in CreateSmartPlaylistDialog.axaml</comment></data>
+  <data name="CreateSmartPlaylist.LimitCount" xml:space="preserve"><value>Число треков</value><comment>Accessible name of the limit number box in CreateSmartPlaylistDialog.axaml</comment></data>
   <data name="CreateSmartPlaylist.TracksSortedBy" xml:space="preserve"><value>треков, сортировка по</value><comment>Text in CreateSmartPlaylistDialog.axaml</comment></data>
+  <data name="CreateSmartPlaylist.SortBy" xml:space="preserve"><value>Сортировка</value><comment>Accessible name of the sort box in CreateSmartPlaylistDialog.axaml (its visible lead-in is "tracks, sorted by")</comment></data>
   <data name="CreateSmartPlaylist.Subtitle" xml:space="preserve"><value>Заполняется сам по заданным правилам</value><comment>One-line purpose under the title in CreateSmartPlaylistDialog.axaml</comment></data>
   <data name="CreateSmartPlaylist.Name" xml:space="preserve"><value>Название</value><comment>Field label in CreateSmartPlaylistDialog.axaml</comment></data>
   <data name="CreateSmartPlaylist.Description" xml:space="preserve"><value>Описание</value><comment>Field label in CreateSmartPlaylistDialog.axaml</comment></data>
@@ -1682,6 +1688,7 @@ Deezer и TIDAL: вставьте ссылку.</value></data>
   <data name="PlaybackBar.QueueTip" xml:space="preserve"><value>Очередь</value><comment>ToolTip.Tip in PlaybackBarView.axaml</comment></data>
   <data name="PlaybackBar.LyricsTip" xml:space="preserve"><value>Текст</value><comment>ToolTip.Tip in PlaybackBarView.axaml</comment></data>
   <data name="PlaybackBar.VolumeTip" xml:space="preserve"><value>Громкость</value><comment>ToolTip.Tip in PlaybackBarView.axaml</comment></data>
+  <data name="PlaybackBar.Seek" xml:space="preserve"><value>Позиция воспроизведения</value><comment>Accessible name of the seek bars (island, lyrics page timeline, mini player)</comment></data>
 
   <!-- PlaylistDescriptionDialog.axaml (auto-migrated) -->
   <data name="PlaylistDescription.PlaylistDescription" xml:space="preserve"><value>Описание плейлиста</value><comment>Title in PlaylistDescriptionDialog.axaml</comment></data>
@@ -2456,6 +2463,7 @@ Deezer и TIDAL: вставьте ссылку.</value></data>
   <data name="LyricsStudio.ComposeCheck" xml:space="preserve"><value>Проверьте текст ниже — по одной строке на каждую спетую строку, — затем нажмите «Выровнять текст».</value><comment>Lyrics box hint when text is present</comment></data>
   <data name="LyricsStudio.TranscriptBanner" xml:space="preserve"><value>Экспериментальная расшифровка. Пение часто распознаётся плохо, поэтому исправьте слова ниже, затем нажмите «Выровнять текст», чтобы расставить тайминг.</value><comment>Lyrics box banner after a transcription</comment></data>
   <data name="LyricsStudio.PasteWatermark" xml:space="preserve"><value>Вставьте сюда текст, по одной строке на каждую спетую строку…</value><comment>Lyrics box watermark</comment></data>
+  <data name="LyricsStudio.LyricsBox" xml:space="preserve"><value>Текст песни</value><comment>Accessible name of the lyrics box (its watermark disappears once text is in)</comment></data>
   <data name="LyricsStudio.ImportFile" xml:space="preserve"><value>Импортировать файл…</value><comment>Lyrics box button</comment></data>
   <data name="LyricsStudio.ImportFileTip" xml:space="preserve"><value>Загрузить текст из файла .txt, .lrc, .elrc или .ttml (метки времени отбрасываются и расставляются заново)</value><comment>Tooltip</comment></data>
   <data name="LyricsStudio.TranscribeDraft" xml:space="preserve"><value>Распознать на слух · Экспериментально</value><comment>Lyrics box button: transcribe the song into the box</comment></data>

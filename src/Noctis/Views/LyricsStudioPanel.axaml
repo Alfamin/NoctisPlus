@@ -472,7 +472,8 @@
                     </StackPanel>
                 </Border>
                 <!-- Settings: the language and run options behind one popover (09-23). -->
-                <Button x:Name="StudioSettingsButton" Grid.Column="2" Classes="studio-btn studio-options" Margin="8,0,0,0">
+                <Button x:Name="StudioSettingsButton" Grid.Column="2" Classes="studio-btn studio-options" Margin="8,0,0,0"
+                        AutomationProperties.Name="{loc:T LyricsStudio.Settings}">
                     <StackPanel Orientation="Horizontal" Spacing="6">
                         <TextBlock Text="{loc:T LyricsStudio.Settings}" VerticalAlignment="Center" />
                         <PathIcon Data="{StaticResource ChevronDownThinIcon}" Width="10" Height="10" Opacity="0.7" VerticalAlignment="Center" />
@@ -696,6 +697,7 @@
                         </Grid>
                         <!-- The pill pop-ups' multi-line box: filled, no rim at rest, the accent ring while typing. -->
                         <TextBox x:Name="LyricsBox" Classes="pill-area" Text="{Binding Selected.DraftText}" AcceptsReturn="True" TextWrapping="Wrap"
+                                 AutomationProperties.Name="{loc:T LyricsStudio.LyricsBox}"
                                  PlaceholderText="{loc:T LyricsStudio.PasteWatermark}" FontSize="13"
                                  ScrollViewer.VerticalScrollBarVisibility="Auto" IsEnabled="{Binding !IsRunning}" />
                     </DockPanel>

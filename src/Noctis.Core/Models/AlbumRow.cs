@@ -8,4 +8,7 @@ namespace Noctis.Models;
 public class AlbumRow
 {
     public List<Album> Albums { get; init; } = new();
+
+    /// <summary>A screen reader reads the row (a ListBoxItem) as the albums on it.</summary>
+    public override string ToString() => string.Join(", ", Albums.Select(a => a.Name));
 }

@@ -35,8 +35,11 @@
         </Style>
     </UserControl.Styles>
 
+    <!-- Reads the name the picker is given where it is used (its swatch Panel read
+         "Avalonia.Controls.Panel"). -->
     <Button x:Name="SwatchButton"
             Classes="color-swatch-btn"
+            AutomationProperties.Name="{Binding #Root.(AutomationProperties.Name)}"
             Cursor="Hand"
             Background="Transparent"
             BorderThickness="0"

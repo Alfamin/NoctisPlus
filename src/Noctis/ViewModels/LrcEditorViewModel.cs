@@ -68,6 +68,10 @@ public partial class LrcEditorLine : ObservableObject
     public string TimestampLabel => Timestamp is { } t
         ? LrcEditorViewModel.FormatTimestamp(t)
         : "--:--.--";
+
+    /// <summary>What a screen reader reads for the row: its time, then its words (the
+    /// ListBoxItem read "Noctis.ViewModels.LrcEditorLine").</summary>
+    public override string ToString() => HasTimestamp ? $"{TimestampLabel}, {DisplayText}" : DisplayText;
 }
 
 /// <summary>
