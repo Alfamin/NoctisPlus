@@ -564,6 +564,32 @@ public class AccessibleNamesTests
         Assert.Equal("Play", NameOf(text));
     }
 
+    /// <summary>A button whose content is a lone TextBlock read "Avalonia.Controls.TextBlock"
+    /// (Lyrics Studio's Back / Skip / Done and the lyrics page's Search lyrics, 10-13). It
+    /// reads the text, follows it, and an explicit name still wins.</summary>
+    [AvaloniaFact]
+    public void TextBlockContentNamesTheButton()
+    {
+        var label = new TextBlock { Text = "Search lyrics" };
+        var button = new Button { Content = label };
+        ToolTip.SetTip(button, "Opens the Search Lyrics dialog");
+        Assert.Equal("Search lyrics", NameOf(button));
+        label.Text = "Buscar letras";
+        Assert.Equal("Buscar letras", NameOf(button));
+        // No text (a description not loaded yet): the tooltip still names it.
+        label.Text = "";
+        Assert.Equal("Opens the Search Lyrics dialog", NameOf(button));
+        label.Text = "Search lyrics";
+        Assert.Equal("Search lyrics", NameOf(button));
+
+        button.Content = new PathIcon();
+        Assert.Equal("Opens the Search Lyrics dialog", NameOf(button));
+
+        var named = new Button { Content = new TextBlock { Text = "Done" } };
+        AutomationProperties.SetName(named, "Finish");
+        Assert.Equal("Finish", NameOf(named));
+    }
+
     /// <summary>Every input an editor exposes: the button-like controls of
     /// <see cref="Unnamed"/> plus text boxes, combo boxes, sliders and switches.</summary>
     private static List<string> UnnamedInputs(IEnumerable<Control> controls)
