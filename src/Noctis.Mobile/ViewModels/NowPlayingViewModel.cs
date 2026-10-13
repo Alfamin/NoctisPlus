@@ -87,7 +87,7 @@ public sealed partial class NowPlayingViewModel : ObservableObject, IDisposable
     private TimeSpan _duration;
 
     [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(IsRepeatOn), nameof(IsRepeatOne))]
+    [NotifyPropertyChangedFor(nameof(IsRepeatOn), nameof(IsRepeatOne), nameof(HasNext))]
     private RepeatMode _repeatMode;
 
     public bool IsRepeatOn => RepeatMode != RepeatMode.Off;
@@ -468,6 +468,7 @@ public sealed partial class NowPlayingViewModel : ObservableObject, IDisposable
     {
         UpNext.ReplaceAll(_queue.UpNext);
         OnPropertyChanged(nameof(HasUpNext));
+        OnPropertyChanged(nameof(HasNext));   // the mini player greys its Next with nothing to skip to
         // _queue.Current, not CurrentTrack: a queue that ran out keeps its last track loaded
         // for the mini bar, but has no place left to number.
         QueuePositionText = _queue.Current != null && _queue.PlayedInQueue is { } played

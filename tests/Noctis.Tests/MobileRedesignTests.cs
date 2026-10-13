@@ -274,7 +274,7 @@ public class MobileRedesignTests
     // ── Headers ──
 
     [AvaloniaFact]
-    public void Headers_TheListToolsSitInTheTitleRow_AndOnlyLibraryKeepsTheProfile()
+    public void Headers_TheListToolsSitInTheTitleRow_AndEveryTabHasTheProfile()
     {
         var a = MobileFixtures.Song("Alpha", favourite: true);
         using var rig = MobileFixtures.MakeRig(new[] { a });
@@ -286,14 +286,18 @@ public class MobileRedesignTests
         // One pill shows: the header's (the embedded list hides its own title row).
         var tools = favourites.GetVisualDescendants().OfType<ListTools>().Single(t => t.IsEffectivelyVisible);
         Assert.Same(rig.Shell.FavoritesRoot, tools.DataContext);
-        // No profile button outside Library: Settings is reached from Library's header.
-        Assert.DoesNotContain(favourites.GetVisualDescendants().OfType<Button>(), b => b.Command == rig.Shell.OpenSettingsCommand);
-        Assert.DoesNotContain(view.FindControl<Grid>("PlaylistsRoot")!.GetVisualDescendants().OfType<Button>(),
+        // Apple's tab headers each end in the profile circle (Settings), not Library's alone.
+        Assert.Contains(favourites.GetVisualDescendants().OfType<Button>(), b => b.Command == rig.Shell.OpenSettingsCommand);
+        rig.Shell.SelectTabCommand.Execute(MobileTab.Playlists);
+        window.UpdateLayout();
+        Assert.Contains(view.FindControl<Grid>("PlaylistsRoot")!.GetVisualDescendants().OfType<Button>(),
             b => b.Command == rig.Shell.OpenSettingsCommand);
 
         rig.Shell.SelectTabCommand.Execute(MobileTab.Search);
         rig.Shell.Search.Query = "alp";
         window.UpdateLayout();
+        Assert.Contains(MobileFixtures.Find<SearchPage>(view).GetVisualDescendants().OfType<Button>(),
+            b => b.Command == rig.Shell.OpenSettingsCommand);
         var sort = MobileFixtures.Named<Button>(view, "SortButton");
         var chips = MobileFixtures.Named<ScrollViewer>(view, "ScopeBar");
         // The sort button sits above the chip row, so the chips never scroll under it.
