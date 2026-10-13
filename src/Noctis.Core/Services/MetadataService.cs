@@ -707,8 +707,8 @@ public class MetadataService : IMetadataService
     /// Writing to a same-directory copy and atomically renaming it over the original
     /// leaves the player's open file descriptor pointing at the untouched original
     /// inode, so playback is undisturbed and the new tags take effect on next load.
-    /// Windows already serializes this through its file share lock, so the in-place
-    /// path is kept there to avoid a needless full-file copy.
+    /// Windows takes the same path (crash safety); there the rename over the playing
+    /// file needs POSIX semantics or the player letting go of it (see <see cref="ReplaceWithCopy"/>).
     /// </summary>
     private static bool SaveTagsAtomically(string targetFilePath, Action<TagLib.File> applyTags)
         => SaveTagsAtomically(targetFilePath, applyTags, out _);
@@ -741,8 +741,11 @@ public class MetadataService : IMetadataService
     /// The temp-copy + atomic-rename save behind <see cref="SaveTagsAtomically(string, Action{TagLib.File})"/>,
     /// throwing on failure (after removing the temp copy) so callers that retry on a
     /// transient <see cref="IOException"/> — the ReplayGain scanner — can tell it apart.
+    /// <paramref name="releaseOpenFile"/> false never has the player let go of the file (see
+    /// <see cref="ReplaceWithCopy"/>): a background write must not put a gap in the music.
     /// </summary>
-    internal static void SaveTagsAtomicallyOrThrow(string targetFilePath, Action<TagLib.File> applyTags)
+    internal static void SaveTagsAtomicallyOrThrow(string targetFilePath, Action<TagLib.File> applyTags,
+        bool releaseOpenFile = true)
     {
         // Same directory keeps the rename on one filesystem (so it is atomic); the
         // leading dot hides the transient file; the original extension is preserved
@@ -771,7 +774,7 @@ public class MetadataService : IMetadataService
                 applyTags(file);
                 file.Save();
             }
-            File.Move(tempPath, targetFilePath, overwrite: true);
+            ReplaceWithCopy(tempPath, targetFilePath, releaseOpenFile);
         }
         catch
         {
@@ -779,6 +782,74 @@ public class MetadataService : IMetadataService
             throw;
         }
     }
+
+    // Waits between rename attempts once the first one was refused: covers handles that
+    // close on their own (a waveform or BPM decode, an antivirus scan of the fresh copy)
+    // and a released holder whose handle closes a moment late (an ffmpeg being killed).
+    private static readonly int[] ReplaceRetryDelaysMs = [50, 100, 200, 400, 800];
+
+    /// <summary>Test seam: skip the POSIX rename, so a test reaches the release fallback on NTFS.</summary>
+    internal static bool PosixReplaceDisabled { get; set; }
+
+    /// <summary>
+    /// Renames the tagged copy over the original. Windows refuses to replace a file while
+    /// any handle on it is open (also one shared for delete: MoveFileEx is no POSIX rename),
+    /// and LibVLC keeps the playing and the staged next track open, so every save of the
+    /// playing track failed with "Access to the path is denied" (live, 10-13).
+    /// A refused rename is retried with POSIX semantics first: LibVLC's handle shares
+    /// delete, so on NTFS the new file takes the name while the player keeps reading the
+    /// old data, untouched, exactly as on macOS/Linux. Where that is refused too (FAT,
+    /// exFAT, network shares; a reader not sharing delete, like the side decode's ffmpeg)
+    /// the registered holders (<see cref="OpenFileHolders"/>) let go of the file, the rename
+    /// is retried briefly, and the holders open it again where they were.
+    /// </summary>
+    private static void ReplaceWithCopy(string tempPath, string targetFilePath, bool releaseOpenFile)
+    {
+        try
+        {
+            File.Move(tempPath, targetFilePath, overwrite: true);
+            return;
+        }
+        catch (Exception ex) when (IsFileInUse(ex))
+        {
+            if (OperatingSystem.IsWindows() && !PosixReplaceDisabled)
+            {
+                if (WindowsPosixRename.TryReplace(tempPath, targetFilePath, out var error))
+                    return;
+                DebugLog.Write("Metadata", $"POSIX replace of '{Path.GetFileName(targetFilePath)}' refused: "
+                    + WindowsPosixRename.Describe(error));
+            }
+            DebugLog.Write("Metadata", $"Replace of '{Path.GetFileName(targetFilePath)}' refused ({ex.Message}), retrying"
+                + (releaseOpenFile ? " with the file released" : ""));
+        }
+
+        if (releaseOpenFile)
+            OpenFileHolders.RunReleased(targetFilePath, () => MoveWithRetries(tempPath, targetFilePath));
+        else
+            MoveWithRetries(tempPath, targetFilePath);
+    }
+
+    private static void MoveWithRetries(string tempPath, string targetFilePath)
+    {
+        for (var attempt = 0; ; attempt++)
+        {
+            try
+            {
+                File.Move(tempPath, targetFilePath, overwrite: true);
+                return;
+            }
+            catch (Exception ex) when (IsFileInUse(ex) && attempt < ReplaceRetryDelaysMs.Length)
+            {
+                Thread.Sleep(ReplaceRetryDelaysMs[attempt]);
+            }
+        }
+    }
+
+    /// <summary>What a rename over a file something has open throws: access denied, or a
+    /// sharing violation. A missing file or folder is not worth a retry.</summary>
+    private static bool IsFileInUse(Exception ex) =>
+        ex is UnauthorizedAccessException ||
+        (ex is IOException && ex is not FileNotFoundException && ex is not DirectoryNotFoundException);
 
     /// <summary>Copies Unix mode bits from source to destination. No-op on Windows.</summary>
     private static void TryCopyUnixFileMode(string source, string destination)
