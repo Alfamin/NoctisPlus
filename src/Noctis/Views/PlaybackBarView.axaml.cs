@@ -1739,6 +1739,8 @@ public partial class PlaybackBarView : UserControl
             header.Children.Add(title);
             header.Children.Add(start);
             var row = new MenuItem { Header = header, Command = vm.SeekToChapterCommand, CommandParameter = chapter };
+            // A Grid header gives the row no accessible name; spell out title and start.
+            Avalonia.Automation.AutomationProperties.SetName(row, $"{title.Text}, {start.Text}");
             if (i == current)
                 row.Icon = new LineIcon { Data = MenuV2.FindGeometry(this, "MenuLineCheck"), Classes = { "mv2-icon", "mv2-check" } };
             item.Items.Add(row);

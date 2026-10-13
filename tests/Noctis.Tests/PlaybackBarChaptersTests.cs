@@ -1,3 +1,4 @@
+using Avalonia.Automation;
 using Avalonia.Controls;
 using Avalonia.Headless.XUnit;
 using Avalonia.Threading;
@@ -92,6 +93,8 @@ public class PlaybackBarChaptersTests
             Assert.Equal(3, rows.Count);
             Assert.Equal("Chapter One — Начало", ((TextBlock)((Grid)rows[1].Header!).Children[0]).Text);
             Assert.Equal("0:01", ((TextBlock)((Grid)rows[1].Header!).Children[1]).Text);
+            // The header is a Grid, so screen readers need the row's name spelled out.
+            Assert.Equal("Chapter One — Начало, 0:01", AutomationProperties.GetName(rows[1]));
             // Only the chapter under the playhead carries the tick.
             Assert.Null(rows[0].Icon);
             Assert.Contains("mv2-check", Assert.IsType<LineIcon>(rows[1].Icon).Classes);
