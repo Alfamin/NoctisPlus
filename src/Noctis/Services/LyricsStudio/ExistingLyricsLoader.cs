@@ -30,6 +30,9 @@ public static partial class ExistingLyricsLoader
 
     private static readonly TimeSpan DefaultWordSpan = TimeSpan.FromMilliseconds(420);
 
+    /// <summary>An ELRC background-vocal line: "[bg: &lt;mm:ss.xx&gt;word …&lt;mm:ss.xx&gt;]".</summary>
+    private const string BgLinePrefix = "[bg:";
+
     public static ExistingLyrics? Load(Track track)
     {
         var path = track.FilePath;
@@ -197,10 +200,22 @@ public static partial class ExistingLyricsLoader
     /// </summary>
     public static IReadOnlyList<AlignedLine> ParseTimed(string text)
     {
-        var raw = new List<(TimeSpan Start, string Text, List<WordTiming>? Words, LyricVoice Voice)>();
+        var raw = new List<(TimeSpan Start, string Text, List<WordTiming>? Words, LyricVoice Voice, List<AlignedWord>? Background)>();
         foreach (var rawLine in text.Replace("\r\n", "\n").Replace('\r', '\n').Split('\n'))
         {
             var line = rawLine.Trim();
+            // A "[bg: …]" background vocal belongs to the timed line above it in the file, as on
+            // the lyrics page (LrcParser). It looks like a header tag and was dropped with them,
+            // so a Studio save wrote the song without its background vocals.
+            if (line.StartsWith(BgLinePrefix, StringComparison.Ordinal))
+            {
+                if (raw.Count > 0 && ParseBackground(line, raw[^1].Start) is { } bg)
+                {
+                    var last = raw[^1];
+                    raw[^1] = last with { Background = last.Background is null ? bg : [.. last.Background, .. bg] };
+                }
+                continue;
+            }
             if (line.Length == 0 || MetadataTag().IsMatch(line)) continue;
 
             // Compressed lines carry several timestamps: one entry per stamp.
@@ -223,7 +238,7 @@ public static partial class ExistingLyricsLoader
             if (string.IsNullOrWhiteSpace(plain)) continue;
             // Word times are absolute, so they only make sense on a single-stamp line.
             var lineWords = stamps.Count == 1 ? words : null;
-            foreach (var s in stamps) raw.Add((s, plain.Trim(), lineWords, voice));
+            foreach (var s in stamps) raw.Add((s, plain.Trim(), lineWords, voice, null));
         }
         // Stable: List.Sort reordered lines sharing a start once a file passed 16 lines.
         raw = raw.OrderBy(r => r.Start).ToList();
@@ -232,7 +247,7 @@ public static partial class ExistingLyricsLoader
         var result = new List<AlignedLine>(raw.Count);
         for (var i = 0; i < raw.Count; i++)
         {
-            var (start, plain, words, voice) = raw[i];
+            var (start, plain, words, voice, background) = raw[i];
             var nextStart = i + 1 < raw.Count ? raw[i + 1].Start : (TimeSpan?)null;
             var aligned = new List<AlignedWord>();
             if (words is { Count: > 0 })
@@ -254,6 +269,7 @@ public static partial class ExistingLyricsLoader
             {
                 Companions = companions[i],
                 Voice = voice,
+                Background = background,
             });
         }
         return result;
@@ -291,10 +307,10 @@ public static partial class ExistingLyricsLoader
     /// Pulls companion lines (plain, same start, same voice as an earlier line there) out of
     /// <paramref name="raw"/>; returns each remaining line's companions, index-aligned with it.
     /// </summary>
-    private static List<List<string>?> GroupCompanions(List<(TimeSpan Start, string Text, List<WordTiming>? Words, LyricVoice Voice)> raw)
+    private static List<List<string>?> GroupCompanions(List<(TimeSpan Start, string Text, List<WordTiming>? Words, LyricVoice Voice, List<AlignedWord>? Background)> raw)
     {
         var companions = new List<List<string>?>(raw.Count);
-        var kept = new List<(TimeSpan, string, List<WordTiming>?, LyricVoice)>(raw.Count);
+        var kept = new List<(TimeSpan, string, List<WordTiming>?, LyricVoice, List<AlignedWord>?)>(raw.Count);
         var taken = new bool[raw.Count];
         for (var i = 0; i < raw.Count; i++)
         {
@@ -309,6 +325,8 @@ public static partial class ExistingLyricsLoader
                 var other = raw[k];
                 if (taken[k] || other.Words is { Count: > 0 } || other.Voice != main.Voice) continue;
                 taken[k] = true;
+                // A companion's background vocal is the line's (LrcParser moves it the same way).
+                if (other.Background is { } bg) main.Background = main.Background is null ? bg : [.. main.Background, .. bg];
                 if (seen.Add(other.Text)) (mine ??= new List<string>()).Add(other.Text);
             }
             kept.Add(main);
@@ -317,6 +335,31 @@ public static partial class ExistingLyricsLoader
         raw.Clear();
         raw.AddRange(kept);
         return companions;
+    }
+
+    /// <summary>
+    /// A "[bg: …]" line as timed words. Word tags give the times (a word with no end runs to the
+    /// next one, the last for <see cref="DefaultWordSpan"/>); a body with no tags is one word at
+    /// <paramref name="lineStart"/>, where the lyrics page puts it. Null when it holds no text.
+    /// </summary>
+    private static List<AlignedWord>? ParseBackground(string line, TimeSpan lineStart)
+    {
+        var body = line[BgLinePrefix.Length..];
+        if (body.EndsWith(']')) body = body[..^1];
+        var (plain, words) = EnhancedLrcParser.ParseLine(body);
+        if (string.IsNullOrWhiteSpace(plain)) return null;
+        if (words is not { Count: > 0 })
+            return [new AlignedWord(plain.Trim(), lineStart, lineStart + DefaultWordSpan)];
+
+        var result = new List<AlignedWord>(words.Count);
+        for (var w = 0; w < words.Count; w++)
+        {
+            var wText = words[w].Text.Trim();
+            if (wText.Length == 0) continue;
+            var end = words[w].End ?? (w + 1 < words.Count ? words[w + 1].Start : words[w].Start + DefaultWordSpan);
+            result.Add(new AlignedWord(wText, words[w].Start, end < words[w].Start ? words[w].Start : end));
+        }
+        return result.Count > 0 ? result : null;
     }
 
     private static bool TryParseFile(string path, out IReadOnlyList<AlignedLine> lines)

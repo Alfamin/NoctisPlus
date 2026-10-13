@@ -29,6 +29,12 @@ public sealed record AlignedLine(
     public IReadOnlyList<string>? Companions { get; init; }
 
     /// <summary>
+    /// The source line's background vocal (an ELRC "[bg: …]" line under it, a TTML x-bg span).
+    /// Not aligned; it moves with the line and is written back under it. Null when none.
+    /// </summary>
+    public IReadOnlyList<AlignedWord>? Background { get; init; }
+
+    /// <summary>
     /// The duet voice the source line carried (ELRC "v2:"/"v3:"), written back as a TTML agent.
     /// <see cref="Noctis.Models.LyricVoice.Default"/> for plain lines and for timed text.
     /// </summary>
