@@ -1920,13 +1920,28 @@ public partial class MetadataViewModel : ViewModelBase
         if (trimmed.All(char.IsAsciiDigit))
             return trimmed.Length >= 6 && long.TryParse(trimmed, out id);
 
-        // Otherwise it only counts as an ID if it is actually an Apple Music link.
-        if (!Uri.TryCreate(trimmed, UriKind.Absolute, out var uri) ||
-            !uri.Host.EndsWith("apple.com", StringComparison.OrdinalIgnoreCase))
+        // Otherwise it only counts as an ID if it is actually an Apple link — a real host
+        // comparison, with or without the scheme an address bar may have dropped.
+        var link = trimmed.Contains("://", StringComparison.Ordinal) ? trimmed : "https://" + trimmed;
+        if (!Uri.TryCreate(link, UriKind.Absolute, out var uri) ||
+            !(uri.Host.Equals("apple.com", StringComparison.OrdinalIgnoreCase) ||
+              uri.Host.EndsWith(".apple.com", StringComparison.OrdinalIgnoreCase)))
             return false;
 
-        var match = System.Text.RegularExpressions.Regex.Match(trimmed, @"\d{6,}");
-        return match.Success && long.TryParse(match.Value, out id);
+        // The ID is the last numeric path segment (".../<slug>/1500776322" or ".../id1500776322").
+        // Not the first 6+ digit run: the slug is the album title and can be a number itself
+        // (Vnuk's "1000000 - EP" is /album/1000000-ep/1628626875), and ?i= names a track.
+        var segments = uri.AbsolutePath.Split('/', StringSplitOptions.RemoveEmptyEntries);
+        for (var i = segments.Length - 1; i >= 0; i--)
+        {
+            var segment = segments[i].StartsWith("id", StringComparison.OrdinalIgnoreCase)
+                ? segments[i][2..]
+                : segments[i];
+            if (segment.Length >= 6 && segment.All(char.IsAsciiDigit) && long.TryParse(segment, out id))
+                return true;
+        }
+
+        return false;
     }
 
     // Set only when the user explicitly clears synced lyrics via the Remove button.

@@ -24,6 +24,8 @@ public class AnimatedArtworkLiveProbeTests
     [InlineData("MAYHEM Lady Gaga")]
     [InlineData("https://music.apple.com/us/album/yhlqmdlg/1500776322")]
     [InlineData("1500776322")]
+    [InlineData("https://music.apple.com/us/song/la-dificil/1500776327")]
+    [InlineData("https://music.apple.com/us/album/1000000-ep/1628626875")]
     [InlineData("HIT ME HARD AND SOFT Billie Eilish")]
     [InlineData("Die With A Smile Lady Gaga")]
     public async Task TypedQuery(string typed)
