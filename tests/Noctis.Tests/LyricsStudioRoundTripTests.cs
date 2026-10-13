@@ -90,6 +90,36 @@ public class LyricsStudioRoundTripTests : IDisposable
         Assert.Equal(TimeSpan.FromSeconds(2.1), ttml[0].BackgroundWords![0].Start);
     }
 
+    [AvaloniaFact]
+    public async Task Saved_KeepsTheSecondSinger_AndTheirTranslation()
+    {
+        // The review rows dropped the line's voice and the ELRC/LRC writers never wrote one,
+        // so a duet saved from the Studio came back with every line in the first singer's place.
+        const string duet =
+            "[00:01.00]<00:01.00>Paper <00:01.50>lanterns<00:02.00>\n" +
+            "[00:04.00]v2:<00:04.00>Silver <00:04.60>moon<00:05.00>\n" +
+            "[00:04.00]v2:Luna de plata\n" +
+            "[00:06.00]Quiet harbor";
+        var (vm, song) = StudioOn(duet);
+        vm.WordTimings = true;
+        vm.SaveTtml = true;
+        vm.Selected = vm.Queue[0];
+
+        await vm.SaveCommand.ExecuteAsync(null);
+        Assert.Equal(LyricsStudioViewModel.StudioStatus.Saved, vm.Queue[0].Status);
+
+        var voices = new[] { LyricVoice.Default, LyricVoice.Voice2, LyricVoice.Default };
+        foreach (var ext in new[] { ".elrc", ".lrc" })
+        {
+            var lines = LrcParser.Parse(File.ReadAllText(Path.ChangeExtension(song.FilePath!, ext)));
+            Assert.Equal(new[] { "Paper lanterns", "Silver moon", "Quiet harbor" }, lines.Select(l => l.Text));
+            Assert.Equal(voices, lines.Select(l => l.Voice));
+            Assert.Equal("Luna de plata", lines[1].Translation);
+        }
+        var (ttml, _) = TtmlParser.Parse(File.ReadAllText(Path.ChangeExtension(song.FilePath!, ".ttml")));
+        Assert.Equal(voices, ttml!.Select(l => l.Voice));
+    }
+
     [Fact]
     public void LyricsPageTtmlExport_KeepsTheBackgroundVocal()
     {

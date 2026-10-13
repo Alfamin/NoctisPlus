@@ -23,12 +23,25 @@ public static partial class TimedLyricsBuilder
         var sb = new StringBuilder();
         foreach (var line in Ordered(lines))
         {
-            sb.Append('[').Append(FormatTimestamp(line.Start)).Append(']').Append(line.Text).Append('\n');
+            sb.Append(Stamp(line)).Append(line.Text).Append('\n');
             AppendBackground(sb, line, timed: false);
             AppendCompanions(sb, line);
         }
         return sb.ToString().TrimEnd('\n');
     }
+
+    /// <summary>
+    /// "[mm:ss.xx]" at the line's start, then its duet voice as the reader's "v2:"/"v3:" marker
+    /// (none for the first singer). Without it a saved duet came back all in one voice, and a
+    /// second singer's romaji / translation no longer matched its line's voice and showed as sung.
+    /// </summary>
+    private static string Stamp(AlignedLine line) =>
+        "[" + FormatTimestamp(line.Start) + "]" + line.Voice switch
+        {
+            LyricVoice.Voice2 => "v2:",
+            LyricVoice.Group => "v3:",
+            _ => string.Empty,
+        };
 
     /// <summary>A line's romaji / translation lines (GitHub #116), at its own timestamp, as plain text.</summary>
     private static void AppendCompanions(StringBuilder sb, AlignedLine line)
@@ -36,7 +49,7 @@ public static partial class TimedLyricsBuilder
         if (line.Companions is not { Count: > 0 } companions) return;
         foreach (var c in companions)
             if (!string.IsNullOrWhiteSpace(c))
-                sb.Append('[').Append(FormatTimestamp(line.Start)).Append(']').Append(c.Trim()).Append('\n');
+                sb.Append(Stamp(line)).Append(c.Trim()).Append('\n');
     }
 
     /// <summary>
@@ -66,7 +79,7 @@ public static partial class TimedLyricsBuilder
         var sb = new StringBuilder();
         foreach (var line in Ordered(lines))
         {
-            sb.Append('[').Append(FormatTimestamp(line.Start)).Append(']').Append(BuildElrcBody(line)).Append('\n');
+            sb.Append(Stamp(line)).Append(BuildElrcBody(line)).Append('\n');
             AppendBackground(sb, line, timed: true);
             AppendCompanions(sb, line);
         }
