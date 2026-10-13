@@ -22,6 +22,44 @@ public sealed class MobileTheme
     private ResourceInclude? _overlay;
     private ResourceDictionary? _lightText;
     private ResourceDictionary? _accent;
+    private ResourceDictionary? _palette;
+
+    /// <summary>
+    /// The phone's own surface palette (iOS-style grouped pages, cards, hairlines, floating
+    /// chrome), keyed per variant so the always-dark scopes (Now Playing, Lyrics) pick the Dark set.
+    /// </summary>
+    public static ResourceDictionary BuildPalette()
+    {
+        static SolidColorBrush B(string hex) => new(Color.Parse(hex));
+        var palette = new ResourceDictionary();
+        palette.ThemeDictionaries[ThemeVariant.Light] = new ResourceDictionary
+        {
+            ["PhoneBackgroundBrush"] = B("#FFFFFF"),
+            ["PhoneGroupedBackgroundBrush"] = B("#F2F2F7"),
+            ["PhoneCardBrush"] = B("#FFFFFF"),
+            ["PhoneSeparatorBrush"] = B("#E3E3E6"),
+            ["PhoneFillBrush"] = B("#1F767680"),
+            ["PhoneChromeBrush"] = B("#E6FAFAFA"),
+            ["PhoneChromeOutlineBrush"] = B("#14000000"),
+            ["PhoneChromeSelectedBrush"] = B("#14000000"),
+            ["PhoneSecondaryTextBrush"] = B("#8A8A8E"),
+            ["PhoneChevronBrush"] = B("#C4C4C7"),
+        };
+        palette.ThemeDictionaries[ThemeVariant.Dark] = new ResourceDictionary
+        {
+            ["PhoneBackgroundBrush"] = B("#000000"),
+            ["PhoneGroupedBackgroundBrush"] = B("#1C1C1E"),
+            ["PhoneCardBrush"] = B("#2C2C2E"),
+            ["PhoneSeparatorBrush"] = B("#3A3A3C"),
+            ["PhoneFillBrush"] = B("#1C1C1E"),
+            ["PhoneChromeBrush"] = B("#E6232325"),
+            ["PhoneChromeOutlineBrush"] = B("#26FFFFFF"),
+            ["PhoneChromeSelectedBrush"] = B("#B3000000"),
+            ["PhoneSecondaryTextBrush"] = B("#8D8D93"),
+            ["PhoneChevronBrush"] = B("#5A5A5E"),
+        };
+        return palette;
+    }
 
     /// <summary>The theme last applied ("Light" or a dark theme), or null.</summary>
     public string? ThemeName { get; private set; }
@@ -67,6 +105,9 @@ public sealed class MobileTheme
             app.Resources.MergedDictionaries.Add(_lightText);
         }
 
+        _palette = BuildPalette();
+        app.Resources.MergedDictionaries.Add(_palette);
+
         var color = !string.IsNullOrWhiteSpace(accentHex) && Color.TryParse(accentHex, out var parsed)
             ? parsed
             : Color.Parse(DefaultAccent);
@@ -80,7 +121,9 @@ public sealed class MobileTheme
     {
         if (_overlay != null) app.Resources.MergedDictionaries.Remove(_overlay);
         if (_lightText != null) app.Resources.MergedDictionaries.Remove(_lightText);
+        if (_palette != null) app.Resources.MergedDictionaries.Remove(_palette);
         if (_accent != null) app.Resources.MergedDictionaries.Remove(_accent);
+        _palette = null;
         _overlay = null;
         _lightText = null;
         _accent = null;
