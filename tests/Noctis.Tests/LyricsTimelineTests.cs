@@ -203,6 +203,211 @@ public class LyricsTimelineTests
         Assert.False(a.IsActive);
     }
 
+    // ── Overlapping lines (TTML duets: a second voice starts before the first ends) ──
+
+    /// <summary>A sings 10–13 s, B starts at 12 s: one second of two voices at once.</summary>
+    private static (LyricLine A, LyricLine B, LyricLine C, LyricsTimeline T) Duet()
+    {
+        var a = WordLine(10, ("a1", 10, 11), ("a2", 11, 13));
+        var b = WordLine(12, ("b1", 12, 13), ("b2", 13, 14));
+        var c = Line(20, "c");
+        return (a, b, c, Make(Line(0, "intro"), a, b, c));
+    }
+
+    [Fact]
+    public void Overlapping_lines_are_both_active_with_their_own_word_progress()
+    {
+        var (a, b, _, t) = Duet();
+        t.Update(TimeSpan.FromSeconds(11));
+
+        var step = t.Update(TimeSpan.FromSeconds(12.5 - 0.08));
+
+        Assert.True(step.LineChanged);
+        Assert.Equal(2, step.ActiveIndex);                  // the scroll anchor is still the newest line
+        Assert.Same(b, step.ActiveLine);
+        Assert.Equal(new[] { 1, 2 }, t.ActiveIndices);
+        Assert.Equal(new[] { a, b }, t.ActiveLines);
+        Assert.True(a.IsActive);
+        Assert.True(b.IsActive);
+        Assert.Equal(1, a.CurrentWordIndex);                // a2, 11–13 s
+        Assert.Equal(0.75, a.Words![1].Progress, 3);
+        Assert.Equal(0, b.CurrentWordIndex);                // b1, 12–13 s
+        Assert.Equal(0.5, b.Words![0].Progress, 3);
+    }
+
+    [Fact]
+    public void Co_active_line_deactivates_fully_swept_once_its_end_passes()
+    {
+        var (a, b, _, t) = Duet();
+        t.Update(TimeSpan.FromSeconds(12.5));
+        Assert.True(a.IsActive);
+
+        var step = t.Update(TimeSpan.FromSeconds(13.5));
+
+        Assert.False(step.LineChanged);                     // primary is still B
+        Assert.True(step.ActiveSetChanged);
+        Assert.Equal(new[] { 2 }, t.ActiveIndices);
+        Assert.False(a.IsActive);
+        Assert.Equal(2, a.CurrentWordIndex);                // Words.Count: the "fully swept" sentinel
+        Assert.All(a.Words!, w => Assert.True(w.IsPast));
+        Assert.True(b.IsActive);
+
+        var quiet = t.Update(TimeSpan.FromSeconds(13.6));
+        Assert.False(quiet.ActiveSetChanged);
+    }
+
+    [Fact]
+    public void Overlap_shorter_than_the_minimum_keeps_single_line_behaviour()
+    {
+        // A's last word ends 200 ms into B: boundary slop, not a second voice.
+        var a = WordLine(10, ("a1", 10, 11), ("a2", 11, 12.2));
+        var b = WordLine(12, ("b1", 12, 13));
+        var t = Make(a, b);
+        t.Update(TimeSpan.FromSeconds(11));
+
+        var step = t.Update(TimeSpan.FromSeconds(12.1 - 0.08));
+
+        Assert.True(step.LineChanged);
+        Assert.Equal(new[] { 1 }, t.ActiveIndices);
+        Assert.False(a.IsActive);
+        Assert.Equal(2, a.CurrentWordIndex);
+        Assert.True(b.IsActive);
+    }
+
+    [Fact]
+    public void Plain_lrc_without_end_times_never_co_activates()
+    {
+        var a = Line(10, "a"); var b = Line(11, "b"); var c = Line(12, "c");
+        var t = Make(a, b, c);
+
+        t.Update(TimeSpan.FromSeconds(11.5));
+
+        Assert.Equal(new[] { 1 }, t.ActiveIndices);
+        Assert.False(a.IsActive);
+        Assert.True(b.IsActive);
+    }
+
+    [Fact]
+    public void Line_end_timestamp_alone_qualifies_a_plain_line()
+    {
+        // Line-timed TTML: <p begin end> without spans.
+        var a = Line(10, "a", endSec: 14);
+        var b = Line(12, "b", endSec: 15);
+        var t = Make(a, b);
+
+        t.Update(TimeSpan.FromSeconds(13));
+        Assert.Equal(new[] { 0, 1 }, t.ActiveIndices);
+
+        t.Update(TimeSpan.FromSeconds(14.1));
+        Assert.Equal(new[] { 1 }, t.ActiveIndices);
+        Assert.False(a.IsActive);
+    }
+
+    [Fact]
+    public void Seeking_back_before_a_co_active_line_clears_it()
+    {
+        var (a, b, _, t) = Duet();
+        t.Update(TimeSpan.FromSeconds(12.5));
+        Assert.True(a.IsActive && b.IsActive);
+
+        var step = t.Update(TimeSpan.FromSeconds(5));
+
+        Assert.True(step.ActiveSetChanged);
+        Assert.Equal(0, step.ActiveIndex);
+        Assert.Equal(new[] { 0 }, t.ActiveIndices);
+        Assert.False(a.IsActive);
+        Assert.False(b.IsActive);
+    }
+
+    [Fact]
+    public void Seeking_back_into_the_overlap_restores_both_lines()
+    {
+        var (a, b, c, t) = Duet();
+        t.Update(TimeSpan.FromSeconds(21));
+        Assert.True(c.IsActive);
+
+        t.Update(TimeSpan.FromSeconds(12.5));
+
+        Assert.Equal(new[] { 1, 2 }, t.ActiveIndices);
+        Assert.True(a.IsActive);
+        Assert.True(b.IsActive);
+        Assert.False(c.IsActive);
+        Assert.Equal(1, a.CurrentWordIndex);                // re-entry recomputes the real index
+    }
+
+    [Fact]
+    public void Reset_clears_every_active_line()
+    {
+        var (a, b, _, t) = Duet();
+        t.Update(TimeSpan.FromSeconds(12.5));
+
+        t.Reset();
+
+        Assert.Empty(t.ActiveIndices);
+        Assert.Empty(t.ActiveLines);
+        Assert.False(a.IsActive);
+        Assert.False(b.IsActive);
+    }
+
+    [Fact]
+    public void Co_active_line_still_updates_while_the_safety_branch_holds_the_primary()
+    {
+        // No intro line: a big seek back to before the first lyric resets the cursor
+        // without the backward walk, so no candidate matches and the safety branch holds
+        // the current primary (unchanged behaviour). The co-active line is in the future
+        // now and must not stay lit alongside it.
+        var a = WordLine(10, ("a1", 10, 11), ("a2", 11, 13));
+        var b = WordLine(12, ("b1", 12, 13), ("b2", 13, 14));
+        var t = Make(a, b);
+        t.Update(TimeSpan.FromSeconds(12.5));
+        Assert.Equal(new[] { 0, 1 }, t.ActiveIndices);
+
+        var step = t.Update(TimeSpan.FromSeconds(9));
+
+        Assert.False(step.LineChanged);
+        Assert.Same(b, step.ActiveLine);
+        Assert.True(step.ActiveSetChanged);
+        Assert.Equal(new[] { 1 }, t.ActiveIndices);
+        Assert.False(a.IsActive);
+        Assert.True(b.IsActive);
+    }
+
+    [Fact]
+    public void Co_active_open_last_word_is_bounded_by_its_own_next_line()
+    {
+        // A's main layer has a start-tag-only last word and no line end; its adlib runs
+        // to 13 s, past B's start, so A stays co-active. The open word must close at B's
+        // start (the line after A), not at C's (the line after the primary).
+        var a = Line(10, "a1");
+        a.BackgroundEndTimestamp = TimeSpan.FromSeconds(13);
+        a.BackgroundWords = new List<WordTiming>
+        {
+            new() { Text = "ah", Start = TimeSpan.FromSeconds(11), End = TimeSpan.FromSeconds(13) },
+        };
+        a.Words = new List<WordTiming> { new() { Text = "a1", Start = TimeSpan.FromSeconds(10) } };
+        var b = WordLine(11, ("b1", 11, 12));
+        var c = Line(30, "c");
+        var t = Make(a, b, c);
+
+        t.Update(TimeSpan.FromSeconds(11.5 - 0.08));
+
+        Assert.Equal(new[] { 0, 1 }, t.ActiveIndices);
+        Assert.Equal(KaraokeSweep.BandProgress(10, 11, 11.5), a.Words![0].Progress, 3);
+    }
+
+    [Fact]
+    public void Nearest_active_distance_measures_from_every_active_line()
+    {
+        var active = new[] { 3, 4 };
+        Assert.Equal(0, LyricsTimeline.DistanceToNearestActive(3, 4, active));
+        Assert.Equal(0, LyricsTimeline.DistanceToNearestActive(4, 4, active));
+        Assert.Equal(1, LyricsTimeline.DistanceToNearestActive(2, 4, active));
+        Assert.Equal(2, LyricsTimeline.DistanceToNearestActive(6, 4, active));
+        // A primary outside the set (caller-held index) still counts.
+        Assert.Equal(0, LyricsTimeline.DistanceToNearestActive(9, 9, active));
+        Assert.Equal(1, LyricsTimeline.DistanceToNearestActive(8, 9, Array.Empty<int>()));
+    }
+
     [Fact]
     public void Empty_list_is_inert()
     {
@@ -211,6 +416,7 @@ public class LyricsTimelineTests
         var step = t.Update(TimeSpan.FromSeconds(3));
 
         Assert.False(step.LineChanged);
+        Assert.False(step.ActiveSetChanged);
         Assert.Equal(-1, step.ActiveIndex);
     }
 }

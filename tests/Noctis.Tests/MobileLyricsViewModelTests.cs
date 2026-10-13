@@ -123,6 +123,39 @@ public class MobileLyricsViewModelTests : IDisposable
         Assert.Equal(0, vm.ActiveLineIndex);
     }
 
+    /// <summary>Two voices overlap 3–4 s: both lines are lit at full opacity with their own
+    /// word progress, and the ramp runs from the nearer of the two.</summary>
+    [Fact]
+    public async Task OverlappingDuetLines_AreBothLitAtFullOpacity()
+    {
+        var (vm, np, player, files, _) = Make();
+        files.Sidecars[".ttml"] = """
+            <tt xmlns="http://www.w3.org/ns/ttml" xmlns:ttm="http://www.w3.org/ns/ttml#metadata">
+              <body><div>
+                <p begin="1.000" end="4.000" ttm:agent="v1"><span begin="1.000" end="2.000">one</span> <span begin="2.000" end="4.000">two</span></p>
+                <p begin="3.000" end="5.000" ttm:agent="v2"><span begin="3.000" end="5.000">three</span></p>
+                <p begin="8.000" end="9.000" ttm:agent="v1"><span begin="8.000" end="9.000">four</span></p>
+                <p begin="10.000" end="11.000" ttm:agent="v1"><span begin="10.000" end="11.000">five</span></p>
+              </div></body>
+            </tt>
+            """;
+
+        np.PlayTracks(new[] { NewTrack("a") }, 0);
+        await WaitForAsync(() => vm.HasLyrics);
+        player.RaisePositionChanged(TimeSpan.FromSeconds(3.5));
+        vm.OnFrame(1000);
+
+        Assert.Equal(1, vm.ActiveLineIndex);                  // the newest line anchors the scroll
+        Assert.True(vm.Lines[0].IsActive);
+        Assert.True(vm.Lines[1].IsActive);
+        Assert.Equal(1, vm.Lines[0].CurrentWordIndex);        // "two", 2–4 s, still sweeping
+        Assert.Equal(0, vm.Lines[1].CurrentWordIndex);
+        Assert.Equal(1.0, vm.Lines[0].LineOpacity, 6);
+        Assert.Equal(1.0, vm.Lines[1].LineOpacity, 6);
+        Assert.Equal(0.55, vm.Lines[2].LineOpacity, 6);
+        Assert.Equal(0.32, vm.Lines[3].LineOpacity, 6);
+    }
+
     /// <summary>Nothing is sung before the first line, so nothing is dimmed (desktop
     /// UpdateLineOpacities(-1)); the ramp only starts once a line is active.</summary>
     [Fact]

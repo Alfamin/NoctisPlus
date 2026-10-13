@@ -244,16 +244,20 @@ public sealed partial class LyricsPageViewModel : ObservableObject, IDisposable
         }
 
         var step = _timeline.Update(TimeSpan.FromMilliseconds(Math.Max(0, audible)));
-        if (!step.LineChanged) return;
+        // Also re-ramp when an overlapping (duet) line joins or leaves the lit set
+        // while the active line stays.
+        if (!step.ActiveSetChanged) return;
         ActiveLineIndex = step.ActiveIndex;
         ApplyOpacities(step.ActiveIndex);
     }
 
     /// <summary>Before the first line (<paramref name="active"/> &lt; 0) every line is at full
     /// opacity, as the desktop's UpdateLineOpacities(-1) does: nothing is sung yet, so nothing
-    /// should read as dimmed.</summary>
+    /// should read as dimmed. Otherwise the ramp runs from the nearest lit line, so
+    /// overlapping duet lines all sit at full opacity.</summary>
     private void ApplyOpacities(int active)
     {
+        var lit = _timeline.ActiveIndices;
         for (var i = 0; i < Lines.Count; i++)
         {
             if (active < 0)
@@ -261,7 +265,7 @@ public sealed partial class LyricsPageViewModel : ObservableObject, IDisposable
                 Lines[i].LineOpacity = 1.0;
                 continue;
             }
-            var distance = Math.Abs(i - active);
+            var distance = LyricsTimeline.DistanceToNearestActive(i, active, lit);
             var ramp = distance < OpacityRamp.Length ? OpacityRamp[distance] : 0;
             Lines[i].LineOpacity = Math.Max(ramp, _minOpacity);
         }

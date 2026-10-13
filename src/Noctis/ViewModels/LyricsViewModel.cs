@@ -3512,10 +3512,17 @@ public partial class LyricsViewModel : ViewModelBase, IDisposable
         position -= LyricsOffset;
         if (position < TimeSpan.Zero) position = TimeSpan.Zero;
         var step = _timeline.Update(position);
-        if (!step.LineChanged) return;
+        // The set also changes without a line change: an overlapping (duet) line that
+        // stays lit under the active one finishes, so the ramp re-centres on what's left.
+        if (!step.ActiveSetChanged) return;
         if (DebugLog.VlcBridgeEnabled)
-            Views.LyricsView.Trace($"active {ActiveLineIndex}→{step.ActiveIndex} at {position.TotalMilliseconds:0}ms" +
-                                   (step.ActiveLine?.Timestamp is { } ts ? $" (line starts {ts.TotalMilliseconds:0}ms)" : ""));
+        {
+            var lit = _timeline.ActiveIndices.Count > 1 ? $" lit [{string.Join(",", _timeline.ActiveIndices)}]" : "";
+            Views.LyricsView.Trace(step.LineChanged
+                ? $"active {ActiveLineIndex}→{step.ActiveIndex} at {position.TotalMilliseconds:0}ms" +
+                  (step.ActiveLine?.Timestamp is { } ts ? $" (line starts {ts.TotalMilliseconds:0}ms)" : "") + lit
+                : $"lit set [{string.Join(",", _timeline.ActiveIndices)}] at {position.TotalMilliseconds:0}ms (active {step.ActiveIndex})");
+        }
         ActiveLineIndex = step.ActiveIndex;
         UpdateLineOpacities(step.ActiveIndex);
         UpdateWordClockSubscription();
@@ -3622,8 +3629,17 @@ public partial class LyricsViewModel : ViewModelBase, IDisposable
         && IsAnyLyricsSurfaceVisible
         && _player.State == Models.PlaybackState.Playing
         && _lyricsSyncTimer.IsEnabled
-        && (_timeline.ActiveLine?.HasWords == true || _timeline.ActiveLine?.HasBackgroundWords == true
-            || _timeline.ActiveLine?.HasTransliterationWords == true);
+        && AnyActiveLineHasWordLayer();
+
+    // Any lit line, not just the active one: an overlapping duet line keeps sweeping
+    // under a plain active line and would freeze if only the active line counted.
+    private bool AnyActiveLineHasWordLayer()
+    {
+        foreach (var line in _timeline.ActiveLines)
+            if (line.HasWords || line.HasBackgroundWords || line.HasTransliterationWords)
+                return true;
+        return false;
+    }
 
     private void OnWordClockFrame(TimeSpan _)
     {
@@ -3648,7 +3664,9 @@ public partial class LyricsViewModel : ViewModelBase, IDisposable
     }
 
     /// <summary>
-    /// Sets LineOpacity on each lyric line based on distance from the active line.
+    /// Sets LineOpacity on each lyric line based on distance from the nearest lit line
+    /// (the active line or an overlapping duet line still being sung, see
+    /// <see cref="LyricsTimeline.ActiveIndices"/>).
     /// Active=1.0, adjacent lines fade gradually over ±9 lines, rest=0.0 (hidden);
     /// fullscreen focus (opt-in) tightens the ramp to the active line ±2.
     /// Pass activeIndex=-1 to restore all lines to full opacity (e.g. unsynced or reset).
@@ -3676,10 +3694,11 @@ public partial class LyricsViewModel : ViewModelBase, IDisposable
         // from its lyrics. 0 keeps the ramp as designed.
         var floor = Math.Clamp(_player.LyricsMinLineOpacity, 0, 100) / 100.0;
 
+        // Distance to the NEAREST lit line: overlapping duet lines all sit at full focus.
+        var lit = _timeline.ActiveIndices;
         for (int i = 0; i < LyricLines.Count; i++)
         {
-            var dist = i - activeIndex;
-            var absDist = Math.Abs(dist);
+            var absDist = LyricsTimeline.DistanceToNearestActive(i, activeIndex, lit);
             var opacity = focus
                 ? absDist switch
                 {
