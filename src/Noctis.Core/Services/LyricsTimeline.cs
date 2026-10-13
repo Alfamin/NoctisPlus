@@ -132,10 +132,14 @@ public sealed class LyricsTimeline
 
         // Seek-backwards detection: rewind the cursor so we don't miss earlier lines.
         // 750ms threshold tolerates small non-monotonic jitter from the player position poll.
+        // It counts as a rewind: landing before the first lyric must clear the old line, not
+        // let the safety branch below hold it lit.
+        var rewound = false;
         if (_lastPosition != TimeSpan.MinValue &&
             position + TimeSpan.FromMilliseconds(750) < _lastPosition)
         {
             _cursor = 0;
+            rewound = true;
         }
         _lastPosition = position;
 
@@ -163,7 +167,6 @@ public sealed class LyricsTimeline
         // line: dragging backwards froze the lyrics until release finally delivered a big
         // enough discontinuity. Stepping back per sample makes both directions resolve on
         // the same tick, and still costs nothing during normal forward playback.
-        var rewound = false;
         while (_cursor > 0)
         {
             var current = _lines[_cursor];

@@ -350,12 +350,11 @@ public class LyricsTimelineTests
     }
 
     [Fact]
-    public void Co_active_line_still_updates_while_the_safety_branch_holds_the_primary()
+    public void Seeking_back_before_the_first_lyric_clears_every_lit_line()
     {
         // No intro line: a big seek back to before the first lyric resets the cursor
-        // without the backward walk, so no candidate matches and the safety branch holds
-        // the current primary (unchanged behaviour). The co-active line is in the future
-        // now and must not stay lit alongside it.
+        // without the backward walk. That reset is a rewind, so the safety branch must
+        // not hold the old line lit — it used to keep B (now in the future) highlighted.
         var a = WordLine(10, ("a1", 10, 11), ("a2", 11, 13));
         var b = WordLine(12, ("b1", 12, 13), ("b2", 13, 14));
         var t = Make(a, b);
@@ -364,12 +363,28 @@ public class LyricsTimelineTests
 
         var step = t.Update(TimeSpan.FromSeconds(9));
 
-        Assert.False(step.LineChanged);
-        Assert.Same(b, step.ActiveLine);
+        Assert.True(step.LineChanged);
         Assert.True(step.ActiveSetChanged);
-        Assert.Equal(new[] { 1 }, t.ActiveIndices);
+        Assert.Null(step.ActiveLine);
+        Assert.Equal(-1, step.ActiveIndex);
+        Assert.Empty(t.ActiveIndices);
         Assert.False(a.IsActive);
+        Assert.False(b.IsActive);
+    }
+
+    [Fact]
+    public void Seeking_back_before_the_first_plain_lyric_clears_the_active_line()
+    {
+        var a = Line(1.5, "a"); var b = Line(5, "b");
+        var t = Make(a, b);
+        t.Update(TimeSpan.FromSeconds(6));
         Assert.True(b.IsActive);
+
+        var step = t.Update(TimeSpan.FromSeconds(1.1));
+
+        Assert.Equal(-1, step.ActiveIndex);
+        Assert.False(b.IsActive);
+        Assert.False(a.IsActive);
     }
 
     [Fact]
