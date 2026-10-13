@@ -129,7 +129,7 @@
                             <PathIcon Data="{DynamicResource PhVolumeHigh}" />
                         </Button>
                         <Button Grid.Column="2" Name="QueueButton" Classes="icon" HorizontalAlignment="Center" Command="{Binding ToggleQueueCommand}">
-                            <PathIcon Data="{DynamicResource PhList}" />
+                            <PathIcon Data="{DynamicResource PhQueue}" />
                         </Button>
                     </Grid>
                 </StackPanel>

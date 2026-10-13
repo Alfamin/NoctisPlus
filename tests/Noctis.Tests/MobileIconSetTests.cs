@@ -52,7 +52,7 @@ public class MobileIconSetTests
             "PhPlayFill", "PhPauseFill", "PhForwardFill", "PhRewindFill", "PhShuffle", "PhRepeat", "PhRepeatOne",
             "PhHeart", "PhHeartFill", "PhMore", "PhBack", "PhClose", "PhChevronRight", "PhCheck", "PhSearch",
             "PhPerson", "PhList", "PhChevronDown", "PhLyrics", "PhVolumeLow", "PhVolumeHigh", "PhPlayNext",
-            "PhAddToQueue", "PhAddToPlaylist", "PhDownload", "PhTrash", "PhPin",
+            "PhAddToQueue", "PhAddToPlaylist", "PhDownload", "PhTrash", "PhPin", "PhQueue", "PhAlbum", "PhArtist",
         };
         Assert.Empty(keys.Where(k => !phone.ContainsKey(k)));
     }
