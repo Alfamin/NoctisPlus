@@ -1016,41 +1016,56 @@ public class MetadataService : IMetadataService
             var scanSize = (int)Math.Min(fs.Length, 1024 * 1024);
             var data = new byte[scanSize];
             int bytesRead = fs.Read(data, 0, scanSize);
+            var config = FindAlacConfig(data, bytesRead);
+            if (config.BitDepth > 0)
+                return config;
 
-            for (int i = 4; i < bytesRead - 32; i++)
-            {
-                if (data[i] != 'a' || data[i + 1] != 'l' || data[i + 2] != 'a' || data[i + 3] != 'c')
-                    continue;
-
-                // Box size is the 4 bytes before the type (big-endian).
-                int boxSize = (data[i - 4] << 24) | (data[i - 3] << 16) | (data[i - 2] << 8) | data[i - 1];
-
-                // Inner ALAC config box is small (typically 36 bytes).
-                // Outer ALAC sample entry is much larger (300+ bytes). Skip it.
-                if (boxSize < 28 || boxSize > 64)
-                    continue;
-
-                int configStart = i + 4; // past 'alac' type bytes
-
-                // bitDepth at config offset 9: version(4) + frameLength(4) + compatVersion(1)
-                int bdOffset = configStart + 9;
-                // sampleRate at config offset 24: +tuning(3) +channels(1) +maxRun(2) +maxFrameBytes(4) +avgBitRate(4)
-                int srOffset = configStart + 24;
-
-                if (srOffset + 3 >= bytesRead)
-                    continue;
-
-                int bd = data[bdOffset];
-                int sr = (data[srOffset] << 24) | (data[srOffset + 1] << 16) |
-                         (data[srOffset + 2] << 8) | data[srOffset + 3];
-
-                if (bd is 16 or 24 or 32)
-                    return (bd, sr >= 8000 ? sr : 0);
-            }
+            // moov after mdat (ffmpeg without +faststart — the Audio Converter's own ALAC
+            // output): the atom sits past the first megabyte. Read moov itself.
+            if (fs.Length > scanSize && Mp4ChapterReader.ReadTopLevelBox(fs, "moov") is { } moov)
+                return FindAlacConfig(moov, moov.Length);
         }
         catch
         {
             // Best-effort fallback only; return zeros if anything goes wrong.
+        }
+
+        return (0, 0);
+    }
+
+    /// <summary>The ALAC decoder config box's bit depth and sample rate within
+    /// <paramref name="data"/>, or zeros (layout on <see cref="TryReadAlacConfigFromFile"/>).</summary>
+    private static (int BitDepth, int SampleRate) FindAlacConfig(byte[] data, int bytesRead)
+    {
+        for (int i = 4; i < bytesRead - 32; i++)
+        {
+            if (data[i] != 'a' || data[i + 1] != 'l' || data[i + 2] != 'a' || data[i + 3] != 'c')
+                continue;
+
+            // Box size is the 4 bytes before the type (big-endian).
+            int boxSize = (data[i - 4] << 24) | (data[i - 3] << 16) | (data[i - 2] << 8) | data[i - 1];
+
+            // Inner ALAC config box is small (typically 36 bytes).
+            // Outer ALAC sample entry is much larger (300+ bytes). Skip it.
+            if (boxSize < 28 || boxSize > 64)
+                continue;
+
+            int configStart = i + 4; // past 'alac' type bytes
+
+            // bitDepth at config offset 9: version(4) + frameLength(4) + compatVersion(1)
+            int bdOffset = configStart + 9;
+            // sampleRate at config offset 24: +tuning(3) +channels(1) +maxRun(2) +maxFrameBytes(4) +avgBitRate(4)
+            int srOffset = configStart + 24;
+
+            if (srOffset + 3 >= bytesRead)
+                continue;
+
+            int bd = data[bdOffset];
+            int sr = (data[srOffset] << 24) | (data[srOffset + 1] << 16) |
+                     (data[srOffset + 2] << 8) | data[srOffset + 3];
+
+            if (bd is 16 or 24 or 32)
+                return (bd, sr >= 8000 ? sr : 0);
         }
 
         return (0, 0);

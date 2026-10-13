@@ -67,8 +67,9 @@ public static class Mp4ChapterReader
 
     // ── Box walking ──
 
-    /// <summary>The payload of the first top-level box of <paramref name="type"/>, or null.</summary>
-    private static byte[]? ReadTopLevelBox(Stream stream, string type)
+    /// <summary>The payload of the first top-level box of <paramref name="type"/>, or null
+    /// (also MetadataService's way to the ALAC config atom when moov follows mdat).</summary>
+    internal static byte[]? ReadTopLevelBox(Stream stream, string type)
     {
         var header = new byte[16];
         long pos = 0, length = stream.Length;
