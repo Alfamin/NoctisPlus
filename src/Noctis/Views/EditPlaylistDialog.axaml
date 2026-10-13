@@ -55,6 +55,11 @@
         <!-- Folder field: the pill-field AutoCompleteBox (PillDialog.axaml), plus its suggestion
              list as a rounded card in the dialog's own fill with inset pill rows, like the pill
              ComboBoxes' drop-downs. Opaque: the window behind is transparent. -->
+        <!-- Typing lands in the box's inner text box: it reads the field's label too
+             (a nameless Edit beside "Sidebar folder"). -->
+        <Style Selector="AutoCompleteBox.ep-folder /template/ TextBox#PART_TextBox">
+            <Setter Property="AutomationProperties.Name" Value="{loc:T EditPlaylist.SidebarFolder}" />
+        </Style>
         <Style Selector="AutoCompleteBox.ep-folder /template/ Border#PART_SuggestionsContainer">
             <Setter Property="Background" Value="{DynamicResource SystemControlBackgroundAltHighBrush}" />
             <Setter Property="BorderBrush" Value="{DynamicResource SystemControlForegroundBaseLowBrush}" />
@@ -242,6 +247,7 @@
                 <TextBlock Classes="ep-label" Text="{loc:T EditPlaylist.Name}" />
                 <TextBox x:Name="NameTextBox"
                          Classes="pill-field"
+                         AutomationProperties.Name="{loc:T EditPlaylist.Name}"
                          Text="{Binding PlaylistName}"
                          Watermark="{loc:T EditPlaylist.EnterPlaylistName}">
                     <TextBox.KeyBindings>
@@ -260,6 +266,7 @@
                 <TextBlock Classes="ep-label" Text="{loc:T EditPlaylist.Description}" />
                 <TextBox x:Name="DescriptionTextBox"
                          Classes="pill-area"
+                         AutomationProperties.Name="{loc:T EditPlaylist.Description}"
                          Text="{Binding PlaylistDescription}"
                          Watermark="{loc:T EditPlaylist.EnterPlaylistDescription}"
                          AcceptsReturn="True"
@@ -272,6 +279,7 @@
             <StackPanel Spacing="6">
                 <TextBlock Classes="ep-label" Text="{loc:T EditPlaylist.SidebarFolder}" />
                 <AutoCompleteBox x:Name="FolderBox"
+                                 AutomationProperties.Name="{loc:T EditPlaylist.SidebarFolder}"
                                  Classes="pill-field ep-folder"
                                  Text="{Binding PlaylistFolder, Mode=TwoWay}"
                                  ItemsSource="{Binding ExistingFolders}"

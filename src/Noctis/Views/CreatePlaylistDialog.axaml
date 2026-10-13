@@ -61,6 +61,7 @@
                 <TextBlock Classes="cp-label" Text="{loc:T CreatePlaylist.Name}" />
                 <TextBox x:Name="NameTextBox"
                          Classes="pill-field"
+                         AutomationProperties.Name="{loc:T CreatePlaylist.Name}"
                          Text="{Binding PlaylistName}"
                          Watermark="{loc:T CreatePlaylist.PlaylistName}">
                     <TextBox.KeyBindings>
@@ -77,6 +78,7 @@
                 <TextBlock Classes="cp-label" Text="{loc:T CreatePlaylist.Description}" />
                 <TextBox x:Name="DescriptionTextBox"
                          Classes="pill-field"
+                         AutomationProperties.Name="{loc:T CreatePlaylist.Description}"
                          Text="{Binding PlaylistDescription}"
                          Watermark="{loc:T CreatePlaylist.Optional}" />
             </StackPanel>

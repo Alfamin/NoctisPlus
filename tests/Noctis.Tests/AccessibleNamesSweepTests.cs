@@ -589,6 +589,40 @@ public class AccessibleNamesSweepTests
     }
 
     [AvaloniaFact]
+    public void CommonDialogs()
+    {
+        EnsureAppStyles();
+        var found = new List<string>();
+        var dialogs = new (string Name, Window Dialog)[]
+        {
+            ("Confirmation", new ConfirmationDialog("Remove 3 songs from the library?")),
+            ("Text prompt", new TextPromptDialog("Rename", "Night Drive", "Name", "Save")),
+            ("Remove from library", new RemoveFromLibraryDialog(3)),
+            ("Create playlist", new CreatePlaylistDialog { DataContext = new CreatePlaylistDialogViewModel() }),
+            ("Add to playlist", new AddToPlaylistDialog { DataContext = new AddToPlaylistDialogViewModel(AddToPlaylistDialogTests.Lists(3), 2) }),
+            ("Create smart playlist", new CreateSmartPlaylistDialog()),
+            ("Edit playlist", new EditPlaylistDialog()),
+            ("Badge name", new BadgeNameDialog()),
+        };
+        foreach (var (name, dialog) in dialogs)
+        {
+            dialog.Width = 1000;
+            dialog.Height = 760;
+            dialog.Show();
+            try
+            {
+                Pump(dialog);
+                found.AddRange(Offenders(name, All(dialog)));
+            }
+            finally
+            {
+                dialog.Close();
+            }
+        }
+        AssertNone(found);
+    }
+
+    [AvaloniaFact]
     public void MainWindow_ShellSidebarAndTopBar()
     {
         EnsureAppStyles();
@@ -614,5 +648,69 @@ public class AccessibleNamesSweepTests
         {
             window.Close();
         }
+    }
+
+    [AvaloniaFact]
+    public async Task DetailPages_AlbumArtistPlaylistQueueHome()
+    {
+        EnsureAppStyles();
+        var albumId = Guid.NewGuid();
+        var tracks = new List<Track> { Song("Head Like A Hole", albumId: albumId, plays: 12), Song("Terrible Lie", albumId: albumId, plays: 9) };
+        var album = new Album
+        {
+            Id = albumId, Name = "Pretty Hate Machine", Artist = "Nine Inch Nails", Year = 1989,
+            TrackCount = tracks.Count, TotalDuration = TimeSpan.FromMinutes(8), Tracks = tracks,
+        };
+        var lib = new FakeLibraryService();
+        lib.TrackList.AddRange(tracks);
+        ((List<Album>)lib.Albums).Add(album);
+        var persistence = new TestPersistenceService();
+        var player = new PlayerViewModel(new FakeAudioPlayer(), lib, persistence, new FakeAnimatedCoverService());
+        player.History.Add(tracks[0]);
+        player.UpNext.Add(tracks[1]);
+        var sidebar = new SidebarViewModel(persistence, lib);
+        var playlist = new Playlist { Name = "Night Drive", TrackIds = tracks.Select(t => t.Id).ToList() };
+        sidebar.Playlists.Add(playlist);
+        var found = new List<string>();
+
+        async Task Sweep(string surface, Control view, Func<bool>? ready = null)
+        {
+            var window = Show(view);
+            try
+            {
+                if (ready != null)
+                {
+                    await PumpUntil(ready, 2000);
+                    Assert.True(ready(), $"{surface}: its rows never realized");
+                }
+                Pump(window);
+                found.AddRange(Offenders(surface, All(view)));
+            }
+            finally
+            {
+                window.Close();
+            }
+        }
+
+        var albumView = new AlbumDetailView { DataContext = new AlbumDetailViewModel(album, player, persistence, lib, sidebar, null!) };
+        await Sweep("Album page", albumView, () => albumView.GetVisualDescendants().OfType<ListBoxItem>().Count() >= 2);
+
+        var artistVm = new ArtistDetailViewModel("Nine Inch Nails", lib, player);
+        var artistView = new ArtistDetailView { DataContext = artistVm };
+        await Sweep("Artist page", artistView, () => artistView.GetVisualDescendants().OfType<Button>().Count(b => b.Classes.Contains("song-row")) >= 2);
+
+        var playlistVm = new PlaylistViewModel(playlist, player, lib, persistence, sidebar);
+        var playlistView = new PlaylistView { DataContext = playlistVm };
+        await Sweep("Playlist page", playlistView, () => playlistView.GetVisualDescendants().OfType<ListBoxItem>().Count() >= 2);
+
+        var queueView = new QueueView { DataContext = new QueueViewModel(player) };
+        await Sweep("Queue page", queueView, () => queueView.GetVisualDescendants().OfType<ListBoxItem>().Any());
+
+        var home = new HomeViewModel(player, lib, sidebar);
+        await home.RefreshAsync();
+        var homeView = new HomeView { DataContext = home };
+        await Sweep("Home", homeView, () => homeView.GetVisualDescendants().OfType<Button>().Count() > 5);
+
+        AssertNone(found);
     }
 }

@@ -872,7 +872,9 @@ Deezer и TIDAL: вставьте ссылку.</value></data>
   <data name="CreateSmartPlaylist.To" xml:space="preserve"><value>До...</value><comment>Watermark in CreateSmartPlaylistDialog.axaml</comment></data>
   <data name="CreateSmartPlaylist.AddRule" xml:space="preserve"><value>Добавить правило</value><comment>Text in CreateSmartPlaylistDialog.axaml</comment></data>
   <data name="CreateSmartPlaylist.Limit" xml:space="preserve"><value>Ограничить до</value><comment>Content in CreateSmartPlaylistDialog.axaml</comment></data>
+  <data name="CreateSmartPlaylist.LimitCount" xml:space="preserve"><value>Число треков</value><comment>Accessible name of the limit number box in CreateSmartPlaylistDialog.axaml</comment></data>
   <data name="CreateSmartPlaylist.TracksSortedBy" xml:space="preserve"><value>треков, сортировка по</value><comment>Text in CreateSmartPlaylistDialog.axaml</comment></data>
+  <data name="CreateSmartPlaylist.SortBy" xml:space="preserve"><value>Сортировка</value><comment>Accessible name of the sort box in CreateSmartPlaylistDialog.axaml (its visible lead-in is "tracks, sorted by")</comment></data>
   <data name="CreateSmartPlaylist.Subtitle" xml:space="preserve"><value>Заполняется сам по заданным правилам</value><comment>One-line purpose under the title in CreateSmartPlaylistDialog.axaml</comment></data>
   <data name="CreateSmartPlaylist.Name" xml:space="preserve"><value>Название</value><comment>Field label in CreateSmartPlaylistDialog.axaml</comment></data>
   <data name="CreateSmartPlaylist.Description" xml:space="preserve"><value>Описание</value><comment>Field label in CreateSmartPlaylistDialog.axaml</comment></data>

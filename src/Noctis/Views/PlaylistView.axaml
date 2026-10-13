@@ -432,6 +432,7 @@
                                            TextWrapping="NoWrap" />
                             </Button>
                             <TextBox x:Name="RenameBox"
+                                     AutomationProperties.Name="{loc:T CreatePlaylist.PlaylistName}"
                                      Text="{Binding NameEditorText, Mode=TwoWay}"
                                      FontSize="40"
                                      FontWeight="Bold"
