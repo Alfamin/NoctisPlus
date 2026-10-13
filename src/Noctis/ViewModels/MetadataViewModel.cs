@@ -146,6 +146,21 @@ public partial class MetadataViewModel : ViewModelBase
     // True while ApplyLyrics fills the lyric fields from the song: that text is no paste.
     private bool _applyingLyrics;
 
+    // The last TTML imported or pasted as the synced lyrics, with the LRC it became.
+    private (string Ttml, string Lrc)? _importedTtml;
+
+    /// <summary>
+    /// The imported TTML when the synced lyrics being saved are still exactly what it became.
+    /// LRC has no line ends, so the .lrc alone lit an overlapping duet one line at a time; the
+    /// document saved beside it (read first by the lyrics page) keeps them, as the same .ttml
+    /// put there by hand does. Null once the lines were edited, shifted or replaced.
+    /// </summary>
+    private string? ImportedTtmlToSave() =>
+        _importedTtml is { } imported
+        && string.Equals(NormalizeNewlines(_track.SyncedLyrics).Trim(), imported.Lrc, StringComparison.Ordinal)
+            ? imported.Ttml
+            : null;
+
     /// <summary>
     /// A TTML document pasted into the Plain Lyrics box — the dialog's only free-text lyrics
     /// field — is imported as Import file does it (GitHub #132): its timing becomes the synced
@@ -2150,8 +2165,12 @@ public partial class MetadataViewModel : ViewModelBase
     internal void ImportLyricsText(string text, string fileName)
     {
         text ??= string.Empty;
+        string? ttml = null;
         if (fileName.EndsWith(".ttml", StringComparison.OrdinalIgnoreCase) || TtmlParser.LooksLikeTtml(text))
+        {
+            ttml = text;
             text = TtmlParser.ToLrc(text) ?? string.Join("\n", LyricsLoader.RawTextLines(text));
+        }
 
         var normalized = text.Replace("\r\n", "\n").Trim();
         if (normalized.Length == 0)
@@ -2163,6 +2182,7 @@ public partial class MetadataViewModel : ViewModelBase
         if (LyricsTextHelper.ContainsTimestamps(normalized))
         {
             SyncedLyrics = normalized;
+            _importedTtml = ttml is null ? null : (ttml, normalized);
             HasCustomSyncedLyrics = true;
             SyncedLyricsSearchStatus = $"Imported {fileName}";
             RebuildSyncedLinesFromText();
@@ -2746,7 +2766,11 @@ public partial class MetadataViewModel : ViewModelBase
                     if (File.Exists(lrcPath) || (SyncedLyricsWereChanged && lyricsTarget.WritesSidecars()))
                         await File.WriteAllTextAsync(lrcPath, _track.SyncedLyrics);
                     if (SyncedLyricsWereChanged)
+                    {
                         await Task.Run(() => TrashSidecarsAboveLrc(_track.FilePath));
+                        if (lyricsTarget.WritesSidecars() && ImportedTtmlToSave() is { } ttml)
+                            await File.WriteAllTextAsync(Path.ChangeExtension(_track.FilePath, ".ttml"), ttml);
+                    }
                 }
                 else if (SyncedLyricsWereRemoved)
                 {

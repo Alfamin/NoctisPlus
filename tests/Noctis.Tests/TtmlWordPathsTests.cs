@@ -266,6 +266,39 @@ public class TtmlWordPathsTests : IDisposable
     }
 
     [Fact]
+    public async Task EditInfo_ImportedLineTimedDuet_KeepsItsOverlap_LikeTheSameFileBesideTheSong()
+    {
+        // LRC has no line ends, so the .lrc an import is saved as cannot say that line 1 is
+        // still sung when line 2 starts: the duet lit one line at a time, unlike the same
+        // .ttml beside the song. The imported document goes beside the song too.
+        var path = Song();
+        var (vm, track) = await OpenEditInfo(path, LyricsSaveTarget.Sidecar);
+
+        vm.ImportLyricsText(LineTtml, "song.ttml");
+        await vm.SaveCommand.ExecuteAsync(null);
+
+        Assert.True(File.Exists(Path.ChangeExtension(path, ".lrc")));
+        var lines = AssertLineSync(PageLines(track));
+        Assert.Equal(TimeSpan.FromSeconds(5), lines[0].EndTimestamp);
+        Assert.True(LitTogether(lines, 4.5));
+    }
+
+    [Fact]
+    public async Task EditInfo_ImportedTtml_EditedBeforeSave_IsSavedAsTheEdit()
+    {
+        // Once the imported lines are retimed, the document no longer says what was saved.
+        var path = Song();
+        var (vm, track) = await OpenEditInfo(path, LyricsSaveTarget.Sidecar);
+        vm.ImportLyricsText(LineTtml, "song.ttml");
+
+        vm.SyncedLyricLines.Last(l => l.HasTimestamp).Nudge(forward: true);
+        await vm.SaveCommand.ExecuteAsync(null);
+
+        Assert.False(File.Exists(Path.ChangeExtension(path, ".ttml")));
+        Assert.Equal(8.1, Sung(PageLines(track))[2].Timestamp!.Value.TotalSeconds, 3);
+    }
+
+    [Fact]
     public async Task EditInfo_RetimingOneLine_KeepsTheBackgroundVocals()
     {
         // The Timestamp Lyrics rows are rebuilt into the text on any touch. The "[bg: …]" line
