@@ -539,7 +539,7 @@ public sealed partial class NoctisServer : IAsyncDisposable
 
     internal static string ContentTypeFor(string path) => Path.GetExtension(path).ToLowerInvariant() switch
     {
-        ".mp3" => "audio/mpeg", ".flac" => "audio/flac", ".m4a" or ".mp4" or ".alac" => "audio/mp4", ".aac" => "audio/aac",
+        ".mp3" => "audio/mpeg", ".flac" => "audio/flac", ".m4a" or ".m4b" or ".mp4" or ".alac" => "audio/mp4", ".aac" => "audio/aac",
         ".ogg" or ".oga" => "audio/ogg", ".opus" => "audio/ogg", ".wav" => "audio/wav", ".wma" => "audio/x-ms-wma",
         ".aif" or ".aiff" => "audio/aiff", ".ape" => "audio/x-ape", ".wv" => "audio/x-wavpack", ".dsf" => "audio/x-dsf",
         ".jpg" or ".jpeg" => "image/jpeg", ".png" => "image/png", ".webp" => "image/webp", ".gif" => "image/gif",

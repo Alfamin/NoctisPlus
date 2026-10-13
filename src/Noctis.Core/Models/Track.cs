@@ -751,7 +751,7 @@ public partial class Track : ObservableObject
             {
                 ".flac" or ".wav" or ".aiff" or ".aif" or ".aifc" or ".ape" or ".wv" or ".alac" => true,
                 // M4A/MP4 should only be considered lossless when codec parsing identifies ALAC.
-                ".m4a" or ".mp4" => codecLower.Contains("alac") || codecLower.Contains("lossless"),
+                ".m4a" or ".m4b" or ".mp4" => codecLower.Contains("alac") || codecLower.Contains("lossless"),
                 _ => false
             };
         }
@@ -824,7 +824,7 @@ public partial class Track : ObservableObject
                 ".flac" => "FLAC",
                 // M4A/MP4 containers default to lossy AAC; only a codec string
                 // identifying lossless content means ALAC (mirrors IsLossless).
-                ".m4a" or ".mp4" => c.Contains("lossless") ? "ALAC" : "AAC",
+                ".m4a" or ".m4b" or ".mp4" => c.Contains("lossless") ? "ALAC" : "AAC",
                 ".wav" => "WAV",
                 ".aiff" or ".aif" or ".aifc" => "AIFF",
                 ".ape" => "APE",

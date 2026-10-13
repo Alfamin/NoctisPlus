@@ -47,13 +47,14 @@ public class MetadataService : IMetadataService
     /// <summary>
     /// Audio file extensions we consider valid.
     /// Includes lossless (FLAC, ALAC, AIFF, WAV, APE, WavPack),
-    /// lossy (MP3, AAC, OGG, Opus, WMA), and container formats (M4A, MP4, ASF).
+    /// lossy (MP3, AAC, OGG, Opus, WMA), and container formats (M4A, M4B, MP4, ASF).
     /// .m4a can contain either AAC (lossy) or ALAC (lossless) — both are supported.
+    /// .m4b is the same MP4 container under Apple's audiobook name (usually AAC + chapters).
     /// </summary>
     public static readonly HashSet<string> SupportedExtensions = new(StringComparer.OrdinalIgnoreCase)
     {
         ".mp3", ".flac", ".ogg", ".oga", ".m4a", ".wav", ".wma", ".aac",
-        ".opus", ".aiff", ".aif", ".aifc", ".ape", ".wv", ".alac", ".mp4",
+        ".opus", ".aiff", ".aif", ".aifc", ".ape", ".wv", ".alac", ".mp4", ".m4b",
         // ASF is the container behind .wma (TagLib reads/writes its tags natively;
         // the bundled VLC ships an asf demuxer + WMA decoders in libavcodec).
         // Like .mp4 above, a video-bearing .asf plays audio-only (--no-video).
@@ -948,7 +949,7 @@ public class MetadataService : IMetadataService
     /// <summary>An MP4-family file whose codec reads as Apple Lossless.</summary>
     private static bool IsAlacContainer(string ext, string? codec)
     {
-        if (ext is not (".m4a" or ".mp4" or ".alac"))
+        if (ext is not (".m4a" or ".m4b" or ".mp4" or ".alac"))
             return false;
         var codecLower = (codec ?? string.Empty).ToLowerInvariant();
         return codecLower.Contains("alac") || codecLower.Contains("lossless");
@@ -1250,7 +1251,7 @@ public class MetadataService : IMetadataService
             ".mp3" => "MPEG Audio Layer 3",
             ".flac" => "FLAC",
             ".ogg" or ".oga" => "Vorbis",
-            ".m4a" or ".mp4" or ".aac" => "AAC",
+            ".m4a" or ".m4b" or ".mp4" or ".aac" => "AAC",
             ".alac" => "Apple Lossless (ALAC)",
             ".wav" => "PCM (WAV)",
             ".aiff" or ".aif" or ".aifc" => "PCM (AIFF)",
@@ -1452,6 +1453,7 @@ public class MetadataService : IMetadataService
             ".flac" => "FLAC",
             ".ogg" or ".oga" => "OGG Vorbis",
             ".m4a" => "Apple Audio (M4A)",
+            ".m4b" => "Apple Audiobook (M4B)",
             ".mp4" => "MPEG-4 Audio",
             ".aac" => "AAC",
             ".alac" => "Apple Lossless",

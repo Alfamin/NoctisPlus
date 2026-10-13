@@ -73,7 +73,7 @@ Options and client notes are in [docs/SELF-HOSTING.md](docs/SELF-HOSTING.md).
 
 ### Sound
 
-- [x] Plays FLAC, ALAC, WAV, AIFF, APE, WavPack, MP3, AAC, OGG, Opus, WMA and M4A
+- [x] Plays FLAC, ALAC, WAV, AIFF, APE, WavPack, MP3, AAC, OGG, Opus, WMA, M4A and M4B audiobooks
 - [x] Bit-perfect exclusive output on Windows
 - [x] Parametric EQ with presets, and a saved preset per track if you want one
 - [x] Gapless playback, crossfade and AutoMix transitions
