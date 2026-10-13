@@ -3015,15 +3015,16 @@ public partial class MetadataViewModel : ViewModelBase
         ChangesSaved?.Invoke(this, EventArgs.Empty);
 
         // Keep the dialog open when the tags did not actually reach disk, so the edit
-        // isn't silently lost on the next rescan. The most common cause is the file
-        // being held open by the player or another app.
+        // isn't silently lost on the next rescan. The player lets go of the playing file
+        // for the save (OpenFileHolders), so what is left is another app holding the file
+        // open, or a file that cannot be written at all.
         if (failedWrites.Count > 0)
         {
             SaveErrorMessage = failedWrites.Count == 1
-                ? $"Couldn't write tags to \"{failedWrites[0]}\". The file may be in use — " +
-                  "stop playback or close other apps using it, then try again."
+                ? $"Couldn't write tags to \"{failedWrites[0]}\". Another app may have the file open, " +
+                  "or it may be read-only — close it there or check the file, then try again."
                 : $"Couldn't write tags to {failedWrites.Count} files (e.g. \"{failedWrites[0]}\"). " +
-                  "They may be in use — stop playback or close other apps using them, then try again.";
+                  "Another app may have them open, or they may be read-only — close them there or check the files, then try again.";
             return;
         }
 
