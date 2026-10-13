@@ -146,7 +146,7 @@
             <Setter Property="Height" Value="30" />
             <Setter Property="Margin" Value="-3" />
             <Setter Property="VerticalAlignment" Value="Center" />
-            <Setter Property="Foreground" Value="{DynamicResource AccentTextBrush}" />
+            <Setter Property="Foreground" Value="{DynamicResource AccentTextExactBrush}" />
         </Style>
         <!-- One glyph per row kind (the Tag is the row's key). -->
         <Style Selector="PathIcon.row-icon[Tag=Playlists]">

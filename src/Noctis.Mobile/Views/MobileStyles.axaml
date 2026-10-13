@@ -252,7 +252,7 @@
     </Style>
     <!-- A favourite's heart on a song row, and a page tool that is on (a filter in use). -->
     <Style Selector="Button.row-heart.on PathIcon, Button.icon.on PathIcon, Button.glass-round.on PathIcon">
-        <Setter Property="Foreground" Value="{DynamicResource AccentTextBrush}" />
+        <Setter Property="Foreground" Value="{DynamicResource AccentTextExactBrush}" />
     </Style>
     <!-- The long-press sheet's quick actions: an icon over a short label, four across. -->
     <Style Selector="Button.sheet-tile">
@@ -282,7 +282,7 @@
         <Setter Property="Margin" Value="0,6,0,0" />
     </Style>
     <Style Selector="Button.sheet-tile.on PathIcon">
-        <Setter Property="Foreground" Value="{DynamicResource AccentTextBrush}" />
+        <Setter Property="Foreground" Value="{DynamicResource AccentTextExactBrush}" />
     </Style>
 
     <!-- A Library section title: accent icon, title, a small chevron; the whole row opens the list. -->
@@ -296,7 +296,7 @@
         <Setter Property="Height" Value="21" />
         <Setter Property="Margin" Value="-2,-2,6,-2" />
         <Setter Property="VerticalAlignment" Value="Center" />
-        <Setter Property="Foreground" Value="{DynamicResource AccentTextBrush}" />
+        <Setter Property="Foreground" Value="{DynamicResource AccentTextExactBrush}" />
     </Style>
     <!-- The chevron's 11u-tall glyph at the old 12 dp: a 26 box in the old 12x12 footprint. -->
     <Style Selector="Button.section-header PathIcon.chevron">
@@ -424,7 +424,10 @@
     </Style>
     <!-- Tab colours sit on the icon and label themselves, so Fluent's presenter Foreground
          swap on :pointerover cannot reach them. Apple's bar: filled glyphs in the text colour,
-         small medium labels, the selected tab in the accent. -->
+         small medium labels, the selected tab in the accent. The phone's accent glyphs and
+         labels take AccentTextExactBrush, the accent itself unless it lacks contrast: the
+         desktop's AccentTextBrush mixes it 55 % toward white on dark themes, and the red
+         icons Apple keeps in dark came out pale pink. -->
     <Style Selector="Button.tab PathIcon">
         <Setter Property="Width" Value="26" />
         <Setter Property="Height" Value="26" />
@@ -438,10 +441,10 @@
         <Setter Property="Foreground" Value="{DynamicResource PrimaryTextBrush}" />
     </Style>
     <Style Selector="Button.tab.selected PathIcon">
-        <Setter Property="Foreground" Value="{DynamicResource AccentTextBrush}" />
+        <Setter Property="Foreground" Value="{DynamicResource AccentTextExactBrush}" />
     </Style>
     <Style Selector="Button.tab.selected TextBlock">
-        <Setter Property="Foreground" Value="{DynamicResource AccentTextBrush}" />
+        <Setter Property="Foreground" Value="{DynamicResource AccentTextExactBrush}" />
     </Style>
     <!-- The folded bar's round buttons: one glyph, a touch smaller. -->
     <Style Selector="Button.tab.bubble PathIcon">
