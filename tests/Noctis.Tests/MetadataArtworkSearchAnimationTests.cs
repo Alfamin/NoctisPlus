@@ -350,4 +350,29 @@ public class MetadataArtworkSearchAnimationTests
         }
         finally { win.Close(); PumpUntil(() => !win.IsVisible); }
     }
+
+    [AvaloniaFact]
+    public void AnimatedArtworkSearch_TypingAndEnter_RunsTheSearchWithTheTypedText()
+    {
+        // The hint says "type an album name and press Enter": the typed text has to reach the
+        // VM before Enter, and Enter has to run the search. This editor has no iTunes service,
+        // so the search's first line — "unavailable" — is the proof that it ran.
+        var (vm, win) = Editor("Animated Artwork");
+        try
+        {
+            var box = win.GetVisualDescendants().OfType<TextBox>()
+                .Single(b => b.IsEffectivelyVisible && b.KeyBindings.Any(k => k.Command == vm.SearchAnimatedCoverCommand));
+            box.Focus();
+            Assert.True(PumpUntil(() => box.IsFocused));
+
+            win.KeyTextInput("YHLQMDLG Bad Bunny");
+            PumpUntil(() => false, 50);
+            Assert.Equal("YHLQMDLG Bad Bunny", vm.AnimatedSearchInput);
+
+            win.KeyPressQwerty(PhysicalKey.Enter, RawInputModifiers.None);
+            Assert.True(PumpUntil(() => vm.AnimatedSearchStatus == "Search service unavailable."),
+                $"Enter did not run the search (status '{vm.AnimatedSearchStatus}')");
+        }
+        finally { win.Close(); PumpUntil(() => !win.IsVisible); }
+    }
 }

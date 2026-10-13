@@ -1,4 +1,3 @@
-using System.Diagnostics;
 using System.Net;
 using System.Text.Json;
 using System.Text.RegularExpressions;
@@ -42,6 +41,10 @@ public sealed class ITunesArtworkService
     private static readonly Regex AnimatedUrlFallbackRegex = new(
         "(https?:[^\"\\\\\\s]+?\\.(?:m3u8|mp4))",
         RegexOptions.Compiled | RegexOptions.IgnoreCase);
+
+    // Session-log tag for every stage of the animated-artwork lookup. These failures used to
+    // go to Debug.WriteLine, which a release build drops, so a miss left nothing to go on.
+    internal const string LogSource = "AnimatedArt";
 
     private readonly HttpClient _http;
 
@@ -106,7 +109,7 @@ public sealed class ITunesArtworkService
         }
         catch (Exception ex)
         {
-            Debug.WriteLine($"[iTunes] search failed: {ex.Message}");
+            DebugLog.Write(LogSource, $"iTunes album search for \"{albumTerm}\" failed: {ex.Message}");
             return Array.Empty<ArtworkCandidate>();
         }
     }
@@ -144,7 +147,7 @@ public sealed class ITunesArtworkService
         }
         catch (Exception ex)
         {
-            Debug.WriteLine($"[iTunes] download failed: {ex.Message}");
+            DebugLog.Write(LogSource, $"download of {url} failed: {ex.Message}");
             return null;
         }
     }
@@ -161,10 +164,20 @@ public sealed class ITunesArtworkService
             using var req = new HttpRequestMessage(HttpMethod.Get, albumViewUrl);
             req.Headers.UserAgent.ParseAdd(AppleMusicHtmlUserAgent);
             using var resp = await _http.SendAsync(req, ct);
-            if (!resp.IsSuccessStatusCode) return Array.Empty<AnimatedArtworkVariant>();
+            if (!resp.IsSuccessStatusCode)
+            {
+                DebugLog.Write(LogSource, $"album page {albumViewUrl} returned HTTP {(int)resp.StatusCode}");
+                return Array.Empty<AnimatedArtworkVariant>();
+            }
 
             var html = await HttpSafety.ReadStringBoundedAsync(resp.Content, ct: ct);
             var mediaUrls = ExtractAnimatedMediaUrls(html, albumViewUrl);
+            if (mediaUrls.Count == 0)
+            {
+                DebugLog.Write(LogSource, $"album page {albumViewUrl}: {DescribeMissingAnimatedArtwork(html)}");
+                return Array.Empty<AnimatedArtworkVariant>();
+            }
+
             var variants = new List<AnimatedArtworkVariant>();
 
             foreach (var mediaUrl in mediaUrls)
@@ -185,7 +198,10 @@ public sealed class ITunesArtworkService
                 if (!mediaUrl.Contains(".m3u8", StringComparison.OrdinalIgnoreCase))
                     continue;
 
-                variants.AddRange(await ParseHlsMasterVariantsAsync(mediaUrl, ct));
+                var parsed = await ParseHlsMasterVariantsAsync(mediaUrl, ct);
+                if (parsed.Count == 0)
+                    DebugLog.Write(LogSource, $"HLS master {mediaUrl} gave no usable variants");
+                variants.AddRange(parsed);
             }
 
             var deduped = variants
@@ -197,7 +213,7 @@ public sealed class ITunesArtworkService
         }
         catch (Exception ex)
         {
-            Debug.WriteLine($"[iTunes] animated lookup failed: {ex.Message}");
+            DebugLog.Write(LogSource, $"animated lookup of {albumViewUrl} failed: {ex.Message}");
             return Array.Empty<AnimatedArtworkVariant>();
         }
     }
@@ -273,7 +289,7 @@ public sealed class ITunesArtworkService
         }
         catch (Exception ex)
         {
-            Debug.WriteLine($"[iTunes] HLS download failed: {ex.Message}");
+            DebugLog.Write(LogSource, $"HLS download of {variant.Url} failed: {ex.Message}");
             return false;
         }
     }
@@ -293,7 +309,11 @@ public sealed class ITunesArtworkService
         {
             var url = $"{LookupUrl}?id={collectionId}&country=us";
             using var resp = await _http.GetAsync(url, ct);
-            if (!resp.IsSuccessStatusCode) return null;
+            if (!resp.IsSuccessStatusCode)
+            {
+                DebugLog.Write(LogSource, $"lookup of {collectionId} returned HTTP {(int)resp.StatusCode}");
+                return null;
+            }
 
             var json = await HttpSafety.ReadStringBoundedAsync(resp.Content, ct: ct);
             using var doc = JsonDocument.Parse(json);
@@ -307,10 +327,12 @@ public sealed class ITunesArtworkService
                 if (TryReadCandidate(item, out var candidate))
                     return candidate;
             }
+
+            DebugLog.Write(LogSource, $"lookup of {collectionId} found no album in the US store");
         }
         catch (Exception ex)
         {
-            Debug.WriteLine($"[iTunes] lookup failed: {ex.Message}");
+            DebugLog.Write(LogSource, $"lookup of {collectionId} failed: {ex.Message}");
         }
 
         return null;
@@ -349,12 +371,20 @@ public sealed class ITunesArtworkService
             req.Headers.UserAgent.ParseAdd(AppleMusicHtmlUserAgent);
             using var resp = await _http.SendAsync(req, ct);
             if (!resp.IsSuccessStatusCode)
+            {
+                DebugLog.Write(LogSource, $"Apple Music search for \"{term}\" returned HTTP {(int)resp.StatusCode}");
                 return Array.Empty<ArtworkCandidate>();
+            }
 
             var html = await HttpSafety.ReadStringBoundedAsync(resp.Content, ct: ct);
             var ids = ExtractAppleMusicAlbumIds(html).Take(Math.Max(1, limit)).ToList();
             if (ids.Count == 0)
+            {
+                // A page with no album link at all is likelier a markup change than an empty
+                // catalogue, so the size goes in too.
+                DebugLog.Write(LogSource, $"Apple Music search for \"{term}\" linked no albums ({html.Length} chars of page)");
                 return Array.Empty<ArtworkCandidate>();
+            }
 
             // The page gives IDs but no dependable title/artist text, and the caller has to
             // check both — so let /lookup name them authoritatively, in one request.
@@ -362,7 +392,7 @@ public sealed class ITunesArtworkService
         }
         catch (Exception ex)
         {
-            Debug.WriteLine($"[iTunes] Apple Music search failed: {ex.Message}");
+            DebugLog.Write(LogSource, $"Apple Music search for \"{term}\" failed: {ex.Message}");
             return Array.Empty<ArtworkCandidate>();
         }
     }
@@ -396,14 +426,21 @@ public sealed class ITunesArtworkService
         {
             var url = $"{LookupUrl}?id={string.Join(",", wanted)}&country=us&entity=album";
             using var resp = await _http.GetAsync(url, ct);
-            if (!resp.IsSuccessStatusCode) return Array.Empty<ArtworkCandidate>();
+            if (!resp.IsSuccessStatusCode)
+            {
+                DebugLog.Write(LogSource, $"lookup of {wanted.Count} album(s) returned HTTP {(int)resp.StatusCode}");
+                return Array.Empty<ArtworkCandidate>();
+            }
 
             var json = await HttpSafety.ReadStringBoundedAsync(resp.Content, ct: ct);
             using var doc = JsonDocument.Parse(json);
 
             if (!doc.RootElement.TryGetProperty("results", out var results) ||
                 results.ValueKind != JsonValueKind.Array)
+            {
+                DebugLog.Write(LogSource, $"lookup of {wanted.Count} album(s) had no results array");
                 return Array.Empty<ArtworkCandidate>();
+            }
 
             var byId = new Dictionary<long, ArtworkCandidate>();
             foreach (var item in results.EnumerateArray())
@@ -419,7 +456,7 @@ public sealed class ITunesArtworkService
         }
         catch (Exception ex)
         {
-            Debug.WriteLine($"[iTunes] batch lookup failed: {ex.Message}");
+            DebugLog.Write(LogSource, $"lookup of {wanted.Count} album(s) failed: {ex.Message}");
             return Array.Empty<ArtworkCandidate>();
         }
     }
@@ -520,6 +557,24 @@ public sealed class ITunesArtworkService
 
         return urls;
     }
+
+    /// <summary>
+    /// Why an album page yielded no stream, for the log. Apple's page says it outright:
+    /// <c>"videoArtwork":null</c> is an album without a loop (HIT ME HARD AND SOFT — the
+    /// catalog API's editorialVideo agrees), while a page with no such key at all means the
+    /// markup moved and the scraper needs looking at.
+    /// </summary>
+    internal static string DescribeMissingAnimatedArtwork(string html)
+    {
+        if (NullVideoArtworkRegex.IsMatch(html))
+            return "videoArtwork is null (Apple has no animated artwork for this album)";
+        if (html.Contains("videoArtwork", StringComparison.Ordinal))
+            return "videoArtwork present but no stream URL matched (page format may have changed)";
+        return $"no videoArtwork field in {html.Length} chars of page (page format may have changed)";
+    }
+
+    private static readonly Regex NullVideoArtworkRegex = new(
+        "\"videoArtwork\"\\s*:\\s*null", RegexOptions.Compiled);
 
     /// <summary>
     /// True only for absolute http(s). On Windows a protocol-relative "//host/path" parses as
@@ -737,6 +792,43 @@ public sealed class ITunesArtworkService
 
         return got.Contains(wanted, StringComparison.Ordinal) ||
                wanted.Contains(got, StringComparison.Ordinal);
+    }
+
+    /// <summary>
+    /// Whether a candidate is the album someone typed into the animated-artwork box. People
+    /// type "Happier Than Ever Billie Eilish", not just the title, and Apple's search page ranks
+    /// those queries perfectly — but read as a title, "album artist" never equals the store's
+    /// album name, so every right answer was rejected before its page was opened. Accepted:
+    /// the title alone (<see cref="IsLikelySameAlbum"/>'s exact rule), or the title with the
+    /// artist before or after it ("by" and dashes allowed). The leftover must be a whole-word
+    /// run of the candidate's credit ("Lady Gaga" in "Lady Gaga &amp; Bruno Mars"), never the
+    /// other way round, or "1989 Taylor's Version Taylor Swift" would read as the original 1989.
+    /// </summary>
+    internal static bool MatchesTypedAlbumQuery(string? candidateAlbum, string? candidateArtist, string? typed)
+    {
+        if (IsLikelySameAlbum(candidateAlbum, candidateArtist, typed, null))
+            return true;
+
+        var query = NormalizeSearchText(typed);
+        var album = NormalizeAlbumForMatch(candidateAlbum);
+        var credit = NormalizeSearchText(candidateArtist);
+        if (query.Length == 0 || album.Length == 0 || credit.Length == 0)
+            return false;
+
+        string rest;
+        if (query.StartsWith(album + " ", StringComparison.Ordinal))
+            rest = query[(album.Length + 1)..];
+        else if (query.EndsWith(" " + album, StringComparison.Ordinal))
+            rest = query[..^(album.Length + 1)];
+        else
+            return false;
+
+        if (rest.StartsWith("by ", StringComparison.Ordinal))
+            rest = rest[3..];
+        else if (rest.EndsWith(" by", StringComparison.Ordinal))
+            rest = rest[..^3];
+
+        return rest.Length > 0 && $" {credit} ".Contains($" {rest} ", StringComparison.Ordinal);
     }
 
     // Edition wrappers a local tag and the store routinely spell differently. Only these are

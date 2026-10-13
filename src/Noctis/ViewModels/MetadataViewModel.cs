@@ -1760,15 +1760,17 @@ public partial class MetadataViewModel : ViewModelBase
             // so it skips search on both sources.
             if (TryExtractAppleAlbumId(AnimatedSearchInput, out var pastedId))
             {
+                DebugLog.Write(ITunesArtworkService.LogSource, $"search: pasted album id {pastedId}");
                 var candidate = _itunes == null ? null : await _itunes.LookupAlbumByIdAsync(pastedId);
                 if (candidate != null)
                     variants.AddRange(await _itunes!.SearchAnimatedArtworkVariantsAsync(candidate.ViewUrl));
             }
             else
             {
-                // A typed album name steers the search away from the loaded track's tags.
-                // The artist is then unknown, and IsLikelySameAlbum falls back to matching on
-                // title alone — which is what the user asked for by typing it.
+                // A typed album name steers the search away from the loaded track's tags. It
+                // may carry the artist too ("Happier Than Ever Billie Eilish"), which is how
+                // people type it; MatchesTypedAlbumQuery accepts the title alone or with the
+                // candidate's artist beside it.
                 var typed = (AnimatedSearchInput ?? string.Empty).Trim();
                 var manual = typed.Length > 0;
                 var trackArtist = !string.IsNullOrWhiteSpace(AlbumArtist) ? AlbumArtist : Artist;
@@ -1780,10 +1782,12 @@ public partial class MetadataViewModel : ViewModelBase
                 // (the user may be searching for someone else's album entirely), so it is
                 // passed as a preference that only orders equally-titled matches.
                 var artist = manual ? string.Empty : trackArtist;
+                DebugLog.Write(ITunesArtworkService.LogSource,
+                    manual ? $"search: typed \"{album}\"" : $"search: tags \"{album}\" by \"{artist}\"");
 
-                variants.AddRange(await SearchAppleMusicVariantsAsync(album, artist, trackArtist));
+                variants.AddRange(await SearchAppleMusicVariantsAsync(album, artist, trackArtist, manual));
                 if (variants.Count == 0)
-                    variants.AddRange(await SearchITunesVariantsAsync(album, artist, trackArtist));
+                    variants.AddRange(await SearchITunesVariantsAsync(album, artist, trackArtist, manual));
             }
 
             foreach (var variant in variants)
@@ -1809,6 +1813,7 @@ public partial class MetadataViewModel : ViewModelBase
         }
         catch (Exception ex)
         {
+            DebugLog.Write(ITunesArtworkService.LogSource, $"search failed: {ex}");
             AnimatedSearchStatus = $"Search failed: {ex.Message}";
         }
         finally
@@ -1825,13 +1830,13 @@ public partial class MetadataViewModel : ViewModelBase
     // if the web page's markup shifts under the first one.
 
     private async Task<IReadOnlyList<ITunesArtworkService.AnimatedArtworkVariant>> SearchAppleMusicVariantsAsync(
-        string album, string artist, string preferArtist)
+        string album, string artist, string preferArtist, bool typed)
     {
         if (_itunes == null || string.IsNullOrWhiteSpace(album))
             return Array.Empty<ITunesArtworkService.AnimatedArtworkVariant>();
 
         var results = await _itunes.SearchAppleMusicAlbumsAsync(artist, album);
-        return await FirstMatchingVariantsAsync(results, album, artist, preferArtist);
+        return await FirstMatchingVariantsAsync("Apple Music", results, album, artist, preferArtist, typed);
     }
 
     // 0 sorts ahead of 1: candidates by the artist we already know about win ties. Only a
@@ -1845,7 +1850,7 @@ public partial class MetadataViewModel : ViewModelBase
     }
 
     private async Task<IReadOnlyList<ITunesArtworkService.AnimatedArtworkVariant>> SearchITunesVariantsAsync(
-        string album, string artist, string preferArtist)
+        string album, string artist, string preferArtist, bool typed)
     {
         if (_itunes == null)
             return Array.Empty<ITunesArtworkService.AnimatedArtworkVariant>();
@@ -1854,7 +1859,7 @@ public partial class MetadataViewModel : ViewModelBase
         // only when the title is distinctive, and self-titled albums sit behind a wall of
         // karaoke and cover records.
         var results = await _itunes.SearchAlbumsAsync(artist, album, limit: 8);
-        return await FirstMatchingVariantsAsync(results, album, artist, preferArtist);
+        return await FirstMatchingVariantsAsync("iTunes", results, album, artist, preferArtist, typed);
     }
 
     /// <summary>
@@ -1864,17 +1869,33 @@ public partial class MetadataViewModel : ViewModelBase
     /// Same" offered Take Care's loop. Only candidates that really are this album are opened.
     /// </summary>
     private async Task<IReadOnlyList<ITunesArtworkService.AnimatedArtworkVariant>> FirstMatchingVariantsAsync(
+        string source,
         IReadOnlyList<ITunesArtworkService.ArtworkCandidate> results,
-        string album, string artist, string preferArtist)
+        string album, string artist, string preferArtist, bool typed)
     {
-        foreach (var r in results
-                     .Where(r => ITunesArtworkService.IsLikelySameAlbum(
-                         r.CollectionName, r.ArtistName, album, artist))
-                     .OrderBy(r => PreferredArtistRank(r.ArtistName, preferArtist)))
+        var matches = results
+            .Where(r => typed
+                ? ITunesArtworkService.MatchesTypedAlbumQuery(r.CollectionName, r.ArtistName, album)
+                : ITunesArtworkService.IsLikelySameAlbum(r.CollectionName, r.ArtistName, album, artist))
+            .OrderBy(r => PreferredArtistRank(r.ArtistName, preferArtist))
+            .ToList();
+
+        DebugLog.Write(ITunesArtworkService.LogSource,
+            $"{source}: {results.Count} candidate(s), {matches.Count} match \"{album}\"" +
+            (results.Count > matches.Count
+                ? "; rejected " + string.Join(", ", results.Except(matches).Take(4)
+                    .Select(r => $"\"{r.CollectionName}\" by {r.ArtistName}"))
+                : string.Empty));
+
+        foreach (var r in matches)
         {
             var variants = await _itunes!.SearchAnimatedArtworkVariantsAsync(r.ViewUrl);
             if (variants.Count > 0)
+            {
+                DebugLog.Write(ITunesArtworkService.LogSource,
+                    $"{source}: {variants.Count} variant(s) from \"{r.CollectionName}\" ({r.CollectionId})");
                 return variants;
+            }
         }
 
         return Array.Empty<ITunesArtworkService.AnimatedArtworkVariant>();
