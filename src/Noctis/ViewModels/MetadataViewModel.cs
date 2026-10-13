@@ -2017,7 +2017,7 @@ public partial class MetadataViewModel : ViewModelBase
         SyncedLyricLines.Clear();
 
         var source = !string.IsNullOrWhiteSpace(SyncedLyrics) ? SyncedLyrics : Lyrics;
-        var (rows, background) = SplitBackgroundLines(source ?? string.Empty);
+        var (rows, background) = LrcEditorViewModel.SplitBackgroundLines(source ?? string.Empty);
         for (var i = 0; i < rows.Count; i++)
         {
             var line = new SyncedLyricEditorLine(rows[i].Time, rows[i].Text) { BackgroundLines = background.GetValueOrDefault(i) };
@@ -2027,35 +2027,6 @@ public partial class MetadataViewModel : ViewModelBase
 
         HasSyncedLines = SyncedLyricLines.Count > 0;
         HasWordTimedLines = SyncedLyricLines.Any(l => l.HasWordTiming);
-    }
-
-    /// <summary>
-    /// The editor rows of <paramref name="text"/>, and its "[bg: …]" background-vocal lines keyed
-    /// by the row they follow. <see cref="LrcEditorViewModel.ParseLrc"/> takes a bg line for a
-    /// header tag ([ar:], [ti:]) and leaves it out, so the text rebuilt from the rows after any
-    /// edit lost every background vocal (a TTML import's x-bg spans among them).
-    /// </summary>
-    private static (List<(TimeSpan? Time, string Text)> Rows, Dictionary<int, List<string>> Background) SplitBackgroundLines(string text)
-    {
-        var background = new Dictionary<int, List<string>>();
-        var kept = new List<string>();
-        // Rows ParseLrc makes of the kept lines so far: blank lines count once text follows them
-        // (it drops trailing ones), a header tag none, a stack of stamps one per stamp.
-        int rows = 0, blanks = 0;
-        foreach (var raw in text.Split('\n'))
-        {
-            var line = raw.TrimEnd('\r');
-            if (rows > 0 && line.TrimStart().StartsWith("[bg:", StringComparison.Ordinal))
-            {
-                if (!background.TryGetValue(rows - 1, out var list)) background[rows - 1] = list = new List<string>();
-                list.Add(line.Trim());
-                continue;
-            }
-            kept.Add(line);
-            if (string.IsNullOrWhiteSpace(line)) blanks++;
-            else { rows += blanks + LrcEditorViewModel.ParseLrc(line).Count; blanks = 0; }
-        }
-        return (LrcEditorViewModel.ParseLrc(string.Join('\n', kept)), background);
     }
 
     private void OnSyncedLineChanged() => RebuildSyncedTextFromLines();

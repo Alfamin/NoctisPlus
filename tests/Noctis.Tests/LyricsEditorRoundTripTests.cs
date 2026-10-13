@@ -112,4 +112,33 @@ public class LyricsEditorRoundTripTests : IDisposable
         Assert.NotNull(seed);
         AssertKeepsWordsBackgroundAndVoices(seed!);
     }
+
+    [AvaloniaFact]
+    public async Task Save_AfterRetimingALine_KeepsTheBackgroundVocals()
+    {
+        // The editor's rows come from ParseLrc, which takes a "[bg: …]" line for a header tag
+        // ([ar:], [ti:]) and leaves it out — so the save wrote the song without its
+        // background vocal.
+        var editor = new LrcEditorViewModel(new Track { Title = "Song", Artist = "Test", FilePath = SongPath },
+            Player(), new StubMetadata(), Elrc, null) { SaveTarget = () => LyricsSaveTarget.Sidecar };
+
+        editor.NudgeForwardCommand.Execute(editor.Lines[^1]);
+        await editor.SaveCommand.ExecuteAsync(null);
+
+        var saved = await File.ReadAllTextAsync(SidecarPath);
+        Assert.Contains("[00:06.10]Quiet harbor", saved);
+        AssertKeepsWordsBackgroundAndVoices(saved);
+    }
+
+    [AvaloniaFact]
+    public async Task OpenedFromTheLyricsPage_SavedUntouched_TheSidecarLoadsTheSame()
+    {
+        var (vm, player) = await LoadPage();
+        var editor = new LrcEditorViewModel(player.CurrentTrack!, player, new StubMetadata(),
+            vm.BuildSeedFromLoadedLines(), null) { SaveTarget = () => LyricsSaveTarget.Sidecar };
+
+        await editor.SaveCommand.ExecuteAsync(null);
+
+        AssertKeepsWordsBackgroundAndVoices(await File.ReadAllTextAsync(SidecarPath));
+    }
 }
