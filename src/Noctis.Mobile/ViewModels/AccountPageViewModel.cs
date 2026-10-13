@@ -329,7 +329,14 @@ public sealed partial class AccountPageViewModel : MobilePage
         }
     }
 
-    [RelayCommand] private void AskRemoveDownloads() => IsConfirmingRemoveDownloads = true;
+    /// <summary>One question at a time: asking to remove the downloads closes a pending sign-out
+    /// question (both cards stood open at once, each with its own red button).</summary>
+    [RelayCommand]
+    private void AskRemoveDownloads()
+    {
+        IsConfirmingSignOut = false;
+        IsConfirmingRemoveDownloads = true;
+    }
 
     [RelayCommand] private void CancelRemoveDownloads() => IsConfirmingRemoveDownloads = false;
 
@@ -345,6 +352,7 @@ public sealed partial class AccountPageViewModel : MobilePage
     [RelayCommand]
     private void AskSignOut()
     {
+        IsConfirmingRemoveDownloads = false;
         AlsoRemoveDownloads = false;
         IsConfirmingSignOut = true;
     }

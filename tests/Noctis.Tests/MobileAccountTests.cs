@@ -368,6 +368,24 @@ public class MobileAccountTests
         Assert.False(page.CanUpload);
     }
 
+    /// <summary>Remove all downloads and Sign out each ask first; asking one closes the other,
+    /// so two red confirm buttons never stand open together.</summary>
+    [Fact]
+    public void ConfirmQuestions_AreOneAtATime()
+    {
+        using var rig = MobileFixtures.MakeRig();
+        var page = OpenAccount(ShellWith(rig, new FakeAccount { Account = FakeAccount.SignedInAs() }));
+
+        page.AskRemoveDownloadsCommand.Execute(null);
+        Assert.True(page.IsConfirmingRemoveDownloads);
+        page.AskSignOutCommand.Execute(null);
+        Assert.True(page.IsConfirmingSignOut);
+        Assert.False(page.IsConfirmingRemoveDownloads);
+        page.AskRemoveDownloadsCommand.Execute(null);
+        Assert.True(page.IsConfirmingRemoveDownloads);
+        Assert.False(page.IsConfirmingSignOut);
+    }
+
     /// <summary>Settings' profile card: the account's name, its computer, initials (no picture);
     /// signed out, the invitation and the person glyph. It follows sign-in and sign-out.</summary>
     [Fact]
