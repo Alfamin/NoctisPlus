@@ -170,7 +170,23 @@ public static class TtmlParser
             for (var i = 0; i < words.Count; i++)
             {
                 if (i > 0) body.Append(' ');
-                body.Append('<').Append(FormatLrcTime(words[i].Start)).Append('>').Append(OneLine(words[i].Text));
+                var text = OneLine(words[i].Text);
+                // A word sung in syllables (spans with no space between) tags each syllable,
+                // which the ELRC reader joins back into the word with the same clocks.
+                if (words[i].Syllables is { Count: > 1 } syllables
+                    && words[i].Text.TrimEnd() == text
+                    && syllables.Sum(s => s.Length) == text.Length
+                    && syllables.All(s => s.Length > 0))
+                {
+                    var at = 0;
+                    foreach (var s in syllables)
+                    {
+                        body.Append('<').Append(FormatLrcTime(s.Start)).Append('>').Append(text, at, s.Length);
+                        at += s.Length;
+                    }
+                    continue;
+                }
+                body.Append('<').Append(FormatLrcTime(words[i].Start)).Append('>').Append(text);
             }
             var end = words[^1].End ?? lineEnd ?? words[^1].Start;
             return body.Append('<').Append(FormatLrcTime(end)).Append('>').ToString();
