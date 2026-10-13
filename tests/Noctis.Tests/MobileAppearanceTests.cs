@@ -5,6 +5,7 @@ using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 using Avalonia;
 using Avalonia.Controls;
+using Avalonia.Controls.Primitives;
 using Avalonia.Headless.XUnit;
 using Avalonia.Markup.Xaml.Styling;
 using Avalonia.Media;
@@ -236,6 +237,45 @@ public class MobileAppearanceTests
         }
         finally
         {
+            theme.Remove(app);
+            app.RequestedThemeVariant = before;
+        }
+    }
+
+    /// <summary>Now Playing is always dark: its seek fill and thumb take the dark-variant guarded
+    /// accent, so Indigo reads on the scrim (#121214) under Light and dark styles alike; the
+    /// raw Indigo read 2:1 there (device, Smoke · Indigo).</summary>
+    [AvaloniaTheory]
+    [InlineData("Light")]
+    [InlineData("Smoke")]
+    [InlineData("Midnight")]
+    public void NowPlaying_SeekBar_ReadsOnTheDarkScrim_EvenForIndigo(string themeName)
+    {
+        var app = Application.Current!;
+        var before = app.RequestedThemeVariant;
+        var theme = new MobileTheme();
+        using var rig = MobileFixtures.MakeRig(new[] { MobileFixtures.Song("Tone") });
+        var window = MobileFixtures.Mount(rig.Shell, out var view);
+        try
+        {
+            theme.Apply(app, themeName, "#4338CA");
+            rig.Shell.Player.PlayTracks(rig.Library.TrackList, 0);
+            rig.Shell.OpenNowPlayingCommand.Execute(null);
+            window.UpdateLayout();
+            var page = view.FindControl<NowPlayingPage>("NowPlaying")!;
+            var seek = MobileFixtures.Named<Slider>(page, "SeekBar");
+            var scrim = Color.Parse("#121214");
+            var fill = seek.GetVisualDescendants().OfType<RepeatButton>().First(b => b.Name == "PART_DecreaseButton");
+            var thumb = seek.GetVisualDescendants().OfType<Avalonia.Controls.Primitives.Thumb>().First();
+            foreach (var (part, brush) in new[] { ("fill", fill.Background), ("thumb", thumb.Background) })
+            {
+                var ratio = MobileTheme.ContrastRatio(((ISolidColorBrush)brush!).Color, scrim);
+                Assert.True(ratio >= MobileTheme.MinAccentContrast, $"{themeName}: {part} {ratio:0.00} ");
+            }
+        }
+        finally
+        {
+            window.Close();
             theme.Remove(app);
             app.RequestedThemeVariant = before;
         }

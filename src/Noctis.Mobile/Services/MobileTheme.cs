@@ -135,6 +135,12 @@ public sealed class MobileTheme
     /// and UI parts. The default Crimson clears it as is everywhere.</summary>
     public const double MinAccentContrast = 3.0;
 
+    internal static readonly string[] SliderAccentKeys =
+    {
+        "SliderTrackValueFill", "SliderTrackValueFillPointerOver", "SliderTrackValueFillPressed",
+        "SliderThumbBackground", "SliderThumbBackgroundPointerOver", "SliderThumbBackgroundPressed",
+    };
+
     /// <summary>
     /// The phone's contrast guards over the shared accent palette. On an accent fill (Play,
     /// chips, the selected tab's tile, switches) the glyph is white unless white falls under
@@ -171,6 +177,11 @@ public sealed class MobileTheme
                 accent.Remove(key);
                 text[key] = new SolidColorBrush(Readable(((ISolidColorBrush)built[key]!).Color, behind, isLight ? Colors.Black : Colors.White));
             }
+            // Fluent's slider fill and thumb (Now Playing's seek and volume bars, on the dark
+            // scrim): the guarded accent too. The thumb's colour is a template value, which no
+            // page style can override, so the resource is the one place to set it.
+            foreach (var key in SliderAccentKeys)
+                text[key] = text["AccentTextExactBrush"];
             accent.ThemeDictionaries[variant] = text;
         }
     }
