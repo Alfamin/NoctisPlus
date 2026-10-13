@@ -252,6 +252,8 @@ public partial class AndroidApp : Avalonia.Application, IThemeHost
             var settings = await persistence.LoadSettingsAsync();
             Loc.Instance.SetCulture(settings.Language);
             ApplyTheme(settings.MobileAppearance, settings.Theme, settings.AccentColorHex);
+            // The Library rows need only the settings: on screen now, not after the loads below.
+            _shell!.Library.ApplySettings(settings);
             // No SetGapless(settings.GaplessPlaybackEnabled): the phone is always gapless
             // (NowPlayingViewModel turns it on), whatever a desktop-written settings.json says.
             await history.PreloadAsync();

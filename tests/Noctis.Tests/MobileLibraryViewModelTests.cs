@@ -50,6 +50,29 @@ public class MobileLibraryViewModelTests : IDisposable
         Assert.Equal(new[] { "a", "b", "c" }, vm.Songs.Select(t => t.Title)); // sorted by title
     }
 
+    /// <summary>Cold launch: the host hands over the settings before the library loads, and the
+    /// Library rows show from them at once; the sections below wait for the library.</summary>
+    [Fact]
+    public async Task ApplySettings_ShowsTheRows_BeforeTheLibraryLoads_AndTheSectionsAfter()
+    {
+        var persistence = new PersistenceService(_root);
+        var settings = await persistence.LoadSettingsAsync();
+        settings.MusicFolders.Add("content://tree/music");
+        settings.PhoneLibraryRows.AddRange(new[] { "Songs", "Albums" });
+        await persistence.SaveSettingsAsync(settings);
+        var vm = new LibraryViewModel(new FakeLibraryService(), persistence, new ScriptedPicker(), marshal: a => a());
+
+        vm.ApplySettings(settings);
+
+        Assert.True(vm.HasFolders);
+        Assert.Equal(new[] { "Songs", "Albums" }, vm.LibraryRowKeys);
+        Assert.False(vm.ShowConnectCard);
+        Assert.False(vm.ShowSections);       // no pin hint over a Pinned rail that has not loaded
+
+        await vm.InitializeAsync();
+        Assert.True(vm.ShowSections);
+    }
+
     [Fact]
     public async Task AddFolder_PersistsThePickedUri_AndScansIt()
     {

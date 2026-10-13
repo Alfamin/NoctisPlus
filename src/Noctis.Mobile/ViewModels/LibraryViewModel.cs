@@ -81,7 +81,7 @@ public sealed partial class LibraryViewModel : ObservableObject
     [ObservableProperty] private int _scanProgress;
 
     [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(ShowConnectCard), nameof(HasNotice))]
+    [NotifyPropertyChangedFor(nameof(ShowConnectCard), nameof(HasNotice), nameof(ShowSections))]
     private bool _hasFolders;
 
     /// <summary>The last scan aborted on an unreadable root (a revoked SAF grant, spec §7):
@@ -96,7 +96,7 @@ public sealed partial class LibraryViewModel : ObservableObject
 
     /// <summary>InitializeAsync has read the settings: until then HasFolders is unknown, not false.</summary>
     [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(ShowConnectCard), nameof(HasNotice))]
+    [NotifyPropertyChangedFor(nameof(ShowConnectCard), nameof(HasNotice), nameof(ShowSections))]
     private bool _isLoaded;
 
     [ObservableProperty] private bool _hasShelf;
@@ -114,6 +114,11 @@ public sealed partial class LibraryViewModel : ObservableObject
     /// <summary>First launch: no folder yet, so the only thing to show is the way in. Held
     /// back until the settings have loaded, or a user with folders sees it flash on launch.</summary>
     public bool ShowConnectCard => IsLoaded && !HasFolders;
+
+    /// <summary>The sections under the rows (Pinned and its hint): the rows show from the settings
+    /// alone (<see cref="ApplySettings"/>), the sections wait for the library, or the pin hint
+    /// flashed over a Pinned rail still loading.</summary>
+    public bool ShowSections => IsLoaded && HasFolders;
 
     /// <summary>Any card above the Library sections (connect, reconnect, scan progress), so an
     /// empty card area takes no room.</summary>
@@ -305,16 +310,26 @@ public sealed partial class LibraryViewModel : ObservableObject
         Refreshed?.Invoke(this, EventArgs.Empty);
     }
 
+    /// <summary>
+    /// What the settings alone decide: the folders (so the Library rows show) and the rows'
+    /// order, and the pins. The host applies these as soon as it has read the settings at start,
+    /// before the play log and the library load: the Library tab sat as a bare title for that
+    /// whole load on a cold launch (~1 s on the emulator, longer with a big library).
+    /// </summary>
+    public void ApplySettings(AppSettings settings)
+    {
+        SetFolders(settings.MusicFolders);
+        _pinnedAlbumIds = settings.PinnedAlbumIds.ToList();
+        _pinnedArtistNames = settings.PinnedArtistNames.ToList();
+        _pinnedTrackIds = settings.PinnedTrackIds.ToList();
+        LibraryRowKeys = settings.PhoneLibraryRows.ToList();
+    }
+
     public async Task InitializeAsync()
     {
         try
         {
-            var settings = await _persistence.LoadSettingsAsync();
-            SetFolders(settings.MusicFolders);
-            _pinnedAlbumIds = settings.PinnedAlbumIds.ToList();
-            _pinnedArtistNames = settings.PinnedArtistNames.ToList();
-            _pinnedTrackIds = settings.PinnedTrackIds.ToList();
-            LibraryRowKeys = settings.PhoneLibraryRows.ToList();
+            ApplySettings(await _persistence.LoadSettingsAsync());
             await LoadPlaylistsAsync();
             RefreshFromLibrary();
         }

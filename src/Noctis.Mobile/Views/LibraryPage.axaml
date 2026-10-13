@@ -349,7 +349,7 @@
                 <Panel>
                     <StackPanel Name="LibrarySections" Spacing="22" Classes.editing="{Binding LibraryRows.IsEditing}">
                         <!-- Pinned: always shown once there is music, so the pin system is discoverable. -->
-                        <StackPanel Name="PinnedSection" Spacing="10" IsVisible="{Binding Library.HasFolders}">
+                        <StackPanel Name="PinnedSection" Spacing="10" IsVisible="{Binding Library.ShowSections}">
                             <Button Name="PinnedHeader" Classes="row section-header" Command="{Binding OpenPinnedCommand}">
                                 <StackPanel Orientation="Horizontal">
                                     <PathIcon Data="{DynamicResource LibPinIcon}" />
