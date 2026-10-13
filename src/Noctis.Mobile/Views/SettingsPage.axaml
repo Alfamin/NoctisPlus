@@ -15,9 +15,10 @@
 
     <UserControl.Resources>
         <!-- A Look tile's mini preview: a theme's grouped page with two cards on it, the first
-             carrying the accent. -->
+             carrying the accent. It fills the rim's inside (56 x 38), and its padding leaves the
+             two cards (13 + 4 + 11) exactly that height, so nothing is cut at the edges. -->
         <DataTemplate x:Key="LookPreviewTemplate" x:DataType="vm:LookPreview">
-            <Border Width="58" Height="40" CornerRadius="9" Background="{Binding Page}" Padding="6">
+            <Border CornerRadius="8" Background="{Binding Page}" Padding="6,5">
                 <StackPanel Spacing="4">
                     <Border Height="13" CornerRadius="4" Background="{Binding Card}">
                         <Ellipse Width="6" Height="6" Margin="4,0,0,0" HorizontalAlignment="Left" VerticalAlignment="Center"
@@ -350,7 +351,7 @@
                                             <ContentControl Content="{Binding DarkPreview}" ContentTemplate="{StaticResource LookPreviewTemplate}" />
                                             <Border Width="28" HorizontalAlignment="Left" ClipToBounds="True">
                                                 <Canvas>
-                                                    <ContentControl Content="{Binding LightPreview}" ContentTemplate="{StaticResource LookPreviewTemplate}" />
+                                                    <ContentControl Width="56" Height="38" Content="{Binding LightPreview}" ContentTemplate="{StaticResource LookPreviewTemplate}" />
                                                 </Canvas>
                                             </Border>
                                         </Panel>
@@ -420,9 +421,8 @@
                             <Border Classes="group-card">
                                 <Button Name="RescanButton" Classes="row accent-row" Command="{Binding Shell.Library.RescanCommand}"
                                         IsEnabled="{Binding CanRescan}">
-                                    <Grid Classes="setting-row" ColumnDefinitions="Auto,*">
-                                        <views:GridIcon Classes="row-icon" Data="{DynamicResource SyncIcon}" />
-                                        <TextBlock Grid.Column="1" Classes="row-label" Text="Rescan Library" />
+                                    <Grid Classes="setting-row">
+                                        <TextBlock Classes="row-label" Text="Rescan Library" />
                                     </Grid>
                                 </Button>
                             </Border>
@@ -434,9 +434,8 @@
                         <StackPanel>
                             <Border Name="AdvancedCard" Classes="group-card">
                                 <Button Name="ExportLogsButton" Classes="row accent-row" Command="{Binding ExportLogsCommand}">
-                                    <Grid Classes="setting-row" ColumnDefinitions="Auto,*">
-                                        <views:GridIcon Classes="row-icon" Data="{DynamicResource ClipboardIcon}" />
-                                        <TextBlock Grid.Column="1" Classes="row-label" Text="Export Logs" />
+                                    <Grid Classes="setting-row">
+                                        <TextBlock Classes="row-label" Text="Export Logs" />
                                     </Grid>
                                 </Button>
                             </Border>

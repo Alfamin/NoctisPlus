@@ -534,7 +534,7 @@ public class MobileSettingsTests
             Assert.All(rows, r => Assert.True(r.Bounds.Height >= 52, $"{r.Name ?? r.GetType().Name} is {r.Bounds.Height} tall"));
 
             var icons = rows.SelectMany(r => r.GetVisualDescendants().OfType<GridIcon>().Where(i => i.Classes.Contains("row-icon"))).ToList();
-            Assert.Equal(3, icons.Count);                    // Rescan Library, Export Logs, Add Folder
+            Assert.Equal(1, icons.Count);                    // Add Folder; Rescan Library and Export Logs are text only
             Assert.All(icons, i => Assert.Contains("accent-row", i.GetVisualAncestors().OfType<Button>().First().Classes));
             Assert.All(icons, i => Assert.Equal(new Size(24, 24), i.Bounds.Size));
             Assert.All(icons, i =>
@@ -656,6 +656,21 @@ public class MobileSettingsTests
         {
             var tiles = new[] { "LookSystem", "LookLight", "LookDark" }.Select(n => MobileFixtures.Named<Button>(page, n)).ToList();
             Assert.Equal(new[] { true, false, false }, tiles.Select(t => t.Classes.Contains("selected")));
+
+            // Each preview's page and its two cards sit wholly inside the rim (they were cut at
+            // the right and bottom edges when the page was sized as the rim's outside).
+            Assert.All(tiles, tile =>
+            {
+                var rim = tile.GetVisualDescendants().OfType<Border>().First(b => b.Classes.Contains("look-preview"));
+                var inside = new Rect(rim.Bounds.Size).Deflate(rim.BorderThickness);
+                var shapes = rim.GetVisualDescendants().OfType<Border>().Where(b => b.IsEffectivelyVisible && b.Background != null).ToList();
+                Assert.NotEmpty(shapes);
+                Assert.All(shapes, b =>
+                {
+                    var r = new Rect(b.TranslatePoint(new Point(0, 0), rim)!.Value, b.Bounds.Size);
+                    Assert.True(inside.Inflate(0.01).Contains(r), $"{tile.Name}: {r} outside {inside}");
+                });
+            });
 
             tiles[2].Command!.Execute(tiles[2].CommandParameter);
             window.UpdateLayout();
