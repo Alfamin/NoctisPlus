@@ -2457,6 +2457,7 @@ The lines and their timings are dropped and an empty lyrics box opens for your o
   <data name="LyricsStudio.ComposeCheck" xml:space="preserve"><value>Check the lyrics below, one line per sung line, then press Align lyrics.</value><comment>Lyrics box hint when text is present</comment></data>
   <data name="LyricsStudio.TranscriptBanner" xml:space="preserve"><value>Experimental transcript. Sung vocals often transcribe poorly, so fix the words below, then press Align lyrics to time them.</value><comment>Lyrics box banner after a transcription</comment></data>
   <data name="LyricsStudio.PasteWatermark" xml:space="preserve"><value>Paste the lyrics here, one line per sung line…</value><comment>Lyrics box watermark</comment></data>
+  <data name="LyricsStudio.LyricsBox" xml:space="preserve"><value>Lyrics</value><comment>Accessible name of the lyrics box (its watermark disappears once text is in)</comment></data>
   <data name="LyricsStudio.ImportFile" xml:space="preserve"><value>Import file…</value><comment>Lyrics box button</comment></data>
   <data name="LyricsStudio.ImportFileTip" xml:space="preserve"><value>Load lyrics from a .txt, .lrc, .elrc or .ttml file (timestamps are dropped and re-timed)</value><comment>Tooltip</comment></data>
   <data name="LyricsStudio.TranscribeDraft" xml:space="preserve"><value>Listen instead · Experimental</value><comment>Lyrics box button: transcribe the song into the box</comment></data>

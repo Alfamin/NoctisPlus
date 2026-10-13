@@ -406,4 +406,213 @@ public class AccessibleNamesSweepTests
         }
         AssertNone(found);
     }
+
+    [AvaloniaFact]
+    public async Task LibraryPages_SongsAlbumsArtistsPlaylistsFoldersFavorites()
+    {
+        EnsureAppStyles();
+        var albumId = Guid.NewGuid();
+        var tracks = new List<Track> { Song("Head Like A Hole", albumId: albumId, plays: 4), Song("Terrible Lie", albumId: albumId, plays: 2) };
+        tracks[0].IsFavorite = true;
+        var lib = new FakeLibraryService();
+        lib.TrackList.AddRange(tracks);
+        var album = new Album
+        {
+            Id = albumId, Name = "Pretty Hate Machine", Artist = "Nine Inch Nails", Year = 1989,
+            TrackCount = tracks.Count, Tracks = tracks,
+        };
+        ((List<Album>)lib.Albums).Add(album);
+        var persistence = new TestPersistenceService();
+        var player = new PlayerViewModel(new FakeAudioPlayer(), lib, persistence, new FakeAnimatedCoverService());
+        var sidebar = new SidebarViewModel(persistence, lib);
+        sidebar.Playlists.Add(new Playlist { Name = "Night Drive", TrackIds = tracks.Select(t => t.Id).ToList() });
+        var settings = new SettingsViewModel(persistence, lib, new FakeHistoryLog());
+        var found = new List<string>();
+
+        async Task Sweep(string surface, Control view, Func<bool>? ready = null)
+        {
+            var window = Show(view);
+            try
+            {
+                if (ready != null)
+                {
+                    await PumpUntil(ready, 2000);
+                    Assert.True(ready(), $"{surface}: its rows never realized");
+                }
+                Pump(window);
+                found.AddRange(Offenders(surface, All(view)));
+            }
+            finally
+            {
+                window.Close();
+            }
+        }
+
+        var songs = new LibrarySongsViewModel(lib, player, sidebar, persistence);
+        var songsView = new LibrarySongsView { DataContext = songs };
+        songs.IsActive = true;
+        await Sweep("Songs", songsView, () => songsView.GetVisualDescendants().OfType<ListBoxItem>().Any());
+
+        var albums = new LibraryAlbumsViewModel(lib, player, sidebar, settings);
+        albums.FilteredAlbumRows.Add(new AlbumRow { Albums = new List<Album> { album } });
+        var albumsView = new LibraryAlbumsView { DataContext = albums };
+        await Sweep("Albums", albumsView, () => albumsView.GetVisualDescendants().OfType<Button>().Count() > 5);
+
+        var artists = new LibraryArtistsViewModel(lib);
+        var row = new ArtistRow();
+        row.Artists.Add(new Artist { Id = Guid.NewGuid(), Name = "Nine Inch Nails", IsFavorite = true });
+        artists.ArtistRows.ReplaceAll(new[] { row });
+        var artistsView = new LibraryArtistsView { DataContext = artists };
+        string? tileName = null;
+        await Sweep("Artists", artistsView, () =>
+        {
+            var tile = artistsView.GetVisualDescendants().OfType<Button>().FirstOrDefault(b => b.Classes.Contains("artist-tile"));
+            tileName = tile is null ? null : NameOf(tile);
+            return tile != null;
+        });
+        Assert.Equal("Nine Inch Nails", tileName);
+
+        var playlists = new LibraryPlaylistsViewModel(sidebar, player, lib, persistence);
+        var playlistsView = new LibraryPlaylistsView { DataContext = playlists };
+        await Sweep("Playlists", playlistsView, () => playlistsView.GetVisualDescendants().OfType<Button>().Count() > 3);
+
+        var folders = new LibraryFoldersViewModel(lib, player, persistence, sidebar);
+        await Sweep("Folders", new LibraryFoldersView { DataContext = folders });
+
+        var favorites = new FavoritesViewModel(player, lib, persistence, sidebar, settings);
+        await Sweep("Favorites", new FavoritesView { DataContext = favorites });
+
+        AssertNone(found);
+    }
+
+    [AvaloniaFact]
+    public void Statistics_BothTabs()
+    {
+        EnsureAppStyles();
+        var lib = new FakeLibraryService();
+        var a = Song("Head Like A Hole");
+        var b = Song("Terrible Lie");
+        lib.TrackList.AddRange(new[] { a, b });
+        var now = DateTime.UtcNow;
+        var events = Enumerable.Range(0, 20)
+            .Select(i => StatisticsNumbersTests.Play((i % 2 == 0 ? a : b).Id, (i % 2 == 0 ? a : b).Title, "Nine Inch Nails", now.AddHours(-i)))
+            .ToArray();
+        var vm = new StatisticsViewModel(lib, new StatisticsNumbersTests.History(events));
+        var view = new StatisticsView { DataContext = vm };
+        var window = Show(view);
+        var found = new List<string>();
+        try
+        {
+            StatisticsNumbersTests.Refresh(vm);
+            Pump(window);
+            found.AddRange(Offenders("Stats (overview)", All(view)));
+            vm.IsHistoryTabSelected = true;
+            Pump(window);
+            found.AddRange(Offenders("Stats (history)", All(view)));
+        }
+        finally
+        {
+            window.Close();
+        }
+        AssertNone(found);
+    }
+
+    [AvaloniaFact]
+    public async Task Wrap()
+    {
+        EnsureAppStyles();
+        var lib = new FakeLibraryService();
+        var log = new FakeHistoryLog();
+        var year = DateTime.Now.Year;
+        for (var i = 0; i < 6; i++)
+        {
+            var t = Song($"Song {i}", $"Artist {i}", $"Album {i}");
+            lib.TrackList.Add(t);
+            for (var p = 0; p < 8 - i; p++)
+                log.Seed(t, new DateTime(year, 1, 1 + p, 9 + i, 0, 0, DateTimeKind.Local).ToUniversalTime());
+        }
+        var archive = Path.Combine(Path.GetTempPath(), "noctis-a11y-wrap-" + Guid.NewGuid().ToString("N") + ".json");
+        var vm = new WrapViewModel(log, lib, new WrapArchiveService(archive), _ => null);
+        var win = new WrapDialog(vm) { Width = 1300, Height = 900 };
+        win.Show();
+        try
+        {
+            await PumpUntil(() => vm.HasData && !vm.IsLoading, 5000);
+            Pump(win);
+            AssertNone(Offenders("Wrap", All(win)));
+        }
+        finally
+        {
+            win.Close();
+        }
+    }
+
+    [AvaloniaFact]
+    public void LyricsStudio_ChooseSongs()
+    {
+        EnsureAppStyles();
+        var root = Path.Combine(Path.GetTempPath(), "noctis-a11y-studio-" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(root);
+        var tracks = new[] { Song("Head Like A Hole"), Song("Terrible Lie") };
+        var vm = new LyricsStudioViewModel(tracks, new LyricsStudioModelDownloadTests.ModelOnlyEngine(new WhisperModelManager(root)),
+            new LyricsWriter(null!, null), new FakeLibraryService(), null, () => new AppSettings(), _ => { });
+        var panel = new LyricsStudioPanel { DataContext = vm, ShowHeader = true };
+        var window = Show(panel, 1200, 850);
+        try
+        {
+            AssertNone(Offenders("Lyrics Studio", All(panel)));
+            Assert.Contains("Terrible Lie, Nine Inch Nails", panel.GetVisualDescendants().OfType<ListBoxItem>().Select(NameOf));
+        }
+        finally
+        {
+            window.Close();
+        }
+    }
+
+    [AvaloniaFact]
+    public void LrcEditor_WithSyncedLines()
+    {
+        EnsureAppStyles();
+        var player = new PlayerViewModel(new FakeAudioPlayer(), new FakeLibraryService(), new TestPersistenceService(), new FakeAnimatedCoverService());
+        var vm = new LrcEditorViewModel(Song("Head Like A Hole"), player, new StubMetadata(), SyncedLrc, null);
+        var dialog = new LrcEditorDialog(vm) { Width = 1100, Height = 820 };
+        dialog.Show();
+        try
+        {
+            Pump(dialog);
+            AssertNone(Offenders("LRC editor", All(dialog)));
+        }
+        finally
+        {
+            dialog.Close();
+        }
+    }
+
+    [AvaloniaFact]
+    public void MainWindow_ShellSidebarAndTopBar()
+    {
+        EnsureAppStyles();
+        var window = new MainWindow();
+        try
+        {
+            // The island and the sidebar bind their view models (their names are bindings);
+            // they are swept below and in PlaybackBar_AndItsMenus with one.
+            // The queue's now-playing card (shown with a current track) binds that track.
+            window.FindControl<StackPanel>("QueueNowPlaying")!.GetLogicalDescendants().OfType<Border>().First()
+                .DataContext = Song("Down In It");
+            var found = Offenders("Main window", All(window).Where(c => c.FindLogicalAncestorOfType<PlaybackBarView>() == null
+                                                                      && c.FindLogicalAncestorOfType<SidebarView>() == null));
+            var sidebarVm = new SidebarViewModel(new TestPersistenceService(), new FakeLibraryService()) { TopBar = new TopBarViewModel() };
+            sidebarVm.SidebarRows.Add(new PlaylistNavItem { Label = "Road Trip", PlaylistId = Guid.NewGuid() });
+            var sidebar = new SidebarView { DataContext = sidebarVm };
+            var shown = Show(sidebar, 300, 900);
+            try { found.AddRange(Offenders("Sidebar", All(sidebar))); }
+            finally { shown.Close(); }
+            AssertNone(found);
+        }
+        finally
+        {
+            window.Close();
+        }
+    }
 }

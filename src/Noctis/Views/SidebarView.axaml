@@ -449,6 +449,7 @@
                                             <TextBox x:Name="SearchBox"
                                                      Grid.Column="0"
                                                      Classes="search-box"
+                                                     AutomationProperties.Name="{loc:T Sidebar.Search}"
                                                      Text="{Binding TopBar.SearchText, Mode=TwoWay}"
                                                      Watermark="{Binding TopBar.SearchWatermark}"
                                                      ToolTip.Tip="{loc:T Sidebar.SearchSyntaxTip}"
