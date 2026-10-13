@@ -276,9 +276,16 @@ public class MobileSettingsTests
         window.UpdateLayout();
 
         var page = MobileFixtures.Find<SettingsPage>(view);
-        Assert.Equal(new[] { new SettingsFolder("Music/Tones", false) }, ((SettingsPageViewModel)page.DataContext!).FolderRows);
-        Assert.Contains(MobileFixtures.Named<ItemsControl>(page, "FolderList").GetVisualDescendants().OfType<TextBlock>(), t => t.Text == "Music/Tones");
+        var vm = (SettingsPageViewModel)page.DataContext!;
+        Assert.Equal(new[] { new SettingsFolder("Music/Tones", false) }, vm.FolderRows);
         Assert.True(MobileFixtures.Named<Button>(page, "ExportLogsButton").IsEffectivelyVisible);
+
+        // Music Folders: the folder's own name, where it is in grey under it.
+        vm.OpenPaneCommand.Execute(SettingsPane.Folders);
+        window.UpdateLayout();
+        var texts = MobileFixtures.Named<ItemsControl>(page, "FolderList").GetVisualDescendants().OfType<TextBlock>()
+            .Where(t => t.IsEffectivelyVisible).Select(t => t.Text).ToList();
+        Assert.Equal(new[] { "Tones", "Music/Tones" }, texts);
         window.Close();
     }
 
@@ -313,7 +320,7 @@ public class MobileSettingsTests
     }
 
     /// <summary>Mounts Settings with the desktop icon set merged as the device merges it
-    /// (AndroidApp.axaml), so the section badges resolve their Rail icons.</summary>
+    /// (AndroidApp.axaml), so the action rows resolve their icons.</summary>
     private static async Task WithMountedSettings(MobileFixtures.Rig rig, Action<SettingsPage, SettingsPageViewModel, Window> check)
     {
         var app = Application.Current!;
@@ -335,168 +342,397 @@ public class MobileSettingsTests
         }
     }
 
-    /// <summary>Owner 10-11: every section is a rounded card headed by the desktop Settings
-    /// rail's icon for it, and the gapless switch is gone (the phone is always gapless).
-    /// 10-12, Apple's account sheet: the head sits over its card, which has 24 dp corners.</summary>
+    /// <summary>Device 10-13: the profile card's avatar sat flush against the card's left edge,
+    /// the circle clipped by the card's corner: the row's Button#AccountRow padding lost to
+    /// MobileStyles' Button.row (Padding 0). The inset is now the row grid's own margin.</summary>
     [AvaloniaFact]
-    public async Task Settings_IsRoundedCards_EachHeadedByItsDesktopIcon_WithNoGaplessSwitch()
+    public async Task Settings_ProfileCard_InsetsTheAvatar16dp()
     {
         using var rig = MobileFixtures.MakeRig();
+        var shell = new ShellViewModel(rig.Shell.Library, rig.Shell.Player, rig.Shell.Lyrics)
+        {
+            Account = new MobileAccountTests.FakeAccount { Account = MobileAccountTests.FakeAccount.SignedInAs("John Doe") },
+            Marshal = a => a(),
+            TintFactory = rig.Shell.TintFactory,
+        };
+        var window = MobileFixtures.Mount(shell, out var view);
+        try
+        {
+            shell.OpenSettingsCommand.Execute(null);
+            await ((SettingsPageViewModel)shell.CurrentPage!).Loaded;
+            window.UpdateLayout();
+            var page = MobileFixtures.Find<SettingsPage>(view);
+            var card = MobileFixtures.Named<Border>(page, "AccountCard");
+            var avatar = MobileFixtures.Named<Border>(page, "ProfileAvatar");
+            Assert.Equal(16, avatar.TranslatePoint(new Point(0, 0), card)!.Value.X, 1);
+        }
+        finally
+        {
+            window.Close();
+        }
+    }
+
+    /// <summary>Lets a pushed page's slide (and the hidden pane's settle) run to the end.</summary>
+    private static void Settle(Window window, int ms = 520)
+    {
+        var sw = System.Diagnostics.Stopwatch.StartNew();
+        while (sw.ElapsedMilliseconds < ms)
+        {
+            Avalonia.Threading.Dispatcher.UIThread.RunJobs();
+            Avalonia.Headless.AvaloniaHeadlessPlatform.ForceRenderTimerTick();
+            System.Threading.Thread.Sleep(5);
+        }
+        Avalonia.Threading.Dispatcher.UIThread.RunJobs();
+        window.UpdateLayout();
+    }
+
+    private static Task<MobileFixtures.Rig> RigWithFolders(MobileFixtures.NoPicker? picker = null, params string[] folders) =>
+        Task.FromResult(MobileFixtures.MakeRig(picker: picker, seed: async p =>
+        {
+            var s = await p.LoadSettingsAsync();
+            s.MusicFolders.AddRange(folders);
+            await p.SaveSettingsAsync(s);
+        }));
+
+    private const string Tones = "content://com.android.externalstorage.documents/tree/primary%3AMusic%2FTones";
+    private const string Beats = "content://com.android.externalstorage.documents/tree/primary%3AMusic%2FBeats";
+
+    /// <summary>Owner 10-13, "cluttered, very AI": the top level is Apple's account sheet. No
+    /// section heads, no header badge; three plain rows (no icons) into the pages; the only
+    /// accent rows are the two actions; the version is a small footer, not a card. Every card
+    /// keeps its 24 dp corners, and the gapless switch stays gone (the phone is always gapless).</summary>
+    [AvaloniaFact]
+    public async Task Settings_TopLevel_IsCalm_PlainRowsIntoPages_AndOnlyActionsInTheAccent()
+    {
+        using var rig = await RigWithFolders(null, Tones);
         await WithMountedSettings(rig, (page, _, _) =>
         {
-            var sections = page.GetVisualDescendants().OfType<StackPanel>()
-                .Where(s => s.Classes.Contains("settings-section") && s.IsEffectivelyVisible).ToList();
-            var heads = sections.Select(s =>
-            {
-                var head = s.Children.OfType<Grid>().First(g => g.Classes.Contains("group-head"));
-                var title = head.Children.OfType<TextBlock>().Single(t => t.Classes.Contains("group-title")).Text;
-                var card = s.Children.OfType<Border>().Single(b => b.Classes.Contains("group-card"));
-                return (Title: title, Icon: head.Children.OfType<GridIcon>().Single().Data, Corner: card.CornerRadius.TopLeft);
-            }).ToList();
+            var visible = page.GetVisualDescendants().OfType<Control>().Where(c => c.IsEffectivelyVisible).ToList();
+            Assert.DoesNotContain(visible, c => c.Classes.Contains("group-head") || c.Classes.Contains("sheet-glyph"));
+            Assert.Equal("Settings", MobileFixtures.Named<TextBlock>(page, "SettingsTitle").Text);
+            Assert.False(MobileFixtures.Named<Button>(page, "BackButton").IsVisible);
 
-            // No account service in this rig: the Account card stays hidden.
-            Assert.Equal(new[] { "Library", "Appearance", "Lyrics", "Advanced", "About" }, heads.Select(h => h.Title));
-            var keys = new[] { "RailFolderIcon", "RailPaletteIcon", "RailLyricsIcon", "RailWrenchIcon", "RailInfoIcon" };
-            for (var i = 0; i < keys.Length; i++)
+            foreach (var (name, label) in new[] { ("FoldersRow", "Music Folders"), ("AppearanceRow", "Appearance"), ("LyricsRow", "Lyrics") })
             {
-                Assert.True(Application.Current!.TryGetResource(keys[i], null, out var geometry), keys[i]);
-                Assert.Same(geometry, heads[i].Icon);
+                var row = MobileFixtures.Named<Button>(page, name);
+                Assert.DoesNotContain("accent-row", row.Classes);
+                Assert.Equal(label, row.GetVisualDescendants().OfType<TextBlock>().First(t => t.Classes.Contains("row-label")).Text);
+                // The chevron is the row's only icon.
+                Assert.Equal(new[] { "row-chevron" }, row.GetVisualDescendants().OfType<GridIcon>().Select(i => i.Classes.Single()));
             }
-            Assert.All(heads, h => Assert.Equal(24, h.Corner));
 
-            Assert.DoesNotContain(page.GetVisualDescendants().OfType<Control>(), c => c.Name == "GaplessSwitch");
+            var accentRows = visible.OfType<Button>().Where(b => b.Classes.Contains("accent-row")).Select(b => b.Name).ToList();
+            Assert.Equal(new[] { "RescanButton", "ExportLogsButton" }, accentRows);
+            // Icons on the top level: the actions' own and the chevrons, nothing else.
+            Assert.All(visible.OfType<GridIcon>().Where(i => i.Classes.Contains("row-icon")),
+                i => Assert.Contains(i.GetVisualAncestors().OfType<Button>().First().Name, accentRows));
+
+            Assert.All(visible.OfType<Border>().Where(b => b.Classes.Contains("group-card")), c => Assert.Equal(24, c.CornerRadius.TopLeft));
+            var version = MobileFixtures.Named<TextBlock>(page, "VersionLabel");
+            Assert.True(version.IsEffectivelyVisible);
+            Assert.Equal(Avalonia.Layout.HorizontalAlignment.Center, version.HorizontalAlignment);
+            Assert.DoesNotContain(visible, c => c.Name is "AboutCard" or "GaplessSwitch");
             Assert.DoesNotContain(page.GetVisualDescendants().OfType<TextBlock>(), t => t.Text?.Contains("Gapless", StringComparison.OrdinalIgnoreCase) == true);
         });
     }
 
-    /// <summary>Rows are touch-sized (each at least 52 dp tall, each button at least 44 dp)
-    /// and each leads with an icon.</summary>
+    /// <summary>Each row into a page carries its value in grey: how many folders (a red dot when
+    /// one lost its access), the dark style and accent, which lyric lines show. They follow changes.</summary>
     [AvaloniaFact]
-    public async Task Settings_Rows_AreTouchSized_AndLeadWithAnIcon()
+    public async Task Settings_PageRows_ShowTheirValues_AndFollowChanges()
     {
-        using var rig = MobileFixtures.MakeRig(seed: async p =>
+        var picker = new MobileFixtures.NoPicker();
+        picker.Lost.Add(Beats);
+        using var rig = await RigWithFolders(picker, Tones, Beats);
+        await WithMountedSettings(rig, (page, vm, window) =>
         {
-            var s = await p.LoadSettingsAsync();
-            s.MusicFolders.Add("content://com.android.externalstorage.documents/tree/primary%3AMusic%2FTones");
-            await p.SaveSettingsAsync(s);
+            Assert.Equal("2", MobileFixtures.Named<TextBlock>(page, "FoldersValueLabel").Text);
+            Assert.True(MobileFixtures.Named<Avalonia.Controls.Shapes.Ellipse>(page, "FolderWarningDot").IsEffectivelyVisible);
+            Assert.Equal("Ink · Crimson", MobileFixtures.Named<TextBlock>(page, "AppearanceValueLabel").Text);
+            Assert.Equal("Translations, Romanization", MobileFixtures.Named<TextBlock>(page, "LyricsValueLabel").Text);
+
+            vm.DarkTheme = "Midnight";
+            vm.SelectedAccent = SettingsPageViewModel.Accents.Single(a => a.Name == "Emerald");
+            rig.Shell.Lyrics.ShowRomanization = false;
+            window.UpdateLayout();
+            Assert.Equal("Midnight · Emerald", MobileFixtures.Named<TextBlock>(page, "AppearanceValueLabel").Text);
+            Assert.Equal("Translations on", MobileFixtures.Named<TextBlock>(page, "LyricsValueLabel").Text);
+
+            vm.Appearance = "Light";                         // no dark style under Light: just the accent
+            window.UpdateLayout();
+            Assert.Equal("Emerald", MobileFixtures.Named<TextBlock>(page, "AppearanceValueLabel").Text);
         });
-        await WithMountedSettings(rig, (page, _, _) =>
+        await ((SettingsPageViewModel)rig.Shell.CurrentPage!).PendingSave;
+    }
+
+    /// <summary>A row opens its page inside the sheet: the header takes the page's name and a back
+    /// button, the top level leaves the screen. Back (the header's button, or Android Back)
+    /// returns to the top level first; the next Back closes Settings.</summary>
+    [AvaloniaFact]
+    public async Task Settings_Pages_PushInsideTheSheet_AndBackReturnsToTheTopLevelFirst()
+    {
+        using var rig = await RigWithFolders(null, Tones);
+        await WithMountedSettings(rig, (page, vm, window) =>
         {
-            var rows = page.GetVisualDescendants().OfType<Control>()
-                .Where(c => c.IsEffectivelyVisible && (c.Classes.Contains("setting-row") || c.Classes.Contains("switch-row"))).ToList();
-            Assert.True(rows.Count >= 9, $"{rows.Count} rows");
-            Assert.All(rows, r =>
+            var title = MobileFixtures.Named<TextBlock>(page, "SettingsTitle");
+            var back = MobileFixtures.Named<Button>(page, "BackButton");
+            foreach (var (row, pane, heading) in new[]
+                     {
+                         ("FoldersRow", "FoldersPane", "Music Folders"),
+                         ("AppearanceRow", "AppearancePane", "Appearance"),
+                         ("LyricsRow", "LyricsPane", "Lyrics"),
+                     })
             {
-                Assert.True(r.Bounds.Height >= 52, $"{r.Name ?? r.GetType().Name} is {r.Bounds.Height} tall");
-                var icon = r.GetVisualDescendants().OfType<Control>().First(c => c is GridIcon or Ellipse);
-                Assert.True(icon.Bounds.Width >= 18, $"{r.Name ?? r.GetType().Name} has no leading icon");
-            });
-            // Every row icon is the same 24 dp box at the same left edge, centred on its row:
-            // PathIcon stretched each glyph's own bounds, so they came out uneven (owner 10-11).
-            var icons = rows.Select(r => r.GetVisualDescendants().OfType<GridIcon>().FirstOrDefault()).OfType<GridIcon>().ToList();
-            Assert.True(icons.Count >= 8, $"{icons.Count} grid icons");
-            Assert.All(icons, i => Assert.Equal(new Size(24, 24), i.Bounds.Size));
-            Assert.Single(icons.Select(i => Math.Round(i.TranslatePoint(new Point(0, 0), page)!.Value.X)).Distinct());
-            Assert.All(rows.Where(r => r.GetVisualDescendants().OfType<GridIcon>().Any()), r =>
-            {
-                var icon = r.GetVisualDescendants().OfType<GridIcon>().First();
-                var centre = icon.TranslatePoint(new Point(0, 12), r)!.Value.Y;
-                Assert.InRange(centre, r.Bounds.Height / 2 - 1.5, r.Bounds.Height / 2 + 1.5);
-            });
-            Assert.All(page.GetVisualDescendants().OfType<Button>().Where(b => b.IsEffectivelyVisible && b.TemplatedParent == null),  // not a slider's parts
-                b => Assert.True(b.Bounds.Height >= 44, $"{b.Name} is {b.Bounds.Height} tall"));
+                var button = MobileFixtures.Named<Button>(page, row);
+                button.Command!.Execute(button.CommandParameter);
+                Settle(window);
+                Assert.Equal(heading, title.Text);
+                Assert.True(back.IsEffectivelyVisible);
+                Assert.True(MobileFixtures.Named<StackPanel>(page, pane).IsEffectivelyVisible);
+                Assert.False(MobileFixtures.Named<ScrollViewer>(page, "MainScroll").IsEffectivelyVisible);
+                // The page sits fully in place once its slide ends.
+                Assert.Equal(0, MobileFixtures.Named<ScrollViewer>(page, "SubScroll").TranslatePoint(new Point(0, 0), page)!.Value.X, 1);
+
+                back.Command!.Execute(back.CommandParameter);
+                Settle(window);
+                Assert.Equal("Settings", title.Text);
+                Assert.True(MobileFixtures.Named<ScrollViewer>(page, "MainScroll").IsEffectivelyVisible);
+                Assert.False(MobileFixtures.Named<ScrollViewer>(page, "SubScroll").IsEffectivelyVisible);
+            }
+
+            vm.OpenPaneCommand.Execute(SettingsPane.Lyrics);
+            Assert.True(rig.Shell.TryHandleBack());          // Android Back: out of Lyrics…
+            Assert.Equal(SettingsPane.Main, vm.Pane);
+            Assert.Same(vm, rig.Shell.CurrentPage);
+            Assert.True(rig.Shell.TryHandleBack());          // …then out of Settings
+            Assert.Null(rig.Shell.CurrentPage);
         });
     }
 
-    /// <summary>Apple's grouped look: every hairline starts under the row's label and stops 16 dp
-    /// short of the card's right edge (they ran to the edge before), and the round close button
-    /// in the header goes back.</summary>
+    /// <summary>Rows are touch-sized on every page (each at least 52 dp tall, each button at least
+    /// 44 dp); icons lead only the accent action rows, all the same 24 dp box at one left edge,
+    /// centred on their rows.</summary>
+    [AvaloniaFact]
+    public async Task Settings_Rows_AreTouchSized_AndOnlyActionsLeadWithAnIcon()
+    {
+        using var rig = await RigWithFolders(null, Tones);
+        await WithMountedSettings(rig, (page, vm, window) =>
+        {
+            var rows = new List<Control>();
+            foreach (var pane in new[] { SettingsPane.Main, SettingsPane.Folders, SettingsPane.Appearance, SettingsPane.Lyrics })
+            {
+                vm.Pane = pane;
+                Settle(window);
+                var shown = page.GetVisualDescendants().OfType<Control>()
+                    .Where(c => c.IsEffectivelyVisible && (c.Classes.Contains("setting-row") || c.Classes.Contains("switch-row"))).ToList();
+                Assert.NotEmpty(shown);
+                rows.AddRange(shown);
+                Assert.All(page.GetVisualDescendants().OfType<Button>().Where(b => b.IsEffectivelyVisible && b.TemplatedParent == null),  // not a slider's parts
+                    b => Assert.True(b.Bounds.Height >= 44, $"{b.Name} is {b.Bounds.Height} tall"));
+            }
+            Assert.True(rows.Count >= 12, $"{rows.Count} rows");
+            Assert.All(rows, r => Assert.True(r.Bounds.Height >= 52, $"{r.Name ?? r.GetType().Name} is {r.Bounds.Height} tall"));
+
+            var icons = rows.SelectMany(r => r.GetVisualDescendants().OfType<GridIcon>().Where(i => i.Classes.Contains("row-icon"))).ToList();
+            Assert.Equal(3, icons.Count);                    // Rescan Library, Export Logs, Add Folder
+            Assert.All(icons, i => Assert.Contains("accent-row", i.GetVisualAncestors().OfType<Button>().First().Classes));
+            Assert.All(icons, i => Assert.Equal(new Size(24, 24), i.Bounds.Size));
+            Assert.All(icons, i =>
+            {
+                var card = i.GetVisualAncestors().OfType<Border>().First(b => b.Classes.Contains("group-card"));
+                Assert.Equal(16, i.TranslatePoint(new Point(0, 0), card)!.Value.X, 1);
+                var row = i.GetVisualAncestors().OfType<Grid>().First(g => g.Classes.Contains("setting-row"));
+                Assert.InRange(i.TranslatePoint(new Point(0, 12), row)!.Value.Y, row.Bounds.Height / 2 - 1.5, row.Bounds.Height / 2 + 1.5);
+            });
+        });
+        await ((SettingsPageViewModel)rig.Shell.CurrentPage!).PendingSave;
+    }
+
+    /// <summary>Apple's grouped look: a hairline between plain rows starts under the text, 16 dp in,
+    /// and stops 16 dp short of the card's right edge; the round close button closes the sheet.</summary>
     [AvaloniaFact]
     public async Task Settings_Hairlines_AreInsetOnBothSides_AndTheCloseButtonGoesBack()
     {
-        using var rig = MobileFixtures.MakeRig(seed: async p =>
+        using var rig = await RigWithFolders(null, Tones, Beats);
+        await WithMountedSettings(rig, (page, vm, window) =>
         {
-            var s = await p.LoadSettingsAsync();
-            s.MusicFolders.Add("content://com.android.externalstorage.documents/tree/primary%3AMusic%2FTones");
-            await p.SaveSettingsAsync(s);
-        });
-        await WithMountedSettings(rig, (page, _, window) =>
-        {
-            var lines = page.GetVisualDescendants().OfType<Border>()
-                .Where(b => b.Classes.Contains("row-separator") && b.IsEffectivelyVisible).ToList();
-            Assert.True(lines.Count >= 5, $"{lines.Count} hairlines");
+            var lines = new List<Border>();
+            foreach (var pane in new[] { SettingsPane.Main, SettingsPane.Folders, SettingsPane.Appearance, SettingsPane.Lyrics })
+            {
+                vm.Pane = pane;
+                Settle(window);
+                lines.AddRange(page.GetVisualDescendants().OfType<Border>().Where(b => b.Classes.Contains("row-separator") && b.IsEffectivelyVisible));
+            }
+            // 2 on the top level, 1 between two folders, 3 between four dark styles, 1 in Lyrics:
+            // none above a list's first row.
+            Assert.Equal(7, lines.Count);
             Assert.All(lines, line =>
             {
                 var card = line.GetVisualAncestors().OfType<Border>().First(b => b.Classes.Contains("group-card"));
                 var left = line.TranslatePoint(new Point(0, 0), card)!.Value.X;
-                Assert.Equal(56, left, 1);
+                Assert.Equal(16, left, 1);
                 Assert.Equal(card.Bounds.Width - 16, left + line.Bounds.Width, 1);
             });
 
+            vm.Pane = SettingsPane.Folders;
+            Settle(window);
             var close = MobileFixtures.Named<Button>(page, "CloseButton");
             Assert.True(close.Bounds.Width >= 44 && close.Bounds.Height >= 44);
-            close.Command!.Execute(close.CommandParameter);
+            close.Command!.Execute(close.CommandParameter);     // from a pushed page too: the whole sheet
             window.UpdateLayout();
             Assert.IsNotType<SettingsPageViewModel>(rig.Shell.CurrentPage);
         });
     }
 
-    /// <summary>The library card lists each folder by name, says in place when its access was
-    /// lost, and offers Add folder and Rescan as accent icon rows.</summary>
+    /// <summary>Music Folders lists each folder by its name with where it is under it, says in
+    /// place when its access was lost, and offers Add Folder as an accent action.</summary>
     [AvaloniaFact]
-    public async Task Settings_LibraryCard_ShowsTheLostFolder_AndTheTwoActionRows()
+    public async Task Settings_MusicFolders_ShowsTheLostFolder_AndAddFolder()
     {
-        const string tones = "content://com.android.externalstorage.documents/tree/primary%3AMusic%2FTones";
-        const string beats = "content://com.android.externalstorage.documents/tree/primary%3AMusic%2FBeats";
         var picker = new MobileFixtures.NoPicker();
-        picker.Lost.Add(beats);
-        using var rig = MobileFixtures.MakeRig(picker: picker, seed: async p =>
+        picker.Lost.Add(Beats);
+        using var rig = await RigWithFolders(picker, Tones, Beats);
+        await WithMountedSettings(rig, (page, vm, window) =>
         {
-            var s = await p.LoadSettingsAsync();
-            s.MusicFolders.Add(tones);
-            s.MusicFolders.Add(beats);
-            await p.SaveSettingsAsync(s);
-        });
-        await WithMountedSettings(rig, (page, _, _) =>
-        {
-            var warnings = MobileFixtures.Named<ItemsControl>(page, "FolderList").GetVisualDescendants().OfType<TextBlock>()
-                .Where(t => t.Classes.Contains("folder-lost")).ToList();
+            vm.OpenPaneCommand.Execute(SettingsPane.Folders);
+            Settle(window);
+            var list = MobileFixtures.Named<ItemsControl>(page, "FolderList");
+            var warnings = list.GetVisualDescendants().OfType<TextBlock>().Where(t => t.Classes.Contains("folder-lost")).ToList();
             Assert.Equal(new[] { false, true }, warnings.Select(w => w.IsEffectivelyVisible));
+            Assert.Equal(new[] { "Tones", "Music/Tones", "Beats", "Access lost. Add this folder again to play its songs." },
+                list.GetVisualDescendants().OfType<TextBlock>().Where(t => t.IsEffectivelyVisible).Select(t => t.Text));
             Assert.False(MobileFixtures.Named<Grid>(page, "NoFoldersRow").IsEffectivelyVisible);
 
-            foreach (var (name, label) in new[] { ("AddFolderButton", "Add folder"), ("RescanButton", "Rescan") })
-            {
-                var row = MobileFixtures.Named<Button>(page, name);
-                Assert.Contains("accent-row", row.Classes);
-                Assert.NotNull(row.GetVisualDescendants().OfType<GridIcon>().Single().Data);
-                Assert.Contains(row.GetVisualDescendants().OfType<TextBlock>(), t => t.Text == label);
-            }
+            var add = MobileFixtures.Named<Button>(page, "AddFolderButton");
+            Assert.True(add.IsEffectivelyVisible);
+            Assert.Contains("accent-row", add.Classes);
+            Assert.NotNull(add.GetVisualDescendants().OfType<GridIcon>().Single().Data);
+            Assert.Contains(add.GetVisualDescendants().OfType<TextBlock>(), t => t.Text == "Add Folder");
         });
     }
 
-    /// <summary>System / Dark / Light leads Appearance; the dark style hides under Light,
-    /// where it cannot apply, and comes back for System and Dark.</summary>
+    /// <summary>Rescan Library is one accent row on the top level. With no folder it is greyed,
+    /// and its note says why (it used to do nothing on a tap); with folders it is live and quiet.</summary>
     [AvaloniaFact]
-    public async Task Settings_Appearance_LeadsWithTheThemeChoice_AndHidesTheDarkStyleUnderLight()
+    public async Task Settings_Rescan_IsGreyedWithANote_UntilThereIsAFolder()
     {
-        using var rig = MobileFixtures.MakeRig();
+        using (var empty = MobileFixtures.MakeRig())
+        {
+            await WithMountedSettings(empty, (page, _, _) =>
+            {
+                var rescan = MobileFixtures.Named<Button>(page, "RescanButton");
+                Assert.False(rescan.IsEffectivelyEnabled);
+                Assert.Equal("Add a music folder to scan it.", MobileFixtures.Named<TextBlock>(page, "ScanStatusLabel").Text);
+                Assert.True(MobileFixtures.Named<TextBlock>(page, "ScanStatusLabel").IsEffectivelyVisible);
+                Assert.Equal("None", MobileFixtures.Named<TextBlock>(page, "FoldersValueLabel").Text);
+                Assert.False(MobileFixtures.Named<Avalonia.Controls.Shapes.Ellipse>(page, "FolderWarningDot").IsEffectivelyVisible);
+            });
+        }
+
+        using var rig = await RigWithFolders(null, Tones);
+        await WithMountedSettings(rig, (page, _, _) =>
+        {
+            var rescan = MobileFixtures.Named<Button>(page, "RescanButton");
+            Assert.True(rescan.IsEffectivelyEnabled);
+            Assert.Contains(rescan.GetVisualDescendants().OfType<TextBlock>(), t => t.Text == "Rescan Library");
+            Assert.False(MobileFixtures.Named<TextBlock>(page, "ScanStatusLabel").IsEffectivelyVisible);
+        });
+    }
+
+    /// <summary>The Look tiles (System / Light / Dark) apply at a tap and mark the chosen one.
+    /// On Appearance, Dark Style is a check list; under Light it is greyed with a note saying
+    /// why, rather than vanishing.</summary>
+    [AvaloniaFact]
+    public async Task Settings_LookTiles_Apply_AndDarkStyleGreysUnderLight()
+    {
+        var host = new FakeThemeHost();
+        using var rig = MobileFixtures.MakeRig(theme: host);
         await WithMountedSettings(rig, (page, vm, window) =>
         {
-            var lists = MobileFixtures.Named<Border>(page, "AppearanceCard").GetVisualDescendants().OfType<ListBox>().ToList();
-            Assert.Equal("AppearanceList", lists[0].Name);
-            Assert.Equal(new[] { "System", "Dark", "Light" }, lists[0].Items.Cast<string>());
-            Assert.True(MobileFixtures.Named<StackPanel>(page, "DarkThemeSection").IsEffectivelyVisible);
+            var tiles = new[] { "LookSystem", "LookLight", "LookDark" }.Select(n => MobileFixtures.Named<Button>(page, n)).ToList();
+            Assert.Equal(new[] { true, false, false }, tiles.Select(t => t.Classes.Contains("selected")));
 
-            vm.Appearance = "Light";
+            tiles[2].Command!.Execute(tiles[2].CommandParameter);
             window.UpdateLayout();
-            Assert.False(vm.ShowsDarkThemes);
-            Assert.False(MobileFixtures.Named<StackPanel>(page, "DarkThemeSection").IsEffectivelyVisible);
-            Assert.Equal("Light", lists[0].SelectedItem);
+            Assert.Equal(("Dark", "Ink", "#E74856"), host.Last);
+            Assert.Equal(new[] { false, false, true }, tiles.Select(t => t.Classes.Contains("selected")));
 
-            vm.Appearance = "Dark";
-            window.UpdateLayout();
+            vm.OpenPaneCommand.Execute(SettingsPane.Appearance);
+            Settle(window);
+            var styles = MobileFixtures.Named<ListBox>(page, "DarkThemeList");
+            Assert.Equal(new[] { "Ink", "Smoke", "Dark", "Midnight" }, styles.Items.Cast<string>());
+            Assert.True(styles.IsEffectivelyEnabled);
+            styles.SelectedItem = "Smoke";
+            Assert.Equal(("Dark", "Smoke", "#E74856"), host.Last);
+            // The chosen style's checkmark is the only one showing.
+            Assert.Equal(new[] { 0.0, 1.0, 0.0, 0.0 }, styles.GetVisualDescendants().OfType<GridIcon>().Where(i => i.Classes.Contains("check")).Select(i => i.Opacity));
+
+            vm.ShowMainCommand.Execute(null);
+            Settle(window);
+            tiles[1].Command!.Execute(tiles[1].CommandParameter);
+            vm.OpenPaneCommand.Execute(SettingsPane.Appearance);
+            Settle(window);
+            Assert.Equal(("Light", "Smoke", "#E74856"), host.Last);
             Assert.True(MobileFixtures.Named<StackPanel>(page, "DarkThemeSection").IsEffectivelyVisible);
+            Assert.False(styles.IsEffectivelyEnabled);
+            Assert.Equal("Dark Style applies when Look is System or Dark.", MobileFixtures.Named<TextBlock>(page, "DarkStyleFootnote").Text);
         });
         await ((SettingsPageViewModel)rig.Shell.CurrentPage!).PendingSave;
+    }
+
+    /// <summary>The Look tiles' previews paint the theme's own page and card colours: they must
+    /// follow MobileTheme.BuildPalette, for Light and each dark style.</summary>
+    [AvaloniaTheory]
+    [InlineData(null)]
+    [InlineData("Ink")]
+    [InlineData("Smoke")]
+    [InlineData("Dark")]
+    [InlineData("Midnight")]
+    public void LookPreview_MatchesThePalette(string? darkTheme)
+    {
+        var palette = MobileTheme.BuildPalette(darkTheme);
+        var variant = darkTheme == null ? ThemeVariant.Light : ThemeVariant.Dark;
+        var keys = (ResourceDictionary)palette.ThemeDictionaries[variant];
+        var preview = darkTheme == null ? LookPreview.Light : LookPreview.Dark(darkTheme);
+        Color Of(string key) => ((ISolidColorBrush)keys[key]!).Color;
+        Assert.Equal(Of("PhoneGroupedBackgroundBrush"), ((ISolidColorBrush)preview.Page).Color);
+        Assert.Equal(Of("PhoneCardBrush"), ((ISolidColorBrush)preview.Card).Color);
+        Assert.Equal(Of("PhoneSeparatorBrush"), ((ISolidColorBrush)preview.Line).Color);
+    }
+
+    /// <summary>The profile card's grey line says when the phone last synced, in words.</summary>
+    [Fact]
+    public void SyncedText_ReadsAsRelativeTime()
+    {
+        var now = new DateTime(2026, 10, 13, 15, 0, 0, DateTimeKind.Local).ToUniversalTime();
+        Assert.Equal("not synced yet", SettingsPageViewModel.SyncedText(null, now));
+        Assert.Equal("synced just now", SettingsPageViewModel.SyncedText(now.AddSeconds(-20), now));
+        Assert.Equal("synced 5 min ago", SettingsPageViewModel.SyncedText(now.AddMinutes(-5), now));
+        Assert.Equal("synced 3 hr ago", SettingsPageViewModel.SyncedText(now.AddHours(-3), now));
+        Assert.Equal("synced yesterday", SettingsPageViewModel.SyncedText(now.AddHours(-24), now));
+        Assert.Equal("synced 4 days ago", SettingsPageViewModel.SyncedText(now.AddDays(-4), now));
+        Assert.StartsWith("synced ", SettingsPageViewModel.SyncedText(now.AddDays(-30), now));
+        Assert.DoesNotContain("ago", SettingsPageViewModel.SyncedText(now.AddDays(-30), now));
+    }
+
+    /// <summary>The hairline under the header shows only once the page has scrolled under it.</summary>
+    [AvaloniaFact]
+    public async Task Settings_HeaderHairline_ShowsOnlyWhenScrolled()
+    {
+        using var rig = await RigWithFolders(null, Tones);
+        await WithMountedSettings(rig, (page, _, window) =>
+        {
+            var line = MobileFixtures.Named<Border>(page, "HeaderHairline");
+            var scroll = MobileFixtures.Named<ScrollViewer>(page, "MainScroll");
+            window.Height = 500;                               // short enough to scroll
+            window.UpdateLayout();
+            Assert.Equal(0, line.Opacity);
+            scroll.Offset = new Vector(0, 80);
+            Settle(window, 250);
+            Assert.Equal(1, line.Opacity);
+            scroll.Offset = default;
+            Settle(window, 250);
+            Assert.Equal(0, line.Opacity);
+        });
     }
 }

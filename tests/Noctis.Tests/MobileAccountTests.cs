@@ -393,16 +393,21 @@ public class MobileAccountTests
     {
         using var rig = MobileFixtures.MakeRig();
         var account = new FakeAccount();
-        var settings = new SettingsPageViewModel(ShellWith(rig, account));
+        var now = DateTime.UtcNow;
+        var settings = new SettingsPageViewModel(ShellWith(rig, account)) { UtcNow = () => now };
 
-        Assert.Equal("Sign in to your Noctis desktop", settings.AccountTitle);
-        Assert.Equal("Sync with your computer", settings.AccountSubtitle);
+        Assert.Equal("Sign in to your computer", settings.AccountTitle);
+        Assert.Equal("Sync your library with Noctis on your PC", settings.AccountSubtitle);
         Assert.True(settings.ShowAccountGlyph);
         Assert.False(settings.ShowAccountInitials);
 
         await account.SignInAsync("https://192.168.1.20:4747", "John Doe", "pw", Fingerprint);
         Assert.Equal("John Doe", settings.AccountTitle);
-        Assert.Equal("Studio PC · Sync and downloads", settings.AccountSubtitle);
+        Assert.Equal("Studio PC · not synced yet", settings.AccountSubtitle);
+        Assert.Equal("Playlists, favourites and plays stay in step with your computer.", settings.AccountFootnote);
+        account.Account = account.Account! with { LastSyncUtc = now.AddMinutes(-5) };
+        account.RaiseStateChanged();
+        Assert.Equal("Studio PC · synced 5 min ago", settings.AccountSubtitle);
         Assert.Equal("JD", settings.AccountInitials);
         Assert.True(settings.ShowAccountInitials);
         Assert.False(settings.HasAccountAvatar);
@@ -414,7 +419,7 @@ public class MobileAccountTests
         Assert.False(settings.ShowAccountGlyph);
 
         await account.SignOutAsync(removeDownloads: false);
-        Assert.Equal("Sign in to your Noctis desktop", settings.AccountTitle);
+        Assert.Equal("Sign in to your computer", settings.AccountTitle);
         Assert.Null(settings.AccountAvatarPath);
         Assert.True(settings.ShowAccountGlyph);
         settings.OnClosed();
@@ -835,7 +840,7 @@ public class MobileAccountTests
         var account = new FakeAccount();
         var shell = ShellWith(rig, account);
         var settings = new SettingsPageViewModel(shell);
-        Assert.Equal("Sign in to your Noctis desktop", settings.AccountRowText);
+        Assert.Equal("Sign in to your computer", settings.AccountRowText);
         var page = OpenAccount(shell);
         var changed = new List<string?>();
         settings.PropertyChanged += (_, e) => changed.Add(e.PropertyName);

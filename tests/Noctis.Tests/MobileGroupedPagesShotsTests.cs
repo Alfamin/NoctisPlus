@@ -64,7 +64,11 @@ public class MobileGroupedPagesShotsTests
                 using var rig = MobileFixtures.MakeRig();
                 var account = new MobileAccountTests.FakeAccount
                 {
-                    Account = MobileAccountTests.FakeAccount.SignedInAs("ferlin@example.com") with { DisplayName = "Ferlin Mejia" },
+                    Account = MobileAccountTests.FakeAccount.SignedInAs("ferlin@example.com") with
+                    {
+                        DisplayName = "Ferlin Mejia",
+                        LastSyncUtc = DateTime.UtcNow.AddMinutes(-5),
+                    },
                 };
                 var shell = new ShellViewModel(rig.Shell.Library, rig.Shell.Player, rig.Shell.Lyrics)
                 {
@@ -77,9 +81,19 @@ public class MobileGroupedPagesShotsTests
                 try
                 {
                     shell.OpenSettingsCommand.Execute(null);
-                    await ((SettingsPageViewModel)shell.CurrentPage!).Loaded;
+                    var settings = (SettingsPageViewModel)shell.CurrentPage!;
+                    await settings.Loaded;
                     Pump(300);
                     Save(window, Path.Combine(dir, $"settings-{name}.png"));
+                    // The pages pushed inside the sheet, each once its slide has settled.
+                    foreach (var pane in new[] { SettingsPane.Folders, SettingsPane.Appearance, SettingsPane.Lyrics })
+                    {
+                        settings.Pane = pane;
+                        Pump(600);
+                        Save(window, Path.Combine(dir, $"settings-{pane}-{name}.png"));
+                    }
+                    settings.Pane = SettingsPane.Main;
+                    Pump(600);
 
                     shell.OpenAccountCommand.Execute(null);
                     var page = (AccountPageViewModel)shell.CurrentPage!;
