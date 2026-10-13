@@ -26,6 +26,10 @@ public partial class LrcEditorLine : ObservableObject
 
     public string Text { get; }
 
+    /// <summary>The "[bg: …]" background-vocal lines written under this line. They have no row
+    /// of their own; save writes them back after this line.</summary>
+    public IReadOnlyList<string>? BackgroundLines { get; init; }
+
     /// <summary>
     /// Row display: duet voice markers ("v1:"/"v2:") and inline enhanced-LRC word
     /// tags stripped. Save round-trips the raw Text, so neither is lost by viewing.
@@ -83,8 +87,9 @@ public partial class LrcEditorViewModel : ViewModelBase
         // Prefer existing synced lyrics (retiming); otherwise start from plain
         // text lines with no timestamps (the tap-to-sync starting point).
         var source = !string.IsNullOrWhiteSpace(syncedLyrics) ? syncedLyrics : plainLyrics;
-        foreach (var (time, text) in ParseLrc(source ?? string.Empty))
-            Lines.Add(new LrcEditorLine(time, text));
+        var (rows, background) = SplitBackgroundLines(source ?? string.Empty);
+        for (var i = 0; i < rows.Count; i++)
+            Lines.Add(new LrcEditorLine(rows[i].Time, rows[i].Text) { BackgroundLines = background.GetValueOrDefault(i) });
 
         SelectedIndex = Lines.Count > 0 ? 0 : -1;
     }
@@ -148,6 +153,36 @@ public partial class LrcEditorViewModel : ViewModelBase
                 result.Add((time, content.Trim()));
         }
         return result;
+    }
+
+    /// <summary>
+    /// The editor rows of <paramref name="text"/>, and its "[bg: …]" background-vocal lines keyed
+    /// by the row they follow. <see cref="ParseLrc"/> takes a bg line for a header tag ([ar:],
+    /// [ti:]) and leaves it out, so the text rebuilt from the rows after any edit lost every
+    /// background vocal (a TTML import's x-bg spans among them). Both editors — this one and
+    /// Edit Info's Timestamp Lyrics — keep them on the row and write them back under it.
+    /// </summary>
+    public static (List<(TimeSpan? Time, string Text)> Rows, Dictionary<int, List<string>> Background) SplitBackgroundLines(string text)
+    {
+        var background = new Dictionary<int, List<string>>();
+        var kept = new List<string>();
+        // Rows ParseLrc makes of the kept lines so far: blank lines count once text follows them
+        // (it drops trailing ones), a header tag none, a stack of stamps one per stamp.
+        int rows = 0, blanks = 0;
+        foreach (var raw in text.Split('\n'))
+        {
+            var line = raw.TrimEnd('\r');
+            if (rows > 0 && line.TrimStart().StartsWith("[bg:", StringComparison.Ordinal))
+            {
+                if (!background.TryGetValue(rows - 1, out var list)) background[rows - 1] = list = new List<string>();
+                list.Add(line.Trim());
+                continue;
+            }
+            kept.Add(line);
+            if (string.IsNullOrWhiteSpace(line)) blanks++;
+            else { rows += blanks + ParseLrc(line).Count; blanks = 0; }
+        }
+        return (ParseLrc(string.Join('\n', kept)), background);
     }
 
     private static TimeSpan ToTime(Match match)
@@ -272,9 +307,12 @@ public partial class LrcEditorViewModel : ViewModelBase
     [RelayCommand]
     private async Task Save()
     {
+        // A line's "[bg: …]" vocals go out right under it, wherever the time sort puts it.
         var content = Lines
             .Where(l => !string.IsNullOrWhiteSpace(l.Text))
-            .Select(l => (l.Timestamp, l.Text))
+            .Select(l => (l.Timestamp, l.BackgroundLines is { Count: > 0 } bg
+                ? l.Text + Environment.NewLine + string.Join(Environment.NewLine, bg)
+                : l.Text))
             .ToList();
 
         if (!content.Any(l => l.Timestamp.HasValue))

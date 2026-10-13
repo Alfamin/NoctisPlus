@@ -133,7 +133,17 @@ public static class TtmlParser
         var (lines, plain) = Parse(content, joinSplitWords, preferredLanguage);
         if (lines is not { Count: > 0 }) return null;
         if (!lines.Any(l => l.Timestamp.HasValue)) return plain;
+        return ToLrc(lines);
+    }
 
+    /// <summary>
+    /// Parsed lines back as the LRC text <see cref="LrcParser"/> reads into the same lines: word
+    /// timing as ELRC word tags, duet voices as "v2:"/"v3:", background vocals as a "[bg: …]"
+    /// line, romanization / translation as lines at the same timestamp. Untimed lines are their
+    /// text, in place.
+    /// </summary>
+    public static string ToLrc(IReadOnlyList<LyricLine> lines)
+    {
         var sb = new StringBuilder();
         foreach (var line in lines)
         {

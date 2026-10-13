@@ -3402,17 +3402,16 @@ public partial class LyricsViewModel : ViewModelBase, IDisposable
     {
         if (!_hasSyncedLyrics || LyricLines.Count == 0) return null;
 
-        // A line's romanization / translation go back as lines at its own timestamp
-        // (GitHub #116) — the LRC shape they load from — so the editor's save keeps them.
         var lines = LyricLines
             .Where(l => !string.IsNullOrWhiteSpace(l.Text) && l.Text != "...")
-            .SelectMany(l => LrcParser.CompanionLines(l)
-                .Prepend(l.Text.Replace("\r\n", " ").Replace('\n', ' ').Trim())
-                .Select(text => (l.Timestamp, Text: text)))
             .ToList();
 
+        // Written back in the LRC shape each layer loads from: word tags, "v2:"/"v3:" voices,
+        // the "[bg: …]" vocal, romanization / translation at the line's own timestamp (GitHub
+        // #116). Plain "[mm:ss.xx]text" lost all but the last, so a save from the editor —
+        // a line untouched, even — turned a word-timed sidecar into line timing.
         return lines.Any(l => l.Timestamp.HasValue)
-            ? LrcEditorViewModel.BuildLrcPreservingUntimed(lines)
+            ? TtmlParser.ToLrc(lines)
             : null;
     }
 
