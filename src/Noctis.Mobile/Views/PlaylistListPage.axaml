@@ -15,7 +15,7 @@
             <views:PlaylistTools Grid.Column="2" Margin="8,0,0,0" VerticalAlignment="Center" />
         </Grid>
 
-        <TextBox Grid.Row="1" Name="PlaylistSearchBox" Margin="16,0,16,8" CornerRadius="12" PlaceholderText="Search in playlists"
+        <TextBox Grid.Row="1" Name="PlaylistSearchBox" Classes="search-field" Margin="16,0,16,8" PlaceholderText="Search in playlists"
                  Text="{Binding FilterText}" IsVisible="{Binding IsSearchOpen}" />
 
         <ScrollViewer Classes="page-scroll" Grid.Row="2" views:ScrollMemory.IsEnabled="True" HorizontalScrollBarVisibility="Disabled">
