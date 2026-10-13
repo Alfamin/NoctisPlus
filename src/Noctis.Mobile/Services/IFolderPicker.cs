@@ -18,4 +18,8 @@ public interface IFolderPicker
     /// persisted grant, of which an app has a limited number). Called when a folder is removed,
     /// or a pick is refused.</summary>
     void ReleaseAccess(string folder) { }
+
+    /// <summary>The storage <paramref name="folder"/> is on when that is not the phone's own
+    /// ("SD card", a USB drive's name); null on the phone's storage, or when unknown.</summary>
+    string? StorageName(string folder) => null;
 }

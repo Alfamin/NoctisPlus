@@ -225,8 +225,8 @@
             <Setter Property="Opacity" Value="1" />
         </Style>
 
-        <!-- Music Folders: a folder whose access was lost reads as a warning. -->
-        <Style Selector="TextBlock.folder-lost">
+        <!-- Music Folders: a folder whose access was lost, or that the last scan could not reach, reads as a warning. -->
+        <Style Selector="TextBlock.folder-lost, TextBlock.folder-unavailable">
             <Setter Property="FontSize" Value="13.5" />
             <Setter Property="Foreground" Value="#E5484D" />
             <Setter Property="TextWrapping" Value="Wrap" />
@@ -509,6 +509,8 @@
                                                                 <TextBlock Classes="row-sub" Text="{Binding Name}" IsVisible="{Binding ShowsPath}" />
                                                                 <TextBlock Classes="folder-lost" IsVisible="{Binding AccessLost}"
                                                                            Text="Access lost. Add this folder again to play its songs." />
+                                                                <TextBlock Classes="folder-unavailable" IsVisible="{Binding Unavailable}"
+                                                                           Text="Not available. Reconnect its storage, then rescan." />
                                                             </StackPanel>
                                                             <Button Grid.Column="1" Classes="folder-remove"
                                                                     Command="{Binding $parent[ItemsControl].((vm:SettingsPageViewModel)DataContext).AskRemoveFolderCommand}"

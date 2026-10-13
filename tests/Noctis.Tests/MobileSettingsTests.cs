@@ -259,6 +259,68 @@ public class MobileSettingsTests
         Assert.Equal(new[] { new SettingsFolder(tones, "Music/Tones", false), new SettingsFolder(beats, "Music/Beats", true) }, page.FolderRows);
     }
 
+    /// <summary>Device 10-13: with the SD card taken out, a rescan said "1 folder(s) unavailable"
+    /// and no row said which. The scan's unreachable folder is now marked on its row (its grant
+    /// is fine, so not "Access lost"), named in the note, and the top level shows the dot; a scan
+    /// that reaches it again clears all three.</summary>
+    [AvaloniaFact]
+    public async Task AFolderTheScanCouldNotReach_IsMarked_UntilItIsBack()
+    {
+        const string card = "content://com.android.externalstorage.documents/tree/A00C-1602%3AMusic";
+        var picker = new MobileFixtures.NoPicker();
+        picker.Storage[card] = "SD card";
+        using var rig = MobileFixtures.MakeRig(picker: picker, seed: async p =>
+        {
+            var s = await p.LoadSettingsAsync();
+            s.MusicFolders.AddRange(new[] { Tones, card });
+            await p.SaveSettingsAsync(s);
+        });
+        rig.Shell.OpenSettingsCommand.Execute(null);
+        var page = (SettingsPageViewModel)rig.Shell.CurrentPage!;
+        await page.Loaded;
+
+        rig.Library.AbortScanWithRoots = new[] { card };
+        await rig.Shell.Library.RescanCommand.ExecuteAsync(null);
+
+        Assert.Equal(new[] { false, true }, page.FolderRows.Select(f => f.Unavailable));
+        Assert.All(page.FolderRows, f => Assert.False(f.AccessLost));
+        Assert.True(page.HasLostFolder);
+        Assert.Equal("“Music” is unavailable. Reconnect it and rescan.", page.FoldersFootnote);
+
+        rig.Library.AbortScanWithRoots = null;
+        await rig.Shell.Library.RescanCommand.ExecuteAsync(null);
+        Assert.All(page.FolderRows, f => Assert.False(f.Unavailable));
+        Assert.False(page.HasLostFolder);
+        Assert.Equal("Noctis can read only the folders you choose here.", page.FoldersFootnote);
+    }
+
+    /// <summary>Device 10-13: a virtual SD card's Music read just "Music", the same as the phone's
+    /// own Music folder. A folder on a card now says which card, and a whole card is its name.</summary>
+    [AvaloniaFact]
+    public async Task AFolderOnACard_SaysWhichCard()
+    {
+        const string music = "content://com.android.externalstorage.documents/tree/primary%3AMusic";
+        const string cardMusic = "content://com.android.externalstorage.documents/tree/A00C-1602%3AMusic";
+        const string card = "content://com.android.externalstorage.documents/tree/B11D-2713%3A";
+        var picker = new MobileFixtures.NoPicker();
+        picker.Storage[cardMusic] = "SD card";
+        picker.Storage[card] = "USB drive";
+        using var rig = MobileFixtures.MakeRig(picker: picker, seed: async p =>
+        {
+            var s = await p.LoadSettingsAsync();
+            s.MusicFolders.AddRange(new[] { music, cardMusic, card });
+            await p.SaveSettingsAsync(s);
+        });
+
+        rig.Shell.OpenSettingsCommand.Execute(null);
+        var page = (SettingsPageViewModel)rig.Shell.CurrentPage!;
+        await page.Loaded;
+
+        Assert.Equal(new[] { ("Music", false), ("Music", true), ("USB drive", false) },
+            page.FolderRows.Select(f => (f.Title, f.ShowsPath)));
+        Assert.Equal(new[] { "Music", "SD card/Music", "USB drive" }, page.FolderRows.Select(f => f.Name));
+    }
+
     [AvaloniaFact]
     public async Task ProfileButton_OpensSettings_WithReadableFolders()
     {

@@ -22,8 +22,11 @@ internal static class MobileFixtures
     {
         /// <summary>Folders whose access is reported lost.</summary>
         public HashSet<string> Lost { get; } = new();
+        /// <summary>Folders on a card, with the card's name.</summary>
+        public Dictionary<string, string> Storage { get; } = new();
         public Task<string?> PickFolderAsync() => Task.FromResult<string?>(null);
         public bool HasAccess(string folder) => !Lost.Contains(folder);
+        public string? StorageName(string folder) => Storage.GetValueOrDefault(folder);
     }
 
     /// <summary>

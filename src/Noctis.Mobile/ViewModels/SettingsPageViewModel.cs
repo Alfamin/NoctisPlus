@@ -36,6 +36,10 @@ public sealed record SettingsFolder(string Root, string Name, bool AccessLost)
     /// <summary>The grey line under it: where the folder is ("Music/Tones"), when that says more
     /// than the label. A lost folder shows the warning there instead.</summary>
     public bool ShowsPath => !AccessLost && Title != Name;
+
+    /// <summary>Readable as far as the phone's grants go, but the last scan could not reach it
+    /// (its card was taken out, the folder was deleted or renamed).</summary>
+    public bool Unavailable { get; init; }
 }
 
 /// <summary>Settings is one sheet: its top level, or one of the pages pushed inside it.</summary>
@@ -160,8 +164,20 @@ public sealed partial class SettingsPageViewModel : MobilePage
     /// <summary>The configured roots as the user would name them ("Music/Tones"), not SAF URIs,
     /// each flagged when its access was lost: its songs stay listed but none of them plays.</summary>
     public IReadOnlyList<SettingsFolder> FolderRows => Shell.Library.Folders
-        .Select(f => new SettingsFolder(f, FolderDisplay(f), !Shell.Library.HasAccess(f)))
+        .Select(f => Shell.Library.HasAccess(f)
+            ? new SettingsFolder(f, FolderName(f), false) { Unavailable = Shell.Library.UnavailableFolders.Contains(f) }
+            : new SettingsFolder(f, FolderName(f), true))
         .ToList();
+
+    /// <summary>Where the folder is, as the user would say it: "Music/Tones" on the phone's
+    /// storage; on a card the card's name first ("SD card/Music"), or a whole card by its name
+    /// alone, so a card's Music is not mistaken for the phone's.</summary>
+    private string FolderName(string root)
+    {
+        var path = FolderDisplay(root);
+        if (Shell.Library.StorageName(root) is not { } storage) return path;
+        return path.EndsWith(':') ? storage : $"{storage}/{path}";
+    }
 
     /// <summary>The folder whose Remove was tapped: the page asks before it goes.</summary>
     [ObservableProperty]
@@ -195,8 +211,9 @@ public sealed partial class SettingsPageViewModel : MobilePage
     /// <summary>The Music Folders row's value: how many there are.</summary>
     public string FoldersValue => Shell.Library.Folders.Count == 0 ? "None" : Shell.Library.Folders.Count.ToString();
 
-    /// <summary>A folder lost its access: the Music Folders row carries a warning dot.</summary>
-    public bool HasLostFolder => FolderRows.Any(f => f.AccessLost);
+    /// <summary>A folder lost its access, or the last scan could not reach it: the Music Folders
+    /// row carries a warning dot.</summary>
+    public bool HasLostFolder => FolderRows.Any(f => f.AccessLost || f.Unavailable);
 
     /// <summary>Rescan only with a folder to scan and no scan running.</summary>
     public bool CanRescan => Shell.Library.HasFolders && !Shell.Library.IsScanning;

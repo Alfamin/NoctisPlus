@@ -45,8 +45,11 @@ public sealed partial class LibraryViewModel : ObservableObject
         _library.ScanProgress += (_, n) => _marshal(() => ScanProgress = n);
         _library.ScanAborted += (_, roots) => _marshal(() =>
         {
+            UnavailableFolders = roots;
             NeedsReconnect = true;
-            StatusText = $"{roots.Length} folder(s) unavailable. Reconnect them and rescan.";
+            StatusText = roots.Length == 1
+                ? $"“{FolderName(roots[0])}” is unavailable. Reconnect it and rescan."
+                : $"{roots.Length} folders are unavailable. Reconnect them and rescan.";
         });
     }
 
@@ -89,6 +92,10 @@ public sealed partial class LibraryViewModel : ObservableObject
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(ShowStatusLine), nameof(HasNotice))]
     private bool _needsReconnect;
+
+    /// <summary>The folders the last scan could not reach (a card taken out, a folder deleted),
+    /// set with <see cref="NeedsReconnect"/>; Settings marks them.</summary>
+    public IReadOnlyList<string> UnavailableFolders { get; private set; } = Array.Empty<string>();
 
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(ShowStatusLine))]
@@ -346,6 +353,9 @@ public sealed partial class LibraryViewModel : ObservableObject
     /// <summary>Whether <paramref name="folder"/> is still readable; see IFolderPicker.HasAccess.</summary>
     public bool HasAccess(string folder) => _picker.HasAccess(folder);
 
+    /// <summary>The storage <paramref name="folder"/> is on when not the phone's own; see IFolderPicker.StorageName.</summary>
+    public string? StorageName(string folder) => _picker.StorageName(folder);
+
     /// <summary>
     /// Desktop parity (SettingsViewModel.AddFolderPath): the same folder again is silent (and
     /// rescans, which is how a folder whose access was lost comes back); a folder inside one
@@ -469,7 +479,8 @@ public sealed partial class LibraryViewModel : ObservableObject
             do
             {
                 _scanAgain = false;
-                // Each pass judges the folders afresh.
+                // Each pass judges the folders afresh: one back in reach is no longer flagged.
+                UnavailableFolders = Array.Empty<string>();
                 NeedsReconnect = false;
                 StatusText = "Scanning…";
                 var folders = (await _persistence.LoadSettingsAsync()).MusicFolders.ToList();
