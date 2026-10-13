@@ -220,6 +220,21 @@ public class EnhancedLrcParserTests
     }
 
     [Fact]
+    public void AppendBackground_JoiningAPart_KeepsTheSeamWordsSyllables()
+    {
+        // Two "[bg: …]" parts on one line share a row; the seam word gains a space, and must
+        // keep its syllable timings while doing so.
+        var lines = LrcParser.Parse(
+            "[00:01.00]<00:01.00>main <00:02.00>line<00:03.00>\n[bg: <00:03.00>o<00:03.20>oh<00:03.50>]\n[bg: <00:04.00>ah<00:05.00>]");
+
+        var bg = lines[0].BackgroundWords!;
+        Assert.Equal(new[] { "ooh ", "ah" }, bg.Select(w => w.Text));
+        Assert.Equal(
+            new[] { TimeSpan.FromSeconds(3), TimeSpan.FromSeconds(3.2) },
+            bg[0].Syllables!.Select(s => s.Start));
+    }
+
+    [Fact]
     public void AppendBackground_StopsGrowingPastWordCap()
     {
         var target = new Noctis.Models.LyricLine { Timestamp = TimeSpan.FromSeconds(1), Text = "Hey" };

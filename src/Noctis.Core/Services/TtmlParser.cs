@@ -157,6 +157,11 @@ public static class TtmlParser
             if (!line.IsBackgroundOnly && line.BackgroundWords is { Count: > 0 } bg)
                 sb.Append("[bg: ").Append(ElrcBody(bg, line.BackgroundEndTimestamp)).Append("]\n");
 
+            // The LRC reader takes a word-timed "(…)" line as an adlib of the line before it and
+            // gives it no layers: its translation or romanization at the same stamp would come
+            // back as a sung line of its own, so an adlib's layers are not written.
+            if (words is { Count: > 0 } && IsFullyParenthesized(line.Text)) continue;
+
             foreach (var companion in LrcParser.CompanionLines(line))
                 sb.Append(stamp).Append(OneLine(companion)).Append('\n');
         }
@@ -164,13 +169,37 @@ public static class TtmlParser
 
         static string OneLine(string text) => text.Replace("\r\n", " ").Replace('\n', ' ').Trim();
 
+        // EnhancedLrcParser.IsBackgroundCandidate's text rule.
+        static bool IsFullyParenthesized(string text)
+        {
+            text = text.Trim();
+            if (text.Length < 2 || text[0] is not ('(' or '（') || text[^1] is not (')' or '）')) return false;
+            return !text[1..^1].Any(c => c is '(' or ')' or '（' or '）');
+        }
+
         static string ElrcBody(IReadOnlyList<WordTiming> words, TimeSpan? lineEnd)
         {
             var body = new StringBuilder();
             for (var i = 0; i < words.Count; i++)
             {
                 if (i > 0) body.Append(' ');
-                body.Append('<').Append(FormatLrcTime(words[i].Start)).Append('>').Append(OneLine(words[i].Text));
+                var text = OneLine(words[i].Text);
+                // A word sung in syllables (spans with no space between) tags each syllable,
+                // which the ELRC reader joins back into the word with the same clocks.
+                if (words[i].Syllables is { Count: > 1 } syllables
+                    && words[i].Text.TrimEnd() == text
+                    && syllables.Sum(s => s.Length) == text.Length
+                    && syllables.All(s => s.Length > 0))
+                {
+                    var at = 0;
+                    foreach (var s in syllables)
+                    {
+                        body.Append('<').Append(FormatLrcTime(s.Start)).Append('>').Append(text, at, s.Length);
+                        at += s.Length;
+                    }
+                    continue;
+                }
+                body.Append('<').Append(FormatLrcTime(words[i].Start)).Append('>').Append(text);
             }
             var end = words[^1].End ?? lineEnd ?? words[^1].Start;
             return body.Append('<').Append(FormatLrcTime(end)).Append('>').ToString();
@@ -229,6 +258,15 @@ public static class TtmlParser
 
         var lineText = text.ToString().Trim();
         var bgLineText = bgText.ToString().Trim();
+
+        // Untimed text ahead of the first timed span (mixed content) is a word of its own from
+        // the line's begin, like an ELRC line's untagged first word. The word row replaces the
+        // line text on screen, so text left out of it was never shown.
+        if (words.Count > 0 && layers.LeadText is { } lead && lead.Trim().Length > 0)
+        {
+            var first = words[0].Start;
+            words.Insert(0, new WordTiming { Text = lead.TrimStart(), Start = start is { } s && s < first ? s : first, End = first });
+        }
 
         // Too many words to be a real karaoke line (each realizes its own cell): keep the
         // text, drop word timing. An oversized background row is dropped, as in
@@ -532,6 +570,7 @@ public static class TtmlParser
                         var wordText = el.Value;
                         if (wordText.Length > 0)
                         {
+                            if (!isBg && words.Count == 0) layers.LeadText ??= text.ToString();
                             spanText.Append(wordText);
                             spanWords.Add(new WordTiming
                             {
@@ -565,6 +604,8 @@ public static class TtmlParser
     {
         public string? Translation;
         public string? Romanization;
+        /// <summary>The line text written before its first timed word (often empty).</summary>
+        public string? LeadText;
     }
 
     private static LayerRole? AuxiliaryRole(XElement el)
