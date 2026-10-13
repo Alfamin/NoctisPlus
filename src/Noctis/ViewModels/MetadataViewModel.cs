@@ -2024,6 +2024,9 @@ public partial class MetadataViewModel : ViewModelBase
             line.Changed += OnSyncedLineChanged;
             SyncedLyricLines.Add(line);
         }
+        var owners = LrcEditorViewModel.CompanionOwners(rows);
+        for (var i = 0; i < owners.Length; i++)
+            if (owners[i] >= 0) (SyncedLyricLines[owners[i]].Companions ??= new List<SyncedLyricEditorLine>()).Add(SyncedLyricLines[i]);
 
         HasSyncedLines = SyncedLyricLines.Count > 0;
         HasWordTimedLines = SyncedLyricLines.Any(l => l.HasWordTiming);

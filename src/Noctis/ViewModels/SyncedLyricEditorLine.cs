@@ -37,6 +37,10 @@ public partial class SyncedLyricEditorLine : ObservableObject
     /// of their own; the text rebuilt from the rows writes them back after this line.</summary>
     public IReadOnlyList<string>? BackgroundLines { get; init; }
 
+    /// <summary>The rows written at this line's stamp as its romanization / translation
+    /// (GitHub #116, <see cref="LrcEditorViewModel.CompanionOwners"/>); null when none.</summary>
+    internal List<SyncedLyricEditorLine>? Companions { get; set; }
+
     // The stamp the row's word tags were timed against: a re-stamp moves them by the difference.
     private readonly TimeSpan? _wordAnchor;
 
@@ -99,6 +103,15 @@ public partial class SyncedLyricEditorLine : ObservableObject
     }
 
     partial void OnTimestampChanged(TimeSpan? value) => Changed?.Invoke();
+
+    // Re-timing the line takes its companions along while they still share its stamp: left
+    // behind, they came back from the save as separate sung lines. One moved on its own stays put.
+    partial void OnTimestampChanged(TimeSpan? oldValue, TimeSpan? newValue)
+    {
+        if (Companions is null) return;
+        foreach (var companion in Companions)
+            if (companion.Timestamp == oldValue) companion.Timestamp = newValue;
+    }
 
     private static readonly TimeSpan NudgeStep = TimeSpan.FromMilliseconds(100);
 

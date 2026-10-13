@@ -166,4 +166,91 @@ public class LyricsRestampTests : IDisposable
         Assert.Equal("[bg: <00:02.50>(oh)<00:03.00>]", LyricsTextHelper.ShiftWordTimestamps("[bg: <00:02.00>(oh)<00:02.50>]", S(0.5)));
         Assert.Equal("<00:01.234>x", LyricsTextHelper.ShiftWordTimestamps("<00:01.234>x", TimeSpan.Zero));
     }
+
+    // ── Bug: re-stamping a line left its romanization / translation rows behind ──
+
+    // A sung line with its romanization and translation at its stamp (GitHub #116), twice.
+    private const string WithCompanions =
+        "[00:01.00]Hoshi no michi\n" +
+        "[00:01.00]hoshi no michi\n" +
+        "[00:01.00]Path of stars\n" +
+        "[00:04.00]Tsuki akari\n" +
+        "[00:04.00]Moonlight";
+
+    private static void AssertFirstLineWithItsCompanionsAt(List<LyricLine> lines, double start)
+    {
+        Assert.Equal(new[] { "Hoshi no michi", "Tsuki akari" }, lines.Select(l => l.Text));
+        Assert.Equal(S(start), lines[0].Timestamp);
+        Assert.Equal("hoshi no michi", lines[0].Transliteration);
+        Assert.Equal("Path of stars", lines[0].Translation);
+        Assert.Equal("Moonlight", lines[1].Translation);
+    }
+
+    [AvaloniaFact]
+    public async Task TapSync_NudgingALine_ItsCompanionRowsMoveWithIt()
+    {
+        // The romaji and translation rows kept the old stamp, so after save they came back as
+        // separate sung lines and the moved line lost them.
+        var (editor, _) = TapSync(WithCompanions);
+        editor.NudgeForwardCommand.Execute(editor.Lines[0]);
+
+        Assert.Equal(new TimeSpan?[] { S(1.1), S(1.1), S(1.1), S(4), S(4) }, editor.Lines.Select(l => l.Timestamp));
+        AssertFirstLineWithItsCompanionsAt(await SaveAndRead(editor), 1.1);
+    }
+
+    [AvaloniaFact]
+    public async Task TapSync_StampingALine_TakesItsCompanionsAndSkipsTheirRows()
+    {
+        // Tap-to-sync went on to the romaji row, so the next tap stamped the romaji apart
+        // from its line.
+        var (editor, player) = TapSync(WithCompanions);
+        editor.SelectedIndex = 0;
+        player.Position = S(1.5);
+
+        editor.StampCurrentCommand.Execute(null);
+
+        Assert.Equal(3, editor.SelectedIndex);
+        Assert.Equal(new TimeSpan?[] { S(1.5), S(1.5), S(1.5), S(4), S(4) }, editor.Lines.Select(l => l.Timestamp));
+        AssertFirstLineWithItsCompanionsAt(await SaveAndRead(editor), 1.5);
+    }
+
+    [Fact]
+    public async Task EditInfo_NudgingALine_ItsCompanionRowsMoveWithIt()
+    {
+        var vm = await EditInfo(WithCompanions);
+        vm.SyncedLyricLines[0].Nudge(forward: true);
+
+        Assert.Equal(WithCompanions.Replace("[00:01.00]", "[00:01.10]"), vm.SyncedLyrics);
+        AssertFirstLineWithItsCompanionsAt(Parsed(vm.SyncedLyrics), 1.1);
+    }
+
+    [Fact]
+    public async Task EditInfo_TypingATimestamp_ItsCompanionRowsMoveWithIt()
+    {
+        var vm = await EditInfo(WithCompanions);
+        vm.SyncedLyricLines[3].TimestampText = "0:03.20";
+
+        Assert.Equal(WithCompanions.Replace("[00:04.00]", "[00:03.20]"), vm.SyncedLyrics);
+    }
+
+    [Fact]
+    public async Task EditInfo_ACompanionRowMovedOnItsOwn_StaysWhereItWasPut()
+    {
+        var vm = await EditInfo(WithCompanions);
+        vm.SyncedLyricLines[2].TimestampText = "0:02.00";
+        vm.SyncedLyricLines[0].Nudge(forward: true);
+
+        Assert.Equal(new TimeSpan?[] { S(1.1), S(1.1), S(2), S(4), S(4) }, vm.SyncedLyricLines.Select(l => l.Timestamp));
+    }
+
+    [Fact]
+    public async Task EditInfo_SungLinesAtOneStamp_AreNotCompanions()
+    {
+        // Guard: another singer, or a word-timed line, at the same instant is sung, not a layer.
+        const string Lrc = "[00:01.00]v1:Call\n[00:01.00]v2:Answer\n[00:01.00]<00:01.00>Echo<00:01.50>\n[00:03.00]End";
+        var vm = await EditInfo(Lrc);
+        vm.SyncedLyricLines[0].Nudge(forward: true);
+
+        Assert.Equal(new TimeSpan?[] { S(1.1), S(1), S(1), S(3) }, vm.SyncedLyricLines.Select(l => l.Timestamp));
+    }
 }
