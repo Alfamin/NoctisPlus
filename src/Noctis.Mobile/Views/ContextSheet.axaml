@@ -83,7 +83,7 @@
                                         </Button>
                                         <Button Name="AddToPlaylistAction" Classes="sheet-tile" Command="{Binding ShowPlaylistsCommand}">
                                             <StackPanel>
-                                                <PathIcon Data="{DynamicResource PhPlus}" />
+                                                <PathIcon Data="{DynamicResource PhAddToPlaylist}" />
                                                 <TextBlock Text="Add to Playlist" />
                                             </StackPanel>
                                         </Button>
@@ -98,10 +98,10 @@
                                         <Grid ColumnDefinitions="40,*"><PathIcon Data="{DynamicResource PhTrash}" /><TextBlock Grid.Column="1" Text="{Binding RemoveDownloadLabel}" /></Grid>
                                     </Button>
                                     <Button Name="GoToAlbumAction" Classes="row sheet-action" Command="{Binding GoToAlbumCommand}" IsVisible="{Binding CanGoToAlbum}">
-                                        <Grid ColumnDefinitions="40,*"><PathIcon Data="{DynamicResource ChipAlbumsIcon}" /><TextBlock Grid.Column="1" Text="Go to Album" /></Grid>
+                                        <Grid ColumnDefinitions="40,*"><PathIcon Data="{DynamicResource PhAlbum}" /><TextBlock Grid.Column="1" Text="Go to Album" /></Grid>
                                     </Button>
                                     <Button Name="GoToArtistAction" Classes="row sheet-action" Command="{Binding GoToArtistCommand}" IsVisible="{Binding CanGoToArtist}">
-                                        <Grid ColumnDefinitions="40,*"><PathIcon Data="{DynamicResource ChipArtistsIcon}" /><TextBlock Grid.Column="1" Text="Go to Artist" /></Grid>
+                                        <Grid ColumnDefinitions="40,*"><PathIcon Data="{DynamicResource PhArtist}" /><TextBlock Grid.Column="1" Text="Go to Artist" /></Grid>
                                     </Button>
                                 </StackPanel>
 
