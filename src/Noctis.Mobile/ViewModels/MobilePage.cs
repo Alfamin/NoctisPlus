@@ -26,5 +26,9 @@ public abstract partial class MobilePage : ObservableObject
     /// event subscriptions so a closed page stops rebuilding on every library refresh.</summary>
     public virtual void OnClosed() { }
 
+    /// <summary>Android Back, before the page itself is popped: a page with pages of its own
+    /// (Settings' Music Folders, Appearance, Lyrics) returns to its top level and says so.</summary>
+    public virtual bool TryGoBackWithin() => false;
+
     public override string ToString() => Title;
 }
