@@ -143,6 +143,26 @@ public partial class MetadataViewModel : ViewModelBase
     [ObservableProperty] private bool _hasCustomLyrics;
     [ObservableProperty] private bool _hasCustomSyncedLyrics;
 
+    // True while ApplyLyrics fills the lyric fields from the song: that text is no paste.
+    private bool _applyingLyrics;
+
+    /// <summary>
+    /// A TTML document pasted into the Plain Lyrics box — the dialog's only free-text lyrics
+    /// field — is imported as Import file does it (GitHub #132): its timing becomes the synced
+    /// lyrics, its words the plain lyrics. Kept as pasted, the markup was saved as plain lyrics
+    /// (the .txt, the lyrics tag) and listed as untimed rows on the Timestamp Lyrics tab.
+    /// Text that is not a whole document yet (still being typed) is left alone, and so is
+    /// TTML the song's own tag holds, loaded with the dialog.
+    /// </summary>
+    partial void OnLyricsChanged(string value)
+    {
+        if (_applyingLyrics || !TtmlParser.LooksLikeTtml(value)) return;
+        var (lines, plain) = TtmlParser.Parse(value);
+        if (lines is not { Count: > 0 } || plain is null) return;
+        ImportLyricsText(value, "pasted TTML");
+        Lyrics = plain;
+    }
+
     // ── Synced lyrics manual editor ──
     // Per-line timestamp editing (type/nudge/clear) presented instead of the raw
     // [mm:ss.xx] textarea. The list is the source the user touches; edits flow back
@@ -1334,7 +1354,12 @@ public partial class MetadataViewModel : ViewModelBase
             // is not the user's to have removed.
             _syncedLyricsRemovedByUser = false;
         }
-        if (!KeepsEdit(nameof(Lyrics))) Lyrics = plain;
+        if (!KeepsEdit(nameof(Lyrics)))
+        {
+            _applyingLyrics = true;
+            try { Lyrics = plain; }
+            finally { _applyingLyrics = false; }
+        }
         // A Custom Lyrics switch the user flipped stays flipped (on: the loaded text shows
         // in the now-enabled box; off: the lyrics are being removed on purpose).
         if (!KeepsEdit(nameof(HasCustomLyrics))) HasCustomLyrics = !string.IsNullOrWhiteSpace(Lyrics);

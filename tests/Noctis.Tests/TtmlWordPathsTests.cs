@@ -170,6 +170,69 @@ public class TtmlWordPathsTests : IDisposable
         Assert.True(LitTogether(lines, 4.5));
     }
 
+    // ── (b) TTML pasted into Edit Info ──
+
+    [Theory]
+    [InlineData(LyricsSaveTarget.Sidecar)]
+    [InlineData(LyricsSaveTarget.Embedded)]
+    public async Task EditInfo_PastedWordTimedTtml_IsSavedAsTimedLyrics_ThePageShowsAsKaraoke(LyricsSaveTarget target)
+    {
+        var path = Song();
+        var (vm, track) = await OpenEditInfo(path, target);
+
+        // The Plain Lyrics box is the dialog's only free-text lyrics field; the Timestamp
+        // Lyrics tab lists its lines when there are no synced lyrics yet.
+        vm.HasCustomLyrics = true;
+        vm.Lyrics = WordTtml;
+
+        Assert.True(vm.HasCustomSyncedLyrics);
+        Assert.True(vm.HasWordTimedLines);
+        Assert.DoesNotContain("<p", vm.Lyrics);
+        Assert.Equal("Paper lanterns drifting\nSilver marmalade\nQuiet harbor", vm.Lyrics);
+
+        await vm.SaveCommand.ExecuteAsync(null);
+
+        Assert.Equal(string.Empty, vm.SaveErrorMessage);
+        Assert.DoesNotContain("<tt", track.Lyrics);
+        Assert.Contains("<00:01.40>lan<00:01.80>terns", track.SyncedLyrics);
+        AssertKaraoke(PageLines(track));
+
+        // Re-read from disk, as after a restart: the .lrc or the tags hold the same.
+        var reread = new MetadataService().ReadTrackMetadata(path)!;
+        AssertKaraoke(PageLines(reread));
+    }
+
+    [Fact]
+    public async Task EditInfo_PastedLineTimedTtml_KeepsLineSync_WithoutWords()
+    {
+        var (vm, track) = await OpenEditInfo(Song(), LyricsSaveTarget.Sidecar);
+        vm.HasCustomLyrics = true;
+        vm.Lyrics = LineTtml;
+        Assert.True(vm.HasCustomSyncedLyrics);
+        Assert.False(vm.HasWordTimedLines);
+
+        await vm.SaveCommand.ExecuteAsync(null);
+
+        Assert.DoesNotContain("<tt", track.Lyrics);
+        Assert.StartsWith("[00:01.00]Paper lanterns drifting", track.SyncedLyrics);
+        AssertLineSync(PageLines(track));
+    }
+
+    [Fact]
+    public async Task EditInfo_LoadingTtmlFromTheTag_IsNotAnEdit()
+    {
+        // A song whose lyrics tag holds TTML opens with it in the Plain box. That is not the
+        // user pasting it: a title fix must not rewrite the lyrics.
+        var path = Song(tag: f => f.Tag.Lyrics = WordTtml);
+        var (vm, _) = await OpenEditInfo(path, LyricsSaveTarget.Sidecar);
+
+        vm.Title = "A title fix";
+        await vm.SaveCommand.ExecuteAsync(null);
+
+        Assert.False(File.Exists(Path.ChangeExtension(path, ".lrc")));
+        Assert.Contains("itunes:timing=\"Word\"", EmbeddedLyrics.ReadFile(path).Text);
+    }
+
     // ── (c) A .ttml imported in Edit Info ──
 
     [Theory]
