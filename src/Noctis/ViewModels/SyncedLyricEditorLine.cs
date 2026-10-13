@@ -32,6 +32,10 @@ public partial class SyncedLyricEditorLine : ObservableObject
 
     public string Text { get; }
 
+    /// <summary>The "[bg: …]" background-vocal lines written under this line. They have no row
+    /// of their own; the text rebuilt from the rows writes them back after this line.</summary>
+    public IReadOnlyList<string>? BackgroundLines { get; init; }
+
     /// <summary>
     /// Lyric text with inline enhanced-LRC word tags (&lt;mm:ss.xx&gt;) stripped, so
     /// display rows show the words instead of the markup. Save round-trips the raw

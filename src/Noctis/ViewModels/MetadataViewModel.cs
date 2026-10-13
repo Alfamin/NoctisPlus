@@ -143,6 +143,41 @@ public partial class MetadataViewModel : ViewModelBase
     [ObservableProperty] private bool _hasCustomLyrics;
     [ObservableProperty] private bool _hasCustomSyncedLyrics;
 
+    // True while ApplyLyrics fills the lyric fields from the song: that text is no paste.
+    private bool _applyingLyrics;
+
+    // The last TTML imported or pasted as the synced lyrics, with the LRC it became.
+    private (string Ttml, string Lrc)? _importedTtml;
+
+    /// <summary>
+    /// The imported TTML when the synced lyrics being saved are still exactly what it became.
+    /// LRC has no line ends, so the .lrc alone lit an overlapping duet one line at a time; the
+    /// document saved beside it (read first by the lyrics page) keeps them, as the same .ttml
+    /// put there by hand does. Null once the lines were edited, shifted or replaced.
+    /// </summary>
+    private string? ImportedTtmlToSave() =>
+        _importedTtml is { } imported
+        && string.Equals(NormalizeNewlines(_track.SyncedLyrics).Trim(), imported.Lrc, StringComparison.Ordinal)
+            ? imported.Ttml
+            : null;
+
+    /// <summary>
+    /// A TTML document pasted into the Plain Lyrics box — the dialog's only free-text lyrics
+    /// field — is imported as Import file does it (GitHub #132): its timing becomes the synced
+    /// lyrics, its words the plain lyrics. Kept as pasted, the markup was saved as plain lyrics
+    /// (the .txt, the lyrics tag) and listed as untimed rows on the Timestamp Lyrics tab.
+    /// Text that is not a whole document yet (still being typed) is left alone, and so is
+    /// TTML the song's own tag holds, loaded with the dialog.
+    /// </summary>
+    partial void OnLyricsChanged(string value)
+    {
+        if (_applyingLyrics || !TtmlParser.LooksLikeTtml(value)) return;
+        var (lines, plain) = TtmlParser.Parse(value);
+        if (lines is not { Count: > 0 } || plain is null) return;
+        ImportLyricsText(value, "pasted TTML");
+        Lyrics = plain;
+    }
+
     // ── Synced lyrics manual editor ──
     // Per-line timestamp editing (type/nudge/clear) presented instead of the raw
     // [mm:ss.xx] textarea. The list is the source the user touches; edits flow back
@@ -1334,7 +1369,12 @@ public partial class MetadataViewModel : ViewModelBase
             // is not the user's to have removed.
             _syncedLyricsRemovedByUser = false;
         }
-        if (!KeepsEdit(nameof(Lyrics))) Lyrics = plain;
+        if (!KeepsEdit(nameof(Lyrics)))
+        {
+            _applyingLyrics = true;
+            try { Lyrics = plain; }
+            finally { _applyingLyrics = false; }
+        }
         // A Custom Lyrics switch the user flipped stays flipped (on: the loaded text shows
         // in the now-enabled box; off: the lyrics are being removed on purpose).
         if (!KeepsEdit(nameof(HasCustomLyrics))) HasCustomLyrics = !string.IsNullOrWhiteSpace(Lyrics);
@@ -1977,9 +2017,10 @@ public partial class MetadataViewModel : ViewModelBase
         SyncedLyricLines.Clear();
 
         var source = !string.IsNullOrWhiteSpace(SyncedLyrics) ? SyncedLyrics : Lyrics;
-        foreach (var (time, text) in LrcEditorViewModel.ParseLrc(source ?? string.Empty))
+        var (rows, background) = SplitBackgroundLines(source ?? string.Empty);
+        for (var i = 0; i < rows.Count; i++)
         {
-            var line = new SyncedLyricEditorLine(time, text);
+            var line = new SyncedLyricEditorLine(rows[i].Time, rows[i].Text) { BackgroundLines = background.GetValueOrDefault(i) };
             line.Changed += OnSyncedLineChanged;
             SyncedLyricLines.Add(line);
         }
@@ -1988,15 +2029,45 @@ public partial class MetadataViewModel : ViewModelBase
         HasWordTimedLines = SyncedLyricLines.Any(l => l.HasWordTiming);
     }
 
+    /// <summary>
+    /// The editor rows of <paramref name="text"/>, and its "[bg: …]" background-vocal lines keyed
+    /// by the row they follow. <see cref="LrcEditorViewModel.ParseLrc"/> takes a bg line for a
+    /// header tag ([ar:], [ti:]) and leaves it out, so the text rebuilt from the rows after any
+    /// edit lost every background vocal (a TTML import's x-bg spans among them).
+    /// </summary>
+    private static (List<(TimeSpan? Time, string Text)> Rows, Dictionary<int, List<string>> Background) SplitBackgroundLines(string text)
+    {
+        var background = new Dictionary<int, List<string>>();
+        var kept = new List<string>();
+        // Rows ParseLrc makes of the kept lines so far: blank lines count once text follows them
+        // (it drops trailing ones), a header tag none, a stack of stamps one per stamp.
+        int rows = 0, blanks = 0;
+        foreach (var raw in text.Split('\n'))
+        {
+            var line = raw.TrimEnd('\r');
+            if (rows > 0 && line.TrimStart().StartsWith("[bg:", StringComparison.Ordinal))
+            {
+                if (!background.TryGetValue(rows - 1, out var list)) background[rows - 1] = list = new List<string>();
+                list.Add(line.Trim());
+                continue;
+            }
+            kept.Add(line);
+            if (string.IsNullOrWhiteSpace(line)) blanks++;
+            else { rows += blanks + LrcEditorViewModel.ParseLrc(line).Count; blanks = 0; }
+        }
+        return (LrcEditorViewModel.ParseLrc(string.Join('\n', kept)), background);
+    }
+
     private void OnSyncedLineChanged() => RebuildSyncedTextFromLines();
 
     /// <summary>Regenerates the SyncedLyrics LRC text from the edited lines, in list order.</summary>
     private void RebuildSyncedTextFromLines()
     {
         SyncedLyrics = string.Join("\n", SyncedLyricLines.Select(l =>
-            l.Timestamp is { } t
+            (l.Timestamp is { } t
                 ? $"[{LrcEditorViewModel.FormatTimestamp(t)}]{l.Text}"
-                : l.Text));
+                : l.Text)
+            + (l.BackgroundLines is { Count: > 0 } bg ? "\n" + string.Join("\n", bg) : string.Empty)));
 
         // Manually timing lines counts as having custom synced lyrics. Save gates
         // the synced write on HasCustomSyncedLyrics, which stays false when the
@@ -2094,8 +2165,12 @@ public partial class MetadataViewModel : ViewModelBase
     internal void ImportLyricsText(string text, string fileName)
     {
         text ??= string.Empty;
+        string? ttml = null;
         if (fileName.EndsWith(".ttml", StringComparison.OrdinalIgnoreCase) || TtmlParser.LooksLikeTtml(text))
+        {
+            ttml = text;
             text = TtmlParser.ToLrc(text) ?? string.Join("\n", LyricsLoader.RawTextLines(text));
+        }
 
         var normalized = text.Replace("\r\n", "\n").Trim();
         if (normalized.Length == 0)
@@ -2107,6 +2182,7 @@ public partial class MetadataViewModel : ViewModelBase
         if (LyricsTextHelper.ContainsTimestamps(normalized))
         {
             SyncedLyrics = normalized;
+            _importedTtml = ttml is null ? null : (ttml, normalized);
             HasCustomSyncedLyrics = true;
             SyncedLyricsSearchStatus = $"Imported {fileName}";
             RebuildSyncedLinesFromText();
@@ -2690,7 +2766,11 @@ public partial class MetadataViewModel : ViewModelBase
                     if (File.Exists(lrcPath) || (SyncedLyricsWereChanged && lyricsTarget.WritesSidecars()))
                         await File.WriteAllTextAsync(lrcPath, _track.SyncedLyrics);
                     if (SyncedLyricsWereChanged)
+                    {
                         await Task.Run(() => TrashSidecarsAboveLrc(_track.FilePath));
+                        if (lyricsTarget.WritesSidecars() && ImportedTtmlToSave() is { } ttml)
+                            await File.WriteAllTextAsync(Path.ChangeExtension(_track.FilePath, ".ttml"), ttml);
+                    }
                 }
                 else if (SyncedLyricsWereRemoved)
                 {

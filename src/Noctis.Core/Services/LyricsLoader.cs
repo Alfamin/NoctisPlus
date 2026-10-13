@@ -33,7 +33,7 @@ public static class LyricsLoader
             if (hit == null) break;
             var text = LyricsTextDecoder.Decode(hit.Bytes);
             var parsed = hit.Extension == ".ttml"
-                ? FromTtml(text, joinSplitWords)
+                ? FromTtml(text, joinSplitWords, LyricsSource.SidecarTtml)
                 : FromLrc(text, hit.Extension == ".elrc" ? LyricsSource.SidecarElrc : LyricsSource.SidecarLrc);
             if (parsed != null) return parsed;
             if (hit.Extension == ".ttml") unparsedTtml ??= text;
@@ -51,6 +51,11 @@ public static class LyricsLoader
             && FromLrc(plain, LyricsSource.EmbeddedSynced) is { } legacy)
             return legacy;
 
+        // A whole TTML document as the lyrics text (pasted into a tagger's lyrics field, GitHub
+        // #132) is timed lyrics, read as the .ttml sidecar is — not markup to print.
+        if (TtmlParser.LooksLikeTtml(plain) && FromTtml(plain, joinSplitWords, LyricsSource.EmbeddedSynced) is { } ttmlField)
+            return ttmlField;
+
         // The file's own tags, read now: SYLT and SYNCEDLYRICS, and the UNSYNCEDLYRICS-style
         // aliases a row scanned before GitHub #135 never stored.
         var embedded = ReadEmbedded(track, files);
@@ -62,6 +67,8 @@ public static class LyricsLoader
         {
             if (LrcParser.ContainsTimestamp(embedded.Text) && FromLrc(embedded.Text, LyricsSource.EmbeddedSynced) is { IsSynced: true } timed)
                 return timed;
+            if (TtmlParser.LooksLikeTtml(embedded.Text) && FromTtml(embedded.Text, joinSplitWords, LyricsSource.EmbeddedSynced) is { } ttmlTag)
+                return ttmlTag;
             plain = embedded.Text;
         }
 
@@ -100,10 +107,10 @@ public static class LyricsLoader
         return text.Split('\n').Select(l => l.Trim()).Where(l => l.Length > 0).ToList();
     }
 
-    private static LoadedLyrics? FromTtml(string text, bool joinSplitWords)
+    private static LoadedLyrics? FromTtml(string text, bool joinSplitWords, LyricsSource source)
     {
         var (lines, _) = TtmlParser.Parse(text, joinSplitWords);
-        return lines is { Count: > 0 } ? Synced(lines, LyricsSource.SidecarTtml) : null;
+        return lines is { Count: > 0 } ? Synced(lines, source) : null;
     }
 
     /// <summary>An LRC with stamps is synced; one without is unsynced text (still a hit, so an
