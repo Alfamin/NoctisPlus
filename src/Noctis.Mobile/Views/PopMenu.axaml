@@ -12,39 +12,48 @@
          code-behind, which plays the desktop menu's pop. -->
     <UserControl.Resources>
         <ResourceDictionary>
-            <!-- Clear, bright glass that takes the colour of what lies behind it: the backdrop
-                 strongly blurred and saturated, a light frost over it and a bright rim, never a
-                 dark smoke. The luminance range is what keeps the labels readable over any cover:
-                 on dark glass the backdrop shows through no brighter than PopMenuMaxLuminance, on
-                 light glass no darker than PopMenuMinLuminance (MobilePopMenuTests checks the worst
-                 case against the text). The card takes the theme of what it opened from, so Now
-                 Playing's menu is the dark glass. -->
+            <!-- Apple's iOS 26 menu glass (owner 10-14, measured off Apple Music): no outline of
+                 its own, the edge drawn by the glass itself - a catch-light along the top that
+                 fades down the sides (GlassPanel.SpecularStyle TopCatch), a dark contact line (faint
+                 on light glass, so it never reads as an outline) and a soft wide shadow. Behind it
+                 the backdrop is lightly blurred, so the cover's shapes stay readable, and lifted: a
+                 lighter view of what lies beneath rather than a flat white tint over it, the
+                 lift a white veil over dark content, not its colour scaled up (which turned dark
+                 ink into orange and red blotches). The luminance range is what keeps the labels
+                 readable over any cover: on dark glass the backdrop shows through no brighter than
+                 PopMenuMaxLuminance, on light glass no darker than PopMenuMinLuminance
+                 (MobilePopMenuTests checks the worst case against the text). The tone curve climbs
+                 fast from the dark end so most covers show bright and only the brightest is held
+                 down. The card takes the theme of what it opened from, so Now Playing's menu is the
+                 dark glass. -->
             <ResourceDictionary.ThemeDictionaries>
                 <ResourceDictionary x:Key="Dark">
-                    <SolidColorBrush x:Key="PopMenuTint" Color="#24FFFFFF" />
-                    <x:Double x:Key="PopMenuMinLuminance">0.18</x:Double>
-                    <x:Double x:Key="PopMenuMaxLuminance">0.30</x:Double>
-                    <SolidColorBrush x:Key="PopMenuEdge" Color="#59FFFFFF" />
+                    <SolidColorBrush x:Key="PopMenuTint" Color="#0AFFFFFF" />
+                    <x:Double x:Key="PopMenuMinLuminance">0.22</x:Double>
+                    <x:Double x:Key="PopMenuMaxLuminance">0.41</x:Double>
+                    <x:Double x:Key="PopMenuToneCurve">2</x:Double>
+                    <BoxShadows x:Key="PopMenuShadow">0 0 0.8 0.3 #73000000, 0 12 40 0 #33000000</BoxShadows>
                     <LinearGradientBrush x:Key="PopMenuSheen" StartPoint="0%,0%" EndPoint="0%,100%">
-                        <GradientStop Offset="0" Color="#14FFFFFF" />
-                        <GradientStop Offset="0.4" Color="#00FFFFFF" />
+                        <GradientStop Offset="0" Color="#0AFFFFFF" />
+                        <GradientStop Offset="0.25" Color="#00FFFFFF" />
                     </LinearGradientBrush>
                     <SolidColorBrush x:Key="PopMenuText" Color="#FFFFFFFF" />
                     <SolidColorBrush x:Key="PopMenuSecondaryText" Color="#B3FFFFFF" />
-                    <SolidColorBrush x:Key="PopMenuHairline" Color="#38FFFFFF" />
+                    <SolidColorBrush x:Key="PopMenuHairline" Color="#2EFFFFFF" />
                 </ResourceDictionary>
                 <ResourceDictionary x:Key="Light">
-                    <SolidColorBrush x:Key="PopMenuTint" Color="#80FFFFFF" />
-                    <x:Double x:Key="PopMenuMinLuminance">0.62</x:Double>
+                    <SolidColorBrush x:Key="PopMenuTint" Color="#4DFFFFFF" />
+                    <x:Double x:Key="PopMenuMinLuminance">0.74</x:Double>
                     <x:Double x:Key="PopMenuMaxLuminance">1</x:Double>
-                    <SolidColorBrush x:Key="PopMenuEdge" Color="#B3FFFFFF" />
+                    <x:Double x:Key="PopMenuToneCurve">1</x:Double>
+                    <BoxShadows x:Key="PopMenuShadow">0 0 1 0 #1F000000, 0 12 40 0 #1F000000</BoxShadows>
                     <LinearGradientBrush x:Key="PopMenuSheen" StartPoint="0%,0%" EndPoint="0%,100%">
-                        <GradientStop Offset="0" Color="#59FFFFFF" />
-                        <GradientStop Offset="0.4" Color="#00FFFFFF" />
+                        <GradientStop Offset="0" Color="#33FFFFFF" />
+                        <GradientStop Offset="0.3" Color="#00FFFFFF" />
                     </LinearGradientBrush>
                     <SolidColorBrush x:Key="PopMenuText" Color="#FF000000" />
                     <SolidColorBrush x:Key="PopMenuSecondaryText" Color="#99000000" />
-                    <SolidColorBrush x:Key="PopMenuHairline" Color="#24000000" />
+                    <SolidColorBrush x:Key="PopMenuHairline" Color="#1F000000" />
                 </ResourceDictionary>
             </ResourceDictionary.ThemeDictionaries>
         </ResourceDictionary>
@@ -110,11 +119,14 @@
         <ThemeVariantScope Name="Scope">
             <Panel Name="Card" Width="290" HorizontalAlignment="Left" VerticalAlignment="Top">
                 <controls:GlassPanel Name="Glass" CornerRadius="28" UseAppGlass="False" IsGlassActive="True"
-                                     BlurRadius="24" Saturation="1.8" Refraction="16" RefractionAmount="18" Specular="0.55"
+                                     BlurRadius="7" Saturation="1.2" Refraction="14" RefractionAmount="10"
+                                     Specular="0.24" SpecularStyle="TopCatch"
                                      BackdropMinLuminance="{DynamicResource PopMenuMinLuminance}"
                                      BackdropMaxLuminance="{DynamicResource PopMenuMaxLuminance}"
+                                     BackdropToneCurve="{DynamicResource PopMenuToneCurve}"
+                                     BackdropLift="1"
                                      Background="{DynamicResource PopMenuTint}"
-                                     EdgeBrush="{DynamicResource PopMenuEdge}" EdgeThickness="1" BoxShadow="0 16 48 0 #40000000">
+                                     EdgeThickness="0" BoxShadow="{DynamicResource PopMenuShadow}">
                     <Panel>
                         <Border Name="Sheen" Background="{DynamicResource PopMenuSheen}" CornerRadius="28" IsHitTestVisible="False" />
                         <ScrollViewer Name="Body" HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Hidden">
