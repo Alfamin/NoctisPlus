@@ -97,7 +97,7 @@
                     </StackPanel>
                     <!-- Favourite and the rest live in the ⋯ menu (Apple's). -->
                     <Button Grid.Column="1" Name="NowPlayingMore" Classes="icon" Margin="8,0,-10,0" VerticalAlignment="Center"
-                            Command="{Binding OpenCurrentTrackSheetCommand}" AutomationProperties.Name="More">
+                            Command="{Binding OpenNowPlayingMenuCommand}" AutomationProperties.Name="More">
                         <PathIcon Data="{DynamicResource PhMore}" Width="26" Height="26" />
                     </Button>
                 </Grid>
@@ -161,5 +161,8 @@
                 </StackPanel>
             </Grid>
         </Border>
+
+        <!-- The ⋯ menu, over everything on the page; it pops out of NowPlayingMore. -->
+        <views:NowPlayingMenu Name="Menu" />
     </Panel>
 </UserControl>
