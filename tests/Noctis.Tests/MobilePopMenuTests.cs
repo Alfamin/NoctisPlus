@@ -386,6 +386,20 @@ public class MobilePopMenuTests(ITestOutputHelper output)
         window.Close();
     }
 
+    /// <summary>Apple's menu glass has no outline of its own (owner 10-14): no stroke round the card,
+    /// only the catch-light along its top; a light blur so the cover shows through; and dark content
+    /// lifted under a white veil rather than scaled into a vivid blotch.</summary>
+    [AvaloniaFact]
+    public void TheGlass_HasNoOutline_OnlyACatchLight_AndAClearView()
+    {
+        var glass = new PopMenu().FindControl<GlassPanel>("Glass")!;
+        Assert.True(glass.EdgeThickness <= 0 || glass.EdgeBrush is null, "no stroke round the card");
+        Assert.Equal(GlassSpecularStyle.TopCatch, glass.SpecularStyle);
+        Assert.True(glass.Specular > 0);
+        Assert.True(glass.BlurRadius <= 10, $"blur {glass.BlurRadius}: the cover's shapes stay readable");
+        Assert.Equal(1, glass.BackdropLift);
+    }
+
     /// <summary>The menu wears the theme of what it opened from: Now Playing's always-dark page
     /// gives the dark glass (white text) whatever the app theme; a page gives the app's.</summary>
     [AvaloniaFact]
