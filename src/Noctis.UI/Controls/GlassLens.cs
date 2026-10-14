@@ -21,17 +21,42 @@ namespace Noctis.Controls;
 /// text on the glass keeps its contrast over any content: dark glass caps how bright a white
 /// cover can show through, light glass lifts how dark a black one can.</param>
 /// <param name="ToneMax">See <paramref name="ToneMin"/>.</param>
+/// <param name="ToneCurve">1 = the luminance maps onto that range in a straight line. Above 1 the
+/// map climbs steeply from the dark end and eases into the top (<c>1 - (1 - l)^curve</c>): most
+/// content shows through clear and bright, and only the brightest is held down for the text.</param>
+/// <param name="ToneLift">0..1: how a colour is lifted to a brighter luminance. 0 scales it up
+/// (vivid; a dark colour lifted far turns garish and runs out of range), 1 lays a white veil over
+/// it (frosted white glass: the colour keeps its own strength, never brighter).</param>
 public readonly record struct GlassLensFrame(
     SKRect Bounds, GlassCornerRadii Radii, float Band, float Bend, float Dispersion, float Zoom, float Saturation,
-    float ToneMin = 0, float ToneMax = 1);
+    float ToneMin = 0, float ToneMax = 1, float ToneCurve = 1, float ToneLift = 0);
 
 /// <summary>A <see cref="GlassPanel"/>'s lens settings in logical px, captured by value for the
 /// render thread; <see cref="GlassBackdropOp"/> scales them to device px.</summary>
 internal readonly record struct GlassLensSettings(double Band, double Bend, double Dispersion, double Zoom, double Saturation,
-    double ToneMin = 0, double ToneMax = 1);
+    double ToneMin = 0, double ToneMax = 1, double ToneCurve = 1, double ToneLift = 0);
 
 /// <summary>A rounded rect's four corner radii in device px, passed to the shaders as one float4.</summary>
 public readonly record struct GlassCornerRadii(float TopLeft, float TopRight, float BottomRight, float BottomLeft);
+
+/// <summary>
+/// How the rim light falls round a <see cref="GlassPanel"/>'s outline. Where the rim's outward
+/// normal faces the light (<paramref name="LightX"/>, <paramref name="LightY"/>, a unit vector)
+/// the line is at full strength; elsewhere it is <paramref name="Ambient"/>, plus
+/// <paramref name="Back"/> on the rim facing away (the light caught again on the far side).
+/// <paramref name="Power"/> is how fast the light fades round the corners; the inner glow keeps
+/// <paramref name="GlowAmbient"/> of its strength along the rim the light does not face.
+/// </summary>
+public readonly record struct GlassRimShape(float LightX, float LightY, float Ambient, float Back, float Power, float GlowAmbient)
+{
+    /// <summary>The default: lit from the top-left, a line all the way round.</summary>
+    public static readonly GlassRimShape Diagonal = new(-0.7071f, -0.7071f, 0.22f, 0.5f, 1.5f, 0.35f);
+
+    /// <summary>Apple's iOS 26 menus: a catch-light along the top edge that fades out down the
+    /// sides, caught again more faintly along the bottom, and next to nothing on the sides, so
+    /// the glass has no outline of its own.</summary>
+    public static readonly GlassRimShape TopCatch = new(0, -1, 0.18f, 0.5f, 2.5f, 0.15f);
+}
 
 /// <summary>
 /// The Liquid Glass lens: Apple's iOS 26 glass does not only frost what lies beneath, its
@@ -88,6 +113,8 @@ public static class GlassLens
         uniform float zoom;
         uniform float saturation;
         uniform float2 tone;
+        uniform float toneCurve;
+        uniform float toneLift;
 
         """ + RoundRectSdf + """
 
@@ -121,8 +148,13 @@ public static class GlassLens
                 // the hue is blur residue (an 8-bit (0,1,2) scaled up to the floor turned bright
                 // blue), so it fades to grey there.
                 float l = dot(float3(color.rgb), float3(0.2126, 0.7152, 0.0722));
-                float target = mix(tone.x, tone.y, l);
-                float3 rgb = mix(float3(target), float3(color.rgb) * (target / max(l, 0.0005)), smoothstep(0.0, 0.06, l));
+                float s = toneCurve == 1.0 ? l : 1.0 - pow(clamp(1.0 - l, 0.0, 1.0), toneCurve);
+                float target = mix(tone.x, tone.y, s);
+                float3 c = float3(color.rgb);
+                float3 hued = c * (target / max(l, 0.0005));
+                if (toneLift > 0.0 && target > l)
+                    hued = mix(hued, 1.0 - (1.0 - c) * ((1.0 - target) / max(1.0 - l, 0.0005)), toneLift);
+                float3 rgb = mix(float3(target), hued, smoothstep(0.0, 0.06, l));
                 color.rgb = half3(clamp(rgb, 0.0, float(color.a)));
             }
             return color;
@@ -131,8 +163,9 @@ public static class GlassLens
 
     /// <summary>
     /// The rim light drawn over the tint: a crisp line along the outline, brightest where it
-    /// faces the light (top-left) and again, dimmer, on the opposite rim (bottom-right), plus a
-    /// soft inner glow. <c>iridescence</c> adds a fringe just inside the line that runs through
+    /// faces the light (top-left by default) and again, dimmer, on the opposite rim, plus a
+    /// soft inner glow, falling round the rim as <c>light</c> and <c>shape</c> say (see
+    /// <see cref="GlassRimShape"/>). <c>iridescence</c> adds a fringe just inside the line that runs through
     /// the spectrum by angle — the rainbow on a moving droplet's rim. Coverage is computed from the distance field, so the
     /// shader needs no clip and its edge is anti-aliased.
     /// </summary>
@@ -144,6 +177,8 @@ public static class GlassLens
         uniform float glowWidth;
         uniform float glow;
         uniform float iridescence;
+        uniform float2 light;
+        uniform float4 shape;
 
         """ + RoundRectSdf + """
 
@@ -157,11 +192,10 @@ public static class GlassLens
             if (cover <= 0.0) return half4(0.0);
             float depth = max(-sd, 0.0);
             float2 n = roundRectNormal(p, h, min(r * 1.5, min(h.x, h.y)));
-            float2 light = float2(-0.7071, -0.7071);
             float facing = dot(n, light);
-            float lit = 0.22 + 0.78 * pow(max(facing, 0.0), 1.5) + 0.5 * pow(max(-facing, 0.0), 1.5);
+            float lit = shape.x + (1.0 - shape.x) * pow(max(facing, 0.0), shape.z) + shape.y * pow(max(-facing, 0.0), shape.z);
             float line = 1.0 - smoothstep(lineWidth * 0.5, lineWidth * 1.5, depth);
-            float inner = glow * exp(-depth / max(glowWidth, 0.001)) * (0.35 + 0.65 * abs(facing));
+            float inner = glow * exp(-depth / max(glowWidth, 0.001)) * (shape.w + (1.0 - shape.w) * abs(facing));
             // Premultiplied: the white line and glow, then the spectral fringe just inside it.
             float a = line * lit + inner;
             float3 rgb = float3(a);
@@ -246,15 +280,19 @@ public static class GlassLens
     }
 
     /// <summary>The shader's tone remap of one colour (0..1 channels): luminance 0..1 onto
-    /// <paramref name="min"/>..<paramref name="max"/>, hue kept.</summary>
-    public static (float R, float G, float B) Tone(float r, float g, float b, float min, float max)
+    /// <paramref name="min"/>..<paramref name="max"/>, hue kept (<paramref name="curve"/>: see
+    /// <see cref="GlassLensFrame.ToneCurve"/>; <paramref name="lift"/>: <see cref="GlassLensFrame.ToneLift"/>).</summary>
+    public static (float R, float G, float B) Tone(float r, float g, float b, float min, float max, float curve = 1, float lift = 0)
     {
         var l = 0.2126f * r + 0.7152f * g + 0.0722f * b;
-        var target = min + (max - min) * l;
+        var s = curve == 1 ? l : 1 - MathF.Pow(Math.Clamp(1 - l, 0, 1), curve);
+        var target = min + (max - min) * s;
         var k = target / Math.Max(l, 0.0005f);
+        var veil = (1 - target) / Math.Max(1 - l, 0.0005f);
         var t = Math.Clamp(l / 0.06f, 0, 1);
         var hue = t * t * (3 - 2 * t);   // smoothstep: near black the hue is noise, lifted to grey
-        float Mix(float c) => Math.Clamp(target + (c * k - target) * hue, 0, 1);
+        float Hued(float c) => lift > 0 && target > l ? c * k + (1 - (1 - c) * veil - c * k) * lift : c * k;
+        float Mix(float c) => Math.Clamp(target + (Hued(c) - target) * hue, 0, 1);
         return (Mix(r), Mix(g), Mix(b));
     }
 
@@ -320,6 +358,8 @@ public static class GlassLens
                 ["zoom"] = Math.Max(frame.Zoom, 0.01f),
                 ["saturation"] = frame.Saturation,
                 ["tone"] = new[] { Math.Clamp(frame.ToneMin, 0f, 1f), Math.Clamp(frame.ToneMax, 0f, 1f) },
+                ["toneCurve"] = Math.Max(frame.ToneCurve, 0.01f),
+                ["toneLift"] = Math.Clamp(frame.ToneLift, 0f, 1f),
             };
             var children = new SKRuntimeEffectChildren(effect) { ["content"] = content };
             using var shader = effect.ToShader(uniforms, children);
@@ -358,12 +398,15 @@ public static class GlassLens
     }
 
     /// <summary>Draws the rim light for a panel whose device geometry is <paramref name="bounds"/>
-    /// / <paramref name="radii"/>. Sizes in device px; <paramref name="strength"/> 0..1.</summary>
+    /// / <paramref name="radii"/>. Sizes in device px; <paramref name="strength"/> 0..1.
+    /// <paramref name="shape"/> defaults to <see cref="GlassRimShape.Diagonal"/>; <paramref name="additive"/>
+    /// adds the light to what lies beneath (so it takes its colour) instead of laying white over it.</summary>
     internal static void DrawRim(SKCanvas canvas, SKRect bounds, GlassCornerRadii radii, float strength, float lineWidth,
-        float glowWidth, float glow, float iridescence)
+        float glowWidth, float glow, float iridescence, GlassRimShape? shape = null, bool additive = false)
     {
         var effect = Rim(out _);
         if (effect is null || strength <= 0) return;
+        var s = shape ?? GlassRimShape.Diagonal;
         var uniforms = new SKRuntimeEffectUniforms(effect)
         {
             ["bounds"] = new[] { bounds.Left, bounds.Top, bounds.Right, bounds.Bottom },
@@ -373,9 +416,11 @@ public static class GlassLens
             ["glowWidth"] = glowWidth,
             ["glow"] = glow,
             ["iridescence"] = iridescence,
+            ["light"] = new[] { s.LightX, s.LightY },
+            ["shape"] = new[] { s.Ambient, s.Back, s.Power, s.GlowAmbient },
         };
         using var shader = effect.ToShader(uniforms);
-        using var paint = new SKPaint { Shader = shader };
+        using var paint = new SKPaint { Shader = shader, BlendMode = additive ? SKBlendMode.Plus : SKBlendMode.SrcOver };
         canvas.Save();
         canvas.SetMatrix(SKMatrix.Identity);
         canvas.DrawRect(SKRect.Inflate(bounds, 1, 1), paint);
