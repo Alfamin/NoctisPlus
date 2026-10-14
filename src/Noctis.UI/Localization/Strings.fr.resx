@@ -816,6 +816,14 @@
     <value>Afficher la progression de la chanson sur le bouton de la barre des tâches. Ambre en pause.</value>
     <comment>Text in SettingsView.axaml</comment>
   </data>
+  <data name="Settings.MediaControlsTaskbar" xml:space="preserve">
+    <value>Commandes multimédias dans la barre des tâches</value>
+    <comment>Text in SettingsView.axaml</comment>
+  </data>
+  <data name="Settings.MediaControlsTaskbarDesc" xml:space="preserve">
+    <value>Afficher les boutons Précédent, Lecture/Pause, Suivant et Favori au survol de l'icône dans la barre des tâches.</value>
+    <comment>Text in SettingsView.axaml</comment>
+  </data>
   <data name="Settings.AutomaticAlbumCoverSize" xml:space="preserve">
     <value>Taille automatique des pochettes</value>
     <comment>Text in SettingsView.axaml</comment>

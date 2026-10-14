@@ -631,6 +631,11 @@ public class AppSettings
     /// should opt into.</summary>
     public bool TaskbarProgressEnabled { get; set; } = false;
 
+    /// <summary>Windows only: Previous / Play-Pause / Forward / Favorite buttons under the
+    /// taskbar thumbnail (the preview when you hover the app's taskbar icon). On by default,
+    /// as they always were before the toggle existed.</summary>
+    public bool TaskbarMediaControlsEnabled { get; set; } = true;
+
     /// <summary>When true (default), "feat./ft." credits found in track titles — or file names,
     /// which stand in for the title on untagged files — are merged into the artist credit at
     /// scan time so collaborations show the full credit. Off: artist tags are used exactly as

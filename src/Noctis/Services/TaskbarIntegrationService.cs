@@ -114,7 +114,7 @@ public sealed class TaskbarIntegrationService : IDisposable
     // ── Constants ────────────────────────────────────────────────
 
     private const uint THB_ICON = 0x0002, THB_TOOLTIP = 0x0004, THB_FLAGS = 0x0008;
-    private const uint THBF_ENABLED = 0x0000;
+    private const uint THBF_ENABLED = 0x0000, THBF_HIDDEN = 0x0008;
     private const uint WM_COMMAND = 0x0111, WM_SETTINGCHANGE = 0x001A, THBN_CLICKED = 0x1800;
     private const uint ID_PREV = 1, ID_PLAY = 2, ID_NEXT = 3, ID_FAVORITE = 4;
     private const int IconSize = 20;
@@ -163,6 +163,9 @@ public sealed class TaskbarIntegrationService : IDisposable
     // Last known UI state, so re-added buttons show the right glyphs after the
     // taskbar button is recreated (tray hide/show, Explorer restart, DPI change).
     private bool _isPlaying, _isFavorite;
+    // Settings > "Media Controls on Taskbar". Buttons can't be removed once added, only
+    // hidden, so off sends every button with THBF_HIDDEN.
+    private bool _buttonsVisible = true;
 
     public event Action? PreviousClicked;
     public event Action? PlayPauseClicked;
@@ -277,6 +280,18 @@ public sealed class TaskbarIntegrationService : IDisposable
         UpdateButton(ID_FAVORITE);
     }
 
+    /// <summary>Shows or hides all thumbnail buttons live. Safe to call before
+    /// <see cref="Initialize"/>: the first add then uses this state.</summary>
+    public void SetButtonsVisible(bool visible)
+    {
+        if (_buttonsVisible == visible) return;
+        _buttonsVisible = visible;
+        if (!_ready || _taskbar == null) return;
+
+        var buttons = BuildButtons();
+        _taskbar.ThumbBarUpdateButtons(_hwnd, (uint)buttons.Length, buttons);
+    }
+
     private void UpdateButton(uint id)
     {
         if (!_ready || _taskbar == null) return;
@@ -293,7 +308,7 @@ public sealed class TaskbarIntegrationService : IDisposable
         _taskbar.ThumbBarUpdateButtons(_hwnd, (uint)buttons.Length, buttons);
     }
 
-    /// <summary>Adds all four buttons reflecting the last known playback/favorite state.</summary>
+    /// <summary>Adds all four buttons reflecting the last known playback/favorite/visibility state.</summary>
     private void AddButtons()
     {
         if (_taskbar == null) return;
@@ -308,17 +323,26 @@ public sealed class TaskbarIntegrationService : IDisposable
     /// the playback bar's own localization keys, so they read the same as the island's.</summary>
     internal readonly record struct ThumbButtonSpec(uint Id, ThumbGlyph Glyph, string TipKey, uint Flags);
 
-    internal static ThumbButtonSpec[] DescribeButtons(bool isPlaying, bool isFavorite) => new[]
+    /// <remarks>Every button carries the visibility flag, single-button updates (play/pause,
+    /// favorite) included: THB_FLAGS replaces the flags, so an update sent without
+    /// THBF_HIDDEN would bring a hidden button back.</remarks>
+    internal static ThumbButtonSpec[] DescribeButtons(bool isPlaying, bool isFavorite, bool visible = true)
     {
-        new ThumbButtonSpec(ID_PREV, ThumbGlyph.Previous, "PlaybackBar.PreviousTip", THBF_ENABLED),
-        new ThumbButtonSpec(ID_PLAY, isPlaying ? ThumbGlyph.Pause : ThumbGlyph.Play,
-            isPlaying ? "PlaybackBar.Pause" : "PlaybackBar.Play", THBF_ENABLED),
-        new ThumbButtonSpec(ID_NEXT, ThumbGlyph.Next, "PlaybackBar.ForwardTip", THBF_ENABLED),
-        new ThumbButtonSpec(ID_FAVORITE, isFavorite ? ThumbGlyph.HeartFilled : ThumbGlyph.Heart,
-            isFavorite ? "PlaybackBar.RemoveFromFavorites" : "PlaybackBar.FavoriteTip", THBF_ENABLED),
-    };
+        var flags = visible ? THBF_ENABLED : THBF_HIDDEN;
+        return new[]
+        {
+            new ThumbButtonSpec(ID_PREV, ThumbGlyph.Previous, "PlaybackBar.PreviousTip", flags),
+            new ThumbButtonSpec(ID_PLAY, isPlaying ? ThumbGlyph.Pause : ThumbGlyph.Play,
+                isPlaying ? "PlaybackBar.Pause" : "PlaybackBar.Play", flags),
+            new ThumbButtonSpec(ID_NEXT, ThumbGlyph.Next, "PlaybackBar.ForwardTip", flags),
+            new ThumbButtonSpec(ID_FAVORITE, isFavorite ? ThumbGlyph.HeartFilled : ThumbGlyph.Heart,
+                isFavorite ? "PlaybackBar.RemoveFromFavorites" : "PlaybackBar.FavoriteTip", flags),
+        };
+    }
 
-    private THUMBBUTTON[] BuildButtons() => DescribeButtons(_isPlaying, _isFavorite)
+    internal const uint HiddenFlag = THBF_HIDDEN;
+
+    private THUMBBUTTON[] BuildButtons() => DescribeButtons(_isPlaying, _isFavorite, _buttonsVisible)
         .Select(b => Btn(b.Id, IconFor(b.Glyph), Loc.T(b.TipKey), b.Flags))
         .ToArray();
 

@@ -816,6 +816,14 @@
     <value>إظهار تقدم الأغنية على زر شريط المهام. أيضًا أثناء الإيقاف مؤقتاً.</value>
     <comment>Text in SettingsView.axaml</comment>
   </data>
+  <data name="Settings.MediaControlsTaskbar" xml:space="preserve">
+    <value>أزرار التحكم في الوسائط على شريط المهام</value>
+    <comment>Text in SettingsView.axaml</comment>
+  </data>
+  <data name="Settings.MediaControlsTaskbarDesc" xml:space="preserve">
+    <value>إظهار أزرار السابق والتشغيل/الإيقاف المؤقت والتالي والمفضلة عند تمرير المؤشر فوق أيقونة شريط المهام.</value>
+    <comment>Text in SettingsView.axaml</comment>
+  </data>
   <data name="Settings.AutomaticAlbumCoverSize" xml:space="preserve">
     <value>حجم تلقائي لأغلفة الألبومات</value>
     <comment>Text in SettingsView.axaml</comment>

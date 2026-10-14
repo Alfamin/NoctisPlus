@@ -1950,6 +1950,7 @@ public partial class SettingsViewModel : ViewModelBase
         RefreshFileAssociationState();
     }
     [ObservableProperty] private bool _taskbarProgressEnabled;
+    [ObservableProperty] private bool _taskbarMediaControlsEnabled = true;
     [ObservableProperty] private bool _liquidGlassEnabled;
     [ObservableProperty] private bool _collapseAlbumEditions;
     [ObservableProperty] private bool _mergeFeaturedFromTitles = true;
@@ -2863,6 +2864,7 @@ public partial class SettingsViewModel : ViewModelBase
             SidebarAlwaysExpanded = _settings.SidebarAlwaysExpanded;
             LiquidGlassEnabled = _settings.LiquidGlassEnabled;
             TaskbarProgressEnabled = _settings.TaskbarProgressEnabled;
+            TaskbarMediaControlsEnabled = _settings.TaskbarMediaControlsEnabled;
             RefreshFileAssociationState();
             CollapseAlbumEditions = _settings.CollapseAlbumEditions;
             MergeFeaturedFromTitles = _settings.MergeFeaturedFromTitles;
@@ -3334,6 +3336,7 @@ public partial class SettingsViewModel : ViewModelBase
         _settings.SidebarAlwaysExpanded = SidebarAlwaysExpanded;
         _settings.LiquidGlassEnabled = LiquidGlassEnabled;
         _settings.TaskbarProgressEnabled = TaskbarProgressEnabled;
+        _settings.TaskbarMediaControlsEnabled = TaskbarMediaControlsEnabled;
         _settings.CollapseAlbumEditions = CollapseAlbumEditions;
         _settings.MergeFeaturedFromTitles = MergeFeaturedFromTitles;
         _settings.ArtistGroupMode = ArtistGroupModes.Parse(ArtistGroupMode).ToString();
@@ -4368,6 +4371,13 @@ public partial class SettingsViewModel : ViewModelBase
     partial void OnTaskbarProgressEnabledChanged(bool value)
     {
         // MainWindow listens to this property to paint/clear the taskbar overlay.
+        if (_suspendSettingPersistence) return;
+        _ = SaveAsync();
+    }
+
+    partial void OnTaskbarMediaControlsEnabledChanged(bool value)
+    {
+        // MainWindow listens to this property to show/hide the thumbnail buttons.
         if (_suspendSettingPersistence) return;
         _ = SaveAsync();
     }
@@ -7113,6 +7123,7 @@ public partial class SettingsViewModel : ViewModelBase
             SidebarAlwaysExpanded = defaultSettings.SidebarAlwaysExpanded;
             LiquidGlassEnabled = defaultSettings.LiquidGlassEnabled;
             TaskbarProgressEnabled = defaultSettings.TaskbarProgressEnabled;
+            TaskbarMediaControlsEnabled = defaultSettings.TaskbarMediaControlsEnabled;
             // Upmix, sync, YouTube downloads and Lyrics Studio: re-read from the defaulted
             // _settings the same way LoadAsync does (ApplyAudioSettings below pushes upmix).
             LoadFeatureSettings();

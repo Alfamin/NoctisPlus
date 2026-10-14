@@ -289,6 +289,8 @@ Deezer и TIDAL: вставьте ссылку.</value></data>
   <data name="Settings.Wider" xml:space="preserve"><value>Шире</value><comment>Text in SettingsView.axaml</comment></data>
   <data name="Settings.SongProgressTaskbar" xml:space="preserve"><value>Прогресс песни на панели задач</value><comment>Text in SettingsView.axaml</comment></data>
   <data name="Settings.ShowHowFarAlong" xml:space="preserve"><value>Показывать прогресс песни на кнопке в панели задач. На паузе — янтарным.</value><comment>Text in SettingsView.axaml</comment></data>
+  <data name="Settings.MediaControlsTaskbar" xml:space="preserve"><value>Кнопки управления на панели задач</value><comment>Text in SettingsView.axaml</comment></data>
+  <data name="Settings.MediaControlsTaskbarDesc" xml:space="preserve"><value>Показывать кнопки «Назад», «Воспроизвести/Пауза», «Вперёд» и «В избранное» при наведении на значок в панели задач.</value><comment>Text in SettingsView.axaml</comment></data>
   <data name="Settings.AutomaticAlbumCoverSize" xml:space="preserve"><value>Автоматический размер обложек</value><comment>Text in SettingsView.axaml</comment></data>
   <data name="Settings.AlbumCoverSize" xml:space="preserve"><value>Размер обложек альбомов</value><comment>Accessible name of the cover size slider (Smaller / Larger) in SettingsView.axaml</comment></data>
   <data name="Settings.FiveCoversPerRow" xml:space="preserve"><value>Пять обложек в ряду. Выключите, чтобы задать размер самостоятельно.</value><comment>Text in SettingsView.axaml</comment></data>
