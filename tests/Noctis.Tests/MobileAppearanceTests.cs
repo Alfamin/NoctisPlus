@@ -338,7 +338,7 @@ public class MobileAppearanceTests
                 Avalonia.Headless.AvaloniaHeadlessPlatform.ForceRenderTimerTick();
                 System.Threading.Thread.Sleep(5);
             }
-            window.UpdateLayout();
+            MobileFixtures.Land(window);   // the sheet's rise can outlast the wait
             check(MobileFixtures.Find<SettingsPage>(view), vm, window);
         }
         finally

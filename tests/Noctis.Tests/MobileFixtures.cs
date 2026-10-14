@@ -145,6 +145,18 @@ internal static class MobileFixtures
 
     internal static T Find<T>(Visual root) where T : Visual => root.GetVisualDescendants().OfType<T>().First();
 
+    /// <summary>Lands every page and sheet in motion (Motion: they slide on a clock the headless
+    /// tests do not run), then lays the window out: what a test sees once the motion is over.</summary>
+    internal static void Land(Window window)
+    {
+        Motion.FinishAll();
+        window.UpdateLayout();
+    }
+
+    /// <summary>The view holding the top page (PageHost's, or SheetHost's while a sheet is up).</summary>
+    internal static ContentControl PageView(ShellView view, MobilePage page) =>
+        view.FindControl<PageStack>("SheetHost")!.ViewOf(page) ?? view.FindControl<PageStack>("PageHost")!.ViewOf(page)!;
+
     /// <summary>A named control anywhere below <paramref name="root"/>: pages are UserControls
     /// with their own name scopes, so ShellView.FindControl cannot see into them.</summary>
     internal static T Named<T>(Visual root, string name) where T : Control =>

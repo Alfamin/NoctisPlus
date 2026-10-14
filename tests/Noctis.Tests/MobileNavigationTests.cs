@@ -234,21 +234,25 @@ public class MobileNavigationTests : IDisposable
         var shell = MakeShell();
         var (view, window) = Mount(shell);
         var library = view.GetVisualDescendants().OfType<HomePage>().Single();   // the start tab
-        var host = view.FindControl<ContentControl>("PageHost")!;
-        Assert.True(library.IsVisible);
-        Assert.False(host.IsVisible);
+        var host = view.FindControl<PageStack>("PageHost")!;
+        Assert.True(library.IsEffectivelyVisible);
+        Assert.Null(host.Top);
 
         shell.Navigate(new NavTestPage("Pushed Page"));
         window.UpdateLayout();
+        Assert.True(library.IsEffectivelyVisible);   // under the page while it slides in
+        MobileFixtures.Land(window);
 
-        Assert.False(library.IsVisible);
-        Assert.True(host.IsVisible);
+        Assert.False(library.IsEffectivelyVisible);
+        Assert.Same(shell.CurrentPage, host.Top);
         // No DataTemplate matches the test page, so Avalonia's default template shows ToString().
         Assert.Contains(host.GetVisualDescendants().OfType<TextBlock>(), t => t.Text == "Pushed Page");
 
         shell.NavigateBackCommand.Execute(null);
         window.UpdateLayout();
-        Assert.True(library.IsVisible);
+        Assert.True(library.IsEffectivelyVisible);   // back at once, under the page sliding away
+        MobileFixtures.Land(window);
+        Assert.DoesNotContain(host.GetVisualDescendants().OfType<TextBlock>(), t => t.Text == "Pushed Page");
         window.Close();
     }
 

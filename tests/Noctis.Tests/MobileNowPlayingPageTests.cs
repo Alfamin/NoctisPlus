@@ -134,7 +134,7 @@ public class MobileNowPlayingPageTests : IDisposable
         var window = MobileFixtures.Mount(rig.Shell, out var view);
         rig.Shell.Player.PlayTracks(rig.Library.TrackList, 0);
         rig.Shell.OpenNowPlayingCommand.Execute(null);
-        window.UpdateLayout();
+        MobileFixtures.Land(window);   // the player takes touches once it has risen
 
         var page = view.FindControl<NowPlayingPage>("NowPlaying")!;
         var seek = MobileFixtures.Named<Avalonia.Controls.Primitives.RangeBase>(page, "SeekBar");
@@ -172,7 +172,7 @@ public class MobileNowPlayingPageTests : IDisposable
         var window = MobileFixtures.Mount(shell, out var view);
         shell.Player.PlayTracks(rig.Library.TrackList, 0);
         shell.OpenNowPlayingCommand.Execute(null);
-        window.UpdateLayout();
+        MobileFixtures.Land(window);   // the player takes touches once it has risen
 
         var page = view.FindControl<NowPlayingPage>("NowPlaying")!;
         var slider = MobileFixtures.Named<CapsuleSlider>(page, "VolumeSlider");

@@ -173,11 +173,12 @@ public class MobileLibraryPagesTests
         // 250 rows: long enough to inherit the offset. Pushed directly: an artist link now opens
         // the artist page, which has no SongScroll.
         rig.Shell.Navigate(new SongListPageViewModel(rig.Shell, "Even", () => MobileLibrary.SongsBy(rig.Library, "Even")));
-        window.UpdateLayout();
+        MobileFixtures.Land(window);
         Dispatcher.UIThread.RunJobs();
         Assert.Equal(0, MobileFixtures.Named<ScrollViewer>(view, "SongScroll").Offset.Y, 1);   // a new page starts at the top
 
         rig.Shell.NavigateBackCommand.Execute(null);
+        MobileFixtures.Land(window);
         for (var i = 0; i < 3; i++) { window.UpdateLayout(); Dispatcher.UIThread.RunJobs(); }
 
         Assert.Same(page, rig.Shell.CurrentPage);

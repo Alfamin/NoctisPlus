@@ -7,6 +7,10 @@ namespace Noctis.Mobile.ViewModels;
 /// Home is the start tab (Back from the others returns to it).</summary>
 public enum MobileTab { Home, Favorites, Playlists, Library, Search }
 
+/// <summary>How the page stack last changed: a page pushed (or presented), the top one popped,
+/// or a jump straight to the root (a tab tap) that no page slides through.</summary>
+public enum PageMove { Push, Pop, Reset }
+
 /// <summary>
 /// A page pushed over a tab's root (Songs, an album, an artist, Settings…). ShellView shows
 /// the top one through its PageHost with a DataTemplate per concrete type, so a page's view
@@ -20,6 +24,11 @@ public abstract partial class MobilePage : ObservableObject
     /// <summary>Shown as a tab's root under the tab's own title (Playlists, Favorites) rather
     /// than pushed: the view hides its own back/title header.</summary>
     public bool IsEmbedded { get; init; }
+
+    /// <summary>Presented as a sheet (Settings): it rises over the tabs and the tab bar rather
+    /// than sliding in over the tab, and the pages pushed after it open inside it. Set by
+    /// <see cref="ShellViewModel.Present"/>.</summary>
+    public bool IsSheet { get; internal set; }
 
     [ObservableProperty] private Vector _scrollOffset;
 

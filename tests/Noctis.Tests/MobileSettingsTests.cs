@@ -475,7 +475,7 @@ public class MobileSettingsTests
             System.Threading.Thread.Sleep(5);
         }
         Avalonia.Threading.Dispatcher.UIThread.RunJobs();
-        window.UpdateLayout();
+        MobileFixtures.Land(window);
     }
 
     private static Task<MobileFixtures.Rig> RigWithFolders(MobileFixtures.NoPicker? picker = null, params string[] folders) =>

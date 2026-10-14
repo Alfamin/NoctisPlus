@@ -32,14 +32,19 @@ public partial class ShellView : UserControl
         // with itself, and the bar sits over the overlays while the page is on screen.
         QueueSheet.TabBar = BottomChrome;
         QueueSheet.PropertyChanged += OnQueueSheetPropertyChanged;
+        PageHost.Root = RootLayer;
         DataContextChanged += OnDataContextChanged;
     }
 
     /// <summary>Raised while the Queue page shows, its slide down included; the long-press sheet
-    /// stays above it (ZIndex 2 in the XAML).</summary>
+    /// stays above it (ZIndex 2 in the XAML). Under the Queue the bar stands at full size though
+    /// Now Playing (a sheet) is up; it arrives and leaves off screen, so it changes size unseen.</summary>
     private void OnQueueSheetPropertyChanged(object? sender, AvaloniaPropertyChangedEventArgs e)
     {
-        if (e.Property == IsVisibleProperty) BottomChrome.ZIndex = QueueSheet.IsVisible ? 1 : 0;
+        if (e.Property != IsVisibleProperty) return;
+        ChromeLayer.ZIndex = QueueSheet.IsVisible ? 1 : 0;
+        Motion.Stop(ChromeLayer);
+        ChromeLayer.RenderTransform = ChromeScale(_covered);
     }
 
     /// <summary>
@@ -137,6 +142,9 @@ public partial class ShellView : UserControl
         _vm = DataContext as ShellViewModel;
         if (_vm != null) _vm.PropertyChanged += OnShellPropertyChanged;
         ApplyChromeLayout();
+        SyncPages(animate: false);
+        ShowPlayer(animate: false);
+        ShowLyrics(animate: false);
     }
 
     private void OnShellPropertyChanged(object? sender, PropertyChangedEventArgs e)
@@ -144,7 +152,14 @@ public partial class ShellView : UserControl
         // Unfolded as the Queue opens: the bar rises with the sheet already laid out rather
         // than morphing on the way up (ApplyChromeLayout re-attaches the transitions).
         if (e.PropertyName == nameof(ShellViewModel.IsTabBarCollapsed) && _vm?.IsQueueOpen == true) DetachTransitions();
-        if (e.PropertyName == nameof(ShellViewModel.CurrentPage)) TrackPageTint();
+        if (e.PropertyName == nameof(ShellViewModel.CurrentPage))
+        {
+            TrackPageTint();
+            SyncPages(animate: _vm?.LastPageMove != PageMove.Reset);
+        }
+        if (e.PropertyName == nameof(ShellViewModel.IsNowPlayingOpen)) ShowPlayer(animate: true);
+        if (e.PropertyName == nameof(ShellViewModel.IsLyricsOpen)) ShowLyrics(animate: true);
+        if (e.PropertyName == nameof(ShellViewModel.SelectedTab)) FadeInTab();
         if (e.PropertyName is nameof(ShellViewModel.IsTabBarCollapsed) or nameof(ShellViewModel.IsMiniBarVisible)
             or nameof(ShellViewModel.SelectedTab) or nameof(ShellViewModel.SafeArea))
             ApplyChromeLayout();
@@ -305,6 +320,135 @@ public partial class ShellView : UserControl
         // than animating in from zero.
         if (!_transitionsOn && IsLoaded) AttachTransitions();
     }
+
+    // ---- Pages, sheets and the player: the motion system (Motion) --------------------------
+
+    /// <summary>
+    /// Puts the page stack on screen: the pages up to the first sheet in PageHost, over the tab
+    /// roots; the sheet and the pages pushed inside it in SheetHost, over the tab bar. A page
+    /// pushed slides in, a popped one slides out, a sheet rises or drops; a reset (a tab tap)
+    /// jumps, as does the first layout.
+    /// </summary>
+    private void SyncPages(bool animate)
+    {
+        if (_vm is not { } vm) return;
+        var pages = vm.Pages;
+        var sheetAt = -1;
+        for (var i = 0; i < pages.Count && sheetAt < 0; i++)
+            if (pages[i].IsSheet) sheetAt = i;
+        var tabTop = sheetAt < 0 ? pages.LastOrDefault() : sheetAt > 0 ? pages[sheetAt - 1] : null;
+        var sheetTop = sheetAt < 0 ? null : pages[^1];
+        Move(PageHost, tabTop, sheet: false);
+        Move(SheetHost, sheetTop, sheet: true);
+        ApplyBackdrop(animate);
+
+        void Move(PageStack stack, MobilePage? top, bool sheet)
+        {
+            if (top == stack.Top) return;
+            if (!animate) stack.Reset(top);
+            else if (sheet && stack.Top == null) stack.Present(top!);
+            else if (sheet && top == null) stack.Dismiss();
+            // The old top still in the stack: the new one went on over it.
+            else if (top != null && (stack.Top == null || pages.Contains(stack.Top))) stack.Push(top);
+            else stack.Pop(top);
+        }
+    }
+
+    private bool _covered;
+
+    private static ITransform? AppScale(bool covered) => covered ? Motion.Scale(Motion.BehindScale) : null;
+
+    /// <summary>The chrome steps back with the app, except under the Queue, which keeps it at full size.</summary>
+    private ITransform? ChromeScale(bool covered) => AppScale(covered && !QueueSheet.IsVisible);
+
+    /// <summary>
+    /// The app behind a sheet (Settings, Now Playing) steps back a little and dims, as iOS does,
+    /// and the dim takes the taps meant for it (a second tap on the profile circle while the
+    /// sheet rises); both come back as the sheet goes.
+    /// </summary>
+    private void ApplyBackdrop(bool animate)
+    {
+        if (_vm is not { } vm) return;
+        var covered = vm.IsNowPlayingOpen || vm.Pages.Any(p => p.IsSheet);
+        if (covered == _covered) return;
+        _covered = covered;
+        SheetDim.IsHitTestVisible = covered;
+        if (covered) SheetDim.IsVisible = true;
+        if (!animate)
+        {
+            foreach (var c in new Control[] { AppLayer, ChromeLayer, SheetDim }) Motion.Stop(c);
+            AppLayer.RenderTransform = AppScale(covered);
+            ChromeLayer.RenderTransform = ChromeScale(covered);
+            SheetDim.Opacity = covered ? Motion.BehindDim : 0;
+            SheetDim.IsVisible = covered;
+            return;
+        }
+        // Back at full size the layers drop their transforms, as if never moved.
+        var still = Motion.Scale(1);
+        Motion.To(AppLayer, Motion.Sheet, AppScale(covered) ?? still,
+            from: Motion.IsRunning(AppLayer) ? null : AppLayer.RenderTransform ?? still,
+            done: () => AppLayer.RenderTransform = AppScale(_covered));
+        Motion.To(ChromeLayer, Motion.Sheet, ChromeScale(covered) ?? still,
+            from: Motion.IsRunning(ChromeLayer) ? null : ChromeLayer.RenderTransform ?? still,
+            done: () => ChromeLayer.RenderTransform = ChromeScale(_covered));
+        Motion.To(SheetDim, Motion.Sheet, opacity: covered ? Motion.BehindDim : 0, done: () => SheetDim.IsVisible = _covered);
+    }
+
+    private bool _playerShown;
+
+    /// <summary>Now Playing rises from the bottom edge as a sheet and drops back on close (the
+    /// grabber, Back, a page opened from it), Lyrics with it when it is over the player. It
+    /// takes touches once it has landed, none on the way down.</summary>
+    private void ShowPlayer(bool animate)
+    {
+        var open = _vm?.IsNowPlayingOpen == true;
+        if (open == _playerShown) return;
+        _playerShown = open;
+        var down = Motion.TranslateY(Bounds.Height > 0 ? Bounds.Height : 915);
+        NowPlaying.IsHitTestVisible = false;
+        if (open) NowPlaying.IsVisible = true;
+        void Land()
+        {
+            NowPlaying.IsVisible = _playerShown;
+            NowPlaying.IsHitTestVisible = true;
+            PlayerLayer.RenderTransform = null;
+        }
+        if (!animate)
+        {
+            Motion.Stop(PlayerLayer);
+            Land();
+        }
+        else if (open)
+            Motion.To(PlayerLayer, Motion.Sheet, Motion.TranslateY(0), from: Motion.IsRunning(PlayerLayer) ? null : down, enter: true, done: Land);
+        else
+            Motion.To(PlayerLayer, Motion.Sheet, down, done: Land);
+        ApplyBackdrop(animate);
+    }
+
+    /// <summary>Lyrics fades in over the player and out again.</summary>
+    private void ShowLyrics(bool animate)
+    {
+        var open = _vm?.IsLyricsOpen == true;
+        LyricsSheet.IsHitTestVisible = open;
+        if (open) LyricsSheet.IsVisible = true;
+        if (!animate)
+        {
+            Motion.Stop(LyricsSheet);
+            LyricsSheet.Opacity = 1;
+            LyricsSheet.IsVisible = open;
+            return;
+        }
+        Motion.To(LyricsSheet, Motion.Fade, opacity: open ? 1 : 0,
+            fromOpacity: open && !Motion.IsRunning(LyricsSheet) ? 0 : null, done: () =>
+            {
+                LyricsSheet.IsVisible = _vm?.IsLyricsOpen == true;
+                LyricsSheet.Opacity = 1;
+            });
+    }
+
+    /// <summary>A tab switch: the new tab fades in, quickly, with no slide.</summary>
+    private void FadeInTab() =>
+        Motion.To(TabContent, Motion.Fade, opacity: 1, fromOpacity: Motion.IsRunning(TabContent) ? null : 0);
 
     // ---- Page-coloured bottom fade -------------------------------------------------------
 

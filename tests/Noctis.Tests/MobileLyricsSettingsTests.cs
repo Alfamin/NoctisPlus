@@ -79,7 +79,7 @@ public class MobileLyricsSettingsTests : IDisposable
             Thread.Sleep(5);
         }
         Avalonia.Threading.Dispatcher.UIThread.RunJobs();
-        window.UpdateLayout();
+        MobileFixtures.Land(window);   // the sheet's rise can outlast the wait (its first frame is slow)
     }
 
     /// <summary>Settings mounted on its Lyrics page, the icon set merged as on the device.</summary>
