@@ -32,7 +32,9 @@ public class MobileLibraryRowsTests
     {
         var a = MobileFixtures.Song("Alpha", artist: "Band", favourite: true);
         var b = MobileFixtures.Song("Beta", artist: "Band");
-        return MobileFixtures.MakeRig(new[] { a, b }, new[] { MobileFixtures.MakeAlbum("First", "Band", a, b) }, WithFolder(rows));
+        var rig = MobileFixtures.MakeRig(new[] { a, b }, new[] { MobileFixtures.MakeAlbum("First", "Band", a, b) }, WithFolder(rows));
+        rig.Shell.SelectTabCommand.Execute(MobileTab.Library);   // Home is the start tab
+        return rig;
     }
 
     /// <summary>The row buttons on screen, top to bottom, by their label.</summary>
@@ -64,10 +66,11 @@ public class MobileLibraryRowsTests
         foreach (var kind in new[] { LibraryRowKind.Playlists, LibraryRowKind.Artists, LibraryRowKind.Albums, LibraryRowKind.Songs })
             Assert.NotNull(RowButton(view, kind).GetVisualDescendants().OfType<PathIcon>().First(i => i.Name == "RowIcon").Data);
 
-        // The rows come first, then the sections.
+        // The rows come first, then Recently Added (Apple's Library).
         var rowList = MobileFixtures.Named<ItemsControl>(view, "LibraryRowList");
-        var pinned = MobileFixtures.Named<StackPanel>(view, "PinnedSection");
-        Assert.True(rowList.TranslatePoint(default, view)!.Value.Y < pinned.TranslatePoint(default, view)!.Value.Y);
+        var added = MobileFixtures.Named<StackPanel>(view, "RecentlyAddedSection");
+        Assert.True(added.IsEffectivelyVisible);
+        Assert.True(rowList.TranslatePoint(default, view)!.Value.Y < added.TranslatePoint(default, view)!.Value.Y);
         window.Close();
     }
 

@@ -3,8 +3,9 @@ using CommunityToolkit.Mvvm.ComponentModel;
 
 namespace Noctis.Mobile.ViewModels;
 
-/// <summary>The three tabs of the phone UI. Library is the start tab (Back from the others returns to it).</summary>
-public enum MobileTab { Library, Search, Playlists, Favorites }
+/// <summary>The tabs of the phone UI, in the bar's order (Apple Music's: Home first, Search last).
+/// Home is the start tab (Back from the others returns to it).</summary>
+public enum MobileTab { Home, Favorites, Playlists, Library, Search }
 
 /// <summary>
 /// A page pushed over a tab's root (Songs, an album, an artist, Settings…). ShellView shows

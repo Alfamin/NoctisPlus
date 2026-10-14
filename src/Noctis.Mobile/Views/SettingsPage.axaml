@@ -584,7 +584,7 @@
                             </StackPanel>
                         </StackPanel>
 
-                        <!-- Appearance: the dark style as a check list, then the accent. -->
+                        <!-- Appearance: the dark style as a check list, the accent, then the player bar. -->
                         <StackPanel Name="AppearancePane" Classes="grouped-content" IsVisible="{Binding ShowsAppearancePane}">
                             <StackPanel Name="DarkThemeSection">
                                 <TextBlock Classes="group-caption" Text="Dark Style" />
@@ -630,6 +630,26 @@
                                     </ListBox>
                                 </Border>
                                 <TextBlock Classes="group-footnote" Text="{Binding AccentName, StringFormat='{}{0}. The accent colours buttons, switches and highlights.'}" />
+                            </StackPanel>
+                            <!-- The mini player's progress, both off by default (Apple's plain glass
+                                 capsule); the shell applies each switch at once and saves it. -->
+                            <StackPanel>
+                                <TextBlock Classes="group-caption" Text="Player Bar" />
+                                <Border Name="PlayerBarCard" Classes="group-card">
+                                    <StackPanel>
+                                        <ToggleButton Name="ProgressColourSwitch" Classes="switch-row" AutomationProperties.Name="Progress Colour"
+                                                      IsChecked="{Binding Shell.ShowMiniProgressFill}">
+                                            <TextBlock Classes="row-label" Text="Progress Colour" />
+                                        </ToggleButton>
+                                        <Border Classes="row-separator plain" />
+                                        <ToggleButton Name="ProgressLineSwitch" Classes="switch-row" AutomationProperties.Name="Progress Line"
+                                                      IsChecked="{Binding Shell.ShowMiniProgressLine}">
+                                            <TextBlock Classes="row-label" Text="Progress Line" />
+                                        </ToggleButton>
+                                    </StackPanel>
+                                </Border>
+                                <TextBlock Classes="group-footnote"
+                                           Text="Progress Colour fills the player bar in the cover's colour as the song plays. Progress Line draws a thin line along its bottom edge. With both off the bar is plain glass." />
                             </StackPanel>
                         </StackPanel>
 

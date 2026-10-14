@@ -114,6 +114,14 @@ public class AppSettings
     /// <summary>Phone: the lyrics page's text size on top of the system font scale (0.8-1.6).</summary>
     public double MobileLyricsTextScale { get; set; } = 1.0;
 
+    /// <summary>Phone, Settings › Appearance › Player Bar: the mini player's elapsed part filled in
+    /// the cover's colour. Off (the default) leaves the capsule plain glass, as Apple's.</summary>
+    public bool MobilePlayerBarProgressFill { get; set; }
+
+    /// <summary>Phone, Settings › Appearance › Player Bar: the bright progress line along the mini
+    /// player's bottom edge. Off by default.</summary>
+    public bool MobilePlayerBarProgressLine { get; set; }
+
     /// <summary>User-defined custom themes selectable from the Themes row.</summary>
     public List<CustomThemeDefinition> CustomThemes { get; set; } = new();
 

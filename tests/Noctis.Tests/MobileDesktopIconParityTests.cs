@@ -100,16 +100,54 @@ public class MobileDesktopIconParityTests
         Assert.True(differ <= covered * 0.02, $"{phoneKey} vs desktop {desktopKey}: {differ} of {covered} pixels differ");
     }
 
-    private static SKBitmap Rasterize(string data, double strokeWidth)
+    /// <summary>
+    /// The Home tab (owner 10-13) draws the desktop sidebar's Home: a PNG mask (Home ICON.png,
+    /// 48 px over the 24-grid, no vector exists), traced. Drawn at the PNG's own size, the outline
+    /// glyph's coverage stays within half a pixel's alpha of the PNG everywhere and carries the
+    /// same ink; the filled glyph keeps the same silhouette (it covers every pixel the PNG does
+    /// outside the door).
+    /// </summary>
+    [Fact]
+    public void TabHome_TracesTheDesktopsHomePng()
+    {
+        var icons = Geometries(Path.Combine("src", "Noctis.Mobile", "Views", "TabIcons.axaml"));
+        using var png = SKBitmap.Decode(Path.Combine(RepoRoot(), "src", "Noctis.UI", "Assets", "Icons", "Home ICON.png"));
+        var scale = png.Width / 24;
+        using var outline = Rasterize(icons["TabHomeIcon"], 0, scale);
+        using var filled = Rasterize(icons["TabHomeFilledIcon"], 0, scale);
+
+        double inkPhone = 0, inkDesktop = 0, worst = 0;
+        int missed = 0, inked = 0;
+        for (var y = 0; y < png.Height; y++)
+        for (var x = 0; x < png.Width; x++)
+        {
+            var a = outline.GetPixel(x, y).Alpha / 255.0;
+            var b = png.GetPixel(x, y).Alpha / 255.0;
+            inkPhone += a;
+            inkDesktop += b;
+            worst = Math.Max(worst, Math.Abs(a - b));
+            if (b > 0.5)
+            {
+                inked++;
+                if (filled.GetPixel(x, y).Alpha < 128) missed++;
+            }
+        }
+        Assert.True(worst < 0.5, $"a pixel differs by {worst:0.00} alpha");
+        Assert.InRange(inkPhone / inkDesktop, 0.95, 1.05);
+        // Only the door's frame, knocked out of the filled house, may go uncovered.
+        Assert.True(missed <= inked * 0.12, $"{missed} of {inked} desktop pixels outside the filled house");
+    }
+
+    private static SKBitmap Rasterize(string data, double strokeWidth, int scale = Scale)
     {
         var nonZero = data.StartsWith("F1", StringComparison.Ordinal);
         if (data.StartsWith("F0", StringComparison.Ordinal) || nonZero) data = data[2..];
         using var path = SKPath.ParseSvgPathData(data.Trim()) ?? throw new InvalidOperationException("unparsable: " + data);
         path.FillType = nonZero ? SKPathFillType.Winding : SKPathFillType.EvenOdd;
-        var bitmap = new SKBitmap(24 * Scale, 24 * Scale, SKColorType.Alpha8, SKAlphaType.Premul);
+        var bitmap = new SKBitmap(24 * scale, 24 * scale, SKColorType.Alpha8, SKAlphaType.Premul);
         using var canvas = new SKCanvas(bitmap);
         canvas.Clear(SKColors.Transparent);
-        canvas.Scale(Scale);
+        canvas.Scale(scale);
         using var paint = new SKPaint { Color = SKColors.Black, IsAntialias = true };
         if (strokeWidth > 0)
         {

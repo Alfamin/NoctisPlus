@@ -35,8 +35,12 @@ public class MobileLibraryPagesTests
 
         Assert.True(MobileFixtures.Named<Border>(view, "ConnectCard").IsVisible);
         Assert.False(MobileFixtures.Named<Border>(view, "ReconnectCard").IsVisible);
-        Assert.False(MobileFixtures.Named<ItemsControl>(view, "LibraryRowList").IsVisible);
         Assert.False(MobileFixtures.Named<StackPanel>(view, "PinnedSection").IsVisible);
+        rig.Shell.SelectTabCommand.Execute(MobileTab.Library);
+        window.UpdateLayout();
+        var library = MobileFixtures.Find<LibraryPage>(view);
+        Assert.True(MobileFixtures.Named<Border>(library, "ConnectCard").IsVisible);
+        Assert.False(MobileFixtures.Named<ItemsControl>(library, "LibraryRowList").IsVisible);
         Assert.False(rig.Shell.IsMiniBarVisible);
         window.Close();
     }
@@ -52,9 +56,12 @@ public class MobileLibraryPagesTests
         using var rig = MobileFixtures.MakeRig(new[] { a, b, c }, new[] { album }, WithFolder(mix));
         var window = MobileFixtures.Mount(rig.Shell, out var view);
 
+        Assert.True(MobileFixtures.Named<Border>(view, "PinnedHint").IsVisible);     // Home: nothing pinned yet
+        rig.Shell.SelectTabCommand.Execute(MobileTab.Library);
+        window.UpdateLayout();
         Assert.True(MobileFixtures.Named<ItemsControl>(view, "LibraryRowList").IsVisible);
-        Assert.False(MobileFixtures.Named<Border>(view, "ConnectCard").IsVisible);
-        Assert.True(MobileFixtures.Named<Border>(view, "PinnedHint").IsVisible);     // nothing pinned yet
+        Assert.False(rig.Shell.Library.HasNotice);                                   // no card: the notices collapse
+        Assert.DoesNotContain(view.GetVisualDescendants().OfType<Border>(), b => b.Name == "ConnectCard" && b.IsEffectivelyVisible);
         Assert.Equal(3, rig.Shell.Library.SongCount);
         Assert.Equal(1, rig.Shell.Library.FavoriteCount);
         Assert.Equal(2, rig.Shell.Library.RecentlyAddedCount);                      // the 30-day window drops Beta
@@ -185,6 +192,7 @@ public class MobileLibraryPagesTests
         rig.Library.AbortScanWithRoots = new[] { "content://tree/music" };
 
         await rig.Shell.Library.RescanCommand.ExecuteAsync(null);
+        rig.Shell.SelectTabCommand.Execute(MobileTab.Library);
         var window = MobileFixtures.Mount(rig.Shell, out var view);
 
         Assert.True(rig.Shell.Library.NeedsReconnect);

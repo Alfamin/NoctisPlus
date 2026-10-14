@@ -1,0 +1,33 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:Noctis.Mobile.ViewModels"
+             x:Class="Noctis.Mobile.Views.LibraryNotices"
+             x:DataType="vm:ShellViewModel">
+
+    <!-- The library's notices at the top of the Home and Library tabs: the first-run folder
+         card, the reconnect card, the scan's progress. The pages hide this control itself when
+         there is none (Library.HasNotice): a visible empty one still took its page's Spacing,
+         22 dp of blank above the first row. -->
+    <StackPanel Name="NoticeCards" Margin="20,0" Spacing="14">
+        <Border Name="ConnectCard" Classes="card" Padding="16" IsVisible="{Binding Library.ShowConnectCard}">
+            <StackPanel Spacing="10">
+                <TextBlock Classes="section" Text="Add your music" />
+                <TextBlock Classes="subtle" TextWrapping="Wrap"
+                           Text="Pick the folder your music lives in. Noctis reads it in place and never uploads anything." />
+                <Button Classes="pill-accent" Content="Choose folder" Command="{Binding Library.AddFolderCommand}" />
+            </StackPanel>
+        </Border>
+
+        <Border Name="ReconnectCard" Classes="card" Padding="16" IsVisible="{Binding Library.NeedsReconnect}">
+            <StackPanel Spacing="10">
+                <TextBlock Text="{Binding Library.StatusText}" TextWrapping="Wrap" />
+                <Button Classes="pill" Content="Reconnect folder" Command="{Binding Library.AddFolderCommand}" />
+            </StackPanel>
+        </Border>
+
+        <StackPanel Spacing="4" IsVisible="{Binding Library.IsScanning}">
+            <ProgressBar IsIndeterminate="True" />
+            <TextBlock Classes="subtle" Text="{Binding Library.ScanProgress, StringFormat='Scanning… {0} files'}" />
+        </StackPanel>
+    </StackPanel>
+</UserControl>

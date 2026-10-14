@@ -104,6 +104,7 @@
          code-behind raises the chrome over the overlays while the Queue page is on screen. -->
     <Grid>
         <Panel Name="TabContent" Margin="{Binding TopSafePadding}">
+            <views:HomePage DataContext="{Binding}" IsVisible="{Binding IsHomeRootVisible}" />
             <views:LibraryPage DataContext="{Binding}" IsVisible="{Binding IsLibraryRootVisible}" />
             <views:SearchPage DataContext="{Binding Search}" IsVisible="{Binding $parent[views:ShellView].((vm:ShellViewModel)DataContext).IsSearchRootVisible}" />
             <Grid Name="PlaylistsRoot" RowDefinitions="Auto,*" IsVisible="{Binding IsPlaylistsRootVisible}">
@@ -142,7 +143,7 @@
             <Panel Name="ChromeHost" Margin="16,0,16,8" VerticalAlignment="Bottom">
 
                 <!-- The tab capsule (Apple Music, iOS 26): a floating glass pill with a hairline rim.
-                     Expanded it spans the row and holds the four tabs; folded it shrinks to a round
+                     Expanded it spans the row and holds the five tabs; folded it shrinks to a round
                      button showing the current tab. Its content clips to it (the full-width tab row
                      while folded), the glass itself does not: its shadow falls outside. -->
                 <controls:GlassPanel Name="TabCapsule" Classes="liquid" CornerRadius="31"
@@ -157,12 +158,13 @@
                                                     UseAppGlass="False" IsGlassActive="True" BlurRadius="0" EdgeThickness="0" />
                             </Panel>
                             <!-- Filled glyphs on every tab, as Apple's: the selected one takes the accent. -->
-                            <Grid Name="TabBar" ColumnDefinitions="*,*,*,*">
-                                <Button Grid.Column="0" Name="LibraryTab" Classes="tab" Classes.selected="{Binding IsLibrarySelected}"
-                                        Command="{Binding SelectTabCommand}" CommandParameter="{x:Static vm:MobileTab.Library}">
+                            <!-- Apple Music's order: Home first (the start tab), Search last. -->
+                            <Grid Name="TabBar" ColumnDefinitions="*,*,*,*,*">
+                                <Button Grid.Column="0" Name="HomeTab" Classes="tab" Classes.selected="{Binding IsHomeSelected}"
+                                        Command="{Binding SelectTabCommand}" CommandParameter="{x:Static vm:MobileTab.Home}">
                                     <StackPanel Spacing="2">
-                                        <PathIcon Data="{DynamicResource TabLibraryFilledIcon}" />
-                                        <TextBlock Text="{loc:T Tab.Library}" />
+                                        <PathIcon Data="{DynamicResource TabHomeFilledIcon}" />
+                                        <TextBlock Text="{loc:T Nav.Home}" />
                                     </StackPanel>
                                 </Button>
                                 <Button Grid.Column="1" Name="FavoritesTab" Classes="tab" Classes.selected="{Binding IsFavoritesSelected}"
@@ -179,7 +181,14 @@
                                         <TextBlock Text="{loc:T Nav.Playlists}" />
                                     </StackPanel>
                                 </Button>
-                                <Button Grid.Column="3" Name="SearchTab" Classes="tab" Classes.selected="{Binding IsSearchSelected}"
+                                <Button Grid.Column="3" Name="LibraryTab" Classes="tab" Classes.selected="{Binding IsLibrarySelected}"
+                                        Command="{Binding SelectTabCommand}" CommandParameter="{x:Static vm:MobileTab.Library}">
+                                    <StackPanel Spacing="2">
+                                        <PathIcon Data="{DynamicResource TabLibraryFilledIcon}" />
+                                        <TextBlock Text="{loc:T Tab.Library}" />
+                                    </StackPanel>
+                                </Button>
+                                <Button Grid.Column="4" Name="SearchTab" Classes="tab" Classes.selected="{Binding IsSearchSelected}"
                                         Command="{Binding SelectTabCommand}" CommandParameter="{x:Static vm:MobileTab.Search}">
                                     <StackPanel Spacing="2">
                                         <PathIcon Data="{DynamicResource TabSearchFilledIcon}" />
@@ -193,6 +202,7 @@
                         <Button Name="CollapsedTabButton" Classes="tab selected bubble" HorizontalAlignment="Left"
                                 Command="{Binding ExpandTabBarCommand}" AutomationProperties.Name="Show tabs">
                             <Panel>
+                                <PathIcon Data="{DynamicResource TabHomeFilledIcon}" IsVisible="{Binding IsHomeSelected}" />
                                 <PathIcon Data="{DynamicResource TabLibraryFilledIcon}" IsVisible="{Binding IsLibrarySelected}" />
                                 <PathIcon Data="{DynamicResource TabFavoritesFilledIcon}" IsVisible="{Binding IsFavoritesSelected}" />
                                 <PathIcon Data="{DynamicResource TabPlaylistsFilledIcon}" IsVisible="{Binding IsPlaylistsSelected}" />
@@ -222,12 +232,15 @@
                                      IsVisible="{Binding IsMiniBarVisible}">
                     <Panel>
                         <!-- The elapsed part of the song, filled in the cover's colour with a bright
-                             edge along the bottom: progress at a glance, as the full player shows it. -->
-                        <Border Name="MiniProgress" CornerRadius="26" ClipToBounds="True" IsHitTestVisible="False">
+                             edge along the bottom: progress at a glance, as the full player shows it.
+                             Each is a Settings › Appearance › Player Bar switch, both off by default:
+                             then the capsule is plain glass, as Apple's. -->
+                        <Border Name="MiniProgress" CornerRadius="26" ClipToBounds="True" IsHitTestVisible="False"
+                                IsVisible="{Binding ShowsMiniProgress}">
                             <views:FractionPanel Fraction="{Binding Player.ProgressFraction}">
-                                <Border Name="MiniProgressFill" Background="{Binding MiniProgressFill}" />
+                                <Border Name="MiniProgressFill" Background="{Binding MiniProgressFill}" IsVisible="{Binding ShowMiniProgressFill}" />
                                 <Border Name="MiniProgressLine" Background="{Binding MiniProgressLine}" Height="2"
-                                        VerticalAlignment="Bottom" />
+                                        VerticalAlignment="Bottom" IsVisible="{Binding ShowMiniProgressLine}" />
                             </views:FractionPanel>
                         </Border>
                         <Border Background="{DynamicResource GlassBarSheen}" CornerRadius="26" IsHitTestVisible="False" />
@@ -245,12 +258,14 @@
                                                                   DecodeWidth="128" ClearOnSourceChange="False" Stretch="UniformToFill" />
                                         </Panel>
                                     </Border>
-                                    <!-- The desktop's marquee: a title or artist too long for the row scrolls
+                                    <!-- Apple's sizes, measured on its mini player: the title's capitals stand
+                                         about a sixth of the bar's height, the artist the same size, regular.
+                                         The desktop's marquee: a title or artist too long for the row scrolls
                                          (both start together after the rest), else it sits still. Left-aligned
                                          so a short line stays at the start; MaxDisplayWidth only lifts the
                                          control's 240 default cap — the column sets the real width. -->
                                     <StackPanel Grid.Column="1" Margin="11,0,4,0" VerticalAlignment="Center">
-                                        <controls:MarqueeTextBlock Name="MiniTitle" Text="{Binding Player.CurrentTrack.Title}" FontSize="15" FontWeight="SemiBold"
+                                        <controls:MarqueeTextBlock Name="MiniTitle" Text="{Binding Player.CurrentTrack.Title}" FontSize="12" FontWeight="SemiBold"
                                                                    MaxDisplayWidth="10000" HorizontalAlignment="Left" />
                                         <controls:MarqueeTextBlock Name="MiniArtist" Text="{Binding Player.CurrentTrack.Artist}" FontSize="12"
                                                                    Foreground="{DynamicResource PhoneSecondaryTextBrush}"
@@ -260,15 +275,15 @@
                             </Button>
                             <Button Grid.Column="1" Name="MiniPlayButton" Classes="icon mini" Command="{Binding Player.TogglePlayPauseCommand}">
                                 <Panel>
-                                    <PathIcon Data="{DynamicResource PhPlayFill}" IsVisible="{Binding !Player.IsPlaying}" />
-                                    <PathIcon Data="{DynamicResource PhPauseFill}" IsVisible="{Binding Player.IsPlaying}" />
+                                    <PathIcon Name="MiniPlayGlyph" Data="{DynamicResource PhPlayFill}" IsVisible="{Binding !Player.IsPlaying}" />
+                                    <PathIcon Name="MiniPauseGlyph" Data="{DynamicResource PhPauseFill}" IsVisible="{Binding Player.IsPlaying}" />
                                 </Panel>
                             </Button>
                             <!-- Expanded only, like Apple's: the folded row has room for Play alone.
                                  Greyed when there is nothing to skip to. -->
                             <Button Grid.Column="2" Name="MiniNextButton" Classes="icon mini" Classes.unavailable="{Binding !Player.HasNext}"
                                     IsEnabled="{Binding Player.HasNext}" Command="{Binding Player.NextCommand}">
-                                <PathIcon Data="{DynamicResource PhForwardFill}" />
+                                <PathIcon Name="MiniNextGlyph" Classes="forward" Data="{DynamicResource PhForwardFill}" />
                             </Button>
                         </Grid>
                     </Panel>

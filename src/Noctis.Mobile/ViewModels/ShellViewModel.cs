@@ -12,7 +12,7 @@ using Noctis.Services;
 namespace Noctis.Mobile.ViewModels;
 
 /// <summary>
-/// Root of the phone UI: three tabs, one stack of pages pushed over the active tab's root,
+/// Root of the phone UI: five tabs, one stack of pages pushed over the active tab's root,
 /// the Now Playing / Lyrics / Queue overlays and the mini bar. Every Android Back decision
 /// is made here (<see cref="TryHandleBack"/>) so it is testable on Windows.
 /// </summary>
@@ -161,13 +161,14 @@ public sealed partial class ShellViewModel : ObservableObject
     }
 
     [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(IsFavoritesSelected), nameof(IsLibrarySelected), nameof(IsSearchSelected), nameof(IsPlaylistsSelected),
-        nameof(IsFavoritesRootVisible), nameof(IsLibraryRootVisible), nameof(IsSearchRootVisible), nameof(IsPlaylistsRootVisible))]
-    private MobileTab _selectedTab = MobileTab.Library;
+    [NotifyPropertyChangedFor(nameof(IsHomeSelected), nameof(IsFavoritesSelected), nameof(IsLibrarySelected), nameof(IsSearchSelected),
+        nameof(IsPlaylistsSelected), nameof(IsHomeRootVisible), nameof(IsFavoritesRootVisible), nameof(IsLibraryRootVisible),
+        nameof(IsSearchRootVisible), nameof(IsPlaylistsRootVisible))]
+    private MobileTab _selectedTab = MobileTab.Home;
 
     [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(HasPage), nameof(IsFavoritesRootVisible), nameof(IsLibraryRootVisible), nameof(IsSearchRootVisible),
-        nameof(IsPlaylistsRootVisible))]
+    [NotifyPropertyChangedFor(nameof(HasPage), nameof(IsHomeRootVisible), nameof(IsFavoritesRootVisible), nameof(IsLibraryRootVisible),
+        nameof(IsSearchRootVisible), nameof(IsPlaylistsRootVisible))]
     private MobilePage? _currentPage;
 
     /// <summary>
@@ -199,12 +200,14 @@ public sealed partial class ShellViewModel : ObservableObject
     /// first use, after the host has set <see cref="Account"/> (it decides the Downloaded row).</summary>
     public LibraryRowsViewModel LibraryRows => _libraryRows ??= new LibraryRowsViewModel(this);
 
+    public bool IsHomeSelected => SelectedTab == MobileTab.Home;
     public bool IsFavoritesSelected => SelectedTab == MobileTab.Favorites;
     public bool IsLibrarySelected => SelectedTab == MobileTab.Library;
     public bool IsSearchSelected => SelectedTab == MobileTab.Search;
     public bool IsPlaylistsSelected => SelectedTab == MobileTab.Playlists;
 
     public bool HasPage => CurrentPage != null;
+    public bool IsHomeRootVisible => IsHomeSelected && !HasPage;
     public bool IsFavoritesRootVisible => IsFavoritesSelected && !HasPage;
     public bool IsLibraryRootVisible => IsLibrarySelected && !HasPage;
     public bool IsSearchRootVisible => IsSearchSelected && !HasPage;
@@ -345,6 +348,66 @@ public sealed partial class ShellViewModel : ObservableObject
         MiniProgressLine = new Avalonia.Media.Immutable.ImmutableSolidColorBrush(Avalonia.Media.Color.FromArgb((byte)(neutral ? 0x99 : 0xE6), c.R, c.G, c.B));
     }
 
+    // Settings › Appearance › Player Bar. Both off by default: the capsule is plain glass, as
+    // Apple's. Saved to settings.json (MobilePlayerBarProgress*) and applied live.
+
+    /// <summary>The elapsed fill in the cover's colour (<see cref="MiniProgressFill"/>).</summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(ShowsMiniProgress))]
+    private bool _showMiniProgressFill;
+
+    /// <summary>The bright line along the capsule's bottom edge (<see cref="MiniProgressLine"/>).</summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(ShowsMiniProgress))]
+    private bool _showMiniProgressLine;
+
+    public bool ShowsMiniProgress => ShowMiniProgressFill || ShowMiniProgressLine;
+
+    private bool _playerBarLoaded;
+    private Task _playerBarSaveChain = Task.CompletedTask;
+
+    /// <summary>The tail of the player-bar saves; tests await it.</summary>
+    internal Task PendingPlayerBarSave { get; private set; } = Task.CompletedTask;
+
+    partial void OnShowMiniProgressFillChanged(bool value) => SavePlayerBarSettings();
+    partial void OnShowMiniProgressLineChanged(bool value) => SavePlayerBarSettings();
+
+    private async Task LoadPlayerBarSettingsAsync()
+    {
+        try
+        {
+            var settings = await Library.Persistence.LoadSettingsAsync();
+            ShowMiniProgressFill = settings.MobilePlayerBarProgressFill;
+            ShowMiniProgressLine = settings.MobilePlayerBarProgressLine;
+        }
+        catch (Exception ex)
+        {
+            DebugLog.Write("Settings", $"Player bar settings load failed: {ex.Message}");
+        }
+        _playerBarLoaded = true;
+    }
+
+    /// <summary>One save after another, so a quick on-off never lands out of order.</summary>
+    private void SavePlayerBarSettings()
+    {
+        if (!_playerBarLoaded) return;
+        bool fill = ShowMiniProgressFill, line = ShowMiniProgressLine;
+        PendingPlayerBarSave = _playerBarSaveChain = _playerBarSaveChain.ContinueWith(async _ =>
+        {
+            try
+            {
+                var settings = await Library.Persistence.LoadSettingsAsync();
+                settings.MobilePlayerBarProgressFill = fill;
+                settings.MobilePlayerBarProgressLine = line;
+                await Library.Persistence.SaveSettingsAsync(settings);
+            }
+            catch (Exception ex)
+            {
+                DebugLog.Write("Settings", $"Player bar settings save failed: {ex.Message}");
+            }
+        }, TaskScheduler.Default).Unwrap();
+    }
+
     /// <summary>A started track's play reached the log: the Library's play-log rails re-read it,
     /// and a desktop song's play is queued for the desktop (sent as a scrobble on the next sync).</summary>
     private void OnPlayRecorded(object? sender, EventArgs e)
@@ -428,9 +491,10 @@ public sealed partial class ShellViewModel : ObservableObject
 
     /// <summary>
     /// Android Back: the topmost thing closes first — the long-press sheet, Queue, Lyrics, Now
-    /// Playing, then pushed pages (a page's own inner page first), then a non-start tab returns to Library. The Library rows'
-    /// Edit mode then finishes (as Done would). Returns whether the press was consumed; only at
-    /// the Library root does the activity fall through to the system default (finish).
+    /// Playing, then pushed pages (a page's own inner page first), then the Library rows' Edit
+    /// mode finishes (as Done would), then a non-start tab returns to Home. Returns whether the
+    /// press was consumed; only at the Home root does the activity fall through to the system
+    /// default (finish).
     /// </summary>
     public bool TryHandleBack()
     {
@@ -440,8 +504,8 @@ public sealed partial class ShellViewModel : ObservableObject
         if (IsNowPlayingOpen) { IsNowPlayingOpen = false; return true; }
         if (CurrentPage?.TryGoBackWithin() == true) return true;
         if (GoBack()) return true;
-        if (SelectedTab != MobileTab.Library) { SelectedTab = MobileTab.Library; return true; }
         if (_libraryRows is { IsEditing: true } rows) { rows.FinishEditing(); return true; }
+        if (SelectedTab != MobileTab.Home) { SelectedTab = MobileTab.Home; return true; }
         return false;
     }
 
@@ -694,6 +758,7 @@ public sealed partial class ShellViewModel : ObservableObject
     public async Task InitializeAsync()
     {
         await Library.InitializeAsync();
+        await LoadPlayerBarSettingsAsync();
         // Lyrics settings before the queue restore: restoring sets CurrentTrack, which loads
         // that track's lyrics with the saved split-word and layer preferences.
         await Lyrics.InitializeAsync();
