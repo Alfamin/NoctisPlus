@@ -676,7 +676,7 @@ public partial class SettingsViewModel : ViewModelBase
     /// <summary>Settings ▸ Lyrics ▸ Preferred lyrics type (GitHub #135): "WordSynced", "LineSynced" or "Plain".</summary>
     [ObservableProperty] private string _lyricsPreferredType = nameof(Models.LyricsPreferredType.WordSynced);
 
-    /// <summary>One row of a lyrics saving picker: the stored value and its label.</summary>
+    /// <summary>One row of a string-valued picker (lyrics saving, Discord status): the stored value and its label.</summary>
     public sealed record LyricsChoiceOption(string Value, string Label)
     {
         public override string ToString() => Label;
@@ -732,6 +732,32 @@ public partial class SettingsViewModel : ViewModelBase
         {
             if (value is null) return;
             LyricsPreferredType = value.Value;
+        }
+    }
+
+    public IReadOnlyList<LyricsChoiceOption> DiscordStatusDisplayOptions
+    {
+        get => _discordStatusDisplayOptions;
+        private set => SetProperty(ref _discordStatusDisplayOptions, value);
+    }
+    private IReadOnlyList<LyricsChoiceOption> _discordStatusDisplayOptions = BuildDiscordStatusDisplayOptions();
+
+    private static IReadOnlyList<LyricsChoiceOption> BuildDiscordStatusDisplayOptions() =>
+        Enum.GetValues<Models.DiscordStatusDisplay>()
+            .Select(d => new LyricsChoiceOption(d.ToString(), Loc.T($"Settings.DiscordStatusDisplay.{d}")))
+            .ToList();
+
+    public LyricsChoiceOption? SelectedDiscordStatusDisplayOption
+    {
+        get
+        {
+            var current = DiscordPresenceOptions.ParseStatusDisplay(DiscordStatusDisplay).ToString();
+            return DiscordStatusDisplayOptions.FirstOrDefault(o => o.Value == current);
+        }
+        set
+        {
+            if (value is null) return;
+            DiscordStatusDisplay = value.Value;
         }
     }
 
@@ -967,6 +993,8 @@ public partial class SettingsViewModel : ViewModelBase
         OnPropertyChanged(nameof(SelectedLyricsSaveTargetOption));
         LyricsPreferredTypeOptions = BuildLyricsPreferredTypeOptions();
         OnPropertyChanged(nameof(SelectedLyricsPreferredTypeOption));
+        DiscordStatusDisplayOptions = BuildDiscordStatusDisplayOptions();
+        OnPropertyChanged(nameof(SelectedDiscordStatusDisplayOption));
     }
 
     public VisualizerStyle LyricsVisualizerStyleMode => VisualizerStyles.Parse(LyricsVisualizerStyle);
@@ -2126,6 +2154,8 @@ public partial class SettingsViewModel : ViewModelBase
     [ObservableProperty] private bool _discordRichPresenceEnabled;
     /// <summary>Album line on the Discord card; see <see cref="AppSettings.DiscordShowAlbum"/>.</summary>
     [ObservableProperty] private bool _discordShowAlbum = true;
+    /// <summary>Discord status line: "Artist", "Title" or "AppName"; see <see cref="AppSettings.DiscordStatusDisplay"/>.</summary>
+    [ObservableProperty] private string _discordStatusDisplay = nameof(Models.DiscordStatusDisplay.Artist);
     [ObservableProperty] private bool _lastFmScrobblingEnabled;
     [ObservableProperty] private string _lastFmUsername = "";
     [ObservableProperty] private bool _isLastFmConnected;
@@ -2946,6 +2976,7 @@ public partial class SettingsViewModel : ViewModelBase
             // Integrations
             DiscordRichPresenceEnabled = _settings.DiscordRichPresenceEnabled;
             DiscordShowAlbum = _settings.DiscordShowAlbum;
+            DiscordStatusDisplay = DiscordPresenceOptions.ParseStatusDisplay(_settings.DiscordStatusDisplay).ToString();
             LastFmScrobblingEnabled = _settings.LastFmScrobblingEnabled;
             LastFmUsername = _settings.LastFmUsername;
 
@@ -3372,6 +3403,7 @@ public partial class SettingsViewModel : ViewModelBase
         _settings.EqualizerBands = GetGraphicEqBands().bands;
         _settings.DiscordRichPresenceEnabled = DiscordRichPresenceEnabled;
         _settings.DiscordShowAlbum = DiscordShowAlbum;
+        _settings.DiscordStatusDisplay = DiscordPresenceOptions.ParseStatusDisplay(DiscordStatusDisplay).ToString();
         _settings.LastFmScrobblingEnabled = LastFmScrobblingEnabled;
         _settings.LastFmUsername = LastFmUsername;
         if (_lastFm is LastFmService lfm)
@@ -5429,7 +5461,8 @@ public partial class SettingsViewModel : ViewModelBase
             Artist: track.Artist ?? "Unknown Artist",
             Album: track.Album,
             ArtworkUrl: artworkUrl,
-            ShowAlbum: DiscordShowAlbum);
+            ShowAlbum: DiscordShowAlbum,
+            StatusDisplay: DiscordPresenceOptions.ParseStatusDisplay(DiscordStatusDisplay));
 
         var isPlaying = _player.State == PlaybackState.Playing;
         await _discord.UpdateAsync(dto, _player.Position, _player.Duration, isPlaying);
@@ -5440,6 +5473,15 @@ public partial class SettingsViewModel : ViewModelBase
         if (_suspendSettingPersistence) return;
         _ = SaveAsync();
         // Re-send the current track so the card reflects the flip without a song change.
+        _ = RepublishDiscordPresenceAsync();
+    }
+
+    partial void OnDiscordStatusDisplayChanged(string value)
+    {
+        OnPropertyChanged(nameof(SelectedDiscordStatusDisplayOption));
+        if (_suspendSettingPersistence) return;
+        _ = SaveAsync();
+        // Same as the album toggle: the status line changes now, not at the next song.
         _ = RepublishDiscordPresenceAsync();
     }
 
@@ -7147,6 +7189,7 @@ public partial class SettingsViewModel : ViewModelBase
             // Integrations
             DiscordRichPresenceEnabled = false;
             DiscordShowAlbum = defaultSettings.DiscordShowAlbum;
+            DiscordStatusDisplay = DiscordPresenceOptions.ParseStatusDisplay(defaultSettings.DiscordStatusDisplay).ToString();
             LastFmScrobblingEnabled = defaultSettings.LastFmScrobblingEnabled;
             LastFmUsername = "";
             IsLastFmConnected = false;

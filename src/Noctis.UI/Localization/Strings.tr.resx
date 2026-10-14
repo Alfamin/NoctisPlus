@@ -368,6 +368,11 @@
   <data name="Settings.ShowCurrentSongDiscord" xml:space="preserve"><value>Çalan şarkını Discord'da göster.</value><comment>Text in SettingsView.axaml</comment></data>
   <data name="Settings.ShowAlbumDiscord" xml:space="preserve"><value>Discord'da Albümü Göster</value><comment>Text in SettingsView.axaml</comment></data>
   <data name="Settings.AddAlbumNameUnder" xml:space="preserve"><value>Discord kartında sanatçının altında albüm adını göster.</value><comment>Text in SettingsView.axaml</comment></data>
+  <data name="Settings.DiscordStatusDisplay" xml:space="preserve"><value>Discord Durumu</value><comment>Settings ▸ Integrations ▸ Discord, SettingsView.axaml</comment></data>
+  <data name="Settings.DiscordStatusDisplayHint" xml:space="preserve"><value>Discord'un üye listesinde ve profilinde "Dinliyor" ifadesinden sonra gösterdiği bilgi.</value><comment>Settings ▸ Integrations ▸ Discord, SettingsView.axaml</comment></data>
+  <data name="Settings.DiscordStatusDisplay.Artist" xml:space="preserve"><value>Sanatçı</value><comment>Discord status line choice (SettingsViewModel)</comment></data>
+  <data name="Settings.DiscordStatusDisplay.Title" xml:space="preserve"><value>Şarkı adı</value><comment>Discord status line choice (SettingsViewModel)</comment></data>
+  <data name="Settings.DiscordStatusDisplay.AppName" xml:space="preserve"><value>Noctis</value><comment>Discord status line choice (SettingsViewModel)</comment></data>
   <data name="Settings.LastFmScrobbling" xml:space="preserve"><value>Last.fm Scrobble</value><comment>Text in SettingsView.axaml</comment></data>
   <data name="Settings.SendPlaysLastFm" xml:space="preserve"><value>Dinlemeleri Last.fm'e gönder.</value><comment>Text in SettingsView.axaml</comment></data>
   <data name="Settings.ACCOUNT" xml:space="preserve"><value>HESAP</value><comment>Text in SettingsView.axaml</comment></data>

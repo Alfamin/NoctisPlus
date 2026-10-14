@@ -716,6 +716,10 @@ public class AppSettings
     /// image's hover text). Off drops that line for a leaner card (Discord ask, 2026-09-03).</summary>
     public bool DiscordShowAlbum { get; set; } = true;
 
+    /// <summary>What Discord's status line reads after "Listening to": "Artist", "Title" or
+    /// "AppName" (see <see cref="Models.DiscordStatusDisplay"/>). Discord ask, 2026-10-14.</summary>
+    public string DiscordStatusDisplay { get; set; } = nameof(Models.DiscordStatusDisplay.Artist);
+
     /// <summary>Loon server URL for Discord cover art (e.g. "wss://loon.example.com").</summary>
     public string LoonServerUrl { get; set; } = "https://noctis-loon.duckdns.org";
 

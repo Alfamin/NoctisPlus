@@ -474,6 +474,11 @@ Deezer и TIDAL: вставьте ссылку.</value></data>
   <data name="Settings.ShowCurrentSongDiscord" xml:space="preserve"><value>Показывать текущую песню в Discord.</value><comment>Text in SettingsView.axaml</comment></data>
   <data name="Settings.ShowAlbumDiscord" xml:space="preserve"><value>Показывать альбом в Discord</value><comment>Text in SettingsView.axaml</comment></data>
   <data name="Settings.AddAlbumNameUnder" xml:space="preserve"><value>Показывать название альбома под исполнителем в карточке Discord.</value><comment>Text in SettingsView.axaml</comment></data>
+  <data name="Settings.DiscordStatusDisplay" xml:space="preserve"><value>Статус в Discord</value><comment>Settings ▸ Integrations ▸ Discord, SettingsView.axaml</comment></data>
+  <data name="Settings.DiscordStatusDisplayHint" xml:space="preserve"><value>Что Discord показывает после «Слушает» в списке участников и в вашем профиле.</value><comment>Settings ▸ Integrations ▸ Discord, SettingsView.axaml</comment></data>
+  <data name="Settings.DiscordStatusDisplay.Artist" xml:space="preserve"><value>Исполнитель</value><comment>Discord status line choice (SettingsViewModel)</comment></data>
+  <data name="Settings.DiscordStatusDisplay.Title" xml:space="preserve"><value>Название песни</value><comment>Discord status line choice (SettingsViewModel)</comment></data>
+  <data name="Settings.DiscordStatusDisplay.AppName" xml:space="preserve"><value>Noctis</value><comment>Discord status line choice (SettingsViewModel)</comment></data>
   <data name="Settings.LastFmScrobbling" xml:space="preserve"><value>Скробблинг Last.fm</value><comment>Text in SettingsView.axaml</comment></data>
   <data name="Settings.SendPlaysLastFm" xml:space="preserve"><value>Отправлять прослушивания в Last.fm.</value><comment>Text in SettingsView.axaml</comment></data>
   <data name="Settings.ACCOUNT" xml:space="preserve"><value>АККАУНТ</value><comment>Text in SettingsView.axaml</comment></data>

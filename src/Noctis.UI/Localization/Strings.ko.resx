@@ -1300,6 +1300,26 @@
     <value>Discord 카드에서 아티스트 아래에 앨범 이름을 표시합니다.</value>
     <comment>Text in SettingsView.axaml</comment>
   </data>
+  <data name="Settings.DiscordStatusDisplay" xml:space="preserve">
+    <value>Discord 상태</value>
+    <comment>Settings ▸ Integrations ▸ Discord, SettingsView.axaml</comment>
+  </data>
+  <data name="Settings.DiscordStatusDisplayHint" xml:space="preserve">
+    <value>멤버 목록과 프로필의 상태에 Discord가 표시할 내용입니다.</value>
+    <comment>Settings ▸ Integrations ▸ Discord, SettingsView.axaml</comment>
+  </data>
+  <data name="Settings.DiscordStatusDisplay.Artist" xml:space="preserve">
+    <value>아티스트</value>
+    <comment>Discord status line choice (SettingsViewModel)</comment>
+  </data>
+  <data name="Settings.DiscordStatusDisplay.Title" xml:space="preserve">
+    <value>곡 제목</value>
+    <comment>Discord status line choice (SettingsViewModel)</comment>
+  </data>
+  <data name="Settings.DiscordStatusDisplay.AppName" xml:space="preserve">
+    <value>Noctis</value>
+    <comment>Discord status line choice (SettingsViewModel)</comment>
+  </data>
   <data name="Settings.LastFmScrobbling" xml:space="preserve">
     <value>Last.fm 스크로블링</value>
     <comment>Text in SettingsView.axaml</comment>

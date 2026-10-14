@@ -1300,6 +1300,26 @@
     <value>Affiche le nom de l'album sous l'artiste sur votre carte Discord.</value>
     <comment>Text in SettingsView.axaml</comment>
   </data>
+  <data name="Settings.DiscordStatusDisplay" xml:space="preserve">
+    <value>Statut sur Discord</value>
+    <comment>Settings ▸ Integrations ▸ Discord, SettingsView.axaml</comment>
+  </data>
+  <data name="Settings.DiscordStatusDisplayHint" xml:space="preserve">
+    <value>Ce que Discord affiche après « Écoute » dans la liste des membres et sur votre profil.</value>
+    <comment>Settings ▸ Integrations ▸ Discord, SettingsView.axaml</comment>
+  </data>
+  <data name="Settings.DiscordStatusDisplay.Artist" xml:space="preserve">
+    <value>Artiste</value>
+    <comment>Discord status line choice (SettingsViewModel)</comment>
+  </data>
+  <data name="Settings.DiscordStatusDisplay.Title" xml:space="preserve">
+    <value>Titre du morceau</value>
+    <comment>Discord status line choice (SettingsViewModel)</comment>
+  </data>
+  <data name="Settings.DiscordStatusDisplay.AppName" xml:space="preserve">
+    <value>Noctis</value>
+    <comment>Discord status line choice (SettingsViewModel)</comment>
+  </data>
   <data name="Settings.LastFmScrobbling" xml:space="preserve">
     <value>Scrobbling Last.fm</value>
     <comment>Text in SettingsView.axaml</comment>
