@@ -2,9 +2,12 @@ using System;
 using System.Collections;
 using System.Linq;
 using System.Reflection;
+using System.Runtime.CompilerServices;
 using Avalonia.Controls;
 using Avalonia.Headless.XUnit;
+using Avalonia.Threading;
 using Avalonia.VisualTree;
+using Noctis.Mobile.Services;
 using Noctis.Mobile.ViewModels;
 using Xunit;
 
@@ -12,9 +15,10 @@ namespace Noctis.Tests;
 
 /// <summary>
 /// An idle phone screen asks Avalonia for no frames. Every animation on the global clock, even
-/// one paused because its control is hidden, keeps MediaContext rendering every 16 ms. The scan
-/// bar on Home and Library was indeterminate while hidden: two endless Fluent animations,
-/// always on the clock.
+/// one paused because its control is hidden, keeps MediaContext rendering every 16 ms (and on
+/// Android, with the dispatcher's two clocks apart, that 16 ms timer spun the UI thread at a
+/// full core). The scan bar on Home and Library was indeterminate while hidden: two endless
+/// Fluent animations, always on the clock. And the dispatcher's clock is the loop's own.
 /// </summary>
 public class MobileIdleClockTests
 {
@@ -83,5 +87,29 @@ public class MobileIdleClockTests
         Assert.Empty(EndlessAnimationsOnClock());
         Assert.All(view.GetVisualDescendants().OfType<ProgressBar>(), b => Assert.False(b.IsIndeterminate));
         window.Close();
+    }
+
+    [UnsafeAccessor(UnsafeAccessorKind.Field, Name = "_timeProvider")]
+    private static extern ref Func<long> TimeProvider(Dispatcher dispatcher);
+
+    [UnsafeAccessor(UnsafeAccessorKind.Field, Name = "_impl")]
+    private static extern ref IDispatcherImpl Impl(Dispatcher dispatcher);
+
+    /// <summary>Fails when an Avalonia upgrade renames the fields DispatcherClock reaches (the
+    /// phone would quietly be back to spinning).</summary>
+    [AvaloniaFact]
+    public void Dispatcher_clock_reads_its_loop()
+    {
+        var dispatcher = Dispatcher.UIThread;
+        var original = TimeProvider(dispatcher);
+        try
+        {
+            Assert.True(DispatcherClock.Align(dispatcher));
+            Assert.Same(Impl(dispatcher), TimeProvider(dispatcher).Target);
+        }
+        finally
+        {
+            TimeProvider(dispatcher) = original;
+        }
     }
 }
