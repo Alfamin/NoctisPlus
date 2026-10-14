@@ -889,7 +889,14 @@ public sealed partial class ShellViewModel : ObservableObject
         // Lyrics settings before the queue restore: restoring sets CurrentTrack, which loads
         // that track's lyrics with the saved split-word and layer preferences.
         await Lyrics.InitializeAsync();
-        await Player.RestoreStateAsync();
+        try
+        {
+            await Player.RestoreStateAsync();
+        }
+        finally
+        {
+            _queueRestored = true;
+        }
         // Signed in: pull the desktop's changes and push ours. Fire-and-forget over a loaded
         // library; a failure (the computer is off, another network) is logged and never
         // reaches the UI — Settings → Account shows the next manual sync's error instead.
@@ -911,5 +918,15 @@ public sealed partial class ShellViewModel : ObservableObject
         }
     }
 
-    public Task SaveStateAsync() => Player.SaveStateAsync();
+    // Set once the saved queue has been read back (InitializeAsync).
+    private bool _queueRestored;
+
+    /// <summary>
+    /// The activity's background checkpoint (MainActivity.OnPause). Not before the saved queue
+    /// has been restored: the activity pauses mid-start (Android 13's notification prompt, or a
+    /// switch away while the library loads), and saving then wrote the empty, not yet restored
+    /// queue over queue.json, so the restore found nothing and the mini player never came back.
+    /// A queue the owner changes before the restore is saved by the player's own mutators.
+    /// </summary>
+    public Task SaveStateAsync() => _queueRestored ? Player.SaveStateAsync() : Task.CompletedTask;
 }
