@@ -457,8 +457,8 @@ public class MobilePopMenuTests(ITestOutputHelper output)
     [AvaloniaFact]
     public void TheGlass_IsALightFrost_AndItsTextStaysReadableOverAnyBackdrop()
     {
-        var menu = new PopMenu();
-        ResourceDictionary Theme(ThemeVariant v) => (ResourceDictionary)menu.Resources.ThemeDictionaries[v];
+        var glass = new MenuGlass();
+        ResourceDictionary Theme(ThemeVariant v) => (ResourceDictionary)glass.Resources.ThemeDictionaries[v];
         static double Over(double under, Color c) => under * (1 - c.A / 255.0) + c.R / 255.0 * (c.A / 255.0);
         static Color Gray(double g) { var b = (byte)Math.Round(Math.Clamp(g, 0, 1) * 255); return Color.FromRgb(b, b, b); }
         static Color Composite(Color text, Color under)
@@ -468,22 +468,22 @@ public class MobilePopMenuTests(ITestOutputHelper output)
                 (byte)Math.Round(text.B * a + under.B * (1 - a)));
         }
         Color Brush(ResourceDictionary d, string key) => ((SolidColorBrush)d[key]!).Color;
-        Color SheenTop(ResourceDictionary d) => ((LinearGradientBrush)d["PopMenuSheen"]!).GradientStops[0].Color;
+        Color SheenTop(ResourceDictionary d) => ((LinearGradientBrush)d["MenuGlassSheen"]!).GradientStops[0].Color;
 
         var dark = Theme(ThemeVariant.Dark);
-        var tint = Brush(dark, "PopMenuTint");
+        var tint = Brush(dark, "MenuGlassTint");
         Assert.True(tint.R == 255 && tint.G == 255 && tint.B == 255, "the frost is white, not a dark smoke");
-        var brightest = Over(Over((double)dark["PopMenuMaxLuminance"]!, tint), SheenTop(dark));
-        var overBlack = Over((double)dark["PopMenuMinLuminance"]!, tint);
+        var brightest = Over(Over((double)dark["MenuGlassMaxLuminance"]!, tint), SheenTop(dark));
+        var overBlack = Over((double)dark["MenuGlassMinLuminance"]!, tint);
         output.WriteLine($"dark glass: {overBlack:0.000} over black .. {brightest:0.000} over the brightest cover");
         Assert.True(overBlack >= 0.25, $"over black the glass must read lighter than the backdrop ({overBlack:0.000})");
-        Assert.True(PageTint.ContrastRatio(Brush(dark, "PopMenuText"), Gray(brightest)) >= 4.5);
-        Assert.True(PageTint.ContrastRatio(Composite(Brush(dark, "PopMenuSecondaryText"), Gray(brightest)), Gray(brightest)) >= 3);
+        Assert.True(PageTint.ContrastRatio(Brush(dark, "MenuGlassText"), Gray(brightest)) >= 4.5);
+        Assert.True(PageTint.ContrastRatio(Composite(Brush(dark, "MenuGlassSecondaryText"), Gray(brightest)), Gray(brightest)) >= 3);
 
         var light = Theme(ThemeVariant.Light);
-        var darkest = Over((double)light["PopMenuMinLuminance"]!, Brush(light, "PopMenuTint"));
+        var darkest = Over((double)light["MenuGlassMinLuminance"]!, Brush(light, "MenuGlassTint"));
         output.WriteLine($"light glass: {darkest:0.000} over black");
-        Assert.True(PageTint.ContrastRatio(Brush(light, "PopMenuText"), Gray(darkest)) >= 4.5);
-        Assert.True(PageTint.ContrastRatio(Composite(Brush(light, "PopMenuSecondaryText"), Gray(darkest)), Gray(darkest)) >= 4.5);
+        Assert.True(PageTint.ContrastRatio(Brush(light, "MenuGlassText"), Gray(darkest)) >= 4.5);
+        Assert.True(PageTint.ContrastRatio(Composite(Brush(light, "MenuGlassSecondaryText"), Gray(darkest)), Gray(darkest)) >= 4.5);
     }
 }

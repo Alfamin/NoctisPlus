@@ -209,9 +209,14 @@ public sealed partial class ShellViewModel : ObservableObject
     [NotifyPropertyChangedFor(nameof(PopMenu), nameof(IsMenuOpen))]
     private LibraryMenuViewModel? _libraryMenu;
 
-    /// <summary>What the glass pop menu shows: the Library menu, or an item's actions until its
-    /// playlist list takes over.</summary>
-    public object? PopMenu => (object?)LibraryMenu ?? (Sheet is { IsPickingPlaylist: false } sheet ? sheet : null);
+    /// <summary>A page's sort or filter menu, or an album's quality note (<see cref="ShowOptions"/>).</summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(PopMenu), nameof(IsMenuOpen))]
+    private OptionsMenuViewModel? _optionsMenu;
+
+    /// <summary>What the glass pop menu shows: the Library menu, a sort or filter menu, or an
+    /// item's actions until its playlist list takes over.</summary>
+    public object? PopMenu => (object?)LibraryMenu ?? (object?)OptionsMenu ?? (Sheet is { IsPickingPlaylist: false } sheet ? sheet : null);
 
     public bool IsMenuOpen => PopMenu != null;
 
@@ -221,6 +226,7 @@ public sealed partial class ShellViewModel : ObservableObject
         if (newValue == null) return;
         newValue.PropertyChanged += OnSheetPropertyChanged;
         LibraryMenu = null;
+        OptionsMenu = null;
     }
 
     /// <summary>Add to Playlist picked in the menu: the menu closes and the sheet opens on the list.</summary>
@@ -570,7 +576,7 @@ public sealed partial class ShellViewModel : ObservableObject
     /// </summary>
     public bool TryHandleBack()
     {
-        if (IsSheetOpen || LibraryMenu != null) { CloseSheet(); return true; }
+        if (IsSheetOpen || LibraryMenu != null || OptionsMenu != null) { CloseSheet(); return true; }
         if (IsQueueOpen) { IsQueueOpen = false; return true; }
         if (IsLyricsOpen) { IsLyricsOpen = false; return true; }
         if (IsNowPlayingOpen) { IsNowPlayingOpen = false; return true; }
@@ -739,6 +745,16 @@ public sealed partial class ShellViewModel : ObservableObject
     {
         Sheet = null;
         LibraryMenu = null;
+        OptionsMenu = null;
+    }
+
+    /// <summary>Opens a sort or filter menu (or a note) on the glass pop menu, out of the button
+    /// tapped, closing whatever menu was up.</summary>
+    public void ShowOptions(OptionsMenuViewModel menu)
+    {
+        Sheet = null;
+        LibraryMenu = null;
+        OptionsMenu = menu;
     }
 
     /// <summary>
@@ -786,6 +802,7 @@ public sealed partial class ShellViewModel : ObservableObject
     private void OpenLibraryMenu()
     {
         Sheet = null;
+        OptionsMenu = null;
         LibraryMenu = new LibraryMenuViewModel(this);
     }
 

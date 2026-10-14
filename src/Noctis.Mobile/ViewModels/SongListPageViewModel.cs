@@ -122,6 +122,14 @@ public sealed partial class SongListPageViewModel : MobilePage, ISortable
 
     public bool HasSortDirection => true;
 
+    /// <summary>The toolbar's sort button: the sort menu on the glass pop menu, out of the button.</summary>
+    [RelayCommand]
+    private void ShowSortMenu() => Shell.ShowOptions(OptionsMenuViewModel.ForSort(Shell, this));
+
+    /// <summary>The toolbar's filter button: the filter menu on the glass pop menu.</summary>
+    [RelayCommand]
+    private void ShowFilterMenu() => Shell.ShowOptions(OptionsMenuViewModel.ForFilter(Shell, this));
+
     public void ChooseSort(SortChoice choice)
     {
         foreach (var c in SortChoices) c.IsSelected = ReferenceEquals(c, choice);

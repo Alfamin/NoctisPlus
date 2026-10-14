@@ -1,67 +1,20 @@
 <UserControl xmlns="https://github.com/avaloniaui"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:vm="using:Noctis.Mobile.ViewModels"
-             xmlns:controls="using:Noctis.Controls"
+             xmlns:views="using:Noctis.Mobile.Views"
              x:Class="Noctis.Mobile.Views.PopMenu"
              x:DataType="vm:ShellViewModel"
              IsVisible="False">
 
     <!-- Every ⋯ menu on the phone (owner 10-13), Apple Music's: a Liquid Glass card that pops out
          of the ⋯ button (or the held row or tile), three tiles on top and the rest as rows with
-         inset hairlines. The desktop menus' glyphs (PhoneIcons). Opened, placed and closed by the
-         code-behind, which plays the desktop menu's pop. -->
-    <UserControl.Resources>
-        <ResourceDictionary>
-            <!-- Apple's iOS 26 menu glass (owner 10-14, measured off Apple Music): no outline of
-                 its own, the edge drawn by the glass itself - a catch-light along the top that
-                 fades down the sides (GlassPanel.SpecularStyle TopCatch), a dark contact line (faint
-                 on light glass, so it never reads as an outline) and a soft wide shadow. Behind it
-                 the backdrop is lightly blurred, so the cover's shapes stay readable, and lifted: a
-                 lighter view of what lies beneath rather than a flat white tint over it, the
-                 lift a white veil over dark content, not its colour scaled up (which turned dark
-                 ink into orange and red blotches). The luminance range is what keeps the labels
-                 readable over any cover: on dark glass the backdrop shows through no brighter than
-                 PopMenuMaxLuminance, on light glass no darker than PopMenuMinLuminance
-                 (MobilePopMenuTests checks the worst case against the text). The tone curve climbs
-                 fast from the dark end so most covers show bright and only the brightest is held
-                 down. The card takes the theme of what it opened from, so Now Playing's menu is the
-                 dark glass. -->
-            <ResourceDictionary.ThemeDictionaries>
-                <ResourceDictionary x:Key="Dark">
-                    <SolidColorBrush x:Key="PopMenuTint" Color="#0AFFFFFF" />
-                    <x:Double x:Key="PopMenuMinLuminance">0.22</x:Double>
-                    <x:Double x:Key="PopMenuMaxLuminance">0.41</x:Double>
-                    <x:Double x:Key="PopMenuToneCurve">2</x:Double>
-                    <BoxShadows x:Key="PopMenuShadow">0 0 0.8 0.3 #73000000, 0 12 40 0 #33000000</BoxShadows>
-                    <LinearGradientBrush x:Key="PopMenuSheen" StartPoint="0%,0%" EndPoint="0%,100%">
-                        <GradientStop Offset="0" Color="#0AFFFFFF" />
-                        <GradientStop Offset="0.25" Color="#00FFFFFF" />
-                    </LinearGradientBrush>
-                    <SolidColorBrush x:Key="PopMenuText" Color="#FFFFFFFF" />
-                    <SolidColorBrush x:Key="PopMenuSecondaryText" Color="#B3FFFFFF" />
-                    <SolidColorBrush x:Key="PopMenuHairline" Color="#2EFFFFFF" />
-                </ResourceDictionary>
-                <ResourceDictionary x:Key="Light">
-                    <SolidColorBrush x:Key="PopMenuTint" Color="#4DFFFFFF" />
-                    <x:Double x:Key="PopMenuMinLuminance">0.74</x:Double>
-                    <x:Double x:Key="PopMenuMaxLuminance">1</x:Double>
-                    <x:Double x:Key="PopMenuToneCurve">1</x:Double>
-                    <BoxShadows x:Key="PopMenuShadow">0 0 1 0 #1F000000, 0 12 40 0 #1F000000</BoxShadows>
-                    <LinearGradientBrush x:Key="PopMenuSheen" StartPoint="0%,0%" EndPoint="0%,100%">
-                        <GradientStop Offset="0" Color="#33FFFFFF" />
-                        <GradientStop Offset="0.3" Color="#00FFFFFF" />
-                    </LinearGradientBrush>
-                    <SolidColorBrush x:Key="PopMenuText" Color="#FF000000" />
-                    <SolidColorBrush x:Key="PopMenuSecondaryText" Color="#99000000" />
-                    <SolidColorBrush x:Key="PopMenuHairline" Color="#1F000000" />
-                </ResourceDictionary>
-            </ResourceDictionary.ThemeDictionaries>
-        </ResourceDictionary>
-    </UserControl.Resources>
-
+         inset hairlines. The desktop menus' glyphs (PhoneIcons). The sort and filter menus and the
+         album's quality note are this card too (OptionsMenuViewModel), and the card is MenuGlass,
+         the one glass every pop-up is made of. Opened, placed and closed by the code-behind, which
+         plays the desktop menu's pop. -->
     <UserControl.Styles>
         <Style Selector="Button.np-tile, Button.np-row">
-            <Setter Property="Foreground" Value="{DynamicResource PopMenuText}" />
+            <Setter Property="Foreground" Value="{DynamicResource MenuGlassText}" />
         </Style>
         <Style Selector="Button.np-tile">
             <Setter Property="Padding" Value="2,12,2,10" />
@@ -96,16 +49,36 @@
         </Style>
         <Style Selector="Button.np-row TextBlock.np-detail">
             <Setter Property="FontSize" Value="14" />
-            <Setter Property="Foreground" Value="{DynamicResource PopMenuSecondaryText}" />
+            <Setter Property="Foreground" Value="{DynamicResource MenuGlassSecondaryText}" />
             <Setter Property="TextWrapping" Value="Wrap" />
             <Setter Property="MaxLines" Value="2" />
             <Setter Property="TextTrimming" Value="CharacterEllipsis" />
+        </Style>
+        <!-- The sort and filter menus' rows: Apple's shorter option rows, the tick in the lead column. -->
+        <Style Selector="Button.np-option">
+            <Setter Property="MinHeight" Value="48" />
+        </Style>
+        <Style Selector="Button.np-option PathIcon">
+            <Setter Property="Width" Value="20" />
+            <Setter Property="Height" Value="20" />
+        </Style>
+        <Style Selector="TextBlock.np-note">
+            <Setter Property="FontSize" Value="14" />
+            <Setter Property="Foreground" Value="{DynamicResource MenuGlassSecondaryText}" />
+            <Setter Property="TextWrapping" Value="Wrap" />
+            <Setter Property="Margin" Value="0,4,0,0" />
+        </Style>
+        <!-- Apple's band between a menu's groups (the sort order, then its direction). -->
+        <Style Selector="Border.np-gap">
+            <Setter Property="Height" Value="8" />
+            <Setter Property="Background" Value="{DynamicResource MenuGlassGroupGap}" />
+            <Setter Property="IsHitTestVisible" Value="False" />
         </Style>
         <!-- Inset hairlines over each row after the first: from the label to the card's edge, as
              Apple's (so a hidden row never leaves a line at the card's foot). -->
         <Style Selector="Border.np-line">
             <Setter Property="Height" Value="0.6" />
-            <Setter Property="Background" Value="{DynamicResource PopMenuHairline}" />
+            <Setter Property="Background" Value="{DynamicResource MenuGlassHairline}" />
             <Setter Property="VerticalAlignment" Value="Top" />
             <Setter Property="Margin" Value="0,0,20,0" />
             <Setter Property="IsHitTestVisible" Value="False" />
@@ -118,17 +91,8 @@
 
         <ThemeVariantScope Name="Scope">
             <Panel Name="Card" Width="290" HorizontalAlignment="Left" VerticalAlignment="Top">
-                <controls:GlassPanel Name="Glass" CornerRadius="28" UseAppGlass="False" IsGlassActive="True"
-                                     BlurRadius="7" Saturation="1.2" Refraction="14" RefractionAmount="10"
-                                     Specular="0.24" SpecularStyle="TopCatch"
-                                     BackdropMinLuminance="{DynamicResource PopMenuMinLuminance}"
-                                     BackdropMaxLuminance="{DynamicResource PopMenuMaxLuminance}"
-                                     BackdropToneCurve="{DynamicResource PopMenuToneCurve}"
-                                     BackdropLift="1"
-                                     Background="{DynamicResource PopMenuTint}"
-                                     EdgeThickness="0" BoxShadow="{DynamicResource PopMenuShadow}">
+                <views:MenuGlass Name="Glass">
                     <Panel>
-                        <Border Name="Sheen" Background="{DynamicResource PopMenuSheen}" CornerRadius="28" IsHitTestVisible="False" />
                         <ScrollViewer Name="Body" HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Hidden">
                             <ContentControl Name="MenuContent">
                                 <ContentControl.DataTemplates>
@@ -243,11 +207,39 @@
                                             </Button>
                                         </StackPanel>
                                     </DataTemplate>
+                                    <!-- A sort or filter menu (Apple's: the choice in use ticked, a band
+                                         between groups), or a note with no choices (an album's quality). -->
+                                    <DataTemplate DataType="vm:OptionsMenuViewModel">
+                                        <StackPanel Name="OptionRows" Margin="0,6,0,6">
+                                            <StackPanel Name="OptionNote" IsVisible="{Binding HasTitle}" Margin="20,10,20,10" Spacing="4">
+                                                <TextBlock Classes="np-label" Text="{Binding Title}" FontWeight="SemiBold" />
+                                                <TextBlock Classes="np-detail" Text="{Binding Detail}" IsVisible="{Binding HasDetail}" />
+                                                <TextBlock Classes="np-note" Text="{Binding Note}" IsVisible="{Binding HasNote}" />
+                                            </StackPanel>
+                                            <ItemsControl Name="OptionItems" ItemsSource="{Binding Items}" IsVisible="{Binding HasItems}">
+                                                <ItemsControl.ItemTemplate>
+                                                    <DataTemplate DataType="vm:OptionsMenuItem">
+                                                        <StackPanel>
+                                                            <Border Classes="np-gap" IsVisible="{Binding StartsGroup}" />
+                                                            <Button Classes="row np-row np-option" Command="{Binding PickCommand}"
+                                                                    AutomationProperties.Name="{Binding Label}">
+                                                                <Grid ColumnDefinitions="48,*">
+                                                                    <PathIcon Data="{DynamicResource PhCheck}" IsVisible="{Binding IsChecked}" />
+                                                                    <TextBlock Grid.Column="1" Classes="np-label" Text="{Binding Label}" VerticalAlignment="Center" Margin="0,0,16,0" />
+                                                                    <Border Grid.Column="1" Classes="np-line" IsVisible="{Binding HasLine}" />
+                                                                </Grid>
+                                                            </Button>
+                                                        </StackPanel>
+                                                    </DataTemplate>
+                                                </ItemsControl.ItemTemplate>
+                                            </ItemsControl>
+                                        </StackPanel>
+                                    </DataTemplate>
                                 </ContentControl.DataTemplates>
                             </ContentControl>
                         </ScrollViewer>
                     </Panel>
-                </controls:GlassPanel>
+                </views:MenuGlass>
             </Panel>
         </ThemeVariantScope>
     </Panel>

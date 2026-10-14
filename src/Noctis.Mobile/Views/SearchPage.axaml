@@ -12,7 +12,7 @@
         <Grid Grid.Row="0" ColumnDefinitions="*,Auto,Auto" Classes="tab-header">
             <TextBlock Classes="title" Text="Search" />
             <controls:GlassPanel Grid.Column="1" Name="SortGlass" Classes="header-glass" IsVisible="{Binding HasQuery}">
-                <Button Name="SortButton" Classes="glass-round" Classes.on="{Binding IsSorted}" Click="OnSortClick">
+                <Button Name="SortButton" Classes="glass-round" Classes.on="{Binding IsSorted}" Command="{Binding ShowSortMenuCommand}">
                     <PathIcon Data="{DynamicResource PhSort}" />
                 </Button>
             </controls:GlassPanel>
