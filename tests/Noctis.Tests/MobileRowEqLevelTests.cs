@@ -83,12 +83,12 @@ public class MobileRowEqLevelTests
     public void LevelMath_IsTheDesktopRowIndicators()
     {
         double Const(string name) => (double)typeof(EqVisualizer).GetField(name, BindingFlags.NonPublic | BindingFlags.Static)!.GetValue(null)!;
-        Assert.Equal(Const("LiveRest"), PlayingBars.LiveRest);
-        Assert.Equal(Const("LiveSway"), PlayingBars.LiveSway);
-        Assert.Equal(Const("LiveBounce"), PlayingBars.LiveBounce);
-        Assert.Equal(Const("LiveTone"), PlayingBars.LiveTone);
-        Assert.Equal(Const("LiveAttackMs"), PlayingBars.LiveAttackMs);
-        Assert.Equal(Const("LiveReleaseMs"), PlayingBars.LiveReleaseMs);
+        Assert.Equal(PlayingBars.LiveRest, Const("LiveRest"));
+        Assert.Equal(PlayingBars.LiveSway, Const("LiveSway"));
+        Assert.Equal(PlayingBars.LiveBounce, Const("LiveBounce"));
+        Assert.Equal(PlayingBars.LiveTone, Const("LiveTone"));
+        Assert.Equal(PlayingBars.LiveAttackMs, Const("LiveAttackMs"));
+        Assert.Equal(PlayingBars.LiveReleaseMs, Const("LiveReleaseMs"));
 
         var random = new Random(7);
         var bands = new float[5];
@@ -234,6 +234,91 @@ public class MobileRowEqLevelTests
         rig.Levels.TryRead(rig.ClockMs + 1, out var p2, second);
         Assert.Equal(p1, p2);
         Assert.Equal(first, second);
+    }
+
+    // ---- The tap's clock ---------------------------------------------------------------------
+
+    /// <summary>The first buffer anchors at now + latency; the next ones follow on contiguously
+    /// however they are bunched; a small steady disagreement is followed slowly; a jump beyond
+    /// <see cref="TapClock.ReanchorMs"/> (a seek, the AudioTrack's first fill) re-anchors.</summary>
+    [Fact]
+    public void TapClock_RunsContinuously_AndReanchorsOnAJump()
+    {
+        var clock = new TapClock();
+        Assert.Equal(500, clock.Next(1000, 500, 441, 44100));            // anchored: 1500
+        Assert.Equal(510, clock.Next(1000, 500, 441, 44100));            // same instant: right after the first (10 ms)
+        Assert.Equal(519, clock.Next(1000, 500, 441, 44100));            // 520, nudged 5 % back toward 500 twice
+        // 100 ms later, 30 ms of audio queued: still contiguous, nudged 5 % toward now + latency.
+        var ahead = clock.Next(1100, 500, 441, 44100);
+        Assert.InRange(ahead, 428, 435);                                  // ~1529 + 0.05·(1600 − 1529) − 1100
+        // A seek: now + latency lands far from the stream; start over there.
+        Assert.Equal(500, clock.Next(5000, 500, 441, 44100));
+        clock.Reset();
+        Assert.Equal(300, clock.Next(5000, 300, 441, 44100));
+    }
+
+    /// <summary>
+    /// A sink fed in bursts (a quarter second of audio at once, every quarter second, as the
+    /// emulator's is) yields one onset per beat 500 ms apart at 120 BPM when each buffer is
+    /// stamped by the sink's measured lead (audio tapped less audio played), and the stream
+    /// clock keeps them so when that measure is noisy (±150 ms here; the emulator's heard
+    /// position moves in 250 ms steps). The first build stamped every buffer with one fixed
+    /// AudioTrack-length guess: the same feed put the beats 250-750 ms apart.
+    /// </summary>
+    [Fact]
+    public void BurstyFeed_StillPutsTheBeats500MsApart()
+    {
+        double WorstGap(Func<double, double, double> aheadFor, bool streamClock, out int count)
+        {
+            const int rate = 44100, frames = 1152;
+            double wall = 0;
+            var beat = new BeatMeter(() => wall);
+            var clock = new TapClock();
+            var buffer = new float[frames * Channels];
+            long fed = 0;
+            var onsets = new System.Collections.Generic.List<double>();
+            var prev = 0.0;
+            for (var tick = 0; tick < 40; tick++, wall += 250)
+            {
+                // Top up to half a second ahead of what is playing (from wall 0), all at once.
+                while (fed * 1000.0 / rate < wall + 500)
+                {
+                    for (var f = 0; f < frames; f++)
+                    {
+                        var s = Kicks((fed + f) / (double)rate);
+                        buffer[f * Channels] = s;
+                        buffer[f * Channels + 1] = s;
+                    }
+                    var measured = aheadFor(wall, fed * 1000.0 / rate);
+                    var ahead = streamClock ? clock.Next(wall, (int)Math.Round(measured), frames, rate) : (int)Math.Round(measured);
+                    beat.Feed(buffer, 0, buffer.Length, Channels, rate, ahead);
+                    fed += frames;
+                }
+                for (var t = wall; t < wall + 250; t += 2)
+                {
+                    beat.TryRead(t, out var pulse);
+                    if (pulse > 0.9 && prev < 0.5 && t > 2000) onsets.Add(t);
+                    prev = pulse;
+                }
+            }
+            var gaps = onsets.Zip(onsets.Skip(1), (a, b) => b - a).ToArray();
+            count = gaps.Length;
+            return gaps.Length == 0 ? double.NaN : gaps.Max(g => Math.Abs(g - 500));
+        }
+
+        // The sink's lead: tapped less played (playback started at wall 0).
+        double Measured(double wall, double tappedMs) => tappedMs - wall;
+        var noise = new Random(1);
+        double Noisy(double wall, double tappedMs) => tappedMs - wall + (noise.NextDouble() * 2 - 1) * 150;
+
+        var exact = WorstGap(Measured, streamClock: true, out var n);
+        Assert.True(n >= 12, $"{n} gaps");   // 16 beats from 2 s to 10 s
+        Assert.True(exact <= 20, $"worst gap off 500 ms by {exact} ms");     // one 20 ms detection block
+        Assert.True(WorstGap((_, _) => 500, streamClock: false, out _) > 100);   // the fixed guess it replaces
+
+        var smoothed = WorstGap(Noisy, streamClock: true, out _);
+        var raw = WorstGap(Noisy, streamClock: false, out _);
+        Assert.True(smoothed <= 60 && raw > 2 * smoothed, $"noisy lead: {smoothed} ms with the stream clock, {raw} ms without");
     }
 
     // ---- The bars ----------------------------------------------------------------------------
