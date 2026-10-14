@@ -385,10 +385,14 @@ public sealed class DiscordPresenceService : IDiscordPresenceService
     /// and pads to meet the minimum 2-character requirement.
     /// Discord silently drops the entire presence update when any text field is 1 char.
     /// </summary>
-    private static string Truncate(string? value, int maxLength)
+    internal static string Truncate(string? value, int maxLength)
     {
         if (string.IsNullOrEmpty(value)) return string.Empty;
-        var result = value.Length <= maxLength ? value : value[..(maxLength - 3)] + "...";
+        var cut = maxLength - 3;
+        // Never split an emoji (or any surrogate pair) in half: the lone high surrogate is
+        // not valid UTF-8 and reaches Discord as U+FFFD, a "?" box before the "...".
+        if (value.Length > maxLength && char.IsHighSurrogate(value[cut - 1])) cut--;
+        var result = value.Length <= maxLength ? value : value[..cut] + "...";
         // Discord requires all text fields to be at least 2 characters.
         // Single-char names (e.g. album "?") cause the entire SetPresence call to fail silently.
         if (result.Length == 1)
