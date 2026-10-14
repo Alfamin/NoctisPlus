@@ -63,10 +63,15 @@ public class MobileAccountTests
             DeviceId = "device-0001", DeviceName = "Test Phone", ServerName = serverName,
         };
 
-        public Task<string> ProbeFingerprintAsync(string serverUrl, CancellationToken ct = default)
+        /// <summary>Set: the probe waits for this before answering (the page shows "Connecting…").</summary>
+        public TaskCompletionSource? ProbeGate { get; set; }
+
+        public async Task<string> ProbeFingerprintAsync(string serverUrl, CancellationToken ct = default)
         {
             Probes.Add(serverUrl);
-            return ProbeError != null ? Task.FromException<string>(ProbeError) : Task.FromResult(Fingerprint);
+            if (ProbeGate != null) await ProbeGate.Task.WaitAsync(ct);
+            if (ProbeError != null) throw ProbeError;
+            return Fingerprint;
         }
 
         public Task SignInAsync(string serverUrl, string userName, string password, string confirmedFingerprint, CancellationToken ct = default)
@@ -260,7 +265,7 @@ public class MobileAccountTests
         Assert.Equal(string.Empty, page.Password);
         Assert.Equal("owner on Studio PC", page.AccountText);
         Assert.Equal("Synced 2 songs and 1 playlist", page.SyncText);
-        Assert.StartsWith("Last synced", page.LastSyncText);
+        Assert.Equal("Synced just now", page.LastSyncText);
         Assert.False(page.IsBusy);
         Assert.False(page.HasError);
     }
@@ -311,6 +316,9 @@ public class MobileAccountTests
     [InlineData(NoctisErrorKind.SignedOut, "Your computer signed this phone out. Sign in again.")]
     [InlineData(NoctisErrorKind.InvalidAddress, "Enter your computer's address as shown under Connect a phone, like 192.168.1.20 or https://192.168.1.20:4747.")]
     [InlineData(NoctisErrorKind.Server, "Your computer couldn't finish that. Try again in a moment.")]
+    [InlineData(NoctisErrorKind.NotNoctis, "Something answered at that address, but it isn't Noctis. Check the address and port shown under Connect a phone.")]
+    [InlineData(NoctisErrorKind.UnknownHost, "No computer answers to that name. Type the address shown under Connect a phone, like 192.168.1.20.")]
+    [InlineData(NoctisErrorKind.Outdated, "Noctis on your computer is too old to connect a phone. Update it, then try again.")]
     public async Task SignIn_EachErrorKind_IsWorded(NoctisErrorKind kind, string message)
     {
         using var rig = MobileFixtures.MakeRig();
@@ -343,6 +351,155 @@ public class MobileAccountTests
         Assert.StartsWith("Can't reach your computer.", page.ErrorText);
         Assert.True(page.IsFormVisible);
         Assert.Equal("pw", page.Password);                                 // kept for the retry
+    }
+
+    [Fact]
+    public void SignInButton_IsOffered_OnlyWithAllThreeFieldsAndAnAddress()
+    {
+        using var rig = MobileFixtures.MakeRig();
+        var page = OpenAccount(ShellWith(rig, new FakeAccount()));
+        Assert.False(page.CanSignIn);
+        page.ServerAddress = "192.168.1.20";
+        page.UserName = "owner";
+        Assert.False(page.CanSignIn);                                      // no password yet
+        page.Password = "pw";
+        Assert.True(page.CanSignIn);
+        page.ServerAddress = "http://192.168.1.20";                         // not an address the phone takes
+        Assert.False(page.CanSignIn);
+        page.ServerAddress = "192.168.1.20:4747";
+        page.UserName = "   ";
+        Assert.False(page.CanSignIn);
+    }
+
+    /// <summary>Each error shows under the field it is about, and goes once that field is edited
+    /// (before, one red line under the Sign In card, still up over the corrected address).</summary>
+    [Fact]
+    public async Task SignIn_Errors_ShowUnderTheirField_AndGoWhenItIsEdited()
+    {
+        using var rig = MobileFixtures.MakeRig();
+        var account = new FakeAccount { ProbeError = new NoctisServerException(NoctisErrorKind.Unreachable, "timeout") };
+        var page = OpenAccount(ShellWith(rig, account));
+        page.ServerAddress = "10.0.0.2";
+        page.UserName = "owner";
+        page.Password = "pw";
+        await page.SignInCommand.ExecuteAsync(null);
+        Assert.True(page.HasAddressError);
+        Assert.False(page.HasCredentialsError);
+        Assert.False(page.HasGeneralError);
+        page.Password = "pw2";                                             // another field: stays
+        Assert.True(page.HasAddressError);
+        page.ServerAddress = "10.0.0.3";                                   // its field: gone
+        Assert.False(page.HasError);
+
+        account.ProbeError = null;
+        account.SignInError = new NoctisServerException(NoctisErrorKind.BadCredentials, "no");
+        await page.SignInCommand.ExecuteAsync(null);
+        await page.TrustAndSignInCommand.ExecuteAsync(null);
+        Assert.True(page.HasCredentialsError);
+        Assert.Equal("Wrong email, username or password.", page.ErrorText);
+        page.ServerAddress = "10.0.0.4";                                   // not its field: stays
+        Assert.True(page.HasCredentialsError);
+        page.Password = "right";
+        Assert.False(page.HasError);
+
+        account.SignInError = new NoctisServerException(NoctisErrorKind.CertificateChanged, "pin");
+        await page.SignInCommand.ExecuteAsync(null);
+        await page.TrustAndSignInCommand.ExecuteAsync(null);
+        Assert.True(page.HasGeneralError);                                 // about no one field
+    }
+
+    [Fact]
+    public void LeavingTheAddressField_SaysWhatIsWrongWithIt()
+    {
+        using var rig = MobileFixtures.MakeRig();
+        var page = OpenAccount(ShellWith(rig, new FakeAccount()));
+        page.CheckAddress();
+        Assert.False(page.HasError);                                       // empty: nothing to say yet
+        page.ServerAddress = "https://192.168.1.20:4747/rest";
+        page.CheckAddress();
+        Assert.True(page.HasAddressError);
+        Assert.Equal(AccountPageViewModel.Describe(NoctisErrorKind.InvalidAddress, false), page.ErrorText);
+        page.ServerAddress = "192.168.1.20";
+        page.CheckAddress();
+        Assert.False(page.HasError);
+    }
+
+    [AvaloniaFact]
+    public async Task SignIn_View_EnterWalksTheFields_ThenSignsIn_AndTheButtonShowsProgress()
+    {
+        using var rig = MobileFixtures.MakeRig();
+        var account = new FakeAccount { ProbeGate = new TaskCompletionSource() };
+        var shell = ShellWith(rig, account);
+        var window = MobileFixtures.Mount(shell, out var view);
+        shell.OpenAccountCommand.Execute(null);
+        window.UpdateLayout();
+        var page = MobileFixtures.Find<AccountPage>(view);
+        var vm = (AccountPageViewModel)shell.CurrentPage!;
+        var address = MobileFixtures.Named<TextBox>(page, "ServerAddressBox");
+        var user = MobileFixtures.Named<TextBox>(page, "UserNameBox");
+        var password = MobileFixtures.Named<TextBox>(page, "PasswordBox");
+        var button = MobileFixtures.Named<Button>(page, "SignInButton");
+        Assert.False(button.IsEnabled);                                    // nothing typed yet
+
+        void Enter(TextBox box)
+        {
+            Thread.Sleep(300);   // past the guard against one key press moving twice
+            box.RaiseEvent(new Avalonia.Input.KeyEventArgs { RoutedEvent = Avalonia.Input.InputElement.KeyDownEvent, Key = Avalonia.Input.Key.Enter });
+        }
+
+        address.Focus();
+        vm.ServerAddress = "192.168.1.20";
+        Enter(address);
+        Assert.True(user.IsFocused);
+        vm.UserName = "owner";
+        Enter(user);
+        Assert.True(password.IsFocused);
+        vm.Password = "pw";
+        window.UpdateLayout();
+        Assert.True(button.IsEnabled);
+        Enter(password);
+        // Let the button's opacity transition (greyed while the fields were empty) run out.
+        for (var i = 0; i < 40; i++)
+        {
+            Avalonia.Headless.AvaloniaHeadlessPlatform.ForceRenderTimerTick();
+            Avalonia.Threading.Dispatcher.UIThread.RunJobs();
+            Thread.Sleep(10);
+        }
+        window.UpdateLayout();
+
+        Assert.Single(account.Probes);
+        Assert.True(vm.IsBusy);
+        Assert.False(button.IsEnabled);
+        Assert.Equal(1, button.Opacity);                                   // busy, not greyed out
+        Assert.True(MobileFixtures.Named<TextBlock>(page, "SignInStatus").IsEffectivelyVisible);
+        Assert.Equal("Connecting to your computer…", MobileFixtures.Named<TextBlock>(page, "SignInStatus").Text);
+        Assert.False(MobileFixtures.Named<TextBlock>(page, "SignInLabel").IsEffectivelyVisible);
+
+        account.ProbeGate.SetResult();
+        await Task.Delay(50);
+        Avalonia.Threading.Dispatcher.UIThread.RunJobs();
+        window.UpdateLayout();
+        Assert.True(vm.IsConfirmingFingerprint);
+        Assert.True(MobileFixtures.Named<Button>(page, "TrustButton").IsEffectivelyVisible);
+        window.Close();
+    }
+
+    [AvaloniaFact]
+    public void SignIn_View_AnAddressErrorSitsUnderTheAddress()
+    {
+        using var rig = MobileFixtures.MakeRig();
+        var shell = ShellWith(rig, new FakeAccount());
+        var window = MobileFixtures.Mount(shell, out var view);
+        shell.OpenAccountCommand.Execute(null);
+        var vm = (AccountPageViewModel)shell.CurrentPage!;
+        vm.ServerAddress = "ftp://host";
+        vm.CheckAddress();
+        window.UpdateLayout();
+        var page = MobileFixtures.Find<AccountPage>(view);
+        Assert.True(MobileFixtures.Named<TextBlock>(page, "AddressErrorLabel").IsEffectivelyVisible);
+        Assert.False(MobileFixtures.Named<TextBlock>(page, "ErrorLabel").IsEffectivelyVisible);
+        Assert.False(MobileFixtures.Named<TextBlock>(page, "CredentialsErrorLabel").IsEffectivelyVisible);
+        window.Close();
     }
 
     // ── Signed in ──
@@ -750,7 +907,7 @@ public class MobileAccountTests
         account.RaiseStateChanged();
         Assert.Equal("owner@example.com", page.DisplayName);
         Assert.False(page.HasEmailText);
-        Assert.Equal("OC", page.Initials);                                     // "owner@example" + "com", as before
+        Assert.Equal("OW", page.Initials);                                     // the address part: "OC" took the C of ".com"
         settings.OnClosed();
     }
 
@@ -788,6 +945,53 @@ public class MobileAccountTests
         Assert.Equal("Sending 3 of 40", status.Text);
         account.UploadGate.SetResult();
         window.Close();
+    }
+
+    /// <summary>With nothing downloaded, Remove downloads asked "Remove every downloaded song?"
+    /// and then removed nothing: it is off until something is downloaded.</summary>
+    [Fact]
+    public async Task RemoveDownloads_IsOff_WithNothingDownloaded()
+    {
+        using var rig = MobileFixtures.MakeRig();
+        var account = new FakeAccount { Account = FakeAccount.SignedInAs() };
+        var page = OpenAccount(ShellWith(rig, account));
+        Assert.False(page.CanRemoveDownloads);
+        await page.DownloadAllCommand.ExecuteAsync(null);
+        Assert.True(page.CanRemoveDownloads);
+        page.AskRemoveDownloadsCommand.Execute(null);
+        Assert.False(page.CanRemoveDownloads);                             // its question is open
+        Assert.StartsWith("Downloads finished", page.DownloadText);
+        await page.ConfirmRemoveDownloadsCommand.ExecuteAsync(null);
+        Assert.False(page.CanRemoveDownloads);                             // nothing left
+        Assert.Equal(string.Empty, page.DownloadText);                     // not "Downloads finished" over none
+    }
+
+    [Theory]
+    [InlineData(20, "just now")]
+    [InlineData(5 * 60, "5 min ago")]
+    [InlineData(3 * 3600 + 120, "3 h ago")]
+    public void LastSync_IsWordedAsTheDesktopWordsIt(int secondsAgo, string expected)
+    {
+        var now = new DateTime(2026, 10, 13, 12, 0, 0, DateTimeKind.Utc);
+        Assert.Equal(expected, AccountPageViewModel.Ago(now.AddSeconds(-secondsAgo), now));
+        Assert.StartsWith("on ", AccountPageViewModel.Ago(now.AddDays(-2), now));
+    }
+
+    [Fact]
+    public void LastSync_ReadsSyncedMinutesAgo_AndSyncProgressFillsTheBar()
+    {
+        using var rig = MobileFixtures.MakeRig();
+        var account = new FakeAccount { Account = FakeAccount.SignedInAs() with { LastSyncUtc = DateTime.UtcNow.AddMinutes(-5) } };
+        var page = OpenAccount(ShellWith(rig, account));
+        Assert.Equal("Synced 5 min ago", page.LastSyncText);
+        Assert.Equal("Sign out of Studio PC?", page.SignOutQuestion);
+
+        account.RaiseSyncProgress(new NoctisSyncProgress(NoctisSyncStage.Covers, 25, 100));
+        Assert.True(page.IsSyncing);
+        Assert.True(page.IsSyncCounted);
+        Assert.Equal(0.25, page.SyncFraction, 3);
+        account.RaiseSyncProgress(new NoctisSyncProgress(NoctisSyncStage.Done, 100, 100));
+        Assert.False(page.IsSyncCounted);
     }
 
     [Fact]
@@ -1132,6 +1336,9 @@ public class MobileAccountTests
     [InlineData("élodie", "ÉL")]
     [InlineData("  ", "")]
     [InlineData(null, "")]
+    // An email shown as the name: its address part only ("tester@example.com" read "TC", the C of ".com").
+    [InlineData("tester@example.com", "TE")]
+    [InlineData("jane.smith@example.com", "JS")]
     public void Initials_ForTheAvatarFallback(string? name, string expected)
         => Assert.Equal(expected, AccountPageViewModel.InitialsOf(name));
 

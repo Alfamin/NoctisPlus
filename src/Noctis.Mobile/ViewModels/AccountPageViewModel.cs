@@ -42,7 +42,7 @@ public sealed partial class AccountPageViewModel : MobilePage
         _account.UploadProgress += OnUploadProgress;
         Refresh();
         // Signed out by the sync at app start (which only logs): say why the form is back.
-        if (!IsSignedIn && _account.WasSignedOutByComputer) ErrorText = Describe(NoctisErrorKind.SignedOut, signedIn: false);
+        if (!IsSignedIn && _account.WasSignedOutByComputer) SetError(Describe(NoctisErrorKind.SignedOut, signedIn: false));
     }
 
     public ShellViewModel Shell { get; }
@@ -50,9 +50,22 @@ public sealed partial class AccountPageViewModel : MobilePage
 
     // ── Signed out: the form ──
 
-    [ObservableProperty] private string _serverAddress = string.Empty;
-    [ObservableProperty] private string _userName = string.Empty;
-    [ObservableProperty] private string _password = string.Empty;
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(CanSignIn))]
+    private string _serverAddress = string.Empty;
+
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(CanSignIn))]
+    private string _userName = string.Empty;
+
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(CanSignIn))]
+    private string _password = string.Empty;
+
+    /// <summary>Sign In is offered once all three are filled in and the address reads as one;
+    /// a wrong address says why under its field when the field is left (<see cref="CheckAddress"/>).</summary>
+    public bool CanSignIn => IsIdle && NormalizeServerAddress(ServerAddress) != null
+                             && UserName.Trim().Length > 0 && Password.Length > 0;
 
     /// <summary>The fingerprint the address presented, waiting for the user to compare it with
     /// the computer's; null when no check is pending.</summary>
@@ -68,24 +81,38 @@ public sealed partial class AccountPageViewModel : MobilePage
     public bool IsFormVisible => !IsSignedIn && !IsConfirmingFingerprint;
 
     [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(IsIdle), nameof(CanSync), nameof(CanDownload), nameof(CanUpload))]
+    [NotifyPropertyChangedFor(nameof(IsIdle), nameof(CanSync), nameof(CanDownload), nameof(CanUpload), nameof(CanSignIn),
+        nameof(CanRemoveDownloads), nameof(ShowStatusLine))]
     private bool _isBusy;
 
     public bool IsIdle => !IsBusy;
 
-    /// <summary>What the busy step is doing ("Connecting…").</summary>
+    /// <summary>What the busy step is doing ("Connecting to your computer…"): on the Sign In and
+    /// Trust buttons while signing in, as a line under the tiles once signed in.</summary>
     [ObservableProperty] private string _statusText = string.Empty;
 
+    public bool ShowStatusLine => IsBusy && IsSignedIn;
+
     [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(HasError))]
+    [NotifyPropertyChangedFor(nameof(HasError), nameof(HasAddressError), nameof(HasCredentialsError), nameof(HasGeneralError))]
     private string _errorText = string.Empty;
 
+    /// <summary>The field <see cref="ErrorText"/> is about: shown under it, cleared when it is edited.</summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(HasAddressError), nameof(HasCredentialsError), nameof(HasGeneralError))]
+    private AccountField _errorField;
+
     public bool HasError => ErrorText.Length > 0;
+    public bool HasAddressError => HasError && ErrorField == AccountField.Address;
+    public bool HasCredentialsError => HasError && ErrorField == AccountField.Credentials;
+    /// <summary>An error about no one field (a sync, a changed certificate): the line under the cards.</summary>
+    public bool HasGeneralError => HasError && ErrorField == AccountField.None;
 
     // ── Signed in ──
 
     [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(IsSignedOut), nameof(IsFormVisible), nameof(CanUseServer), nameof(CanSync), nameof(CanUpload))]
+    [NotifyPropertyChangedFor(nameof(IsSignedOut), nameof(IsFormVisible), nameof(CanUseServer), nameof(ShowSyncAction), nameof(CanSync), nameof(CanUpload),
+        nameof(ShowStatusLine))]
     private bool _isSignedIn;
 
     public bool IsSignedOut => !IsSignedIn;
@@ -93,10 +120,13 @@ public sealed partial class AccountPageViewModel : MobilePage
     /// <summary>The pinned certificate no longer matches: the only way on is Sign out and a new,
     /// confirmed sign-in — never a silent re-trust — so Sync and Download are hidden.</summary>
     [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(CanUseServer), nameof(CanSync), nameof(CanUpload))]
+    [NotifyPropertyChangedFor(nameof(CanUseServer), nameof(ShowSyncAction), nameof(CanSync), nameof(CanUpload))]
     private bool _isCertificateChanged;
 
     public bool CanUseServer => IsSignedIn && !IsCertificateChanged;
+
+    /// <summary>The row's accent "Sync now": gone while a sync runs (its stage and bar show instead).</summary>
+    public bool ShowSyncAction => CanUseServer && !IsSyncing;
 
     /// <summary>"owner on Studio PC".</summary>
     [ObservableProperty] private string _accountText = string.Empty;
@@ -115,7 +145,12 @@ public sealed partial class AccountPageViewModel : MobilePage
     [ObservableProperty] private string _serverText = string.Empty;
 
     /// <summary>The profile card's computer row: "Studio PC".</summary>
-    [ObservableProperty] private string _computerName = string.Empty;
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(SignOutQuestion))]
+    private string _computerName = string.Empty;
+
+    /// <summary>The sign-out card's question: "Sign out of Studio PC?".</summary>
+    public string SignOutQuestion => $"Sign out of {ComputerName}?";
 
     /// <summary>The desktop's profile picture (a local file the service cached), or null.</summary>
     [ObservableProperty]
@@ -132,14 +167,29 @@ public sealed partial class AccountPageViewModel : MobilePage
     public bool ShowInitials => !HasAvatar && Initials.Length > 0;
     public bool ShowPersonGlyph => !HasAvatar && Initials.Length == 0;
 
+    /// <summary>"Synced 5 min ago" (the desktop's own wording for a phone's last sync).</summary>
     [ObservableProperty] private string _lastSyncText = string.Empty;
     [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(CanSync))]
+    [NotifyPropertyChangedFor(nameof(CanSync), nameof(ShowSyncAction))]
     private bool _isSyncing;
     [ObservableProperty] private string _syncText = string.Empty;
+
+    /// <summary>How far the running sync's counted stage is (0..1); with no count yet the bar runs indeterminate.</summary>
+    [ObservableProperty] private double _syncFraction;
+    [ObservableProperty] private bool _isSyncCounted;
+
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(CanDownload))]
     private bool _isDownloading;
+
+    /// <summary>Songs downloaded so far of the running Download everything (0..1).</summary>
+    [ObservableProperty] private double _downloadFraction;
+    [ObservableProperty] private bool _isDownloadCounted;
+
+    /// <summary>Something is downloaded: Remove downloads has something to remove.</summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(CanRemoveDownloads))]
+    private bool _hasDownloads;
 
     /// <summary>Sync now / Download everything: not while one already runs, and not while
     /// signing in or out (a download started mid-sign-out ran on until the revoked key failed it).
@@ -173,7 +223,13 @@ public sealed partial class AccountPageViewModel : MobilePage
 
     [ObservableProperty] private bool _isConfirmingSignOut;
     [ObservableProperty] private bool _alsoRemoveDownloads;
-    [ObservableProperty] private bool _isConfirmingRemoveDownloads;
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(CanRemoveDownloads))]
+    private bool _isConfirmingRemoveDownloads;
+
+    /// <summary>Remove downloads: only with something downloaded (with nothing it still asked,
+    /// then removed nothing), not while its question is open, and not mid sign-in or sign-out.</summary>
+    public bool CanRemoveDownloads => HasDownloads && !IsConfirmingRemoveDownloads && IsIdle;
 
     // ── Sign in ──
 
@@ -181,16 +237,17 @@ public sealed partial class AccountPageViewModel : MobilePage
     [RelayCommand]
     private async Task SignInAsync()
     {
-        ErrorText = string.Empty;
+        if (IsBusy) return;   // Enter on the password while the check already runs
+        SetError(string.Empty);
         var url = NormalizeServerAddress(ServerAddress);
         if (url == null)
         {
-            ErrorText = Describe(NoctisErrorKind.InvalidAddress, signedIn: false);
+            SetError(Describe(NoctisErrorKind.InvalidAddress, signedIn: false), AccountField.Address);
             return;
         }
         if (UserName.Trim().Length == 0 || Password.Length == 0)
         {
-            ErrorText = "Enter your email or username and your password.";
+            SetError("Enter your email or username and your password.", AccountField.Credentials);
             return;
         }
         ServerAddress = url;
@@ -226,6 +283,31 @@ public sealed partial class AccountPageViewModel : MobilePage
         _probedUrl = null;
     }
 
+    /// <summary>The address field was left (or Next pressed on it): a typed address that cannot
+    /// be one says so under the field then, not only once Sign In is pressed.</summary>
+    public void CheckAddress()
+    {
+        if (ServerAddress.Trim().Length > 0 && NormalizeServerAddress(ServerAddress) == null)
+            SetError(Describe(NoctisErrorKind.InvalidAddress, signedIn: false), AccountField.Address);
+    }
+
+    // An error under a field goes once that field is edited: it stayed up, red, over a corrected
+    // address until the next Sign In.
+    partial void OnServerAddressChanged(string value) => ClearErrorAbout(AccountField.Address);
+    partial void OnUserNameChanged(string value) => ClearErrorAbout(AccountField.Credentials);
+    partial void OnPasswordChanged(string value) => ClearErrorAbout(AccountField.Credentials);
+
+    private void ClearErrorAbout(AccountField field)
+    {
+        if (HasError && ErrorField == field) SetError(string.Empty);
+    }
+
+    private void SetError(string text, AccountField field = AccountField.None)
+    {
+        ErrorField = field;
+        ErrorText = text;
+    }
+
     // ── Signed in ──
 
     [RelayCommand]
@@ -234,7 +316,7 @@ public sealed partial class AccountPageViewModel : MobilePage
     private async Task SyncCoreAsync()
     {
         if (!_account.IsSignedIn || _syncRunning || _account.IsSyncing) return;
-        ErrorText = string.Empty;
+        SetError(string.Empty);
         _syncRunning = true;
         _ownSyncEndPending = true;
         IsSyncing = true;
@@ -266,7 +348,7 @@ public sealed partial class AccountPageViewModel : MobilePage
     private async Task DownloadAllAsync()
     {
         if (!_account.IsSignedIn || IsDownloading) return;
-        ErrorText = string.Empty;
+        SetError(string.Empty);
         _downloadRunning = true;
         IsDownloading = true;
         DownloadText = "Starting downloads…";
@@ -300,7 +382,7 @@ public sealed partial class AccountPageViewModel : MobilePage
             return;
         }
         if (!_account.IsSignedIn) return;
-        ErrorText = string.Empty;
+        SetError(string.Empty);
         using var cts = new CancellationTokenSource();
         // A send this page did not start (running when it opened) shows "Stop sending" too: the
         // service hands back the running send, and a cancelled token stops it. Uncancelled, the
@@ -345,6 +427,9 @@ public sealed partial class AccountPageViewModel : MobilePage
     {
         IsConfirmingRemoveDownloads = false;
         await RunAsync("Removing downloads…", () => _account.RemoveAllDownloadsAsync());
+        // The last download's report goes too: it put "Downloads finished" back under the
+        // Download everything card over a phone that had just removed them all.
+        if (!IsDownloading) _lastDownload = null;
         DownloadText = string.Empty;
         RefreshDownloads();
     }
@@ -375,9 +460,9 @@ public sealed partial class AccountPageViewModel : MobilePage
     /// <summary>One busy step: status shown, errors worded, busy cleared. False when it failed.</summary>
     private async Task<bool> RunAsync(string status, Func<Task> work)
     {
-        IsBusy = true;
         StatusText = status;
-        ErrorText = string.Empty;
+        IsBusy = true;
+        SetError(string.Empty);
         try
         {
             await work();
@@ -402,7 +487,9 @@ public sealed partial class AccountPageViewModel : MobilePage
         DebugLog.Write("Account", $"{kind?.ToString() ?? ex.GetType().Name}: {ex.Message}");
         var signedIn = _account.IsSignedIn;
         if (kind == NoctisErrorKind.CertificateChanged && signedIn) IsCertificateChanged = true;
-        ErrorText = kind is { } k ? Describe(k, signedIn) : "Something went wrong. Try again.";
+        // Signing in, an error about the address or the password goes under that field.
+        SetError(kind is { } k ? Describe(k, signedIn) : "Something went wrong. Try again.",
+            kind is { } f && !signedIn ? FieldFor(f) : AccountField.None);
         Refresh();
     }
 
@@ -417,6 +504,8 @@ public sealed partial class AccountPageViewModel : MobilePage
             // completes, but on a phone it can land after the page's catch already reset
             // _syncRunning, so it is matched by flag: it read as a background sync failing
             // and replaced the page's own text ("Songs updated…") with "didn't finish".
+            SyncFraction = 0;
+            IsSyncCounted = false;
             if (_ownSyncEndPending && progress.Stage != NoctisSyncStage.Idle) _ownSyncEndPending = false;
             else if (!_syncRunning && progress.Stage == NoctisSyncStage.Done) SyncText = "Sync finished";
             // A background sync (the one at app start) that failed left its last stage up
@@ -426,6 +515,8 @@ public sealed partial class AccountPageViewModel : MobilePage
             return;
         }
         SyncText = DescribeStage(progress);
+        IsSyncCounted = progress.Total > 0;
+        SyncFraction = progress.Total > 0 ? Math.Clamp(progress.Done / (double)progress.Total, 0, 1) : 0;
         IsSyncing = true;
     });
 
@@ -451,7 +542,7 @@ public sealed partial class AccountPageViewModel : MobilePage
         var wasSignedIn = IsSignedIn;
         IsSignedIn = _account.IsSignedIn && account != null;
         if (wasSignedIn && !IsSignedIn && _account.WasSignedOutByComputer)
-            ErrorText = Describe(NoctisErrorKind.SignedOut, signedIn: false);
+            SetError(Describe(NoctisErrorKind.SignedOut, signedIn: false));
         var shownName = account == null ? string.Empty : ShownName(account);
         AccountText = account == null ? string.Empty : $"{shownName} on {ServerLabel(account)}";
         DisplayName = shownName;
@@ -461,7 +552,7 @@ public sealed partial class AccountPageViewModel : MobilePage
         ComputerName = account == null ? string.Empty : ServerLabel(account);
         Initials = InitialsOf(shownName);
         AvatarPath = IsSignedIn ? _account.AvatarPath : null;
-        LastSyncText = account?.LastSyncUtc is { } synced ? $"Last synced {FormatWhen(synced)}" : "Not synced yet";
+        RefreshSyncTime();
         IsSyncing = _syncRunning || _account.IsSyncing;
         IsUploading = _uploadCts != null || _account.IsUploading;
         if (!IsSignedIn)
@@ -473,12 +564,20 @@ public sealed partial class AccountPageViewModel : MobilePage
         RefreshDownloads();
     }
 
+    /// <summary>"Synced 5 min ago" goes stale while the page stays open: the page re-reads it
+    /// once a minute (AccountPage's ticker), as the desktop's phone list does.</summary>
+    public void RefreshSyncTime() =>
+        LastSyncText = _account.Account?.LastSyncUtc is { } synced ? $"Synced {Ago(synced, DateTime.UtcNow)}" : "Not synced yet";
+
     private void RefreshDownloads()
     {
         StorageValue = $"{Count(_account.DownloadedCount, "song")} · {FormatBytes(_account.DownloadedBytes)}";
         StorageText = $"Downloaded: {StorageValue}";
+        HasDownloads = _account.DownloadedCount > 0;
         var pending = _lastDownload is { Pending: > 0 };
         IsDownloading = _downloadRunning || pending;
+        IsDownloadCounted = pending;
+        DownloadFraction = _lastDownload is { Pending: > 0 } d ? d.Completed / (double)(d.Completed + d.Pending) : 0;
         if (_lastDownload is not { } p) return;
         // Songs whose file is gone from the computer are told apart: a retry cannot fetch them.
         var otherFailures = p.Failed - p.Missing;
@@ -518,7 +617,22 @@ public sealed partial class AccountPageViewModel : MobilePage
         NoctisErrorKind.StorageFull =>
             "Your phone is almost full, so downloads stopped (1.5 GB is always left free). Remove some downloads or free up space.",
         NoctisErrorKind.FileMissing => "This song's file is missing on your computer.",
+        NoctisErrorKind.NotNoctis =>
+            "Something answered at that address, but it isn't Noctis. Check the address and port shown under Connect a phone.",
+        NoctisErrorKind.UnknownHost =>
+            "No computer answers to that name. Type the address shown under Connect a phone, like 192.168.1.20.",
+        NoctisErrorKind.Outdated => "Noctis on your computer is too old to connect a phone. Update it, then try again.",
         _ => "Your computer couldn't finish that. Try again in a moment.",
+    };
+
+    /// <summary>Which sign-in field an error is about: the address (it is wrong, or nothing
+    /// Noctis answers there) or the email and password; anything else is the page's.</summary>
+    internal static AccountField FieldFor(NoctisErrorKind kind) => kind switch
+    {
+        NoctisErrorKind.InvalidAddress or NoctisErrorKind.Unreachable or NoctisErrorKind.NotNoctis
+            or NoctisErrorKind.UnknownHost => AccountField.Address,
+        NoctisErrorKind.BadCredentials or NoctisErrorKind.LockedOut => AccountField.Credentials,
+        _ => AccountField.None,
     };
 
     internal static string DescribeStage(NoctisSyncProgress progress)
@@ -598,6 +712,10 @@ public sealed partial class AccountPageViewModel : MobilePage
     /// words ("John Doe" → "JD"), else the first two of one word ("owner" → "OW"); empty for none.</summary>
     internal static string InitialsOf(string? name)
     {
+        // An email (a desktop with no profile name): the part before the @. The domain's dots
+        // split it into words, so "tester@example.com" read "TC".
+        var at = (name ?? string.Empty).IndexOf('@');
+        if (at > 0) name = name![..at];
         var words = (name ?? string.Empty).Split([' ', '.', '_', '-'], StringSplitOptions.RemoveEmptyEntries);
         var letters = words.Length >= 2
             ? new[] { FirstLetter(words[0]), FirstLetter(words[1]) }
@@ -611,11 +729,19 @@ public sealed partial class AccountPageViewModel : MobilePage
     internal static string FormatBytes(long bytes) =>
         bytes >= 1L << 30 ? $"{bytes / (double)(1L << 30):0.0} GB" : $"{bytes / (double)(1L << 20):0} MB";
 
-    private static string FormatWhen(DateTime utc)
+    /// <summary>"just now", "5 min ago", "3 h ago", else "on 10/9/2026 2:05 PM": the desktop's
+    /// wording for a phone's last sync (SettingsViewModel.Ago), so both sides read alike.</summary>
+    internal static string Ago(DateTime utc, DateTime nowUtc)
     {
-        var local = utc.ToLocalTime();
-        return local.Date == DateTime.Today ? $"today at {local:t}" : $"{local:g}";
+        var ago = nowUtc - utc;
+        if (ago < TimeSpan.FromMinutes(1)) return "just now";
+        if (ago < TimeSpan.FromHours(1)) return $"{(int)ago.TotalMinutes} min ago";
+        if (ago < TimeSpan.FromDays(1)) return $"{(int)ago.TotalHours} h ago";
+        return $"on {utc.ToLocalTime():g}";
     }
 
     private static string Count(int n, string noun) => n == 1 ? $"1 {noun}" : $"{n} {noun}s";
 }
+
+/// <summary>The sign-in field an error is shown under (<see cref="AccountPageViewModel.ErrorField"/>).</summary>
+public enum AccountField { None, Address, Credentials }
