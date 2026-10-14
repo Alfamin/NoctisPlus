@@ -3,6 +3,7 @@ using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Media;
 using Avalonia.Styling;
+using Noctis.Mobile.Services;
 using Noctis.Mobile.ViewModels;
 
 namespace Noctis.Mobile.Views;
@@ -21,8 +22,9 @@ namespace Noctis.Mobile.Views;
 /// title scrolls up to them (<c>TopScrim</c>, <see cref="ScrollChrome"/>), and switches the status
 /// bar icons to the ones readable on that colour;</item>
 /// <item>keeps the tint's WCAG text colours as page resources ("&lt;prefix&gt;Text",
-/// "&lt;prefix&gt;SubtleText", "&lt;prefix&gt;Wash", "&lt;prefix&gt;Rule", "&lt;prefix&gt;PillText")
-/// for the page's styles.</item>
+/// "&lt;prefix&gt;SubtleText", "&lt;prefix&gt;Wash", "&lt;prefix&gt;Rule", "&lt;prefix&gt;PillText"),
+/// and the accent stepped toward that text colour until it reads on the tint
+/// ("&lt;prefix&gt;Accent", MobileTheme.Readable's 3:1), for the page's styles.</item>
 /// </list>
 /// </summary>
 internal sealed class HeroChrome
@@ -227,6 +229,9 @@ internal sealed class HeroChrome
             _page.Resources[_prefix + "Wash"] = new SolidColorBrush(text, 0.12);
             _page.Resources[_prefix + "Rule"] = new SolidColorBrush(text, 0.12);
             _page.Resources[_prefix + "PillText"] = new SolidColorBrush(dark ? Colors.White : Colors.Black);
+            var accent = _page.TryFindResource("AccentTextBrush", _page.ActualThemeVariant, out var a)
+                         && a is ISolidColorBrush accentBrush ? accentBrush.Color : text;
+            _page.Resources[_prefix + "Accent"] = new SolidColorBrush(MobileTheme.Readable(accent, new[] { tint }, text));
             into = tint;
         }
         _heroFade.Background = into is { } c ? Fade(c, from: 0, to: 1, rising: true) : null;

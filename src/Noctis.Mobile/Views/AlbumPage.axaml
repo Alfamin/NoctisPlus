@@ -103,12 +103,14 @@
             <Setter Property="Background" Value="{DynamicResource AlbumRule}" />
         </Style>
 
-        <!-- The playing row's equalizer (PlayingBars, the desktop's row indicator) in the text colour. -->
+        <!-- The playing row's equalizer (PlayingBars, the desktop's row indicator) in the accent, as
+             the desktop's: the theme-guarded accent text colour, and on a cover's tint the accent
+             stepped toward the tint's text colour until it reads (HeroChrome's AlbumAccent). -->
         <Style Selector="views|AlbumPage views|PlayingBars">
-            <Setter Property="Fill" Value="{DynamicResource PrimaryTextBrush}" />
+            <Setter Property="Fill" Value="{DynamicResource AccentTextBrush}" />
         </Style>
         <Style Selector="views|AlbumPage.tinted views|PlayingBars">
-            <Setter Property="Fill" Value="{DynamicResource AlbumText}" />
+            <Setter Property="Fill" Value="{DynamicResource AlbumAccent}" />
         </Style>
 
         <!-- Shuffle and the heart beside the Play pill: Apple's ~44 pt circles, one height with it. -->
