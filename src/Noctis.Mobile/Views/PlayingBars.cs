@@ -4,6 +4,7 @@ using Avalonia.Controls;
 using Avalonia.Layout;
 using Avalonia.Media;
 using Avalonia.Threading;
+using Noctis.Mobile.Services;
 
 namespace Noctis.Mobile.Views;
 
@@ -13,8 +14,12 @@ namespace Noctis.Mobile.Views;
 /// <see cref="BarWidth"/> wide and <see cref="BarSpacing"/> apart in a <see cref="RowHeight"/>
 /// row, rounded by half their width, each a sine between <see cref="BarMin"/> and
 /// <see cref="BarMax"/> at its own <see cref="Frequencies"/> and <see cref="Phases"/>; on pause they ease flat (<see cref="FlatHeight"/>) over
-/// <see cref="FlattenDuration"/>, cubic ease-out. The desktop's beat and spectrum layer needs its
-/// audio sample tap, which the phone has not got, so this is the desktop's no-tap motion.
+/// <see cref="FlattenDuration"/>, cubic ease-out. While audio is heard the bars follow it as the
+/// desktop's do: the sway, a bounce on every beat and a tilt by the spectrum (bass left, treble
+/// right), <see cref="LiveLevels"/>, eased per bar with a fast attack and a release that falls
+/// between beats (<see cref="Smooth"/>). The pulse and bands come from <see cref="Levels"/>,
+/// the meters the Android player's PCM tap feeds; with nothing feeding them (tests, the first
+/// frames of a track) the sines alone run, the desktop's no-tap motion.
 /// One control draws all five bars: a tick repaints, never re-runs layout.
 /// Stepped on the frame clock (TopLevel.RequestAnimationFrame, like the lyrics page), not the
 /// desktop's 33 ms Render-priority DispatcherTimer: on the Android emulator that timer pinned
@@ -44,9 +49,18 @@ public sealed class PlayingBars : Control
     public static readonly TimeSpan FlattenDuration = TimeSpan.FromMilliseconds(420);
     private static readonly Easing FlattenEasing = new CubicEaseOut();
 
+    /// <summary>The desktop EqVisualizer's live mix (tests hold the two together): level =
+    /// Rest + Sway·sine + Bounce·beat pulse + Tone·(band − mean band), eased per bar with a
+    /// <see cref="LiveAttackMs"/> attack and a <see cref="LiveReleaseMs"/> release.</summary>
+    public const double LiveRest = 0.12, LiveSway = 0.28, LiveBounce = 0.60, LiveTone = 0.60;
+    public const double LiveAttackMs = 25, LiveReleaseMs = 120;
+
     private readonly double[] _heights = { FlatHeight, FlatHeight, FlatHeight, FlatHeight, FlatHeight };
     private readonly double[] _flattenFrom = new double[BarCount];
-    private DateTime _start, _flattenStart;
+    private readonly float[] _bands = new float[BarCount];
+    private readonly float[] _liveTarget = new float[BarCount];
+    private readonly float[] _liveShown = new float[BarCount];
+    private DateTime _start, _flattenStart, _lastTick;
     private bool _flattening, _running, _frameQueued;
     /// <summary>Bumped by every start and stop, so a queued frame or poll from an older run drops out.</summary>
     private int _generation;
@@ -71,6 +85,9 @@ public sealed class PlayingBars : Control
         set => SetValue(FillProperty, value);
     }
 
+    /// <summary>Where the live pulse and bands come from; null runs the sines alone.</summary>
+    public RowEqLevels? Levels { get; set; } = RowEqLevels.Shared;
+
     /// <summary>The current bar heights, left to right (tests read them).</summary>
     internal IReadOnlyList<double> BarHeights => _heights;
 
@@ -83,6 +100,42 @@ public sealed class PlayingBars : Control
     {
         var s = Math.Sin(2 * Math.PI * Frequencies[bar] * t + Phases[bar]);
         return BarMin + (BarMax - BarMin) * (s * 0.5 + 0.5);
+    }
+
+    /// <summary>Bar height for a 0..1 level: the range the sines use (EqVisualizer.HeightForLevel).</summary>
+    public static double HeightForLevel(double level) => BarMin + (BarMax - BarMin) * Math.Clamp(level, 0, 1);
+
+    /// <summary>
+    /// Target 0..1 levels for the five bars <paramref name="t"/> seconds in, from the beat
+    /// <paramref name="pulse"/> (0..1) and five bands (0..1, bass to treble): the desktop's
+    /// EqVisualizer.LiveLevels.
+    /// </summary>
+    public static void LiveLevels(double t, double pulse, ReadOnlySpan<float> bands, Span<float> levels)
+    {
+        double mean = 0;
+        for (var i = 0; i < BarCount; i++) mean += bands[i];
+        mean /= BarCount;
+        for (var i = 0; i < BarCount; i++)
+        {
+            var osc = Math.Sin(2 * Math.PI * Frequencies[i] * t + Phases[i]) * 0.5 + 0.5;
+            var level = LiveRest + LiveSway * osc + LiveBounce * pulse + LiveTone * (bands[i] - mean);
+            levels[i] = (float)Math.Clamp(level, 0, 1);
+        }
+    }
+
+    /// <summary>Eases <paramref name="shown"/> toward <paramref name="target"/> over
+    /// <paramref name="dtMs"/>: up with the attack, down with the release time constant (the
+    /// desktop's SpectrumVisualizer.Smooth).</summary>
+    public static void Smooth(Span<float> shown, ReadOnlySpan<float> target, double dtMs, double attackMs, double releaseMs)
+    {
+        var up = (float)(1 - Math.Exp(-dtMs / attackMs));
+        var down = (float)(1 - Math.Exp(-dtMs / releaseMs));
+        for (var i = 0; i < shown.Length; i++)
+        {
+            var t = target[i];
+            var s = shown[i];
+            shown[i] = t > s ? s + (t - s) * up : s + (t - s) * down;
+        }
     }
 
     protected override Size MeasureOverride(Size availableSize) =>
@@ -133,6 +186,7 @@ public sealed class PlayingBars : Control
     {
         if (VisualRoot == null) return;
         _start = DateTime.UtcNow;
+        _lastTick = _start;
         Run();
     }
 
@@ -196,8 +250,20 @@ public sealed class PlayingBars : Control
             return;
         }
 
+        var dtMs = Math.Clamp((now - _lastTick).TotalMilliseconds, 0, 100);
+        _lastTick = now;
         var t = (now - _start).TotalSeconds;
-        for (var i = 0; i < BarCount; i++) _heights[i] = OscillationHeight(t, i);
+        if (Levels is { } levels && levels.TryRead(levels.NowMs, out var pulse, _bands))
+        {
+            LiveLevels(t, pulse, _bands, _liveTarget);
+            Smooth(_liveShown, _liveTarget, dtMs, LiveAttackMs, LiveReleaseMs);
+            for (var i = 0; i < BarCount; i++) _heights[i] = HeightForLevel(_liveShown[i]);
+        }
+        else
+        {
+            Array.Clear(_liveShown);
+            for (var i = 0; i < BarCount; i++) _heights[i] = OscillationHeight(t, i);
+        }
         InvalidateVisual();
         QueueFrame(generation);
     }
