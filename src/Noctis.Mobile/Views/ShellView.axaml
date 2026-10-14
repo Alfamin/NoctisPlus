@@ -266,7 +266,15 @@
                                          control's 240 default cap — the column sets the real width. -->
                                     <StackPanel Grid.Column="1" Margin="11,0,4,0" VerticalAlignment="Center">
                                         <controls:MarqueeTextBlock Name="MiniTitle" Text="{Binding Player.CurrentTrack.Title}" FontSize="12" FontWeight="SemiBold"
-                                                                   MaxDisplayWidth="10000" HorizontalAlignment="Left" />
+                                                                   MaxDisplayWidth="10000" HorizontalAlignment="Left">
+                                            <!-- The explicit badge rides with the title, as on the desktop's bar. -->
+                                            <controls:MarqueeTextBlock.InlineContent>
+                                                <Border Name="MiniExplicit" Classes="explicit-badge compact" VerticalAlignment="Center"
+                                                        IsVisible="{Binding Player.CurrentTrack.IsExplicit, FallbackValue=False}">
+                                                    <TextBlock Text="E" Classes="explicit-badge-text compact" FontSize="8" Opacity="0.9" />
+                                                </Border>
+                                            </controls:MarqueeTextBlock.InlineContent>
+                                        </controls:MarqueeTextBlock>
                                         <controls:MarqueeTextBlock Name="MiniArtist" Text="{Binding Player.CurrentTrack.Artist}" FontSize="12"
                                                                    Foreground="{DynamicResource PhoneSecondaryTextBrush}"
                                                                    MaxDisplayWidth="10000" HorizontalAlignment="Left" IsForArtist="True" />
