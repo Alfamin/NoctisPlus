@@ -27,14 +27,24 @@ namespace Noctis.Controls;
 /// <param name="ToneLift">0..1: how a colour is lifted to a brighter luminance. 0 scales it up
 /// (vivid; a dark colour lifted far turns garish and runs out of range), 1 lays a white veil over
 /// it (frosted white glass: the colour keeps its own strength, never brighter).</param>
+/// <param name="Spill">0..1: the share of the glass that is the scattered light of its surroundings —
+/// the backdrop blurred at <paramref name="SpillSigma"/>, brought to the same luminance and mixed
+/// in. Dark content then takes the colour of what lies around it instead of a grey or white veil,
+/// and a plain backdrop keeps its own hue and saturation. With it the veil only comes in as the lift
+/// grows (a small lift keeps the colour, as Apple's dark glass does). 0: off.</param>
+/// <param name="SpillSigma">The wide blur the spill reads, in device px.</param>
+/// <param name="Shade">0..1: the rim's shadow on the face, a soft dark band over the lens band
+/// (<paramref name="Band"/>) deepest under the top edge, which faces the light, and gone along the
+/// bottom. 0: none.</param>
 public readonly record struct GlassLensFrame(
     SKRect Bounds, GlassCornerRadii Radii, float Band, float Bend, float Dispersion, float Zoom, float Saturation,
-    float ToneMin = 0, float ToneMax = 1, float ToneCurve = 1, float ToneLift = 0);
+    float ToneMin = 0, float ToneMax = 1, float ToneCurve = 1, float ToneLift = 0,
+    float Spill = 0, float SpillSigma = 0, float Shade = 0);
 
 /// <summary>A <see cref="GlassPanel"/>'s lens settings in logical px, captured by value for the
 /// render thread; <see cref="GlassBackdropOp"/> scales them to device px.</summary>
 internal readonly record struct GlassLensSettings(double Band, double Bend, double Dispersion, double Zoom, double Saturation,
-    double ToneMin = 0, double ToneMax = 1, double ToneCurve = 1, double ToneLift = 0);
+    double ToneMin = 0, double ToneMax = 1, double ToneCurve = 1, double ToneLift = 0, double Spill = 0, double Shade = 0);
 
 /// <summary>A rounded rect's four corner radii in device px, passed to the shaders as one float4.</summary>
 public readonly record struct GlassCornerRadii(float TopLeft, float TopRight, float BottomRight, float BottomLeft);
@@ -54,8 +64,11 @@ public readonly record struct GlassRimShape(float LightX, float LightY, float Am
 
     /// <summary>Apple's iOS 26 menus: a catch-light along the top edge that fades out down the
     /// sides, caught again more faintly along the bottom, and next to nothing on the sides, so
-    /// the glass has no outline of its own.</summary>
-    public static readonly GlassRimShape TopCatch = new(0, -1, 0.18f, 0.5f, 2.5f, 0.15f);
+    /// the glass has no outline of its own. The lobe falls off near-linearly with the rim's turn
+    /// away from the light (the falloff the open-source renderers measured on iOS); the sides'
+    /// trace is a few percent, under what reads as a line (owner 10-14: our menus still showed an
+    /// outline down the sides that Apple's do not).</summary>
+    public static readonly GlassRimShape TopCatch = new(0, -1, 0.04f, 0.4f, 1.5f, 0.05f);
 }
 
 /// <summary>
@@ -105,6 +118,7 @@ public static class GlassLens
     /// </summary>
     public const string LensSource = """
         uniform shader content;
+        uniform shader wide;
         uniform float4 bounds;
         uniform float4 radii;
         uniform float band;
@@ -115,8 +129,22 @@ public static class GlassLens
         uniform float2 tone;
         uniform float toneCurve;
         uniform float toneLift;
+        uniform float spill;
+        uniform float shade;
 
         """ + RoundRectSdf + """
+
+        // A colour brought to luminance `target` from its own `l`: scaled up (hue and saturation
+        // kept) or, lifting under a veil, toward white. With the spill the veil only comes in as
+        // the lift grows: scattered light takes over from transmitted light.
+        float3 toned(float3 c, float l, float target, float lift) {
+            float3 hued = c * (target / max(l, 0.0005));
+            if (lift > 0.0 && target > l)
+                hued = mix(hued, 1.0 - (1.0 - c) * ((1.0 - target) / max(1.0 - l, 0.0005)), lift);
+            // Near black the hue is blur residue (an 8-bit (0,1,2) scaled up to the floor turned
+            // bright blue), so it fades to grey there.
+            return mix(float3(target), hued, smoothstep(0.0, 0.06, l));
+        }
 
         half4 main(float2 coord) {
             float2 h = (bounds.zw - bounds.xy) * 0.5;
@@ -143,19 +171,32 @@ public static class GlassLens
                 half l = dot(color.rgb, half3(0.2126, 0.7152, 0.0722));
                 color.rgb = clamp(mix(half3(l), color.rgb, half(saturation)), 0.0, color.a);
             }
-            if (tone.x > 0.0 || tone.y < 1.0) {
-                // Remap luminance 0..1 onto tone.x..tone.y, keeping each colour's hue. Near black
-                // the hue is blur residue (an 8-bit (0,1,2) scaled up to the floor turned bright
-                // blue), so it fades to grey there.
+            if (tone.x > 0.0 || tone.y < 1.0 || spill > 0.0) {
+                // Remap luminance 0..1 onto tone.x..tone.y, keeping each colour's hue.
                 float l = dot(float3(color.rgb), float3(0.2126, 0.7152, 0.0722));
                 float s = toneCurve == 1.0 ? l : 1.0 - pow(clamp(1.0 - l, 0.0, 1.0), toneCurve);
                 float target = mix(tone.x, tone.y, s);
-                float3 c = float3(color.rgb);
-                float3 hued = c * (target / max(l, 0.0005));
-                if (toneLift > 0.0 && target > l)
-                    hued = mix(hued, 1.0 - (1.0 - c) * ((1.0 - target) / max(1.0 - l, 0.0005)), toneLift);
-                float3 rgb = mix(float3(target), hued, smoothstep(0.0, 0.06, l));
+                // With the spill the veil only comes in as the lift grows: none up to a lift of
+                // 1x, all of it from 5x (light glass over dark ink); a dark menu over a dark page
+                // (2x) keeps most of the page's colour.
+                float lift = spill > 0.0 ? toneLift * clamp((target / max(l, 0.0005) - 1.0) * 0.25, 0.0, 1.0) : toneLift;
+                float3 rgb = toned(float3(color.rgb), l, target, lift);
+                if (spill > 0.0) {
+                    // The light the glass scatters: its surroundings, at the same luminance.
+                    float3 w = float3(wide.eval(at).rgb);
+                    float lw = dot(w, float3(0.2126, 0.7152, 0.0722));
+                    float3 glow = toned(w, lw, target, toneLift * clamp((target / max(lw, 0.0005) - 1.0) * 0.25, 0.0, 1.0));
+                    rgb = mix(rgb, glow, spill);
+                }
                 color.rgb = half3(clamp(rgb, 0.0, float(color.a)));
+            }
+            if (shade > 0.0 && band > 0.0 && depth < band) {
+                // The raised rim shades the face like a wall lit from the top: deepest under the
+                // top edge, half down the sides, nothing along the bottom, easing out over the band.
+                float2 n = roundRectNormal(p, h, min(r * 1.5, min(h.x, h.y)));
+                float wall = smoothstep(0.0, 1.0, -n.y * 0.5 + 0.5);
+                float fall = 1.0 - smoothstep(0.0, band, depth);
+                color.rgb *= half(1.0 - shade * wall * fall * fall);
             }
             return color;
         }
@@ -342,12 +383,18 @@ public static class GlassLens
             frosted = Frost(source, at, region, sigma, context);
             if (frosted is null) return false;
         }
+        // The spill's wide blur of the same pixels; without one the lens reads the content in its place.
+        SKImage? wide = null;
+        if (frame.Spill > 0 && frame.SpillSigma > 0.5f)
+            wide = Frost(source, at, region, frame.SpillSigma, context);
         try
         {
             var image = frosted ?? source;
             var origin = frosted != null ? region.Location : at.Location;
             using var content = image.ToShader(SKShaderTileMode.Clamp, SKShaderTileMode.Clamp,
                 new SKSamplingOptions(SKFilterMode.Linear), SKMatrix.CreateTranslation(origin.X, origin.Y));
+            using var spill = wide?.ToShader(SKShaderTileMode.Clamp, SKShaderTileMode.Clamp,
+                new SKSamplingOptions(SKFilterMode.Linear), SKMatrix.CreateTranslation(region.Left, region.Top));
             var uniforms = new SKRuntimeEffectUniforms(effect)
             {
                 ["bounds"] = new[] { frame.Bounds.Left, frame.Bounds.Top, frame.Bounds.Right, frame.Bounds.Bottom },
@@ -360,8 +407,10 @@ public static class GlassLens
                 ["tone"] = new[] { Math.Clamp(frame.ToneMin, 0f, 1f), Math.Clamp(frame.ToneMax, 0f, 1f) },
                 ["toneCurve"] = Math.Max(frame.ToneCurve, 0.01f),
                 ["toneLift"] = Math.Clamp(frame.ToneLift, 0f, 1f),
+                ["spill"] = spill is null ? 0f : Math.Clamp(frame.Spill, 0f, 1f),
+                ["shade"] = Math.Clamp(frame.Shade, 0f, 1f),
             };
-            var children = new SKRuntimeEffectChildren(effect) { ["content"] = content };
+            var children = new SKRuntimeEffectChildren(effect) { ["content"] = content, ["wide"] = spill ?? content };
             using var shader = effect.ToShader(uniforms, children);
             using var paint = new SKPaint
             {
@@ -379,7 +428,11 @@ public static class GlassLens
             canvas.Restore();
             return true;
         }
-        finally { frosted?.Dispose(); }
+        finally
+        {
+            frosted?.Dispose();
+            wide?.Dispose();
+        }
     }
 
     /// <summary>The backdrop blurred, cut to <paramref name="region"/> (device px). On the GPU

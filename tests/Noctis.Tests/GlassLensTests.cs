@@ -289,6 +289,64 @@ public class GlassLensTests
         Assert.Equal(veiled.B * 255, c.Blue, 2.5);
     }
 
+    /// <summary>Apple's dark menu glass (measured 10-14): a plain backdrop keeps its own hue and
+    /// saturation through the glass (brown lifts to a brighter brown, not a milky grey-brown), and
+    /// dark content inside it takes the colour of its surroundings at the floor, not neutral grey.</summary>
+    [Fact]
+    public void Spill_KeepsAPlainBackdropsColour_AndFillsDarkContentWithItsSurroundings()
+    {
+        static SKSurface BrownWithInk()
+        {
+            var surface = SKSurface.Create(new SKImageInfo(W, H, SKColorType.Rgba8888, SKAlphaType.Premul));
+            surface.Canvas.Clear(new SKColor(120, 70, 30));
+            using var ink = new SKPaint { Color = SKColors.Black };
+            surface.Canvas.DrawRect(new SKRect(116, 76, 124, 84), ink);
+            return surface;
+        }
+        static float Lum(SKColor c) => (0.2126f * c.Red + 0.7152f * c.Green + 0.0722f * c.Blue) / 255f;
+
+        // A floor of 0.4 lifts the brown (luminance 0.305) a little, as a dark menu lifts a dark page.
+        using var veiled = BrownWithInk();
+        Lens(veiled, Frame(band: 0, bend: 0, toneMin: 0.4f, toneMax: 0.5f) with { ToneLift = 1 });
+        using var spilled = BrownWithInk();
+        Lens(spilled, Frame(band: 0, bend: 0, toneMin: 0.4f, toneMax: 0.5f) with { ToneLift = 1, Spill = 0.6f, SpillSigma = 10 });
+
+        // The ink: grey at the floor under the veil; under the spill, the brown around it at the floor.
+        var greyInk = Pixel(veiled, 120, 80);
+        var brownInk = Pixel(spilled, 120, 80);
+        Assert.True(Math.Abs(greyInk.Red - greyInk.Blue) <= 2, $"veiled ink {greyInk} is not grey");
+        Assert.True(brownInk.Red > brownInk.Blue + 12, $"spilled ink {brownInk} took no colour from its surroundings");
+        Assert.Equal(0.4f, Lum(brownInk), 1);
+        // The plain brown: both lift it to the same luminance, but the veil greys it and the spill does not.
+        var plain = new SKColor(120, 70, 30);
+        var veiledBrown = Pixel(veiled, 60, 80);
+        var spilledBrown = Pixel(spilled, 60, 80);
+        Assert.Equal(Lum(veiledBrown), Lum(spilledBrown), 1);
+        static float Saturation(SKColor c)
+        {
+            int max = Math.Max((int)c.Red, Math.Max((int)c.Green, (int)c.Blue)), min = Math.Min((int)c.Red, Math.Min((int)c.Green, (int)c.Blue));
+            return (max - min) / (float)Math.Max(1, max);
+        }
+        Assert.True(Saturation(spilledBrown) > Saturation(plain) - 0.08f, $"spill: {spilledBrown} lost its saturation ({Saturation(plain):0.00})");
+        Assert.True(Saturation(veiledBrown) < Saturation(spilledBrown) - 0.1f, $"veil {veiledBrown} vs spill {spilledBrown}");
+    }
+
+    /// <summary>The rim's shadow on the face: a soft dark band inside the top edge that faces the
+    /// light, none along the bottom, the centre untouched.</summary>
+    [Fact]
+    public void Shade_DarkensUnderTheTopEdge_NotTheBottomOrTheCentre()
+    {
+        using var surface = SKSurface.Create(new SKImageInfo(W, H, SKColorType.Rgba8888, SKAlphaType.Premul));
+        surface.Canvas.Clear(new SKColor(120, 70, 30));
+        Lens(surface, Frame(band: 24, bend: 0) with { Shade = 0.5f });
+        var top = Pixel(surface, 120, 42);
+        var centre = Pixel(surface, 120, 80);
+        var bottom = Pixel(surface, 120, 117);
+        Assert.Equal(120, centre.Red);
+        Assert.True(top.Red < centre.Red * 0.7f, $"top {top.Red} is not shaded");
+        Assert.Equal(centre.Red, bottom.Red, 2.0);
+    }
+
     [Fact]
     public void Rim_TopCatch_LightsTheTopEdge_AndFadesDownTheSides_SoThereIsNoOutline()
     {
@@ -362,6 +420,8 @@ public class GlassLensTests
         Assert.Equal(1, panel.BackdropMaxLuminance);
         Assert.Equal(1, panel.BackdropToneCurve);
         Assert.Equal(0, panel.BackdropLift);
+        Assert.Equal(0, panel.BackdropSpill);
+        Assert.Equal(0, panel.BackdropShade);
         Assert.Equal(GlassSpecularStyle.Diagonal, panel.SpecularStyle);
         Assert.False(panel.HasLens);
         Assert.Null(panel.LensSettings());
