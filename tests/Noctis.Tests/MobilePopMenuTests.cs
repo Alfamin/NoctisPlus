@@ -192,6 +192,104 @@ public class MobilePopMenuTests(ITestOutputHelper output)
         window.Close();
     }
 
+    /// <summary>
+    /// Now Playing's artist line (owner 10-14, Apple Music's): a tap pops a small glass bubble out
+    /// of the artist with only Go to Album (the album under it) and Go to Artist (every credited
+    /// artist under it), sitting just above the text with its lower-left corner by it, growing
+    /// out of it. Back or a tap outside closes only the bubble; each row closes the player and
+    /// opens its page, the artist row the one the ⋯ menu's Go to Artist opens.
+    /// </summary>
+    [AvaloniaFact]
+    public void TheArtistLine_PopsGoToAlbumAndGoToArtist_OutOfItself()
+    {
+        var song = MobileFixtures.Song("Leave the Door Open", artist: "Bruno Mars, Anderson .Paak & Silk Sonic");
+        var album = MobileFixtures.MakeAlbum("An Evening with Silk Sonic", "Bruno Mars", song);
+        using var rig = MobileFixtures.MakeRig(new[] { song }, new[] { album });
+        var window = MobileFixtures.Mount(rig.Shell, out var view);
+        var menu = MenuOf(view);
+        var card = menu.FindControl<Panel>("Card")!;
+
+        void OpenPlayer()
+        {
+            rig.Shell.OpenNowPlayingCommand.Execute(null);
+            Pump(30);
+            MobileFixtures.Land(window);
+        }
+
+        Button ArtistLine() => MobileFixtures.Named<Button>(view.FindControl<NowPlayingPage>("NowPlaying")!, "ArtistButton");
+
+        rig.Shell.Player.PlayTracks(rig.Library.TrackList, 0);
+        OpenPlayer();
+        var artist = ArtistLine();
+        Tap(window, artist);
+        Pump(30);
+
+        Assert.True(menu.IsVisible);
+        Assert.Same(artist, menu.Anchor);
+        Assert.IsType<TrackLinksMenuViewModel>(rig.Shell.PopMenu);
+        Assert.True(rig.Shell.IsNowPlayingOpen);
+        Assert.Equal(1, ScaleOf(card), 3);
+        foreach (var name in new[] { "LinkGoToAlbum", "LinkGoToArtist" })
+            Assert.True(MobileFixtures.Named<Control>(menu, name).IsEffectivelyVisible, name);
+        Assert.Equal(2, MobileFixtures.Named<StackPanel>(menu, "LinkRows").Children.Count);
+        Assert.DoesNotContain(menu.GetVisualDescendants().OfType<Control>(), c => c.Name is "MenuFavourite" or "Tiles" or "MenuAddToQueue");
+        var texts = menu.GetVisualDescendants().OfType<TextBlock>().Where(t => t.IsEffectivelyVisible).Select(t => t.Text).ToList();
+        Assert.Equal(new[] { "Go to Album", "An Evening with Silk Sonic", "Go to Artist", "Bruno Mars, Anderson .Paak & Silk Sonic" }, texts);
+        // The ⋯ menu's glyphs (the desktop's).
+        var glyphs = menu.GetVisualDescendants().OfType<PathIcon>().Select(i => i.Data).ToList();
+        Assert.Equal(new[] { card.FindResource("PhAlbum"), card.FindResource("PhArtist") }, glyphs);
+        Assert.All(glyphs, Assert.NotNull);
+
+        // Apple's place: just above the artist, its lower-left corner by the text, over the title.
+        var cardBox = BoxIn(card, view);
+        var artistBox = BoxIn(artist, view);
+        output.WriteLine($"artist {artistBox}, card {cardBox}");
+        Assert.Equal(artistBox.Top, cardBox.Bottom, 1);
+        Assert.Equal(Math.Max(PopMenu.EdgeGap, artistBox.Left - PopMenu.LinksLead), cardBox.Left, 1);
+        Assert.True(cardBox.Top > 0);
+        // It grows out of the text: the origin is the artist's centre, at the card's foot.
+        var origin = card.RenderTransformOrigin.ToPixels(card.Bounds.Size);
+        Assert.Equal(artistBox.Center.X - cardBox.Left, origin.X, 1);
+        Assert.Equal(cardBox.Height, origin.Y, 1);
+
+        // Back, then a tap outside: only the bubble closes.
+        Assert.True(rig.Shell.TryHandleBack());
+        Assert.False(rig.Shell.IsMenuOpen);
+        Assert.True(rig.Shell.IsNowPlayingOpen);
+        Pump(15);
+        Tap(window, artist);
+        Pump(25);
+        var wasPlaying = rig.Shell.Player.IsPlaying;
+        Tap(window, MobileFixtures.Named<Button>(view, "PlayPauseButton"));
+        Assert.False(rig.Shell.IsMenuOpen);
+        Assert.Equal(wasPlaying, rig.Shell.Player.IsPlaying);
+        Assert.True(rig.Shell.IsNowPlayingOpen);
+        Pump(15);
+
+        // Go to Album: the player closes and the album opens.
+        Tap(window, artist);
+        Pump(25);
+        Tap(window, MobileFixtures.Named<Button>(menu, "LinkGoToAlbum"));
+        Assert.False(rig.Shell.IsMenuOpen);
+        Assert.False(rig.Shell.IsNowPlayingOpen);
+        Assert.Equal(album.Id, Assert.IsType<AlbumPageViewModel>(rig.Shell.CurrentPage).AlbumId);
+        Pump(15);
+
+        // Go to Artist: the artist the ⋯ menu's Go to Artist opens (the one the song is filed under).
+        OpenPlayer();
+        Tap(window, ArtistLine());
+        Pump(25);
+        Tap(window, MobileFixtures.Named<Button>(menu, "LinkGoToArtist"));
+        Assert.False(rig.Shell.IsMenuOpen);
+        Assert.False(rig.Shell.IsNowPlayingOpen);
+        Assert.Equal(song.GroupingArtist, Assert.IsType<ArtistPageViewModel>(rig.Shell.CurrentPage).Title);
+        Pump(15);
+        rig.Shell.OpenTrackSheetCommand.Execute(song);
+        rig.Shell.Sheet!.GoToArtistCommand.Execute(null);
+        Assert.Equal(song.GroupingArtist, rig.Shell.CurrentPage!.Title);
+        window.Close();
+    }
+
     [AvaloniaFact]
     public async Task TheMenusActions_ActOnTheSong_AndCloseIt()
     {

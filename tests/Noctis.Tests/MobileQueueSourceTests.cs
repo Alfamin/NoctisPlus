@@ -159,6 +159,36 @@ public class MobileQueueSourceTests
         Assert.False(player.HasQueuePosition);
     }
 
+    /// <summary>
+    /// Bug (emulator, 10-14): the activity pauses during a cold start (Android 13's notification
+    /// prompt, or the owner switching away before the library has loaded), and its background
+    /// save wrote the queue not yet restored (nothing loaded) over queue.json: the restore then
+    /// found an empty queue, and the mini player never came back after a restart.
+    /// </summary>
+    [Fact]
+    public async Task ABackgroundSave_BeforeTheRestore_LeavesTheSavedQueueAlone()
+    {
+        var songs = Songs(3);
+        using var rig = MobileFixtures.MakeRig(songs, seed: p => p.SaveQueueStateAsync(new QueueState
+        {
+            CurrentTrackId = songs[1].Id,
+            PositionSeconds = 12,
+            UpNextIds = new() { songs[2].Id },
+        }));
+
+        await rig.Shell.SaveStateAsync();          // MainActivity.OnPause mid-start
+        await rig.Shell.InitializeAsync();
+
+        Assert.Same(songs[1], rig.Shell.Player.CurrentTrack);
+        Assert.Equal(TimeSpan.FromSeconds(12), rig.Shell.Player.Position);
+        Assert.True(rig.Shell.IsMiniBarVisible);
+
+        // Restored, a background save writes the queue as before.
+        rig.Shell.Player.NextCommand.Execute(null);
+        await rig.Shell.SaveStateAsync();
+        Assert.Equal(songs[2].Id, (await rig.Persistence.LoadQueueStateAsync())!.CurrentTrackId);
+    }
+
     [Fact]
     public async Task QueuePosition_SurvivesARestart_AndAQueueSavedBeforeItIsUnnumbered()
     {

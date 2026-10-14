@@ -214,9 +214,16 @@ public sealed partial class ShellViewModel : ObservableObject
     [NotifyPropertyChangedFor(nameof(PopMenu), nameof(IsMenuOpen))]
     private OptionsMenuViewModel? _optionsMenu;
 
-    /// <summary>What the glass pop menu shows: the Library menu, a sort or filter menu, or an
-    /// item's actions until its playlist list takes over.</summary>
-    public object? PopMenu => (object?)LibraryMenu ?? (object?)OptionsMenu ?? (Sheet is { IsPickingPlaylist: false } sheet ? sheet : null);
+    /// <summary>Now Playing's artist line tapped: Go to Album and Go to Artist (Apple's bubble).</summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(PopMenu), nameof(IsMenuOpen))]
+    private TrackLinksMenuViewModel? _linksMenu;
+
+    /// <summary>What the glass pop menu shows: the Library menu, a sort or filter menu, the
+    /// playing song's album and artist links, or an item's actions until its playlist list
+    /// takes over.</summary>
+    public object? PopMenu => (object?)LibraryMenu ?? (object?)OptionsMenu ?? (object?)LinksMenu
+        ?? (Sheet is { IsPickingPlaylist: false } sheet ? sheet : null);
 
     public bool IsMenuOpen => PopMenu != null;
 
@@ -227,6 +234,7 @@ public sealed partial class ShellViewModel : ObservableObject
         newValue.PropertyChanged += OnSheetPropertyChanged;
         LibraryMenu = null;
         OptionsMenu = null;
+        LinksMenu = null;
     }
 
     /// <summary>Add to Playlist picked in the menu: the menu closes and the sheet opens on the list.</summary>
@@ -576,7 +584,7 @@ public sealed partial class ShellViewModel : ObservableObject
     /// </summary>
     public bool TryHandleBack()
     {
-        if (IsSheetOpen || LibraryMenu != null || OptionsMenu != null) { CloseSheet(); return true; }
+        if (IsSheetOpen || IsMenuOpen) { CloseSheet(); return true; }
         if (IsQueueOpen) { IsQueueOpen = false; return true; }
         if (IsLyricsOpen) { IsLyricsOpen = false; return true; }
         if (IsNowPlayingOpen) { IsNowPlayingOpen = false; return true; }
@@ -746,6 +754,7 @@ public sealed partial class ShellViewModel : ObservableObject
         Sheet = null;
         LibraryMenu = null;
         OptionsMenu = null;
+        LinksMenu = null;
     }
 
     /// <summary>Opens a sort or filter menu (or a note) on the glass pop menu, out of the button
@@ -754,6 +763,7 @@ public sealed partial class ShellViewModel : ObservableObject
     {
         Sheet = null;
         LibraryMenu = null;
+        LinksMenu = null;
         OptionsMenu = menu;
     }
 
@@ -803,6 +813,7 @@ public sealed partial class ShellViewModel : ObservableObject
     {
         Sheet = null;
         OptionsMenu = null;
+        LinksMenu = null;
         LibraryMenu = new LibraryMenuViewModel(this);
     }
 
@@ -813,11 +824,16 @@ public sealed partial class ShellViewModel : ObservableObject
         if (Player.CurrentTrack is { } track) Sheet = ContextSheetViewModel.ForTrack(this, track);
     }
 
-    /// <summary>Now Playing's artist line: the artist page (Navigate closes the player).</summary>
+    /// <summary>Now Playing's artist line (Apple's): a glass bubble out of the artist with Go to
+    /// Album and Go to Artist, each opening its page (Navigate closes the player).</summary>
     [RelayCommand]
-    private void OpenCurrentArtist()
+    private void OpenCurrentLinks()
     {
-        if (Player.CurrentTrack is { } track) OpenArtist(track.GroupingArtist);
+        if (Player.CurrentTrack is not { } track) return;
+        Sheet = null;
+        LibraryMenu = null;
+        OptionsMenu = null;
+        LinksMenu = new TrackLinksMenuViewModel(this, track);
     }
 
     [RelayCommand]
@@ -873,7 +889,14 @@ public sealed partial class ShellViewModel : ObservableObject
         // Lyrics settings before the queue restore: restoring sets CurrentTrack, which loads
         // that track's lyrics with the saved split-word and layer preferences.
         await Lyrics.InitializeAsync();
-        await Player.RestoreStateAsync();
+        try
+        {
+            await Player.RestoreStateAsync();
+        }
+        finally
+        {
+            _queueRestored = true;
+        }
         // Signed in: pull the desktop's changes and push ours. Fire-and-forget over a loaded
         // library; a failure (the computer is off, another network) is logged and never
         // reaches the UI — Settings → Account shows the next manual sync's error instead.
@@ -895,5 +918,15 @@ public sealed partial class ShellViewModel : ObservableObject
         }
     }
 
-    public Task SaveStateAsync() => Player.SaveStateAsync();
+    // Set once the saved queue has been read back (InitializeAsync).
+    private bool _queueRestored;
+
+    /// <summary>
+    /// The activity's background checkpoint (MainActivity.OnPause). Not before the saved queue
+    /// has been restored: the activity pauses mid-start (Android 13's notification prompt, or a
+    /// switch away while the library loads), and saving then wrote the empty, not yet restored
+    /// queue over queue.json, so the restore found nothing and the mini player never came back.
+    /// A queue the owner changes before the restore is saved by the player's own mutators.
+    /// </summary>
+    public Task SaveStateAsync() => _queueRestored ? Player.SaveStateAsync() : Task.CompletedTask;
 }

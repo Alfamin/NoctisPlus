@@ -50,6 +50,9 @@ public partial class PopMenu : UserControl
     internal const double EdgeGap = 12, TopGap = 4;
     // The tab bar's own bottom margin plus a gap above it (ShellView's ChromeBottomMargin + 8).
     private const double ChromeGap = 16;
+    /// <summary>How far left of Now Playing's artist text the links bubble starts (Apple's: the
+    /// glyph column sits out to the left of the text, the labels inside it).</summary>
+    internal const double LinksLead = 12;
 
     private ShellViewModel? _shell;
     private TopLevel? _top;
@@ -57,6 +60,8 @@ public partial class PopMenu : UserControl
     private Control? _pending;
     // Bumped by every open and close: a deferred step of an older run sees it changed and stops.
     private int _run;
+    // Now Playing's artist links: the bubble rises out of the text instead of covering it.
+    private bool _rises;
 
     public PopMenu()
     {
@@ -133,7 +138,8 @@ public partial class PopMenu : UserControl
         Anchor = _pending is { } pending && pending.IsAttachedToVisualTree() && pending.IsEffectivelyVisible ? pending : null;
         _pending = null;
         Scope.RequestedThemeVariant = ThemeOf(Anchor);
-        Card.Width = menu is LibraryMenuViewModel or OptionsMenuViewModel { HasItems: true } ? LibraryWidth : ItemWidth;
+        Card.Width = menu is LibraryMenuViewModel or TrackLinksMenuViewModel or OptionsMenuViewModel { HasItems: true } ? LibraryWidth : ItemWidth;
+        _rises = menu is TrackLinksMenuViewModel;
         MenuContent.Content = menu;
         Body.Offset = default;
         IsVisible = true;
@@ -283,6 +289,8 @@ public partial class PopMenu : UserControl
     /// Playing's), aligned to the button's right edge on the right half of the screen and its
     /// left edge on the left. Neither fits (a short window): it takes the side with more room
     /// and its rows scroll. It never runs under the status bar, the mini player or the tab bar.
+    /// Now Playing's artist links are Apple's bubble instead: just above the artist, its lower
+    /// left corner by the text, over the title; below the artist when there is no room above.
     /// </summary>
     private void Place()
     {
@@ -303,7 +311,12 @@ public partial class PopMenu : UserControl
         {
             var a = new Rect(at, anchor.Bounds.Size);
             x = a.Center.X >= size.Width / 2 ? a.Right - width : a.Left;
-            if (a.Top + height <= bottom) y = Math.Max(top, a.Top);
+            if (_rises)
+            {
+                x = a.Left - LinksLead;
+                y = a.Top - height >= top ? a.Top - height : a.Bottom;
+            }
+            else if (a.Top + height <= bottom) y = Math.Max(top, a.Top);
             else if (Math.Min(a.Bottom, bottom) - height >= top) y = Math.Min(a.Bottom, bottom) - height;
             else y = bottom - a.Top >= a.Bottom - top ? Math.Max(top, a.Top) : top;
         }

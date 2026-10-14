@@ -86,8 +86,13 @@ public class MobileNowPlayingPageTests : IDisposable
         shell.ShowOutputCommand.Execute(null);
         Assert.Equal(1, outputs.Shown);
 
-        shell.OpenCurrentArtistCommand.Execute(null);
+        // The artist line pops Go to Album / Go to Artist (Apple's); Go to Artist opens the artist.
+        shell.OpenCurrentLinksCommand.Execute(null);
+        Assert.True(shell.IsNowPlayingOpen);
+        Assert.Same(t, Assert.IsType<TrackLinksMenuViewModel>(shell.PopMenu).Track);
+        shell.LinksMenu!.GoToArtistCommand.Execute(null);
         Assert.False(shell.IsNowPlayingOpen);
+        Assert.False(shell.IsMenuOpen);
         Assert.Equal("Band", shell.CurrentPage!.Title);
     }
 

@@ -98,7 +98,8 @@
                                 <TextBlock Text="E" Classes="explicit-badge-text" FontSize="10" Opacity="0.9" />
                             </Border>
                         </Grid>
-                        <Button Name="ArtistButton" Classes="row" HorizontalAlignment="Left" Command="{Binding OpenCurrentArtistCommand}">
+                        <!-- Apple's: a tap pops Go to Album / Go to Artist out of the artist (PopMenu). -->
+                        <Button Name="ArtistButton" Classes="row" HorizontalAlignment="Left" Command="{Binding OpenCurrentLinksCommand}">
                             <TextBlock Classes="np-sub" Text="{Binding Player.CurrentTrack.Artist}" FontSize="20" TextTrimming="CharacterEllipsis" />
                         </Button>
                     </StackPanel>
