@@ -298,7 +298,7 @@ public class MobileContextSheetTests
         using var rig = MobileFixtures.MakeRig(new[] { a });
         var window = MobileFixtures.Mount(rig.Shell, out var view);
         rig.Shell.OpenSongsCommand.Execute(null);
-        window.UpdateLayout();
+        MobileFixtures.Land(window);   // the page takes touches once it has slid in
 
         var more = FirstSongRow(view).GetVisualDescendants().OfType<Button>().First(b => b.Name == "MoreButton");
         var centre = more.TranslatePoint(new Point(more.Bounds.Width / 2, more.Bounds.Height / 2), window)!.Value;

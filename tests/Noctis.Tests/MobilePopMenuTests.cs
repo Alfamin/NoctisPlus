@@ -54,7 +54,7 @@ public class MobilePopMenuTests(ITestOutputHelper output)
         var window = MobileFixtures.Mount(rig.Shell, out var view);
         rig.Shell.Player.PlayTracks(rig.Library.TrackList, 0);
         rig.Shell.OpenNowPlayingCommand.Execute(null);
-        window.UpdateLayout();
+        MobileFixtures.Land(window);   // the player takes touches once it has risen
         return (rig, window, view);
     }
 
@@ -294,13 +294,13 @@ public class MobilePopMenuTests(ITestOutputHelper output)
         }
 
         rig.Shell.OpenSongsCommand.Execute(null);
-        window.UpdateLayout();
+        MobileFixtures.Land(window);   // the page takes touches once it has slid in
         var songRow = view.GetVisualDescendants().OfType<SongRow>().First();
         Check(MobileFixtures.Named<Button>(songRow, "MoreButton"), "Songs row", "MenuAddToQueue");
 
         rig.Shell.OpenAlbumCommand.Execute(album);
         Pump(30);                                                        // the page settles (push, hero)
-        window.UpdateLayout();
+        MobileFixtures.Land(window);
         var albumPage = MobileFixtures.Find<AlbumPage>(view);
         var rowMore = albumPage.GetVisualDescendants().OfType<Button>().First(b => b.Command == rig.Shell.OpenTrackSheetCommand);
         Check(rowMore, "album track row", "MenuGoToAlbum");
@@ -314,6 +314,7 @@ public class MobilePopMenuTests(ITestOutputHelper output)
         rig.Shell.OpenNowPlayingCommand.Execute(null);
         rig.Shell.ToggleQueueCommand.Execute(null);
         Pump(40);
+        MobileFixtures.Land(window);   // the player and the Queue have risen
         Check(MobileFixtures.Named<Button>(view, "QueueMoreButton"), "Queue", "MenuAddToQueue");
         window.Close();
     }
