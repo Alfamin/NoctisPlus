@@ -151,7 +151,7 @@
                         </Button>
                         <Button Grid.Column="1" Name="OutputButton" Classes="icon bottom" HorizontalAlignment="Center"
                                 Command="{Binding ShowOutputCommand}" AutomationProperties.Name="Output">
-                            <PathIcon Data="{DynamicResource PhVolumeHigh}" />
+                            <PathIcon Data="{DynamicResource PhOutput}" />
                         </Button>
                         <Button Grid.Column="2" Name="QueueButton" Classes="icon bottom" HorizontalAlignment="Center"
                                 Command="{Binding ToggleQueueCommand}" AutomationProperties.Name="Queue">

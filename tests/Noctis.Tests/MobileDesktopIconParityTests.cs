@@ -17,7 +17,8 @@ namespace Noctis.Tests;
 /// </summary>
 public class MobileDesktopIconParityTests
 {
-    /// <summary>Phone dictionary, phone key, desktop key, desktop stroke width (0 = filled).</summary>
+    /// <summary>Phone dictionary, phone key, desktop key, desktop stroke width (0 = filled; negative =
+    /// stroked at that width and filled, as MenuV2 draws a favourite's heart).</summary>
     public static readonly TheoryData<string, string, string, double> Pairs = new()
     {
         // Player bar
@@ -31,6 +32,7 @@ public class MobileDesktopIconParityTests
         { "PhoneIcons", "PhVolumeLow", "SpeakerLowIcon", 0 },
         { "PhoneIcons", "PhVolumeHigh", "SpeakerHighIcon", 0 },
         { "PhoneIcons", "PhLyrics", "MenuLineLyrics", 2.25 },
+        { "PhoneIcons", "PhOutput", "MenuLineVolume", 2.25 },
         { "PhoneIcons", "PhQueue", "MenuLineQueue", 2.25 },
         { "LibraryIcons", "QueueRepeatIcon", "RepeatAllIcon", 0 },
         { "LibraryIcons", "QueueRepeatOneIcon", "RepeatOneIcon", 0 },
@@ -69,6 +71,8 @@ public class MobileDesktopIconParityTests
         { "PhoneIcons", "PhPin", "MenuLinePin", 2.25 },
         { "PhoneIcons", "PhAlbum", "MenuLineAlbum", 2.25 },
         { "PhoneIcons", "PhArtist", "MenuLineArtist", 2.25 },
+        { "PhoneIcons", "PhMenuHeart", "MenuLineHeart", 2.25 },
+        { "PhoneIcons", "PhMenuHeartFill", "MenuLineHeart", -2.25 },
         { "LibraryIcons", "LibPinIcon", "PinFilledIcon", 0 },
         { "LibraryIcons", "QueueReorderIcon", "LineGrip", 3.6 },
     };
@@ -111,6 +115,11 @@ public class MobileDesktopIconParityTests
         canvas.Clear(SKColors.Transparent);
         canvas.Scale(Scale);
         using var paint = new SKPaint { Color = SKColors.Black, IsAntialias = true };
+        if (strokeWidth < 0)
+        {
+            canvas.DrawPath(path, paint);
+            strokeWidth = -strokeWidth;
+        }
         if (strokeWidth > 0)
         {
             paint.Style = SKPaintStyle.Stroke;
