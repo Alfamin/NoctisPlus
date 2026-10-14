@@ -5,9 +5,10 @@ using Noctis.Models;
 namespace Noctis.Mobile.ViewModels;
 
 /// <summary>
-/// The long-press sheet for a song, an album or a playlist (spec §5 item 1: play next, add to
-/// queue, add to playlist, favourite; plus pin, and go to album/artist for a song). Every
-/// action closes the sheet; the Shell owns opening and Back.
+/// The ⋯ / long-press menu for a song, an album, a playlist or an artist (spec §5 item 1: play
+/// next, add to queue, add to playlist, favourite; plus pin, and go to album/artist for a song),
+/// shown on the glass pop menu; its Add to Playlist list on the bottom sheet. Every action
+/// closes it; the Shell owns opening and Back.
 /// </summary>
 public sealed partial class ContextSheetViewModel : ObservableObject
 {
@@ -130,24 +131,25 @@ public sealed partial class ContextSheetViewModel : ObservableObject
         await _shell.SetFavouriteAsync(Tracks, !IsFavourite);
     }
 
+    /// <summary>The menu's Add to Playlist: the menu closes and the bottom sheet opens on the
+    /// playlist list (with its keyboard-aware New playlist box), for whatever the menu was on.</summary>
     [RelayCommand] private void ShowPlaylists() => IsPickingPlaylist = true;
 
-    /// <summary>The Now Playing menu's Add to Playlist: the card closes and the bottom sheet
-    /// opens on its playlist page (with its keyboard-aware New playlist box).</summary>
-    [RelayCommand]
-    private void PickPlaylist()
-    {
-        _shell.CloseSheet();
-        if (Track != null) _shell.Sheet = new ContextSheetViewModel(_shell, Title, Subtitle, ArtworkPath, Tracks) { Track = Track, IsPickingPlaylist = true };
-    }
+    /// <summary>Lyrics are the playing song's page: the row shows only on that song's menu.</summary>
+    public bool CanShowLyrics => Track != null && _shell.Player.CurrentTrack?.Id == Track.Id;
 
-    /// <summary>The Now Playing menu's Lyrics: the lyrics page over the player.</summary>
+    /// <summary>The menu's Lyrics: the lyrics page, over the player or a list (the Queue, which
+    /// would sit over it, gives way).</summary>
     [RelayCommand]
     private void ShowLyrics()
     {
         _shell.CloseSheet();
+        _shell.IsQueueOpen = false;
         _shell.IsLyricsOpen = true;
     }
+
+    /// <summary>The second line under Go to Artist: the song's, or the album's, artists.</summary>
+    public string? ArtistLine => Track?.Artist ?? Album?.Artist;
 
     [RelayCommand]
     private async Task AddToPlaylistAsync(Playlist? playlist)

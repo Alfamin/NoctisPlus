@@ -259,22 +259,10 @@
                                 IsVisible="{Binding Library.HasFolders}">
                             <PathIcon Data="{DynamicResource PhList}" />
                         </Button>
-                        <Button Name="LibraryMoreButton" Classes="glass-round">
+                        <!-- Add Folder…, Rescan Library and Settings on the glass pop menu (PopMenu). -->
+                        <Button Name="LibraryMoreButton" Classes="glass-round" Command="{Binding OpenLibraryMenuCommand}"
+                                AutomationProperties.Name="More">
                             <PathIcon Data="{DynamicResource LibMoreIcon}" />
-                            <Button.Flyout>
-                                <MenuFlyout Placement="BottomEdgeAlignedRight">
-                                    <!-- The Windows app's own glyphs for the same three actions. -->
-                                    <MenuItem Header="Add Folder…" Command="{Binding Library.AddFolderCommand}">
-                                        <MenuItem.Icon><PathIcon Data="{DynamicResource FolderIcon}" Width="18" Height="18" /></MenuItem.Icon>
-                                    </MenuItem>
-                                    <MenuItem Header="Rescan Library" Command="{Binding Library.RescanCommand}">
-                                        <MenuItem.Icon><PathIcon Data="{DynamicResource SyncIcon}" Width="18" Height="18" /></MenuItem.Icon>
-                                    </MenuItem>
-                                    <MenuItem Header="Settings" Command="{Binding OpenSettingsCommand}">
-                                        <MenuItem.Icon><PathIcon Data="{DynamicResource SettingsIcon}" Width="18" Height="18" /></MenuItem.Icon>
-                                    </MenuItem>
-                                </MenuFlyout>
-                            </Button.Flyout>
                         </Button>
                     </StackPanel>
                 </controls:GlassPanel>
