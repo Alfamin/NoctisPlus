@@ -75,6 +75,11 @@ public class MobileDesktopIconParityTests
         { "PhoneIcons", "PhMenuHeartFill", "MenuLineHeart", -2.25 },
         { "LibraryIcons", "LibPinIcon", "PinFilledIcon", 0 },
         { "LibraryIcons", "QueueReorderIcon", "LineGrip", 3.6 },
+        // The Library ⋯ menu and the Add to Playlist list, at the menus' 2.25u weight (owner 10-13)
+        { "PhoneIcons", "PhFolder", "MenuLineFolder", 2.25 },
+        { "PhoneIcons", "PhRescan", "PluginsRefreshGlyph", 2.25 },
+        { "PhoneIcons", "PhSettings", "SettingsIcon", -0.75 },
+        { "PhoneIcons", "PhPlaylist", "MenuLinePlaylist", 2.25 },
     };
 
     private const int Scale = 8; // 24 grid -> 192 px
