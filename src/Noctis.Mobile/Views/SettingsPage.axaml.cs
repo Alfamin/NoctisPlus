@@ -1,9 +1,6 @@
 using System.ComponentModel;
 using Avalonia;
-using Avalonia.Animation;
 using Avalonia.Controls;
-using Avalonia.Media.Transformation;
-using Avalonia.Threading;
 using Noctis.Mobile.ViewModels;
 
 namespace Noctis.Mobile.Views;
@@ -11,16 +8,13 @@ namespace Noctis.Mobile.Views;
 /// <summary>
 /// Settings' pages inside the sheet: the top level and the pushed page (Music Folders,
 /// Appearance, Lyrics) share one area. A pushed page slides in from the right while the top
-/// level drifts a little left and fades, and Back reverses it (TransformOperationsTransition:
-/// an Animation cannot drive RenderTransform here). The header's hairline shows once the page
-/// showing has scrolled under it.
+/// level drifts a little left and fades, and Back reverses it: the app's push (Motion), with a
+/// fade rather than a shade because the two panes are see-through over one backdrop. The
+/// header's hairline shows once the page showing has scrolled under it.
 /// </summary>
 public partial class SettingsPage : UserControl
 {
-    private static readonly TimeSpan Slide = TimeSpan.FromMilliseconds(380);
-
     private SettingsPageViewModel? _vm;
-    private int _moves;
 
     public SettingsPage()
     {
@@ -53,30 +47,27 @@ public partial class SettingsPage : UserControl
     {
         var sub = _vm?.IsSubPane == true;
         var width = PaneHost.Bounds.Width > 0 ? PaneHost.Bounds.Width : 412;
+        var main = Motion.TranslateX(sub ? -width * Motion.PushShift : 0);
+        var page = Motion.TranslateX(sub ? 0 : width);
 
-        MainScroll.Transitions = animate ? SlideTransitions() : null;
-        SubScroll.Transitions = animate ? SlideTransitions() : null;
         MainScroll.IsVisible = true;
         SubScroll.IsVisible = true;
         MainScroll.IsHitTestVisible = !sub;
         SubScroll.IsHitTestVisible = sub;
-        MainScroll.RenderTransform = TransformOperations.Parse(sub ? $"translateX({-width * 0.3:0.#}px)" : "translateX(0px)");
-        SubScroll.RenderTransform = TransformOperations.Parse(sub ? "translateX(0px)" : $"translateX({width:0.#}px)");
-        MainScroll.Opacity = sub ? 0 : 1;
         UpdateHairline();
-
-        var move = ++_moves;
-        if (animate) _ = SettleAfterSlideAsync(move);
-        else Settle();
-    }
-
-    private async Task SettleAfterSlideAsync(int move)
-    {
-        await Task.Delay(Slide + TimeSpan.FromMilliseconds(40)).ConfigureAwait(false);
-        Dispatcher.UIThread.Post(() =>
+        if (animate)
         {
-            if (move == _moves) Settle();   // a later move owns the panes now
-        });
+            // Each run's end settles the panes; a later move drops the earlier runs, ends and all.
+            Motion.To(MainScroll, Motion.Push, main, opacity: sub ? 0 : 1, done: Settle);
+            Motion.To(SubScroll, Motion.Push, page, done: Settle);
+            return;
+        }
+        Motion.Stop(MainScroll);
+        Motion.Stop(SubScroll);
+        MainScroll.RenderTransform = main;
+        SubScroll.RenderTransform = page;
+        MainScroll.Opacity = sub ? 0 : 1;
+        Settle();
     }
 
     private void Settle()
@@ -85,12 +76,6 @@ public partial class SettingsPage : UserControl
         MainScroll.IsVisible = !sub;
         SubScroll.IsVisible = sub;
     }
-
-    private static Transitions SlideTransitions() => new()
-    {
-        new TransformOperationsTransition { Property = RenderTransformProperty, Duration = Slide, Easing = new GlideEase() },
-        new DoubleTransition { Property = OpacityProperty, Duration = Slide, Easing = new GlideEase() },
-    };
 
     private void UpdateHairline()
     {

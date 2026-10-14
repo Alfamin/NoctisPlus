@@ -473,13 +473,27 @@ public sealed partial class ShellViewModel : ObservableObject
         UnfoldTabBar();
     }
 
-    /// <summary>Push <paramref name="page"/> over the current tab. A page opened from Now
-    /// Playing (the artist link) closes the player first.</summary>
-    public void Navigate(MobilePage page)
+    /// <summary>How the last change of <see cref="CurrentPage"/> came about, raised before it:
+    /// ShellView moves the pages to match (a push slides in, a pop slides out, a reset jumps).</summary>
+    public PageMove LastPageMove { get; private set; }
+
+    private bool _resetting;
+
+    /// <summary>Push <paramref name="page"/> over the current tab (inside the sheet, when one is
+    /// up). A page opened from Now Playing (the artist link) closes the player first.</summary>
+    public void Navigate(MobilePage page) => Push(page, sheet: false);
+
+    /// <summary>Present <paramref name="page"/> as a sheet over everything (Settings); Back or its
+    /// close button drops it, and pages pushed from it open inside it.</summary>
+    public void Present(MobilePage page) => Push(page, sheet: !Pages.Any(p => p.IsSheet));
+
+    private void Push(MobilePage page, bool sheet)
     {
         CloseSheet();
         if (IsNowPlayingOpen) CloseNowPlaying();
+        page.IsSheet = sheet;
         Pages.Add(page);
+        LastPageMove = PageMove.Push;
         CurrentPage = page;
     }
 
@@ -490,13 +504,32 @@ public sealed partial class ShellViewModel : ObservableObject
         var top = Pages[^1];
         Pages.RemoveAt(Pages.Count - 1);
         top.OnClosed();
+        LastPageMove = _resetting ? PageMove.Reset : PageMove.Pop;
         CurrentPage = Pages.Count > 0 ? Pages[^1] : null;
         return true;
     }
 
+    /// <summary>Drops the sheet (Settings, with Account if it is open inside it): a swipe down on
+    /// it. False when no sheet is up.</summary>
+    public bool DismissSheet()
+    {
+        if (!Pages.Any(p => p.IsSheet)) return false;
+        while (Pages.Any(p => p.IsSheet)) GoBack();
+        return true;
+    }
+
+    /// <summary>Back to the tab's root at once (a tab tap): no page slides on the way.</summary>
     public void PopToRoot()
     {
-        while (GoBack()) { }
+        _resetting = true;
+        try
+        {
+            while (GoBack()) { }
+        }
+        finally
+        {
+            _resetting = false;
+        }
     }
 
     [RelayCommand] private void NavigateBack() => GoBack();
@@ -780,16 +813,18 @@ public sealed partial class ShellViewModel : ObservableObject
     [RelayCommand]
     private void OpenSettings()
     {
+        // A second tap while the sheet rises is the same request, not a second sheet.
+        if (Pages.Any(p => p is SettingsPageViewModel)) return;
         var page = new SettingsPageViewModel(this);
-        Navigate(page);
+        Present(page);
         _ = page.LoadAsync();
     }
 
-    /// <summary>Settings → Account.</summary>
+    /// <summary>Settings → Account, pushed inside the Settings sheet.</summary>
     [RelayCommand]
     private void OpenAccount()
     {
-        if (Account != null) Navigate(new AccountPageViewModel(this, Account));
+        if (Account != null && CurrentPage is not AccountPageViewModel) Navigate(new AccountPageViewModel(this, Account));
     }
 
     /// <summary>The sheet's Download: fetches <paramref name="tracks"/> for offline play. Failures

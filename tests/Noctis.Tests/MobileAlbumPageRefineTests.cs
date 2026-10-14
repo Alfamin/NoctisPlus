@@ -197,7 +197,7 @@ public class MobileAlbumPageRefineTests
         using var rig = Rig(tracks, album);
         var window = MobileFixtures.Mount(rig.Shell, out var view);
         rig.Shell.OpenAlbumCommand.Execute(album);
-        window.UpdateLayout();
+        MobileFixtures.Land(window);
         var vm = Assert.IsType<AlbumPageViewModel>(rig.Shell.CurrentPage);
         vm.PlayTrackCommand.Execute(vm.Tracks[1]);
         window.UpdateLayout();
@@ -222,7 +222,7 @@ public class MobileAlbumPageRefineTests
         Pump(4);
         Assert.True(bars.IsRunning);
         rig.Shell.NavigateBackCommand.Execute(null);
-        window.UpdateLayout();
+        MobileFixtures.Land(window);   // the page slides away, then goes
         Pump(4);
         Assert.False(bars.IsRunning);
         window.Close();

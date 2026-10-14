@@ -338,9 +338,9 @@ public class MobileArtistPageTests : IDisposable
         using var rig = MobileFixtures.MakeRig(tracks, albums, tint: Tint(Color.FromRgb(0xC8, 0x10, 0x2E)));
         rig.Shell.SafeArea = new Thickness(0, 40, 0, 0);
         var window = MobileFixtures.Mount(rig.Shell, out var view);
-        var host = MobileFixtures.Named<ContentControl>(view, "PageHost");
         rig.Shell.OpenArtistCommand.Execute("Band");
         window.UpdateLayout();
+        var host = MobileFixtures.PageView(view, rig.Shell.CurrentPage!);
 
         var page = MobileFixtures.Find<ArtistPage>(view);
         var hero = MobileFixtures.Named<Panel>(page, "Hero");
@@ -375,7 +375,7 @@ public class MobileArtistPageTests : IDisposable
         Assert.Equal(Colors.White, ((ISolidColorBrush)buttons[1].Foreground!).Color);
 
         rig.Shell.NavigateBackCommand.Execute(null);
-        window.UpdateLayout();
+        MobileFixtures.Land(window);   // the page slides away, then lets go of its host
         Assert.True(host.ClipToBounds);
         window.Close();
     }

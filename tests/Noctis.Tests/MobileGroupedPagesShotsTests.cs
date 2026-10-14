@@ -13,6 +13,7 @@ using Avalonia.Styling;
 using Avalonia.Threading;
 using Noctis.Mobile.Services;
 using Noctis.Mobile.ViewModels;
+using Noctis.Mobile.Views;
 using Xunit;
 
 namespace Noctis.Tests;
@@ -36,6 +37,8 @@ public class MobileGroupedPagesShotsTests
             AvaloniaHeadlessPlatform.ForceRenderTimerTick();
             Thread.Sleep(5);
         }
+        Dispatcher.UIThread.RunJobs();
+        Motion.FinishAll();   // a shot shows the sheet landed, not on its way
         Dispatcher.UIThread.RunJobs();
     }
 

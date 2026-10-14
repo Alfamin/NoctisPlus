@@ -168,7 +168,7 @@ public class MobileContextSheetTests
         using var rig = MobileFixtures.MakeRig(new[] { a });
         var window = MobileFixtures.Mount(rig.Shell, out var view);
         rig.Shell.OpenSongsCommand.Execute(null);
-        window.UpdateLayout();
+        MobileFixtures.Land(window);   // the page takes touches once it has slid in
         var row = FirstSongRow(view);
         var centre = row.TranslatePoint(new Point(row.Bounds.Width / 2, row.Bounds.Height / 2), window)!.Value;
 
@@ -270,7 +270,7 @@ public class MobileContextSheetTests
         using var rig = MobileFixtures.MakeRig(new[] { a });
         var window = MobileFixtures.Mount(rig.Shell, out var view);
         rig.Shell.OpenSongsCommand.Execute(null);
-        window.UpdateLayout();
+        MobileFixtures.Land(window);   // the page takes touches once it has slid in
         var row = FirstSongRow(view);
         var centre = row.TranslatePoint(new Point(row.Bounds.Width / 2, row.Bounds.Height / 2), window)!.Value;
 

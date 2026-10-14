@@ -177,7 +177,7 @@ public class MobileArtistGridTests
         using var rig = RigWithArtists(ManyArtists(500));
         var window = MobileFixtures.Mount(rig.Shell, out var view);
         var page = OpenArtists(rig);
-        window.UpdateLayout();
+        MobileFixtures.Land(window);   // the page takes touches once it has slid in
         var scroll = MobileFixtures.Named<ScrollViewer>(view, "ArtistScroll");
         var letters = MobileFixtures.Named<ItemsControl>(view, "IndexLetters");
 

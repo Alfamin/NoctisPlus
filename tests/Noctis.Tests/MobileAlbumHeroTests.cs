@@ -184,16 +184,15 @@ public class MobileAlbumHeroTests : IDisposable
         var (album, tracks) = Sample();
         using var rig = MobileFixtures.MakeRig(tracks, new[] { album });
         var window = MobileFixtures.Mount(rig.Shell, out var view);
-        var host = MobileFixtures.Named<ContentControl>(view, "PageHost");
-        Assert.True(host.ClipToBounds);
-
         rig.Shell.OpenAlbumsCommand.Execute(null);
         rig.Shell.OpenAlbumCommand.Execute(album);
         window.UpdateLayout();
+        var host = MobileFixtures.PageView(view, rig.Shell.CurrentPage!);
         Assert.False(host.ClipToBounds);
 
+        // Back: the album slides away, then lets go of its host.
         rig.Shell.NavigateBackCommand.Execute(null);
-        window.UpdateLayout();
+        MobileFixtures.Land(window);
         Assert.True(host.ClipToBounds);
         window.Close();
     }
@@ -452,7 +451,7 @@ public class MobileAlbumHeroTests : IDisposable
         Assert.Equal(false, theme.Icons[^1]);
 
         rig.Shell.NavigateBackCommand.Execute(null);
-        window.UpdateLayout();
+        MobileFixtures.Land(window);   // the album slides away before it hands the bar back
         Assert.Null(theme.Icons[^1]);
         window.Close();
     }
