@@ -2,6 +2,7 @@ using System;
 using System.Linq;
 using Avalonia;
 using Avalonia.Controls;
+using Avalonia.Controls.Presenters;
 using Avalonia.Headless;
 using Avalonia.Headless.XUnit;
 using Avalonia.Media;
@@ -158,6 +159,10 @@ public class MobileGlassDropletTests
         Assert.False(rig.Shell.Player.HasNext);
         Assert.False(next.IsEffectivelyEnabled);
         Assert.True(next.Classes.Contains("unavailable"));
+        // Only the glyph dims: no grey disc from Fluent's disabled presenter behind it.
+        var presenter = next.GetVisualDescendants().OfType<ContentPresenter>().First(p => p.Name == "PART_ContentPresenter");
+        Assert.True(presenter.Background is null || presenter.Background is ISolidColorBrush { Color.A: 0 },
+            $"Next has a {presenter.Background} disc while greyed");
 
         rig.Shell.Player.PlayNext(songs[0]);
         window.UpdateLayout();

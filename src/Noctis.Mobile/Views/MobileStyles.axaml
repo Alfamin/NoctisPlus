@@ -523,6 +523,13 @@
         <Setter Property="BorderBrush" Value="{Binding $parent[Button].BorderBrush}" />
         <Setter Property="Foreground" Value="{Binding $parent[Button].Foreground}" />
     </Style>
+    <!-- Greyed (disabled) too: Fluent fills a disabled button's presenter with its grey, which put a
+         grey disc behind the mini player's Next with nothing to skip to. The glyph dims instead
+         (Button.icon.mini.unavailable); the foreground stays Fluent's disabled grey. -->
+    <Style Selector="Button.row:disabled /template/ ContentPresenter#PART_ContentPresenter, Button.icon:disabled /template/ ContentPresenter#PART_ContentPresenter, Button.round:disabled /template/ ContentPresenter#PART_ContentPresenter, Button.glass-round:disabled /template/ ContentPresenter#PART_ContentPresenter, Button.pill:disabled /template/ ContentPresenter#PART_ContentPresenter, Button.chip:disabled /template/ ContentPresenter#PART_ContentPresenter, Button.tile:disabled /template/ ContentPresenter#PART_ContentPresenter, Button.tab:disabled /template/ ContentPresenter#PART_ContentPresenter, Button.text-chip:disabled /template/ ContentPresenter#PART_ContentPresenter, Button.sheet-tile:disabled /template/ ContentPresenter#PART_ContentPresenter">
+        <Setter Property="Background" Value="{Binding $parent[Button].Background}" />
+        <Setter Property="BorderBrush" Value="{Binding $parent[Button].BorderBrush}" />
+    </Style>
     <!-- Press feedback, the way Apple's controls answer a touch: the button dims and settles a
          touch smaller, easing in and back out, instead of jumping to 70 % opacity. Both ease on
          the button itself (TransformOperationsTransition: an Animation cannot drive RenderTransform
