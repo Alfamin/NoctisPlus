@@ -25,8 +25,11 @@
             </StackPanel>
         </Border>
 
+        <!-- Indeterminate only while scanning, not merely hidden: a hidden indeterminate bar's
+             endless animation is paused but stays on the global clock, which keeps Avalonia
+             rendering a frame every 16 ms on an idle screen (one bar each on Home and Library). -->
         <StackPanel Spacing="4" IsVisible="{Binding Library.IsScanning}">
-            <ProgressBar IsIndeterminate="True" />
+            <ProgressBar IsIndeterminate="{Binding Library.IsScanning}" />
             <TextBlock Classes="subtle" Text="{Binding Library.ScanProgress, StringFormat='Scanning… {0} files'}" />
         </StackPanel>
     </StackPanel>
