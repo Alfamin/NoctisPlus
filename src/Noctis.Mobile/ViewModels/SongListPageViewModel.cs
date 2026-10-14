@@ -100,8 +100,10 @@ public sealed partial class SongListPageViewModel : MobilePage, ISortable
     /// <summary>The filter button lights up while a filter is on.</summary>
     public bool IsFiltered => OnlyFavourites || OnlyDownloaded;
 
-    /// <summary>Downloaded means a desktop song's offline copy: offered only with an account.</summary>
-    public bool CanFilterDownloaded => Shell.Account != null;
+    /// <summary>Downloaded means a desktop song's offline copy: offered while signed in to a
+    /// computer, or while copies are kept from one. Signed out with none, the filter could only
+    /// empty the list (it offered itself whenever the account service existed: "0 of 11", 10-14).</summary>
+    public bool CanFilterDownloaded => Shell.Account is { } account && (account.IsSignedIn || account.DownloadedCount > 0);
 
     // ── Sort ──
 
