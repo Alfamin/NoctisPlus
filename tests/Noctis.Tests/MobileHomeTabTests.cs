@@ -184,4 +184,59 @@ public class MobileHomeTabTests
         Assert.Equal(MobileTab.Home, rig.Shell.SelectedTab);
         Assert.False(rig.Shell.TryHandleBack());
     }
+
+    // ── Mini player ──────────────────────────────────────────────
+
+    private static MobileFixtures.Rig PlayingRig(out Window window, out ShellView view)
+    {
+        var rig = MakeRig();
+        Task.Run(rig.Shell.InitializeAsync).GetAwaiter().GetResult();
+        rig.Shell.Player.PlayTracks(rig.Library.TrackList.ToList(), 0, null);
+        window = MobileFixtures.Mount(rig.Shell, out view);
+        return rig;
+    }
+
+    /// <summary>Default: no fill, no line, the capsule is plain glass (Apple's).</summary>
+    [AvaloniaFact]
+    public void MiniPlayer_IsPlainGlass_ByDefault()
+    {
+        using var rig = PlayingRig(out var window, out var view);
+        Assert.False(rig.Shell.ShowMiniProgressFill);
+        Assert.False(rig.Shell.ShowMiniProgressLine);
+        Assert.False(view.FindControl<Border>("MiniProgress")!.IsEffectivelyVisible);
+        window.Close();
+    }
+
+    /// <summary>Each switch shows its part at once, and both come back after a restart.</summary>
+    [AvaloniaFact]
+    public async Task MiniPlayer_ProgressColourAndLine_ApplyLive_AndPersist()
+    {
+        using var rig = PlayingRig(out var window, out var view);
+        var fill = view.FindControl<Border>("MiniProgressFill")!;
+        var line = view.FindControl<Border>("MiniProgressLine")!;
+
+        rig.Shell.ShowMiniProgressFill = true;
+        window.UpdateLayout();
+        Assert.True(fill.IsEffectivelyVisible);
+        Assert.False(line.IsEffectivelyVisible);
+
+        rig.Shell.ShowMiniProgressFill = false;
+        rig.Shell.ShowMiniProgressLine = true;
+        window.UpdateLayout();
+        Assert.False(fill.IsEffectivelyVisible);
+        Assert.True(line.IsEffectivelyVisible);
+
+        rig.Shell.ShowMiniProgressFill = true;
+        await rig.Shell.PendingPlayerBarSave;
+        var saved = await rig.Persistence.LoadSettingsAsync();
+        Assert.True(saved.MobilePlayerBarProgressFill);
+        Assert.True(saved.MobilePlayerBarProgressLine);
+        window.Close();
+
+        // A fresh shell over the same data reads them back.
+        var again = new ShellViewModel(rig.Shell.Library, rig.Shell.Player, rig.Shell.Lyrics) { TintFactory = rig.Shell.TintFactory };
+        await again.InitializeAsync();
+        Assert.True(again.ShowMiniProgressFill);
+        Assert.True(again.ShowMiniProgressLine);
+    }
 }

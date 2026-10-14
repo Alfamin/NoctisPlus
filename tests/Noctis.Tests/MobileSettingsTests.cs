@@ -404,6 +404,36 @@ public class MobileSettingsTests
         }
     }
 
+    /// <summary>Owner 10-13: Appearance's Player Bar card switches the mini player's progress
+    /// colour and line, both off by default; a switch acts on the shell at once and is saved.</summary>
+    [AvaloniaFact]
+    public async Task Settings_Appearance_PlayerBarSwitches_DriveTheMiniPlayer()
+    {
+        using var rig = await RigWithFolders(null, Tones);
+        await rig.Shell.InitializeAsync();
+        await WithMountedSettings(rig, (page, vm, window) =>
+        {
+            vm.OpenPaneCommand.Execute(SettingsPane.Appearance);
+            Settle(window);
+            var card = MobileFixtures.Named<Border>(page, "PlayerBarCard");
+            Assert.True(card.IsEffectivelyVisible);
+            var colour = MobileFixtures.Named<Avalonia.Controls.Primitives.ToggleButton>(page, "ProgressColourSwitch");
+            var line = MobileFixtures.Named<Avalonia.Controls.Primitives.ToggleButton>(page, "ProgressLineSwitch");
+            Assert.False(colour.IsChecked);
+            Assert.False(line.IsChecked);
+
+            colour.IsChecked = true;
+            Assert.True(rig.Shell.ShowMiniProgressFill);
+            Assert.False(rig.Shell.ShowMiniProgressLine);
+            line.IsChecked = true;
+            Assert.True(rig.Shell.ShowMiniProgressLine);
+        });
+        await rig.Shell.PendingPlayerBarSave;
+        var saved = await rig.Persistence.LoadSettingsAsync();
+        Assert.True(saved.MobilePlayerBarProgressFill);
+        Assert.True(saved.MobilePlayerBarProgressLine);
+    }
+
     /// <summary>Device 10-13: the profile card's avatar sat flush against the card's left edge,
     /// the circle clipped by the card's corner: the row's Button#AccountRow padding lost to
     /// MobileStyles' Button.row (Padding 0). The inset is now the row grid's own margin.</summary>
@@ -625,9 +655,10 @@ public class MobileSettingsTests
                 Settle(window);
                 lines.AddRange(page.GetVisualDescendants().OfType<Border>().Where(b => b.Classes.Contains("row-separator") && b.IsEffectivelyVisible));
             }
-            // 2 on the top level, 1 between two folders, 3 between four dark styles, 3 in Lyrics
-            // (two between its three switches, one between its two sliders): none above a list's first row.
-            Assert.Equal(9, lines.Count);
+            // 2 on the top level, 1 between two folders, 3 between four dark styles and 1 between
+            // the Player Bar's two switches, 3 in Lyrics (two between its three switches, one
+            // between its two sliders): none above a list's first row.
+            Assert.Equal(10, lines.Count);
             Assert.All(lines, line =>
             {
                 var card = line.GetVisualAncestors().OfType<Border>().First(b => b.Classes.Contains("group-card"));

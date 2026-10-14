@@ -348,6 +348,66 @@ public sealed partial class ShellViewModel : ObservableObject
         MiniProgressLine = new Avalonia.Media.Immutable.ImmutableSolidColorBrush(Avalonia.Media.Color.FromArgb((byte)(neutral ? 0x99 : 0xE6), c.R, c.G, c.B));
     }
 
+    // Settings › Appearance › Player Bar. Both off by default: the capsule is plain glass, as
+    // Apple's. Saved to settings.json (MobilePlayerBarProgress*) and applied live.
+
+    /// <summary>The elapsed fill in the cover's colour (<see cref="MiniProgressFill"/>).</summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(ShowsMiniProgress))]
+    private bool _showMiniProgressFill;
+
+    /// <summary>The bright line along the capsule's bottom edge (<see cref="MiniProgressLine"/>).</summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(ShowsMiniProgress))]
+    private bool _showMiniProgressLine;
+
+    public bool ShowsMiniProgress => ShowMiniProgressFill || ShowMiniProgressLine;
+
+    private bool _playerBarLoaded;
+    private Task _playerBarSaveChain = Task.CompletedTask;
+
+    /// <summary>The tail of the player-bar saves; tests await it.</summary>
+    internal Task PendingPlayerBarSave { get; private set; } = Task.CompletedTask;
+
+    partial void OnShowMiniProgressFillChanged(bool value) => SavePlayerBarSettings();
+    partial void OnShowMiniProgressLineChanged(bool value) => SavePlayerBarSettings();
+
+    private async Task LoadPlayerBarSettingsAsync()
+    {
+        try
+        {
+            var settings = await Library.Persistence.LoadSettingsAsync();
+            ShowMiniProgressFill = settings.MobilePlayerBarProgressFill;
+            ShowMiniProgressLine = settings.MobilePlayerBarProgressLine;
+        }
+        catch (Exception ex)
+        {
+            DebugLog.Write("Settings", $"Player bar settings load failed: {ex.Message}");
+        }
+        _playerBarLoaded = true;
+    }
+
+    /// <summary>One save after another, so a quick on-off never lands out of order.</summary>
+    private void SavePlayerBarSettings()
+    {
+        if (!_playerBarLoaded) return;
+        bool fill = ShowMiniProgressFill, line = ShowMiniProgressLine;
+        PendingPlayerBarSave = _playerBarSaveChain = _playerBarSaveChain.ContinueWith(async _ =>
+        {
+            try
+            {
+                var settings = await Library.Persistence.LoadSettingsAsync();
+                settings.MobilePlayerBarProgressFill = fill;
+                settings.MobilePlayerBarProgressLine = line;
+                await Library.Persistence.SaveSettingsAsync(settings);
+            }
+            catch (Exception ex)
+            {
+                DebugLog.Write("Settings", $"Player bar settings save failed: {ex.Message}");
+            }
+        }, TaskScheduler.Default).Unwrap();
+    }
+
     /// <summary>A started track's play reached the log: the Library's play-log rails re-read it,
     /// and a desktop song's play is queued for the desktop (sent as a scrobble on the next sync).</summary>
     private void OnPlayRecorded(object? sender, EventArgs e)
@@ -698,6 +758,7 @@ public sealed partial class ShellViewModel : ObservableObject
     public async Task InitializeAsync()
     {
         await Library.InitializeAsync();
+        await LoadPlayerBarSettingsAsync();
         // Lyrics settings before the queue restore: restoring sets CurrentTrack, which loads
         // that track's lyrics with the saved split-word and layer preferences.
         await Lyrics.InitializeAsync();
