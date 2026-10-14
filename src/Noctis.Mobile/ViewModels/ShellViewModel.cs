@@ -479,6 +479,15 @@ public sealed partial class ShellViewModel : ObservableObject
         return true;
     }
 
+    /// <summary>Drops the sheet (Settings, with Account if it is open inside it): a swipe down on
+    /// it. False when no sheet is up.</summary>
+    public bool DismissSheet()
+    {
+        if (!Pages.Any(p => p.IsSheet)) return false;
+        while (Pages.Any(p => p.IsSheet)) GoBack();
+        return true;
+    }
+
     /// <summary>Back to the tab's root at once (a tab tap): no page slides on the way.</summary>
     public void PopToRoot()
     {

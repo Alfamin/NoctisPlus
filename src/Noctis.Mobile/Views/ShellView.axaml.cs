@@ -8,6 +8,7 @@ using Avalonia.Interactivity;
 using Avalonia.Media;
 using Avalonia.Media.Transformation;
 using Avalonia.Threading;
+using Avalonia.VisualTree;
 using Noctis.Controls;
 using Noctis.Helpers;
 using Noctis.Mobile.ViewModels;
@@ -33,6 +34,13 @@ public partial class ShellView : UserControl
         QueueSheet.TabBar = BottomChrome;
         QueueSheet.PropertyChanged += OnQueueSheetPropertyChanged;
         PageHost.Root = RootLayer;
+        // A swipe down on a sheet drops it (SheetDrag below). Tunnel, handled or not: the press
+        // lands on the sheet's buttons and cover too.
+        SheetHost.AddHandler(PointerPressedEvent, OnSheetPressed, RoutingStrategies.Tunnel, handledEventsToo: true);
+        PlayerLayer.AddHandler(PointerPressedEvent, OnSheetPressed, RoutingStrategies.Tunnel, handledEventsToo: true);
+        AddHandler(PointerMovedEvent, OnSheetDragMoved, RoutingStrategies.Tunnel, handledEventsToo: true);
+        AddHandler(PointerReleasedEvent, OnSheetDragReleased, RoutingStrategies.Tunnel, handledEventsToo: true);
+        AddHandler(PointerCaptureLostEvent, OnSheetDragCaptureLost, RoutingStrategies.Tunnel | RoutingStrategies.Bubble, handledEventsToo: true);
         DataContextChanged += OnDataContextChanged;
     }
 
@@ -449,6 +457,118 @@ public partial class ShellView : UserControl
     /// <summary>A tab switch: the new tab fades in, quickly, with no slide.</summary>
     private void FadeInTab() =>
         Motion.To(TabContent, Motion.Fade, opacity: 1, fromOpacity: Motion.IsRunning(TabContent) ? null : 0);
+
+    // ---- Swipe down to dismiss a sheet -----------------------------------------------------
+    // Settings by its header, Now Playing by its upper half (grabber and cover): the sheet
+    // follows the finger, the app behind comes forward as it goes, and on release it either
+    // drops (pulled a quarter of the way, or flicked) or settles back up. Only the header and
+    // the cover: lower down the lists, sliders and buttons keep their own drags. No edge swipe
+    // back: Android's own Back gesture owns the screen edges and runs the same pop.
+
+    /// <summary>How far the finger must travel before the drag is the sheet's, the header's
+    /// height on a sheet, the share of the screen that drops it, and the flick (dp/ms) that does.</summary>
+    private const double DragSlop = 10, SheetHeaderZone = 72, DismissShare = 0.25, DismissSpeed = 0.5;
+
+    private Control? _dragSheet;
+    private Point _dragStart;
+    private bool _dragging;
+    private double _dragLastY, _dragVelocity;
+    private ulong _dragLastTime;
+
+    private void OnSheetPressed(object? sender, PointerPressedEventArgs e)
+    {
+        _dragSheet = null;
+        _dragging = false;
+        if (_vm is not { } vm || sender is not Control sheet || Motion.IsRunning(sheet)) return;
+        var at = e.GetPosition(sheet);
+        var ok = sheet == SheetHost
+            ? SheetHost.Top != null && at.Y <= SheetHeaderZone
+            : vm is { IsNowPlayingOpen: true, IsLyricsOpen: false, IsQueueOpen: false, IsNowPlayingMenuOpen: false }
+              && at.Y <= sheet.Bounds.Height / 2
+              && (e.Source as Visual)?.FindAncestorOfType<Avalonia.Controls.Primitives.RangeBase>(includeSelf: true) == null;
+        if (!ok) return;
+        _dragSheet = sheet;
+        _dragStart = e.GetPosition(this);
+        _dragLastY = _dragStart.Y;
+        _dragLastTime = e.Timestamp;
+        _dragVelocity = 0;
+    }
+
+    private void OnSheetDragMoved(object? sender, PointerEventArgs e)
+    {
+        if (_dragSheet is not { } sheet) return;
+        var p = e.GetPosition(this);
+        var dy = p.Y - _dragStart.Y;
+        if (!_dragging)
+        {
+            if (Math.Abs(p.X - _dragStart.X) > DragSlop || dy < -DragSlop)
+            {
+                _dragSheet = null;   // sideways or up: not ours
+                return;
+            }
+            if (dy <= DragSlop) return;
+            _dragging = true;
+            e.Pointer.Capture(sheet);   // the button under the finger lets go and does not click
+            foreach (var c in new Control[] { sheet, AppLayer, ChromeLayer, SheetDim }) Motion.Stop(c);
+        }
+        if (e.Timestamp > _dragLastTime)
+        {
+            _dragVelocity = (p.Y - _dragLastY) / (e.Timestamp - _dragLastTime);
+            _dragLastY = p.Y;
+            _dragLastTime = e.Timestamp;
+        }
+        FollowDrag(sheet, Math.Max(0, dy));
+        e.Handled = true;
+    }
+
+    /// <summary>The sheet at <paramref name="offset"/> below its place, the app behind as far
+    /// forward as the sheet is gone. Direct sets per move, no transitions (they would stall).</summary>
+    private void FollowDrag(Control sheet, double offset)
+    {
+        var height = Bounds.Height > 0 ? Bounds.Height : 915;
+        var gone = Math.Clamp(offset / height, 0, 1);
+        sheet.RenderTransform = Motion.TranslateY(offset);
+        var scale = Motion.Scale(Motion.BehindScale + (1 - Motion.BehindScale) * gone);
+        AppLayer.RenderTransform = scale;
+        if (!QueueSheet.IsVisible) ChromeLayer.RenderTransform = scale;
+        SheetDim.Opacity = Motion.BehindDim * (1 - gone);
+    }
+
+    private void OnSheetDragReleased(object? sender, PointerReleasedEventArgs e)
+    {
+        if (!_dragging || _dragSheet is not { } sheet)
+        {
+            _dragSheet = null;
+            return;
+        }
+        var dy = e.GetPosition(this).Y - _dragStart.Y;
+        EndDrag(sheet, drop: dy > (Bounds.Height > 0 ? Bounds.Height : 915) * DismissShare || _dragVelocity > DismissSpeed);
+        e.Pointer.Capture(null);
+        e.Handled = true;
+    }
+
+    private void OnSheetDragCaptureLost(object? sender, PointerCaptureLostEventArgs e)
+    {
+        // Taken away mid-drag (the system shade, a second finger's gesture): settle back up.
+        if (_dragging && _dragSheet is { } sheet) EndDrag(sheet, drop: false);
+    }
+
+    private void EndDrag(Control sheet, bool drop)
+    {
+        _dragging = false;
+        _dragSheet = null;
+        if (drop && _vm is { } vm)
+        {
+            // The view model closes it; the close runs on from where the finger left the sheet.
+            if (sheet == SheetHost) vm.DismissSheet();
+            else vm.CloseNowPlayingCommand.Execute(null);
+            return;
+        }
+        Motion.To(sheet, Motion.Sheet, Motion.TranslateY(0));
+        Motion.To(AppLayer, Motion.Sheet, AppScale(_covered) ?? Motion.Scale(1), done: () => AppLayer.RenderTransform = AppScale(_covered));
+        Motion.To(ChromeLayer, Motion.Sheet, ChromeScale(_covered) ?? Motion.Scale(1), done: () => ChromeLayer.RenderTransform = ChromeScale(_covered));
+        Motion.To(SheetDim, Motion.Sheet, opacity: _covered ? Motion.BehindDim : 0);
+    }
 
     // ---- Page-coloured bottom fade -------------------------------------------------------
 

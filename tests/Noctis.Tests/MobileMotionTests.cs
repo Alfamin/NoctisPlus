@@ -284,6 +284,8 @@ public class MobileMotionTests
             ("album", () => Find<AlbumPage>(view)), ("grid", () => Find<AlbumGridPage>(view)));
         AssertGlides(s, "album", x => x.X, W - 1, 0);
         AssertGone(s, "grid");
+        // Landed, nothing is under the album: its shade went too (it stayed on, hidden behind the page).
+        Assert.All(view.FindControl<PageStack>("PageHost")!.Children.OfType<Border>(), b => Assert.False(b.IsVisible));
         var back = Record("10_album_back", window, () => rig.Shell.NavigateBackCommand.Execute(null), 700,
             ("album", () => Find<AlbumPage>(view)), ("grid", () => Find<AlbumGridPage>(view)));
         AssertGlides(back.Where(x => x.Target != "album" || x.Present).ToList(), "album", x => x.X, 0, W);
@@ -506,6 +508,92 @@ public class MobileMotionTests
         Settle(window);
         Assert.Empty(view.GetVisualDescendants().OfType<SongListPage>());
         Assert.True(Find<HomePage>(view)!.IsEffectivelyVisible);
+        AssertAtRest(view);
+        window.Close();
+    }
+
+    // ── Swipe down to dismiss ──
+
+    /// <summary>Drags the mouse from <paramref name="from"/> down by <paramref name="by"/> in
+    /// steps, the frames running between them; <paramref name="during"/> sees each step.</summary>
+    private static void Drag(Window window, Point from, double by, Action<double>? during = null, int msPerStep = 0)
+    {
+        // Hit-testing reads the compositor's committed scene: let the landed state be drawn first.
+        for (var i = 0; i < 4; i++) Pump(window);
+        window.MouseDown(from, MouseButton.Left, RawInputModifiers.None);
+        for (var dy = 10.0; dy <= by; dy += 10)
+        {
+            window.MouseMove(from + new Point(0, dy), RawInputModifiers.LeftMouseButton);
+            window.UpdateLayout();
+            during?.Invoke(dy);
+            if (msPerStep > 0) System.Threading.Thread.Sleep(msPerStep);   // slow: no flick
+        }
+        window.MouseUp(from + new Point(0, by), MouseButton.Left, RawInputModifiers.None);
+    }
+
+    [AvaloniaFact]
+    public void SwipeDownOnTheSettingsHeader_FollowsTheFinger_AndDropsTheSheet()
+    {
+        var (rig, window, view) = Open(account: true);
+        using var _ = rig;
+        rig.Shell.OpenSettingsCommand.Execute(null);
+        rig.Shell.OpenAccountCommand.Execute(null);   // the whole sheet goes, Account inside it too
+        Settle(window);
+        var host = view.FindControl<PageStack>("SheetHost")!;
+        var app = view.FindControl<Panel>("AppLayer")!;
+        // From the close button: the header is the handle, and a drag that starts on a button is not a tap.
+        var close = MobileFixtures.Named<Button>(Find<AccountPage>(view)!, "CloseButton");
+        var start = close.TranslatePoint(new Point(close.Bounds.Width / 2, close.Bounds.Height / 2), window)!.Value;
+        Drag(window, start, 400, dy =>
+        {
+            if (dy <= 20) return;   // inside the slop the sheet stays
+            Assert.Equal(dy, host.RenderTransform!.Value.M32, 1);              // under the finger
+            Assert.InRange(app.RenderTransform!.Value.M11, Motion.BehindScale, 1);   // the app coming forward
+        });
+        Assert.Empty(rig.Shell.Pages);
+        Settle(window);
+        AssertAtRest(view);
+        window.Close();
+    }
+
+    [AvaloniaFact]
+    public void AShortSwipe_SettlesTheSheetBackUp()
+    {
+        var (rig, window, view) = Open();
+        using var _ = rig;
+        rig.Shell.OpenSettingsCommand.Execute(null);
+        Settle(window);
+        var host = view.FindControl<PageStack>("SheetHost")!;
+        var close = MobileFixtures.Named<Button>(Find<SettingsPage>(view)!, "CloseButton");
+        var centre = close.TranslatePoint(new Point(close.Bounds.Width / 2, close.Bounds.Height / 2), window)!.Value;
+        var moved = 0.0;
+        Drag(window, centre, 80, _ => moved = Math.Max(moved, host.RenderTransform?.Value.M32 ?? 0), msPerStep: 50);
+        Assert.True(moved > 50, $"the sheet followed the finger only {moved:0} px");
+        Assert.IsType<SettingsPageViewModel>(rig.Shell.CurrentPage);   // a drag that started on Close did not close
+        Settle(window);
+        Assert.Equal(0, host.RenderTransform?.Value.M32 ?? 0, 1);
+        Assert.Equal(Motion.BehindScale, view.FindControl<Panel>("AppLayer")!.RenderTransform!.Value.M11, 3);
+        // Still a sheet that takes taps: its close button closes it.
+        for (var i = 0; i < 4; i++) Pump(window);
+        window.MouseDown(centre, MouseButton.Left, RawInputModifiers.None);
+        window.MouseUp(centre, MouseButton.Left, RawInputModifiers.None);
+        Assert.Empty(rig.Shell.Pages);
+        window.Close();
+    }
+
+    [AvaloniaFact]
+    public void SwipeDownOnTheCover_ClosesNowPlaying_ButNotOnTheLowerControls()
+    {
+        var (rig, window, view) = Open(playing: true);
+        using var _ = rig;
+        rig.Shell.OpenNowPlayingCommand.Execute(null);
+        Settle(window);
+        Drag(window, new Point(200, H * 0.75), 300);   // the transport and sliders: theirs
+        Assert.True(rig.Shell.IsNowPlayingOpen);
+        Settle(window);
+        Drag(window, new Point(200, H * 0.3), 300);
+        Assert.False(rig.Shell.IsNowPlayingOpen);
+        Settle(window);
         AssertAtRest(view);
         window.Close();
     }

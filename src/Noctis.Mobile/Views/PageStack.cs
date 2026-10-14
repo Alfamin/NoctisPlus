@@ -155,11 +155,16 @@ public sealed class PageStack : Panel
         });
     }
 
+    /// <summary>The shade over the page underneath; once a push or pop lands nothing is under the
+    /// top page any more, so it goes either way.</summary>
     private void Shade(double opacity, double? from)
     {
         _shade.IsVisible = true;
-        Motion.To(_shade, Motion.Push, opacity: opacity, fromOpacity: from,
-            done: () => _shade.IsVisible = _shade.Opacity > 0);
+        Motion.To(_shade, Motion.Push, opacity: opacity, fromOpacity: from, done: () =>
+        {
+            _shade.IsVisible = false;
+            _shade.Opacity = 0;
+        });
     }
 
     /// <summary>A page or the root that has slid out of sight under the page on top.</summary>
