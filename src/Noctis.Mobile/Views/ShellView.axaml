@@ -231,23 +231,30 @@
                             </views:FractionPanel>
                         </Border>
                         <Border Background="{DynamicResource GlassBarSheen}" CornerRadius="26" IsHitTestVisible="False" />
-                        <Grid ColumnDefinitions="*,Auto,Auto" Margin="8,0,6,0">
+                        <Grid ColumnDefinitions="*,Auto,Auto" Margin="10,0,6,0">
                             <!-- Stretch both ways: Fluent sets Left/Center, which shrank the tap target
                                  to the title text on device (MiniBar_TitleButton_FillsTheWholeRow). -->
                             <Button Grid.Column="0" Classes="row" VerticalAlignment="Stretch"
                                     Command="{Binding OpenNowPlayingCommand}">
                                 <Grid ColumnDefinitions="Auto,*">
-                                    <Border Classes="art" Name="MiniArt" Width="38" Height="38" CornerRadius="7">
+                                    <!-- Round, so it sits in the capsule's round end like the end itself. -->
+                                    <Border Classes="art" Name="MiniArt" Width="38" Height="38" CornerRadius="19">
                                         <Panel>
                                             <PathIcon Data="{DynamicResource SongsIcon}" Width="16" Height="16" Opacity="0.5" />
                                             <controls:CachedImage Name="MiniArtwork" SourcePath="{Binding Player.CurrentTrack.AlbumArtworkPath}"
                                                                   DecodeWidth="128" ClearOnSourceChange="False" Stretch="UniformToFill" />
                                         </Panel>
                                     </Border>
+                                    <!-- The desktop's marquee: a title or artist too long for the row scrolls
+                                         (both start together after the rest), else it sits still. Left-aligned
+                                         so a short line stays at the start; MaxDisplayWidth only lifts the
+                                         control's 240 default cap — the column sets the real width. -->
                                     <StackPanel Grid.Column="1" Margin="11,0,4,0" VerticalAlignment="Center">
-                                        <TextBlock Name="MiniTitle" Text="{Binding Player.CurrentTrack.Title}" FontSize="15" FontWeight="SemiBold"
-                                                   TextTrimming="CharacterEllipsis" />
-                                        <TextBlock Text="{Binding Player.CurrentTrack.Artist}" Classes="subtle" FontSize="12" TextTrimming="CharacterEllipsis" />
+                                        <controls:MarqueeTextBlock Name="MiniTitle" Text="{Binding Player.CurrentTrack.Title}" FontSize="15" FontWeight="SemiBold"
+                                                                   MaxDisplayWidth="10000" HorizontalAlignment="Left" />
+                                        <controls:MarqueeTextBlock Name="MiniArtist" Text="{Binding Player.CurrentTrack.Artist}" FontSize="12"
+                                                                   Foreground="{DynamicResource PhoneSecondaryTextBrush}"
+                                                                   MaxDisplayWidth="10000" HorizontalAlignment="Left" IsForArtist="True" />
                                     </StackPanel>
                                 </Grid>
                             </Button>
