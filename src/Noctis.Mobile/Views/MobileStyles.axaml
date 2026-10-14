@@ -315,7 +315,9 @@
          lens (GlassPanel.Refraction); a hairline outline all the way round (Apple's: a faint
          dark rim on light glass, a faint light one on dark), a soft rim light and shadow. The
          tint and outline are the palette's (MobileTheme.BuildPalette), the luminance range
-         ShellView's theme resources. -->
+         ShellView's theme resources. Dark content under the light glass is lifted under a white
+         veil (BackdropLift), as the menus' glass is: scaling its colour up to the floor turned a
+         dark brown cover peach and orange under the tab bar and the mini player. -->
     <Style Selector="controls|GlassPanel.liquid">
         <Setter Property="UseAppGlass" Value="False" />
         <Setter Property="IsGlassActive" Value="True" />
@@ -326,6 +328,7 @@
         <Setter Property="Specular" Value="0.35" />
         <Setter Property="BackdropMinLuminance" Value="{DynamicResource GlassBarMinLuminance}" />
         <Setter Property="BackdropMaxLuminance" Value="{DynamicResource GlassBarMaxLuminance}" />
+        <Setter Property="BackdropLift" Value="1" />
         <Setter Property="BoxShadow" Value="0 6 20 0 #1F000000" />
         <Setter Property="Background" Value="{DynamicResource PhoneChromeBrush}" />
         <Setter Property="EdgeBrush" Value="{DynamicResource PhoneChromeOutlineBrush}" />
@@ -348,6 +351,7 @@
         <Setter Property="Specular" Value="0.35" />
         <Setter Property="BackdropMinLuminance" Value="{DynamicResource GlassBarMinLuminance}" />
         <Setter Property="BackdropMaxLuminance" Value="{DynamicResource GlassBarMaxLuminance}" />
+        <Setter Property="BackdropLift" Value="1" />
         <Setter Property="BoxShadow" Value="0 3 12 0 #14000000" />
         <Setter Property="Width" Value="44" />
         <Setter Property="Height" Value="44" />
