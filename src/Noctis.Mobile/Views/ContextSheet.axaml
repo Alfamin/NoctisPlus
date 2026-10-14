@@ -3,8 +3,10 @@
              xmlns:vm="using:Noctis.Mobile.ViewModels"
              xmlns:models="using:Noctis.Models"
              xmlns:controls="using:Noctis.Controls"
+             xmlns:views="using:Noctis.Mobile.Views"
              x:Class="Noctis.Mobile.Views.ContextSheet"
-             x:DataType="vm:ShellViewModel">
+             x:DataType="vm:ShellViewModel"
+             IsVisible="False">
 
     <UserControl.Styles>
         <Style Selector="Button.sheet-action">
@@ -19,60 +21,77 @@
             <Setter Property="FontSize" Value="16" />
             <Setter Property="VerticalAlignment" Value="Center" />
         </Style>
+        <!-- The text in the glass's own colours, as the menu's: the card can wear another theme than
+             the app's (Now Playing's dark glass). -->
+        <Style Selector="Border#SheetCard Button.sheet-action">
+            <Setter Property="Foreground" Value="{DynamicResource MenuGlassText}" />
+        </Style>
+        <Style Selector="Border#SheetCard TextBlock.row-title, Border#SheetCard TextBlock.section">
+            <Setter Property="Foreground" Value="{DynamicResource MenuGlassText}" />
+        </Style>
+        <Style Selector="Border#SheetCard TextBlock.row-sub">
+            <Setter Property="Foreground" Value="{DynamicResource MenuGlassSecondaryText}" />
+        </Style>
     </UserControl.Styles>
 
     <Grid>
         <!-- A tap on the dim area above the card dismisses it, as on every Android bottom sheet. -->
         <Border Name="Scrim" Background="#99000000" PointerPressed="OnScrimPressed" />
 
-        <Border Name="SheetCard" VerticalAlignment="Bottom" CornerRadius="20,20,0,0" MaxHeight="640"
-                Padding="{Binding BottomSafePadding}">
-            <Border.Background>
-                <!-- The opaque surface colour: AppMainBackground is translucent on Smoke. -->
-                <SolidColorBrush Color="{DynamicResource AppMainBackgroundColor}" />
-            </Border.Background>
-            <ScrollViewer HorizontalScrollBarVisibility="Disabled">
-                <ContentControl Name="SheetContent" Content="{Binding Sheet}" Margin="16,12,16,12">
-                    <ContentControl.ContentTemplate>
-                        <DataTemplate x:DataType="vm:ContextSheetViewModel">
-                            <StackPanel Spacing="4">
-                                <Grid ColumnDefinitions="Auto,*" Margin="0,0,0,8">
-                                    <Border Classes="art" Classes.artist="{Binding IsArtist}" Width="52" Height="52">
-                                        <Panel>
-                                            <PathIcon Data="{DynamicResource SongsIcon}" Width="20" Height="20" Opacity="0.5" />
-                                            <controls:CachedImage SourcePath="{Binding ArtworkPath}" DecodeWidth="128" Stretch="UniformToFill" />
-                                        </Panel>
-                                    </Border>
-                                    <StackPanel Grid.Column="1" Margin="12,0,0,0" VerticalAlignment="Center">
-                                        <TextBlock Classes="row-title" FontSize="16" Text="{Binding Title}" />
-                                        <TextBlock Classes="row-sub" Text="{Binding Subtitle}" />
-                                    </StackPanel>
-                                </Grid>
+        <!-- The menu's glass (MenuGlass), floating above the gesture bar with the menu's pop
+             (PopMenu.PopFrom/PopIn/PopOut), rising out of the bottom edge. It stays a bottom sheet
+             rather than a page of the menu: the list can be long and its "New playlist" box brings
+             up the keyboard, which the card rides above (OnInputPaneChanged). It wears the theme
+             of the menu it came from. -->
+        <Border Name="SheetCard" VerticalAlignment="Bottom" MaxHeight="640" Padding="{Binding BottomSafePadding}">
+            <ThemeVariantScope Name="SheetScope">
+                <Panel Name="SheetPop" Margin="8,0,8,8">
+                    <views:MenuGlass Name="SheetGlass">
+                        <ScrollViewer Name="SheetBody" HorizontalScrollBarVisibility="Disabled">
+                            <ContentControl Name="SheetContent" Margin="20,16,20,16">
+                                <ContentControl.ContentTemplate>
+                                    <DataTemplate x:DataType="vm:ContextSheetViewModel">
+                                        <StackPanel Spacing="4">
+                                            <Grid ColumnDefinitions="Auto,*" Margin="0,0,0,8">
+                                                <Border Classes="art" Classes.artist="{Binding IsArtist}" Width="52" Height="52">
+                                                    <Panel>
+                                                        <PathIcon Data="{DynamicResource SongsIcon}" Width="20" Height="20" Opacity="0.5" />
+                                                        <controls:CachedImage SourcePath="{Binding ArtworkPath}" DecodeWidth="128" Stretch="UniformToFill" />
+                                                    </Panel>
+                                                </Border>
+                                                <StackPanel Grid.Column="1" Margin="12,0,0,0" VerticalAlignment="Center">
+                                                    <TextBlock Classes="row-title" FontSize="16" Text="{Binding Title}" />
+                                                    <TextBlock Classes="row-sub" Text="{Binding Subtitle}" />
+                                                </StackPanel>
+                                            </Grid>
 
-                                <StackPanel Name="PlaylistPicker" Spacing="6" IsVisible="{Binding IsPickingPlaylist}">
-                                    <TextBlock Classes="section" FontSize="16" Text="Add to Playlist" />
-                                    <ItemsControl ItemsSource="{Binding Playlists}">
-                                        <ItemsControl.ItemTemplate>
-                                            <DataTemplate x:DataType="models:Playlist">
-                                                <Button Classes="row sheet-action"
-                                                        Command="{Binding $parent[ItemsControl].((vm:ContextSheetViewModel)DataContext).AddToPlaylistCommand}"
-                                                        CommandParameter="{Binding}">
-                                                    <Grid ColumnDefinitions="40,*"><PathIcon Data="{DynamicResource PhPlaylist}" /><TextBlock Grid.Column="1" Text="{Binding Name}" /></Grid>
-                                                </Button>
-                                            </DataTemplate>
-                                        </ItemsControl.ItemTemplate>
-                                    </ItemsControl>
-                                    <Grid ColumnDefinitions="*,Auto">
-                                        <TextBox Name="NewPlaylistBox" Text="{Binding NewPlaylistName}" PlaceholderText="New playlist" />
-                                        <Button Grid.Column="1" Classes="pill-accent" Margin="8,0,0,0" Content="Create"
-                                                Command="{Binding CreatePlaylistCommand}" />
-                                    </Grid>
-                                </StackPanel>
-                            </StackPanel>
-                        </DataTemplate>
-                    </ContentControl.ContentTemplate>
-                </ContentControl>
-            </ScrollViewer>
+                                            <StackPanel Name="PlaylistPicker" Spacing="6" IsVisible="{Binding IsPickingPlaylist}">
+                                                <TextBlock Classes="section" FontSize="16" Text="Add to Playlist" />
+                                                <ItemsControl ItemsSource="{Binding Playlists}">
+                                                    <ItemsControl.ItemTemplate>
+                                                        <DataTemplate x:DataType="models:Playlist">
+                                                            <Button Classes="row sheet-action"
+                                                                    Command="{Binding $parent[ItemsControl].((vm:ContextSheetViewModel)DataContext).AddToPlaylistCommand}"
+                                                                    CommandParameter="{Binding}">
+                                                                <Grid ColumnDefinitions="40,*"><PathIcon Data="{DynamicResource PhPlaylist}" /><TextBlock Grid.Column="1" Text="{Binding Name}" /></Grid>
+                                                            </Button>
+                                                        </DataTemplate>
+                                                    </ItemsControl.ItemTemplate>
+                                                </ItemsControl>
+                                                <Grid ColumnDefinitions="*,Auto">
+                                                    <TextBox Name="NewPlaylistBox" Text="{Binding NewPlaylistName}" PlaceholderText="New playlist" />
+                                                    <Button Grid.Column="1" Classes="pill-accent" Margin="8,0,0,0" Content="Create"
+                                                            Command="{Binding CreatePlaylistCommand}" />
+                                                </Grid>
+                                            </StackPanel>
+                                        </StackPanel>
+                                    </DataTemplate>
+                                </ContentControl.ContentTemplate>
+                            </ContentControl>
+                        </ScrollViewer>
+                    </views:MenuGlass>
+                </Panel>
+            </ThemeVariantScope>
         </Border>
     </Grid>
 </UserControl>
