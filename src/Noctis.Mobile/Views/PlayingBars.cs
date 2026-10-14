@@ -165,8 +165,10 @@ public sealed class PlayingBars : Control
         top.RequestAnimationFrame(_ =>
         {
             _frameQueued = false;
-            if (generation == _generation) OnFrame(generation);
-            else if (_running) QueueFrame(_generation);   // a newer run asked while this frame was queued
+            // A newer run (pause → flatten, play again) that asked while this frame was queued is
+            // served by it: re-queueing instead drew nothing this frame, and in the headless
+            // harness a frame that draws nothing is the last one (the flatten never ran).
+            if (generation == _generation || _running) OnFrame(_generation);
         });
     }
 
