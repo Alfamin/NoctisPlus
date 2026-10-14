@@ -1,6 +1,7 @@
 using System;
 using Avalonia;
 using Avalonia.Controls;
+using Avalonia.Controls.Primitives;
 using Avalonia.Input;
 using Avalonia.Interactivity;
 using Noctis.Mobile.ViewModels;
@@ -33,6 +34,9 @@ public partial class NowPlayingPage : UserControl
         // capture, so the Slider's own drag logic still runs), and the shade-cancel case
         // observed on device delivers no pointer event at all. The watchdog is the backstop.
         SeekBar.PointerCaptureLost += OnSeekCaptureLost;
+        // The times follow the drag (PreviewSeek is a no-op unless a seek is held, so the
+        // position pushes that move the bar between drags never come back through here).
+        SeekBar.ValueChanged += OnSeekValueChanged;
     }
 
     private bool? _landscape;
@@ -77,6 +81,9 @@ public partial class NowPlayingPage : UserControl
         vm.Player.EndSeek();
         vm.Player.Seek(TimeSpan.FromSeconds(slider.Value));
     }
+
+    private void OnSeekValueChanged(object? sender, RangeBaseValueChangedEventArgs e)
+        => (DataContext as ShellViewModel)?.Player.PreviewSeek(TimeSpan.FromSeconds(e.NewValue));
 
     private void OnSeekCaptureLost(object? sender, PointerCaptureLostEventArgs e)
         => (DataContext as ShellViewModel)?.Player.EndSeek();

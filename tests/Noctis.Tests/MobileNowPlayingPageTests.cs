@@ -4,6 +4,7 @@ using System.Linq;
 using System.Threading.Tasks;
 using Avalonia;
 using Avalonia.Controls;
+using Avalonia.Headless;
 using Avalonia.Headless.XUnit;
 using Avalonia.VisualTree;
 using Noctis.Mobile.Services;
@@ -105,6 +106,40 @@ public class MobileNowPlayingPageTests : IDisposable
         Assert.Equal("-01:30", MobileFixtures.Named<TextBlock>(page, "RemainingText").Text);
         Assert.False(MobileFixtures.Named<Control>(page, "VolumeRow").IsVisible);   // no volume control in tests
         Assert.DoesNotContain(page.GetVisualDescendants().OfType<TextBlock>(), t => t.Text?.Contains("Video") == true);
+        window.Close();
+    }
+
+    /// <summary>Scrubbing the timeline: the elapsed and remaining times follow the finger while
+    /// it drags (device 10-13: both froze at the drag's start until the finger lifted, so there
+    /// was no telling where the release would land), and the release seeks there.</summary>
+    [AvaloniaFact]
+    public void ScrubbingTheTimeline_MovesTheTimesWithTheFinger_AndSeeksOnRelease()
+    {
+        using var rig = MobileFixtures.MakeRig(new[] { MobileFixtures.Song("Tone") });   // 90 s
+        var window = MobileFixtures.Mount(rig.Shell, out var view);
+        rig.Shell.Player.PlayTracks(rig.Library.TrackList, 0);
+        rig.Shell.OpenNowPlayingCommand.Execute(null);
+        window.UpdateLayout();
+
+        var page = view.FindControl<NowPlayingPage>("NowPlaying")!;
+        var seek = MobileFixtures.Named<Avalonia.Controls.Primitives.RangeBase>(page, "SeekBar");
+        Point At(double fraction) =>
+            seek.TranslatePoint(new Point(seek.Bounds.Width * fraction, seek.Bounds.Height / 2), window)!.Value;
+
+        window.MouseDown(At(0.25), Avalonia.Input.MouseButton.Left);
+        window.MouseMove(At(0.5));
+        window.UpdateLayout();
+        Avalonia.Threading.Dispatcher.UIThread.RunJobs();
+
+        Assert.InRange(seek.Value, 40, 50);
+        var held = TimeSpan.FromSeconds(seek.Value);
+        Assert.Equal(NowPlayingViewModel.FormatTime(held), MobileFixtures.Named<TextBlock>(page, "ElapsedText").Text);
+        Assert.Equal("-" + NowPlayingViewModel.FormatTime(TimeSpan.FromSeconds(90) - held),
+            MobileFixtures.Named<TextBlock>(page, "RemainingText").Text);
+        Assert.Empty(rig.Player.Seeks);                                  // nothing seeks mid-drag
+
+        window.MouseUp(At(0.5), Avalonia.Input.MouseButton.Left);
+        Assert.Equal(seek.Value, Assert.Single(rig.Player.Seeks).TotalSeconds, 3);
         window.Close();
     }
 
