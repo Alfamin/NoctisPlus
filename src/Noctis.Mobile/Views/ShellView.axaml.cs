@@ -48,7 +48,7 @@ public partial class ShellView : UserControl
     /// marks the press so the shell skips that echo, S23 2026-10-05). A slider keeps focus
     /// after a touch and marks Escape handled, so Back did nothing on Now Playing or Settings
     /// once a slider had been dragged (device run B12). Taking Escape here, in the tunnel
-    /// phase, runs the shell's Back before any focused control sees the key; at the Library
+    /// phase, runs the shell's Back before any focused control sees the key; at the Home
     /// root it stays unhandled so the activity still falls through to finish.
     /// </summary>
     private void OnPreviewKeyDown(object? sender, KeyEventArgs e)
@@ -114,6 +114,9 @@ public partial class ShellView : UserControl
     /// <summary>The selected tab's inner capsule: a little wider than its tab (Apple's), kept
     /// this far inside the pill's ends.</summary>
     private const double PillInset = 4, PillOverhang = 2;
+
+    /// <summary>The tabs across the expanded bar: Home, Favorites, Playlists, Library, Search.</summary>
+    internal const int TabCount = 5;
     private static readonly TimeSpan Morph = TimeSpan.FromMilliseconds(380);
     private static readonly TimeSpan Quick = TimeSpan.FromMilliseconds(200);
 
@@ -224,15 +227,25 @@ public partial class ShellView : UserControl
         _settleTimer.Start();
     }
 
-    internal static double SelectionPillWidth(double barWidth) => barWidth / 4 + 2 * PillOverhang;
+    internal static double SelectionPillWidth(double barWidth) => barWidth / TabCount + 2 * PillOverhang;
 
     /// <summary>Where the selected tab's capsule sits: centred on its tab, but never closer than
     /// <see cref="PillInset"/> to the bar's rounded ends.</summary>
     internal static double SelectionPillX(double barWidth, int index)
     {
-        var x = index * (barWidth / 4) - PillOverhang;
+        var x = index * (barWidth / TabCount) - PillOverhang;
         return Math.Clamp(x, PillInset, Math.Max(PillInset, barWidth - SelectionPillWidth(barWidth) - PillInset));
     }
+
+    /// <summary>A tab's column in the bar (TabBar in the XAML).</summary>
+    internal static int TabIndex(MobileTab tab) => tab switch
+    {
+        MobileTab.Home => 0,
+        MobileTab.Favorites => 1,
+        MobileTab.Playlists => 2,
+        MobileTab.Library => 3,
+        _ => 4,
+    };
 
     /// <summary>How tall the expanded chrome stands (mini player + tabs, or tabs alone).</summary>
     internal static double ExpandedChromeHeight(bool miniVisible) => miniVisible ? TabHeight + Gap + MiniHeight : TabHeight;
@@ -279,14 +292,7 @@ public partial class ShellView : UserControl
         MiniBar.Margin = folded ? new Thickness(Bubble + FoldGap, 0, Bubble + FoldGap, 0) : new Thickness(0, 0, 0, TabHeight + Gap);
         MiniNextButton.IsVisible = !folded;
 
-        var slot = width / 4;
-        var index = vm.SelectedTab switch
-        {
-            MobileTab.Library => 0,
-            MobileTab.Favorites => 1,
-            MobileTab.Playlists => 2,
-            _ => 3,
-        };
+        var index = TabIndex(vm.SelectedTab);
         var pillWidth = SelectionPillWidth(width);
         SelectionPill.Width = pillWidth;
         SelectionPill.Height = TabHeight - 2 * PillInset;

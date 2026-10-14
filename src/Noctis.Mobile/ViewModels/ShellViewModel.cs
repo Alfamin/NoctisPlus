@@ -12,7 +12,7 @@ using Noctis.Services;
 namespace Noctis.Mobile.ViewModels;
 
 /// <summary>
-/// Root of the phone UI: three tabs, one stack of pages pushed over the active tab's root,
+/// Root of the phone UI: five tabs, one stack of pages pushed over the active tab's root,
 /// the Now Playing / Lyrics / Queue overlays and the mini bar. Every Android Back decision
 /// is made here (<see cref="TryHandleBack"/>) so it is testable on Windows.
 /// </summary>
@@ -161,13 +161,14 @@ public sealed partial class ShellViewModel : ObservableObject
     }
 
     [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(IsFavoritesSelected), nameof(IsLibrarySelected), nameof(IsSearchSelected), nameof(IsPlaylistsSelected),
-        nameof(IsFavoritesRootVisible), nameof(IsLibraryRootVisible), nameof(IsSearchRootVisible), nameof(IsPlaylistsRootVisible))]
-    private MobileTab _selectedTab = MobileTab.Library;
+    [NotifyPropertyChangedFor(nameof(IsHomeSelected), nameof(IsFavoritesSelected), nameof(IsLibrarySelected), nameof(IsSearchSelected),
+        nameof(IsPlaylistsSelected), nameof(IsHomeRootVisible), nameof(IsFavoritesRootVisible), nameof(IsLibraryRootVisible),
+        nameof(IsSearchRootVisible), nameof(IsPlaylistsRootVisible))]
+    private MobileTab _selectedTab = MobileTab.Home;
 
     [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(HasPage), nameof(IsFavoritesRootVisible), nameof(IsLibraryRootVisible), nameof(IsSearchRootVisible),
-        nameof(IsPlaylistsRootVisible))]
+    [NotifyPropertyChangedFor(nameof(HasPage), nameof(IsHomeRootVisible), nameof(IsFavoritesRootVisible), nameof(IsLibraryRootVisible),
+        nameof(IsSearchRootVisible), nameof(IsPlaylistsRootVisible))]
     private MobilePage? _currentPage;
 
     /// <summary>
@@ -199,12 +200,14 @@ public sealed partial class ShellViewModel : ObservableObject
     /// first use, after the host has set <see cref="Account"/> (it decides the Downloaded row).</summary>
     public LibraryRowsViewModel LibraryRows => _libraryRows ??= new LibraryRowsViewModel(this);
 
+    public bool IsHomeSelected => SelectedTab == MobileTab.Home;
     public bool IsFavoritesSelected => SelectedTab == MobileTab.Favorites;
     public bool IsLibrarySelected => SelectedTab == MobileTab.Library;
     public bool IsSearchSelected => SelectedTab == MobileTab.Search;
     public bool IsPlaylistsSelected => SelectedTab == MobileTab.Playlists;
 
     public bool HasPage => CurrentPage != null;
+    public bool IsHomeRootVisible => IsHomeSelected && !HasPage;
     public bool IsFavoritesRootVisible => IsFavoritesSelected && !HasPage;
     public bool IsLibraryRootVisible => IsLibrarySelected && !HasPage;
     public bool IsSearchRootVisible => IsSearchSelected && !HasPage;
@@ -428,9 +431,10 @@ public sealed partial class ShellViewModel : ObservableObject
 
     /// <summary>
     /// Android Back: the topmost thing closes first — the long-press sheet, Queue, Lyrics, Now
-    /// Playing, then pushed pages (a page's own inner page first), then a non-start tab returns to Library. The Library rows'
-    /// Edit mode then finishes (as Done would). Returns whether the press was consumed; only at
-    /// the Library root does the activity fall through to the system default (finish).
+    /// Playing, then pushed pages (a page's own inner page first), then the Library rows' Edit
+    /// mode finishes (as Done would), then a non-start tab returns to Home. Returns whether the
+    /// press was consumed; only at the Home root does the activity fall through to the system
+    /// default (finish).
     /// </summary>
     public bool TryHandleBack()
     {
@@ -440,8 +444,8 @@ public sealed partial class ShellViewModel : ObservableObject
         if (IsNowPlayingOpen) { IsNowPlayingOpen = false; return true; }
         if (CurrentPage?.TryGoBackWithin() == true) return true;
         if (GoBack()) return true;
-        if (SelectedTab != MobileTab.Library) { SelectedTab = MobileTab.Library; return true; }
         if (_libraryRows is { IsEditing: true } rows) { rows.FinishEditing(); return true; }
+        if (SelectedTab != MobileTab.Home) { SelectedTab = MobileTab.Home; return true; }
         return false;
     }
 

@@ -97,7 +97,7 @@ public class MobileGlassDropletTests
         Assert.False(pill.HasLens);
         var bar = view.FindControl<Panel>("ChromeHost")!.Bounds.Width;
         var target = ShellView.SelectionPillX(bar, 2);
-        Assert.Equal(2 * bar / 4 - 2, target, 1);     // a little wider than its tab, centred on it
+        Assert.Equal(2 * bar / 5 - 2, target, 1);     // a little wider than its tab, centred on it
         PumpUntil(() => Math.Abs((host.RenderTransform?.Value.M31 ?? 0) - target) < 0.5);
         Assert.Equal(target, host.RenderTransform!.Value.M31, 1);
         window.Close();
@@ -110,10 +110,10 @@ public class MobileGlassDropletTests
     {
         const double bar = 380;
         var width = ShellView.SelectionPillWidth(bar);
-        Assert.True(width > bar / 4);
+        Assert.True(width > bar / 5);
         Assert.Equal(4, ShellView.SelectionPillX(bar, 0));
-        Assert.Equal(bar - width - 4, ShellView.SelectionPillX(bar, 3), 3);
-        Assert.Equal(bar / 4 - 2, ShellView.SelectionPillX(bar, 1), 3);
+        Assert.Equal(bar - width - 4, ShellView.SelectionPillX(bar, 4), 3);
+        Assert.Equal(bar / 5 - 2, ShellView.SelectionPillX(bar, 1), 3);
     }
 
     /// <summary>The expanded bar: a full-width tab pill with the mini player's own capsule 8 dp above it.</summary>

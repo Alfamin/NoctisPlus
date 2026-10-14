@@ -104,6 +104,7 @@
          code-behind raises the chrome over the overlays while the Queue page is on screen. -->
     <Grid>
         <Panel Name="TabContent" Margin="{Binding TopSafePadding}">
+            <views:HomePage DataContext="{Binding}" IsVisible="{Binding IsHomeRootVisible}" />
             <views:LibraryPage DataContext="{Binding}" IsVisible="{Binding IsLibraryRootVisible}" />
             <views:SearchPage DataContext="{Binding Search}" IsVisible="{Binding $parent[views:ShellView].((vm:ShellViewModel)DataContext).IsSearchRootVisible}" />
             <Grid Name="PlaylistsRoot" RowDefinitions="Auto,*" IsVisible="{Binding IsPlaylistsRootVisible}">
@@ -142,7 +143,7 @@
             <Panel Name="ChromeHost" Margin="16,0,16,8" VerticalAlignment="Bottom">
 
                 <!-- The tab capsule (Apple Music, iOS 26): a floating glass pill with a hairline rim.
-                     Expanded it spans the row and holds the four tabs; folded it shrinks to a round
+                     Expanded it spans the row and holds the five tabs; folded it shrinks to a round
                      button showing the current tab. Its content clips to it (the full-width tab row
                      while folded), the glass itself does not: its shadow falls outside. -->
                 <controls:GlassPanel Name="TabCapsule" Classes="liquid" CornerRadius="31"
@@ -157,12 +158,13 @@
                                                     UseAppGlass="False" IsGlassActive="True" BlurRadius="0" EdgeThickness="0" />
                             </Panel>
                             <!-- Filled glyphs on every tab, as Apple's: the selected one takes the accent. -->
-                            <Grid Name="TabBar" ColumnDefinitions="*,*,*,*">
-                                <Button Grid.Column="0" Name="LibraryTab" Classes="tab" Classes.selected="{Binding IsLibrarySelected}"
-                                        Command="{Binding SelectTabCommand}" CommandParameter="{x:Static vm:MobileTab.Library}">
+                            <!-- Apple Music's order: Home first (the start tab), Search last. -->
+                            <Grid Name="TabBar" ColumnDefinitions="*,*,*,*,*">
+                                <Button Grid.Column="0" Name="HomeTab" Classes="tab" Classes.selected="{Binding IsHomeSelected}"
+                                        Command="{Binding SelectTabCommand}" CommandParameter="{x:Static vm:MobileTab.Home}">
                                     <StackPanel Spacing="2">
-                                        <PathIcon Data="{DynamicResource TabLibraryFilledIcon}" />
-                                        <TextBlock Text="{loc:T Tab.Library}" />
+                                        <PathIcon Data="{DynamicResource TabHomeFilledIcon}" />
+                                        <TextBlock Text="{loc:T Nav.Home}" />
                                     </StackPanel>
                                 </Button>
                                 <Button Grid.Column="1" Name="FavoritesTab" Classes="tab" Classes.selected="{Binding IsFavoritesSelected}"
@@ -179,7 +181,14 @@
                                         <TextBlock Text="{loc:T Nav.Playlists}" />
                                     </StackPanel>
                                 </Button>
-                                <Button Grid.Column="3" Name="SearchTab" Classes="tab" Classes.selected="{Binding IsSearchSelected}"
+                                <Button Grid.Column="3" Name="LibraryTab" Classes="tab" Classes.selected="{Binding IsLibrarySelected}"
+                                        Command="{Binding SelectTabCommand}" CommandParameter="{x:Static vm:MobileTab.Library}">
+                                    <StackPanel Spacing="2">
+                                        <PathIcon Data="{DynamicResource TabLibraryFilledIcon}" />
+                                        <TextBlock Text="{loc:T Tab.Library}" />
+                                    </StackPanel>
+                                </Button>
+                                <Button Grid.Column="4" Name="SearchTab" Classes="tab" Classes.selected="{Binding IsSearchSelected}"
                                         Command="{Binding SelectTabCommand}" CommandParameter="{x:Static vm:MobileTab.Search}">
                                     <StackPanel Spacing="2">
                                         <PathIcon Data="{DynamicResource TabSearchFilledIcon}" />
@@ -193,6 +202,7 @@
                         <Button Name="CollapsedTabButton" Classes="tab selected bubble" HorizontalAlignment="Left"
                                 Command="{Binding ExpandTabBarCommand}" AutomationProperties.Name="Show tabs">
                             <Panel>
+                                <PathIcon Data="{DynamicResource TabHomeFilledIcon}" IsVisible="{Binding IsHomeSelected}" />
                                 <PathIcon Data="{DynamicResource TabLibraryFilledIcon}" IsVisible="{Binding IsLibrarySelected}" />
                                 <PathIcon Data="{DynamicResource TabFavoritesFilledIcon}" IsVisible="{Binding IsFavoritesSelected}" />
                                 <PathIcon Data="{DynamicResource TabPlaylistsFilledIcon}" IsVisible="{Binding IsPlaylistsSelected}" />
