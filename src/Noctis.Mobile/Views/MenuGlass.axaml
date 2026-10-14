@@ -3,12 +3,12 @@
                      xmlns:controls="using:Noctis.Controls"
                      x:Class="Noctis.Mobile.Views.MenuGlass"
                      CornerRadius="28" UseAppGlass="False" IsGlassActive="True"
-                     BlurRadius="7" Saturation="1.2" Refraction="14" RefractionAmount="10"
-                     Specular="0.24" SpecularStyle="TopCatch"
+                     BlurRadius="9" Saturation="1.2" Refraction="14" RefractionAmount="10"
+                     Specular="0.24" SpecularStyle="TopCatch" BackdropShade="0.16"
                      BackdropMinLuminance="{DynamicResource MenuGlassMinLuminance}"
                      BackdropMaxLuminance="{DynamicResource MenuGlassMaxLuminance}"
                      BackdropToneCurve="{DynamicResource MenuGlassToneCurve}"
-                     BackdropLift="1"
+                     BackdropLift="1" BackdropSpill="{DynamicResource MenuGlassSpill}"
                      Background="{DynamicResource MenuGlassTint}"
                      EdgeThickness="0" BoxShadow="{DynamicResource MenuGlassShadow}"
                      Sheen="{DynamicResource MenuGlassSheen}"
@@ -27,7 +27,16 @@
          than MenuGlassMinLuminance (MobilePopMenuTests checks the worst case against the text).
          The tone curve climbs fast from the dark end so most covers show bright and only the
          brightest is held down. The card takes the theme it is shown in, so Now Playing's menu
-         is the dark glass. -->
+         is the dark glass.
+         Measured off Apple Music's dark menus (10-14, Silk Sonic and ANTI covers): the glass is
+         0.20..0.50 in luminance with a curve near 2.5, and it KEEPS the backdrop's hue and
+         saturation (a plain brown lifts to a brighter brown, 0.58 saturated before and after), while
+         dark content inside it takes the colour of its surroundings. So the glass spills: a share
+         (MenuGlassSpill) of what it shows is the backdrop blurred four times as wide, at the same
+         luminance (GlassPanel.BackdropSpill), and the white veil only comes in as the lift grows.
+         The rim also shades the face (BackdropShade), the soft dark crescent under Apple's top
+         edge, and the frost is a touch heavier. The cap stays at 0.41 for the 4.5:1 text contrast
+         MobilePopMenuTests asks for (Apple's own 0.50 would be about 4:1). -->
     <controls:GlassPanel.Resources>
         <ResourceDictionary>
             <ResourceDictionary.ThemeDictionaries>
@@ -35,7 +44,8 @@
                     <SolidColorBrush x:Key="MenuGlassTint" Color="#0AFFFFFF" />
                     <x:Double x:Key="MenuGlassMinLuminance">0.22</x:Double>
                     <x:Double x:Key="MenuGlassMaxLuminance">0.41</x:Double>
-                    <x:Double x:Key="MenuGlassToneCurve">2</x:Double>
+                    <x:Double x:Key="MenuGlassToneCurve">2.5</x:Double>
+                    <x:Double x:Key="MenuGlassSpill">0.58</x:Double>
                     <BoxShadows x:Key="MenuGlassShadow">0 0 0.8 0.3 #73000000, 0 12 40 0 #33000000</BoxShadows>
                     <LinearGradientBrush x:Key="MenuGlassSheen" StartPoint="0%,0%" EndPoint="0%,100%">
                         <GradientStop Offset="0" Color="#0AFFFFFF" />
@@ -52,6 +62,7 @@
                     <x:Double x:Key="MenuGlassMinLuminance">0.74</x:Double>
                     <x:Double x:Key="MenuGlassMaxLuminance">1</x:Double>
                     <x:Double x:Key="MenuGlassToneCurve">1</x:Double>
+                    <x:Double x:Key="MenuGlassSpill">0.3</x:Double>
                     <BoxShadows x:Key="MenuGlassShadow">0 0 1 0 #1F000000, 0 12 40 0 #1F000000</BoxShadows>
                     <LinearGradientBrush x:Key="MenuGlassSheen" StartPoint="0%,0%" EndPoint="0%,100%">
                         <GradientStop Offset="0" Color="#33FFFFFF" />

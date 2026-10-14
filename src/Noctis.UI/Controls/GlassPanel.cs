@@ -151,6 +151,20 @@ public class GlassPanel : Decorator
     public static readonly StyledProperty<double> BackdropLiftProperty =
         AvaloniaProperty.Register<GlassPanel, double>(nameof(BackdropLift));
 
+    /// <summary>0..1: how much of the glass is the scattered light of its surroundings (Apple: "its
+    /// color is informed by surrounding content") — the backdrop blurred four times as wide as
+    /// <see cref="BlurRadius"/>, brought to the glass's luminance and mixed in. Dark content behind
+    /// the glass then takes the colour of what lies around it instead of a grey or white veil, and a
+    /// plain backdrop keeps its own hue and saturation; <see cref="BackdropLift"/>'s veil only comes
+    /// in as the lift grows. 0 (default): off. See <see cref="GlassLensFrame.Spill"/>.</summary>
+    public static readonly StyledProperty<double> BackdropSpillProperty =
+        AvaloniaProperty.Register<GlassPanel, double>(nameof(BackdropSpill));
+
+    /// <summary>0..1: the rim's shadow on the face, a soft dark band over the lens band
+    /// (<see cref="Refraction"/>), deepest under the top edge, gone along the bottom. 0 (default): none.</summary>
+    public static readonly StyledProperty<double> BackdropShadeProperty =
+        AvaloniaProperty.Register<GlassPanel, double>(nameof(BackdropShade));
+
     /// <summary>Shadows cast outside the panel, as on a <see cref="Border"/>; none by default.</summary>
     public static readonly StyledProperty<BoxShadows> BoxShadowProperty =
         Border.BoxShadowProperty.AddOwner<GlassPanel>();
@@ -162,7 +176,7 @@ public class GlassPanel : Decorator
             EdgeBrushProperty, EdgeThicknessProperty, FadeProperty,
             RefractionProperty, RefractionAmountProperty, DispersionProperty, MagnificationProperty,
             SaturationProperty, SpecularProperty, BoxShadowProperty, BackdropMinLuminanceProperty, BackdropMaxLuminanceProperty,
-            SpecularStyleProperty, BackdropToneCurveProperty, BackdropLiftProperty);
+            SpecularStyleProperty, BackdropToneCurveProperty, BackdropLiftProperty, BackdropSpillProperty, BackdropShadeProperty);
         AffectsArrange<GlassPanel>(BlurRadiusProperty);
     }
 
@@ -177,12 +191,14 @@ public class GlassPanel : Decorator
     public double BackdropLift { get => GetValue(BackdropLiftProperty); set => SetValue(BackdropLiftProperty, value); }
     public double BackdropMinLuminance { get => GetValue(BackdropMinLuminanceProperty); set => SetValue(BackdropMinLuminanceProperty, value); }
     public double BackdropMaxLuminance { get => GetValue(BackdropMaxLuminanceProperty); set => SetValue(BackdropMaxLuminanceProperty, value); }
+    public double BackdropSpill { get => GetValue(BackdropSpillProperty); set => SetValue(BackdropSpillProperty, value); }
+    public double BackdropShade { get => GetValue(BackdropShadeProperty); set => SetValue(BackdropShadeProperty, value); }
     public BoxShadows BoxShadow { get => GetValue(BoxShadowProperty); set => SetValue(BoxShadowProperty, value); }
 
     /// <summary>Any lens setting is on: the backdrop is drawn through <see cref="GlassLens"/>.</summary>
     internal bool HasLens =>
         (Refraction > 0 && RefractionAmount != 0) || Math.Abs(Magnification - 1) > 1e-6 || Math.Abs(Saturation - 1) > 1e-6
-        || BackdropMinLuminance > 0 || BackdropMaxLuminance < 1;
+        || BackdropMinLuminance > 0 || BackdropMaxLuminance < 1 || BackdropSpill > 0 || (BackdropShade > 0 && Refraction > 0);
 
     /// <summary>The panel reads what lies beneath it: a blur, a lens, or both.</summary>
     internal bool NeedsBackdrop => BlurRadius > 0 || HasLens;
@@ -245,7 +261,8 @@ public class GlassPanel : Decorator
         if (change.Property == UseAppGlassProperty || change.Property == IsGlassActiveProperty || change.Property == BlurRadiusProperty
             || change.Property == RefractionProperty || change.Property == RefractionAmountProperty
             || change.Property == MagnificationProperty || change.Property == SaturationProperty
-            || change.Property == BackdropMinLuminanceProperty || change.Property == BackdropMaxLuminanceProperty)
+            || change.Property == BackdropMinLuminanceProperty || change.Property == BackdropMaxLuminanceProperty
+            || change.Property == BackdropSpillProperty || change.Property == BackdropShadeProperty)
         {
             if (!EffectiveGlassActive || !NeedsBackdrop) ReleaseBackdrop();
             _reach?.InvalidateVisual();
@@ -340,7 +357,7 @@ public class GlassPanel : Decorator
         ? new GlassLensSettings(Math.Max(Refraction, 0), RefractionAmount, Math.Clamp(Dispersion, 0, 1),
             Math.Max(Magnification, 0.01), Math.Max(Saturation, 0),
             Math.Clamp(BackdropMinLuminance, 0, 1), Math.Clamp(BackdropMaxLuminance, 0, 1), Math.Max(BackdropToneCurve, 0.01),
-            Math.Clamp(BackdropLift, 0, 1))
+            Math.Clamp(BackdropLift, 0, 1), Math.Clamp(BackdropSpill, 0, 1), Math.Clamp(BackdropShade, 0, 1))
         : null;
 
     public override void Render(DrawingContext context)
@@ -901,8 +918,11 @@ internal sealed class GlassBackdropOp : ICustomDrawOperation
         var local = new SKRect((float)Bounds.X, (float)Bounds.Y, (float)Bounds.Right, (float)Bounds.Bottom);
         var radii = new GlassCornerRadii((float)_corners.TopLeft, (float)_corners.TopRight, (float)_corners.BottomRight, (float)_corners.BottomLeft);
         if (!GlassLens.TryMapToDevice(m, local, radii, out var device, out var deviceRadii, out var scale)) return null;
+        // The spill reads the backdrop four times as wide as the frost (at least 16 logical px).
+        var spillSigma = Math.Max(_blurRadius * 4, 16) * scale;
         return new GlassLensFrame(device, deviceRadii, (float)(l.Band * scale), (float)(l.Bend * scale),
-            (float)l.Dispersion, (float)l.Zoom, (float)l.Saturation, (float)l.ToneMin, (float)l.ToneMax, (float)l.ToneCurve, (float)l.ToneLift);
+            (float)l.Dispersion, (float)l.Zoom, (float)l.Saturation, (float)l.ToneMin, (float)l.ToneMax, (float)l.ToneCurve, (float)l.ToneLift,
+            (float)l.Spill, (float)spillSigma, (float)l.Shade);
     }
 }
 
