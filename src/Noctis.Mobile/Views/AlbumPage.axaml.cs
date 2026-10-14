@@ -3,6 +3,7 @@ using System.Diagnostics;
 using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Media;
+using Avalonia.Media.TextFormatting;
 using Noctis.Helpers;
 using Noctis.Mobile.ViewModels;
 
@@ -46,6 +47,7 @@ public partial class AlbumPage : UserControl
         AlbumScroll.ScrollChanged += (_, _) => UpdateScrollChrome();
         AlbumTitle.SizeChanged += (_, _) => UpdateScrollChrome();
         DescriptionText.SizeChanged += (_, _) => MeasureDescription();
+        DescriptionFoldedTail.TextTrimming = UnmarkedTrimming.Instance;
         DescriptionLess.SizeChanged += (_, _) => MeasureDescription();
         DataContextChanged += (_, _) => Attach();
         _chrome.ApplyTint();
@@ -148,7 +150,29 @@ public partial class AlbumPage : UserControl
         _descriptionFolded = Math.Min(text, lineHeight * DescriptionLines);
         _descriptionOverflows = text > _descriptionFolded + 0.5;
         _descriptionUnfolded = text + (_descriptionOverflows ? DescriptionLess.Bounds.Height + DescriptionLess.Margin.Top : 0);
+        SplitFoldedDescription();
         UnfoldDescription(animate: false);
+    }
+
+    /// <summary>
+    /// The folded stand-in: the lines before the last folded one exactly as the full text wraps
+    /// them, then everything after as one unwrapped line cut at the edge, so it runs on under
+    /// MORE rather than stopping where the next word wrapped away.
+    /// </summary>
+    private void SplitFoldedDescription()
+    {
+        var full = DescriptionText.Text ?? "";
+        var lines = DescriptionText.TextLayout.TextLines;
+        if (!_descriptionOverflows || lines.Count < DescriptionLines)
+        {
+            DescriptionFoldedHead.Text = full;
+            DescriptionFoldedTail.Text = null;
+            return;
+        }
+        var split = Math.Clamp(lines[DescriptionLines - 1].FirstTextSourceIndex, 0, full.Length);
+        DescriptionFoldedHead.Text = full[..split].TrimEnd();
+        DescriptionFoldedHead.IsVisible = split > 0;
+        DescriptionFoldedTail.Text = full[split..].Replace('\n', ' ');
     }
 
     /// <summary>
@@ -169,6 +193,10 @@ public partial class AlbumPage : UserControl
         void Set(double height, double reveal)
         {
             DescriptionClip.Height = height;
+            // The cut copy stands in only while fully folded; any unfolding shows the real wrap.
+            var folded = _descriptionOverflows && !open && reveal <= 0.001;
+            DescriptionFolded.IsVisible = folded;
+            DescriptionText.Opacity = folded ? 0 : 1;
             DescriptionLess.Opacity = _descriptionOverflows ? reveal : 0;
             DescriptionMore.Opacity = _descriptionOverflows ? 1 - reveal : 0;
             DescriptionMore.IsVisible = _descriptionOverflows && reveal < 1;
@@ -193,4 +221,16 @@ public partial class AlbumPage : UserControl
         }
         top.RequestAnimationFrame(Frame);
     }
+}
+
+/// <summary>
+/// Cuts a line by character with no visible mark: the folded description's last line runs on
+/// to the edge under MORE's fade, which stands in for the ellipsis.
+/// </summary>
+internal sealed class UnmarkedTrimming : TextTrimming
+{
+    public static readonly UnmarkedTrimming Instance = new();
+
+    public override TextCollapsingProperties CreateCollapsingProperties(TextCollapsingCreateInfo createInfo) =>
+        new TextTrailingCharacterEllipsis("​", createInfo.Width, createInfo.TextRunProperties, createInfo.FlowDirection);
 }

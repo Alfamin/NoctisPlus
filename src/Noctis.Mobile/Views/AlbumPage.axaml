@@ -221,8 +221,17 @@
                     <Panel>
                         <Border Name="DescriptionClip" ClipToBounds="True" VerticalAlignment="Top">
                             <StackPanel Name="DescriptionContent" VerticalAlignment="Top">
-                                <TextBlock Name="DescriptionText" Text="{Binding Description}" FontSize="15" LineHeight="20"
-                                           TextWrapping="Wrap" />
+                                <!-- Folded, the full text hides behind a copy cut at the last line by
+                                     character, not by word, so that line runs on under MORE (Apple's) instead
+                                     of stopping short where the next word wrapped away. -->
+                                <Panel>
+                                    <TextBlock Name="DescriptionText" Text="{Binding Description}" FontSize="15" LineHeight="20"
+                                               TextWrapping="Wrap" />
+                                    <StackPanel Name="DescriptionFolded" VerticalAlignment="Top" IsVisible="False">
+                                        <TextBlock Name="DescriptionFoldedHead" FontSize="15" LineHeight="20" TextWrapping="Wrap" />
+                                        <TextBlock Name="DescriptionFoldedTail" FontSize="15" LineHeight="20" TextWrapping="NoWrap" />
+                                    </StackPanel>
+                                </Panel>
                                 <TextBlock Name="DescriptionLess" Classes="album-more" Text="LESS" HorizontalAlignment="Right"
                                            Margin="0,2,0,0" />
                             </StackPanel>
