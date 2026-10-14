@@ -816,6 +816,14 @@
     <value>Mostrar progreso de la canción en el botón de la barra de tareas. Ámbar mientras está en pausa.</value>
     <comment>Text in SettingsView.axaml</comment>
   </data>
+  <data name="Settings.MediaControlsTaskbar" xml:space="preserve">
+    <value>Controles multimedia en la barra de tareas</value>
+    <comment>Text in SettingsView.axaml</comment>
+  </data>
+  <data name="Settings.MediaControlsTaskbarDesc" xml:space="preserve">
+    <value>Mostrar los botones Anterior, Reproducir/Pausa, Siguiente y Favorita al pasar el ratón sobre el icono de la barra de tareas.</value>
+    <comment>Text in SettingsView.axaml</comment>
+  </data>
   <data name="Settings.AutomaticAlbumCoverSize" xml:space="preserve">
     <value>Tamaño automático de las portadas</value>
     <comment>Text in SettingsView.axaml</comment>

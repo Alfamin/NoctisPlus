@@ -816,6 +816,14 @@
     <value>在工作列按鈕上顯示歌曲進度。暫停時Amber</value>
     <comment>Text in SettingsView.axaml</comment>
   </data>
+  <data name="Settings.MediaControlsTaskbar" xml:space="preserve">
+    <value>工作列顯示媒體控制按鈕</value>
+    <comment>Text in SettingsView.axaml</comment>
+  </data>
+  <data name="Settings.MediaControlsTaskbarDesc" xml:space="preserve">
+    <value>將滑鼠停留在工作列圖示上時，顯示上一首、播放/暫停、下一首和收藏按鈕。</value>
+    <comment>Text in SettingsView.axaml</comment>
+  </data>
   <data name="Settings.AutomaticAlbumCoverSize" xml:space="preserve">
     <value>自動專輯封面大小</value>
     <comment>Text in SettingsView.axaml</comment>

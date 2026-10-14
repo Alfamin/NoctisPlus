@@ -816,6 +816,14 @@
     <value>작업 표시줄 버튼에 곡 진행률을 표시합니다. 일시정지 중에는 주황색입니다.</value>
     <comment>Text in SettingsView.axaml</comment>
   </data>
+  <data name="Settings.MediaControlsTaskbar" xml:space="preserve">
+    <value>작업 표시줄에 미디어 컨트롤 표시</value>
+    <comment>Text in SettingsView.axaml</comment>
+  </data>
+  <data name="Settings.MediaControlsTaskbarDesc" xml:space="preserve">
+    <value>작업 표시줄 아이콘에 마우스를 올리면 이전, 재생/일시정지, 다음, 즐겨찾기 버튼을 표시합니다.</value>
+    <comment>Text in SettingsView.axaml</comment>
+  </data>
   <data name="Settings.AutomaticAlbumCoverSize" xml:space="preserve">
     <value>앨범 커버 크기 자동 조정</value>
     <comment>Text in SettingsView.axaml</comment>

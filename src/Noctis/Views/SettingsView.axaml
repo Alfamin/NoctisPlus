@@ -2577,6 +2577,19 @@
                                           VerticalAlignment="Center"/>
                 </Grid>
             </Border>
+            <Border Classes="setting-row" IsVisible="{Binding IsTaskbarProgressSupported}">
+                <Grid ColumnDefinitions="*,Auto">
+                    <StackPanel Grid.Column="0" Spacing="2">
+                        <TextBlock Text="{loc:T Settings.MediaControlsTaskbar}" FontSize="15" FontWeight="SemiBold"/>
+                        <TextBlock Text="{loc:T Settings.MediaControlsTaskbarDesc}"
+                                   FontSize="12" Opacity="0.5" TextWrapping="Wrap"/>
+                    </StackPanel>
+                    <controls:LottieToggle Grid.Column="1"
+                                          AutomationProperties.Name="{loc:T Settings.MediaControlsTaskbar}"
+                                          IsChecked="{Binding TaskbarMediaControlsEnabled}"
+                                          VerticalAlignment="Center"/>
+                </Grid>
+            </Border>
             </StackPanel>
             </Border>
             </StackPanel>

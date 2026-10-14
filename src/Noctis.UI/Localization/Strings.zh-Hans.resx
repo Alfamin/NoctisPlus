@@ -816,6 +816,14 @@
     <value>在任务栏按钮上显示歌曲进度。暂停时Amber</value>
     <comment>Text in SettingsView.axaml</comment>
   </data>
+  <data name="Settings.MediaControlsTaskbar" xml:space="preserve">
+    <value>任务栏显示媒体控制按钮</value>
+    <comment>Text in SettingsView.axaml</comment>
+  </data>
+  <data name="Settings.MediaControlsTaskbarDesc" xml:space="preserve">
+    <value>将鼠标悬停在任务栏图标上时，显示上一首、播放/暂停、下一首和收藏按钮。</value>
+    <comment>Text in SettingsView.axaml</comment>
+  </data>
   <data name="Settings.AutomaticAlbumCoverSize" xml:space="preserve">
     <value>自动专辑封面大小</value>
     <comment>Text in SettingsView.axaml</comment>
