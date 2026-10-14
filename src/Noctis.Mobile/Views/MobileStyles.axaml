@@ -453,13 +453,19 @@
     </Style>
 
     <!-- The mini player's Play and Next: Apple's filled glyphs; Next greys out with nothing
-         after the current song. -->
+         after the current song. Apple draws both at one height, about 0.3 of the bar: sized by
+         the drawn glyph, not the box, so 15.5 dp tall each. Play and Pause stand 18 of the
+         24-grid's units (box 20.7), the Forward pair 12.73 (box 29.2). 44 dp touch targets. -->
     <Style Selector="Button.icon.mini">
-        <Setter Property="Width" Value="42" />
+        <Setter Property="Width" Value="44" />
     </Style>
     <Style Selector="Button.icon.mini PathIcon">
-        <Setter Property="Width" Value="28" />
-        <Setter Property="Height" Value="28" />
+        <Setter Property="Width" Value="20.7" />
+        <Setter Property="Height" Value="20.7" />
+    </Style>
+    <Style Selector="Button.icon.mini PathIcon.forward">
+        <Setter Property="Width" Value="29.2" />
+        <Setter Property="Height" Value="29.2" />
     </Style>
     <Style Selector="Button.icon.mini.unavailable PathIcon">
         <Setter Property="Foreground" Value="{DynamicResource PrimaryTextBrush}" />

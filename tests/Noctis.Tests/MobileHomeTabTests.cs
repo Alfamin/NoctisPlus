@@ -196,6 +196,47 @@ public class MobileHomeTabTests
         return rig;
     }
 
+    /// <summary>
+    /// Apple's mini player draws Play and Forward at one height (device 10-13 before: Play 21 dp
+    /// tall, Forward 14.5). The visible glyph, not its box, is what matches: each geometry's
+    /// drawn height on the 24-grid times its box. Touch targets stay 44 dp.
+    /// </summary>
+    [AvaloniaFact]
+    public void MiniPlayer_PlayPauseAndForward_DrawOneHeight_On44dpTargets()
+    {
+        using var rig = PlayingRig(out var window, out var view);
+        var heights = new[] { ("MiniPlayGlyph", "PhPlayFill"), ("MiniPauseGlyph", "PhPauseFill"), ("MiniNextGlyph", "PhForwardFill") }
+            .Select(pair =>
+            {
+                var icon = view.FindControl<PathIcon>(pair.Item1)!;
+                Assert.True(view.TryFindResource(pair.Item2, out var geometry));
+                Assert.Same(geometry, icon.Data);
+                return GlyphHeight(PhoneIconData(pair.Item2)) * icon.Height / 24;
+            }).ToArray();
+        Assert.All(heights, h => Assert.Equal(15.5, h, 0.15));
+        foreach (var name in new[] { "MiniPlayButton", "MiniNextButton" })
+        {
+            var button = view.FindControl<Button>(name)!;
+            Assert.True(button.Bounds.Width >= 44 && button.Bounds.Height >= 44, $"{name} is {button.Bounds.Size}");
+        }
+        window.Close();
+    }
+
+    /// <summary>The mini player's text is Apple's: small beside the 52 dp bar, the artist the
+    /// same size as the title in the regular weight.</summary>
+    [AvaloniaFact]
+    public void MiniPlayer_TitleAndArtist_AreApplesSmallSize()
+    {
+        using var rig = PlayingRig(out var window, out var view);
+        var title = view.FindControl<MarqueeTextBlock>("MiniTitle")!;
+        var artist = view.FindControl<MarqueeTextBlock>("MiniArtist")!;
+        Assert.Equal(12, title.FontSize);
+        Assert.Equal(FontWeight.SemiBold, title.FontWeight);
+        Assert.Equal(title.FontSize, artist.FontSize);
+        Assert.Equal(FontWeight.Normal, artist.FontWeight);
+        window.Close();
+    }
+
     /// <summary>Default: no fill, no line, the capsule is plain glass (Apple's).</summary>
     [AvaloniaFact]
     public void MiniPlayer_IsPlainGlass_ByDefault()
@@ -238,5 +279,25 @@ public class MobileHomeTabTests
         await again.InitializeAsync();
         Assert.True(again.ShowMiniProgressFill);
         Assert.True(again.ShowMiniProgressLine);
+    }
+
+    // ── Glyph geometry ───────────────────────────────────────────
+
+    /// <summary>A PhoneIcons.axaml geometry's path data, as written.</summary>
+    private static string PhoneIconData(string key)
+    {
+        var dir = new DirectoryInfo(AppContext.BaseDirectory);
+        while (dir != null && !File.Exists(Path.Combine(dir.FullName, "Noctis.sln"))) dir = dir.Parent;
+        var text = File.ReadAllText(Path.Combine(dir!.FullName, "src", "Noctis.Mobile", "Views", "PhoneIcons.axaml"));
+        return Regex.Match(text, $"<StreamGeometry x:Key=\"{key}\">(.*?)</StreamGeometry>", RegexOptions.Singleline).Groups[1].Value;
+    }
+
+    /// <summary>The drawn height of a 24-grid glyph, its zero-area grid corners left out.</summary>
+    internal static double GlyphHeight(string data)
+    {
+        data = data.Replace("M0 0ZM24 24Z", "").Trim();
+        if (data.StartsWith("F0", StringComparison.Ordinal) || data.StartsWith("F1", StringComparison.Ordinal)) data = data[2..];
+        using var path = SKPath.ParseSvgPathData(data) ?? throw new InvalidOperationException("unparsable: " + data);
+        return path.TightBounds.Height;
     }
 }

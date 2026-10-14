@@ -258,12 +258,14 @@
                                                                   DecodeWidth="128" ClearOnSourceChange="False" Stretch="UniformToFill" />
                                         </Panel>
                                     </Border>
-                                    <!-- The desktop's marquee: a title or artist too long for the row scrolls
+                                    <!-- Apple's sizes, measured on its mini player: the title's capitals stand
+                                         about a sixth of the bar's height, the artist the same size, regular.
+                                         The desktop's marquee: a title or artist too long for the row scrolls
                                          (both start together after the rest), else it sits still. Left-aligned
                                          so a short line stays at the start; MaxDisplayWidth only lifts the
                                          control's 240 default cap — the column sets the real width. -->
                                     <StackPanel Grid.Column="1" Margin="11,0,4,0" VerticalAlignment="Center">
-                                        <controls:MarqueeTextBlock Name="MiniTitle" Text="{Binding Player.CurrentTrack.Title}" FontSize="15" FontWeight="SemiBold"
+                                        <controls:MarqueeTextBlock Name="MiniTitle" Text="{Binding Player.CurrentTrack.Title}" FontSize="12" FontWeight="SemiBold"
                                                                    MaxDisplayWidth="10000" HorizontalAlignment="Left" />
                                         <controls:MarqueeTextBlock Name="MiniArtist" Text="{Binding Player.CurrentTrack.Artist}" FontSize="12"
                                                                    Foreground="{DynamicResource PhoneSecondaryTextBrush}"
@@ -273,15 +275,15 @@
                             </Button>
                             <Button Grid.Column="1" Name="MiniPlayButton" Classes="icon mini" Command="{Binding Player.TogglePlayPauseCommand}">
                                 <Panel>
-                                    <PathIcon Data="{DynamicResource PhPlayFill}" IsVisible="{Binding !Player.IsPlaying}" />
-                                    <PathIcon Data="{DynamicResource PhPauseFill}" IsVisible="{Binding Player.IsPlaying}" />
+                                    <PathIcon Name="MiniPlayGlyph" Data="{DynamicResource PhPlayFill}" IsVisible="{Binding !Player.IsPlaying}" />
+                                    <PathIcon Name="MiniPauseGlyph" Data="{DynamicResource PhPauseFill}" IsVisible="{Binding Player.IsPlaying}" />
                                 </Panel>
                             </Button>
                             <!-- Expanded only, like Apple's: the folded row has room for Play alone.
                                  Greyed when there is nothing to skip to. -->
                             <Button Grid.Column="2" Name="MiniNextButton" Classes="icon mini" Classes.unavailable="{Binding !Player.HasNext}"
                                     IsEnabled="{Binding Player.HasNext}" Command="{Binding Player.NextCommand}">
-                                <PathIcon Data="{DynamicResource PhForwardFill}" />
+                                <PathIcon Name="MiniNextGlyph" Classes="forward" Data="{DynamicResource PhForwardFill}" />
                             </Button>
                         </Grid>
                     </Panel>
