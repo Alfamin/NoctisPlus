@@ -502,6 +502,24 @@ public class MobileAccountTests
         window.Close();
     }
 
+    /// <summary>Bug (10-14, emulator): signed out with nothing downloaded, a song list's filter
+    /// still offered Downloaded, and picking it emptied the list ("0 of 11").</summary>
+    [Fact]
+    public void SongsFilter_OffersDownloaded_OnlySignedIn_OrWhileCopiesAreKept()
+    {
+        using var rig = MobileFixtures.MakeRig(new[] { MobileFixtures.Song("Local") });
+        var account = new FakeAccount();
+        var list = new SongListPageViewModel(ShellWith(rig, account), "Songs", () => rig.Library.TrackList);
+        Assert.False(list.CanFilterDownloaded);
+
+        account.DownloadedIds.Add(Guid.NewGuid());          // signed out, copies kept
+        Assert.True(list.CanFilterDownloaded);
+
+        account.DownloadedIds.Clear();
+        account.Account = FakeAccount.SignedInAs();
+        Assert.True(list.CanFilterDownloaded);
+    }
+
     // ── Signed in ──
 
     [Fact]

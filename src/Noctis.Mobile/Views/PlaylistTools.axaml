@@ -12,7 +12,7 @@
                 Command="{Binding ToggleSearchCommand}" AutomationProperties.Name="Search playlists">
             <PathIcon Data="{DynamicResource PhSearch}" />
         </Button>
-        <Button Name="PlaylistSortButton" Classes="glass-round" Classes.on="{Binding IsSorted}" Click="OnSortClick"
+        <Button Name="PlaylistSortButton" Classes="glass-round" Classes.on="{Binding IsSorted}" Command="{Binding ShowSortMenuCommand}"
                 AutomationProperties.Name="Sort playlists">
             <PathIcon Data="{DynamicResource PhSort}" />
         </Button>

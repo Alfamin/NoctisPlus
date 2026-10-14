@@ -173,8 +173,9 @@
                                 </MultiBinding>
                             </TextBlock.IsVisible>
                         </TextBlock>
+                        <!-- What the badge means, on the glass pop menu out of the badge (ShowQualityNote). -->
                         <Button Name="QualityBadge" Classes="row" HorizontalAlignment="Left" VerticalAlignment="Center"
-                                IsVisible="{Binding HasQualityBadge}">
+                                IsVisible="{Binding HasQualityBadge}" Command="{Binding ShowQualityNoteCommand}">
                             <StackPanel Orientation="Horizontal" Spacing="4" Margin="0,4">
                                 <Viewbox Width="16" Height="11" Margin="0,1,0,0" VerticalAlignment="Center">
                                     <Path Classes="album-subtle" Data="{StaticResource AlbumQualityIcon}" />
@@ -182,16 +183,6 @@
                                 <TextBlock Name="QualityBadgeText" Classes="album-subtle" FontSize="13" FontWeight="SemiBold"
                                            Text="{Binding QualityBadge}" VerticalAlignment="Center" />
                             </StackPanel>
-                            <Button.Flyout>
-                                <Flyout Placement="Bottom">
-                                    <StackPanel Width="240" Spacing="4">
-                                        <TextBlock Text="{Binding QualityBadge}" FontSize="14" FontWeight="SemiBold" />
-                                        <TextBlock Text="{Binding QualityDetail}" FontSize="13" Opacity="0.85" />
-                                        <TextBlock Text="{Binding QualityDescription}" FontSize="12" TextWrapping="Wrap" Opacity="0.8"
-                                                   Margin="0,4,0,0" />
-                                    </StackPanel>
-                                </Flyout>
-                            </Button.Flyout>
                         </Button>
                     </StackPanel>
                 </StackPanel>

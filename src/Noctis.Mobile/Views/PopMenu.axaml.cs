@@ -133,7 +133,7 @@ public partial class PopMenu : UserControl
         Anchor = _pending is { } pending && pending.IsAttachedToVisualTree() && pending.IsEffectivelyVisible ? pending : null;
         _pending = null;
         Scope.RequestedThemeVariant = ThemeOf(Anchor);
-        Card.Width = menu is LibraryMenuViewModel ? LibraryWidth : ItemWidth;
+        Card.Width = menu is LibraryMenuViewModel or OptionsMenuViewModel { HasItems: true } ? LibraryWidth : ItemWidth;
         MenuContent.Content = menu;
         Body.Offset = default;
         IsVisible = true;
@@ -146,14 +146,7 @@ public partial class PopMenu : UserControl
         UpdateLayout();
 
         // Start values with no transitions (they snap), the targets a frame later with them.
-        Card.Transitions = null;
-        Glass.Transitions = null;
-        Body.Transitions = null;
-        Glass.Fade = 0;
-        Body.Opacity = 0;
-        Sheen.Opacity = 0;
-        Card.RenderTransform = TransformOperations.Parse(Scale(PopScale));
-        Card.RenderTransformOrigin = Origin();
+        PopFrom(Card, Glass, Body, Origin());
 
         Dispatcher.UIThread.Post(() =>
         {
@@ -166,18 +159,7 @@ public partial class PopMenu : UserControl
                 row.RenderTransform = TransformOperations.Parse($"translateY({PopRowOffsetY}px)");
             }
 
-            var fade = TimeSpan.FromMilliseconds(PopFadeMs);
-            Glass.Transitions = new Transitions { new DoubleTransition { Property = GlassPanel.FadeProperty, Duration = fade, Easing = new CubicEaseOut() } };
-            Body.Transitions = new Transitions { new DoubleTransition { Property = OpacityProperty, Duration = fade, Easing = new CubicEaseOut() } };
-            Sheen.Transitions = new Transitions { new DoubleTransition { Property = OpacityProperty, Duration = fade, Easing = new CubicEaseOut() } };
-            Card.Transitions = new Transitions
-            {
-                new TransformOperationsTransition { Property = RenderTransformProperty, Duration = TimeSpan.FromMilliseconds(PopDurationMs), Easing = PopEase },
-            };
-            Glass.Fade = 1;
-            Body.Opacity = 1;
-            Sheen.Opacity = 1;
-            Card.RenderTransform = TransformOperations.Parse(Scale(1));
+            PopIn(Card, Glass, Body);
 
             Dispatcher.UIThread.Post(() =>
             {
@@ -229,18 +211,7 @@ public partial class PopMenu : UserControl
         if (!IsVisible) return;
         var run = ++_run;
         IsHitTestVisible = false;
-        var duration = TimeSpan.FromMilliseconds(PopCloseMs);
-        Glass.Transitions = new Transitions { new DoubleTransition { Property = GlassPanel.FadeProperty, Duration = duration, Easing = PopCloseEase } };
-        Body.Transitions = new Transitions { new DoubleTransition { Property = OpacityProperty, Duration = duration, Easing = PopCloseEase } };
-        Sheen.Transitions = new Transitions { new DoubleTransition { Property = OpacityProperty, Duration = duration, Easing = PopCloseEase } };
-        Card.Transitions = new Transitions
-        {
-            new TransformOperationsTransition { Property = RenderTransformProperty, Duration = duration, Easing = PopCloseEase },
-        };
-        Glass.Fade = 0;
-        Body.Opacity = 0;
-        Sheen.Opacity = 0;
-        Card.RenderTransform = TransformOperations.Parse(Scale(PopCloseScale));
+        PopOut(Card, Glass, Body);
 
         DispatcherTimer.RunOnce(() =>
         {
@@ -248,11 +219,62 @@ public partial class PopMenu : UserControl
             IsVisible = false;
             MenuContent.Content = null;
             Anchor = null;
-            Card.Transitions = null;
-            Glass.Transitions = null;
-            Body.Transitions = null;
-            Sheen.Transitions = null;
-        }, duration);
+            PopDone(Card, Glass, Body);
+        }, TimeSpan.FromMilliseconds(PopCloseMs));
+    }
+
+    /// <summary>
+    /// The pop's start, snapped (no transitions): <paramref name="card"/> scaled down round
+    /// <paramref name="origin"/>, its glass and <paramref name="body"/> faded out. Shared with the
+    /// Add to Playlist sheet (ContextSheet), so every glass pop-up opens and closes alike.
+    /// </summary>
+    internal static void PopFrom(Control card, GlassPanel glass, Control body, RelativePoint origin)
+    {
+        PopDone(card, glass, body);
+        glass.Fade = 0;
+        body.Opacity = 0;
+        card.RenderTransform = TransformOperations.Parse(Scale(PopScale));
+        card.RenderTransformOrigin = origin;
+    }
+
+    /// <summary>The pop: scale up to full size with the soft decelerate, the glass and body fading in
+    /// quickly. Run a frame after <see cref="PopFrom"/>, so the start values have been drawn.</summary>
+    internal static void PopIn(Control card, GlassPanel glass, Control body)
+    {
+        var fade = TimeSpan.FromMilliseconds(PopFadeMs);
+        glass.Transitions = new Transitions { new DoubleTransition { Property = GlassPanel.FadeProperty, Duration = fade, Easing = new CubicEaseOut() } };
+        body.Transitions = new Transitions { new DoubleTransition { Property = OpacityProperty, Duration = fade, Easing = new CubicEaseOut() } };
+        card.Transitions = new Transitions
+        {
+            new TransformOperationsTransition { Property = RenderTransformProperty, Duration = TimeSpan.FromMilliseconds(PopDurationMs), Easing = PopEase },
+        };
+        glass.Fade = 1;
+        body.Opacity = 1;
+        card.RenderTransform = TransformOperations.Parse(Scale(1));
+    }
+
+    /// <summary>The pop reversed, quicker: shrink back toward where it grew from while fading out
+    /// (<see cref="PopCloseMs"/>); hide the card once it is done.</summary>
+    internal static void PopOut(Control card, GlassPanel glass, Control body)
+    {
+        var duration = TimeSpan.FromMilliseconds(PopCloseMs);
+        glass.Transitions = new Transitions { new DoubleTransition { Property = GlassPanel.FadeProperty, Duration = duration, Easing = PopCloseEase } };
+        body.Transitions = new Transitions { new DoubleTransition { Property = OpacityProperty, Duration = duration, Easing = PopCloseEase } };
+        card.Transitions = new Transitions
+        {
+            new TransformOperationsTransition { Property = RenderTransformProperty, Duration = duration, Easing = PopCloseEase },
+        };
+        glass.Fade = 0;
+        body.Opacity = 0;
+        card.RenderTransform = TransformOperations.Parse(Scale(PopCloseScale));
+    }
+
+    /// <summary>Drops the pop's transitions once it has finished.</summary>
+    internal static void PopDone(Control card, GlassPanel glass, Control body)
+    {
+        card.Transitions = null;
+        glass.Transitions = null;
+        body.Transitions = null;
     }
 
     /// <summary>
@@ -317,10 +339,13 @@ public partial class PopMenu : UserControl
         return new RelativePoint(Math.Clamp(x, 0, card.Width), Math.Clamp(y, 0, card.Height), RelativeUnit.Absolute);
     }
 
-    /// <summary>The card's visible rows (the tile row, each action), top to bottom.</summary>
+    /// <summary>The card's visible rows (the tile row, each action; a sort menu's choices), top
+    /// to bottom.</summary>
     private List<Control> Rows() =>
         MenuContent.Presenter?.Child is StackPanel rows
-            ? rows.Children.Where(c => c.IsVisible && c is not Border).ToList()
+            ? rows.Children.Where(c => c.IsVisible && c is not Border)
+                .SelectMany(c => c is ItemsControl items ? items.GetRealizedContainers().Where(r => r.IsVisible) : new[] { c })
+                .ToList()
             : new List<Control>();
 
     private static string Scale(double scale) =>

@@ -341,9 +341,8 @@
 
         <!-- Above everything, the tab bar too: ShellView raises the bar over the Queue (ZIndex 1).
              Every ⋯ menu pops out of what was tapped (PopMenu, over the player and the Queue as
-             well); the bottom sheet is only its Add to Playlist list. -->
+             well); the bottom sheet is only its Add to Playlist list, on the same glass with the same pop. -->
         <views:PopMenu Name="Menu" DataContext="{Binding}" ZIndex="2" />
-        <views:ContextSheet Name="Sheet" DataContext="{Binding}" ZIndex="2"
-                            IsVisible="{Binding IsPlaylistPickerOpen}" />
+        <views:ContextSheet Name="Sheet" DataContext="{Binding}" ZIndex="2" />
     </Grid>
 </UserControl>

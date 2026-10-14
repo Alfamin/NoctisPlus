@@ -14,10 +14,10 @@
                 Command="{Binding ToggleSearchCommand}">
             <PathIcon Data="{DynamicResource PhSearch}" />
         </Button>
-        <Button Name="ListSortButton" Classes="glass-round" Classes.on="{Binding IsSorted}" Click="OnSortClick">
+        <Button Name="ListSortButton" Classes="glass-round" Classes.on="{Binding IsSorted}" Command="{Binding ShowSortMenuCommand}">
             <PathIcon Data="{DynamicResource PhSort}" />
         </Button>
-        <Button Name="ListFilterButton" Classes="glass-round" Classes.on="{Binding IsFiltered}" Click="OnFilterClick">
+        <Button Name="ListFilterButton" Classes="glass-round" Classes.on="{Binding IsFiltered}" Command="{Binding ShowFilterMenuCommand}">
             <PathIcon Data="{DynamicResource PhFilter}" />
         </Button>
     </StackPanel>

@@ -100,8 +100,10 @@ public sealed partial class SongListPageViewModel : MobilePage, ISortable
     /// <summary>The filter button lights up while a filter is on.</summary>
     public bool IsFiltered => OnlyFavourites || OnlyDownloaded;
 
-    /// <summary>Downloaded means a desktop song's offline copy: offered only with an account.</summary>
-    public bool CanFilterDownloaded => Shell.Account != null;
+    /// <summary>Downloaded means a desktop song's offline copy: offered while signed in to a
+    /// computer, or while copies are kept from one. Signed out with none, the filter could only
+    /// empty the list (it offered itself whenever the account service existed: "0 of 11", 10-14).</summary>
+    public bool CanFilterDownloaded => Shell.Account is { } account && (account.IsSignedIn || account.DownloadedCount > 0);
 
     // ── Sort ──
 
@@ -121,6 +123,14 @@ public sealed partial class SongListPageViewModel : MobilePage, ISortable
     public bool IsSorted => Sort != SongSort.Default || IsDescending;
 
     public bool HasSortDirection => true;
+
+    /// <summary>The toolbar's sort button: the sort menu on the glass pop menu, out of the button.</summary>
+    [RelayCommand]
+    private void ShowSortMenu() => Shell.ShowOptions(OptionsMenuViewModel.ForSort(Shell, this));
+
+    /// <summary>The toolbar's filter button: the filter menu on the glass pop menu.</summary>
+    [RelayCommand]
+    private void ShowFilterMenu() => Shell.ShowOptions(OptionsMenuViewModel.ForFilter(Shell, this));
 
     public void ChooseSort(SortChoice choice)
     {

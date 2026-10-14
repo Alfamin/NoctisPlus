@@ -140,6 +140,10 @@ public sealed partial class AlbumPageViewModel : MobilePage, ITintedPage
     public string QualityDetail => Album.AudioQualityDetailedInfo;
     public string QualityDescription => Album.AudioQualityDescription;
 
+    /// <summary>The quality badge: what it means, as a note on the glass pop menu out of the badge.</summary>
+    [RelayCommand]
+    private void ShowQualityNote() => Shell.ShowOptions(OptionsMenuViewModel.ForNote(QualityBadge, QualityDetail, QualityDescription));
+
     /// <summary>"Genre · Year", skipping what a file does not carry (the "Unknown" genre
     /// placeholder, year 0) so a sparsely tagged album never shows "· ·". The quality badge
     /// follows it as its own element, as on the desktop.</summary>

@@ -64,6 +64,10 @@ public sealed partial class PlaylistListPageViewModel : MobilePage, ISortable
 
     public bool HasSortDirection => false;
     public bool IsDescending => false;
+    /// <summary>The toolbar's sort button: the sort menu on the glass pop menu, out of the button.</summary>
+    [RelayCommand]
+    private void ShowSortMenu() => Shell.ShowOptions(OptionsMenuViewModel.ForSort(Shell, this));
+
     public void ChooseDirection(bool descending) { }
 
     public void ChooseSort(SortChoice choice)

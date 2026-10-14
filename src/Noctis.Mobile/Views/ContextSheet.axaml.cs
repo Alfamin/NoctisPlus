@@ -1,18 +1,102 @@
+using System.ComponentModel;
 using Avalonia;
+using Avalonia.Animation;
+using Avalonia.Animation.Easings;
 using Avalonia.Controls;
 using Avalonia.Controls.Platform;
 using Avalonia.Input;
+using Avalonia.Threading;
+using Avalonia.VisualTree;
 using Noctis.Mobile.ViewModels;
 
 namespace Noctis.Mobile.Views;
 
+/// <summary>
+/// The Add to Playlist list (<see cref="ShellViewModel.IsPlaylistPickerOpen"/>): the menu's glass
+/// card (<see cref="MenuGlass"/>) rising out of the bottom edge with the menu's pop, and dropping
+/// back the same way, the dim behind it fading with it. The card keeps the item's content while it
+/// closes, so it never shrinks away empty.
+/// </summary>
 public partial class ContextSheet : UserControl
 {
     private IInputPane? _inputPane;
+    private ShellViewModel? _shell;
+    // Bumped by every open and close: a deferred step of an older run sees it changed and stops.
+    private int _run;
 
     public ContextSheet()
     {
         InitializeComponent();
+    }
+
+    protected override void OnDataContextChanged(EventArgs e)
+    {
+        base.OnDataContextChanged(e);
+        if (_shell != null) _shell.PropertyChanged -= OnShellChanged;
+        _shell = DataContext as ShellViewModel;
+        if (_shell != null) _shell.PropertyChanged += OnShellChanged;
+        Sync();
+    }
+
+    private void OnShellChanged(object? sender, PropertyChangedEventArgs e)
+    {
+        if (e.PropertyName is nameof(ShellViewModel.IsPlaylistPickerOpen) or nameof(ShellViewModel.Sheet)) Sync();
+    }
+
+    private void Sync()
+    {
+        if (_shell is { IsPlaylistPickerOpen: true, Sheet: { } sheet })
+        {
+            if (!IsVisible || !IsHitTestVisible || !ReferenceEquals(SheetContent.Content, sheet)) Open(sheet);
+        }
+        else Close();
+    }
+
+    private void Open(ContextSheetViewModel sheet)
+    {
+        var run = ++_run;
+        // The theme of the menu it was picked in (Now Playing's dark glass, or the page's).
+        SheetScope.RequestedThemeVariant = (this.GetVisualParent() as Panel)?.Children.OfType<PopMenu>().FirstOrDefault()?.Scope.RequestedThemeVariant;
+        SheetContent.Content = sheet;
+        IsVisible = true;
+        IsHitTestVisible = true;
+        UpdateLayout();
+
+        Scrim.Transitions = null;
+        Scrim.Opacity = 0;
+        PopMenu.PopFrom(SheetPop, SheetGlass, SheetBody, new RelativePoint(0.5, 1, RelativeUnit.Relative));
+        Dispatcher.UIThread.Post(() =>
+        {
+            if (run != _run) return;
+            Scrim.Transitions = new Transitions
+            {
+                new DoubleTransition { Property = OpacityProperty, Duration = TimeSpan.FromMilliseconds(PopMenu.PopCloseMs * 2), Easing = new CubicEaseOut() },
+            };
+            Scrim.Opacity = 1;
+            PopMenu.PopIn(SheetPop, SheetGlass, SheetBody);
+        }, DispatcherPriority.Render);
+    }
+
+    /// <summary>The pop reversed: inert at once (a fading card must never take a tap), then gone.</summary>
+    private void Close()
+    {
+        if (!IsVisible) return;
+        var run = ++_run;
+        IsHitTestVisible = false;
+        Scrim.Transitions = new Transitions
+        {
+            new DoubleTransition { Property = OpacityProperty, Duration = TimeSpan.FromMilliseconds(PopMenu.PopCloseMs), Easing = new CubicEaseIn() },
+        };
+        Scrim.Opacity = 0;
+        PopMenu.PopOut(SheetPop, SheetGlass, SheetBody);
+        DispatcherTimer.RunOnce(() =>
+        {
+            if (run != _run) return;
+            IsVisible = false;
+            SheetContent.Content = null;
+            Scrim.Transitions = null;
+            PopMenu.PopDone(SheetPop, SheetGlass, SheetBody);
+        }, TimeSpan.FromMilliseconds(PopMenu.PopCloseMs));
     }
 
     private void OnScrimPressed(object? sender, PointerPressedEventArgs e)
