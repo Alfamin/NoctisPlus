@@ -75,6 +75,10 @@ public class MobileDesktopIconParityTests
         { "PhoneIcons", "PhMenuHeartFill", "MenuLineHeart", -2.25 },
         { "LibraryIcons", "LibPinIcon", "PinFilledIcon", 0 },
         { "LibraryIcons", "QueueReorderIcon", "LineGrip", 3.6 },
+        // Account: the desktop account card's glyphs (SettingsView.axaml)
+        { "AccountPage", "AccountPhoneIcon", "AccountPhoneIcon", 0 },
+        { "AccountPage", "AccountEyeIcon", "AccountEyeIcon", 0 },
+        { "AccountPage", "AccountEyeOffIcon", "AccountEyeOffIcon", 0 },
     };
 
     private const int Scale = 8; // 24 grid -> 192 px
@@ -174,6 +178,9 @@ public class MobileDesktopIconParityTests
         var all = Geometries(Path.Combine("src", "Noctis.UI", "Assets", "Icons.axaml"));
         foreach (var (k, v) in Geometries(Path.Combine("src", "Noctis.UI", "Assets", "IconsMenuExtra.axaml")))
             all[k] = v;
+        // The account card's own glyphs ("Account glyphs Icons.axaml has no shape for").
+        foreach (var (k, v) in Geometries(Path.Combine("src", "Noctis", "Views", "SettingsView.axaml")))
+            if (k.StartsWith("Account", StringComparison.Ordinal)) all.TryAdd(k, v);
         return all;
     }
 

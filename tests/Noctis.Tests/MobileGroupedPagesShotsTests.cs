@@ -101,6 +101,18 @@ public class MobileGroupedPagesShotsTests
                     Pump(300);
                     Save(window, Path.Combine(dir, $"account-{name}.png"));
 
+                    // A sync running (its stage and bar), and a download with something on the phone.
+                    account.RaiseSyncProgress(new Noctis.Mobile.Services.Account.NoctisSyncProgress(
+                        Noctis.Mobile.Services.Account.NoctisSyncStage.Covers, 412, 1332));
+                    account.RaiseDownloadProgress(new Noctis.Mobile.Services.Account.NoctisDownloadProgress(30, 12, 0, 0));
+                    Pump(300);
+                    Save(window, Path.Combine(dir, $"account-syncing-{name}.png"));
+                    account.RaiseSyncProgress(new Noctis.Mobile.Services.Account.NoctisSyncProgress(
+                        Noctis.Mobile.Services.Account.NoctisSyncStage.Done, 1332, 1332));
+                    account.RaiseDownloadProgress(new Noctis.Mobile.Services.Account.NoctisDownloadProgress(0, 42, 0, 0));
+                    page.SyncText = string.Empty;
+                    page.DownloadText = string.Empty;
+
                     page.AskSignOutCommand.Execute(null);
                     Pump(200);
                     Save(window, Path.Combine(dir, $"account-signout-{name}.png"));
@@ -108,6 +120,54 @@ public class MobileGroupedPagesShotsTests
                 finally
                 {
                     window.Close();
+                }
+
+                // Signed out: the form empty, a field's error, signing in, a failed sign-in,
+                // and the security code to compare.
+                var signedOut = new MobileAccountTests.FakeAccount { ProbeGate = new TaskCompletionSource() };
+                var outShell = new ShellViewModel(rig.Shell.Library, rig.Shell.Player, rig.Shell.Lyrics)
+                {
+                    Account = signedOut,
+                    Marshal = a => a(),
+                    TintFactory = rig.Shell.TintFactory,
+                };
+                var outWindow = MobileFixtures.Mount(outShell, out _, 412, 1320);
+                outWindow.Background = Brushes.Transparent;
+                try
+                {
+                    outShell.OpenAccountCommand.Execute(null);
+                    var form = (AccountPageViewModel)outShell.CurrentPage!;
+                    Pump(300);
+                    Save(outWindow, Path.Combine(dir, $"account-out-{name}.png"));
+
+                    form.ServerAddress = "http://192.168.1.20";
+                    form.UserName = "ferlin@example.com";
+                    form.CheckAddress();
+                    Pump(200);
+                    Save(outWindow, Path.Combine(dir, $"account-out-invalid-{name}.png"));
+
+                    form.ServerAddress = "192.168.1.20";
+                    form.Password = "secret";
+                    var probe = form.SignInCommand.ExecuteAsync(null);
+                    Pump(300);
+                    Save(outWindow, Path.Combine(dir, $"account-out-signing-{name}.png"));
+
+                    signedOut.ProbeError = new Noctis.Mobile.Services.Account.NoctisServerException(
+                        Noctis.Mobile.Services.Account.NoctisErrorKind.Unreachable, "timeout");
+                    signedOut.ProbeGate.SetResult();
+                    await probe;
+                    Pump(200);
+                    Save(outWindow, Path.Combine(dir, $"account-out-unreachable-{name}.png"));
+
+                    signedOut.ProbeError = null;
+                    signedOut.ProbeGate = null;
+                    await form.SignInCommand.ExecuteAsync(null);
+                    Pump(200);
+                    Save(outWindow, Path.Combine(dir, $"account-out-code-{name}.png"));
+                }
+                finally
+                {
+                    outWindow.Close();
                 }
             }
         }
