@@ -132,6 +132,23 @@ public sealed partial class ContextSheetViewModel : ObservableObject
 
     [RelayCommand] private void ShowPlaylists() => IsPickingPlaylist = true;
 
+    /// <summary>The Now Playing menu's Add to Playlist: the card closes and the bottom sheet
+    /// opens on its playlist page (with its keyboard-aware New playlist box).</summary>
+    [RelayCommand]
+    private void PickPlaylist()
+    {
+        _shell.CloseSheet();
+        if (Track != null) _shell.Sheet = new ContextSheetViewModel(_shell, Title, Subtitle, ArtworkPath, Tracks) { Track = Track, IsPickingPlaylist = true };
+    }
+
+    /// <summary>The Now Playing menu's Lyrics: the lyrics page over the player.</summary>
+    [RelayCommand]
+    private void ShowLyrics()
+    {
+        _shell.CloseSheet();
+        _shell.IsLyricsOpen = true;
+    }
+
     [RelayCommand]
     private async Task AddToPlaylistAsync(Playlist? playlist)
     {

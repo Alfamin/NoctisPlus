@@ -294,6 +294,20 @@ public sealed partial class NowPlayingViewModel : ObservableObject, IDisposable
     public void EndSeek() => _seeking = false;
 
     /// <summary>
+    /// Mid-drag: shows <paramref name="position"/> in the elapsed and remaining times without
+    /// seeking (the release does that). Held position ticks no longer move the times, so
+    /// without this both froze at the drag's start (device, 10-13) and there was no telling
+    /// where the release would land. Ignored outside a held seek, so a value pushed into the
+    /// bar by anything else never moves the times.
+    /// </summary>
+    public void PreviewSeek(TimeSpan position)
+    {
+        if (!_seeking || CurrentTrack == null) return;
+        _seekIdleTicks = 0;
+        Position = position;
+    }
+
+    /// <summary>
     /// Position ticks a held seek may survive without any pointer activity before it cancels
     /// itself — thirty seconds at the Android player's 4 Hz poll. Android device run,
     /// 2026-09-22: a drag abandoned by pulling the notification shade down over it delivers

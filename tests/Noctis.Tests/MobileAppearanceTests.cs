@@ -242,9 +242,9 @@ public class MobileAppearanceTests
         }
     }
 
-    /// <summary>Now Playing is always dark: its seek fill and thumb take the dark-variant guarded
-    /// accent, so Indigo reads on the scrim (#121214) under Light and dark styles alike; the
-    /// raw Indigo read 2:1 there (device, Smoke · Indigo).</summary>
+    /// <summary>Now Playing is always dark, and its bars are Apple's white capsules (owner 10-13),
+    /// not the accent: whatever the theme and accent (Indigo read 2:1 on the scrim as a fill), the
+    /// played part is light translucent white, with no thumb, and stands out from the track.</summary>
     [AvaloniaTheory]
     [InlineData("Light")]
     [InlineData("Smoke")]
@@ -263,15 +263,14 @@ public class MobileAppearanceTests
             rig.Shell.OpenNowPlayingCommand.Execute(null);
             window.UpdateLayout();
             var page = view.FindControl<NowPlayingPage>("NowPlaying")!;
-            var seek = MobileFixtures.Named<Slider>(page, "SeekBar");
+            Assert.IsType<CapsuleSlider>(MobileFixtures.Named<Control>(page, "SeekBar"));
+            Assert.IsType<CapsuleSlider>(MobileFixtures.Named<Control>(page, "VolumeSlider"));
+            Assert.Empty(page.GetVisualDescendants().OfType<Thumb>());
             var scrim = Color.Parse("#121214");
-            var fill = seek.GetVisualDescendants().OfType<RepeatButton>().First(b => b.Name == "PART_DecreaseButton");
-            var thumb = seek.GetVisualDescendants().OfType<Avalonia.Controls.Primitives.Thumb>().First();
-            foreach (var (part, brush) in new[] { ("fill", fill.Background), ("thumb", thumb.Background) })
-            {
-                var ratio = MobileTheme.ContrastRatio(((ISolidColorBrush)brush!).Color, scrim);
-                Assert.True(ratio >= MobileTheme.MinAccentContrast, $"{themeName}: {part} {ratio:0.00} ");
-            }
+            var fill = Over(Color.FromArgb((byte)Math.Round(CapsuleSlider.FillAlpha * 255), 255, 255, 255), scrim);
+            var track = Over(Color.FromArgb((byte)Math.Round(CapsuleSlider.TrackAlpha * 255), 255, 255, 255), scrim);
+            var ratio = MobileTheme.ContrastRatio(fill, track);
+            Assert.True(ratio >= MobileTheme.MinAccentContrast, $"{themeName}: played part {ratio:0.00}:1 on the track");
         }
         finally
         {

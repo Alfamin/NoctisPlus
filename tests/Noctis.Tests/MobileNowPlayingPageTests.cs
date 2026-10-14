@@ -4,6 +4,7 @@ using System.Linq;
 using System.Threading.Tasks;
 using Avalonia;
 using Avalonia.Controls;
+using Avalonia.Headless;
 using Avalonia.Headless.XUnit;
 using Avalonia.VisualTree;
 using Noctis.Mobile.Services;
@@ -100,11 +101,94 @@ public class MobileNowPlayingPageTests : IDisposable
         window.UpdateLayout();
 
         var page = view.FindControl<NowPlayingPage>("NowPlaying")!;
-        foreach (var name in new[] { "Backdrop", "TitleText", "FavouriteButton", "NowPlayingMore", "SeekBar", "PlayPauseButton", "LyricsButton", "OutputButton", "QueueButton" })
+        foreach (var name in new[] { "Backdrop", "TitleText", "GrabberButton", "NowPlayingMore", "SeekBar", "PlayPauseButton", "LyricsButton", "OutputButton", "QueueButton" })
             Assert.True(MobileFixtures.Named<Control>(page, name).IsEffectivelyVisible, name);
         Assert.Equal("-01:30", MobileFixtures.Named<TextBlock>(page, "RemainingText").Text);
         Assert.False(MobileFixtures.Named<Control>(page, "VolumeRow").IsVisible);   // no volume control in tests
         Assert.DoesNotContain(page.GetVisualDescendants().OfType<TextBlock>(), t => t.Text?.Contains("Video") == true);
+
+        // Apple's page (owner 10-13): no heart by the title (it is in the ⋯ menu), shuffle and
+        // repeat on the Queue page, one transport row with Play/Pause a little larger.
+        foreach (var gone in new[] { "FavouriteButton", "ShuffleButton", "RepeatButton" })
+            Assert.DoesNotContain(page.GetVisualDescendants().OfType<Control>(), c => c.Name == gone);
+        var transport = new[] { "PreviousButton", "PlayPauseButton", "NextButton" }
+            .Select(n => MobileFixtures.Named<Button>(page, n)).ToList();
+        Assert.Single(transport.Select(b => b.TranslatePoint(default, page)!.Value.Y).Distinct());
+        double Glyph(Button b) => b.GetVisualDescendants().OfType<PathIcon>().First(i => i.IsVisible).Width;
+        Assert.True(Glyph(transport[1]) > Glyph(transport[0]) && Glyph(transport[0]) == Glyph(transport[2]));
+        // The cover sits back while paused.
+        var frame = MobileFixtures.Named<Border>(page, "ArtworkFrame");
+        Assert.False(frame.Classes.Contains("paused"));
+        rig.Shell.Player.TogglePlayPauseCommand.Execute(null);
+        Assert.True(frame.Classes.Contains("paused"));
+        window.Close();
+    }
+
+    /// <summary>Scrubbing the timeline: the elapsed and remaining times follow the finger while
+    /// it drags (device 10-13: both froze at the drag's start until the finger lifted, so there
+    /// was no telling where the release would land), and the release seeks there.</summary>
+    [AvaloniaFact]
+    public void ScrubbingTheTimeline_MovesTheTimesWithTheFinger_AndSeeksOnRelease()
+    {
+        using var rig = MobileFixtures.MakeRig(new[] { MobileFixtures.Song("Tone") });   // 90 s
+        var window = MobileFixtures.Mount(rig.Shell, out var view);
+        rig.Shell.Player.PlayTracks(rig.Library.TrackList, 0);
+        rig.Shell.OpenNowPlayingCommand.Execute(null);
+        window.UpdateLayout();
+
+        var page = view.FindControl<NowPlayingPage>("NowPlaying")!;
+        var seek = MobileFixtures.Named<Avalonia.Controls.Primitives.RangeBase>(page, "SeekBar");
+        Point At(double fraction) =>
+            seek.TranslatePoint(new Point(seek.Bounds.Width * fraction, seek.Bounds.Height / 2), window)!.Value;
+
+        window.MouseDown(At(0.25), Avalonia.Input.MouseButton.Left);
+        window.MouseMove(At(0.5));
+        window.UpdateLayout();
+        Avalonia.Threading.Dispatcher.UIThread.RunJobs();
+
+        Assert.InRange(seek.Value, 40, 50);
+        var held = TimeSpan.FromSeconds(seek.Value);
+        Assert.Equal(NowPlayingViewModel.FormatTime(held), MobileFixtures.Named<TextBlock>(page, "ElapsedText").Text);
+        Assert.Equal("-" + NowPlayingViewModel.FormatTime(TimeSpan.FromSeconds(90) - held),
+            MobileFixtures.Named<TextBlock>(page, "RemainingText").Text);
+        Assert.Empty(rig.Player.Seeks);                                  // nothing seeks mid-drag
+
+        window.MouseUp(At(0.5), Avalonia.Input.MouseButton.Left);
+        Assert.Equal(seek.Value, Assert.Single(rig.Player.Seeks).TotalSeconds, 3);
+        window.Close();
+    }
+
+    /// <summary>Apple's bars (owner 10-13): no thumb; held, the capsule grows (a transition on
+    /// Expansion, released back to 0), and the volume follows the finger to the device at once,
+    /// a tap anywhere setting it there.</summary>
+    [AvaloniaFact]
+    public void TheVolumeCapsule_GrowsWhileHeld_AndPutsTheVolumeUnderTheFinger()
+    {
+        using var rig = MobileFixtures.MakeRig(new[] { MobileFixtures.Song("Tone") });
+        var volume = new FakeVolume();
+        var nowPlaying = new NowPlayingViewModel(rig.Player, rig.Library, rig.Persistence, marshal: a => a(), volume: volume);
+        var shell = new ShellViewModel(rig.Shell.Library, nowPlaying,
+            new LyricsPageViewModel(rig.Player, nowPlaying, new FakeTrackFiles(), rig.Persistence, work => Task.FromResult(work())));
+        var window = MobileFixtures.Mount(shell, out var view);
+        shell.Player.PlayTracks(rig.Library.TrackList, 0);
+        shell.OpenNowPlayingCommand.Execute(null);
+        window.UpdateLayout();
+
+        var page = view.FindControl<NowPlayingPage>("NowPlaying")!;
+        var slider = MobileFixtures.Named<CapsuleSlider>(page, "VolumeSlider");
+        Point At(double fraction) =>
+            slider.TranslatePoint(new Point(slider.Bounds.Width * fraction, slider.Bounds.Height / 2), window)!.Value;
+
+        window.MouseDown(At(0.8), Avalonia.Input.MouseButton.Left);
+        Assert.True(slider.IsScrubbing);
+        Assert.Equal(1, slider.GetBaseValue(CapsuleSlider.ExpansionProperty).Value);
+        Assert.Equal(0.8, volume.Level, 2);
+        window.MouseMove(At(0.3));
+        Assert.Equal(0.3, volume.Level, 2);
+        window.MouseUp(At(0.3), Avalonia.Input.MouseButton.Left);
+        Assert.False(slider.IsScrubbing);
+        Assert.Equal(0, slider.GetBaseValue(CapsuleSlider.ExpansionProperty).Value);
+        Assert.Equal(0.3, shell.Player.VolumeLevel, 2);
         window.Close();
     }
 
@@ -127,7 +211,7 @@ public class MobileNowPlayingPageTests : IDisposable
 
         var page = view.FindControl<NowPlayingPage>("NowPlaying")!;
         Assert.True(MobileFixtures.Named<Control>(page, "VolumeRow").IsVisible);
-        foreach (var name in new[] { "SeekBar", "ShuffleButton", "PreviousButton", "PlayPauseButton", "NextButton", "RepeatButton",
+        foreach (var name in new[] { "SeekBar", "PreviousButton", "PlayPauseButton", "NextButton", "NowPlayingMore",
                      "VolumeSlider", "LyricsButton", "OutputButton", "QueueButton" })
         {
             var control = MobileFixtures.Named<Control>(page, name);

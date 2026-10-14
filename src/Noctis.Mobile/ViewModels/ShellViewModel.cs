@@ -194,6 +194,14 @@ public sealed partial class ShellViewModel : ObservableObject
 
     public bool IsSheetOpen => Sheet != null;
 
+    /// <summary>Now Playing's ⋯ menu: the song's actions on a glass card that pops out of the
+    /// button (NowPlayingMenu), Apple's. Its actions close it through <see cref="CloseSheet"/>.</summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(IsNowPlayingMenuOpen))]
+    private ContextSheetViewModel? _nowPlayingMenu;
+
+    public bool IsNowPlayingMenuOpen => NowPlayingMenu != null;
+
     private LibraryRowsViewModel? _libraryRows;
 
     /// <summary>The Library tab's list rows (Playlists, Artists…) and their Edit mode. Made on
@@ -482,6 +490,7 @@ public sealed partial class ShellViewModel : ObservableObject
         // otherwise the Queue overlay is left floating over the Library page.
         IsQueueOpen = false;
         IsLyricsOpen = false;
+        NowPlayingMenu = null;
         IsNowPlayingOpen = false;
     }
 
@@ -498,6 +507,7 @@ public sealed partial class ShellViewModel : ObservableObject
     /// </summary>
     public bool TryHandleBack()
     {
+        if (IsNowPlayingMenuOpen) { NowPlayingMenu = null; return true; }
         if (IsSheetOpen) { CloseSheet(); return true; }
         if (IsQueueOpen) { IsQueueOpen = false; return true; }
         if (IsLyricsOpen) { IsLyricsOpen = false; return true; }
@@ -661,8 +671,13 @@ public sealed partial class ShellViewModel : ObservableObject
         if (item != null) Sheet = ContextSheetViewModel.ForArtist(this, item.Artist, item.ArtworkPath);
     }
 
+    /// <summary>Closes the long-press sheet, or the Now Playing ⋯ menu.</summary>
     [RelayCommand]
-    public void CloseSheet() => Sheet = null;
+    public void CloseSheet()
+    {
+        Sheet = null;
+        NowPlayingMenu = null;
+    }
 
     /// <summary>
     /// Favourite or unfavourite <paramref name="tracks"/>: the flag, one journal write through
@@ -697,7 +712,14 @@ public sealed partial class ShellViewModel : ObservableObject
         if (Player.CurrentTrack is { } track) await SetFavouriteAsync(new[] { track }, !track.IsFavorite);
     }
 
-    /// <summary>Now Playing's ⋯: the song's sheet, over the player.</summary>
+    /// <summary>Now Playing's ⋯: the song's glass menu, over the player.</summary>
+    [RelayCommand]
+    private void OpenNowPlayingMenu()
+    {
+        if (Player.CurrentTrack is { } track) NowPlayingMenu = ContextSheetViewModel.ForTrack(this, track);
+    }
+
+    /// <summary>The Queue's ⋯: the song's sheet, over the Queue.</summary>
     [RelayCommand]
     private void OpenCurrentTrackSheet()
     {
