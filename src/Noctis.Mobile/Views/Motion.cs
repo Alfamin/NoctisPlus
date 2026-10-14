@@ -202,12 +202,22 @@ public static class Motion
     }
 
     /// <summary>Two frames on: the one that lays out and draws the start values, then the next.
-    /// Off screen (no TopLevel yet), after the dispatcher has done its layout work.</summary>
+    /// Each request also marks the control for redraw: a frame request alone came only once
+    /// something else redrew (up to 440 ms on a still screen, headless curves 02_settings_close
+    /// and 14_lyrics_close). Off screen (no TopLevel yet), after the dispatcher has done its
+    /// layout work.</summary>
     private static void AfterNextFrame(Control control, Action action)
     {
-        if (TopLevel.GetTopLevel(control) is { } top)
-            top.RequestAnimationFrame(_ => top.RequestAnimationFrame(_ => action()));
-        else
+        if (TopLevel.GetTopLevel(control) is not { } top)
+        {
             Dispatcher.UIThread.Post(action, DispatcherPriority.Background);
+            return;
+        }
+        top.RequestAnimationFrame(_ =>
+        {
+            top.RequestAnimationFrame(_ => action());
+            control.InvalidateVisual();
+        });
+        control.InvalidateVisual();
     }
 }

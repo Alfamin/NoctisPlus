@@ -124,6 +124,14 @@ public class MobileMotionTests
         Assert.InRange(landed, minMs, maxMs);
     }
 
+    /// <summary>When the target first moved after the action, in ms. A close starts at once: the
+    /// second of its two start frames once waited for something else to redraw (440 ms).</summary>
+    private static double FirstMove(List<Sample> all, string target)
+    {
+        var s = all.Where(x => x.Target == target && x.Ms >= 0).ToList();
+        return s.First(x => x != s[0] && (x.X, x.Y, x.Opacity, x.Scale) != (s[0].X, s[0].Y, s[0].Opacity, s[0].Scale)).Ms;
+    }
+
     /// <summary>The target is gone (or hidden) by the end of the recording.</summary>
     private static void AssertGone(List<Sample> all, string target) =>
         Assert.True(all.Where(x => x.Target == target).Last() is { Present: false } or { Opacity: 0 }, $"{target} still on screen");
@@ -202,6 +210,7 @@ public class MobileMotionTests
         AssertGlides(s.Where(x => x.Y < H - 0.5 || x.Target != "settings" || x.Ms < 5).ToList(), "settings", x => x.Y, 0, H - 1, maxStep: 0.5);
         AssertGone(s, "settings");
         AssertGlides(s, "home", x => x.Scale, Motion.BehindScale, 1, maxStep: 0.6);
+        Assert.InRange(FirstMove(s, "settings"), 0, 150);
         AssertAtRest(view);
         window.Close();
     }
@@ -327,6 +336,7 @@ public class MobileMotionTests
             ("lyrics", () => Find<LyricsPage>(view)));
         Assert.Contains(close, x => x.Opacity is > 0.05 and < 0.95);   // faded, not snapped
         AssertGone(close, "lyrics");
+        Assert.InRange(FirstMove(close, "lyrics"), 0, 150);
         Assert.True(rig.Shell.IsNowPlayingOpen);
         window.Close();
     }
