@@ -960,8 +960,10 @@ public class MobileAccountTests
         Assert.True(page.CanRemoveDownloads);
         page.AskRemoveDownloadsCommand.Execute(null);
         Assert.False(page.CanRemoveDownloads);                             // its question is open
+        Assert.StartsWith("Downloads finished", page.DownloadText);
         await page.ConfirmRemoveDownloadsCommand.ExecuteAsync(null);
         Assert.False(page.CanRemoveDownloads);                             // nothing left
+        Assert.Equal(string.Empty, page.DownloadText);                     // not "Downloads finished" over none
     }
 
     [Theory]

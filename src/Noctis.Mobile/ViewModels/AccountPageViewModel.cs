@@ -427,6 +427,9 @@ public sealed partial class AccountPageViewModel : MobilePage
     {
         IsConfirmingRemoveDownloads = false;
         await RunAsync("Removing downloads…", () => _account.RemoveAllDownloadsAsync());
+        // The last download's report goes too: it put "Downloads finished" back under the
+        // Download everything card over a phone that had just removed them all.
+        if (!IsDownloading) _lastDownload = null;
         DownloadText = string.Empty;
         RefreshDownloads();
     }
