@@ -1,4 +1,5 @@
 using System.Runtime.InteropServices;
+using Noctis.Localization;
 using SkiaSharp;
 
 namespace Noctis.Services;
@@ -202,6 +203,9 @@ public sealed class TaskbarIntegrationService : IDisposable
             _wndProc = WndProc;
             SetWindowSubclass(_hwnd, _wndProc, (UIntPtr)1, IntPtr.Zero);
 
+            // The tooltips are UI strings: follow a language switch in Settings live.
+            Loc.Instance.CultureChanged += OnCultureChanged;
+
             _ready = true;
         }
         catch
@@ -264,23 +268,29 @@ public sealed class TaskbarIntegrationService : IDisposable
     public void UpdatePlayPauseState(bool isPlaying)
     {
         _isPlaying = isPlaying;
-        if (!_ready || _taskbar == null) return;
-
-        _taskbar.ThumbBarUpdateButtons(_hwnd, 1, new[]
-        {
-            Btn(ID_PLAY, isPlaying ? _icoPause : _icoPlay, isPlaying ? "Pause" : "Play")
-        });
+        UpdateButton(ID_PLAY);
     }
 
     public void UpdateFavoriteState(bool isFavorite)
     {
         _isFavorite = isFavorite;
+        UpdateButton(ID_FAVORITE);
+    }
+
+    private void UpdateButton(uint id)
+    {
         if (!_ready || _taskbar == null) return;
 
-        _taskbar.ThumbBarUpdateButtons(_hwnd, 1, new[]
-        {
-            Btn(ID_FAVORITE, isFavorite ? _icoHeartFilled : _icoHeart, isFavorite ? "Unfavorite" : "Favorite"),
-        });
+        var buttons = BuildButtons().Where(b => b.iId == id).ToArray();
+        _taskbar.ThumbBarUpdateButtons(_hwnd, (uint)buttons.Length, buttons);
+    }
+
+    private void OnCultureChanged(object? sender, EventArgs e)
+    {
+        if (!_ready || _taskbar == null) return;
+
+        var buttons = BuildButtons();
+        _taskbar.ThumbBarUpdateButtons(_hwnd, (uint)buttons.Length, buttons);
     }
 
     /// <summary>Adds all four buttons reflecting the last known playback/favorite state.</summary>
@@ -292,12 +302,34 @@ public sealed class TaskbarIntegrationService : IDisposable
         _taskbar.ThumbBarAddButtons(_hwnd, (uint)buttons.Length, buttons);
     }
 
-    private THUMBBUTTON[] BuildButtons() => new[]
+    internal enum ThumbGlyph { Previous, Play, Pause, Next, Heart, HeartFilled }
+
+    /// <summary>What each thumbnail button shows, as data (headless-testable). Tooltips are
+    /// the playback bar's own localization keys, so they read the same as the island's.</summary>
+    internal readonly record struct ThumbButtonSpec(uint Id, ThumbGlyph Glyph, string TipKey, uint Flags);
+
+    internal static ThumbButtonSpec[] DescribeButtons(bool isPlaying, bool isFavorite) => new[]
     {
-        Btn(ID_PREV, _icoPrev, "Previous"),
-        Btn(ID_PLAY, _isPlaying ? _icoPause : _icoPlay, _isPlaying ? "Pause" : "Play"),
-        Btn(ID_NEXT, _icoNext, "Forward"),
-        Btn(ID_FAVORITE, _isFavorite ? _icoHeartFilled : _icoHeart, _isFavorite ? "Unfavorite" : "Favorite"),
+        new ThumbButtonSpec(ID_PREV, ThumbGlyph.Previous, "PlaybackBar.PreviousTip", THBF_ENABLED),
+        new ThumbButtonSpec(ID_PLAY, isPlaying ? ThumbGlyph.Pause : ThumbGlyph.Play,
+            isPlaying ? "PlaybackBar.Pause" : "PlaybackBar.Play", THBF_ENABLED),
+        new ThumbButtonSpec(ID_NEXT, ThumbGlyph.Next, "PlaybackBar.ForwardTip", THBF_ENABLED),
+        new ThumbButtonSpec(ID_FAVORITE, isFavorite ? ThumbGlyph.HeartFilled : ThumbGlyph.Heart,
+            isFavorite ? "PlaybackBar.RemoveFromFavorites" : "PlaybackBar.FavoriteTip", THBF_ENABLED),
+    };
+
+    private THUMBBUTTON[] BuildButtons() => DescribeButtons(_isPlaying, _isFavorite)
+        .Select(b => Btn(b.Id, IconFor(b.Glyph), Loc.T(b.TipKey), b.Flags))
+        .ToArray();
+
+    private IntPtr IconFor(ThumbGlyph glyph) => glyph switch
+    {
+        ThumbGlyph.Previous => _icoPrev,
+        ThumbGlyph.Play => _icoPlay,
+        ThumbGlyph.Pause => _icoPause,
+        ThumbGlyph.Next => _icoNext,
+        ThumbGlyph.Heart => _icoHeart,
+        _ => _icoHeartFilled,
     };
 
     private void CreateIcons()
@@ -389,13 +421,13 @@ public sealed class TaskbarIntegrationService : IDisposable
 
     // ── Helpers ──────────────────────────────────────────────────
 
-    private static THUMBBUTTON Btn(uint id, IntPtr icon, string tip) => new()
+    private static THUMBBUTTON Btn(uint id, IntPtr icon, string tip, uint flags) => new()
     {
         dwMask = THB_ICON | THB_TOOLTIP | THB_FLAGS,
         iId = id,
         hIcon = icon,
         szTip = tip,
-        dwFlags = THBF_ENABLED,
+        dwFlags = flags,
     };
 
     // ── Icon creation via SkiaSharp (SVG path rendering) ─────────
@@ -477,6 +509,7 @@ public sealed class TaskbarIntegrationService : IDisposable
 
     public void Dispose()
     {
+        Loc.Instance.CultureChanged -= OnCultureChanged;
         if (_ready && _hwnd != IntPtr.Zero && _wndProc != null)
             RemoveWindowSubclass(_hwnd, _wndProc, (UIntPtr)1);
 
