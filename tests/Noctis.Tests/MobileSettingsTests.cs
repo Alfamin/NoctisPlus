@@ -371,7 +371,7 @@ public class MobileSettingsTests
             Assert.Equal(ThemeVariant.Light, view.ActualThemeVariant);
             var nowPlaying = MobileFixtures.Find<NowPlayingPage>(view);
             Assert.Equal(ThemeVariant.Dark, nowPlaying.ActualThemeVariant);
-            Assert.Equal(ThemeVariant.Dark, MobileFixtures.Named<Slider>(nowPlaying, "SeekBar").ActualThemeVariant);
+            Assert.Equal(ThemeVariant.Dark, MobileFixtures.Named<Control>(nowPlaying, "SeekBar").ActualThemeVariant);
             Assert.Equal(ThemeVariant.Dark, MobileFixtures.Find<LyricsPage>(view).ActualThemeVariant);
             window.Close();
         }

@@ -3,6 +3,7 @@
              xmlns:vm="using:Noctis.Mobile.ViewModels"
              xmlns:controls="using:Noctis.Controls"
              xmlns:conv="using:Noctis.Converters"
+             xmlns:views="using:Noctis.Mobile.Views"
              x:Class="Noctis.Mobile.Views.NowPlayingPage"
              x:DataType="vm:ShellViewModel"
              Background="#FF121214"
@@ -12,19 +13,46 @@
         <conv:PreBlurredArtworkConverter x:Key="PreBlur" />
     </UserControl.Resources>
 
-    <!-- Always dark (ruling 8): white controls over the blurred cover and scrim. -->
+    <!-- Always dark (ruling 8): white controls over the blurred cover and scrim. Laid out as
+         Apple Music's (owner 10-13): title and artist with a plain ⋯ beside them, the timeline,
+         one row of filled transport glyphs, the volume, then Lyrics / Output / Queue. -->
     <UserControl.Styles>
-        <Style Selector="Button.icon, Button.round, Button.row">
+        <Style Selector="Button.icon, Button.row">
             <Setter Property="Foreground" Value="White" />
         </Style>
-        <Style Selector="Button.round">
-            <Setter Property="Background" Value="#26FFFFFF" />
-        </Style>
-        <Style Selector="Button.dim">
-            <Setter Property="Opacity" Value="0.45" />
-        </Style>
         <Style Selector="TextBlock.np-sub">
-            <Setter Property="Foreground" Value="#B3FFFFFF" />
+            <Setter Property="Foreground" Value="#99FFFFFF" />
+        </Style>
+        <Style Selector="TextBlock.np-time">
+            <Setter Property="Foreground" Value="#80FFFFFF" />
+            <Setter Property="FontSize" Value="12" />
+            <Setter Property="FontWeight" Value="SemiBold" />
+        </Style>
+        <Style Selector="Button.transport">
+            <Setter Property="Width" Value="96" />
+            <Setter Property="Height" Value="72" />
+            <Setter Property="CornerRadius" Value="36" />
+        </Style>
+        <Style Selector="Button.icon.bottom PathIcon">
+            <Setter Property="Width" Value="26" />
+            <Setter Property="Height" Value="26" />
+        </Style>
+        <!-- The cover sits back while paused and comes forward when playing (Apple's). Nothing
+             per-frame drives the class: IsPlaying changes only on play/pause. -->
+        <Style Selector="Border#ArtworkFrame">
+            <Setter Property="RenderTransform" Value="scale(1)" />
+            <Setter Property="Transitions">
+                <Transitions>
+                    <TransformOperationsTransition Property="RenderTransform" Duration="0:0:0.45">
+                        <TransformOperationsTransition.Easing>
+                            <views:GlideEase />
+                        </TransformOperationsTransition.Easing>
+                    </TransformOperationsTransition>
+                </Transitions>
+            </Setter>
+        </Style>
+        <Style Selector="Border#ArtworkFrame.paused">
+            <Setter Property="RenderTransform" Value="scale(0.8)" />
         </Style>
     </UserControl.Styles>
 
@@ -37,98 +65,96 @@
         <Border Padding="{Binding SafeArea}">
             <!-- Portrait: one column. Landscape (the code-behind, on resize): the cover on the
                  left across every row, the controls on the right. -->
-            <Grid Name="Layout" RowDefinitions="Auto,*,Auto,Auto,Auto,Auto,Auto" Margin="24,4,24,12">
-                <Button Grid.Row="0" Classes="icon" HorizontalAlignment="Left" Command="{Binding CloseNowPlayingCommand}">
-                    <PathIcon Data="{DynamicResource PhChevronDown}" Width="26" Height="26" />
+            <Grid Name="Layout" RowDefinitions="Auto,*,Auto,Auto,Auto,Auto,Auto" Margin="24,0,24,8">
+                <!-- Apple's grabber: tap to close (Back closes too). -->
+                <Button Grid.Row="0" Name="GrabberButton" Classes="row" HorizontalAlignment="Center" Width="96" Height="32"
+                        Command="{Binding CloseNowPlayingCommand}" AutomationProperties.Name="Close">
+                    <Border Width="40" Height="5" CornerRadius="2.5" Background="#59FFFFFF"
+                            HorizontalAlignment="Center" VerticalAlignment="Center" />
                 </Button>
 
                 <!-- A fixed 320 box scaled to the row: shrinks in landscape instead of pushing the transport off screen. -->
                 <Viewbox Grid.Row="1" Name="ArtworkBox" Stretch="Uniform" Margin="0,8">
-                    <Border Classes="art" Width="320" Height="320" CornerRadius="14">
-                        <Panel>
-                            <PathIcon Data="{DynamicResource SongsIcon}" Width="72" Height="72" Opacity="0.4" />
-                            <controls:CachedImage Name="Artwork" SourcePath="{Binding Player.CurrentTrack.AlbumArtworkPath}"
-                                                  DecodeWidth="768" ClearOnSourceChange="False" Stretch="UniformToFill" />
-                        </Panel>
+                    <Border Name="ArtworkFrame" Width="320" Height="320" CornerRadius="10"
+                            BoxShadow="0 10 28 0 #66000000" Classes.paused="{Binding !Player.IsPlaying}">
+                        <Border Classes="art" CornerRadius="10">
+                            <Panel>
+                                <PathIcon Data="{DynamicResource SongsIcon}" Width="72" Height="72" Opacity="0.4" />
+                                <controls:CachedImage Name="Artwork" SourcePath="{Binding Player.CurrentTrack.AlbumArtworkPath}"
+                                                      DecodeWidth="768" ClearOnSourceChange="False" Stretch="UniformToFill" />
+                            </Panel>
+                        </Border>
                     </Border>
                 </Viewbox>
 
-                <Grid Grid.Row="2" ColumnDefinitions="*,Auto,Auto" Margin="0,8,0,0">
+                <Grid Grid.Row="2" ColumnDefinitions="*,Auto" Margin="0,12,0,0">
                     <StackPanel VerticalAlignment="Center">
-                        <TextBlock Name="TitleText" Text="{Binding Player.CurrentTrack.Title}" FontSize="21" FontWeight="Bold"
+                        <TextBlock Name="TitleText" Text="{Binding Player.CurrentTrack.Title}" FontSize="20" FontWeight="Bold"
                                    TextTrimming="CharacterEllipsis" />
                         <Button Name="ArtistButton" Classes="row" HorizontalAlignment="Left" Command="{Binding OpenCurrentArtistCommand}">
-                            <TextBlock Classes="np-sub" Text="{Binding Player.CurrentTrack.Artist}" FontSize="16" TextTrimming="CharacterEllipsis" />
+                            <TextBlock Classes="np-sub" Text="{Binding Player.CurrentTrack.Artist}" FontSize="20" TextTrimming="CharacterEllipsis" />
                         </Button>
                     </StackPanel>
-                    <Button Grid.Column="1" Name="FavouriteButton" Classes="icon" Command="{Binding ToggleCurrentFavouriteCommand}">
-                        <controls:HeartIcon IsFavorite="{Binding Player.CurrentTrack.IsFavorite}" Size="26"
-                                           Glyph="{DynamicResource PhHeartFill}" OffGlyph="{DynamicResource PhHeart}" />
-                    </Button>
-                    <Button Grid.Column="2" Name="NowPlayingMore" Classes="icon" Command="{Binding OpenCurrentTrackSheetCommand}">
-                        <PathIcon Data="{DynamicResource PhMore}" Width="24" Height="24" />
+                    <!-- Favourite and the rest live in the ⋯ menu (Apple's). -->
+                    <Button Grid.Column="1" Name="NowPlayingMore" Classes="icon" Margin="8,0,-10,0" VerticalAlignment="Center"
+                            Command="{Binding OpenCurrentTrackSheetCommand}" AutomationProperties.Name="More">
+                        <PathIcon Data="{DynamicResource PhMore}" Width="26" Height="26" />
                     </Button>
                 </Grid>
 
-                <Grid Grid.Row="3" RowDefinitions="Auto,Auto" Margin="0,8,0,0">
-                    <!-- The pointer handlers are registered in the code-behind with Tunnel routing,
-                         not as XAML event attributes; see NowPlayingPage.axaml.cs for why. -->
-                    <Slider Name="SeekBar" Minimum="0" Maximum="{Binding Player.Duration.TotalSeconds}"
-                            Value="{Binding Player.Position.TotalSeconds, Mode=OneWay}" />
-                    <Grid Grid.Row="1" ColumnDefinitions="*,*">
-                        <TextBlock Name="ElapsedText" Classes="np-sub" FontSize="12" Text="{Binding Player.ElapsedText}" />
-                        <TextBlock Grid.Column="1" Name="RemainingText" Classes="np-sub" FontSize="12" HorizontalAlignment="Right"
+                <Grid Grid.Row="3" RowDefinitions="Auto,Auto" Margin="0,10,0,0">
+                    <!-- Seeks on release only (the code-behind); the times follow the drag. -->
+                    <views:CapsuleSlider Name="SeekBar" Height="30" Minimum="0" Maximum="{Binding Player.Duration.TotalSeconds}"
+                                         Value="{Binding Player.Position.TotalSeconds, Mode=OneWay}"
+                                         AutomationProperties.Name="Playback position" />
+                    <Grid Grid.Row="1" ColumnDefinitions="*,*" Margin="0,-4,0,0">
+                        <TextBlock Name="ElapsedText" Classes="np-time" Text="{Binding Player.ElapsedText}" />
+                        <TextBlock Grid.Column="1" Name="RemainingText" Classes="np-time" HorizontalAlignment="Right"
                                    Text="{Binding Player.RemainingText}" />
                     </Grid>
                 </Grid>
 
-                <Grid Grid.Row="4" ColumnDefinitions="*,Auto,Auto,Auto,Auto,Auto,*" Margin="0,4">
-                    <Button Grid.Column="1" Name="ShuffleButton" Classes="icon" Classes.dim="{Binding !Player.IsShuffleEnabled}"
-                            Command="{Binding Player.ToggleShuffleCommand}">
-                        <PathIcon Data="{DynamicResource PhShuffle}" Width="24" Height="24" />
-                    </Button>
-                    <Button Grid.Column="2" Name="PreviousButton" Classes="icon" Width="60" Height="60" Margin="12,0"
-                            Command="{Binding Player.PreviousCommand}">
+                <!-- Apple's sizes: filled glyphs, no circle, Play/Pause a little larger than the skips.
+                     Shuffle and Repeat are on the Queue page (Apple's). -->
+                <Grid Grid.Row="4" ColumnDefinitions="*,Auto,Auto,Auto,*" Margin="0,14">
+                    <Button Grid.Column="1" Name="PreviousButton" Classes="icon transport"
+                            Command="{Binding Player.PreviousCommand}" AutomationProperties.Name="Previous">
                         <PathIcon Data="{DynamicResource PhRewindFill}" Width="44" Height="44" />
                     </Button>
-                    <Button Grid.Column="3" Name="PlayPauseButton" Classes="icon" Width="72" Height="72" CornerRadius="36"
-                            Command="{Binding Player.TogglePlayPauseCommand}">
+                    <Button Grid.Column="2" Name="PlayPauseButton" Classes="icon transport"
+                            Command="{Binding Player.TogglePlayPauseCommand}" AutomationProperties.Name="Play or pause">
                         <Panel>
-                            <PathIcon Data="{DynamicResource PhPlayFill}" Width="54" Height="54" IsVisible="{Binding !Player.IsPlaying}" />
-                            <PathIcon Data="{DynamicResource PhPauseFill}" Width="54" Height="54" IsVisible="{Binding Player.IsPlaying}" />
+                            <PathIcon Data="{DynamicResource PhPlayFill}" Width="46" Height="46" IsVisible="{Binding !Player.IsPlaying}" />
+                            <PathIcon Data="{DynamicResource PhPauseFill}" Width="46" Height="46" IsVisible="{Binding Player.IsPlaying}" />
                         </Panel>
                     </Button>
-                    <Button Grid.Column="4" Name="NextButton" Classes="icon" Width="60" Height="60" Margin="12,0"
-                            Command="{Binding Player.NextCommand}">
+                    <Button Grid.Column="3" Name="NextButton" Classes="icon transport"
+                            Command="{Binding Player.NextCommand}" AutomationProperties.Name="Next">
                         <PathIcon Data="{DynamicResource PhForwardFill}" Width="44" Height="44" />
-                    </Button>
-                    <Button Grid.Column="5" Name="RepeatButton" Classes="icon" Classes.dim="{Binding !Player.IsRepeatOn}"
-                            Command="{Binding Player.CycleRepeatCommand}">
-                        <Panel>
-                            <PathIcon Data="{DynamicResource PhRepeat}" Width="24" Height="24" IsVisible="{Binding !Player.IsRepeatOne}" />
-                            <PathIcon Data="{DynamicResource PhRepeatOne}" Width="24" Height="24" IsVisible="{Binding Player.IsRepeatOne}" />
-                        </Panel>
                     </Button>
                 </Grid>
 
                 <Grid Grid.Row="5" Name="VolumeRow" ColumnDefinitions="Auto,*,Auto" IsVisible="{Binding Player.HasVolumeControl}">
-                    <PathIcon Data="{DynamicResource PhVolumeLow}" Width="22" Height="22" Opacity="0.7" />
-                    <Slider Grid.Column="1" Name="VolumeSlider" Minimum="0" Maximum="1" Margin="10,0"
-                            Value="{Binding Player.VolumeLevel}" />
-                    <PathIcon Grid.Column="2" Data="{DynamicResource PhVolumeHigh}" Width="22" Height="22" Opacity="0.7" />
+                    <PathIcon Data="{DynamicResource PhVolumeLow}" Width="18" Height="18" Opacity="0.6" />
+                    <views:CapsuleSlider Grid.Column="1" Name="VolumeSlider" Height="30" Minimum="0" Maximum="1" Margin="10,0"
+                                         Value="{Binding Player.VolumeLevel, Mode=TwoWay}" AutomationProperties.Name="Volume" />
+                    <PathIcon Grid.Column="2" Data="{DynamicResource PhVolumeHigh}" Width="18" Height="18" Opacity="0.6" />
                 </Grid>
 
                 <StackPanel Grid.Row="6">
                     <TextBlock Name="ErrorLine" Text="{Binding Player.ErrorText}" Foreground="#E74856" FontSize="12" TextWrapping="Wrap"
                                IsVisible="{Binding Player.ErrorText, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
-                    <Grid ColumnDefinitions="*,*,*" Margin="0,4,0,0">
-                        <Button Grid.Column="0" Name="LyricsButton" Classes="icon" HorizontalAlignment="Center" Command="{Binding ToggleLyricsCommand}">
+                    <Grid ColumnDefinitions="*,*,*" Margin="0,12,0,0">
+                        <Button Grid.Column="0" Name="LyricsButton" Classes="icon bottom" HorizontalAlignment="Center"
+                                Command="{Binding ToggleLyricsCommand}" AutomationProperties.Name="Lyrics">
                             <PathIcon Data="{DynamicResource PhLyrics}" />
                         </Button>
-                        <Button Grid.Column="1" Name="OutputButton" Classes="icon" HorizontalAlignment="Center" Command="{Binding ShowOutputCommand}">
+                        <Button Grid.Column="1" Name="OutputButton" Classes="icon bottom" HorizontalAlignment="Center"
+                                Command="{Binding ShowOutputCommand}" AutomationProperties.Name="Output">
                             <PathIcon Data="{DynamicResource PhVolumeHigh}" />
                         </Button>
-                        <Button Grid.Column="2" Name="QueueButton" Classes="icon" HorizontalAlignment="Center" Command="{Binding ToggleQueueCommand}">
+                        <Button Grid.Column="2" Name="QueueButton" Classes="icon bottom" HorizontalAlignment="Center"
+                                Command="{Binding ToggleQueueCommand}" AutomationProperties.Name="Queue">
                             <PathIcon Data="{DynamicResource PhQueue}" />
                         </Button>
                     </Grid>
