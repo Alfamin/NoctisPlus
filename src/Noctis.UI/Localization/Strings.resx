@@ -476,6 +476,11 @@ Deezer and TIDAL: paste the link.</value></data>
   <data name="Settings.ShowCurrentSongDiscord" xml:space="preserve"><value>Show your current song on Discord.</value><comment>Text in SettingsView.axaml</comment></data>
   <data name="Settings.ShowAlbumDiscord" xml:space="preserve"><value>Show Album on Discord</value><comment>Text in SettingsView.axaml</comment></data>
   <data name="Settings.AddAlbumNameUnder" xml:space="preserve"><value>Show the album name under the artist on your Discord card.</value><comment>Text in SettingsView.axaml</comment></data>
+  <data name="Settings.DiscordStatusDisplay" xml:space="preserve"><value>Status on Discord</value><comment>Settings ▸ Integrations ▸ Discord, SettingsView.axaml</comment></data>
+  <data name="Settings.DiscordStatusDisplayHint" xml:space="preserve"><value>What Discord shows after "Listening to" in the member list and on your profile.</value><comment>Settings ▸ Integrations ▸ Discord, SettingsView.axaml</comment></data>
+  <data name="Settings.DiscordStatusDisplay.Artist" xml:space="preserve"><value>Artist</value><comment>Discord status line choice (SettingsViewModel)</comment></data>
+  <data name="Settings.DiscordStatusDisplay.Title" xml:space="preserve"><value>Song title</value><comment>Discord status line choice (SettingsViewModel)</comment></data>
+  <data name="Settings.DiscordStatusDisplay.AppName" xml:space="preserve"><value>Noctis</value><comment>Discord status line choice (SettingsViewModel)</comment></data>
   <data name="Settings.LastFmScrobbling" xml:space="preserve"><value>Last.fm Scrobbling</value><comment>Text in SettingsView.axaml</comment></data>
   <data name="Settings.SendPlaysLastFm" xml:space="preserve"><value>Send plays to Last.fm.</value><comment>Text in SettingsView.axaml</comment></data>
   <data name="Settings.ACCOUNT" xml:space="preserve"><value>ACCOUNT</value><comment>Text in SettingsView.axaml</comment></data>

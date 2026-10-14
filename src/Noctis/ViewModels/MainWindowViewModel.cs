@@ -3206,7 +3206,8 @@ public partial class MainWindowViewModel : ViewModelBase
                 track.Artist ?? "Unknown Artist",
                 track.Album,
                 artworkUrl,
-                ShowAlbum: Settings.DiscordShowAlbum);
+                ShowAlbum: Settings.DiscordShowAlbum,
+                StatusDisplay: DiscordPresenceOptions.ParseStatusDisplay(Settings.DiscordStatusDisplay));
             // Music video audio: the clip's length, as the engine reports it, not the song file's.
             var duration = Player.IsPlayingMusicVideoAudio ? Player.Duration : track.Duration;
             await _discord.UpdateAsync(dto, position, duration, isPlaying);

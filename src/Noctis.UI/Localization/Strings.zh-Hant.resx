@@ -1308,6 +1308,26 @@
     <value>在您的Discord卡上顯示藝人下面的相簿名稱。</value>
     <comment>Text in SettingsView.axaml</comment>
   </data>
+  <data name="Settings.DiscordStatusDisplay" xml:space="preserve">
+    <value>Discord 狀態</value>
+    <comment>Settings ▸ Integrations ▸ Discord, SettingsView.axaml</comment>
+  </data>
+  <data name="Settings.DiscordStatusDisplayHint" xml:space="preserve">
+    <value>Discord 在成員清單和個人檔案中「正在聆聽」後顯示的內容。</value>
+    <comment>Settings ▸ Integrations ▸ Discord, SettingsView.axaml</comment>
+  </data>
+  <data name="Settings.DiscordStatusDisplay.Artist" xml:space="preserve">
+    <value>藝人</value>
+    <comment>Discord status line choice (SettingsViewModel)</comment>
+  </data>
+  <data name="Settings.DiscordStatusDisplay.Title" xml:space="preserve">
+    <value>歌曲名稱</value>
+    <comment>Discord status line choice (SettingsViewModel)</comment>
+  </data>
+  <data name="Settings.DiscordStatusDisplay.AppName" xml:space="preserve">
+    <value>Noctis</value>
+    <comment>Discord status line choice (SettingsViewModel)</comment>
+  </data>
   <data name="Settings.LastFmScrobbling" xml:space="preserve">
     <value>Last.fm 記錄</value>
     <comment>Text in SettingsView.axaml</comment>
