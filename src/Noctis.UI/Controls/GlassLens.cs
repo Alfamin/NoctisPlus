@@ -117,10 +117,12 @@ public static class GlassLens
                 color.rgb = clamp(mix(half3(l), color.rgb, half(saturation)), 0.0, color.a);
             }
             if (tone.x > 0.0 || tone.y < 1.0) {
-                // Remap luminance 0..1 onto tone.x..tone.y, keeping each colour's hue.
+                // Remap luminance 0..1 onto tone.x..tone.y, keeping each colour's hue. Near black
+                // the hue is blur residue (an 8-bit (0,1,2) scaled up to the floor turned bright
+                // blue), so it fades to grey there.
                 float l = dot(float3(color.rgb), float3(0.2126, 0.7152, 0.0722));
                 float target = mix(tone.x, tone.y, l);
-                float3 rgb = l > 0.0005 ? float3(color.rgb) * (target / l) : float3(target);
+                float3 rgb = mix(float3(target), float3(color.rgb) * (target / max(l, 0.0005)), smoothstep(0.0, 0.06, l));
                 color.rgb = half3(clamp(rgb, 0.0, float(color.a)));
             }
             return color;
@@ -249,9 +251,11 @@ public static class GlassLens
     {
         var l = 0.2126f * r + 0.7152f * g + 0.0722f * b;
         var target = min + (max - min) * l;
-        if (l <= 0.0005f) return (target, target, target);
-        var k = target / l;
-        return (Math.Clamp(r * k, 0, 1), Math.Clamp(g * k, 0, 1), Math.Clamp(b * k, 0, 1));
+        var k = target / Math.Max(l, 0.0005f);
+        var t = Math.Clamp(l / 0.06f, 0, 1);
+        var hue = t * t * (3 - 2 * t);   // smoothstep: near black the hue is noise, lifted to grey
+        float Mix(float c) => Math.Clamp(target + (c * k - target) * hue, 0, 1);
+        return (Mix(r), Mix(g), Mix(b));
     }
 
     /// <summary>Where the lens samples the backdrop for device pixel <paramref name="coord"/>

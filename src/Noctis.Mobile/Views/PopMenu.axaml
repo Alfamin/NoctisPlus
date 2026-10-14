@@ -1,0 +1,242 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:Noctis.Mobile.ViewModels"
+             xmlns:controls="using:Noctis.Controls"
+             x:Class="Noctis.Mobile.Views.PopMenu"
+             x:DataType="vm:ShellViewModel"
+             IsVisible="False">
+
+    <!-- Every ⋯ menu on the phone (owner 10-13), Apple Music's: a Liquid Glass card that pops out
+         of the ⋯ button (or the held row or tile), three tiles on top and the rest as rows with
+         inset hairlines. The desktop menus' glyphs (PhoneIcons). Opened, placed and closed by the
+         code-behind, which plays the desktop menu's pop. -->
+    <UserControl.Resources>
+        <ResourceDictionary>
+            <!-- Clear, bright glass that takes the colour of what lies behind it: the backdrop
+                 strongly blurred and saturated, a light frost over it and a bright rim, never a
+                 dark smoke. The luminance range is what keeps the labels readable over any cover:
+                 on dark glass the backdrop shows through no brighter than PopMenuMaxLuminance, on
+                 light glass no darker than PopMenuMinLuminance (MobilePopMenuTests checks the worst
+                 case against the text). The card takes the theme of what it opened from, so Now
+                 Playing's menu is the dark glass. -->
+            <ResourceDictionary.ThemeDictionaries>
+                <ResourceDictionary x:Key="Dark">
+                    <SolidColorBrush x:Key="PopMenuTint" Color="#24FFFFFF" />
+                    <x:Double x:Key="PopMenuMinLuminance">0.18</x:Double>
+                    <x:Double x:Key="PopMenuMaxLuminance">0.30</x:Double>
+                    <SolidColorBrush x:Key="PopMenuEdge" Color="#59FFFFFF" />
+                    <LinearGradientBrush x:Key="PopMenuSheen" StartPoint="0%,0%" EndPoint="0%,100%">
+                        <GradientStop Offset="0" Color="#14FFFFFF" />
+                        <GradientStop Offset="0.4" Color="#00FFFFFF" />
+                    </LinearGradientBrush>
+                    <SolidColorBrush x:Key="PopMenuText" Color="#FFFFFFFF" />
+                    <SolidColorBrush x:Key="PopMenuSecondaryText" Color="#B3FFFFFF" />
+                    <SolidColorBrush x:Key="PopMenuHairline" Color="#38FFFFFF" />
+                </ResourceDictionary>
+                <ResourceDictionary x:Key="Light">
+                    <SolidColorBrush x:Key="PopMenuTint" Color="#80FFFFFF" />
+                    <x:Double x:Key="PopMenuMinLuminance">0.62</x:Double>
+                    <x:Double x:Key="PopMenuMaxLuminance">1</x:Double>
+                    <SolidColorBrush x:Key="PopMenuEdge" Color="#B3FFFFFF" />
+                    <LinearGradientBrush x:Key="PopMenuSheen" StartPoint="0%,0%" EndPoint="0%,100%">
+                        <GradientStop Offset="0" Color="#59FFFFFF" />
+                        <GradientStop Offset="0.4" Color="#00FFFFFF" />
+                    </LinearGradientBrush>
+                    <SolidColorBrush x:Key="PopMenuText" Color="#FF000000" />
+                    <SolidColorBrush x:Key="PopMenuSecondaryText" Color="#99000000" />
+                    <SolidColorBrush x:Key="PopMenuHairline" Color="#24000000" />
+                </ResourceDictionary>
+            </ResourceDictionary.ThemeDictionaries>
+        </ResourceDictionary>
+    </UserControl.Resources>
+
+    <UserControl.Styles>
+        <Style Selector="Button.np-tile, Button.np-row">
+            <Setter Property="Foreground" Value="{DynamicResource PopMenuText}" />
+        </Style>
+        <Style Selector="Button.np-tile">
+            <Setter Property="Padding" Value="2,12,2,10" />
+            <Setter Property="VerticalAlignment" Value="Stretch" />
+            <Setter Property="HorizontalContentAlignment" Value="Center" />
+            <Setter Property="VerticalContentAlignment" Value="Top" />
+        </Style>
+        <Style Selector="Button.np-tile PathIcon">
+            <Setter Property="Width" Value="26" />
+            <Setter Property="Height" Value="26" />
+            <Setter Property="HorizontalAlignment" Value="Center" />
+        </Style>
+        <Style Selector="Button.np-tile TextBlock">
+            <Setter Property="FontSize" Value="13" />
+            <Setter Property="TextAlignment" Value="Center" />
+            <Setter Property="TextWrapping" Value="Wrap" />
+            <Setter Property="MaxLines" Value="2" />
+            <Setter Property="Margin" Value="0,6,0,0" />
+        </Style>
+        <Style Selector="Button.np-row">
+            <Setter Property="MinHeight" Value="52" />
+        </Style>
+        <Style Selector="Button.np-row PathIcon">
+            <Setter Property="Width" Value="24" />
+            <Setter Property="Height" Value="24" />
+            <Setter Property="HorizontalAlignment" Value="Center" />
+            <Setter Property="VerticalAlignment" Value="Center" />
+        </Style>
+        <Style Selector="Button.np-row TextBlock.np-label">
+            <Setter Property="FontSize" Value="17" />
+            <Setter Property="TextTrimming" Value="CharacterEllipsis" />
+        </Style>
+        <Style Selector="Button.np-row TextBlock.np-detail">
+            <Setter Property="FontSize" Value="14" />
+            <Setter Property="Foreground" Value="{DynamicResource PopMenuSecondaryText}" />
+            <Setter Property="TextWrapping" Value="Wrap" />
+            <Setter Property="MaxLines" Value="2" />
+            <Setter Property="TextTrimming" Value="CharacterEllipsis" />
+        </Style>
+        <!-- Inset hairlines over each row after the first: from the label to the card's edge, as
+             Apple's (so a hidden row never leaves a line at the card's foot). -->
+        <Style Selector="Border.np-line">
+            <Setter Property="Height" Value="0.6" />
+            <Setter Property="Background" Value="{DynamicResource PopMenuHairline}" />
+            <Setter Property="VerticalAlignment" Value="Top" />
+            <Setter Property="Margin" Value="0,0,20,0" />
+            <Setter Property="IsHitTestVisible" Value="False" />
+        </Style>
+    </UserControl.Styles>
+
+    <Panel>
+        <!-- A tap anywhere off the card closes it (and goes no further). -->
+        <Border Name="Catcher" Background="Transparent" PointerPressed="OnCatcherPressed" />
+
+        <ThemeVariantScope Name="Scope">
+            <Panel Name="Card" Width="290" HorizontalAlignment="Left" VerticalAlignment="Top">
+                <controls:GlassPanel Name="Glass" CornerRadius="28" UseAppGlass="False" IsGlassActive="True"
+                                     BlurRadius="24" Saturation="1.8" Refraction="16" RefractionAmount="18" Specular="0.55"
+                                     BackdropMinLuminance="{DynamicResource PopMenuMinLuminance}"
+                                     BackdropMaxLuminance="{DynamicResource PopMenuMaxLuminance}"
+                                     Background="{DynamicResource PopMenuTint}"
+                                     EdgeBrush="{DynamicResource PopMenuEdge}" EdgeThickness="1" BoxShadow="0 16 48 0 #40000000">
+                    <Panel>
+                        <Border Name="Sheen" Background="{DynamicResource PopMenuSheen}" CornerRadius="28" IsHitTestVisible="False" />
+                        <ScrollViewer Name="Body" HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Hidden">
+                            <ContentControl Name="MenuContent">
+                                <ContentControl.DataTemplates>
+                                    <!-- A song, album, playlist or artist. -->
+                                    <DataTemplate DataType="vm:ContextSheetViewModel">
+                                        <StackPanel Name="Rows" Margin="0,6,0,6">
+                                            <UniformGrid Name="Tiles" Rows="1" Margin="8,0">
+                                                <Button Name="MenuFavourite" Classes="row np-tile" Command="{Binding ToggleFavouriteCommand}"
+                                                        IsVisible="{Binding CanFavourite}" AutomationProperties.Name="{Binding FavouriteLabel}">
+                                                    <StackPanel>
+                                                        <Panel HorizontalAlignment="Center">
+                                                            <PathIcon Data="{DynamicResource PhMenuHeart}" IsVisible="{Binding !IsFavourite}" />
+                                                            <PathIcon Data="{DynamicResource PhMenuHeartFill}" Foreground="#E74856" IsVisible="{Binding IsFavourite}" />
+                                                        </Panel>
+                                                        <TextBlock Text="{Binding FavouriteTileLabel}" />
+                                                    </StackPanel>
+                                                </Button>
+                                                <Button Name="MenuAddToPlaylist" Classes="row np-tile" Command="{Binding ShowPlaylistsCommand}">
+                                                    <StackPanel>
+                                                        <PathIcon Data="{DynamicResource PhAddToPlaylist}" />
+                                                        <TextBlock Text="Add to Playlist" />
+                                                    </StackPanel>
+                                                </Button>
+                                                <Button Name="MenuPlayNext" Classes="row np-tile" Command="{Binding PlayNextCommand}">
+                                                    <StackPanel>
+                                                        <PathIcon Data="{DynamicResource PhPlayNext}" />
+                                                        <TextBlock Text="Play Next" />
+                                                    </StackPanel>
+                                                </Button>
+                                            </UniformGrid>
+                                            <Border Classes="np-line" Margin="20,2,20,0" />
+
+                                            <Button Name="MenuAddToQueue" Classes="row np-row" Command="{Binding AddToQueueCommand}">
+                                                <Grid ColumnDefinitions="56,*">
+                                                    <PathIcon Data="{DynamicResource PhAddToQueue}" />
+                                                    <TextBlock Grid.Column="1" Classes="np-label" Text="Add to Queue" VerticalAlignment="Center" />
+                                                </Grid>
+                                            </Button>
+                                            <Button Name="MenuDownload" Classes="row np-row" Command="{Binding DownloadCommand}" IsVisible="{Binding CanDownload}">
+                                                <Grid ColumnDefinitions="56,*">
+                                                    <PathIcon Data="{DynamicResource PhDownload}" />
+                                                    <TextBlock Grid.Column="1" Classes="np-label" Text="{Binding DownloadLabel}" VerticalAlignment="Center" />
+                                                    <Border Grid.Column="1" Classes="np-line" />
+                                                </Grid>
+                                            </Button>
+                                            <Button Name="MenuRemoveDownload" Classes="row np-row" Command="{Binding RemoveDownloadCommand}" IsVisible="{Binding CanRemoveDownload}">
+                                                <Grid ColumnDefinitions="56,*">
+                                                    <PathIcon Data="{DynamicResource PhTrash}" />
+                                                    <TextBlock Grid.Column="1" Classes="np-label" Text="{Binding RemoveDownloadLabel}" VerticalAlignment="Center" />
+                                                    <Border Grid.Column="1" Classes="np-line" />
+                                                </Grid>
+                                            </Button>
+                                            <Button Name="MenuPin" Classes="row np-row" Command="{Binding TogglePinCommand}" IsVisible="{Binding CanPin}">
+                                                <Grid ColumnDefinitions="56,*">
+                                                    <PathIcon Data="{DynamicResource PhPin}" />
+                                                    <TextBlock Grid.Column="1" Classes="np-label" Text="{Binding PinLabel}" VerticalAlignment="Center" />
+                                                    <Border Grid.Column="1" Classes="np-line" />
+                                                </Grid>
+                                            </Button>
+                                            <Button Name="MenuGoToAlbum" Classes="row np-row" Command="{Binding GoToAlbumCommand}" IsVisible="{Binding CanGoToAlbum}">
+                                                <Grid ColumnDefinitions="56,*">
+                                                    <PathIcon Data="{DynamicResource PhAlbum}" />
+                                                    <StackPanel Grid.Column="1" VerticalAlignment="Center" Margin="0,9,16,9">
+                                                        <TextBlock Classes="np-label" Text="Go to Album" />
+                                                        <TextBlock Classes="np-detail" Text="{Binding Track.Album}" />
+                                                    </StackPanel>
+                                                    <Border Grid.Column="1" Classes="np-line" />
+                                                </Grid>
+                                            </Button>
+                                            <Button Name="MenuGoToArtist" Classes="row np-row" Command="{Binding GoToArtistCommand}" IsVisible="{Binding CanGoToArtist}">
+                                                <Grid ColumnDefinitions="56,*">
+                                                    <PathIcon Data="{DynamicResource PhArtist}" />
+                                                    <StackPanel Grid.Column="1" VerticalAlignment="Center" Margin="0,9,16,9">
+                                                        <TextBlock Classes="np-label" Text="Go to Artist" />
+                                                        <TextBlock Classes="np-detail" Text="{Binding ArtistLine}" />
+                                                    </StackPanel>
+                                                    <Border Grid.Column="1" Classes="np-line" />
+                                                </Grid>
+                                            </Button>
+                                            <Button Name="MenuLyrics" Classes="row np-row" Command="{Binding ShowLyricsCommand}" IsVisible="{Binding CanShowLyrics}">
+                                                <Grid ColumnDefinitions="56,*">
+                                                    <PathIcon Data="{DynamicResource PhLyrics}" />
+                                                    <TextBlock Grid.Column="1" Classes="np-label" Text="Lyrics" VerticalAlignment="Center" />
+                                                    <Border Grid.Column="1" Classes="np-line" />
+                                                </Grid>
+                                            </Button>
+                                        </StackPanel>
+                                    </DataTemplate>
+
+                                    <!-- The Library tab's ⋯: the desktop's three library actions. -->
+                                    <DataTemplate DataType="vm:LibraryMenuViewModel">
+                                        <StackPanel Name="LibraryRows" Margin="0,6,0,6">
+                                            <Button Name="MenuAddFolder" Classes="row np-row" Command="{Binding AddFolderCommand}">
+                                                <Grid ColumnDefinitions="56,*">
+                                                    <PathIcon Data="{DynamicResource PhFolder}" />
+                                                    <TextBlock Grid.Column="1" Classes="np-label" Text="Add Folder…" VerticalAlignment="Center" />
+                                                </Grid>
+                                            </Button>
+                                            <Button Name="MenuRescan" Classes="row np-row" Command="{Binding RescanCommand}">
+                                                <Grid ColumnDefinitions="56,*">
+                                                    <PathIcon Data="{DynamicResource PhRescan}" />
+                                                    <TextBlock Grid.Column="1" Classes="np-label" Text="Rescan Library" VerticalAlignment="Center" />
+                                                    <Border Grid.Column="1" Classes="np-line" />
+                                                </Grid>
+                                            </Button>
+                                            <Button Name="MenuSettings" Classes="row np-row" Command="{Binding OpenSettingsCommand}">
+                                                <Grid ColumnDefinitions="56,*">
+                                                    <PathIcon Data="{DynamicResource PhSettings}" />
+                                                    <TextBlock Grid.Column="1" Classes="np-label" Text="Settings" VerticalAlignment="Center" />
+                                                    <Border Grid.Column="1" Classes="np-line" />
+                                                </Grid>
+                                            </Button>
+                                        </StackPanel>
+                                    </DataTemplate>
+                                </ContentControl.DataTemplates>
+                            </ContentControl>
+                        </ScrollViewer>
+                    </Panel>
+                </controls:GlassPanel>
+            </Panel>
+        </ThemeVariantScope>
+    </Panel>
+</UserControl>

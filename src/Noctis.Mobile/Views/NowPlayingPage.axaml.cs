@@ -22,7 +22,6 @@ public partial class NowPlayingPage : UserControl
         // The times follow the drag (PreviewSeek is a no-op unless a seek is held, so the
         // position pushes that move the bar between drags never come back through here).
         SeekBar.ValueChanged += OnSeekValueChanged;
-        Menu.Anchor = NowPlayingMore;
     }
 
     private bool? _landscape;

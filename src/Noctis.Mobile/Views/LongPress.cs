@@ -23,6 +23,11 @@ public static class LongPress
     public static readonly AttachedProperty<object?> CommandParameterProperty =
         AvaloniaProperty.RegisterAttached<Control, object?>("CommandParameter", typeof(LongPress));
 
+    /// <summary>Raised (bubbling) on the held control just before its command runs: the glass
+    /// menu (PopMenu) grows out of the control that raised it.</summary>
+    public static readonly RoutedEvent<RoutedEventArgs> FiredEvent =
+        RoutedEvent.Register<RoutedEventArgs>("Fired", RoutingStrategies.Bubble, typeof(LongPress));
+
     private static readonly AttachedProperty<bool> FiredProperty =
         AvaloniaProperty.RegisterAttached<Control, bool>("Fired", typeof(LongPress));
 
@@ -59,6 +64,7 @@ public static class LongPress
         var parameter = control.GetValue(CommandParameterProperty) ?? control.DataContext;
         if (command?.CanExecute(parameter) != true) return false;
         control.SetValue(FiredProperty, true);
+        control.RaiseEvent(new RoutedEventArgs(FiredEvent, control));
         command.Execute(parameter);
         return true;
     }

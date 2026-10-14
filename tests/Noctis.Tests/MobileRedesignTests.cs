@@ -56,10 +56,12 @@ public class MobileRedesignTests
         rig.Shell.OpenTrackSheetCommand.Execute(a);
         window.UpdateLayout();
 
-        var tiles = MobileFixtures.Named<UniformGrid>(view, "QuickActions");
+        // The ⋯ menu's tiles (Apple's): Favorite, Add to Playlist, Play Next; Pin is a row.
+        var tiles = MobileFixtures.Named<UniformGrid>(view, "Tiles");
         var shown = tiles.Children.Where(c => c.IsVisible).Select(c => c.Name).ToArray();
-        Assert.Equal(new[] { "FavouriteAction", "PinAction", "AddToPlaylistAction" }, shown);
-        // Three tiles share the row evenly (the hidden Download tile takes no column).
+        Assert.Equal(new[] { "MenuFavourite", "MenuAddToPlaylist", "MenuPlayNext" }, shown);
+        Assert.False(MobileFixtures.Named<Control>(view, "MenuDownload").IsVisible);
+        // Three tiles share the row evenly.
         var widths = tiles.Children.Where(c => c.IsVisible).Select(c => Math.Round(c.Bounds.Width)).Distinct();
         Assert.Single(widths);
         Assert.Equal("Favorite", rig.Shell.Sheet!.FavouriteTileLabel);

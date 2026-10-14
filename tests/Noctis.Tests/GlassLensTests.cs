@@ -188,6 +188,23 @@ public class GlassLensTests
         Assert.True(colour.Red - colour.Green > 50 + 10, $"{colour}: not more saturated than 160/110/110");
     }
 
+    /// <summary>Bug (phone ⋯ menu, 10-13): a raised floor lifted near-black by dividing by its
+    /// luminance, so the 8-bit residue a blur leaves on black — (0,1,2) — was scaled ~50x into
+    /// bright blue: streaks and specks across dark glass over a black page. Below a small
+    /// luminance the hue is noise, so the floor lifts it to grey.</summary>
+    [Fact]
+    public void Tone_LiftsNearBlackToGrey_NotItsQuantisationNoiseToColour()
+    {
+        using var surface = SKSurface.Create(new SKImageInfo(W, H, SKColorType.Rgba8888, SKAlphaType.Premul));
+        surface.Canvas.Clear(new SKColor(0, 1, 2));
+        Lens(surface, Frame(band: 0, bend: 0, toneMin: 0.18f, toneMax: 0.3f));
+        var c = Pixel(surface, 120, 80);
+        Assert.True(c.Blue - c.Red <= 4, $"{c}: near-black lifted to a colour");
+        Assert.Equal(0.18 * 255, c.Green, 3.0);
+        var (r, _, b) = GlassLens.Tone(0, 1 / 255f, 2 / 255f, 0.18f, 0.3f);
+        Assert.True((b - r) * 255 <= 4, "the C# twin too");
+    }
+
     [Fact]
     public void Tone_SqueezesTheBackdropsLuminance_SoTextOnTheGlassKeepsItsContrast()
     {

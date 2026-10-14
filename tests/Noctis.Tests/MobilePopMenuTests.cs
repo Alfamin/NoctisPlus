@@ -1,0 +1,474 @@
+using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Threading;
+using System.Threading.Tasks;
+using Avalonia;
+using Avalonia.Controls;
+using Avalonia.Headless;
+using Avalonia.Animation;
+using Avalonia.Headless.XUnit;
+using Avalonia.Input;
+using Avalonia.Media;
+using Avalonia.Styling;
+using Avalonia.Threading;
+using Avalonia.VisualTree;
+using Noctis.Controls;
+using Noctis.Helpers;
+using Noctis.Mobile.ViewModels;
+using Noctis.Mobile.Views;
+using Noctis.Models;
+using Xunit;
+
+namespace Noctis.Tests;
+
+/// <summary>Every ⋯ menu on the phone (owner 10-13): Apple's glass card popping out of the tapped
+/// button with the desktop menu's motion, the item's actions in it, on screen wherever the button
+/// is, and every way out of it.</summary>
+public class MobilePopMenuTests(ITestOutputHelper output)
+{
+    private static void Pump(int frames)
+    {
+        for (var i = 0; i < frames; i++)
+        {
+            Dispatcher.UIThread.RunJobs();
+            AvaloniaHeadlessPlatform.ForceRenderTimerTick();
+            Thread.Sleep(16);   // the frame clock is the wall clock
+        }
+    }
+
+    /// <summary>A real tap on <paramref name="target"/>'s centre: press and release.</summary>
+    private static void Tap(Window window, Visual target)
+    {
+        window.UpdateLayout();
+        var point = target.TranslatePoint(new Point(target.Bounds.Width / 2, target.Bounds.Height / 2), window)!.Value;
+        window.MouseDown(point, MouseButton.Left);
+        window.MouseUp(point, MouseButton.Left);
+    }
+
+    private static Rect BoxIn(Visual v, Visual root) => new(v.TranslatePoint(default, root)!.Value, v.Bounds.Size);
+
+    private static (MobileFixtures.Rig rig, Window window, ShellView view) OpenNowPlaying()
+    {
+        var rig = MobileFixtures.MakeRig(new[] { MobileFixtures.Song("Tone", artist: "Band") });
+        var window = MobileFixtures.Mount(rig.Shell, out var view);
+        rig.Shell.Player.PlayTracks(rig.Library.TrackList, 0);
+        rig.Shell.OpenNowPlayingCommand.Execute(null);
+        window.UpdateLayout();
+        return (rig, window, view);
+    }
+
+    private static PopMenu MenuOf(ShellView view) => view.FindControl<PopMenu>("Menu")!;
+
+    private static double ScaleOf(Visual v) => v.RenderTransform?.Value.M11 ?? 1;
+
+    [AvaloniaFact]
+    public void NowPlayingMore_PopsTheMenuOutOfTheButton_WithTheSongsActions_NotTheSheet()
+    {
+        var (rig, window, view) = OpenNowPlaying();
+        using var _ = rig;
+        var page = view.FindControl<NowPlayingPage>("NowPlaying")!;
+        var more = MobileFixtures.Named<Button>(page, "NowPlayingMore");
+        Tap(window, more);
+        Pump(30);
+
+        var menu = MenuOf(view);
+        var card = menu.FindControl<Panel>("Card")!;
+        Assert.True(menu.IsVisible);
+        Assert.Same(more, menu.Anchor);
+        Assert.False(view.FindControl<ContextSheet>("Sheet")!.IsVisible);   // not the bottom sheet
+        Assert.Equal(1, ScaleOf(card), 3);
+        Assert.Equal(1, MobileFixtures.Named<GlassPanel>(menu, "Glass").Fade, 3);
+
+        // Low on the screen, it opens up: its bottom-right corner on the ⋯ button's.
+        var cardBox = BoxIn(card, view);
+        var moreBox = BoxIn(more, view);
+        Assert.Equal(moreBox.Bottom, cardBox.Bottom, 1);
+        Assert.Equal(moreBox.Right, cardBox.Right, 1);
+        Assert.True(cardBox.Top > 0);
+
+        foreach (var name in new[] { "MenuFavourite", "MenuAddToPlaylist", "MenuPlayNext", "MenuAddToQueue", "MenuPin",
+                     "MenuGoToAlbum", "MenuGoToArtist", "MenuLyrics" })
+            Assert.True(MobileFixtures.Named<Control>(menu, name).IsEffectivelyVisible, name);
+        var texts = menu.GetVisualDescendants().OfType<TextBlock>().Select(t => t.Text).ToList();
+        Assert.Contains("Band", texts);                                 // Go to Artist's second line
+        window.Close();
+    }
+
+    /// <summary>The desktop menu's pop (MenuOpenAnimation.Pop, the same numbers): the card starts
+    /// at 0.9 with its frost faded out, grows from the ⋯ button on the desktop's soft decelerate,
+    /// rising steadily to rest with no overshoot, and the close runs it back down to 0.94, inert
+    /// at once, hiding the card after it.</summary>
+    [AvaloniaFact]
+    public void TheMenu_GrowsOutOfTheButton_AndShrinksBackIntoIt_Smoothly()
+    {
+        var (rig, window, view) = OpenNowPlaying();
+        using var _ = rig;
+        var menu = MenuOf(view);
+        var card = menu.FindControl<Panel>("Card")!;
+        var glass = menu.FindControl<GlassPanel>("Glass")!;
+        var more = MobileFixtures.Named<Button>(view, "NowPlayingMore");
+
+        // A tap's order (Click, then the command) without the input pass running the frames.
+        more.RaiseEvent(new Avalonia.Interactivity.RoutedEventArgs(Button.ClickEvent));
+        more.Command!.Execute(null);
+        Assert.Same(more, menu.Anchor);
+        Assert.Equal(0.9, ScaleOf(card), 3);                             // the start, before any frame
+        Assert.Equal(0, glass.Fade);
+        // It grows out of the button: the origin is the ⋯ button's centre inside the card.
+        var origin = card.RenderTransformOrigin.ToPixels(card.Bounds.Size);
+        var centre = more.TranslatePoint(new Point(more.Bounds.Width / 2, more.Bounds.Height / 2), menu)!.Value
+            - card.Bounds.Position;
+        Assert.Equal(centre.X, origin.X, 1);
+        Assert.Equal(centre.Y, origin.Y, 1);
+        Dispatcher.UIThread.RunJobs();                                   // the frame that sets the targets
+
+        var grow = Assert.IsType<TransformOperationsTransition>(Assert.Single(card.Transitions!));
+        Assert.Equal(TimeSpan.FromMilliseconds(280), grow.Duration);
+        Assert.IsType<CubicBezierEase>(grow.Easing);
+        Assert.Equal(TimeSpan.FromMilliseconds(160), Assert.IsType<DoubleTransition>(Assert.Single(glass.Transitions!)).Duration);
+
+        var scales = new List<double> { 0.9 };
+        var fades = new List<double> { 0 };
+        for (var i = 0; i < 30; i++)
+        {
+            Pump(1);
+            scales.Add(ScaleOf(card));
+            fades.Add(glass.Fade);
+        }
+        output.WriteLine("open scale: " + string.Join(" ", scales.Select(v => v.ToString("0.000"))));
+        output.WriteLine("open fade:  " + string.Join(" ", fades.Select(v => v.ToString("0.000"))));
+        Assert.Contains(scales, s => s > 0.92 && s < 0.99);              // frames in between: a glide, not a snap
+        Assert.Equal(1, scales[^1], 3);
+        Assert.Equal(1, fades[^1], 3);
+        for (var i = 1; i < scales.Count; i++)
+        {
+            Assert.True(scales[i] >= scales[i - 1] - 1e-6, $"scale fell back at frame {i}: {string.Join(", ", scales)}");
+            Assert.True(scales[i] <= 1 + 1e-6, "overshoot");
+        }
+
+        rig.Shell.CloseSheet();
+        Assert.False(menu.IsHitTestVisible);                             // inert while it fades
+        Assert.True(menu.IsVisible);
+        Assert.Equal(TimeSpan.FromMilliseconds(PopMenu.PopCloseMs),
+            Assert.IsType<TransformOperationsTransition>(Assert.Single(card.Transitions!)).Duration);
+        var closing = new List<double>();
+        for (var i = 0; i < (int)(PopMenu.PopCloseMs / 16) + 8; i++)
+        {
+            Pump(1);
+            closing.Add(ScaleOf(card));
+        }
+        output.WriteLine("close scale: " + string.Join(" ", closing.Select(v => v.ToString("0.000"))));
+        Assert.Contains(closing, s => s > 0.94 + 1e-3 && s < 1 - 1e-3);  // shrinks through the frames
+        Assert.False(menu.IsVisible);
+        window.Close();
+    }
+
+    [AvaloniaFact]
+    public void BackAndATapOutside_CloseTheMenu_WithoutTouchingWhatIsUnderneath()
+    {
+        var (rig, window, view) = OpenNowPlaying();
+        using var _ = rig;
+        var more = MobileFixtures.Named<Button>(view, "NowPlayingMore");
+
+        Tap(window, more);
+        Pump(20);
+        Assert.True(rig.Shell.TryHandleBack());
+        Assert.False(rig.Shell.IsMenuOpen);
+        Assert.True(rig.Shell.IsNowPlayingOpen);
+
+        Tap(window, more);
+        Pump(20);
+        var play = MobileFixtures.Named<Button>(view, "PlayPauseButton");
+        var wasPlaying = rig.Shell.Player.IsPlaying;
+        Tap(window, play);
+        Assert.False(rig.Shell.IsMenuOpen);
+        Assert.Equal(wasPlaying, rig.Shell.Player.IsPlaying);            // the tap only closed the menu
+        Assert.True(rig.Shell.IsNowPlayingOpen);
+
+        rig.Shell.OpenNowPlayingMenuCommand.Execute(null);
+        rig.Shell.CloseNowPlayingCommand.Execute(null);                  // closing the player takes it too
+        Assert.False(rig.Shell.IsMenuOpen);
+        window.Close();
+    }
+
+    [AvaloniaFact]
+    public async Task TheMenusActions_ActOnTheSong_AndCloseIt()
+    {
+        var (rig, window, _) = OpenNowPlaying();
+        using var __ = rig;
+        var track = rig.Shell.Player.CurrentTrack!;
+
+        rig.Shell.OpenNowPlayingMenuCommand.Execute(null);
+        await rig.Shell.Sheet!.ToggleFavouriteCommand.ExecuteAsync(null);
+        Assert.True(track.IsFavorite);
+        Assert.False(rig.Shell.IsMenuOpen);
+
+        // Add to Playlist: the card gives way to the bottom sheet's playlist list.
+        rig.Shell.OpenNowPlayingMenuCommand.Execute(null);
+        rig.Shell.Sheet!.ShowPlaylistsCommand.Execute(null);
+        Assert.False(rig.Shell.IsMenuOpen);
+        Assert.True(rig.Shell.IsPlaylistPickerOpen);
+        Assert.Same(track, rig.Shell.Sheet.Track);
+        rig.Shell.CloseSheet();
+
+        rig.Shell.OpenNowPlayingMenuCommand.Execute(null);
+        rig.Shell.Sheet!.ShowLyricsCommand.Execute(null);
+        Assert.False(rig.Shell.IsMenuOpen);
+        Assert.True(rig.Shell.IsLyricsOpen);
+        window.Close();
+    }
+
+    /// <summary>Bug (10-13): the old Now Playing menu's Add to Playlist opened the playlist list
+    /// for a song only; from an album's (or playlist's, artist's) ⋯ it closed and did nothing.</summary>
+    [AvaloniaFact]
+    public void AddToPlaylist_FromAnAlbumsMenu_OpensTheListForTheAlbum()
+    {
+        var a = MobileFixtures.Song("A1");
+        var b = MobileFixtures.Song("A2");
+        var album = MobileFixtures.MakeAlbum("Record", "Band", a, b);
+        using var rig = MobileFixtures.MakeRig(new[] { a, b }, new[] { album });
+        var window = MobileFixtures.Mount(rig.Shell, out var view);
+
+        rig.Shell.OpenAlbumSheetCommand.Execute(album);
+        Assert.True(rig.Shell.IsMenuOpen);
+        rig.Shell.Sheet!.ShowPlaylistsCommand.Execute(null);
+        Assert.True(rig.Shell.IsPlaylistPickerOpen);
+        Assert.Same(album, rig.Shell.Sheet!.Album);
+        Assert.Equal(2, rig.Shell.Sheet.Tracks.Count);
+        window.UpdateLayout();
+        Assert.True(view.FindControl<ContextSheet>("Sheet")!.IsVisible);
+        window.Close();
+    }
+
+    /// <summary>Lyrics are the playing song's: the row shows on that song's menu only, and opens
+    /// over the Queue's menu by taking the Queue down (it sits over the lyrics page).</summary>
+    [AvaloniaFact]
+    public void Lyrics_ShowsOnlyForThePlayingSong()
+    {
+        var songs = new[] { MobileFixtures.Song("One"), MobileFixtures.Song("Two") };
+        using var rig = MobileFixtures.MakeRig(songs);
+        var window = MobileFixtures.Mount(rig.Shell, out _);
+        rig.Shell.Player.PlayTracks(songs, 0);
+
+        rig.Shell.OpenTrackSheetCommand.Execute(songs[1]);
+        Assert.False(rig.Shell.Sheet!.CanShowLyrics);
+        rig.Shell.OpenTrackSheetCommand.Execute(songs[0]);
+        Assert.True(rig.Shell.Sheet!.CanShowLyrics);
+
+        rig.Shell.OpenNowPlayingCommand.Execute(null);
+        rig.Shell.ToggleQueueCommand.Execute(null);
+        rig.Shell.OpenCurrentTrackSheetCommand.Execute(null);
+        rig.Shell.Sheet!.ShowLyricsCommand.Execute(null);
+        Assert.False(rig.Shell.IsQueueOpen);
+        Assert.True(rig.Shell.IsLyricsOpen);
+        window.Close();
+    }
+
+    /// <summary>Every ⋯ in the app opens the same glass menu out of itself: a song row (Songs), an
+    /// album's track row, the album page's own ⋯, the Library header's and the Queue's.</summary>
+    [AvaloniaFact]
+    public void EveryMoreButton_OpensTheGlassMenu_OutOfItself()
+    {
+        var tracks = Enumerable.Range(1, 4).Select(i => MobileFixtures.Song($"T{i}", artist: "Band")).ToArray();
+        var album = MobileFixtures.MakeAlbum("Record", "Band", tracks);
+        using var rig = MobileFixtures.MakeRig(tracks, new[] { album });
+        var window = MobileFixtures.Mount(rig.Shell, out var view);
+        var menu = MenuOf(view);
+        var sheet = view.FindControl<ContextSheet>("Sheet")!;
+
+        void Check(Button more, string what, string firstRow)
+        {
+            Tap(window, more);
+            Pump(25);
+            Assert.True(menu.IsVisible, what);
+            Assert.Same(more, menu.Anchor);
+            Assert.False(sheet.IsVisible, what);
+            Assert.True(MobileFixtures.Named<Control>(menu, firstRow).IsEffectivelyVisible, what);
+            var card = BoxIn(menu.FindControl<Panel>("Card")!, view);
+            output.WriteLine($"{what}: button {BoxIn(more, view)}, card {card}");
+            Assert.True(card.Intersects(BoxIn(more, view)), what + ": the card covers its button");
+            Assert.True(card.Left >= 0 && card.Right <= view.Bounds.Width && card.Top >= 0 && card.Bottom <= view.Bounds.Height, what);
+            rig.Shell.CloseSheet();
+            Pump(15);
+        }
+
+        rig.Shell.OpenSongsCommand.Execute(null);
+        window.UpdateLayout();
+        var songRow = view.GetVisualDescendants().OfType<SongRow>().First();
+        Check(MobileFixtures.Named<Button>(songRow, "MoreButton"), "Songs row", "MenuAddToQueue");
+
+        rig.Shell.OpenAlbumCommand.Execute(album);
+        Pump(30);                                                        // the page settles (push, hero)
+        window.UpdateLayout();
+        var albumPage = MobileFixtures.Find<AlbumPage>(view);
+        var rowMore = albumPage.GetVisualDescendants().OfType<Button>().First(b => b.Command == rig.Shell.OpenTrackSheetCommand);
+        Check(rowMore, "album track row", "MenuGoToAlbum");
+        Check(MobileFixtures.Named<Button>(albumPage, "MoreButton"), "album header", "MenuAddToQueue");
+
+        rig.Shell.SelectTabCommand.Execute(MobileTab.Library);
+        window.UpdateLayout();
+        Check(MobileFixtures.Named<Button>(view, "LibraryMoreButton"), "Library header", "MenuAddFolder");
+
+        rig.Shell.Player.PlayTracks(tracks, 0);
+        rig.Shell.OpenNowPlayingCommand.Execute(null);
+        rig.Shell.ToggleQueueCommand.Execute(null);
+        Pump(40);
+        Check(MobileFixtures.Named<Button>(view, "QueueMoreButton"), "Queue", "MenuAddToQueue");
+        window.Close();
+    }
+
+    /// <summary>A ⋯ low on a list opens up, above the mini player and the tab bar, never under
+    /// them; one high on the screen opens down from it.</summary>
+    [AvaloniaFact]
+    public void AMoreButtonNearTheBottom_OpensAbove_ClearOfTheMiniPlayerAndTabBar()
+    {
+        var tracks = Enumerable.Range(1, 14).Select(i => MobileFixtures.Song($"T{i:00}", artist: "Band")).ToArray();
+        var album = MobileFixtures.MakeAlbum("Record", "Band", tracks);
+        using var rig = MobileFixtures.MakeRig(tracks, new[] { album });
+        var window = MobileFixtures.Mount(rig.Shell, out var view);
+        rig.Shell.Player.PlayTracks(tracks, 0);                          // the mini player is up
+        rig.Shell.OpenAlbumCommand.Execute(album);
+        Pump(30);
+        window.UpdateLayout();
+        var menu = MenuOf(view);
+        var tabBar = BoxIn(MobileFixtures.Named<Control>(view, "TabCapsule"), view);
+        var mini = BoxIn(MobileFixtures.Named<Control>(view, "MiniBar"), view);
+        var chromeTop = Math.Min(tabBar.Top, mini.Top);
+
+        // The lowest ⋯ still above the mini player.
+        var page = MobileFixtures.Find<AlbumPage>(view);
+        var low = page.GetVisualDescendants().OfType<Button>()
+            .Where(b => b.Command == rig.Shell.OpenTrackSheetCommand && b.IsEffectivelyVisible)
+            .Select(b => (button: b, box: BoxIn(b, view)))
+            .Where(x => x.box.Bottom < chromeTop - 4)
+            .OrderBy(x => x.box.Top).Last();
+        Tap(window, low.button);
+        Pump(25);
+        var card = BoxIn(menu.FindControl<Panel>("Card")!, view);
+        output.WriteLine($"button {low.box}, card {card}, chrome top {chromeTop}");
+        Assert.True(card.Bottom <= chromeTop + 0.5, "the card runs under the mini player / tab bar");
+        Assert.Equal(low.box.Bottom, card.Bottom, 1);                    // flipped: up from the button
+        Assert.True(card.Top >= 0);
+        rig.Shell.CloseSheet();
+        Pump(15);
+
+        // The Library header's ⋯, at the top: down from it.
+        rig.Shell.SelectTabCommand.Execute(MobileTab.Library);
+        window.UpdateLayout();
+        var more = MobileFixtures.Named<Button>(view, "LibraryMoreButton");
+        Tap(window, more);
+        Pump(25);
+        card = BoxIn(menu.FindControl<Panel>("Card")!, view);
+        var moreBox = BoxIn(more, view);
+        Assert.Equal(moreBox.Top, card.Top, 1);
+        Assert.Equal(moreBox.Right, card.Right, 1);
+        window.Close();
+    }
+
+    /// <summary>The Library ⋯ rows run the desktop's three library actions, closing the menu first.</summary>
+    [AvaloniaFact]
+    public void LibraryMenu_SettingsOpensSettings_AndClosesTheMenu()
+    {
+        using var rig = MobileFixtures.MakeRig(new[] { MobileFixtures.Song("A") });
+        var window = MobileFixtures.Mount(rig.Shell, out var view);
+        rig.Shell.SelectTabCommand.Execute(MobileTab.Library);
+        rig.Shell.OpenLibraryMenuCommand.Execute(null);
+        Assert.True(rig.Shell.IsMenuOpen);
+        Assert.True(rig.Shell.TryHandleBack());
+        Assert.False(rig.Shell.IsMenuOpen);
+
+        rig.Shell.OpenLibraryMenuCommand.Execute(null);
+        rig.Shell.LibraryMenu!.OpenSettingsCommand.Execute(null);
+        Assert.False(rig.Shell.IsMenuOpen);
+        Assert.IsType<SettingsPageViewModel>(rig.Shell.CurrentPage);
+        window.Close();
+    }
+
+    /// <summary>The menu wears the theme of what it opened from: Now Playing's always-dark page
+    /// gives the dark glass (white text) whatever the app theme; a page gives the app's.</summary>
+    [AvaloniaFact]
+    public void TheCard_TakesTheThemeOfWhatItOpenedFrom()
+    {
+        var (rig, window, view) = OpenNowPlaying();
+        using var _ = rig;
+        var menu = MenuOf(view);
+        Tap(window, MobileFixtures.Named<Button>(view, "NowPlayingMore"));
+        Pump(25);
+        var card = menu.FindControl<Panel>("Card")!;
+        Assert.Equal(ThemeVariant.Dark, card.ActualThemeVariant);
+        var label = menu.GetVisualDescendants().OfType<TextBlock>().First(t => t.Text == "Add to Queue");
+        Assert.Equal(Colors.White, ((ISolidColorBrush)label.Foreground!).Color);
+
+        rig.Shell.CloseNowPlayingCommand.Execute(null);
+        Pump(15);
+        rig.Shell.SelectTabCommand.Execute(MobileTab.Library);
+        window.UpdateLayout();
+        var more = MobileFixtures.Named<Button>(view, "LibraryMoreButton");
+        Tap(window, more);
+        Pump(25);
+        Assert.Equal(more.ActualThemeVariant, card.ActualThemeVariant);
+        rig.Shell.CloseSheet();
+        Pump(15);
+
+        // An album page painted in a light cover colour: the light glass, whatever the app theme;
+        // a dark cover colour: the dark glass.
+        var album = MobileFixtures.MakeAlbum("Record", "Band", rig.Library.TrackList.ToArray());
+        rig.Shell.OpenAlbumCommand.Execute(album);
+        Pump(30);
+        var albumVm = (ITintedPage)rig.Shell.CurrentPage!;
+        foreach (var (tint, expected) in new[] { (Color.Parse("#F2EEE6"), ThemeVariant.Light), (Color.Parse("#3A1A08"), ThemeVariant.Dark) })
+        {
+            albumVm.Tint.Apply(tint);
+            window.UpdateLayout();
+            var header = MobileFixtures.Named<Button>(MobileFixtures.Find<AlbumPage>(view), "MoreButton");
+            Tap(window, header);
+            Pump(25);
+            Assert.Equal(expected, card.ActualThemeVariant);
+            rig.Shell.CloseSheet();
+            Pump(15);
+        }
+        window.Close();
+    }
+
+    /// <summary>
+    /// "Liquid glass, not dark" (owner 10-13), and still readable: the glass is a light frost over
+    /// the blurred backdrop, whose brightness the panel remaps into a range. Worst cases: dark
+    /// glass over the brightest cover (the backdrop at its max, the frost and the top sheen on it)
+    /// must keep white labels at 4.5:1 and the second lines at 3:1; light glass over black at its
+    /// min must keep black labels at 4.5:1. And over pure black the dark glass is visibly lighter
+    /// than the backdrop — not the old smoked card (#73161618 tint, backdrop capped at 0.5).
+    /// </summary>
+    [AvaloniaFact]
+    public void TheGlass_IsALightFrost_AndItsTextStaysReadableOverAnyBackdrop()
+    {
+        var menu = new PopMenu();
+        ResourceDictionary Theme(ThemeVariant v) => (ResourceDictionary)menu.Resources.ThemeDictionaries[v];
+        static double Over(double under, Color c) => under * (1 - c.A / 255.0) + c.R / 255.0 * (c.A / 255.0);
+        static Color Gray(double g) { var b = (byte)Math.Round(Math.Clamp(g, 0, 1) * 255); return Color.FromRgb(b, b, b); }
+        static Color Composite(Color text, Color under)
+        {
+            var a = text.A / 255.0;
+            return Color.FromRgb((byte)Math.Round(text.R * a + under.R * (1 - a)), (byte)Math.Round(text.G * a + under.G * (1 - a)),
+                (byte)Math.Round(text.B * a + under.B * (1 - a)));
+        }
+        Color Brush(ResourceDictionary d, string key) => ((SolidColorBrush)d[key]!).Color;
+        Color SheenTop(ResourceDictionary d) => ((LinearGradientBrush)d["PopMenuSheen"]!).GradientStops[0].Color;
+
+        var dark = Theme(ThemeVariant.Dark);
+        var tint = Brush(dark, "PopMenuTint");
+        Assert.True(tint.R == 255 && tint.G == 255 && tint.B == 255, "the frost is white, not a dark smoke");
+        var brightest = Over(Over((double)dark["PopMenuMaxLuminance"]!, tint), SheenTop(dark));
+        var overBlack = Over((double)dark["PopMenuMinLuminance"]!, tint);
+        output.WriteLine($"dark glass: {overBlack:0.000} over black .. {brightest:0.000} over the brightest cover");
+        Assert.True(overBlack >= 0.25, $"over black the glass must read lighter than the backdrop ({overBlack:0.000})");
+        Assert.True(PageTint.ContrastRatio(Brush(dark, "PopMenuText"), Gray(brightest)) >= 4.5);
+        Assert.True(PageTint.ContrastRatio(Composite(Brush(dark, "PopMenuSecondaryText"), Gray(brightest)), Gray(brightest)) >= 3);
+
+        var light = Theme(ThemeVariant.Light);
+        var darkest = Over((double)light["PopMenuMinLuminance"]!, Brush(light, "PopMenuTint"));
+        output.WriteLine($"light glass: {darkest:0.000} over black");
+        Assert.True(PageTint.ContrastRatio(Brush(light, "PopMenuText"), Gray(darkest)) >= 4.5);
+        Assert.True(PageTint.ContrastRatio(Composite(Brush(light, "PopMenuSecondaryText"), Gray(darkest)), Gray(darkest)) >= 4.5);
+    }
+}

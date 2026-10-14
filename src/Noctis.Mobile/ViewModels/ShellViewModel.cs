@@ -188,19 +188,49 @@ public sealed partial class ShellViewModel : ObservableObject
     [NotifyPropertyChangedFor(nameof(TopSafePadding), nameof(BottomSafePadding))]
     private Thickness _safeArea;
 
+    /// <summary>
+    /// The actions of the song, album, playlist or artist a ⋯ (or a long press) was opened on.
+    /// They show as Apple's glass menu popping out of what was tapped (PopMenu); only the Add to
+    /// Playlist list, which needs the room, moves to the bottom sheet (ContextSheet) once picked.
+    /// Every action closes it through <see cref="CloseSheet"/>.
+    /// </summary>
     [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(IsSheetOpen))]
+    [NotifyPropertyChangedFor(nameof(IsSheetOpen), nameof(IsPlaylistPickerOpen), nameof(PopMenu), nameof(IsMenuOpen))]
     private ContextSheetViewModel? _sheet;
 
+    /// <summary>An item's actions are up, as the menu or the playlist list.</summary>
     public bool IsSheetOpen => Sheet != null;
 
-    /// <summary>Now Playing's ⋯ menu: the song's actions on a glass card that pops out of the
-    /// button (NowPlayingMenu), Apple's. Its actions close it through <see cref="CloseSheet"/>.</summary>
-    [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(IsNowPlayingMenuOpen))]
-    private ContextSheetViewModel? _nowPlayingMenu;
+    /// <summary>The bottom sheet: only the Add to Playlist list.</summary>
+    public bool IsPlaylistPickerOpen => Sheet is { IsPickingPlaylist: true };
 
-    public bool IsNowPlayingMenuOpen => NowPlayingMenu != null;
+    /// <summary>The Library tab's ⋯ menu (Add Folder…, Rescan Library, Settings).</summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(PopMenu), nameof(IsMenuOpen))]
+    private LibraryMenuViewModel? _libraryMenu;
+
+    /// <summary>What the glass pop menu shows: the Library menu, or an item's actions until its
+    /// playlist list takes over.</summary>
+    public object? PopMenu => (object?)LibraryMenu ?? (Sheet is { IsPickingPlaylist: false } sheet ? sheet : null);
+
+    public bool IsMenuOpen => PopMenu != null;
+
+    partial void OnSheetChanged(ContextSheetViewModel? oldValue, ContextSheetViewModel? newValue)
+    {
+        if (oldValue != null) oldValue.PropertyChanged -= OnSheetPropertyChanged;
+        if (newValue == null) return;
+        newValue.PropertyChanged += OnSheetPropertyChanged;
+        LibraryMenu = null;
+    }
+
+    /// <summary>Add to Playlist picked in the menu: the menu closes and the sheet opens on the list.</summary>
+    private void OnSheetPropertyChanged(object? sender, PropertyChangedEventArgs e)
+    {
+        if (e.PropertyName != nameof(ContextSheetViewModel.IsPickingPlaylist)) return;
+        OnPropertyChanged(nameof(IsPlaylistPickerOpen));
+        OnPropertyChanged(nameof(PopMenu));
+        OnPropertyChanged(nameof(IsMenuOpen));
+    }
 
     private LibraryRowsViewModel? _libraryRows;
 
@@ -447,7 +477,7 @@ public sealed partial class ShellViewModel : ObservableObject
     /// Playing (the artist link) closes the player first.</summary>
     public void Navigate(MobilePage page)
     {
-        Sheet = null;
+        CloseSheet();
         if (IsNowPlayingOpen) CloseNowPlaying();
         Pages.Add(page);
         CurrentPage = page;
@@ -490,7 +520,7 @@ public sealed partial class ShellViewModel : ObservableObject
         // otherwise the Queue overlay is left floating over the Library page.
         IsQueueOpen = false;
         IsLyricsOpen = false;
-        NowPlayingMenu = null;
+        CloseSheet();
         IsNowPlayingOpen = false;
     }
 
@@ -499,7 +529,7 @@ public sealed partial class ShellViewModel : ObservableObject
     [RelayCommand] private void ToggleLyrics() => IsLyricsOpen = !IsLyricsOpen;
 
     /// <summary>
-    /// Android Back: the topmost thing closes first — the long-press sheet, Queue, Lyrics, Now
+    /// Android Back: the topmost thing closes first — a ⋯ menu or its sheet, Queue, Lyrics, Now
     /// Playing, then pushed pages (a page's own inner page first), then the Library rows' Edit
     /// mode finishes (as Done would), then a non-start tab returns to Home. Returns whether the
     /// press was consumed; only at the Home root does the activity fall through to the system
@@ -507,8 +537,7 @@ public sealed partial class ShellViewModel : ObservableObject
     /// </summary>
     public bool TryHandleBack()
     {
-        if (IsNowPlayingMenuOpen) { NowPlayingMenu = null; return true; }
-        if (IsSheetOpen) { CloseSheet(); return true; }
+        if (IsSheetOpen || LibraryMenu != null) { CloseSheet(); return true; }
         if (IsQueueOpen) { IsQueueOpen = false; return true; }
         if (IsLyricsOpen) { IsLyricsOpen = false; return true; }
         if (IsNowPlayingOpen) { IsNowPlayingOpen = false; return true; }
@@ -671,12 +700,12 @@ public sealed partial class ShellViewModel : ObservableObject
         if (item != null) Sheet = ContextSheetViewModel.ForArtist(this, item.Artist, item.ArtworkPath);
     }
 
-    /// <summary>Closes the long-press sheet, or the Now Playing ⋯ menu.</summary>
+    /// <summary>Closes whichever menu or sheet is open.</summary>
     [RelayCommand]
     public void CloseSheet()
     {
         Sheet = null;
-        NowPlayingMenu = null;
+        LibraryMenu = null;
     }
 
     /// <summary>
@@ -716,10 +745,18 @@ public sealed partial class ShellViewModel : ObservableObject
     [RelayCommand]
     private void OpenNowPlayingMenu()
     {
-        if (Player.CurrentTrack is { } track) NowPlayingMenu = ContextSheetViewModel.ForTrack(this, track);
+        if (Player.CurrentTrack is { } track) Sheet = ContextSheetViewModel.ForTrack(this, track);
     }
 
-    /// <summary>The Queue's ⋯: the song's sheet, over the Queue.</summary>
+    /// <summary>The Library tab's ⋯: Add Folder…, Rescan Library and Settings on the glass menu.</summary>
+    [RelayCommand]
+    private void OpenLibraryMenu()
+    {
+        Sheet = null;
+        LibraryMenu = new LibraryMenuViewModel(this);
+    }
+
+    /// <summary>The Queue's ⋯: the song's menu, over the Queue.</summary>
     [RelayCommand]
     private void OpenCurrentTrackSheet()
     {
