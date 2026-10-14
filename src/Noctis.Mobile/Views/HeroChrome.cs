@@ -234,6 +234,10 @@ internal sealed class HeroChrome
             _page.Resources[_prefix + "Accent"] = new SolidColorBrush(MobileTheme.Readable(accent, new[] { tint }, text));
             into = tint;
         }
+        // The fade over the picture's top takes the page colour too: in the theme's it was a white
+        // haze across a tinted cover in Light (a black one in Dark), as at the bottom.
+        if (_tint?.TintColor is { } topTint)
+            _topFade.Background = TopFadeBrush(topTint, TopFadeAlpha);
         _heroFade.Background = into is { } c ? Fade(c, from: 0, to: 1, rising: true) : null;
         // Solid behind the status bar and the buttons, eased out just below them.
         var solid = _topScrim.Height > 0 ? (SafeTop + TopBarHeight - ScrimSolidInset) / _topScrim.Height : 0;

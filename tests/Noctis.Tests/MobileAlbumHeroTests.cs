@@ -323,6 +323,9 @@ public class MobileAlbumHeroTests : IDisposable
         Assert.NotNull(scrim.Background);
         Assert.NotNull(fade.Background);
         Assert.NotNull(MobileFixtures.Named<Border>(page, "HeroFade").Background);
+        // The top fade is the page's tint, not a white (theme) haze over the cover.
+        var top = Assert.IsType<LinearGradientBrush>(fade.Background).GradientStops[0].Color;
+        Assert.Equal((0x30, 0x40, 0x60), (top.R, top.G, top.B));
 
         MobileFixtures.Named<ScrollViewer>(page, "AlbumScroll").Offset = new Vector(0, 600);
         window.UpdateLayout();
