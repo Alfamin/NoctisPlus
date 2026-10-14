@@ -542,8 +542,17 @@
                                                        IsVisible="{Binding SyncText, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
                                             <TextBlock Name="LastSyncLabel" Classes="row-sub" Text="{Binding LastSyncText}"
                                                        IsVisible="{Binding SyncText, Converter={x:Static StringConverters.IsNullOrEmpty}}" />
+                                            <!-- Indeterminate only while shown: hidden, its endless animation
+                                                 still keeps Avalonia drawing every 16 ms (LibraryNotices). -->
                                             <ProgressBar Name="SyncProgress" Classes="thin" Margin="0,7,0,1" Value="{Binding SyncFraction}"
-                                                         IsIndeterminate="{Binding !IsSyncCounted}" IsVisible="{Binding IsSyncing}" />
+                                                         IsVisible="{Binding IsSyncing}">
+                                                <ProgressBar.IsIndeterminate>
+                                                    <MultiBinding Converter="{x:Static BoolConverters.And}">
+                                                        <Binding Path="IsSyncing" />
+                                                        <Binding Path="!IsSyncCounted" />
+                                                    </MultiBinding>
+                                                </ProgressBar.IsIndeterminate>
+                                            </ProgressBar>
                                         </StackPanel>
                                         <TextBlock Grid.Column="2" Classes="row-action" Text="Sync now" IsVisible="{Binding ShowSyncAction}" />
                                     </Grid>
@@ -560,7 +569,14 @@
                                         <TextBlock Text="Download everything" />
                                     </Button>
                                     <ProgressBar Name="DownloadProgress" Classes="thin" Margin="16,0,16,14" Value="{Binding DownloadFraction}"
-                                                 IsIndeterminate="{Binding !IsDownloadCounted}" IsVisible="{Binding IsDownloading}" />
+                                                 IsVisible="{Binding IsDownloading}">
+                                        <ProgressBar.IsIndeterminate>
+                                            <MultiBinding Converter="{x:Static BoolConverters.And}">
+                                                <Binding Path="IsDownloading" />
+                                                <Binding Path="!IsDownloadCounted" />
+                                            </MultiBinding>
+                                        </ProgressBar.IsIndeterminate>
+                                    </ProgressBar>
                                 </StackPanel>
                             </Border>
                             <TextBlock Name="DownloadLabel" Classes="group-footnote" Text="{Binding DownloadText}"
