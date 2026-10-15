@@ -373,6 +373,7 @@ public partial class LyricsStudioViewModel : ViewModelBase
             TryLoadExisting(fresh);
         if (value is { Result: null } compose)
             PrefillDraft(compose);
+        ResetReviewSelection();
         ReviewLines.Clear();
         _reviewDirty = false;
         if (value?.Result is { } result)
@@ -389,7 +390,47 @@ public partial class LyricsStudioViewModel : ViewModelBase
 
     /// <summary>Any text, time or word edit on the review on screen; drafts of loaded songs are only written when this is set.</summary>
     private bool _reviewDirty;
-    private void MarkReviewDirty() => _reviewDirty = true;
+    private void MarkReviewDirty()
+    {
+        _reviewDirty = true;
+        ScheduleDraftSave();
+    }
+
+    /// <summary>
+    /// The review on screen is rebuilt (a run's result, a stopped re-run, Clear lyrics): tap mode
+    /// and the selected word belonged to the lines just dropped. Tap mode used to outlive a
+    /// Re-sync, so Space kept stamping times on a line no longer on screen.
+    /// </summary>
+    private void ResetReviewSelection()
+    {
+        CancelTap();
+        SelectedWord = null;
+    }
+
+    private CancellationTokenSource? _draftSaveCts;
+    /// <summary>How long after the last edit the review on screen is written to its draft.</summary>
+    internal const int DraftSaveDelayMs = 1000;
+
+    /// <summary>
+    /// Edits are kept as they are made, a second after the last one. Drafts were only written
+    /// when the user moved to another song, previewed or closed the dialog; the sidebar page's
+    /// Studio is never closed, so quitting the app lost every fix made on the song on screen.
+    /// </summary>
+    private void ScheduleDraftSave()
+    {
+        if (_drafts is null || Selected is not { } item) return;
+        _draftSaveCts?.Cancel();
+        var cts = _draftSaveCts = new CancellationTokenSource();
+        _ = SaveDraftSoonAsync(item, cts.Token);
+    }
+
+    private async Task SaveDraftSoonAsync(StudioItem item, CancellationToken token)
+    {
+        try { await Task.Delay(DraftSaveDelayMs, token); }
+        catch (OperationCanceledException) { return; }
+        // Saved, skipped or re-run since: PersistDraft keeps only reviews still open.
+        if (ReferenceEquals(Selected, item)) PersistDraft(item);
+    }
 
     /// <summary>
     /// Selecting a song shows what it already has — .elrc, then .lrc, then embedded — with no
@@ -744,7 +785,11 @@ public partial class LyricsStudioViewModel : ViewModelBase
         item.ForceRun = true;
         item.Status = StudioStatus.Waiting;
         item.Result = null;
-        if (ReferenceEquals(Selected, item)) ReviewLines.Clear();
+        if (ReferenceEquals(Selected, item))
+        {
+            ResetReviewSelection();
+            ReviewLines.Clear();
+        }
         RaiseReviewChanged();
     }
 
