@@ -140,10 +140,88 @@ public partial class LyricsStudioPanel : UserControl
             if (DataContext is LyricsStudioViewModel { PickLyricsFile: null } studio)
                 studio.PickLyricsFile = PickLyricsFileAsync;
             WireLyricsPagePreview();
-            if (this.IsAttachedToVisualTree()) WatchModel();
+            if (this.IsAttachedToVisualTree()) { WatchModel(); WatchLivePreview(); }
         };
-        AttachedToVisualTree += (_, _) => { WireLyricsPagePreview(); HookKeys(); WatchModel(); };
-        DetachedFromVisualTree += (_, _) => { UnhookKeys(); UnwatchModel(); };
+        AttachedToVisualTree += (_, _) => { WireLyricsPagePreview(); HookKeys(); WatchModel(); WatchLivePreview(); };
+        DetachedFromVisualTree += (_, _) => { UnhookKeys(); UnwatchModel(); UnwatchLivePreview(); };
+    }
+
+    // ── Live preview pane (10-14) ──
+    // The pane shows the review through the app's lyrics view model, in a second copy of the
+    // lyrics side panel's view. The panel wires it (the view model never holds the window) and
+    // follows the player while on screen, so the pane knows when the song under review plays.
+
+    /// <summary>The lyrics the pane renders; null = the main window's (tests set their own).</summary>
+    internal LyricsViewModel? PreviewLyrics { get; set; }
+
+    private LyricsStudioViewModel? _liveWatch;
+    private PlayerViewModel? _livePlayer;
+    private LyricsViewModel? _liveLyrics;
+
+    /// <summary>The app's lyrics: the main window's, or for the per-song dialog its owner's.</summary>
+    private LyricsViewModel? ResolveLyrics()
+    {
+        if (PreviewLyrics is { } own) return own;
+        var top = TopLevel.GetTopLevel(this) as Window;
+        if (top?.DataContext is MainWindowViewModel main) return main.Lyrics;
+        return top?.Owner is Window { DataContext: MainWindowViewModel owner } ? owner.Lyrics : null;
+    }
+
+    private void WatchLivePreview()
+    {
+        UnwatchLivePreview();
+        if (DataContext is not LyricsStudioViewModel vm || ResolveLyrics() is not { } lyrics) return;
+        _liveWatch = vm;
+        _liveLyrics = lyrics;
+        if (vm.UpdateLivePreview is null)
+        {
+            vm.ClearLivePreview = lyrics.ClearPreview;
+            vm.UpdateLivePreview = lyrics.UpdatePreview;
+        }
+        vm.PropertyChanged += OnStudioPropertyChanged;
+        _livePlayer = lyrics.Player;
+        _livePlayer.PropertyChanged += OnLivePlayerPropertyChanged;
+        SyncLivePreviewView();
+        vm.RefreshLivePreview();
+    }
+
+    private void UnwatchLivePreview()
+    {
+        if (_liveWatch is not null) _liveWatch.PropertyChanged -= OnStudioPropertyChanged;
+        if (_livePlayer is not null) _livePlayer.PropertyChanged -= OnLivePlayerPropertyChanged;
+        _liveWatch = null;
+        _livePlayer = null;
+    }
+
+    private void OnStudioPropertyChanged(object? sender, System.ComponentModel.PropertyChangedEventArgs e)
+    {
+        if (e.PropertyName == nameof(LyricsStudioViewModel.IsLivePreviewOpen)) SyncLivePreviewView();
+    }
+
+    private void OnLivePlayerPropertyChanged(object? sender, System.ComponentModel.PropertyChangedEventArgs e)
+    {
+        if (e.PropertyName is nameof(PlayerViewModel.CurrentTrack) or nameof(PlayerViewModel.IsPlayingMusicVideoAudio))
+            _liveWatch?.RefreshLivePreview();
+    }
+
+    /// <summary>
+    /// Builds the pane's lyrics view the first time it opens (its karaoke layout is not built for a
+    /// Studio that never shows it), and keeps it counted as a lyrics surface only while open:
+    /// hiding does not detach it (the side panel's own SetShown reason).
+    /// </summary>
+    private void SyncLivePreviewView()
+    {
+        if (_liveWatch is not { } vm || _liveLyrics is not { } lyrics) return;
+        var open = vm.IsLivePreviewOpen;
+        if (LivePreviewHost.Content is not LyricsPanelView view)
+        {
+            if (!open) return;
+            view = new LyricsPanelView { DataContext = lyrics };
+            view.SetCloseAction(() => { if (DataContext is LyricsStudioViewModel studio) studio.ShowLivePreview = false; },
+                Noctis.Localization.Loc.T("LyricsStudio.HidePreview"));
+            LivePreviewHost.Content = view;
+        }
+        view.SetShown(open);
     }
 
     // The model banner follows the shared model manager while the panel is on screen: a download

@@ -222,4 +222,67 @@ public class LyricsStudioPreviewTests
             try { Directory.Delete(dir, recursive: true); } catch { }
         }
     }
+
+    // ── The Studio's live preview pane (10-14) ──
+
+    /// <summary>Once the preview is up, an edit lands in the same call: no fade, no probe, no swap events.</summary>
+    [AvaloniaFact]
+    public async Task UpdatePreview_OnScreen_AppliesTheEditInPlace()
+    {
+        var dir = MakeDir();
+        try
+        {
+            var (vm, player) = MakeViewModel();
+            var track = MakeTrack(dir, "song", RealLrc);
+            player.CurrentTrack = track;
+            vm.EnsureLyricsForCurrentTrack();
+            await WaitUntil(() => Shows(vm, "Real first"), "real lyrics to load");
+            vm.UpdatePreview(track, PreviewElrc);
+            await WaitUntil(() => Shows(vm, "Hello big world"), "the first preview to load");
+
+            var swaps = 0;
+            vm.LyricsSwapPending += (_, _) => swaps++;
+            vm.UpdatePreview(track, PreviewElrc.Replace("<00:01.50>big", "<00:01.60>big"));
+
+            Assert.Equal(0, swaps);
+            var line = vm.LyricLines.Single(l => l.Text == "Hello big world");
+            Assert.Equal(TimeSpan.FromMilliseconds(1600), line.Words![1].Start);
+            Assert.True(vm.IsPreviewActive);
+
+            player.Position = TimeSpan.FromSeconds(4.2);
+            await WaitUntil(() => vm.ActiveLineIndex >= 0 &&
+                                  vm.LyricLines[vm.ActiveLineIndex].Text == "Second line", "active line to follow the edited preview");
+            Assert.Empty(Directory.GetFiles(dir));
+        }
+        finally
+        {
+            try { Directory.Delete(dir, recursive: true); } catch { }
+        }
+    }
+
+    /// <summary>The Studio moved to another song: the first song's preview leaves the screen.</summary>
+    [AvaloniaFact]
+    public async Task UpdatePreview_ForAnotherSong_DropsThePreviewOnScreen()
+    {
+        var dir = MakeDir();
+        try
+        {
+            var (vm, player) = MakeViewModel();
+            var track = MakeTrack(dir, "song", RealLrc);
+            var other = MakeTrack(dir, "other", "[00:01.00]Other track line");
+            player.CurrentTrack = track;
+            vm.EnsureLyricsForCurrentTrack();
+            vm.UpdatePreview(track, PreviewElrc);
+            await WaitUntil(() => Shows(vm, "Hello big world"), "preview to show");
+
+            vm.UpdatePreview(other, "[00:01.00]Other preview");
+
+            Assert.False(vm.IsPreviewActive);
+            await WaitUntil(() => Shows(vm, "Real first"), "the playing song's real lyrics");
+        }
+        finally
+        {
+            try { Directory.Delete(dir, recursive: true); } catch { }
+        }
+    }
 }

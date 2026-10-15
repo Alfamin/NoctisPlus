@@ -10,7 +10,7 @@ using Noctis.Services.LyricsStudio;
 namespace Noctis.ViewModels;
 
 /// <summary>Lyrics Studio choices the user changes inside the dialog; persisted by Settings.</summary>
-public sealed record LyricsStudioPrefs(string Model, string Language, bool WordTimings, bool SkipAlreadyTimed, bool EmbedTags, bool OnlineLyrics = true, bool SaveTtml = false);
+public sealed record LyricsStudioPrefs(string Model, string Language, bool WordTimings, bool SkipAlreadyTimed, bool EmbedTags, bool OnlineLyrics = true, bool SaveTtml = false, bool LivePreview = true);
 
 public sealed record SpeechLanguageOption(string Code, string Name)
 {
@@ -65,6 +65,8 @@ public partial class LyricsStudioViewModel : ViewModelBase
     [ObservableProperty] private bool _onlineLyrics;
     /// <summary>Also save a .ttml next to the song: players that read TTML and LRC but not ELRC get the word timings (Discord: Light Cone).</summary>
     [ObservableProperty] private bool _saveTtml;
+    /// <summary>The live preview pane beside the review is open (remembered like the options).</summary>
+    [ObservableProperty] private bool _showLivePreview;
 
     // ── Model state ──
     [ObservableProperty] private bool _isModelInstalled;
@@ -265,6 +267,7 @@ public partial class LyricsStudioViewModel : ViewModelBase
         _embedTags = s.LyricsStudioEmbedTags;
         _onlineLyrics = s.LyricsStudioOnlineLyrics;
         _saveTtml = s.LyricsStudioSaveTtml;
+        _showLivePreview = s.LyricsStudioLivePreview;
         _loadingPrefs = false;
         Clock = () => _clock.Elapsed;
 
@@ -325,6 +328,7 @@ public partial class LyricsStudioViewModel : ViewModelBase
         OnPropertyChanged(nameof(LineTimings));
         // The rows show the chosen format: word tags for ELRC, plain text for LRC.
         foreach (var line in ReviewLines) line.ShowWordTags = value;
+        ScheduleLivePreview();
     }
     partial void OnSkipAlreadyTimedChanged(bool value) => PersistPrefs();
     partial void OnEmbedTagsChanged(bool value) => PersistPrefs();
@@ -395,6 +399,7 @@ public partial class LyricsStudioViewModel : ViewModelBase
     {
         _reviewDirty = true;
         ScheduleDraftSave();
+        ScheduleLivePreview();
     }
 
     /// <summary>
@@ -502,12 +507,102 @@ public partial class LyricsStudioViewModel : ViewModelBase
         OnPropertyChanged(nameof(IsSelectedWorking));
         OnPropertyChanged(nameof(ShowReviewEmpty));
         OnPropertyChanged(nameof(CanAlignDraft));
+        RefreshLivePreview();
+    }
+
+    // ── Live preview: the review rendered by the lyrics view, beside the editor (10-14) ──
+    // Discord "Manual lyrics editing": switching between Preview and the editor was the hassle.
+    // The pane is the lyrics side panel's own view over the app's lyrics view model, fed the
+    // review through the same unsaved-preview path as Preview: memory only, nothing saved.
+
+    /// <summary>Set by the panel: shows (or updates in place) these synced lyrics, unsaved, for the track in the preview pane. Null = no pane.</summary>
+    public Action<Track, string>? UpdateLivePreview
+    {
+        get => _updateLivePreview;
+        set { _updateLivePreview = value; RefreshLivePreview(); }
+    }
+    private Action<Track, string>? _updateLivePreview;
+    /// <summary>Set with <see cref="UpdateLivePreview"/>: drops the preview so the song's own lyrics come back.</summary>
+    public Action? ClearLivePreview { get; set; }
+
+    public bool CanLivePreview => _updateLivePreview is not null;
+    /// <summary>The pane is on screen: open, and an editable review to show.</summary>
+    public bool IsLivePreviewOpen => ShowLivePreview && CanLivePreview && CanSave;
+    /// <summary>The song under review is the one playing (from the song file, not a music video's audio).</summary>
+    public bool LivePreviewOnSong => _player is { } p && Selected is { } s && p.CurrentTrack?.Id == s.Track.Id && !p.IsPlayingMusicVideoAudio;
+    /// <summary>The pane is open on a song that is not playing: it offers Play instead of lyrics of another song.</summary>
+    public bool ShowLivePreviewIdle => IsLivePreviewOpen && !LivePreviewOnSong;
+
+    /// <summary>What the pane last showed was pushed by it: closing it, or leaving the review, puts the real lyrics back.</summary>
+    private bool _livePreviewShown;
+    private bool _livePreviewPending;
+    /// <summary>Edits reach the pane at most this often (a held , or . repeats ~30 times a second).</summary>
+    internal const int LivePreviewDelayMs = 120;
+
+    partial void OnShowLivePreviewChanged(bool value)
+    {
+        PersistPrefs();
+        RefreshLivePreview();
+    }
+
+    [RelayCommand]
+    private void ToggleLivePreview() => ShowLivePreview = !ShowLivePreview;
+
+    /// <summary>The pane's Play: the song under review from just before the selected line (else its first), like Preview's lead-in.</summary>
+    [RelayCommand]
+    private Task PlayLivePreview()
+    {
+        if (ReviewLines.Count == 0) return Task.CompletedTask;
+        var from = SelectedLine?.Start ?? ReviewLines[0].Start;
+        return PlayFromTime(from - TimeSpan.FromSeconds(2));
+    }
+
+    /// <summary>The pane's state changed (the review, the song playing, the pane itself): say so and bring it up to date.</summary>
+    internal void RefreshLivePreview()
+    {
+        OnPropertyChanged(nameof(CanLivePreview));
+        OnPropertyChanged(nameof(IsLivePreviewOpen));
+        OnPropertyChanged(nameof(LivePreviewOnSong));
+        OnPropertyChanged(nameof(ShowLivePreviewIdle));
+        ScheduleLivePreview();
+    }
+
+    private void ScheduleLivePreview()
+    {
+        if (_livePreviewPending || (_updateLivePreview is null && !_livePreviewShown)) return;
+        _livePreviewPending = true;
+        _ = PushLivePreviewSoonAsync();
+    }
+
+    private async Task PushLivePreviewSoonAsync()
+    {
+        await Task.Delay(LivePreviewDelayMs);
+        _livePreviewPending = false;
+        PushLivePreview();
+    }
+
+    private void PushLivePreview()
+    {
+        if (IsLivePreviewOpen && Selected is { } item && ReviewLines.Count > 0)
+        {
+            try
+            {
+                _updateLivePreview!(item.Track, BuildReviewText());
+                _livePreviewShown = true;
+            }
+            catch (Exception ex) { DebugLogger.Warn(DebugLogger.Category.Lyrics, "LyricsStudio.LivePreviewFailed", ex.Message); }
+        }
+        else if (_livePreviewShown)
+        {
+            _livePreviewShown = false;
+            try { ClearLivePreview?.Invoke(); } catch { }
+        }
     }
 
     private void PersistPrefs()
     {
         if (_loadingPrefs) return;
-        try { _savePrefs(new LyricsStudioPrefs(WhisperModelManager.Lullaby.Size.ToString(), SelectedLanguage.Code, WordTimings, SkipAlreadyTimed, EmbedTags, OnlineLyrics, SaveTtml)); }
+        try { _savePrefs(new LyricsStudioPrefs(WhisperModelManager.Lullaby.Size.ToString(), SelectedLanguage.Code, WordTimings, SkipAlreadyTimed, EmbedTags, OnlineLyrics, SaveTtml, ShowLivePreview)); }
         catch { /* preferences are a convenience */ }
     }
 
@@ -1553,6 +1648,12 @@ public partial class LyricsStudioViewModel : ViewModelBase
     {
         _runCts?.Cancel();
         if (Selected is { } current) PersistDraft(current);
+        // The dialog's pane leaves with it: the lyrics page and side panel show the song's own lyrics again.
+        if (_livePreviewShown)
+        {
+            _livePreviewShown = false;
+            try { ClearLivePreview?.Invoke(); } catch { }
+        }
         if (_savedCount > 0)
         {
             try { await _library.SaveAsync(); } catch { }

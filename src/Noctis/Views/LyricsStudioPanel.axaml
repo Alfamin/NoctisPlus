@@ -47,6 +47,24 @@
                 <Setter Property="Width" Value="250" />
             </Style>
         </ContainerQuery>
+        <!-- Live preview pane (10-14): beside the review, the queue giving up width for it; above
+             the review, full width and short, when the body is narrow. -->
+        <Style Selector="Border.studio-preview">
+            <Setter Property="DockPanel.Dock" Value="Right" />
+            <Setter Property="Width" Value="300" />
+            <Setter Property="Margin" Value="16,0,0,0" />
+        </Style>
+        <Style Selector="Grid.previewing Border.studio-queue">
+            <Setter Property="Width" Value="250" />
+        </Style>
+        <ContainerQuery Name="StudioBody" Query="max-width:900">
+            <Style Selector="Border.studio-preview">
+                <Setter Property="DockPanel.Dock" Value="Top" />
+                <Setter Property="Width" Value="NaN" />
+                <Setter Property="Height" Value="220" />
+                <Setter Property="Margin" Value="0,0,0,12" />
+            </Style>
+        </ContainerQuery>
         <Style Selector="WrapPanel.review-actions, WrapPanel.review-tools">
             <Setter Property="DockPanel.Dock" Value="Right" />
             <Setter Property="Margin" Value="12,0,0,0" />
@@ -530,7 +548,8 @@
         </StackPanel>
 
         <!-- Body: queue | review -->
-        <Grid ColumnDefinitions="Auto,*" Margin="24,0,24,8" ColumnSpacing="16" Container.Name="StudioBody" Container.Sizing="Width">
+        <Grid ColumnDefinitions="Auto,*" Margin="24,0,24,8" ColumnSpacing="16" Container.Name="StudioBody" Container.Sizing="Width"
+              Classes.previewing="{Binding IsLivePreviewOpen}">
             <!-- Queue (width from the styles: narrower in a small window) -->
             <Border Grid.Column="0" Classes="studio-queue" CornerRadius="14" ClipToBounds="True" Background="#0CFFFFFF" Padding="8,8,0,8">
                 <DockPanel>
@@ -601,8 +620,35 @@
                 </DockPanel>
             </Border>
 
-            <!-- Review -->
-            <Border Grid.Column="1" CornerRadius="14" ClipToBounds="True" Background="#0CFFFFFF" Padding="16,16,0,16">
+            <!-- Review, with the live preview pane beside it (or above it when narrow) -->
+            <DockPanel Grid.Column="1">
+            <!-- The lyrics side panel's own view over the app's lyrics, fed the review unsaved
+                 (LyricsViewModel.UpdatePreview): it follows the song and changes with every edit.
+                 Built by the code-behind the first time the pane opens; scaled down to fit. -->
+            <Border Classes="studio-preview" CornerRadius="14" ClipToBounds="True" IsVisible="{Binding IsLivePreviewOpen}">
+                <Panel>
+                    <LayoutTransformControl>
+                        <LayoutTransformControl.LayoutTransform>
+                            <ScaleTransform ScaleX="0.85" ScaleY="0.85" />
+                        </LayoutTransformControl.LayoutTransform>
+                        <ContentControl x:Name="LivePreviewHost" />
+                    </LayoutTransformControl>
+                    <!-- Another song (or none) is playing: its lyrics are not this review's. -->
+                    <Border Background="#E6141414" CornerRadius="14" IsVisible="{Binding ShowLivePreviewIdle}">
+                        <StackPanel VerticalAlignment="Center" HorizontalAlignment="Center" Spacing="10" Margin="16">
+                            <TextBlock Text="{loc:T LyricsStudio.LivePreviewIdle}" FontSize="12.5" Opacity="0.7" TextWrapping="Wrap"
+                                       TextAlignment="Center" MaxWidth="220" />
+                            <Button Classes="studio-btn pill-outline" HorizontalAlignment="Center" Command="{Binding PlayLivePreviewCommand}">
+                                <StackPanel Orientation="Horizontal" Spacing="6">
+                                    <PathIcon Data="{StaticResource PlayIcon}" Width="10" Height="10" VerticalAlignment="Center" />
+                                    <TextBlock Text="{loc:T LyricsStudio.LivePreviewPlay}" VerticalAlignment="Center" />
+                                </StackPanel>
+                            </Button>
+                        </StackPanel>
+                    </Border>
+                </Panel>
+            </Border>
+            <Border CornerRadius="14" ClipToBounds="True" Background="#0CFFFFFF" Padding="16,16,0,16">
                 <Panel>
                     <StackPanel VerticalAlignment="Center" Spacing="6" Margin="0,0,16,0" IsVisible="{Binding ShowReviewEmpty}">
                         <TextBlock Text="{loc:T LyricsStudio.ReviewEmptyTitle}" FontSize="15" FontWeight="SemiBold" TextAlignment="Center" Opacity="0.7" />
@@ -720,6 +766,15 @@
                                     <Button Command="{Binding UpgradeToWordTimingsCommand}" IsVisible="{Binding ReviewCanUpgrade}"
                                             Classes="studio-btn pill-outline" ToolTip.Tip="{loc:T LyricsStudio.UpgradeTip}">
                                         <TextBlock Text="{loc:T LyricsStudio.Upgrade}" />
+                                    </Button>
+                                    <!-- Shows or hides the live preview pane beside the editor (10-14); the dot = open. -->
+                                    <Button Command="{Binding ToggleLivePreviewCommand}" IsVisible="{Binding CanLivePreview}"
+                                            Classes="studio-btn pill-outline studio-live-preview" ToolTip.Tip="{loc:T LyricsStudio.LivePreviewTip}">
+                                        <StackPanel Orientation="Horizontal" Spacing="6">
+                                            <Ellipse Width="6" Height="6" VerticalAlignment="Center" Fill="{DynamicResource AccentColorBrush}"
+                                                     IsVisible="{Binding ShowLivePreview}" />
+                                            <TextBlock Text="{loc:T LyricsStudio.LivePreview}" VerticalAlignment="Center" />
+                                        </StackPanel>
                                     </Button>
                                     <!-- Plays the song on the real lyrics page with these unsaved timings (09-23). -->
                                     <Button Command="{Binding PreviewOnLyricsPageCommand}" IsVisible="{Binding CanPreview}"
@@ -951,6 +1006,7 @@
                     </DockPanel>
                 </Panel>
             </Border>
+            </DockPanel>
         </Grid>
     </DockPanel>
 </UserControl>
