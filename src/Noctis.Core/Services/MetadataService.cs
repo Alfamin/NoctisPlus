@@ -241,8 +241,10 @@ public class MetadataService : IMetadataService
     /// <summary>
     /// Builds the Track from an opened TagLib file. <paramref name="localPath"/> is null
     /// for stream-backed entries (Android SAF): those skip the path-only extras (ffprobe
-    /// metrics, the ALAC atom re-read, folder-derived metadata) rather than throwing on a
-    /// content:// string.
+    /// metrics, folder-derived metadata) rather than throwing on a content:// string. The
+    /// ALAC atom is read from the entry's own stream instead: without it every ALAC on the
+    /// phone had no bit depth (TagLib# gives none for ALAC, and the path read failed on the
+    /// content:// name), so a 24-bit file read as "48 kHz ALAC" and a 96 kHz one as 48 kHz.
     /// </summary>
     private Track? BuildTrack(TagLib.File file, string filePath, string fileName, long length, DateTime lastWriteUtc,
         string? localPath, out byte[]? embeddedArt)
@@ -255,8 +257,10 @@ public class MetadataService : IMetadataService
         var codec = DetermineCodec(file, ext);
         var sampleRate = NormalizeSampleRate(props.AudioSampleRate);
         // ALAC: the decoder config atom is the authority for bit depth AND sample rate (see
-        // ResolveAlacSampleRate). Read once here; path-based, so only for entries reachable by path.
-        var alacConfig = localPath != null && IsAlacContainer(ext, codec) ? TryReadAlacConfigFromFile(localPath) : (BitDepth: 0, SampleRate: 0);
+        // ResolveAlacSampleRate). Read once here: from the path, or from the stream TagLib read.
+        var alacConfig = !IsAlacContainer(ext, codec) ? (BitDepth: 0, SampleRate: 0)
+            : localPath != null ? TryReadAlacConfigFromFile(localPath)
+            : TryReadAlacConfig(file.FileAbstraction.ReadStream);
         var bitsPerSample = NormalizeBitsPerSample(props.BitsPerSample, file, ext, sampleRate, codec, alacConfig.BitDepth);
         sampleRate = ResolveAlacSampleRate(sampleRate, alacConfig.SampleRate);
         var bitrate = NormalizeBitrate(props.AudioBitrate, length, props.Duration);
@@ -1029,7 +1033,7 @@ public class MetadataService : IMetadataService
     }
 
     /// <summary>An MP4-family file whose codec reads as Apple Lossless.</summary>
-    private static bool IsAlacContainer(string ext, string? codec)
+    internal static bool IsAlacContainer(string ext, string? codec)
     {
         if (ext is not (".m4a" or ".m4b" or ".mp4" or ".alac"))
             return false;
@@ -1095,21 +1099,52 @@ public class MetadataService : IMetadataService
         try
         {
             using var fs = new FileStream(filePath, FileMode.Open, FileAccess.Read, FileShare.ReadWrite);
-            var scanSize = (int)Math.Min(fs.Length, 1024 * 1024);
+            return TryReadAlacConfig(fs);
+        }
+        catch
+        {
+            // Best-effort fallback only; return zeros if anything goes wrong.
+        }
+
+        return (0, 0);
+    }
+
+    /// <summary>
+    /// <see cref="TryReadAlacConfigFromFile"/> over an open seekable stream (a file, or the
+    /// Android content stream TagLib read): the stream's position is put back afterwards.
+    /// </summary>
+    private static (int BitDepth, int SampleRate) TryReadAlacConfig(Stream stream)
+    {
+        var position = stream.CanSeek ? stream.Position : 0;
+        try
+        {
+            stream.Position = 0;
+            var scanSize = (int)Math.Min(stream.Length, 1024 * 1024);
             var data = new byte[scanSize];
-            int bytesRead = fs.Read(data, 0, scanSize);
+            // A content stream may hand back less than asked per read; fill the window.
+            var bytesRead = 0;
+            while (bytesRead < scanSize)
+            {
+                var n = stream.Read(data, bytesRead, scanSize - bytesRead);
+                if (n <= 0) break;
+                bytesRead += n;
+            }
             var config = FindAlacConfig(data, bytesRead);
             if (config.BitDepth > 0)
                 return config;
 
             // moov after mdat (ffmpeg without +faststart — the Audio Converter's own ALAC
             // output): the atom sits past the first megabyte. Read moov itself.
-            if (fs.Length > scanSize && Mp4ChapterReader.ReadTopLevelBox(fs, "moov") is { } moov)
+            if (stream.Length > scanSize && Mp4ChapterReader.ReadTopLevelBox(stream, "moov") is { } moov)
                 return FindAlacConfig(moov, moov.Length);
         }
         catch
         {
             // Best-effort fallback only; return zeros if anything goes wrong.
+        }
+        finally
+        {
+            try { if (stream.CanSeek) stream.Position = position; } catch { /* already unusable */ }
         }
 
         return (0, 0);

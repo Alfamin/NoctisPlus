@@ -5,6 +5,7 @@ using Avalonia.Animation.Easings;
 using Avalonia.Controls;
 using Avalonia.Input;
 using Avalonia.Interactivity;
+using Avalonia.Layout;
 using Avalonia.Media.Transformation;
 using Avalonia.Styling;
 using Avalonia.Threading;
@@ -53,6 +54,8 @@ public partial class PopMenu : UserControl
     /// <summary>How far left of Now Playing's artist text the links bubble starts (Apple's: the
     /// glyph column sits out to the left of the text, the labels inside it).</summary>
     internal const double LinksLead = 12;
+    /// <summary>The quality card's width, and the gap it keeps from the badge it grows out of.</summary>
+    internal const double CardWidth = 300, CardGap = 10;
 
     private ShellViewModel? _shell;
     private TopLevel? _top;
@@ -62,6 +65,8 @@ public partial class PopMenu : UserControl
     private int _run;
     // Now Playing's artist links: the bubble rises out of the text instead of covering it.
     private bool _rises;
+    // Now Playing's quality card: centred on the badge, above it (below when there is no room).
+    private bool _centred;
 
     public PopMenu()
     {
@@ -138,8 +143,14 @@ public partial class PopMenu : UserControl
         Anchor = _pending is { } pending && pending.IsAttachedToVisualTree() && pending.IsEffectivelyVisible ? pending : null;
         _pending = null;
         Scope.RequestedThemeVariant = ThemeOf(Anchor);
-        Card.Width = menu is LibraryMenuViewModel or TrackLinksMenuViewModel or OptionsMenuViewModel { HasItems: true } ? LibraryWidth : ItemWidth;
+        Card.Width = menu switch
+        {
+            LibraryMenuViewModel or TrackLinksMenuViewModel or OptionsMenuViewModel { HasItems: true } => LibraryWidth,
+            QualityCardViewModel => CardWidth,
+            _ => ItemWidth,
+        };
         _rises = menu is TrackLinksMenuViewModel;
+        _centred = menu is QualityCardViewModel;
         MenuContent.Content = menu;
         Body.Offset = default;
         IsVisible = true;
@@ -291,6 +302,8 @@ public partial class PopMenu : UserControl
     /// and its rows scroll. It never runs under the status bar, the mini player or the tab bar.
     /// Now Playing's artist links are Apple's bubble instead: just above the artist, its lower
     /// left corner by the text, over the title; below the artist when there is no room above.
+    /// Now Playing's quality card is centred on its badge, a gap above it (over the cover), below
+    /// it when there is no room above.
     /// </summary>
     private void Place()
     {
@@ -311,7 +324,12 @@ public partial class PopMenu : UserControl
         {
             var a = new Rect(at, anchor.Bounds.Size);
             x = a.Center.X >= size.Width / 2 ? a.Right - width : a.Left;
-            if (_rises)
+            if (_centred)
+            {
+                x = a.Center.X - width / 2;
+                y = a.Top - CardGap - height >= top ? a.Top - CardGap - height : Math.Min(a.Bottom + CardGap, bottom - height);
+            }
+            else if (_rises)
             {
                 x = a.Left - LinksLead;
                 y = a.Top - height >= top ? a.Top - height : a.Bottom;
@@ -327,6 +345,14 @@ public partial class PopMenu : UserControl
         }
         x = Math.Clamp(x, EdgeGap, Math.Max(EdgeGap, size.Width - EdgeGap - width));
         y = Math.Clamp(y, top, Math.Max(top, bottom - height));
+        // On the layout's pixel grid, as layout rounding would put it: Origin() works from this
+        // margin, so a half-pixel placement (a card centred on an odd-width badge) would grow
+        // from half a pixel beside the anchor's centre.
+        if (Card.UseLayoutRounding && LayoutHelper.GetLayoutScale(this) is var scale and > 0)
+        {
+            x = LayoutHelper.RoundLayoutValue(x, scale);
+            y = LayoutHelper.RoundLayoutValue(y, scale);
+        }
         Card.MaxHeight = bottom - y;
         Card.Margin = new Thickness(x, y, 0, 0);
     }

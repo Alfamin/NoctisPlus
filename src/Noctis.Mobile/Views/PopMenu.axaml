@@ -231,6 +231,39 @@
                                             </Button>
                                         </StackPanel>
                                     </DataTemplate>
+                                    <!-- Now Playing's quality badge: what the playing file is - its class
+                                         under the badge's glyph, the technical line, one plain line on what
+                                         it means, then OK on its own row. Centred over the badge (the
+                                         code-behind), growing out of it. -->
+                                    <DataTemplate DataType="vm:QualityCardViewModel">
+                                        <StackPanel Name="QualityRows" Margin="0,6,0,6">
+                                            <StackPanel Name="QualityNote" Margin="24,20,24,16" Spacing="4">
+                                                <Viewbox Name="QualityLosslessGlyph" Width="48" Height="27" Margin="0,0,0,10"
+                                                         HorizontalAlignment="Center" IsVisible="{Binding IsLossless}">
+                                                    <Path Data="{DynamicResource PhLossless}" Fill="{DynamicResource MenuGlassText}" />
+                                                </Viewbox>
+                                                <Viewbox Name="QualityLossyGlyph" Width="30" Height="27" Margin="0,0,0,10"
+                                                         HorizontalAlignment="Center" IsVisible="{Binding IsLossy}">
+                                                    <Path Data="{DynamicResource PhLossySteps}" Stroke="{DynamicResource MenuGlassText}"
+                                                          StrokeThickness="2.25" StrokeLineCap="Round" StrokeJoin="Round" />
+                                                </Viewbox>
+                                                <TextBlock Name="QualityLabel" Text="{Binding Label}" FontSize="20" FontWeight="SemiBold"
+                                                           TextAlignment="Center" TextWrapping="Wrap" Foreground="{DynamicResource MenuGlassText}" />
+                                                <TextBlock Name="QualityDetail" Text="{Binding Detail}" FontSize="15" TextAlignment="Center"
+                                                           TextWrapping="Wrap" Foreground="{DynamicResource MenuGlassSecondaryText}"
+                                                           IsVisible="{Binding HasDetail}" />
+                                                <TextBlock Name="QualityMeaning" Classes="np-note" Text="{Binding Meaning}" TextAlignment="Center"
+                                                           Margin="0,10,0,0" />
+                                            </StackPanel>
+                                            <Button Name="QualityDone" Classes="row np-row" Command="{Binding DoneCommand}" AutomationProperties.Name="OK">
+                                                <Panel>
+                                                    <Border Classes="np-line" Margin="20,0,20,0" />
+                                                    <TextBlock Text="OK" FontSize="17" FontWeight="SemiBold" HorizontalAlignment="Center"
+                                                               VerticalAlignment="Center" Foreground="{DynamicResource MenuGlassText}" />
+                                                </Panel>
+                                            </Button>
+                                        </StackPanel>
+                                    </DataTemplate>
                                     <!-- A sort or filter menu (Apple's: the choice in use ticked, a band
                                          between groups), or a note with no choices (an album's quality). -->
                                     <DataTemplate DataType="vm:OptionsMenuViewModel">

@@ -290,6 +290,107 @@ public class MobilePopMenuTests(ITestOutputHelper output)
         window.Close();
     }
 
+    /// <summary>
+    /// Now Playing's quality badge (owner 10-14): a tap pops the quality card out of the badge,
+    /// centred on it and a gap above it, with the menu's own pop - the big glyph, the class, the
+    /// technical line, the plain line and OK. OK, Back and a tap outside close only the card.
+    /// </summary>
+    [AvaloniaFact]
+    public void TheQualityBadge_PopsTheQualityCardOutOfItself()
+    {
+        var song = MobileFixtures.Song("Leave the Door Open", artist: "Silk Sonic");
+        song.Codec = "MPEG-4 Audio (alac)"; song.BitsPerSample = 24; song.SampleRate = 48000;
+        using var rig = MobileFixtures.MakeRig(new[] { song });
+        var window = MobileFixtures.Mount(rig.Shell, out var view);
+        rig.Shell.Player.PlayTracks(rig.Library.TrackList, 0);
+        rig.Shell.OpenNowPlayingCommand.Execute(null);
+        MobileFixtures.Land(window);
+        var menu = MenuOf(view);
+        var card = menu.FindControl<Panel>("Card")!;
+        var page = view.FindControl<NowPlayingPage>("NowPlaying")!;
+        var badge = MobileFixtures.Named<Button>(page, "QualityBadge");
+
+        // The badge sits between the times, on their row, centred on the page.
+        var badgeBox = BoxIn(badge, view);
+        var elapsed = BoxIn(MobileFixtures.Named<TextBlock>(page, "ElapsedText"), view);
+        var remaining = BoxIn(MobileFixtures.Named<TextBlock>(page, "RemainingText"), view);
+        Assert.True(elapsed.Right < badgeBox.Left && badgeBox.Right < remaining.Left, $"{elapsed} {badgeBox} {remaining}");
+        Assert.InRange(badgeBox.Center.X, view.Bounds.Width / 2 - 1, view.Bounds.Width / 2 + 1);
+        Assert.InRange(badgeBox.Center.Y, elapsed.Center.Y - 2, elapsed.Center.Y + 2);
+        Assert.Equal("Lossless", MobileFixtures.Named<TextBlock>(page, "QualityBadgeText").Text);
+        Assert.True(MobileFixtures.Named<Control>(page, "QualityLosslessGlyph").IsVisible);
+        Assert.False(MobileFixtures.Named<Control>(page, "QualityLossyGlyph").IsVisible);
+
+        // A tap's order (Click, then the command): the card starts small at the badge's centre.
+        badge.RaiseEvent(new Avalonia.Interactivity.RoutedEventArgs(Button.ClickEvent));
+        badge.Command!.Execute(null);
+        Assert.Same(badge, menu.Anchor);
+        Assert.IsType<QualityCardViewModel>(rig.Shell.PopMenu);
+        Assert.Equal(0.9, ScaleOf(card), 3);
+        var origin = card.RenderTransformOrigin.ToPixels(card.Bounds.Size);
+        // Layout bounds, not a translated box: the card is drawn at 0.9 round the origin just now.
+        var badgeCentre = badge.TranslatePoint(new Point(badge.Bounds.Width / 2, badge.Bounds.Height / 2), menu)!.Value - card.Bounds.Position;
+        Assert.Equal(badgeCentre.X, origin.X, 1);
+        Assert.Equal(card.Bounds.Height, origin.Y, 1);                   // the badge is below the card's foot
+        Pump(30);
+        Assert.Equal(1, ScaleOf(card), 3);
+
+        // Centred on the badge, a gap above it, over the cover; the same card width every time.
+        var cardBox = BoxIn(card, view);
+        output.WriteLine($"badge {badgeBox}, card {cardBox}");
+        Assert.InRange(cardBox.Center.X, badgeBox.Center.X - 0.5, badgeBox.Center.X + 0.5);   // on the pixel grid
+        Assert.Equal(badgeBox.Top - PopMenu.CardGap, cardBox.Bottom, 1);
+        Assert.Equal(PopMenu.CardWidth, cardBox.Width, 1);
+        Assert.True(cardBox.Top > 0);
+
+        var texts = menu.GetVisualDescendants().OfType<TextBlock>().Where(t => t.IsEffectivelyVisible).Select(t => t.Text).ToList();
+        Assert.Equal(new[] { "Lossless", "24-bit/48 kHz ALAC", Track.LosslessDescription, "OK" }, texts);
+        Assert.True(MobileFixtures.Named<Control>(menu, "QualityLosslessGlyph").IsEffectivelyVisible);
+        Assert.False(MobileFixtures.Named<Control>(menu, "QualityLossyGlyph").IsVisible);
+        Assert.DoesNotContain(menu.GetVisualDescendants().OfType<Control>(), c => c.Name is "Tiles" or "MenuAddToQueue" or "OptionItems");
+
+        // OK: only the card closes, with the menu's close.
+        Tap(window, MobileFixtures.Named<Button>(menu, "QualityDone"));
+        Assert.False(rig.Shell.IsMenuOpen);
+        Assert.True(rig.Shell.IsNowPlayingOpen);
+        Assert.False(menu.IsHitTestVisible);
+        Assert.Equal(TimeSpan.FromMilliseconds(PopMenu.PopCloseMs),
+            Assert.IsType<TransformOperationsTransition>(Assert.Single(card.Transitions!)).Duration);
+        Pump(15);
+        Assert.False(menu.IsVisible);
+
+        // Back, then a tap outside: the same, and the tap goes no further.
+        Tap(window, badge);
+        Pump(25);
+        Assert.True(rig.Shell.TryHandleBack());
+        Assert.False(rig.Shell.IsMenuOpen);
+        Assert.True(rig.Shell.IsNowPlayingOpen);
+        Pump(15);
+        Tap(window, badge);
+        Pump(25);
+        var wasPlaying = rig.Shell.Player.IsPlaying;
+        Tap(window, MobileFixtures.Named<Button>(view, "PlayPauseButton"));
+        Assert.False(rig.Shell.IsMenuOpen);
+        Assert.Equal(wasPlaying, rig.Shell.Player.IsPlaying);
+        Assert.True(rig.Shell.IsNowPlayingOpen);
+        Pump(15);
+
+        // A compressed file: the stepped glyph and the codec, on the badge and the card.
+        var mp3 = MobileFixtures.Song("Tone");
+        mp3.Codec = "MPEG Version 1 Audio, Layer 3"; mp3.SampleRate = 44100; mp3.Bitrate = 320;
+        rig.Shell.Player.PlayTracks(new[] { mp3 }, 0);
+        window.UpdateLayout();
+        Assert.Equal("MP3", MobileFixtures.Named<TextBlock>(page, "QualityBadgeText").Text);
+        Assert.False(MobileFixtures.Named<Control>(page, "QualityLosslessGlyph").IsVisible);
+        Assert.True(MobileFixtures.Named<Control>(page, "QualityLossyGlyph").IsVisible);
+        Tap(window, badge);
+        Pump(25);
+        texts = menu.GetVisualDescendants().OfType<TextBlock>().Where(t => t.IsEffectivelyVisible).Select(t => t.Text).ToList();
+        Assert.Equal(new[] { "MP3", "320 kbps 44.1 kHz MP3", Track.LossyDescription, "OK" }, texts);
+        Assert.True(MobileFixtures.Named<Control>(menu, "QualityLossyGlyph").IsEffectivelyVisible);
+        window.Close();
+    }
+
     [AvaloniaFact]
     public async Task TheMenusActions_ActOnTheSong_AndCloseIt()
     {

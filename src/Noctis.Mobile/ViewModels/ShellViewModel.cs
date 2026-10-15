@@ -219,10 +219,15 @@ public sealed partial class ShellViewModel : ObservableObject
     [NotifyPropertyChangedFor(nameof(PopMenu), nameof(IsMenuOpen))]
     private TrackLinksMenuViewModel? _linksMenu;
 
+    /// <summary>Now Playing's quality badge tapped: what the playing file is (<see cref="ShowQualityCard"/>).</summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(PopMenu), nameof(IsMenuOpen))]
+    private QualityCardViewModel? _qualityCard;
+
     /// <summary>What the glass pop menu shows: the Library menu, a sort or filter menu, the
-    /// playing song's album and artist links, or an item's actions until its playlist list
-    /// takes over.</summary>
-    public object? PopMenu => (object?)LibraryMenu ?? (object?)OptionsMenu ?? (object?)LinksMenu
+    /// playing song's album and artist links or its quality card, or an item's actions until
+    /// its playlist list takes over.</summary>
+    public object? PopMenu => (object?)LibraryMenu ?? (object?)OptionsMenu ?? (object?)LinksMenu ?? (object?)QualityCard
         ?? (Sheet is { IsPickingPlaylist: false } sheet ? sheet : null);
 
     public bool IsMenuOpen => PopMenu != null;
@@ -235,6 +240,7 @@ public sealed partial class ShellViewModel : ObservableObject
         LibraryMenu = null;
         OptionsMenu = null;
         LinksMenu = null;
+        QualityCard = null;
     }
 
     /// <summary>Add to Playlist picked in the menu: the menu closes and the sheet opens on the list.</summary>
@@ -777,6 +783,7 @@ public sealed partial class ShellViewModel : ObservableObject
         LibraryMenu = null;
         OptionsMenu = null;
         LinksMenu = null;
+        QualityCard = null;
     }
 
     /// <summary>Opens a sort or filter menu (or a note) on the glass pop menu, out of the button
@@ -786,6 +793,7 @@ public sealed partial class ShellViewModel : ObservableObject
         Sheet = null;
         LibraryMenu = null;
         LinksMenu = null;
+        QualityCard = null;
         OptionsMenu = menu;
     }
 
@@ -836,6 +844,7 @@ public sealed partial class ShellViewModel : ObservableObject
         Sheet = null;
         OptionsMenu = null;
         LinksMenu = null;
+        QualityCard = null;
         LibraryMenu = new LibraryMenuViewModel(this);
     }
 
@@ -855,7 +864,21 @@ public sealed partial class ShellViewModel : ObservableObject
         Sheet = null;
         LibraryMenu = null;
         OptionsMenu = null;
+        QualityCard = null;
         LinksMenu = new TrackLinksMenuViewModel(this, track);
+    }
+
+    /// <summary>Now Playing's quality badge: what the playing file is, on a glass card out of the
+    /// badge (<see cref="QualityCardViewModel"/>). Nothing without a badge to tap.</summary>
+    [RelayCommand]
+    private void ShowQualityCard()
+    {
+        if (Player.Quality is not { } quality) return;
+        Sheet = null;
+        LibraryMenu = null;
+        OptionsMenu = null;
+        LinksMenu = null;
+        QualityCard = new QualityCardViewModel(this, quality);
     }
 
     [RelayCommand]

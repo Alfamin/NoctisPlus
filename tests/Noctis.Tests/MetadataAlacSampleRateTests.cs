@@ -61,6 +61,28 @@ public class MetadataAlacSampleRateTests
         }
     }
 
+    /// <summary>
+    /// The phone's scan (an Android content stream, no path): the ALAC atom is read from the
+    /// stream TagLib read. Before (emulator-5560, 10-14, library.json): every ALAC scanned with
+    /// 0 bits - a 24-bit/48 kHz file read "48 kHz ALAC", and this 96 kHz one would read 48 kHz
+    /// and lose its Hi-Res badge - because the atom was only ever read from a path.
+    /// </summary>
+    [Fact]
+    public void HiResAlac_ScannedAsAStream_StillReadsTheAtom()
+    {
+        var path = Fixture("alac_96k_tiny.m4a");
+        var info = new FileInfo(path);
+        var entry = new ScanEntry("content://tree/doc/alac_96k_tiny.m4a", info.Name, info.Length, info.LastWriteTimeUtc,
+            LocalPath: null, OpenRead: () => File.OpenRead(path));
+
+        var track = new MetadataService().ReadTrackMetadata(entry, out _);
+
+        Assert.NotNull(track);
+        Assert.Equal(96000, track!.SampleRate);
+        Assert.Equal(24, track.BitsPerSample);
+        Assert.True(track.IsHiResLossless);
+    }
+
     /// <summary>Offset of the first top-level box of <paramref name="type"/>.</summary>
     private static int IndexOfBox(byte[] bytes, string type)
     {
