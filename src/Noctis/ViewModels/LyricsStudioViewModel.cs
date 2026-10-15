@@ -350,6 +350,7 @@ public partial class LyricsStudioViewModel : ViewModelBase
             PersistDraft(leaving);
             CancelTap();
             SelectedWord = null;
+            SelectedLine = null;
             leaving.PropertyChanged -= OnSelectedItemPropertyChanged;
         }
     }
@@ -405,6 +406,7 @@ public partial class LyricsStudioViewModel : ViewModelBase
     {
         CancelTap();
         SelectedWord = null;
+        SelectedLine = null;
     }
 
     private CancellationTokenSource? _draftSaveCts;
@@ -1291,10 +1293,106 @@ public partial class LyricsStudioViewModel : ViewModelBase
     {
         if (oldValue is not null) oldValue.IsSelected = false;
         if (newValue is not null) newValue.IsSelected = true;
+        // A word belongs to its line: the bar's line is the word's.
+        if (newValue is not null) SelectedLine = newValue.Line;
         OnPropertyChanged(nameof(HasSelectedWord));
+        RaiseNudgeTarget();
     }
 
     public bool HasSelectedWord => SelectedWord is not null;
+
+    // ── Nudge bar: the selected line or word, earlier / later by 10 or 100 ms ──
+
+    /// <summary>The line the nudge bar acts on: its time pill, text box or one of its words was clicked.</summary>
+    [ObservableProperty] private ReviewLine? _selectedLine;
+
+    partial void OnSelectedLineChanged(ReviewLine? oldValue, ReviewLine? newValue)
+    {
+        if (oldValue is not null) oldValue.IsSelected = false;
+        if (newValue is not null) newValue.IsSelected = true;
+        if (SelectedWord is { } word && !ReferenceEquals(word.Line, newValue)) SelectedWord = null;
+        RaiseNudgeTarget();
+    }
+
+    /// <summary>What a nudge moves: the whole line or word (start and end together), or one edge.</summary>
+    [ObservableProperty] private NudgeEdge _nudgeEdge = NudgeEdge.Whole;
+
+    partial void OnNudgeEdgeChanged(NudgeEdge value)
+    {
+        OnPropertyChanged(nameof(NudgeWhole));
+        OnPropertyChanged(nameof(NudgeStart));
+        OnPropertyChanged(nameof(NudgeEnd));
+    }
+
+    // The edge picker's three segments (radio buttons); a segment being unchecked changes nothing.
+    public bool NudgeWhole { get => NudgeEdge == NudgeEdge.Whole; set { if (value) NudgeEdge = NudgeEdge.Whole; } }
+    public bool NudgeStart { get => NudgeEdge == NudgeEdge.Start; set { if (value) NudgeEdge = NudgeEdge.Start; } }
+    public bool NudgeEnd { get => NudgeEdge == NudgeEdge.End; set { if (value) NudgeEdge = NudgeEdge.End; } }
+
+    public bool HasNudgeTarget => SelectedLine is not null;
+
+    /// <summary>The bar's label: what a nudge moves now, with its times.</summary>
+    public string NudgeTargetText => SelectedWord is { } word
+        ? Loc("LyricsStudio.NudgeTargetWord", word.Text, word.TimeText, TimedLyricsBuilder.FormatTimestamp(word.End))
+        : SelectedLine is { } line
+            ? Loc("LyricsStudio.NudgeTargetLine", line.TimeText, TimedLyricsBuilder.FormatTimestamp(line.End))
+            : Loc("LyricsStudio.NudgeNoTarget");
+
+    private void RaiseNudgeTarget()
+    {
+        OnPropertyChanged(nameof(HasNudgeTarget));
+        OnPropertyChanged(nameof(NudgeTargetText));
+    }
+
+    /// <summary>Focus on a line's text box (or a click on its row): the bar acts on that line, keeping a word of it.</summary>
+    internal void SelectLine(ReviewLine? line)
+    {
+        if (line is null || !ReviewLines.Contains(line)) return;
+        SelectedLine = line;
+    }
+
+    /// <summary>The bar's steps and the , and . keys: "-100", "-10", "10" or "100" ms.</summary>
+    [RelayCommand]
+    private void NudgeSelection(string? milliseconds)
+    {
+        if (int.TryParse(milliseconds, System.Globalization.NumberStyles.AllowLeadingSign, System.Globalization.CultureInfo.InvariantCulture, out var ms))
+            NudgeSelectionBy(TimeSpan.FromMilliseconds(ms));
+    }
+
+    /// <summary>
+    /// Moves the selected word (else the selected line) by <paramref name="delta"/> along the
+    /// chosen edge, by the <see cref="TimingNudge"/> rules: the neighbouring lines' starts and the
+    /// song's length are the limits. One nudge is one change of the review (and of its draft).
+    /// </summary>
+    internal bool NudgeSelectionBy(TimeSpan delta)
+    {
+        if (IsRunning || SelectedLine is not { } line) return false;
+        var i = ReviewLines.IndexOf(line);
+        if (i < 0) return false;
+        // A word dropped by a text edit no longer has a chip: the line is what is left selected.
+        if (SelectedWord is { } gone && !line.Words.Contains(gone)) SelectedWord = null;
+        TimeSpan? previous = i > 0 ? ReviewLines[i - 1].Start : null;
+        TimeSpan? next = i + 1 < ReviewLines.Count ? ReviewLines[i + 1].Start : null;
+        var duration = Selected?.Track.Duration ?? TimeSpan.Zero;
+        var moved = line.Nudge(SelectedWord, NudgeEdge, delta, previous, next, duration);
+        if (moved) OnPropertyChanged(nameof(NudgeTargetText));
+        return moved;
+    }
+
+    /// <summary>
+    /// "Hear it" and the / key: plays from a second before the time being nudged (the start, or
+    /// the end with End chosen), so you hear it land. The time pill still plays from the line
+    /// itself, with no lead-in (user ask 09-17).
+    /// </summary>
+    [RelayCommand]
+    private Task Audition()
+    {
+        if (SelectedLine is not { } line) return Task.CompletedTask;
+        var at = SelectedWord is { } word
+            ? (NudgeEdge == NudgeEdge.End ? word.End : word.Start)
+            : (NudgeEdge == NudgeEdge.End ? line.End : line.Start);
+        return PlayFromTime(at - TimeSpan.FromSeconds(1));
+    }
 
     /// <summary>Chip click: select the word and seek a little ahead of it so you hear it land.</summary>
     [RelayCommand]
@@ -1306,15 +1404,10 @@ public partial class LyricsStudioViewModel : ViewModelBase
     }
 
     [RelayCommand]
-    private void NudgeWordEarlier() => SelectedWord?.Line.NudgeWord(SelectedWord, TimeSpan.FromMilliseconds(-50));
-
-    [RelayCommand]
-    private void NudgeWordLater() => SelectedWord?.Line.NudgeWord(SelectedWord, TimeSpan.FromMilliseconds(50));
-
-    [RelayCommand]
     private void ToggleWords(ReviewLine? line)
     {
         if (line is null) return;
+        SelectLine(line);
         line.IsExpanded = !line.IsExpanded;
         if (!line.IsExpanded && SelectedWord?.Line == line) SelectedWord = null;
         if (!line.IsExpanded && TapLine == line) CancelTap();
@@ -1400,10 +1493,16 @@ public partial class LyricsStudioViewModel : ViewModelBase
         if (_player is { State: PlaybackState.Playing }) _player.PlayPauseCommand.Execute(null);
     }
 
-    /// <summary>The time pill plays the line from its own timestamp, no pre-roll (user ask 09-17).</summary>
+    /// <summary>The time pill plays the line from its own timestamp, no pre-roll (user ask 09-17), and selects the line for the nudge bar.</summary>
     [RelayCommand]
-    private Task PlayFromLine(ReviewLine? line) =>
-        line is null ? Task.CompletedTask : PlayFromTime(line.Start);
+    private Task PlayFromLine(ReviewLine? line)
+    {
+        if (line is null) return Task.CompletedTask;
+        // The pill picks the line itself: a word of it selected before is let go.
+        SelectedWord = null;
+        SelectLine(line);
+        return PlayFromTime(line.Start);
+    }
 
     private async Task PlayFromTime(TimeSpan target)
     {

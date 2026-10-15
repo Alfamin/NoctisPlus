@@ -132,6 +132,97 @@ public class LyricsStudioEditFlowTests : IDisposable
         Assert.Null(vm.SelectedWord);
     }
 
+    // ── The nudge bar ──────────────────────────────────────────────────────
+
+    private const string WordLrc = "[00:05.00]<00:05.00>First <00:05.50>line <00:06.00>here<00:06.50>\n[00:12.50]<00:12.50>Second <00:13.00>line<00:13.50>\n";
+
+    [AvaloniaFact]
+    public async Task TheTimePill_PicksTheLine_AndTheStepsMoveIt_StoppingBeforeTheNextLine()
+    {
+        var vm = Studio(null, SongWithLrc("song"));
+        vm.Selected = vm.Queue[0];
+        Assert.False(vm.HasNudgeTarget);
+        Assert.False(vm.NudgeSelectionBy(Ms(10)));
+
+        await vm.PlayFromLineCommand.ExecuteAsync(vm.ReviewLines[0]);
+        Assert.Same(vm.ReviewLines[0], vm.SelectedLine);
+        Assert.True(vm.ReviewLines[0].IsSelected);
+        Assert.Contains("00:05.00", vm.NudgeTargetText);
+
+        vm.NudgeSelectionCommand.Execute("100");
+        vm.NudgeSelectionCommand.Execute("-10");
+        Assert.Equal(S(5.09), vm.ReviewLines[0].Start);
+        Assert.Contains("00:05.09", vm.NudgeTargetText);
+        Assert.Equal(S(12.5), vm.ReviewLines[1].Start); // only the chosen line moved
+
+        for (var i = 0; i < 100; i++) vm.NudgeSelectionCommand.Execute("100");
+        Assert.Equal(S(12.49), vm.ReviewLines[0].Start); // clamped 10 ms before the next line
+    }
+
+    [AvaloniaFact]
+    public async Task AWord_PicksItsLine_AndTheEndEdgeMovesOnlyItsEnd()
+    {
+        var vm = Studio(null, SongWithLrc("song", WordLrc));
+        vm.WordTimings = true;
+        vm.Selected = vm.Queue[0];
+        var line = vm.ReviewLines[0];
+        await vm.SelectWordCommand.ExecuteAsync(line.Words[1]);
+        Assert.Same(line, vm.SelectedLine);
+
+        vm.NudgeEnd = true;
+        vm.NudgeSelectionCommand.Execute("100");
+
+        Assert.Equal(new[] { S(5), S(5.5), S(6.1) }, line.Words.Select(w => w.Start));
+        Assert.Equal(S(6.5), line.End);
+
+        // The time pill goes back to the whole line.
+        await vm.PlayFromLineCommand.ExecuteAsync(line);
+        Assert.Null(vm.SelectedWord);
+        vm.NudgeWhole = true;
+        vm.NudgeSelectionCommand.Execute("-100");
+        Assert.Equal(new[] { S(4.9), S(5.4), S(6) }, line.Words.Select(w => w.Start));
+    }
+
+    [AvaloniaFact]
+    public async Task PickingAnotherSong_LetsTheLineGo()
+    {
+        var vm = Studio(null, SongWithLrc("one"), SongWithLrc("two"));
+        vm.Selected = vm.Queue[0];
+        await vm.PlayFromLineCommand.ExecuteAsync(vm.ReviewLines[0]);
+        var line = vm.SelectedLine!;
+
+        vm.Selected = vm.Queue[1];
+
+        Assert.Null(vm.SelectedLine);
+        Assert.False(line.IsSelected);
+        Assert.False(vm.NudgeSelectionBy(Ms(10)));
+    }
+
+    [AvaloniaFact]
+    public async Task NudgedTimes_AreWhatSaveWrites_InElrcLrcAndTtml()
+    {
+        var song = SongWithLrc("song", WordLrc);
+        var writer = new LyricsWriter(null!, null, new AppWrittenSidecarRegistry(Path.Combine(_root, "registry.json")), Path.Combine(_root, "cache"))
+        {
+            TrashFile = path => { File.Delete(path); return true; },
+        };
+        var vm = new LyricsStudioViewModel(new[] { song }, new Engine(_root), writer, new FakeLibraryService(), null,
+            () => new AppSettings { LyricsStudioWordTimings = true, LyricsStudioSaveTtml = true }, _ => { });
+        vm.Confirm = _ => Task.FromResult(true);
+        vm.Selected = vm.Queue[0];
+        await vm.SelectWordCommand.ExecuteAsync(vm.ReviewLines[1].Words[1]);
+        vm.NudgeStart = true;
+        vm.NudgeSelectionCommand.Execute("100"); // "line" 13.00 → 13.10
+
+        await vm.SaveCommand.ExecuteAsync(null);
+
+        var elrc = File.ReadAllText(Path.ChangeExtension(song.FilePath!, ".elrc"));
+        Assert.Contains("[00:12.50]<00:12.50>Second <00:13.10>line<00:13.50>", elrc);
+        Assert.Contains("[00:12.50]Second line", File.ReadAllText(Path.ChangeExtension(song.FilePath!, ".lrc")));
+        var ttml = File.ReadAllText(Path.ChangeExtension(song.FilePath!, ".ttml"));
+        Assert.Contains("<span begin=\"00:00:13.100\"", ttml);
+    }
+
     // ── Engine ─────────────────────────────────────────────────────────────
 
     private sealed class Engine : ILyricsStudioEngine

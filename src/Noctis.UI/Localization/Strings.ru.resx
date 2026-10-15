@@ -2476,13 +2476,31 @@ Deezer и TIDAL: вставьте ссылку.</value></data>
   <data name="LyricsStudio.Save" xml:space="preserve"><value>Сохранить текст</value><comment>Review button</comment></data>
   <data name="LyricsStudio.Words" xml:space="preserve"><value>Слова</value><comment>Per-line toggle that opens the word strip</comment></data>
   <data name="LyricsStudio.WordsTip" xml:space="preserve"><value>Показать каждое слово с его временем. Нажмите на слово, чтобы его прослушать.</value><comment>Word toggle tooltip</comment></data>
-  <data name="LyricsStudio.WordEarlier" xml:space="preserve"><value>Выбранное слово на 50 мс раньше (соседние остаются на месте)</value><comment>Word nudge tooltip</comment></data>
-  <data name="LyricsStudio.WordLater" xml:space="preserve"><value>Выбранное слово на 50 мс позже (соседние остаются на месте)</value><comment>Word nudge tooltip</comment></data>
   <data name="LyricsStudio.TapWords" xml:space="preserve"><value>Отстучать слова</value><comment>Starts tap-to-time for one line</comment></data>
   <data name="LyricsStudio.TapTip" xml:space="preserve"><value>Воспроизводит строку. Нажимайте Пробел или «Тап» на каждом слове; ещё одно нажатие завершает строку.</value><comment>Tap button tooltip</comment></data>
   <data name="LyricsStudio.Tap" xml:space="preserve"><value>Тап</value><comment>Tap bar button</comment></data>
   <data name="LyricsStudio.TapCancel" xml:space="preserve"><value>Готово</value><comment>Tap bar leave button</comment></data>
   <data name="LyricsStudio.PlayFromHere" xml:space="preserve"><value>Играть отсюда</value><comment>Time pill tooltip</comment></data>
+  <data name="LyricsStudio.NudgeTargetLine" xml:space="preserve"><value>Строка {0} – {1}</value><comment>Nudge bar label: the selected line's start and end</comment></data>
+  <data name="LyricsStudio.NudgeTargetWord" xml:space="preserve"><value>«{0}» {1} – {2}</value><comment>Nudge bar label: the selected word, its start and end</comment></data>
+  <data name="LyricsStudio.NudgeNoTarget" xml:space="preserve"><value>Нажмите на время строки или на слово, чтобы сдвинуть его</value><comment>Nudge bar label when nothing is selected</comment></data>
+  <data name="LyricsStudio.NudgeWhole" xml:space="preserve"><value>Целиком</value><comment>Nudge bar segment: move start and end together</comment></data>
+  <data name="LyricsStudio.NudgeWholeTip" xml:space="preserve"><value>Сдвинуть целиком: начало и конец вместе. Строка сдвигается вместе со словами.</value><comment>Tooltip</comment></data>
+  <data name="LyricsStudio.NudgeStart" xml:space="preserve"><value>Начало</value><comment>Nudge bar segment: move only the start</comment></data>
+  <data name="LyricsStudio.NudgeStartTip" xml:space="preserve"><value>Сдвинуть только начало</value><comment>Tooltip</comment></data>
+  <data name="LyricsStudio.NudgeEnd" xml:space="preserve"><value>Конец</value><comment>Nudge bar segment: move only the end</comment></data>
+  <data name="LyricsStudio.NudgeEndTip" xml:space="preserve"><value>Сдвинуть только конец</value><comment>Tooltip</comment></data>
+  <data name="LyricsStudio.NudgeFineEarlier" xml:space="preserve"><value>На 10 мс раньше · клавиша ,</value><comment>Tooltip</comment></data>
+  <data name="LyricsStudio.NudgeFineLater" xml:space="preserve"><value>На 10 мс позже · клавиша .</value><comment>Tooltip</comment></data>
+  <data name="LyricsStudio.NudgeCoarseEarlier" xml:space="preserve"><value>На 100 мс раньше · клавиша Shift+,</value><comment>Tooltip</comment></data>
+  <data name="LyricsStudio.NudgeCoarseLater" xml:space="preserve"><value>На 100 мс позже · клавиша Shift+.</value><comment>Tooltip</comment></data>
+  <data name="LyricsStudio.Hear" xml:space="preserve"><value>Прослушать</value><comment>Nudge bar button: play from just before the selection</comment></data>
+  <data name="LyricsStudio.HearTip" xml:space="preserve"><value>Играть с секунды до выбранной строки или слова · клавиша /</value><comment>Tooltip</comment></data>
+  <data name="LyricsStudio.LivePreview" xml:space="preserve"><value>Живой просмотр</value><comment>Review button: show or hide the lyrics preview beside the editor</comment></data>
+  <data name="LyricsStudio.LivePreviewTip" xml:space="preserve"><value>Показывает текст так, как он будет выглядеть, рядом с редактором и следом за песней. Обновляется при правке; ничего не сохраняется.</value><comment>Tooltip</comment></data>
+  <data name="LyricsStudio.LivePreviewIdle" xml:space="preserve"><value>Включите эту песню, чтобы видеть здесь её текст</value><comment>Preview pane, when another song (or none) is playing</comment></data>
+  <data name="LyricsStudio.LivePreviewPlay" xml:space="preserve"><value>Играть</value><comment>Preview pane button</comment></data>
+  <data name="LyricsStudio.HidePreview" xml:space="preserve"><value>Скрыть просмотр</value><comment>Tooltip of the preview pane's X</comment></data>
   <data name="LyricsStudio.ModelNeededTitle" xml:space="preserve"><value>Скачайте Lullaby, чтобы начать</value><comment>Model card title: no model on disk yet "Lullaby" is the model's name: keep it untranslated.</comment></data>
   <data name="LyricsStudio.ModelNeededBody" xml:space="preserve"><value>Студия текстов слушает песни с помощью Lullaby — модели Noctis для текстов на основе OpenAI Whisper — прямо на этом компьютере. Это однократная загрузка размером {0}.</value><comment>Model card text. {0} = download size, e.g. 1.4 GB "Lullaby" is the model's name: keep it untranslated.</comment></data>
   <data name="LyricsStudio.ModelDownloadSize" xml:space="preserve"><value>Скачать ({0})</value><comment>Model card button. {0} = download size</comment></data>

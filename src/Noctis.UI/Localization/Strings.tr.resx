@@ -1663,8 +1663,6 @@
   <data name="LyricsStudio.Save" xml:space="preserve"><value>Sözleri kaydet</value><comment>Review button</comment></data>
   <data name="LyricsStudio.Words" xml:space="preserve"><value>Kelimeler</value><comment>Per-line toggle that opens the word strip</comment></data>
   <data name="LyricsStudio.WordsTip" xml:space="preserve"><value>Her kelimeyi zamanıyla göster. Duymak için birine tıkla.</value><comment>Word toggle tooltip</comment></data>
-  <data name="LyricsStudio.WordEarlier" xml:space="preserve"><value>Seçili kelime 50 ms öne (komşuları yerinde kalır)</value><comment>Word nudge tooltip</comment></data>
-  <data name="LyricsStudio.WordLater" xml:space="preserve"><value>Seçili kelime 50 ms geriye (komşuları yerinde kalır)</value><comment>Word nudge tooltip</comment></data>
   <data name="LyricsStudio.TapWords" xml:space="preserve"><value>Kelimelere dokun</value><comment>Starts tap-to-time for one line</comment></data>
   <data name="LyricsStudio.TapTip" xml:space="preserve"><value>Satırı çalar. Her kelimede Boşluk'a veya Dokun'a bas; bir dokunuş daha satırı bitirir.</value><comment>Tap button tooltip</comment></data>
   <data name="LyricsStudio.Tap" xml:space="preserve"><value>Dokun</value><comment>Tap bar button</comment></data>
