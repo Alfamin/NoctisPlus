@@ -558,7 +558,8 @@
         <!-- Last child so it paints above the lyric flow and its glow spill
              (PanelLyricsHost runs with ClipToBounds=False). The 12px inset clears
              the wrapper's 16px corner radius, which clips to bounds. -->
-        <Button Classes="panel-close"
+        <Button x:Name="PanelCloseButton"
+                Classes="panel-close"
                 Click="OnCloseClick"
                 HorizontalAlignment="Right"
                 VerticalAlignment="Top"

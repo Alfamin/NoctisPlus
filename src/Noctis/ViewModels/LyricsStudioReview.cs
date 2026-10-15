@@ -117,6 +117,9 @@ public sealed partial class ReviewLine : ObservableObject
     /// <summary>Word strip open under the line.</summary>
     [ObservableProperty] private bool _isExpanded;
 
+    /// <summary>The line the nudge bar acts on (its time pill, a word or its text was clicked).</summary>
+    [ObservableProperty] private bool _isSelected;
+
     /// <summary>ELRC chosen in the Studio toolbar: the row shows, and edits, the line as ELRC will save it.</summary>
     [ObservableProperty] private bool _showWordTags;
 
@@ -334,6 +337,33 @@ public sealed partial class ReviewLine : ObservableObject
     /// word). Marks the line as word-timed. Returns the time actually applied.
     /// </summary>
     public TimeSpan NudgeWord(ReviewWord word, TimeSpan delta) => SetWordStart(word, word.Start + delta);
+
+    /// <summary>
+    /// One step of the review's nudge bar or its , and . keys: the line (<paramref name="word"/>
+    /// null) or one of its words, by the <see cref="TimingNudge"/> rules. A word nudge marks the
+    /// line word-timed, as the other word edits do; a line nudge leaves that as it was. False
+    /// when nothing could move.
+    /// </summary>
+    public bool Nudge(ReviewWord? word, NudgeEdge edge, TimeSpan delta, TimeSpan? previousStart, TimeSpan? nextStart, TimeSpan duration)
+    {
+        var index = word is null ? -1 : Words.IndexOf(word);
+        if (word is not null && index < 0) return false;
+        var before = new NudgeLine(Words.Select(w => w.Start).ToList(), End);
+        var after = TimingNudge.Apply(before, index, edge, delta, previousStart, nextStart, duration, spread: index < 0 && !HasWordTimings);
+        if (ReferenceEquals(after, before)) return false;
+        for (var i = 0; i < Words.Count; i++) Words[i].Start = after.WordStarts[i];
+        End = after.End;
+        // A whole line takes its background vocal along, as Shift does.
+        var moved = after.WordStarts[0] - before.WordStarts[0];
+        if (index < 0 && edge == NudgeEdge.Whole && Background is { } background)
+            Background = background.Select(w => new AlignedWord(w.Text,
+                TimeSpan.FromTicks(Math.Max(0, (w.Start + moved).Ticks)), TimeSpan.FromTicks(Math.Max(0, (w.End + moved).Ticks)))).ToList();
+        if (index >= 0) HasWordTimings = true;
+        SnapshotBaseline();
+        RaiseTimes();
+        Changed?.Invoke();
+        return true;
+    }
 
     /// <summary>Tap-to-time: stamps a time on one word with the same clamping as a nudge.</summary>
     public TimeSpan SetWordStart(ReviewWord word, TimeSpan time, bool tapped = false)

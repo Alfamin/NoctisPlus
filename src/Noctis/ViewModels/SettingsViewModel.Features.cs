@@ -338,6 +338,8 @@ public partial class SettingsViewModel
     [ObservableProperty] private bool _lyricsStudioEmbedTags;
     [ObservableProperty] private bool _lyricsStudioOnlineLyrics = true;
     [ObservableProperty] private bool _lyricsStudioSaveTtml;
+    /// <summary>The Studio's live preview pane is open (set from the Studio itself).</summary>
+    [ObservableProperty] private bool _lyricsStudioLivePreview = true;
     /// <summary>Skip songs that already carry the format being written.</summary>
     [ObservableProperty] private bool _lyricsStudioSkipAlreadyTimed = true;
     [ObservableProperty] private string _lyricsStudioStats = string.Empty;
@@ -393,6 +395,13 @@ public partial class SettingsViewModel
         QueueSettingsSave();
     }
 
+    partial void OnLyricsStudioLivePreviewChanged(bool value)
+    {
+        if (!_settingsLoaded) return;
+        _settings.LyricsStudioLivePreview = value;
+        QueueSettingsSave();
+    }
+
     /// <summary>The dialog changed model/language/format: mirror it here and persist.</summary>
     public void ApplyLyricsStudioSettings(LyricsStudioPrefs prefs)
     {
@@ -403,6 +412,7 @@ public partial class SettingsViewModel
         LyricsStudioEmbedTags = prefs.EmbedTags;
         LyricsStudioOnlineLyrics = prefs.OnlineLyrics;
         LyricsStudioSaveTtml = prefs.SaveTtml;
+        LyricsStudioLivePreview = prefs.LivePreview;
     }
 
     private CancellationTokenSource? _lyricsStatsCts;
@@ -507,6 +517,7 @@ public partial class SettingsViewModel
         LyricsStudioEmbedTags = _settings.LyricsStudioEmbedTags;
         LyricsStudioOnlineLyrics = _settings.LyricsStudioOnlineLyrics;
         LyricsStudioSaveTtml = _settings.LyricsStudioSaveTtml;
+        LyricsStudioLivePreview = _settings.LyricsStudioLivePreview;
     }
 
     private void SaveFeatureSettings()
@@ -524,6 +535,7 @@ public partial class SettingsViewModel
         _settings.LyricsStudioEmbedTags = LyricsStudioEmbedTags;
         _settings.LyricsStudioOnlineLyrics = LyricsStudioOnlineLyrics;
         _settings.LyricsStudioSaveTtml = LyricsStudioSaveTtml;
+        _settings.LyricsStudioLivePreview = LyricsStudioLivePreview;
     }
 
     /// <summary>Tab opened: refresh what the tab shows.</summary>

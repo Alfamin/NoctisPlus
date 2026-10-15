@@ -182,12 +182,29 @@ public partial class LyricsPanelView : UserControl
 
     private bool _lyricsSwapInProgress;
 
+    private Action? _closeOverride;
+
+    /// <summary>
+    /// Set by a host that shows this panel itself (the Lyrics Studio's preview pane, 10-14): the X
+    /// calls it, with its own tooltip, instead of closing the main window's side panel.
+    /// </summary>
+    internal void SetCloseAction(Action close, string tooltip)
+    {
+        _closeOverride = close;
+        ToolTip.SetTip(PanelCloseButton, tooltip);
+    }
+
     /// <summary>
     /// Closes the panel by clearing the flag on the main VM, which drives the
     /// wrapper's width animation — the same close path the Escape key takes.
     /// </summary>
     private void OnCloseClick(object? sender, RoutedEventArgs e)
     {
+        if (_closeOverride is { } close)
+        {
+            close();
+            return;
+        }
         var mainWindow = this.FindLogicalAncestorOfType<MainWindow>();
         if (mainWindow?.DataContext is MainWindowViewModel mainVm)
             mainVm.IsLyricsPanelOpen = false;

@@ -47,6 +47,24 @@
                 <Setter Property="Width" Value="250" />
             </Style>
         </ContainerQuery>
+        <!-- Live preview pane (10-14): beside the review, the queue giving up width for it; above
+             the review, full width and short, when the body is narrow. -->
+        <Style Selector="Border.studio-preview">
+            <Setter Property="DockPanel.Dock" Value="Right" />
+            <Setter Property="Width" Value="300" />
+            <Setter Property="Margin" Value="16,0,0,0" />
+        </Style>
+        <Style Selector="Grid.previewing Border.studio-queue">
+            <Setter Property="Width" Value="250" />
+        </Style>
+        <ContainerQuery Name="StudioBody" Query="max-width:900">
+            <Style Selector="Border.studio-preview">
+                <Setter Property="DockPanel.Dock" Value="Top" />
+                <Setter Property="Width" Value="NaN" />
+                <Setter Property="Height" Value="220" />
+                <Setter Property="Margin" Value="0,0,0,12" />
+            </Style>
+        </ContainerQuery>
         <Style Selector="WrapPanel.review-actions, WrapPanel.review-tools">
             <Setter Property="DockPanel.Dock" Value="Right" />
             <Setter Property="Margin" Value="12,0,0,0" />
@@ -67,7 +85,7 @@
         </ContainerQuery>
         <!-- Shift all lines as one segmented pill: [− 0.1s +], a filled pill (the Settings
              boxes' fill since 10-08, no rim) around two round steps that wash on hover. -->
-        <Style Selector="Border.nudge-pill">
+        <Style Selector="Border.nudge-pill, Border.edit-nudge-pill">
             <Setter Property="CornerRadius" Value="999" />
             <Setter Property="Padding" Value="2" />
             <Setter Property="Background" Value="{DynamicResource PillFieldBackground}" />
@@ -143,13 +161,21 @@
             <Setter Property="Opacity" Value="0.8" />
         </Style>
         <Style Selector="Border.review-line">
-            <Setter Property="Padding" Value="6,4" />
+            <!-- A clear 1px rim at rest (padding one less) so the selected row's rim moves nothing. -->
+            <Setter Property="Padding" Value="5,3" />
+            <Setter Property="BorderThickness" Value="1" />
+            <Setter Property="BorderBrush" Value="Transparent" />
             <Setter Property="CornerRadius" Value="8" />
             <!-- The 2px gap between lines (the virtualizing panel has no Spacing). -->
             <Setter Property="Margin" Value="0,0,0,2" />
         </Style>
         <Style Selector="Border.review-line.low">
             <Setter Property="Background" Value="#22E5A34D" />
+        </Style>
+        <!-- The line the nudge bar acts on (10-14): the queue's selected-row fill plus the accent rim. -->
+        <Style Selector="Border.review-line.selected">
+            <Setter Property="Background" Value="#1CFFFFFF" />
+            <Setter Property="BorderBrush" Value="{DynamicResource AccentColorBrush}" />
         </Style>
         <!-- An ELRC row edit that was refused (bad or backwards time): the line kept its words. -->
         <Style Selector="Border.review-line.edit-error">
@@ -522,7 +548,8 @@
         </StackPanel>
 
         <!-- Body: queue | review -->
-        <Grid ColumnDefinitions="Auto,*" Margin="24,0,24,8" ColumnSpacing="16" Container.Name="StudioBody" Container.Sizing="Width">
+        <Grid ColumnDefinitions="Auto,*" Margin="24,0,24,8" ColumnSpacing="16" Container.Name="StudioBody" Container.Sizing="Width"
+              Classes.previewing="{Binding IsLivePreviewOpen}">
             <!-- Queue (width from the styles: narrower in a small window) -->
             <Border Grid.Column="0" Classes="studio-queue" CornerRadius="14" ClipToBounds="True" Background="#0CFFFFFF" Padding="8,8,0,8">
                 <DockPanel>
@@ -593,8 +620,35 @@
                 </DockPanel>
             </Border>
 
-            <!-- Review -->
-            <Border Grid.Column="1" CornerRadius="14" ClipToBounds="True" Background="#0CFFFFFF" Padding="16,16,0,16">
+            <!-- Review, with the live preview pane beside it (or above it when narrow) -->
+            <DockPanel Grid.Column="1">
+            <!-- The lyrics side panel's own view over the app's lyrics, fed the review unsaved
+                 (LyricsViewModel.UpdatePreview): it follows the song and changes with every edit.
+                 Built by the code-behind the first time the pane opens; scaled down to fit. -->
+            <Border Classes="studio-preview" CornerRadius="14" ClipToBounds="True" IsVisible="{Binding IsLivePreviewOpen}">
+                <Panel>
+                    <LayoutTransformControl>
+                        <LayoutTransformControl.LayoutTransform>
+                            <ScaleTransform ScaleX="0.85" ScaleY="0.85" />
+                        </LayoutTransformControl.LayoutTransform>
+                        <ContentControl x:Name="LivePreviewHost" />
+                    </LayoutTransformControl>
+                    <!-- Another song (or none) is playing: its lyrics are not this review's. -->
+                    <Border Background="#E6141414" CornerRadius="14" IsVisible="{Binding ShowLivePreviewIdle}">
+                        <StackPanel VerticalAlignment="Center" HorizontalAlignment="Center" Spacing="10" Margin="16">
+                            <TextBlock Text="{loc:T LyricsStudio.LivePreviewIdle}" FontSize="12.5" Opacity="0.7" TextWrapping="Wrap"
+                                       TextAlignment="Center" MaxWidth="220" />
+                            <Button Classes="studio-btn pill-outline" HorizontalAlignment="Center" Command="{Binding PlayLivePreviewCommand}">
+                                <StackPanel Orientation="Horizontal" Spacing="6">
+                                    <PathIcon Data="{StaticResource PlayIcon}" Width="10" Height="10" VerticalAlignment="Center" />
+                                    <TextBlock Text="{loc:T LyricsStudio.LivePreviewPlay}" VerticalAlignment="Center" />
+                                </StackPanel>
+                            </Button>
+                        </StackPanel>
+                    </Border>
+                </Panel>
+            </Border>
+            <Border CornerRadius="14" ClipToBounds="True" Background="#0CFFFFFF" Padding="16,16,0,16">
                 <Panel>
                     <StackPanel VerticalAlignment="Center" Spacing="6" Margin="0,0,16,0" IsVisible="{Binding ShowReviewEmpty}">
                         <TextBlock Text="{loc:T LyricsStudio.ReviewEmptyTitle}" FontSize="15" FontWeight="SemiBold" TextAlignment="Center" Opacity="0.7" />
@@ -713,6 +767,15 @@
                                             Classes="studio-btn pill-outline" ToolTip.Tip="{loc:T LyricsStudio.UpgradeTip}">
                                         <TextBlock Text="{loc:T LyricsStudio.Upgrade}" />
                                     </Button>
+                                    <!-- Shows or hides the live preview pane beside the editor (10-14); the dot = open. -->
+                                    <Button Command="{Binding ToggleLivePreviewCommand}" IsVisible="{Binding CanLivePreview}"
+                                            Classes="studio-btn pill-outline studio-live-preview" ToolTip.Tip="{loc:T LyricsStudio.LivePreviewTip}">
+                                        <StackPanel Orientation="Horizontal" Spacing="6">
+                                            <Ellipse Width="6" Height="6" VerticalAlignment="Center" Fill="{DynamicResource AccentColorBrush}"
+                                                     IsVisible="{Binding ShowLivePreview}" />
+                                            <TextBlock Text="{loc:T LyricsStudio.LivePreview}" VerticalAlignment="Center" />
+                                        </StackPanel>
+                                    </Button>
                                     <!-- Plays the song on the real lyrics page with these unsaved timings (09-23). -->
                                     <Button Command="{Binding PreviewOnLyricsPageCommand}" IsVisible="{Binding CanPreview}"
                                             Classes="studio-btn pill-outline" ToolTip.Tip="{loc:T LyricsStudio.PreviewTip}">
@@ -799,6 +862,56 @@
                                     <TextBlock Text="{Binding ReviewConfidenceText}" FontSize="11" Opacity="0.55" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" />
                                 </WrapPanel>
                             </DockPanel>
+                            <!-- Nudge bar (Discord "Manual lyrics editing", 10-14): the selected line or word,
+                                 whole or one edge, 10 ms / 100 ms each way, and Hear it. Keys outside text boxes:
+                                 , and . (Shift: 100 ms), / hears it. Clamped, never pushed (TimingNudge). -->
+                            <WrapPanel Classes="review-nudge" ItemSpacing="8" LineSpacing="6">
+                                <TextBlock Text="{Binding NudgeTargetText}" FontSize="12" Opacity="0.6" VerticalAlignment="Center"
+                                           FontFeatures="+tnum" TextTrimming="CharacterEllipsis" MaxWidth="320" />
+                                <Border Classes="pill-well" CornerRadius="999" Padding="3" VerticalAlignment="Center" IsEnabled="{Binding HasNudgeTarget}">
+                                    <StackPanel Orientation="Horizontal" Spacing="2">
+                                        <RadioButton Classes="studio-seg" GroupName="NudgeEdge" MinWidth="0" Padding="10,0" Content="{loc:T LyricsStudio.NudgeWhole}"
+                                                     IsChecked="{Binding NudgeWhole}" ToolTip.Tip="{loc:T LyricsStudio.NudgeWholeTip}" />
+                                        <RadioButton Classes="studio-seg" GroupName="NudgeEdge" MinWidth="0" Padding="10,0" Content="{loc:T LyricsStudio.NudgeStart}"
+                                                     IsChecked="{Binding NudgeStart}" ToolTip.Tip="{loc:T LyricsStudio.NudgeStartTip}" />
+                                        <RadioButton Classes="studio-seg" GroupName="NudgeEdge" MinWidth="0" Padding="10,0" Content="{loc:T LyricsStudio.NudgeEnd}"
+                                                     IsChecked="{Binding NudgeEnd}" ToolTip.Tip="{loc:T LyricsStudio.NudgeEndTip}" />
+                                    </StackPanel>
+                                </Border>
+                                <Border Classes="edit-nudge-pill" IsEnabled="{Binding HasNudgeTarget}">
+                                    <StackPanel Orientation="Horizontal" Spacing="2">
+                                        <Button Classes="nudge-step" Command="{Binding NudgeSelectionCommand}" CommandParameter="-10"
+                                                ToolTip.Tip="{loc:T LyricsStudio.NudgeFineEarlier}">
+                                            <TextBlock Text="−" />
+                                        </Button>
+                                        <TextBlock Text="0.01s" FontSize="12" Opacity="0.75" FontFeatures="+tnum" VerticalAlignment="Center" />
+                                        <Button Classes="nudge-step" Command="{Binding NudgeSelectionCommand}" CommandParameter="10"
+                                                ToolTip.Tip="{loc:T LyricsStudio.NudgeFineLater}">
+                                            <TextBlock Text="+" />
+                                        </Button>
+                                    </StackPanel>
+                                </Border>
+                                <Border Classes="edit-nudge-pill" IsEnabled="{Binding HasNudgeTarget}">
+                                    <StackPanel Orientation="Horizontal" Spacing="2">
+                                        <Button Classes="nudge-step" Command="{Binding NudgeSelectionCommand}" CommandParameter="-100"
+                                                ToolTip.Tip="{loc:T LyricsStudio.NudgeCoarseEarlier}">
+                                            <TextBlock Text="−" />
+                                        </Button>
+                                        <TextBlock Text="0.1s" FontSize="12" Opacity="0.75" FontFeatures="+tnum" VerticalAlignment="Center" />
+                                        <Button Classes="nudge-step" Command="{Binding NudgeSelectionCommand}" CommandParameter="100"
+                                                ToolTip.Tip="{loc:T LyricsStudio.NudgeCoarseLater}">
+                                            <TextBlock Text="+" />
+                                        </Button>
+                                    </StackPanel>
+                                </Border>
+                                <Button Classes="studio-btn pill-outline" Padding="12,5" Command="{Binding AuditionCommand}"
+                                        IsEnabled="{Binding HasNudgeTarget}" ToolTip.Tip="{loc:T LyricsStudio.HearTip}">
+                                    <StackPanel Orientation="Horizontal" Spacing="6">
+                                        <PathIcon Data="{StaticResource PlayIcon}" Width="10" Height="10" VerticalAlignment="Center" />
+                                        <TextBlock Text="{loc:T LyricsStudio.Hear}" VerticalAlignment="Center" />
+                                    </StackPanel>
+                                </Button>
+                            </WrapPanel>
                             <Border CornerRadius="10" Padding="12,8" Background="{DynamicResource AccentButtonBackground}" IsVisible="{Binding IsTapping}">
                                 <Grid ColumnDefinitions="*,Auto,Auto" ColumnSpacing="8">
                                     <TextBlock Grid.Column="0" Text="{Binding TapHint}" FontSize="12" FontWeight="SemiBold" VerticalAlignment="Center" TextWrapping="Wrap"
@@ -824,7 +937,8 @@
                                 </ItemsControl.ItemsPanel>
                                 <ItemsControl.ItemTemplate>
                                     <DataTemplate x:DataType="vm:ReviewLine">
-                                        <Border Classes="review-line" Classes.low="{Binding IsLow}" Classes.edit-error="{Binding HasEditError}">
+                                        <Border Classes="review-line" Classes.low="{Binding IsLow}" Classes.edit-error="{Binding HasEditError}"
+                                                Classes.selected="{Binding IsSelected}" PointerPressed="OnReviewRowPointerPressed">
                                             <!-- Time | words toggle | line; the error and the word strip sit under the line's
                                                  text column so they read as the line's own. No row spacing: the strip's gap is
                                                  its body margin, inside the folding height (a panel gap would snap shut at the
@@ -850,7 +964,7 @@
                                                 </Button>
                                                 <!-- ELRC: the line as saved, word tags included; Enter / focus loss reads it back, Esc undoes. -->
                                                 <TextBox Grid.Column="2" Classes="line-edit" Text="{Binding RowText}" VerticalAlignment="Center" TextWrapping="Wrap"
-                                                         KeyDown="OnLineEditKeyDown" LostFocus="OnLineEditLostFocus" />
+                                                         KeyDown="OnLineEditKeyDown" LostFocus="OnLineEditLostFocus" GotFocus="OnLineEditGotFocus" />
                                                 <TextBlock Grid.Row="1" Grid.Column="2" Text="{Binding EditError}" IsVisible="{Binding HasEditError}" FontSize="11" Foreground="#FF6B6B"
                                                            TextWrapping="Wrap" Margin="6,4,0,0" />
                                                 <!-- Word strip: one chip per word, click = select + hear it. Folds open and shut like
@@ -876,14 +990,6 @@
                                                             </ItemsControl.ItemTemplate>
                                                         </ItemsControl>
                                                         <StackPanel Orientation="Horizontal" Spacing="6">
-                                                            <Button Classes="studio-btn pill-outline" Command="{Binding $parent[views:LyricsStudioPanel].((vm:LyricsStudioViewModel)DataContext).NudgeWordEarlierCommand}"
-                                                                    IsEnabled="{Binding $parent[views:LyricsStudioPanel].((vm:LyricsStudioViewModel)DataContext).HasSelectedWord}" ToolTip.Tip="{loc:T LyricsStudio.WordEarlier}">
-                                                                <TextBlock Text="−50ms" />
-                                                            </Button>
-                                                            <Button Classes="studio-btn pill-outline" Command="{Binding $parent[views:LyricsStudioPanel].((vm:LyricsStudioViewModel)DataContext).NudgeWordLaterCommand}"
-                                                                    IsEnabled="{Binding $parent[views:LyricsStudioPanel].((vm:LyricsStudioViewModel)DataContext).HasSelectedWord}" ToolTip.Tip="{loc:T LyricsStudio.WordLater}">
-                                                                <TextBlock Text="+50ms" />
-                                                            </Button>
                                                             <Button Classes="studio-btn pill-outline" Command="{Binding $parent[views:LyricsStudioPanel].((vm:LyricsStudioViewModel)DataContext).StartTapCommand}"
                                                                     CommandParameter="{Binding}" ToolTip.Tip="{loc:T LyricsStudio.TapTip}">
                                                                 <TextBlock Text="{loc:T LyricsStudio.TapWords}" />
@@ -900,6 +1006,7 @@
                     </DockPanel>
                 </Panel>
             </Border>
+            </DockPanel>
         </Grid>
     </DockPanel>
 </UserControl>
