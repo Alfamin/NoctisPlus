@@ -15,23 +15,32 @@ public sealed partial class PageTint : ObservableObject
     /// <summary>Luminance above which page text goes dark (the desktop's AlbumDetailViewModel.LightTintThreshold).</summary>
     public const double LightTintThreshold = 0.55;
 
-    private readonly Func<string, Color?> _extract;
+    /// <summary>What one extraction yields: the colour the picture meets the page with (its
+    /// bottom rows), the colour under the status bar at rest (its top rows), and the page colour.</summary>
+    public readonly record struct Colours(Color Cover, Color Top, Color Page);
+
+    private readonly Func<string, Colours?> _extract;
     private readonly Func<Func<Color?>, Task<Color?>> _runBackground;
     private int _generation;
 
     public PageTint(Func<string, Color?>? extract = null, Func<Func<Color?>, Task<Color?>>? runBackground = null)
     {
-        _extract = extract ?? (path => HeroFade
-            ? DominantColorExtractor.ExtractHeroBottomColorFromFile(path)
-            : DominantColorExtractor.ExtractEdgeBackgroundColorFromFile(path));
+        _extract = extract != null
+            ? path => extract(path) is { } c ? FromCover(c) : null
+            : path => HeroFade
+                ? FromHero(DominantColorExtractor.ExtractHeroColorsFromFile(path))
+                : DominantColorExtractor.ExtractEdgeBackgroundColorFromFile(path) is { } edge ? FromCover(edge) : null;
         _runBackground = runBackground ?? (work => Task.Run(work));
     }
 
     /// <summary>
     /// The page continues a full-bleed cover (the album hero): the colour comes from the
-    /// cover's bottom rows, which the hero fades into, not its four edges; and the text flips
-    /// by WCAG contrast (<see cref="PrefersDarkText"/>) instead of <see cref="LightTintThreshold"/>,
-    /// which left white text at 1.8:1 on mid-light tints. Set before <see cref="Load"/>.
+    /// cover's bottom rows, which the hero fades into, not its four edges, and the page itself
+    /// is a deep shade of it (<see cref="DominantColorExtractor.DeepPageColor"/>), Apple Music's
+    /// page under a cover: the cover's beige deepens into a brown page with white text, instead
+    /// of a flat beige page with black text. The text flips by WCAG contrast
+    /// (<see cref="PrefersDarkText"/>) instead of <see cref="LightTintThreshold"/>. Set before
+    /// <see cref="Load"/>.
     /// </summary>
     public bool HeroFade { get; set; }
 
@@ -41,8 +50,16 @@ public sealed partial class PageTint : ObservableObject
     [ObservableProperty] private bool _hasTint;
     [ObservableProperty] private bool _isLight;
 
-    /// <summary>The tint itself; null without one.</summary>
+    /// <summary>The page colour (the floor the cover's colour deepens into on a hero page); null without one.</summary>
     [ObservableProperty] private Color? _tintColor;
+
+    /// <summary>The colour the picture meets the page with (its bottom rows): where the fade and
+    /// the page's ramp start. On a hero page it is lighter than <see cref="TintColor"/>; else the same.</summary>
+    [ObservableProperty] private Color? _coverColor;
+
+    /// <summary>The picture's own colour under the status bar at rest (its top rows): the haze
+    /// that keeps the bar readable is this colour, not a white (theme) one and not the bottom's.</summary>
+    [ObservableProperty] private Color? _topColor;
 
     /// <summary>The latest extraction; tests await it.</summary>
     public Task Ready { get; private set; } = Task.CompletedTask;
@@ -52,7 +69,7 @@ public sealed partial class PageTint : ObservableObject
         var generation = ++_generation;
         if (string.IsNullOrEmpty(artworkPath) || !File.Exists(artworkPath))
         {
-            Apply(null);
+            Apply((Colours?)null);
             Ready = Task.CompletedTask;
             return;
         }
@@ -61,33 +78,51 @@ public sealed partial class PageTint : ObservableObject
 
     private async Task LoadAsync(string path, int generation)
     {
-        Color? color;
+        Colours? colours = null;
+        Color? cover;
         try
         {
-            color = await _runBackground(() => _extract(path));
+            // The background work hands back the cover colour alone (the shape tests drive);
+            // the full set rides along in the capture.
+            cover = await _runBackground(() => (colours = _extract(path))?.Cover);
         }
         catch (Exception ex)
         {
             DebugLog.Write("Artwork", $"Page tint failed: {ex.Message}");
-            color = null;
+            cover = null;
         }
         if (generation != _generation) return;   // a newer cover won
-        Apply(color);
+        Apply(colours ?? (cover is { } c ? FromCover(c) : null));
     }
 
-    public void Apply(Color? color)
+    /// <summary>The colours for a cover whose edge colour is <paramref name="cover"/>: a deep
+    /// page under a hero, the colour itself elsewhere (the mini player's progress fill).</summary>
+    private Colours FromCover(Color cover) =>
+        new(cover, cover, HeroFade ? DominantColorExtractor.DeepPageColor(cover) : cover);
+
+    private Colours? FromHero(DominantColorExtractor.HeroColors? hero) =>
+        hero == null ? null : new Colours(hero.Bottom, hero.Top, DominantColorExtractor.DeepPageColor(hero.Bottom));
+
+    /// <summary>Paints the page in <paramref name="color"/> as if it were a cover's edge colour.</summary>
+    public void Apply(Color? color) => Apply(color is { } c ? FromCover(c) : null);
+
+    private void Apply(Colours? colours)
     {
-        if (color is not { } c)
+        if (colours is not { } c)
         {
             Background = null;
+            CoverColor = null;
+            TopColor = null;
             TintColor = null;
             HasTint = false;
             IsLight = false;
             return;
         }
-        Background = new SolidColorBrush(c);
-        TintColor = c;
-        IsLight = HeroFade ? PrefersDarkText(c) : DominantColorExtractor.GetRelativeLuminance(c) > LightTintThreshold;
+        Background = new SolidColorBrush(c.Page);
+        CoverColor = c.Cover;
+        TopColor = c.Top;
+        IsLight = HeroFade ? PrefersDarkText(c.Page) : DominantColorExtractor.GetRelativeLuminance(c.Page) > LightTintThreshold;
+        TintColor = c.Page;
         HasTint = true;
     }
 
@@ -115,15 +150,36 @@ public sealed partial class PageTint : ObservableObject
     /// Secondary text on <paramref name="background"/>: <paramref name="text"/> blended toward
     /// the background as far as <see cref="SubtleTextMinOpacity"/>, but no further than keeps
     /// 4.5:1 (full strength on the mid tints where even the primary text only just clears it).
+    /// White text is added to the background (<see cref="PlusLighter"/>) rather than mixed, so it
+    /// keeps the page's hue: Apple's secondary text on its #4C2000 Silk Sonic page is #E5B899,
+    /// the page plus 60% white; mixing gave a grey #B6A79B.
     /// </summary>
     public static Color SubtleTextOn(Color background, Color text)
     {
+        var additive = text == Colors.White;
         for (var a = SubtleTextMinOpacity; a < 1; a += 0.02)
         {
-            var blended = Mix(background, text, a);
+            var blended = additive ? PlusLighter(background, a) : Mix(background, text, a);
             if (ContrastRatio(blended, background) >= 4.5) return blended;
         }
         return text;
+    }
+
+    /// <summary><paramref name="under"/> with white at <paramref name="amount"/> added to each
+    /// channel (the plus-lighter blend of Apple's vibrant labels), opaque.</summary>
+    public static Color PlusLighter(Color under, double amount)
+    {
+        byte Add(byte u) => (byte)Math.Min(255, Math.Round(u + 255 * amount));
+        return Color.FromRgb(Add(under.R), Add(under.G), Add(under.B));
+    }
+
+    /// <summary>A colour at <paramref name="alpha"/> that, laid over <paramref name="under"/>,
+    /// lands on <see cref="PlusLighter"/>(<paramref name="under"/>, <paramref name="amount"/>):
+    /// a translucent wash or rule in the page's own hue rather than a grey one.</summary>
+    public static Color PlusLighterOver(Color under, double amount, double alpha)
+    {
+        var lit = PlusLighter(under, amount / alpha);
+        return Color.FromArgb((byte)Math.Round(alpha * 255), lit.R, lit.G, lit.B);
     }
 
     /// <summary><paramref name="over"/> at <paramref name="amount"/> over <paramref name="under"/>, opaque.</summary>

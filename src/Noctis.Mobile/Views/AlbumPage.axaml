@@ -133,7 +133,9 @@
          is full-bleed; the floating buttons and the scrim are laid over the scroller. -->
     <Panel>
         <ScrollViewer Classes="page-scroll" Name="AlbumScroll" views:ScrollMemory.IsEnabled="True" HorizontalScrollBarVisibility="Disabled">
-            <StackPanel Margin="0,0,0,24">
+            <!-- The body carries the page's ramp (HeroChrome): the cover's colour deepening into
+                 the page colour over the first stretch below the cover, as Apple's. -->
+            <StackPanel Name="PageBody" Margin="0,0,0,24">
                 <!-- Square (the code-behind sizes it from the width); the bottom of the cover
                      fades into the page colour, so the cover never ends in a hard line. -->
                 <Panel Name="Hero" Height="412" ClipToBounds="True" Background="{DynamicResource HomeCardBackground}">

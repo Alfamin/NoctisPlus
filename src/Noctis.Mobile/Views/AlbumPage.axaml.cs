@@ -42,7 +42,7 @@ public partial class AlbumPage : UserControl
     public AlbumPage()
     {
         InitializeComponent();
-        _chrome = new HeroChrome(this, HeroFade, TopFade, TopScrim, TopBar, "Album", UpdateScrollChrome, SetDescriptionMoreFade);
+        _chrome = new HeroChrome(this, Hero, HeroFade, TopFade, TopScrim, TopBar, PageBody, "Album", UpdateScrollChrome, SetDescriptionMoreFade);
         AlbumScroll.SizeChanged += (_, _) => LayoutHero();
         AlbumScroll.ScrollChanged += (_, _) => UpdateScrollChrome();
         AlbumTitle.SizeChanged += (_, _) => UpdateScrollChrome();
@@ -95,6 +95,7 @@ public partial class AlbumPage : UserControl
         var height = Math.Min(width, Math.Max(320, AlbumScroll.Bounds.Height * HeroMaxViewportShare));
         Hero.Height = height;
         HeroFade.Height = Math.Round(height * HeroFadeShare);
+        _chrome.ApplyFades();   // the fade and the body's ramp follow the hero's size
         UpdateScrollChrome();
     }
 
@@ -105,7 +106,7 @@ public partial class AlbumPage : UserControl
     {
         var titleTop = Hero.Height + TitleBlock.Margin.Top - AlbumScroll.Offset.Y;
         var chrome = ScrollChrome(titleTop, AlbumTitle.Bounds.Height, _chrome.BarBottom);
-        _chrome.ApplyScrim(chrome.Scrim);
+        _chrome.ApplyScrim(chrome.Scrim, AlbumScroll.Offset.Y + _chrome.BarBottom - Hero.Height);
         AlbumTitle.Opacity = chrome.BigTitle;
         SmallTitle.Opacity = chrome.SmallTitle;
     }
