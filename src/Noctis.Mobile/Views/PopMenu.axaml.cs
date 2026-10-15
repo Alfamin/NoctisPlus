@@ -5,6 +5,7 @@ using Avalonia.Animation.Easings;
 using Avalonia.Controls;
 using Avalonia.Input;
 using Avalonia.Interactivity;
+using Avalonia.Layout;
 using Avalonia.Media.Transformation;
 using Avalonia.Styling;
 using Avalonia.Threading;
@@ -327,6 +328,14 @@ public partial class PopMenu : UserControl
         }
         x = Math.Clamp(x, EdgeGap, Math.Max(EdgeGap, size.Width - EdgeGap - width));
         y = Math.Clamp(y, top, Math.Max(top, bottom - height));
+        // On the layout's pixel grid, as layout rounding would put it: Origin() works from this
+        // margin, so a half-pixel placement (a card centred on an odd-width badge) would grow
+        // from half a pixel beside the anchor's centre.
+        if (Card.UseLayoutRounding && LayoutHelper.GetLayoutScale(this) is var scale and > 0)
+        {
+            x = LayoutHelper.RoundLayoutValue(x, scale);
+            y = LayoutHelper.RoundLayoutValue(y, scale);
+        }
         Card.MaxHeight = bottom - y;
         Card.Margin = new Thickness(x, y, 0, 0);
     }
