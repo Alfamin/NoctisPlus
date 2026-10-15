@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Threading.Tasks;
@@ -127,6 +128,108 @@ public class MobileNowPlayingPageTests : IDisposable
         rig.Shell.Player.TogglePlayPauseCommand.Execute(null);
         Assert.True(frame.Classes.Contains("paused"));
         window.Close();
+    }
+
+    /// <summary>
+    /// The wash under the player (owner 10-14, after Apple Music's): the cover blurred to colour
+    /// and stretched over the whole screen, a vertical shade light where the cover sits and
+    /// darkest at the foot (so white text reads on any cover: a white cover under the transport
+    /// row is at most 0.18 relative luminance, 4.5:1 against white), its stops close enough that
+    /// no step is a band, and a tile of faint noise over it. Nothing in it animates or binds
+    /// per frame; a file without a badge shows no badge.
+    /// </summary>
+    [AvaloniaFact]
+    public void TheWash_IsTheCoverStretched_ShadedDownward_AndDithered()
+    {
+        using var rig = MobileFixtures.MakeRig(new[] { MobileFixtures.Song("Tone") });   // no codec: no badge
+        var window = MobileFixtures.Mount(rig.Shell, out var view);
+        rig.Shell.Player.PlayTracks(rig.Library.TrackList, 0);
+        rig.Shell.OpenNowPlayingCommand.Execute(null);
+        window.UpdateLayout();
+        var page = view.FindControl<NowPlayingPage>("NowPlaying")!;
+
+        var backdrop = MobileFixtures.Named<Image>(page, "Backdrop");
+        Assert.Equal(Avalonia.Media.Stretch.Fill, backdrop.Stretch);
+        Assert.Null(backdrop.Transitions);
+
+        var shade = MobileFixtures.Named<Border>(page, "WashShade");
+        var gradient = Assert.IsAssignableFrom<Avalonia.Media.ILinearGradientBrush>(shade.Background);
+        var stops = gradient.GradientStops.OrderBy(s => s.Offset).ToList();
+        Assert.True(stops.Count >= 5, "a long shade needs close stops");
+        Assert.All(stops, s => Assert.Equal(0, s.Color.R + s.Color.G + s.Color.B));   // black, only its alpha varies
+        for (var i = 1; i < stops.Count; i++)
+        {
+            Assert.True(stops[i].Color.A >= stops[i - 1].Color.A, "the shade only darkens downward");
+            Assert.True(stops[i].Color.A - stops[i - 1].Color.A <= 40, $"stop {i} steps {stops[i].Color.A - stops[i - 1].Color.A}/255 at once");
+        }
+        var top = stops[0].Color.A / 255.0;
+        var bottom = stops[^1].Color.A / 255.0;
+        Assert.InRange(top, 0.25, 0.4);              // the cover's colours stay bright around the cover
+        Assert.InRange(bottom, 0.7, 0.85);           // Apple's reference: a third of the brightness at the foot
+        // Under the transport row (about 72% down) a white cover must leave white text 4.5:1.
+        var transport = MobileFixtures.Named<Button>(page, "PlayPauseButton").TranslatePoint(default, page)!.Value.Y / page.Bounds.Height;
+        var alphaThere = AlphaAt(stops, transport);
+        var luminance = Math.Pow(1 - alphaThere, 2.2);   // sRGB white dimmed by the shade, linearised
+        Assert.True((1.05) / (luminance + 0.05) >= 4.5, $"white text over a white cover at {transport:0.00}: shade {alphaThere:0.00}");
+
+        var dither = MobileFixtures.Named<Border>(page, "WashDither");
+        var tile = Assert.IsAssignableFrom<Avalonia.Media.IImageBrush>(dither.Background);
+        Assert.Equal(Avalonia.Media.TileMode.Tile, tile.TileMode);
+        Assert.Equal(Avalonia.Media.Stretch.Fill, tile.Stretch);   // fills its cell at any density (None left gaps on the phone)
+        Assert.Same(NowPlayingPage.Dither, dither.Background);                 // one tile per process
+
+        // The layers lie under the controls, in order: cover wash, shade, dither.
+        var panel = Assert.IsType<Panel>(backdrop.Parent);
+        Assert.Equal(new Control[] { backdrop, shade, dither }, panel.Children.Take(3));
+        Assert.False(backdrop.IsHitTestVisible || shade.IsHitTestVisible || dither.IsHitTestVisible);
+
+        Assert.False(MobileFixtures.Named<Button>(page, "QualityBadge").IsVisible);
+        window.Close();
+    }
+
+    /// <summary>The dither really draws: over black, a scatter of pixels a few levels up, none
+    /// brighter than its amplitude (a tile that renders nothing leaves the shade's bands).</summary>
+    [AvaloniaFact]
+    public void TheDither_DrawsFaintNoise()
+    {
+        if (!HeadlessTestApp.RealRendering)
+            Assert.Skip("needs real Skia rendering (NOCTIS_TEST_SKIA=1)");
+        var window = new Window
+        {
+            Width = 128, Height = 128, Background = Avalonia.Media.Brushes.Black,
+            Content = new Border { Background = NowPlayingPage.Dither },
+        };
+        window.Show();
+        var frame = window.CaptureRenderedFrame()!;
+        int lit = 0, max = 0, total = 0;
+        using (var fb = frame.Lock())
+        {
+            var row = new byte[fb.RowBytes];
+            for (var y = 0; y < 128; y++)
+            {
+                System.Runtime.InteropServices.Marshal.Copy(fb.Address + y * fb.RowBytes, row, 0, row.Length);
+                for (var x = 0; x < 128; x++, total++)
+                {
+                    int g = row[x * 4 + 1];
+                    if (g > 0) lit++;
+                    max = Math.Max(max, g);
+                }
+            }
+        }
+        window.Close();
+        Assert.True(lit > total / 5, $"{lit} of {total} pixels lit");
+        Assert.InRange(max, 2, NowPlayingPage.DitherAmplitude);
+    }
+
+    private static double AlphaAt(List<Avalonia.Media.IGradientStop> stops, double offset)
+    {
+        for (var i = 1; i < stops.Count; i++)
+        {
+            if (offset > stops[i].Offset) continue;
+            var t = (offset - stops[i - 1].Offset) / (stops[i].Offset - stops[i - 1].Offset);
+            return (stops[i - 1].Color.A + (stops[i].Color.A - stops[i - 1].Color.A) * t) / 255.0;
+        }
+        return stops[^1].Color.A / 255.0;
     }
 
     /// <summary>Scrubbing the timeline: the elapsed and remaining times follow the finger while

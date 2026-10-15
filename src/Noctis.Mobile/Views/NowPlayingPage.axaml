@@ -75,10 +75,35 @@
     </UserControl.Styles>
 
     <Panel>
-        <!-- Blurred once per cover (PreBlurredArtworkConverter) from the visible cover's own bitmap. -->
-        <Image Name="Backdrop" Source="{Binding #Artwork.Source, Converter={StaticResource PreBlur}}"
-               Stretch="UniformToFill" IsHitTestVisible="False" />
-        <Border Background="#99000000" IsHitTestVisible="False" />
+        <!-- The wash (owner 10-14, after Apple Music's Now Playing): the cover's colours carry on
+             below it as a soft wash that darkens toward the bottom, no edge and no bands. Three
+             static layers, drawn once per cover and never per frame:
+             1. the cover blurred to colour alone (PreBlurredArtworkConverter's "wash": 128 px,
+                three times the lyrics backdrop's blur) and stretched over the whole screen - the
+                cover's top colours at the top, its bottom colours at the bottom, nothing cropped;
+             2. a vertical shade: light where the cover sits, darker from the title down, darkest
+                under the transport and the bottom icons, so white text and glyphs read on any
+                cover (Apple's reference, measured: its wash falls to a third of its brightness
+                between the cover's foot and the screen's); gradient stops close together, so each
+                step is small (MobileNowPlayingPageTests checks the shade and the dither);
+             3. a tile of faint noise (NowPlayingPage.axaml.cs, +-5/255): an 8-bit gradient this
+                long otherwise lands in visible bands; a hair of noise breaks them up. -->
+        <Image Name="Backdrop" Source="{Binding #Artwork.Source, Converter={StaticResource PreBlur}, ConverterParameter=wash}"
+               Stretch="Fill" IsHitTestVisible="False" />
+        <Border Name="WashShade" IsHitTestVisible="False">
+            <Border.Background>
+                <LinearGradientBrush StartPoint="0%,0%" EndPoint="0%,100%">
+                    <GradientStop Offset="0" Color="#4D000000" />
+                    <GradientStop Offset="0.30" Color="#59000000" />
+                    <GradientStop Offset="0.45" Color="#73000000" />
+                    <GradientStop Offset="0.58" Color="#8F000000" />
+                    <GradientStop Offset="0.72" Color="#A6000000" />
+                    <GradientStop Offset="0.86" Color="#B5000000" />
+                    <GradientStop Offset="1" Color="#BF000000" />
+                </LinearGradientBrush>
+            </Border.Background>
+        </Border>
+        <Border Name="WashDither" IsHitTestVisible="False" />
 
         <Border Padding="{Binding SafeArea}">
             <!-- Portrait: one column. Landscape (the code-behind, on resize): the cover on the

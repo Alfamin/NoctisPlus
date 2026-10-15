@@ -2,15 +2,62 @@ using System;
 using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Controls.Primitives;
+using Avalonia.Media;
+using Avalonia.Media.Imaging;
+using Avalonia.Platform;
 using Noctis.Mobile.ViewModels;
 
 namespace Noctis.Mobile.Views;
 
 public partial class NowPlayingPage : UserControl
 {
+    /// <summary>The dither tile's side, and how far a pixel may move (in 8-bit levels).</summary>
+    internal const int DitherSize = 64, DitherAmplitude = 5;
+
+    private static IBrush? _dither;
+
+    /// <summary>
+    /// The wash's dither (the page's third layer): a 64 px tile of noise, each pixel black or
+    /// white at a random alpha up to <see cref="DitherAmplitude"/>/255, tiled over the screen. A
+    /// gradient this long (a 2400 px screen falls through ~110 levels) otherwise shows its 8-bit
+    /// steps as bands; noise of a few levels, invisible as texture, scatters them. Made once per
+    /// process, drawn as a tiled image, so it costs nothing per track or per frame.
+    /// </summary>
+    internal static IBrush Dither => _dither ??= MakeDither();
+
+    private static IBrush MakeDither()
+    {
+        var bitmap = new WriteableBitmap(new PixelSize(DitherSize, DitherSize), new Vector(96, 96), PixelFormat.Bgra8888, AlphaFormat.Premul);
+        var rng = new Random(0x5EED);   // fixed: the tile is the same every launch
+        var row = new byte[DitherSize * 4];
+        using (var fb = bitmap.Lock())
+        {
+            for (var y = 0; y < DitherSize; y++)
+            {
+                for (var x = 0; x < DitherSize; x++)
+                {
+                    var a = (byte)rng.Next(DitherAmplitude + 1);
+                    var white = rng.Next(2) == 0;
+                    row[x * 4] = row[x * 4 + 1] = row[x * 4 + 2] = white ? a : (byte)0;   // premultiplied
+                    row[x * 4 + 3] = a;
+                }
+                System.Runtime.InteropServices.Marshal.Copy(row, 0, fb.Address + y * fb.RowBytes, row.Length);
+            }
+        }
+        return new ImageBrush(bitmap)
+        {
+            TileMode = TileMode.Tile,
+            // Filled into its 64 dp cell: Stretch.None drew the 64 px bitmap at its pixel size on
+            // the phone (24 dp at 2.625x), a patch per cell with bare gaps between (10-14).
+            Stretch = Stretch.Fill,
+            DestinationRect = new RelativeRect(0, 0, DitherSize, DitherSize, RelativeUnit.Absolute),
+        };
+    }
+
     public NowPlayingPage()
     {
         InitializeComponent();
+        WashDither.Background = Dither;
 
         // The bar is a CapsuleSlider: it captures the finger itself and brackets the drag with
         // these, so a gesture taken away by the system (a notification, the shade) arrives as
