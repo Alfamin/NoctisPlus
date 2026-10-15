@@ -400,8 +400,9 @@ public sealed partial class ShellViewModel : ObservableObject
         MiniProgressLine = new Avalonia.Media.Immutable.ImmutableSolidColorBrush(Avalonia.Media.Color.FromArgb((byte)(neutral ? 0x99 : 0xE6), c.R, c.G, c.B));
     }
 
-    // Settings › Appearance › Player Bar. Both off by default: the capsule is plain glass, as
-    // Apple's. Saved to settings.json (MobilePlayerBarProgress*) and applied live.
+    // Settings › Appearance › Player Bar and Album Colours. The player bar's two are off by
+    // default: the capsule is plain glass, as Apple's. Saved to settings.json
+    // (MobilePlayerBarProgress*, MobileArtworkPageColors) and applied live.
 
     /// <summary>The elapsed fill in the cover's colour (<see cref="MiniProgressFill"/>).</summary>
     [ObservableProperty]
@@ -413,6 +414,11 @@ public sealed partial class ShellViewModel : ObservableObject
     [NotifyPropertyChangedFor(nameof(ShowsMiniProgress))]
     private bool _showMiniProgressLine;
 
+    /// <summary>Album Colours: album and artist pages painted in a deep shade of the cover's
+    /// colour (<see cref="PageTint.Enabled"/>, which the open pages follow); off, they keep the
+    /// theme's plain pages. On by default.</summary>
+    [ObservableProperty] private bool _artworkPageColors = true;
+
     public bool ShowsMiniProgress => ShowMiniProgressFill || ShowMiniProgressLine;
 
     private bool _playerBarLoaded;
@@ -423,6 +429,7 @@ public sealed partial class ShellViewModel : ObservableObject
 
     partial void OnShowMiniProgressFillChanged(bool value) => SavePlayerBarSettings();
     partial void OnShowMiniProgressLineChanged(bool value) => SavePlayerBarSettings();
+    partial void OnArtworkPageColorsChanged(bool value) => SavePlayerBarSettings();
 
     private async Task LoadPlayerBarSettingsAsync()
     {
@@ -431,6 +438,7 @@ public sealed partial class ShellViewModel : ObservableObject
             var settings = await Library.Persistence.LoadSettingsAsync();
             ShowMiniProgressFill = settings.MobilePlayerBarProgressFill;
             ShowMiniProgressLine = settings.MobilePlayerBarProgressLine;
+            ArtworkPageColors = settings.MobileArtworkPageColors;
         }
         catch (Exception ex)
         {
@@ -443,7 +451,7 @@ public sealed partial class ShellViewModel : ObservableObject
     private void SavePlayerBarSettings()
     {
         if (!_playerBarLoaded) return;
-        bool fill = ShowMiniProgressFill, line = ShowMiniProgressLine;
+        bool fill = ShowMiniProgressFill, line = ShowMiniProgressLine, pages = ArtworkPageColors;
         PendingPlayerBarSave = _playerBarSaveChain = _playerBarSaveChain.ContinueWith(async _ =>
         {
             try
@@ -451,6 +459,7 @@ public sealed partial class ShellViewModel : ObservableObject
                 var settings = await Library.Persistence.LoadSettingsAsync();
                 settings.MobilePlayerBarProgressFill = fill;
                 settings.MobilePlayerBarProgressLine = line;
+                settings.MobileArtworkPageColors = pages;
                 await Library.Persistence.SaveSettingsAsync(settings);
             }
             catch (Exception ex)

@@ -122,6 +122,10 @@ public class AppSettings
     /// player's bottom edge. Off by default.</summary>
     public bool MobilePlayerBarProgressLine { get; set; }
 
+    /// <summary>Phone, Settings › Appearance › Album Colours: album and artist pages painted in a
+    /// deep shade of the cover's colour. Off, they keep the theme's plain pages. On by default.</summary>
+    public bool MobileArtworkPageColors { get; set; } = true;
+
     /// <summary>User-defined custom themes selectable from the Themes row.</summary>
     public List<CustomThemeDefinition> CustomThemes { get; set; } = new();
 

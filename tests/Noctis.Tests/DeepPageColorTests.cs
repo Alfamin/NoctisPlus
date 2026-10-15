@@ -18,7 +18,8 @@ namespace Noctis.Tests;
 /// <summary>
 /// The phone album page's colour, Apple Music's: the cover's bottom colour deepens into the page
 /// as a thicker layer of its ink would (<see cref="DominantColorExtractor.DeepPageColor"/>), white text on it, the
-/// ramp between the two (HeroChrome), the status bar's haze in the cover's TOP colour.
+/// ramp between the two (HeroChrome), the status bar's haze in the cover's TOP colour, and the
+/// tint switching off and on (the Album Colours setting: MobileAlbumColoursSettingTests).
 /// </summary>
 public class DeepPageColorTests : IDisposable
 {
@@ -217,6 +218,27 @@ public class DeepPageColorTests : IDisposable
         Assert.Equal(SilkSonicCover, tint.CoverColor);
         // The desktop's rule still decides the plain tint's text (the beige's luminance is 0.36).
         Assert.Equal(DominantColorExtractor.GetRelativeLuminance(SilkSonicCover) > PageTint.LightTintThreshold, tint.IsLight);
+    }
+
+    [Fact]
+    public async Task SwitchedOff_ThePageIsPlain_AndBackOn_WithoutAnotherDecode()
+    {
+        var decodes = 0;
+        var tint = new PageTint(_ => { decodes++; return SilkSonicCover; }, work => Task.FromResult(work())) { HeroFade = true };
+        tint.Load(WriteSkyOverSand());
+        await tint.Ready;
+        Assert.True(tint.HasTint);
+
+        tint.Enabled = false;
+        Assert.False(tint.HasTint);
+        Assert.Null(tint.Background);
+        Assert.Null(tint.TintColor);
+        Assert.Null(tint.CoverColor);
+
+        tint.Enabled = true;
+        Assert.True(tint.HasTint);
+        Assert.Equal(DominantColorExtractor.DeepPageColor(SilkSonicCover), tint.TintColor);
+        Assert.Equal(1, decodes);
     }
 
     // ---- The ramp ---------------------------------------------------------------------------------

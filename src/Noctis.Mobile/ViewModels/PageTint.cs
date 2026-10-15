@@ -22,6 +22,7 @@ public sealed partial class PageTint : ObservableObject
     private readonly Func<string, Colours?> _extract;
     private readonly Func<Func<Color?>, Task<Color?>> _runBackground;
     private int _generation;
+    private Colours? _extracted;
 
     public PageTint(Func<string, Color?>? extract = null, Func<Func<Color?>, Task<Color?>>? runBackground = null)
     {
@@ -60,6 +61,15 @@ public sealed partial class PageTint : ObservableObject
     /// <summary>The picture's own colour under the status bar at rest (its top rows): the haze
     /// that keeps the bar readable is this colour, not a white (theme) one and not the bottom's.</summary>
     [ObservableProperty] private Color? _topColor;
+
+    /// <summary>
+    /// Settings › Appearance › Album Colours: off, the page stays the theme's plain page
+    /// (<see cref="HasTint"/> false, no <see cref="Background"/>) whatever the cover; the extracted
+    /// colours are kept, so switching back on repaints without another decode.
+    /// </summary>
+    [ObservableProperty] private bool _enabled = true;
+
+    partial void OnEnabledChanged(bool value) => Apply(_extracted);
 
     /// <summary>The latest extraction; tests await it.</summary>
     public Task Ready { get; private set; } = Task.CompletedTask;
@@ -108,7 +118,8 @@ public sealed partial class PageTint : ObservableObject
 
     private void Apply(Colours? colours)
     {
-        if (colours is not { } c)
+        _extracted = colours;
+        if (!Enabled || colours is not { } c)
         {
             Background = null;
             CoverColor = null;
