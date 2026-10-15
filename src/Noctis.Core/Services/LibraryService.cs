@@ -266,7 +266,12 @@ public class LibraryService : ILibraryService
                     if (snapshot.Length == 0 || snapshot.Length == lastCount) continue;
                     lastCount = snapshot.Length;
 
-                    _tracks = snapshot.Concat(carriedRemote)
+                    // On a rescan the known tracks the walk has not reached yet stay in (the
+                    // snapshot alone made the library shrink to the walked part and grow back,
+                    // seen as songs and albums vanishing after launch with Scan on Startup); a
+                    // file that is gone leaves at the final publish. Snapshot first: a re-read
+                    // file's fresh tags win over the original.
+                    _tracks = snapshot.Concat(originalTracks).Concat(carriedRemote)
                         .GroupBy(t => t.Id).Select(g => g.First())
                         .OrderBy(t => t.Artist).ThenBy(t => t.Album)
                         .ThenBy(t => t.DiscNumber).ThenBy(t => t.TrackNumber).ToList();

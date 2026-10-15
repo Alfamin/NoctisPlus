@@ -662,7 +662,7 @@ public sealed partial class ShellViewModel : ObservableObject
     private void OpenAlbum(Album? album)
     {
         if (album == null) return;
-        Navigate(new AlbumPageViewModel(this, album));
+        Navigate(new AlbumPageViewModel(this, CurrentAlbum(album)));
     }
 
     /// <summary>An artist row or link: the artist page.</summary>
@@ -688,7 +688,7 @@ public sealed partial class ShellViewModel : ObservableObject
     [RelayCommand]
     private void OpenRailItem(RailItem? item)
     {
-        switch (item?.Payload)
+        switch (CurrentPayload(item))
         {
             case Album album:
                 OpenAlbum(album);
@@ -701,8 +701,8 @@ public sealed partial class ShellViewModel : ObservableObject
                 break;
             case Track track:
                 // A song plays the rail it sits on: On Repeat, else the pinned songs.
-                var onRepeat = Library.OnRepeatRail.Select(r => r.Payload).OfType<Track>().ToList();
-                var pinned = Library.PinnedRail.Select(r => r.Payload).OfType<Track>().ToList();
+                var onRepeat = Library.OnRepeatRail.Select(CurrentPayload).OfType<Track>().ToList();
+                var pinned = Library.PinnedRail.Select(CurrentPayload).OfType<Track>().ToList();
                 if (onRepeat.IndexOf(track) is var r and >= 0) Player.PlayTracks(onRepeat, r, "On Repeat");
                 else if (pinned.IndexOf(track) is var p and >= 0) Player.PlayTracks(pinned, p, "Pinned");
                 else Player.PlayTracks(new[] { track }, 0, null);
@@ -719,7 +719,7 @@ public sealed partial class ShellViewModel : ObservableObject
     [RelayCommand]
     private void OpenAlbumSheet(Album? album)
     {
-        if (album != null) Sheet = ContextSheetViewModel.ForAlbum(this, album);
+        if (album != null) Sheet = ContextSheetViewModel.ForAlbum(this, CurrentAlbum(album));
     }
 
     [RelayCommand]
@@ -731,14 +731,27 @@ public sealed partial class ShellViewModel : ObservableObject
     [RelayCommand]
     private void OpenRailItemSheet(RailItem? item)
     {
-        switch (item?.Payload)
+        switch (CurrentPayload(item))
         {
             case Album album: OpenAlbumSheet(album); break;
             case Playlist playlist: OpenPlaylistSheet(playlist); break;
             case Track track: OpenTrackSheet(track); break;
-            case Artist artist: Sheet = ContextSheetViewModel.ForArtist(this, artist, item.ArtworkPath); break;
+            case Artist artist: Sheet = ContextSheetViewModel.ForArtist(this, artist, item!.ArtworkPath); break;
         }
     }
+
+    /// <summary>Album grids and rails keep unchanged tiles across library refreshes, so a tile's
+    /// album can be an object from before a rescan: open the one the library holds now.</summary>
+    private Album CurrentAlbum(Album album) => Library.Service.GetAlbumById(album.Id) ?? album;
+
+    /// <summary>A rail keeps an unchanged tile across library refreshes (<see cref="RailItem.Equals(RailItem?)"/>),
+    /// so its payload can be an object from before a rescan: act on what the library holds now.</summary>
+    private object? CurrentPayload(RailItem? item) => item?.Payload switch
+    {
+        Track track => Library.Service.GetTrackById(track.Id) ?? track,
+        Artist artist => Library.Service.Artists.FirstOrDefault(a => string.Equals(a.Name, artist.Name, StringComparison.OrdinalIgnoreCase)) ?? artist,
+        var other => other,
+    };
 
     /// <summary>A long-pressed artist row: play, queue or pin the artist.</summary>
     [RelayCommand]

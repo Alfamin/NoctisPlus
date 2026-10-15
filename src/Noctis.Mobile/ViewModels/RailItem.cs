@@ -23,4 +23,25 @@ public sealed record RailItem(RailItemKind Kind, string Title, string Subtitle, 
 
     public static RailItem ForPlaylist(Playlist playlist, string? artworkPath) =>
         new(RailItemKind.Playlist, playlist.Name, playlist.TrackIds.Count == 1 ? "1 song" : $"{playlist.TrackIds.Count} songs", artworkPath, playlist);
+
+    /// <summary>
+    /// Every library refresh rebuilds the Album, Track and Artist objects (a rescan publishes every
+    /// 1.5 s), so comparing the payload by reference made an unchanged rail differ each time and
+    /// tear down and re-fade every tile: Recently Added went blank again and again during a rescan.
+    /// Those payloads compare by what they are (id, or the artist's name); a tap re-resolves them
+    /// (<see cref="ShellViewModel"/>'s rail commands). Playlists stay by reference.
+    /// </summary>
+    public bool Equals(RailItem? other) =>
+        other is not null && Kind == other.Kind && Title == other.Title && Subtitle == other.Subtitle
+        && ArtworkPath == other.ArtworkPath && Equals(PayloadKey, other.PayloadKey);
+
+    public override int GetHashCode() => HashCode.Combine(Kind, Title, Subtitle, ArtworkPath, PayloadKey);
+
+    private object PayloadKey => Payload switch
+    {
+        Album album => album.Id,
+        Track track => track.Id,
+        Artist artist => artist.Name.ToUpperInvariant(),
+        _ => Payload,
+    };
 }

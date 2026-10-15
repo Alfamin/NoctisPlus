@@ -193,6 +193,70 @@ public class MobileLibraryRailsTests
         Assert.True(library.ShowConnectCard);
     }
 
+    /// <summary>A rescan publishes rebuilt Album objects every 1.5 s. An unchanged Recently Added
+    /// rail must not be reset each time (a Reset re-fades every tile: the rail went blank again and
+    /// again on the phone), and a kept tile must still open the album the library holds now.</summary>
+    [Fact]
+    public void RecentlyAddedRail_IsNotRebuilt_WhenARefreshOnlyRebuildsTheAlbumObjects()
+    {
+        var a1 = MobileFixtures.Song("A1", daysAgo: 1);
+        var b1 = MobileFixtures.Song("B1", daysAgo: 2);
+        var alpha = MobileFixtures.MakeAlbum("Alpha", "X", a1);
+        var beta = MobileFixtures.MakeAlbum("Beta", "Y", b1);
+        using var rig = MobileFixtures.MakeRig(new[] { a1, b1 }, new[] { alpha, beta });
+        var rail = rig.Shell.Library.RecentlyAddedRail;
+        Assert.Equal(new[] { "Alpha", "Beta" }, rail.Select(r => r.Title));
+        var resets = 0;
+        rail.CollectionChanged += (_, _) => resets++;
+
+        // The same albums, as new objects with the same ids (what RebuildIndexesAsync produces).
+        var albums = (List<Album>)rig.Library.Albums;
+        var alphaNow = new Album { Id = alpha.Id, Name = "Alpha", Artist = "X", Tracks = alpha.Tracks.ToList(), TrackCount = 1 };
+        var betaNow = new Album { Id = beta.Id, Name = "Beta", Artist = "Y", Tracks = beta.Tracks.ToList(), TrackCount = 1 };
+        albums.Clear();
+        albums.AddRange(new[] { alphaNow, betaNow });
+        rig.Library.RaiseLibraryUpdated();
+
+        Assert.Equal(0, resets);
+        rig.Shell.OpenRailItemCommand.Execute(rail[0]);
+        Assert.Same(alphaNow, Assert.IsType<AlbumPageViewModel>(rig.Shell.CurrentPage).Album);
+
+        // A real change still lands.
+        albums.Remove(betaNow);
+        rig.Library.RaiseLibraryUpdated();
+        Assert.Equal(new[] { "Alpha" }, rail.Select(r => r.Title));
+    }
+
+    /// <summary>The Albums grid, same rule: rebuilt-but-equal albums keep the rows (a reset blanked
+    /// every cover during a rescan), a tile still opens the current album, a real change lands.</summary>
+    [Fact]
+    public void AlbumGrid_KeepsItsRows_WhenARefreshOnlyRebuildsTheAlbumObjects()
+    {
+        var a1 = MobileFixtures.Song("A1");
+        var b1 = MobileFixtures.Song("B1");
+        var alpha = MobileFixtures.MakeAlbum("Alpha", "X", a1);
+        var beta = MobileFixtures.MakeAlbum("Beta", "Y", b1);
+        using var rig = MobileFixtures.MakeRig(new[] { a1, b1 }, new[] { alpha, beta });
+        var grid = new AlbumGridPageViewModel(rig.Shell);
+        var resets = 0;
+        grid.Rows.CollectionChanged += (_, _) => resets++;
+
+        var albums = (List<Album>)rig.Library.Albums;
+        var alphaNow = new Album { Id = alpha.Id, Name = "Alpha", Artist = "X", Tracks = alpha.Tracks.ToList(), TrackCount = 1 };
+        var betaNow = new Album { Id = beta.Id, Name = "Beta", Artist = "Y", Tracks = beta.Tracks.ToList(), TrackCount = 1 };
+        albums.Clear();
+        albums.AddRange(new[] { alphaNow, betaNow });
+        rig.Library.RaiseLibraryUpdated();
+
+        Assert.Equal(0, resets);
+        rig.Shell.OpenAlbumCommand.Execute(grid.Rows[0].Albums[0]);
+        Assert.Same(alphaNow, Assert.IsType<AlbumPageViewModel>(rig.Shell.CurrentPage).Album);
+
+        betaNow.Name = "Beta (Deluxe)";
+        rig.Library.RaiseLibraryUpdated();
+        Assert.Equal(new[] { "Alpha", "Beta (Deluxe)" }, grid.Rows.SelectMany(r => r.Albums).Select(a => a.Name));
+    }
+
     [Fact]
     public void BuildLastPlayed_KeepsTheNewestOfEachTrack()
     {
