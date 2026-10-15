@@ -178,7 +178,8 @@ public class MobileArtistPageTests : IDisposable
 
         var page = MobileFixtures.Find<ArtistPage>(view);
         var pages = MobileFixtures.Named<ItemsControl>(page, "TopSongPages");
-        var first = (Control)pages.GetRealizedContainers().First();
+        // The column itself: its container also holds the gap after it (the column's margin).
+        var first = ((Control)pages.GetRealizedContainers().First()).GetVisualDescendants().OfType<ItemsControl>().First();
         Assert.Equal(412 - ArtistPage.PageInset - ArtistPage.ColumnGap - ArtistPage.ColumnPeek, first.Bounds.Width, 1);
         var grid = MobileFixtures.Named<ScrollViewer>(page, "TopSongScroll");
         Assert.True(grid.Extent.Width > grid.Viewport.Width);   // the next column peeks in
