@@ -845,11 +845,11 @@
                                     <TextBlock Text="{loc:T LyricsStudio.ShiftAllLines}" FontSize="12" Opacity="0.6" VerticalAlignment="Center" />
                                     <Border Classes="nudge-pill">
                                         <StackPanel Orientation="Horizontal" Spacing="2">
-                                            <Button Classes="nudge-step" Command="{Binding NudgeEarlierCommand}" ToolTip.Tip="{loc:T LyricsStudio.NudgeEarlier}">
+                                            <Button Classes="nudge-step" Command="{Binding NudgeEarlierCommand}" ToolTip.Tip="{loc:T LyricsStudio.NudgeEarlier}" AutomationProperties.Name="{loc:T LyricsStudio.NudgeEarlier}">
                                                 <TextBlock Text="−" />
                                             </Button>
                                             <TextBlock Text="0.1s" FontSize="12" Opacity="0.75" FontFeatures="+tnum" VerticalAlignment="Center" />
-                                            <Button Classes="nudge-step" Command="{Binding NudgeLaterCommand}" ToolTip.Tip="{loc:T LyricsStudio.NudgeLater}">
+                                            <Button Classes="nudge-step" Command="{Binding NudgeLaterCommand}" ToolTip.Tip="{loc:T LyricsStudio.NudgeLater}" AutomationProperties.Name="{loc:T LyricsStudio.NudgeLater}">
                                                 <TextBlock Text="+" />
                                             </Button>
                                         </StackPanel>
@@ -881,12 +881,12 @@
                                 <Border Classes="edit-nudge-pill" IsEnabled="{Binding HasNudgeTarget}">
                                     <StackPanel Orientation="Horizontal" Spacing="2">
                                         <Button Classes="nudge-step" Command="{Binding NudgeSelectionCommand}" CommandParameter="-10"
-                                                ToolTip.Tip="{loc:T LyricsStudio.NudgeFineEarlier}">
+                                                ToolTip.Tip="{loc:T LyricsStudio.NudgeFineEarlier}" AutomationProperties.Name="{loc:T LyricsStudio.NudgeFineEarlier}">
                                             <TextBlock Text="−" />
                                         </Button>
                                         <TextBlock Text="0.01s" FontSize="12" Opacity="0.75" FontFeatures="+tnum" VerticalAlignment="Center" />
                                         <Button Classes="nudge-step" Command="{Binding NudgeSelectionCommand}" CommandParameter="10"
-                                                ToolTip.Tip="{loc:T LyricsStudio.NudgeFineLater}">
+                                                ToolTip.Tip="{loc:T LyricsStudio.NudgeFineLater}" AutomationProperties.Name="{loc:T LyricsStudio.NudgeFineLater}">
                                             <TextBlock Text="+" />
                                         </Button>
                                     </StackPanel>
@@ -894,12 +894,12 @@
                                 <Border Classes="edit-nudge-pill" IsEnabled="{Binding HasNudgeTarget}">
                                     <StackPanel Orientation="Horizontal" Spacing="2">
                                         <Button Classes="nudge-step" Command="{Binding NudgeSelectionCommand}" CommandParameter="-100"
-                                                ToolTip.Tip="{loc:T LyricsStudio.NudgeCoarseEarlier}">
+                                                ToolTip.Tip="{loc:T LyricsStudio.NudgeCoarseEarlier}" AutomationProperties.Name="{loc:T LyricsStudio.NudgeCoarseEarlier}">
                                             <TextBlock Text="−" />
                                         </Button>
                                         <TextBlock Text="0.1s" FontSize="12" Opacity="0.75" FontFeatures="+tnum" VerticalAlignment="Center" />
                                         <Button Classes="nudge-step" Command="{Binding NudgeSelectionCommand}" CommandParameter="100"
-                                                ToolTip.Tip="{loc:T LyricsStudio.NudgeCoarseLater}">
+                                                ToolTip.Tip="{loc:T LyricsStudio.NudgeCoarseLater}" AutomationProperties.Name="{loc:T LyricsStudio.NudgeCoarseLater}">
                                             <TextBlock Text="+" />
                                         </Button>
                                     </StackPanel>

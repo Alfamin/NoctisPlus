@@ -82,6 +82,8 @@ public class LyricsStudioNudgeBarTests : IDisposable
             Assert.All(steps, b => Assert.Same(vm.NudgeSelectionCommand, b.Command));
             Assert.Equal(Noctis.Localization.Loc.T("LyricsStudio.NudgeFineEarlier"), ToolTip.GetTip(steps[0]));
             Assert.Contains(",", (string)ToolTip.GetTip(steps[0])!);
+            // Screen readers read the glyph ("−"/"+") without a name; each step says what it does.
+            Assert.All(steps, b => Assert.Equal(ToolTip.GetTip(b), Avalonia.Automation.AutomationProperties.GetName(b)));
             Assert.All(steps, b => Assert.False(b.IsEffectivelyEnabled));
             Assert.Equal(Noctis.Localization.Loc.T("LyricsStudio.NudgeNoTarget"), vm.NudgeTargetText);
 
