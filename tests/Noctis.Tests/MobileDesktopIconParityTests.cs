@@ -80,6 +80,8 @@ public class MobileDesktopIconParityTests
         { "PhoneIcons", "PhRescan", "PluginsRefreshGlyph", 2.25 },
         { "PhoneIcons", "PhSettings", "SettingsIcon", -0.75 },
         { "PhoneIcons", "PhPlaylist", "MenuLinePlaylist", 2.25 },
+        // The lossless waveform (the album page's badge, Now Playing's quality badge): the mini player's
+        { "PhoneIcons", "PhLossless", "LosslessWaveIcon", 0 },
         // Account: the desktop account card's glyphs (SettingsView.axaml)
         { "AccountPage", "AccountPhoneIcon", "AccountPhoneIcon", 0 },
         { "AccountPage", "AccountEyeIcon", "AccountEyeIcon", 0 },
@@ -186,6 +188,9 @@ public class MobileDesktopIconParityTests
         // The account card's own glyphs ("Account glyphs Icons.axaml has no shape for").
         foreach (var (k, v) in Geometries(Path.Combine("src", "Noctis", "Views", "SettingsView.axaml")))
             if (k.StartsWith("Account", StringComparison.Ordinal)) all.TryAdd(k, v);
+        // The lossless waveform lives on the mini player (hoisted there, not in Icons.axaml).
+        foreach (var (k, v) in Geometries(Path.Combine("src", "Noctis", "Views", "MiniPlayerWindow.axaml")))
+            if (k == "LosslessWaveIcon") all.TryAdd(k, v);
         return all;
     }
 
