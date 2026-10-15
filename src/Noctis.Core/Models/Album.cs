@@ -149,24 +149,7 @@ public class Album : ObservableObject
         {
             if (IsMixedQuality) return MixedQualityDetailedInfo();
 
-            var track = GetRepresentativeQualityTrack();
-            if (track == null) return string.Empty;
-
-            var parts = new List<string>();
-            if (!track.IsLossless && track.Bitrate > 0)
-                parts.Add($"{track.Bitrate} kbps");
-            if (track.BitsPerSample > 0 && track.SampleRate > 0)
-                parts.Add($"{track.BitsPerSample}-bit/{track.SampleRate / 1000.0:0.###} kHz");
-            else if (track.BitsPerSample > 0)
-                parts.Add($"{track.BitsPerSample}-bit");
-            else if (track.SampleRate > 0)
-                parts.Add($"{track.SampleRate / 1000.0:0.###} kHz");
-
-            var codec = track.CodecShortName;
-            if (!string.IsNullOrEmpty(codec))
-                parts.Add(codec);
-
-            return string.Join(" ", parts);
+            return GetRepresentativeQualityTrack()?.QualityDetailLine ?? string.Empty;
         }
     }
 
