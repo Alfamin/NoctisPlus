@@ -35,7 +35,10 @@ public sealed partial class AlbumGridPageViewModel : MobilePage
         var albums = Shell.Library.Service.Albums
             .OrderBy(a => a.Name, StringComparer.CurrentCultureIgnoreCase)
             .ToList();
-        Rows.ReplaceAll(albums.Chunk(Columns).Select(chunk => new AlbumRow { Albums = chunk.ToList() }));
+        // Rows are compared by the albums on them: a refresh that changes nothing (a heart, a
+        // scan's progress) must not Reset the grid, which re-realised every tile on screen.
+        MobileLibrary.ReplaceIfChanged(Rows, albums.Chunk(Columns).Select(chunk => new AlbumRow { Albums = chunk.ToList() }).ToList(),
+            (a, b) => a.Albums.SequenceEqual(b.Albums));
         AlbumCount = albums.Count;
     }
 

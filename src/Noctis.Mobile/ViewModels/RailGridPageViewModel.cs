@@ -35,7 +35,7 @@ public sealed partial class RailGridPageViewModel : MobilePage
 
     public void Refresh()
     {
-        Items.ReplaceAll(_source().ToList());
+        MobileLibrary.ReplaceIfChanged(Items, _source().ToList());
         ItemCount = Items.Count;
     }
 
