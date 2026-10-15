@@ -524,20 +524,21 @@ public class MobilePopMenuTests(ITestOutputHelper output)
         rig.Shell.CloseSheet();
         Pump(15);
 
-        // An album page painted in a light cover colour: the light glass, whatever the app theme;
-        // a dark cover colour: the dark glass.
+        // An album page is painted in a deep shade of its cover's colour, from a light cover as
+        // from a dark one (PageTint.HeroFade): the dark glass, whatever the app theme.
         var album = MobileFixtures.MakeAlbum("Record", "Band", rig.Library.TrackList.ToArray());
         rig.Shell.OpenAlbumCommand.Execute(album);
         Pump(30);
         var albumVm = (ITintedPage)rig.Shell.CurrentPage!;
-        foreach (var (tint, expected) in new[] { (Color.Parse("#F2EEE6"), ThemeVariant.Light), (Color.Parse("#3A1A08"), ThemeVariant.Dark) })
+        foreach (var tint in new[] { Color.Parse("#F2EEE6"), Color.Parse("#3A1A08") })
         {
             albumVm.Tint.Apply(tint);
+            Assert.False(albumVm.Tint.IsLight);
             window.UpdateLayout();
             var header = MobileFixtures.Named<Button>(MobileFixtures.Find<AlbumPage>(view), "MoreButton");
             Tap(window, header);
             Pump(25);
-            Assert.Equal(expected, card.ActualThemeVariant);
+            Assert.Equal(ThemeVariant.Dark, card.ActualThemeVariant);
             rig.Shell.CloseSheet();
             Pump(15);
         }

@@ -35,13 +35,33 @@ public class PageTintContrastTests : IDisposable
         }
     }
 
-    /// <summary>On a dark tint there is contrast to spare: secondary text dims to the 60% floor.</summary>
+    /// <summary>On a dark tint there is contrast to spare: secondary text dims to the 60% floor,
+    /// added to the tint so it keeps its hue (Apple's plus-lighter labels).</summary>
     [Fact]
     public void SubtleText_DimsWhereTheTintAllows()
     {
         var bg = Color.FromRgb(0x20, 0x18, 0x14);
         var subtle = PageTint.SubtleTextOn(bg, Colors.White);
-        Assert.Equal(PageTint.Mix(bg, Colors.White, PageTint.SubtleTextMinOpacity), subtle);
+        Assert.Equal(PageTint.PlusLighter(bg, PageTint.SubtleTextMinOpacity), subtle);
+    }
+
+    /// <summary>Apple's Silk Sonic page (sRGB, from the iOS reference): the page #4C2000, its
+    /// secondary text #E5B899, the round buttons' wash #603515 and the rules #6C4021, each the
+    /// page plus white; ours land within two steps per channel.</summary>
+    [Fact]
+    public void SilkSonicPage_SecondaryColours_MatchApples()
+    {
+        var page = Color.FromRgb(0x4C, 0x20, 0x00);
+        void Near(Color expected, Color actual)
+        {
+            Assert.True(Math.Abs(expected.R - actual.R) <= 2 && Math.Abs(expected.G - actual.G) <= 2
+                        && Math.Abs(expected.B - actual.B) <= 2, $"{actual} vs {expected}");
+        }
+        Color Over(Color under, Color over) => PageTint.Mix(under, Color.FromRgb(over.R, over.G, over.B), over.A / 255.0);
+
+        Near(Color.FromRgb(0xE5, 0xB8, 0x99), PageTint.SubtleTextOn(page, Colors.White));
+        Near(Color.FromRgb(0x60, 0x35, 0x15), Over(page, PageTint.PlusLighterOver(page, 0.08, 0.12)));
+        Near(Color.FromRgb(0x6C, 0x40, 0x21), Over(page, PageTint.PlusLighterOver(page, 0.125, 0.2)));
     }
 
     private string WriteSkyOverSand()
@@ -61,8 +81,10 @@ public class PageTintContrastTests : IDisposable
         return path;
     }
 
-    /// <summary>The album page's default extractor reads the cover's bottom (sand); other
-    /// pages' PageTint keeps the four-edge colour (sky wins three of the four edges).</summary>
+    /// <summary>The album page's default extractor reads the cover's bottom (sand) as the colour
+    /// the cover meets the page with, its top (sky) for the status bar's haze, and makes the page
+    /// the sand's deep shade; other pages' PageTint keeps the four-edge colour as the page colour
+    /// itself (sky wins three of the four edges), undeepened.</summary>
     [Fact]
     public async Task HeroFadeTint_ReadsTheBottom_OtherPagesKeepTheEdges()
     {
@@ -74,9 +96,14 @@ public class PageTintContrastTests : IDisposable
         edges.Load(path);
         await edges.Ready;
 
-        var sand = hero.TintColor!.Value;
+        var sand = hero.CoverColor!.Value;
         Assert.InRange(sand.R, 0xC0, 0xD0);
         Assert.InRange(sand.B, 0x70, 0x80);
+        var sky = hero.TopColor!.Value;
+        Assert.True(sky.B > sky.R, $"top colour {sky}");
+        Assert.Equal(Noctis.Services.DominantColorExtractor.DeepPageColor(sand), hero.TintColor);
+        Assert.False(hero.IsLight);
         Assert.True(edges.TintColor!.Value.B > edges.TintColor.Value.R, $"edge colour {edges.TintColor}");
+        Assert.Equal(edges.TintColor, edges.CoverColor);
     }
 }

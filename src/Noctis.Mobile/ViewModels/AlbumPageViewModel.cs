@@ -51,6 +51,7 @@ public sealed partial class AlbumPageViewModel : MobilePage, ITintedPage
         AlbumId = album.Id;
         Tint = shell.TintFactory();
         Tint.HeroFade = true;
+        Tint.Enabled = shell.ArtworkPageColors;
         Shell.Library.Refreshed += OnRefreshed;
         Shell.Player.PropertyChanged += OnPlayerChanged;
         Shell.PropertyChanged += OnShellChanged;
@@ -262,6 +263,8 @@ public sealed partial class AlbumPageViewModel : MobilePage, ITintedPage
         if (e.PropertyName is nameof(ShellViewModel.IsNowPlayingOpen) or nameof(ShellViewModel.IsLyricsOpen)
             or nameof(ShellViewModel.IsQueueOpen))
             SyncNowPlaying();
+        else if (e.PropertyName == nameof(ShellViewModel.ArtworkPageColors))
+            Tint.Enabled = Shell.ArtworkPageColors;   // Settings › Appearance › Album Colours, live
     }
 
     /// <summary>Marks the player's track and runs its bars only while it plays and the page is

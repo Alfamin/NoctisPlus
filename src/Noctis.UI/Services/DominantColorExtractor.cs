@@ -791,7 +791,14 @@ public static class DominantColorExtractor
     /// </list>
     /// Null when there are no pixels.
     /// </summary>
-    internal static Color? PickHeroBottomColor(byte[] rgb, int width, int height)
+    internal static Color? PickHeroBottomColor(byte[] rgb, int width, int height) => PickHeroBandColor(rgb, width, height, top: false);
+
+    /// <summary>The same pick over the cover's TOP band: what the status bar's haze over the
+    /// picture's top takes its colour from, so a sky over sand gets a sky-coloured haze, not a
+    /// sand-coloured one (the bottom colour was used for both before).</summary>
+    internal static Color? PickHeroTopColor(byte[] rgb, int width, int height) => PickHeroBandColor(rgb, width, height, top: true);
+
+    private static Color? PickHeroBandColor(byte[] rgb, int width, int height, bool top)
     {
         if (width <= 0 || height <= 0 || rgb.Length < width * height * 3) return null;
 
@@ -802,7 +809,8 @@ public static class DominantColorExtractor
         var bins = new Dictionary<int, EdgeCluster>();
         for (int row = 0, k = 0; row < depth; row++)
         {
-            var y = height - depth + row;
+            // Row 0 is the band's inner edge, row depth-1 the cover's own edge, which weighs most.
+            var y = top ? depth - 1 - row : height - depth + row;
             var weight = depth == 1 ? 1.0 : HeroBandTopWeight + (1 - HeroBandTopWeight) * row / (depth - 1);
             for (int x = 0; x < width; x++, k++)
             {
@@ -910,10 +918,98 @@ public static class DominantColorExtractor
         return (byte)Math.Round(Math.Clamp(s, 0, 1) * 255);
     }
 
-    /// <summary>sRGB → OKLab (Björn Ottosson's reference matrices).</summary>
-    internal static (double L, double A, double B) ToOkLab(byte r, byte g, byte b)
+    /// <summary>
+    /// OKLab lightness of the phone album page's floor, the colour the cover's own colour deepens
+    /// into below it (<see cref="DeepPageColor"/>). Measured on Apple Music's album page (iOS
+    /// screenshot, 2026-10-14, Display P3 converted to sRGB): under the beige "An Evening with
+    /// Silk Sonic" cover (#C2955E where it meets the page, OKLab L 0.70) the page settles at
+    /// #4C2000, L 0.302.
+    /// </summary>
+    public const double DeepPageLightness = 0.30;
+
+    /// <summary>
+    /// How fast the cover's colour thickens as it deepens (<see cref="DeepenTo"/>): the exponent
+    /// on its linear channels is e^(rate × lightness drop). Fitted to Apple's Silk Sonic page,
+    /// whose ramp from the cover down to the floor follows one exponent per row on all three
+    /// channels, 1.1 just below the cover to 2.75 at the floor (0.4 lower in OKLab L).
+    /// </summary>
+    public const double DeepeningRate = 2.54;
+
+    /// <summary>
+    /// The page colour for a cover whose bottom is <paramref name="cover"/>: the cover's colour
+    /// deepened to <see cref="DeepPageLightness"/> (<see cref="DeepenTo"/>), kept as it is when
+    /// the cover is already as dark or darker (a black cover's page stays black). A beige cover
+    /// gives a warm brown, not an olive one: Apple's page under Silk Sonic is #4C2000, this gives
+    /// #4B1F03 from the same beige, where keeping the beige's hue gave #402800. White text reads
+    /// on every result (≥ 9:1 at L 0.30).
+    /// </summary>
+    public static Color DeepPageColor(Color cover)
     {
-        double lr = SrgbToLinear(r), lg = SrgbToLinear(g), lb = SrgbToLinear(b);
+        var (l, _, _) = ToOkLab(cover.R, cover.G, cover.B);
+        return DeepenTo(cover, Math.Min(l, DeepPageLightness));
+    }
+
+    /// <summary>
+    /// <paramref name="cover"/> deepened to OKLab lightness <paramref name="lightness"/> the way a
+    /// thicker layer of the same ink darkens (Beer–Lambert): each linear channel raised to one
+    /// exponent (<see cref="DeepeningRate"/>), so the strongest channel holds and the weak ones
+    /// fall away: beige turns to brown, sky blue to navy, grey stays grey. Then scaled to the
+    /// lightness, chroma pulled in only if sRGB needs it. The colour itself when it is not
+    /// lighter than <paramref name="lightness"/>.
+    /// </summary>
+    public static Color DeepenTo(Color cover, double lightness)
+    {
+        var (l, _, _) = ToOkLab(cover.R, cover.G, cover.B);
+        if (lightness >= l || l <= 0) return cover;
+        var n = Math.Exp(DeepeningRate * (l - lightness));
+        double r = Math.Pow(SrgbToLinear(cover.R), n), g = Math.Pow(SrgbToLinear(cover.G), n), b = Math.Pow(SrgbToLinear(cover.B), n);
+        var deepened = LinearToOkLab(r, g, b);
+        if (deepened.L <= 1e-6) return FromOkLabInGamut(Math.Max(lightness, 0), 0, 0);
+        // Scaling the linear light by k scales OKLab L, a and b by ∛k alike: hue and the
+        // chroma-to-lightness ratio stay the deepened colour's.
+        var scale = lightness / deepened.L;
+        return FromOkLabInGamut(lightness, deepened.A * scale, deepened.B * scale);
+    }
+
+    /// <summary>OKLab → sRGB with the chroma scaled down (hue and lightness kept) until the colour
+    /// fits sRGB, instead of clipping channels, which shifts the hue.</summary>
+    public static Color FromOkLabInGamut(double okL, double okA, double okB)
+    {
+        if (OkLabFitsSrgb(okL, okA, okB)) return FromOkLab(okL, okA, okB);
+        double lo = 0, hi = 1;
+        for (var i = 0; i < 16; i++)
+        {
+            var mid = (lo + hi) / 2;
+            if (OkLabFitsSrgb(okL, okA * mid, okB * mid)) lo = mid; else hi = mid;
+        }
+        return FromOkLab(okL, okA * lo, okB * lo);
+    }
+
+    private static bool OkLabFitsSrgb(double okL, double okA, double okB)
+    {
+        var (r, g, b) = OkLabToLinearSrgb(okL, okA, okB);
+        const double slack = 1e-4;
+        return r >= -slack && r <= 1 + slack && g >= -slack && g <= 1 + slack && b >= -slack && b <= 1 + slack;
+    }
+
+    private static (double R, double G, double B) OkLabToLinearSrgb(double okL, double okA, double okB)
+    {
+        var l = Math.Pow(okL + 0.3963377774 * okA + 0.2158037573 * okB, 3);
+        var m = Math.Pow(okL - 0.1055613458 * okA - 0.0638541728 * okB, 3);
+        var s = Math.Pow(okL - 0.0894841775 * okA - 1.2914855480 * okB, 3);
+        return (4.0767416621 * l - 3.3077115913 * m + 0.2309699292 * s,
+                -1.2684380046 * l + 2.6097574011 * m - 0.3413193965 * s,
+                -0.0041960863 * l - 0.7034186948 * m + 1.7076147010 * s);
+    }
+
+    /// <summary>sRGB → OKLab (Björn Ottosson's reference matrices).</summary>
+    public static (double L, double A, double B) ToOkLab(byte r, byte g, byte b)
+    {
+        return LinearToOkLab(SrgbToLinear(r), SrgbToLinear(g), SrgbToLinear(b));
+    }
+
+    private static (double L, double A, double B) LinearToOkLab(double lr, double lg, double lb)
+    {
         var l = Math.Cbrt(0.4122214708 * lr + 0.5363325363 * lg + 0.0514459929 * lb);
         var m = Math.Cbrt(0.2119034982 * lr + 0.6806995451 * lg + 0.1073969566 * lb);
         var s = Math.Cbrt(0.0883024619 * lr + 0.2817188376 * lg + 0.6299787005 * lb);
@@ -922,16 +1018,11 @@ public static class DominantColorExtractor
                 0.0259040371 * l + 0.7827717662 * m - 0.8086757660 * s);
     }
 
-    /// <summary>OKLab → sRGB, clamped into gamut.</summary>
-    internal static Color FromOkLab(double okL, double okA, double okB)
+    /// <summary>OKLab → sRGB, each channel clamped into range.</summary>
+    public static Color FromOkLab(double okL, double okA, double okB)
     {
-        var l = Math.Pow(okL + 0.3963377774 * okA + 0.2158037573 * okB, 3);
-        var m = Math.Pow(okL - 0.1055613458 * okA - 0.0638541728 * okB, 3);
-        var s = Math.Pow(okL - 0.0894841775 * okA - 1.2914855480 * okB, 3);
-        return Color.FromRgb(
-            LinearToSrgb(4.0767416621 * l - 3.3077115913 * m + 0.2309699292 * s),
-            LinearToSrgb(-1.2684380046 * l + 2.6097574011 * m - 0.3413193965 * s),
-            LinearToSrgb(-0.0041960863 * l - 0.7034186948 * m + 1.7076147010 * s));
+        var (r, g, b) = OkLabToLinearSrgb(okL, okA, okB);
+        return Color.FromRgb(LinearToSrgb(r), LinearToSrgb(g), LinearToSrgb(b));
     }
 
     /// <summary>
@@ -1028,12 +1119,13 @@ public static class DominantColorExtractor
         HeroFileCache.TryRemove(artworkPath, out _);
     }
 
-    /// <summary>The phone album hero's colours: <see cref="Bottom"/>, the page colour the
-    /// full-bleed cover fades into (<see cref="PickHeroBottomColor"/>), and
-    /// <see cref="RowLuminance"/>, the luminance of each of the visible square's 64 rows, top
-    /// first: what lies under the status bar at any scroll position; <see cref="TopMixed"/>, the
-    /// top band is a high-contrast texture (<see cref="TopBandIsMixed"/>).</summary>
-    public sealed record HeroColors(Color Bottom, IReadOnlyList<double> RowLuminance, bool TopMixed = false);
+    /// <summary>The phone album hero's colours: <see cref="Bottom"/>, the colour the full-bleed
+    /// cover meets the page with (<see cref="PickHeroBottomColor"/>; the page itself is its
+    /// <see cref="DeepPageColor"/>); <see cref="Top"/>, the colour under the status bar at rest
+    /// (<see cref="PickHeroTopColor"/>); <see cref="RowLuminance"/>, the luminance of each of the
+    /// visible square's 64 rows, top first: what lies under the status bar at any scroll position;
+    /// <see cref="TopMixed"/>, the top band is a high-contrast texture (<see cref="TopBandIsMixed"/>).</summary>
+    public sealed record HeroColors(Color Bottom, Color Top, IReadOnlyList<double> RowLuminance, bool TopMixed = false);
 
     /// <summary>The hero colours already extracted for a path, without decoding; null if not cached.</summary>
     public static HeroColors? GetCachedHeroColors(string? artworkPath) =>
@@ -1075,8 +1167,8 @@ public static class DominantColorExtractor
             if (raw == null) return null;
 
             var rgb = BoxDownscaleCentreSquare(raw, n);
-            if (PickHeroBottomColor(rgb, n, n) is not { } bottom) return null;
-            var colors = new HeroColors(bottom, RowLuminance(rgb, n, n), TopBandIsMixed(rgb, n, n));
+            if (PickHeroBottomColor(rgb, n, n) is not { } bottom || PickHeroTopColor(rgb, n, n) is not { } top) return null;
+            var colors = new HeroColors(bottom, top, RowLuminance(rgb, n, n), TopBandIsMixed(rgb, n, n));
 
             if (HeroFileCache.Count >= MaxCacheSize) HeroFileCache.Clear();
             HeroFileCache.TryAdd(artworkPath, colors);
