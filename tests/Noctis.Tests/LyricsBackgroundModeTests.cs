@@ -102,7 +102,7 @@ public class LyricsBackgroundModeTests : IDisposable
         => new(player, new StubLrcLib(), new StubNetEase(), new StubMetadata(),
             persistence ?? new TestPersistenceService(), new FakeLibraryService());
 
-    private static Color ColorOf(IBrush brush) => Assert.IsType<SolidColorBrush>(brush, exactMatch: false).Color;
+    private static Color ColorOf(IBrush brush) => Assert.IsAssignableFrom<ISolidColorBrush>(brush).Color;
 
     /// <summary>
     /// Bug: the Artwork mode text palette was picked for the cover under a 40% scrim

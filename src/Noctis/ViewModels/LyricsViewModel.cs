@@ -4,6 +4,7 @@ using System.Text.RegularExpressions;
 using Avalonia;
 using Avalonia.Media;
 using Avalonia.Media.Imaging;
+using Avalonia.Media.Immutable;
 using Avalonia.Threading;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
@@ -386,32 +387,34 @@ public partial class LyricsViewModel : ViewModelBase, IDisposable
     // Cached per-branch brushes. UpdateForegroundsForBackground runs on every track
     // change; fresh instances made every colour binding on every word control
     // re-evaluate even when the branch didn't change (the setters skip same-instance
-    // sets). Kept as SolidColorBrush, not immutable: LyricsView.SetResourceBrush
-    // pattern-matches SolidColorBrush to copy the BtnBg colours. Never mutated.
-    private static SolidColorBrush Solid(string hex) => new(Color.Parse(hex));
-    private static readonly SolidColorBrush LightPrimaryFg = Solid("#111111");
-    private static readonly SolidColorBrush LightSecondaryFg = Solid("#55111111");
-    private static readonly SolidColorBrush LightSubtleFg = Solid("#555555");
-    private static readonly SolidColorBrush LightSliderFilled = Solid("#CC111111");
-    private static readonly SolidColorBrush LightSliderUnfilled = Solid("#33111111");
-    private static readonly SolidColorBrush LightControlFill = Solid("#222222");
-    private static readonly SolidColorBrush LightBtnBg = Solid("#22000000");
-    private static readonly SolidColorBrush LightBtnBgHover = Solid("#33000000");
-    private static readonly SolidColorBrush LightSliderThumb = Solid("#DD111111");
-    private static readonly SolidColorBrush MediumSecondaryFg = Solid("#DDFFFFFF");
-    private static readonly SolidColorBrush MediumSubtleFg = Solid("#CCCCCC");
-    private static readonly SolidColorBrush MediumSliderFilled = Solid("#EEFFFFFF");
-    private static readonly SolidColorBrush MediumSliderUnfilled = Solid("#44FFFFFF");
-    private static readonly SolidColorBrush MediumBtnBg = Solid("#44000000");
-    private static readonly SolidColorBrush MediumBtnBgHover = Solid("#55000000");
-    private static readonly SolidColorBrush MediumSliderThumb = Solid("#FFFFFFFF");
-    private static readonly SolidColorBrush DarkSecondaryFg = Solid("#B0FFFFFF");
-    private static readonly SolidColorBrush DarkSubtleFg = Solid("#999999");
-    private static readonly SolidColorBrush DarkSliderFilled = Solid("#CCFFFFFF");
-    private static readonly SolidColorBrush DarkSliderUnfilled = Solid("#33FFFFFF");
-    private static readonly SolidColorBrush DarkBtnBg = Solid("#33FFFFFF");
-    private static readonly SolidColorBrush DarkBtnBgHover = Solid("#55FFFFFF");
-    private static readonly SolidColorBrush DarkSliderThumb = Solid("#EEFFFFFF");
+    // sets). Immutable: a SolidColorBrush is an AvaloniaObject that belongs to the thread
+    // that built it, and these statics are built by whichever thread first touches the
+    // class (a test thread in the suite), so the UI thread then could not use them.
+    // LyricsView.SetResourceBrush copies colours from any ISolidColorBrush.
+    private static ImmutableSolidColorBrush Solid(string hex) => new(Color.Parse(hex));
+    private static readonly ImmutableSolidColorBrush LightPrimaryFg = Solid("#111111");
+    private static readonly ImmutableSolidColorBrush LightSecondaryFg = Solid("#55111111");
+    private static readonly ImmutableSolidColorBrush LightSubtleFg = Solid("#555555");
+    private static readonly ImmutableSolidColorBrush LightSliderFilled = Solid("#CC111111");
+    private static readonly ImmutableSolidColorBrush LightSliderUnfilled = Solid("#33111111");
+    private static readonly ImmutableSolidColorBrush LightControlFill = Solid("#222222");
+    private static readonly ImmutableSolidColorBrush LightBtnBg = Solid("#22000000");
+    private static readonly ImmutableSolidColorBrush LightBtnBgHover = Solid("#33000000");
+    private static readonly ImmutableSolidColorBrush LightSliderThumb = Solid("#DD111111");
+    private static readonly ImmutableSolidColorBrush MediumSecondaryFg = Solid("#DDFFFFFF");
+    private static readonly ImmutableSolidColorBrush MediumSubtleFg = Solid("#CCCCCC");
+    private static readonly ImmutableSolidColorBrush MediumSliderFilled = Solid("#EEFFFFFF");
+    private static readonly ImmutableSolidColorBrush MediumSliderUnfilled = Solid("#44FFFFFF");
+    private static readonly ImmutableSolidColorBrush MediumBtnBg = Solid("#44000000");
+    private static readonly ImmutableSolidColorBrush MediumBtnBgHover = Solid("#55000000");
+    private static readonly ImmutableSolidColorBrush MediumSliderThumb = Solid("#FFFFFFFF");
+    private static readonly ImmutableSolidColorBrush DarkSecondaryFg = Solid("#B0FFFFFF");
+    private static readonly ImmutableSolidColorBrush DarkSubtleFg = Solid("#999999");
+    private static readonly ImmutableSolidColorBrush DarkSliderFilled = Solid("#CCFFFFFF");
+    private static readonly ImmutableSolidColorBrush DarkSliderUnfilled = Solid("#33FFFFFF");
+    private static readonly ImmutableSolidColorBrush DarkBtnBg = Solid("#33FFFFFF");
+    private static readonly ImmutableSolidColorBrush DarkBtnBgHover = Solid("#55FFFFFF");
+    private static readonly ImmutableSolidColorBrush DarkSliderThumb = Solid("#EEFFFFFF");
 
     [ObservableProperty] private IBrush _lyricsPrimaryFg = Brushes.White;
     [ObservableProperty] private IBrush _lyricsSecondaryFg = new SolidColorBrush(Color.Parse("#B0FFFFFF"));

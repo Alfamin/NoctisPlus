@@ -738,7 +738,7 @@ public partial class LyricsView : UserControl
 
     private void SetResourceBrush(string key, IBrush brush)
     {
-        if (brush is SolidColorBrush scb && Resources[key] is SolidColorBrush existing)
+        if (brush is ISolidColorBrush scb && Resources[key] is SolidColorBrush existing)
             existing.Color = scb.Color;
     }
 

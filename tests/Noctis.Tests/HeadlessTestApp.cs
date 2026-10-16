@@ -1,6 +1,8 @@
+using System.Reflection;
 using Avalonia;
 using Avalonia.Headless;
 using Avalonia.Themes.Fluent;
+using Avalonia.Threading;
 
 [assembly: AvaloniaTestApplication(typeof(Noctis.Tests.HeadlessTestApp))]
 // Test classes run one at a time: plain [Fact] tests that post to Dispatcher.UIThread or
@@ -26,7 +28,7 @@ public class HeadlessTestApp : Application
     public static bool RealRendering =>
         Environment.GetEnvironmentVariable("NOCTIS_TEST_SKIA") == "1";
 
-    public static AppBuilder BuildAvaloniaApp() => RealRendering
+    public static AppBuilder BuildAvaloniaApp() => ClaimUiThreadFirst(RealRendering
         ? AppBuilder
             .Configure<HeadlessTestApp>()
             .UseSkia()
@@ -34,7 +36,42 @@ public class HeadlessTestApp : Application
             .UseHeadless(new AvaloniaHeadlessPlatformOptions { UseHeadlessDrawing = false })
         : AppBuilder
             .Configure<HeadlessTestApp>()
-            .UseHeadless(new AvaloniaHeadlessPlatformOptions());
+            .UseHeadless(new AvaloniaHeadlessPlatformOptions()));
+
+    /// <summary>
+    /// Avalonia 12 makes whichever thread first touches <see cref="Dispatcher.UIThread"/>, or
+    /// builds any AvaloniaObject, after the per-test reset the UI thread. A previous test's
+    /// leftover background callback (a search result posting back, a timer) could win that
+    /// race while the session was still setting up, and the next test then failed in setup
+    /// with "The calling thread cannot access this object because a different thread owns it"
+    /// (CI, 10-16: LyricsSourceAutoSearchTests). Claim the dispatcher on the session thread
+    /// before any other platform setup; if a leftover got there first anyway, reset and claim
+    /// again. Headless tests always get the default managed dispatcher, so claiming it early
+    /// changes nothing else.
+    /// </summary>
+    private static AppBuilder ClaimUiThreadFirst(AppBuilder builder)
+    {
+        var runtimeSetup = builder.RuntimePlatformServicesInitializer;
+        return builder.UseRuntimePlatformSubsystem(() =>
+        {
+            ClaimUiThread();
+            runtimeSetup?.Invoke();
+        }, builder.RuntimePlatformServicesName);
+    }
+
+    private static readonly MethodInfo? ResetDispatcherForTests =
+        typeof(Dispatcher).GetMethod("ResetBeforeUnitTests", BindingFlags.NonPublic | BindingFlags.Static);
+
+    internal static void ClaimUiThread()
+    {
+        for (var attempt = 0; !Dispatcher.UIThread.CheckAccess(); attempt++)
+        {
+            if (ResetDispatcherForTests == null || attempt == 20)
+                throw new InvalidOperationException(
+                    "Another thread kept taking Avalonia's UI dispatcher during headless test setup.");
+            ResetDispatcherForTests.Invoke(null, null);
+        }
+    }
 
     public override void Initialize()
     {
