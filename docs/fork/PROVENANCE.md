@@ -1,7 +1,8 @@
 # Noctis Plus: source provenance
 
 Noctis Plus is a fork of [Noctis](https://github.com/heartached/Noctis) by heartached, MIT licensed. The upstream
-`LICENSE` and notices stay in place unchanged. Our own changes are listed by file in Git history.
+copyright notice stays in `LICENSE`; the Noctis Plus changes are MIT licensed too (second copyright line, 2026-10-16).
+Our own changes are listed by file in Git history.
 
 ## Base
 
@@ -15,13 +16,14 @@ Noctis Plus is a fork of [Noctis](https://github.com/heartached/Noctis) by heart
 
 | Feature | Source repository | Author / rights |
 |---|---|---|
-| Free Music Finder (catalog, downloads) | Alfamin/noctic-download-plugin, forked from Pr0nE/noctic-download-plugin (first commit 4d7ae1b) | The original code is by Pr0nE. Neither repository has a license file. Pr0nE gave permission to include and redistribute his code in Noctis Plus (told to us by the owner, 2026-10-16). A license file in his repository would make that permanent. |
-| True Shuffle | Alfamin/TrueShuffle | Alfamin (owner); no license file yet |
-| Lyric Motion | Alfamin/LyricMotion | Alfamin (owner); no license file yet |
-| WordLyrics (plugin and program) | Alfamin/WordLyrics | Alfamin (owner); no license file yet |
+| Free Music Finder (catalog, downloads) | Alfamin/noctic-download-plugin, forked from Pr0nE/noctic-download-plugin (first commit 4d7ae1b) | The original code is by Pr0nE. Neither repository has a license file. Pr0nE gave permission to include and redistribute his code in Noctis Plus (told to us by the owner, 2026-10-16). It is shipped with that permission only: it is **not** MIT, and reusing it elsewhere needs its authors' permission. A license file in his repository would change that. |
+| True Shuffle | Alfamin/TrueShuffle | Alfamin (owner), MIT (LICENSE added 2026-10-16) |
+| Lyric Motion | Alfamin/LyricMotion | Alfamin (owner), MIT (LICENSE added 2026-10-16) |
+| WordLyrics (plugin and program) | Alfamin/WordLyrics | Alfamin (owner), MIT (LICENSE added 2026-10-16) |
 
-Before the first public release, the owner should choose a license for these parts. MIT matches Noctis, but it is not
-assigned automatically.
+The owner chose MIT for their own modules and for the Noctis Plus changes ("fine for anyone to use", 2026-10-16).
+The bundled module binaries are the pinned builds listed in `bundled-plugins/manifest.json`; the license files were
+added afterwards without changing their code. Finder's bundled `WTelegramClient.dll` is WTelegramClient by Wizou (MIT).
 
 ## Third-party dependencies to review before distribution
 

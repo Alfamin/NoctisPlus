@@ -122,9 +122,19 @@ internal static class AutoUpdatePolicy
         @"^NoctisPlus-Update-[0-9a-f]{8}(-Setup\.exe|\.dmg|\.AppImage|\.tar\.gz)$",
         RegexOptions.CultureInvariant);
 
-    /// <summary>Three-part version. Assembly versions are 4-part (1.5.4.0) while Version("1.5.4")
-    /// has Revision -1 and compares LESS than 1.5.4.0, so both sides go through here.</summary>
-    public static Version Normalize(Version v) => new(v.Major, v.Minor, Math.Max(0, v.Build));
+    /// <summary>Four-part version with missing parts as 0. Assembly versions are 4-part (1.5.4.0)
+    /// while Version("1.5.4") has Revision -1 and compares LESS than 1.5.4.0, so both sides go
+    /// through here. The fourth part is kept: Noctis Plus numbers its own releases on top of the
+    /// Noctis base (1.6.3.1, 1.6.3.2, ...), and dropping it made 1.6.3.1 look already installed.</summary>
+    public static Version Normalize(Version v) =>
+        new(v.Major, v.Minor, Math.Max(0, v.Build), Math.Max(0, v.Revision));
+
+    /// <summary>"1.6.3" for a plain release, "1.6.3.1" for a Noctis Plus revision.</summary>
+    public static string Format(Version v)
+    {
+        var n = Normalize(v);
+        return n.Revision > 0 ? n.ToString(4) : n.ToString(3);
+    }
 
     public static AutoUpdateMode ResolveMode(
         bool isWindows, bool isMacOS, bool isLinux, InstallSource source,

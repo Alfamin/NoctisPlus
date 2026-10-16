@@ -15,4 +15,5 @@ files, and update its provenance and hashes in `manifest.json`. Do not copy buil
 or private profile files into this folder. Keep the original package's API references; the
 1.6.3 host supports API 1.1 and 1.2 plugins.
 
-See `docs/fork/PROVENANCE.md` for licensing status before a public release.
+Licensing is in `docs/fork/PROVENANCE.md`: True Shuffle, Lyric Motion and WordLyrics are MIT;
+Free Music Finder ships with its original author's permission and is not MIT.

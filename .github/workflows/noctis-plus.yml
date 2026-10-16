@@ -3,6 +3,8 @@ name: Noctis Plus Windows preview
 on:
   push:
     branches: [main]
+    # A version tag (v1.6.3.1) runs the same build and checks, then publishes the release below.
+    tags: ['v*']
     paths-ignore: ['website/**']
   pull_request:
     branches: [main]
@@ -32,6 +34,21 @@ jobs:
           New-Item -ItemType Directory -Path artifacts/plus -Force | Out-Null
           dotnet tests/Noctis.Tests/bin/Release/net10.0-windows10.0.19041.0/Noctis.Tests.dll -parallelAlgorithm conservative -maxThreads 4 -longRunning 60 -noColor -xml artifacts/plus/ci-tests.xml
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - name: List failed tests on the run page
+        # Annotations are readable without signing in, unlike the log and the report artifact.
+        if: failure()
+        shell: pwsh
+        run: |
+          $report = 'artifacts/plus/ci-tests.xml'
+          if (!(Test-Path $report)) { Write-Host '::error::No test report was written.'; exit 0 }
+          [xml]$x = Get-Content $report -Raw
+          $clean = { param($s) $c = ([string]$s -replace '%', '%25' -replace '\r?\n', ' '); $c.Substring(0, [Math]::Min(400, $c.Length)) }
+          foreach ($t in $x.SelectNodes("//test[@result='Fail']")) {
+            Write-Host ("::error title=FAIL {0}::{1}" -f $t.name, (& $clean $t.failure.message.InnerText))
+          }
+          foreach ($e in $x.SelectNodes('//errors/error')) {
+            Write-Host ("::error title=ERROR {0} {1}::{2}" -f $e.type, $e.name, (& $clean $e.failure.message.InnerText))
+          }
       - name: Inno Setup (preinstalled, else from Chocolatey)
         shell: powershell
         run: |
@@ -64,3 +81,32 @@ jobs:
             scripts/install.ps1
           if-no-files-found: error
           retention-days: 14
+
+  release:
+    # Only for a version tag, and only after the Windows job built, tested and install-checked it.
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: windows
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: write
+      actions: read
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+      - name: Publish the GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ github.ref_name }}
+        run: |
+          set -euo pipefail
+          version="${TAG#v}"
+          gh run download "$GITHUB_RUN_ID" --repo "$GITHUB_REPOSITORY" --name NoctisPlus-windows-x64 --dir dist
+          setup="dist/release-artifacts/NoctisPlus-v${version}-Setup.exe"
+          # The tag must match the version the app was built with, or the updater would offer it forever.
+          test -f "$setup" || { echo "No $setup: bump <Version> in src/Noctis/Noctis.csproj to $version before tagging."; ls -R dist; exit 1; }
+          notes="docs/fork/releases/${TAG}.md"
+          test -f "$notes" || { echo "Missing release notes $notes"; exit 1; }
+          (cd dist/release-artifacts && sha256sum -c SHA256SUMS)
+          gh release create "$TAG" --repo "$GITHUB_REPOSITORY" --verify-tag \
+            --title "Noctis Plus ${version}" --notes-file "$notes" \
+            "$setup" dist/release-artifacts/SHA256SUMS dist/release-artifacts/NoctisPlus-windows-x64.zip

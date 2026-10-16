@@ -37,8 +37,7 @@ public sealed class UpdateService
     /// <summary>Header lines for the session log: product + version, then install source.</summary>
     public static string DescribeBuild()
     {
-        var v = CurrentVersion;
-        return $"{ProductIdentity.Name} {v.Major}.{v.Minor}.{v.Build}" + (IsPrereleaseBuild ? " (pre-release)" : "")
+        return $"{ProductIdentity.Name} {AutoUpdatePolicy.Format(CurrentVersion)}" + (IsPrereleaseBuild ? " (pre-release)" : "")
              + $"\nInstall source: {Source}"
              + (MacRosetta.IsTranslated == true ? "\nRunning under Rosetta 2: Intel (x64) build on Apple Silicon" : "");
     }
@@ -47,8 +46,7 @@ public sealed class UpdateService
     {
         get
         {
-            var v = CurrentVersion;
-            return $"Version {v.Major}.{v.Minor}.{v.Build}";
+            return $"Version {AutoUpdatePolicy.Format(CurrentVersion)}";
         }
     }
 
@@ -810,9 +808,9 @@ public sealed class UpdateService
         state.Pending = new PendingInstall
         {
             Tag = update.TagName,
-            FromVersion = CurrentVersion.ToString(3),
+            FromVersion = AutoUpdatePolicy.Format(CurrentVersion),
             // Normalized: a two-part tag ("v2.0") parses with Build -1, and ToString(3) throws on it.
-            ToVersion = AutoUpdatePolicy.Normalize(update.Version).ToString(3),
+            ToVersion = AutoUpdatePolicy.Format(update.Version),
             InstallerPath = installerPath,
             Sha256 = sha,
             IsPrerelease = update.IsPrerelease,
@@ -858,7 +856,7 @@ public sealed class UpdateService
                     state.Pending = null;
                     state.Failures = 0;
                     store.Save(state);
-                    DebugLog.Write("Updater", $"Auto-update: now running {CurrentVersion.ToString(3)} (from {pending.FromVersion}).");
+                    DebugLog.Write("Updater", $"Auto-update: now running {AutoUpdatePolicy.Format(CurrentVersion)} (from {pending.FromVersion}).");
                     return false;
 
                 case LaunchAction.Discard:
@@ -895,7 +893,7 @@ public sealed class UpdateService
             pending.LastLaunchUtc = now;
             store.Save(state);
             DebugLog.Write("Updater",
-                $"Auto-update: installing {pending.Tag} at launch (attempt {pending.LaunchAttempts}, from {CurrentVersion.ToString(3)}).");
+                $"Auto-update: installing {pending.Tag} at launch (attempt {pending.LaunchAttempts}, from {AutoUpdatePolicy.Format(CurrentVersion)}).");
 
             if (LaunchInstaller(path)) return true;
 

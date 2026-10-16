@@ -320,6 +320,24 @@ public class AutoUpdateLaunchActionTests
 
     [Fact]
     public void HappyPath_Install() => Assert.Equal(LaunchAction.Install, Decide(Pending(attempts: 1)));
+
+    /// <summary>Noctis Plus numbers releases on its Noctis base (1.6.3.1). Dropping the fourth part
+    /// made a queued 1.6.3.1 look already installed on 1.6.3, so it was never installed.</summary>
+    [Theory]
+    [InlineData("1.6.3.1", 1, 6, 3, 0, nameof(LaunchAction.Install))]
+    [InlineData("1.6.3.1", 1, 6, 3, 1, nameof(LaunchAction.Completed))]
+    [InlineData("1.6.3.1", 1, 6, 3, 2, nameof(LaunchAction.Discard))]
+    [InlineData("1.6.4", 1, 6, 3, 1, nameof(LaunchAction.Install))]
+    public void PlusRevision_IsItsOwnVersion(string to, int major, int minor, int build, int revision, string expected)
+        => Assert.Equal(expected, Decide(Pending(to: to), current: new Version(major, minor, build, revision)).ToString());
+
+    [Theory]
+    [InlineData("1.6.3", "1.6.3")]
+    [InlineData("1.6.3.0", "1.6.3")]
+    [InlineData("1.6.3.1", "1.6.3.1")]
+    [InlineData("2.0", "2.0.0")]
+    public void Format_ShowsTheFourthPartOnlyWhenSet(string version, string expected)
+        => Assert.Equal(expected, AutoUpdatePolicy.Format(Version.Parse(version)));
 }
 
 /// <summary>Only the updater's own temp downloads may be launched or deleted.</summary>

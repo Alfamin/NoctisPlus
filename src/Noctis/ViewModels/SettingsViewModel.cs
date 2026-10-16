@@ -7664,7 +7664,7 @@ public partial class SettingsViewModel : ViewModelBase
         {
             LatestVersionTag = done.Tag;
             ShowWhatsNew = true;
-            UpdateStatusText = $"Updated to {UpdateService.CurrentVersion.ToString(3)}.";
+            UpdateStatusText = $"Updated to {AutoUpdatePolicy.Format(UpdateService.CurrentVersion)}.";
         }
         if (UpdateService.LaunchInstallNote is { } note)
         {
@@ -7899,7 +7899,7 @@ public partial class SettingsViewModel : ViewModelBase
                 _allReleases.Add(new DevReleaseItem
                 {
                     TagName = release.Info.TagName,
-                    VersionDisplay = $"{release.Version.Major}.{release.Version.Minor}.{release.Version.Build}",
+                    VersionDisplay = AutoUpdatePolicy.Format(release.Version),
                     DateDisplay = release.PublishedAt?.ToLocalTime().ToString("MMM d, yyyy") ?? "",
                     IsPrerelease = release.Info.IsPrerelease,
                     IsCurrent = isCurrent,
@@ -8140,8 +8140,7 @@ public partial class SettingsViewModel : ViewModelBase
     [RelayCommand]
     private async Task CopyVersionInfoAsync()
     {
-        var v = UpdateService.CurrentVersion;
-        var info = $"{ProductIdentity.Name} {v.Major}.{v.Minor}.{v.Build} (based on Noctis) — " +
+        var info = $"{ProductIdentity.Name} {AutoUpdatePolicy.Format(UpdateService.CurrentVersion)} (based on Noctis) — " +
                    $"{System.Runtime.InteropServices.RuntimeInformation.OSDescription} " +
                    $"({System.Runtime.InteropServices.RuntimeInformation.OSArchitecture})";
 

@@ -1,13 +1,13 @@
-# Noctis Plus: first local preview
+# Noctis Plus
 
-This first version uses the stable Noctis 1.6.3 base. Finder 2.11.1, True Shuffle 1.5.0,
+Noctis Plus 1.6.3.1 uses the stable Noctis 1.6.3 base. Finder 2.11.1, True Shuffle 1.5.0,
 WordLyrics plugin 1.2.4 and Lyric Motion 1.4.3 are included and enabled. Keep using their
 existing controls; individual switches and settings are in Settings > Plugins. The
 community-plugin switch controls extra plugins, not the four included features.
 
 ## Install
 
-Once a release is published, paste this into PowerShell (no administrator needed):
+Paste this into PowerShell (no administrator needed):
 
 ```powershell
 irm https://raw.githubusercontent.com/Alfamin/NoctisPlus/main/scripts/install.ps1 | iex
@@ -90,7 +90,10 @@ cannot be installed or cleaned up by Plus. The developer version manager uses th
 The four included module versions currently update with a Plus build. Independent module
 updates and native integration are later work.
 
-This is a preview, not a public release. Before publishing: choose licenses for the included
-modules, check the CI install run, and try the Setup on an ordinary Windows 10/11 PC.
-A release needs the Setup and `SHA256SUMS` as assets (the updater and `install.ps1` refuse a
-Setup without them). Recommendation engine changes remain deferred.
+Releases are numbered on top of the Noctis base: 1.6.3.1, 1.6.3.2, ... Plugins still see the base
+version (1.6.3). To publish one: bump `<Version>` in `src/Noctis/Noctis.csproj`, add
+`docs/fork/releases/v<version>.md`, commit, then push the tag `v<version>`. The Windows workflow
+builds, tests and install-checks that tag, and only then publishes the release with the Setup,
+`SHA256SUMS` and the ZIP (the updater and `install.ps1` refuse a Setup without `SHA256SUMS`).
+The Setup is not code-signed, so Windows SmartScreen may warn on first run ("More info" >
+"Run anyway"). Licensing is in `PROVENANCE.md`. Recommendation engine changes remain deferred.
