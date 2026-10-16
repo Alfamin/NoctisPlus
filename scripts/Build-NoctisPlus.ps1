@@ -42,10 +42,10 @@ if ($Installer) {
     if (!(Test-Path -LiteralPath $InnoCompiler -PathType Leaf)) {
         throw "Portable ZIP is ready at $zip. Inno Setup is not installed; pass -InnoCompiler to build the optional installer."
     }
-    & $InnoCompiler "/DPublishDir=$publishRoot" (Join-Path $repoRoot 'installer.iss')
-    if ($LASTEXITCODE -ne 0) { throw 'Installer compilation failed; the portable ZIP is still available.' }
     [xml]$project = Get-Content -LiteralPath (Join-Path $repoRoot 'src\Noctis\Noctis.csproj') -Raw
     $version = $project.Project.PropertyGroup.Version | Where-Object { $_ } | Select-Object -First 1
+    & $InnoCompiler "/DPublishDir=$publishRoot" "/DMyAppVersion=$version" (Join-Path $repoRoot 'installer.iss')
+    if ($LASTEXITCODE -ne 0) { throw 'Installer compilation failed; the portable ZIP is still available.' }
     $setup = Join-Path $repoRoot "installer-output\NoctisPlus-v$version-Setup.exe"
     Copy-Item -LiteralPath $setup -Destination $outputRoot -Force
     $assets += Join-Path $outputRoot (Split-Path -Leaf $setup)

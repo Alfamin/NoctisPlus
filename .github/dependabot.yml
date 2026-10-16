@@ -4,12 +4,17 @@ version: 2
 # binary shipped in every release went unnoticed (CVE-2025-6965 in the SQLite bundled by
 # Microsoft.Data.Sqlite 8.0.11). Both ecosystems are covered: NuGet for the app, and
 # github-actions so the workflow refs stay current once they are SHA-pinned.
+#
+# Noctis Plus: version-update pull requests are off (limit 0). Plus stays on the reviewed upstream
+# release and takes dependency updates through deliberate upstream integration; its first push got
+# ten automatic bump PRs, one of them (NAudio 3.2) a breaking change. Dependabot SECURITY updates
+# are unaffected by this limit and still arrive when enabled in the repository settings.
 updates:
   - package-ecosystem: nuget
     directory: /
     schedule:
       interval: weekly
-    open-pull-requests-limit: 5
+    open-pull-requests-limit: 0
     groups:
       avalonia:
         patterns:
@@ -24,4 +29,4 @@ updates:
     directory: /
     schedule:
       interval: weekly
-    open-pull-requests-limit: 5
+    open-pull-requests-limit: 0

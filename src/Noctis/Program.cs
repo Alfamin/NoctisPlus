@@ -72,6 +72,11 @@ internal class Program
             // journal replays the in-memory ring when it attaches.
             Services.CrashJournal.Initialize(AppPaths.DataRoot);
 
+            // Noctis Plus: the first launch of a new profile carries the official Noctis profile over (App shows
+            // the progress) before any service reads settings, the library or plugin data from this profile.
+            var profileImport = ownsInstance ? Services.ProfileImportStartup.Prepare() : null;
+            App.PendingProfileImport = profileImport;
+
             App.PendingOpenFiles = filesToOpen;
 
             // Configure DI container
@@ -86,7 +91,9 @@ internal class Program
             // Auto-update: a verified release downloaded in an earlier session installs now, before the
             // audio engine or any window exists, so it never interrupts playback. Only the instance that
             // owns the guard may do it, and not when files were passed (the installer's relaunch drops them).
-            if (ownsInstance && provider.GetRequiredService<UpdateService>().TryInstallPendingUpdateAtLaunch(filesToOpen.Length > 0))
+            // (Skipped while a profile import is pending: a profile still being filled has no update of its own yet.)
+            if (ownsInstance && profileImport == null
+                && provider.GetRequiredService<UpdateService>().TryInstallPendingUpdateAtLaunch(filesToOpen.Length > 0))
             {
                 provider.Dispose();
                 Services.CrashJournal.MarkCleanShutdown();
@@ -100,12 +107,14 @@ internal class Program
             // resolve and delays first paint. DI serializes singleton creation,
             // so the UI-thread resolve either finds it ready or waits exactly as
             // it does today — the instance is never built twice.
-            _ = Task.Run(() =>
-            {
-                try { provider.GetRequiredService<IAudioPlayer>(); }
-                catch { /* a broken libvlc install surfaces the same error on the UI-thread resolve */ }
-                Services.StartupTrace.Mark("libvlc-warm-done");
-            });
+            // Not while a profile import is pending: nothing may read the profile before it is filled.
+            if (profileImport == null)
+                _ = Task.Run(() =>
+                {
+                    try { provider.GetRequiredService<IAudioPlayer>(); }
+                    catch { /* a broken libvlc install surfaces the same error on the UI-thread resolve */ }
+                    Services.StartupTrace.Mark("libvlc-warm-done");
+                });
 
             // Mark login-launched runs (the autostart entry passes "--startup", plus
             // "--minimized" when the user wants it to start hidden in the tray) so the

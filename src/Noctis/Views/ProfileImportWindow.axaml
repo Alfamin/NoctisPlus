@@ -1,0 +1,35 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:helpers="using:Noctis.Helpers"
+        x:Class="Noctis.Views.ProfileImportWindow"
+        Title="{x:Static helpers:ProductIdentity.Name}"
+        Icon="avares://Noctis.UI/Assets/Icons/Noctis.ico"
+        Width="460" SizeToContent="Height"
+        CanResize="False"
+        WindowStartupLocation="CenterScreen"
+        Background="{DynamicResource AppWindowBackgroundBrush}">
+
+    <!-- First launch of a new Noctis Plus profile: the official Noctis profile is copied in before the player opens. -->
+    <StackPanel Margin="28,24,28,22" Spacing="14">
+        <StackPanel Spacing="8">
+            <TextBlock x:Name="TitleText"
+                       Text="Bringing over your Noctis library"
+                       FontSize="18" FontWeight="SemiBold"
+                       TextWrapping="Wrap" />
+            <TextBlock x:Name="MessageText"
+                       Text="Settings, stats, playlists, history, sign-ins and plugin data. Noctis itself stays as it is."
+                       FontSize="13" Opacity="0.75"
+                       TextWrapping="Wrap" />
+        </StackPanel>
+
+        <StackPanel x:Name="ProgressPanel" Spacing="6">
+            <ProgressBar x:Name="Bar" Minimum="0" Maximum="1" IsIndeterminate="True" Height="6" />
+            <TextBlock x:Name="DetailText" FontSize="12" Opacity="0.6" Text=" " />
+        </StackPanel>
+
+        <StackPanel x:Name="Actions" Orientation="Horizontal" HorizontalAlignment="Right" Spacing="8" IsVisible="False">
+            <Button x:Name="FreshButton" Classes="pill-secondary" Content="Start fresh instead" Click="OnStartFreshClick" />
+            <Button x:Name="RetryButton" Classes="pill-primary" Content="Try again" Click="OnRetryClick" />
+        </StackPanel>
+    </StackPanel>
+</Window>

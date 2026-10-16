@@ -3,7 +3,10 @@
 ; Compile with: ISCC.exe installer.iss
 
 #define MyAppName "Noctis Plus"
-#define MyAppVersion "1.6.3"
+; Build-NoctisPlus.ps1 passes /DMyAppVersion=<Noctis.csproj Version>, so the Setup name matches what the updater looks for.
+#ifndef MyAppVersion
+  #define MyAppVersion "1.6.3"
+#endif
 #define MyAppPublisher "Alfamin"
 #define MyAppExeName "Noctis.exe"
 #define MyAppURL "https://github.com/Alfamin/NoctisPlus"
@@ -42,6 +45,9 @@ ArchitecturesAllowed=x64compatible
 ArchitecturesInstallIn64BitMode=x64compatible
 ; Tell Explorer associations changed so the Open-with list refreshes without a re-login.
 ChangesAssociations=yes
+; One Setup at a time (the in-app updater and scripts\install.ps1 can both start one).
+SetupMutex=NoctisPlusSetup
+; Uninstalling removes the program only: %APPDATA%\Noctis Plus (library, settings, sign-ins) is kept, like official Noctis.
 
 [Languages]
 Name: "english"; MessagesFile: "compiler:Default.isl"
@@ -119,11 +125,12 @@ Filename: "{app}\{#MyAppExeName}"; Description: "{cm:LaunchProgram,{#StringChang
 // On silent installs (the in-app updater path), Inno skips every [Run] entry
 // flagged `postinstall skipifsilent`, so the app would never relaunch after
 // "Install & Restart". Launch the new exe ourselves at ssDone in that case.
+// /NOLAUNCH=1 (scripts\install.ps1 with NOCTISPLUS_NO_START, CI install checks) installs only.
 procedure CurStepChanged(CurStep: TSetupStep);
 var
   ResultCode: Integer;
 begin
-  if (CurStep = ssDone) and WizardSilent() then
+  if (CurStep = ssDone) and WizardSilent() and (ExpandConstant('{param:NOLAUNCH|0}') <> '1') then
     Exec(ExpandConstant('{app}\{#MyAppExeName}'), '', '',
          SW_SHOW, ewNoWait, ResultCode);
 end;

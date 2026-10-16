@@ -29,6 +29,10 @@ public partial class App : Application
     /// finished, consumed by the main window once the player is ready.</summary>
     public static IReadOnlyList<string> PendingOpenFiles { get; set; } = Array.Empty<string>();
 
+    /// <summary>Set by Program.Main on the first launch of a new Noctis Plus profile: the official Noctis
+    /// profile is copied in behind <see cref="ProfileImportWindow"/> before the player opens.</summary>
+    public static Noctis.Services.ProfileImport.ProfileImporter? PendingProfileImport { get; set; }
+
     /// <summary>True when the autostart entry additionally requested a minimized (tray)
     /// start ("--startup --minimized"). Read from args at process start so the decision
     /// needs no async settings load — the main window hides immediately if the tray is up.</summary>
@@ -158,6 +162,32 @@ public partial class App : Application
         {
             Noctis.Services.StartupTrace.Mark("avalonia-initialized");
 
+            if (PendingProfileImport is { } import)
+            {
+                // The player (and every service it resolves) starts only once the profile is filled.
+                PendingProfileImport = null;
+                var importWindow = new ProfileImportWindow(import);
+                importWindow.Finished += (_, _) =>
+                {
+                    var player = StartMainWindow(desktop);
+                    player.Show();
+                    importWindow.Close();
+                };
+                desktop.MainWindow = importWindow;
+            }
+            else
+            {
+                StartMainWindow(desktop);
+            }
+        }
+
+        base.OnFrameworkInitializationCompleted();
+    }
+
+    /// <summary>Builds the player window and its services; the lifetime shows it at startup, or the caller does.</summary>
+    private Window StartMainWindow(IClassicDesktopStyleApplicationLifetime desktop)
+    {
+        {
             // This resolve builds the entire object graph, IAudioPlayer included — so it
             // blocks on the same singleton lock the Program.Main warm task is holding
             // while libvlc loads. The gap between the two marks is how much of that load
@@ -250,9 +280,8 @@ public partial class App : Application
                 sideFeed.Dispose();
                 desktop.Shutdown();
             };
+            return mainWindow;
         }
-
-        base.OnFrameworkInitializationCompleted();
     }
 
     /// <summary>How long the shutdown save may hold the exit before we quit regardless.</summary>
