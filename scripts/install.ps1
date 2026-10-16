@@ -189,7 +189,11 @@
     Write-Host ' Installing for your user. If Noctis Plus is open, Setup closes it first.'
     $arguments = @('/SILENT', '/SUPPRESSMSGBOXES', '/NORESTART', '/SP-')
     if ($env:NOCTISPLUS_NO_START -eq '1') { $arguments += '/NOLAUNCH=1' }
-    $process = Start-Process -FilePath $setup -ArgumentList $arguments -Wait -PassThru
+    # Not -Wait: in Windows PowerShell that also waits for every program Setup starts, so the line
+    # would hang until the user closed the Noctis Plus that Setup opens at the end.
+    $process = Start-Process -FilePath $setup -ArgumentList $arguments -PassThru
+    $null = $process.Handle   # keeps ExitCode readable once it has exited
+    $process.WaitForExit()
     if ($process.ExitCode -ne 0) {
         $why = switch ($process.ExitCode) {
             2 { 'Setup was cancelled before it started.' }

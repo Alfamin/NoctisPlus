@@ -84,6 +84,17 @@ Invoke-Expression (Get-Content -LiteralPath (Join-Path $repoRoot 'scripts\instal
 Check (Test-Path -LiteralPath $exe) 'still installed after reinstall'
 Check ((Fingerprint $plusProfile) -eq $plusBefore) 'reinstall leaves the Plus profile alone'
 
+Write-Host '== the install line as users run it: Setup starts Plus, and the line still finishes'
+Remove-Item Env:\NOCTISPLUS_NO_START
+$line = Start-Process -FilePath 'powershell.exe' -PassThru -WindowStyle Hidden -ArgumentList '-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', (Join-Path $repoRoot 'scripts\install.ps1')
+$null = $line.Handle
+$returned = $line.WaitForExit(180000)
+Check $returned 'install line returned while Noctis Plus was open'
+if ($returned) { Check ($line.ExitCode -eq 0) 'install line exit code 0' } else { Stop-Process -Id $line.Id -Force }
+Check (Wait-For { @(Get-Process -Name Noctis -ErrorAction SilentlyContinue).Count -gt 0 } 30) 'Setup started Noctis Plus'
+Get-Process -Name Noctis -ErrorAction SilentlyContinue | Stop-Process -Force
+Wait-For { @(Get-Process -Name Noctis -ErrorAction SilentlyContinue).Count -eq 0 } 20 | Out-Null
+
 Write-Host '== uninstall'
 $uninstaller = Join-Path $installDir 'unins000.exe'
 $p = Start-Process -FilePath $uninstaller -ArgumentList '/VERYSILENT','/SUPPRESSMSGBOXES','/NORESTART' -Wait -PassThru
