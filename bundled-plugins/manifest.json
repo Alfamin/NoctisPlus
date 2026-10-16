@@ -1,0 +1,51 @@
+{
+  "schemaVersion": 1,
+  "modules": [
+    {
+      "id": "dev.moshi.freemusicfinder",
+      "version": "2.11.1",
+      "repository": "Alfamin/noctic-download-plugin",
+      "commit": "384c0de",
+      "packageSha256": "cda35d74dfc6a353729798f3ccd56f81dbec2294ace67e0d0fd293658d8435bb",
+      "files": {
+        "FreeMusicFinder.deps.json": "cc5670920faf429d578f9ee3caaf8ae843c29007253c6ef06af04db6db2eff4f",
+        "FreeMusicFinder.dll": "d64b07ce8f13071b4404e414177a53ef7f9ac9c61f0760e69279de4f340ad4cd",
+        "plugin.json": "69dec99d82637765475c9ce92f4f0e2828f735582989f6f7bb2815da3a2f4383",
+        "WTelegramClient.dll": "81b82f5687925c2e10eb31181a30d12861d53ca5a1604986bbd46b2ad0990398"
+      }
+    },
+    {
+      "id": "dev.moshi.trueshuffle",
+      "version": "1.5.0",
+      "repository": "Alfamin/TrueShuffle",
+      "commit": "57114ad",
+      "packageSha256": "2360c28045ee32a26add11af17f435b81ace8850af48fa8032ca1b98a71b302f",
+      "files": {
+        "TrueShuffle.dll": "c2d07a617d7a347ec651a0ad9e0fc5bde134c9fdae0155bddf3b2563fc15d403",
+        "plugin.json": "a2a7073c5e7523067977aac4b97dee05617a0ff4f66ba9f0e996b95afec42e75"
+      }
+    },
+    {
+      "id": "dev.moshi.lyricmotion",
+      "version": "1.4.3",
+      "repository": "Alfamin/LyricMotion",
+      "commit": "a175a57",
+      "packageSha256": "cf4b35de16f356b16778a7c2592cddbb2ecb7ac38c09affeff5aa4c5977b341c",
+      "files": {
+        "LyricMotion.dll": "527be0fe7ea1eaf73a19d0bd79df2af014a836f2125740935392724fff88bc96",
+        "plugin.json": "fa6685f5a7459a96fdc08b1b5a5de0c36f74c02f8f6f290762bd9bb38c151143"
+      }
+    },
+    {
+      "id": "dev.moshi.wordlyrics",
+      "version": "1.2.4",
+      "repository": "Alfamin/WordLyrics",
+      "commit": "6a87585",
+      "packageSha256": "473434be2d9cc16dfd04263a08cda7981d6da9492fe1b834500d73eb483a9f91",
+      "files": {
+        "WordLyricsForNoctis.dll": "a19a68b7fbf22a9593265f519567f1b23e16d7f669e93250c6cfa1da36fc6f13",
+        "plugin.json": "4e1673212b8e9d0ea69897ab3d438b012d767984fbaebb9ad270b80a690ef708"
+      }
+    }
+  ]
+}

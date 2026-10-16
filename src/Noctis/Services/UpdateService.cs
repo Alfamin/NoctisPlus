@@ -4,6 +4,7 @@ using System.Net.Http.Json;
 using System.Reflection;
 using System.Runtime.InteropServices;
 using System.Text.Json.Serialization;
+using Noctis.Helpers;
 
 namespace Noctis.Services;
 
@@ -12,10 +13,11 @@ public sealed class UpdateService
     // Fetch the recent releases list (instead of /releases/latest) so pre-releases are included.
     // GitHub excludes pre-releases from /releases/latest, which would hide prerelease builds from
     // the in-app updater. We pick the highest-version release that has this platform's installer asset.
-    private const string ReleaseUrl = "https://api.github.com/repos/heartached/Noctis/releases?per_page=10";
+    // Noctis Plus updates from its own repository only, never from official Noctis releases.
+    private const string ReleaseUrl = "https://api.github.com/repos/" + ProductIdentity.Repository + "/releases?per_page=10";
 
     // Developer Mode version manager fetches the full recent history (GitHub caps per_page at 100).
-    private const string ReleaseListUrl = "https://api.github.com/repos/heartached/Noctis/releases?per_page=100";
+    private const string ReleaseListUrl = "https://api.github.com/repos/" + ProductIdentity.Repository + "/releases?per_page=100";
 
     private readonly HttpClient _http;
 
@@ -36,7 +38,7 @@ public sealed class UpdateService
     public static string DescribeBuild()
     {
         var v = CurrentVersion;
-        return $"Noctis {v.Major}.{v.Minor}.{v.Build}" + (IsPrereleaseBuild ? " (pre-release)" : "")
+        return $"{ProductIdentity.Name} {v.Major}.{v.Minor}.{v.Build}" + (IsPrereleaseBuild ? " (pre-release)" : "")
              + $"\nInstall source: {Source}"
              + (MacRosetta.IsTranslated == true ? "\nRunning under Rosetta 2: Intel (x64) build on Apple Silicon" : "");
     }
@@ -80,7 +82,7 @@ public sealed class UpdateService
     // AppId + "_is1"; per-user installs (PrivilegesRequired=lowest) land in
     // HKCU, elevated ones in HKLM.
     private const string InnoUninstallSubKey =
-        @"Software\Microsoft\Windows\CurrentVersion\Uninstall\{E8A3B5F1-7C2D-4A9E-B6F0-1D3E5A7C9B2F}_is1";
+        @"Software\Microsoft\Windows\CurrentVersion\Uninstall\" + ProductIdentity.InstallerAppId + "_is1";
 
     private static InstallSource? _cachedSource;
 
@@ -102,7 +104,7 @@ public sealed class UpdateService
     /// </summary>
     public static string? ExternalUpdateHint => Source switch
     {
-        InstallSource.Scoop => "Update with: scoop update noctis",
+        InstallSource.Scoop => "Download Noctis Plus from its GitHub releases.",
         InstallSource.Portable => "Download the new version from GitHub.",
         _ => null
     };
@@ -228,6 +230,8 @@ public sealed class UpdateService
         request.Headers.Accept.Add(new System.Net.Http.Headers.MediaTypeWithQualityHeaderValue("application/vnd.github+json"));
 
         using var response = await _http.SendAsync(request, ct);
+        // An unpublished fork has no release feed yet. Other failures still surface normally.
+        if (response.StatusCode == System.Net.HttpStatusCode.NotFound) return null;
         response.EnsureSuccessStatusCode();
 
         var releasesJson = await HttpSafety.ReadStringBoundedAsync(response.Content, ct: ct);
@@ -269,7 +273,7 @@ public sealed class UpdateService
             InstallerSize = installerAsset?.Size ?? 0,
             InstallerAssetName = installerAsset?.Name,
             ChecksumsApiUrl = checksumsAsset?.Url,
-            ReleaseUrl = best.Release.HtmlUrl ?? $"https://github.com/heartached/Noctis/releases/tag/{best.Release.TagName}",
+            ReleaseUrl = best.Release.HtmlUrl ?? $"{ProductIdentity.ProjectUrl}/releases/tag/{best.Release.TagName}",
             PublishedAt = best.Release.PublishedAt,
             WarningText = ExtractReleaseWarning(best.Release.Body)
         };
@@ -287,6 +291,7 @@ public sealed class UpdateService
         request.Headers.Accept.Add(new System.Net.Http.Headers.MediaTypeWithQualityHeaderValue("application/vnd.github+json"));
 
         using var response = await _http.SendAsync(request, ct);
+        if (response.StatusCode == System.Net.HttpStatusCode.NotFound) return new List<ReleaseListItem>();
         response.EnsureSuccessStatusCode();
 
         var releasesJson = await HttpSafety.ReadStringBoundedAsync(response.Content, ct: ct);
@@ -301,7 +306,7 @@ public sealed class UpdateService
 
             var installerAsset = FindInstallerAsset(release);
             var checksumsAsset = FindChecksumsAsset(release);
-            var releaseUrl = release.HtmlUrl ?? $"https://github.com/heartached/Noctis/releases/tag/{release.TagName}";
+            var releaseUrl = release.HtmlUrl ?? $"{ProductIdentity.ProjectUrl}/releases/tag/{release.TagName}";
 
             items.Add(new ReleaseListItem
             {
@@ -403,7 +408,7 @@ public sealed class UpdateService
         {
             return release.Assets.FirstOrDefault(a =>
                 a.Name != null &&
-                a.Name.StartsWith("Noctis-", StringComparison.OrdinalIgnoreCase) &&
+                a.Name.StartsWith(ProductIdentity.Key + "-", StringComparison.OrdinalIgnoreCase) &&
                 a.Name.EndsWith("-Setup.exe", StringComparison.OrdinalIgnoreCase));
         }
 
@@ -412,7 +417,7 @@ public sealed class UpdateService
             var arch = MacDmgArch(RuntimeInformation.OSArchitecture, MacRosetta.IsTranslated);
             return release.Assets.FirstOrDefault(a =>
                 a.Name != null &&
-                a.Name.StartsWith("Noctis-", StringComparison.OrdinalIgnoreCase) &&
+                a.Name.StartsWith(ProductIdentity.Key + "-", StringComparison.OrdinalIgnoreCase) &&
                 a.Name.EndsWith($"-osx-{arch}.dmg", StringComparison.OrdinalIgnoreCase));
         }
 
@@ -430,13 +435,13 @@ public sealed class UpdateService
                 // Pinned to the exact CI asset name so a future release shipping multiple
                 // AppImages can't ambiguously match the wrong one.
                 return release.Assets.FirstOrDefault(a =>
-                    string.Equals(a.Name, "Noctis-x86_64.AppImage", StringComparison.OrdinalIgnoreCase));
+                    string.Equals(a.Name, ProductIdentity.Key + "-x86_64.AppImage", StringComparison.OrdinalIgnoreCase));
             }
 
             var tarball = RuntimeInformation.OSArchitecture switch
             {
-                Architecture.X64 => "Noctis-linux-x64.tar.gz",
-                Architecture.Arm64 => "Noctis-linux-arm64.tar.gz",
+                Architecture.X64 => ProductIdentity.Key + "-linux-x64.tar.gz",
+                Architecture.Arm64 => ProductIdentity.Key + "-linux-arm64.tar.gz",
                 _ => null
             };
             if (tarball is null)
@@ -507,7 +512,7 @@ public sealed class UpdateService
     /// Windows and macOS: the per-user temp folder, as before.
     /// </summary>
     internal static string InstallerDirectory => OperatingSystem.IsLinux()
-        ? Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "Noctis", "updates")
+        ? Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), ProductIdentity.DataFolderName, "updates")
         : Path.GetTempPath();
 
     private async Task<string> DownloadInstallerAsync(
@@ -534,7 +539,7 @@ public sealed class UpdateService
         // Installable downloads also pin the repo, not just the host: IsTrustedGitHubUrl accepts
         // any GitHub repo's assets, and an unattended install must only ever run our own releases.
         if (requireChecksums && (!IsConfiguredRepoAssetUrl(url) || !IsConfiguredRepoAssetUrl(checksumsUrl)))
-            throw new InvalidOperationException("Refusing an update asset from outside heartached/Noctis.");
+            throw new InvalidOperationException("Refusing an update asset from outside " + ProductIdentity.Repository + ".");
 
         if (destinationPath is null && OperatingSystem.IsLinux())
         {
@@ -547,9 +552,9 @@ public sealed class UpdateService
         // verify-then-launch swap (TOCTOU) on the elevated installer.
         var runTag = Guid.NewGuid().ToString("N")[..8];
         var tempPath = destinationPath ?? Path.Combine(InstallerDirectory,
-            OperatingSystem.IsMacOS() ? $"Noctis-Update-{runTag}.dmg"
-            : OperatingSystem.IsLinux() ? $"Noctis-Update-{runTag}{LinuxInstallerExtension()}"
-            : $"Noctis-Update-{runTag}-Setup.exe");
+            OperatingSystem.IsMacOS() ? $"{ProductIdentity.Key}-Update-{runTag}.dmg"
+            : OperatingSystem.IsLinux() ? $"{ProductIdentity.Key}-Update-{runTag}{LinuxInstallerExtension()}"
+            : $"{ProductIdentity.Key}-Update-{runTag}-Setup.exe");
 
         try
         {
@@ -1004,11 +1009,11 @@ public sealed class UpdateService
             || host.EndsWith(".githubusercontent.com", StringComparison.OrdinalIgnoreCase);
     }
 
-    private const string RepoAssetPathPrefix = "/repos/heartached/Noctis/releases/assets/";
+    private const string RepoAssetPathPrefix = "/repos/" + ProductIdentity.Repository + "/releases/assets/";
 
     /// <summary>
     /// True only for this repo's release-asset API URL
-    /// (https://api.github.com/repos/heartached/Noctis/releases/assets/&lt;id&gt;, no query):
+    /// (https://api.github.com/repos/Alfamin/NoctisPlus/releases/assets/&lt;id&gt;, no query; official Noctis assets are refused):
     /// what CheckForUpdateAsync reads from the pinned releases endpoint. Checked on top of
     /// <see cref="IsTrustedGitHubUrl"/> for every download that may be installed.
     /// </summary>

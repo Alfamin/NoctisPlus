@@ -8129,7 +8129,7 @@ public partial class SettingsViewModel : ViewModelBase
     [RelayCommand]
     private void OpenGitHub()
     {
-        Helpers.PlatformHelper.OpenUrl("https://github.com/heartached/Noctis");
+        Helpers.PlatformHelper.OpenUrl(ProductIdentity.ProjectUrl);
     }
 
     /// <summary>True briefly after the version is copied — drives the inline
@@ -8141,7 +8141,7 @@ public partial class SettingsViewModel : ViewModelBase
     private async Task CopyVersionInfoAsync()
     {
         var v = UpdateService.CurrentVersion;
-        var info = $"Noctis {v.Major}.{v.Minor}.{v.Build} — " +
+        var info = $"{ProductIdentity.Name} {v.Major}.{v.Minor}.{v.Build} (based on Noctis) — " +
                    $"{System.Runtime.InteropServices.RuntimeInformation.OSDescription} " +
                    $"({System.Runtime.InteropServices.RuntimeInformation.OSArchitecture})";
 
@@ -8162,8 +8162,8 @@ public partial class SettingsViewModel : ViewModelBase
     private void OpenLatestRelease()
     {
         var url = string.IsNullOrEmpty(LatestVersionTag)
-            ? "https://github.com/heartached/Noctis/releases/latest"
-            : $"https://github.com/heartached/Noctis/releases/tag/{LatestVersionTag}";
+            ? $"{ProductIdentity.ProjectUrl}/releases/latest"
+            : $"{ProductIdentity.ProjectUrl}/releases/tag/{LatestVersionTag}";
         Helpers.PlatformHelper.OpenUrl(url);
     }
 

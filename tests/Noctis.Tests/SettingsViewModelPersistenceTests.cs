@@ -66,7 +66,7 @@ public class SettingsViewModelPersistenceTests : IDisposable
         var seeded = new AppSettings { AutoInstallUpdates = true };
         await new PersistenceService(_root).SaveSettingsAsync(seeded);
 
-        var installer = Path.Combine(Path.GetTempPath(), $"Noctis-Update-{Guid.NewGuid().ToString("N")[..8]}-Setup.exe");
+        var installer = Path.Combine(Path.GetTempPath(), $"NoctisPlus-Update-{Guid.NewGuid().ToString("N")[..8]}-Setup.exe");
         File.WriteAllText(installer, "not an installer");
         try
         {

@@ -9,7 +9,7 @@
         xmlns:helpers="using:Noctis.Helpers"
         x:Class="Noctis.Views.MainWindow"
         x:DataType="vm:MainWindowViewModel"
-        Title="{loc:T Main.Noctis}"
+        Title="{x:Static helpers:ProductIdentity.Name}"
         Icon="avares://Noctis.UI/Assets/Icons/Noctis.ico"
         Width="1280" Height="800"
         MinWidth="780" MinHeight="500"

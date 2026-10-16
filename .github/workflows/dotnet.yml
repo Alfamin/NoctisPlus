@@ -23,6 +23,7 @@ permissions:
 
 jobs:
   build:
+    if: github.repository == 'heartached/Noctis'
     name: ${{ matrix.name }}
     runs-on: ${{ matrix.runs-on }}
 

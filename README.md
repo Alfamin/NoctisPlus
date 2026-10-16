@@ -1,3 +1,15 @@
+# Noctis Plus (local preview)
+
+Fork of [Noctis by heartached](https://github.com/heartached/Noctis), based on stable 1.6.3.
+Includes Finder, True Shuffle, WordLyrics and Lyric Motion, with separate profiles, Windows
+installation identity and update feed. [Run/build instructions](docs/fork/QUICKSTART.md) ·
+[provenance and release requirements](docs/fork/PROVENANCE.md).
+
+The original Noctis README follows. Its installers, package-manager commands and website
+refer to official Noctis; use the Plus instructions above for this fork.
+
+---
+
 <div align="center">
 
 <h1>

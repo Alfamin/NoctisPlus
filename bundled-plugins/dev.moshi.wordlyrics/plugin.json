@@ -1,0 +1,79 @@
+{
+  "id": "dev.moshi.wordlyrics",
+  "name": "WordLyrics",
+  "version": "1.2.4",
+  "author": "moshi",
+  "description": "Word-by-word lyrics for new songs, by themselves: when a song is added to a library folder (downloaded, copied, ripped), the WordLyrics program finds its lyrics and times every word in the background, and writes a .elrc file next to the song. Songs are only read. Needs the WordLyrics program on this computer; the switch below installs it.",
+  "type": "dotnet",
+  "entry": "WordLyricsForNoctis.dll",
+  "entryType": "WordLyricsForNoctis.WordLyricsPlugin",
+  "apiVersion": "1.1",
+  "minAppVersion": "1.5.5",
+  "platforms": ["windows"],
+  "permissions": ["menu.commands", "notifications", "network"],
+  "settings": [
+    {
+      "key": "auto",
+      "label": "Time new songs by themselves",
+      "type": "bool",
+      "default": true,
+      "description": "A song that appears in a library folder gets word-by-word lyrics a moment later. Off: only when you right-click a song and choose \"Time the words (WordLyrics)\"."
+    },
+    {
+      "key": "speed",
+      "label": "How hard the computer works",
+      "type": "choice",
+      "choices": ["Full", "Half", "Light"],
+      "default": "Half",
+      "description": "A share of what this computer's graphics card can do. One song takes a few seconds at Full; Light is for gaming at the same time."
+    },
+    {
+      "key": "notify",
+      "label": "Say when a song is done",
+      "type": "bool",
+      "default": true
+    },
+    {
+      "key": "folder",
+      "label": "WordLyrics folder",
+      "type": "string",
+      "default": "",
+      "description": "Leave empty for the usual place: the WordLyrics folder in your user folder."
+    },
+    {
+      "key": "backup",
+      "label": "Backup folder",
+      "type": "string",
+      "default": "",
+      "description": "WordLyrics keeps a copy of every song before it works on it. Leave empty for the usual place: a \"WordLyrics Backups\" folder on the drive with the most free space."
+    },
+    {
+      "key": "setup",
+      "label": "Install or update WordLyrics",
+      "type": "bool",
+      "default": false,
+      "description": "Flip this switch (either way). A window checks the installed program, packages and models first; working components are reused. Missing parts download into the folder above (about 1.4 GB for a first setup). For a published update, run the public installer again."
+    },
+    {
+      "key": "showProgress",
+      "label": "Show progress when new songs are timed",
+      "type": "bool",
+      "default": true,
+      "description": "Opens a small WordLyrics window with the current stage, song count and errors. Closing it keeps the job running."
+    },
+    {
+      "key": "progress",
+      "label": "Open progress and last result",
+      "type": "bool",
+      "default": false,
+      "description": "Flip either way to show the current job or its last result and report."
+    },
+    {
+      "key": "library",
+      "label": "Generate timestamps / choose music folders",
+      "type": "bool",
+      "default": false,
+      "description": "Flip either way to open WordLyrics. One Noctis folder is selected automatically; with several folders you can select one, several, or all. Choose 1 to generate missing word timestamps."
+    }
+  ]
+}

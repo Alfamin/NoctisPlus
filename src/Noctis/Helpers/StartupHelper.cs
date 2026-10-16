@@ -20,7 +20,7 @@ namespace Noctis.Helpers;
 /// </summary>
 public static class StartupHelper
 {
-    private const string AppName = "Noctis";
+    private const string AppName = ProductIdentity.Name;
     private const string WindowsRunKey = @"Software\Microsoft\Windows\CurrentVersion\Run";
 
     /// <summary>Passed in every autostart command so a login launch is distinguishable
@@ -114,7 +114,7 @@ public static class StartupHelper
     // ── macOS: LaunchAgent plist ──
     private static string MacAgentPath => Path.Combine(
         Environment.GetFolderPath(Environment.SpecialFolder.UserProfile),
-        "Library", "LaunchAgents", "com.heartached.noctis.plist");
+        "Library", "LaunchAgents", "io.github.alfamin.noctisplus.plist");
 
     private static bool MacSet(bool enabled, bool startMinimized)
     {
@@ -138,7 +138,7 @@ public static class StartupHelper
             "<plist version=\"1.0\">\n" +
             "<dict>\n" +
             "  <key>Label</key>\n" +
-            "  <string>com.heartached.noctis</string>\n" +
+            "  <string>io.github.alfamin.noctisplus</string>\n" +
             "  <key>ProgramArguments</key>\n" +
             "  <array>\n" +
             "    <string>/usr/bin/open</string>\n" +
@@ -172,7 +172,7 @@ public static class StartupHelper
     // ── Linux: ~/.config/autostart/.desktop ──
     private static string LinuxDesktopPath => Path.Combine(
         Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), // ~/.config
-        "autostart", "noctis.desktop");
+        "autostart", "noctisplus.desktop");
 
     private static bool LinuxSet(bool enabled, bool startMinimized)
     {
@@ -189,7 +189,7 @@ public static class StartupHelper
         var desktop =
             "[Desktop Entry]\n" +
             "Type=Application\n" +
-            "Name=Noctis\n" +
+            "Name=" + ProductIdentity.Name + "\n" +
             $"Exec=\"{exec}\" {LaunchArgs(startMinimized)}\n" +
             "Terminal=false\n" +
             "X-GNOME-Autostart-enabled=true\n";

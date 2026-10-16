@@ -18,6 +18,9 @@ public class LastFmService : ILastFmService
     private readonly HttpClient _http;
     private string? _sessionKey;
     private string? _token;
+    private readonly object _sessionGate = new();
+    private long _sessionGeneration;
+    internal Task SessionVerification { get; private set; } = Task.CompletedTask;
     /// <summary>Album descriptions (album.getinfo + the JSON cache), shared with the phone;
     /// the description methods below forward to it unchanged.</summary>
     private readonly LastFmAlbumDescriptions _albumDescriptions;
@@ -34,25 +37,13 @@ public class LastFmService : ILastFmService
 
     public void Configure(string? sessionKey)
     {
-        _sessionKey = sessionKey;
-
-        // If we have a session key, validate it by getting user info
-        if (!string.IsNullOrEmpty(sessionKey))
+        lock (_sessionGate)
         {
-            _ = Task.Run(async () =>
-            {
-                try
-                {
-                    var name = await GetAuthenticatedUsernameAsync();
-                    Username = name;
-                }
-                catch
-                {
-                    // Session key may be expired
-                    _sessionKey = null;
-                    Username = null;
-                }
-            });
+            if (_sessionKey != sessionKey) Username = null;
+            _sessionKey = sessionKey;
+            var generation = ++_sessionGeneration;
+            SessionVerification = string.IsNullOrEmpty(sessionKey)
+                ? Task.CompletedTask : VerifySessionAsync(sessionKey, generation);
         }
     }
 
@@ -116,14 +107,21 @@ public class LastFmService : ILastFmService
 
     public void Logout()
     {
-        _sessionKey = null;
-        Username = null;
-        _token = null;
+        lock (_sessionGate)
+        {
+            ++_sessionGeneration;
+            _sessionKey = null;
+            Username = null;
+            _token = null;
+        }
     }
 
     public async Task ScrobbleAsync(Track track, DateTime startedAt)
     {
-        if (!IsAuthenticated || string.IsNullOrEmpty(track.Artist) || string.IsNullOrEmpty(track.Title))
+        string? sessionKey;
+        long generation;
+        lock (_sessionGate) { sessionKey = _sessionKey; generation = _sessionGeneration; }
+        if (string.IsNullOrEmpty(sessionKey) || string.IsNullOrEmpty(track.Artist) || string.IsNullOrEmpty(track.Title))
             return;
 
         try
@@ -132,7 +130,7 @@ public class LastFmService : ILastFmService
             {
                 { "method", "track.scrobble" },
                 { "api_key", ApiKey },
-                { "sk", _sessionKey! },
+                { "sk", sessionKey },
                 { "artist", track.Artist },
                 { "track", track.Title },
                 { "timestamp", new DateTimeOffset(startedAt).ToUnixTimeSeconds().ToString() }
@@ -170,12 +168,8 @@ public class LastFmService : ILastFmService
             {
                 DebugLog.Write("LastFm", $"Scrobble error: {Truncate(okBody, 200)}");
                 // Code 9 = invalid session key: the stored credential is dead.
-                if (okBody.Contains("\"error\":9", StringComparison.Ordinal))
-                {
-                    _sessionKey = null;
-                    Username = null;
-                    SessionExpired?.Invoke(this, EventArgs.Empty);
-                }
+                using var error = JsonDocument.Parse(okBody);
+                if (IsInvalidSession(error.RootElement)) ExpireSession(sessionKey, generation);
                 ScrobbleFailed?.Invoke(this, "Last.fm rejected the scrobble.");
             }
         }
@@ -288,28 +282,63 @@ public class LastFmService : ILastFmService
         return await HttpSafety.ReadStringBoundedAsync(resp.Content);
     }
 
-    private async Task<string?> GetAuthenticatedUsernameAsync()
+    private async Task VerifySessionAsync(string sessionKey, long generation)
     {
-        var parameters = new SortedDictionary<string, string>
+        try
         {
-            { "method", "user.getInfo" },
-            { "api_key", ApiKey },
-            { "sk", _sessionKey! }
-        };
+            var parameters = new SortedDictionary<string, string>
+            {
+                { "method", "user.getInfo" },
+                { "api_key", ApiKey },
+                { "sk", sessionKey }
+            };
 
-        var sig = GenerateSignature(parameters);
-        parameters["api_sig"] = sig;
-        parameters["format"] = "json";
+            var sig = GenerateSignature(parameters);
+            parameters["api_sig"] = sig;
+            parameters["format"] = "json";
 
-        var url = BuildUrl(parameters);
-        var response = await GetStringBoundedAsync(url);
-        using var doc = JsonDocument.Parse(response);
+            var url = BuildUrl(parameters);
+            using var response = await _http.GetAsync(url);
+            using var doc = JsonDocument.Parse(await HttpSafety.ReadStringBoundedAsync(response.Content));
 
-        if (doc.RootElement.TryGetProperty("user", out var user) &&
-            user.TryGetProperty("name", out var name))
-            return name.GetString();
+            if (IsInvalidSession(doc.RootElement))
+            {
+                ExpireSession(sessionKey, generation);
+                return;
+            }
+            // Offline, VPN/proxy errors, rate limits, server failures, and other API errors
+            // cannot establish that a stored credential is invalid. Never erase it for those.
+            if (!response.IsSuccessStatusCode) return;
 
-        return null;
+            if (doc.RootElement.TryGetProperty("user", out var user) &&
+                user.TryGetProperty("name", out var name) && name.ValueKind == JsonValueKind.String)
+            {
+                lock (_sessionGate)
+                    if (generation == _sessionGeneration && sessionKey == _sessionKey)
+                        Username = name.GetString();
+            }
+        }
+        catch (Exception ex)
+        {
+            // Exception messages can contain the request URL/session. Log the type only.
+            DebugLog.Write("LastFm", $"Session verification unavailable ({ex.GetType().Name}); keeping login.");
+        }
+    }
+
+    private static bool IsInvalidSession(JsonElement root) => root.ValueKind == JsonValueKind.Object
+        && root.TryGetProperty("error", out var error) && error.ValueKind == JsonValueKind.Number
+        && error.TryGetInt32(out var code) && code == 9;
+
+    private void ExpireSession(string? sessionKey, long generation)
+    {
+        lock (_sessionGate)
+        {
+            if (generation != _sessionGeneration || sessionKey != _sessionKey) return;
+            ++_sessionGeneration;
+            _sessionKey = null;
+            Username = null;
+        }
+        SessionExpired?.Invoke(this, EventArgs.Empty);
     }
 
     private static string GenerateSignature(SortedDictionary<string, string> parameters)

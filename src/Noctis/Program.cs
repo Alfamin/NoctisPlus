@@ -18,6 +18,7 @@ internal class Program
     [STAThread]
     public static void Main(string[] args)
     {
+        ConfigureBundledTools();
         Services.StartupTrace.Begin();
         // The core's log header must name this app, not the core assembly.
         Services.DebugLog.DescribeBuild = Services.UpdateService.DescribeBuild;
@@ -161,6 +162,14 @@ internal class Program
             }
         }
     }
+
+    /// <summary>
+    /// The bundled WordLyrics plugin uses the existing WordLyrics bootstrap. That installer
+    /// also offers official Noctis/plugins by default. Its documented backend-only switch
+    /// must be inherited by child processes from Plus, without changing user/machine settings.
+    /// </summary>
+    internal static void ConfigureBundledTools()
+        => Environment.SetEnvironmentVariable("WORDLYRICS_NO_NOCTIS", "1", EnvironmentVariableTarget.Process);
 
     [System.Runtime.InteropServices.DllImport("user32.dll", CharSet = System.Runtime.InteropServices.CharSet.Unicode)]
     private static extern int MessageBox(IntPtr hWnd, string text, string caption, uint type);
@@ -323,7 +332,7 @@ internal class Program
             {
                 Timeout = TimeSpan.FromSeconds(15)
             };
-            http.DefaultRequestHeaders.UserAgent.ParseAdd("Noctis/1.0");
+            http.DefaultRequestHeaders.UserAgent.ParseAdd(ProductIdentity.Key + "/" + UpdateService.CurrentVersion.ToString(3));
             http.DefaultRequestHeaders.Accept.Add(new MediaTypeWithQualityHeaderValue("application/json"));
             return http;
         });

@@ -43,7 +43,7 @@ public class UpdateDownloadStallTests : IDisposable
         Version = new Version(9, 9, 9),
         InstallerApiUrl = AssetUrl,
         InstallerSize = size,
-        InstallerAssetName = "Noctis-v9.9.9-Setup.exe",
+        InstallerAssetName = "NoctisPlus-v9.9.9-Setup.exe",
         ReleaseUrl = "https://github.com/heartached/Noctis/releases/tag/v9.9.9",
     };
 

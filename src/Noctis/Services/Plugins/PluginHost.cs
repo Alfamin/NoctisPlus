@@ -86,6 +86,9 @@ public sealed partial class LoadedPlugin : ObservableObject
     /// <summary>A data-only pack ("type": "content"): never loads code, needs no approval.</summary>
     public bool IsContentPack => Manifest?.IsContent == true;
     public bool IsCodePlugin => !IsContentPack;
+    /// <summary>Ships with the application. Can be switched off, but never overwritten or removed by the plugin manager.</summary>
+    public bool IsBundled { get; internal init; }
+    public bool CanRemove => !IsBundled;
     /// <summary>The pack's parsed files; null for code plugins and for packs that failed to load.</summary>
     public ContentPackData? Content { get; init; }
     /// <summary>Declared permissions (without the implicit "playback.read").</summary>
@@ -412,17 +415,19 @@ public sealed class PluginHost
     private readonly Func<AppSettings> _settings;
     private readonly Action _saveSettings;
     private readonly string _appVersion;
+    private readonly string? _bundledDirectory;
 
     /// <param name="player">The live player; null in tests (plugins then see no track and no events).</param>
     /// <param name="library">For "library.read"; null → an empty library.</param>
     public PluginHost(PlayerViewModel? player, string dataDirectory, Func<AppSettings> settings, Action saveSettings, string appVersion,
-        ILibraryService? library = null)
+        ILibraryService? library = null, string? bundledDirectory = null)
     {
         _player = player;
         _library = library;
         _settings = settings;
         _saveSettings = saveSettings;
         _appVersion = appVersion;
+        _bundledDirectory = bundledDirectory;
         PluginsDirectory = Path.Combine(dataDirectory, "plugins");
         PluginDataRoot = Path.Combine(dataDirectory, "plugin-data");
     }
@@ -492,11 +497,26 @@ public sealed class PluginHost
         catch (Exception ex) { DebugLogger.Error(DebugLogger.Category.State, "Plugins", $"create folder: {ex.Message}"); return; }
 
         var found = new List<LoadedPlugin>();
+        if (_bundledDirectory is not null && Directory.Exists(_bundledDirectory))
+        {
+            foreach (var dir in Directory.EnumerateDirectories(_bundledDirectory).OrderBy(d => d, StringComparer.OrdinalIgnoreCase))
+            {
+                if (Path.GetFileName(dir).StartsWith('.')) continue;
+                var plugin = Discover(dir, bundled: true);
+                if (plugin is not null) found.Add(plugin);
+            }
+        }
         foreach (var dir in Directory.EnumerateDirectories(PluginsDirectory).OrderBy(d => d, StringComparer.OrdinalIgnoreCase))
         {
             if (Path.GetFileName(dir).StartsWith('.')) continue; // .staging-* from an interrupted install
             var plugin = Discover(dir);
-            if (plugin is not null) found.Add(plugin);
+            if (plugin is not null)
+            {
+                // The app owns built-in versions. An imported community copy must not run twice,
+                // or acquire built-in trust merely by choosing the same id.
+                if (found.Any(p => p.IsBundled && SameId(p.Id, plugin.Id))) continue;
+                found.Add(plugin);
+            }
         }
 
         var dirty = MigrateSettings(found);
@@ -638,13 +658,14 @@ public sealed class PluginHost
     /// <summary>True when the permissions the plugin declares were approved before.</summary>
     public bool IsApproved(LoadedPlugin plugin)
     {
+        if (plugin.IsBundled) return true;
         var grants = _settings().PluginPermissionGrants;
         if (grants is null) return false;
         var granted = grants.FirstOrDefault(kv => SameId(kv.Key, plugin.Id)).Value;
         return granted is not null && plugin.Permissions.All(p => granted.Contains(p, StringComparer.OrdinalIgnoreCase));
     }
 
-    private LoadedPlugin? Discover(string dir)
+    private LoadedPlugin? Discover(string dir, bool bundled = false)
     {
         PluginManifest? manifest = null;
         string? error = null;
@@ -670,7 +691,7 @@ public sealed class PluginHost
             catch (Exception ex) when (ex is IOException or UnauthorizedAccessException) { error = "The pack could not be read: " + ex.Message; }
         }
 
-        var plugin = new LoadedPlugin(dir, assembly, manifest, error) { Content = content };
+        var plugin = new LoadedPlugin(dir, assembly, manifest, error) { Content = content, IsBundled = bundled };
         Prepare(plugin);
         return plugin;
     }
@@ -722,10 +743,10 @@ public sealed class PluginHost
         {
             // Plugins already installed ran before this switch existed: keep them running and
             // treat what they declare today as approved. Everyone else starts restricted.
-            var hadPlugins = found.Any(p => p.AssemblyPath is not null || p.InProcessFactory is not null);
+            var hadPlugins = found.Any(p => !p.IsBundled && (p.AssemblyPath is not null || p.InProcessFactory is not null));
             settings.CommunityPluginsEnabled = hadPlugins;
             if (hadPlugins)
-                foreach (var p in found.Where(p => !IsDisabled(p)))
+                foreach (var p in found.Where(p => !p.IsBundled && !IsDisabled(p)))
                     Grant(settings, p);
             dirty = true;
             DebugLogger.Info(DebugLogger.Category.State, "Plugins", $"community plugins default {(hadPlugins ? "ON (plugins were installed)" : "OFF")}");
@@ -768,15 +789,15 @@ public sealed class PluginHost
             return;
         }
 
-        plugin.CanToggle = CommunityPluginsEnabled;
-        if (!CommunityPluginsEnabled) plugin.Status = PluginStatus.Restricted;
+        plugin.CanToggle = plugin.IsBundled || CommunityPluginsEnabled;
+        if (!plugin.CanToggle) plugin.Status = PluginStatus.Restricted;
         else if (plugin.IsEnabled) Start(plugin);
         else if (!IsDisabled(plugin) && HasGrantEntry(plugin)) plugin.Status = PluginStatus.NeedsApproval;
         else plugin.Status = PluginStatus.Disabled;
     }
 
     private bool CanRun(LoadedPlugin plugin)
-        => CommunityPluginsEnabled && plugin.CanToggle && (plugin.AssemblyPath is not null || plugin.InProcessFactory is not null);
+        => (plugin.IsBundled || CommunityPluginsEnabled) && plugin.CanToggle && (plugin.AssemblyPath is not null || plugin.InProcessFactory is not null);
 
     // The Settings toggle binds IsEnabled two-way; SetEnabled also writes IsEnabled, so only
     // act when the flag disagrees with the actual running state (re-entrancy guard).
@@ -1093,6 +1114,9 @@ public sealed class PluginHost
         catch (PluginInstallException ex) { return new PluginInstallResult(PluginInstallOutcome.Failed, ex.Message); }
 
         var manifest = package.Manifest;
+        if (existing?.IsBundled == true)
+            return new PluginInstallResult(PluginInstallOutcome.AlreadyInstalled,
+                $"{existing.Name} {existing.Version} is included with Noctis Plus. Update Noctis Plus to update this feature.", existing);
         var target = Path.Combine(PluginsDirectory, SafeFolderName(manifest.Id));
         if (existing is not null)
         {
@@ -1146,6 +1170,7 @@ public sealed class PluginHost
     /// </summary>
     public bool Remove(LoadedPlugin plugin, bool deleteData)
     {
+        if (plugin.IsBundled) return false;
         Stop(plugin);
         Plugins.Remove(plugin);
         var settings = _settings();

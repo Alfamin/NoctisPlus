@@ -53,7 +53,7 @@ public class PersistenceService : IPersistenceService
     private string AnimatedCoverDirectory => Path.Combine(DataDirectory, "animated_covers");
 
     public PersistenceService()
-        // Data root is %APPDATA%\Noctis by default; NOCTIS_DATA_DIR overrides
+        // Data root is %APPDATA%\Noctis Plus by default; NOCTIS_PLUS_DATA_DIR overrides
         // (used by dev builds so they don't clobber a parallel install).
         : this(Helpers.AppPaths.DataRoot)
     {

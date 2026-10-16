@@ -9,6 +9,7 @@ using System.Text.Json;
 using System.Text.Json.Serialization;
 using System.Threading;
 using System.Threading.Tasks;
+using Noctis.Helpers;
 
 namespace Noctis.Services;
 
@@ -50,7 +51,7 @@ public sealed class ArtistInfoService
     internal const int CurrentSchema = 3;
 
     private static readonly string UserAgent =
-        $"Noctis/{Assembly.GetExecutingAssembly().GetName().Version?.ToString(3) ?? "1.0"} (https://github.com/heartached/Noctis)";
+        $"{ProductIdentity.Key}/{Assembly.GetExecutingAssembly().GetName().Version?.ToString(3) ?? "1.0"} ({ProductIdentity.ProjectUrl})";
 
     private readonly HttpClient _http;
     private readonly string _dir;

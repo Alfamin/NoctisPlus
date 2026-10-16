@@ -2,6 +2,7 @@ using System.Diagnostics;
 using System.Runtime.InteropServices;
 using Noctis.Models;
 using LibVLCSharp.Shared;
+using Noctis.Helpers;
 
 namespace Noctis.Services;
 
@@ -606,8 +607,8 @@ public class VlcAudioPlayer : IAudioPlayer
         // "VLC media player (LibVLC x.y.z)".
         try
         {
-            _libVlc.SetUserAgent("Noctis", "Noctis");
-            _libVlc.SetAppId("com.heartached.noctis", "1.0", "noctis");
+            _libVlc.SetUserAgent(ProductIdentity.Name, ProductIdentity.Key);
+            _libVlc.SetAppId("io.github.alfamin.noctisplus", "1.0", "noctisplus");
         }
         catch { /* cosmetic only — never block playback on naming */ }
 

@@ -1,0 +1,41 @@
+{
+  "runtimeTarget": {
+    "name": ".NETCoreApp,Version=v10.0",
+    "signature": ""
+  },
+  "compilationOptions": {},
+  "targets": {
+    ".NETCoreApp,Version=v10.0": {
+      "FreeMusicFinder/2.10.1": {
+        "dependencies": {
+          "WTelegramClient": "4.4.9"
+        },
+        "runtime": {
+          "FreeMusicFinder.dll": {}
+        }
+      },
+      "WTelegramClient/4.4.9": {
+        "runtime": {
+          "lib/net8.0/WTelegramClient.dll": {
+            "assemblyVersion": "4.4.9.0",
+            "fileVersion": "4.4.9.0"
+          }
+        }
+      }
+    }
+  },
+  "libraries": {
+    "FreeMusicFinder/2.10.1": {
+      "type": "project",
+      "serviceable": false,
+      "sha512": ""
+    },
+    "WTelegramClient/4.4.9": {
+      "type": "package",
+      "serviceable": true,
+      "sha512": "sha512-K4xOqTx8J9/g/Qzwk4YHxcMnO3CrL5ascHW3Ka/TZcGK5hryAKUOW/e2SzoU/ilqXBV//Hn9RXW2wmn+OcRoXA==",
+      "path": "wtelegramclient/4.4.9",
+      "hashPath": "wtelegramclient.4.4.9.nupkg.sha512"
+    }
+  }
+}

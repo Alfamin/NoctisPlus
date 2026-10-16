@@ -13,8 +13,18 @@ public static class SingleInstanceGuard
 {
     // Mutex default namespace is per-session on Windows; the pipe namespace is
     // machine-global, so the user name keeps two logged-in users independent.
-    private static readonly string MutexName = $"Noctis-SingleInstance-{Environment.UserName}";
-    private static readonly string PipeName = $"Noctis-Activate-{Environment.UserName}";
+    // Include the profile so release, Debug and explicit test profiles can coexist.
+    private static readonly string ProfileKey = ProfileIdentity(AppPaths.DataRoot);
+    private static readonly string MutexName = $"{ProductIdentity.Key}-SingleInstance-{Environment.UserName}-{ProfileKey}";
+    private static readonly string PipeName = $"{ProductIdentity.Key}-Activate-{Environment.UserName}-{ProfileKey}";
+
+    internal static string ProfileIdentity(string root)
+    {
+        var path = Path.TrimEndingDirectorySeparator(Path.GetFullPath(root));
+        if (OperatingSystem.IsWindows()) path = path.ToUpperInvariant();
+        return Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(
+            System.Text.Encoding.UTF8.GetBytes(path)))[..16];
+    }
 
     private static Mutex? _mutex;
     private static FileStream? _unixLock;

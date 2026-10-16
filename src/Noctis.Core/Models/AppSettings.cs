@@ -297,7 +297,7 @@ public class AppSettings
     public bool WebRemoteEnabled { get; set; }
 
     /// <summary>TCP port for the web remote.</summary>
-    public int WebRemotePort { get; set; } = 9420;
+    public int WebRemotePort { get; set; } = 9430; // Noctis Plus: official Noctis uses 9420, so both can run
 
     /// <summary>Local automation API on 127.0.0.1 (/api/v1, docs/LOCAL-API.md). Off by default.
     /// The token lives in local-api.json, never here.</summary>
@@ -305,7 +305,7 @@ public class AppSettings
 
     /// <summary>Preferred TCP port for the Local API (a free one is used when it's taken;
     /// local-api.json records the real one).</summary>
-    public int LocalApiPort { get; set; } = 9421;
+    public int LocalApiPort { get; set; } = 9431; // Noctis Plus: official Noctis uses 9421
 
     /// <summary>Built-in Noctis server (OpenSubsonic API over HTTPS for phones and other clients). Off by default.</summary>
     public bool NoctisServerEnabled { get; set; }
@@ -954,8 +954,8 @@ public class AppSettings
     {
         Volume = Math.Clamp(Volume, 0, 100);
         // Below 1024 needs privileges on Unix; 65535 is the top of the port space.
-        WebRemotePort = WebRemotePort is >= 1024 and <= 65535 ? WebRemotePort : 9420;
-        LocalApiPort = LocalApiPort is >= 1024 and <= 65535 ? LocalApiPort : 9421;
+        WebRemotePort = WebRemotePort is >= 1024 and <= 65535 ? WebRemotePort : 9430;
+        LocalApiPort = LocalApiPort is >= 1024 and <= 65535 ? LocalApiPort : 9431;
         NoctisServerPort = NoctisServerPort is >= 1024 and <= 65535 ? NoctisServerPort : 4747;
         ReplayGainPreampDb = Math.Clamp(ReplayGainPreampDb, -12, 12);
         EqPreampDb = Math.Clamp(EqPreampDb, Services.ParametricEqMath.EqPreampMinDb, Services.ParametricEqMath.EqPreampMaxDb);

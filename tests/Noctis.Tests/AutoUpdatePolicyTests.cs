@@ -40,11 +40,11 @@ public class AutoUpdateShouldDownloadTests
     {
         TagName = tag,
         Version = UpdateService.ParseTag(tag)!,
-        InstallerApiUrl = installer ? "https://api.github.com/repos/heartached/Noctis/releases/assets/1" : null,
-        ChecksumsApiUrl = sums ? "https://api.github.com/repos/heartached/Noctis/releases/assets/2" : null,
+        InstallerApiUrl = installer ? "https://api.github.com/repos/Alfamin/NoctisPlus/releases/assets/1" : null,
+        ChecksumsApiUrl = sums ? "https://api.github.com/repos/Alfamin/NoctisPlus/releases/assets/2" : null,
         WarningText = warning,
         PublishedAt = published ? Now - (age ?? TimeSpan.FromHours(25)) : null,
-        ReleaseUrl = $"https://github.com/heartached/Noctis/releases/tag/{tag}",
+        ReleaseUrl = $"https://github.com/Alfamin/NoctisPlus/releases/tag/{tag}",
     };
 
     private static AutoUpdateState Failed(int failures, TimeSpan ago, bool blocked = false, string tag = "v1.5.5") => new()
@@ -326,25 +326,26 @@ public class AutoUpdateLaunchActionTests
 public class AutoUpdateOwnedFileTests
 {
     private static readonly string Temp = Path.Combine(Path.GetTempPath(), "nx-owned-temp");
-    private const string Name = "Noctis-Update-1a2b3c4d-Setup.exe";
+    private const string Name = "NoctisPlus-Update-1a2b3c4d-Setup.exe";
 
     [Theory]
-    [InlineData("Noctis-Update-1a2b3c4d-Setup.exe")]
-    [InlineData("Noctis-Update-1a2b3c4d.dmg")]
-    [InlineData("Noctis-Update-1a2b3c4d.AppImage")]
-    [InlineData("Noctis-Update-1a2b3c4d.tar.gz")]
+    [InlineData("NoctisPlus-Update-1a2b3c4d-Setup.exe")]
+    [InlineData("NoctisPlus-Update-1a2b3c4d.dmg")]
+    [InlineData("NoctisPlus-Update-1a2b3c4d.AppImage")]
+    [InlineData("NoctisPlus-Update-1a2b3c4d.tar.gz")]
     public void UpdaterTempNames_AreOwned(string name)
         => Assert.True(AutoUpdatePolicy.IsOwnedUpdateFile(Path.Combine(Temp, name), Temp));
 
     [Theory]
-    [InlineData("Noctis-Update-1A2B3C4D-Setup.exe")]   // uppercase run tag
-    [InlineData("Noctis-Update-1a2b3c4-Setup.exe")]    // 7 hex
-    [InlineData("Noctis-Update-1a2b3c4d5-Setup.exe")]  // 9 hex
-    [InlineData("Noctis-Update-1a2b3c4d.exe")]
-    [InlineData("Noctis-Update-1a2b3c4d.msi")]
-    [InlineData("Noctis-Update-1a2b3c4d-Setup.exe.bak")]
-    [InlineData("Noctis-v1.5.5-Setup.exe")]
+    [InlineData("NoctisPlus-Update-1A2B3C4D-Setup.exe")]   // uppercase run tag
+    [InlineData("NoctisPlus-Update-1a2b3c4-Setup.exe")]    // 7 hex
+    [InlineData("NoctisPlus-Update-1a2b3c4d5-Setup.exe")]  // 9 hex
+    [InlineData("NoctisPlus-Update-1a2b3c4d.exe")]
+    [InlineData("NoctisPlus-Update-1a2b3c4d.msi")]
+    [InlineData("NoctisPlus-Update-1a2b3c4d-Setup.exe.bak")]
+    [InlineData("NoctisPlus-v1.5.5-Setup.exe")]
     [InlineData("evil.exe")]
+    [InlineData("Noctis-Update-1a2b3c4d-Setup.exe")] // never delete an official Noctis update
     public void OtherNames_AreNotOwned(string name)
         => Assert.False(AutoUpdatePolicy.IsOwnedUpdateFile(Path.Combine(Temp, name), Temp));
 
@@ -415,7 +416,7 @@ public class AutoUpdateStoreTests : IDisposable
             Pending = new PendingInstall
             {
                 Tag = "v1.5.5", FromVersion = "1.5.4", ToVersion = "1.5.5", InstallerPath = "p",
-                Sha256 = new string('b', 64), IsPrerelease = true, ReleaseUrl = "https://github.com/heartached/Noctis",
+                Sha256 = new string('b', 64), IsPrerelease = true, ReleaseUrl = "https://github.com/Alfamin/NoctisPlus",
                 DownloadedUtc = downloaded, PostponedUntilUtc = downloaded.AddDays(1), LaunchAttempts = 1,
                 LastLaunchUtc = downloaded.AddDays(2)
             }
@@ -431,7 +432,7 @@ public class AutoUpdateStoreTests : IDisposable
         Assert.Equal(("v1.5.5", "1.5.4", "1.5.5", "p"), (p.Tag, p.FromVersion, p.ToVersion, p.InstallerPath));
         Assert.Equal(new string('b', 64), p.Sha256);
         Assert.True(p.IsPrerelease);
-        Assert.Equal("https://github.com/heartached/Noctis", p.ReleaseUrl);
+        Assert.Equal("https://github.com/Alfamin/NoctisPlus", p.ReleaseUrl);
         Assert.Equal(downloaded, p.DownloadedUtc);
         Assert.Equal(downloaded.AddDays(1), p.PostponedUntilUtc);
         Assert.Equal(1, p.LaunchAttempts);

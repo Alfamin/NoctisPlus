@@ -464,7 +464,7 @@ public class MetadataSearchEngineTests
         Assert.True(stamps.Count >= 3, $"expected search + release + recording lookups, got {stamps.Count}");
         for (var i = 1; i < stamps.Count; i++)
             Assert.True(stamps[i].At - stamps[i - 1].At >= TimeSpan.FromMilliseconds(180), $"gap {i}: {(stamps[i].At - stamps[i - 1].At).TotalMilliseconds} ms");
-        Assert.All(stamps, s => Assert.Matches(@"^Noctis/\d+\.\d+\.\d+ \( https://github\.com/heartached/Noctis \)$", s.UserAgent));
+        Assert.All(stamps, s => Assert.Matches(@"^NoctisPlus/\d+\.\d+\.\d+ \( https://github\.com/Alfamin/NoctisPlus \)$", s.UserAgent));
     }
 
     [Fact]

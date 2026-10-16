@@ -14,8 +14,8 @@
     <ApplicationIcon Condition="$([MSBuild]::IsOSPlatform('Windows')) And Exists('Assets\Icons\Noctis.ico')">Assets\Icons\Noctis.ico</ApplicationIcon>
     <AssemblyName>Noctis</AssemblyName>
     <RootNamespace>Noctis</RootNamespace>
-    <Product>Noctis</Product>
-    <Company>Noctis</Company>
+    <Product>Noctis Plus</Product>
+    <Company>Alfamin; based on Noctis by heartached</Company>
     <Version>1.6.3</Version>
     <!-- Pre-release marker: numeric Version stays 1.1.16 (update checks + the
          displayed number are unchanged); the "-prerelease" SemVer suffix on the
@@ -149,6 +149,11 @@
   </ItemGroup>
 
   <!-- Embedded assets -->
+  <ItemGroup>
+    <!-- Pinned first-party modules. Kept outside the user plugin directory; no startup download. -->
+    <Content Include="..\..\bundled-plugins\**\*" Link="bundled-plugins\%(RecursiveDir)%(Filename)%(Extension)"
+             CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
+  </ItemGroup>
   <ItemGroup>
     <!-- Shared assets (themes, styles, icons, fonts) live in Noctis.UI; only the
          exe icon stays here for ApplicationIcon and the installer. -->

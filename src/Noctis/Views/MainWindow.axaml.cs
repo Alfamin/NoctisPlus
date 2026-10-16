@@ -1101,7 +1101,7 @@ public partial class MainWindow : Window, IPageKeyOverlayHost
 
             var menu = new NativeMenu();
 
-            var open = new NativeMenuItem("Open Noctis");
+            var open = new NativeMenuItem("Open " + ProductIdentity.Name);
             open.Click += (_, _) => ShowFromTray();
             menu.Items.Add(open);
 
@@ -1133,7 +1133,7 @@ public partial class MainWindow : Window, IPageKeyOverlayHost
             _trayIcon = new TrayIcon
             {
                 Icon = icon,
-                ToolTipText = "Noctis",
+                ToolTipText = ProductIdentity.Name,
                 Menu = menu,
                 IsVisible = true,
             };
@@ -1157,7 +1157,7 @@ public partial class MainWindow : Window, IPageKeyOverlayHost
                         if (_trayIcon != null)
                         {
                             _trayIcon.ToolTipText = track == null
-                                ? "Noctis"
+                                ? ProductIdentity.Name
                                 : Truncate($"{track.Title} — {track.Artist}", 120);
                         }
                         playPause.Header = vm.Player.State == PlaybackState.Playing ? "Pause" : "Play";

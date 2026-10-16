@@ -62,6 +62,7 @@ defaults:
 
 jobs:
   deploy:
+    if: github.repository == 'heartached/Noctis'
     runs-on: ubuntu-latest
     steps:
       # Pinned to commit SHAs so a moved tag can't swap the action's code.

@@ -119,7 +119,7 @@ internal static class AutoUpdatePolicy
 
     // The names DownloadInstallerAsync gives its temp files (random lowercase 8-hex run tag).
     private static readonly Regex OwnedName = new(
-        @"^Noctis-Update-[0-9a-f]{8}(-Setup\.exe|\.dmg|\.AppImage|\.tar\.gz)$",
+        @"^NoctisPlus-Update-[0-9a-f]{8}(-Setup\.exe|\.dmg|\.AppImage|\.tar\.gz)$",
         RegexOptions.CultureInvariant);
 
     /// <summary>Three-part version. Assembly versions are 4-part (1.5.4.0) while Version("1.5.4")

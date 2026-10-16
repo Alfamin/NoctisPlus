@@ -1,0 +1,18 @@
+# Included modules
+
+These are the existing released plugins, bundled unchanged in Noctis Plus. `manifest.json`
+records source repositories, commits, package hashes and every delivered file hash.
+The build script verifies the files before publishing. No user settings, Telegram sessions,
+Last.fm user keys, listening history, music, Python runtime or model files belong here.
+
+Built-in modules start enabled, separately from the community-plugin switch. Their normal
+settings and individual on/off switches remain available. The application owns their code:
+the plugin manager cannot uninstall or overwrite it. Duplicate copies in the user plugin
+folder are ignored. Built-ins are updated by a Plus release in this first version.
+
+To update one, build/test its source repository, review the ZIP, replace only that module's
+files, and update its provenance and hashes in `manifest.json`. Do not copy build directories
+or private profile files into this folder. Keep the original package's API references; the
+1.6.3 host supports API 1.1 and 1.2 plugins.
+
+See `docs/fork/PROVENANCE.md` for licensing status before a public release.

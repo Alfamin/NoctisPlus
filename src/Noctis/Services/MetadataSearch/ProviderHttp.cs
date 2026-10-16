@@ -1,5 +1,6 @@
 using System.Net;
 using System.Reflection;
+using Noctis.Helpers;
 
 namespace Noctis.Services.MetadataSearch;
 
@@ -13,11 +14,11 @@ public sealed class ProviderHttp
 {
     /// <summary>Project page used as the contact in User-Agent strings (MusicBrainz requires
     /// "Application/version ( contact-url )" and throttles anonymous agents).</summary>
-    public const string ProjectUrl = "https://github.com/heartached/Noctis";
+    public const string ProjectUrl = ProductIdentity.ProjectUrl;
 
-    /// <summary>"Noctis/1.5.9 ( https://github.com/heartached/Noctis )".</summary>
+    /// <summary>"NoctisPlus/1.6.3 ( https://github.com/Alfamin/NoctisPlus )".</summary>
     public static string UserAgent { get; } =
-        $"Noctis/{Assembly.GetExecutingAssembly().GetName().Version?.ToString(3) ?? "1.0"} ( {ProjectUrl} )";
+        $"{ProductIdentity.Key}/{Assembly.GetExecutingAssembly().GetName().Version?.ToString(3) ?? "1.0"} ( {ProjectUrl} )";
 
     private static readonly TimeSpan MaxRetryAfter = TimeSpan.FromSeconds(3);
 

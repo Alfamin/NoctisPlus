@@ -7,22 +7,23 @@ using Xunit;
 
 namespace Noctis.Tests;
 
-/// <summary>Installable downloads must come from heartached/Noctis's own release-asset API.</summary>
+/// <summary>Installable downloads must come from Alfamin/NoctisPlus's own release-asset API.</summary>
 public class UpdateRepoPinTests
 {
     [Theory]
-    [InlineData("https://api.github.com/repos/heartached/Noctis/releases/assets/123", true)]
-    [InlineData("https://api.github.com/repos/heartached/noctis/releases/assets/587322385", true)]
-    [InlineData("http://api.github.com/repos/heartached/Noctis/releases/assets/123", false)]      // not HTTPS
+    [InlineData("https://api.github.com/repos/Alfamin/NoctisPlus/releases/assets/123", true)]
+    [InlineData("https://api.github.com/repos/alfamin/noctisplus/releases/assets/587322385", true)]
+    [InlineData("http://api.github.com/repos/Alfamin/NoctisPlus/releases/assets/123", false)]      // not HTTPS
     [InlineData("https://api.github.com/repos/evil/Noctis/releases/assets/123", false)]           // other owner
-    [InlineData("https://api.github.com/repos/heartached/Other/releases/assets/123", false)]      // other repo
-    [InlineData("https://github.com/heartached/Noctis/releases/download/v1.5.4/SHA256SUMS", false)] // browser URL
+    [InlineData("https://api.github.com/repos/Alfamin/Other/releases/assets/123", false)]      // other repo
+    [InlineData("https://api.github.com/repos/heartached/Noctis/releases/assets/123", false)]  // official Noctis: never installed over Noctis Plus
+    [InlineData("https://github.com/Alfamin/NoctisPlus/releases/download/v1.5.4/SHA256SUMS", false)] // browser URL
     [InlineData("https://objects.githubusercontent.com/github-production-release-asset/1", false)]
-    [InlineData("https://api.github.com/repos/heartached/Noctis/releases/assets/123?token=x", false)] // query
-    [InlineData("https://api.github.com:8443/repos/heartached/Noctis/releases/assets/123", false)]    // port
-    [InlineData("https://api.github.com/repos/heartached/Noctis/releases/assets/../../../evil/x/releases/assets/1", false)]
-    [InlineData("https://api.github.com/repos/heartached/Noctis/releases/assets/", false)]           // no id
-    [InlineData("https://api.github.com/repos/heartached/Noctis/releases/assets/12a", false)]
+    [InlineData("https://api.github.com/repos/Alfamin/NoctisPlus/releases/assets/123?token=x", false)] // query
+    [InlineData("https://api.github.com:8443/repos/Alfamin/NoctisPlus/releases/assets/123", false)]    // port
+    [InlineData("https://api.github.com/repos/Alfamin/NoctisPlus/releases/assets/../../../evil/x/releases/assets/1", false)]
+    [InlineData("https://api.github.com/repos/Alfamin/NoctisPlus/releases/assets/", false)]           // no id
+    [InlineData("https://api.github.com/repos/Alfamin/NoctisPlus/releases/assets/12a", false)]
     [InlineData("", false)]
     [InlineData(null, false)]
     public void IsConfiguredRepoAssetUrl_PinsOwnerRepoAndAssetPath(string? url, bool expected)
@@ -33,9 +34,9 @@ public class UpdateRepoPinTests
 /// release's SHA256SUMS, fail closed, delete what failed, and refuse other repos before any request.</summary>
 public class UpdateVerificationTests : IDisposable
 {
-    private const string AssetUrl = "https://api.github.com/repos/heartached/Noctis/releases/assets/1";
-    private const string SumsUrl = "https://api.github.com/repos/heartached/Noctis/releases/assets/2";
-    private const string AssetName = "Noctis-v9.9.9-Setup.exe";
+    private const string AssetUrl = "https://api.github.com/repos/Alfamin/NoctisPlus/releases/assets/1";
+    private const string SumsUrl = "https://api.github.com/repos/Alfamin/NoctisPlus/releases/assets/2";
+    private const string AssetName = "NoctisPlus-v9.9.9-Setup.exe";
     private static readonly byte[] Payload = Encoding.ASCII.GetBytes("not an installer, just test bytes");
 
     private readonly string _dir = Path.Combine(Path.GetTempPath(), "NoctisTests", Guid.NewGuid().ToString("N"));
@@ -57,7 +58,7 @@ public class UpdateVerificationTests : IDisposable
         InstallerSize = Payload.Length,
         InstallerAssetName = AssetName,
         ChecksumsApiUrl = sumsUrl,
-        ReleaseUrl = "https://github.com/heartached/Noctis/releases/tag/v9.9.9",
+        ReleaseUrl = "https://github.com/Alfamin/NoctisPlus/releases/tag/v9.9.9",
     };
 
     private static string Sha(byte[] b) => Convert.ToHexString(SHA256.HashData(b)).ToLowerInvariant();
@@ -99,7 +100,7 @@ public class UpdateVerificationTests : IDisposable
     [Theory]
     [InlineData("https://api.github.com/repos/evil/Noctis/releases/assets/1", SumsUrl)]
     [InlineData(AssetUrl, "https://api.github.com/repos/evil/Noctis/releases/assets/2")]
-    [InlineData("https://api.github.com/repos/heartached/Noctis/releases/assets/1?x=1", SumsUrl)]
+    [InlineData("https://api.github.com/repos/Alfamin/NoctisPlus/releases/assets/1?x=1", SumsUrl)]
     public async Task AssetsFromOutsideTheRepo_AreRefusedBeforeAnyRequest(string installerUrl, string sumsUrl)
     {
         var handler = new AssetHandler($"{Sha(Payload)}  {AssetName}\n");
@@ -145,7 +146,7 @@ public class AutoUpdateLaunchInstallTests : IDisposable
     /// <summary>A file named like the updater's own temp download, in the real temp folder.</summary>
     private string OwnedTempFile()
     {
-        var path = Path.Combine(Path.GetTempPath(), $"Noctis-Update-{Guid.NewGuid().ToString("N")[..8]}-Setup.exe");
+        var path = Path.Combine(Path.GetTempPath(), $"NoctisPlus-Update-{Guid.NewGuid().ToString("N")[..8]}-Setup.exe");
         File.WriteAllText(path, "not an installer");
         _tempFiles.Add(path);
         return path;
@@ -168,7 +169,7 @@ public class AutoUpdateLaunchInstallTests : IDisposable
         var update = new UpdateInfo
         {
             TagName = "v9.9.9", Version = new Version(9, 9, 9), IsPrerelease = true,
-            ReleaseUrl = "https://github.com/heartached/Noctis/releases/tag/v9.9.9"
+            ReleaseUrl = "https://github.com/Alfamin/NoctisPlus/releases/tag/v9.9.9"
         };
         await Service().ScheduleAutoInstallAsync(update, file, store);
 
@@ -196,7 +197,7 @@ public class AutoUpdateLaunchInstallTests : IDisposable
         var update = new UpdateInfo
         {
             TagName = "v99.1", Version = UpdateService.ParseTag("v99.1")!,
-            ReleaseUrl = "https://github.com/heartached/Noctis/releases/tag/v99.1"
+            ReleaseUrl = "https://github.com/Alfamin/NoctisPlus/releases/tag/v99.1"
         };
         await Service().ScheduleAutoInstallAsync(update, file, store);
 
@@ -217,7 +218,7 @@ public class AutoUpdateLaunchInstallTests : IDisposable
         var update = new UpdateInfo
         {
             TagName = "v98.0.0", Version = new Version(98, 0, 0),
-            ReleaseUrl = "https://github.com/heartached/Noctis/releases/tag/v98.0.0"
+            ReleaseUrl = "https://github.com/Alfamin/NoctisPlus/releases/tag/v98.0.0"
         };
         await Service().ScheduleAutoInstallAsync(update, file, store);
         Assert.Equal((2, false), (store.Load()!.Failures, store.Load()!.Blocked));
@@ -354,7 +355,7 @@ public class AutoUpdateLaunchInstallTests : IDisposable
     [Fact]
     public void QueueNamingAFileThatIsNotOurs_IsDiscarded_WithoutTouchingThatFile()
     {
-        var foreign = Path.Combine(_dir, "Noctis-Update-1a2b3c4d-Setup.exe"); // right name, wrong folder
+        var foreign = Path.Combine(_dir, "NoctisPlus-Update-1a2b3c4d-Setup.exe"); // right name, wrong folder
         File.WriteAllText(foreign, "someone else's file");
         var store = new AutoUpdateStore(_dir);
         store.Save(new AutoUpdateState { Pending = Pending(foreign, "99.0.0") });

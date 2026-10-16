@@ -54,7 +54,7 @@ public class MetadataFinderServiceTests
 
         await svc.IdentifyAsync(Lucid());
 
-        Assert.Contains("( https://github.com/heartached/Noctis )", handler.MusicBrainzUserAgent);
+        Assert.Contains("( https://github.com/Alfamin/NoctisPlus )", handler.MusicBrainzUserAgent);
     }
 
     private sealed class Handler(string deezer, string mb) : HttpMessageHandler

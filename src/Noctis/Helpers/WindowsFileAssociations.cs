@@ -16,8 +16,8 @@ namespace Noctis.Helpers;
 [SupportedOSPlatform("windows")]
 public static class WindowsFileAssociations
 {
-    public const string ProgId = "Noctis.AudioFile";
-    private const string CapabilitiesPath = @"Software\Noctis\Capabilities";
+    public const string ProgId = ProductIdentity.ProgId;
+    private const string CapabilitiesPath = ProductIdentity.RegistryKey + @"\Capabilities";
     private const string RegisteredAppsPath = @"Software\RegisteredApplications";
 
     /// <summary>Extensions offered to Windows. Mirrors MetadataService.SupportedExtensions
@@ -94,7 +94,7 @@ public static class WindowsFileAssociations
 
         using (var caps = Registry.CurrentUser.CreateSubKey(CapabilitiesPath))
         {
-            caps.SetValue("ApplicationName", "Noctis");
+            caps.SetValue("ApplicationName", ProductIdentity.Name);
             caps.SetValue("ApplicationDescription", "Music player");
             using var assoc = caps.CreateSubKey("FileAssociations");
             foreach (var ext in Extensions)
@@ -102,7 +102,7 @@ public static class WindowsFileAssociations
         }
 
         using (var registered = Registry.CurrentUser.CreateSubKey(RegisteredAppsPath))
-            registered.SetValue("Noctis", CapabilitiesPath);
+            registered.SetValue(ProductIdentity.Name, CapabilitiesPath);
 
         foreach (var ext in Extensions)
         {
@@ -122,7 +122,7 @@ public static class WindowsFileAssociations
         try
         {
             using var registered = Registry.CurrentUser.OpenSubKey(RegisteredAppsPath, writable: true);
-            registered?.DeleteValue("Noctis", throwOnMissingValue: false);
+            registered?.DeleteValue(ProductIdentity.Name, throwOnMissingValue: false);
         }
         catch { }
         foreach (var ext in Extensions)

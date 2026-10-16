@@ -2,6 +2,7 @@ using System.Globalization;
 using System.Net;
 using System.Text.Json;
 using Noctis.Models;
+using Noctis.Helpers;
 
 namespace Noctis.Services;
 
@@ -40,7 +41,7 @@ public class LrcLibService : ILrcLibService
         for (var attempt = 0; ; attempt++)
         {
             using var request = new HttpRequestMessage(HttpMethod.Get, url);
-            request.Headers.Add("User-Agent", "Noctis (https://github.com/heartached/Noctis)");
+            request.Headers.Add("User-Agent", $"{ProductIdentity.Key} ({ProductIdentity.ProjectUrl})");
             var response = await _http.SendAsync(request, ct);
             if (attempt > 0 || response.StatusCode is not (HttpStatusCode.ServiceUnavailable or HttpStatusCode.TooManyRequests))
                 return response;

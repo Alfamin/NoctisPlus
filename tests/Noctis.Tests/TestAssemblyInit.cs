@@ -26,7 +26,7 @@ internal static class TestAssemblyInit
         var root = Path.Combine(Path.GetTempPath(), "NoctisTests", "data-" + Guid.NewGuid().ToString("N"));
         Directory.CreateDirectory(root);
         // The env var too, so anything that re-resolves the root lands in the same folder.
-        Environment.SetEnvironmentVariable("NOCTIS_DATA_DIR", root);
+        Environment.SetEnvironmentVariable("NOCTIS_PLUS_DATA_DIR", root);
         AppPaths.OverrideDataRoot(root);
         AppDomain.CurrentDomain.ProcessExit += (_, _) =>
         {

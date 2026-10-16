@@ -23,8 +23,8 @@ public class AutoUpdateModeCollection { }
 [Collection("AutoUpdate mode")]
 public class AutoUpdateViewModelTests : IDisposable
 {
-    private const string AssetUrl = "https://api.github.com/repos/heartached/Noctis/releases/assets/1";
-    private const string SumsUrl = "https://api.github.com/repos/heartached/Noctis/releases/assets/2";
+    private const string AssetUrl = "https://api.github.com/repos/Alfamin/NoctisPlus/releases/assets/1";
+    private const string SumsUrl = "https://api.github.com/repos/Alfamin/NoctisPlus/releases/assets/2";
     private static readonly byte[] Payload = Encoding.ASCII.GetBytes("not an installer, just test bytes");
 
     private readonly string _root = Path.Combine(Path.GetTempPath(), "NoctisTests", Guid.NewGuid().ToString("N"));
@@ -41,7 +41,7 @@ public class AutoUpdateViewModelTests : IDisposable
     }
 
     private static HashSet<string> UpdaterTempFiles() =>
-        Directory.GetFiles(Path.GetTempPath(), "Noctis-Update-*").ToHashSet();
+        Directory.GetFiles(Path.GetTempPath(), "NoctisPlus-Update-*").ToHashSet();
 
     private AutoUpdateStore Store => new(_root);
 
@@ -282,7 +282,7 @@ public class AutoUpdateViewModelTests : IDisposable
     public async Task Startup_RestoresAQueuedInstall_AfterItsFileReverifies()
     {
         var vm = await CreateAsync(new FakeGitHub("v99.0.0"), autoOn: true);
-        var file = Path.Combine(Path.GetTempPath(), $"Noctis-Update-{Guid.NewGuid().ToString("N")[..8]}-Setup.exe");
+        var file = Path.Combine(Path.GetTempPath(), $"NoctisPlus-Update-{Guid.NewGuid().ToString("N")[..8]}-Setup.exe");
         File.WriteAllBytes(file, Payload);
         Store.Save(new AutoUpdateState
         {
@@ -383,12 +383,12 @@ public class AutoUpdateViewModelTests : IDisposable
         /// <summary>The release list request fails (offline, GitHub down).</summary>
         public bool FailChecks;
 
-        private string AssetName => $"Noctis-{tag}-Setup.exe";
+        private string AssetName => $"NoctisPlus-{tag}-Setup.exe";
 
         protected override async Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken ct)
         {
             var url = request.RequestUri!.AbsoluteUri;
-            if (url.StartsWith("https://api.github.com/repos/heartached/Noctis/releases?", StringComparison.Ordinal))
+            if (url.StartsWith("https://api.github.com/repos/Alfamin/NoctisPlus/releases?", StringComparison.Ordinal))
             {
                 Interlocked.Increment(ref ReleaseChecks);
                 if (FailChecks) return new HttpResponseMessage(HttpStatusCode.ServiceUnavailable);
@@ -449,7 +449,7 @@ public class AutoUpdateViewModelTests : IDisposable
             new
             {
                 tag_name = tag, prerelease, draft = false, body = "Fixes.",
-                html_url = $"https://github.com/heartached/Noctis/releases/tag/{tag}",
+                html_url = $"https://github.com/Alfamin/NoctisPlus/releases/tag/{tag}",
                 published_at = DateTimeOffset.UtcNow - Age,
                 assets = new[]
                 {

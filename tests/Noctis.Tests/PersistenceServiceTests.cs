@@ -186,7 +186,7 @@ public class PersistenceServiceTests : IDisposable
         var loaded = await svc.LoadSettingsAsync();
 
         Assert.Equal(100, loaded.Volume);
-        Assert.Equal(9420, loaded.WebRemotePort);
+        Assert.Equal(9430, loaded.WebRemotePort);
         Assert.Equal(12, loaded.ReplayGainPreampDb);
         Assert.Equal(12, loaded.CrossfadeDuration);
     }
