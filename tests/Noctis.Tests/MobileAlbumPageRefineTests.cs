@@ -261,6 +261,25 @@ public class MobileAlbumPageRefineTests
         window.Close();
     }
 
+    /// <summary>A compressed album (AAC) shows the lossy glyph on its badge and footer, never the
+    /// lossless waveform it used to carry beside "AAC".</summary>
+    [AvaloniaFact]
+    public void QualityGlyph_IsTheLossyOne_OnACompressedAlbum()
+    {
+        var (album, tracks) = Sample(3, (t, i) => { t.Codec = "AAC"; t.SampleRate = 44100; t.Bitrate = 256; });
+        using var rig = Rig(tracks, album);
+        var window = MobileFixtures.Mount(rig.Shell, out var view);
+        rig.Shell.OpenAlbumCommand.Execute(album);
+        window.UpdateLayout();
+
+        var page = MobileFixtures.Find<AlbumPage>(view);
+        bool Shown(string name) => MobileFixtures.Named<Control>(page, name).IsVisible;
+        Assert.Equal("AAC", MobileFixtures.Named<TextBlock>(page, "QualityBadgeText").Text);
+        Assert.True(Shown("BadgeLossyGlyph") && Shown("FooterLossyGlyph"));
+        Assert.False(Shown("BadgeLosslessGlyph") || Shown("FooterLosslessGlyph"));
+        window.Close();
+    }
+
     /// <summary>A sparsely tagged album: the year for the date, and no quality, ℗ or label lines.</summary>
     [AvaloniaFact]
     public void Footer_HidesWhatTheTagsDoNotGive()

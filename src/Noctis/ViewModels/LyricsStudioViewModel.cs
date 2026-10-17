@@ -558,6 +558,29 @@ public partial class LyricsStudioViewModel : ViewModelBase
     }
 
     /// <summary>The pane's state changed (the review, the song playing, the pane itself): say so and bring it up to date.</summary>
+    /// <summary>
+    /// The panel left the screen (another page, or the dialog closed): the pane's preview lives in
+    /// the app's lyrics view model, so it stayed on the lyrics page and side panel, with Save and
+    /// Search off, until the song changed. Drop it now and push nothing until
+    /// <see cref="ResumeLivePreview"/>.
+    /// </summary>
+    internal void SuspendLivePreview()
+    {
+        _livePreviewSuspended = true;
+        if (!_livePreviewShown) return;
+        _livePreviewShown = false;
+        try { ClearLivePreview?.Invoke(); } catch { }
+    }
+
+    /// <summary>The panel is on screen again: the pane shows the review again.</summary>
+    internal void ResumeLivePreview()
+    {
+        _livePreviewSuspended = false;
+        RefreshLivePreview();
+    }
+
+    private bool _livePreviewSuspended;
+
     internal void RefreshLivePreview()
     {
         OnPropertyChanged(nameof(CanLivePreview));
@@ -583,7 +606,7 @@ public partial class LyricsStudioViewModel : ViewModelBase
 
     private void PushLivePreview()
     {
-        if (IsLivePreviewOpen && Selected is { } item && ReviewLines.Count > 0)
+        if (IsLivePreviewOpen && !_livePreviewSuspended && Selected is { } item && ReviewLines.Count > 0)
         {
             try
             {
@@ -1231,6 +1254,8 @@ public partial class LyricsStudioViewModel : ViewModelBase
             else if (_player.State != PlaybackState.Playing)
                 _player.PlayPauseCommand.Execute(null);
         }
+        // The lyrics page now shows Preview's own copy: leaving the Studio for it must not drop it.
+        _livePreviewShown = false;
         try { await ShowOnLyricsPage(item.Track, synced); }
         catch (Exception ex) { DebugLogger.Warn(DebugLogger.Category.Lyrics, "LyricsStudio.PreviewFailed", ex.Message); }
     }
@@ -1654,12 +1679,9 @@ public partial class LyricsStudioViewModel : ViewModelBase
     {
         _runCts?.Cancel();
         if (Selected is { } current) PersistDraft(current);
-        // The dialog's pane leaves with it: the lyrics page and side panel show the song's own lyrics again.
-        if (_livePreviewShown)
-        {
-            _livePreviewShown = false;
-            try { ClearLivePreview?.Invoke(); } catch { }
-        }
+        // The dialog's pane leaves with it: the lyrics page and side panel show the song's own lyrics
+        // again, and an edit still waiting for the pane is not pushed after the dialog closed.
+        SuspendLivePreview();
         if (_savedCount > 0)
         {
             try { await _library.SaveAsync(); } catch { }

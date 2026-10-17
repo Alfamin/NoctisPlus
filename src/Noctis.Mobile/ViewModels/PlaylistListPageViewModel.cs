@@ -93,8 +93,9 @@ public sealed partial class PlaylistListPageViewModel : MobilePage, ISortable
             PlaylistSort.RecentlyAdded => pinnedFirst.ThenByDescending(p => p.CreatedAt),
             _ => pinnedFirst.ThenBy(p => p.Name, StringComparer.CurrentCultureIgnoreCase),
         };
-        Playlists.ReplaceAll(sorted.ToList());
-        Rows.ReplaceAll(Playlists.Select(p => new PlaylistRow(p, Shell.Library.PlaylistArtwork(p))).ToList());
+        // Only when something changed: a refresh of the same playlists must not Reset the list.
+        MobileLibrary.ReplaceIfChanged(Playlists, sorted.ToList());
+        MobileLibrary.ReplaceIfChanged(Rows, Playlists.Select(p => new PlaylistRow(p, Shell.Library.PlaylistArtwork(p))).ToList());
         OnPropertyChanged(nameof(ShowNoMatches));
     }
 

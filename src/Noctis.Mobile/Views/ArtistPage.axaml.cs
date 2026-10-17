@@ -25,6 +25,10 @@ public partial class ArtistPage : UserControl
     /// how much of the next card or column shows at the right edge.</summary>
     public const double PageInset = 16, CardGap = 16, CardPeek = 44, ColumnGap = 16, ColumnPeek = 30;
 
+    /// <summary>The gap after each Top Songs column, carried by the column itself (its panel
+    /// virtualises and has no Spacing).</summary>
+    public static readonly Thickness ColumnMargin = new(0, 0, ColumnGap, 0);
+
     /// <summary>How far the round buttons' and the cards' fills move from the page colour
     /// (HSL lightness; see <see cref="Shade"/>).</summary>
     internal const double ButtonShade = 0.1, CardShade = 0.07;
@@ -117,7 +121,8 @@ public partial class ArtistPage : UserControl
         CardWidth = cards > 1 ? width - PageInset - CardGap - CardPeek : width - 2 * PageInset;
         CardList.Margin = new Thickness(PageInset, 0, cards > 1 ? CardGap + CardPeek : PageInset, 0);
         TopSongPageWidth = width - PageInset - ColumnGap - ColumnPeek;
-        TopSongPages.Margin = new Thickness(PageInset, 0, ColumnGap + ColumnPeek, 0);
+        // The last column's own right margin is the gap; the peek's room comes after it.
+        TopSongPages.Margin = new Thickness(PageInset, 0, ColumnPeek, 0);
         LayoutTitle();
     }
 

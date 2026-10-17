@@ -69,6 +69,16 @@ public partial class AndroidApp : Avalonia.Application, IThemeHost
         // or AppWrittenSidecarRegistry.
         AppPaths.OverrideDataRoot(context.FilesDir!.AbsolutePath);
 
+        // What the desktop App wires at the same point. Without the first, a cover the scan
+        // replaced (a re-tagged album) kept showing its old picture in every list until a
+        // restart: CachedImage reloads only on ArtworkCache.Invalidate. Without the second,
+        // every cold decode of a cover read the full-size file: a 3000 px PNG (most real
+        // covers) cannot shrink while decoding, so each grid tile that scrolled in past the
+        // bitmap budget cost a full decode again. The thumbnails live in the cache dir, which
+        // Android may clear; a missing one is simply decoded from the source once more.
+        LibraryService.ArtworkFileReplaced += ArtworkCache.Invalidate;
+        ArtworkThumbnailCache.Enable(Path.Combine((context.CacheDir ?? context.FilesDir!).AbsolutePath, "artwork_thumbs"));
+
         // DebugLog is an in-memory ring with no output of its own, so every handled error the
         // app logs — startup, library scan, playback, SAF listing — would be invisible on a
         // phone. Mirror it to logcat, where `adb logcat -s Noctis` can read it. AttachSink

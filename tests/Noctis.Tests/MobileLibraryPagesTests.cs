@@ -175,14 +175,15 @@ public class MobileLibraryPagesTests
         rig.Shell.Navigate(new SongListPageViewModel(rig.Shell, "Even", () => MobileLibrary.SongsBy(rig.Library, "Even")));
         MobileFixtures.Land(window);
         Dispatcher.UIThread.RunJobs();
-        Assert.Equal(0, MobileFixtures.Named<ScrollViewer>(view, "SongScroll").Offset.Y, 1);   // a new page starts at the top
+        // Scoped to the top page's view: the Songs page stays in the tree, hidden, under it.
+        Assert.Equal(0, MobileFixtures.Named<ScrollViewer>(MobileFixtures.PageView(view, rig.Shell.CurrentPage!), "SongScroll").Offset.Y, 1);   // a new page starts at the top
 
         rig.Shell.NavigateBackCommand.Execute(null);
         MobileFixtures.Land(window);
         for (var i = 0; i < 3; i++) { window.UpdateLayout(); Dispatcher.UIThread.RunJobs(); }
 
         Assert.Same(page, rig.Shell.CurrentPage);
-        Assert.Equal(3000, MobileFixtures.Named<ScrollViewer>(view, "SongScroll").Offset.Y, 1);
+        Assert.Equal(3000, MobileFixtures.Named<ScrollViewer>(MobileFixtures.PageView(view, page), "SongScroll").Offset.Y, 1);
         window.Close();
     }
 

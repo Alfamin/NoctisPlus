@@ -41,7 +41,7 @@ public sealed partial class LibraryViewModel : ObservableObject
         _marshal = marshal ?? (a => Avalonia.Threading.Dispatcher.UIThread.Post(a));
 
         _library.LibraryUpdated += (_, _) => _marshal(RefreshFromLibrary);
-        _library.FavoritesChanged += (_, _) => _marshal(RefreshFromLibrary);
+        _library.FavoritesChanged += (_, _) => _marshal(RefreshFavourites);
         _library.ScanProgress += (_, n) => _marshal(() => ScanProgress = n);
         _library.ScanAborted += (_, roots) => _marshal(() =>
         {
@@ -576,6 +576,18 @@ public sealed partial class LibraryViewModel : ObservableObject
         Songs.ReplaceAll(tracks.OrderBy(t => t.Title, StringComparer.CurrentCultureIgnoreCase));
         RefreshRails();
         RefreshRecents();
+        Refreshed?.Invoke(this, EventArgs.Empty);
+    }
+
+    /// <summary>
+    /// A heart toggled: the count and the open lists re-read (Favorites, a filtered list). The
+    /// songs, albums and their order are what they were, so nothing is re-sorted or rebuilt:
+    /// this used to run the full refresh, whose title sort of every song (culture-aware) held
+    /// the UI thread for a good part of a second on a big library, on every tap of a heart.
+    /// </summary>
+    private void RefreshFavourites()
+    {
+        FavoriteCount = _library.Tracks.Count(t => t.IsFavorite);
         Refreshed?.Invoke(this, EventArgs.Empty);
     }
 

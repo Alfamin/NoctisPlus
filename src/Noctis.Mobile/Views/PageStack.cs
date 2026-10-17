@@ -12,9 +12,13 @@ namespace Noctis.Mobile.Views;
 /// the new page in from the right over the old one, Back slides it away again; as a sheet the
 /// whole stack rises from the bottom and drops back. While a page moves, the page it covers
 /// stays on screen (the tab roots, <see cref="Root"/>, under the first page) and neither takes
-/// touches; once it lands only the top page is left, so a page's view is re-created when it
-/// comes back to the top (ScrollMemory keeps its place), as before. Pages stack by ZIndex,
-/// never by reordering Children: a view taken out of the tree and put back would re-attach.
+/// touches. Once it lands, the page it covered stays in the tree hidden, so Back shows it at
+/// once: re-creating it (its list, its covers) at the start of the pop cost the pop its first
+/// frames (the Albums grid 180 ms, the Artists grid 270 ms on the emulator's Debug build). One
+/// deep only: the page under that one is dropped, which bounds what hidden pages keep in
+/// memory; it is re-created when it comes back (ScrollMemory keeps its place), as before.
+/// Pages stack by ZIndex, never by reordering Children: a view taken out of the tree and put
+/// back would re-attach.
 /// </summary>
 public sealed class PageStack : Panel
 {
@@ -113,12 +117,13 @@ public sealed class PageStack : Panel
         Motion.To(leaving, Motion.Push, Motion.TranslateX(width), from: Motion.IsRunning(leaving) ? null : Motion.Identity,
             done: () => Remove(leaving));
 
-        // The page coming back: still on screen when the push it was under is cut short, else
-        // made again, a little to the left under the shade, as the push left it.
+        // The page coming back: kept hidden under the top page (or the root), or still on screen
+        // when the push it was under is cut short, else made again. Hidden or new, it starts a
+        // little to the left under the shade, as the push left it.
         Control? under;
         bool fresh;
         if (newTop == null) (under, fresh) = (Root, Root is { IsVisible: false });
-        else if (ViewOf(newTop) is { } existing) (under, fresh) = (existing, false);
+        else if (ViewOf(newTop) is { } existing) (under, fresh) = (existing, !existing.IsVisible);
         else (under, fresh) = (ViewFor(newTop, z: leaving.ZIndex - 2), true);
         if (under == null) return;
         _shade.ZIndex = leaving.ZIndex - 1;
@@ -167,15 +172,21 @@ public sealed class PageStack : Panel
         });
     }
 
-    /// <summary>A page or the root that has slid out of sight under the page on top.</summary>
+    /// <summary>A page or the root that has slid out of sight under the page on top: kept hidden
+    /// for Back, while any page kept under it before is dropped (one deep).</summary>
     private void Retire(Control under)
     {
         if (under == Root)
         {
             Rest(under);
             under.IsVisible = Top == null;
+            return;
         }
-        else Remove((ContentControl)under);
+        var kept = (ContentControl)under;
+        foreach (var view in _views.Values.ToList())
+            if (view != kept && !view.IsVisible) Remove(view);
+        Rest(kept);
+        kept.IsVisible = false;
     }
 
     private static void Rest(Control view)

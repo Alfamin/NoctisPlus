@@ -143,7 +143,7 @@ public partial class LyricsStudioPanel : UserControl
             if (this.IsAttachedToVisualTree()) { WatchModel(); WatchLivePreview(); }
         };
         AttachedToVisualTree += (_, _) => { WireLyricsPagePreview(); HookKeys(); WatchModel(); WatchLivePreview(); };
-        DetachedFromVisualTree += (_, _) => { UnhookKeys(); UnwatchModel(); UnwatchLivePreview(); };
+        DetachedFromVisualTree += (_, _) => { UnhookKeys(); UnwatchModel(); _liveWatch?.SuspendLivePreview(); UnwatchLivePreview(); };
     }
 
     // ── Live preview pane (10-14) ──
@@ -182,7 +182,7 @@ public partial class LyricsStudioPanel : UserControl
         _livePlayer = lyrics.Player;
         _livePlayer.PropertyChanged += OnLivePlayerPropertyChanged;
         SyncLivePreviewView();
-        vm.RefreshLivePreview();
+        vm.ResumeLivePreview();
     }
 
     private void UnwatchLivePreview()

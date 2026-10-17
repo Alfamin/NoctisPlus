@@ -165,7 +165,9 @@ public sealed partial class SongListPageViewModel : MobilePage, ISortable
             var match = new MobileSearch.Matcher(FilterText);
             rows = rows.Where(match.HitTrack);
         }
-        Songs.ReplaceAll(Order(rows));
+        // Only when the rows differ: every library refresh (a heart, a scan's progress) re-runs
+        // this, and a Reset on an unchanged list tore down and re-realised every row on screen.
+        MobileLibrary.ReplaceIfChanged(Songs, Order(rows).ToList());
         SongCount = Songs.Count;
     }
 

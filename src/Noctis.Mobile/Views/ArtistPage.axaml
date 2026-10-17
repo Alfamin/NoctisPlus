@@ -232,7 +232,12 @@
                     </ItemsControl>
                 </ScrollViewer>
 
-                <!-- Top Songs: columns of four rows, paged sideways with the next column peeking. -->
+                <!-- Top Songs: columns of four rows, paged sideways with the next column peeking.
+                     Virtualised sideways like the rails below: all five columns (20 rows, each a
+                     cover, two buttons and the bars) used to be realised as the page opened, and
+                     they were the largest part of its first layout; now the column on screen and
+                     the one peeking in. VirtualizingStackPanel has no Spacing, so each column
+                     carries the gap as a right margin. -->
                 <StackPanel Name="TopSongsSection" Margin="0,22,0,0" IsVisible="{Binding HasTopSongs}">
                     <Button Name="TopSongsHeader" Classes="row artist-section" Command="{Binding OpenAllSongsCommand}">
                         <StackPanel Orientation="Horizontal" Spacing="2">
@@ -245,13 +250,13 @@
                         <ItemsControl Name="TopSongPages" ItemsSource="{Binding TopSongPages}" Margin="16,0,16,0">
                             <ItemsControl.ItemsPanel>
                                 <ItemsPanelTemplate>
-                                    <StackPanel Orientation="Horizontal" Spacing="{x:Static views:ArtistPage.ColumnGap}" />
+                                    <VirtualizingStackPanel Orientation="Horizontal" />
                                 </ItemsPanelTemplate>
                             </ItemsControl.ItemsPanel>
                             <ItemsControl.ItemTemplate>
                                 <DataTemplate x:DataType="vm:ArtistTopSongPage">
                                     <ItemsControl ItemsSource="{Binding Rows}" Width="{Binding $parent[views:ArtistPage].TopSongPageWidth}"
-                                                  VerticalAlignment="Top">
+                                                  Margin="{x:Static views:ArtistPage.ColumnMargin}" VerticalAlignment="Top">
                                         <ItemsControl.ItemTemplate>
                                             <DataTemplate x:DataType="vm:ArtistTopSong">
                                                 <Button Classes="row"
