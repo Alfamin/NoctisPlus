@@ -17,9 +17,16 @@ public partial class AlbumDetailViewModel
 {
     private CatalogAlbumOpen? _catalog;
     private FinderOnlineSearch? _catalogOnline;
+    // A library album the catalog completed (its missing songs shown under the owned ones),
+    // as opposed to an online album the library has nothing of.
+    private bool _catalogEnriches;
+    private CancellationTokenSource? _enrichStop;
 
-    /// <summary>The page shows an online album (opened from Search, For you or an artist page).</summary>
+    /// <summary>The page shows catalog songs (an online album, or a library album completed by the catalog).</summary>
     public bool IsCatalogAlbum => _catalog is not null;
+
+    /// <summary>An online album opened from Search, For you or an artist page: not in the library.</summary>
+    public bool IsOnlineAlbum => _catalog is not null && !_catalogEnriches;
 
     /// <summary>The album's songs the library does not have yet, in album order.</summary>
     public ObservableCollection<ArtistCatalogSong> CatalogMissing { get; } = [];
@@ -29,11 +36,52 @@ public partial class AlbumDetailViewModel
     public bool ShowCatalogMissingHeader => HasCatalogMissing && Tracks.Count > 0;
 
     /// <summary>Play, Shuffle and Add to Queue need local songs: an online album with none hides them.</summary>
-    public bool ShowPlayActions => !IsCatalogAlbum || Tracks.Count > 0;
+    public bool ShowPlayActions => !IsOnlineAlbum || Tracks.Count > 0;
 
     /// <summary>A quiet line (partial catalog answer, a download message).</summary>
     [ObservableProperty, NotifyPropertyChangedFor(nameof(HasCatalogNotice))] private string _catalogNotice = "";
     public bool HasCatalogNotice => CatalogNotice.Length > 0;
+
+    /// <summary>
+    /// A library album: find the same release in the catalog (in the background, metadata only)
+    /// and show the songs the library lacks under the owned rows (owner, 2026-10-17: owning one
+    /// song of an album hid the rest). Quietly does nothing when the catalog is off, offline or
+    /// has no matching release.
+    /// </summary>
+    internal void EnrichFromCatalog()
+    {
+        if (_catalog is not null || Album.CatalogReleaseId is not null || Album.Tracks.Count == 0) return;
+        if (FreeMusicPlugin.Current?.CatalogPages is not { Enabled: true } pages) return;
+        var artist = Album.Artist;
+        if (string.IsNullOrWhiteSpace(artist) || artist.Equals("Various Artists", StringComparison.OrdinalIgnoreCase)) return;
+        _enrichStop?.Cancel();
+        var stop = _enrichStop = new CancellationTokenSource();
+        var name = Album.Name;
+        var titles = Album.Tracks.Select(t => t.Title).ToArray();
+        _ = Task.Run(async () =>
+        {
+            try
+            {
+                var (identity, _) = await pages.IdentifyAsync(artist, pages.LocalAlbums(artist), titles, stop.Token);
+                if (identity is null) return;
+                var profile = await pages.Catalog.SavedArtistAsync(identity, stop.Token)
+                              ?? await pages.Catalog.ArtistAsync(identity, false, stop.Token);
+                var release = profile.Value.Releases.FirstOrDefault(r => CatalogEditions.Matches(r, name, artist));
+                if (release is null) return;
+                var album = await pages.Catalog.AlbumAsync(release, false, stop.Token);
+                var matches = await pages.Actions.MatchAsync(album.Value.Songs, stop.Token, reuse: true);
+                if (stop.IsCancellationRequested) return;
+                await Dispatcher.UIThread.InvokeAsync(() =>
+                {
+                    if (stop.IsCancellationRequested || _catalog is not null) return;
+                    _catalogEnriches = true;
+                    ShowCatalog(new CatalogAlbumOpen(album.Value, matches));
+                });
+            }
+            catch (Exception ex) when (ex is OperationCanceledException or HttpRequestException or IOException or TimeoutException
+                                           or InvalidDataException or InvalidOperationException or SourcesWaitingException or ArgumentException) { }
+        });
+    }
 
     internal void ShowCatalog(CatalogAlbumOpen open)
     {
@@ -48,7 +96,9 @@ public partial class AlbumDetailViewModel
         CatalogNotice = open.Album.Notice.Length > 0 ? "Some of this album's songs are not in the online catalog." : "";
         RefreshCatalogOwnership();
         OnPropertyChanged(nameof(IsCatalogAlbum));
-        _ = LoadCatalogCoverAsync(open.Album.Release);
+        OnPropertyChanged(nameof(IsOnlineAlbum));
+        // A library album keeps its own cover.
+        if (!_catalogEnriches) _ = LoadCatalogCoverAsync(open.Album.Release);
     }
 
     /// <summary>Which album songs the library has right now (after a download lands, a scan).
@@ -67,13 +117,17 @@ public partial class AlbumDetailViewModel
             Track? local = open.Matches.TryGetValue(song.Id, out var match) && match.Local is { } l ? byId.GetValueOrDefault(l.Id) : null;
             local ??= locals.FirstOrDefault(t => RecordingMatch.Fits(song.Request, t.Artist, t.Title, t.Duration));
             if (local is not null) { if (!owned.Contains(local)) owned.Add(local); continue; }
+            // A library album: a song it already has under another title/edition stays a library row.
+            if (_catalogEnriches && Tracks.Any(t => RecordingMatch.Fits(song.Request, t.Artist, t.Title, t.Duration))) continue;
             var existing = CatalogMissing.FirstOrDefault(r => r.CatalogId == song.Id);
             missing.Add(existing ?? new ArtistCatalogSong(song.Number > 0 ? song.Number : number,
                 new SearchSongItem(_catalogOnline?.Remember(new CatalogSearchSong(song, open.Album.Release, open.Album.Release.Artwork))
                     ?? new Services.Search.OnlineSong(song.Id, song.Title, string.Join(", ", song.Artists.Select(a => a.Name)), open.Album.Release.Title, song.Seconds, song.Explicit)),
                 song.Id));
         }
-        if (!IsShownTrackList(owned))
+        // A library album keeps its own rows (all of them, in its own order); only an online
+        // album's rows are the songs the library turned out to have.
+        if (!_catalogEnriches && !IsShownTrackList(owned))
         {
             Tracks.ReplaceAll(owned);
             BuildDiscGroups();
@@ -128,6 +182,7 @@ public partial class AlbumDetailViewModel
 
     private void DisposeCatalog()
     {
+        _enrichStop?.Cancel();
         if (_catalogOnline is not null) _catalogOnline.DownloadsChanged -= CatalogDownloadsChanged;
         _catalogOnline = null;
     }

@@ -405,7 +405,7 @@ public partial class AlbumDetailViewModel : ViewModelBase, IDisposable
     [ObservableProperty, NotifyPropertyChangedFor(nameof(ShowAddAlbumDescription))]
     private bool _isAlbumDescriptionLoaded;
 
-    public bool ShowAddAlbumDescription => IsAlbumDescriptionLoaded && !HasAlbumDescription && !IsCatalogAlbum;
+    public bool ShowAddAlbumDescription => IsAlbumDescriptionLoaded && !HasAlbumDescription && !IsOnlineAlbum;
 
     /// <summary>Resolves this album's animated cover from its first track (sidecar or managed cache).</summary>
     private string? ResolveAlbumAnimatedCover()
@@ -414,7 +414,7 @@ public partial class AlbumDetailViewModel : ViewModelBase, IDisposable
     private void RefreshFromLibrary()
     {
         // An online album is not in the library by design: follow which songs are owned now.
-        if (IsCatalogAlbum) { RefreshCatalogOwnership(); return; }
+        if (IsOnlineAlbum) { RefreshCatalogOwnership(); return; }
 
         // Try to find album by current ID first
         var updatedAlbum = _library.Albums.FirstOrDefault(a => a.Id == Album.Id);
@@ -462,6 +462,9 @@ public partial class AlbumDetailViewModel : ViewModelBase, IDisposable
         // reloads via the shared LRU cache automatically on path change.
         var artPath = _persistence.GetArtworkPath(updatedAlbum.Id);
         HeaderArtPath = File.Exists(artPath) ? artPath : null;
+
+        // A library album completed by the catalog: a song that just landed leaves the missing list.
+        if (IsCatalogAlbum) RefreshCatalogOwnership();
     }
 
     partial void OnAlbumArtChanged(Bitmap? value)

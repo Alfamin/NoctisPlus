@@ -952,6 +952,9 @@ public partial class MainWindowViewModel : ViewModelBase
                         if (roundTrip == "artist-album" && CurrentView is ArtistDetailViewModel artistPage
                             && artistPage.Releases.FirstOrDefault(a => a.IsOnlineOnly) is { } online)
                             artistPage.OpenAlbumCommand.Execute(online);
+                        if (roundTrip == "artist-local" && CurrentView is ArtistDetailViewModel localPage
+                            && localPage.Releases.FirstOrDefault(a => !a.IsOnlineOnly && a.Tracks.Count < 5 && a.ReleaseType == ReleaseType.Album) is { } partial)
+                            localPage.OpenAlbumCommand.Execute(partial);
                         return;
                     }
                     GoBackInHistory();
@@ -2587,6 +2590,8 @@ public partial class MainWindowViewModel : ViewModelBase
         detail.SetSearchLyricsAction(SearchLyricsForTrack);
         detail.SetOpenMoreByArtistAction(OpenMoreByArtistPage);
         CurrentView = detail;
+        // Noctis Plus: a library album also lists the songs it lacks, from the online catalog.
+        detail.EnrichFromCatalog();
         HighlightSidebarSection("albums");
         TopBar.ShowAlbumDetailBackButton(GetCurrentAlbumDetailBackButtonText(), GoBackInHistoryCommand);
     }
