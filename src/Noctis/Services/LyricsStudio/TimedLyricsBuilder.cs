@@ -61,12 +61,18 @@ public static partial class TimedLyricsBuilder
         if (line.Background is not { Count: > 0 } words) return;
         sb.Append("[bg: ");
         if (!timed)
-            sb.Append(string.Join(' ', words.Select(w => w.Text.Trim())));
+        {
+            for (var i = 0; i < words.Count; i++)
+            {
+                if (i > 0 && !words[i - 1].JoinsNext) sb.Append(' ');
+                sb.Append(words[i].Text.Trim());
+            }
+        }
         else
         {
             for (var i = 0; i < words.Count; i++)
             {
-                if (i > 0) sb.Append(' ');
+                if (i > 0 && !words[i - 1].JoinsNext) sb.Append(' ');
                 sb.Append('<').Append(FormatTimestamp(words[i].Start)).Append('>').Append(words[i].Text.Trim());
             }
             sb.Append('<').Append(FormatTimestamp(words[^1].End)).Append('>');
@@ -95,7 +101,7 @@ public static partial class TimedLyricsBuilder
         {
             var w = line.Words[i];
             sb.Append('<').Append(FormatTimestamp(w.Start)).Append('>').Append(w.Text.Trim());
-            if (i + 1 < line.Words.Count) sb.Append(' ');
+            if (i + 1 < line.Words.Count && !w.JoinsNext) sb.Append(' ');
         }
         return sb.Append('<').Append(FormatTimestamp(line.Words[^1].End)).Append('>').ToString();
     }
@@ -280,7 +286,7 @@ public static partial class TimedLyricsBuilder
         {
             var w = words[k];
             var text = w.Text.Trim();
-            if (k + 1 < words.Count || spaceAfterLast) text += " ";
+            if (k + 1 < words.Count ? !w.JoinsNext : spaceAfterLast) text += " ";
             sb.Append("<span begin=\"").Append(FormatTtmlTime(w.Start)).Append("\" end=\"")
               .Append(FormatTtmlTime(w.End < w.Start ? w.Start : w.End)).Append("\">")
               .Append(XmlText(text)).Append("</span>");

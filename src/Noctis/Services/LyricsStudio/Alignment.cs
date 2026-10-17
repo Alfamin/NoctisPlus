@@ -7,7 +7,15 @@ namespace Noctis.Services.LyricsStudio;
 public sealed record RecognizedWord(string Text, TimeSpan Start, TimeSpan End, float Probability);
 
 /// <summary>A lyric word with the time it is sung.</summary>
-public sealed record AlignedWord(string Text, TimeSpan Start, TimeSpan End);
+public sealed record AlignedWord(string Text, TimeSpan Start, TimeSpan End)
+{
+    /// <summary>
+    /// The next word follows with no space between, as the source file wrote it: CJK lyrics,
+    /// timed a character at a time, or punctuation timed on its own ("Hey" + ","). False for
+    /// words of text split on spaces. The writers put no space after such a word.
+    /// </summary>
+    public bool JoinsNext { get; init; }
+}
 
 /// <summary>
 /// One lyric line placed on the timeline. <see cref="Confidence"/> is the share of the

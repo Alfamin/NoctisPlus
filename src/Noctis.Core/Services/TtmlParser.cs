@@ -192,7 +192,10 @@ public static class TtmlParser
             var body = new StringBuilder();
             for (var i = 0; i < words.Count; i++)
             {
-                if (i > 0) body.Append(' ');
+                // The space between words rides on the word before it ("Paper "); spans with none
+                // between them that stay separate words (CJK characters, lone punctuation) get none,
+                // or an imported "偶尔" came back as "偶 尔".
+                if (i > 0 && words[i - 1].Text is { Length: > 0 } before && char.IsWhiteSpace(before[^1])) body.Append(' ');
                 var text = OneLine(words[i].Text);
                 // A word sung in syllables (spans with no space between) tags each syllable,
                 // which the ELRC reader joins back into the word with the same clocks.

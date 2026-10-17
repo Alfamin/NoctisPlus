@@ -133,6 +133,41 @@ public class TtmlWordSpacesTests
         Assert.Equal("Sleepin' you're on", Assert.Single(TtmlParser.Parse(ttml).Lines!).Text);
     }
 
+    // ── CJK: characters timed one by one, written with no space between ───────────
+
+    /// <summary>Save ▸ TTML of a CJK word-synced .elrc: the saved file put a space between every character.</summary>
+    [Fact]
+    public void SavedTtml_OfCjkCharacters_WritesNoSpaceBetweenThem()
+    {
+        const string synced = "[00:20.51]<00:20.51>偶<00:20.94>尔<00:23.53>\n[00:24.44]<00:24.44>我<00:24.63>会 <00:24.79>怀<00:24.99>疑<00:25.14>";
+        var ttml = LyricsViewModel.BuildTtmlFromSynced(synced)!;
+
+        Assert.Contains(">偶</span><span", ttml);
+        Assert.Equal(new[] { "偶尔", "我会 怀疑" }, DefaultReaderLines(ttml));
+        Assert.Equal(new[] { "偶尔", "我会 怀疑" }, TtmlParser.Parse(ttml).Lines!.Select(l => l.Text));
+        Assert.Equal(new[] { "偶尔", "我会 怀疑" }, LyricsViewModel.ParseLrcContent(TimedLyricsBuilder.BuildElrc(ExistingLyricsLoader.ParseTimed(synced))).Select(l => l.Text));
+    }
+
+    /// <summary>
+    /// A CJK TTML imported in Edit Info / Lyrics Studio (TtmlParser.ToLrc): the span layout of
+    /// amll-ttml-db am-lyrics/1010728767.ttml line L1 and L4 (a real space between two words).
+    /// </summary>
+    [Fact]
+    public void ImportedCjkTtml_KeepsItsCharactersTogether()
+    {
+        const string ttml = """
+            <tt xmlns="http://www.w3.org/ns/ttml"><body><div>
+            <p begin="20.519" end="23.530"><span begin="20.519" end="20.942">偶</span><span begin="20.942" end="23.530">尔</span></p>
+            <p begin="30.258" end="32.497"><span begin="30.258" end="30.621">再</span><span begin="30.621" end="31.042">怎</span><span begin="31.042" end="31.412">么</span> <span begin="31.412" end="31.839">深</span><span begin="31.839" end="32.172">呼</span><span begin="32.172" end="32.497">吸</span></p>
+            </div></body></tt>
+            """;
+        var lrc = TtmlParser.ToLrc(ttml)!;
+
+        Assert.Equal(new[] { "偶尔", "再怎么 深呼吸" }, LyricsViewModel.ParseLrcContent(lrc).Select(l => l.Text));
+        Assert.Equal(new[] { "偶尔", "再怎么 深呼吸" }, ExistingLyricsLoader.ParseTimed(lrc).Select(l => l.Text));
+        Assert.Equal(new[] { "偶尔", "再怎么 深呼吸" }, TtmlParser.Parse(TimedLyricsBuilder.BuildTtml(ExistingLyricsLoader.ParseTimed(lrc))).Lines!.Select(l => l.Text));
+    }
+
     /// <summary>Duet agents are unchanged and each singer's line keeps its spaces.</summary>
     [Fact]
     public void SavedTtml_Duet_KeepsAgentsAndSpaces()
