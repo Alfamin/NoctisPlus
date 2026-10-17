@@ -255,7 +255,19 @@ public class LyricsStudioLivePreviewTests : IDisposable
             Assert.False(pane.IsEffectivelyVisible);
             await Until(() => !lyrics.IsPreviewActive, "the preview to be dropped");
         }
-        finally { win.Close(); }
+        finally { await CloseQuietly(win, lyrics); }
+    }
+
+    /// <summary>
+    /// Closes the window and lets the lyrics reload it starts (or one still in flight) land before
+    /// the test ends, then disposes the lyrics view model: a probe that finishes after the test
+    /// posts its swap into whichever headless test runs next.
+    /// </summary>
+    private static async Task CloseQuietly(Window win, LyricsViewModel lyrics)
+    {
+        win.Close();
+        try { await Until(() => !lyrics.IsPreviewActive && lyrics.LyricLines.Any(l => l.Text == "Second line here"), "the song's own lyrics to reload"); }
+        finally { lyrics.Dispose(); }
     }
 
     [AvaloniaFact]
@@ -291,7 +303,7 @@ public class LyricsStudioLivePreviewTests : IDisposable
             Settle(win);
             await Until(() => lyrics.IsPreviewActive && lyrics.LyricLines.Any(l => l.Text == "Second line fixed"), "the pane back on return");
         }
-        finally { win.Close(); }
+        finally { await CloseQuietly(win, lyrics); }
     }
 
     private sealed class NoRunEngine : ILyricsStudioEngine
