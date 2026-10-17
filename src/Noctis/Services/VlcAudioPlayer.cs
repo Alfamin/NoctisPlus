@@ -5966,6 +5966,11 @@ public class VlcAudioPlayer : IAudioPlayer, IOpenFileHolder
         _player.Dispose();
         _standbyPlayer.Dispose();
         _libVlc.Dispose();
+        lock (_engineInTapLock)
+        {
+            try { _engineInTap?.Dispose(); } catch { }
+            _engineInTap = null;
+        }
         if (lockHeld)
         {
             try { _playbackLock.Release(); } catch { }
