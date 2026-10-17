@@ -117,14 +117,15 @@ public class LyricsTimelineTests
         var line = WordLine(10, ("one", 10, 11), ("two", 11, 12), ("three", 12, 13));
         var t = Make(line);
 
-        // Adjusted clock lands exactly on 11.5 s: word 1 half sung, word 0 half a
-        // word past its end (the band overshoots [0,1] on neighbours by design).
+        // Adjusted clock lands exactly on 11.5 s: word 1 half sung. Its neighbours read
+        // the same front in characters: 1.5 of "two" past "one"'s start is 1.5 "one"s
+        // (3 chars each), and 1.5 chars short of "three" (5 chars) is -0.3.
         t.Update(TimeSpan.FromSeconds(11.5 - 0.08));
 
         Assert.Equal(1, line.CurrentWordIndex);
         Assert.Equal(1.5, line.Words![0].Progress, 3);
         Assert.Equal(0.5, line.Words[1].Progress, 3);
-        Assert.Equal(-0.5, line.Words[2].Progress, 3);
+        Assert.Equal(-0.3, line.Words[2].Progress, 3);
     }
 
     [Fact]
@@ -407,7 +408,9 @@ public class LyricsTimelineTests
         t.Update(TimeSpan.FromSeconds(11.5 - 0.08));
 
         Assert.Equal(new[] { 0, 1 }, t.ActiveIndices);
-        Assert.Equal(KaraokeSweep.BandProgress(10, 11, 11.5), a.Words![0].Progress, 3);
+        // Closed at B's start (11 s): fully swept at 11.5. Bounded by C (capped at 12 s)
+        // it would still be sweeping (0.75).
+        Assert.Equal(1.0, a.Words![0].Progress, 3);
     }
 
     [Fact]

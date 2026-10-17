@@ -14,7 +14,6 @@
              Background="Transparent">
 
     <UserControl.Resources>
-        <conv:ProgressToSweepForegroundConverter x:Key="ProgressToSweepFg"/>
         <conv:EmphasisGlowConverter x:Key="EmphasisGlow"/>
         <conv:WordOverflowPaddingConverter x:Key="WordOverflowPad"/>
         <conv:BlurRadiusToEffectConverter x:Key="BlurToEffect"/>
@@ -59,31 +58,26 @@
                              mirrors the lyrics page template. -->
                         <TextBlock.Opacity>
                             <MultiBinding Converter="{StaticResource EmphasisGlow}">
-                                <Binding Path="Progress"/>
+                                <Binding Path="EmphasisMs"/>
                                 <Binding Path="HeldDurationMs"/>
+                                <Binding Path="IsLastInLine"/>
+                                <Binding Path="EmphasisCharCount"/>
                             </MultiBinding>
                         </TextBlock.Opacity>
                     </TextBlock>
                 </Canvas>
-                <TextBlock Text="{Binding Text}"
-                           Classes="word-base"
-                           Padding="{Binding Text, Converter={StaticResource WordOverflowPad}}"
-                           FontWeight="Bold"
-                           Foreground="{Binding $parent[UserControl].((vm:LyricsViewModel)DataContext).LyricsPrimaryFg}"/>
-                <TextBlock Text="{Binding SweepText}"
-                           HorizontalAlignment="Left"
-                           FontWeight="Bold">
-                    <TextBlock.Foreground>
-                        <MultiBinding Converter="{StaticResource ProgressToSweepFg}">
-                            <Binding Path="Progress"/>
-                            <Binding Path="$parent[UserControl].((vm:LyricsViewModel)DataContext).LyricsPrimaryFg"/>
-                            <!-- Layout width + font size → constant ~0.25em feather, so
-                                 narrow tokens (single CJK cells) get a soft edge too. -->
-                            <Binding Path="Bounds.Width" RelativeSource="{RelativeSource Self}"/>
-                            <Binding Path="FontSize" RelativeSource="{RelativeSource Self}"/>
-                        </MultiBinding>
-                    </TextBlock.Foreground>
-                </TextBlock>
+                <controls:KaraokeWordText Text="{Binding Text}"
+                                          Classes="word-sweep"
+                                          Padding="{Binding Text, Converter={StaticResource WordOverflowPad}}"
+                                          FontWeight="Bold"
+                                          Foreground="{Binding $parent[UserControl].((vm:LyricsViewModel)DataContext).LyricsPrimaryFg}"
+                                          Progress="{Binding Progress}"
+                                          LeadIn="{Binding SweepLeadIn}"
+                                          TrailOut="{Binding SweepTrailOut}"
+                                          IsEmphasis="{Binding IsEmphasis}"
+                                          EmphasisMs="{Binding EmphasisMs}"
+                                          HeldDurationMs="{Binding HeldDurationMs}"
+                                          IsLastInLine="{Binding IsLastInLine}"/>
                 </Panel>
                 </Viewbox>
             </Panel>
@@ -136,17 +130,6 @@
             <Setter Property="RenderTransform" Value="translate(0px,0px) scale(1)"/>
         </Style>
 
-        <!-- Held-note emphasis: slow swell + soft glow, as on the lyrics page. -->
-        <Style Selector="Panel.word-cell.emphasis">
-            <Setter Property="Transitions">
-                <Transitions>
-                    <TransformOperationsTransition Property="RenderTransform" Duration="0:0:0.8" Easing="CubicEaseOut"/>
-                </Transitions>
-            </Setter>
-        </Style>
-        <Style Selector="Panel.word-cell.emphasis.current">
-            <Setter Property="RenderTransform" Value="translate(0px,-2px) scale(1.04)"/>
-        </Style>
         <!-- Glow opacity is bound per-frame in the template (EmphasisGlowConverter
              bell over the hold). No Opacity setter or transition here: a transition
              would low-pass the per-frame values and lag the vocal. -->
@@ -156,16 +139,16 @@
 
         <!-- Word base layer: full brightness on inactive lines, soft ghost under the
              sweep while the line is active. -->
-        <Style Selector="ItemsControl.word-layer TextBlock.word-base">
-            <Setter Property="Opacity" Value="1.0"/>
+        <Style Selector="ItemsControl.word-layer TextBlock.word-sweep">
+            <Setter Property="controls:KaraokeWordText.BaseOpacity" Value="1.0"/>
             <Setter Property="Transitions">
                 <Transitions>
-                    <DoubleTransition Property="Opacity" Duration="0:0:0.35" Easing="CubicEaseInOut"/>
+                    <DoubleTransition Property="controls:KaraokeWordText.BaseOpacity" Duration="0:0:0.35" Easing="CubicEaseInOut"/>
                 </Transitions>
             </Setter>
         </Style>
-        <Style Selector="ItemsControl.word-layer.active TextBlock.word-base">
-            <Setter Property="Opacity" Value="0.45"/>
+        <Style Selector="ItemsControl.word-layer.active TextBlock.word-sweep">
+            <Setter Property="controls:KaraokeWordText.BaseOpacity" Value="0.45"/>
         </Style>
 
         <Style Selector="TextBlock.panel-lyric-line">

@@ -3681,6 +3681,9 @@ public partial class LyricsViewModel : ViewModelBase, IDisposable
     // under a plain active line and would freeze if only the active line counted.
     private bool AnyActiveLineHasWordLayer()
     {
+        // A held note finishing its letter animation on a line that just went inactive
+        // still needs frames, even when the new line is plain text.
+        if (_timeline.HasEmphasisInFlight) return true;
         foreach (var line in _timeline.ActiveLines)
             if (line.HasWords || line.HasBackgroundWords || line.HasTransliterationWords)
                 return true;
