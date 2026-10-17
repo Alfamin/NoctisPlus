@@ -69,11 +69,13 @@ public sealed partial class SearchViewModel : ViewModelBase, ISearchable, IDispo
     public SearchArtistItem? TopArtist => TopResult as SearchArtistItem;
     public SearchAlbumItem? TopAlbum => TopResult as SearchAlbumItem;
 
-    [ObservableProperty, NotifyPropertyChangedFor(nameof(HasQuery), nameof(ShowEmptyPrompt))]
+    [ObservableProperty, NotifyPropertyChangedFor(nameof(HasQuery), nameof(ShowEmptyPrompt), nameof(ShowForYou))]
     private string _queryText = "";
 
     public bool HasQuery => QueryText.Trim().Length > 0;
-    public bool ShowEmptyPrompt => !HasQuery;
+    public bool ShowEmptyPrompt => !HasQuery && !HasOnline;
+    public bool ShowForYou => !HasQuery && HasOnline;
+    public ForYouShelfViewModel ForYou { get; } = new();
 
     /// <summary>Online results are on their way and none has arrived yet: skeletons stand in.</summary>
     [ObservableProperty, NotifyPropertyChangedFor(nameof(ShowSongSkeletons), nameof(ShowCardSkeletons), nameof(ShowNoResults))]
@@ -511,11 +513,14 @@ public sealed partial class SearchViewModel : ViewModelBase, ISearchable, IDispo
         _source = source;
         if (_source is not null) _source.DownloadsChanged += OnDownloadsChanged;
         OnPropertyChanged(nameof(HasOnline));
+        OnPropertyChanged(nameof(ShowForYou));
+        OnPropertyChanged(nameof(ShowEmptyPrompt));
         RefreshDownloadStates();
     }
 
     public void Dispose()
     {
+        ForYou.Dispose();
         _onlineCts?.Cancel();
         _artCts?.Cancel();
         _index.Rebuilt -= OnIndexRebuilt;

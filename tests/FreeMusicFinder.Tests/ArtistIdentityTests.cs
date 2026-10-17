@@ -55,5 +55,55 @@ internal static class ArtistIdentityTests
         await Check.ThrowsAsync<System.IO.InvalidDataException>(() => catalog.ArtistAsync(new("apple:55", "Drake"), false, default), "wrong cached artist ID is rejected before display");
         Seed(folder, "album:apple:123", new CatalogAlbum(Release("apple:123", "Thank Me Later", namesake), []));
         await Check.ThrowsAsync<InvalidDataException>(() => catalog.AlbumAsync(Release("apple:123", "Thank Me Later", actual), false, default), "cached release with a foreign artist ID is rejected before opening songs");
+        await MergedProviderAsync();
+    }
+
+    private static async Task MergedProviderAsync()
+    {
+        var merged = new CatalogArtist("deezer:11235313", "AveNoir");
+        var actual = new CatalogArtist("apple:1607710313", "Avenoir", "R&B/Soul");
+        var other = new CatalogArtist("apple:6802208621", "Avenoir", "Ambient");
+        CatalogSearchSong Song(CatalogArtist artist, string id, string title, string album) => new(
+            new(id, title, [artist], 180, true), new("apple:900", album, artist, "2026-01-01", "album", 10));
+        var folder = Check.NewFolder("merged-provider-identity");
+        var evidence = new List<CatalogSearchSong>
+        {
+            Song(actual, "apple:1", "Shameless", "NOIRE"), Song(actual, "apple:2", "Favour", "Mirage"),
+            Song(other, "apple:3", "Tonight", "Unrelated release")
+        };
+        Seed(folder, "identity-recordings:apple:AVENOIR", evidence);
+        var http = new DiscoveryTests.Http { Offline = true };
+        using var catalog = DiscoveryTests.Catalog(folder, http);
+        Check.Equal(actual.Id, (await catalog.SeparateNamesakesAsync(merged, ["NOIRE"], ["Shameless", "Favour"], default)).Id,
+            "independent recording evidence separates musicians merged under ONE Deezer id");
+        Check.Equal(0, http.Calls.Count, "cached cross-provider identity verification works offline without delaying Search");
+        Check.Equal(merged.Id, (await catalog.SeparateNamesakesAsync(merged, ["Unreleased"], ["Unknown song", "Unknown two"], default)).Id,
+            "no matching evidence never substitutes a famous or first namesake");
+        evidence.Add(Song(other, "apple:4", "Shameless", "NOIRE"));
+        evidence.Add(Song(other, "apple:5", "Favour", "Mirage"));
+        var tiedFolder = Check.NewFolder("merged-provider-tied"); Seed(tiedFolder, "identity-recordings:apple:AVENOIR", evidence);
+        using var tied = DiscoveryTests.Catalog(tiedFolder, new() { Offline = true });
+        Check.Equal(merged.Id, (await tied.SeparateNamesakesAsync(merged, ["NOIRE"], ["Shameless", "Favour"], default)).Id,
+            "equal independent recording evidence does not guess a namesake");
+        Check.Equal(actual.Id, (await catalog.SeparateNamesakesAsync(actual, [], [], default)).Id,
+            "a separated Apple identity never crosses back into a merged provider");
+        using var offline = DiscoveryTests.Catalog(Check.NewFolder("merged-provider-offline"), new() { Offline = true });
+        Check.Equal(merged.Id, (await offline.SeparateNamesakesAsync(merged, ["NOIRE"], ["Shameless", "Favour"], default)).Id,
+            "verification outage retains the selected identity and local library");
+        using var stopped = new CancellationTokenSource(); stopped.Cancel();
+        await Check.ThrowsAsync<OperationCanceledException>(() => catalog.SeparateNamesakesAsync(merged, [], [], stopped.Token),
+            "cancelled artist navigation does not continue verification");
+
+        var topHttp = new DiscoveryTests.Http(); using var top = DiscoveryTests.Catalog(Check.NewFolder("artist-top-songs"), topHttp);
+        var songs = await top.ArtistSongsAsync(DiscoveryTests.Star, false, default);
+        Check.Equal(3, songs.Value.Count, "artist top songs include online recordings absent from the library");
+        Check.True(songs.Value.All(t => t.Song.Artists.Any(a => a.Id == DiscoveryTests.Star.Id)), "online top songs retain stable artist credits");
+        await top.ArtistSongsAsync(DiscoveryTests.Star, false, default);
+        Check.Equal(1, topHttp.Calls.Count, "See all reuses the artist-song catalog cache");
+        var foreignHttp = new DiscoveryTests.Http { Override = (_, _) => Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK)
+        { Content = new StringContent(JsonSerializer.Serialize(new { data = new[] { new { id = 9, title = "Tonight", artist = new { id = 999, name = "North Star" } } } })) }) };
+        using var foreign = DiscoveryTests.Catalog(Check.NewFolder("artist-foreign-top"), foreignHttp);
+        Check.Equal(0, (await foreign.ArtistSongsAsync(DiscoveryTests.Star, false, default)).Value.Count,
+            "same-name top song credited to another provider id never enters the selected catalog");
     }
 }

@@ -81,6 +81,7 @@ try
     app.SetupWithoutStarting();
     TelegramSignInTests.Run();
     StreamingPlaylistImportTests.Run();
+    NativeForYouTests.Run();
     WindowTests.Run(string.IsNullOrEmpty(pictures) ? null : pictures);
     PlaylistWindowTests.Run(pictures);
     NativePlaylistTests.Run(Environment.GetEnvironmentVariable("FMF_NOCTIS_APP"));

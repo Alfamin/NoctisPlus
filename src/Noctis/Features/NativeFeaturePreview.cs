@@ -15,6 +15,11 @@ internal static class NativeFeaturePreview
     {
         // Explicit profile override is required for any developer preview.
         if (string.IsNullOrWhiteSpace(Environment.GetEnvironmentVariable("NOCTIS_PLUS_DATA_DIR"))) return;
+        if (preview == "artist-avenoir")
+        {
+            FreeMusicPlugin.Current?.OnlineSearch?.OpenArtist(new("deezer:11235313", "Avenoir"));
+            return;
+        }
         if (preview == "playlist-import") { await ShowPlaylistImportAsync(owner); return; }
         if (!preview.StartsWith("telegram-", StringComparison.Ordinal)) return;
         var dialog = new TelegramSignInDialog(new PreviewAccount(), _ => { });

@@ -476,6 +476,36 @@
              Playing takes a DOUBLE click (user ask 09-14), as in every flat track list, so the
              command is invoked from the code-behind instead of Button.Command; the Play button
              over the artwork stays a single click. -->
+        <DataTemplate x:Key="CatalogSongPill" x:DataType="vm:ArtistCatalogSong">
+            <Border Background="{DynamicResource HomeCardBackground}" CornerRadius="6" Margin="0,3" MinHeight="48">
+                <Grid ColumnDefinitions="40,40,*,Auto,Auto" Margin="0,4,8,4">
+                    <TextBlock Grid.Column="0" Classes="rank-num" Text="{Binding Rank}" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                    <Button Grid.Column="1" Width="36" Height="36" Padding="0" CornerRadius="4" ClipToBounds="True"
+                            Background="{DynamicResource ArtworkPlaceholderBackground}"
+                            Command="{Binding $parent[UserControl].((vm:ArtistDetailViewModel)DataContext).PlayCatalogSongCommand}" CommandParameter="{Binding}"
+                            ToolTip.Tip="{Binding Song.Title}">
+                        <Panel>
+                            <ctrl:CachedImage SourcePath="{Binding Song.ArtworkPath}" Stretch="UniformToFill" />
+                            <Path Data="{StaticResource PlayIcon}" Width="12" Height="12" Stretch="Uniform" HorizontalAlignment="Center" VerticalAlignment="Center" IsVisible="{Binding Song.IsLocal}" />
+                        </Panel>
+                    </Button>
+                    <StackPanel Grid.Column="2" VerticalAlignment="Center" Margin="14,0,12,0">
+                        <TextBlock Text="{Binding Song.Title}" FontWeight="SemiBold" FontSize="13" TextTrimming="CharacterEllipsis" />
+                        <TextBlock Text="{Binding Song.AlbumTitle}" FontSize="11" Opacity="0.55" TextTrimming="CharacterEllipsis" />
+                    </StackPanel>
+                    <TextBlock Grid.Column="3" Text="{Binding Song.DurationText}" FontSize="12" Opacity="0.7" VerticalAlignment="Center" Margin="0,0,8,0" />
+                    <StackPanel Grid.Column="4" Orientation="Horizontal" VerticalAlignment="Center" Spacing="4">
+                        <Button Classes="header-icon-btn" Content="↓" Width="28" Height="28" Padding="0" FontSize="20" IsVisible="{Binding Song.CanStartDownload}"
+                                ToolTip.Tip="Download now" Command="{Binding $parent[UserControl].((vm:ArtistDetailViewModel)DataContext).PlayCatalogSongCommand}" CommandParameter="{Binding}" />
+                        <Button Classes="header-icon-btn" Content="+" Width="28" Height="28" Padding="0" FontSize="20" IsVisible="{Binding Song.CanStartDownload}"
+                                ToolTip.Tip="Queue download" Command="{Binding $parent[UserControl].((vm:ArtistDetailViewModel)DataContext).QueueCatalogDownloadCommand}" CommandParameter="{Binding}" />
+                        <ProgressBar Width="32" Height="3" Minimum="0" Maximum="1" Value="{Binding Song.Progress}" IsVisible="{Binding Song.IsDownloading}" />
+                        <TextBlock Text="Queued" FontSize="11" Opacity="0.55" IsVisible="{Binding Song.IsQueued}" />
+                        <TextBlock Text="✓" FontSize="16" Opacity="0.7" IsVisible="{Binding Song.IsSaved}" />
+                    </StackPanel>
+                </Grid>
+            </Border>
+        </DataTemplate>
         <DataTemplate x:Key="SongPill" x:DataType="m:TopSongRow">
             <Button Classes="browse-item song-row"
                     Classes.playing="{Binding Track.IsNowPlaying}"
@@ -615,7 +645,6 @@
                         CornerRadius="95"
                         HorizontalAlignment="Center"
                         Cursor="Hand"
-                        IsEnabled="{Binding IsInLibrary}"
                         Command="{Binding $parent[UserControl].((vm:ArtistDetailViewModel)DataContext).OpenSimilarArtistCommand}"
                         CommandParameter="{Binding}">
                     <Button.Clip>
@@ -971,7 +1000,9 @@
                             <Button Grid.Column="1" Classes="accent-btn album-header-action see-all-pill" Content="{loc:T ArtistDetail.SeeAll}"
                                     Command="{Binding SelectTabCommand}" CommandParameter="songs" VerticalAlignment="Center" />
                         </Grid>
-                        <ItemsControl ItemsSource="{Binding PopularSongs}" ItemTemplate="{StaticResource SongPill}">
+                        <ItemsControl ItemsSource="{Binding CatalogPopular}" ItemTemplate="{StaticResource CatalogSongPill}" IsVisible="{Binding HasCatalogSongs}" />
+                        <TextBlock Text="{Binding CatalogSongStatus}" IsVisible="{Binding HasCatalogSongStatus}" FontSize="11" Opacity="0.6" TextWrapping="Wrap" />
+                        <ItemsControl ItemsSource="{Binding PopularSongs}" ItemTemplate="{StaticResource SongPill}" IsVisible="{Binding !HasCatalogSongs}">
                             <ItemsControl.ItemsPanel>
                                 <ItemsPanelTemplate>
                                     <StackPanel />
@@ -980,7 +1011,7 @@
                         </ItemsControl>
                         <TextBlock Text="{loc:T ArtistDetail.NoSongsMatch}"
                                    FontSize="13" Opacity="0.5" Margin="2,4,0,0"
-                                   IsVisible="{Binding !HasPopular}" />
+                                   IsVisible="{Binding ShowNoPopular}" />
 
                         <!-- In your library: stat tiles under the rows. They used to sit in the
                              About card, where a long bio pushed the whole row's height and left
@@ -1439,14 +1470,18 @@
                      song was a live row: a 175-song artist realized all 175 on the tab
                      switch (~0.7 MB and ~7 ms each in the headless probe), a multi-second
                      stall and hundreds of MB of garbage for the GC (ArtistPageStreamingTests). -->
-                <ItemsControl ItemsSource="{Binding AllSongs}" ItemTemplate="{StaticResource SongPill}">
+                <ItemsControl ItemsSource="{Binding CatalogSongs}" ItemTemplate="{StaticResource CatalogSongPill}" IsVisible="{Binding HasCatalogSongs}">
+                    <ItemsControl.ItemsPanel><ItemsPanelTemplate><VirtualizingStackPanel /></ItemsPanelTemplate></ItemsControl.ItemsPanel>
+                </ItemsControl>
+                <TextBlock Text="{Binding CatalogSongStatus}" IsVisible="{Binding HasCatalogSongStatus}" FontSize="12" Opacity="0.6" TextWrapping="Wrap" />
+                <ItemsControl ItemsSource="{Binding AllSongs}" ItemTemplate="{StaticResource SongPill}" IsVisible="{Binding !HasCatalogSongs}">
                     <ItemsControl.ItemsPanel>
                         <ItemsPanelTemplate>
                             <VirtualizingStackPanel />
                         </ItemsPanelTemplate>
                     </ItemsControl.ItemsPanel>
                 </ItemsControl>
-                <TextBlock Text="{loc:T ArtistDetail.NoSongsMatch}" FontSize="13" Opacity="0.5" Margin="2,4,0,0" IsVisible="{Binding !HasAllSongs}" />
+                <TextBlock Text="{loc:T ArtistDetail.NoSongsMatch}" FontSize="13" Opacity="0.5" Margin="2,4,0,0" IsVisible="{Binding ShowNoAllSongs}" />
             </StackPanel>
 
             <!-- ── Similar Artists tab ──────────────────────────────── -->

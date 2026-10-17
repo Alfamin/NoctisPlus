@@ -1,5 +1,6 @@
 <UserControl xmlns="https://github.com/avaloniaui"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:views="using:Noctis.Views"
              xmlns:vm="using:Noctis.ViewModels"
              xmlns:controls="using:Noctis.Controls"
              x:Class="Noctis.Views.SearchView"
@@ -507,6 +508,8 @@
                             Command="{Binding SelectFilterCommand}" CommandParameter="Albums" />
                 </WrapPanel>
             </Grid>
+
+            <views:ForYouShelfView DataContext="{Binding ForYou}" IsVisible="{Binding $parent[UserControl].((vm:SearchViewModel)DataContext).ShowForYou}" />
 
             <!-- All: Top result beside the first songs. -->
             <Grid x:Name="TopGrid" ColumnDefinitions="5*,28,7*" IsVisible="{Binding IsAllFilter}">

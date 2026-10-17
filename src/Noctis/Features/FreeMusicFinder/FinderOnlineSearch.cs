@@ -160,6 +160,17 @@ internal sealed class FinderOnlineSearch : IOnlineMusicSearch
 
     public void RequestSignIn() => _signIn();
 
+    /// <summary>A recommendation uses the same native download actions as a search result.</summary>
+    internal OnlineSong Remember(CatalogSearchSong track)
+    {
+        var s = track.Song;
+        _songs[s.Id] = s;
+        if (track.Album is { } album) _albums[album.Id] = album;
+        return new(s.Id, s.Title, string.Join(", ", s.Artists.Select(a => a.Name)), track.Album?.Title ?? "",
+            s.Seconds, s.Explicit, CatalogArtwork.SizedUrl(track.Artwork.Length > 0 ? track.Artwork : track.Album?.Artwork, CardArtwork) ?? "",
+            AlbumId: track.Album?.Id ?? "");
+    }
+
     public IDownloadQueue Downloads => _queue ??= new FinderDownloadQueue(_actions.Downloads);
     private FinderDownloadQueue? _queue;
 
@@ -190,7 +201,11 @@ internal sealed class FinderOnlineSearch : IOnlineMusicSearch
 
     public void OpenArtist(OnlineArtist artist)
     {
+        // Related-artist tiles already carry a provider id; they need not have appeared
+        // in this Search instance first. Never turn navigation into a name-only search.
         if (_artists.TryGetValue(artist.Id, out var a)) _pages.OpenArtist(a);
+        else if (System.Text.RegularExpressions.Regex.IsMatch(artist.Id, @"^(apple|deezer):[1-9][0-9]{0,17}$"))
+            _pages.OpenArtist(new(artist.Id, artist.Name, artist.Genre, artist.PictureUrl));
     }
 
     public async Task OpenAlbumAsync(OnlineAlbum album, CancellationToken ct)

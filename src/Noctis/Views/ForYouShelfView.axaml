@@ -1,0 +1,57 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:Noctis.ViewModels"
+             xmlns:ctrl="using:Noctis.Controls"
+             x:Class="Noctis.Views.ForYouShelfView" x:DataType="vm:ForYouShelfViewModel">
+    <StackPanel Spacing="12">
+        <Grid ColumnDefinitions="*,Auto,Auto" ColumnSpacing="12">
+            <Button Background="Transparent" BorderThickness="0" Padding="0" HorizontalAlignment="Left" Command="{Binding ToggleExpandedCommand}">
+                <TextBlock Text="For you" FontSize="24" FontWeight="Bold" />
+            </Button>
+            <TextBlock Grid.Column="1" Text="New picks" FontSize="12" Opacity="0.6" VerticalAlignment="Center" IsVisible="{Binding HasNewPicks}" />
+            <Button Grid.Column="2" Classes="accent-btn album-header-action" Content="Refresh" Command="{Binding RefreshCommand}" IsEnabled="{Binding !IsLoading}" />
+        </Grid>
+        <Grid ColumnDefinitions="*,Auto" IsVisible="{Binding HasUndo}">
+            <TextBlock Text="{Binding UndoLabel}" Opacity="0.7" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" />
+            <Button Grid.Column="1" Classes="text-link" Content="Undo" Command="{Binding UndoCommand}" />
+        </Grid>
+        <ProgressBar IsIndeterminate="True" Height="3" IsVisible="{Binding IsLoading}" />
+        <TextBlock Text="{Binding Status}" Opacity="0.6" FontSize="12" TextWrapping="Wrap" />
+        <ctrl:CollapsibleContent IsOpen="{Binding IsExpanded}" Lift="10" Motion="Glide">
+            <ScrollViewer HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Disabled">
+                <ItemsControl ItemsSource="{Binding Picks}" Margin="0,0,0,12">
+                    <ItemsControl.ItemsPanel><ItemsPanelTemplate><StackPanel Orientation="Horizontal" Spacing="20" /></ItemsPanelTemplate></ItemsControl.ItemsPanel>
+                    <ItemsControl.ItemTemplate>
+                        <DataTemplate x:DataType="vm:ForYouPick">
+                            <StackPanel Width="168" Spacing="6">
+                                <Button Background="Transparent" Padding="0" BorderThickness="0" CornerRadius="8" ClipToBounds="True"
+                                        Command="{Binding $parent[UserControl].((vm:ForYouShelfViewModel)DataContext).OpenPickCommand}" CommandParameter="{Binding}">
+                                    <Border Width="168" Height="168" Background="{DynamicResource ArtworkPlaceholderBackground}" CornerRadius="8" ClipToBounds="True">
+                                        <ctrl:CachedImage SourcePath="{Binding Song.ArtworkPath}" Stretch="UniformToFill" />
+                                    </Border>
+                                </Button>
+                                <TextBlock Text="{Binding Song.Title}" FontSize="14" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" ToolTip.Tip="{Binding Song.Title}" />
+                                <Button Background="Transparent" BorderThickness="0" Padding="0" HorizontalAlignment="Left"
+                                        Command="{Binding $parent[UserControl].((vm:ForYouShelfViewModel)DataContext).OpenPickArtistCommand}" CommandParameter="{Binding}">
+                                    <TextBlock Text="{Binding Song.ArtistDisplay}" FontSize="12" Opacity="0.6" TextTrimming="CharacterEllipsis" />
+                                </Button>
+                                <TextBlock Text="{Binding Because}" FontSize="11" Opacity="0.45" TextTrimming="CharacterEllipsis" ToolTip.Tip="{Binding Because}" />
+                                <Grid ColumnDefinitions="Auto,Auto,*,Auto" Height="30">
+                                    <Button Classes="header-icon-btn" Content="↓" FontSize="20" Padding="0" Width="28" ToolTip.Tip="Download now" IsVisible="{Binding Song.CanStartDownload}"
+                                            Command="{Binding $parent[UserControl].((vm:ForYouShelfViewModel)DataContext).DownloadCommand}" CommandParameter="{Binding}" />
+                                    <Button Grid.Column="1" Classes="header-icon-btn" Content="+" FontSize="20" Padding="0" Width="28" ToolTip.Tip="Queue download" IsVisible="{Binding Song.CanStartDownload}"
+                                            Command="{Binding $parent[UserControl].((vm:ForYouShelfViewModel)DataContext).QueueDownloadCommand}" CommandParameter="{Binding}" />
+                                    <TextBlock Text="Queued" FontSize="11" Opacity="0.6" VerticalAlignment="Center" IsVisible="{Binding Song.IsQueued}" />
+                                    <TextBlock Text="✓" FontSize="16" VerticalAlignment="Center" IsVisible="{Binding Song.IsSaved}" />
+                                    <ProgressBar Grid.ColumnSpan="2" Width="40" Height="3" Minimum="0" Maximum="1" Value="{Binding Song.Progress}" IsVisible="{Binding Song.IsDownloading}" />
+                                    <Button Grid.Column="3" Classes="header-icon-btn" Content="−" FontSize="20" Padding="0" Width="28" ToolTip.Tip="Not for me"
+                                            Command="{Binding $parent[UserControl].((vm:ForYouShelfViewModel)DataContext).NotForMeCommand}" CommandParameter="{Binding}" />
+                                </Grid>
+                            </StackPanel>
+                        </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                </ItemsControl>
+            </ScrollViewer>
+        </ctrl:CollapsibleContent>
+    </StackPanel>
+</UserControl>

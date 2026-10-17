@@ -208,12 +208,17 @@ internal sealed class NativeCatalogPages : IDisposable
             Set(tile, "ArtworkPath", art);
         var vm = NativeCatalogBridge.OpenAlbum(main, tile, result.Value, matches); _opened[vm] = (result.Value, tile); Scan(); _window()?.Activate();
     }
-    private async Task<CatalogArtist?> ResolveArtist(string name, WrapPanel? choices, CancellationToken ct, Action<CatalogArtist>? choose = null, IReadOnlyList<string>? albums = null)
+    private async Task<CatalogArtist?> ResolveArtist(string name, WrapPanel? choices, CancellationToken ct, Action<CatalogArtist>? choose = null, IReadOnlyList<string>? albums = null, IReadOnlyList<string>? titles = null)
     {
         _chosen.TryGetValue(name, out var saved);
         if (saved is not null && _manualChoices.Contains(name)) return saved;
         var result = await _catalog().IdentifyAsync(name, albums ?? LocalAlbums(name), saved, ct);
         if (result.Artist is {} matched) { SaveChoice(name, matched); return matched; }
+        if (titles is { Count: >= 2 } && result.Candidates.FirstOrDefault(a => a.Id.StartsWith("deezer:") && BotText.Key(a.Name) == BotText.Key(name)) is { } candidate)
+        {
+            var verified = await _catalog().SeparateNamesakesAsync(candidate, albums ?? LocalAlbums(name), titles, ct);
+            if (verified.Id.StartsWith("apple:")) { SaveChoice(name, verified); return verified; }
+        }
         if (choices is null) throw new InvalidOperationException("CATALOG_ARTIST_AMBIGUOUS: Open the artist page and select the correct catalog identity first. Local music was kept.");
         foreach (var artist in result.Candidates)
         {
@@ -245,8 +250,15 @@ internal sealed class NativeCatalogPages : IDisposable
             state.Busy = true; state.Interrupted = false; state.LoadStop = loading = CancellationTokenSource.CreateLinkedTokenSource(_stop.Token);
             state.Loading.IsVisible = true; state.Strip.Children.Clear(); state.Strip.Children.Add(state.Status); state.Strip.Children.Add(state.Loading); state.Status.Text = "Loading releases… Your local music stays available.";
             var name = Get(vm, "ArtistName") as string ?? "";
-            var identity = _requestedArtists.GetValueOrDefault(vm) ?? await ResolveArtist(name, state.Strip, loading.Token, chosen => { _requestedArtists[vm] = chosen; _ = LoadArtist(state.Page, vm); });
+            var identity = _requestedArtists.GetValueOrDefault(vm) ?? await ResolveArtist(name, state.Strip, loading.Token, chosen => { _requestedArtists[vm] = chosen; _ = LoadArtist(state.Page, vm); },
+                titles: (vm as Noctis.ViewModels.ArtistDetailViewModel)?.IdentityTitles);
             if (identity is null) { state.Status.Text = "Choose the artist's catalog once (several artists share this name):"; return; }
+            if (vm is Noctis.ViewModels.ArtistDetailViewModel nativeArtist)
+            {
+                identity = await _catalog().SeparateNamesakesAsync(identity, nativeArtist.IdentityAlbums, nativeArtist.IdentityTitles, loading.Token);
+                loading.Token.ThrowIfCancellationRequested();
+                nativeArtist.SetCatalogArtist(_catalog(), identity, refresh);
+            }
             var saved = await _catalog().SavedArtistAsync(identity, loading.Token); loading.Token.ThrowIfCancellationRequested();
             if (_disposed || !_enabled() || !_artists.ContainsKey(vm)) return;
             if (saved is not null)

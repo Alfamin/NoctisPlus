@@ -600,6 +600,7 @@ public partial class ArtistDetailViewModel : ViewModelBase, ISearchable, IDispos
         _allReleases = releases;
         _allAppearsOn = appearsOn;
         _allSongs = songs;
+        RefreshCatalogOwnership();
 
         LatestRelease = releases.FirstOrDefault();
         var total = TimeSpan.FromTicks(songs.Sum(t => t.Duration.Ticks));
@@ -942,7 +943,7 @@ public partial class ArtistDetailViewModel : ViewModelBase, ISearchable, IDispos
 
     /// <summary>Pure: Deezer's related artists joined to the library by name. An artist in
     /// the library uses their library portrait (the user may have picked one) and opens
-    /// their page; the rest show Deezer's photo and are inert.</summary>
+    /// their page; the rest still open a browsable catalog page.</summary>
     internal static List<SimilarArtistRow> BuildSimilarRows(
         IReadOnlyList<SimilarArtist> related, IReadOnlyList<Artist> libraryArtists, ArtistImageService? images)
     {
@@ -965,6 +966,7 @@ public partial class ArtistDetailViewModel : ViewModelBase, ISearchable, IDispos
                 Name = libraryArtist?.Name ?? r.Name,
                 ImagePath = image ?? string.Empty,
                 IsInLibrary = libraryArtist != null,
+                CatalogId = r.DeezerId > 0 ? "deezer:" + r.DeezerId : "",
             });
         }
         return rows;
@@ -982,6 +984,7 @@ public partial class ArtistDetailViewModel : ViewModelBase, ISearchable, IDispos
     {
         _query = query ?? string.Empty;
         ApplyLists();
+        FilterCatalogSongs();
     }
 
     // ── Commands ──
@@ -1115,7 +1118,10 @@ public partial class ArtistDetailViewModel : ViewModelBase, ISearchable, IDispos
     [RelayCommand]
     private void OpenSimilarArtist(SimilarArtistRow? row)
     {
-        if (row is { IsInLibrary: true }) ArtistOpened?.Invoke(this, row.Name);
+        if (row is null) return;
+        if (row.CatalogId.Length > 0 && FreeMusicFinder.FreeMusicPlugin.Current?.OnlineSearch is { } online)
+            online.OpenArtist(new Services.Search.OnlineArtist(row.CatalogId, row.Name));
+        else ArtistOpened?.Invoke(this, row.Name);
     }
 
     [RelayCommand]
@@ -1182,6 +1188,7 @@ public partial class ArtistDetailViewModel : ViewModelBase, ISearchable, IDispos
 
     public void Dispose()
     {
+        DisposeCatalogSongs();
         _cts.Cancel();
         _cts.Dispose();
         _songsGeneration++; // stops an in-flight Songs-tab slice fill
@@ -1194,9 +1201,9 @@ public partial class ArtistDetailViewModel : ViewModelBase, ISearchable, IDispos
 public sealed partial class SimilarArtistRow : ObservableObject
 {
     public required string Name { get; init; }
+    public string CatalogId { get; init; } = string.Empty;
     public string ImagePath { get; init; } = string.Empty;
     public bool HasImage => ImagePath.Length > 0;
-    /// <summary>True when the library has this artist: the tile opens their page; a
-    /// stranger's tile is inert and dimmed.</summary>
+    /// <summary>Ownership badge only; browsing is available without owning music.</summary>
     [ObservableProperty] private bool _isInLibrary;
 }

@@ -19,6 +19,9 @@ public sealed class FreeMusicPlugin : INoctisPlugin
 {
     internal static FreeMusicPlugin? Current { get; private set; }
     internal SpotifyPlaylists? PlaylistImports => _playlists;
+    internal ForYouSource? ForYou => _forYou;
+    internal FinderOnlineSearch? OnlineSearch => _online;
+    internal DiscoveryActions? Discovery => _discoveryActions;
     internal bool IsSignedIn => _telegram?.IsLoggedIn == true;
     internal string DownloadFolder => Downloader.Folder(_host?.Settings.GetString(DownloadFolderKey), _host!.DataDirectory);
     private const string OpenSearchKey = "openSearch";
@@ -88,7 +91,8 @@ public sealed class FreeMusicPlugin : INoctisPlugin
         _artistPages = new NativeCatalogPages(() => _catalog!, _discoveryActions, Log, () => _host?.Settings.GetBool("artistCatalogOnPages", true) == true, choicesPath: Path.Combine(host.DataDirectory, "artist-catalog", "artist-choices.json"));
         _forYou = new ForYouSource(() => _catalog ?? throw new InvalidOperationException("Free Music Finder has stopped."), _discoveryActions,
             DiscoverAlbums, new PlaylistLibrary(), NoctisDataOf(host.DataDirectory), Path.Combine(host.DataDirectory, "for-you-hidden.json"), () => _similar, () => _lastFm);
-        _forYou.WarmUp();
+        // Native For you loads when its shelf is visible. A startup background build
+        // must not compete with the user's first Search for metadata connections.
         // The app's own Search page reads the catalog and starts downloads through this.
         _online = new FinderOnlineSearch(() => _catalog, _discoveryActions, _artistPages, () => _telegram?.IsLoggedIn == true, ShowSignIn);
         Current = this;

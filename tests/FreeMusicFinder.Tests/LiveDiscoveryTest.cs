@@ -34,11 +34,24 @@ internal static class LiveDiscoveryTest
                 Console.WriteLine($"  IDENTITY {previous ?? "unselected"} → {identity.Artist?.Id}; {identity.Albums.Count} matching album(s).");
             }
             var elapsed = System.Diagnostics.Stopwatch.StartNew();
-            var artist = await catalog.ArtistAsync(exact[0], false, stop.Token);
+            var chosen = exact[0];
+            if (Environment.GetEnvironmentVariable("FMF_IDENTITY_TITLES") is { Length: > 0 } titles)
+            {
+                chosen = await catalog.SeparateNamesakesAsync(chosen, [], titles.Split('|'), stop.Token);
+                Console.WriteLine($"  SEPARATED {exact[0].Id} → {chosen.Id}, using recording evidence");
+                if (Environment.GetEnvironmentVariable("FMF_IDENTITY_EXPECTED") is { Length: > 0 } expected)
+                    Check.Equal(expected, chosen.Id, "live metadata: independently separated artist identity");
+            }
+            var artist = await catalog.ArtistAsync(chosen, false, stop.Token);
+            if (Environment.GetEnvironmentVariable("FMF_DISCOVERY_EXCLUDE") is { Length: > 0 } exclude)
+                foreach (var unwanted in exclude.Split('|'))
+                    Check.True(!artist.Value.Releases.Any(r => CatalogEditions.Same(r.Title, unwanted)), "live metadata: unrelated release excluded: " + unwanted);
+            var topSongs = await catalog.ArtistSongsAsync(chosen, false, stop.Token);
+            Check.True(topSongs.Value.Count > 0, "live metadata: online artist songs available without a local library");
             Console.WriteLine($"  PERF  {(artist.Cached ? "cached" : "network")} artist metadata ready: {elapsed.Elapsed.TotalMilliseconds:F1} ms");
             Check.True(artist.Value.Releases.Count > 0, "live metadata: artist releases for " + name);
             var title = Environment.GetEnvironmentVariable("FMF_DISCOVERY_ALBUM");
-            var release = artist.Value.Releases.First(a => a.Count > 0 && (string.IsNullOrEmpty(title) || CatalogEditions.Same(a.Title, title)));
+            var release = artist.Value.Releases.First(a => string.IsNullOrEmpty(title) || CatalogEditions.Same(a.Title, title));
             var album = await catalog.AlbumAsync(release, false, stop.Token);
             Check.True(album.Value.Songs.Count > 0 && album.Value.Songs.All(s => !string.IsNullOrWhiteSpace(s.Request.Artist) && !string.IsNullOrWhiteSpace(s.Request.Title)), "live metadata: album songs produce usable recording requests");
             Console.WriteLine($"  {artist.Value.Artist.Name}: {artist.Value.Artist.Id.Split(':')[0]}, {artist.Value.Releases.Count} releases; {album.Value.Release.Title}: {album.Value.Songs.Count}/{album.Value.Release.Count} songs. {artist.Value.Notice} {album.Value.Notice}");
