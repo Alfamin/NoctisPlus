@@ -372,6 +372,15 @@ public class MiniPlayerDesignTests
             var card = win.FindControl<Border>("SleeveCard")!;
             var sheet = win.FindControl<Border>("DrawerSheet")!;
             var ground = win.FindControl<Border>("SleeveGround")!;
+            // The initial form reveal is posted at Render priority. Under suite load its
+            // 180 ms scale transition can start after the initial 300 ms pump. Measuring
+            // a moving entrance pose as the closed baseline incorrectly blames the drawer.
+            var root = win.FindControl<Control>("SleeveFormRoot")!;
+            var deadline = Environment.TickCount64 + 2000;
+            bool Settled() => root.IsVisible && root.Opacity >= 0.999 &&
+                Math.Abs((root.RenderTransform?.Value ?? Matrix.Identity).M11 - 1) < 0.0001;
+            while (!Settled() && Environment.TickCount64 < deadline) await PumpFor(16);
+            Assert.True(Settled(), "The initial sleeve reveal must settle before measuring the drawer.");
             Assert.True(ground.IsVisible);
             Assert.Equal(34, ground.CornerRadius.BottomLeft, 3);
             Assert.Equal(34, card.CornerRadius.BottomLeft, 3);
