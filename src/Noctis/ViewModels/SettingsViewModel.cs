@@ -2233,6 +2233,9 @@ public partial class SettingsViewModel : ViewModelBase
 
     [ObservableProperty] private bool _watchFoldersEnabled = true;
 
+    /// <summary>Settings › Library › Inbox for New Music (AppSettings.InboxEnabled).</summary>
+    [ObservableProperty] private bool _inboxEnabled;
+
     [ObservableProperty] private bool _useEmbeddedArtwork = true;
 
     [ObservableProperty] private string _organizePattern = "{AlbumArtist}/{Album}/{TrackNo} {Title}";
@@ -2749,6 +2752,7 @@ public partial class SettingsViewModel : ViewModelBase
 
             ScanOnStartup = _settings.ScanOnStartup;
             WatchFoldersEnabled = _settings.WatchFoldersEnabled;
+            InboxEnabled = _settings.InboxEnabled;
             UseEmbeddedArtwork = _settings.UseEmbeddedArtwork;
             OrganizePattern = _settings.OrganizePattern;
             OrganizeTargetRoot = _settings.OrganizeTargetRoot;
@@ -3224,6 +3228,7 @@ public partial class SettingsViewModel : ViewModelBase
 
         _settings.ScanOnStartup = ScanOnStartup;
         _settings.WatchFoldersEnabled = WatchFoldersEnabled;
+        _settings.InboxEnabled = InboxEnabled;
         _settings.UseEmbeddedArtwork = UseEmbeddedArtwork;
         _settings.OrganizePattern = OrganizePattern;
         _settings.OrganizeTargetRoot = OrganizeTargetRoot;
@@ -4169,6 +4174,32 @@ public partial class SettingsViewModel : ViewModelBase
         _ = SaveAsync();
         // Start/stop the filesystem watchers to match the new preference.
         App.Services?.GetService<ILibraryWatcherService>()?.Refresh();
+    }
+
+    partial void OnInboxEnabledChanged(bool value)
+    {
+        _settings.InboxEnabled = value;
+        if (!_settingsLoaded) return;
+        _ = ApplyInboxEnabledAsync(value);
+    }
+
+    /// <summary>Saves the Inbox switch; off moves every song waiting in the Inbox into the
+    /// library, so nothing stays hidden once the feature is gone. Saved first, so a scan
+    /// starting meanwhile reads "off".</summary>
+    internal async Task ApplyInboxEnabledAsync(bool enabled)
+    {
+        try
+        {
+            await SaveAsync();
+            if (enabled) return;
+            var waiting = _library.AllTracks.Where(t => t.IsInInbox).Select(t => t.Id).ToList();
+            if (waiting.Count > 0)
+                await _library.AcceptInboxTracksAsync(waiting);
+        }
+        catch (Exception ex)
+        {
+            DebugLog.Write("Settings", $"Inbox switch failed: {ex.Message}");
+        }
     }
 
     partial void OnUseEmbeddedArtworkChanged(bool value)
@@ -7045,6 +7076,7 @@ public partial class SettingsViewModel : ViewModelBase
             // Preferences
             ScanOnStartup = true;
             WatchFoldersEnabled = true;
+            InboxEnabled = defaultSettings.InboxEnabled;
             UseEmbeddedArtwork = defaultSettings.UseEmbeddedArtwork;
             OrganizePattern = "{AlbumArtist}/{Album}/{TrackNo} {Title}";
             OrganizeTargetRoot = string.Empty;

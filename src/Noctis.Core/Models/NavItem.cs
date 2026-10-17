@@ -17,6 +17,14 @@ public partial class NavItem : ObservableObject
     /// (used to flag an available app update on the Settings entry).</summary>
     [ObservableProperty] private bool _showBadge;
 
+    /// <summary>Count shown after the label in the expanded sidebar (the Inbox's waiting
+    /// songs); 0 shows nothing.</summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(HasCount))]
+    private int _count;
+
+    public bool HasCount => Count > 0;
+
     /// <summary>Icon glyph character or path identifier.</summary>
     public string IconGlyph { get; set; } = string.Empty;
 

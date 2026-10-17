@@ -56,6 +56,7 @@ public partial class App : Application
             [typeof(LyricsViewModel)] = () => new LyricsView(),
             [typeof(ServerViewModel)] = () => new ServerView(),
             [typeof(AudioCdViewModel)] = () => new AudioCdView(),
+            [typeof(InboxViewModel)] = () => new InboxView(),
             [typeof(VisualizerViewModel)] = () => new VisualizerView(),
             [typeof(LyricsStudioPageViewModel)] = () => new LyricsStudioView(),
         });

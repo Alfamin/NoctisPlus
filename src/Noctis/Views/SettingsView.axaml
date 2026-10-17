@@ -4338,6 +4338,21 @@
                                           VerticalAlignment="Center"/>
                 </Grid>
             </Border>
+            <!-- Discord request (MusicBee's Inbox): new songs found in the music folders wait
+                 on the sidebar's Inbox page until added to the library or deleted. -->
+            <Border Classes="setting-row">
+                <Grid ColumnDefinitions="*,Auto">
+                    <StackPanel Grid.Column="0" Spacing="2" VerticalAlignment="Center" Margin="0,0,16,0">
+                        <TextBlock Text="{loc:T Settings.Inbox}" FontSize="15" FontWeight="SemiBold"/>
+                        <TextBlock Text="{loc:T Settings.InboxHint}"
+                                   FontSize="12" Opacity="0.5" TextWrapping="Wrap"/>
+                    </StackPanel>
+                    <controls:LottieToggle Grid.Column="1"
+                                          AutomationProperties.Name="{loc:T Settings.Inbox}"
+                                          IsChecked="{Binding InboxEnabled}"
+                                          VerticalAlignment="Center"/>
+                </Grid>
+            </Border>
             <Border Classes="setting-row">
                 <Grid ColumnDefinitions="*,Auto">
                     <StackPanel Grid.Column="0">
