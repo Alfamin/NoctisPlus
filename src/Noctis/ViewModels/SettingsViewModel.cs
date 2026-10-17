@@ -2031,6 +2031,8 @@ public partial class SettingsViewModel : ViewModelBase
     [ObservableProperty] private bool _netEaseEnabled = true;
     [ObservableProperty] private bool _musixmatchEnabled;
     [ObservableProperty] private bool _kugouEnabled = true;
+    [ObservableProperty] private bool _lrcRedEnabled = true;
+    [ObservableProperty] private bool _unisonEnabled = true;
     [ObservableProperty] private bool _youTubeMusicLyricsEnabled;
 
     // ── Metadata Providers ──
@@ -2927,6 +2929,8 @@ public partial class SettingsViewModel : ViewModelBase
             NetEaseEnabled = _settings.NetEaseEnabled;
             MusixmatchEnabled = _settings.MusixmatchEnabled;
             KugouEnabled = _settings.KugouEnabled;
+            LrcRedEnabled = _settings.LrcRedEnabled;
+            UnisonEnabled = _settings.UnisonEnabled;
             YouTubeMusicLyricsEnabled = _settings.YouTubeMusicLyricsEnabled;
             LoadFeatureSettings();
 
@@ -3392,6 +3396,8 @@ public partial class SettingsViewModel : ViewModelBase
         _settings.NetEaseEnabled = NetEaseEnabled;
         _settings.MusixmatchEnabled = MusixmatchEnabled;
         _settings.KugouEnabled = KugouEnabled;
+        _settings.LrcRedEnabled = LrcRedEnabled;
+        _settings.UnisonEnabled = UnisonEnabled;
         _settings.YouTubeMusicLyricsEnabled = YouTubeMusicLyricsEnabled;
         _settings.EqualizerEnabled = EqualizerEnabled;
         _settings.EqPreampDb = EqPreampDb;
@@ -5140,6 +5146,18 @@ public partial class SettingsViewModel : ViewModelBase
     }
 
     partial void OnKugouEnabledChanged(bool value)
+    {
+        if (_suspendSettingPersistence) return;
+        _ = SaveAsync();
+    }
+
+    partial void OnLrcRedEnabledChanged(bool value)
+    {
+        if (_suspendSettingPersistence) return;
+        _ = SaveAsync();
+    }
+
+    partial void OnUnisonEnabledChanged(bool value)
     {
         if (_suspendSettingPersistence) return;
         _ = SaveAsync();
@@ -7175,6 +7193,8 @@ public partial class SettingsViewModel : ViewModelBase
             NetEaseEnabled = true;
             MusixmatchEnabled = defaultSettings.MusixmatchEnabled;
             KugouEnabled = defaultSettings.KugouEnabled;
+            LrcRedEnabled = defaultSettings.LrcRedEnabled;
+            UnisonEnabled = defaultSettings.UnisonEnabled;
             YouTubeMusicLyricsEnabled = defaultSettings.YouTubeMusicLyricsEnabled;
 
             // Metadata providers

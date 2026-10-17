@@ -3335,6 +3335,26 @@
                     </Grid>
                     <Grid ColumnDefinitions="*,Auto">
                         <StackPanel Grid.Column="0" VerticalAlignment="Center">
+                            <TextBlock Text="{loc:T Settings.LrcRed}" FontSize="13" FontWeight="SemiBold"/>
+                            <TextBlock Text="{loc:T Settings.LrcRedHint}" FontSize="11" Opacity="0.5"/>
+                        </StackPanel>
+                        <controls:LottieToggle Grid.Column="1"
+                                              AutomationProperties.Name="{loc:T Settings.LrcRed}"
+                                              IsChecked="{Binding LrcRedEnabled}"
+                                              VerticalAlignment="Center"/>
+                    </Grid>
+                    <Grid ColumnDefinitions="*,Auto">
+                        <StackPanel Grid.Column="0" VerticalAlignment="Center">
+                            <TextBlock Text="{loc:T Settings.Unison}" FontSize="13" FontWeight="SemiBold"/>
+                            <TextBlock Text="{loc:T Settings.UnisonHint}" FontSize="11" Opacity="0.5"/>
+                        </StackPanel>
+                        <controls:LottieToggle Grid.Column="1"
+                                              AutomationProperties.Name="{loc:T Settings.Unison}"
+                                              IsChecked="{Binding UnisonEnabled}"
+                                              VerticalAlignment="Center"/>
+                    </Grid>
+                    <Grid ColumnDefinitions="*,Auto">
+                        <StackPanel Grid.Column="0" VerticalAlignment="Center">
                             <TextBlock Text="{loc:T Settings.Kugou}" FontSize="13" FontWeight="SemiBold"/>
                             <TextBlock Text="{loc:T Settings.KugouHint}" FontSize="11" Opacity="0.5"/>
                         </StackPanel>

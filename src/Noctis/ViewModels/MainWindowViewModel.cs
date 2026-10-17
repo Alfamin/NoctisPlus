@@ -568,12 +568,14 @@ public partial class MainWindowViewModel : ViewModelBase
         _queueVm = new QueueViewModel(Player);
         _lyricsVm = new LyricsViewModel(Player, lrcLib, netEase, metadata, persistence, library);
         _lyricsVm.PluginLyricsSources = () => Plugins.LyricsProviders;
-        // Musixmatch, Kugou and YouTube Music (issue #113): searched when switched on in
-        // Settings, and always offered by the lyrics page's Choose Source dialog.
+        // Musixmatch, lrc.red, Unison, Kugou and YouTube Music (issue #113): searched when switched
+        // on in Settings, and always offered by the lyrics page's Choose Source dialog.
         if (App.Services?.GetService<IMusixmatchService>() is { } musixmatch
             && App.Services.GetService<IKugouLyricsService>() is { } kugou
-            && App.Services.GetService<IYouTubeMusicLyricsService>() is { } youTubeMusic)
-            _lyricsVm.ExtraLyricsSources = Services.Lyrics.OnlineLyricsSource.BuiltIns(musixmatch, kugou, youTubeMusic);
+            && App.Services.GetService<IYouTubeMusicLyricsService>() is { } youTubeMusic
+            && App.Services.GetService<ILrcRedLyricsService>() is { } lrcRed
+            && App.Services.GetService<IUnisonLyricsService>() is { } unison)
+            _lyricsVm.ExtraLyricsSources = Services.Lyrics.OnlineLyricsSource.BuiltIns(musixmatch, kugou, youTubeMusic, lrcRed, unison);
         _lyricsVm.ShowLyricsSearchDialog = MetadataHelper.OpenLyricsSearchDialog;
         // Lyrics saved inside audio files (GitHub #135) wait until the song is not playing.
         _lyricsVm.TagWriter = App.Services?.GetService<IDeferredTagWriter>();

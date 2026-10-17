@@ -521,6 +521,10 @@ Deezer и TIDAL: вставьте ссылку.</value></data>
   <data name="Settings.MusixmatchHint" xml:space="preserve"><value>Тексты с синхронизацией по словам · может останавливаться, когда запрашивает капчу</value><comment>Text in SettingsView.axaml</comment></data>
   <data name="Settings.Kugou" xml:space="preserve"><value>Kugou</value><comment>Text in SettingsView.axaml — lyrics provider name</comment></data>
   <data name="Settings.KugouHint" xml:space="preserve"><value>Каталог текстов с синхронизацией по словам</value><comment>Text in SettingsView.axaml</comment></data>
+  <data name="Settings.LrcRed" xml:space="preserve"><value>lrc.red</value><comment>Text in SettingsView.axaml — lyrics provider name</comment></data>
+  <data name="Settings.LrcRedHint" xml:space="preserve"><value>Тексты с синхронизацией по словам и строкам, с дуэтами</value><comment>Text in SettingsView.axaml</comment></data>
+  <data name="Settings.Unison" xml:space="preserve"><value>Unison</value><comment>Text in SettingsView.axaml — lyrics provider name</comment></data>
+  <data name="Settings.UnisonHint" xml:space="preserve"><value>Тексты сообщества Better Lyrics · Lyrics from Unison (unison.boidu.dev)</value><comment>Text in SettingsView.axaml; keep "Lyrics from Unison (unison.boidu.dev)": the attribution Unison's ODbL licence asks for</comment></data>
   <data name="Settings.YouTubeMusicLyrics" xml:space="preserve"><value>YouTube Music</value><comment>Text in SettingsView.axaml — lyrics provider name</comment></data>
   <data name="Settings.YouTubeMusicLyricsHint" xml:space="preserve"><value>Синхронизированные тексты · поиск медленнее</value><comment>Text in SettingsView.axaml</comment></data>
   <data name="Settings.LyricsSourcesPickerHint" xml:space="preserve"><value>«Выбрать источник» на странице текста ищет во всех этих сервисах, даже если они здесь выключены.</value><comment>Text in SettingsView.axaml, under the online lyrics providers</comment></data>
