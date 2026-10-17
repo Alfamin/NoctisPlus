@@ -142,6 +142,15 @@ public class AppSettings
     public bool WatchFoldersEnabled { get; set; } = true;
 
     /// <summary>
+    /// Inbox for new music (Discord request, MusicBee's Inbox): songs a scan or the folder
+    /// watcher finds for the first time in a music folder that already holds songs wait in
+    /// the Inbox, out of the library views, until added to the library or deleted. A new
+    /// folder's songs (and a fresh library's first scan) are an import and skip it. Off by
+    /// default; turning it off moves everything waiting into the library.
+    /// </summary>
+    public bool InboxEnabled { get; set; }
+
+    /// <summary>
     /// Whether album covers may be read from the artwork embedded in each file's
     /// tags (ID3 APIC / FLAC picture / MP4 covr). Off = folder images only.
     /// </summary>

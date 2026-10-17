@@ -201,6 +201,15 @@ public partial class Track : ObservableObject
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)]
     public bool AddedIndividually { get; set; }
 
+    /// <summary>
+    /// Waiting in the Inbox (Settings › Library › Inbox for New Music): a file a scan or the
+    /// folder watcher found for the first time, kept out of Songs, Albums, Artists, Home and
+    /// search until the user adds it to the library or deletes it. Written to library.json
+    /// only when true, like <see cref="AddedIndividually"/>.
+    /// </summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)]
+    public bool IsInInbox { get; set; }
+
     /// <summary>Transient flag: true when the track was just drag-and-drop imported this session.</summary>
     [System.Text.Json.Serialization.JsonIgnore]
     public bool IsRecentImport { get; set; }

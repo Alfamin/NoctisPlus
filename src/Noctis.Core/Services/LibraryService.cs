@@ -36,9 +36,14 @@ public class LibraryService : ILibraryService
     // SetFolderHiddenAsync, so a reader always sees one consistent array.
     private string[] _hiddenFolders = Array.Empty<string>();
 
+    // AppSettings.InboxEnabled as LoadAsync read it: off releases any marked songs on load.
+    private bool _inboxEnabledAtLoad;
+
     // Last VisibleTracks result, keyed by the exact _tracks list and hidden array it came
     // from (both are swapped, never edited in place), so Tracks costs one filter per change.
-    private sealed record VisibleSnapshot(List<Track> Source, string[] Hidden, List<Track> Visible);
+    // The Inbox split rides along: every change to a track's IsInInbox swaps _tracks too.
+    private sealed record VisibleSnapshot(List<Track> Source, string[] Hidden, List<Track> Visible,
+        List<Track> Inbox, Dictionary<Guid, Track>? InboxIndex);
     private volatile VisibleSnapshot? _visible;
     private List<Artist> _artists = new();
 
@@ -79,6 +84,7 @@ public class LibraryService : ILibraryService
     public IReadOnlyList<Track> Tracks => VisibleTracks(_tracks);
     public IReadOnlyList<Track> AllTracks => _tracks;
     public IReadOnlyList<string> HiddenFolders => _hiddenFolders;
+    public IReadOnlyList<Track> InboxTracks => Snapshot(_tracks).Inbox;
     public IReadOnlyList<Album> Albums => _albums;
     public IReadOnlyList<Artist> Artists => _artists;
 
@@ -236,6 +242,9 @@ public class LibraryService : ILibraryService
         var carriedRemote = originalTracks.Where(IsServerTrack).ToList();
         var originalTrackCount = originalTracks.Count - carriedRemote.Count;
         var didPublishPartial = false;
+        // Inbox (opt-in): a file first found under a music folder that already held songs is
+        // a new arrival. A new folder's songs and a fresh library's first scan are an import.
+        var inboxRoots = settings.InboxEnabled ? RootsHoldingTracks(includeRoots, originalTracks) : Array.Empty<string>();
 
         void RestoreOriginalLibrary()
         {
@@ -346,7 +355,12 @@ public class LibraryService : ILibraryService
                         if (existing != null)
                             CopyMutableTrackState(existing, track);
                         else
+                        {
                             track.SourceType = SourceType.Local;
+                            // Before the add below: a progressive publish must never show it
+                            // in Songs first.
+                            track.IsInInbox = IsUnderAnyRoot(filePath, inboxRoots);
+                        }
                         track.ArtworkHash = TrackArtwork.Fingerprint(embeddedArt);
                         freshlyRead.TryAdd(track.Id, 0);
                         newTracks.Add(track);
@@ -1159,7 +1173,7 @@ public class LibraryService : ILibraryService
         await _scanGate.WaitAsync(ct);
         try
         {
-            await ImportFilesCoreAsync(filePaths, ct, progress);
+            await ImportFilesCoreAsync(filePaths, ct, progress, discovered: false);
         }
         finally
         {
@@ -1167,7 +1181,22 @@ public class LibraryService : ILibraryService
         }
     }
 
-    private async Task ImportFilesCoreAsync(IEnumerable<string> filePaths, CancellationToken ct, IProgress<int>? progress)
+    /// <inheritdoc />
+    public async Task ImportDiscoveredFilesAsync(IEnumerable<string> filePaths, CancellationToken ct = default)
+    {
+        await _scanGate.WaitAsync(ct);
+        try
+        {
+            await ImportFilesCoreAsync(filePaths, ct, progress: null, discovered: true);
+        }
+        finally
+        {
+            _scanGate.Release();
+        }
+    }
+
+    private async Task ImportFilesCoreAsync(IEnumerable<string> filePaths, CancellationToken ct, IProgress<int>? progress,
+        bool discovered)
     {
         var files = (filePaths ?? Array.Empty<string>())
             .Where(p => !string.IsNullOrWhiteSpace(p))
@@ -1193,6 +1222,11 @@ public class LibraryService : ILibraryService
 
         var trackById = _tracks.ToDictionary(t => t.Id);
         var changed = false;
+        // Inbox: only a file the folder watcher found, under a music folder that already held
+        // songs (the same rule as a scan). A drop, download or conversion is the user's own add.
+        var inboxRoots = discovered && settings.InboxEnabled
+            ? RootsHoldingTracks(BuildIncludeRoots(settings.MusicFolders, settings), _tracks)
+            : Array.Empty<string>();
 
         // Capture the pre-import library so a cancelled import can roll back the
         // progressive partial publishes below and honour "cancel = no change".
@@ -1296,7 +1330,10 @@ public class LibraryService : ILibraryService
             if (existing != null)
                 CopyMutableTrackState(existing, track);
             else
+            {
                 track.SourceType = SourceType.Local;
+                track.IsInInbox = IsUnderAnyRoot(filePath, inboxRoots);
+            }
             track.ArtworkHash = TrackArtwork.Fingerprint(embeddedArt);
 
             var artPath = _persistence.GetArtworkPath(track.AlbumId);
@@ -1381,19 +1418,45 @@ public class LibraryService : ILibraryService
     }
 
     /// <summary>
-    /// <paramref name="all"/> minus the tracks under a hidden folder; the same list when
-    /// nothing is hidden. Cached per (list, hidden set) — see <see cref="_visible"/>.
+    /// <paramref name="all"/> minus the tracks under a hidden folder and those in the Inbox;
+    /// the same list when neither applies. Cached per (list, hidden set) — see <see cref="_visible"/>.
     /// </summary>
-    private List<Track> VisibleTracks(List<Track> all)
+    private List<Track> VisibleTracks(List<Track> all) => Snapshot(all).Visible;
+
+    /// <summary>The visible / Inbox split of <paramref name="all"/>, cached per (list, hidden set).
+    /// A hidden folder wins over the Inbox: its songs are in neither.</summary>
+    private VisibleSnapshot Snapshot(List<Track> all)
     {
         var hidden = _hiddenFolders;
-        if (hidden.Length == 0) return all;
         var cached = _visible;
         if (cached != null && ReferenceEquals(cached.Source, all) && ReferenceEquals(cached.Hidden, hidden))
-            return cached.Visible;
-        var visible = all.Where(t => !FolderPathMatch.IsInOrSameAsAny(t.FilePath, hidden)).ToList();
-        _visible = new VisibleSnapshot(all, hidden, visible);
-        return visible;
+            return cached;
+
+        VisibleSnapshot snapshot;
+        if (hidden.Length == 0 && !all.Any(t => t.IsInInbox))
+        {
+            snapshot = new VisibleSnapshot(all, hidden, all, new List<Track>(), null);
+        }
+        else
+        {
+            var visible = new List<Track>(all.Count);
+            var inbox = new List<Track>();
+            foreach (var t in all)
+            {
+                if (hidden.Length > 0 && FolderPathMatch.IsInOrSameAsAny(t.FilePath, hidden)) continue;
+                if (t.IsInInbox) inbox.Add(t);
+                else visible.Add(t);
+            }
+            Dictionary<Guid, Track>? inboxIndex = null;
+            if (inbox.Count > 0)
+            {
+                inboxIndex = new Dictionary<Guid, Track>(inbox.Count);
+                foreach (var t in inbox) inboxIndex.TryAdd(t.Id, t);
+            }
+            snapshot = new VisibleSnapshot(all, hidden, visible, inbox, inboxIndex);
+        }
+        _visible = snapshot;
+        return snapshot;
     }
 
     public async Task SetFolderHiddenAsync(string folderPath, bool hidden)
@@ -1427,14 +1490,41 @@ public class LibraryService : ILibraryService
         LibraryUpdated?.Invoke(this, EventArgs.Empty);
     }
 
+    /// <inheritdoc />
+    public async Task AcceptInboxTracksAsync(IEnumerable<Guid> ids)
+    {
+        var idSet = new HashSet<Guid>(ids ?? Array.Empty<Guid>());
+        if (idSet.Count == 0) return;
+        var current = _tracks;
+        // _tracks, not InboxTracks: an Inbox song under a hidden folder is released too.
+        var accepted = current.Where(t => t.IsInInbox && idSet.Contains(t.Id)).ToList();
+        if (accepted.Count == 0) return;
+
+        var now = DateTime.UtcNow;
+        foreach (var t in accepted)
+        {
+            t.IsInInbox = false;
+            // It joins the library now, so Recently Added shows it with today's arrivals.
+            t.DateAdded = now;
+        }
+        // Copy-and-swap: the visible / Inbox split is cached per list instance.
+        _tracks = current.ToList();
+        DebugLog.Write("Library", $"inbox: {accepted.Count} track(s) added to the library");
+
+        await RebuildIndexesAsync();
+        await SaveAsync();
+        LibraryUpdated?.Invoke(this, EventArgs.Empty);
+    }
+
     /// <summary>
-    /// Every known track by id, hidden folders included — what a scan or a file move must
-    /// match against. <see cref="_trackIndex"/> covers the visible tracks only, so it IS
-    /// the full index whenever nothing is hidden.
+    /// Every known track by id, hidden folders and the Inbox included — what a scan or a file
+    /// move must match against. <see cref="_trackIndex"/> covers the visible tracks only, so it
+    /// IS the full index whenever nothing is hidden or in the Inbox (an Inbox song missing here
+    /// came back from the next scan as a brand-new track, its plays and rating gone).
     /// </summary>
     private Dictionary<Guid, Track> AllTrackIndex()
     {
-        if (_hiddenFolders.Length == 0) return _trackIndex;
+        if (ReferenceEquals(VisibleTracks(_tracks), _tracks)) return _trackIndex;
         var all = new Dictionary<Guid, Track>(_tracks.Count);
         foreach (var t in _tracks) all.TryAdd(t.Id, t);
         return all;
@@ -1442,8 +1532,11 @@ public class LibraryService : ILibraryService
 
     public Track? GetTrackById(Guid id)
     {
-        _trackIndex.TryGetValue(id, out var track);
-        return track;
+        if (_trackIndex.TryGetValue(id, out var track)) return track;
+        // Inbox songs play, queue and restore like any other: the player drops a queued
+        // track this misses as "deleted".
+        var inboxIndex = Snapshot(_tracks).InboxIndex;
+        return inboxIndex != null && inboxIndex.TryGetValue(id, out track) ? track : null;
     }
 
     public Album? GetAlbumById(Guid id)
@@ -1810,6 +1903,19 @@ public class LibraryService : ILibraryService
     /// exclude rule). The mark lives with the track in library.json — it follows the track
     /// through renames and leaves with it on removal. Returns how many were newly marked.
     /// </summary>
+    /// <summary>The <paramref name="roots"/> at least one known local track lives under: where a
+    /// file found for the first time is a new arrival (Inbox) rather than part of an import.
+    /// Internal for tests.</summary>
+    internal static string[] RootsHoldingTracks(IEnumerable<string> roots, IReadOnlyList<Track> knownTracks)
+        => roots.Where(root => knownTracks.Any(t => !IsServerTrack(t) && PathIsUnder(t.FilePath, root))).ToArray();
+
+    private static bool IsUnderAnyRoot(string path, string[] roots)
+    {
+        foreach (var root in roots)
+            if (PathIsUnder(path, root)) return true;
+        return false;
+    }
+
     private static int MarkAddedIndividually(IEnumerable<Track> importedTracks, AppSettings settings)
     {
         var roots = BuildIncludeRoots(settings.MusicFolders, settings).ToList();
@@ -1863,6 +1969,12 @@ public class LibraryService : ILibraryService
 
         if (tracks != null && tracks.Count > 0)
         {
+            // The Inbox is off but songs still carry its mark (switched off while the app
+            // was closed, an older settings.json): nothing stays hidden. The next save
+            // writes them out unmarked.
+            if (!_inboxEnabledAtLoad)
+                foreach (var t in tracks)
+                    t.IsInInbox = false;
             _tracks = tracks;
 
             // Overlay journaled user state (ratings, favorites, play counts, ...)
@@ -1951,6 +2063,7 @@ public class LibraryService : ILibraryService
             _hiddenFolders = settings.HiddenLibraryFolders
                 .Where(f => !string.IsNullOrWhiteSpace(f))
                 .ToArray();
+            _inboxEnabledAtLoad = settings.InboxEnabled;
         }
         catch (Exception ex)
         {
@@ -2424,6 +2537,8 @@ public class LibraryService : ILibraryService
         target.SavedPositionMs = source.SavedPositionMs;
         target.DateAdded = source.DateAdded;
         target.AddedIndividually = source.AddedIndividually;
+        // A song re-tagged while it waits in the Inbox stays there.
+        target.IsInInbox = source.IsInInbox;
 
         // Analysis results are expensive to produce (a full ffmpeg decode per track) and
         // are not always round-trippable through file tags, so carry them across a

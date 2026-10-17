@@ -585,7 +585,8 @@ public partial class HomeViewModel : ViewModelBase, IDisposable
         // Hide a row entirely when it has too few tracks to earn its header.
         List<Track> Resolve(List<Guid> ids)
         {
-            var tracks = ids.Select(_library.GetTrackById).OfType<Track>().ToList();
+            // Inbox songs resolve by id (they play) but are not in the library yet.
+            var tracks = ids.Select(_library.GetTrackById).OfType<Track>().Where(t => !t.IsInInbox).ToList();
             return tracks.Count >= HomeRowsBuilder.MinRowItems ? tracks : new List<Track>();
         }
 
@@ -929,7 +930,9 @@ public partial class HomeViewModel : ViewModelBase, IDisposable
         // still holds them (restored from queue.json), so fall back to its copies.
         Dictionary<Guid, Track>? external = null;
         return BuildRecentFromLog(events,
-            id => _library.GetTrackById(id) ?? (external ??= _player.GetExternalTracksById()).GetValueOrDefault(id),
+            id => _library.GetTrackById(id) is { } t
+                ? (t.IsInInbox ? null : t) // played from the Inbox: not in the library yet
+                : (external ??= _player.GetExternalTracksById()).GetValueOrDefault(id),
             RecentLogScan);
     }
 

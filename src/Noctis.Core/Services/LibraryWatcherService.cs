@@ -491,7 +491,7 @@ public sealed class LibraryWatcherService : ILibraryWatcherService
             }
 
             if (batch.ToImport.Count > 0)
-                await _library.ImportFilesAsync(batch.ToImport).ConfigureAwait(false);
+                await _library.ImportDiscoveredFilesAsync(batch.ToImport).ConfigureAwait(false);
         }
         catch (Exception ex)
         {
