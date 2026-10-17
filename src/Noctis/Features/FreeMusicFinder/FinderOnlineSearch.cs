@@ -163,7 +163,7 @@ internal sealed class FinderOnlineSearch : IOnlineMusicSearch
         if (d is null) return OnlineDownloadStatus.None;
         return d.State switch
         {
-            DownloadState.Running => new(OnlineDownloadState.Downloading, d.Progress / 100.0),
+            DownloadState.Running => new(OnlineDownloadState.Downloading, Math.Clamp(d.Progress, 0, 1)), // a 0..1 share
             DownloadState.Saved or DownloadState.AlreadyThere => new(OnlineDownloadState.Saved, 1),
             DownloadState.Failed => new(OnlineDownloadState.Failed, 0, d.Error),
             DownloadState.Cancelled => OnlineDownloadStatus.None,

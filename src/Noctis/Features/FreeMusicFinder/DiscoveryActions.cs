@@ -41,7 +41,7 @@ internal sealed class DiscoveryActions(IPlaylistLibrary library, Downloads downl
                 return new DiscoveryMatch(local, queued, local is not null ? (local.Visible ? "In your library" : "In your library · hidden folder") : queued is not null ? queued.State switch
                 {
                     DownloadState.Saved or DownloadState.AlreadyThere => "Saved · waiting for Noctis to scan",
-                    DownloadState.Running => "Downloading · " + queued.Progress.ToString("0") + "%",
+                    DownloadState.Running => "Downloading · " + (queued.Progress * 100).ToString("0") + "%", // Progress is a 0..1 share
                     DownloadState.Waiting => queued.Error,
                     DownloadState.Failed => "Needs retry · " + queued.Error,
                     _ => queued.Held ? "Queued · press Start queued downloads" : "In download queue",
