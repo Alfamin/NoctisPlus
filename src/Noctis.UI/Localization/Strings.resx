@@ -2528,6 +2528,7 @@ The lines and their timings are dropped and an empty lyrics box opens for your o
   <data name="Settings.Desc.AccountDevices" xml:space="preserve"><value>Your account, your phone and remote control.</value><comment>Settings page description</comment></data>
   <data name="Settings.Desc.Integrations" xml:space="preserve"><value>Discord, scrobbling, TIDAL and music servers.</value><comment>Settings page description</comment></data>
   <data name="Settings.Desc.Plugins" xml:space="preserve"><value>Add extra features to Noctis.</value><comment>Settings page description</comment></data>
+  <data name="Settings.Desc.Features" xml:space="preserve"><value>What Noctis Plus adds, built in. Switch each one on or off and set it up here.</value><comment>Settings page description</comment></data>
   <data name="Settings.Desc.Statistics" xml:space="preserve"><value>Your library and listening at a glance.</value><comment>Settings page description</comment></data>
   <data name="Settings.Desc.About" xml:space="preserve"><value>Version, updates and links.</value><comment>Settings page description</comment></data>
   <data name="Settings.Section.Language" xml:space="preserve"><value>Language</value><comment>Settings section label</comment></data>
@@ -2603,6 +2604,7 @@ The lines and their timings are dropped and an empty lyrics box opens for your o
   <data name="Settings.Tab.AccountDevices" xml:space="preserve"><value>Account &amp; Devices</value><comment>Settings rail</comment></data>
   <data name="Settings.Tab.Integrations" xml:space="preserve"><value>Integrations</value><comment>Settings rail</comment></data>
   <data name="Settings.Tab.Plugins" xml:space="preserve"><value>Plugins</value><comment>Settings rail</comment></data>
+  <data name="Settings.Tab.Features" xml:space="preserve"><value>Features</value><comment>Settings rail</comment></data>
   <data name="Settings.Tab.Statistics" xml:space="preserve"><value>Statistics</value><comment>Settings rail</comment></data>
   <data name="Settings.Tab.About" xml:space="preserve"><value>About</value><comment>Settings rail</comment></data>
   <data name="Settings.Group.App" xml:space="preserve"><value>App</value><comment>Settings rail</comment></data>

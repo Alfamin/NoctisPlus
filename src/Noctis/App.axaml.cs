@@ -48,6 +48,7 @@ public partial class App : Application
         var cachedLocator = new CachedViewLocator(new Dictionary<Type, Func<Avalonia.Controls.Control>>
         {
             [typeof(LibrarySongsViewModel)] = () => new LibrarySongsView(),
+            [typeof(SearchViewModel)] = () => new SearchView(),
             [typeof(LibraryAlbumsViewModel)] = () => new LibraryAlbumsView(),
             [typeof(LibraryArtistsViewModel)] = () => new LibraryArtistsView(),
             [typeof(CoverFlowViewModel)] = () => new CoverFlowView(),

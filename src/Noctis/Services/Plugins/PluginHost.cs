@@ -497,13 +497,25 @@ public sealed class PluginHost
         catch (Exception ex) { DebugLogger.Error(DebugLogger.Category.State, "Plugins", $"create folder: {ex.Message}"); return; }
 
         var found = new List<LoadedPlugin>();
+        // Noctis Plus features compiled into the app come first; a bundled or community copy
+        // with the same id never loads beside them.
+        foreach (var feature in _builtIn)
+        {
+            var plugin = new LoadedPlugin(Path.Combine(AppContext.BaseDirectory, "features", feature.Manifest.Id), assemblyPath: null, feature.Manifest)
+            {
+                InProcessFactory = feature.Factory,
+                IsBundled = true,
+            };
+            Prepare(plugin);
+            found.Add(plugin);
+        }
         if (_bundledDirectory is not null && Directory.Exists(_bundledDirectory))
         {
             foreach (var dir in Directory.EnumerateDirectories(_bundledDirectory).OrderBy(d => d, StringComparer.OrdinalIgnoreCase))
             {
                 if (Path.GetFileName(dir).StartsWith('.')) continue;
                 var plugin = Discover(dir, bundled: true);
-                if (plugin is not null) found.Add(plugin);
+                if (plugin is not null && !found.Any(p => SameId(p.Id, plugin.Id))) found.Add(plugin);
             }
         }
         foreach (var dir in Directory.EnumerateDirectories(PluginsDirectory).OrderBy(d => d, StringComparer.OrdinalIgnoreCase))
@@ -581,6 +593,19 @@ public sealed class PluginHost
         RebuildContent();
         VisualLayersChanged?.Invoke(this, EventArgs.Empty);
         return plugin;
+    }
+
+    private readonly List<(PluginManifest Manifest, Func<INoctisPlugin> Factory)> _builtIn = new();
+
+    /// <summary>
+    /// A Noctis Plus feature compiled into the app. It keeps its plugin id, so its settings
+    /// (Settings → Features), approvals and data folder (plugin-data/&lt;id&gt;) are the ones the
+    /// separate plugin had. Takes effect on the next <see cref="LoadAll"/>.
+    /// </summary>
+    public void RegisterBuiltIn(PluginManifest manifest, Func<INoctisPlugin> factory)
+    {
+        _builtIn.RemoveAll(f => SameId(f.Manifest.Id, manifest.Id));
+        _builtIn.Add((manifest, factory));
     }
 
     /// <summary>Tests: registers a plugin whose instance comes from <paramref name="factory"/> instead of a DLL.</summary>

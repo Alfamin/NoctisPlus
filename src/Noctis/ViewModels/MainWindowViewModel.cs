@@ -275,6 +275,7 @@ public partial class MainWindowViewModel : ViewModelBase
 
     private readonly HomeViewModel _homeVm;
     private readonly LibrarySongsViewModel _songsVm;
+    private readonly SearchViewModel _searchVm;
     private readonly LibraryAlbumsViewModel _albumsVm;
     private readonly LibraryArtistsViewModel _artistsVm;
     private readonly LibraryPlaylistsViewModel _playlistsVm;
@@ -410,6 +411,7 @@ public partial class MainWindowViewModel : ViewModelBase
         Plugins = new PluginHost(Player, persistence.DataDirectory, () => Settings.GetSettings(),
             () => _ = Settings.SaveAsync(), UpdateService.CurrentVersion.ToString(3), library,
             Path.Combine(AppContext.BaseDirectory, "bundled-plugins"));
+        Features.BuiltInFeatures.Register(Plugins);
         Settings.Plugins = Plugins;
         // Get plugins (official list) fetches only when the Plugins page opens.
         if (App.Services?.GetService<System.Net.Http.HttpClient>() is { } pluginHttp)
@@ -446,6 +448,8 @@ public partial class MainWindowViewModel : ViewModelBase
         audioCd.StartWatching();
         _homeVm = new HomeViewModel(Player, library, Sidebar, artistImageService, playHistory, Settings);
         _songsVm = new LibrarySongsViewModel(library, Player, Sidebar, persistence, Settings);
+        // Noctis Plus Search: library + online catalog in one page (the rail's Search button).
+        _searchVm = new SearchViewModel(library, Player, name => ViewArtistByName(name), album => OpenAlbumDetail(album));
         _albumsVm = new LibraryAlbumsViewModel(library, Player, Sidebar, Settings);
         // Keep the top-bar dropdown labels in sync with the Albums grid filters/sort.
         _albumsVm.PropertyChanged += (_, e) =>
@@ -638,6 +642,14 @@ public partial class MainWindowViewModel : ViewModelBase
         // Wire up search
         TopBar.SearchTextChanged += OnSearchTextChanged;
         TopBar.HomeSearchRedirectRequested += OnHomeSearchRedirectRequested;
+        TopBar.SearchPageRequested += (_, _) => OpenSearchPage();
+        // The Search page follows every keystroke (library results are instant); the
+        // debounced SearchTextChanged above is for the list pages' filters.
+        TopBar.PropertyChanged += (_, e) =>
+        {
+            if (e.PropertyName == nameof(TopBarViewModel.SearchText) && ReferenceEquals(CurrentView, _searchVm))
+                _searchVm.SetQuery(TopBar.SearchText);
+        };
 
         // Wire up album detail navigation from albums view
         _albumsVm.AlbumOpened += OnAlbumOpened;
@@ -873,6 +885,18 @@ public partial class MainWindowViewModel : ViewModelBase
         var defaultKey = Settings.GetDefaultPageKey();
         Navigate(defaultKey);
         Services.StartupTrace.Mark("first-page-navigated");
+#if DEBUG
+        // Developer check of the Search page on an isolated profile: NOCTISPLUS_DEBUG_SEARCH=<query>
+        // opens Search with that query (NOCTISPLUS_DEBUG_FILTER=Songs|Artists|Albums picks a chip).
+        if (Environment.GetEnvironmentVariable("NOCTISPLUS_DEBUG_SEARCH") is { Length: > 0 } debugQuery)
+            Dispatcher.UIThread.Post(() =>
+            {
+                OpenSearchPage();
+                TopBar.SearchText = debugQuery;
+                if (Environment.GetEnvironmentVariable("NOCTISPLUS_DEBUG_FILTER") is { Length: > 0 } chip)
+                    _searchVm.SelectFilterCommand.Execute(chip);
+            }, DispatcherPriority.Background);
+#endif
 
         // Pre-warm cached views and the non-visible content VMs on background
         // priority. The visible page was already refreshed by Navigate(); this
@@ -1675,6 +1699,7 @@ public partial class MainWindowViewModel : ViewModelBase
     {
         TopBar.SearchWatermark = CurrentView switch
         {
+            SearchViewModel => "Artists, songs, albums",
             PlaylistFeaturedArtistsViewModel => Loc.T("TopBar.SearchIn", Loc.T("TopBar.FeaturedArtists")),
             MoreByArtistViewModel => Loc.T("TopBar.SearchIn", Loc.T("Nav.Albums")),
             ArtistDetailViewModel artistPage => Loc.T("TopBar.SearchIn", artistPage.ArtistName),
@@ -2192,6 +2217,7 @@ public partial class MainWindowViewModel : ViewModelBase
             CurrentView = key switch
             {
                 "home" => RefreshAndReturn(_homeVm),
+                "search" => _searchVm,
                 "songs" => RefreshAndReturnSongs(_songsVm),
                 "albums" => ResetFilterAndReturnAlbums(),
                 "artists" => ResetAndReturnArtists(),
@@ -2232,6 +2258,7 @@ public partial class MainWindowViewModel : ViewModelBase
         TopBar.CurrentTabName = key switch
         {
             "home" => "Home",
+            "search" => "Search",
             "songs" => "Songs",
             "albums" => "Albums",
             "artists" => "Artists",
@@ -2567,14 +2594,25 @@ public partial class MainWindowViewModel : ViewModelBase
 
     private void OnHomeSearchRedirectRequested(object? sender, EventArgs e)
     {
-        // Home has nothing to filter, so the search gesture lands on Songs instead.
-        // Drive the jump through the sidebar selection — the same path as clicking
-        // the Songs item — so history and top-bar state behave like a real
-        // navigation. Navigate closes and clears the search pill as part of the
-        // section switch, so it may only be reopened once navigation is done.
-        var songs = Sidebar.NavItems.FirstOrDefault(n => n.Key == "songs");
-        if (songs == null) return;
-        Sidebar.SelectedNavItem = songs;
+        // Home has nothing to filter, so the search gesture opens Search (Noctis Plus;
+        // upstream Noctis landed on Songs).
+        OpenSearchPage();
+    }
+
+    /// <summary>
+    /// The rail's Search button (and Ctrl+F on Home): the Search page, library and online,
+    /// with the pill open on the last query. From the Search page itself it just focuses
+    /// the pill. Ctrl+F on a list page still filters that page.
+    /// </summary>
+    internal void OpenSearchPage()
+    {
+        if (!ReferenceEquals(CurrentView, _searchVm))
+        {
+            Navigate("search");
+            // Navigate clears the pill; Search keeps its last query (back to where you were).
+            TopBar.SearchText = _searchVm.QueryText;
+        }
+        _searchVm.OnShown();
         if (TopBar.IsSearchVisible)
             TopBar.OpenSearchCommand.Execute(null);
     }
@@ -2824,6 +2862,7 @@ public partial class MainWindowViewModel : ViewModelBase
     private string GetCurrentViewKey()
     {
         if (CurrentView == _homeVm) return "home";
+        if (CurrentView == _searchVm) return "search";
         if (CurrentView == _songsVm) return "songs";
         if (CurrentView == _albumsVm || CurrentView == _coverFlowVm) return "albums";
         if (CurrentView == _artistsVm) return "artists";

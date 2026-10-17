@@ -1,0 +1,185 @@
+using System.Text.RegularExpressions;
+
+namespace FreeMusicFinder;
+
+internal sealed record CatalogSearchSong(CatalogSong Song, CatalogRelease? Album, string Artwork = "");
+
+internal sealed partial class ArtistCatalog
+{
+    private static string SearchText(string text)
+    {
+        text = text.Trim();
+        if (text.Length is < 1 or > 200 || text.Any(char.IsControl)) throw new ArgumentException("Enter an artist, song or album (up to 200 characters).");
+        return text;
+    }
+    public Task<CatalogResult<List<CatalogSearchSong>>> SearchSongsAsync(string query, CancellationToken ct)
+    {
+        query = SearchText(query);
+        return Cached("songs-search:" + query.ToUpperInvariant(), TimeSpan.FromDays(1), false, async () =>
+        {
+            try
+            {
+                using var data = await Get("deezer", "/search/track?limit=50&q=" + Uri.EscapeDataString(query), ct);
+                var rows = Data(data.RootElement).Select(t =>
+                {
+                    var song = DeezerSong(t); if (song is null) return null;
+                    var album = t.TryGetProperty("album", out var a) ? DeezerRelease(a, song.Artists[0]) : null;
+                    return new CatalogSearchSong(song, album, album?.Artwork ?? "");
+                }).Where(t => t is not null).Cast<CatalogSearchSong>().DistinctBy(t => t.Song.Id).ToList();
+                if (rows.Count == 0) throw Invalid("No Deezer song matches; trying Apple.");
+                return rows;
+            }
+            catch (Exception ex) when (Recoverable(ex))
+            {
+                using var data = await Get("apple", "/search?entity=song&media=music&country=US&explicit=Yes&limit=50&term=" + Uri.EscapeDataString(query), ct);
+                return Results(data.RootElement).Select(t => AppleSong(t) is {} song ? new CatalogSearchSong(song, AppleRelease(t), Text(t, "artworkUrl100")) : null)
+                    .Where(t => t is not null).Cast<CatalogSearchSong>().DistinctBy(t => t.Song.Id).ToList();
+            }
+        }, ct);
+    }
+    public Task<CatalogResult<List<CatalogRelease>>> SearchAlbumsAsync(string query, CancellationToken ct)
+    {
+        query = SearchText(query);
+        return Cached("albums-search-v2:" + query.ToUpperInvariant(), TimeSpan.FromDays(1), false, async () =>
+        {
+            try
+            {
+                using var data = await Get("deezer", "/search/album?limit=25&q=" + Uri.EscapeDataString(query), ct);
+                var rows = Data(data.RootElement).Select(a => DeezerRelease(a, new("", ""))).Where(a => a is not null && a.Artist.Id.Length > 0).Cast<CatalogRelease>().DistinctBy(a => a.Id).ToList();
+                if (rows.Count == 0) throw Invalid("No Deezer album matches; trying Apple.");
+                return RelevanceEditions(rows);
+            }
+            catch (Exception ex) when (Recoverable(ex))
+            {
+                using var data = await Get("apple", "/search?entity=album&media=music&country=US&explicit=Yes&limit=25&term=" + Uri.EscapeDataString(query), ct);
+                return RelevanceEditions(Results(data.RootElement).Where(a => Text(a, "wrapperType") == "collection").Select(AppleRelease).Where(a => a is not null).Cast<CatalogRelease>());
+            }
+        }, ct);
+    }
+    internal static List<CatalogRelease> RelevanceEditions(IEnumerable<CatalogRelease> values)
+    {
+        var rows = values.ToList();
+        return CatalogEditions.Consolidate(rows).OrderBy(r => rows.FindIndex(a => a.Artist.Id == r.Artist.Id && a.Kind == r.Kind && CatalogEditions.Same(a.Title, r.Title))).ToList();
+    }
+    public Task<CatalogResult<List<CatalogSearchSong>>> ArtistSongsAsync(CatalogArtist artist, CancellationToken ct)
+    {
+        var (provider, id) = Split(artist.Id);
+        return Cached("artist-search-songs:" + artist.Id, TimeSpan.FromDays(1), false, async () =>
+        {
+            using var data = await Get(provider, provider == "apple" ? "/lookup?id=" + id + "&entity=song&limit=25&country=US" : "/artist/" + id + "/top?limit=25", ct);
+            return (provider == "apple" ? Results(data.RootElement) : Data(data.RootElement)).Select(t =>
+            {
+                var song = provider == "apple" ? AppleSong(t) : DeezerSong(t);
+                if (song is null || !song.Artists.Any(a => a.Id == artist.Id)) return null;
+                var album = provider == "apple" ? AppleRelease(t) : t.TryGetProperty("album", out var a) ? DeezerRelease(a, artist) : null;
+                return new CatalogSearchSong(song, album, album?.Artwork ?? "");
+            }).Where(t => t is not null).Cast<CatalogSearchSong>().DistinctBy(s => s.Song.Id).ToList();
+        }, ct);
+    }
+}
+
+internal sealed record FinderQuery(string Text, string Term, string Title, string Artist)
+{
+    internal static FinderQuery Parse(string text)
+    {
+        text = text.Trim();
+        // An explicit "title by artist" is a hint, not a persistent identity choice.
+        var split = text.LastIndexOf(" by ", StringComparison.OrdinalIgnoreCase);
+        var title = split > 0 ? text[..split].Trim() : text;
+        var artist = split > 0 ? text[(split + 4)..].Trim() : "";
+        if (new[] { "me", "you", "us", "them", "myself", "yourself", "himself", "herself" }.Contains(artist.ToLowerInvariant())) return new(text, text, text, "");
+        return artist.Length == 0 ? new(text, text, text, "") : new(text, title + " " + artist, title, artist);
+    }
+}
+
+internal sealed record FinderHit(string Kind, string Id, string Title, string Subtitle, double Score,
+    CatalogArtist? Artist = null, CatalogSearchSong? Track = null, CatalogRelease? Album = null, double? ArtistRank = null);
+
+/// <summary>Explainable relevance, provider order and local album evidence. No name allowlist,
+/// popularity cutoff, generative model, download or cross-provider identity substitution.</summary>
+internal static class SearchRanking
+{
+    private static HashSet<string> Words(string text) => Regex.Matches(text.Normalize(System.Text.NormalizationForm.FormKC).ToLowerInvariant(), @"[\p{L}\p{N}]+")
+        .Select(m => m.Value).ToHashSet(StringComparer.Ordinal);
+    private static double Fit(string query, string title, string artist = "")
+    {
+        var q = BotText.Key(query); var t = BotText.Key(title);
+        if (q.Length == 0 || t.Length == 0) return 0;
+        if (q == t) return 88;
+        var wanted = Words(query); var name = Words(title); var combined = Words(title + " " + artist);
+        if (wanted.Count == 0) return 0;
+        var coverage = (double)wanted.Count(combined.Contains) / wanted.Count;
+        var titleCoverage = (double)wanted.Count(name.Contains) / wanted.Count;
+        return coverage * 64 + titleCoverage * 12 + (t.StartsWith(q, StringComparison.Ordinal) ? 5 : 0);
+    }
+    internal static List<FinderHit> Build(FinderQuery query, IReadOnlyList<CatalogArtist> artists,
+        IReadOnlyList<CatalogSearchSong> songs, IReadOnlyList<CatalogRelease> albums, ArtistIdentity? identity = null)
+    {
+        var output = new List<FinderHit>();
+        for (var i = 0; i < artists.Count; i++)
+        {
+            var a = artists[i]; var exact = BotText.Key(a.Name) == BotText.Key(query.Text);
+            var support = songs.Count(s => s.Song.Artists.Any(by => by.Id == a.Id));
+            var score = Fit(query.Artist.Length > 0 ? query.Artist : query.Text, a.Name) + (exact ? 18 : 0) + Math.Min(12, support * 2) - Math.Min(4, i * .15);
+            if (query.Artist.Length > 0) score -= 28;
+            var matched = identity?.LibraryMatch == true && identity.Artist?.Id == a.Id;
+            if (matched) score += 16;
+            output.Add(new("Artists", a.Id, a.Name, matched ? "Matches your library · " + string.Join(", ", identity!.Albums.Take(3)) : "Artist" + (a.Genre.Length > 0 ? " · " + a.Genre : ""), score, Artist: a));
+        }
+        var artistIntent = identity?.Artist ?? artists.FirstOrDefault(a => BotText.Key(a.Name) == BotText.Key(query.Text));
+        foreach (var s in DeduplicateSongs(songs))
+        {
+            var by = string.Join(", ", s.Song.Artists.Select(a => a.Name));
+            var score = Fit(query.Term, s.Song.Title, by);
+            if (query.Artist.Length > 0)
+                score = Math.Max(Fit(query.Text, s.Song.Title, by), Fit(query.Artist, by) >= 60 ? Fit(query.Title, s.Song.Title) + Fit(query.Artist, by) * .35 : 0);
+            if (BotText.Key(query.Title) == BotText.Key(BotText.Plain(s.Song.Title))) score += 8;
+            if (artistIntent is not null && query.Artist.Length == 0 && s.Song.Artists.Any(a => a.Id == artistIntent.Id)) score = Math.Min(95, score + 40);
+            var position = songs.ToList().FindIndex(a => a.Song.Id == s.Song.Id);
+            output.Add(new("Songs", s.Song.Id, s.Song.Title, "Song · " + by, score + 3 + 8d / (1 + position * .2), Track: s));
+        }
+        var orderedAlbums = ArtistCatalog.RelevanceEditions(albums);
+        for (var position = 0; position < orderedAlbums.Count; position++)
+        {
+            var a = orderedAlbums[position];
+            // Edition words do not hide a relevant album, but never merge its distinct ID.
+            var title = Regex.Replace(a.Title, @"\s*[\(\[]deluxe(?:\s+(?:edition|version))?[\)\]]", "", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant);
+            var score = Math.Max(Fit(query.Term, a.Title, a.Artist.Name), Fit(query.Term, title, a.Artist.Name));
+            if (query.Artist.Length > 0) score = Math.Max(Fit(query.Text, a.Title, a.Artist.Name), Fit(query.Artist, a.Artist.Name) >= 60 ? Fit(query.Title, a.Title) + Fit(query.Artist, a.Artist.Name) * .35 : 0);
+            output.Add(new("Albums", a.Id, a.Title, (a.Kind is "single" ? "Single" : a.Kind == "ep" ? "EP" : "Album") + " · " + a.Artist.Name, score + 7 + 12d / (1 + position * .2), Album: a));
+        }
+        // Artists is a view of this music search, not another literal-name lookup. Link
+        // relevant tracks/releases to their credited source IDs without guessing names.
+        var related = new Dictionary<string, (CatalogArtist Artist, double Rank, double SourceScore, string Reason)>();
+        foreach (var hit in output.Where(h => h.Track is not null).OrderByDescending(h => h.Score))
+        {
+            foreach (var by in hit.Track!.Song.Artists)
+            {
+                var titleMatch = Fit(query.Title, hit.Title) >= 60;
+                if (!titleMatch && Fit(query.Text, by.Name) < 60 && (query.Artist.Length == 0 || Fit(query.Artist, by.Name) < 60)) continue;
+                Remember(by, hit.Score + 18, hit.Score, titleMatch ? "Artist of “" + hit.Title + "”" : "Artist · " + by.Name);
+            }
+        }
+        foreach (var hit in output.Where(h => h.Album is not null))
+            if (Fit(query.Title, hit.Title) >= 60) Remember(hit.Album!.Artist, hit.Score + 16, hit.Score, "Artist of “" + hit.Title + "”");
+        foreach (var (_, context) in related.OrderByDescending(p => p.Value.Rank).Take(30))
+        {
+            var at = output.FindIndex(h => h.Artist?.Id == context.Artist.Id);
+            if (at >= 0)
+            {
+                var existing = output[at];
+                output[at] = existing with { ArtistRank = Math.Max(existing.Score, context.Rank), Subtitle = existing.Subtitle.StartsWith("Matches your library") ? existing.Subtitle + " · " + context.Reason : context.Reason };
+            }
+            else output.Add(new("Artists", context.Artist.Id, context.Artist.Name, context.Reason, context.SourceScore - 1, Artist: context.Artist, ArtistRank: context.Rank));
+        }
+        return output.OrderByDescending(h => h.Score).ThenBy(h => h.Kind == "Albums" ? 0 : h.Kind == "Songs" ? 1 : 2).ToList();
+        void Remember(CatalogArtist by, double rank, double sourceScore, string reason)
+        {
+            if (!related.TryGetValue(by.Id, out var old) || rank > old.Rank) related[by.Id] = (by, rank, sourceScore, reason);
+        }
+    }
+    internal static IEnumerable<FinderHit> Artists(IEnumerable<FinderHit> hits) => hits.Where(h => h.Artist is not null).OrderByDescending(h => h.ArtistRank ?? h.Score);
+    internal static IEnumerable<CatalogSearchSong> DeduplicateSongs(IEnumerable<CatalogSearchSong> songs) => songs
+        .GroupBy(s => (Title: CatalogEditions.Key(s.Song.Title), Artist: string.Join("|", s.Song.Artists.Select(a => a.Id).Order()), Seconds: (int)Math.Round(s.Song.Seconds ?? -1)))
+        .Select(g => g.OrderByDescending(s => s.Song.Explicit == true ? 2 : s.Song.Explicit is null ? 1 : 0).First());
+}

@@ -1,0 +1,22 @@
+{
+  "id": "dev.moshi.freemusicfinder",
+  "name": "Free Music Finder",
+  "version": "2.11.1",
+  "author": "moshi",
+  "description": "Find music and import full Spotify/Deezer playlists with Music Hunters and DeezLoad, saved queues and automatic fallback. These are third-party bots; what you download is your responsibility.",
+  "type": "dotnet",
+  "entry": "FreeMusicFinder.dll",
+  "apiVersion": "1.1",
+  "minAppVersion": "1.5.3",
+  "platforms": ["windows", "macos", "linux"],
+  "permissions": ["menu.commands", "notifications", "network", "library.read"],
+  "settings": [
+    { "key": "lastfmApiKey", "label": "Last.fm API key", "description": "Optional: faster, better For you artist picks. Create a free key at https://www.last.fm/api/account/create (any name, callback empty), then paste the 32-character API key, not the secret. Only artist names are sent to Last.fm, through your Proxy setting. Noctis keeps this setting as plain text. Leave empty to use the other catalogs.", "type": "string", "default": "" },
+    { "key": "artistCatalogOnPages", "label": "Fill artist and album pages from online catalogs", "description": "Add online releases to Noctis's existing Albums, Singles & EPs and Appears On sections. Native album pages show owned songs and missing songs with download actions. Metadata uses the same Proxy setting. Browsing never downloads audio.", "type": "bool", "default": true },
+    { "key": "shortcut", "label": "Shortcut", "description": "Press this anywhere in Noctis to open the search window (on a Mac, Ctrl means Cmd). Write it like Ctrl+Shift+F or Ctrl+Alt+M; leave it empty to turn it off. If Noctis itself uses the same keys, Noctis wins.", "type": "string", "default": "Ctrl+Shift+F" },
+    { "key": "openSearch", "label": "Open the search window", "description": "Flip this switch (either way) to open the search window. Quicker: press the shortcut above anywhere in Noctis. You can also right-click any track → \"Find more by this artist…\".", "type": "bool", "default": false },
+    { "key": "allowMp3", "label": "Accept MP3 when there is no FLAC", "description": "Songs are always asked for in FLAC first, from both bots. When neither has the song in FLAC (often the case for leaks and unreleased songs), the MP3 a bot sent is saved instead. Switch off to download FLAC only.", "type": "bool", "default": true },
+    { "key": "downloadFolder", "label": "Download folder", "description": "Leave empty to save into \"Noctis Free Music\" inside your first Noctis library folder, so downloads appear in the library right away (needs Watch Folders on). If you set a folder outside the library, add it to your Noctis library folders.", "type": "string", "default": "" },
+    { "key": "proxy", "label": "Proxy", "description": "Leave empty to do what the computer does: when a proxy is switched on in the computer's own settings (a VPN app's \"system proxy\" mode does that), Telegram is reached through it, otherwise directly. Spotify and Deezer playlists are read the same way. Or name a proxy yourself: host:port, socks5://host:port (or socks5://name:password@host:port), http://host:port, or a Telegram proxy link (https://t.me/proxy?server=…&port=…&secret=…; that kind carries Telegram only, playlists are then read the computer's way). Write direct to never use a proxy. It is used from the next search, login or playlist import on. Noctis keeps this setting as plain text.", "type": "string", "default": "" }
+  ]
+}

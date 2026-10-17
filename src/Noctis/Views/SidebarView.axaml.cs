@@ -778,7 +778,9 @@ public partial class SidebarView : UserControl
             // restored button paints with its hover fill: land tinted.
             CloseSearchPopup(landOnHover: ReferenceEquals(sender, SearchCapButton));
         else
-            topBar.OpenSearchCommand.Execute(null);
+            // Noctis Plus: the button is the way into Search (library and online). Ctrl+F
+            // still filters the page you are on.
+            topBar.OpenSearchPageCommand.Execute(null);
     }
 
     // Tunnels on the whole capsule: Esc used to work only from the text box, so with focus

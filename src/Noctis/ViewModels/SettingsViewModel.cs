@@ -86,6 +86,8 @@ public partial class SettingsViewModel : ViewModelBase
     public const string TabStatistics = "Statistics";
     public const string TabIntegrations = "Integrations";
     public const string TabPlugins = "Plugins";
+    /// <summary>Noctis Plus: the features built into the app (Free Music Finder, True Shuffle, ...).</summary>
+    public const string TabFeatures = "Features";
     public const string TabAbout = "About";
     public const string TabAccountDevices = "Account & Devices";
     public const string TabPlayer = "Player";
@@ -112,7 +114,7 @@ public partial class SettingsViewModel : ViewModelBase
         {
             // Rail* keys are one icon family (Fluent regular) so every page reads at the same weight;
             // RailFolderIcon is the open-folder shape the sidebar's Folders entry uses.
-            G("App", (TabGeneral, "RailSettingsIcon"), (TabAppearance, "RailPaletteIcon"), (TabPlayer, "RailPlayIcon"), (TabLyrics, "LyricsBubbleIcon"), (TabShortcuts, "RailKeyboardIcon")),
+            G("App", (TabGeneral, "RailSettingsIcon"), (TabAppearance, "RailPaletteIcon"), (TabPlayer, "RailPlayIcon"), (TabLyrics, "LyricsBubbleIcon"), (TabFeatures, "RailSparkleIcon"), (TabShortcuts, "RailKeyboardIcon")),
             G("Playback", (TabAudio, "RailSpeakerIcon")),
             G("Library", (TabLibrary, "RailFolderIcon"), (TabAdvanced, "RailWrenchIcon")),
             G("Connect", (TabAccountDevices, "RailPersonIcon"), (TabIntegrations, "RailPlugIcon"), (TabPlugins, "RailPuzzleIcon")),
@@ -146,6 +148,8 @@ public partial class SettingsViewModel : ViewModelBase
     public bool IsIntegrationsTabSelected => SelectedSettingsTab == TabIntegrations;
     public bool IsPluginsTabSelected => SelectedSettingsTab == TabPlugins;
     public bool IsPluginsTabVisible => IsPluginsTabSelected;
+    public bool IsFeaturesTabSelected => SelectedSettingsTab == TabFeatures;
+    public bool IsFeaturesTabVisible => IsFeaturesTabSelected;
     public bool IsAboutTabSelected => SelectedSettingsTab == TabAbout;
     public bool IsAccountDevicesTabSelected => SelectedSettingsTab == TabAccountDevices;
     public bool IsAccountDevicesTabVisible => IsAccountDevicesTabSelected;
@@ -381,6 +385,8 @@ public partial class SettingsViewModel : ViewModelBase
         OnPropertyChanged(nameof(IsIntegrationsTabSelected));
         OnPropertyChanged(nameof(IsPluginsTabSelected));
         OnPropertyChanged(nameof(IsPluginsTabVisible));
+        OnPropertyChanged(nameof(IsFeaturesTabSelected));
+        OnPropertyChanged(nameof(IsFeaturesTabVisible));
         OnPropertyChanged(nameof(IsAboutTabSelected));
         OnPropertyChanged(nameof(IsGeneralTabVisible));
         OnPropertyChanged(nameof(IsAppearanceTabVisible));
@@ -402,6 +408,7 @@ public partial class SettingsViewModel : ViewModelBase
         OnPropertyChanged(nameof(SelectedTabDescription));
         OnFeatureTabOpened(value);
         if (value == TabPlugins) OnPluginsPageOpened();
+        if (value == TabFeatures) SyncCustomPlugins();
 
         // Transient validation hints (e.g. ListenBrainz "Token required") are tied to
         // a Connect click, not to persisted state — drop them when navigating tabs so

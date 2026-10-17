@@ -5970,6 +5970,68 @@
             </Border>
             </StackPanel>
 
+            <!-- Noctis Plus Features: what ships inside the app. Each feature is one card: name,
+                 what it does, its switch, then its own settings. No permissions, folder or Remove:
+                 these are part of the app, not add-ons. -->
+            <StackPanel x:Name="FeaturesTabPanel" Classes="tab-page" IsVisible="{Binding IsFeaturesTabVisible}" Spacing="10">
+                <ItemsControl x:Name="BuiltInFeaturesList" ItemsSource="{Binding BuiltInFeatures}">
+                    <ItemsControl.ItemsPanel>
+                        <ItemsPanelTemplate>
+                            <StackPanel Spacing="10"/>
+                        </ItemsPanelTemplate>
+                    </ItemsControl.ItemsPanel>
+                    <ItemsControl.ItemTemplate>
+                        <DataTemplate x:DataType="plugins:LoadedPlugin">
+                            <Border Classes="setting-card">
+                                <StackPanel Spacing="12">
+                                    <Grid ColumnDefinitions="*,Auto">
+                                        <StackPanel Grid.Column="0" Spacing="3" Margin="0,0,16,0">
+                                            <TextBlock Text="{Binding Name}" FontSize="15" FontWeight="SemiBold"/>
+                                            <TextBlock Text="{Binding Description}" FontSize="12" Opacity="0.6" TextWrapping="Wrap"
+                                                       IsVisible="{Binding HasDescription}"/>
+                                            <TextBlock Text="{Binding Error}" FontSize="11" Foreground="#FF6B6B" TextWrapping="Wrap"
+                                                       IsVisible="{Binding HasError}"/>
+                                        </StackPanel>
+                                        <controls:LottieToggle Grid.Column="1" IsChecked="{Binding IsEnabled, Mode=TwoWay}"
+                                                              IsEnabled="{Binding CanToggle}" VerticalAlignment="Top"/>
+                                    </Grid>
+                                    <ItemsControl ItemsSource="{Binding SettingItems}" IsVisible="{Binding HasSettings}">
+                                        <ItemsControl.ItemsPanel>
+                                            <ItemsPanelTemplate>
+                                                <StackPanel Spacing="10"/>
+                                            </ItemsPanelTemplate>
+                                        </ItemsControl.ItemsPanel>
+                                        <ItemsControl.ItemTemplate>
+                                            <DataTemplate x:DataType="plugins:PluginSettingItem">
+                                                <Grid ColumnDefinitions="*,Auto">
+                                                    <StackPanel Grid.Column="0" Spacing="1" VerticalAlignment="Center" Margin="0,0,12,0">
+                                                        <TextBlock Text="{Binding Label}" FontSize="13" TextWrapping="Wrap"/>
+                                                        <TextBlock Text="{Binding Description}" FontSize="11" Opacity="0.5" TextWrapping="Wrap"
+                                                                   IsVisible="{Binding HasDescription}"/>
+                                                    </StackPanel>
+                                                    <Panel Grid.Column="1" VerticalAlignment="Center">
+                                                        <controls:LottieToggle IsVisible="{Binding IsBool}"
+                                                                              IsChecked="{Binding BoolValue, Mode=TwoWay}"/>
+                                                        <TextBox IsVisible="{Binding IsString}" Text="{Binding TextValue, Mode=TwoWay}" Watermark="{Binding Placeholder}"
+                                                                 Width="220" CornerRadius="999" Padding="14,6" BorderThickness="1.5" MinHeight="0"/>
+                                                        <NumericUpDown IsVisible="{Binding IsNumber}" Value="{Binding NumberValue, Mode=TwoWay}"
+                                                                       Minimum="{Binding Minimum}" Maximum="{Binding Maximum}"
+                                                                       Width="150" CornerRadius="999" FormatString="0.###"/>
+                                                        <ComboBox IsVisible="{Binding IsChoice}" Classes="pill-list"
+                                                                  ItemsSource="{Binding Choices}" SelectedItem="{Binding SelectedChoice, Mode=TwoWay}"
+                                                                  MinWidth="160" CornerRadius="999" Padding="14,6"/>
+                                                    </Panel>
+                                                </Grid>
+                                            </DataTemplate>
+                                        </ItemsControl.ItemTemplate>
+                                    </ItemsControl>
+                                </StackPanel>
+                            </Border>
+                        </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                </ItemsControl>
+            </StackPanel>
+
             <StackPanel x:Name="PluginsTabPanel" Classes="tab-page" IsVisible="{Binding IsPluginsTabVisible}" Spacing="4">
             <!-- Community plugins: restricted mode when off (Obsidian-style). First on the page: it
                  decides whether anything below can run. -->

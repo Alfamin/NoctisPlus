@@ -49,6 +49,7 @@
   <!-- Expose internal services (e.g. the Core Audio COM interop) to the test project. -->
   <ItemGroup>
     <InternalsVisibleTo Include="Noctis.Tests" />
+    <InternalsVisibleTo Include="FreeMusicFinder.Tests" />
   </ItemGroup>
   <!-- Built-in Noctis server (Settings → Integrations): OpenSubsonic API over Kestrel.
        The shared framework is only loaded when the server is switched on. -->
@@ -153,8 +154,17 @@
   <!-- Embedded assets -->
   <ItemGroup>
     <!-- Pinned first-party modules. Kept outside the user plugin directory; no startup download. -->
-    <Content Include="..\..\bundled-plugins\**\*" Link="bundled-plugins\%(RecursiveDir)%(Filename)%(Extension)"
+    <Content Include="..\..\bundled-plugins\**\*" Exclude="..\..\bundled-plugins\dev.moshi.freemusicfinder\**" Link="bundled-plugins\%(RecursiveDir)%(Filename)%(Extension)"
              CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
+  </ItemGroup>
+  <!-- Noctis Plus features compiled into the app (Features/<Name>): their plugin.json declares
+       the settings shown in Settings → Features. -->
+  <ItemGroup>
+    <EmbeddedResource Include="Features\FreeMusicFinder\plugin.json" LogicalName="Noctis.Features.FreeMusicFinder.plugin.json" />
+  </ItemGroup>
+  <ItemGroup>
+    <!-- Free Music Finder: Telegram (MTProto) client for the music bots. -->
+    <PackageReference Include="WTelegramClient" Version="4.4.9" />
   </ItemGroup>
   <ItemGroup>
     <!-- Shared assets (themes, styles, icons, fonts) live in Noctis.UI; only the

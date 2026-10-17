@@ -1,0 +1,680 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:Noctis.ViewModels"
+             xmlns:controls="using:Noctis.Controls"
+             x:Class="Noctis.Views.SearchView"
+             x:DataType="vm:SearchViewModel"
+             Focusable="True"
+             Background="{DynamicResource AppMainBackground}">
+
+    <!-- Search (Noctis Plus): the library and the online catalog in one page. Built from the
+         app's own pieces: section titles and artist portraits as on Home, song rows as the
+         artist page's Popular list, album tiles as the Albums grid, chips as the top bar's.
+         An online-only song or album wears a small download badge on its cover and quieter
+         text; everything else looks and behaves exactly like the library. -->
+
+    <UserControl.Resources>
+        <!-- One song row. Library: double-click plays, hover Play over the cover, heart.
+             Online: the same row, a download badge on the cover, a download button where
+             the heart would be (a ring while it downloads). -->
+        <DataTemplate x:Key="SearchSongRow" x:DataType="vm:SearchSongItem">
+            <Button Classes="browse-item song-row"
+                    Classes.playing="{Binding Local.IsNowPlaying, FallbackValue=False}"
+                    Classes.online="{Binding IsOnline}"
+                    AutomationProperties.Name="{Binding Title}"
+                    Background="{DynamicResource HomeCardBackground}"
+                    BorderThickness="0"
+                    CornerRadius="6"
+                    Padding="0"
+                    Height="48"
+                    Margin="0,3"
+                    Cursor="Hand"
+                    HorizontalAlignment="Stretch"
+                    HorizontalContentAlignment="Stretch"
+                    DoubleTapped="OnSongRowDoubleTapped">
+                <Grid ColumnDefinitions="52,*,Auto,52">
+                    <Panel Grid.Column="0" Width="36" Height="36" HorizontalAlignment="Center" VerticalAlignment="Center">
+                        <Border Width="36" Height="36"
+                                CornerRadius="4"
+                                ClipToBounds="True"
+                                Background="{DynamicResource SystemControlBackgroundBaseLowBrush}">
+                            <Panel>
+                                <PathIcon Data="{StaticResource SongsIcon}" Width="14" Height="14" Opacity="0.3"
+                                          HorizontalAlignment="Center" VerticalAlignment="Center"
+                                          IsVisible="{Binding !HasArtwork}" />
+                                <controls:CachedImage Classes="search-art"
+                                                      SourcePath="{Binding ArtworkPath}"
+                                                      DecodeWidth="128"
+                                                      Stretch="UniformToFill"
+                                                      RenderOptions.BitmapInterpolationMode="HighQuality"
+                                                      IsVisible="{Binding HasArtwork}" />
+                                <Button Classes="art-play-overlay"
+                                        Background="#66000000"
+                                        BorderThickness="0"
+                                        Padding="0"
+                                        CornerRadius="4"
+                                        HorizontalAlignment="Stretch"
+                                        VerticalAlignment="Stretch"
+                                        HorizontalContentAlignment="Center"
+                                        VerticalContentAlignment="Center"
+                                        Cursor="Hand"
+                                        IsVisible="{Binding IsLocal}"
+                                        ToolTip.Tip="Play"
+                                        Command="{Binding $parent[UserControl].((vm:SearchViewModel)DataContext).PlaySongCommand}"
+                                        CommandParameter="{Binding}">
+                                    <Panel>
+                                        <Viewbox Width="14" Height="14" Margin="1,0,0,0" IsVisible="{Binding !Local.IsCurrentlyPlaying, FallbackValue=True}"><Path Data="{StaticResource PlayIcon}" /></Viewbox>
+                                        <Viewbox Width="14" Height="14" IsVisible="{Binding Local.IsCurrentlyPlaying, FallbackValue=False}"><Path Data="{StaticResource PauseIcon}" /></Viewbox>
+                                    </Panel>
+                                </Button>
+                            </Panel>
+                        </Border>
+                        <!-- Not in your library yet: the download badge, tucked on the cover's corner. -->
+                        <Border Classes="online-badge" IsVisible="{Binding IsOnline}"
+                                HorizontalAlignment="Right" VerticalAlignment="Bottom" Margin="0,0,-5,-5"
+                                ToolTip.Tip="Not in your library">
+                            <Path Data="{StaticResource SearchDownloadGlyph}" Width="9" Height="9" Stretch="Uniform"
+                                  Stroke="White" StrokeThickness="2.2" StrokeLineCap="Round" StrokeJoin="Round" />
+                        </Border>
+                    </Panel>
+
+                    <StackPanel Grid.Column="1" Spacing="1" VerticalAlignment="Center" Margin="2,0,16,0">
+                        <TextBlock Classes="song-title"
+                                   FontSize="13"
+                                   FontWeight="SemiBold"
+                                   TextTrimming="CharacterEllipsis"
+                                   MaxLines="1">
+                            <Run Text="{Binding Title}" />
+                            <InlineUIContainer BaselineAlignment="Center">
+                                <Border Classes="explicit-badge compact" Margin="6,0,0,0" IsVisible="{Binding IsExplicit}">
+                                    <TextBlock Text="E" Classes="explicit-badge-text compact" FontSize="8" Opacity="0.9" />
+                                </Border>
+                            </InlineUIContainer>
+                        </TextBlock>
+                        <TextBlock Classes="song-row-dim"
+                                   FontSize="11"
+                                   Opacity="0.55"
+                                   TextTrimming="CharacterEllipsis"
+                                   MaxLines="1">
+                            <Run Text="{Binding ArtistDisplay}" />
+                            <Run Text="{Binding AlbumTitle, StringFormat=' · {0}'}" />
+                        </TextBlock>
+                    </StackPanel>
+
+                    <TextBlock Grid.Column="2"
+                               Classes="song-row-dim"
+                               Text="{Binding DurationText}"
+                               FontSize="12"
+                               Opacity="0.7"
+                               VerticalAlignment="Center"
+                               Margin="0,0,10,0" />
+
+                    <Panel Grid.Column="3" Width="32" Height="32" HorizontalAlignment="Center" VerticalAlignment="Center">
+                        <!-- Library: the heart, as on every other song row. -->
+                        <controls:HeartIcon Size="14" ShowWhenOff="False" IsVisible="{Binding IsLocal}"
+                                            HorizontalAlignment="Center" VerticalAlignment="Center"
+                                            IsFavorite="{Binding Local.IsFavorite, FallbackValue=False}" />
+                        <!-- Online: download (right-click: add to downloads instead). -->
+                        <Button Classes="search-download"
+                                IsVisible="{Binding CanStartDownload}"
+                                ToolTip.Tip="Download"
+                                Command="{Binding $parent[UserControl].((vm:SearchViewModel)DataContext).DownloadSongCommand}"
+                                CommandParameter="{Binding}">
+                            <Button.ContextMenu>
+                                <ContextMenu>
+                                    <MenuItem Header="Download now"
+                                              Command="{Binding $parent[UserControl].((vm:SearchViewModel)DataContext).DownloadSongCommand}"
+                                              CommandParameter="{Binding}" />
+                                    <MenuItem Header="Add to downloads"
+                                              Command="{Binding $parent[UserControl].((vm:SearchViewModel)DataContext).QueueSongDownloadCommand}"
+                                              CommandParameter="{Binding}" />
+                                </ContextMenu>
+                            </Button.ContextMenu>
+                            <Path Data="{StaticResource SearchDownloadGlyph}" Width="14" Height="14" Stretch="Uniform"
+                                  Stroke="{Binding $parent[Button].Foreground}" StrokeThickness="1.9"
+                                  StrokeLineCap="Round" StrokeJoin="Round" />
+                        </Button>
+                        <controls:ProgressRing Width="20" Height="20" Thickness="2"
+                                               Foreground="{DynamicResource AccentColorBrush}"
+                                               IsVisible="{Binding IsDownloading}"
+                                               Value="{Binding Progress}"
+                                               ToolTip.Tip="Downloading" />
+                        <controls:ProgressRing Width="20" Height="20" Thickness="2"
+                                               Foreground="{DynamicResource SystemControlForegroundBaseMediumBrush}"
+                                               IsVisible="{Binding IsQueued}"
+                                               IsIndeterminate="True"
+                                               ToolTip.Tip="In downloads" />
+                        <PathIcon Data="{StaticResource CheckmarkIcon}" Width="13" Height="13"
+                                  Foreground="{DynamicResource AccentColorBrush}"
+                                  IsVisible="{Binding IsSaved}"
+                                  ToolTip.Tip="Downloaded · appears when Noctis has scanned it" />
+                    </Panel>
+                </Grid>
+            </Button>
+        </DataTemplate>
+
+        <!-- A placeholder row in the song list's exact shape, while online results load. -->
+        <DataTemplate x:Key="SkeletonRow">
+            <Border Classes="skeleton-row" Height="48" Margin="0,3" CornerRadius="6" Background="{DynamicResource HomeCardBackground}">
+                <Grid ColumnDefinitions="52,*">
+                    <Border Classes="skeleton" Width="36" Height="36" CornerRadius="4" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                    <StackPanel Grid.Column="1" Spacing="6" VerticalAlignment="Center" Margin="2,0,0,0">
+                        <Border Classes="skeleton" Width="180" Height="10" CornerRadius="5" HorizontalAlignment="Left" />
+                        <Border Classes="skeleton" Width="110" Height="8" CornerRadius="4" HorizontalAlignment="Left" />
+                    </StackPanel>
+                </Grid>
+            </Border>
+        </DataTemplate>
+
+        <DataTemplate x:Key="SearchArtistTile" x:DataType="vm:SearchArtistItem">
+            <Button Classes="search-artist-tile"
+                    AutomationProperties.Name="{Binding Name}"
+                    Background="Transparent" BorderThickness="0" Padding="6"
+                    Margin="0,2,14,8" Cursor="Hand" Width="162"
+                    HorizontalContentAlignment="Center"
+                    Command="{Binding $parent[UserControl].((vm:SearchViewModel)DataContext).OpenArtistCommand}"
+                    CommandParameter="{Binding}">
+                <StackPanel Spacing="9" HorizontalAlignment="Center">
+                    <Panel Width="150" Height="150" HorizontalAlignment="Center">
+                        <Border Width="150" Height="150" CornerRadius="75"
+                                Background="{DynamicResource SystemControlBackgroundBaseLowBrush}" ClipToBounds="True">
+                            <Panel>
+                                <PathIcon Data="{StaticResource ArtistsIcon}" Width="60" Height="60"
+                                          HorizontalAlignment="Center" VerticalAlignment="Center" Opacity="0.22"
+                                          IsVisible="{Binding !HasArtwork}" />
+                                <controls:CachedImage Classes="search-art" SourcePath="{Binding ArtworkPath}" DecodeWidth="384"
+                                                      Stretch="UniformToFill" Width="150" Height="150"
+                                                      IsVisible="{Binding HasArtwork}" />
+                            </Panel>
+                        </Border>
+                        <Border Classes="artist-ring" Width="150" Height="150" CornerRadius="75" BorderThickness="2"
+                                BorderBrush="Transparent" IsHitTestVisible="False" />
+                    </Panel>
+                    <StackPanel Spacing="1" HorizontalAlignment="Center">
+                        <TextBlock Text="{Binding Name}" FontSize="14" FontWeight="SemiBold"
+                                   HorizontalAlignment="Center" TextAlignment="Center"
+                                   TextTrimming="CharacterEllipsis" MaxLines="2" />
+                        <TextBlock Text="{Binding Subtitle}" FontSize="12" Opacity="0.55"
+                                   HorizontalAlignment="Center" TextTrimming="CharacterEllipsis" MaxLines="1" />
+                    </StackPanel>
+                </StackPanel>
+            </Button>
+        </DataTemplate>
+
+        <DataTemplate x:Key="SearchAlbumTile" x:DataType="vm:SearchAlbumItem">
+            <Button Classes="album-tile search-album-tile"
+                    Classes.online="{Binding IsOnline}"
+                    AutomationProperties.Name="{Binding Title}"
+                    Margin="2,2,12,12" Padding="2" VerticalAlignment="Top"
+                    Command="{Binding $parent[UserControl].((vm:SearchViewModel)DataContext).OpenAlbumCommand}"
+                    CommandParameter="{Binding}">
+                <StackPanel Spacing="0" Width="168">
+                    <Panel Width="168" Height="168">
+                        <Border Width="168" Height="168" CornerRadius="6" ClipToBounds="True"
+                                Background="{DynamicResource SystemControlBackgroundBaseLowBrush}">
+                            <Panel>
+                                <PathIcon Data="{StaticResource AlbumsIcon}" Width="40" Height="40" Opacity="0.2"
+                                          HorizontalAlignment="Center" VerticalAlignment="Center"
+                                          IsVisible="{Binding !HasArtwork}" />
+                                <controls:CachedImage Classes="search-art" SourcePath="{Binding ArtworkPath}" DecodeWidth="384"
+                                                      Stretch="UniformToFill" RenderOptions.BitmapInterpolationMode="HighQuality"
+                                                      IsVisible="{Binding HasArtwork}" />
+                                <Border Classes="tile-dim" />
+                            </Panel>
+                        </Border>
+                        <Border Classes="online-badge large" IsVisible="{Binding IsOnline}"
+                                HorizontalAlignment="Right" VerticalAlignment="Bottom" Margin="0,0,7,7"
+                                ToolTip.Tip="Not in your library">
+                            <Path Data="{StaticResource SearchDownloadGlyph}" Width="11" Height="11" Stretch="Uniform"
+                                  Stroke="White" StrokeThickness="2.2" StrokeLineCap="Round" StrokeJoin="Round" />
+                        </Border>
+                    </Panel>
+                    <TextBlock FontSize="13" FontWeight="SemiBold" Margin="0,5,0,0"
+                               TextWrapping="Wrap" TextTrimming="CharacterEllipsis" MaxLines="2">
+                        <Run Text="{Binding Title}" />
+                        <InlineUIContainer BaselineAlignment="Center">
+                            <Border Classes="explicit-badge compact" Margin="4,0,0,0" IsVisible="{Binding IsExplicit}">
+                                <TextBlock Text="E" Classes="explicit-badge-text compact" FontSize="8" Opacity="0.9" />
+                            </Border>
+                        </InlineUIContainer>
+                    </TextBlock>
+                    <TextBlock Text="{Binding Subtitle}" FontSize="12" FontWeight="Bold" Opacity="0.55" Margin="0,1,0,0"
+                               TextTrimming="CharacterEllipsis" MaxLines="1" />
+                </StackPanel>
+            </Button>
+        </DataTemplate>
+    </UserControl.Resources>
+
+    <UserControl.Styles>
+        <!-- Section titles: Home's 22 px bold. -->
+        <Style Selector="TextBlock.search-section">
+            <Setter Property="FontSize" Value="22" />
+            <Setter Property="FontWeight" Value="Bold" />
+            <Setter Property="Margin" Value="0,0,0,12" />
+        </Style>
+
+        <!-- Filter chips: the top bar's release-type chips. -->
+        <Style Selector="Button.search-chip">
+            <Setter Property="Background" Value="{DynamicResource ChipBackground}" />
+            <Setter Property="Foreground" Value="{DynamicResource SystemControlForegroundBaseHighBrush}" />
+            <Setter Property="CornerRadius" Value="999" />
+            <Setter Property="Padding" Value="14,6" />
+            <Setter Property="FontSize" Value="12" />
+            <Setter Property="FontWeight" Value="SemiBold" />
+            <Setter Property="BorderThickness" Value="0" />
+            <Setter Property="Cursor" Value="Hand" />
+            <Setter Property="Margin" Value="0,0,8,0" />
+        </Style>
+        <Style Selector="Button.search-chip:pointerover /template/ ContentPresenter">
+            <Setter Property="Background" Value="{DynamicResource ChipHoverBackground}" />
+        </Style>
+        <Style Selector="Button.search-chip.active">
+            <Setter Property="Background" Value="{DynamicResource AccentColorBrush}" />
+            <Setter Property="Foreground" Value="{DynamicResource AccentForegroundBrush}" />
+        </Style>
+        <Style Selector="Button.search-chip.active /template/ ContentPresenter">
+            <Setter Property="Background" Value="{DynamicResource AccentColorBrush}" />
+            <Setter Property="Foreground" Value="{DynamicResource AccentForegroundBrush}" />
+        </Style>
+
+        <!-- Song rows: the artist page's Popular rows (hover wash, accent fill while playing,
+             no press zoom). -->
+        <Style Selector="Button.browse-item:pointerover, Button.song-row:pressed">
+            <Setter Property="RenderTransform" Value="scale(1)" />
+        </Style>
+        <Style Selector="Button.song-row /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Transitions">
+                <Transitions>
+                    <BrushTransition Property="Background" Duration="0:0:0.08" />
+                </Transitions>
+            </Setter>
+        </Style>
+        <Style Selector="Button.song-row:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Background" Value="{DynamicResource HomeCardHoverBackground}" />
+        </Style>
+        <Style Selector="Button.song-row.playing">
+            <Setter Property="Background" Value="{DynamicResource AccentButtonBackground}" />
+            <Setter Property="Transitions"><Transitions /></Setter>
+        </Style>
+        <Style Selector="Button.song-row.playing /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Transitions"><Transitions /></Setter>
+        </Style>
+        <Style Selector="Button.song-row.playing:pointerover /template/ ContentPresenter#PART_ContentPresenter, Button.song-row.playing:pressed /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Background" Value="{DynamicResource AccentButtonBackground}" />
+        </Style>
+        <Style Selector="Button.song-row.playing TextBlock">
+            <Setter Property="Foreground" Value="{DynamicResource AccentForegroundBrush}" />
+        </Style>
+        <Style Selector="Button.song-row.playing controls|HeartIcon">
+            <Setter Property="OnBrush" Value="{DynamicResource AccentForegroundBrush}" />
+            <Setter Property="OffBrush" Value="{DynamicResource AccentForegroundBrush}" />
+        </Style>
+        <!-- Online rows read one step quieter than library rows: the visible "not yours yet". -->
+        <Style Selector="Button.song-row.online TextBlock.song-title">
+            <Setter Property="Opacity" Value="0.8" />
+        </Style>
+        <Style Selector="Button.song-row.online controls|CachedImage.search-art">
+            <Setter Property="Opacity" Value="0.82" />
+        </Style>
+        <Style Selector="Button.art-play-overlay">
+            <Setter Property="Opacity" Value="0" />
+            <Setter Property="Transitions">
+                <Transitions>
+                    <DoubleTransition Property="Opacity" Duration="0:0:0.12" />
+                </Transitions>
+            </Setter>
+        </Style>
+        <Style Selector="Button.song-row:pointerover Button.art-play-overlay">
+            <Setter Property="Opacity" Value="1" />
+        </Style>
+        <Style Selector="Button.art-play-overlay:pointerover, Button.art-play-overlay:pressed">
+            <Setter Property="RenderTransform" Value="scale(1)" />
+        </Style>
+        <Style Selector="Button.art-play-overlay:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Background" Value="#80000000" />
+        </Style>
+        <Style Selector="Button.art-play-overlay Path">
+            <Setter Property="Fill" Value="White" />
+            <Setter Property="Stretch" Value="Uniform" />
+        </Style>
+
+        <!-- The download badge: a small dark disc on the cover's corner. -->
+        <Style Selector="Border.online-badge">
+            <Setter Property="Width" Value="17" />
+            <Setter Property="Height" Value="17" />
+            <Setter Property="CornerRadius" Value="999" />
+            <Setter Property="Background" Value="#CC1C1C1E" />
+            <Setter Property="BorderBrush" Value="{DynamicResource AppMainBackground}" />
+            <Setter Property="BorderThickness" Value="1.5" />
+            <Setter Property="BoxShadow" Value="0 1 3 0 #55000000" />
+        </Style>
+        <Style Selector="Border.online-badge.large">
+            <Setter Property="Width" Value="24" />
+            <Setter Property="Height" Value="24" />
+            <Setter Property="BorderThickness" Value="0" />
+        </Style>
+
+        <!-- Download button: a round chip that lights in the accent on hover. -->
+        <Style Selector="Button.search-download">
+            <Setter Property="Width" Value="30" />
+            <Setter Property="Height" Value="30" />
+            <Setter Property="Padding" Value="0" />
+            <Setter Property="CornerRadius" Value="999" />
+            <Setter Property="Background" Value="{DynamicResource ChipBackground}" />
+            <Setter Property="BorderThickness" Value="0" />
+            <Setter Property="HorizontalContentAlignment" Value="Center" />
+            <Setter Property="VerticalContentAlignment" Value="Center" />
+            <Setter Property="Cursor" Value="Hand" />
+        </Style>
+        <Style Selector="Button.search-download:pointerover /template/ ContentPresenter">
+            <Setter Property="Background" Value="{DynamicResource AccentColorBrush}" />
+            <Setter Property="Foreground" Value="{DynamicResource AccentForegroundBrush}" />
+        </Style>
+
+        <!-- Artist portraits: the accent ring on hover, as on Home's Top Artists. -->
+        <Style Selector="Button.search-artist-tile:pointerover Border.artist-ring">
+            <Setter Property="BorderBrush" Value="{DynamicResource AccentColorBrush}" />
+        </Style>
+        <Style Selector="Border.artist-ring">
+            <Setter Property="Transitions">
+                <Transitions>
+                    <BrushTransition Property="BorderBrush" Duration="0:0:0.15" />
+                </Transitions>
+            </Setter>
+        </Style>
+        <Style Selector="Button.search-artist-tile:pointerover /template/ ContentPresenter, Button.search-artist-tile:pressed /template/ ContentPresenter">
+            <Setter Property="Background" Value="Transparent" />
+        </Style>
+        <Style Selector="Button.search-album-tile">
+            <Setter Property="Background" Value="Transparent" />
+            <Setter Property="BorderThickness" Value="0" />
+            <Setter Property="Cursor" Value="Hand" />
+        </Style>
+        <Style Selector="Button.search-album-tile:pointerover /template/ ContentPresenter, Button.search-album-tile:pressed /template/ ContentPresenter">
+            <Setter Property="Background" Value="Transparent" />
+        </Style>
+        <Style Selector="Button.search-album-tile:pressed, Button.search-artist-tile:pressed">
+            <Setter Property="RenderTransform" Value="scale(1)" />
+        </Style>
+        <Style Selector="Button.search-album-tile.online controls|CachedImage.search-art">
+            <Setter Property="Opacity" Value="0.86" />
+        </Style>
+
+        <!-- Covers fade in as they arrive instead of popping. -->
+        <Style Selector="controls|CachedImage.search-art">
+            <Setter Property="Transitions">
+                <Transitions>
+                    <DoubleTransition Property="Opacity" Duration="0:0:0.18" />
+                </Transitions>
+            </Setter>
+        </Style>
+
+        <!-- Skeletons: a soft pulse, never a spinner. -->
+        <Style Selector="Border.skeleton">
+            <Setter Property="Background" Value="{DynamicResource SystemControlBackgroundBaseLowBrush}" />
+            <Style.Animations>
+                <Animation Duration="0:0:1.1" IterationCount="Infinite" PlaybackDirection="Alternate" Easing="SineEaseInOut">
+                    <KeyFrame Cue="0%"><Setter Property="Opacity" Value="0.45" /></KeyFrame>
+                    <KeyFrame Cue="100%"><Setter Property="Opacity" Value="1" /></KeyFrame>
+                </Animation>
+            </Style.Animations>
+        </Style>
+
+        <!-- Sections fade up into place when they appear (the Settings tab-page recipe). -->
+        <Style Selector="StackPanel.search-block">
+            <Setter Property="RenderTransform" Value="translateY(0px)" />
+            <Setter Property="Transitions">
+                <Transitions>
+                    <DoubleTransition Property="Opacity" Duration="0:0:0.22" Easing="CubicEaseOut" />
+                    <TransformOperationsTransition Property="RenderTransform" Duration="0:0:0.22" Easing="CubicEaseOut" />
+                </Transitions>
+            </Setter>
+        </Style>
+        <Style Selector="StackPanel.search-block[IsVisible=False]">
+            <Setter Property="Opacity" Value="0" />
+            <Setter Property="RenderTransform" Value="translateY(8px)" />
+        </Style>
+
+        <!-- Top result card: Home's Continue card fill and radius. -->
+        <Style Selector="Button.top-result">
+            <Setter Property="Background" Value="{DynamicResource HomeCardBackground}" />
+            <Setter Property="BorderThickness" Value="0" />
+            <Setter Property="CornerRadius" Value="16" />
+            <Setter Property="Padding" Value="20" />
+            <Setter Property="Cursor" Value="Hand" />
+            <Setter Property="HorizontalAlignment" Value="Stretch" />
+            <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+            <Setter Property="VerticalAlignment" Value="Stretch" />
+            <Setter Property="VerticalContentAlignment" Value="Stretch" />
+        </Style>
+        <Style Selector="Button.top-result:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Background" Value="{DynamicResource HomeCardHoverBackground}" />
+        </Style>
+        <Style Selector="Button.top-result:pointerover, Button.top-result:pressed">
+            <Setter Property="RenderTransform" Value="scale(1)" />
+        </Style>
+        <Style Selector="Border.kind-pill">
+            <Setter Property="Background" Value="{DynamicResource ChipBackground}" />
+            <Setter Property="CornerRadius" Value="999" />
+            <Setter Property="Padding" Value="10,3" />
+            <Setter Property="HorizontalAlignment" Value="Left" />
+        </Style>
+    </UserControl.Styles>
+
+    <ScrollViewer x:Name="Scroller" HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Auto">
+        <StackPanel Margin="28,20,28,115" Spacing="28">
+
+            <!-- Nothing typed yet. -->
+            <StackPanel Classes="search-block" IsVisible="{Binding ShowEmptyPrompt}" Spacing="8"
+                        HorizontalAlignment="Center" Margin="0,90,0,0">
+                <PathIcon Data="{StaticResource SearchIcon}" Width="38" Height="38" Opacity="0.25" HorizontalAlignment="Center" />
+                <TextBlock Text="Search your music" FontSize="20" FontWeight="Bold" HorizontalAlignment="Center" Margin="0,8,0,0" />
+                <TextBlock FontSize="13" Opacity="0.55" HorizontalAlignment="Center" TextAlignment="Center" MaxWidth="420" TextWrapping="Wrap"
+                           IsVisible="{Binding HasOnline}"
+                           Text="Songs, artists and albums from your library and online. Songs you don't have yet show a download badge." />
+                <TextBlock FontSize="13" Opacity="0.55" HorizontalAlignment="Center" TextAlignment="Center" MaxWidth="420" TextWrapping="Wrap"
+                           IsVisible="{Binding !HasOnline}"
+                           Text="Songs, artists and albums in your library." />
+            </StackPanel>
+
+            <!-- The search pill (the sidebar's, fixed 250 px, anchored to the rail) floats over
+                 this row's left end; the filter chips continue it on the same line, so box and
+                 chips read as one toolbar. SearchView.ChipsInset keeps them clear of the pill. -->
+            <Grid Height="48" Margin="0,-6,0,-10">
+                <WrapPanel x:Name="Chips" IsVisible="{Binding HasQuery}" Orientation="Horizontal" VerticalAlignment="Center">
+                    <Button Classes="search-chip" Classes.active="{Binding IsAllFilter}" Content="All"
+                            Command="{Binding SelectFilterCommand}" CommandParameter="All" />
+                    <Button Classes="search-chip" Classes.active="{Binding IsSongsFilter}" Content="Songs"
+                            Command="{Binding SelectFilterCommand}" CommandParameter="Songs" />
+                    <Button Classes="search-chip" Classes.active="{Binding IsArtistsFilter}" Content="Artists"
+                            Command="{Binding SelectFilterCommand}" CommandParameter="Artists" />
+                    <Button Classes="search-chip" Classes.active="{Binding IsAlbumsFilter}" Content="Albums"
+                            Command="{Binding SelectFilterCommand}" CommandParameter="Albums" />
+                </WrapPanel>
+            </Grid>
+
+            <!-- All: Top result beside the first songs. -->
+            <Grid x:Name="TopGrid" ColumnDefinitions="5*,28,7*" IsVisible="{Binding IsAllFilter}">
+                <StackPanel Grid.Column="0" Classes="search-block" IsVisible="{Binding HasTopResult}">
+                    <TextBlock Classes="search-section" Text="Top result" />
+
+                    <!-- Artist -->
+                    <Button Classes="top-result" Height="238" IsVisible="{Binding TopArtist, Converter={x:Static ObjectConverters.IsNotNull}}"
+                            Command="{Binding OpenArtistCommand}" CommandParameter="{Binding TopArtist}">
+                        <StackPanel Spacing="14" VerticalAlignment="Center">
+                            <Border Width="110" Height="110" CornerRadius="55" ClipToBounds="True" HorizontalAlignment="Left"
+                                    Background="{DynamicResource SystemControlBackgroundBaseLowBrush}" BoxShadow="0 10 26 0 #60000000">
+                                <Panel>
+                                    <PathIcon Data="{StaticResource ArtistsIcon}" Width="44" Height="44" Opacity="0.22"
+                                              HorizontalAlignment="Center" VerticalAlignment="Center"
+                                              IsVisible="{Binding !TopArtist.HasArtwork, FallbackValue=True}" />
+                                    <controls:CachedImage Classes="search-art" SourcePath="{Binding TopArtist.ArtworkPath, FallbackValue={x:Null}}" DecodeWidth="256"
+                                                          Stretch="UniformToFill" IsVisible="{Binding TopArtist.HasArtwork, FallbackValue=False}" />
+                                </Panel>
+                            </Border>
+                            <StackPanel Spacing="8">
+                                <TextBlock Text="{Binding TopArtist.Name, FallbackValue=''}" FontSize="28" FontWeight="Bold"
+                                           TextTrimming="CharacterEllipsis" MaxLines="1" />
+                                <Border Classes="kind-pill">
+                                    <TextBlock Text="Artist" FontSize="12" FontWeight="SemiBold" />
+                                </Border>
+                            </StackPanel>
+                        </StackPanel>
+                    </Button>
+
+                    <!-- Album -->
+                    <Button Classes="top-result" Height="238" IsVisible="{Binding TopAlbum, Converter={x:Static ObjectConverters.IsNotNull}}"
+                            Command="{Binding OpenAlbumCommand}" CommandParameter="{Binding TopAlbum}">
+                        <StackPanel Spacing="14" VerticalAlignment="Center">
+                            <Panel Width="110" Height="110" HorizontalAlignment="Left">
+                                <Border Width="110" Height="110" CornerRadius="8" ClipToBounds="True"
+                                        Background="{DynamicResource SystemControlBackgroundBaseLowBrush}" BoxShadow="0 10 26 0 #60000000">
+                                    <Panel>
+                                        <PathIcon Data="{StaticResource AlbumsIcon}" Width="36" Height="36" Opacity="0.2"
+                                                  HorizontalAlignment="Center" VerticalAlignment="Center"
+                                                  IsVisible="{Binding !TopAlbum.HasArtwork, FallbackValue=True}" />
+                                        <controls:CachedImage Classes="search-art" SourcePath="{Binding TopAlbum.ArtworkPath, FallbackValue={x:Null}}" DecodeWidth="256"
+                                                              Stretch="UniformToFill" IsVisible="{Binding TopAlbum.HasArtwork, FallbackValue=False}" />
+                                    </Panel>
+                                </Border>
+                                <Border Classes="online-badge large" IsVisible="{Binding TopAlbum.IsOnline, FallbackValue=False}"
+                                        HorizontalAlignment="Right" VerticalAlignment="Bottom" Margin="0,0,6,6">
+                                    <Path Data="{StaticResource SearchDownloadGlyph}" Width="11" Height="11" Stretch="Uniform"
+                                          Stroke="White" StrokeThickness="2.2" StrokeLineCap="Round" StrokeJoin="Round" />
+                                </Border>
+                            </Panel>
+                            <StackPanel Spacing="8">
+                                <TextBlock Text="{Binding TopAlbum.Title, FallbackValue=''}" FontSize="28" FontWeight="Bold"
+                                           TextTrimming="CharacterEllipsis" MaxLines="1" />
+                                <StackPanel Orientation="Horizontal" Spacing="8">
+                                    <Border Classes="kind-pill">
+                                        <TextBlock Text="Album" FontSize="12" FontWeight="SemiBold" />
+                                    </Border>
+                                    <TextBlock Text="{Binding TopAlbum.Subtitle, FallbackValue=''}" FontSize="13" Opacity="0.65"
+                                               VerticalAlignment="Center" TextTrimming="CharacterEllipsis" MaxLines="1" />
+                                </StackPanel>
+                            </StackPanel>
+                        </StackPanel>
+                    </Button>
+
+                    <!-- Song -->
+                    <Button Classes="top-result" Height="238" IsVisible="{Binding TopSong, Converter={x:Static ObjectConverters.IsNotNull}}"
+                            DoubleTapped="OnTopSongDoubleTapped">
+                        <Grid RowDefinitions="*,Auto">
+                            <StackPanel Spacing="14" VerticalAlignment="Center">
+                                <Panel Width="110" Height="110" HorizontalAlignment="Left">
+                                    <Border Width="110" Height="110" CornerRadius="8" ClipToBounds="True"
+                                            Background="{DynamicResource SystemControlBackgroundBaseLowBrush}" BoxShadow="0 10 26 0 #60000000">
+                                        <Panel>
+                                            <PathIcon Data="{StaticResource SongsIcon}" Width="32" Height="32" Opacity="0.2"
+                                                      HorizontalAlignment="Center" VerticalAlignment="Center"
+                                                      IsVisible="{Binding !TopSong.HasArtwork, FallbackValue=True}" />
+                                            <controls:CachedImage Classes="search-art" SourcePath="{Binding TopSong.ArtworkPath, FallbackValue={x:Null}}" DecodeWidth="256"
+                                                                  Stretch="UniformToFill" IsVisible="{Binding TopSong.HasArtwork, FallbackValue=False}" />
+                                        </Panel>
+                                    </Border>
+                                    <Border Classes="online-badge large" IsVisible="{Binding TopSong.IsOnline, FallbackValue=False}"
+                                            HorizontalAlignment="Right" VerticalAlignment="Bottom" Margin="0,0,6,6">
+                                        <Path Data="{StaticResource SearchDownloadGlyph}" Width="11" Height="11" Stretch="Uniform"
+                                              Stroke="White" StrokeThickness="2.2" StrokeLineCap="Round" StrokeJoin="Round" />
+                                    </Border>
+                                </Panel>
+                                <StackPanel Spacing="8">
+                                    <TextBlock Text="{Binding TopSong.Title, FallbackValue=''}" FontSize="28" FontWeight="Bold"
+                                               TextTrimming="CharacterEllipsis" MaxLines="1" />
+                                    <StackPanel Orientation="Horizontal" Spacing="8">
+                                        <Border Classes="kind-pill">
+                                            <TextBlock Text="Song" FontSize="12" FontWeight="SemiBold" />
+                                        </Border>
+                                        <TextBlock Text="{Binding TopSong.ArtistDisplay, FallbackValue=''}" FontSize="13" Opacity="0.65"
+                                                   VerticalAlignment="Center" TextTrimming="CharacterEllipsis" MaxLines="1" />
+                                    </StackPanel>
+                                </StackPanel>
+                            </StackPanel>
+                            <!-- Library: Play. Online: Download. Both the app's accent pill. -->
+                            <StackPanel Grid.Row="1" Orientation="Horizontal" Spacing="8" HorizontalAlignment="Right">
+                                <Button Classes="accent-btn" Background="{DynamicResource AccentButtonBackground}" BorderThickness="0"
+                                        Padding="16,8" CornerRadius="999" Cursor="Hand"
+                                        IsVisible="{Binding TopSong.IsLocal, FallbackValue=False}"
+                                        Command="{Binding PlaySongCommand}" CommandParameter="{Binding TopSong}">
+                                    <StackPanel Orientation="Horizontal" Spacing="7">
+                                        <PathIcon Data="{StaticResource PlayIcon}" Width="12" Height="12" Margin="1,0,0,0"
+                                                  Foreground="{DynamicResource AccentForegroundBrush}" VerticalAlignment="Center" />
+                                        <TextBlock Text="Play" FontSize="13" FontWeight="SemiBold"
+                                                   Foreground="{DynamicResource AccentForegroundBrush}" VerticalAlignment="Center" />
+                                    </StackPanel>
+                                </Button>
+                                <Button Classes="accent-btn" Background="{DynamicResource AccentButtonBackground}" BorderThickness="0"
+                                        Padding="16,8" CornerRadius="999" Cursor="Hand"
+                                        IsVisible="{Binding TopSong.CanStartDownload, FallbackValue=False}"
+                                        Command="{Binding DownloadSongCommand}" CommandParameter="{Binding TopSong}">
+                                    <StackPanel Orientation="Horizontal" Spacing="7">
+                                        <Path Data="{StaticResource SearchDownloadGlyph}" Width="12" Height="12" Stretch="Uniform"
+                                              Stroke="{DynamicResource AccentForegroundBrush}" StrokeThickness="2"
+                                              StrokeLineCap="Round" StrokeJoin="Round" VerticalAlignment="Center" />
+                                        <TextBlock Text="Download" FontSize="13" FontWeight="SemiBold"
+                                                   Foreground="{DynamicResource AccentForegroundBrush}" VerticalAlignment="Center" />
+                                    </StackPanel>
+                                </Button>
+                                <controls:ProgressRing Width="26" Height="26" Thickness="2.4"
+                                                       Foreground="{DynamicResource AccentColorBrush}"
+                                                       IsVisible="{Binding TopSong.IsDownloading, FallbackValue=False}"
+                                                       Value="{Binding TopSong.Progress, FallbackValue=0}" />
+                            </StackPanel>
+                        </Grid>
+                    </Button>
+                </StackPanel>
+
+                <StackPanel Grid.Column="2" Classes="search-block" IsVisible="{Binding HasQuery}">
+                    <TextBlock Classes="search-section" Text="Songs" />
+                    <ItemsControl ItemsSource="{Binding Songs}" ItemTemplate="{StaticResource SearchSongRow}" />
+                    <ItemsControl ItemTemplate="{StaticResource SkeletonRow}" IsVisible="{Binding ShowSongSkeletons}"
+                                  ItemsSource="{Binding SkeletonsShort}" />
+                </StackPanel>
+            </Grid>
+
+            <!-- Songs filter: the whole list. -->
+            <StackPanel Classes="search-block" IsVisible="{Binding IsSongsFilter}">
+                <ItemsControl ItemsSource="{Binding Songs}" ItemTemplate="{StaticResource SearchSongRow}" />
+                <ItemsControl ItemTemplate="{StaticResource SkeletonRow}" IsVisible="{Binding ShowSongSkeletons}"
+                              ItemsSource="{Binding SkeletonsLong}" />
+            </StackPanel>
+
+            <!-- Artists -->
+            <StackPanel Classes="search-block" IsVisible="{Binding HasArtists}" x:Name="ArtistsBlock">
+                <TextBlock Classes="search-section" Text="Artists" IsVisible="{Binding IsAllFilter}" />
+                <ItemsControl ItemsSource="{Binding Artists}" ItemTemplate="{StaticResource SearchArtistTile}">
+                    <ItemsControl.ItemsPanel>
+                        <ItemsPanelTemplate><WrapPanel Orientation="Horizontal" /></ItemsPanelTemplate>
+                    </ItemsControl.ItemsPanel>
+                </ItemsControl>
+            </StackPanel>
+
+            <!-- Albums -->
+            <StackPanel Classes="search-block" IsVisible="{Binding HasAlbums}" x:Name="AlbumsBlock">
+                <TextBlock Classes="search-section" Text="Albums" IsVisible="{Binding IsAllFilter}" />
+                <ItemsControl ItemsSource="{Binding Albums}" ItemTemplate="{StaticResource SearchAlbumTile}">
+                    <ItemsControl.ItemsPanel>
+                        <ItemsPanelTemplate><WrapPanel Orientation="Horizontal" /></ItemsPanelTemplate>
+                    </ItemsControl.ItemsPanel>
+                </ItemsControl>
+            </StackPanel>
+
+            <!-- Card skeletons while the online artists and albums load. -->
+            <StackPanel IsVisible="{Binding ShowCardSkeletons}" Orientation="Horizontal" Spacing="14">
+                <Border Classes="skeleton" Width="168" Height="168" CornerRadius="6" />
+                <Border Classes="skeleton" Width="168" Height="168" CornerRadius="6" />
+                <Border Classes="skeleton" Width="168" Height="168" CornerRadius="6" />
+                <Border Classes="skeleton" Width="168" Height="168" CornerRadius="6" />
+            </StackPanel>
+
+            <!-- Nothing found anywhere. -->
+            <StackPanel Classes="search-block" IsVisible="{Binding ShowNoResults}" Spacing="6" HorizontalAlignment="Center" Margin="0,60,0,0">
+                <TextBlock Text="{Binding QueryText, StringFormat='No results for “{0}”'}" FontSize="18" FontWeight="Bold" HorizontalAlignment="Center" />
+                <TextBlock Text="Check the spelling, or try fewer words." FontSize="13" Opacity="0.55" HorizontalAlignment="Center" />
+            </StackPanel>
+
+            <TextBlock Text="{Binding Status}" IsVisible="{Binding HasStatus}" FontSize="12" Opacity="0.5" TextWrapping="Wrap" />
+        </StackPanel>
+    </ScrollViewer>
+</UserControl>

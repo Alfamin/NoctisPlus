@@ -4,7 +4,8 @@ using Xunit;
 
 namespace Noctis.Tests;
 
-/// <summary>The Settings rail after the 2026-09 revamp: 13 pages in 5 groups, every page with an icon.</summary>
+/// <summary>The Settings rail after the 2026-09 revamp: 14 pages in 5 groups (Noctis Plus adds
+/// Features), every page with an icon.</summary>
 public class SettingsRailTests
 {
     private static SettingsViewModel NewVm()
@@ -14,13 +15,13 @@ public class SettingsRailTests
     }
 
     [Fact]
-    public void Rail_HasThirteenPagesInFiveGroups_InOrder()
+    public void Rail_HasFourteenPagesInFiveGroups_InOrder()
     {
         var vm = NewVm();
 
         Assert.Equal(new[] { "App", "Playback", "Library", "Connect", "More" }, vm.SectionGroups.Select(g => g.Name));
         Assert.Equal(
-            new[] { "General", "Appearance", "Player", "Lyrics", "Shortcuts", "Audio", "Library", "Advanced", "Account & Devices", "Integrations", "Plugins", "Statistics", "About" },
+            new[] { "General", "Appearance", "Player", "Lyrics", "Features", "Shortcuts", "Audio", "Library", "Advanced", "Account & Devices", "Integrations", "Plugins", "Statistics", "About" },
             vm.Sections.Select(s => s.Key));
         Assert.Equal(vm.Sections.Count, vm.SectionGroups.Sum(g => g.Sections.Count));
         Assert.All(vm.Sections, s => Assert.False(string.IsNullOrEmpty(s.IconKey)));

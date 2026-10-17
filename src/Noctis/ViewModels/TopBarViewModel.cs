@@ -62,10 +62,9 @@ public partial class TopBarViewModel : ViewModelBase
     [NotifyPropertyChangedFor(nameof(IsSearchActionAvailable))]
     private bool _isSearchVisible = true;
 
-    /// <summary>Enables the sidebar magnifier. Home itself is not searchable, but the
-    /// button stays clickable there because invoking search on Home redirects to the
-    /// Songs page (see <see cref="OpenSearch"/>).</summary>
-    public bool IsSearchActionAvailable => IsSearchVisible || CurrentTabName == "Home";
+    /// <summary>Enables the sidebar magnifier. Noctis Plus: it opens the Search page, which
+    /// is reachable from every page (Settings is a modal over them).</summary>
+    public bool IsSearchActionAvailable => CurrentTabName != "Settings";
     // The search pill is a persistent (non-light-dismiss) popup: it stays open while
     // the user browses/filters and only closes explicitly (toggle, Esc, or navigating
     // to a page without search).
@@ -658,6 +657,13 @@ public partial class TopBarViewModel : ViewModelBase
         IsSearchOpen = true;
         SearchOpenRequested?.Invoke(this, EventArgs.Empty);
     }
+
+    /// <summary>Noctis Plus: the rail's Search button opens the Search page (library and
+    /// online); the shell navigates there and opens the pill.</summary>
+    public event EventHandler? SearchPageRequested;
+
+    [RelayCommand]
+    private void OpenSearchPage() => SearchPageRequested?.Invoke(this, EventArgs.Empty);
 
     [RelayCommand]
     private void ToggleSearch()

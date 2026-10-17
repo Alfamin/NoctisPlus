@@ -97,21 +97,30 @@ public partial class SettingsViewModel
     /// and removals in place (no Clear), so an untouched row keeps its container and state.</summary>
     private void SyncCustomPlugins()
     {
+        // Features built into Noctis Plus have their own Settings page and never show as plugins.
         var wanted = Plugins is null
             ? new List<LoadedPlugin>()
-            : Plugins.Plugins.Where(p => !OfficialPlugins.Any(o =>
+            : Plugins.Plugins.Where(p => !p.IsBundled && !OfficialPlugins.Any(o =>
                 string.Equals(o.Entry.Id, p.Id, StringComparison.OrdinalIgnoreCase))).ToList();
+        SyncInPlace(CustomPlugins, wanted);
+        SyncInPlace(BuiltInFeatures, Plugins is null ? new List<LoadedPlugin>() : Plugins.Plugins.Where(p => p.IsBundled).ToList());
+        OnPropertyChanged(nameof(HasNoCustomPlugins));
+    }
 
-        for (var i = CustomPlugins.Count - 1; i >= 0; i--)
-            if (!wanted.Contains(CustomPlugins[i])) CustomPlugins.RemoveAt(i);
+    /// <summary>Settings → Features: what ships inside Noctis Plus, each with its switch and settings.</summary>
+    public ObservableCollection<LoadedPlugin> BuiltInFeatures { get; } = new();
+
+    private static void SyncInPlace(ObservableCollection<LoadedPlugin> list, List<LoadedPlugin> wanted)
+    {
+        for (var i = list.Count - 1; i >= 0; i--)
+            if (!wanted.Contains(list[i])) list.RemoveAt(i);
         for (var i = 0; i < wanted.Count; i++)
         {
-            var at = CustomPlugins.IndexOf(wanted[i]);
+            var at = list.IndexOf(wanted[i]);
             if (at == i) continue;
-            if (at < 0) CustomPlugins.Insert(i, wanted[i]);
-            else CustomPlugins.Move(at, i);
+            if (at < 0) list.Insert(i, wanted[i]);
+            else list.Move(at, i);
         }
-        OnPropertyChanged(nameof(HasNoCustomPlugins));
     }
 
     /// <summary>The row's button: Install / Update, or Cancel while it downloads (hence concurrent:
