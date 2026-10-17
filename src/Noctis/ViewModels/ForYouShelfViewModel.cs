@@ -25,6 +25,7 @@ public sealed partial class ForYouShelfViewModel : ObservableObject, IDisposable
     {
         _followFeature = true;
         _undoDuration = TimeSpan.FromSeconds(8);
+        Picks.CollectionChanged += (_, _) => OnPropertyChanged(nameof(ShowSkeletons));
         OnlineMusicSearch.CurrentChanged += FeatureChanged;
         Attach(FreeMusicPlugin.Current?.ForYou, FreeMusicPlugin.Current?.OnlineSearch, FreeMusicPlugin.Current?.Discovery);
     }
@@ -32,17 +33,20 @@ public sealed partial class ForYouShelfViewModel : ObservableObject, IDisposable
     internal ForYouShelfViewModel(ForYouSource source, FinderOnlineSearch online, DiscoveryActions actions, TimeSpan? undoDuration = null)
     {
         _undoDuration = undoDuration ?? TimeSpan.FromSeconds(8);
+        Picks.CollectionChanged += (_, _) => OnPropertyChanged(nameof(ShowSkeletons));
         Attach(source, online, actions);
     }
 
     public ObservableCollection<ForYouPick> Picks { get; } = [];
-    [ObservableProperty] private bool _isLoading;
+    [ObservableProperty, NotifyPropertyChangedFor(nameof(ShowSkeletons))] private bool _isLoading;
     [ObservableProperty] private string _status = "";
     [ObservableProperty] private bool _hasUndo;
     [ObservableProperty] private string _undoLabel = "";
     [ObservableProperty] private bool _hasNewPicks;
     [ObservableProperty] private bool _isExpanded = true;
     public bool IsAvailable => _source is not null && _online is not null;
+    /// <summary>First load with nothing to show yet: cover-shaped placeholders.</summary>
+    public bool ShowSkeletons => IsLoading && Picks.Count == 0;
 
     private void FeatureChanged(object? sender, EventArgs e) => Dispatcher.UIThread.Post(() =>
     {
@@ -104,7 +108,16 @@ public sealed partial class ForYouShelfViewModel : ObservableObject, IDisposable
             if (Current()) Show(page, source);
         }
         catch (OperationCanceledException) when (stop.IsCancellationRequested) { }
-        catch (Exception ex) { if (Current()) Status = "For you could not load: " + ArtistCatalog.Explain(ex); }
+        catch (Exception ex)
+        {
+            if (!Current()) return;
+            // Never blank a shelf that had picks: keep what is on screen, or bring back the last
+            // saved page (even an old one) and say quietly that it could not refresh.
+            if (Picks.Count == 0 && source.LastSaved() is { Songs.Count: > 0 } saved) Show(saved, source);
+            Status = Picks.Count > 0
+                ? "Couldn't refresh right now. Showing your last picks."
+                : "For you could not load: " + ArtistCatalog.Explain(ex);
+        }
         finally { if (Current()) IsLoading = false; }
     }
 

@@ -440,6 +440,17 @@ internal sealed class ForYouSource(Func<ArtistCatalog> catalog, DiscoveryActions
         }
     }, ct);
 
+    /// <summary>The last saved page even when it has expired: what the shelf shows when a refresh
+    /// cannot reach the catalog, instead of going blank.</summary>
+    public DiscoverResult? LastSaved()
+    {
+        lock (_sync)
+        {
+            var page = _last ?? _cache.Read(_now(), expired: true);
+            return page is null ? null : Filter(page.Result);
+        }
+    }
+
     private DiscoverResult Filter(DiscoverResult result) => result with
     {
         Songs = result.Songs.Where(s => !Hidden.HidesSong(s.Track.Song)).ToList(),

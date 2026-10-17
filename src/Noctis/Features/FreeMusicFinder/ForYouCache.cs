@@ -6,14 +6,14 @@ namespace FreeMusicFinder;
 internal sealed class ForYouCache(string path)
 {
     internal sealed record Page(int Version, DateTimeOffset At, DateTimeOffset Until, DiscoverResult Result);
-    public Page? Read(DateTimeOffset now)
+    public Page? Read(DateTimeOffset now, bool expired = false)
     {
         try
         {
             if (!Safe() || !File.Exists(path) || new FileInfo(path).Length > 2 * 1024 * 1024) return null;
             var page = JsonSerializer.Deserialize<Page>(File.ReadAllText(path));
             return page is { Version: 1, Result.Songs: not null, Result.Artists: not null, Result.Notice: not null } &&
-                page.At <= now.AddMinutes(5) && page.At >= now.AddDays(-7) && page.Until > now && page.Until <= page.At.AddDays(7) &&
+                page.At <= now.AddMinutes(5) && page.At >= now.AddDays(-7) && (expired || page.Until > now) && page.Until <= page.At.AddDays(7) &&
                 page.Result.Songs.Count <= 100 && page.Result.Artists.Count <= 30 &&
                 page.Result.Songs.All(s => s is { Track.Song.Artists: { Count: > 0 }, Track.Song.Id: not null, Track.Song.Title: not null, Because: not null } &&
                     s.Track.Song.Artists.All(a => a is { Id: not null, Name: not null }) && double.IsFinite(s.Score)) &&

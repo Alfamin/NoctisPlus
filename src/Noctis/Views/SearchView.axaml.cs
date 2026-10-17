@@ -24,6 +24,8 @@ public partial class SearchView : UserControl
         InitializeComponent();
         LayoutUpdated += (_, _) => PlaceChips();
         Scroller.SizeChanged += (_, e) => UpdateRowCapacity(e.NewSize.Width);
+        // The toolbar stays put; once results run under it, the top bar's hairline marks its edge.
+        Scroller.ScrollChanged += (_, _) => HeaderRule.IsVisible = Scroller.Offset.Y > 0.5;
     }
 
     /// <summary>Puts the chips on the pill's line, just past its right end. Measured from the

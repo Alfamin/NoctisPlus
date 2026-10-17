@@ -906,6 +906,17 @@ public partial class MainWindowViewModel : ViewModelBase
         // opens Search with that query (NOCTISPLUS_DEBUG_FILTER=Songs|Artists|Albums picks a chip).
         if (Environment.GetEnvironmentVariable("NOCTISPLUS_DEBUG_PAGE") is { Length: > 0 } debugPage)
             Dispatcher.UIThread.Post(() => Navigate(debugPage), DispatcherPriority.Background);
+        // NOCTISPLUS_DEBUG_ROUNDTRIP=1: Search, then Songs after 4 s, then Search again after 8 s
+        // (leaving and coming back, for the For you shelf).
+        if (Environment.GetEnvironmentVariable("NOCTISPLUS_DEBUG_ROUNDTRIP") is { Length: > 0 })
+            Dispatcher.UIThread.Post(async () =>
+            {
+                OpenSearchPage();
+                await Task.Delay(4000);
+                Navigate("songs");
+                await Task.Delay(4000);
+                OpenSearchPage();
+            }, DispatcherPriority.Background);
         if (Environment.GetEnvironmentVariable("NOCTISPLUS_DEBUG_SEARCH") is { Length: > 0 } debugQuery)
             Dispatcher.UIThread.Post(() =>
             {
@@ -2174,6 +2185,10 @@ public partial class MainWindowViewModel : ViewModelBase
                || ReferenceEquals(view, _statisticsVm)
                || ReferenceEquals(view, _coverFlowVm)
                || ReferenceEquals(view, _serverVm)
+               // Noctis Plus: Search and Downloads live for the whole session (created once);
+               // disposing them on leaving cut Search off from the catalog and For you.
+               || ReferenceEquals(view, _searchVm)
+               || ReferenceEquals(view, _downloadsVm)
                || ReferenceEquals(view, Settings);
     }
 

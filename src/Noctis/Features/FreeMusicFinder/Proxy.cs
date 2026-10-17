@@ -262,12 +262,29 @@ internal static class SystemProxy
 /// way as well. The setting is read when a connection is made, so one that is not understood
 /// fails that request with its reason and not the plugin as it starts.
 /// </summary>
-internal sealed class MetadataRoute : DelegatingHandler
+internal sealed class MetadataRoute : HttpMessageHandler
 {
     private readonly string _setting;
     private readonly Action<string>? _log;
     private readonly Func<string, int, ProxyChoice?> _computer;
+    private readonly TimeSpan _patience;
+    private readonly object _poolLock = new();
+    private HttpMessageInvoker? _pool;
+    private string? _poolKey;
     private string? _last;
+
+    // Bumped when the computer's network changes (Wi-Fi, a VPN adapter coming or going).
+    private static int _network;
+
+    static MetadataRoute()
+    {
+        try
+        {
+            System.Net.NetworkInformation.NetworkChange.NetworkAddressChanged += (_, _) => Interlocked.Increment(ref _network);
+            System.Net.NetworkInformation.NetworkChange.NetworkAvailabilityChanged += (_, _) => Interlocked.Increment(ref _network);
+        }
+        catch (Exception ex) when (ex is System.Net.NetworkInformation.NetworkInformationException or PlatformNotSupportedException) { }
+    }
 
     /// <param name="computer">The computer's proxy for a host and port; the tests put their own here.</param>
     /// <param name="patience">How long a connection may take to open.</param>
@@ -276,17 +293,53 @@ internal sealed class MetadataRoute : DelegatingHandler
         _setting = setting;
         _log = log;
         _computer = computer ?? Computer;
-        InnerHandler = new SocketsHttpHandler
+        _patience = patience ?? TimeSpan.FromSeconds(15);
+    }
+
+    private SocketsHttpHandler NewConnections() => new()
+    {
+        AllowAutoRedirect = false,
+        UseProxy = false, // the connections are opened here
+        ConnectTimeout = _patience,
+        ConnectCallback = ConnectAsync,
+        // Catalog JSON shrinks ~5x compressed: fewer round trips through a slow VPN.
+        AutomaticDecompression = DecompressionMethods.GZip | DecompressionMethods.Deflate | DecompressionMethods.Brotli,
+        // Keep a warmed connection (Search opens one ahead of the first query) for a while.
+        PooledConnectionIdleTimeout = TimeSpan.FromMinutes(5),
+    };
+
+    /// <summary>Which way a request to <paramref name="host"/> goes right now, plus the network's
+    /// generation: when either changes, connections opened the old way are not used again.</summary>
+    internal string KeyFor(string host, int port = 443)
+    {
+        string way;
+        try { way = Route(host, port).Way; }
+        catch (FormatException) { way = "setting not understood"; }
+        return way + "|" + Volatile.Read(ref _network);
+    }
+
+    /// <summary>The kept connections for the way out as it is now. A VPN switched on (or off)
+    /// while Noctis runs gets fresh connections at once: a kept one opened the old way would
+    /// hang or fail until it timed out, which only a restart used to cure.</summary>
+    private HttpMessageInvoker Connections(Uri to)
+    {
+        var key = KeyFor(to.Host, to.Port);
+        lock (_poolLock)
         {
-            AllowAutoRedirect = false,
-            UseProxy = false, // the connections are opened here
-            ConnectTimeout = patience ?? TimeSpan.FromSeconds(15),
-            ConnectCallback = ConnectAsync,
-            // Catalog JSON shrinks ~5x compressed: fewer round trips through a slow VPN.
-            AutomaticDecompression = DecompressionMethods.GZip | DecompressionMethods.Deflate | DecompressionMethods.Brotli,
-            // Keep a warmed connection (Search opens one ahead of the first query) for a while.
-            PooledConnectionIdleTimeout = TimeSpan.FromMinutes(5),
-        };
+            if (_pool is not null && key == _poolKey) return _pool;
+            var old = _pool;
+            _pool = new HttpMessageInvoker(NewConnections(), disposeHandler: true);
+            _poolKey = key;
+            // Requests still running on the old connections finish (or fail) on their own first.
+            if (old is not null) _ = Task.Delay(TimeSpan.FromSeconds(30)).ContinueWith(_ => old.Dispose(), TaskScheduler.Default);
+            return _pool;
+        }
+    }
+
+    protected override void Dispose(bool disposing)
+    {
+        if (disposing) lock (_poolLock) { _pool?.Dispose(); _pool = null; }
+        base.Dispose(disposing);
     }
 
     /// <summary>What to tell the user when <paramref name="to"/> did not answer in time.</summary>
@@ -307,7 +360,7 @@ internal sealed class MetadataRoute : DelegatingHandler
     {
         try
         {
-            return await base.SendAsync(request, ct).ConfigureAwait(false);
+            return await Connections(request.RequestUri!).SendAsync(request, ct).ConfigureAwait(false);
         }
         catch (HttpRequestException ex)
         {

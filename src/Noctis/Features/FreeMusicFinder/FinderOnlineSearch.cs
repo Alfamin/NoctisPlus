@@ -37,6 +37,10 @@ internal sealed class FinderOnlineSearch : IOnlineMusicSearch
 
     public void WarmUp() => _catalog()?.WarmUp();
 
+    public void Retry() => _catalog()?.ForgetGuessedWaits();
+
+    public string Route => _catalog()?.RouteKey ?? "";
+
     private ArtistCatalog Catalog => _catalog() ?? throw new InvalidOperationException("Free Music Finder has stopped.");
 
     public async IAsyncEnumerable<OnlineSearchResult> SearchAsync(string text, [EnumeratorCancellation] CancellationToken ct)

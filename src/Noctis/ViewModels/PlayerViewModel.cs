@@ -2331,10 +2331,29 @@ public partial class PlayerViewModel : ViewModelBase
     /// </summary>
     private void SyncNowPlayingFlags()
     {
-        var current = CurrentTrack;
-        var playing = State == PlaybackState.Playing;
-        if (current != null) current.IsCurrentlyPlaying = playing;
+        lock (_flagLock)
+        {
+            var current = CurrentTrack;
+            var playing = State == PlaybackState.Playing;
+            // The song flagged last time, if it is no longer the current one, is cleared here too:
+            // a state change landing just as the track changed could otherwise leave an earlier
+            // song showing Pause on hover in every list (Noctis Plus fix).
+            if (_flaggedTrack != null && !ReferenceEquals(_flaggedTrack, current))
+            {
+                _flaggedTrack.IsCurrentlyPlaying = false;
+                _flaggedTrack.IsNowPlaying = false;
+            }
+            _flaggedTrack = current;
+            if (current != null) current.IsCurrentlyPlaying = playing;
+            SyncAlbumFlags(current, playing);
+        }
+    }
 
+    private readonly object _flagLock = new();
+    private Track? _flaggedTrack;
+
+    private void SyncAlbumFlags(Track? current, bool playing)
+    {
         var album = current != null && current.AlbumId != Guid.Empty ? _library.GetAlbumById(current.AlbumId) : null;
         if (_flaggedAlbum != null && !ReferenceEquals(_flaggedAlbum, album))
         {

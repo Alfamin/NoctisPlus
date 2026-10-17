@@ -31,6 +31,12 @@ internal sealed partial class ArtistCatalog : IDisposable
     private readonly TimeSpan _applePace;
     private DateTimeOffset _nextApple;
     private readonly Dictionary<string, DateTimeOffset> _wait = new();
+    // Waits the catalog did not ask for (no Retry-After; a 403 is often a block on the way, not a
+    // limit): the way out they were set on. A VPN switched on since then ends them.
+    private readonly Dictionary<string, string> _guessedOn = new();
+    private readonly MetadataRoute? _route;
+    // Waits the service asked for itself (Retry-After), this run: Retry keeps those.
+    private readonly HashSet<string> _askedBy = new();
     // Six covers at a time: Search shows a screenful at once and covers are small (~20 KB).
     private readonly SemaphoreSlim _artGate = new(6, 6);
     private readonly SemaphoreSlim[] _artLocks = Enumerable.Range(0, 16).Select(_ => new SemaphoreSlim(1, 1)).ToArray();
@@ -45,7 +51,9 @@ internal sealed partial class ArtistCatalog : IDisposable
         _applePace = applePace ?? TimeSpan.FromSeconds(3.1);
         // HTTP/2 where the catalog offers it: the parallel searches share one connection (one
         // TLS handshake through the proxy) instead of opening three.
-        _http = new HttpClient(handler ?? PlaylistCatalog.MetadataHandler(""))
+        handler ??= PlaylistCatalog.MetadataHandler("");
+        _route = handler as MetadataRoute;
+        _http = new HttpClient(handler)
         {
             Timeout = TimeSpan.FromSeconds(25),
             DefaultRequestVersion = HttpVersion.Version20,
@@ -60,6 +68,21 @@ internal sealed partial class ArtistCatalog : IDisposable
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or JsonException or InvalidDataException) { }
     }
+
+    /// <summary>The user asked to try again (Search's Retry): waits the catalog itself did not ask
+    /// for end now, including ones saved by an earlier run. A Retry-After it sent is kept.</summary>
+    public void ForgetGuessedWaits()
+    {
+        lock (_limitsLock)
+        {
+            foreach (var provider in _wait.Keys.Where(p => !_askedBy.Contains(p)).ToList()) _wait.Remove(provider);
+            _guessedOn.Clear();
+        }
+        _warmedAt = default;
+    }
+
+    /// <summary>The way out to the song catalog right now (proxy and network generation).</summary>
+    public string RouteKey => _route?.KeyFor("api.deezer.com") ?? "";
 
     private DateTimeOffset _warmedAt;
 
@@ -314,10 +337,14 @@ internal sealed partial class ArtistCatalog : IDisposable
     }
     private async Task<JsonDocument> Get(string provider, string path, CancellationToken ct)
     {
+        var host = provider == "apple" ? "itunes.apple.com" : "api.deezer.com";
         void CheckCooldown()
         {
             lock (_limitsLock)
+            {
+                if (_guessedOn.TryGetValue(provider, out var on) && _route?.KeyFor(host) != on) { _wait.Remove(provider); _guessedOn.Remove(provider); }
                 if (_wait.TryGetValue(provider, out var until) && until > _now()) throw new SourcesWaitingException(provider + " catalog is waiting until " + until.ToLocalTime().ToString("g") + ". Cached results remain available.", until);
+            }
         }
         CheckCooldown();
         if (provider == "apple")
@@ -344,7 +371,12 @@ internal sealed partial class ArtistCatalog : IDisposable
                 retry = retry < _now().AddSeconds(3) ? _now().AddSeconds(3) : retry > _now().AddDays(7) ? _now().AddDays(7) : retry;
                 lock (_limitsLock)
                 {
-                    if (!_wait.TryGetValue(provider, out var previous) || retry > previous) _wait[provider] = retry;
+                    if (!_wait.TryGetValue(provider, out var previous) || retry > previous)
+                    {
+                        _wait[provider] = retry;
+                        if (response.Headers.RetryAfter is not null) { _askedBy.Add(provider); _guessedOn.Remove(provider); }
+                        else if (_route is not null) _guessedOn[provider] = _route.KeyFor(host);
+                    }
                     retry = _wait[provider];
                     try { AtomicJson.Write(SafeFile("limits.json")!, _wait); } catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or InvalidDataException) { }
                 }

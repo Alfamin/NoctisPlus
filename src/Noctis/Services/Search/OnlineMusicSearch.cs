@@ -45,6 +45,14 @@ public interface IOnlineMusicSearch
     /// user's proxy), so the first search does not pay for it. Cheap to call again.</summary>
     void WarmUp();
 
+    /// <summary>The user (or a changed connection) asks to try again: pauses the source set on
+    /// its own after a refusal end now; a wait the service itself asked for is kept.</summary>
+    void Retry();
+
+    /// <summary>The way out right now (proxy, network). When it changes, a failed search is worth
+    /// running again: a VPN was switched on, Wi-Fi came back.</summary>
+    string Route { get; }
+
     /// <summary>Progressive results for <paramref name="query"/>, each a fuller picture than the last.</summary>
     IAsyncEnumerable<OnlineSearchResult> SearchAsync(string query, CancellationToken ct);
 

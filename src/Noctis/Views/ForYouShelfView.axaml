@@ -2,56 +2,266 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:vm="using:Noctis.ViewModels"
              xmlns:ctrl="using:Noctis.Controls"
+             xmlns:helpers="using:Noctis.Helpers"
              x:Class="Noctis.Views.ForYouShelfView" x:DataType="vm:ForYouShelfViewModel">
-    <StackPanel Spacing="12">
-        <Grid ColumnDefinitions="*,Auto,Auto" ColumnSpacing="12">
-            <Button Background="Transparent" BorderThickness="0" Padding="0" HorizontalAlignment="Left" Command="{Binding ToggleExpandedCommand}">
-                <TextBlock Text="For you" FontSize="24" FontWeight="Bold" />
+
+    <!-- For you (Noctis Plus), built as one of Home's sections: the folding title with the
+         chevron box, then a left-packed row of covers in the Albums-row tile shape. Hover dims
+         the cover and shows two circles (Home's tile-play / tile-more): Download bottom-left,
+         the options menu bottom-right. No scroll bar, no extra buttons under the covers. -->
+
+    <UserControl.Styles>
+        <!-- Home's section header (HomeView): the title is the hit target, the chevron in the
+             sidebar folder's grey box turns as the section folds. -->
+        <Style Selector="Button.section-toggle">
+            <Setter Property="Background" Value="Transparent" />
+            <Setter Property="BorderThickness" Value="0" />
+            <Setter Property="Padding" Value="0" />
+            <Setter Property="Cursor" Value="Hand" />
+            <Setter Property="HorizontalAlignment" Value="Left" />
+        </Style>
+        <Style Selector="Button.section-toggle:pointerover /template/ ContentPresenter#PART_ContentPresenter, Button.section-toggle:pressed /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Background" Value="Transparent" />
+        </Style>
+        <Style Selector="Button.section-toggle:pointerover, Button.section-toggle:pressed">
+            <Setter Property="RenderTransform" Value="scale(1)" />
+        </Style>
+        <Style Selector="Border.section-chevron-box">
+            <Setter Property="Width" Value="28" />
+            <Setter Property="Height" Value="28" />
+            <Setter Property="CornerRadius" Value="8" />
+            <Setter Property="Background" Value="#22808080" />
+            <Setter Property="VerticalAlignment" Value="Center" />
+        </Style>
+        <Style Selector="Button.section-toggle Path.section-chevron">
+            <Setter Property="Stroke" Value="{Binding $parent[Button].Foreground}" />
+            <Setter Property="Opacity" Value="0.8" />
+            <Setter Property="RenderTransform" Value="rotate(-90deg)" />
+            <Setter Property="Transitions">
+                <Transitions>
+                    <TransformOperationsTransition Property="RenderTransform" Duration="0:0:0.18">
+                        <TransformOperationsTransition.Easing><CubicEaseOut /></TransformOperationsTransition.Easing>
+                    </TransformOperationsTransition>
+                    <DoubleTransition Property="Opacity" Duration="0:0:0.15" />
+                </Transitions>
+            </Setter>
+        </Style>
+        <Style Selector="Button.section-toggle.expanded Path.section-chevron">
+            <Setter Property="RenderTransform" Value="rotate(0deg)" />
+        </Style>
+        <Style Selector="Button.section-toggle:pointerover Path.section-chevron">
+            <Setter Property="Opacity" Value="1" />
+        </Style>
+
+        <!-- The main window's corner icon (34 px round, chip fill). -->
+        <Style Selector="Button.corner-icon">
+            <Setter Property="Width" Value="34" />
+            <Setter Property="Height" Value="34" />
+            <Setter Property="CornerRadius" Value="17" />
+            <Setter Property="Padding" Value="0" />
+            <Setter Property="BorderThickness" Value="0" />
+            <Setter Property="Background" Value="{DynamicResource ChipBackground}" />
+            <Setter Property="Foreground" Value="{DynamicResource SystemControlForegroundBaseHighBrush}" />
+            <Setter Property="HorizontalContentAlignment" Value="Center" />
+            <Setter Property="VerticalContentAlignment" Value="Center" />
+            <Setter Property="VerticalAlignment" Value="Center" />
+            <Setter Property="Cursor" Value="Hand" />
+        </Style>
+        <Style Selector="Button.corner-icon:pointerover /template/ ContentPresenter, Button.corner-icon:pressed /template/ ContentPresenter">
+            <Setter Property="Background" Value="{DynamicResource ChipHoverBackground}" />
+        </Style>
+        <Style Selector="Button.corner-icon:disabled">
+            <Setter Property="Opacity" Value="0.5" />
+        </Style>
+        <Style Selector="Border.corner-dot">
+            <Setter Property="Width" Value="9" />
+            <Setter Property="Height" Value="9" />
+            <Setter Property="CornerRadius" Value="4.5" />
+            <Setter Property="Background" Value="{DynamicResource AccentColorBrush}" />
+            <Setter Property="BorderBrush" Value="{DynamicResource AppMainBackground}" />
+            <Setter Property="BorderThickness" Value="1.5" />
+            <Setter Property="HorizontalAlignment" Value="Right" />
+            <Setter Property="VerticalAlignment" Value="Top" />
+            <Setter Property="IsHitTestVisible" Value="False" />
+        </Style>
+
+        <!-- The artist page's text link (Undo). -->
+        <Style Selector="Button.text-link">
+            <Setter Property="Background" Value="Transparent" />
+            <Setter Property="BorderThickness" Value="0" />
+            <Setter Property="Padding" Value="8,4" />
+            <Setter Property="MinHeight" Value="0" />
+            <Setter Property="CornerRadius" Value="999" />
+            <Setter Property="FontSize" Value="13" />
+            <Setter Property="FontWeight" Value="SemiBold" />
+            <Setter Property="Foreground" Value="{DynamicResource AccentTextExactBrush}" />
+            <Setter Property="Cursor" Value="Hand" />
+        </Style>
+        <Style Selector="Button.text-link:pointerover, Button.text-link:pressed">
+            <Setter Property="RenderTransform" Value="scale(1)" />
+        </Style>
+        <Style Selector="Button.text-link:pointerover /template/ ContentPresenter">
+            <Setter Property="Background" Value="{DynamicResource ChipBackground}" />
+            <Setter Property="Foreground" Value="{DynamicResource AccentTextExactBrush}" />
+        </Style>
+
+        <!-- Home's album tiles: bare cover + two text lines, no plate, no press zoom. -->
+        <Style Selector="Button.foryou-tile">
+            <Setter Property="Background" Value="Transparent" />
+            <Setter Property="BorderThickness" Value="0" />
+            <Setter Property="Cursor" Value="Hand" />
+            <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+        </Style>
+        <Style Selector="Button.foryou-tile:pointerover /template/ ContentPresenter#PART_ContentPresenter, Button.foryou-tile:pressed /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Background" Value="Transparent" />
+        </Style>
+        <Style Selector="Button.foryou-tile:pressed">
+            <Setter Property="RenderTransform" Value="scale(1)" />
+        </Style>
+        <!-- The download circle lights in the accent, as Home's Play circle does. -->
+        <Style Selector="Button.tile-play.download:pointerover /template/ ContentPresenter">
+            <Setter Property="Background" Value="{DynamicResource AccentColorBrush}" />
+        </Style>
+        <!-- Cards fade up as a page arrives (Search's section recipe). -->
+        <Style Selector="Button.foryou-tile">
+            <Style.Animations>
+                <Animation Duration="0:0:0.22" Easing="CubicEaseOut" FillMode="Backward">
+                    <KeyFrame Cue="0%"><Setter Property="Opacity" Value="0" /></KeyFrame>
+                    <KeyFrame Cue="100%"><Setter Property="Opacity" Value="1" /></KeyFrame>
+                </Animation>
+            </Style.Animations>
+        </Style>
+        <Style Selector="Border.skeleton">
+            <Setter Property="Background" Value="{DynamicResource SystemControlBackgroundBaseLowBrush}" />
+            <Style.Animations>
+                <Animation Duration="0:0:1.1" IterationCount="Infinite" PlaybackDirection="Alternate" Easing="SineEaseInOut">
+                    <KeyFrame Cue="0%"><Setter Property="Opacity" Value="0.45" /></KeyFrame>
+                    <KeyFrame Cue="100%"><Setter Property="Opacity" Value="1" /></KeyFrame>
+                </Animation>
+            </Style.Animations>
+        </Style>
+    </UserControl.Styles>
+
+    <StackPanel>
+        <Grid ColumnDefinitions="*,Auto">
+            <Button Classes="section-toggle" Classes.expanded="{Binding IsExpanded}" Command="{Binding ToggleExpandedCommand}"
+                    ToolTip.Tip="Hide or show this section">
+                <StackPanel Orientation="Horizontal" Spacing="8">
+                    <TextBlock Text="For you" FontSize="22" FontWeight="Bold" />
+                    <Border Classes="section-chevron-box">
+                        <Path Classes="section-chevron" Width="28" Height="28" Data="M 9,11.5 L 14,16.5 L 19,11.5"
+                              StrokeThickness="1.8" StrokeLineCap="Round" StrokeJoin="Round" />
+                    </Border>
+                </StackPanel>
             </Button>
-            <TextBlock Grid.Column="1" Text="New picks" FontSize="12" Opacity="0.6" VerticalAlignment="Center" IsVisible="{Binding HasNewPicks}" />
-            <Button Grid.Column="2" Classes="accent-btn album-header-action" Content="Refresh" Command="{Binding RefreshCommand}" IsEnabled="{Binding !IsLoading}" />
+            <!-- Refresh: a corner icon; the accent dot says newer picks are waiting. -->
+            <Panel Grid.Column="1" VerticalAlignment="Center">
+                <Button Classes="corner-icon" Command="{Binding RefreshCommand}" IsEnabled="{Binding !IsLoading}"
+                        ToolTip.Tip="Refresh" AutomationProperties.Name="Refresh">
+                    <Path Data="{StaticResource PluginsRefreshGlyph}" Width="15" Height="15" Stretch="Uniform"
+                          Stroke="{Binding $parent[Button].Foreground}" StrokeThickness="2"
+                          StrokeLineCap="Round" StrokeJoin="Round" Opacity="0.85" />
+                </Button>
+                <Border Classes="corner-dot" IsVisible="{Binding HasNewPicks}" />
+            </Panel>
         </Grid>
-        <Grid ColumnDefinitions="*,Auto" IsVisible="{Binding HasUndo}">
-            <TextBlock Text="{Binding UndoLabel}" Opacity="0.7" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" />
-            <Button Grid.Column="1" Classes="text-link" Content="Undo" Command="{Binding UndoCommand}" />
-        </Grid>
-        <ProgressBar IsIndeterminate="True" Height="3" IsVisible="{Binding IsLoading}" />
-        <TextBlock Text="{Binding Status}" Opacity="0.6" FontSize="12" TextWrapping="Wrap" />
+
         <ctrl:CollapsibleContent IsOpen="{Binding IsExpanded}" Lift="10" Motion="Glide">
-            <ScrollViewer HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Disabled">
-                <ItemsControl ItemsSource="{Binding Picks}" Margin="0,0,0,12">
-                    <ItemsControl.ItemsPanel><ItemsPanelTemplate><StackPanel Orientation="Horizontal" Spacing="20" /></ItemsPanelTemplate></ItemsControl.ItemsPanel>
+            <StackPanel Margin="0,14,0,0" Spacing="10">
+                <!-- A quiet line: why it is empty, or that an old page is shown. -->
+                <TextBlock Text="{Binding Status}" FontSize="12" Opacity="0.55" TextWrapping="Wrap"
+                           IsVisible="{Binding Status, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
+
+                <!-- Hidden a song: the artist page's text link brings it back for a few seconds. -->
+                <StackPanel Orientation="Horizontal" Spacing="4" IsVisible="{Binding HasUndo}">
+                    <TextBlock Text="{Binding UndoLabel}" FontSize="13" Opacity="0.7" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" MaxWidth="420" />
+                    <Button Classes="text-link" Content="Undo" Command="{Binding UndoCommand}" VerticalAlignment="Center" />
+                </StackPanel>
+
+                <!-- Loading for the first time: cover-shaped placeholders, never a spinner. -->
+                <StackPanel Orientation="Horizontal" Spacing="16" IsVisible="{Binding ShowSkeletons}">
+                    <Border Classes="skeleton" Width="168" Height="168" CornerRadius="6" />
+                    <Border Classes="skeleton" Width="168" Height="168" CornerRadius="6" />
+                    <Border Classes="skeleton" Width="168" Height="168" CornerRadius="6" />
+                    <Border Classes="skeleton" Width="168" Height="168" CornerRadius="6" />
+                </StackPanel>
+
+                <ItemsControl ItemsSource="{Binding Picks}">
+                    <ItemsControl.ItemsPanel>
+                        <ItemsPanelTemplate><WrapPanel Orientation="Horizontal" /></ItemsPanelTemplate>
+                    </ItemsControl.ItemsPanel>
                     <ItemsControl.ItemTemplate>
                         <DataTemplate x:DataType="vm:ForYouPick">
-                            <StackPanel Width="168" Spacing="6">
-                                <Button Background="Transparent" Padding="0" BorderThickness="0" CornerRadius="8" ClipToBounds="True"
-                                        Command="{Binding $parent[UserControl].((vm:ForYouShelfViewModel)DataContext).OpenPickCommand}" CommandParameter="{Binding}">
-                                    <Border Width="168" Height="168" Background="{DynamicResource ArtworkPlaceholderBackground}" CornerRadius="8" ClipToBounds="True">
-                                        <ctrl:CachedImage SourcePath="{Binding Song.ArtworkPath}" Stretch="UniformToFill" />
+                            <Button Classes="album-tile foryou-tile" Margin="2,2,12,14" Padding="2" VerticalAlignment="Top"
+                                    AutomationProperties.Name="{Binding Song.Title}"
+                                    Command="{Binding $parent[UserControl].((vm:ForYouShelfViewModel)DataContext).OpenPickCommand}"
+                                    CommandParameter="{Binding}">
+                                <Button.ContextMenu>
+                                    <ContextMenu>
+                                        <MenuItem Header="Download now" IsVisible="{Binding Song.CanStartDownload}"
+                                                  Command="{Binding $parent[UserControl].((vm:ForYouShelfViewModel)DataContext).DownloadCommand}" CommandParameter="{Binding}" />
+                                        <MenuItem Header="Add to downloads" IsVisible="{Binding Song.CanStartDownload}"
+                                                  Command="{Binding $parent[UserControl].((vm:ForYouShelfViewModel)DataContext).QueueDownloadCommand}" CommandParameter="{Binding}" />
+                                        <MenuItem Header="Open album"
+                                                  Command="{Binding $parent[UserControl].((vm:ForYouShelfViewModel)DataContext).OpenPickCommand}" CommandParameter="{Binding}" />
+                                        <MenuItem Header="Go to artist"
+                                                  Command="{Binding $parent[UserControl].((vm:ForYouShelfViewModel)DataContext).OpenPickArtistCommand}" CommandParameter="{Binding}" />
+                                        <Separator />
+                                        <MenuItem Header="Not for me"
+                                                  Command="{Binding $parent[UserControl].((vm:ForYouShelfViewModel)DataContext).NotForMeCommand}" CommandParameter="{Binding}" />
+                                    </ContextMenu>
+                                </Button.ContextMenu>
+                                <StackPanel Width="168" Spacing="0">
+                                    <Border Width="168" Height="168" CornerRadius="6" ClipToBounds="True"
+                                            Background="{DynamicResource SystemControlBackgroundBaseLowBrush}">
+                                        <Panel>
+                                            <PathIcon Data="{StaticResource SongsIcon}" Width="36" Height="36" Opacity="0.2"
+                                                      HorizontalAlignment="Center" VerticalAlignment="Center"
+                                                      IsVisible="{Binding !Song.HasArtwork}" />
+                                            <ctrl:CachedImage SourcePath="{Binding Song.ArtworkPath}" DecodeWidth="384" Stretch="UniformToFill"
+                                                              RenderOptions.BitmapInterpolationMode="HighQuality"
+                                                              IsVisible="{Binding Song.HasArtwork}" />
+                                            <Border Classes="tile-dim" />
+                                            <!-- Bottom-left: Download (Home's Play circle); a ring while it runs. -->
+                                            <Button Classes="tile-play download" IsVisible="{Binding Song.CanStartDownload}"
+                                                    ToolTip.Tip="Download" AutomationProperties.Name="Download"
+                                                    Command="{Binding $parent[UserControl].((vm:ForYouShelfViewModel)DataContext).DownloadCommand}"
+                                                    CommandParameter="{Binding}">
+                                                <Viewbox Width="13" Height="13">
+                                                    <Path Data="{StaticResource SearchDownloadGlyph}" Fill="{x:Null}" Stroke="White"
+                                                          StrokeThickness="2.4" StrokeLineCap="Round" StrokeJoin="Round" />
+                                                </Viewbox>
+                                            </Button>
+                                            <Border Width="32" Height="32" CornerRadius="16" Margin="8" Background="#B3232325"
+                                                    HorizontalAlignment="Left" VerticalAlignment="Bottom"
+                                                    IsVisible="{Binding !Song.CanStartDownload}">
+                                                <Panel>
+                                                    <ctrl:ProgressRing Width="20" Height="20" Thickness="2" Foreground="{DynamicResource AccentColorBrush}"
+                                                                       IsVisible="{Binding Song.IsDownloading}" Value="{Binding Song.Progress}" ToolTip.Tip="Downloading" />
+                                                    <ctrl:ProgressRing Width="20" Height="20" Thickness="2" Foreground="White"
+                                                                       IsVisible="{Binding Song.IsQueued}" IsIndeterminate="True" ToolTip.Tip="In downloads" />
+                                                    <PathIcon Data="{StaticResource CheckmarkIcon}" Width="12" Height="12" Foreground="{DynamicResource AccentColorBrush}"
+                                                              IsVisible="{Binding Song.IsSaved}" ToolTip.Tip="Downloaded" />
+                                                </Panel>
+                                            </Border>
+                                            <!-- Bottom-right: the options (the same menu as right-click). -->
+                                            <Button Classes="tile-more" Click="OnMoreClick">
+                                                <Viewbox Width="14" Height="14"><Path Data="{StaticResource MoreDotsIcon}" /></Viewbox>
+                                            </Button>
+                                        </Panel>
                                     </Border>
-                                </Button>
-                                <TextBlock Text="{Binding Song.Title}" FontSize="14" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" ToolTip.Tip="{Binding Song.Title}" />
-                                <Button Background="Transparent" BorderThickness="0" Padding="0" HorizontalAlignment="Left"
-                                        Command="{Binding $parent[UserControl].((vm:ForYouShelfViewModel)DataContext).OpenPickArtistCommand}" CommandParameter="{Binding}">
-                                    <TextBlock Text="{Binding Song.ArtistDisplay}" FontSize="12" Opacity="0.6" TextTrimming="CharacterEllipsis" />
-                                </Button>
-                                <TextBlock Text="{Binding Because}" FontSize="11" Opacity="0.45" TextTrimming="CharacterEllipsis" ToolTip.Tip="{Binding Because}" />
-                                <Grid ColumnDefinitions="Auto,Auto,*,Auto" Height="30">
-                                    <Button Classes="header-icon-btn" Content="↓" FontSize="20" Padding="0" Width="28" ToolTip.Tip="Download now" IsVisible="{Binding Song.CanStartDownload}"
-                                            Command="{Binding $parent[UserControl].((vm:ForYouShelfViewModel)DataContext).DownloadCommand}" CommandParameter="{Binding}" />
-                                    <Button Grid.Column="1" Classes="header-icon-btn" Content="+" FontSize="20" Padding="0" Width="28" ToolTip.Tip="Queue download" IsVisible="{Binding Song.CanStartDownload}"
-                                            Command="{Binding $parent[UserControl].((vm:ForYouShelfViewModel)DataContext).QueueDownloadCommand}" CommandParameter="{Binding}" />
-                                    <TextBlock Text="Queued" FontSize="11" Opacity="0.6" VerticalAlignment="Center" IsVisible="{Binding Song.IsQueued}" />
-                                    <TextBlock Text="✓" FontSize="16" VerticalAlignment="Center" IsVisible="{Binding Song.IsSaved}" />
-                                    <ProgressBar Grid.ColumnSpan="2" Width="40" Height="3" Minimum="0" Maximum="1" Value="{Binding Song.Progress}" IsVisible="{Binding Song.IsDownloading}" />
-                                    <Button Grid.Column="3" Classes="header-icon-btn" Content="−" FontSize="20" Padding="0" Width="28" ToolTip.Tip="Not for me"
-                                            Command="{Binding $parent[UserControl].((vm:ForYouShelfViewModel)DataContext).NotForMeCommand}" CommandParameter="{Binding}" />
-                                </Grid>
-                            </StackPanel>
+                                    <TextBlock Text="{Binding Song.Title}" FontSize="13" FontWeight="SemiBold" Margin="0,5,0,0"
+                                               TextWrapping="Wrap" TextTrimming="CharacterEllipsis" MaxLines="2" ToolTip.Tip="{Binding Song.Title}" />
+                                    <TextBlock Text="{Binding Song.ArtistDisplay}" FontSize="12" FontWeight="Bold" Opacity="0.55" Margin="0,1,0,0"
+                                               TextTrimming="CharacterEllipsis" MaxLines="1" />
+                                    <TextBlock Text="{Binding Because}" FontSize="11" Opacity="0.4" Margin="0,2,0,0"
+                                               TextTrimming="CharacterEllipsis" MaxLines="1" ToolTip.Tip="{Binding Because}" />
+                                </StackPanel>
+                            </Button>
                         </DataTemplate>
                     </ItemsControl.ItemTemplate>
                 </ItemsControl>
-            </ScrollViewer>
+            </StackPanel>
         </ctrl:CollapsibleContent>
     </StackPanel>
 </UserControl>

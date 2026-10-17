@@ -52,7 +52,8 @@ public sealed partial class SearchViewModel : ViewModelBase, ISearchable, IDispo
     public ObservableCollection<SearchAlbumItem> Albums { get; } = new();
 
     /// <summary>All, Songs, Artists or Albums.</summary>
-    [ObservableProperty, NotifyPropertyChangedFor(nameof(IsAllFilter), nameof(IsSongsFilter), nameof(IsArtistsFilter), nameof(IsAlbumsFilter))]
+    [ObservableProperty, NotifyPropertyChangedFor(nameof(IsAllFilter), nameof(IsSongsFilter), nameof(IsArtistsFilter), nameof(IsAlbumsFilter),
+        nameof(ShowArtists), nameof(ShowAlbums), nameof(ShowCardSkeletons))]
     private string _filter = "All";
 
     public bool IsAllFilter => Filter == "All";
@@ -69,7 +70,7 @@ public sealed partial class SearchViewModel : ViewModelBase, ISearchable, IDispo
     public SearchArtistItem? TopArtist => TopResult as SearchArtistItem;
     public SearchAlbumItem? TopAlbum => TopResult as SearchAlbumItem;
 
-    [ObservableProperty, NotifyPropertyChangedFor(nameof(HasQuery), nameof(ShowEmptyPrompt), nameof(ShowForYou))]
+    [ObservableProperty, NotifyPropertyChangedFor(nameof(HasQuery), nameof(ShowEmptyPrompt), nameof(ShowForYou), nameof(ShowOnlineProblem))]
     private string _queryText = "";
 
     public bool HasQuery => QueryText.Trim().Length > 0;
@@ -78,7 +79,7 @@ public sealed partial class SearchViewModel : ViewModelBase, ISearchable, IDispo
     public ForYouShelfViewModel ForYou { get; } = new();
 
     /// <summary>Online results are on their way and none has arrived yet: skeletons stand in.</summary>
-    [ObservableProperty, NotifyPropertyChangedFor(nameof(ShowSongSkeletons), nameof(ShowCardSkeletons), nameof(ShowNoResults))]
+    [ObservableProperty, NotifyPropertyChangedFor(nameof(ShowSongSkeletons), nameof(ShowCardSkeletons), nameof(ShowNoResults), nameof(ShowSongsSection))]
     private bool _isOnlinePending;
 
     /// <summary>Online results are still arriving (the first may already be on screen).</summary>
@@ -87,10 +88,21 @@ public sealed partial class SearchViewModel : ViewModelBase, ISearchable, IDispo
     [ObservableProperty, NotifyPropertyChangedFor(nameof(HasStatus))]
     private string _status = "";
 
-    public bool HasStatus => Status.Length > 0;
+    /// <summary>A small note under the results (a partial failure while other results did come);
+    /// never shown alongside the can't-reach notice, which already says it.</summary>
+    public bool HasStatus => Status.Length > 0 && !IsOnlineUnreachable;
 
-    [ObservableProperty, NotifyPropertyChangedFor(nameof(ShowNoResults), nameof(HasSongs), nameof(HasArtists), nameof(HasAlbums), nameof(ShowSongSkeletons), nameof(ShowCardSkeletons))]
+    [ObservableProperty, NotifyPropertyChangedFor(nameof(ShowNoResults), nameof(HasSongs), nameof(HasArtists), nameof(HasAlbums), nameof(ShowSongSkeletons), nameof(ShowCardSkeletons),
+        nameof(ShowArtists), nameof(ShowAlbums), nameof(ShowSongsSection))]
     private int _resultVersion;
+
+    /// <summary>The online catalog could not be reached for this query (no connection, VPN off,
+    /// or it stopped answering). The page says so above the results and offers Retry; it also
+    /// tries again by itself when the connection changes.</summary>
+    [ObservableProperty, NotifyPropertyChangedFor(nameof(ShowOnlineProblem), nameof(ShowNoResults), nameof(HasStatus))]
+    private bool _isOnlineUnreachable;
+
+    public bool ShowOnlineProblem => IsOnlineUnreachable && HasQuery && HasOnline;
 
     /// <summary>Placeholder rows: three beside the top result, five on the Songs filter.</summary>
     public IReadOnlyList<int> SkeletonsShort { get; } = [1, 2, 3];
@@ -100,8 +112,14 @@ public sealed partial class SearchViewModel : ViewModelBase, ISearchable, IDispo
     public bool HasArtists => Artists.Count > 0;
     public bool HasAlbums => Albums.Count > 0;
     public bool ShowSongSkeletons => IsOnlinePending && Songs.Count < SongCap;
-    public bool ShowCardSkeletons => IsOnlinePending && Albums.Count == 0;
-    public bool ShowNoResults => HasQuery && !IsOnlinePending && !IsOnlineLoading && Songs.Count == 0 && Artists.Count == 0 && Albums.Count == 0;
+    /// <summary>The All view's Songs column: only with songs (or their placeholders) to show.</summary>
+    public bool ShowSongsSection => HasSongs || ShowSongSkeletons;
+    public bool ShowCardSkeletons => IsOnlinePending && Albums.Count == 0 && !IsSongsFilter;
+    public bool ShowNoResults => HasQuery && !IsOnlinePending && !IsOnlineLoading && !IsOnlineUnreachable && Songs.Count == 0 && Artists.Count == 0 && Albums.Count == 0;
+
+    /// <summary>Each chip shows its own kind only; All shows everything.</summary>
+    public bool ShowArtists => HasArtists && (IsAllFilter || IsArtistsFilter);
+    public bool ShowAlbums => HasAlbums && (IsAllFilter || IsAlbumsFilter);
 
     /// <summary>True while an online catalog is available (Free Music Finder switched on).</summary>
     public bool HasOnline => _source is not null;
@@ -137,12 +155,13 @@ public sealed partial class SearchViewModel : ViewModelBase, ISearchable, IDispo
         Run(text.Trim(), force: false);
     }
 
-    private void Run(string query, bool force)
+    private void Run(string query, bool force, bool again = false)
     {
-        if (!force && query == _query) return;
+        if (!force && !again && query == _query) return;
         _query = query;
         _onlineCts?.Cancel();
         _onlineCts = null;
+        if (!force) IsOnlineUnreachable = false;
         // A re-run for a library change keeps what is on screen (no skeleton flash); the online
         // half answers again from its caches and refreshes which songs are now owned.
         if (!force) { _online = null; Status = ""; }
@@ -183,7 +202,49 @@ public sealed partial class SearchViewModel : ViewModelBase, ISearchable, IDispo
     {
         _source?.WarmUp();
         RefreshDownloadStates();
+        // Back on the page after the catalog failed: maybe the connection is back.
+        if (IsOnlineUnreachable && _query.Length > 0) RetryOnline();
     }
+
+    /// <summary>Retry (the notice's button, or a changed connection): the online half again,
+    /// with the source's self-imposed pauses lifted. Library results stay as they are.</summary>
+    [RelayCommand]
+    private void RetryOnline()
+    {
+        if (_source is not { } source || _query.Length == 0) return;
+        source.Retry();
+        Run(_query, force: false, again: true);
+    }
+
+    // While the notice is up: every few seconds, has the way out changed (a VPN switched on,
+    // the network back)? Then try again at once. Otherwise a quiet retry every half minute.
+    private DispatcherTimer? _reconnect;
+    private string _failedRoute = "";
+    private DateTime _failedAt;
+
+    partial void OnIsOnlineUnreachableChanged(bool value)
+    {
+        if (!value) { _reconnect?.Stop(); return; }
+        _failedRoute = _source?.Route ?? "";
+        _failedAt = DateTime.UtcNow;
+        _reconnect ??= new DispatcherTimer(TimeSpan.FromSeconds(3), DispatcherPriority.Background, (_, _) => CheckReconnect());
+        _reconnect.Start();
+    }
+
+    private void CheckReconnect()
+    {
+        if (!IsOnlineUnreachable || _source is not { } source || _query.Length == 0) { _reconnect?.Stop(); return; }
+        if (IsOnlineLoading) return;
+        if (source.Route != _failedRoute || DateTime.UtcNow - _failedAt > TimeSpan.FromSeconds(30))
+        {
+            source.Retry();
+            Run(_query, force: false, again: true);
+        }
+    }
+
+    /// <summary>How long the first online answer may take before the page says it cannot reach
+    /// the catalog (the search goes on; results replace the notice if they come).</summary>
+    internal static TimeSpan SlowAnswer = TimeSpan.FromSeconds(8);
 
     private async Task RunOnlineAsync(IOnlineMusicSearch source, string query, CancellationTokenSource cts, TimeSpan delay)
     {
@@ -192,9 +253,27 @@ public sealed partial class SearchViewModel : ViewModelBase, ISearchable, IDispo
             if (delay > TimeSpan.Zero) await Task.Delay(delay, cts.Token);
             var clock = System.Diagnostics.Stopwatch.StartNew();
             var first = true;
+            var answered = false;
+            _ = Task.Delay(SlowAnswer, cts.Token).ContinueWith(_ => Dispatcher.UIThread.Post(() =>
+            {
+                if (!answered && ReferenceEquals(cts, _onlineCts)) { IsOnlinePending = false; IsOnlineUnreachable = true; }
+            }), TaskContinuationOptions.OnlyOnRanToCompletion);
             await foreach (var result in source.SearchAsync(query, cts.Token).WithCancellation(cts.Token))
             {
                 if (cts.IsCancellationRequested || !ReferenceEquals(cts, _onlineCts)) return;
+                var empty = result.Songs.Count == 0 && result.Artists.Count == 0 && result.Albums.Count == 0;
+                // Nothing at all came back and something went wrong: the catalog is out of reach
+                // (said once, above the results, not as a line of error text at the bottom).
+                if (result.Complete && empty && result.Warning.Length > 0)
+                {
+                    answered = true;
+                    IsOnlinePending = IsOnlineLoading = false;
+                    Status = "";
+                    IsOnlineUnreachable = true;
+                    Trace($"unreachable after {clock.ElapsedMilliseconds} ms: {result.Warning}");
+                    return;
+                }
+                if (!empty || result.Complete) { answered = true; IsOnlineUnreachable = false; }
                 _online = result;
                 IsOnlinePending = false;
                 if (result.Complete) IsOnlineLoading = false;
@@ -208,7 +287,7 @@ public sealed partial class SearchViewModel : ViewModelBase, ISearchable, IDispo
         catch (OperationCanceledException) { }
         catch (Exception ex)
         {
-            if (ReferenceEquals(cts, _onlineCts)) Status = "Online results are unavailable right now: " + ex.Message;
+            if (ReferenceEquals(cts, _onlineCts)) { IsOnlineUnreachable = true; Trace("online search failed: " + ex.Message); }
         }
         finally
         {
@@ -233,6 +312,7 @@ public sealed partial class SearchViewModel : ViewModelBase, ISearchable, IDispo
         var albums = MergeAlbums();
         TopResult = PickTop(songs, artists, albums);
         Sync(Songs, songs.Take(SongCap).ToList());
+        for (var i = 0; i < Songs.Count; i++) Songs[i].Number = i + 1;
         Sync(Artists, artists.Take(ArtistCap).ToList());
         Sync(Albums, albums.Take(AlbumCap).ToList());
         RefreshDownloadStates();
@@ -515,6 +595,7 @@ public sealed partial class SearchViewModel : ViewModelBase, ISearchable, IDispo
         OnPropertyChanged(nameof(HasOnline));
         OnPropertyChanged(nameof(ShowForYou));
         OnPropertyChanged(nameof(ShowEmptyPrompt));
+        OnPropertyChanged(nameof(ShowOnlineProblem));
         RefreshDownloadStates();
     }
 
@@ -523,6 +604,7 @@ public sealed partial class SearchViewModel : ViewModelBase, ISearchable, IDispo
         ForYou.Dispose();
         _onlineCts?.Cancel();
         _artCts?.Cancel();
+        _reconnect?.Stop();
         _index.Rebuilt -= OnIndexRebuilt;
         _index.Dispose();
         OnlineMusicSearch.CurrentChanged -= OnSourceChanged;
@@ -573,6 +655,9 @@ public sealed partial class SearchSongItem : ObservableObject, IOnlineArtwork
     public string DurationText { get; }
     public bool IsExplicit { get; }
     public string ArtworkUrl { get; }
+
+    /// <summary>The row's place in the Songs list (the table's # column).</summary>
+    [ObservableProperty] private int _number;
 
     [ObservableProperty, NotifyPropertyChangedFor(nameof(HasArtwork))]
     private string? _artworkPath;
