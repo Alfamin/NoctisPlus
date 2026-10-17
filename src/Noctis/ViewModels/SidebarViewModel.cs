@@ -29,6 +29,10 @@ public partial class SidebarViewModel : ViewModelBase
     /// Set by MainWindowViewModel right after both ViewModels are constructed.</summary>
     [ObservableProperty] private TopBarViewModel? _topBar;
 
+    /// <summary>Noctis Plus: the Search page is showing. The rail's Search button takes the
+    /// selected look and no section row stays highlighted.</summary>
+    [ObservableProperty] private bool _isSearchPageActive;
+
     /// <summary>Folders the user has collapsed this session (default expanded).</summary>
     private readonly HashSet<string> _collapsedFolders = new(StringComparer.OrdinalIgnoreCase);
     private readonly HashSet<string> _foldingFolders = new(StringComparer.OrdinalIgnoreCase);

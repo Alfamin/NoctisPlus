@@ -168,9 +168,6 @@
 
         <ctrl:CollapsibleContent IsOpen="{Binding IsExpanded}" Lift="10" Motion="Glide">
             <StackPanel Margin="0,14,0,0" Spacing="10">
-                <!-- A quiet line: why it is empty, or that an old page is shown. -->
-                <TextBlock Text="{Binding Status}" FontSize="12" Opacity="0.55" TextWrapping="Wrap"
-                           IsVisible="{Binding Status, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
 
                 <!-- Hidden a song: the artist page's text link brings it back for a few seconds. -->
                 <StackPanel Orientation="Horizontal" Spacing="4" IsVisible="{Binding HasUndo}">
@@ -261,6 +258,11 @@
                         </DataTemplate>
                     </ItemsControl.ItemTemplate>
                 </ItemsControl>
+
+                <!-- A quiet line at the end (owner: not important enough for the top): why the
+                     shelf is empty, that an old page is shown, or which artists could not load. -->
+                <TextBlock Text="{Binding Status}" FontSize="12" Opacity="0.5" TextWrapping="Wrap"
+                           IsVisible="{Binding Status, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
             </StackPanel>
         </ctrl:CollapsibleContent>
     </StackPanel>

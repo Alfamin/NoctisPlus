@@ -32,15 +32,19 @@ public partial class SearchView : UserControl
     /// rail's Search button in layout units, so it holds at any window size and display scale.</summary>
     private void PlaceChips()
     {
-        if (Chips.Parent is not Visual row) return;
         _railSearch ??= TopLevel.GetTopLevel(this)?.GetVisualDescendants().OfType<SidebarView>().FirstOrDefault()
             ?.FindControl<Button>("SearchButton");
-        if (_railSearch is null || _railSearch.TranslatePoint(default, row) is not { } at) return;
+        if (_railSearch is null) return;
+        // The row itself moves down to the pill's line (its margin, not a render offset), so
+        // the results below always start under it whatever the top bar does.
+        if (_railSearch.TranslatePoint(new Point(0, _railSearch.Bounds.Height / 2), this) is { } centre)
+        {
+            var top = Math.Max(0, centre.Y - Toolbar.Height / 2);
+            if (Math.Abs(Toolbar.Margin.Top - top) > 0.5) Toolbar.Margin = new Thickness(28, top, 28, 0);
+        }
+        if (_railSearch.TranslatePoint(default, Toolbar) is not { } at) return;
         var left = Math.Max(0, at.X + PillWidth + ChipGap);
-        var dy = at.Y + _railSearch.Bounds.Height / 2 - row.Bounds.Height / 2;
         if (Math.Abs(Chips.Margin.Left - left) > 0.5) Chips.Margin = new Thickness(left, 0, 0, 0);
-        if (Chips.RenderTransform is not TranslateTransform { } t || Math.Abs(t.Y - dy) > 0.5)
-            Chips.RenderTransform = new TranslateTransform(0, dy);
     }
 
     private void UpdateRowCapacity(double width)

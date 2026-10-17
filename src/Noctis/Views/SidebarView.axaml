@@ -251,6 +251,23 @@
                     <Style Selector="Button.rail-action:pointerover /template/ ContentPresenter#PART_ContentPresenter">
                         <Setter Property="Background" Value="{DynamicResource SidebarHoverBrush}"/>
                     </Style>
+                    <!-- On the Search page the Search button is the selected row: the same accent
+                         pill and contrast icon as a selected section (Styles.axaml). -->
+                    <Style Selector="Button.rail-action PathIcon.rail-search-icon">
+                        <Setter Property="Foreground" Value="{DynamicResource IslandForeground}"/>
+                    </Style>
+                    <Style Selector="Button.rail-action.active /template/ ContentPresenter#PART_ContentPresenter">
+                        <Setter Property="Background" Value="{DynamicResource AccentColorBrush}"/>
+                    </Style>
+                    <Style Selector="Button.rail-action.active:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+                        <Setter Property="Background" Value="{DynamicResource AccentColorBrushDark1}"/>
+                    </Style>
+                    <Style Selector="Button.rail-action.active PathIcon.rail-search-icon">
+                        <Setter Property="Foreground" Value="{DynamicResource AccentForegroundBrush}"/>
+                    </Style>
+                    <Style Selector="Button.rail-action.active TextBlock">
+                        <Setter Property="Foreground" Value="{DynamicResource AccentForegroundBrush}"/>
+                    </Style>
                     <Style Selector="Button.rail-action:disabled">
                         <Setter Property="Opacity" Value="0.3"/>
                     </Style>
@@ -302,6 +319,7 @@
 
                 <Button x:Name="SearchButton"
                         Classes="rail-action"
+                        Classes.active="{Binding IsSearchPageActive}"
                         Classes.expanded="{Binding IsExpanded}"
                         IsEnabled="{Binding TopBar.IsSearchActionAvailable, FallbackValue=False}"
                         Click="OnSearchButtonClick"
@@ -309,8 +327,7 @@
                     <StackPanel Orientation="Horizontal" Spacing="14"
                                 HorizontalAlignment="{Binding IsExpanded, Converter={StaticResource BoolToAlignment}}">
                         <Grid x:Name="SearchIconHost" Width="28" Height="28">
-                            <PathIcon Data="{StaticResource SearchIcon}" Width="16" Height="16"
-                                      Foreground="{DynamicResource IslandForeground}"/>
+                            <PathIcon Classes="rail-search-icon" Data="{StaticResource SearchIcon}" Width="16" Height="16"/>
                             <!-- Active-filter dot: search text survives the pill closing,
                                  so mark the icon while a query is filtering the page. -->
                             <Ellipse Width="7" Height="7"

@@ -611,7 +611,7 @@
         <!-- The search pill (the sidebar's, fixed 250 px, anchored to the rail) floats over
              this row's left end; the filter chips continue it on the same line, so box and
              chips read as one toolbar. SearchView.ChipsInset keeps them clear of the pill. -->
-        <Grid Grid.Row="0" Height="48" Margin="28,14,28,0">
+        <Grid Grid.Row="0" x:Name="Toolbar" Height="48" Margin="28,14,28,0">
             <!-- The download queue: the top bar's round corner icon at the row's right end; how many
                  are still to come sits on its corner in the accent (only while there are any). -->
             <Panel HorizontalAlignment="Right" VerticalAlignment="Center" IsVisible="{Binding HasOnline}">

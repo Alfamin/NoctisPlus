@@ -908,10 +908,23 @@ public partial class MainWindowViewModel : ViewModelBase
             Dispatcher.UIThread.Post(() => Navigate(debugPage), DispatcherPriority.Background);
         // NOCTISPLUS_DEBUG_ROUNDTRIP=1: Search, then Songs after 4 s, then Search again after 8 s
         // (leaving and coming back, for the For you shelf).
-        if (Environment.GetEnvironmentVariable("NOCTISPLUS_DEBUG_ROUNDTRIP") is { Length: > 0 })
+        // NOCTISPLUS_DEBUG_ROUNDTRIP=artist: Search "drake", open the artist, then Back.
+        if (Environment.GetEnvironmentVariable("NOCTISPLUS_DEBUG_ROUNDTRIP") is { Length: > 0 } roundTrip)
             Dispatcher.UIThread.Post(async () =>
             {
                 OpenSearchPage();
+                if (roundTrip == "artist")
+                {
+                    TopBar.SearchText = "drake";
+                    await Task.Delay(5000);
+                    _searchVm.SelectFilterCommand.Execute("Artists");
+                    await Task.Delay(2000);
+                    if (_searchVm.Artists.FirstOrDefault() is { } first) _searchVm.OpenArtistCommand.Execute(first);
+                    else ViewArtistByName("Drake");
+                    await Task.Delay(4000);
+                    GoBackInHistory();
+                    return;
+                }
                 await Task.Delay(4000);
                 Navigate("songs");
                 await Task.Delay(4000);
@@ -1671,6 +1684,13 @@ public partial class MainWindowViewModel : ViewModelBase
     {
         UpdateSectionActiveFlags();
         UpdateWindowTint();
+        // Search is not a rail row: on it, the Search button is the selected one and the
+        // section the user came from (Home) must not stay lit. Posted so it lands after
+        // whatever selection the navigation itself restores.
+        var onSearch = ReferenceEquals(newValue, _searchVm);
+        Sidebar.IsSearchPageActive = onSearch;
+        if (onSearch)
+            Dispatcher.UIThread.Post(() => { if (ReferenceEquals(CurrentView, _searchVm)) Sidebar.SetSelectedNavItemSilently(null); });
         // Artist pages kept in history stay subscribed to LibraryUpdated; only the shown
         // one rebuilds, the rest catch up when navigated back to.
         if (oldValue is ArtistDetailViewModel leftArtistPage) leftArtistPage.IsActive = false;
