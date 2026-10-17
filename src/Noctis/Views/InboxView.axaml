@@ -62,9 +62,8 @@
 
     <Grid RowDefinitions="Auto,*" Margin="16,8,2,16">
 
-        <!-- Header: title, what the page is for, count/size, actions -->
+        <!-- Header: what the page is for, count/size, actions (the page title is in the top bar) -->
         <StackPanel Grid.Row="0" Spacing="6" Margin="10,2,10,12">
-            <TextBlock Text="{loc:T Nav.Inbox}" FontSize="24" FontWeight="Bold" />
             <TextBlock Text="{loc:T Inbox.Subtitle}" FontSize="13" Opacity="0.6" TextWrapping="Wrap" />
             <TextBlock Text="{Binding SummaryText}" FontSize="13" Opacity="0.6"
                        IsVisible="{Binding SummaryText, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
