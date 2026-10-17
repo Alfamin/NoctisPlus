@@ -28,15 +28,21 @@ public class WordEmphasisTests
     };
 
     [Fact]
-    public void UniformSlowLine_GetsNoEmphasis()
+    public void UniformSlowLine_FollowsAmll_ButShortHoldsBarelyMove()
     {
-        // A ballad at ~1.2s per word crossed the old fixed 1s gate on every word —
-        // the emphasis fired on nearly every lyric. Words matching their own line's
-        // cadence must not count as held.
+        // A ballad at ~1.2s per word: AMLL emphasizes every word (>= 1s), and its strength
+        // curve keeps such short holds nearly still. The cadence-relative gate that used to
+        // suppress them was measured against the AMLL TTML DB (true word ends): precision
+        // flat (0.881 vs 0.880), a fifth of the real held notes lost in Latin lines.
         var line = Line(
             W("Slow ", 0, 1200), W("songs ", 1200, 2400), W("feel ", 2400, 3600),
             W("like ", 3600, 4800), W("this ", 4800, 6000));
-        Assert.All(line.Words!, w => Assert.False(w.IsEmphasis));
+        Assert.All(line.Words!, w => Assert.True(w.IsEmphasis));
+
+        var shortHold = EmphasisMotion.For(1200, isLastWord: false);
+        var longHold = EmphasisMotion.For(3000, isLastWord: false);
+        Assert.True(shortHold.Amount < 0.15, $"1.2s swell amount {shortHold.Amount}");
+        Assert.True(longHold.Amount > 0.6, $"3s swell amount {longHold.Amount}");
     }
 
     [Fact]

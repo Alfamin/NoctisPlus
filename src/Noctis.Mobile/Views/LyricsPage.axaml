@@ -24,6 +24,8 @@
                             <Binding Source="{StaticResource LyricsFg}" />
                             <Binding Path="Bounds.Width" RelativeSource="{RelativeSource Self}" />
                             <Binding Path="FontSize" RelativeSource="{RelativeSource Self}" />
+                            <Binding Path="SweepLeadIn" />
+                            <Binding Path="SweepTrailOut" />
                         </MultiBinding>
                     </TextBlock.Foreground>
                 </TextBlock>

@@ -7,18 +7,20 @@ using Noctis.Services;
 namespace Noctis.Converters;
 
 /// <summary>
-/// Held-note glow opacity from <c>[0]=Progress</c> and <c>[1]=HeldDurationMs</c>:
-/// the AMLL bell — rises over the first half of the hold, releases over the second,
-/// with a peak that scales with how long the note is held. Replaces the fixed
-/// snap-to-0.5 class transition, which lit every emphasis word equally and then
-/// froze for the rest of the hold.
+/// Held-note glow opacity from <c>[0]=EmphasisMs</c>, <c>[1]=HeldDurationMs</c>,
+/// <c>[2]=IsLastInLine</c> and <c>[3]=EmphasisCharCount</c>: the mean of AMLL's per-letter
+/// glow bells (<see cref="EmphasisMotion.GlowOpacity"/>), which rise and release one letter
+/// after another and peak higher the longer the note is held. 0 at rest (NaN).
 /// </summary>
 public class EmphasisGlowConverter : IMultiValueConverter
 {
     public object? Convert(IList<object?> values, Type targetType, object? parameter, CultureInfo culture)
     {
-        var progress = values.Count > 0 && values[0] is double p ? p : 0.0;
+        var t = values.Count > 0 && values[0] is double ms ? ms : double.NaN;
+        if (double.IsNaN(t)) return 0.0;
         var heldMs = values.Count > 1 && values[1] is double d ? d : 0.0;
-        return EmphasisBell.Evaluate(progress, heldMs);
+        var isLast = values.Count > 2 && values[2] is true;
+        var count = values.Count > 3 && values[3] is int n ? n : 1;
+        return EmphasisMotion.GlowOpacity(t, count, EmphasisMotion.For(heldMs, isLast));
     }
 }

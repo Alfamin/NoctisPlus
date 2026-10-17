@@ -96,6 +96,7 @@ public sealed class LyricsTimeline
         _activeIndices.Clear();
         ActiveLine = null;
         ActiveIndex = -1;
+        ClearEmphasisTail();
         Rewind();
     }
 
@@ -299,9 +300,12 @@ public sealed class LyricsTimeline
     /// to full opacity. Snapping to -1 here blanked the overlay instantly, which read as
     /// the finished line dimming for a beat. Re-entry recomputes the real index.
     /// </summary>
-    private static void Deactivate(LyricLine line)
+    private void Deactivate(LyricLine line)
     {
         line.IsActive = false;
+        HandOffEmphasis(line.Words);
+        HandOffEmphasis(line.BackgroundWords);
+        HandOffEmphasis(line.TransliterationWords);
         if (line.HasWords)
             line.CurrentWordIndex = line.Words!.Count;
         if (line.HasBackgroundWords)
@@ -310,11 +314,13 @@ public sealed class LyricsTimeline
             line.TransliterationWordIndex = line.TransliterationWords!.Count;
     }
 
-    /// <summary>Drives the word layers of every active line, each on its own clock.</summary>
+    /// <summary>Drives the word layers of every active line, each on its own clock, and
+    /// lets held-note animations of lines that just left the set play out.</summary>
     private void UpdateActiveWords(TimeSpan position)
     {
         for (int i = 0; i < _activeLines.Count; i++)
             UpdateLineWords(_activeLines[i], _activeIndices[i], position);
+        DriveEmphasisTail(position + _wordLookahead);
     }
 
     /// <summary>
@@ -328,24 +334,108 @@ public sealed class LyricsTimeline
         var adjusted = position + _wordLookahead;
 
         if (line.HasWords)
-            DriveWordLayer(line.Words!, adjusted, line.EndTimestamp, index,
-                line.CurrentWordIndex, i => line.CurrentWordIndex = i);
+            DriveWordLayer(line, WordLayer.Main, line.Words!, adjusted, line.EndTimestamp, index);
 
         // Background vocals (adlibs) run as an independent layer with their own clock.
         if (line.HasBackgroundWords)
-            DriveWordLayer(line.BackgroundWords!, adjusted, line.BackgroundEndTimestamp, index,
-                line.BackgroundWordIndex, i => line.BackgroundWordIndex = i);
+            DriveWordLayer(line, WordLayer.Background, line.BackgroundWords!, adjusted, line.BackgroundEndTimestamp, index);
 
         // Word-timed romanization (TTML transliteration) — its own clock, like the adlibs.
         if (line.HasTransliterationWords)
-            DriveWordLayer(line.TransliterationWords!, adjusted, line.TransliterationEndTimestamp, index,
-                line.TransliterationWordIndex, i => line.TransliterationWordIndex = i);
+            DriveWordLayer(line, WordLayer.Transliteration, line.TransliterationWords!, adjusted, line.TransliterationEndTimestamp, index);
     }
 
-    /// <summary>Advances one word layer's current-word index and sweeps the active word.</summary>
+    // Which word index a layer drives. A switch rather than a captured setter lambda:
+    // this runs every rendered frame, and three closures per line per frame were garbage.
+    private enum WordLayer { Main, Background, Transliteration }
+
+    private static void SetWordIndex(LyricLine line, WordLayer layer, int target)
+    {
+        switch (layer)
+        {
+            case WordLayer.Main:
+                if (line.CurrentWordIndex != target) line.CurrentWordIndex = target;
+                break;
+            case WordLayer.Background:
+                if (line.BackgroundWordIndex != target) line.BackgroundWordIndex = target;
+                break;
+            default:
+                if (line.TransliterationWordIndex != target) line.TransliterationWordIndex = target;
+                break;
+        }
+    }
+
+    // Held-note words whose line left the active set mid-animation. AMLL lets the letters
+    // finish their swell after the line goes inactive; clearing them on deactivation
+    // dropped a lifted, glowing word back to rest in one frame.
+    private readonly List<WordTiming> _emphasisTail = new();
+
+    /// <summary>True while a held-note animation is still playing out on a line that is no
+    /// longer active — the frame clock must keep running for it.</summary>
+    public bool HasEmphasisInFlight => _emphasisTail.Count > 0;
+
+    /// <summary>Sets <see cref="WordTiming.EmphasisMs"/> on the held-note words of a layer:
+    /// the time since the word started while its letter animation is in flight, else NaN.</summary>
+    private static void DriveEmphasis(IReadOnlyList<WordTiming> words, TimeSpan adjusted)
+    {
+        for (int i = 0; i < words.Count; i++)
+        {
+            var w = words[i];
+            if (w.IsEmphasis) SetEmphasisClock(w, adjusted);
+        }
+    }
+
+    /// <returns>True while the word's animation is still in flight.</returns>
+    private static bool SetEmphasisClock(WordTiming w, TimeSpan adjusted)
+    {
+        var rel = (adjusted - w.Start).TotalMilliseconds;
+        var inFlight = EmphasisMotion.IsInFlight(rel, w.EmphasisParams, w.EmphasisCharCount);
+        var value = inFlight ? rel : double.NaN;
+        if (!w.EmphasisMs.Equals(value)) w.EmphasisMs = value;
+        return inFlight;
+    }
+
+    private void DriveEmphasisTail(TimeSpan adjusted)
+    {
+        for (int i = _emphasisTail.Count - 1; i >= 0; i--)
+        {
+            if (!SetEmphasisClock(_emphasisTail[i], adjusted))
+                _emphasisTail.RemoveAt(i);
+        }
+    }
+
+    private void HandOffEmphasis(IReadOnlyList<WordTiming>? words)
+    {
+        if (words == null) return;
+        foreach (var w in words)
+        {
+            if (w.IsEmphasis && !double.IsNaN(w.EmphasisMs) && !_emphasisTail.Contains(w))
+                _emphasisTail.Add(w);
+        }
+    }
+
+    private void ClearEmphasisTail()
+    {
+        foreach (var w in _emphasisTail) w.EmphasisMs = double.NaN;
+        _emphasisTail.Clear();
+    }
+
+    /// <summary>
+    /// Advances one word layer: sets its current-word index and sweeps the words around it.
+    ///
+    /// The soft edge is ONE front moving through the line (AMLL's line mask animator): it
+    /// crosses each word at that word's own pace, and the words either side of the current
+    /// one take their progress from that same front (in characters), so where two words
+    /// meet the edge straddles them in one place. Each word used to run its own clock past
+    /// both ends instead, which split the edge in two whenever neighbours differ in pace —
+    /// after a held word the next word was fully lit while the held word's last letter was
+    /// still dim. Words next to a rest (or a line edge) are flagged
+    /// <see cref="WordTiming.SweepLeadIn"/> / <see cref="WordTiming.SweepTrailOut"/>, so the
+    /// renderer brings the edge in from dark and finishes it by the word's end there.
+    /// </summary>
     private void DriveWordLayer(
-        IReadOnlyList<WordTiming> words, TimeSpan adjusted, TimeSpan? layerEnd, int lineIndex,
-        int currentIndex, Action<int> setIndex)
+        LyricLine line, WordLayer layer, IReadOnlyList<WordTiming> words, TimeSpan adjusted,
+        TimeSpan? layerEnd, int lineIndex)
     {
         // Past the layer's end → last word remains highlighted until the line changes.
         int target;
@@ -368,37 +458,71 @@ public sealed class LyricsTimeline
             }
         }
 
-        if (currentIndex != target)
-            setIndex(target);
+        // First: the index setter (LyricLine.ApplyWordIndex) snaps the words away from
+        // the current one to the inert sentinels, so this frame's values go in after it.
+        SetWordIndex(line, layer, target);
+        DriveEmphasis(words, adjusted);
 
-        // Drive the AMLL-style sweep on the current word AND its immediate
-        // neighbours, on the same lookahead-adjusted clock as the index above.
-        // BandProgress keeps moving a little past both ends of each word, so the
-        // feathered edge finishes crossing the previous token while it is already
-        // entering the next — clamping at [0,1] here is what used to park the band
-        // at every token boundary of a slow passage. Before the line starts
-        // (target -1) this pre-rolls word 0; past the layer end the last word
-        // settles at the inert-past sentinel (fully lit) until the line changes.
-        var first = Math.Max(0, target - 1);
-        var last = Math.Min(words.Count - 1, target + 1);
-        for (int i = first; i <= last; i++)
+        if (target < 0)
         {
-            var w = words[i];
-            // Last word of a start-tag-only layer has no end anywhere — bound it by
-            // the next line's start (capped) so it sweeps instead of snapping to lit.
-            var end = w.End ?? (i + 1 < words.Count
-                ? words[i + 1].Start
-                : layerEnd ?? KaraokeSweep.ResolveOpenLastWordEnd(w.Start, NextSyncedLineStart(lineIndex)));
-            // Words joined from several timed spans sweep on their syllables' own
-            // clocks — a linear ramp would outrun the voice on a held syllable.
-            var progress = w.Syllables is { Count: > 1 } syllables
-                ? KaraokeSweep.SyllableBandProgress(
-                    syllables, w.Start.TotalSeconds, end.TotalSeconds, adjusted.TotalSeconds)
-                : KaraokeSweep.BandProgress(
-                    w.Start.TotalSeconds, end.TotalSeconds, adjusted.TotalSeconds);
-            if (w.Progress != progress)
-                w.Progress = progress;
+            // Before the layer's first word: all dark. (The first word is SweepLeadIn, so
+            // its edge enters from dark at its start — no pre-roll ahead of the voice.)
+            SetProgress(words[0], KaraokeSweep.InertFuture);
+            return;
         }
+
+        var cur = words[target];
+        var curP = OwnProgress(words, target, adjusted, layerEnd, lineIndex);
+        SetProgress(cur, curP);
+
+        // Neighbours read the same front, in characters. Across a rest they don't:
+        // the edge finished (or will start) inside each word's own window.
+        var curLen = SweepLength(cur);
+        if (target > 0)
+        {
+            var prev = words[target - 1];
+            SetProgress(prev, cur.SweepLeadIn
+                ? KaraokeSweep.InertPast
+                : (curP * curLen + SweepLength(prev)) / SweepLength(prev));
+        }
+        if (target + 1 < words.Count)
+        {
+            var next = words[target + 1];
+            SetProgress(next, cur.SweepTrailOut
+                ? KaraokeSweep.InertFuture
+                : (curP * curLen - curLen) / SweepLength(next));
+        }
+
+        static void SetProgress(WordTiming w, double p)
+        {
+            if (w.Progress != p) w.Progress = p;
+        }
+    }
+
+    /// <summary>Visible characters the front crosses in a word (at least one).</summary>
+    private static int SweepLength(WordTiming w) => Math.Max(1, w.SweepText.Trim().Length);
+
+    /// <summary>
+    /// The front's position inside word <paramref name="i"/>, 0..1: the elapsed fraction of
+    /// its window, held at 0 in a rest before it and at 1 once it ends. Words joined from
+    /// several timed spans follow their syllables' own clocks.
+    /// </summary>
+    private double OwnProgress(IReadOnlyList<WordTiming> words, int i, TimeSpan adjusted, TimeSpan? layerEnd, int lineIndex)
+    {
+        var w = words[i];
+        // Last word of a start-tag-only layer has no end anywhere — bound it by the next
+        // line's start (capped) so it sweeps instead of snapping to lit.
+        var end = w.End ?? (i + 1 < words.Count
+            ? words[i + 1].Start
+            : layerEnd ?? KaraokeSweep.ResolveOpenLastWordEnd(w.Start, NextSyncedLineStart(lineIndex)));
+        var t = adjusted.TotalSeconds;
+        var s = w.Start.TotalSeconds;
+        var e = end.TotalSeconds;
+        if (t <= s) return 0;
+        if (t >= e) return 1;
+        return w.Syllables is { Count: > 1 } syllables
+            ? KaraokeSweep.SyllableBandProgress(syllables, s, e, t)
+            : KaraokeSweep.WordProgress(s, e, t);
     }
 
     /// <summary>Start of the first synced line after line <paramref name="index"/>; null when none.</summary>
