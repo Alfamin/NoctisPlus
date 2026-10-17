@@ -4404,6 +4404,10 @@
     <value>تشغيل</value>
     <comment>Text in PlaybackBarView.axaml</comment>
   </data>
+  <data name="PlaybackBar.Pause" xml:space="preserve">
+    <value>إيقاف مؤقت</value>
+    <comment>Play/pause button tooltip and accessible name while playing</comment>
+  </data>
   <data name="PlaybackBar.PlayNext" xml:space="preserve">
     <value>التشغيل تاليًا</value>
     <comment>Header in PlaybackBarView.axaml</comment>

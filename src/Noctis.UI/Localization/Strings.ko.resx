@@ -4404,6 +4404,10 @@
     <value>재생</value>
     <comment>Text in PlaybackBarView.axaml</comment>
   </data>
+  <data name="PlaybackBar.Pause" xml:space="preserve">
+    <value>일시정지</value>
+    <comment>Play/pause button tooltip and accessible name while playing</comment>
+  </data>
   <data name="PlaybackBar.PlayNext" xml:space="preserve">
     <value>다음에 재생</value>
     <comment>Header in PlaybackBarView.axaml</comment>
