@@ -808,8 +808,9 @@ public class ContextMenuV2ViewsTests
 
             var centre = row.TranslatePoint(new Point(row.Bounds.Width / 2, row.Bounds.Height / 2), win)!.Value;
             win.MouseMove(centre, Avalonia.Input.RawInputModifiers.None);
-            var deadline = Environment.TickCount64 + 2000;
-            while (Environment.TickCount64 < deadline && Math.Abs(grip.Opacity - 0.55) > 0.01)
+            // Generous: the CI runner's frames are far apart, so the hover fades can take seconds there.
+            var deadline = Environment.TickCount64 + 6000;
+            while (Environment.TickCount64 < deadline && (Math.Abs(grip.Opacity - 0.55) > 0.004 || index.Opacity > 0.004))
             {
                 Pump(1);
                 await Task.Delay(10);

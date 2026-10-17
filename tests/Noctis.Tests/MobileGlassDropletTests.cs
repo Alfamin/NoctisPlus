@@ -88,9 +88,17 @@ public class MobileGlassDropletTests
         Assert.Equal(0, pill.Lift);
 
         rig.Shell.SelectTabCommand.Execute(MobileTab.Playlists);
-        var peak = 0.0;
-        PumpUntil(() => { peak = Math.Max(peak, pill.Lift); return peak > 0.9; });
-        Assert.True(peak > 0.9, $"the droplet only lifted to {peak}");
+        // The lift is a 200 ms transition held 170 ms, both on wall time: a slow machine's frames can
+        // step past the top, so check it is sent all the way up (its target) and visibly rises.
+        var peak = 0.0; var target = 0.0;
+        PumpUntil(() =>
+        {
+            peak = Math.Max(peak, pill.Lift);
+            target = Math.Max(target, pill.GetBaseValue(GlassDroplet.LiftProperty).GetValueOrDefault());
+            return peak > 0.9;
+        });
+        Assert.Equal(1, target);
+        Assert.True(peak > 0.3, $"the droplet only lifted to {peak}");
 
         PumpUntil(() => pill.Lift == 0);
         Assert.Equal(0, pill.Lift);

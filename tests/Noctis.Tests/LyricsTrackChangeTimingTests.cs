@@ -142,6 +142,8 @@ public class LyricsTrackChangeTimingTests : IDisposable
             t0 = Environment.TickCount64;
             player.ReplaceQueueAndPlay(new List<Track> { a, b }, 0);
             await Pump(900);
+            // A slow machine (the CI runner) can need longer for the first load.
+            for (var waited = 0; waited < 5000 && !vm.LyricLines.Any(l => l.Text.Contains("alpha")); waited += 100) await Pump(100);
             _output.WriteLine("--- first track (cold) ---");
             foreach (var l in log) _output.WriteLine(l);
             log.Clear();
@@ -156,8 +158,11 @@ public class LyricsTrackChangeTimingTests : IDisposable
             double? lastOpacity = null;
             string? lastFirst = null;
             long? fadedOutAt = null, newLinesAt = null, fadedInAt = null;
-            var end = Environment.TickCount64 + 1200;
-            while (Environment.TickCount64 < end)
+            // Watch at least 1.2 s (the whole fade on a normal machine), and on a slow one keep
+            // watching until the new lines have faded back in, up to 6 s.
+            var minEnd = Environment.TickCount64 + 1200;
+            var maxEnd = Environment.TickCount64 + 6000;
+            while (Environment.TickCount64 < minEnd || (fadedInAt is null && Environment.TickCount64 < maxEnd))
             {
                 Tick();
                 var op = host!.Opacity;
