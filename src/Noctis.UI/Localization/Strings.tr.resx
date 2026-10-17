@@ -1209,6 +1209,7 @@
   <data name="PlaybackBar.FavoriteTip" xml:space="preserve"><value>Favori</value><comment>ToolTip.Tip in PlaybackBarView.axaml</comment></data>
   <data name="PlaybackBar.OptionsTip" xml:space="preserve"><value>Seçenekler</value><comment>ToolTip.Tip in PlaybackBarView.axaml</comment></data>
   <data name="PlaybackBar.Play" xml:space="preserve"><value>Çal</value><comment>Text in PlaybackBarView.axaml</comment></data>
+  <data name="PlaybackBar.Pause" xml:space="preserve"><value>Duraklat</value><comment>Play/pause button tooltip and accessible name while playing</comment></data>
   <data name="PlaybackBar.PlayNext" xml:space="preserve"><value>Sonraki Çal</value><comment>Header in PlaybackBarView.axaml</comment></data>
   <data name="PlaybackBar.AddQueue" xml:space="preserve"><value>Kuyruğa Ekle</value><comment>Header in PlaybackBarView.axaml</comment></data>
   <data name="PlaybackBar.AddPlaylist" xml:space="preserve"><value>Çalma Listesine Ekle</value><comment>Header in PlaybackBarView.axaml</comment></data>

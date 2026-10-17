@@ -20,10 +20,13 @@ public sealed partial class ReviewWord : ObservableObject
 
     public ReviewLine Line { get; }
 
-    [ObservableProperty] private string _text;
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(AccessibleName))]
+    private string _text;
 
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(TimeText))]
+    [NotifyPropertyChangedFor(nameof(AccessibleName))]
     private TimeSpan _start;
 
     /// <summary>Set by tap-to-time; cleared by a re-sync.</summary>
@@ -37,6 +40,8 @@ public sealed partial class ReviewWord : ObservableObject
 
     public TimeSpan End => Line.EndOf(this);
     public string TimeText => TimedLyricsBuilder.FormatTimestamp(Start);
+    /// <summary>The chip's screen-reader name, "word, 00:05.10": its content is a panel, which UIA read as its type name.</summary>
+    public string AccessibleName => $"{Text}, {TimeText}";
 
     partial void OnTextChanged(string value) => Line.WordTextEdited();
 }

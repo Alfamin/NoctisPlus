@@ -50,6 +50,24 @@ public class TaskbarThumbButtonsTests : IDisposable
     }
 
     [Fact]
+    public void Tooltips_AreTranslatedInEveryShippedLanguage()
+    {
+        // The playback bar's "Pause" key was English-only outside Russian, so the taskbar's
+        // play button read "Pause" in Spanish, Japanese, ... while its "Play" was translated.
+        var dir = Path.GetDirectoryName(typeof(TaskbarThumbButtonsTests).Assembly.Location)!;
+        while (!Directory.Exists(Path.Combine(dir, "src", "Noctis.UI", "Localization"))) dir = Path.GetDirectoryName(dir)!;
+        var keys = new[] { true, false }.SelectMany(p => new[] { true, false }.SelectMany(f => TaskbarIntegrationService.DescribeButtons(p, f)))
+            .Select(b => b.TipKey).Distinct().ToList();
+        var missing = new List<string>();
+        foreach (var file in Directory.GetFiles(Path.Combine(dir, "src", "Noctis.UI", "Localization"), "Strings.*.resx"))
+        {
+            var names = System.Xml.Linq.XDocument.Load(file).Root!.Elements("data").Select(d => (string)d.Attribute("name")!).ToHashSet();
+            missing.AddRange(keys.Where(k => !names.Contains(k)).Select(k => $"{Path.GetFileName(file)}:{k}"));
+        }
+        Assert.True(missing.Count == 0, "Untranslated: " + string.Join(", ", missing));
+    }
+
+    [Fact]
     public void PlayButton_FollowsThePlaybackState()
     {
         var paused = TaskbarIntegrationService.DescribeButtons(isPlaying: false, isFavorite: false)[1];
