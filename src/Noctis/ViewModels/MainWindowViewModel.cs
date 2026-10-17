@@ -413,7 +413,10 @@ public partial class MainWindowViewModel : ViewModelBase
         Plugins = new PluginHost(Player, persistence.DataDirectory, () => Settings.GetSettings(),
             () => _ = Settings.SaveAsync(), UpdateService.CurrentVersion.ToString(3), library,
             Path.Combine(AppContext.BaseDirectory, "bundled-plugins"));
-        Features.BuiltInFeatures.Register(Plugins);
+        var shuffleQueue = new Features.TrueShuffle.ShuffleQueue(Player, library, () => Player.AllowExplicitContent,
+            () => CurrentView as PlaylistViewModel);
+        var shuffleService = new Features.TrueShuffle.TrueShuffleService(shuffleQueue, persistence.DataDirectory);
+        Features.BuiltInFeatures.Register(Plugins, shuffleService);
         Settings.Plugins = Plugins;
         // Get plugins (official list) fetches only when the Plugins page opens.
         if (App.Services?.GetService<System.Net.Http.HttpClient>() is { } pluginHttp)

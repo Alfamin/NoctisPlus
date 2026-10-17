@@ -874,17 +874,17 @@
 
                     <!-- Shuffle (island extra, GitHub #59): after Repeat, same accent pill
                          treatment while shuffle is on. Shuffle also stays in the Queue header. -->
-                    <Button Classes="pill-btn transport-btn"
-                            Command="{Binding ToggleShuffleCommand}"
+                    <Button Classes="pill-btn transport-btn" x:Name="NativeShuffleButton"
                             ToolTip.Tip="{loc:T PlaybackBar.ShuffleTip}"
                             IsVisible="{Binding IslandShowShuffle}"
                             Width="34" Height="34">
+                        <Button.Flyout><controls:ShuffleMenu Player="{Binding #NativeShuffleButton.((vm:PlayerViewModel)DataContext)}" /></Button.Flyout>
                         <Panel Width="34" Height="34">
                             <Border Width="28" Height="28"
                                     CornerRadius="8"
                                     Background="{DynamicResource AccentColorBrush}"
                                     Opacity="0.18"
-                                    IsVisible="{Binding IsShuffleEnabled}" />
+                                    IsVisible="{Binding IsShuffleLit}" />
                             <!-- Off: white glyph like the transport icons; on: accent glyph
                                  like Repeat (Discord, Mistery 2026-09-21: arrows stayed white
                                  on the accent wash). -->
@@ -892,10 +892,10 @@
                                 <Canvas Width="24" Height="24">
                                     <Path Fill="{DynamicResource IslandIconFill}"
                                           Data="{StaticResource ShuffleIcon}"
-                                          IsVisible="{Binding !IsShuffleEnabled}" />
+                                          IsVisible="{Binding !IsShuffleLit}" />
                                     <Path Fill="{DynamicResource AccentColorBrush}"
                                           Data="{StaticResource ShuffleIcon}"
-                                          IsVisible="{Binding IsShuffleEnabled}" />
+                                          IsVisible="{Binding IsShuffleLit}" />
                                 </Canvas>
                             </Viewbox>
                         </Panel>

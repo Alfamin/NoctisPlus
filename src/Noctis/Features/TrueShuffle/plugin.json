@@ -1,0 +1,73 @@
+{
+  "id": "dev.moshi.trueshuffle",
+  "name": "True Shuffle",
+  "version": "1.6.0",
+  "author": "moshi",
+  "description": "Native shuffle modes in the player and queue. Keeps your existing shuffle settings and cycle history.",
+  "type": "dotnet",
+  "entry": "Noctis.dll",
+  "entryType": "Noctis.Features.TrueShuffle.TrueShuffleFeature",
+  "apiVersion": "1.2",
+  "minAppVersion": "1.5.9",
+  "homepage": "https://github.com/Alfamin/TrueShuffle",
+  "permissions": [],
+  "settings": [
+    {
+      "key": "shortcut",
+      "label": "Shuffle shortcut",
+      "type": "string",
+      "default": "Follow Noctis",
+      "description": "Follow Noctis opens these modes with its Shuffle key (Ctrl+S by default), including keys changed in Settings. Enter another modified key, or off for native keyboard shuffle. No music or queue changes until you choose a mode."
+    },
+    {
+      "key": "open",
+      "label": "Show shuffle modes",
+      "type": "bool",
+      "default": false,
+      "description": "Open the native player shuffle menu. Choosing a mode starts it."
+    },
+    {
+      "key": "mode",
+      "label": "Default mode",
+      "type": "choice",
+      "default": "No repeats",
+      "choices": [
+        "Equal chance",
+        "No repeats",
+        "Discovery",
+        "Never played only",
+        "For you"
+      ]
+    },
+    {
+      "key": "forYouDiscovery",
+      "label": "For you: new songs",
+      "type": "choice",
+      "default": "Balanced",
+      "choices": [
+        "Familiar",
+        "Balanced",
+        "Adventurous"
+      ],
+      "description": "How many songs you have not heard yet For you mixes in: about one in ten, one in five, or one in three."
+    },
+    {
+      "key": "scope",
+      "label": "Default source",
+      "type": "choice",
+      "default": "Current queue",
+      "choices": [
+        "Current queue",
+        "Open playlist",
+        "Whole library"
+      ]
+    },
+    {
+      "key": "skipDisliked",
+      "label": "Exclude disliked songs by default",
+      "type": "bool",
+      "default": false,
+      "description": "Off: disliked songs have the same chance as other eligible songs. On: exclude them from all modes."
+    }
+  ]
+}

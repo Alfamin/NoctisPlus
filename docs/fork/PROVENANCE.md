@@ -41,3 +41,12 @@ The native word renderer is owned by Noctis's lyrics templates and its existing 
 It retains the settings id/keys from Alfamin/LyricMotion 1.4.3 and its MIT-licensed LetterLayer, Spring/Follower, FillReader, tuning and easing. Native word controls own the text layers and register directly; the old Director/Surface/Rig discovery and reflection are not used. LetterLayer retains its geometric ancestor transforms for pixel alignment. The source licence is retained under
 `src/Noctis/Features/LyricMotion/LICENSE` and delivered as `features/dev.moshi.lyricmotion/LICENSE`.
 The old pinned DLL remains in this repository for provenance, but is excluded from new packages.
+
+## Native True Shuffle (2026-10-17)
+
+The app now owns shuffle sessions, rolling queue refill and player menus. The MIT domain logic
+from Alfamin/TrueShuffle (57114ad) remains in `src/Noctis/Features/TrueShuffle`; the original
+licence is delivered under `features/dev.moshi.trueshuffle/LICENSE`. The bundled DLL/manifest
+entry was removed. Existing settings and `plugin-data/dev.moshi.trueshuffle` history keep their
+identity. The native service uses typed player/library calls and explicit queue intent; the
+plugin's reflection bridge, injected menus, visual-tree scans and attach timers are not used.

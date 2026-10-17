@@ -15,17 +15,6 @@
       }
     },
     {
-      "id": "dev.moshi.trueshuffle",
-      "version": "1.5.0",
-      "repository": "Alfamin/TrueShuffle",
-      "commit": "57114ad",
-      "packageSha256": "2360c28045ee32a26add11af17f435b81ace8850af48fa8032ca1b98a71b302f",
-      "files": {
-        "TrueShuffle.dll": "c2d07a617d7a347ec651a0ad9e0fc5bde134c9fdae0155bddf3b2563fc15d403",
-        "plugin.json": "a2a7073c5e7523067977aac4b97dee05617a0ff4f66ba9f0e996b95afec42e75"
-      }
-    },
-    {
       "id": "dev.moshi.lyricmotion",
       "version": "1.4.3",
       "repository": "Alfamin/LyricMotion",

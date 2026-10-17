@@ -81,19 +81,19 @@ internal sealed class ShuffleQueue
         {
             try
             {
-                _player.ClearQueue();
+                _player.ClearShuffleUpcoming();
                 _player.AppendShuffleGenerated(ordered.ToList());
             }
             catch (Exception failed)
             {
                 // A failed append must not silently erase the user's upcoming songs.
                 if (!ReferenceEquals(_player.CurrentTrack, previousCurrent)) throw;
-                try { _player.ClearQueue(); _player.AppendShuffleGenerated(original); }
+                try { _player.ClearShuffleUpcoming(); _player.AppendShuffleGenerated(original); }
                 catch (Exception recovery) { throw new AggregateException("Queue application and recovery failed. No music files were changed.", failed, recovery); }
                 throw new InvalidOperationException("Shuffle could not be applied. Previous upcoming songs were restored; built-in Shuffle is off.", failed);
             }
         }
-        else _player.ReplaceQueueAndPlay(ordered.ToList(), 0);
+        else _player.PlayShuffleOrder(ordered.ToList());
     }
 
     /// <summary>
@@ -119,11 +119,11 @@ internal sealed class ShuffleQueue
     public void ReplaceUpcoming(IReadOnlyList<Track> tracks)
     {
         var original = _player.UpNext.ToList();
-        _player.ClearQueue();
+        _player.ClearShuffleUpcoming();
         try { _player.AppendShuffleGenerated(tracks.ToList()); }
         catch (Exception failed)
         {
-            try { _player.ClearQueue(); _player.AppendShuffleGenerated(original); }
+            try { _player.ClearShuffleUpcoming(); _player.AppendShuffleGenerated(original); }
             catch (Exception recovery) { throw new AggregateException("The queue could not be rearranged or put back. No music files were changed.", failed, recovery); }
             throw new InvalidOperationException("The queue could not be rearranged; it was left as Noctis made it.", failed);
         }

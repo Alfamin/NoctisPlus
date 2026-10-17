@@ -108,7 +108,7 @@ public class BundledPluginTests : IDisposable
         var root = Path.Combine(AppContext.BaseDirectory, "bundled-plugins");
         using var doc = JsonDocument.Parse(File.ReadAllText(Path.Combine(root, "manifest.json")));
         var modules = doc.RootElement.GetProperty("modules");
-        Assert.Equal(4, modules.GetArrayLength());
+        Assert.Equal(3, modules.GetArrayLength());
         foreach (var module in modules.EnumerateArray())
         {
             // Compiled into the app now (src/Noctis/Features): its DLL is no longer delivered.
@@ -135,6 +135,7 @@ public class BundledPluginTests : IDisposable
             Assert.Equal(4, _host.Plugins.Count);
             Assert.Contains(_host.Plugins, p => p.Id == "dev.moshi.freemusicfinder" && p.IsBundled);
             Assert.Contains(_host.Plugins, p => p.Id == "dev.moshi.lyricmotion" && p.IsBundled && p.AssemblyPath is null);
+            Assert.Contains(_host.Plugins, p => p.Id == "dev.moshi.trueshuffle" && p.IsBundled && p.AssemblyPath is null);
             Assert.All(_host.Plugins, p => Assert.True(p.Status == PluginStatus.Running, $"{p.Name}: {p.Status}: {p.Error}"));
         }
         finally { _host.UnloadAll(); }

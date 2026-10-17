@@ -1551,11 +1551,13 @@ public partial class PlayerViewModel : ViewModelBase
 
     /// <param name="unshuffled">From <see cref="PlayShuffled"/>: <paramref name="tracks"/> is a
     /// shuffle of this list, which becomes the Shuffle-off order and the Repeat All cycle.</param>
-    private void ReplaceQueueAndPlay(IList<Track> tracks, int startIndex, IList<Track>? unshuffled)
+    private void ReplaceQueueAndPlay(IList<Track> tracks, int startIndex, IList<Track>? unshuffled, bool notifyShuffle = true)
     {
         DebugLogger.Info(DebugLogger.Category.Queue, "ReplaceQueueAndPlay", $"tracks={tracks.Count}, startIdx={startIndex}");
         if (tracks.Count == 0) return;
         if (startIndex < 0 || startIndex >= tracks.Count) startIndex = 0;
+        var nativeSource = tracks as IReadOnlyList<Track> ?? tracks.ToList();
+        if (notifyShuffle) ShuffleListStarting?.Invoke(nativeSource);
         // Any non-radio queue replacement (album/playlist/shuffle/etc.) ends radio so
         // it stops refilling. StartRadio re-enables IsRadioActive after calling this.
         IsRadioActive = false;
@@ -1602,6 +1604,7 @@ public partial class PlayerViewModel : ViewModelBase
 
         // Play the selected track
         PlayTrack(tracks[startIndex]);
+        if (notifyShuffle) ShuffleListStarted?.Invoke(nativeSource);
     }
 
     /// <summary>
@@ -1641,6 +1644,7 @@ public partial class PlayerViewModel : ViewModelBase
         DebugLogger.Info(DebugLogger.Category.Queue, "AddNext", $"track={track.Title}");
         CancelAutoMixTransition("queue changed");
         MarkQueueChanged();
+        DropShuffleCopies([track]);
         UpNext.Insert(0, track);
         if (_repeatCycleTracks.Count > 0)
         {
@@ -1672,6 +1676,9 @@ public partial class PlayerViewModel : ViewModelBase
         var ids = tracks.Select(t => t.Id).ToHashSet();
         for (var i = UpNext.Count - 1; i >= 0; i--)
             if (generated.Contains(UpNext[i]) && ids.Contains(UpNext[i].Id)) { generated.Remove(UpNext[i]); UpNext.RemoveAt(i); }
+        // A previous cycle may have generated the same Track instance. Even if it is no
+        // longer upcoming, adding it now makes it the user's row (later additions go after it).
+        generated.RemoveWhere(t => ids.Contains(t.Id));
     }
 
     /// <summary>Noctis Plus True Shuffle: appends songs the shuffle itself planned (behind everything, marked as its own).</summary>
@@ -1740,7 +1747,11 @@ public partial class PlayerViewModel : ViewModelBase
 
     /// <summary>Clears all upcoming tracks.</summary>
     public void ClearQueue()
+        => ClearQueueCore(notifyShuffle: true);
+
+    private void ClearQueueCore(bool notifyShuffle)
     {
+        if (notifyShuffle) ShuffleQueueCleared?.Invoke();
         DebugLogger.Info(DebugLogger.Category.Queue, "ClearQueue", $"cleared={UpNext.Count} tracks");
         CancelAutoMixTransition("queue changed");
         MarkQueueChanged();
@@ -1771,6 +1782,7 @@ public partial class PlayerViewModel : ViewModelBase
     /// go back to them; they no longer count as this queue's.</param>
     public void StopAndClear(string reason = "unspecified", bool keepHistory = false)
     {
+        ShuffleQueueCleared?.Invoke();
         DebugLogger.Info(DebugLogger.Category.Playback, "StopAndClear",
             $"reason={reason}, track={CurrentTrack?.Id}, upNext={UpNext.Count}, history={History.Count}");
         if (CurrentTrack?.RememberPlaybackPosition == true)
@@ -1956,6 +1968,8 @@ public partial class PlayerViewModel : ViewModelBase
     public void PlayFromHistoryAt(int index)
     {
         if (index < 0 || index >= History.Count) return;
+        var nativeSource = new[] { History[index] };
+        ShuffleListStarting?.Invoke(nativeSource);
         DebugLogger.Info(DebugLogger.Category.Playback, "PlayFromHistoryAt", $"index={index}, historyLen={History.Count}");
         CancelAutoMixTransition("user skipped");
         MarkQueueChanged();
@@ -1983,6 +1997,7 @@ public partial class PlayerViewModel : ViewModelBase
         SyncPlayedTracks();
         _queueHistoryDepth = Math.Max(0, _queueHistoryDepth - (index + 1));
         PlayTrack(target);
+        ShuffleListStarted?.Invoke(nativeSource);
     }
 
     /// <summary>

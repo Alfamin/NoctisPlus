@@ -1,3 +1,4 @@
+using Noctis.Models;
 using System;
 using System.ComponentModel;
 using Avalonia;
@@ -1214,6 +1215,16 @@ public partial class MiniPlayerWindow : Window
 
     private void OnPreviewKeyDown(object? sender, KeyEventArgs e)
     {
+        if (Vm is { } vm && !vm.Settings.Shortcuts.IsRecording && vm.Player.NativeShuffle is { } shuffle)
+        {
+            var action = vm.Settings.ShortcutService.TryMatch(e);
+            if (action == ShortcutAction.ToggleShuffle && shuffle.FollowShortcut || action is null && shuffle.CustomShortcut(e))
+            {
+                var button = new[] { NativeMiniShuffle0, NativeMiniShuffle1, NativeMiniShuffle2, NativeMiniShuffle3 }
+                    .FirstOrDefault(b => b.IsEffectivelyVisible);
+                if (button is not null) { button.Flyout?.ShowAt(button); e.Handled = true; return; }
+            }
+        }
         if (e.Key == Key.Escape)
         {
             if (MorePopup.IsOpen)

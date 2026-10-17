@@ -943,14 +943,15 @@
 
                 <StackPanel Grid.Row="2" Orientation="Horizontal" Spacing="18" HorizontalAlignment="Center">
                     <Button Classes="mini-transport glass-circle" Width="34" Height="34"
-                            Command="{Binding Player.ToggleShuffleCommand}" ToolTip.Tip="{loc:T MiniPlayer.ShuffleTip}">
+                             x:Name="NativeMiniShuffle0" ToolTip.Tip="{loc:T MiniPlayer.ShuffleTip}">
+                        <Button.Flyout><controls:ShuffleMenu Player="{Binding #NativeMiniShuffle0.((vm:MiniPlayerViewModel)DataContext).Player}" /></Button.Flyout>
                         <Panel>
-                            <Viewbox Width="18" Height="18" IsVisible="{Binding !Player.IsShuffleEnabled}">
+                            <Viewbox Width="18" Height="18" IsVisible="{Binding !Player.IsShuffleLit}">
                                 <Canvas Width="24" Height="24">
                                     <Path Fill="#B8FFFFFF" Data="{StaticResource ShuffleIcon}"/>
                                 </Canvas>
                             </Viewbox>
-                            <Viewbox Width="18" Height="18" IsVisible="{Binding Player.IsShuffleEnabled}">
+                            <Viewbox Width="18" Height="18" IsVisible="{Binding Player.IsShuffleLit}">
                                 <Canvas Width="24" Height="24">
                                     <Path Fill="{DynamicResource AccentColorBrush}" Data="{StaticResource ShuffleIcon}"/>
                                 </Canvas>
@@ -1139,14 +1140,15 @@
                 <Grid Grid.Row="3" ColumnDefinitions="Auto,*,Auto" Margin="0,8,0,0">
                     <Button Grid.Column="0" Classes="mini-transport glass-circle" Width="36" Height="36"
                             HorizontalAlignment="Left" VerticalAlignment="Center"
-                            Command="{Binding Player.ToggleShuffleCommand}" ToolTip.Tip="{loc:T MiniPlayer.ShuffleTip}">
+                             x:Name="NativeMiniShuffle1" ToolTip.Tip="{loc:T MiniPlayer.ShuffleTip}">
+                        <Button.Flyout><controls:ShuffleMenu Player="{Binding #NativeMiniShuffle1.((vm:MiniPlayerViewModel)DataContext).Player}" /></Button.Flyout>
                         <Panel>
-                            <Viewbox Width="19" Height="19" IsVisible="{Binding !Player.IsShuffleEnabled}">
+                            <Viewbox Width="19" Height="19" IsVisible="{Binding !Player.IsShuffleLit}">
                                 <Canvas Width="24" Height="24">
                                     <Path Fill="#B8FFFFFF" Data="{StaticResource ShuffleIcon}"/>
                                 </Canvas>
                             </Viewbox>
-                            <Viewbox Width="19" Height="19" IsVisible="{Binding Player.IsShuffleEnabled}">
+                            <Viewbox Width="19" Height="19" IsVisible="{Binding Player.IsShuffleLit}">
                                 <Canvas Width="24" Height="24">
                                     <Path Fill="{DynamicResource AccentColorBrush}" Data="{StaticResource ShuffleIcon}"/>
                                 </Canvas>
@@ -1395,14 +1397,15 @@
                 <Grid Grid.Row="3" ColumnDefinitions="Auto,*,Auto" Margin="0,4,0,0">
                     <Button Grid.Column="0" Classes="mini-transport glass-circle" Width="36" Height="36"
                             HorizontalAlignment="Left" VerticalAlignment="Center"
-                            Command="{Binding Player.ToggleShuffleCommand}" ToolTip.Tip="{loc:T MiniPlayer.ShuffleTip}">
+                             x:Name="NativeMiniShuffle2" ToolTip.Tip="{loc:T MiniPlayer.ShuffleTip}">
+                        <Button.Flyout><controls:ShuffleMenu Player="{Binding #NativeMiniShuffle2.((vm:MiniPlayerViewModel)DataContext).Player}" /></Button.Flyout>
                         <Panel>
-                            <Viewbox Width="19" Height="19" IsVisible="{Binding !Player.IsShuffleEnabled}">
+                            <Viewbox Width="19" Height="19" IsVisible="{Binding !Player.IsShuffleLit}">
                                 <Canvas Width="24" Height="24">
                                     <Path Fill="#B8FFFFFF" Data="{StaticResource ShuffleIcon}"/>
                                 </Canvas>
                             </Viewbox>
-                            <Viewbox Width="19" Height="19" IsVisible="{Binding Player.IsShuffleEnabled}">
+                            <Viewbox Width="19" Height="19" IsVisible="{Binding Player.IsShuffleLit}">
                                 <Canvas Width="24" Height="24">
                                     <Path Fill="{DynamicResource AccentColorBrush}" Data="{StaticResource ShuffleIcon}"/>
                                 </Canvas>
@@ -1660,14 +1663,15 @@
 
                     <StackPanel Grid.Row="3" Orientation="Horizontal" Spacing="8" HorizontalAlignment="Center" Margin="0,2,0,0">
                         <Button Classes="mini-transport glass-circle" Width="30" Height="30"
-                                Command="{Binding Player.ToggleShuffleCommand}" ToolTip.Tip="{loc:T MiniPlayer.ShuffleTip}">
+                                 x:Name="NativeMiniShuffle3" ToolTip.Tip="{loc:T MiniPlayer.ShuffleTip}">
+                        <Button.Flyout><controls:ShuffleMenu Player="{Binding #NativeMiniShuffle3.((vm:MiniPlayerViewModel)DataContext).Player}" /></Button.Flyout>
                             <Panel>
-                                <Viewbox Width="16" Height="16" IsVisible="{Binding !Player.IsShuffleEnabled}">
+                                <Viewbox Width="16" Height="16" IsVisible="{Binding !Player.IsShuffleLit}">
                                     <Canvas Width="24" Height="24">
                                         <Path Fill="#B8FFFFFF" Data="{StaticResource ShuffleIcon}"/>
                                     </Canvas>
                                 </Viewbox>
-                                <Viewbox Width="16" Height="16" IsVisible="{Binding Player.IsShuffleEnabled}">
+                                <Viewbox Width="16" Height="16" IsVisible="{Binding Player.IsShuffleLit}">
                                     <Canvas Width="24" Height="24">
                                         <Path Fill="{DynamicResource AccentColorBrush}" Data="{StaticResource ShuffleIcon}"/>
                                     </Canvas>

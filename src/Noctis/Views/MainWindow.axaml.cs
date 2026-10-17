@@ -1839,7 +1839,11 @@ public partial class MainWindow : Window, IPageKeyOverlayHost
         // A Shortcuts-tab chip is waiting for a chord: the chip owns every key until it
         // is done, otherwise pressing the key you are trying to assign would run it.
         if (vm.Settings.Shortcuts.IsRecording) return;
-        if (shortcuts.TryMatch(e) is not { } action) return;
+        if (shortcuts.TryMatch(e) is not { } action)
+        {
+            if (vm.Player.NativeShuffle?.CustomShortcut(e) == true && vm.Player.RequestShuffleModes()) e.Handled = true;
+            return;
+        }
 
         // An unmodified key (Space, or whatever the user bound) must still type in an
         // edit box: typing a space in the search box stays typing a space. Ctrl+←/→ in

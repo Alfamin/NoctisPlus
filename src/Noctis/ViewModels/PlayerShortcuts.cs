@@ -52,6 +52,7 @@ public static class PlayerShortcuts
                 return true;
             // GitHub #131: the same commands as the island's buttons.
             case ShortcutAction.ToggleShuffle:
+                if (player.NativeShuffle?.FollowShortcut == true && player.RequestShuffleModes()) return true;
                 player.ToggleShuffleCommand.Execute(null);
                 return true;
             case ShortcutAction.CycleRepeat:

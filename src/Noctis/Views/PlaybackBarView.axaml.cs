@@ -208,6 +208,7 @@ public partial class PlaybackBarView : UserControl
 
     private void OnPlaybackBarAttachedToVisualTree(object? sender, VisualTreeAttachmentEventArgs e)
     {
+        if (_observedPlayerViewModel is { } shufflePlayer) { shufflePlayer.ShuffleMenuRequested -= OpenNativeShuffleModes; shufflePlayer.ShuffleMenuRequested += OpenNativeShuffleModes; }
         ScheduleTrackTitleMarqueeUpdate(resetAnimation: true);
         ScheduleArtistNameMarqueeUpdate(resetAnimation: true);
         DispatcherTimer.RunOnce(RefreshTrackInfoLayout, TimeSpan.FromMilliseconds(10));
@@ -228,6 +229,7 @@ public partial class PlaybackBarView : UserControl
 
     private void OnPlaybackBarDetachedFromVisualTree(object? sender, VisualTreeAttachmentEventArgs e)
     {
+        if (_observedPlayerViewModel is { } shufflePlayer) shufflePlayer.ShuffleMenuRequested -= OpenNativeShuffleModes;
         // Safety: ensure seek drag state is fully cleared on detach
         if (_isSeekDragging)
         {
@@ -248,10 +250,12 @@ public partial class PlaybackBarView : UserControl
 
     private void OnPlaybackBarDataContextChanged(object? sender, EventArgs e)
     {
+        if (_observedPlayerViewModel is { } oldShuffle) oldShuffle.ShuffleMenuRequested -= OpenNativeShuffleModes;
         if (_observedPlayerViewModel != null)
             _observedPlayerViewModel.PropertyChanged -= OnObservedPlayerViewModelPropertyChanged;
 
         _observedPlayerViewModel = DataContext as PlayerViewModel;
+        if (_observedPlayerViewModel is { } newShuffle) newShuffle.ShuffleMenuRequested += OpenNativeShuffleModes;
 
         if (_observedPlayerViewModel != null)
             _observedPlayerViewModel.PropertyChanged += OnObservedPlayerViewModelPropertyChanged;
@@ -265,6 +269,13 @@ public partial class PlaybackBarView : UserControl
         ScheduleArtistNameMarqueeUpdate(resetAnimation: true);
         DispatcherTimer.RunOnce(RefreshTrackInfoLayout, TimeSpan.FromMilliseconds(10));
         UpdateVolumeMuteLook();
+    }
+
+    private bool OpenNativeShuffleModes()
+    {
+        if (!IsEffectivelyVisible || TopLevel.GetTopLevel(this) is not Window { IsActive: true }) return false;
+        NativeShuffleButton.Flyout?.ShowAt(NativeShuffleButton.IsEffectivelyVisible ? NativeShuffleButton : this);
+        return true;
     }
 
     private void UpdateVolumeMuteLook() => UpdateVolumeSliderVisual();

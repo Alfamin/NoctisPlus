@@ -9,10 +9,11 @@ namespace Noctis.Features;
 /// </summary>
 internal static class BuiltInFeatures
 {
-    public static void Register(PluginHost host)
+    public static void Register(PluginHost host, TrueShuffle.TrueShuffleService? shuffle = null)
     {
         host.RegisterBuiltIn(Manifest("FreeMusicFinder"), () => new FreeMusicFinder.FreeMusicPlugin());
         host.RegisterBuiltIn(Manifest("LyricMotion"), () => new LyricMotion.LyricMotionFeature());
+        host.RegisterBuiltIn(Manifest("TrueShuffle"), () => new TrueShuffle.TrueShuffleFeature(shuffle));
     }
 
     /// <summary>The feature's plugin.json, embedded as Noctis.Features.&lt;folder&gt;.plugin.json.</summary>

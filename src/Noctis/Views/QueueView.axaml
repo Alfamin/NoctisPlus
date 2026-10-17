@@ -124,25 +124,26 @@
                          translucent brush resource is needed. Fixed 27x23 replaces the
                          old Padding="6,4" — identical footprint, but the Panel now
                          fills the button so the wash can cover it. -->
-                    <Button Command="{Binding Player.ToggleShuffleCommand}"
+                    <Button x:Name="NativeQueueShuffle"
                             Classes="queue-toggle-btn"
                             Background="Transparent" BorderThickness="0" Padding="0"
                             Width="27" Height="23"
                             Cursor="Hand" VerticalAlignment="Center"
                             ToolTip.Tip="{loc:T Queue.ShuffleTip}">
+                        <Button.Flyout><controls:ShuffleMenu Player="{Binding #NativeQueueShuffle.((vm:QueueViewModel)DataContext).Player}" /></Button.Flyout>
                         <Panel Width="27" Height="23">
                             <Border CornerRadius="6"
                                     Background="{DynamicResource AccentColorBrush}"
                                     Opacity="0.18"
-                                    IsVisible="{Binding Player.IsShuffleEnabled}" />
+                                    IsVisible="{Binding Player.IsShuffleLit}" />
                             <PathIcon Data="{StaticResource ShuffleIcon}" Width="15" Height="15"
                                       HorizontalAlignment="Center" VerticalAlignment="Center"
                                       Opacity="0.55"
-                                      IsVisible="{Binding !Player.IsShuffleEnabled}" />
+                                      IsVisible="{Binding !Player.IsShuffleLit}" />
                             <PathIcon Data="{StaticResource ShuffleIcon}" Width="15" Height="15"
                                       HorizontalAlignment="Center" VerticalAlignment="Center"
                                       Foreground="{DynamicResource AccentColorBrush}"
-                                      IsVisible="{Binding Player.IsShuffleEnabled}" />
+                                      IsVisible="{Binding Player.IsShuffleLit}" />
                         </Panel>
                     </Button>
                     <Button Command="{Binding Player.CycleRepeatCommand}"

@@ -1,6 +1,8 @@
 # Included modules
 
-These are the existing released plugins, bundled unchanged in Noctis Plus. `manifest.json`
+This folder retains pinned packages for provenance and the WordLyrics plugin still used by
+Noctis Plus. Finder and Lyric Motion are compiled into the app and excluded from packaging;
+True Shuffle is native too, and its former bundled package was removed. `manifest.json`
 records source repositories, commits, package hashes and every delivered file hash.
 The build script verifies the files before publishing. No user settings, Telegram sessions,
 Last.fm user keys, listening history, music, Python runtime or model files belong here.
@@ -15,5 +17,5 @@ files, and update its provenance and hashes in `manifest.json`. Do not copy buil
 or private profile files into this folder. Keep the original package's API references; the
 1.6.3 host supports API 1.1 and 1.2 plugins.
 
-Licensing is in `docs/fork/PROVENANCE.md`: True Shuffle, Lyric Motion and WordLyrics are MIT;
-Free Music Finder ships with its original author's permission and is not MIT.
+Licensing is in `docs/fork/PROVENANCE.md`: all four features are MIT, with the original
+authors' notices retained. Finder's original author added its MIT licence on 2026-10-17.
