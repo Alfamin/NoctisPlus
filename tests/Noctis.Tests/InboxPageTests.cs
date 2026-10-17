@@ -195,4 +195,17 @@ public class InboxPageTests : IDisposable
 
         Assert.Equal(new[] { "One", "Two", "Old" }, ordered.Select(t => t.Title));
     }
+
+    [Theory]
+    [InlineData(240_000L, "234 KB")]      // a short song read "0 MB" live on 10-17
+    [InlineData(300L, "1 KB")]
+    [InlineData(2_097_124L, "2 MB")]
+    [InlineData(3_221_225_472L, "3 GB")]
+    public void Summary_SizeUnder1MB_ShowsKilobytes(long bytes, string expected)
+    {
+        var song = Song("One", inbox: true, 1, new DateTime(2026, 10, 17, 0, 0, 0, DateTimeKind.Utc));
+        song.FileSize = bytes;
+
+        Assert.EndsWith("· " + expected, InboxViewModel.Summary(new[] { song }));
+    }
 }

@@ -108,7 +108,8 @@ public partial class InboxViewModel : ViewModelBase, ISearchable
         long bytes = 0;
         foreach (var t in tracks) bytes += t.FileSize;
         var gb = bytes / (1024.0 * 1024.0 * 1024.0);
-        var size = gb >= 1 ? $"{gb:0.#} GB" : $"{bytes / (1024.0 * 1024.0):0} MB";
+        var mb = bytes / (1024.0 * 1024.0);
+        var size = gb >= 1 ? $"{gb:0.#} GB" : mb >= 1 ? $"{mb:0} MB" : $"{Math.Max(1, bytes / 1024):0} KB";
         return $"{count} · {size}";
     }
 
