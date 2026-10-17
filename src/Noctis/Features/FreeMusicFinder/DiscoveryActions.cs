@@ -8,13 +8,31 @@ internal sealed class DiscoveryActions(IPlaylistLibrary library, Downloads downl
     Func<string> folder, Func<bool> loggedIn)
 {
     private readonly SemaphoreSlim _gate = new(1, 1);
+    private (long Key, DateTimeOffset At, PlaylistMatcher Matcher)? _matcher;
     public Downloads Downloads => downloads;
-    public async Task<Dictionary<string, DiscoveryMatch>> MatchAsync(IEnumerable<CatalogSong> songs, CancellationToken ct)
+
+    /// <summary>The matcher checks every library file still exists, ~2,000 disk lookups. Search
+    /// asks on every query, so one matcher serves while the library is unchanged (same songs,
+    /// same paths) for up to two minutes.</summary>
+    private PlaylistMatcher Matcher(IReadOnlyList<LocalSong> snapshot)
+    {
+        long key = snapshot.Count;
+        foreach (var s in snapshot) key = key * 31 + s.Id.GetHashCode() + StringComparer.OrdinalIgnoreCase.GetHashCode(s.Path);
+        var now = DateTimeOffset.UtcNow;
+        if (_matcher is { } cached && cached.Key == key && now - cached.At < TimeSpan.FromMinutes(2)) return cached.Matcher;
+        var matcher = new PlaylistMatcher(snapshot);
+        _matcher = (key, now, matcher);
+        return matcher;
+    }
+
+    /// <param name="reuse">Browsing (Search) may reuse a recent matcher; anything that decides
+    /// what to download checks the disk afresh.</param>
+    public async Task<Dictionary<string, DiscoveryMatch>> MatchAsync(IEnumerable<CatalogSong> songs, CancellationToken ct, bool reuse = false)
     {
         var rows = songs.ToArray(); var snapshot = await library.SnapshotAsync(); ct.ThrowIfCancellationRequested();
         return await Task.Run(() =>
         {
-            var matcher = new PlaylistMatcher(snapshot); var history = downloads.History;
+            var matcher = reuse ? Matcher(snapshot) : new PlaylistMatcher(snapshot); var history = downloads.History;
             return rows.DistinctBy(s => s.Id).ToDictionary(s => s.Id, s =>
             {
                 var local = matcher.Find(s.Request);

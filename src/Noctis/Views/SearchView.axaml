@@ -510,6 +510,19 @@
                     <!-- Artist -->
                     <Button Classes="top-result" Height="238" IsVisible="{Binding TopArtist, Converter={x:Static ObjectConverters.IsNotNull}}"
                             Command="{Binding OpenArtistCommand}" CommandParameter="{Binding TopArtist}">
+                        <Grid>
+                        <!-- In the library: Play their songs (the app's accent pill, as Home's Resume). -->
+                        <Button Classes="accent-btn" Background="{DynamicResource AccentButtonBackground}" BorderThickness="0"
+                                Padding="16,8" CornerRadius="999" Cursor="Hand" HorizontalAlignment="Right" VerticalAlignment="Bottom"
+                                IsVisible="{Binding TopArtist.HasLibrarySongs, FallbackValue=False}"
+                                Command="{Binding PlayArtistCommand}" CommandParameter="{Binding TopArtist}">
+                            <StackPanel Orientation="Horizontal" Spacing="7">
+                                <PathIcon Data="{StaticResource PlayIcon}" Width="12" Height="12" Margin="1,0,0,0"
+                                          Foreground="{DynamicResource AccentForegroundBrush}" VerticalAlignment="Center" />
+                                <TextBlock Text="Play" FontSize="13" FontWeight="SemiBold"
+                                           Foreground="{DynamicResource AccentForegroundBrush}" VerticalAlignment="Center" />
+                            </StackPanel>
+                        </Button>
                         <StackPanel Spacing="14" VerticalAlignment="Center">
                             <Border Width="110" Height="110" CornerRadius="55" ClipToBounds="True" HorizontalAlignment="Left"
                                     Background="{DynamicResource SystemControlBackgroundBaseLowBrush}" BoxShadow="0 10 26 0 #60000000">
@@ -529,6 +542,7 @@
                                 </Border>
                             </StackPanel>
                         </StackPanel>
+                        </Grid>
                     </Button>
 
                     <!-- Album -->

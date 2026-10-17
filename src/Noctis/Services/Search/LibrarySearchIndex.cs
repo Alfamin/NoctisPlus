@@ -56,6 +56,13 @@ public sealed class LibrarySearchIndex : IDisposable
         if (words.Length == 0) return LibrarySearchResult.Empty;
         var key = string.Concat(words);
         var s = _snapshot;
+        // The library's first load at startup announces nothing; an index holding a different
+        // number of songs than the library is stale, so build it now (a few ms for thousands).
+        if (s.Tracks.Length != _library.Tracks.Count)
+        {
+            try { RebuildNow(); s = _snapshot; }
+            catch (InvalidOperationException) { } // changing under us; LibraryUpdated rebuilds
+        }
 
         var songs = new List<Scored<Track>>();
         foreach (var t in s.Tracks)

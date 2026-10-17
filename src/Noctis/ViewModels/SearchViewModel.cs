@@ -17,7 +17,9 @@ namespace Noctis.ViewModels;
 public sealed partial class SearchViewModel : ViewModelBase, ISearchable, IDisposable
 {
     internal static readonly TimeSpan OnlineDelay = TimeSpan.FromMilliseconds(200);
-    private const double LibraryBonus = 6;
+    /// <summary>At equal relevance the library leads: online scores stop at 97, an artist-intent
+    /// library song is 92 + this.</summary>
+    private const double LibraryBonus = 10;
 
     private readonly ILibraryService _library;
     private readonly PlayerViewModel _player;
@@ -425,6 +427,19 @@ public sealed partial class SearchViewModel : ViewModelBase, ISearchable, IDispo
     [RelayCommand]
     private void OpenDownloads() => _source?.OpenDownloads();
 
+    /// <summary>Top result "Play" on an artist: their songs in the library, most played first.</summary>
+    [RelayCommand]
+    private void PlayArtist(SearchArtistItem? item)
+    {
+        if (item?.Local is null) return;
+        var key = NameKey(item.Name);
+        var tracks = _library.Tracks
+            .Where(t => NameKey(t.Artist) == key || NameKey(t.AlbumArtist) == key)
+            .OrderByDescending(t => t.PlayCount).ThenBy(t => t.Album).ThenBy(t => t.TrackNumber)
+            .ToList();
+        if (tracks.Count > 0) _player.PlayFromRow(tracks, 0);
+    }
+
     [RelayCommand]
     private void OpenArtist(SearchArtistItem? item)
     {
@@ -588,6 +603,7 @@ public sealed partial class SearchArtistItem : ObservableObject, IOnlineArtwork
 
     public Artist? Local { get; }
     public OnlineArtist? Online { get; private set; }
+    public bool HasLibrarySongs => Local is { TrackCount: > 0 };
     public string Name { get; }
     public string Subtitle { get; private set; }
     public string ArtworkUrl { get; private set; } = "";

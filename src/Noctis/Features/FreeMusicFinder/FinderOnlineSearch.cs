@@ -94,7 +94,7 @@ internal sealed class FinderOnlineSearch : IOnlineMusicSearch
         // Which of these the library already has (same recording: title, artist, length).
         if (songs.Count > 0)
         {
-            try { matches = await _actions.MatchAsync(songs.Select(s => s.Song), ct).ConfigureAwait(false); }
+            try { matches = await _actions.MatchAsync(songs.Select(s => s.Song), ct, reuse: true).ConfigureAwait(false); }
             catch (Exception ex) when (ex is not OperationCanceledException) { warnings.Enqueue("Library check: " + ex.Message); }
         }
         yield return Build(query, artists, songs, albums, matches, complete: true, warnings);
@@ -138,7 +138,7 @@ internal sealed class FinderOnlineSearch : IOnlineMusicSearch
     /// <summary>Finder's ranking (exact name ≈ 96-110, every word ≈ 76-90, spread ≈ 50-70) onto the
     /// library index's 0-100 scale, so an exact online match and an exact library match tie and the
     /// library's own bonus decides.</summary>
-    internal static double Scale(double finder) => Math.Clamp(finder * 0.92, 0, 100);
+    internal static double Scale(double finder) => Math.Clamp(finder * 0.92, 0, 97);
 
     public string? CachedArtwork(string url) => url.Length == 0 ? null : _catalog()?.SavedArtwork(url);
 
