@@ -3069,6 +3069,7 @@
     <value>Escrita por: </value>
     <comment>Text in LyricsView.axaml</comment>
   </data>
+  <data name="Lyrics.Sync" xml:space="preserve"><value>Sincronizar</value><comment>Pill that brings the lyrics back to the current line</comment></data>
   <data name="Lyrics.Follow" xml:space="preserve">
     <value>Seguir</value>
     <comment>Text in LyricsView.axaml</comment>

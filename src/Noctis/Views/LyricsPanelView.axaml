@@ -212,6 +212,37 @@
             <Setter Property="BorderThickness" Value="1"/>
             <Setter Property="CornerRadius" Value="14"/>
         </Style>
+        <!-- "Sync" pill: same shape as the lyrics page's (LyricsView sync-pill), in the lyrics
+             pill colours (the page's LyricsBtnBgRes / LyricsBtnBgHoverRes defaults). Keep in sync. -->
+        <Style Selector="Button.sync-pill">
+            <Setter Property="Padding" Value="16,8"/>
+            <Setter Property="FontSize" Value="13"/>
+            <Setter Property="FontWeight" Value="SemiBold"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="RenderTransform" Value="scale(1)"/>
+            <Setter Property="Transitions">
+                <Transitions>
+                    <TransformOperationsTransition Property="RenderTransform" Duration="0:0:0.12" Easing="CubicEaseOut"/>
+                </Transitions>
+            </Setter>
+        </Style>
+        <Style Selector="Button.sync-pill /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Background" Value="#33FFFFFF"/>
+            <Setter Property="Foreground" Value="White"/>
+            <Setter Property="BorderThickness" Value="0"/>
+            <Setter Property="CornerRadius" Value="19"/>
+        </Style>
+        <Style Selector="Button.sync-pill:pointerover">
+            <Setter Property="RenderTransform" Value="scale(1.04)"/>
+        </Style>
+        <Style Selector="Button.sync-pill:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Background" Value="#55FFFFFF"/>
+            <Setter Property="Foreground" Value="White"/>
+        </Style>
+        <Style Selector="Button.sync-pill:pressed">
+            <Setter Property="RenderTransform" Value="scale(0.97)"/>
+        </Style>
+
         <!-- Revealed by the pointer anywhere in the panel. Keyboard focus reveals
              it too — tabbing to an invisible control would otherwise be a dead end. -->
         <Style Selector="Grid.panel-root:pointerover Button.panel-close">
@@ -567,6 +598,22 @@
                 </StackPanel>
             </ScrollViewer>
         </Border>
+
+        <!-- "Sync" pill: shown while the current line is scrolled out of view (same pill as the lyrics page). -->
+        <Button x:Name="PanelFollowButton"
+                IsVisible="False"
+                Click="OnFollowClick"
+                HorizontalAlignment="Center"
+                VerticalAlignment="Bottom"
+                Classes="sync-pill"
+                Margin="0,0,0,18">
+            <StackPanel Orientation="Horizontal" Spacing="6">
+                <controls:LineIcon Data="{DynamicResource PageLineSync}"
+                                   Width="16" Height="16"
+                                   VerticalAlignment="Center"/>
+                <TextBlock Text="{loc:T Lyrics.Sync}" VerticalAlignment="Center"/>
+            </StackPanel>
+        </Button>
 
         <!-- Last child so it paints above the lyric flow and its glow spill
              (PanelLyricsHost runs with ClipToBounds=False). The 12px inset clears

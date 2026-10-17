@@ -3069,6 +3069,7 @@
     <value>작사: </value>
     <comment>Text in LyricsView.axaml</comment>
   </data>
+  <data name="Lyrics.Sync" xml:space="preserve"><value>동기화</value><comment>Pill that brings the lyrics back to the current line</comment></data>
   <data name="Lyrics.Follow" xml:space="preserve">
     <value>따라가기</value>
     <comment>Text in LyricsView.axaml</comment>

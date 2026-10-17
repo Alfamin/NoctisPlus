@@ -238,6 +238,13 @@ public partial class LyricsPanelView : UserControl
             // Mid-swap index churn must not start an animated glide — the
             // ActiveLyricLines re-anchor below jumps once the swap lands.
             if (_lyricsSwapInProgress) return;
+            if (_followPaused && !_scrollHold && _vm.IsSyncTabSelected)
+            {
+                // The song has reached the lines the user is looking at: follow again from there.
+                Dispatcher.UIThread.Post(() => { if (_followPaused && !_scrollHold && IsActiveLineOnScreen()) SetFollowPaused(false); },
+                    DispatcherPriority.Loaded);
+                return;
+            }
             if (_followPaused || !_vm.IsSyncTabSelected) return;
             if (_vm.ActiveLineIndex >= 0)
                 ScrollToLine(_vm.ActiveLineIndex);
@@ -246,8 +253,8 @@ public partial class LyricsPanelView : UserControl
         {
             // Track change or sync/plain switch — re-anchor from scratch.
             _lastScrolledIndex = -1;
-            _followPaused = false;
             CancelFollowResumeTimer();
+            SetFollowPaused(false);
             var index = _vm.IsSyncTabSelected ? _vm.ActiveLineIndex : -1;
             if (index >= 0)
                 JumpToLineWhenReady(index);
@@ -258,7 +265,12 @@ public partial class LyricsPanelView : UserControl
         }
     }
 
-    // ── Manual-scroll pause: let the user read, then glide back ────────
+    // ── Manual scroll, "Sync now" (Noctis Plus, owner 2026-10-17) ───────
+    // Same rule as the lyrics page, kept panel-local: the view holds while the user scrolls;
+    // once it settles, follow carries on if the current line is still in view (no pill);
+    // otherwise the Follow pill appears and stays until it is tapped, the user scrolls back to
+    // the line, or the song reaches the visible lines. No timed glide back any more.
+    private bool _scrollHold;
 
     private void OnUserScroll(object? sender, PointerWheelEventArgs e)
     {
@@ -267,15 +279,44 @@ public partial class LyricsPanelView : UserControl
         _followPaused = true;
 
         CancelFollowResumeTimer();
-        _followResumeTimer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(4) };
-        _followResumeTimer.Tick += (_, _) =>
-        {
-            CancelFollowResumeTimer();
-            _followPaused = false;
-            if (_vm is { IsSyncTabSelected: true, ActiveLineIndex: >= 0 } vm)
-                ScrollToLine(vm.ActiveLineIndex, force: true);
-        };
+        _scrollHold = true;
+        _followResumeTimer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(400) };
+        _followResumeTimer.Tick += (_, _) => SettleUserScroll();
         _followResumeTimer.Start();
+    }
+
+    /// <summary>The scroll has settled: follow on if the current line is in view, else show the pill.</summary>
+    private void SettleUserScroll()
+    {
+        CancelFollowResumeTimer();
+        SetFollowPaused(!IsActiveLineOnScreen());
+    }
+
+    private void SetFollowPaused(bool paused)
+    {
+        _followPaused = paused;
+        if (PanelFollowButton is not null) PanelFollowButton.IsVisible = paused;
+    }
+
+    private void OnFollowClick(object? sender, RoutedEventArgs e)
+    {
+        CancelFollowResumeTimer();
+        SetFollowPaused(false);
+        if (_vm is { IsSyncTabSelected: true, ActiveLineIndex: >= 0 } vm)
+            ScrollToLine(vm.ActiveLineIndex, force: true);
+    }
+
+    /// <summary>True when the current line's middle is inside the visible part of the panel.</summary>
+    private bool IsActiveLineOnScreen()
+    {
+        if (_vm is not { IsSyncTabSelected: true, ActiveLineIndex: >= 0 } vm) return true;
+        var panel = GetLinesPanel();
+        if (panel == null || vm.ActiveLineIndex >= panel.Children.Count || PanelScrollViewer == null) return true;
+        var line = panel.Children[vm.ActiveLineIndex];
+        if (line.TransformToVisual(panel) is not { } transform) return true;
+        var middle = transform.Transform(new Point(0, line.Bounds.Height / 2)).Y;
+        var top = PanelScrollViewer.Offset.Y;
+        return middle >= top && middle <= top + PanelScrollViewer.Viewport.Height;
     }
 
     private void OnLyricsOffsetWheel(object? sender, PointerWheelEventArgs e)
@@ -292,6 +333,7 @@ public partial class LyricsPanelView : UserControl
     {
         _followResumeTimer?.Stop();
         _followResumeTimer = null;
+        _scrollHold = false;
     }
 
     // ── Scrolling ──────────────────────────────────────────────────────

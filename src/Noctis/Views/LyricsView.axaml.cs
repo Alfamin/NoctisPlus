@@ -340,6 +340,7 @@ public partial class LyricsView : UserControl
             LyricsItemsControl.MaxWidth = Math.Clamp(width / 2 - 120, 280, 620);
             RightPanel.RenderTransform = Avalonia.Media.Transformation.TransformOperations.Parse("scale(1.1, 1.1)");
         }
+        Dispatcher.UIThread.Post(PlaceFollowPill, DispatcherPriority.Loaded);
 
         LeftContentStack.Width = stackWidth;
 
@@ -600,7 +601,7 @@ public partial class LyricsView : UserControl
             // seek every visible line sits outside the ±9 dim window at opacity 0, so
             // the lyrics looked gone until the next line boundary.
             if (sender is LyricsViewModel resumed && !resumed.IsAutoFollowPaused
-                && !_lyricsSwapInProgress && !_isJumpingOnAttach)
+                && !_lyricsSwapInProgress && !_isJumpingOnAttach && !_resumeWithoutRecenter)
             {
                 CancelAutoFollowResumeTimer();
                 if (resumed.IsSyncTabSelected && resumed.ActiveLineIndex >= 0)
@@ -992,6 +993,7 @@ public partial class LyricsView : UserControl
     {
         _autoFollowResumeTimer?.Stop();
         _autoFollowResumeTimer = null;
+        _userScrollHold = false;
     }
 
     // Every scroll this view performs itself goes through ApplyScrollOffset, which records
@@ -1010,7 +1012,10 @@ public partial class LyricsView : UserControl
     private void OnLyricsScrollViewerPropertyChanged(object? sender, AvaloniaPropertyChangedEventArgs e)
     {
         if (e.Property != ScrollViewer.OffsetProperty) return;
-        if (_isProgrammaticScroll) return;
+        // No early return during our own glide: every write of ours goes through
+        // ApplyScrollOffset and matches _lastAppliedScrollY, so a value that does not is the
+        // user's, even mid-glide (fast songs glide most of the time; such a scroll used to be
+        // overwritten by the rest of the glide).
         if (e.NewValue is not Vector v) return;
 
         // Nothing has been scrolled by us yet — this is the first layout pass, not a user
@@ -1031,8 +1036,8 @@ public partial class LyricsView : UserControl
 
     private void OnLyricsPointerWheelChanged(object? sender, PointerWheelEventArgs e)
     {
-        if (!_isProgrammaticScroll)
-            PauseAutoFollow();
+        // A wheel turn is always the user's, even while a line glide is running.
+        PauseAutoFollow();
     }
 
     private void OnLyricsOffsetWheel(object? sender, PointerWheelEventArgs e)
@@ -1046,22 +1051,76 @@ public partial class LyricsView : UserControl
             e.Handled = true;
     }
 
+    // Noctis Plus "Sync now" (owner, 2026-10-17): a manual scroll holds the view while it moves,
+    // then, once it has settled, follow simply carries on if the current line is still on
+    // screen (no pill). Only when the current line is off screen does the Follow pill appear,
+    // and it stays until the user taps it, scrolls back to the line, or the song reaches the
+    // visible lines; there is no timed snap-back any more.
+    private const int ScrollSettleMs = 400;
+    private const double FollowPillGap = 30;
+
+    /// <summary>
+    /// Keeps the Follow pill FollowPillGap above the bottom of what is actually visible. The
+    /// lyrics column runs past the window (its wide-mode 1.1x scale about the centre, plus the
+    /// page reaching under the window edge), and a fixed 30 px margin left the pill out of view.
+    /// </summary>
+    private void PlaceFollowPill()
+    {
+        if (TopLevel.GetTopLevel(this) is not { } top || RightPanel.TransformToVisual(top) is not { } panel) return;
+        var scale = panel.M22 > 0.05 ? panel.M22 : 1;
+        var panelBottom = panel.Transform(new Point(0, RightPanel.Bounds.Height)).Y;
+        var visibleBottom = top.ClientSize.Height;
+        if (this.TransformToVisual(top) is { } page)
+            visibleBottom = Math.Min(visibleBottom, page.Transform(new Point(0, Bounds.Height)).Y);
+        var hidden = Math.Max(0, panelBottom - visibleBottom);
+        var margin = new Thickness(0, 0, 0, (FollowPillGap + hidden) / scale);
+        if (FollowPill.Margin != margin) FollowPill.Margin = margin;
+    }
+    private bool _userScrollHold;
+    private bool _resumeWithoutRecenter;
+
     private void PauseAutoFollow()
     {
-        if (DataContext is not LyricsViewModel vm) return;
-
-        vm.IsAutoFollowPaused = true;
-
-        // Auto-resume after 5 seconds
+        if (DataContext is not LyricsViewModel) return;
+        CancelScrollAnimation();
         CancelAutoFollowResumeTimer();
-        _autoFollowResumeTimer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(5) };
-        _autoFollowResumeTimer.Tick += (_, _) =>
-        {
-            CancelAutoFollowResumeTimer();
-            if (DataContext is LyricsViewModel v)
-                v.IsAutoFollowPaused = false;
-        };
+        _userScrollHold = true;
+        _autoFollowResumeTimer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(ScrollSettleMs) };
+        _autoFollowResumeTimer.Tick += (_, _) => SettleUserScroll();
         _autoFollowResumeTimer.Start();
+    }
+
+    /// <summary>The scroll has settled: follow on if the current line is in view, else show the pill.</summary>
+    private void SettleUserScroll()
+    {
+        CancelAutoFollowResumeTimer();
+        if (DataContext is not LyricsViewModel v) return;
+        if (IsActiveLineOnScreen(v)) ResumeFollowInPlace(v);
+        else v.IsAutoFollowPaused = true;
+    }
+
+    /// <summary>Follow again from where the user left the view: the next line change glides on from here.</summary>
+    private void ResumeFollowInPlace(LyricsViewModel vm)
+    {
+        if (!vm.IsAutoFollowPaused) return;
+        _resumeWithoutRecenter = true;
+        vm.IsAutoFollowPaused = false;
+        _resumeWithoutRecenter = false;
+    }
+
+    /// <summary>True when the current line's middle is inside the visible part of the lyrics.</summary>
+    private bool IsActiveLineOnScreen(LyricsViewModel vm)
+    {
+        if (!vm.IsSyncTabSelected || vm.ActiveLineIndex < 0) return true;
+        if (LyricsItemsControl == null || LyricsScrollViewer == null) return true;
+        var presenter = LyricsItemsControl.GetVisualDescendants().OfType<ItemsPresenter>().FirstOrDefault();
+        if (presenter?.GetVisualChildren().FirstOrDefault() is not Panel panel
+            || vm.ActiveLineIndex >= panel.Children.Count) return true;
+        var line = panel.Children[vm.ActiveLineIndex];
+        if (line.TransformToVisual(panel) is not { } transform) return true;
+        var middle = transform.Transform(new Point(0, line.Bounds.Height / 2)).Y + LyricsItemsControl.Margin.Top;
+        var top = LyricsScrollViewer.Offset.Y;
+        return middle >= top && middle <= top + LyricsScrollViewer.Viewport.Height;
     }
 
     // ── Center-anchored lyrics padding ──
@@ -1126,9 +1185,12 @@ public partial class LyricsView : UserControl
         if (index == _lastScrolledIndex) return;
         _lastScrolledIndex = index;
 
-        if (DataContext is LyricsViewModel vm && vm.IsAutoFollowPaused)
+        if (DataContext is LyricsViewModel vm && (vm.IsAutoFollowPaused || _userScrollHold))
         {
             Trace($"scroll→{index} skipped: auto-follow paused");
+            // The song has reached the lines the user is looking at: follow again from there.
+            if (vm.IsAutoFollowPaused && !_userScrollHold)
+                Dispatcher.UIThread.Post(() => { if (IsActiveLineOnScreen(vm)) ResumeFollowInPlace(vm); }, DispatcherPriority.Loaded);
             return;
         }
 

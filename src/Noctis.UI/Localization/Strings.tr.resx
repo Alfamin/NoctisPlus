@@ -854,6 +854,7 @@
   <data name="Lyrics.SearchLyrics" xml:space="preserve"><value>Söz Ara</value><comment>Text in LyricsView.axaml</comment></data>
   <data name="Lyrics.SearchingLyrics" xml:space="preserve"><value>Sözler Aranıyor</value><comment>Text in LyricsView.axaml</comment></data>
   <data name="Lyrics.WrittenBy" xml:space="preserve"><value>Söz Yazarı: </value><comment>Text in LyricsView.axaml</comment></data>
+  <data name="Lyrics.Sync" xml:space="preserve"><value>Senkronize et</value><comment>Pill that brings the lyrics back to the current line</comment></data>
   <data name="Lyrics.Follow" xml:space="preserve"><value>Takip et</value><comment>Text in LyricsView.axaml</comment></data>
 
   <!-- MainWindow.axaml (auto-migrated) -->

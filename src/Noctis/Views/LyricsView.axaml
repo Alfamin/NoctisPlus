@@ -189,6 +189,37 @@
             <Setter Property="Background" Value="{DynamicResource LyricsBtnBgHoverRes}"/>
         </Style>
 
+        <!-- "Sync" pill: the owner's reference shape (a roomy pill, sound bars, "Sync") in
+             the lyrics page's own adaptive pill colours. Same look in LyricsPanelView; keep in sync. -->
+        <Style Selector="Button.sync-pill">
+            <Setter Property="Padding" Value="18,9"/>
+            <Setter Property="FontSize" Value="14"/>
+            <Setter Property="FontWeight" Value="SemiBold"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="RenderTransform" Value="scale(1)"/>
+            <Setter Property="Transitions">
+                <Transitions>
+                    <TransformOperationsTransition Property="RenderTransform" Duration="0:0:0.12" Easing="CubicEaseOut"/>
+                </Transitions>
+            </Setter>
+        </Style>
+        <Style Selector="Button.sync-pill /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Background" Value="{DynamicResource LyricsBtnBgRes}"/>
+            <Setter Property="Foreground" Value="White"/>
+            <Setter Property="BorderThickness" Value="0"/>
+            <Setter Property="CornerRadius" Value="21"/>
+        </Style>
+        <Style Selector="Button.sync-pill:pointerover">
+            <Setter Property="RenderTransform" Value="scale(1.04)"/>
+        </Style>
+        <Style Selector="Button.sync-pill:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Background" Value="{DynamicResource LyricsBtnBgHoverRes}"/>
+            <Setter Property="Foreground" Value="White"/>
+        </Style>
+        <Style Selector="Button.sync-pill:pressed">
+            <Setter Property="RenderTransform" Value="scale(0.97)"/>
+        </Style>
+
         <!-- Color picker circle button -->
         <Style Selector="Button.icon-circle-btn">
             <Setter Property="Background" Value="{DynamicResource LyricsBtnBgRes}"/>
@@ -1303,20 +1334,22 @@
 
             <!-- (Source / Save / Alternate buttons moved to left panel bottom) -->
 
-            <!-- Follow Button -->
-            <Button Classes="pill-btn"
+            <!-- "Sync" pill (Noctis Plus, owner's reference: a solid white pill with sound bars).
+                 Shown while the current line is scrolled out of view; its bottom margin is set in
+                 code, as the wide-mode 1.1x scale of this column otherwise pushes it below the window. -->
+            <Button x:Name="FollowPill"
+                    Classes="sync-pill"
                     HorizontalAlignment="Center"
                     VerticalAlignment="Bottom"
                     Margin="0,0,0,30"
                     ZIndex="2"
                     IsVisible="{Binding IsAutoFollowPaused}"
                     Command="{Binding ResumeAutoFollowCommand}">
-                <StackPanel Orientation="Horizontal" Spacing="6">
-                    <!-- A locate crosshair, not the clipboard (ClipboardIcon is Paste). -->
-                    <controls:LineIcon Data="{DynamicResource PageLineFollow}"
-                                       Width="15" Height="15"
+                <StackPanel Orientation="Horizontal" Spacing="7">
+                    <controls:LineIcon Data="{DynamicResource PageLineSync}"
+                                       Width="17" Height="17"
                                        VerticalAlignment="Center"/>
-                    <TextBlock Text="{loc:T Lyrics.Follow}" VerticalAlignment="Center"/>
+                    <TextBlock Text="{loc:T Lyrics.Sync}" VerticalAlignment="Center"/>
                 </StackPanel>
             </Button>
         </Grid>

@@ -1148,6 +1148,7 @@ Deezer и TIDAL: вставьте ссылку.</value></data>
   <data name="LyricsSearch.CouldNotConnect" xml:space="preserve"><value>Не удалось подключиться</value><comment>Result in LyricsSearchViewModel</comment></data>
   <data name="LyricsSearch.Instrumental" xml:space="preserve"><value>Инструментал</value><comment>Result in LyricsSearchViewModel</comment></data>
   <data name="Lyrics.WrittenBy" xml:space="preserve"><value>Авторы: </value><comment>Text in LyricsView.axaml</comment></data>
+  <data name="Lyrics.Sync" xml:space="preserve"><value>Синхронизировать</value><comment>Pill that brings the lyrics back to the current line</comment></data>
   <data name="Lyrics.Follow" xml:space="preserve"><value>Следовать</value><comment>Text in LyricsView.axaml</comment></data>
   <data name="Lyrics.PreviewUnsaved" xml:space="preserve"><value>Предпросмотр · текст не сохранён</value><comment>Text in LyricsView.axaml — Lyrics Studio preview indicator</comment></data>
   <data name="Lyrics.SaveReplaceOne" xml:space="preserve"><value>У «{0}» уже есть {1}.
