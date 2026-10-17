@@ -5,7 +5,7 @@ namespace FreeMusicFinder;
 
 internal sealed record MusicRequest(string Title, string Artist, double? Seconds = null, string? Url = null,
     bool? Explicit = null, string? Playlist = null, int Position = 0, int? MessageId = null, string? CachedFrom = null, string? PreferredSource = null, string? OriginUri = null,
-    BotSelection? Selection = null)
+    BotSelection? Selection = null, AudioQuality? Quality = null)
 {
     public TimeSpan? Duration => Seconds is > 0 and <= 86400 ? TimeSpan.FromSeconds(Seconds.Value) : null;
     public string Identity => OriginUri is {Length:>0} ? OriginUri : Url is { Length: > 0 } ? Url : BotText.Key(Artist) + "|" + BotText.Key(Title) + "|" + Seconds;
@@ -75,10 +75,14 @@ internal sealed class MusicSources
     private readonly string? _state;
     private readonly Action<string> _notice;
     private readonly Func<bool> _allowMp3;
+    private readonly Func<bool> _preferFlac;
+    private readonly Func<AudioQuality>? _quality;
     /// <param name="allowMp3">Whether an MP3 is taken when no bot has the recording in FLAC (a leak, say). Asked per song.</param>
-    public MusicSources(IMusicSource primary, IMusicSource backup, Action<string> notice, string? state = null, Func<DateTimeOffset>? now = null, Func<bool>? allowMp3 = null)
+    public MusicSources(IMusicSource primary, IMusicSource backup, Action<string> notice, string? state = null, Func<DateTimeOffset>? now = null, Func<bool>? allowMp3 = null, Func<bool>? preferFlac = null, Func<AudioQuality>? quality = null)
     {
         _sources = [primary, backup]; _notice = notice; _state = state; _now = now ?? (() => DateTimeOffset.UtcNow); _allowMp3 = allowMp3 ?? (() => false);
+        _preferFlac = preferFlac ?? (() => true);
+        _quality = quality;
         if (state is null || !File.Exists(state)) return;
         try
         {
@@ -130,21 +134,33 @@ internal sealed class MusicSources
         try
         {
             CheckGlobal(); var errors = new List<string>();
+            var preferred = _quality?.Invoke();
+            var allowMp3 = preferred == AudioQuality.MP3 || _allowMp3();
+            var preferFlac = preferred is { } format ? format == AudioQuality.FLAC : _preferFlac();
+            var qualityErrors = await ConfigureQualityAsync(progress, ct, preferred).ConfigureAwait(false);
+            if (preferred is not null) request = request with { Quality = preferred };
             // An MP3 a bot sent is kept aside while the other bot is asked for FLAC. It is used only when no
             // bot has the recording in FLAC and the setting allows it.
             using var mp3 = new MemoryStream(); var haveMp3 = false; var skipped = false;
             foreach (var source in _sources.OrderBy(s => request.CachedFrom == s.Id ? 0 : request.Selection?.Provider == s.Id ? 1 : request.PreferredSource == s.Id ? 2 : 3))
             {
+                if (qualityErrors.TryGetValue(source.Id, out var qualityError)) { errors.Add(qualityError); continue; }
                 if (Cooling(source.Id) && request.CachedFrom != source.Id) { skipped = true; continue; }
                 try
                 {
                     if (output.CanSeek) { output.SetLength(0); output.Position = 0; }
+                    TransferProgress.Stage(progress, haveMp3
+                        ? "MP3 ready · checking FLAC with " + source.Id + "…"
+                        : "Asking " + source.Id + " for the file…");
                     // Callbacks and chat message IDs are scoped to one provider. Only recording
                     // metadata and public track URLs may cross to the fallback bot.
                     var ext = await source.FetchAsync(BotSelections.ForSource(request,source.Id), output, progress, ct).ConfigureAwait(false);
+                    if (preferred == AudioQuality.MP3 && ext != "mp3")
+                        throw new TrackUnavailableException(source.Id + " returned " + ext + " despite confirming MP3. Trying the other provider; no format was relabelled.");
                     if (ext != "flac")
                     {
-                        if (ext == "mp3" && !haveMp3 && output.CanSeek && output.Length > 0 && _allowMp3())
+                        if (ext == "mp3" && allowMp3 && !preferFlac) return ext;
+                        if (ext == "mp3" && !haveMp3 && output.CanSeek && output.Length > 0 && allowMp3)
                         {
                             output.Position = 0; await output.CopyToAsync(mp3, ct).ConfigureAwait(false); haveMp3 = true;
                         }
@@ -170,9 +186,54 @@ internal sealed class MusicSources
                 return "mp3";
             }
             if (_sources.Any(s => Cooling(s.Id))) throw Waiting();
-            throw new TrackUnavailableException("Neither bot supplied a matching " + (_allowMp3() ? "FLAC or MP3" : "FLAC") + " recording. " + string.Join(" ", errors));
+            throw new TrackUnavailableException("Neither bot supplied a matching " + (preferred == AudioQuality.MP3 ? "MP3" : allowMp3 ? "FLAC or MP3" : "FLAC") + " recording. " + string.Join(" ", errors));
         }
         finally { _gate.Release(); }
+    }
+    public async Task SynchronizeQualityAsync(CancellationToken ct)
+    {
+        await _gate.WaitAsync(ct).ConfigureAwait(false);
+        try
+        {
+            CheckGlobal();
+            var quality = _quality?.Invoke();
+            var errors = await ConfigureQualityAsync(null, ct, quality).ConfigureAwait(false);
+            foreach (var source in _sources.Where(s => Cooling(s.Id)))
+                errors.TryAdd(source.Id, source.Id + " is waiting for its reported limit; its quality has not been confirmed yet.");
+            if (errors.Count > 0) throw new BotAnswerException(string.Join(" ", errors.Values));
+            if (quality is not null) _notice("Both bots confirmed preferred quality: " + quality);
+        }
+        finally { _gate.Release(); }
+    }
+
+    private async Task<Dictionary<string, string>> ConfigureQualityAsync(IProgress<double>? progress, CancellationToken ct, AudioQuality? preferred)
+    {
+        var errors = new Dictionary<string, string>();
+        if (_quality is null) return errors;
+        // Settings replies have keyboards too. They must not be mistaken for search results.
+        await _searchGate.WaitAsync(ct).ConfigureAwait(false);
+        try
+        {
+            var quality = preferred ?? _quality();
+            foreach (var source in _sources)
+            {
+                if (Cooling(source.Id)) continue;
+                if (source is not IQualityMusicSource configurable) continue;
+                TransferProgress.Stage(progress, "Setting " + source.Id + " quality to " + quality + "…");
+                try { await configurable.SetQualityAsync(quality, ct).ConfigureAwait(false); }
+                catch (SourceLimitException ex) { Block(ex); if (ex.Global) throw Waiting(); errors[source.Id] = ex.Message; }
+                catch (TL.RpcException ex) when (BotLimits.Read(source.Id, ex.Message, _now()) is { })
+                { var limit = BotLimits.Read(source.Id, ex.Message, _now())!; Block(limit); if (limit.Global) throw Waiting(); errors[source.Id] = limit.Message; }
+                catch (TL.RpcException ex)
+                { errors[source.Id] = "BOT_QUALITY_FAILED: " + source.Id + " rejected the quality request: " + ex.Message; _notice(errors[source.Id]); }
+                catch (System.Net.Sockets.SocketException ex)
+                { Block(new(source.Id, "TELEGRAM_CONNECTION_FAILED: " + ex.Message + " Check the VPN/proxy; queued work is preserved.", _now().AddMinutes(10), true)); throw Waiting(); }
+                catch (Exception ex) when (ex is BotAnswerException or TimeoutException)
+                { errors[source.Id] = ex.Message; _notice(ex.Message); }
+            }
+            return errors;
+        }
+        finally { _searchGate.Release(); }
     }
     // Searches and downloads run side by side, so the limits they share are read and written under a lock.
     private bool Cooling(string id) { lock (_cooldowns) return _cooldowns.TryGetValue(id, out var value) && value.Until > _now(); }

@@ -12,9 +12,10 @@ internal static class TransferTests
         public string Id=>id;
         public int Calls;
         public int Searches;
+        public Action<IProgress<double>?>? Progress;
         public Func<MusicRequest,Stream,Task<string>> Fetch=async(_,output)=>{await output.WriteAsync(Encoding.ASCII.GetBytes("fLaCtest audio"));return "flac";};
         public Task<IReadOnlyList<MusicRequest>> SearchAsync(string query,CancellationToken ct){Searches++;return Task.FromResult<IReadOnlyList<MusicRequest>>([new("Song","Artist",180)]);}
-        public Task<string> FetchAsync(MusicRequest request,Stream output,IProgress<double>? progress,CancellationToken ct){Calls++;return Fetch(request,output);}
+        public Task<string> FetchAsync(MusicRequest request,Stream output,IProgress<double>? progress,CancellationToken ct){Calls++;Progress?.Invoke(progress);return Fetch(request,output);}
     }
     private sealed class Http(Func<HttpRequestMessage,HttpResponseMessage> response) : HttpMessageHandler
     {
@@ -39,7 +40,33 @@ internal static class TransferTests
     public static async Task RunAsync()
     {
         LinksAndMatching();Limits();await Routing();await DurableHandoff();await Catalogs();await QueueFailures();
-        await Mp3WhenNoFlac();await SearchBesideDownload();
+        await Mp3WhenNoFlac();await SearchBesideDownload();await CompletedBytesAreNotASavedFile();
+    }
+    private static async Task CompletedBytesAreNotASavedFile()
+    {
+        Check.Section("100% bytes while checking the backup is not download completion");
+        var checking = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var release = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var first = new Source("Music Hunters") { Progress = p => p?.Report(1), Fetch = async (_, s) => { await s.WriteAsync(Encoding.ASCII.GetBytes("ID3 mp3 audio")); return "mp3"; } };
+        var backup = new Source("DeezLoad") { Fetch = async (_, _) => { checking.TrySetResult(); await release.Task; throw new TrackUnavailableException("not there"); } };
+        var sources = new MusicSources(first, backup, _ => { }, allowMp3: () => true);
+        using var downloads = new Downloads(_ => { });
+        var folder = Check.NewFolder("truthful-download-progress");
+        var runningShares = new List<double>();
+        downloads.Changed += d => { if (d.State == DownloadState.Running) lock(runningShares) runningShares.Add(d.Progress); };
+        var item = downloads.Start(sources.Track(new("Leak", "Artist", 180)), folder);
+        try
+        {
+            await checking.Task.WaitAsync(TimeSpan.FromSeconds(5));
+            var row = new FinderDownloadQueue(downloads).Snapshot().Single();
+            Check.True(row.Detail.Contains("MP3 ready") && row.Detail.Contains("DeezLoad"), "row tells the user the backup is being checked while MP3 is ready");
+            Check.True(item.Progress < 1 && item.State == DownloadState.Running, "backup waiting cannot remain at 100%");
+            lock(runningShares) Check.True(runningShares.All(p => p < 1), "no running notification claims the file is saved");
+            Check.False(Directory.EnumerateFiles(folder, "*.mp3").Any(), "unfinished download is not published to the library");
+        }
+        finally { release.TrySetResult(); }
+        await Check.UntilAsync(() => downloads.Active.Count == 0, "fallback download completes after the backup answers");
+        Check.True(item.State == DownloadState.Saved && item.Progress == 1 && File.Exists(item.SavedPath), "100% means a saved playable file, with its final path");
     }
     private static async Task Mp3WhenNoFlac()
     {
@@ -48,6 +75,16 @@ internal static class TransferTests
         Source Mp3(string id)=>new(id){Fetch=async(_,output)=>{await output.WriteAsync(Encoding.ASCII.GetBytes("ID3 mp3 audio"));return "mp3";}};
         Source Missing(string id)=>new(id){Fetch=(_,_)=>throw new TrackUnavailableException("not there")};
         var notices=new List<string>();
+        foreach (var reverse in new[] { false, true })
+        {
+            var mp3 = Mp3(reverse ? "DeezLoad" : "Music Hunters"); var spare = Missing("backup");
+            using var immediate = new MemoryStream();
+            Check.Equal("mp3", await new MusicSources(mp3, spare, _ => { }, allowMp3: () => true, preferFlac: () => false)
+                .FetchAsync(request, immediate, null, default), "save-immediately preference accepts MP3 from either provider");
+            Check.Equal(0, spare.Calls, "save-immediately preference makes no unnecessary backup request");
+        }
+        Check.Equal("mp3", DeezLoadSource.TransferExtension(new TL.Document { mime_type = "audio/mpeg" }), "DeezLoad accepts MP3 even without a filename");
+        Check.Equal("flac", DeezLoadSource.TransferExtension(new TL.Document { mime_type = "audio/flac" }), "DeezLoad still accepts FLAC without a filename");
         using(var output=new MemoryStream())
         {
             var hunters=Mp3("Music Hunters");var deez=Missing("DeezLoad");

@@ -108,6 +108,7 @@ internal static class Downloader
             await using (var output = new FileStream(partial, FileMode.Create, FileAccess.ReadWrite, FileShare.None, 81920, useAsync: true))
             {
                 extension = await track.Fetch(output, progress, ct).ConfigureAwait(false);
+                TransferProgress.Stage(progress, "Checking and saving the audio…");
                 length = output.Length;
             }
             if (!AudioExtensions.Contains(extension)) throw new InvalidDataException($"The bot sent a \".{extension}\" file, which is not a song.");

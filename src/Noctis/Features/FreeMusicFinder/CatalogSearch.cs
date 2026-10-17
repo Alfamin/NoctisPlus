@@ -15,7 +15,7 @@ internal sealed partial class ArtistCatalog
     public Task<CatalogResult<List<CatalogSearchSong>>> SearchSongsAsync(string query, CancellationToken ct)
     {
         query = SearchText(query);
-        return Cached("songs-search:" + query.ToUpperInvariant(), TimeSpan.FromDays(1), false, async () =>
+        return Cached("songs-search-v2:" + query.ToUpperInvariant(), TimeSpan.FromDays(1), false, async () =>
         {
             try
             {
@@ -55,6 +55,30 @@ internal sealed partial class ArtistCatalog
                 return RelevanceEditions(Results(data.RootElement).Where(a => Text(a, "wrapperType") == "collection").Select(AppleRelease).Where(a => a is not null).Cast<CatalogRelease>());
             }
         }, ct, fallback: rows => rows.Count > 0 && rows.All(r => r.Id.StartsWith("apple:", StringComparison.Ordinal)));
+    }
+    /// <summary>Disambiguate strong same-title recordings using public artist reach. Only an ambiguous
+    /// title needs these small cached lookups; the first results are already visible while they run.</summary>
+    internal async Task<List<CatalogSearchSong>> RefineTitleAsync(FinderQuery query, List<CatalogSearchSong> songs, CancellationToken ct)
+    {
+        if (query.Artist.Length > 0) return songs;
+        var candidates = songs.Where(s => BotText.Key(s.Song.Title) == BotText.Key(query.Text) && s.Song.Popularity >= 300000)
+            .SelectMany(s => s.Song.Artists.Take(1)).Where(a => a.Id.StartsWith("deezer:")).DistinctBy(a => a.Id).Take(3).ToList();
+        if (candidates.Count < 2) return songs;
+        var reach = await Task.WhenAll(candidates.Select(async a =>
+        {
+            try
+            {
+                var result = await Cached("artist-reach-v1:" + a.Id, TimeSpan.FromDays(7), false, async () =>
+                {
+                    using var data = await Get("deezer", "/artist/" + Split(a.Id).Id, ct);
+                    return (int)Math.Clamp(Number(data.RootElement, "nb_fan"), 0, 100_000_000);
+                }, ct);
+                return (a.Id, Fans: result.Value);
+            }
+            catch (Exception ex) when (Recoverable(ex)) { return (a.Id, Fans: 0); }
+        }));
+        var byId = reach.ToDictionary(a => a.Id, a => a.Fans);
+        return songs.Select(s => s with { Song = s.Song with { ArtistReach = s.Song.Artists.Take(1).Select(a => byId.GetValueOrDefault(a.Id)).FirstOrDefault() } }).ToList();
     }
     internal static List<CatalogRelease> RelevanceEditions(IEnumerable<CatalogRelease> values)
     {
@@ -134,6 +158,12 @@ internal static class SearchRanking
             if (query.Artist.Length > 0)
                 score = Math.Max(Fit(query.Text, s.Song.Title, by), Fit(query.Artist, by) >= 60 ? Fit(query.Title, s.Song.Title) + Fit(query.Artist, by) * .35 : 0);
             if (BotText.Key(query.Title) == BotText.Key(BotText.Plain(s.Song.Title))) score += 8;
+            // An exact title can be a famous recording rather than a literal artist namesake.
+            // Use the provider's actual recording rank, never an artist-name allowlist. Non-title
+            // (artist/featured-artist) searches retain the provider's existing order.
+            if (BotText.Key(query.Title) == BotText.Key(BotText.Plain(s.Song.Title)))
+                score += 24 * Math.Clamp(s.Song.Popularity / 1_000_000d, 0, 1) +
+                    (s.Song.ArtistReach > 0 ? 8 * Math.Log10(1 + s.Song.ArtistReach) : 0);
             if (artistIntent is not null && query.Artist.Length == 0 && s.Song.Artists.Any(a => a.Id == artistIntent.Id)) score = Math.Min(95, score + 40);
             var position = songs.ToList().FindIndex(a => a.Song.Id == s.Song.Id);
             output.Add(new("Songs", s.Song.Id, s.Song.Title, "Song · " + by, score + 3 + 8d / (1 + position * .2), Track: s));
@@ -146,7 +176,11 @@ internal static class SearchRanking
             var title = Regex.Replace(a.Title, @"\s*[\(\[]deluxe(?:\s+(?:edition|version))?[\)\]]", "", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant);
             var score = Math.Max(Fit(query.Term, a.Title, a.Artist.Name), Fit(query.Term, title, a.Artist.Name));
             if (query.Artist.Length > 0) score = Math.Max(Fit(query.Text, a.Title, a.Artist.Name), Fit(query.Artist, a.Artist.Name) >= 60 ? Fit(query.Title, a.Title) + Fit(query.Artist, a.Artist.Name) * .35 : 0);
-            output.Add(new("Albums", a.Id, a.Title, (a.Kind is "single" ? "Single" : a.Kind == "ep" ? "EP" : "Album") + " · " + a.Artist.Name, score + 7 + 12d / (1 + position * .2), Album: a));
+            score += 7 + 12d / (1 + position * .2);
+            if (a.Kind == "album" && a.Count > 1 && BotText.Key(query.Title) == BotText.Key(title))
+                foreach (var hit in output.Where(h => h.Track is { } track && BotText.Key(query.Title) == BotText.Key(BotText.Plain(track.Song.Title)) && track.Song.Artists.Any(by => by.Id == a.Artist.Id)))
+                    score = Math.Max(score, hit.Score + 1);
+            output.Add(new("Albums", a.Id, a.Title, (a.Kind is "single" ? "Single" : a.Kind == "ep" ? "EP" : "Album") + " · " + a.Artist.Name, score, Album: a));
         }
         // Artists is a view of this music search, not another literal-name lookup. Link
         // relevant tracks/releases to their credited source IDs without guessing names.

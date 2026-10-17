@@ -34,6 +34,7 @@ public sealed class FreeMusicPlugin : INoctisPlugin
     private IPluginHost? _host;
     private TelegramAccount? _telegram;
     private MusicSources? _bot;
+    private CancellationTokenSource _qualityStop = new();
     private PlaylistTransfers? _transfers;
     private SpotifyPlaylists? _playlists;
     private Downloads? _downloads;
@@ -48,6 +49,7 @@ public sealed class FreeMusicPlugin : INoctisPlugin
     // Read on the threads that connect to Telegram; settings themselves are only read on the UI thread.
     private volatile string _proxy = "";
     private volatile bool _allowMp3 = true;
+    private volatile AudioQuality _preferredQuality = AudioQuality.FLAC;
     private readonly Func<string, string, ArtistCatalog> _catalogFactory;
     private ForYouSource? _forYou;
     private FinderOnlineSearch? _online;
@@ -71,13 +73,16 @@ public sealed class FreeMusicPlugin : INoctisPlugin
 
     public void Initialize(IPluginHost host)
     {
+        if (_qualityStop.IsCancellationRequested) { _qualityStop.Dispose(); _qualityStop = new(); }
         _host = host;
         _proxy = host.Settings.GetString(ProxyKey) ?? "";
         _allowMp3 = host.Settings.GetBool(AllowMp3Key, true);
+        _preferredQuality = host.Settings.GetString("preferredQuality") == "MP3" ? AudioQuality.MP3 : AudioQuality.FLAC;
         _lastFmKey = host.Settings.GetString(LastFmKey)?.Trim() ?? "";
         _telegram = new TelegramAccount(Path.Combine(host.DataDirectory, "telegram.dat"), () => _proxy, Log);
         _bot = new MusicSources(new HunterMusicSource(_telegram,Log),new DeezLoadSource(_telegram,Announce),Announce,
-            Path.Combine(host.DataDirectory,"source-limits.json"),allowMp3:()=>_allowMp3);
+            Path.Combine(host.DataDirectory,"source-limits.json"),allowMp3:()=>_preferredQuality == AudioQuality.MP3 || _allowMp3,
+            preferFlac: () => _preferredQuality == AudioQuality.FLAC, quality: () => _preferredQuality);
         _downloads = new Downloads(Log,Path.Combine(host.DataDirectory,"download-queue.json"),_bot.Track);
         _transfers = new PlaylistTransfers(_telegram,_bot,_downloads,Path.Combine(host.DataDirectory,"playlist-queue.json"),Owns,
             new PlaylistCatalog(PlaylistCatalog.MetadataHandler(_proxy,Log)));
@@ -129,6 +134,7 @@ public sealed class FreeMusicPlugin : INoctisPlugin
 
     public void Shutdown()
     {
+        _qualityStop.Cancel();
         if (ReferenceEquals(Current, this)) Current = null;
         if (_host is not null) _host.Settings.Changed -= OnSettingChanged;
         if (ReferenceEquals(Noctis.Services.Search.OnlineMusicSearch.Current, _online)) Noctis.Services.Search.OnlineMusicSearch.Current = null;
@@ -183,6 +189,18 @@ public sealed class FreeMusicPlugin : INoctisPlugin
         }
         else if (key == ShortcutKey) ApplyShortcut();
         else if (key == AllowMp3Key) _allowMp3 = _host?.Settings.GetBool(AllowMp3Key, true) ?? true;
+        else if (key == "preferredQuality")
+        {
+            _preferredQuality = _host?.Settings.GetString(key) == "MP3" ? AudioQuality.MP3 : AudioQuality.FLAC;
+            if (_telegram?.IsLoggedIn == true) _ = SynchronizeQualityAsync();
+        }
+    }
+
+    private async Task SynchronizeQualityAsync()
+    {
+        try { if (_bot is not null) await _bot.SynchronizeQualityAsync(_qualityStop.Token).ConfigureAwait(false); }
+        catch (OperationCanceledException) when (_qualityStop.IsCancellationRequested) { }
+        catch (Exception ex) { Announce("Audio quality not confirmed: " + ex.Message); }
     }
 
     private void ApplyShortcut()

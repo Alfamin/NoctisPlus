@@ -78,6 +78,24 @@ internal sealed class TelegramAccount : ITelegramSignIn, IDisposable
 
     private readonly Dictionary<string, User> _bots = new(StringComparer.OrdinalIgnoreCase);
     private readonly HashSet<string> _started = new(StringComparer.OrdinalIgnoreCase);
+    private readonly SemaphoreSlim _qualityGate = new(1, 1);
+    private readonly Dictionary<string, (Client Client, AudioQuality Quality)> _qualities = new(StringComparer.OrdinalIgnoreCase);
+
+    public async Task SetQualityAsync(string username, string provider, AudioQuality quality, CancellationToken ct)
+    {
+        await _qualityGate.WaitAsync(ct).ConfigureAwait(false);
+        try
+        {
+            var client = await ConnectAsync(ct).ConfigureAwait(false);
+            if (_qualities.TryGetValue(username, out var set) && ReferenceEquals(set.Client, client) && set.Quality == quality) return;
+            var user = await BotAsync(client, username).ConfigureAwait(false);
+            await StartBotAsync(client, user, username, ct).ConfigureAwait(false);
+            await BotQuality.ApplyAsync(provider, new TelegramQualityConversation(client, user, provider), quality, ct).ConfigureAwait(false);
+            _qualities[username] = (client, quality);
+            _log?.Invoke(provider + " confirmed preferred quality: " + quality);
+        }
+        finally { _qualityGate.Release(); }
+    }
     private Client? _botsClient;
 
     /// <summary>
@@ -540,9 +558,9 @@ internal sealed class TelegramBotSource : IHunterBotSource
     }
 
     /// <summary>The extension to save a file under, or null when it is not a song file.</summary>
-    private static string? Extension(Document document)
+    internal static string? Extension(Document document)
     {
-        var fromName = Path.GetExtension(document.Filename ?? "").TrimStart('.').ToLowerInvariant();
+        var fromName = Path.GetExtension(document.attributes?.OfType<DocumentAttributeFilename>().FirstOrDefault()?.file_name ?? "").TrimStart('.').ToLowerInvariant();
         if (Downloader.AudioExtensions.Contains(fromName)) return fromName;
         // No usable name ("Mr. Brightside" ends in no extension at all): the declared type decides.
         return document.mime_type switch

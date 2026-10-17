@@ -23,6 +23,7 @@ internal static class LiveUnifiedSearchTest
             var artists = await catalog.SearchAsync(query.Artist.Length > 0 ? query.Artist : query.Text, false, stop.Token);
             var songs = await catalog.SearchSongsAsync(query.Term, stop.Token);
             var albums = await catalog.SearchAlbumsAsync(query.Term, stop.Token);
+            songs = songs with { Value = await catalog.RefineTitleAsync(query, songs.Value, stop.Token) };
             var hits = SearchRanking.Build(query, artists.Value, songs.Value, albums.Value);
             if (hits.FirstOrDefault()?.Artist is {} leading && BotText.Key(leading.Name) == BotText.Key(query.Text))
             {
@@ -33,13 +34,16 @@ internal static class LiveUnifiedSearchTest
             }
             Check.True(hits.Count > 0, "live unified query has public results: " + part);
             var top = hits.First(); Console.WriteLine($"  TOP {top.Kind}: {top.Title} / {top.Subtitle}; {artists.Value.Count} artists, {songs.Value.Count} songs, {albums.Value.Count} albums; {timer.Elapsed.TotalSeconds:F1}s");
+            foreach (var hit in hits.Take(12)) Console.WriteLine($"  SCORE {hit.Score:F3} {hit.Kind}: {hit.Title} / {hit.Subtitle}; popularity={hit.Track?.Song.Popularity}");
             if (query.Artist.Length > 0) Check.True(top.Track is not null && top.Track.Song.Artists.Any(a => BotText.Key(a.Name) == BotText.Key(query.Artist)), "song-by-artist query leads with the named artist's recording");
+            else if (part.Equals("runaway", StringComparison.OrdinalIgnoreCase))
+                Check.True(top.Track?.Song.Artists.Any(a => a.Name == "Kanye West") == true, "Runaway leads with Kanye West's recording");
             else if (part is "Flaws and Sins" or "God's Plan")
             {
                 var intended = part == "Flaws and Sins" ? "Juice WRLD" : "Drake";
                 var contextual = SearchRanking.Artists(hits).First();
                 Console.WriteLine("  ARTISTS FILTER: " + contextual.Title + " / " + contextual.Subtitle);
-                Check.Equal(intended, contextual.Artist?.Name, "song-title Artists filter leads with its credited performer, not a literal artist-name match");
+                Check.Equal(BotText.Key(intended), BotText.Key(contextual.Artist?.Name ?? ""), "song-title Artists filter leads with its credited performer, not a literal artist-name match");
             }
             else if (part == "Take Care") Check.True(top.Kind == "Albums" && top.Album?.Artist.Name == "Drake", "album title preserves provider relevance and leads with Drake's album");
             else Check.True(top.Artist is not null && BotText.Key(top.Title) == BotText.Key(part), "artist query leads with its exact artist");

@@ -552,7 +552,7 @@
                                         <MenuItem.Header>
                                             <StackPanel Margin="0,5" Spacing="2">
                                                 <TextBlock Text="{loc:T Main.ImportPlaylist}" FontSize="13" FontWeight="SemiBold" />
-                                                <TextBlock Text="{loc:T Main.FromM3uM3u8File}" FontSize="11" Opacity="0.55" />
+                                                <TextBlock Text="Spotify / Deezer · .m3u / .m3u8" FontSize="11" Opacity="0.55" />
                                             </StackPanel>
                                         </MenuItem.Header>
                                     </MenuItem>

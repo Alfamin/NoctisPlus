@@ -79,6 +79,9 @@ internal sealed class FinderOnlineSearch : IOnlineMusicSearch
             yield return Build(query, artists, songs, albums, matches, complete: false, warnings);
         }
 
+        songs = await catalog.RefineTitleAsync(query, songs, ct).ConfigureAwait(false);
+        yield return Build(query, artists, songs, albums, matches, complete: false, warnings);
+
         // An artist search ("drake"): that artist's own top songs lead the song list.
         var hits = SearchRanking.Build(query, artists, songs, albums);
         if (hits.FirstOrDefault() is { Artist: { } leading } && BotText.Key(leading.Name) == BotText.Key(text))
@@ -186,7 +189,7 @@ internal sealed class FinderOnlineSearch : IOnlineMusicSearch
         if (d is null) return OnlineDownloadStatus.None;
         return d.State switch
         {
-            DownloadState.Running => new(OnlineDownloadState.Downloading, Math.Clamp(d.Progress, 0, 1)), // a 0..1 share
+            DownloadState.Running => new(OnlineDownloadState.Downloading, Math.Clamp(d.Progress, 0, 1), d.Stage), // a 0..1 share
             DownloadState.Saved or DownloadState.AlreadyThere => new(OnlineDownloadState.Saved, 1),
             DownloadState.Failed => new(OnlineDownloadState.Failed, 0, d.Error),
             DownloadState.Cancelled => OnlineDownloadStatus.None,

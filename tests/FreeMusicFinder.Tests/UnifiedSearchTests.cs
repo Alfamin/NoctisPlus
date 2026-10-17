@@ -55,6 +55,10 @@ internal static class UnifiedSearchTests
         Check.Equal(Main.Id, rank[0].Artist?.Id, "an artist query leads with the exact artist supported by song identities, even after a namesake");
         Check.True(rank.Any(h => h.Artist?.Id == Other.Id), "small namesakes remain available rather than filtered out");
         var songArtist = SearchRanking.Build(FinderQuery.Parse("Flaws & Sins"), [new("deezer:999", "Flaws & Sins")], songs, []);
+        var runaway = Song(9000, "Runaway", new("deezer:1", "Kanye West")) with { Song = new("deezer:9000", "Runaway", [new("deezer:1", "Kanye West")], 548, true, Popularity: 950000) };
+        var titleRank = SearchRanking.Build(FinderQuery.Parse("runaway"), [new("deezer:9999", "Runaway")],
+            [Song(9001, "Runaway", new("deezer:2", "Unknown singer")) with { Song = new("deezer:9001", "Runaway", [new("deezer:2", "Unknown singer")], 180, true, Popularity: 1000) }, runaway], []);
+        Check.Equal(runaway.Song.Id, titleRank.First().Track?.Song.Id, "a popular exact recording beats an obscure exact artist and low-popularity recording");
         Check.Equal(Main.Id, SearchRanking.Artists(songArtist).First().Artist?.Id, "Artists filter for a song title leads with the credited performer rather than a literal-name namesake");
         Check.True(SearchRanking.Artists(songArtist).First().Subtitle.Contains("Artist of “Flaws & Sins”"), "artist result explains the song relationship using catalog metadata");
         Check.True(songArtist.Any(h => h.Artist?.Id == "deezer:999"), "literal name match is retained below relevant song artists");
@@ -162,7 +166,7 @@ internal static class UnifiedSearchTests
     private static void PartialUi()
     {
         var folder = Check.NewFolder("unified-partial-ui");
-        ArtistIdentityTests.Seed(folder, "songs-search:SLOW", new[] { Song(101, "Cached song") });
+        ArtistIdentityTests.Seed(folder, "songs-search-v2:SLOW", new[] { Song(101, "Cached song") });
         ArtistIdentityTests.Seed(folder, "albums-search-v2:SLOW", new[] { Orbit });
         int stopped = 0;
         using var catalog = DiscoveryTests.Catalog(folder, new() { Override = async (_, ct) =>

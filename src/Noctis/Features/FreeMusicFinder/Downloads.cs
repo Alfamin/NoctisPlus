@@ -3,12 +3,19 @@ namespace FreeMusicFinder;
 // Keep the existing numeric values for saved 2.5 queues.
 internal enum DownloadState { Queued, Running, Saved, AlreadyThere, Failed, Cancelled, Waiting, Removed }
 
+/// <summary>A transfer has stages as well as bytes: a completed MP3 may still await a FLAC answer.</summary>
+internal interface IDownloadProgress : IProgress<double>
+{
+    void Stage(string text);
+}
+
 internal sealed class Download(BotTrack track, string folder)
 {
     public BotTrack Track { get; } = track;
     public string Folder { get; } = folder;
     public DownloadState State { get; internal set; }
     public double Progress { get; internal set; }
+    public string Stage { get; internal set; } = "";
     public string Error { get; internal set; } = "";
     public DateTimeOffset? RetryAt { get; internal set; }
     public bool Priority { get; internal set; }
@@ -247,7 +254,7 @@ internal sealed class Downloads : IDisposable
                     {
                         transfer = CancellationTokenSource.CreateLinkedTokenSource(_stop.Token);
                         _current = download; _currentStop = transfer;
-                        download.State = DownloadState.Running; download.Error = ""; download.RetryAt = null; SaveOrLog();
+                        download.State = DownloadState.Running; download.Error = ""; download.Stage = ""; download.Progress = 0; download.RetryAt = null; SaveOrLog();
                     }
                     else if (eligible.Length > 0)
                         delay = TimeSpan.FromMilliseconds(Math.Clamp((eligible.Min(d => d.RetryAt)!.Value - DateTimeOffset.UtcNow).TotalMilliseconds, 10, 60000));
@@ -295,13 +302,16 @@ internal sealed class Downloads : IDisposable
                 _log($"removed {removed} unfinished downloads left in {download.Folder}");
             Raise(download);
             var outcome = await Downloader.DownloadAsync(download.Track, download.Folder, new Report(p =>
-            { download.Progress = p; Raise(download); }), ct).ConfigureAwait(false);
+            { download.Progress = double.IsFinite(p) ? Math.Clamp(p, 0, .99) : 0; download.Stage = ""; Raise(download); },
+                stage => { download.Stage = stage; download.Progress = 0; Raise(download); }), ct).ConfigureAwait(false);
             var savedPath = Downloader.FindExisting(download.Folder, download.Track.FileName);
             lock (_gate)
             {
                 if (download.State != DownloadState.Removed)
                 {
                     download.SavedPath = savedPath;
+                    download.Stage = "";
+                    download.Progress = 1;
                     download.State = outcome == DownloadOutcome.Saved ? DownloadState.Saved : DownloadState.AlreadyThere;
                 }
             }
@@ -330,5 +340,9 @@ internal sealed class Downloads : IDisposable
     }
     private void Raise(Download d) { try { Changed?.Invoke(d); } catch (Exception ex) { _log("download listener failed: " + ex.Message); } }
     private void RaiseFinished(string text) { try { Finished?.Invoke(text); } catch (Exception ex) { _log("download listener failed: " + ex.Message); } }
-    private sealed class Report(Action<double> report) : IProgress<double> { void IProgress<double>.Report(double value) => report(value); }
+    private sealed class Report(Action<double> report, Action<string> stage) : IDownloadProgress
+    {
+        void IProgress<double>.Report(double value) => report(value);
+        public void Stage(string text) => stage(text);
+    }
 }

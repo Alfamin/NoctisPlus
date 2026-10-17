@@ -7,7 +7,7 @@ namespace FreeMusicFinder;
 
 internal sealed record CatalogArtist(string Id, string Name, string Genre = "", string Picture = "");
 internal sealed record CatalogRelease(string Id, string Title, CatalogArtist Artist, string Date, string Kind, int Count, bool? Explicit = null, string Artwork = "");
-internal sealed record CatalogSong(string Id, string Title, List<CatalogArtist> Artists, double? Seconds, bool? Explicit, int Disc = 1, int Number = 0)
+internal sealed record CatalogSong(string Id, string Title, List<CatalogArtist> Artists, double? Seconds, bool? Explicit, int Disc = 1, int Number = 0, int Popularity = 0, int ArtistReach = 0)
 {
     // Apple IDs identify metadata, not a playable/downloadable URL for either bot.
     public MusicRequest Request => new(Title, string.Join(", ", Artists.Select(a => a.Name)), Seconds,
@@ -431,7 +431,7 @@ internal sealed partial class ArtistCatalog : IDisposable
     {
         var artists = t.TryGetProperty("contributors", out var cs) && cs.ValueKind == JsonValueKind.Array ? cs.EnumerateArray().Select(DeezerArtist).Where(a => a is not null).Cast<CatalogArtist>().DistinctBy(a => a.Id).ToList() : [];
         if (artists.Count == 0 && t.TryGetProperty("artist", out var by) && DeezerArtist(by) is {} artist) artists.Add(artist);
-        return Id(t, "id", "deezer") is {} id && Text(t, "title") is { Length: > 0 } title && artists.Count > 0 ? new(id, title, artists, Duration(Number(t, "duration")), Flag(t, "explicit_lyrics"), (int)Math.Clamp(Number(t, "disk_number"), 1, 100), (int)Math.Clamp(Number(t, "track_position"), 0, 10000)) : null;
+        return Id(t, "id", "deezer") is {} id && Text(t, "title") is { Length: > 0 } title && artists.Count > 0 ? new(id, title, artists, Duration(Number(t, "duration")), Flag(t, "explicit_lyrics"), (int)Math.Clamp(Number(t, "disk_number"), 1, 100), (int)Math.Clamp(Number(t, "track_position"), 0, 10000), (int)Math.Clamp(Number(t, "rank"), 0, 1_000_000)) : null;
     }
     private static CatalogSong? AppleSong(JsonElement t) => Text(t, "kind") == "song" && Id(t, "trackId", "apple") is {} id && Text(t, "trackName") is { Length: > 0 } title && AppleArtist(t) is {} artist
         ? new(id, title, [artist], Duration(Number(t, "trackTimeMillis") / 1000d), Explicit(t, "trackExplicitness"), (int)Math.Clamp(Number(t, "discNumber"), 1, 100), (int)Math.Clamp(Number(t, "trackNumber"), 0, 10000)) : null;

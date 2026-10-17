@@ -396,10 +396,28 @@ public sealed partial class SearchViewModel : ViewModelBase, ISearchable, IDispo
     }
 
     private object? PickTop(List<SearchSongItem> songs, List<SearchArtistItem> artists, List<SearchAlbumItem> albums)
+        => ChooseTop(_query, songs, artists, albums, _online);
+
+    internal static object? ChooseTop(string query, List<SearchSongItem> songs, List<SearchArtistItem> artists,
+        List<SearchAlbumItem> albums, OnlineSearchResult? online)
     {
-        if (_query.Length == 0) return null;
-        var key = NameKey(_query);
-        // Typing an artist's name: the artist leads (library tile first when there is one).
+        if (query.Length == 0) return null;
+        var key = NameKey(query);
+        // A local exact recording remains instant and wins an equal-relevance catalog match.
+        if (songs.FirstOrDefault(s => s.IsLocal && NameKey(s.Title) == key) is { } owned) return owned;
+        // Respect the catalog's cross-kind relevance. Previously ANY exact artist name overrode
+        // every song score, so an obscure artist called Runaway stole Kanye West's top result.
+        if (online?.Top is { } top)
+        {
+            object? result = top.Kind switch
+            {
+                "song" => songs.FirstOrDefault(s => s.Online?.Id == top.Id || s.Local is { } t && online.Songs.Any(o => o.Id == top.Id && o.LocalTrackId == t.Id)),
+                "artist" => artists.FirstOrDefault(a => a.Online?.Id == top.Id || a.Local is not null && online.Artists.Any(o => o.Id == top.Id && NameKey(o.Name) == NameKey(a.Name))),
+                "album" => albums.FirstOrDefault(a => a.Online?.Id == top.Id),
+                _ => null,
+            };
+            if (result is not null) return result;
+        }
         if (artists.FirstOrDefault(a => NameKey(a.Name) == key) is { } artist) return artist;
         if (albums.FirstOrDefault(a => NameKey(a.Title) == key) is { } album && songs.FirstOrDefault(s => NameKey(s.Title) == key) is null) return album;
         return songs.FirstOrDefault() ?? (object?)artists.FirstOrDefault() ?? albums.FirstOrDefault();

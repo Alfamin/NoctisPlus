@@ -30,7 +30,7 @@ internal sealed class FinderDownloadQueue(Downloads downloads) : IDownloadQueue
     {
         var (state, detail) = d.State switch
         {
-            DownloadState.Running => (OnlineDownloadState.Downloading, d.Progress > 0 ? $"Downloading · {d.Progress:P0}" : "Asking for the file…"),
+            DownloadState.Running => (OnlineDownloadState.Downloading, d.Stage.Length > 0 ? d.Stage : d.Progress > 0 ? $"Downloading · {d.Progress:P0}" : "Asking for the file…"),
             DownloadState.Waiting => (OnlineDownloadState.Queued, d.RetryAt is { } at ? $"Waiting for the service · until {at.ToLocalTime():HH:mm}" : "Waiting for the service"),
             DownloadState.Failed => (OnlineDownloadState.Failed, d.Error.Length > 0 ? d.Error : "Could not download"),
             DownloadState.Saved => (OnlineDownloadState.Saved, "Downloaded"),
