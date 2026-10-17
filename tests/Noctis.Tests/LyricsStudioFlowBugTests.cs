@@ -139,6 +139,36 @@ public class LyricsStudioFlowBugTests : IDisposable
         Assert.Equal(2, vm.ReviewLines.Count);
     }
 
+    [AvaloniaFact]
+    public async Task ASpeechEngineThatWillNotLoad_SaysWhatToDo_NotWhichNuGetToInstall()
+    {
+        // Whisper.net's own text on a PC without AVX when the noavx runtime is missing (Discord 10-17).
+        var native = new PlatformNotSupportedException("AVX is not supported on this platform, and noavx runtime is not available. Install Whisper.net.Runtime.NoAvx for support on this platform.");
+        var engine = new Engine(_root) { OpenError = new WhisperEngineUnavailableException(native) };
+        var vm = Studio(engine, SongWithLrc("song"));
+        vm.Selected = vm.Queue[0];
+
+        await vm.UpgradeToWordTimingsCommand.ExecuteAsync(null);
+
+        var expected = Noctis.Localization.Loc.T(OperatingSystem.IsWindows() ? "LyricsStudio.EngineUnavailableWindows" : "LyricsStudio.EngineUnavailable");
+        Assert.Equal(expected, vm.RunStatusText);
+        Assert.DoesNotContain("NuGet", vm.RunStatusText, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("Whisper.net", vm.RunStatusText);
+        Assert.Equal(LyricsStudioViewModel.StudioStatus.Loaded, vm.Queue[0].Status);
+        Assert.True(vm.HasReview);
+    }
+
+    [Fact]
+    public void TheNoAvxSpeechEngineShipsBesideTheApp()
+    {
+        // Whisper.net loads runtimes/{rid} only on a CPU with AVX, AVX2 and FMA; without them
+        // it needs runtimes/noavx/{rid} (Whisper.net.Runtime.NoAvx), or Start fails.
+        if (System.Runtime.InteropServices.RuntimeInformation.ProcessArchitecture != System.Runtime.InteropServices.Architecture.X64) return;
+        var (rid, lib) = OperatingSystem.IsWindows() ? ("win-x64", "whisper.dll") : OperatingSystem.IsLinux() ? ("linux-x64", "libwhisper.so") : (null, null);
+        if (rid is null) return;
+        Assert.True(File.Exists(Path.Combine(AppContext.BaseDirectory, "runtimes", "noavx", rid, lib!)), $"runtimes/noavx/{rid}/{lib} is missing");
+    }
+
     // ── A finished song does not pull the review away mid-edit ────────────
 
     [AvaloniaFact]
@@ -293,6 +323,7 @@ public class LyricsStudioFlowBugTests : IDisposable
         public WhisperModelManager Models { get; }
         public bool WaitForCancel { get; set; }
         public bool FailToOpen { get; init; }
+        public Exception? OpenError { get; init; }
         public int Started => Volatile.Read(ref _started);
 
         public IDisposable OpenSession(WhisperModelSize model)
@@ -300,6 +331,7 @@ public class LyricsStudioFlowBugTests : IDisposable
             OpenedOnUiThread = Dispatcher.UIThread.CheckAccess();
             Interlocked.Increment(ref _openCalls);
             if (FailToOpen) throw new InvalidOperationException("model could not be loaded");
+            if (OpenError is { } error) throw error;
             if (OpenGate is { } gate && !OpenedOnUiThread) gate.Wait(TimeSpan.FromSeconds(10));
             return new Handle();
         }

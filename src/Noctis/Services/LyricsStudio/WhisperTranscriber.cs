@@ -1,9 +1,17 @@
 using Noctis.Helpers;
 using Whisper.net;
+using Whisper.net.LibraryLoader;
 
 namespace Noctis.Services.LyricsStudio;
 
 public sealed record Transcript(IReadOnlyList<RecognizedWord> Words, string Language);
+
+/// <summary>The speech engine's native library would not load on this PC (no build for its CPU,
+/// a missing system library); the model file is not at fault.</summary>
+public sealed class WhisperEngineUnavailableException : Exception
+{
+    public WhisperEngineUnavailableException(Exception inner) : base(inner.Message, inner) { }
+}
 
 /// <summary>
 /// Runs a Whisper ggml model over 16 kHz mono PCM and returns word-level timings. Tokens are
@@ -33,6 +41,7 @@ public sealed class WhisperTranscriber
         public Session(string modelPath, WhisperAlignmentHeadsPreset alignmentHeads = WhisperAlignmentHeadsPreset.None)
         {
             ModelPath = modelPath;
+            EnsureNativeEngine();
             _dtw = alignmentHeads != WhisperAlignmentHeadsPreset.None;
             _dtwShiftCs = DtwShiftCs(alignmentHeads);
             _factory = _dtw
@@ -181,6 +190,27 @@ public sealed class WhisperTranscriber
         }
 
         public void Dispose() => _factory.Dispose();
+
+        /// <summary>
+        /// Loads whisper.cpp on its own, before the model, so a native failure is told apart
+        /// from a bad model file. Whisper.net picks the folder by CPU: runtimes/{rid} needs AVX,
+        /// AVX2 and FMA, runtimes/noavx/{rid} (Whisper.net.Runtime.NoAvx) is the fallback. Without
+        /// it a PC with no AVX failed Start with "AVX is not supported on this platform, and
+        /// noavx runtime is not available" (Discord 10-17). The library's load is cached for the
+        /// process, failure included.
+        /// </summary>
+        private static void EnsureNativeEngine()
+        {
+            try
+            {
+                var info = WhisperFactory.GetRuntimeInfo();
+                DebugLogger.Info(DebugLogger.Category.Lyrics, "Whisper.Runtime", $"{RuntimeOptions.LoadedLibrary} | {info?.Trim()}");
+            }
+            catch (Exception ex)
+            {
+                throw new WhisperEngineUnavailableException(ex);
+            }
+        }
     }
 
     /// <summary>Language detection windows when the lyrics leave the language open (or there are none).</summary>

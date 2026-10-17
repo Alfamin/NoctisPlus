@@ -53,6 +53,15 @@ public sealed class ITunesArtworkService
         _http = http;
     }
 
+    /// <summary>
+    /// The largest box Apple's artwork CDN accepts: it serves the master (3000 px, or 4000 for
+    /// OK Computer) for any box up to 10000, and answers 400 "Invalid request parameter" above
+    /// it. Verified 2026-10-17: 10000x10000-999 → 200, 10001x10001-999 and the old
+    /// 100000x100000-999 → 400, and the uncompressed original on a5.mzstatic.com/us/r1000/0/
+    /// → 403 for every album tried — so Max fell through to the 300 px thumbnail.
+    /// </summary>
+    internal const int MaxArtworkBox = 10000;
+
     /// <summary>One iTunes search hit, with both a thumbnail and a hi-res URL.</summary>
     public sealed record ArtworkCandidate(
         long CollectionId,
@@ -61,7 +70,22 @@ public sealed class ITunesArtworkService
         string ThumbUrl,
         string StandardUrl,
         string HiResUrl,
-        string ViewUrl);
+        string ViewUrl)
+    {
+        /// <summary>
+        /// URLs to try for a pick, best first. Max goes to the master at maximum quality, then
+        /// the master at the CDN's normal quality (a large master at -999 can pass the 24 MB
+        /// image cap), then the standard 1000 px; the thumbnail is the last resort for both,
+        /// so a failed Max never lands below Standard.
+        /// </summary>
+        public IReadOnlyList<string> DownloadUrls(bool highestResolution)
+        {
+            var urls = highestResolution
+                ? new[] { HiResUrl, RewriteArtworkUrl(StandardUrl, $"{MaxArtworkBox}x{MaxArtworkBox}bb"), StandardUrl, ThumbUrl }
+                : new[] { StandardUrl, ThumbUrl };
+            return urls.Where(u => !string.IsNullOrWhiteSpace(u)).Distinct(StringComparer.Ordinal).ToList();
+        }
+    }
 
     public sealed record AnimatedArtworkVariant(
         string Label,
@@ -479,7 +503,7 @@ public sealed class ITunesArtworkService
 
         var thumb = RewriteArtworkUrl(artworkUrl, "300x300bb");
         var standard = RewriteArtworkUrl(artworkUrl, "1000x1000bb");
-        var hiRes = BuildUncompressedArtworkUrl(artworkUrl) ?? RewriteArtworkUrl(artworkUrl, "100000x100000-999");
+        var hiRes = RewriteArtworkUrl(artworkUrl, $"{MaxArtworkBox}x{MaxArtworkBox}-999");
         candidate = new ArtworkCandidate(id, name, artistName, thumb, standard, hiRes, viewUrl);
         return true;
     }
@@ -898,25 +922,5 @@ public sealed class ITunesArtworkService
         var rewritten = Regex.Replace(url, @"\d+x\d+bb\.(jpg|png|jpeg)$", $"{sizeSuffix}.$1",
             RegexOptions.IgnoreCase);
         return rewritten;
-    }
-
-    private static string? BuildUncompressedArtworkUrl(string url)
-    {
-        var hiRes = RewriteArtworkUrl(url, "100000x100000-999");
-        if (!Uri.TryCreate(hiRes, UriKind.Absolute, out var uri))
-            return null;
-
-        var marker = "/image/thumb/";
-        var path = uri.AbsolutePath;
-        var markerIndex = path.IndexOf(marker, StringComparison.OrdinalIgnoreCase);
-        if (markerIndex < 0)
-            return null;
-
-        var assetPath = path[(markerIndex + marker.Length)..];
-        var slash = assetPath.LastIndexOf('/');
-        if (slash <= 0)
-            return null;
-
-        return "https://a5.mzstatic.com/us/r1000/0/" + assetPath[..slash];
     }
 }

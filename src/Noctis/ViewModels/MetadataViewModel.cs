@@ -1705,10 +1705,14 @@ public partial class MetadataViewModel : ViewModelBase
         ArtworkSearchStatus = "Downloading…";
         try
         {
-            var url = useHighestResolution ? candidate.HiResUrl : candidate.StandardUrl;
-            var data = await _itunes.DownloadAsync(url)
-                       ?? await _itunes.DownloadAsync(candidate.ThumbUrl);
-            if (data is null or { Length: 0 } || !Services.HttpSafety.LooksLikeImage(data))
+            byte[]? data = null;
+            foreach (var url in candidate.DownloadUrls(useHighestResolution))
+            {
+                data = await _itunes.DownloadAsync(url);
+                if (data is { Length: > 0 } && Services.HttpSafety.LooksLikeImage(data)) break;
+                data = null;
+            }
+            if (data is null)
             {
                 ArtworkSearchStatus = "Download failed.";
                 return;
