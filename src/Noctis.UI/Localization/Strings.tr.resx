@@ -1571,6 +1571,9 @@
   <data name="Upmix.Surround" xml:space="preserve"><value>Surround</value><comment>Upmix mode</comment></data>
   <data name="Upmix.SurroundHint" xml:space="preserve"><value>Ortam sesi arkalara, geniş sahne öne</value><comment>Upmix mode hint</comment></data>
   <data name="Upmix.Note" xml:space="preserve"><value>Yalnızca yerleşik çıkış motoru. Özel Mod dosyanın kendi düzenini korur.</value><comment>Upmix footnote</comment></data>
+  <data name="Settings.HeadphoneSurround" xml:space="preserve"><value>Kulaklık Surround</value><comment>Text in SettingsView.axaml</comment></data>
+  <data name="Settings.HeadphoneSurroundDesc" xml:space="preserve"><value>5.1 ve 7.1 dosyalarını düz bir stereo miks yerine kulaklıkta uzamsal sese dönüştürür. Stereo şarkılar değişmez.</value><comment>Text in SettingsView.axaml</comment></data>
+  <data name="Settings.HeadphoneSurroundRestart" xml:space="preserve"><value>Bu değişikliği uygulamak için Noctis'i yeniden başlatın.</value><comment>Shown under Headphone Surround after a change, in SettingsView.axaml</comment></data>
 
   <data name="Server.AccountsMoved" xml:space="preserve"><value>Hesaplar ve cihaz eşitleme, Hesap ve Eşitleme'den yönetilir.</value><comment>Integrations → Noctis Server card footer</comment></data>
   <data name="Server.OpenAccountSync" xml:space="preserve"><value>Hesap ve Eşitleme'yi Aç</value><comment>Integrations → Noctis Server card button</comment></data>

@@ -344,6 +344,11 @@ public class AppSettings
     /// <summary>"Off" | "Duplicate" | "Surround" — see <see cref="Services.UpmixMode"/>.</summary>
     public string UpmixMode { get; set; } = "Off";
 
+    /// <summary>Settings → Audio: 5.1/7.1 files play binaurally (VLC's headphone mode) instead of
+    /// a plain stereo downmix. Stereo and mono pass untouched. Read at launch (VLC takes it as an
+    /// instance option), so a change applies the next time Noctis starts.</summary>
+    public bool HeadphoneSurround { get; set; }
+
     // ── YouTube downloads ──
 
     /// <summary>Where downloaded tracks land. Empty = "&lt;first music folder&gt;/YouTube".</summary>

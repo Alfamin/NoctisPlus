@@ -2343,6 +2343,9 @@ Quote phrases: album:"ok computer" · Years: year:1990-1999, year:&gt;2000</valu
   <data name="Upmix.Surround" xml:space="preserve"><value>Surround</value><comment>Upmix mode</comment></data>
   <data name="Upmix.SurroundHint" xml:space="preserve"><value>Ambience to the rears, wide stage in front</value><comment>Upmix mode hint</comment></data>
   <data name="Upmix.Note" xml:space="preserve"><value>Built-in output engine only. Exclusive Mode keeps the file's own layout.</value><comment>Upmix footnote</comment></data>
+  <data name="Settings.HeadphoneSurround" xml:space="preserve"><value>Headphone Surround</value><comment>Text in SettingsView.axaml</comment></data>
+  <data name="Settings.HeadphoneSurroundDesc" xml:space="preserve"><value>Turns 5.1 and 7.1 files into spatial headphone sound instead of a flat stereo mix. Stereo songs are not changed.</value><comment>Text in SettingsView.axaml</comment></data>
+  <data name="Settings.HeadphoneSurroundRestart" xml:space="preserve"><value>Restart Noctis to apply this change.</value><comment>Shown under Headphone Surround after a change, in SettingsView.axaml</comment></data>
 
   <data name="Server.AccountsMoved" xml:space="preserve"><value>Accounts and device sync are managed in Account &amp; Sync.</value><comment>Integrations → Noctis Server card footer</comment></data>
   <data name="Server.OpenAccountSync" xml:space="preserve"><value>Open Account &amp; Sync</value><comment>Integrations → Noctis Server card button</comment></data>

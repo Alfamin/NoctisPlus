@@ -5687,6 +5687,18 @@
     <value>Moteur de sortie intégré uniquement. Mode exclusif conserve la propre disposition du fichier.</value>
     <comment>Upmix footnote</comment>
   </data>
+  <data name="Settings.HeadphoneSurround" xml:space="preserve">
+    <value>Surround pour casque</value>
+    <comment>Text in SettingsView.axaml</comment>
+  </data>
+  <data name="Settings.HeadphoneSurroundDesc" xml:space="preserve">
+    <value>Transforme les fichiers 5.1 et 7.1 en son spatial au casque au lieu d'un mixage stéréo plat. Les morceaux stéréo ne changent pas.</value>
+    <comment>Text in SettingsView.axaml</comment>
+  </data>
+  <data name="Settings.HeadphoneSurroundRestart" xml:space="preserve">
+    <value>Redémarrez Noctis pour appliquer ce changement.</value>
+    <comment>Shown under Headphone Surround after a change, in SettingsView.axaml</comment>
+  </data>
   <data name="Server.AccountsMoved" xml:space="preserve">
     <value>La synchronisation des comptes et de l'appareil est gérée dans Compte &amp; Synchronisation.</value>
     <comment>Integrations → Noctis Server card footer</comment>

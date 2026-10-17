@@ -73,6 +73,7 @@ internal sealed class FakeAudioPlayer : IAudioPlayer
     public void SetPitchSemitones(double semitones) => PitchSemitones = semitones;
     public string UpmixMode { get; private set; } = "Off";
     public void SetUpmixMode(string mode) => UpmixMode = mode;
+    public bool HeadphoneSurroundActive { get; set; }
     public void PrepareNext(string filePath, long startPositionMs = -1) => PreparedPaths.Add(filePath);
     public bool PreparesRemoteStreams { get; set; }
     public int CancelledCount { get; private set; }

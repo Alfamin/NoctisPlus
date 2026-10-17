@@ -5687,6 +5687,18 @@
     <value>محرك الإخراج المدمج فقط. الوضع الحصري يحافظ على تخطيط الملف الخاص به.</value>
     <comment>Upmix footnote</comment>
   </data>
+  <data name="Settings.HeadphoneSurround" xml:space="preserve">
+    <value>صوت محيطي للسماعات</value>
+    <comment>Text in SettingsView.axaml</comment>
+  </data>
+  <data name="Settings.HeadphoneSurroundDesc" xml:space="preserve">
+    <value>يحوّل ملفات 5.1 و7.1 إلى صوت مكاني في السماعات بدلاً من مزيج ستيريو مسطّح. لا تتغير الأغاني الستيريو.</value>
+    <comment>Text in SettingsView.axaml</comment>
+  </data>
+  <data name="Settings.HeadphoneSurroundRestart" xml:space="preserve">
+    <value>أعد تشغيل Noctis لتطبيق هذا التغيير.</value>
+    <comment>Shown under Headphone Surround after a change, in SettingsView.axaml</comment>
+  </data>
   <data name="Server.AccountsMoved" xml:space="preserve">
     <value>تتم إدارة الحسابات ومزامنة الجهاز في الحساب والمزامنة.</value>
     <comment>Integrations → Noctis Server card footer</comment>

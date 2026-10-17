@@ -2591,6 +2591,7 @@ public partial class SettingsViewModel : ViewModelBase
     public void SetAudioPlayer(IAudioPlayer audioPlayer)
     {
         _audioPlayer = audioPlayer;
+        OnPropertyChanged(nameof(HeadphoneSurroundNeedsRestart));
         // Only surface the output-mode status while Exclusive Mode is enabled (it
         // describes the exclusive/fell-back-to-shared state). When exclusive is off
         // the line stays hidden. This also prevents a flicker: toggling exclusive

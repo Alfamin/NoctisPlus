@@ -3759,6 +3759,23 @@
                     <TextBlock Text="{loc:T Upmix.Note}" FontSize="11" Opacity="0.45" TextWrapping="Wrap"/>
                 </StackPanel>
             </Border>
+            <Border Classes="setting-row" IsVisible="{Binding IsHeadphoneSurroundSupported}">
+                <Grid ColumnDefinitions="*,Auto">
+                    <StackPanel Grid.Column="0" Spacing="2">
+                        <TextBlock Text="{loc:T Settings.HeadphoneSurround}" FontSize="15" FontWeight="SemiBold"/>
+                        <TextBlock Text="{loc:T Settings.HeadphoneSurroundDesc}"
+                                   FontSize="12" Opacity="0.5" TextWrapping="Wrap"/>
+                        <controls:CollapsibleContent IsOpen="{Binding HeadphoneSurroundNeedsRestart}" Lift="6">
+                            <TextBlock Text="{loc:T Settings.HeadphoneSurroundRestart}"
+                                       FontSize="12" Opacity="0.8" TextWrapping="Wrap" Margin="0,4,0,0"/>
+                        </controls:CollapsibleContent>
+                    </StackPanel>
+                    <controls:LottieToggle Grid.Column="1"
+                                          AutomationProperties.Name="{loc:T Settings.HeadphoneSurround}"
+                                          IsChecked="{Binding HeadphoneSurround}"
+                                          VerticalAlignment="Center"/>
+                </Grid>
+            </Border>
             <Border Classes="setting-row">
                 <StackPanel Spacing="10">
                     <Grid ColumnDefinitions="*,Auto">
