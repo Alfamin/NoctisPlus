@@ -82,13 +82,13 @@ internal sealed class ShuffleQueue
             try
             {
                 _player.ClearQueue();
-                _player.AddRangeToQueue(ordered.ToList(), null, false);
+                _player.AppendShuffleGenerated(ordered.ToList());
             }
             catch (Exception failed)
             {
                 // A failed append must not silently erase the user's upcoming songs.
                 if (!ReferenceEquals(_player.CurrentTrack, previousCurrent)) throw;
-                try { _player.ClearQueue(); _player.AddRangeToQueue(original, null, false); }
+                try { _player.ClearQueue(); _player.AppendShuffleGenerated(original); }
                 catch (Exception recovery) { throw new AggregateException("Queue application and recovery failed. No music files were changed.", failed, recovery); }
                 throw new InvalidOperationException("Shuffle could not be applied. Previous upcoming songs were restored; built-in Shuffle is off.", failed);
             }
@@ -96,10 +96,22 @@ internal sealed class ShuffleQueue
         else _player.ReplaceQueueAndPlay(ordered.ToList(), 0);
     }
 
-    /// <summary>Adds songs behind what is already upcoming. Nothing is cleared, moved or restarted.</summary>
+    /// <summary>
+    /// Starts the queue rule for a session: from now on songs the user adds go ahead of <paramref name="generated"/>
+    /// (and of everything the shuffle appends later), behind the user's earlier ones, in order.
+    /// </summary>
+    public void BeginSession(IEnumerable<Track> generated)
+        => _player.ShuffleGenerated = new HashSet<Track>(generated, ReferenceEqualityComparer.Instance);
+
+    /// <summary>Back to Noctis's normal queue: Add to Queue appends at the end again.</summary>
+    public void EndSession() => _player.ShuffleGenerated = null;
+
+    public bool InSession => _player.ShuffleGenerated != null;
+
+    /// <summary>Adds songs behind what is already upcoming (as the shuffle's own). Nothing is cleared, moved or restarted.</summary>
     public void AppendUpcoming(IReadOnlyList<Track> tracks)
     {
-        if (tracks.Count > 0) _player.AddRangeToQueue(tracks.ToList(), null, false);
+        if (tracks.Count > 0) _player.AppendShuffleGenerated(tracks.ToList());
     }
 
     /// <summary>Puts these songs in the upcoming queue instead of what is there; the playing song is not touched. If that
@@ -108,10 +120,10 @@ internal sealed class ShuffleQueue
     {
         var original = _player.UpNext.ToList();
         _player.ClearQueue();
-        try { _player.AddRangeToQueue(tracks.ToList(), null, false); }
+        try { _player.AppendShuffleGenerated(tracks.ToList()); }
         catch (Exception failed)
         {
-            try { _player.ClearQueue(); _player.AddRangeToQueue(original, null, false); }
+            try { _player.ClearQueue(); _player.AppendShuffleGenerated(original); }
             catch (Exception recovery) { throw new AggregateException("The queue could not be rearranged or put back. No music files were changed.", failed, recovery); }
             throw new InvalidOperationException("The queue could not be rearranged; it was left as Noctis made it.", failed);
         }

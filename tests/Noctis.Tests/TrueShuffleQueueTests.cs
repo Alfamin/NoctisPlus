@@ -85,6 +85,61 @@ public class TrueShuffleQueueTests
         Assert.Throws<InvalidOperationException>(() => queue.Snapshot(ShuffleScope.OpenPlaylist));
     }
 
+    [AvaloniaFact]
+    public void DuringASession_AddedSongsGoAheadOfTheShuffle_InOrder_WithoutDuplicates()
+    {
+        // Blueprint queue rule: songs the user adds stay ahead of generated songs, in order, in the native queue.
+        var (player, audio, _, tracks, queue) = Rig(8);
+        player.ReplaceQueueAndPlay([tracks[0]], 0);
+        Dispatcher.UIThread.RunJobs();
+        var plays = audio.PlayedPaths.Count;
+        queue.Apply([tracks[1], tracks[2], tracks[3]], keepCurrent: true);
+        queue.BeginSession(player.UpNext);
+
+        player.AddToQueue(tracks[4]);
+        player.AddToQueue(tracks[5]);
+        Assert.Equal(["Song 5", "Song 6", "Song 2", "Song 3", "Song 4"], Titles(player.UpNext));
+
+        player.AddRangeToQueue([tracks[6], tracks[2]]); // Song 3 was in the shuffle: it moves up, it is not doubled
+        Assert.Equal(["Song 5", "Song 6", "Song 7", "Song 3", "Song 2", "Song 4"], Titles(player.UpNext));
+
+        queue.AppendUpcoming([tracks[7]]);              // the shuffle's own refill goes behind everything...
+        player.AddToQueue(tracks[1]);                   // ...and the user's next song still goes ahead of the shuffle
+        Assert.Equal(["Song 5", "Song 6", "Song 7", "Song 3", "Song 2", "Song 4", "Song 8"], Titles(player.UpNext));
+
+        player.AddNext(tracks[3]);                       // Play Next keeps Noctis's own place: the very front
+        Assert.Equal("Song 4", player.UpNext[0].Title);
+        Assert.Equal(plays, audio.PlayedPaths.Count);    // nothing restarted the playing song
+
+        queue.EndSession();
+        player.AddToQueue(tracks[0]);
+        Assert.Equal("Song 1", player.UpNext[^1].Title); // normal Noctis queue again
+    }
+
+    [AvaloniaFact]
+    public void WithoutASession_AddToQueueAppendsAsNoctisAlwaysDid()
+    {
+        var (player, _, _, tracks, queue) = Rig(4);
+        player.ReplaceQueueAndPlay([tracks[0], tracks[1]], 0);
+        Dispatcher.UIThread.RunJobs();
+        Assert.False(queue.InSession);
+        player.AddToQueue(tracks[2]);
+        player.AddRangeToQueue([tracks[3]]);
+        Assert.Equal(["Song 2", "Song 3", "Song 4"], Titles(player.UpNext));
+    }
+
+    [Fact]
+    public void RollingQueue_HandsOutThePlanInWindows_AndKnowsWhatRemains()
+    {
+        var plan = Enumerable.Range(1, 5).Select(i => new Track { Title = "Song " + i }).Select(t => new ShuffleEntry(t, ShuffleQueue.SongOf(t))).ToList();
+        var roll = new RollingQueue(ShuffleMode.NoRepeats, ShuffleScope.WholeLibrary, false, null, plan, taken: 2, new());
+        Assert.Equal(3, roll.Remaining);
+        Assert.Equal(["Song 3", "Song 4"], Titles(roll.Take(2)));
+        Assert.Equal(["Song 5"], Titles(roll.Take(10)));
+        Assert.Equal(0, roll.Remaining);
+        Assert.Empty(roll.Take(1));
+    }
+
     [Fact]
     public void SameSongs_IgnoresPlayCountsAndTags_ButNotMembershipOrOrder()
     {

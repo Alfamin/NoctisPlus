@@ -1651,13 +1651,47 @@ public partial class PlayerViewModel : ViewModelBase
         }
     }
 
+    /// <summary>
+    /// Noctis Plus True Shuffle: while a custom shuffle runs, the upcoming rows it generated (by reference). Songs the
+    /// user adds with Add to Queue then go ahead of these, behind the user's earlier ones and in order, and a copy of
+    /// the same song further down the shuffle is dropped so it does not play twice. Null = Noctis's normal queue.
+    /// </summary>
+    internal HashSet<Track>? ShuffleGenerated { get; set; }
+
+    /// <summary>Where Add to Queue puts a song: the end, or in front of the shuffle's own rows while one runs.</summary>
+    private int UserQueueInsertIndex()
+    {
+        if (ShuffleGenerated is not { Count: > 0 } generated) return UpNext.Count;
+        for (var i = 0; i < UpNext.Count; i++) if (generated.Contains(UpNext[i])) return i;
+        return UpNext.Count;
+    }
+
+    private void DropShuffleCopies(IEnumerable<Track> tracks)
+    {
+        if (ShuffleGenerated is not { Count: > 0 } generated) return;
+        var ids = tracks.Select(t => t.Id).ToHashSet();
+        for (var i = UpNext.Count - 1; i >= 0; i--)
+            if (generated.Contains(UpNext[i]) && ids.Contains(UpNext[i].Id)) { generated.Remove(UpNext[i]); UpNext.RemoveAt(i); }
+    }
+
+    /// <summary>Noctis Plus True Shuffle: appends songs the shuffle itself planned (behind everything, marked as its own).</summary>
+    internal void AppendShuffleGenerated(IList<Track> tracks)
+    {
+        var generated = ShuffleGenerated;
+        ShuffleGenerated = null;
+        try { AddRangeToQueue(tracks, null, false); }
+        finally { ShuffleGenerated = generated; }
+        generated?.UnionWith(tracks);
+    }
+
     /// <summary>Appends a track to the end of the UpNext queue ("Add to Queue").</summary>
     public void AddToQueue(Track track, bool announce = true)
     {
         DebugLogger.Info(DebugLogger.Category.Queue, "AddToQueue", $"track={track.Title}, newLen={UpNext.Count + 1}");
         CancelAutoMixTransition("queue changed");
         MarkQueueChanged();
-        UpNext.Add(track);
+        if (ShuffleGenerated is { Count: > 0 }) { DropShuffleCopies([track]); UpNext.Insert(UserQueueInsertIndex(), track); }
+        else UpNext.Add(track);
         if (_repeatCycleTracks.Count > 0) _repeatCycleTracks.Add(track);
         if (announce) AnnounceQueued(new[] { track }, null, playNext: false);
     }
@@ -1672,7 +1706,16 @@ public partial class PlayerViewModel : ViewModelBase
         CancelAutoMixTransition("queue changed");
         MarkQueueChanged();
         _suppressHasContentNotify = true;
-        try { UpNext.AddRange(tracks); }
+        try
+        {
+            if (ShuffleGenerated is { Count: > 0 })
+            {
+                DropShuffleCopies(tracks);
+                var at = UserQueueInsertIndex();
+                for (var i = 0; i < tracks.Count; i++) UpNext.Insert(at + i, tracks[i]);
+            }
+            else UpNext.AddRange(tracks);
+        }
         finally
         {
             _suppressHasContentNotify = false;
