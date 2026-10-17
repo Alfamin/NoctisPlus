@@ -17,7 +17,7 @@
                     AutomationProperties.Name="{Binding Title}" BorderThickness="0" CornerRadius="6" Padding="0"
                     Height="56" Margin="0,1" HorizontalAlignment="Stretch" HorizontalContentAlignment="Stretch"
                     DoubleTapped="OnFinishedDoubleTapped" ContextRequested="OnFinishedContextRequested">
-                <Grid ColumnDefinitions="52,3*,2*,Auto,36,36">
+                <Grid ColumnDefinitions="52,3*,2*,Auto,Auto,36">
                     <Border Width="36" Height="36" CornerRadius="5" ClipToBounds="True" VerticalAlignment="Center"
                             Background="{DynamicResource SystemControlBackgroundBaseLowBrush}">
                         <Panel>
@@ -47,6 +47,8 @@
                     <Button Grid.Column="4" Classes="row-icon" IsVisible="{Binding IsActionable}" ToolTip.Tip="More options" Click="OnFinishedMoreClick">
                         <TextBlock Text="⋯" FontSize="18" />
                     </Button>
+                    <Button Grid.Column="4" Classes="grey-pill" IsVisible="{Binding IsAddingToLibrary}" Content="Add to library"
+                            Command="{Binding $parent[UserControl].((vm:DownloadsViewModel)DataContext).ImportSavedCommand}" CommandParameter="{Binding}" />
                     <Button Grid.Column="5" Classes="row-icon" ToolTip.Tip="Remove from this list · keeps the file"
                             Command="{Binding $parent[UserControl].((vm:DownloadsViewModel)DataContext).RemoveCommand}" CommandParameter="{Binding}">
                         <Path Data="M7 7L17 17 M17 7L7 17" Width="11" Height="11" Stretch="Uniform"

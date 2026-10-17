@@ -15,6 +15,11 @@ internal static class NativeFeaturePreview
     {
         // Explicit profile override is required for any developer preview.
         if (string.IsNullOrWhiteSpace(Environment.GetEnvironmentVariable("NOCTIS_PLUS_DATA_DIR"))) return;
+        if (preview == "downloads-recovery" && owner.DataContext is MainWindowViewModel main)
+        {
+            var page = new DownloadsViewModel(); page.Attach(new RecoveryQueue()); main.CurrentView = page;
+            return;
+        }
         if (preview == "artist-avenoir")
         {
             FreeMusicPlugin.Current?.OnlineSearch?.OpenArtist(new("deezer:11235313", "Avenoir"));
@@ -94,6 +99,20 @@ internal static class NativeFeaturePreview
             => Task.CompletedTask;
     }
 
+    private sealed class RecoveryQueue : Noctis.Services.Search.IDownloadQueue
+    {
+        public IReadOnlyList<Noctis.Services.Search.DownloadEntry> Snapshot() =>
+            [new(new object(), "Synthetic saved song", "Test artist", Noctis.Services.Search.OnlineDownloadState.Saved, 1, "Downloaded", false, false, Path.Combine(Path.GetTempPath(), "synthetic-moved.wav")),
+             new(new object(), "Waiting song", "Test artist", Noctis.Services.Search.OnlineDownloadState.Queued, 0, "TELEGRAM_CONNECTION_FAILED: Check your VPN or system proxy · retry at 23:00", false, false)];
+        public bool IsPaused => false;
+        public event EventHandler? Changed { add { } remove { } }
+        public void SetPaused(bool value) { }
+        public void RetryFailed() { }
+        public void StartHeld() { }
+        public void Clear() { }
+        public void DownloadNext(Noctis.Services.Search.DownloadEntry entry) { }
+        public void Remove(Noctis.Services.Search.DownloadEntry entry) { }
+    }
     private sealed class PreviewAccount : ITelegramSignIn
     {
         public bool IsLoggedIn => false;

@@ -6,6 +6,11 @@ namespace FreeMusicFinder.Tests;
 /// <summary>Synthetic protocol replies, not a claim of a live bot-account test.</summary>
 internal static class BotQualityTests
 {
+    private sealed class HungChat : IQualityConversation
+    {
+        public Task<QualityReply> OpenAsync(CancellationToken ct) => new TaskCompletionSource<QualityReply>().Task;
+        public Task<QualityReply> PressAsync(QualityReply reply, QualityButton button, CancellationToken ct) => new TaskCompletionSource<QualityReply>().Task;
+    }
     private sealed class Chat(params QualityReply[] replies) : IQualityConversation
     {
         private int _next;
@@ -31,6 +36,7 @@ internal static class BotQualityTests
     public static async Task RunAsync()
     {
         Check.Section("preferred quality configures both bots, with verified settings replies");
+        await Check.ThrowsAsync<TimeoutException>(() => BotQuality.ApplyAsync("offline provider", new HungChat(), AudioQuality.MP3, default, TimeSpan.FromMilliseconds(40)), "a non-answering settings request cannot stall the queue forever");
         foreach (var quality in new[] { AudioQuality.FLAC, AudioQuality.MP3 })
         {
             var opposite = quality == AudioQuality.FLAC ? "MP3 320" : "FLAC";
@@ -84,6 +90,19 @@ internal static class BotQualityTests
             Check.Equal("mp3", format, "wrong-format FLAC is not relabelled as the requested MP3");
             Check.True(first.Fetched && backup.Fetched, "backup supplies MP3 when the confirmed primary sends FLAC");
         }
+        first = new("Music Hunters") { Configure = _ => throw new BotAnswerException("BOT_QUALITY_UNVERIFIED") };
+        backup = new("DeezLoad") { Configure = first.Configure };
+        using (var output = new MemoryStream())
+        {
+            var format = await new MusicSources(first, backup, _ => { }, quality: () => AudioQuality.MP3)
+                .FetchAsync(new("Song", "Artist"), output, null, default);
+            Check.Equal("mp3", format, "changed settings menus on BOTH bots do not block valid default MP3 audio");
+        }
+        first = new("Music Hunters") { Configure = _ => throw new BotAnswerException("BOT_QUALITY_UNVERIFIED") };
+        backup = new("DeezLoad") { Configure = first.Configure };
+        using (var output = new MemoryStream())
+            await Check.ThrowsAsync<TrackUnavailableException>(() => new MusicSources(first, backup, _ => { }, quality: () => AudioQuality.FLAC)
+                .FetchAsync(new("Song", "Artist"), output, null, default), "unconfirmed settings never bypass FLAC-only preference");
         var preference = AudioQuality.MP3;
         first = new("Music Hunters") { Configure = _ => { preference = AudioQuality.FLAC; return Task.CompletedTask; } };
         backup = new("DeezLoad");

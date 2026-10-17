@@ -27,7 +27,7 @@ public class DownloadsPageTests
         using var vm = new DownloadsViewModel(library); vm.Attach(queue);
         var row = Assert.Single(vm.Finished);
         Assert.True(row.IsAddingToLibrary);
-        Assert.Equal("Adding to library…", row.DisplayDetail);
+        Assert.Equal("Downloaded · not in library yet", row.DisplayDetail);
         library.TrackList.Add(song); library.RaiseLibraryUpdated(); Dispatcher.UIThread.RunJobs();
         Assert.Same(row, Assert.Single(vm.Finished)); Assert.Same(song, row.Local); Assert.True(row.IsActionable);
         vm.RemoveCommand.Execute(row); Dispatcher.UIThread.RunJobs();

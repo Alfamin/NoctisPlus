@@ -142,9 +142,18 @@ internal sealed class MusicSources
             // An MP3 a bot sent is kept aside while the other bot is asked for FLAC. It is used only when no
             // bot has the recording in FLAC and the setting allows it.
             using var mp3 = new MemoryStream(); var haveMp3 = false; var skipped = false;
-            foreach (var source in _sources.OrderBy(s => request.CachedFrom == s.Id ? 0 : request.Selection?.Provider == s.Id ? 1 : request.PreferredSource == s.Id ? 2 : 3))
+            foreach (var source in _sources.OrderBy(s => qualityErrors.ContainsKey(s.Id) ? 1 : 0)
+                .ThenBy(s => request.CachedFrom == s.Id ? 0 : request.Selection?.Provider == s.Id ? 1 : request.PreferredSource == s.Id ? 2 : 3))
             {
-                if (qualityErrors.TryGetValue(source.Id, out var qualityError)) { errors.Add(qualityError); continue; }
+                // A changed settings keyboard must not disable both download providers.
+                // Confirmed providers go first. A responsive unconfirmed one can still supply
+                // the requested format, which is checked below; rate limits are still kept.
+                if (qualityErrors.TryGetValue(source.Id, out var qualityError))
+                {
+                    errors.Add(qualityError);
+                    if (Cooling(source.Id)) { skipped = true; continue; }
+                    _notice(source.Id + " did not confirm its setting. Checking the actual supplied audio format instead.");
+                }
                 if (Cooling(source.Id) && request.CachedFrom != source.Id) { skipped = true; continue; }
                 try
                 {

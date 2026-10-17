@@ -293,6 +293,7 @@ public partial class MainWindowViewModel : ViewModelBase
 
     private readonly QueueViewModel _queueVm;
     private readonly LyricsViewModel _lyricsVm;
+    private readonly Services.Search.DownloadedFileImporter _downloadImporter;
     private readonly StatisticsViewModel _statisticsVm;
     private readonly CoverFlowViewModel _coverFlowVm;
     /// <summary>True when the global Cover Flow overlay is active. Survives sidebar navigation between toggle-eligible sections; auto-exits when navigating to an ineligible section.</summary>
@@ -606,6 +607,8 @@ public partial class MainWindowViewModel : ViewModelBase
         _queueVm = new QueueViewModel(Player);
         _lyricsVm = new LyricsViewModel(Player, lrcLib, netEase, metadata, persistence, library);
         wordService.LyricsWritten += _lyricsVm.ReloadWrittenLyrics;
+        _downloadImporter = new(library, text => Dispatcher.UIThread.Post(() =>
+            TransientStatus.Show(nameof(PluginNotice), v => PluginNotice = v, text, TimeSpan.FromSeconds(12))));
         _lyricsVm.PluginLyricsSources = () => Plugins.LyricsProviders;
         // Musixmatch, Kugou and YouTube Music (issue #113): searched when switched on in
         // Settings, and always offered by the lyrics page's Choose Source dialog.
@@ -1153,6 +1156,7 @@ public partial class MainWindowViewModel : ViewModelBase
     /// </summary>
     public async Task ShutdownAsync()
     {
+        _downloadImporter.Dispose();
         // Silence playback first. The saves below run for seconds after the window
         // is already gone, and nothing else stops the audio engine before process
         // exit — so the track audibly kept playing after the app "closed".

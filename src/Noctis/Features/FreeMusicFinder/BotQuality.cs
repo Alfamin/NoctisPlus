@@ -45,9 +45,17 @@ internal static class BotQuality
         return false;
     }
 
-    public static async Task ApplyAsync(string provider, IQualityConversation chat, AudioQuality wanted, CancellationToken ct)
+    public static async Task ApplyAsync(string provider, IQualityConversation chat, AudioQuality wanted, CancellationToken ct, TimeSpan? timeout = null)
     {
-        var reply = await chat.OpenAsync(ct).ConfigureAwait(false);
+        using var deadline = CancellationTokenSource.CreateLinkedTokenSource(ct);
+        deadline.CancelAfter(timeout ?? TimeSpan.FromSeconds(45));
+        try { await ApplyCoreAsync(provider, chat, wanted, deadline.Token).ConfigureAwait(false); }
+        catch (OperationCanceledException) when (!ct.IsCancellationRequested)
+        { throw new TimeoutException($"BOT_QUALITY_TIMEOUT: {provider} did not finish confirming {wanted}. The supplied audio format will be checked; no quality change is assumed."); }
+    }
+    private static async Task ApplyCoreAsync(string provider, IQualityConversation chat, AudioQuality wanted, CancellationToken ct)
+    {
+        var reply = await chat.OpenAsync(ct).WaitAsync(ct).ConfigureAwait(false);
         for (var step = 0; step < 3; step++)
         {
             ct.ThrowIfCancellationRequested();
@@ -58,7 +66,7 @@ internal static class BotQuality
                 choices = choices.Where(b => Words(b.Text).Contains("320")).ToList();
             if (choices.Count == 0) choices = reply.Buttons.Where(b => QualityLabel(b.Text)).ToList();
             if (choices.Count != 1) throw Unverified(provider, wanted);
-            reply = await chat.PressAsync(reply, choices[0], ct).ConfigureAwait(false);
+            reply = await chat.PressAsync(reply, choices[0], ct).WaitAsync(ct).ConfigureAwait(false);
         }
         if (!Confirmed(reply, wanted)) throw Unverified(provider, wanted);
     }
@@ -74,23 +82,23 @@ internal sealed class TelegramQualityConversation(Client client, User user, stri
 
     public async Task<QualityReply> OpenAsync(CancellationToken ct)
     {
-        var info = await client.Users_GetFullUser(user).WaitAsync(ct).ConfigureAwait(false);
+        var info = await client.Users_GetFullUser(user).WaitAsync(TimeSpan.FromSeconds(25), ct).ConfigureAwait(false);
         var commands = info.full_user.bot_info?.commands ?? [];
         var command = commands.FirstOrDefault(c => c.command is "settings" or "setting")?.command
             ?? commands.FirstOrDefault(c => c.command is "quality" or "setquality" or "set_quality")?.command
             ?? "settings";
-        var sent = await client.SendMessageAsync(Peer, "/" + command).WaitAsync(ct).ConfigureAwait(false);
+        var sent = await client.SendMessageAsync(Peer, "/" + command).WaitAsync(TimeSpan.FromSeconds(25), ct).ConfigureAwait(false);
         return await WaitAsync(sent.id, null, ct).ConfigureAwait(false);
     }
 
     public async Task<QualityReply> PressAsync(QualityReply reply, QualityButton button, CancellationToken ct)
     {
-        var latest = await client.Messages_GetHistory(Peer, limit: 1).WaitAsync(ct).ConfigureAwait(false);
+        var latest = await client.Messages_GetHistory(Peer, limit: 1).WaitAsync(TimeSpan.FromSeconds(25), ct).ConfigureAwait(false);
         var after = latest.Messages.FirstOrDefault()?.ID ?? reply.Id;
         string? answer = null;
         if (button.Callback is { } data)
-            answer = (await client.Messages_GetBotCallbackAnswer(Peer, reply.Id, data).WaitAsync(ct).ConfigureAwait(false))?.message;
-        else after = (await client.SendMessageAsync(Peer, button.Text).WaitAsync(ct).ConfigureAwait(false)).id;
+            answer = (await client.Messages_GetBotCallbackAnswer(Peer, reply.Id, data).WaitAsync(TimeSpan.FromSeconds(25), ct).ConfigureAwait(false))?.message;
+        else after = (await client.SendMessageAsync(Peer, button.Text).WaitAsync(TimeSpan.FromSeconds(25), ct).ConfigureAwait(false)).id;
         if (BotLimits.Read(provider, answer ?? "", DateTimeOffset.UtcNow) is { } limited) throw limited;
         // A callback can acknowledge the change in an alert rather than editing its message.
         var ack = new QualityReply(reply.Id, answer ?? "", []);
@@ -105,7 +113,7 @@ internal sealed class TelegramQualityConversation(Client client, User user, stri
         {
             ct.ThrowIfCancellationRequested();
             // Callbacks often EDIT the previous message. Keep it in the read, but require a changed body/keyboard.
-            var history = await client.Messages_GetHistory(Peer, limit: 20).WaitAsync(ct).ConfigureAwait(false);
+            var history = await client.Messages_GetHistory(Peer, limit: 20).WaitAsync(TimeSpan.FromSeconds(25), ct).ConfigureAwait(false);
             foreach (var message in history.Messages.OfType<Message>().Where(m => !m.flags.HasFlag(Message.Flags.out_) && (m.id > after || m.id == previous?.Id)).OrderByDescending(m => m.id))
             {
                 if (BotLimits.Read(provider, message.message ?? "", DateTimeOffset.UtcNow) is { } limited) throw limited;

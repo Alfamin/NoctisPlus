@@ -175,6 +175,18 @@ public sealed partial class DownloadsViewModel : ViewModelBase, IDisposable
     [RelayCommand] private void StartHeld() => Act(() => _queue?.StartHeld());
     [RelayCommand] private void DownloadNext(DownloadRow? row) { if (row?.Entry is { } e) Act(() => _queue?.DownloadNext(e)); }
     [RelayCommand] private void Remove(DownloadRow? row) { if (row?.Entry is { } e) Act(() => _queue?.Remove(e)); }
+    [RelayCommand]
+    private async Task ImportSaved(DownloadRow? row)
+    {
+        if (_library is null || row?.Entry?.SavedPath is not { } path || !row.IsSaved) return;
+        try
+        {
+            if (!File.Exists(path)) throw new FileNotFoundException("The downloaded file was moved or removed. Retry the download.");
+            await _library.ImportFilesAsync([path]); RebuildLibrary(); Resolve(row);
+            Status = row.Local is not null ? "Added to library." : "The file is saved, but Noctis could not read its audio metadata. Check the file or retry the download.";
+        }
+        catch (Exception ex) { Status = "DOWNLOAD_IMPORT_FAILED: " + ex.Message; }
+    }
     [RelayCommand] private void PlayTrack(Track? track)
     {
         if (track is null || _player is null) return;
@@ -230,7 +242,7 @@ public sealed partial class DownloadRow : ObservableObject
     private Track? _local;
     public bool IsActionable => IsSaved && Local is not null;
     public bool IsAddingToLibrary => IsSaved && Local is null;
-    public string DisplayDetail => IsAddingToLibrary ? "Adding to library…" : Detail;
+    public string DisplayDetail => IsAddingToLibrary ? "Downloaded · not in library yet" : Detail;
 
     public bool IsDownloading => State == OnlineDownloadState.Downloading;
     public bool IsQueued => State == OnlineDownloadState.Queued;

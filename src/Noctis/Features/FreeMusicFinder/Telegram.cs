@@ -60,7 +60,12 @@ internal sealed class TelegramAccount : ITelegramSignIn, IDisposable
             if (_client is null)
             {
                 var client = CreateClient();
-                try { await client.ConnectAsync().ConfigureAwait(false); }
+                try { await client.ConnectAsync().WaitAsync(TimeSpan.FromSeconds(40), ct).ConfigureAwait(false); }
+                catch (TimeoutException)
+                {
+                    client.Dispose();
+                    throw new SocketException((int)SocketError.TimedOut);
+                }
                 catch
                 {
                     client.Dispose();
@@ -102,11 +107,11 @@ internal sealed class TelegramAccount : ITelegramSignIn, IDisposable
     /// A bot's account, looked up once per connection. Telegram limits how often a username may be
     /// resolved, and a playlist asks for many songs in a row.
     /// </summary>
-    public async Task<User> BotAsync(Client client, string username)
+    public async Task<User> BotAsync(Client client, string username, CancellationToken ct = default)
     {
         lock (_bots)
             if (ReferenceEquals(_botsClient, client) && _bots.TryGetValue(username, out var known)) return known;
-        var user = (await client.Contacts_ResolveUsername(username).ConfigureAwait(false)).User;
+        var user = (await client.Contacts_ResolveUsername(username).WaitAsync(TimeSpan.FromSeconds(25), ct).ConfigureAwait(false)).User;
         lock (_bots)
         {
             if (!ReferenceEquals(_botsClient, client)) { _bots.Clear(); _started.Clear(); _botsClient = client; }
@@ -123,10 +128,10 @@ internal sealed class TelegramAccount : ITelegramSignIn, IDisposable
     {
         lock (_bots)
             if (ReferenceEquals(_botsClient, client) && _started.Contains(username)) return;
-        var history = await client.Messages_GetHistory(bot, limit: 1).WaitAsync(ct).ConfigureAwait(false);
+        var history = await client.Messages_GetHistory(bot, limit: 1).WaitAsync(TimeSpan.FromSeconds(25), ct).ConfigureAwait(false);
         if (history.Messages.Length == 0)
         {
-            await client.SendMessageAsync(bot, "/start").WaitAsync(ct).ConfigureAwait(false);
+            await client.SendMessageAsync(bot, "/start").WaitAsync(TimeSpan.FromSeconds(25), ct).ConfigureAwait(false);
             _log?.Invoke("started the chat with @" + username);
             // Its welcome arrives first, so it is not taken for the answer to the request that follows.
             await Task.Delay(TimeSpan.FromSeconds(3), ct).ConfigureAwait(false);
@@ -184,8 +189,8 @@ internal sealed class TelegramAccount : ITelegramSignIn, IDisposable
                 try
                 {
                     _client ??= CreateClient();
-                    await _client.ConnectAsync().ConfigureAwait(false);
-                    await _client.Auth_LogOut().ConfigureAwait(false);
+                    await _client.ConnectAsync().WaitAsync(TimeSpan.FromSeconds(25)).ConfigureAwait(false);
+                    await _client.Auth_LogOut().WaitAsync(TimeSpan.FromSeconds(25)).ConfigureAwait(false);
                 }
                 catch (Exception ex) when (ex is RpcException or WTException or IOException or TimeoutException or FormatException)
                 {
@@ -333,7 +338,7 @@ internal sealed class TelegramBotSource : IHunterBotSource
                 await LearnFromHistoryAsync(client, bot, ct).ConfigureAwait(false);
                 var wait = _timings.Wait(SearchTiming, SearchWait, MinSearchWait, SearchWait);
                 var clock = System.Diagnostics.Stopwatch.StartNew();
-                var sent = await client.SendMessageAsync(bot, "/search " + query).ConfigureAwait(false);
+                var sent = await client.SendMessageAsync(bot, "/search " + query).WaitAsync(TimeSpan.FromSeconds(25), ct).ConfigureAwait(false);
                 // The answer always carries buttons; without results it has no numbered ones.
                 var results = await WaitForAsync(client, bot, sent.id, m => m.media is not MessageMediaDocument && Buttons(m).Any(), wait, ct).ConfigureAwait(false)
                     ?? throw new TimeoutException($"The bot did not answer within {wait.TotalSeconds:0} seconds (it usually answers in about {Usual(SearchTiming)}).");
@@ -391,12 +396,12 @@ internal sealed class TelegramBotSource : IHunterBotSource
         _=BotSelections.DecodeHunter(selection);
         return RunAsync(async (client, bot) =>
         {
-            var old=await client.Messages_GetHistory(bot,offset_id:selection.MessageId+1,limit:1).WaitAsync(ct).ConfigureAwait(false);
+            var old=await client.Messages_GetHistory(bot,offset_id:selection.MessageId+1,limit:1).WaitAsync(TimeSpan.FromSeconds(25), ct).ConfigureAwait(false);
             var button=ValidateSelection(request,old.Messages.OfType<Message>().FirstOrDefault(m=>m.id==selection.MessageId));
             var resultsId=selection.MessageId;
-            var newest = (await client.Messages_GetHistory(bot, limit: 1).ConfigureAwait(false)).Messages.FirstOrDefault()?.ID ?? resultsId;
+            var newest = (await client.Messages_GetHistory(bot, limit: 1).WaitAsync(TimeSpan.FromSeconds(25), ct).ConfigureAwait(false)).Messages.FirstOrDefault()?.ID ?? resultsId;
             string? notice = null;
-            try { notice = (await client.Messages_GetBotCallbackAnswer(bot, resultsId, button).ConfigureAwait(false))?.message; }
+            try { notice = (await client.Messages_GetBotCallbackAnswer(bot, resultsId, button).WaitAsync(TimeSpan.FromSeconds(25), ct).ConfigureAwait(false))?.message; }
             // The bot may acknowledge the press later than Telegram waits; the file still arrives.
             catch (RpcException ex) when (ex.Message.Contains("TIMEOUT", StringComparison.OrdinalIgnoreCase)) { }
             catch(RpcException ex) when(IsStaleCallback(ex.Message))
@@ -522,7 +527,7 @@ internal sealed class TelegramBotSource : IHunterBotSource
         while (true)
         {
             ct.ThrowIfCancellationRequested();
-            var history = await client.Messages_GetHistory(bot, min_id: afterId, limit: 30).ConfigureAwait(false);
+            var history = await client.Messages_GetHistory(bot, min_id: afterId, limit: 30).WaitAsync(TimeSpan.FromSeconds(25), ct).ConfigureAwait(false);
             foreach (var reply in history.Messages.OfType<Message>().Where(m => !m.flags.HasFlag(Message.Flags.out_)))
                 if (BotLimits.Read("Music Hunters", reply.message ?? "", DateTimeOffset.UtcNow) is { } limited) throw limited;
             var found = history.Messages.OfType<Message>().Reverse()

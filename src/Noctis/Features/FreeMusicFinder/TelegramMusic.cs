@@ -48,7 +48,7 @@ internal sealed class HunterMusicSource : IMusicSource, IQualityMusicSource
         {
             var client=await account.ConnectAsync(ct).ConfigureAwait(false);
             var bot=await account.BotAsync(client,TelegramBotSource.Bot).ConfigureAwait(false);
-            var old=await client.Messages_GetHistory(bot,offset_id:id+1,limit:1).WaitAsync(ct).ConfigureAwait(false);
+            var old=await client.Messages_GetHistory(bot,offset_id:id+1,limit:1).WaitAsync(TimeSpan.FromSeconds(25), ct).ConfigureAwait(false);
             if(old.Messages.OfType<Message>().FirstOrDefault(m=>m.id==id)?.media is MessageMediaDocument{document:Document doc} && DeezLoadSource.Fits(request,doc) && TelegramAudioCache.AcceptsQuality(request, doc))
             {
                 await client.DownloadFileAsync(doc,output,(PhotoSizeBase?)null,TransferProgress.Steps(progress,ct)).WaitAsync(ct).ConfigureAwait(false);
@@ -133,7 +133,7 @@ internal sealed class DeezLoadSource : IMusicSource, IQualityMusicSource
         var bot=await _account.BotAsync(client,Bot).ConfigureAwait(false);
         try
         {
-            var results=await client.Messages_GetInlineBotResults(bot,bot,query,"").WaitAsync(ct).ConfigureAwait(false);
+            var results=await client.Messages_GetInlineBotResults(bot,bot,query,"").WaitAsync(TimeSpan.FromSeconds(25), ct).ConfigureAwait(false);
             var found=new List<MusicRequest>();
             foreach(var result in results.results)
             {
@@ -169,7 +169,7 @@ internal sealed class DeezLoadSource : IMusicSource, IQualityMusicSource
         if(request.MessageId is {} id && request.CachedFrom == Id)
         {
             // The message is already in this bot's chat; reading its file does not request another bot download.
-            var old=await client.Messages_GetHistory(bot,offset_id:id+1,limit:1).WaitAsync(ct).ConfigureAwait(false);
+            var old=await client.Messages_GetHistory(bot,offset_id:id+1,limit:1).WaitAsync(TimeSpan.FromSeconds(25), ct).ConfigureAwait(false);
             var message=old.Messages.OfType<Message>().FirstOrDefault(m=>m.id==id);
             if(message?.media is MessageMediaDocument {document:Document cached} && Fits(request,cached) && TelegramAudioCache.AcceptsQuality(request, cached))
                 return await Download(client,cached,output,progress,ct).ConfigureAwait(false);
@@ -180,14 +180,14 @@ internal sealed class DeezLoadSource : IMusicSource, IQualityMusicSource
             var url=request.Url;
             if(url is null)
             {
-                var matches=await client.Messages_GetInlineBotResults(bot,bot,request.Artist+" "+request.Title,"").WaitAsync(ct).ConfigureAwait(false);
+                var matches=await client.Messages_GetInlineBotResults(bot,bot,request.Artist+" "+request.Title,"").WaitAsync(TimeSpan.FromSeconds(25), ct).ConfigureAwait(false);
                 foreach(var item in matches.results.OfType<BotInlineMediaResult>())
                     if(item.document is Document doc && Fits(request,doc) && (request.Quality != AudioQuality.MP3 || TelegramBotSource.Extension(doc) == "mp3")) return await Download(client,doc,output,progress,ct).ConfigureAwait(false);
                 url=MatchingInlineLink(request,matches.results.OfType<BotInlineResult>());
             }
             if(!MusicLink.TryParse(url,out var link) || link!.Kind!="track") throw new TrackUnavailableException("DeezLoad did not return a usable track link.");
             await _account.StartBotAsync(client,bot,Bot,ct).ConfigureAwait(false);
-            var sent=await client.SendMessageAsync(bot,link.Url).WaitAsync(ct).ConfigureAwait(false);
+            var sent=await client.SendMessageAsync(bot,link.Url).WaitAsync(TimeSpan.FromSeconds(25), ct).ConfigureAwait(false);
             var end=DateTimeOffset.UtcNow.AddMinutes(15); var cursor=sent.id; var lastNotice="";
             string? other=null; DateTimeOffset? otherSince=null;
             while(DateTimeOffset.UtcNow<end)
@@ -256,7 +256,7 @@ internal sealed class DeezLoadSource : IMusicSource, IQualityMusicSource
         var all=new List<Message>(); var offset=0;
         for(var page=0;page<100;page++)
         {
-            var history=await client.Messages_GetHistory(bot,offset_id:offset,min_id:after,limit:100).WaitAsync(ct).ConfigureAwait(false);
+            var history=await client.Messages_GetHistory(bot,offset_id:offset,min_id:after,limit:100).WaitAsync(TimeSpan.FromSeconds(25), ct).ConfigureAwait(false);
             if(history.Messages.Length==0) break;
             all.AddRange(history.Messages.OfType<Message>().Where(m=>!m.flags.HasFlag(Message.Flags.out_)));
             var next=history.Messages.Min(m=>m.ID);
@@ -299,7 +299,7 @@ internal static class TelegramAudioCache
     /// <summary>Already received files can be copied directly, without another bot request or a new provider queue.</summary>
     public static async Task<Document?> Find(Client client,InputPeer peer,MusicRequest wanted,CancellationToken ct)
     {
-        var history=await client.Messages_GetHistory(peer,limit:100).WaitAsync(ct).ConfigureAwait(false);
+        var history=await client.Messages_GetHistory(peer,limit:100).WaitAsync(TimeSpan.FromSeconds(25), ct).ConfigureAwait(false);
         return history.Messages.OfType<Message>().Select(m=>(m.media as MessageMediaDocument)?.document).OfType<Document>()
             .Where(doc => AcceptsQuality(wanted, doc) && DeezLoadSource.Fits(wanted, doc))
             .OrderByDescending(doc => TelegramBotSource.Extension(doc) == "flac").FirstOrDefault();
