@@ -101,6 +101,25 @@ public class LyricsTrackChangeTimingTests : IDisposable
     }
 
     [AvaloniaFact]
+    public async Task CompletedWordTimingReloadsOnlyItsCurrentSong_AndPreservesStudioPreview()
+    {
+        using var persistence = new TestPersistenceService();
+        var player = new PlayerViewModel(new FakeAudioPlayer(), new FakeLibraryService(), persistence, new FakeAnimatedCoverService());
+        using var vm = new LyricsViewModel(player, new StubLrcLib(), new StubNetEase(), new StubMetadata(), persistence, new FakeLibraryService());
+        var song = MakeTrack("repair", Elrc("before"));
+        player.ReplaceQueueAndPlay([song], 0); await Pump(300);
+        Assert.Contains("before", vm.LyricLines[0].Text);
+        File.WriteAllText(Path.ChangeExtension(song.FilePath, ".elrc"), Elrc("after"));
+        vm.ReloadWrittenLyrics([Path.Combine(_dir, "different.flac")]); await Pump(100);
+        Assert.Contains("before", vm.LyricLines[0].Text);
+        vm.ReloadWrittenLyrics([song.FilePath]); await Pump(300);
+        Assert.Contains("after", vm.LyricLines[0].Text);
+        vm.ShowPreview(song, Elrc("unsaved")); await Pump(300);
+        vm.ReloadWrittenLyrics([song.FilePath]); await Pump(100);
+        Assert.Contains("unsaved", vm.LyricLines[0].Text);
+    }
+
+    [AvaloniaFact]
     public async Task TrackChange_Timeline()
     {
         var player = new PlayerViewModel(

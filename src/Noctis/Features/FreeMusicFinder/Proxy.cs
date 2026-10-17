@@ -421,6 +421,8 @@ internal sealed class MetadataRoute : HttpMessageHandler
             : "directly (the computer has no proxy switched on)");
     }
 
+    internal ProxyChoice? ProxyFor(string host, int port) => Route(host, port).Via;
+
     private (string Way, string Advice) Describe(Uri to)
     {
         var (via, way) = Route(to.Host, to.Port);

@@ -50,3 +50,15 @@ licence is delivered under `features/dev.moshi.trueshuffle/LICENSE`. The bundled
 entry was removed. Existing settings and `plugin-data/dev.moshi.trueshuffle` history keep their
 identity. The native service uses typed player/library calls and explicit queue intent; the
 plugin's reflection bridge, injected menus, visual-tree scans and attach timers are not used.
+
+## Native WordLyrics (2026-10-17)
+
+Noctis owns the song menu, pill dialogs, settings migration and typed library/download events.
+The MIT queue/backend protocol from Alfamin/WordLyrics (local 1.6.4 source) is retained under
+`src/Noctis/Features/WordLyrics`, with the owner's copyright/MIT notice delivered under
+`features/dev.moshi.wordlyrics/LICENSE`. The original plugin DLL/manifest were removed.
+Existing settings and `plugin-data/dev.moshi.wordlyrics` checkpoints keep their identity.
+Python and AI models remain separately installed; they are not embedded in Noctis. The native
+background entry forbids package/model downloads. Explicit setup asks for consent first.
+The MMS model's separate CC-BY-NC 4.0 terms remain in the standalone backend's model notices;
+the MIT licence on the native integration does not change those model terms.

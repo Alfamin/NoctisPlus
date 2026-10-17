@@ -2556,6 +2556,14 @@ public partial class LyricsViewModel : ViewModelBase, IDisposable
             OnPropertyChanged(nameof(ShowMetadataFavoriteHeart));
     }
 
+    internal void ReloadWrittenLyrics(IReadOnlyList<string> paths)
+    {
+        // A sidecar is not a Track tag edit. Reload the currently shown song directly;
+        // ordinary library rescans must not interrupt the word clock or a Studio preview.
+        if (_currentTrack is { } track && !IsPreviewActive && paths.Contains(track.FilePath, StringComparer.OrdinalIgnoreCase))
+            LoadLyricsForTrack(track);
+    }
+
     private void OnLibraryUpdated(object? sender, EventArgs e)
     {
         Dispatcher.UIThread.Post(() =>

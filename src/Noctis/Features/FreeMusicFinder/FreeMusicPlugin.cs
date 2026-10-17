@@ -48,6 +48,7 @@ public sealed class FreeMusicPlugin : INoctisPlugin
     private KeyGesture? _shortcut;
     // Read on the threads that connect to Telegram; settings themselves are only read on the UI thread.
     private volatile string _proxy = "";
+    internal string MetadataProxy => _proxy;
     private volatile bool _allowMp3 = true;
     private volatile AudioQuality _preferredQuality = AudioQuality.FLAC;
     private readonly Func<string, string, ArtistCatalog> _catalogFactory;

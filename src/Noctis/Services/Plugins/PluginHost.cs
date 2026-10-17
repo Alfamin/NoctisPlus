@@ -596,16 +596,19 @@ public sealed class PluginHost
     }
 
     private readonly List<(PluginManifest Manifest, Func<INoctisPlugin> Factory)> _builtIn = new();
+    private readonly Dictionary<string, Func<Dictionary<string, string>, bool>> _builtInSettingMigrations = new(StringComparer.OrdinalIgnoreCase);
+    internal event Action<string, string>? NativePreferenceChanged;
 
     /// <summary>
     /// A Noctis Plus feature compiled into the app. It keeps its plugin id, so its settings
     /// (Settings → Features), approvals and data folder (plugin-data/&lt;id&gt;) are the ones the
     /// separate plugin had. Takes effect on the next <see cref="LoadAll"/>.
     /// </summary>
-    public void RegisterBuiltIn(PluginManifest manifest, Func<INoctisPlugin> factory)
+    public void RegisterBuiltIn(PluginManifest manifest, Func<INoctisPlugin> factory, Func<Dictionary<string, string>, bool>? migrateSettings = null)
     {
         _builtIn.RemoveAll(f => SameId(f.Manifest.Id, manifest.Id));
         _builtIn.Add((manifest, factory));
+        if (migrateSettings is not null) _builtInSettingMigrations[manifest.Id] = migrateSettings;
     }
 
     /// <summary>Tests: registers a plugin whose instance comes from <paramref name="factory"/> instead of a DLL.</summary>
@@ -724,6 +727,8 @@ public sealed class PluginHost
     /// <summary>Data folder, its migration, and the settings rows.</summary>
     private void Prepare(LoadedPlugin plugin)
     {
+        if (plugin.IsBundled && _builtInSettingMigrations.TryGetValue(plugin.Id, out var migrate) && migrate(StoredValues(plugin.Id, create: true)!))
+            _saveSettings();
         plugin.DataDirectory = Path.Combine(PluginDataRoot, SafeFolderName(plugin.Id));
         // 1.0 kept data in <plugin>/data; move it out so updates keep it. Only for plugins built
         // against 1.0: a 1.1 plugin may ship its own "data" folder of assets.
@@ -1104,8 +1109,10 @@ public sealed class PluginHost
     private void OnSettingChanged(LoadedPlugin plugin, PluginSettingItem item)
     {
         StoredValues(plugin.Id, create: true)![item.Key] = item.Value;
+        if (plugin.IsBundled && _builtInSettingMigrations.TryGetValue(plugin.Id, out var migrate)) migrate(StoredValues(plugin.Id, create: true)!);
         _saveSettings();
         plugin.Adapter?.RaiseSettingChanged(item.Key);
+        NativePreferenceChanged?.Invoke(plugin.Id, item.Key);
     }
 
     // ── Install / remove ──

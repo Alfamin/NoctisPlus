@@ -9,11 +9,13 @@ namespace Noctis.Features;
 /// </summary>
 internal static class BuiltInFeatures
 {
-    public static void Register(PluginHost host, TrueShuffle.TrueShuffleService? shuffle = null)
+    public static void Register(PluginHost host, TrueShuffle.TrueShuffleService? shuffle = null, WordLyrics.WordLyricsService? words = null)
     {
+        words?.AttachPreferences(host);
         host.RegisterBuiltIn(Manifest("FreeMusicFinder"), () => new FreeMusicFinder.FreeMusicPlugin());
         host.RegisterBuiltIn(Manifest("LyricMotion"), () => new LyricMotion.LyricMotionFeature());
         host.RegisterBuiltIn(Manifest("TrueShuffle"), () => new TrueShuffle.TrueShuffleFeature(shuffle));
+        host.RegisterBuiltIn(Manifest("WordLyrics"), () => new WordLyrics.WordLyricsFeature(words), WordLyrics.WordTimingSettings.Migrate);
     }
 
     /// <summary>The feature's plugin.json, embedded as Noctis.Features.&lt;folder&gt;.plugin.json.</summary>

@@ -416,7 +416,8 @@ public partial class MainWindowViewModel : ViewModelBase
         var shuffleQueue = new Features.TrueShuffle.ShuffleQueue(Player, library, () => Player.AllowExplicitContent,
             () => CurrentView as PlaylistViewModel);
         var shuffleService = new Features.TrueShuffle.TrueShuffleService(shuffleQueue, persistence.DataDirectory);
-        Features.BuiltInFeatures.Register(Plugins, shuffleService);
+        var wordService = new Features.WordLyrics.WordLyricsService(library, () => Settings.GetSettings());
+        Features.BuiltInFeatures.Register(Plugins, shuffleService, wordService);
         Settings.Plugins = Plugins;
         // Get plugins (official list) fetches only when the Plugins page opens.
         if (App.Services?.GetService<System.Net.Http.HttpClient>() is { } pluginHttp)
@@ -604,6 +605,7 @@ public partial class MainWindowViewModel : ViewModelBase
         _favoritesVm = new FavoritesViewModel(Player, library, persistence, Sidebar, Settings);
         _queueVm = new QueueViewModel(Player);
         _lyricsVm = new LyricsViewModel(Player, lrcLib, netEase, metadata, persistence, library);
+        wordService.LyricsWritten += _lyricsVm.ReloadWrittenLyrics;
         _lyricsVm.PluginLyricsSources = () => Plugins.LyricsProviders;
         // Musixmatch, Kugou and YouTube Music (issue #113): searched when switched on in
         // Settings, and always offered by the lyrics page's Choose Source dialog.

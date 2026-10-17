@@ -1,0 +1,82 @@
+{
+  "id": "dev.moshi.wordlyrics",
+  "name": "WordLyrics",
+  "version": "1.3.0",
+  "author": "moshi",
+  "description": "Native word timing, lyric repair and private drafts. New downloads use the mode below. Requires the separately installed WordLyrics backend; audio stays unchanged.",
+  "type": "dotnet",
+  "entry": "Noctis.dll",
+  "entryType": "Noctis.Features.WordLyrics.WordLyricsFeature",
+  "apiVersion": "1.1",
+  "minAppVersion": "1.5.5",
+  "platforms": [
+    "windows"
+  ],
+  "permissions": [
+    "notifications",
+    "network"
+  ],
+  "settings": [
+    {
+      "key": "defaultMode",
+      "label": "New songs: word timing",
+      "type": "choice",
+      "choices": [
+        "Off",
+        "Light",
+        "Medium",
+        "Full"
+      ],
+      "default": "Medium",
+      "description": "Applied to every new download and newly added local song. Off skips automatic timing; manual repair remains available. Medium keeps the previous Half setting. Changes affect the next batch."
+    },
+    {
+      "key": "notify",
+      "label": "Say when a song is done",
+      "type": "bool",
+      "default": true
+    },
+    {
+      "key": "folder",
+      "label": "WordLyrics folder",
+      "type": "string",
+      "default": "",
+      "description": "Leave empty for the usual place: the WordLyrics folder in your user folder."
+    },
+    {
+      "key": "backup",
+      "label": "Backup folder",
+      "type": "string",
+      "default": "",
+      "description": "WordLyrics keeps a copy of every song before it works on it. Leave empty for the usual place: a \"WordLyrics Backups\" folder on the drive with the most free space."
+    },
+    {
+      "key": "setup",
+      "label": "Set up WordLyrics\u2026",
+      "type": "bool",
+      "default": false,
+      "description": "Opens a confirmation before setup downloads anything. The two models need about 1.33 GB, plus Python and packages; existing components are reused. Cancel keeps queued songs and existing lyrics."
+    },
+    {
+      "key": "showProgress",
+      "label": "Show timing status",
+      "type": "bool",
+      "default": true,
+      "description": "Show stages in Noctis notifications. Open progress below for pause, stop and details; background work never takes keyboard focus."
+    },
+    {
+      "key": "progress",
+      "label": "Open timing progress\u2026",
+      "type": "bool",
+      "default": false,
+      "description": "Open native progress, pause/resume, stop and the latest result."
+    },
+    {
+      "key": "library",
+      "label": "Time library songs\u2026",
+      "type": "bool",
+      "default": false,
+      "description": "Open the native folder picker to time missing words. Existing word timing is kept; a large batch asks before starting."
+    }
+  ]
+}

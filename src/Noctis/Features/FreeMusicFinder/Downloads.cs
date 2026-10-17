@@ -315,6 +315,8 @@ internal sealed class Downloads : IDisposable
                     download.State = outcome == DownloadOutcome.Saved ? DownloadState.Saved : DownloadState.AlreadyThere;
                 }
             }
+            if (outcome == DownloadOutcome.Saved && savedPath is not null)
+                Noctis.Services.Search.OnlineMusicSearch.PublishSavedFile(savedPath);
         }
         catch (SourcesWaitingException ex) { SetOutcome(download, DownloadState.Waiting, ex.Message, ex.Until); }
         catch (IOException ex) { SetOutcome(download, DownloadState.Waiting, "Connection or storage interrupted: " + ex.Message, DateTimeOffset.UtcNow.AddMinutes(10)); }

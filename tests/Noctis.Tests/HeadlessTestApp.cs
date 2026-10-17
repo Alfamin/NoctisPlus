@@ -75,6 +75,9 @@ public class HeadlessTestApp : Application
 
     public override void Initialize()
     {
+        // Headless view tests must never launch the developer's installed models. Backend
+        // protocol tests inject their own readiness check and an isolated synthetic runner.
+        Noctis.Features.WordLyrics.Tool.SuppressModelLaunchForTests = true;
         Styles.Add(new FluentTheme());
     }
 }

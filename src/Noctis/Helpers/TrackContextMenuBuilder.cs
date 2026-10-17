@@ -602,6 +602,7 @@ public sealed class TrackContextMenuBuilder
 
         SearchLyrics.Command = searchLyricsCommand;
         SearchLyrics.CommandParameter = track;
+        BindWordLyrics(track);
 
         ShowFolder.Command = showInExplorerCommand;
         ShowFolder.CommandParameter = track;
@@ -621,6 +622,20 @@ public sealed class TrackContextMenuBuilder
         if (IsV2)
             BindV2(track, rateCommand);
     }
+
+    private void BindWordLyrics(Track track)
+    {
+        if (_wordTiming is null)
+        {
+            _wordTiming = new MenuItem { Header = "Word timing / repair…" };
+            _wordTiming.Command = new RelayCommand<Track>(t => { if (t is not null) Features.WordLyrics.WordLyricsFeature.Current?.Show(track: t); });
+            Lyrics.Items.Add(_wordTiming);
+        }
+        _wordTiming.IsVisible = Features.WordLyrics.WordLyricsFeature.Current?.Enabled == true;
+        _wordTiming.IsEnabled = !track.IsRemoteStream;
+        _wordTiming.CommandParameter = track;
+    }
+    private MenuItem? _wordTiming;
 
     /// <summary>Rebuilds the plugin entries for this open. A plugin that throws here is contained by the host.</summary>
     private void BindPluginCommands(Track track)

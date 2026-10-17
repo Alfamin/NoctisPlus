@@ -112,6 +112,16 @@ public interface IDownloadQueue
 /// <summary>Where the running online source is published (set by the feature while it runs).</summary>
 public static class OnlineMusicSearch
 {
+    /// <summary>A new file was committed successfully. Native consumers need no queue polling.
+    /// Raised on the transfer thread; callbacks must not block it.</summary>
+    internal static event EventHandler<string>? FileSaved;
+    internal static void PublishSavedFile(string path)
+    {
+        if (FileSaved is not { } listeners) return;
+        foreach (EventHandler<string> listener in listeners.GetInvocationList())
+            try { listener(null, path); }
+            catch (Exception ex) { System.Diagnostics.Trace.WriteLine("Saved-file observer failed: " + ex.GetType().Name); }
+    }
     private static IOnlineMusicSearch? _current;
 
     public static IOnlineMusicSearch? Current

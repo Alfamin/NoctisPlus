@@ -21,6 +21,19 @@ internal static class NativeFeaturePreview
             return;
         }
         if (preview == "playlist-import") { await ShowPlaylistImportAsync(owner); return; }
+        if (preview.StartsWith("wordlyrics", StringComparison.Ordinal))
+        {
+            for (var n = 0; n < 20 && WordLyrics.WordLyricsFeature.Current is null; n++) await Task.Delay(50);
+            if (WordLyrics.WordLyricsFeature.Current is not { } words) return;
+            words.SetPreviewState(preview == "wordlyrics-error"
+                ? new("Waiting for the lyric provider", "DNS_FAILED: Check your VPN or system proxy. Queued songs are saved and retry later.", Error: true, Finished: true)
+                : new("Timing words", "Synthetic Artist · Night Drive", 3, 8, .45, Controllable: true));
+            var track = preview == "wordlyrics-custom" ? new Models.Track { Title = "Night Drive", Artist = "Synthetic Artist", FilePath = Path.Combine(Path.GetTempPath(), "noctis-synthetic.wav") } : null;
+            var wordDialog = new WordLyricsDialog(words, preview == "wordlyrics-library", track);
+            if (preview == "wordlyrics-custom" && wordDialog.DataContext is WordLyricsViewModel edit)
+            { edit.ActionIndex = 3; edit.Words = "[00:01.00]A synthetic line for the visual check\n[00:04.00]The next line keeps its timing guide"; }
+            DialogHelper.SizeToOwner(wordDialog, owner); await wordDialog.ShowDialog(owner); return;
+        }
         if (!preview.StartsWith("telegram-", StringComparison.Ordinal)) return;
         var dialog = new TelegramSignInDialog(new PreviewAccount(), _ => { });
         var vm = (TelegramSignInViewModel)dialog.DataContext!;

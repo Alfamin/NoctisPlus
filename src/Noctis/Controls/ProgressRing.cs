@@ -35,7 +35,7 @@ public sealed class ProgressRing : Control
     private readonly Animation _spin = new()
     {
         Duration = TimeSpan.FromSeconds(1.1),
-        IterationCount = IterationCount.Infinite,
+        IterationCount = new IterationCount(1),
         Children =
         {
             new KeyFrame { Cue = new Cue(0), Setters = { new Avalonia.Styling.Setter(SpinProperty, 0.0) } },
@@ -43,6 +43,7 @@ public sealed class ProgressRing : Control
         },
     };
     private CancellationTokenSource? _spinning;
+    internal Task SpinTask { get; private set; } = Task.CompletedTask;
 
     static ProgressRing()
     {
@@ -63,7 +64,7 @@ public sealed class ProgressRing : Control
     {
         base.OnPropertyChanged(change);
         if (change.Property == ValueProperty) SetValue(ShownProperty, Math.Clamp(Value, 0, 1));
-        else if (change.Property == IsIndeterminateProperty || change.Property == IsVisibleProperty) UpdateSpin();
+        else if (change.Property == IsIndeterminateProperty || change.Property == IsVisibleProperty || change.Property.Name == nameof(IsEffectivelyVisible)) UpdateSpin();
     }
 
     protected override void OnAttachedToVisualTree(VisualTreeAttachmentEventArgs e)
@@ -76,16 +77,28 @@ public sealed class ProgressRing : Control
     {
         base.OnDetachedFromVisualTree(e);
         _spinning?.Cancel();
+        _spinning?.Dispose();
         _spinning = null;
     }
 
     private void UpdateSpin()
     {
-        var want = IsIndeterminate && IsVisible && VisualRoot is not null;
+        var want = IsIndeterminate && IsEffectivelyVisible && VisualRoot is not null;
         if (want == _spinning is not null) return;
-        if (!want) { _spinning?.Cancel(); _spinning = null; return; }
+        if (!want) { _spinning?.Cancel(); _spinning?.Dispose(); _spinning = null; return; }
         _spinning = new CancellationTokenSource();
-        _ = _spin.RunAsync(this, _spinning.Token);
+        SpinTask = SpinAsync(_spinning.Token);
+    }
+
+    private async Task SpinAsync(CancellationToken ct)
+    {
+        try
+        {
+            // Avalonia 12 rejects infinite RunAsync animations. A cancellable sequence of
+            // finite turns uses its public clock API and leaves no unobserved faulted task.
+            while (!ct.IsCancellationRequested) await _spin.RunAsync(this, ct);
+        }
+        catch (OperationCanceledException) when (ct.IsCancellationRequested) { }
     }
 
     public override void Render(DrawingContext context)
