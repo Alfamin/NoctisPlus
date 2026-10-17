@@ -139,6 +139,59 @@ public class ElrcHeldWordTests
         Assert.True(minRatio > 0.85 && maxRatio < 1.15, $"per-frame advance {minRatio:F2}..{maxRatio:F2} of ideal");
     }
 
+    // ── Which words are held notes ──
+
+    private static WordTiming[] Words(string elrc) => Parse(elrc)[0].Words!.ToArray();
+
+    private static string Emphasized(string elrc) =>
+        string.Join(" ", Words(elrc).Where(w => w.IsEmphasis).Select(w => w.Text.Trim()));
+
+    [Fact]
+    public void HeldNote_RealLines_WhichWordsAreEmphasized()
+    {
+        // The line's last word carries its own end tag, so its length is real.
+        Assert.Equal("told", Emphasized("[00:43.23]<00:43.23>Let <00:43.50>my <00:43.92>story <00:44.59>be <00:45.20>told<00:47.62>"));
+        // A 1.16 s "brand" in a slow line: the old cadence gate (1.5x the line median)
+        // asked 1.74 s of it; AMLL's 1 s rule emphasizes it.
+        Assert.Equal("brand new", Emphasized("[03:41.19]<03:41.19>Be <03:41.65>brand <03:42.81>new<03:48.20>"));
+        Assert.Equal("embers", Emphasized("[03:13.47]<03:13.47>Time <03:14.41>turns <03:15.23>flames <03:15.82>to <03:16.05>embers<03:17.10>"));
+        // A comma then the next word's start: the span holds the breath after the comma
+        // (on true word ends such words are sung for a median 80% of it).
+        Assert.Equal("", Emphasized("[02:05.46]<02:05.46>Yeah, <02:06.49>you <02:06.69>know <02:06.88>what's <02:07.13>up<02:07.47>"));
+        Assert.Equal("", Emphasized("[01:26.19]<01:26.19>I <01:26.57>push <01:26.92>my <01:27.15>luck, <01:28.29>it <01:29.15>shows<01:30.07>"));
+        // Long enough to be a hold even with the breath in it.
+        Assert.Equal("Oh, oh", Emphasized("[00:47.89]<00:47.89>Oh, <00:50.63>oh<00:53.18>"));
+    }
+
+    [Fact]
+    public void PunctuationFloor_OnlyAppliesWhenTheEndIsTheNextStart()
+    {
+        // TTML-style true end with a rest after it: the 1.2 s is all singing.
+        var line = new LyricLine
+        {
+            Timestamp = TimeSpan.Zero,
+            Text = "t",
+            Words = new List<WordTiming>
+            {
+                new() { Text = "luck, ", Start = TimeSpan.Zero, End = TimeSpan.FromMilliseconds(1200) },
+                new() { Text = "it", Start = TimeSpan.FromMilliseconds(1600), End = TimeSpan.FromMilliseconds(1900) },
+            },
+        };
+        Assert.True(line.Words![0].IsEmphasis);
+        Assert.True(line.Words[0].SweepTrailOut);
+        Assert.True(line.Words[1].SweepLeadIn);
+    }
+
+    [Fact]
+    public void MergedWord_WithOneHeldSyllable_IsEmphasized()
+    {
+        // AMLL: a chunk is emphasized when any of its syllables is a held note by itself.
+        var words = Words("[00:01.00]<00:01.00>Every<00:01.30>bo<00:01.50>dyyyy<00:03.00>");
+        Assert.Single(words);
+        Assert.Equal("Everybodyyyy", words[0].Text);
+        Assert.True(words[0].IsEmphasis);
+    }
+
     // ── The letter animation's clock ──
 
     [Fact]

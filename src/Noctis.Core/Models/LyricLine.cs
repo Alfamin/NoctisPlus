@@ -123,13 +123,17 @@ public partial class LyricLine : ObservableObject
     public TimeSpan? TransliterationEndTimestamp { get; set; }
 
     /// <summary>AMLL's shouldEmphasize floor: a held note is at least 1s of vocal.</summary>
-    private const double EmphasisFloorMs = 1000;
+    internal const double EmphasisFloorMs = 1000;
 
-    /// <summary>Adaptive-threshold cap: a multi-second note is a hold no matter the cadence.</summary>
-    private const double EmphasisCapMs = 2500;
-
-    /// <summary>A held word must stand out from its line's own cadence by this factor.</summary>
-    private const double EmphasisCadenceFactor = 1.5;
+    /// <summary>
+    /// Floor for a mid-line word that ends in punctuation and runs straight into the next
+    /// word's start (every ELRC mid-line word: its end IS the next start, so the span
+    /// includes any rest). Measured on 50,695 word-timed Latin lines of the AMLL TTML DB,
+    /// where true word ends are known: such words are sung for a median 80% of that span
+    /// (plain words 100%) — the breath sits after the comma. Asking 1.6 s of them cut the
+    /// false held notes by a third (2549 → 1659) for 4% of the real ones.
+    /// </summary>
+    internal const double EmphasisRestAfterPunctuationMs = 1600;
 
     /// <summary>Gaps up to this long between one word's end and the next one's start still
     /// carry the sweep's soft edge straight across (TTML phrases have tiny gaps between
@@ -140,10 +144,6 @@ public partial class LyricLine : ObservableObject
     {
         if (words == null || words.Count == 0) return;
 
-        // ELRC word ends are the NEXT word's start, so every duration includes the
-        // rest that follows the word.
-        var durations = new double[words.Count];
-        var sizeOk = new bool[words.Count];
         for (int i = 0; i < words.Count; i++)
         {
             var w = words[i];
@@ -158,35 +158,41 @@ public partial class LyricLine : ObservableObject
             w.SweepLeadIn = i == 0 || !Abuts(words[i - 1], w);
             w.SweepTrailOut = next == null || !Abuts(w, next);
 
+            // AMLL shouldEmphasize: at least 1s, and CJK cells (one character each, the
+            // parser never merges them) gate on duration alone while Latin words must be
+            // 2–7 characters. No cadence-relative gate: on the AMLL TTML DB it kept
+            // precision flat (0.881 vs 0.880) and dropped a fifth of the real held notes
+            // in Latin lines (recall 0.80) and over half with CJK (0.47).
             var text = w.Text.Trim();
-            // AMLL shouldEmphasize size rule: CJK cells (one character each, the
-            // parser never merges them) gate on duration alone; Latin words must be
-            // 2–7 characters — longer merged words span >1s at a normal pace, and a
-            // single letter reads wrong under a whole-word glow.
-            sizeOk[i] = text.Length > 0
-                && (IsCjkish(text) || (text.Length >= 2 && text.Length <= 7));
-            durations[i] = duration;
+            var abutsNext = next != null && (w.End == null || w.End.Value >= next.Start);
+            var floor = abutsNext && EndsInPunctuation(text) ? EmphasisRestAfterPunctuationMs : EmphasisFloorMs;
+            var emphasis = text.Length > 0 && SizeOk(text.Length, IsCjkish(text)) && duration >= floor;
+
+            // AMLL also emphasizes a merged Latin word when one of its syllables is a
+            // held note by itself ("No-o-o-o" carries the hold in one syllable).
+            if (!emphasis && w.Syllables is { Count: > 1 } syllables && !IsCjkish(text))
+            {
+                for (int s = 0; s < syllables.Count && !emphasis; s++)
+                {
+                    var syl = syllables[s];
+                    var sylEnd = syl.End ?? (s + 1 < syllables.Count ? syllables[s + 1].Start : end);
+                    emphasis = sylEnd.HasValue && SizeOk(syl.Length, false)
+                        && (sylEnd.Value - syl.Start).TotalMilliseconds >= EmphasisFloorMs;
+                }
+            }
+            w.IsEmphasis = emphasis;
         }
-
-        // Adaptive gate: a held word must beat 1.5× the line's median word duration,
-        // floored at AMLL's 1s and capped at 2.5s (an unambiguous hold fires even in
-        // a uniformly slow line). This keeps ballads from glowing on every word.
-        var threshold = Math.Clamp(
-            EmphasisCadenceFactor * Median(durations), EmphasisFloorMs, EmphasisCapMs);
-        for (int i = 0; i < words.Count; i++)
-            words[i].IsEmphasis = sizeOk[i] && durations[i] >= threshold;
     }
 
-    private static double Median(double[] values)
-    {
-        var sorted = (double[])values.Clone();
-        Array.Sort(sorted);
-        var mid = sorted.Length / 2;
-        return sorted.Length % 2 == 1 ? sorted[mid] : (sorted[mid - 1] + sorted[mid]) / 2.0;
-    }
+    private static bool SizeOk(int length, bool cjk) => cjk ? length > 0 : length is >= 2 and <= 7;
 
     private static bool Abuts(WordTiming a, WordTiming b) =>
         a.End is not { } end || (b.Start - end).TotalMilliseconds <= SweepAbutToleranceMs;
+
+    // Closing punctuation where a singer breathes. Apostrophes and hyphens are elisions
+    // ("goin'", "me-e-e"), not rests.
+    private static bool EndsInPunctuation(string text) =>
+        text.Length > 0 && ",.!?;:…)\"”，。！？；：、）」』".Contains(text[^1]);
 
     // Matches the ELRC parser's CJK boundary (chars from the CJK radicals block up).
     private static bool IsCjkish(string text)
