@@ -65,7 +65,7 @@ public sealed partial class AlbumPageViewModel : MobilePage, ITintedPage
 
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(Title), nameof(HasArtwork), nameof(QualityBadge), nameof(HasQualityBadge),
-        nameof(QualityDetail), nameof(QualityDescription))]
+        nameof(QualityDetail), nameof(QualityDescription), nameof(QualityIsLossy))]
     private Album _album = null!;
 
     [ObservableProperty] private IReadOnlyList<AlbumTrackRow> _tracks = Array.Empty<AlbumTrackRow>();
@@ -138,6 +138,9 @@ public sealed partial class AlbumPageViewModel : MobilePage, ITintedPage
     /// with its tooltip lines for the tap-to-explain flyout; all from Core's Album.</summary>
     public string QualityBadge => Album.AudioQualityBadge;
     public bool HasQualityBadge => QualityBadge.Length > 0;
+    /// <summary>No lossless track at all (AAC, MP3…): the badge and footer take the lossy glyph,
+    /// as Now Playing does, not the lossless waveform.</summary>
+    public bool QualityIsLossy => Album.Tracks?.Any(t => t.IsLossless) != true;
     public string QualityDetail => Album.AudioQualityDetailedInfo;
     public string QualityDescription => Album.AudioQualityDescription;
 

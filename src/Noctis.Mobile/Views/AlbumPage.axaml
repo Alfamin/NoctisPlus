@@ -48,6 +48,13 @@
         <Style Selector="views|AlbumPage.tinted Path.album-subtle">
             <Setter Property="Fill" Value="{DynamicResource AlbumSubtleText}" />
         </Style>
+        <!-- The lossy glyph (PhLossySteps) is a stroked line, not a fill. -->
+        <Style Selector="views|AlbumPage Path.album-glyph-stroke">
+            <Setter Property="Stroke" Value="{DynamicResource SecondaryTextBrush}" />
+        </Style>
+        <Style Selector="views|AlbumPage.tinted Path.album-glyph-stroke">
+            <Setter Property="Stroke" Value="{DynamicResource AlbumSubtleText}" />
+        </Style>
 
         <!-- Play: a dark pill on light tints and a light one on dark tints (Apple's black pill
              on a pale cover); without a tint, the theme's text colour on its background. -->
@@ -175,8 +182,14 @@
                         <Button Name="QualityBadge" Classes="row" HorizontalAlignment="Left" VerticalAlignment="Center"
                                 IsVisible="{Binding HasQualityBadge}" Command="{Binding ShowQualityNoteCommand}">
                             <StackPanel Orientation="Horizontal" Spacing="4" Margin="0,4">
-                                <Viewbox Width="16" Height="11" Margin="0,1,0,0" VerticalAlignment="Center">
+                                <Viewbox Name="BadgeLosslessGlyph" Width="16" Height="11" Margin="0,1,0,0" VerticalAlignment="Center"
+                                         IsVisible="{Binding !QualityIsLossy}">
                                     <Path Classes="album-subtle" Data="{DynamicResource PhLossless}" />
+                                </Viewbox>
+                                <Viewbox Name="BadgeLossyGlyph" Width="13" Height="11" Margin="0,1,0,0" VerticalAlignment="Center"
+                                         IsVisible="{Binding QualityIsLossy}">
+                                    <Path Classes="album-glyph-stroke" Data="{DynamicResource PhLossySteps}" StrokeThickness="2.25"
+                                          StrokeLineCap="Round" StrokeJoin="Round" />
                                 </Viewbox>
                                 <TextBlock Name="QualityBadgeText" Classes="album-subtle" FontSize="13" FontWeight="SemiBold"
                                            Text="{Binding QualityBadge}" VerticalAlignment="Center" />
@@ -300,8 +313,14 @@
                 <StackPanel Name="Footer" Margin="18,22,18,0">
                     <StackPanel Name="FooterQuality" Orientation="Horizontal" Spacing="6" Margin="0,0,0,12"
                                 IsVisible="{Binding HasQualityLine}">
-                        <Viewbox Width="18" Height="12" VerticalAlignment="Center">
+                        <Viewbox Name="FooterLosslessGlyph" Width="18" Height="12" VerticalAlignment="Center"
+                                 IsVisible="{Binding !QualityIsLossy}">
                             <Path Classes="album-subtle" Data="{DynamicResource PhLossless}" />
+                        </Viewbox>
+                        <Viewbox Name="FooterLossyGlyph" Width="14" Height="12" VerticalAlignment="Center"
+                                 IsVisible="{Binding QualityIsLossy}">
+                            <Path Classes="album-glyph-stroke" Data="{DynamicResource PhLossySteps}" StrokeThickness="2.25"
+                                  StrokeLineCap="Round" StrokeJoin="Round" />
                         </Viewbox>
                         <TextBlock Name="FooterQualityText" Classes="album-subtle" FontSize="14" Text="{Binding QualityLine}"
                                    VerticalAlignment="Center" />
