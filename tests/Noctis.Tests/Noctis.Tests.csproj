@@ -12,6 +12,9 @@
 
   <ItemGroup>
     <PackageReference Include="Microsoft.NET.Test.Sdk" Version="18.10.1" />
+    <!-- Built-in Free Music Finder (src/Noctis/Features) needs it at run time; tests that scan
+         the app's types load every type. -->
+    <PackageReference Include="WTelegramClient" Version="4.4.9" />
     <PackageReference Include="xunit.v3" Version="3.2.2" />
     <PackageReference Include="xunit.runner.visualstudio" Version="3.1.5" />
     <!-- Headless UI harness (same version as the app's Avalonia pin): lets tests

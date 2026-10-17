@@ -110,6 +110,7 @@ public partial class SettingsView : UserControl
         (SettingsViewModel.TabAppearance, "AppearanceTabPanel"),
         (SettingsViewModel.TabPlayer, "PlayerTabPanel"),
         (SettingsViewModel.TabLyrics, "LyricsTabPanel"),
+        (SettingsViewModel.TabFeatures, "FeaturesTabPanel"),
         (SettingsViewModel.TabShortcuts, "ShortcutsTabPanel"),
         (SettingsViewModel.TabAudio, "AudioTabPanel"),
         (SettingsViewModel.TabLibrary, "LibraryTabPanel"),
