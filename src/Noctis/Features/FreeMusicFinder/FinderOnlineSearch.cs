@@ -110,7 +110,9 @@ internal sealed class FinderOnlineSearch : IOnlineMusicSearch
         {
             var s = hit.Track!; _songs[s.Song.Id] = s.Song;
             var local = matches is not null && matches.TryGetValue(s.Song.Id, out var m) ? m.Local?.Id : null;
-            var own = leading is not null && s.Song.Artists.FirstOrDefault()?.Id == leading ? 6 : 0;
+            // The owner prefers the catalog's popularity order here: a hit the artist is featured
+            // on ("All The Stars" for SZA) may lead their own songs. No own-song bonus.
+            var own = 0;
             songRows.Add(new(s.Song.Id, s.Song.Title, string.Join(", ", s.Song.Artists.Select(a => a.Name)), s.Album?.Title ?? "",
                 s.Song.Seconds, s.Song.Explicit, CatalogArtwork.SizedUrl(s.Artwork.Length > 0 ? s.Artwork : s.Album?.Artwork, RowArtwork) ?? "",
                 local, s.Album?.Id ?? "", Scale(hit.Score + own)));
@@ -137,7 +139,13 @@ internal sealed class FinderOnlineSearch : IOnlineMusicSearch
     /// <summary>Finder's ranking (exact name ≈ 96-110, every word ≈ 76-90, spread ≈ 50-70) onto the
     /// library index's 0-100 scale, so an exact online match and an exact library match tie and the
     /// library's own bonus decides.</summary>
-    internal static double Scale(double finder) => Math.Clamp(finder * 0.92, 0, 97);
+    internal static double Scale(double finder)
+    {
+        // Above 90 the curve flattens towards 97 without reaching it: strong online matches keep
+        // their order among themselves but never outrank an equally strong library match.
+        var s = Math.Max(0, finder * 0.92);
+        return s <= 90 ? s : 90 + 7 * (1 - Math.Exp(-(s - 90) / 10));
+    }
 
     public string? CachedArtwork(string url) => url.Length == 0 ? null : _catalog()?.SavedArtwork(url);
 

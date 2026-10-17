@@ -177,7 +177,11 @@ public sealed partial class SearchViewModel : ViewModelBase, ISearchable, IDispo
     }
 
     /// <summary>The page was opened: warm the online connection so the first query is quick.</summary>
-    public void OnShown() => _source?.WarmUp();
+    public void OnShown()
+    {
+        _source?.WarmUp();
+        RefreshDownloadStates();
+    }
 
     private async Task RunOnlineAsync(IOnlineMusicSearch source, string query, CancellationTokenSource cts, TimeSpan delay)
     {
@@ -470,9 +474,15 @@ public sealed partial class SearchViewModel : ViewModelBase, ISearchable, IDispo
 
     // ── Downloads and library changes ──
 
+    /// <summary>Requests still to finish (queued, downloading, failed): the count on the Downloads button.</summary>
+    [ObservableProperty, NotifyPropertyChangedFor(nameof(HasPendingDownloads))] private int _pendingDownloads;
+    public bool HasPendingDownloads => PendingDownloads > 0;
+
     private void RefreshDownloadStates()
     {
         if (_source is not { } source) return;
+        try { PendingDownloads = source.Downloads.Snapshot().Count(e => e.State != OnlineDownloadState.Saved); }
+        catch (InvalidOperationException) { }
         foreach (var item in Songs)
             if (item.Online is { } song) item.Apply(source.StatusOf(song));
         if (TopSong is { Online: { } top } topItem) topItem.Apply(source.StatusOf(top));
@@ -501,6 +511,7 @@ public sealed partial class SearchViewModel : ViewModelBase, ISearchable, IDispo
         _source = source;
         if (_source is not null) _source.DownloadsChanged += OnDownloadsChanged;
         OnPropertyChanged(nameof(HasOnline));
+        RefreshDownloadStates();
     }
 
     public void Dispose()

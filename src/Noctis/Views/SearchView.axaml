@@ -488,6 +488,12 @@
                         <Path Data="{StaticResource SearchDownloadGlyph}" Width="11" Height="11" Stretch="Uniform" VerticalAlignment="Center"
                               Stroke="{Binding $parent[Button].Foreground}" StrokeThickness="2" StrokeLineCap="Round" StrokeJoin="Round" />
                         <TextBlock Text="Downloads" VerticalAlignment="Center" />
+                        <!-- How many are still to come, in the accent (only while there are any). -->
+                        <Border IsVisible="{Binding HasPendingDownloads}" CornerRadius="999" Padding="6,0" MinWidth="18" Height="18"
+                                Background="{DynamicResource AccentColorBrush}" VerticalAlignment="Center">
+                            <TextBlock Text="{Binding PendingDownloads}" FontSize="11" FontWeight="Bold" HorizontalAlignment="Center"
+                                       VerticalAlignment="Center" Foreground="{DynamicResource AccentForegroundBrush}" />
+                        </Border>
                     </StackPanel>
                 </Button>
                 <WrapPanel x:Name="Chips" IsVisible="{Binding HasQuery}" Orientation="Horizontal" VerticalAlignment="Center">
