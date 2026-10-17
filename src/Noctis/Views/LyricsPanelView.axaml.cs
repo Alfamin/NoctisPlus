@@ -65,6 +65,7 @@ public partial class LyricsPanelView : UserControl
     public LyricsPanelView()
     {
         InitializeComponent();
+        _ = new Features.LyricMotion.LyricMotionScope(this, small: true);
 
         _flow = new FlowingArtworkAnimator(this, PanelFlowBackdrop, PanelFlowLayer1, PanelFlowLayer2, PanelBeatGlow, GetBeatContext);
 

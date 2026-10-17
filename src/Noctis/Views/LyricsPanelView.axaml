@@ -25,6 +25,7 @@
         <!-- Duet layout (ELRC v1:/v2:/v3: voice markers) — panel copy of the lyrics
              page keys; keep in sync. -->
         <conv:LyricVoiceToAlignmentConverter x:Key="VoiceAlign"/>
+        <conv:NativeLyricAlignmentConverter x:Key="NativeVoiceAlign"/>
         <conv:LyricVoiceToTextAlignmentConverter x:Key="VoiceTextAlign"/>
         <conv:LyricVoiceToItemsAlignmentConverter x:Key="VoiceItemsAlign"/>
         <conv:LyricVoiceToTransformOriginConverter x:Key="VoiceOrigin"/>
@@ -34,6 +35,8 @@
              main word layer and the background-vocal (adlib) layer below it. Panel copy
              of the lyrics page template (smaller glow headroom). -->
         <DataTemplate x:Key="WordCellTemplate" x:DataType="m:WordTiming">
+            <controls:MotionWordCell Word="{Binding}" Line="{Binding $parent[ItemsControl].((m:LyricLine)DataContext)}" Foreground="{Binding $parent[UserControl].((vm:LyricsViewModel)DataContext).LyricsPrimaryFg}">
+            <controls:MotionWordCell.FallbackTemplate><DataTemplate x:DataType="m:WordTiming">
             <Panel Classes="word-cell"
                    Classes.current="{Binding IsCurrent}"
                    Classes.emphasis="{Binding IsEmphasis}">
@@ -87,6 +90,8 @@
                 </Panel>
                 </Viewbox>
             </Panel>
+        </DataTemplate></controls:MotionWordCell.FallbackTemplate>
+            </controls:MotionWordCell>
         </DataTemplate>
     </UserControl.Resources>
 
@@ -352,18 +357,20 @@
                         <MultiBinding Converter="{StaticResource DuetMinWidth}">
                             <Binding Path="HasDuetLines"/>
                             <Binding Path="$self.MaxWidth"/>
+                                <Binding Path="$self.(controls:MotionWordCell.RightToLeftSong)"/>
                         </MultiBinding>
                     </ItemsControl.MinWidth>
                     <ItemsControl.ItemTemplate>
                         <DataTemplate x:DataType="m:LyricLine">
                             <Button Background="Transparent"
                                     Classes="panel-lyric-line-btn"
+                                        AutomationProperties.Name="{Binding Text}"
                                     Classes.active="{Binding IsActive}"
                                     BorderThickness="0"
                                     Padding="0"
                                     Margin="0,14"
                                     MaxWidth="{Binding $parent[ItemsControl].MaxWidth}"
-                                    HorizontalAlignment="{Binding Voice, Converter={StaticResource VoiceAlign}}"
+
                                     RenderTransformOrigin="{Binding Voice, Converter={StaticResource VoiceOrigin}}"
                                     HorizontalContentAlignment="Left"
                                     Cursor="Hand"
@@ -371,6 +378,14 @@
                                     Command="{Binding $parent[ItemsControl].((vm:LyricsViewModel)DataContext).SeekToLineCommand}"
                                     CommandParameter="{Binding}"
                                     Effect="{Binding BlurRadius, Converter={StaticResource BlurToEffect}}">
+                                    <Button.HorizontalAlignment>
+                                        <MultiBinding Converter="{StaticResource NativeVoiceAlign}">
+                                            <Binding Path="Voice"/>
+                                            <Binding Path="Text"/>
+                                            <Binding Path="$self.(controls:MotionWordCell.RightToLeftEnabled)"/>
+                                            <Binding Path="$self.(controls:MotionWordCell.RightToLeftSong)"/>
+                                        </MultiBinding>
+                                    </Button.HorizontalAlignment>
                                 <StackPanel HorizontalAlignment="Left"
                                             MaxWidth="{Binding $parent[ItemsControl].MaxWidth}">
                                 <Panel HorizontalAlignment="{Binding Voice, Converter={StaticResource VoiceAlign}}">
@@ -404,7 +419,7 @@
                                         </ItemsControl.Transitions>
                                         <ItemsControl.ItemsPanel>
                                             <ItemsPanelTemplate>
-                                                <WrapPanel Orientation="Horizontal" ItemsAlignment="{Binding Voice, Converter={StaticResource VoiceItemsAlign}}"/>
+                                                <controls:LyricWordWrapPanel Line="{Binding}" Orientation="Horizontal" ItemsAlignment="{Binding Voice, Converter={StaticResource VoiceItemsAlign}}"/>
                                             </ItemsPanelTemplate>
                                         </ItemsControl.ItemsPanel>
                                     </ItemsControl>
@@ -451,7 +466,7 @@
                                     </ItemsControl.Transitions>
                                     <ItemsControl.ItemsPanel>
                                         <ItemsPanelTemplate>
-                                            <WrapPanel Orientation="Horizontal" ItemsAlignment="{Binding Voice, Converter={StaticResource VoiceItemsAlign}}"/>
+                                            <controls:LyricWordWrapPanel Line="{Binding}" Orientation="Horizontal" ItemsAlignment="{Binding Voice, Converter={StaticResource VoiceItemsAlign}}"/>
                                         </ItemsPanelTemplate>
                                     </ItemsControl.ItemsPanel>
                                 </ItemsControl>
@@ -481,7 +496,7 @@
                                     </ItemsControl.Transitions>
                                     <ItemsControl.ItemsPanel>
                                         <ItemsPanelTemplate>
-                                            <WrapPanel Orientation="Horizontal" ItemsAlignment="{Binding Voice, Converter={StaticResource VoiceItemsAlign}}"/>
+                                            <controls:LyricWordWrapPanel Line="{Binding}" Orientation="Horizontal" ItemsAlignment="{Binding Voice, Converter={StaticResource VoiceItemsAlign}}"/>
                                         </ItemsPanelTemplate>
                                     </ItemsControl.ItemsPanel>
                                 </ItemsControl>

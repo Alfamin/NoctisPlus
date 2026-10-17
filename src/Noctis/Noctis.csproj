@@ -154,13 +154,16 @@
   <!-- Embedded assets -->
   <ItemGroup>
     <!-- Pinned first-party modules. Kept outside the user plugin directory; no startup download. -->
-    <Content Include="..\..\bundled-plugins\**\*" Exclude="..\..\bundled-plugins\dev.moshi.freemusicfinder\**" Link="bundled-plugins\%(RecursiveDir)%(Filename)%(Extension)"
+    <Content Include="..\..\bundled-plugins\**\*" Exclude="..\..\bundled-plugins\dev.moshi.freemusicfinder\**;..\..\bundled-plugins\dev.moshi.lyricmotion\**" Link="bundled-plugins\%(RecursiveDir)%(Filename)%(Extension)"
              CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
   </ItemGroup>
   <!-- Noctis Plus features compiled into the app (Features/<Name>): their plugin.json declares
        the settings shown in Settings → Features. -->
   <ItemGroup>
     <EmbeddedResource Include="Features\FreeMusicFinder\plugin.json" LogicalName="Noctis.Features.FreeMusicFinder.plugin.json" />
+    <EmbeddedResource Include="Features\LyricMotion\plugin.json" LogicalName="Noctis.Features.LyricMotion.plugin.json" />
+    <Content Include="Features\LyricMotion\LICENSE" Link="features\dev.moshi.lyricmotion\LICENSE"
+             CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
   </ItemGroup>
   <ItemGroup>
     <!-- Free Music Finder: Telegram (MTProto) client for the music bots. -->

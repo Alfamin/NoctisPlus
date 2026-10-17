@@ -65,6 +65,7 @@ public partial class LyricsView : UserControl
     public LyricsView()
     {
         InitializeComponent();
+        _ = new Features.LyricMotion.LyricMotionScope(this);
 
         // Detect manual scroll via mouse wheel to pause auto-follow
         if (LyricsScrollViewer != null)

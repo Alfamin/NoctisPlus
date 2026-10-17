@@ -87,8 +87,8 @@ public class DuetMinWidthConverter : IMultiValueConverter
 {
     public object? Convert(IList<object?> values, Type targetType, object? parameter, CultureInfo culture)
     {
-        if (values.Count == 2 && values[0] is bool hasDuet && values[1] is double maxWidth
-            && hasDuet && !double.IsInfinity(maxWidth) && !double.IsNaN(maxWidth))
+        if (values.Count >= 2 && values[0] is bool hasDuet && values[1] is double maxWidth
+            && (hasDuet || values.Count > 2 && values[2] is true) && !double.IsInfinity(maxWidth) && !double.IsNaN(maxWidth))
         {
             return maxWidth;
         }

@@ -929,8 +929,10 @@ public partial class MainWindowViewModel : ViewModelBase
             }, DispatcherPriority.Background);
         // Developer check of the Search page on an isolated profile: NOCTISPLUS_DEBUG_SEARCH=<query>
         // opens Search with that query (NOCTISPLUS_DEBUG_FILTER=Songs|Artists|Albums picks a chip).
+        // NOCTISPLUS_DEBUG_PAGE=lyrics-panel opens the lyrics side panel instead (Lyric Motion checks).
         if (Environment.GetEnvironmentVariable("NOCTISPLUS_DEBUG_PAGE") is { Length: > 0 } debugPage)
-            Dispatcher.UIThread.Post(() => Navigate(debugPage), DispatcherPriority.Background);
+            Dispatcher.UIThread.Post(() => { if (debugPage == "lyrics-panel") ToggleLyricsPanel(); else Navigate(debugPage); },
+                DispatcherPriority.Background);
         // NOCTISPLUS_DEBUG_ROUNDTRIP=1: Search, then Songs after 4 s, then Search again after 8 s
         // (leaving and coming back, for the For you shelf).
         // NOCTISPLUS_DEBUG_ROUNDTRIP=artist: Search "drake", open the artist, then Back.

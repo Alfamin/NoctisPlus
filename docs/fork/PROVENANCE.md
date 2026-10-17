@@ -16,7 +16,7 @@ Our own changes are listed by file in Git history.
 
 | Feature | Source repository | Author / rights |
 |---|---|---|
-| Free Music Finder (catalog, downloads) | Alfamin/noctic-download-plugin, forked from Pr0nE/noctic-download-plugin (first commit 4d7ae1b) | The original code is by Pr0nE. Neither repository has a license file. Pr0nE gave permission to include and redistribute his code in Noctis Plus (told to us by the owner, 2026-10-16). It is shipped with that permission only: it is **not** MIT, and reusing it elsewhere needs its authors' permission. A license file in his repository would change that. |
+| Free Music Finder (catalog, downloads) | Alfamin/noctic-download-plugin, forked from Pr0nE/noctic-download-plugin (first commit 4d7ae1b) | Original code by Pr0nE, MIT. The owner, a maintainer, added the MIT LICENSE upstream in 1503a6c on 2026-10-17 (afternoon handoff). Alfamin's fork changes are MIT as well. This supersedes the initial permission-only status. |
 | True Shuffle | Alfamin/TrueShuffle | Alfamin (owner), MIT (LICENSE added 2026-10-16) |
 | Lyric Motion | Alfamin/LyricMotion | Alfamin (owner), MIT (LICENSE added 2026-10-16) |
 | WordLyrics (plugin and program) | Alfamin/WordLyrics | Alfamin (owner), MIT (LICENSE added 2026-10-16) |
@@ -34,3 +34,10 @@ Microsoft.Extensions.DependencyInjection 8.0.1, NAudio 2.3.0, Net.Codecrete.QrCo
 System.Security.Cryptography.ProtectedData 8.0.0, TagLibSharp 2.3.0, Tmds.DBus.Protocol 0.95.1, Whisper.net 1.9.1,
 YamlDotNet 15.3.0; the CI build also bundles ffmpeg. Feature modules may add WTelegramClient 4.4.9 (Finder) and the
 WordLyrics program's Python runtime and models, which are installed separately.
+
+## Native Lyric Motion (2026-10-17)
+
+The native word renderer is owned by Noctis's lyrics templates and its existing word clock.
+It retains the settings id/keys from Alfamin/LyricMotion 1.4.3 and its MIT-licensed LetterLayer, Spring/Follower, FillReader, tuning and easing. Native word controls own the text layers and register directly; the old Director/Surface/Rig discovery and reflection are not used. LetterLayer retains its geometric ancestor transforms for pixel alignment. The source licence is retained under
+`src/Noctis/Features/LyricMotion/LICENSE` and delivered as `features/dev.moshi.lyricmotion/LICENSE`.
+The old pinned DLL remains in this repository for provenance, but is excluded from new packages.

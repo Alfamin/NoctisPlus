@@ -12,6 +12,7 @@ internal static class BuiltInFeatures
     public static void Register(PluginHost host)
     {
         host.RegisterBuiltIn(Manifest("FreeMusicFinder"), () => new FreeMusicFinder.FreeMusicPlugin());
+        host.RegisterBuiltIn(Manifest("LyricMotion"), () => new LyricMotion.LyricMotionFeature());
     }
 
     /// <summary>The feature's plugin.json, embedded as Noctis.Features.&lt;folder&gt;.plugin.json.</summary>

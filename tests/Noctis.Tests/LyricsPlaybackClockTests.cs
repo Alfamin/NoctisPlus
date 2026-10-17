@@ -19,6 +19,58 @@ public class LyricsPlaybackClockTests
     private const double FrameMs = 1000.0 / 60;
     private const double PollMs = 100;
 
+    [Fact]
+    public void RapidPauseResumeRetainsTheDisplayedSweepWithoutAddingPausedTime()
+    {
+        var clock = new LyricsPlaybackClock();
+        clock.Sample(1000, 0);
+        var shown = clock.Sample(1000, 70);
+        for (var i = 0; i < 12; i++)
+        {
+            clock.Pause();
+            Assert.Equal(shown, clock.Sample(1000, 1000 + i * 500));
+            clock.Resume();
+            Assert.Equal(shown, clock.Sample(1000, 1100 + i * 500));
+            var next = clock.Sample(1000, 1116 + i * 500);
+            Assert.InRange(next - shown, 16 * 0.92 - 0.01, 16 * 1.08 + 0.01);
+            shown = next;
+        }
+        clock.Pause(); clock.Reset();
+        Assert.Equal(200, clock.Sample(200, 20000));
+    }
+
+    [Fact]
+    public void RapidPauseResume_DoesNotStackALagBehindThePlayer()
+    {
+        // Seen in the real app (2026-10-17): after a pause the player still reports ~100 ms more
+        // than the frozen picture. Eight quick toggles left the lyrics ~400 ms late with only the
+        // ±8% bend. After each resume the clock must catch up smoothly: never backwards, at most
+        // 1.5x speed, and in sync again well within half a second.
+        var clock = new LyricsPlaybackClock();
+        double now = 0, raw = 5000, shown = clock.Sample(raw, now);
+        void Play(double ms)
+        {
+            for (var t = 0.0; t < ms; t += FrameMs)
+            {
+                now += FrameMs; raw += FrameMs;
+                var next = clock.Sample(Math.Floor(raw / PollMs) * PollMs, now);
+                Assert.InRange(next - shown, -0.001, FrameMs * (1 + LyricsPlaybackClock.ResumeCatchUpRate) + 0.01);
+                shown = next;
+            }
+        }
+        Play(500);
+        for (var i = 0; i < 4; i++)
+        {
+            clock.Pause();
+            raw += 100; // the output's tail after the pause
+            now += 180; clock.Sample(Math.Floor(raw / PollMs) * PollMs, now);
+            clock.Resume();
+            Play(180);
+        }
+        Play(450);
+        Assert.InRange(raw - shown, -60, 60);
+    }
+
     /// <summary>
     /// Models the real chain: the audio layer's position advances per decoded block,
     /// a 100ms timer polls it, and the dispatcher delivers it some jittery time later.

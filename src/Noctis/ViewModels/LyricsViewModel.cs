@@ -683,7 +683,7 @@ public partial class LyricsViewModel : ViewModelBase, IDisposable
         // during the wheel-scroll pause window left the view parked while every visible
         // line dimmed to opacity 0 (outside the ±9 window around the new active line).
         // The views re-anchor on the resulting IsAutoFollowPaused change.
-        _player.Seeked += (_, _) => IsAutoFollowPaused = false;
+        _player.Seeked += OnPlayerSeekedForLyrics;
 
         // React to accent colour changes so the artist/album text recolours live.
         _accentHandler = (_, _) => Dispatcher.UIThread.Post(RefreshAccentForegrounds);
@@ -2476,6 +2476,7 @@ public partial class LyricsViewModel : ViewModelBase, IDisposable
     /// <summary>Clears all lyrics state when no track is playing.</summary>
     private void ClearLyricsState()
     {
+        ResetNativeMotion();
         _currentTrack = null;
         _currentOnlineResult = null;
         _alternateOnlineResult = null;
@@ -2636,6 +2637,10 @@ public partial class LyricsViewModel : ViewModelBase, IDisposable
 
     private void OnPlayerPropertyChanged(object? sender, System.ComponentModel.PropertyChangedEventArgs e)
     {
+        if (e.PropertyName == nameof(PlayerViewModel.CurrentTrack)
+            || e.PropertyName == nameof(PlayerViewModel.State) && _player.State == Models.PlaybackState.Stopped
+            || e.PropertyName == nameof(PlayerViewModel.IsSeeking) && _player.IsSeeking)
+            ResetNativeMotion();
         if (e.PropertyName == nameof(PlayerViewModel.CurrentTrack))
             RefreshHeaderCredits();
 
@@ -2675,6 +2680,12 @@ public partial class LyricsViewModel : ViewModelBase, IDisposable
         // Only run the timer when synced tab is active.
         if (e.PropertyName == nameof(PlayerViewModel.State))
         {
+            if (_player.State == Models.PlaybackState.Paused)
+            {
+                _clock.Pause();
+                NativeMotionFreeze?.Invoke();
+            }
+            else if (_player.State == Models.PlaybackState.Playing) _clock.Resume();
             if (_player.State == Models.PlaybackState.Playing && _hasSyncedLyrics && IsSyncTabSelected)
                 _lyricsSyncTimer.Start();
             else
@@ -3520,6 +3531,7 @@ public partial class LyricsViewModel : ViewModelBase, IDisposable
             Views.LyricsView.Trace($"active {ActiveLineIndex}→{step.ActiveIndex} at {position.TotalMilliseconds:0}ms" +
                                    (step.ActiveLine?.Timestamp is { } ts ? $" (line starts {ts.TotalMilliseconds:0}ms)" : ""));
         ActiveLineIndex = step.ActiveIndex;
+        BeginNativeMotionHandover();
         UpdateLineOpacities(step.ActiveIndex);
         UpdateWordClockSubscription();
     }
@@ -3537,10 +3549,15 @@ public partial class LyricsViewModel : ViewModelBase, IDisposable
         var raw = _player.Position;
         if (_player.State != Models.PlaybackState.Playing)
         {
-            // Not advancing — forget the clock so resume re-anchors fresh (state held
-            // across a pause would otherwise add the pause length on resume).
-            _clock.Reset();
-            return raw;
+            if (_player.State != Models.PlaybackState.Paused || _player.IsSeeking)
+            {
+                _clock.Reset();
+                return raw;
+            }
+            _clock.Pause();
+            var frozen = _clock.Sample(raw.TotalMilliseconds,
+                System.Diagnostics.Stopwatch.GetTimestamp() * 1000.0 / System.Diagnostics.Stopwatch.Frequency);
+            return TimeSpan.FromMilliseconds(Math.Max(0, frozen - _player.OutputLatency.TotalMilliseconds));
         }
 
         // While the timeline is being dragged, Position is a target the user is steering,
@@ -3626,7 +3643,7 @@ public partial class LyricsViewModel : ViewModelBase, IDisposable
         && _player.State == Models.PlaybackState.Playing
         && _lyricsSyncTimer.IsEnabled
         && (_timeline.ActiveLine?.HasWords == true || _timeline.ActiveLine?.HasBackgroundWords == true
-            || _timeline.ActiveLine?.HasTransliterationWords == true);
+            || _timeline.ActiveLine?.HasTransliterationWords == true || HasNativeMotionHandover);
 
     private void OnWordClockFrame(TimeSpan _)
     {
@@ -3638,7 +3655,9 @@ public partial class LyricsViewModel : ViewModelBase, IDisposable
 
         // Note: UpdateActiveLine re-enters UpdateWordClockSubscription on line change;
         // the _wordClockRunning flag prevents a second concurrent loop.
-        UpdateActiveLine(GetPlaybackPosition());
+        var position = GetPlaybackPosition();
+        UpdateActiveLine(position);
+        if (!_player.IsSeeking) NativeLyricFrame?.Invoke(position - LyricsOffset + WordLookahead);
 
         if (GetWordClockHost() is { } topLevel)
         {
@@ -3744,6 +3763,8 @@ public partial class LyricsViewModel : ViewModelBase, IDisposable
 
     public void Dispose()
     {
+        ResetNativeMotion();
+        _player.Seeked -= OnPlayerSeekedForLyrics;
         // Stop and dispose timer to prevent memory leak. This also ends the word-sweep
         // RequestAnimationFrame loop: WantsWordClock goes false, so the next frame
         // callback exits without re-registering.

@@ -30,16 +30,35 @@ public sealed class LyricsPlaybackClock
     /// <summary>No fresh raw value for this long (buffering hiccup) → hold rather than run away.</summary>
     public const double StallHoldMs = 1000;
 
+    /// <summary>
+    /// Right after a resume the frozen picture can trail the player (the output keeps reporting
+    /// progress for a moment after the pause). The ordinary ±8% bend would take seconds to close
+    /// that, and rapid pause/resume stacked it into a visible lag; so until the clock has caught
+    /// up it may run this much faster (never backwards, never a jump).
+    /// </summary>
+    public const double ResumeCatchUpRate = 0.5;
+
+    /// <summary>Time constant of the catch-up after a resume.</summary>
+    public const double ResumeTauMs = 200;
+
     private double _raw = double.NaN;   // last raw reading
     private double _rawAtMs;            // wall time it was observed
     private double _estimate = double.NaN;
     private double _estimateAtMs;
+    private bool _paused, _resuming, _catchUp, _freshSinceResume;
+
+    /// <summary>Freeze the last displayed position, including its sub-poll precision.</summary>
+    public void Pause() { _paused = true; _resuming = false; }
+
+    /// <summary>Exclude the pause's wall time without rewinding to a coarse raw poll.</summary>
+    public void Resume() { if (_paused) _resuming = true; _paused = false; }
 
     /// <summary>Forget everything; the next sample re-anchors on the raw value.</summary>
     public void Reset()
     {
         _raw = double.NaN;
         _estimate = double.NaN;
+        _paused = _resuming = _catchUp = _freshSinceResume = false;
     }
 
     /// <summary>
@@ -51,6 +70,16 @@ public sealed class LyricsPlaybackClock
         if (double.IsNaN(_estimate))
             return Anchor(rawMs, nowMs);
 
+        if (_paused) return _estimate;
+        if (_resuming)
+        {
+            _resuming = false;
+            _raw = rawMs; _rawAtMs = _estimateAtMs = nowMs;
+            if (Math.Abs(rawMs - _estimate) > SnapThresholdMs) return Anchor(rawMs, nowMs);
+            _catchUp = true; _freshSinceResume = false;
+            return _estimate;
+        }
+
         if (rawMs != _raw)
         {
             // Raw below the previous raw is the player itself moving backwards (a
@@ -59,6 +88,7 @@ public sealed class LyricsPlaybackClock
                 return Anchor(rawMs, nowMs);
             _raw = rawMs;
             _rawAtMs = nowMs;
+            _freshSinceResume = true;
         }
 
         var dt = Math.Max(0, nowMs - _estimateAtMs);
@@ -78,7 +108,15 @@ public sealed class LyricsPlaybackClock
             return _estimate;
         }
 
-        var rate = Math.Clamp(1 + error / CorrectionTauMs, 1 - MaxRateError, 1 + MaxRateError);
+        double rate;
+        if (_catchUp && (error > 0 || _freshSinceResume))
+        {
+            // Speeding up may start at once (the reading at resume is the player's own); slowing
+            // down waits for a fresh reading, as the one at resume can be a stale poll.
+            rate = Math.Clamp(1 + error / ResumeTauMs, 1 - MaxRateError, 1 + ResumeCatchUpRate);
+            if (Math.Abs(error) < 4) _catchUp = false;
+        }
+        else rate = Math.Clamp(1 + error / CorrectionTauMs, 1 - MaxRateError, 1 + MaxRateError);
         _estimate += dt * rate;
         return _estimate;
     }

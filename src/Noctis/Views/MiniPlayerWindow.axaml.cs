@@ -80,6 +80,8 @@ public partial class MiniPlayerWindow : Window
     public MiniPlayerWindow()
     {
         InitializeComponent();
+        _ = new Features.LyricMotion.LyricMotionScope(this, small: true,
+            select: data => (data as MiniPlayerViewModel)?.Lyrics);
 
         // Per-pixel transparency by default — OS acrylic (AcrylicBlur) tints the WHOLE
         // window rect, which painted the transparent corners outside the rounded

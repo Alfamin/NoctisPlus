@@ -112,7 +112,7 @@ public class BundledPluginTests : IDisposable
         foreach (var module in modules.EnumerateArray())
         {
             // Compiled into the app now (src/Noctis/Features): its DLL is no longer delivered.
-            if (module.GetProperty("id").GetString() == "dev.moshi.freemusicfinder") continue;
+            if (module.GetProperty("id").GetString() is "dev.moshi.freemusicfinder" or "dev.moshi.lyricmotion") continue;
             var dir = Path.Combine(root, module.GetProperty("id").GetString()!);
             var manifest = PluginManifest.TryLoad(dir)!;
             Assert.Equal(module.GetProperty("version").GetString(), manifest.Version);
@@ -129,11 +129,12 @@ public class BundledPluginTests : IDisposable
             bundledDirectory: Path.Combine(AppContext.BaseDirectory, "bundled-plugins"));
         try
         {
-            // Three delivered modules plus Free Music Finder, built into the app.
+            // Two delivered modules plus Finder and Lyric Motion, built into the app.
             Noctis.Features.BuiltInFeatures.Register(_host);
             _host.LoadAll();
             Assert.Equal(4, _host.Plugins.Count);
             Assert.Contains(_host.Plugins, p => p.Id == "dev.moshi.freemusicfinder" && p.IsBundled);
+            Assert.Contains(_host.Plugins, p => p.Id == "dev.moshi.lyricmotion" && p.IsBundled && p.AssemblyPath is null);
             Assert.All(_host.Plugins, p => Assert.True(p.Status == PluginStatus.Running, $"{p.Name}: {p.Status}: {p.Error}"));
         }
         finally { _host.UnloadAll(); }
