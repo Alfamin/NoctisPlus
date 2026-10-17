@@ -106,6 +106,20 @@ public class PlatformHelperAppImageTests
         Assert.Empty(changes);
     }
 
+    // Without --print-reply dbus-send exits 0 once the call is queued, even with no
+    // FileManager1 provider on the bus (WSL check: exit 0 vs exit 1 ServiceUnknown), so
+    // Show in Folder reported success, opened nothing and never fell back.
+    [Theory]
+    [InlineData("ShowItems")]
+    [InlineData("ShowFolders")]
+    public void FileManager1Call_WaitsForTheReply(string method)
+    {
+        var args = PlatformHelper.FileManager1Call(method, "file:///home/u/a%2Cb.flac");
+        Assert.Contains("--print-reply", args);
+        Assert.Contains("org.freedesktop.FileManager1." + method, args);
+        Assert.Contains("array:string:file:///home/u/a%2Cb.flac", args);
+    }
+
     [Fact]
     public void Scrub_IsNoOp_OutsideAnAppImage()
     {

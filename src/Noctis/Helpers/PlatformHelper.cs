@@ -117,42 +117,29 @@ public static class PlatformHelper
     private static bool TryShowInLinuxFileManager(string filePath)
     {
         // Try the FileManager1 D-Bus interface first (works for nautilus, nemo, dolphin, thunar).
-        try
-        {
-            // Percent-encoded file URI: dbus-send's array:string: syntax splits
-            // elements on commas, and Uri leaves ',' unescaped (legal in a URI
-            // path), so it must be encoded on top of Uri's own escaping.
-            var fileUri = new Uri(filePath).AbsoluteUri.Replace(",", "%2C");
-            var psi = new ProcessStartInfo
-            {
-                FileName = "dbus-send",
-                ArgumentList =
-                {
-                    "--session",
-                    "--dest=org.freedesktop.FileManager1",
-                    "--type=method_call",
-                    "/org/freedesktop/FileManager1",
-                    "org.freedesktop.FileManager1.ShowItems",
-                    $"array:string:{fileUri}",
-                    "string:"
-                },
-                UseShellExecute = false,
-                CreateNoWindow = true,
-                RedirectStandardOutput = true,
-                RedirectStandardError = true
-            };
-            ScrubAppImageEnvironment(psi);
-            using var proc = Process.Start(psi);
-            if (proc != null)
-            {
-                proc.WaitForExit(1500);
-                if (proc.ExitCode == 0) return true;
-            }
-        }
-        catch { /* fall through */ }
-
-        return false;
+        // Percent-encoded file URI: dbus-send's array:string: syntax splits
+        // elements on commas, and Uri leaves ',' unescaped (legal in a URI
+        // path), so it must be encoded on top of Uri's own escaping.
+        string fileUri;
+        try { fileUri = new Uri(filePath).AbsoluteUri.Replace(",", "%2C"); }
+        catch (UriFormatException) { return false; }
+        return TryRunHostTool("dbus-send", FileManager1Call("ShowItems", fileUri), waitMs: 2500);
     }
+
+    /// <summary>
+    /// dbus-send arguments for a FileManager1 method. --print-reply is what makes the exit
+    /// code mean anything: without it dbus-send exits 0 as soon as the message is queued,
+    /// even when no file manager provides the name (ServiceUnknown), so Show in Folder
+    /// "succeeded" without opening anything and never fell back to the parent folder.
+    /// Internal for tests.
+    /// </summary>
+    internal static string[] FileManager1Call(string method, string uri) => new[]
+    {
+        "--session", "--print-reply",
+        "--dest=org.freedesktop.FileManager1", "--type=method_call",
+        "/org/freedesktop/FileManager1", "org.freedesktop.FileManager1." + method,
+        $"array:string:{uri}", "string:"
+    };
 
     /// <summary>
     /// Opens a URL in the default browser.
@@ -239,13 +226,7 @@ public static class PlatformHelper
     private static void OpenLinuxFolder(string folderPath)
     {
         var folderUri = new Uri(folderPath).AbsoluteUri.Replace(",", "%2C");
-        if (TryRunHostTool("dbus-send", new[]
-            {
-                "--session", "--print-reply",
-                "--dest=org.freedesktop.FileManager1", "--type=method_call",
-                "/org/freedesktop/FileManager1", "org.freedesktop.FileManager1.ShowFolders",
-                $"array:string:{folderUri}", "string:"
-            }, waitMs: 2500))
+        if (TryRunHostTool("dbus-send", FileManager1Call("ShowFolders", folderUri), waitMs: 2500))
             return;
         if (TryRunHostTool("xdg-open", new[] { folderPath }, waitMs: 4000))
             return;
