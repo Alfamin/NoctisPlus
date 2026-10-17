@@ -117,42 +117,29 @@ public static class PlatformHelper
     private static bool TryShowInLinuxFileManager(string filePath)
     {
         // Try the FileManager1 D-Bus interface first (works for nautilus, nemo, dolphin, thunar).
-        try
-        {
-            // Percent-encoded file URI: dbus-send's array:string: syntax splits
-            // elements on commas, and Uri leaves ',' unescaped (legal in a URI
-            // path), so it must be encoded on top of Uri's own escaping.
-            var fileUri = new Uri(filePath).AbsoluteUri.Replace(",", "%2C");
-            var psi = new ProcessStartInfo
-            {
-                FileName = "dbus-send",
-                ArgumentList =
-                {
-                    "--session",
-                    "--dest=org.freedesktop.FileManager1",
-                    "--type=method_call",
-                    "/org/freedesktop/FileManager1",
-                    "org.freedesktop.FileManager1.ShowItems",
-                    $"array:string:{fileUri}",
-                    "string:"
-                },
-                UseShellExecute = false,
-                CreateNoWindow = true,
-                RedirectStandardOutput = true,
-                RedirectStandardError = true
-            };
-            ScrubAppImageEnvironment(psi);
-            using var proc = Process.Start(psi);
-            if (proc != null)
-            {
-                proc.WaitForExit(1500);
-                if (proc.ExitCode == 0) return true;
-            }
-        }
-        catch { /* fall through */ }
-
-        return false;
+        // Percent-encoded file URI: dbus-send's array:string: syntax splits
+        // elements on commas, and Uri leaves ',' unescaped (legal in a URI
+        // path), so it must be encoded on top of Uri's own escaping.
+        string fileUri;
+        try { fileUri = new Uri(filePath).AbsoluteUri.Replace(",", "%2C"); }
+        catch (UriFormatException) { return false; }
+        return TryRunHostTool("dbus-send", FileManager1Call("ShowItems", fileUri), waitMs: 2500);
     }
+
+    /// <summary>
+    /// dbus-send arguments for a FileManager1 method. --print-reply is what makes the exit
+    /// code mean anything: without it dbus-send exits 0 as soon as the message is queued,
+    /// even when no file manager provides the name (ServiceUnknown), so Show in Folder
+    /// "succeeded" without opening anything and never fell back to the parent folder.
+    /// Internal for tests.
+    /// </summary>
+    internal static string[] FileManager1Call(string method, string uri) => new[]
+    {
+        "--session", "--print-reply",
+        "--dest=org.freedesktop.FileManager1", "--type=method_call",
+        "/org/freedesktop/FileManager1", "org.freedesktop.FileManager1." + method,
+        $"array:string:{uri}", "string:"
+    };
 
     /// <summary>
     /// Opens a URL in the default browser.
@@ -239,13 +226,7 @@ public static class PlatformHelper
     private static void OpenLinuxFolder(string folderPath)
     {
         var folderUri = new Uri(folderPath).AbsoluteUri.Replace(",", "%2C");
-        if (TryRunHostTool("dbus-send", new[]
-            {
-                "--session", "--print-reply",
-                "--dest=org.freedesktop.FileManager1", "--type=method_call",
-                "/org/freedesktop/FileManager1", "org.freedesktop.FileManager1.ShowFolders",
-                $"array:string:{folderUri}", "string:"
-            }, waitMs: 2500))
+        if (TryRunHostTool("dbus-send", FileManager1Call("ShowFolders", folderUri), waitMs: 2500))
             return;
         if (TryRunHostTool("xdg-open", new[] { folderPath }, waitMs: 4000))
             return;
@@ -315,7 +296,7 @@ public static class PlatformHelper
         if (string.IsNullOrWhiteSpace(appDir) && string.IsNullOrWhiteSpace(appImage))
             return;
         var env = psi.Environment;
-        foreach (var key in new[] { "LD_LIBRARY_PATH", "LD_PRELOAD" })
+        foreach (var key in LoaderPathKeys)
         {
             if (!env.TryGetValue(key, out var value) || string.IsNullOrEmpty(value))
                 continue;
@@ -326,13 +307,51 @@ public static class PlatformHelper
         foreach (var key in new[] { "VLC_PLUGIN_PATH", "NOCTIS_BUNDLED_VLC", "PYTHONHOME", "PYTHONPATH" })
         {
             if (!env.TryGetValue(key, out var value)) continue;
-            if (key is "NOCTIS_BUNDLED_VLC" || string.IsNullOrEmpty(appDir) || (value != null && PointsInside(value, appDir)))
+            if (key is "NOCTIS_BUNDLED_VLC" || string.IsNullOrEmpty(appDir)
+                || (value != null && (PointsInside(value, appDir) || IsInsideAppImageMount(value))))
                 env.Remove(key);
         }
     }
 
+    private static readonly string[] LoaderPathKeys = { "LD_LIBRARY_PATH", "LD_PRELOAD" };
+
+    /// <summary>
+    /// Strips the AppImage's library paths from this process's own environment, so every
+    /// child inherits the host loader path whoever starts it: the call sites above, and
+    /// also Core's ffprobe probe, the ffmpeg tools, yt-dlp, the updater's relaunch shell
+    /// and the startup-error dialog, none of which scrub a ProcessStartInfo. Unscrubbed,
+    /// the relaunch shell handed this mount's paths to the next instance, whose scrub only
+    /// knew its own mount (GitHub #139). Managed-only: on Unix .NET keeps its own copy of
+    /// the environment that libc's getenv never sees (hence VlcAudioPlayer.SetUnixEnv), and
+    /// the loader read LD_LIBRARY_PATH at exec, so libvlc and the bundled libraries still
+    /// load from the AppImage. Call once, first thing in Main.
+    /// </summary>
+    public static void ScrubAppImageLoaderPathsForChildren()
+    {
+        if (!IsLinux) return;
+        foreach (var (key, value) in AppImageLoaderPathChanges(Environment.GetEnvironmentVariable,
+                     Environment.GetEnvironmentVariable("APPDIR"), Environment.GetEnvironmentVariable("APPIMAGE")))
+            Environment.SetEnvironmentVariable(key, value);
+    }
+
+    /// <summary>The loader variables to rewrite (null = remove) for <see cref="ScrubAppImageLoaderPathsForChildren"/>. Pure; internal for tests.</summary>
+    internal static List<(string Key, string? Value)> AppImageLoaderPathChanges(Func<string, string?> read, string? appDir, string? appImage)
+    {
+        var changes = new List<(string, string?)>();
+        if (string.IsNullOrWhiteSpace(appDir) && string.IsNullOrWhiteSpace(appImage))
+            return changes;
+        foreach (var key in LoaderPathKeys)
+        {
+            var value = read(key);
+            if (string.IsNullOrEmpty(value)) continue;
+            var kept = StripAppDirEntries(value, appDir);
+            if (kept != value) changes.Add((key, kept.Length == 0 ? null : kept));
+        }
+        return changes;
+    }
+
     /// <summary>Drops every ':'-separated path entry that lives under <paramref name="appDir"/>
-    /// (or, with no known AppDir, under a /tmp/.mount_ AppImage mount); keeps the rest in order.</summary>
+    /// or inside any AppImage runtime mount; keeps the rest in order.</summary>
     internal static string StripAppDirEntries(string pathList, string? appDir)
     {
         var kept = new List<string>();
@@ -340,11 +359,21 @@ public static class PlatformHelper
         {
             if (raw.Length == 0) continue;
             if (!string.IsNullOrEmpty(appDir) && PointsInside(raw, appDir)) continue;
-            if (string.IsNullOrEmpty(appDir) && raw.StartsWith("/tmp/.mount_", StringComparison.Ordinal)) continue;
+            if (IsInsideAppImageMount(raw)) continue;
             kept.Add(raw);
         }
         return string.Join(':', kept);
     }
+
+    /// <summary>
+    /// True for a path inside an AppImage runtime mount ($TMPDIR/.mount_&lt;name&gt;&lt;random&gt;),
+    /// this instance's or another's. An earlier Noctis's mount reaches us through the
+    /// updater's relaunch and stays mounted for as long as we run: its runtime ends only
+    /// once every holder of its keep-alive pipe has exited, and that pipe is inherited down
+    /// the process tree (GitHub #139: /tmp/.mount_noctisDAPFBb next to our own APPDIR).
+    /// </summary>
+    private static bool IsInsideAppImageMount(string path) =>
+        path.StartsWith('/') && path.Contains("/.mount_", StringComparison.Ordinal);
 
     private static bool PointsInside(string path, string root)
     {
