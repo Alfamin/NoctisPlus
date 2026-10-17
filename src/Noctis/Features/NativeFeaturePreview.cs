@@ -13,6 +13,9 @@ internal static class NativeFeaturePreview
 {
     internal static async Task ShowAsync(Window owner, string preview)
     {
+        // Explicit profile override is required for any developer preview.
+        if (string.IsNullOrWhiteSpace(Environment.GetEnvironmentVariable("NOCTIS_PLUS_DATA_DIR"))) return;
+        if (preview == "playlist-import") { await ShowPlaylistImportAsync(owner); return; }
         if (!preview.StartsWith("telegram-", StringComparison.Ordinal)) return;
         var dialog = new TelegramSignInDialog(new PreviewAccount(), _ => { });
         var vm = (TelegramSignInViewModel)dialog.DataContext!;
@@ -27,6 +30,50 @@ internal static class NativeFeaturePreview
         if (preview == "telegram-busy") vm.IsBusy = true;
         DialogHelper.SizeToOwner(dialog, owner);
         await dialog.ShowDialog(owner);
+    }
+
+    private static async Task ShowPlaylistImportAsync(Window owner)
+    {
+        var folder = Directory.CreateTempSubdirectory("NoctisPlus-visual-").FullName;
+        var library = new PreviewLibrary();
+        for (var n = 0; n < 2; n++)
+        {
+            var path = Path.Combine(folder, $"synthetic-{n}.txt");
+            File.WriteAllText(path, "Synthetic visual fixture, not audio.");
+            library.Songs.Add(new(Guid.NewGuid(), "Test artist", n == 0 ? "Night Drive" : "After Hours", path, TimeSpan.FromMinutes(3)));
+        }
+        var url = "https://open.spotify.com/playlist/0000000000000000000001";
+        var entries = new[] { "Night Drive", "New Horizon", "After Hours" }.Select((title, n) => new CatalogEntry
+        {
+            Position = n + 1, Uri = "spotify:track:" + n.ToString("D22"),
+            Request = new MusicRequest(title, "Test artist", 180),
+        }).ToList();
+        var job = new SpotifyPlaylist
+        {
+            Url = url, Created = true,
+            Manifest = new() { Url = url, Name = "Night drive", Total = 3, CompleteIds = true, Entries = entries },
+            Matches = new() { [1] = library.Songs[0].Id, [3] = library.Songs[1].Id },
+            Applied = library.Songs.Select(s => s.Id).ToList(),
+            Status = "2 of 3 songs matched locally · 1 missing",
+        };
+        var file = Path.Combine(folder, "imports.json");
+        File.WriteAllText(file, System.Text.Json.JsonSerializer.Serialize(new[] { job }));
+        using var downloads = new Downloads(_ => { });
+        using var imports = new SpotifyPlaylists(file, library, downloads,
+            request => throw new InvalidOperationException("Visual preview never contacts download bots."));
+        var dialog = new StreamingPlaylistImportDialog(imports, () => folder, () => false,
+            async parent => await TelegramSignInDialog.ShowAsync(parent, new PreviewAccount(), _ => { }));
+        DialogHelper.SizeToOwner(dialog, owner);
+        await dialog.ShowDialog(owner);
+        // The folder contains synthetic fixtures only. It stays in Temp for evidence/debugging.
+    }
+
+    private sealed class PreviewLibrary : IPlaylistLibrary
+    {
+        internal List<LocalSong> Songs { get; } = [];
+        public Task<IReadOnlyList<LocalSong>> SnapshotAsync() => Task.FromResult<IReadOnlyList<LocalSong>>(Songs);
+        public Task ApplyAsync(Guid id, string name, string url, IReadOnlyList<Guid> tracks, bool create, IReadOnlyList<Guid> expected, IReadOnlyList<Guid>? remappedExpected = null)
+            => Task.CompletedTask;
     }
 
     private sealed class PreviewAccount : ITelegramSignIn

@@ -76,7 +76,7 @@ internal sealed class PlaylistLibrary(Func<object?>? main = null) : IPlaylistLib
         if (Get(playlist, "TrackIds") is not List<Guid> original) throw Changed();
         var oldIds = original.ToList();
         if (!added && oldIds.SequenceEqual(tracks)) return; // recover a crash after the native save but before the import checkpoint
-        if (!added && !Equals(Get(playlist, "Description"), "Imported from Spotify\n" + url))
+        if (!added && !Equals(Get(playlist, "Description"), ImportDescription(url)))
             throw new InvalidOperationException("PLAYLIST_EDITED: This playlist no longer identifies the original Spotify import. Automatic filling stopped to preserve your edits.");
         if (!added && !oldIds.SequenceEqual(expected) && (remappedExpected is null || !oldIds.SequenceEqual(remappedExpected))) throw new InvalidOperationException("PLAYLIST_EDITED: You changed this playlist's songs or order. Automatic filling stopped to preserve your edits.");
         // Validate every requested ID against the live library before any mutation.
@@ -90,7 +90,7 @@ internal sealed class PlaylistLibrary(Func<object?>? main = null) : IPlaylistLib
         {
             if (added)
             {
-                Set(playlist, "Id", id); Set(playlist, "Name", name); Set(playlist, "Description", "Imported from Spotify\n" + url); Set(playlist, "SortMode", "Manual");
+                Set(playlist, "Id", id); Set(playlist, "Name", name); Set(playlist, "Description", ImportDescription(url)); Set(playlist, "SortMode", "Manual");
             }
             Set(playlist, "TrackIds", tracks.ToList());
             if (added)
@@ -111,6 +111,7 @@ internal sealed class PlaylistLibrary(Func<object?>? main = null) : IPlaylistLib
         }
     }
     private static void Set(object obj, string property, object value) => obj.GetType().GetProperty(property)!.SetValue(obj, value);
+    internal static string ImportDescription(string url) => "Imported from " + (MusicLink.TryParse(url, out var link) && link!.Service == "deezer" ? "Deezer" : "Spotify") + "\n" + url;
 }
 
 internal sealed class PlaylistMatcher

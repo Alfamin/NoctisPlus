@@ -229,7 +229,8 @@ public partial class LibraryPlaylistsViewModel : ViewModelBase, ISearchable
     [RelayCommand]
     private async Task ImportPlaylist()
     {
-        await MetadataHelper.OpenPlaylistImportDialog();
+        if (!await Views.StreamingPlaylistImportDialog.TryShowAsync())
+            await MetadataHelper.OpenPlaylistImportDialog();
     }
 
     [RelayCommand]

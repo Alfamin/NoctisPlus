@@ -189,7 +189,7 @@ internal sealed class PlaylistCatalog : IDisposable
         catch(OperationCanceledException) when(!ct.IsCancellationRequested) {throw new TimeoutException("METADATA_TIMEOUT: "+(_route?.Unanswered(uri)??"the metadata service did not respond in 25 seconds."));}
         using var responseScope=response;
         if(response.StatusCode==(HttpStatusCode)429)
-        {var until=response.Headers.RetryAfter?.Date??DateTimeOffset.UtcNow.Add(response.Headers.RetryAfter?.Delta??TimeSpan.FromMinutes(10));throw new SourcesWaitingException("Spotify metadata requests are limited; progress saved until its retry time.",until);}
+        {var until=response.Headers.RetryAfter?.Date??DateTimeOffset.UtcNow.Add(response.Headers.RetryAfter?.Delta??TimeSpan.FromMinutes(10));throw new SourcesWaitingException((uri.Host=="api.deezer.com"?"Deezer":"Spotify")+" metadata requests are limited; progress saved until its retry time.",until);}
         if(!response.IsSuccessStatusCode) throw new InvalidDataException($"METADATA_HTTP_{(int)response.StatusCode}: cannot read the full list. Make the playlist accessible; if region-blocked, check your VPN/proxy and retry.");
         if(response.Content.Headers.ContentLength>4*1024*1024) throw new InvalidDataException("METADATA_TOO_LARGE: response exceeded 4 MB.");
         // The client's timeout ends when the headers arrive. Reading the rest gets 25 seconds of its own, so a reply

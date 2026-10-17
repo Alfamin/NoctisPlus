@@ -1,0 +1,82 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:vm="using:Noctis.ViewModels"
+        xmlns:controls="using:Noctis.Controls"
+        x:Class="Noctis.Views.StreamingPlaylistImportDialog"
+        x:DataType="vm:StreamingPlaylistImportViewModel"
+        Title="Import playlists" CanResize="False" WindowDecorations="None"
+        TransparencyLevelHint="Transparent" Background="Transparent"
+        ShowInTaskbar="False" WindowStartupLocation="CenterOwner">
+    <controls:PillDialogHost>
+        <Grid Width="680" MaxHeight="700" RowDefinitions="Auto,Auto,*,Auto">
+            <Border Padding="28,22,28,16" BorderThickness="0,0,0,1" BorderBrush="{DynamicResource SystemControlForegroundBaseLowBrush}">
+                <Grid ColumnDefinitions="56,16,*">
+                    <Border Width="56" Height="56" CornerRadius="18" Classes="pill-well">
+                        <controls:LineIcon Data="{DynamicResource MenuLineImport}" Width="22" Height="22" Opacity="0.6" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                    </Border>
+                    <StackPanel Grid.Column="2" Spacing="3" VerticalAlignment="Center">
+                        <TextBlock Text="Import playlists" FontSize="18" FontWeight="Bold" />
+                        <TextBlock Text="Spotify · Deezer" FontSize="13" Opacity="0.65" />
+                    </StackPanel>
+                </Grid>
+            </Border>
+            <StackPanel Grid.Row="1" Margin="28,20,28,16" Spacing="12">
+                <TextBox x:Name="LinksField" Classes="pill-area" Text="{Binding Links}" AcceptsReturn="True" MinHeight="80" MaxHeight="140"
+                         TextWrapping="Wrap" PlaceholderText="Paste playlist links, one per line" IsEnabled="{Binding CanInteract}" />
+                <Grid ColumnDefinitions="*,Auto,Auto">
+                    <TextBlock Text="Uses your local songs. Downloads are your choice." Opacity="0.55" FontSize="12" TextWrapping="Wrap" VerticalAlignment="Center" Margin="0,0,12,0" />
+                    <Button Grid.Column="1" Classes="pill-secondary" Content="Check library" Command="{Binding CheckLibraryCommand}" Margin="0,0,10,0" />
+                    <Button Grid.Column="2" Classes="pill-primary" Content="Import" Command="{Binding ImportCommand}" MinWidth="100" />
+                </Grid>
+                <Grid ColumnDefinitions="Auto,*" ColumnSpacing="10">
+                    <controls:ProgressRing Width="16" Height="16" IsIndeterminate="True" IsVisible="{Binding IsBusy}" VerticalAlignment="Center" />
+                    <TextBlock Grid.Column="1" Text="{Binding Status}" FontSize="12" Opacity="0.7" TextWrapping="Wrap" />
+                </Grid>
+                <TextBlock Text="{Binding Error}" IsVisible="{Binding Error, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"
+                           FontSize="12" TextWrapping="Wrap" Foreground="{DynamicResource SystemControlErrorTextForegroundBrush}" />
+            </StackPanel>
+            <Grid Grid.Row="2" Margin="28,0,28,20" RowDefinitions="Auto,*" RowSpacing="12">
+                <ListBox ItemsSource="{Binding Imports}" SelectedItem="{Binding Selected}" MaxHeight="140" Background="Transparent" BorderThickness="0">
+                    <ListBox.ItemTemplate>
+                        <DataTemplate x:DataType="vm:StreamingImportRow">
+                            <Grid ColumnDefinitions="*,Auto,Auto" Margin="0,5">
+                                <StackPanel Spacing="3" Margin="0,0,12,0">
+                                    <TextBlock Text="{Binding Name}" FontWeight="SemiBold" FontSize="14" TextTrimming="CharacterEllipsis" />
+                                    <TextBlock Text="{Binding Summary}" FontSize="12" Opacity="0.55" TextWrapping="Wrap" />
+                                </StackPanel>
+                                <Button Grid.Column="1" Classes="pill-secondary" Content="Download missing" IsEnabled="{Binding CanDownload}"
+                                        Command="{Binding $parent[Window].((vm:StreamingPlaylistImportViewModel)DataContext).QueueMissingCommand}"
+                                        CommandParameter="{Binding}" VerticalAlignment="Center" />
+                                <Button Grid.Column="2" Classes="pill-secondary" Click="OnRemoveImport" Width="36" Padding="0" Margin="8,0,0,0"
+                                        IsEnabled="{Binding $parent[Window].((vm:StreamingPlaylistImportViewModel)DataContext).CanInteract}"
+                                        ToolTip.Tip="Remove import…" AutomationProperties.Name="Remove import">
+                                    <controls:LineIcon Data="{DynamicResource MenuLineTrash}" Width="15" Height="15" />
+                                </Button>
+                            </Grid>
+                        </DataTemplate>
+                    </ListBox.ItemTemplate>
+                </ListBox>
+                <ListBox Grid.Row="1" ItemsSource="{Binding Selected.Missing}" MaxHeight="230" MinHeight="0" Background="Transparent" BorderThickness="0">
+                    <ListBox.ItemTemplate>
+                        <DataTemplate x:DataType="vm:StreamingMissingRow">
+                            <Grid ColumnDefinitions="32,*" Margin="0,4">
+                                <TextBlock Text="{Binding Position}" FontSize="12" Opacity="0.4" VerticalAlignment="Center" />
+                                <StackPanel Grid.Column="1" Spacing="2">
+                                    <TextBlock Text="{Binding Title}" FontSize="13" TextTrimming="CharacterEllipsis" />
+                                    <TextBlock Text="{Binding Artist}" FontSize="12" Opacity="0.55" TextTrimming="CharacterEllipsis" />
+                                    <TextBlock Text="{Binding Reason}" FontSize="11" Opacity="0.45" TextWrapping="Wrap" />
+                                </StackPanel>
+                            </Grid>
+                        </DataTemplate>
+                    </ListBox.ItemTemplate>
+                </ListBox>
+            </Grid>
+            <Border Grid.Row="3" Padding="28,14" BorderThickness="0,1,0,0" BorderBrush="{DynamicResource SystemControlForegroundBaseLowBrush}">
+                <Grid ColumnDefinitions="Auto,*,Auto">
+                    <Button Classes="pill-secondary" Content="File or other source…" Click="OnFileImport" IsEnabled="{Binding CanInteract}" />
+                    <Button Grid.Column="2" Classes="pill-primary" Content="Done" Click="OnDone" MinWidth="108" />
+                </Grid>
+            </Border>
+        </Grid>
+    </controls:PillDialogHost>
+</Window>

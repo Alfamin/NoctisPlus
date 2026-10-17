@@ -38,7 +38,7 @@ internal sealed class SpotifyPlaylists : IDisposable
     public event Action? Changed;
     public IReadOnlyList<SpotifyPlaylist> Jobs { get { lock (_gate) return _jobs.ToArray(); } }
     public bool Busy { get; private set; }
-    public string Status { get; private set; } = "Paste one or more Spotify playlist links. Matching uses every Noctis library folder.";
+    public string Status { get; private set; } = "Paste Spotify or Deezer playlist links. Matching uses every Noctis library folder.";
     public SpotifyPlaylists(string file, IPlaylistLibrary library, Downloads downloads, Func<MusicRequest, BotTrack> track, PlaylistCatalog? catalog = null)
     {
         _file = file; _library = library; _downloads = downloads; _track = track; _catalog = catalog ?? new();
@@ -64,17 +64,17 @@ internal sealed class SpotifyPlaylists : IDisposable
     internal static bool PlaylistLink(string input, out MusicLink? link)
     {
         if (Regex.IsMatch(input, "^spotify:playlist:[A-Za-z0-9]{22}$")) input = "https://open.spotify.com/playlist/" + input[17..];
-        return MusicLink.TryParse(input, out link) && link!.Service == "spotify" && link.Kind == "playlist";
+        return MusicLink.TryParse(input, out link) && link!.Service is "spotify" or "deezer" && link.Kind == "playlist";
     }
     internal static IReadOnlyList<string> Links(string text)
     {
         if (text.Length > 32768) throw new FormatException("Paste up to 100 playlist links at once.");
         var values = text.Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries);
-        if (values.Length == 0 || values.Length > 100) throw new FormatException("Paste one or more Spotify playlist links, one per line.");
+        if (values.Length == 0 || values.Length > 100) throw new FormatException("Paste Spotify or Deezer playlist links, one per line (up to 100).");
         var links = new List<string>();
         foreach (var value in values)
         {
-            if (!PlaylistLink(value, out var link)) throw new FormatException("Use full Spotify playlist links (one per line). Track, album and other website links are not playlist imports.");
+            if (!PlaylistLink(value, out var link)) throw new FormatException("Use full Spotify or Deezer playlist links, one per line. Track, album and other website links are not playlist imports.");
             if (!links.Contains(link!.Url)) links.Add(link.Url);
         }
         return links;
@@ -113,10 +113,14 @@ internal sealed class SpotifyPlaylists : IDisposable
                 {
                     if (job.Manifest is not { CompleteIds: true } || job.Manifest.Entries.Any(e => e.Request is null && e.Uri.StartsWith("spotify:track:")))
                     {
-                        var retry = Jobs.Max(j => j.MetadataRetryAt);
+                        // Provider limits are independent: a blocked Spotify batch must not
+                        // hold up a Deezer playlist in the same paste (or vice versa).
+                        PlaylistLink(url, out var target);
+                        var retry = Jobs.Where(j => PlaylistLink(j.Url, out var source) && source!.Service == target!.Service)
+                            .Max(j => j.MetadataRetryAt);
                         if (retry > DateTimeOffset.UtcNow)
                         {
-                            job.Status = $"METADATA_LIMIT: Spotify asked for a wait until {retry.ToLocalTime():ddd HH:mm}. Saved progress is kept; retry these links after that.";
+                            job.Status = $"METADATA_LIMIT: The catalog asked for a wait until {retry.ToLocalTime():ddd HH:mm}. Saved progress is kept; retry these links after that.";
                             Save(); Publish(); continue;
                         }
                         PlaylistLink(url, out var link);
@@ -129,7 +133,7 @@ internal sealed class SpotifyPlaylists : IDisposable
                 }
                 catch (OperationCanceledException) { throw; }
                 catch (SourcesWaitingException ex)
-                { job.MetadataRetryAt = ex.Until; job.Status = $"METADATA_LIMIT: Spotify asked for a wait until {ex.Until.ToLocalTime():ddd HH:mm}. Saved progress is kept; retry after that."; Save(); Publish(); }
+                { job.MetadataRetryAt = ex.Until; job.Status = $"METADATA_LIMIT: The catalog asked for a wait until {ex.Until.ToLocalTime():ddd HH:mm}. Saved progress is kept; retry after that."; Save(); Publish(); }
                 catch (Exception ex) { job.Status = Explain(ex); Save(); Publish(); }
             }
             var selected = Jobs.Where(j => links.Contains(j.Url)).ToArray();
@@ -147,7 +151,7 @@ internal sealed class SpotifyPlaylists : IDisposable
         using var scope = CancellationTokenSource.CreateLinkedTokenSource(ct, _stop.Token);
         await _operation.WaitAsync(scope.Token).ConfigureAwait(false);
         Busy = true;
-        try { await CheckCore(scope.Token).ConfigureAwait(false); Publish("Library checked. Missing downloads will fill their original Spotify positions."); }
+        try { await CheckCore(scope.Token).ConfigureAwait(false); Publish("Library checked. Missing downloads will fill their original playlist positions."); }
         finally { Busy = false; _operation.Release(); Publish(); }
     }
     private async Task CheckCore(CancellationToken ct, IReadOnlyList<LocalSong>? snapshot = null)

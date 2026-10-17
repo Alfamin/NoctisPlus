@@ -24,6 +24,10 @@ public partial class PlaylistViewModel : ViewModelBase, ISearchable, IDisposable
     private Playlist _playlist;
     private PlaylistNavItem? _navItem;
     private string _currentFilter = string.Empty;
+    private FreeMusicFinder.SpotifyPlaylists? _streamingImports;
+    private bool _streamingDisposed;
+    [ObservableProperty] private bool _hasMissingDownloads;
+    [ObservableProperty] private string _missingDownloadsLabel = "Download missing";
 
     /// <summary>Saved scroll offset for restoring position after navigation.</summary>
     public double SavedScrollOffset { get; set; }
@@ -249,6 +253,40 @@ public partial class PlaylistViewModel : ViewModelBase, ISearchable, IDisposable
 
         _sidebar.PlaylistTracksChanged += OnPlaylistTracksChanged;
         _sidebar.PlaylistEdited += OnPlaylistEdited;
+        Services.Search.OnlineMusicSearch.CurrentChanged += OnStreamingFeatureChanged;
+        AttachStreamingImports();
+    }
+
+    private void OnStreamingFeatureChanged(object? sender, EventArgs e) => Dispatcher.UIThread.Post(() =>
+    {
+        if (!_streamingDisposed) AttachStreamingImports();
+    });
+
+    private void AttachStreamingImports()
+    {
+        if (_streamingImports is not null) _streamingImports.Changed -= OnStreamingImportsChanged;
+        _streamingImports = FreeMusicFinder.FreeMusicPlugin.Current?.PlaylistImports;
+        if (_streamingImports is not null) _streamingImports.Changed += OnStreamingImportsChanged;
+        RefreshMissingDownloads();
+    }
+
+    private void OnStreamingImportsChanged() => Dispatcher.UIThread.Post(() =>
+    {
+        if (!_streamingDisposed) RefreshMissingDownloads();
+    });
+
+    private void RefreshMissingDownloads()
+    {
+        var job = _streamingImports?.Jobs.FirstOrDefault(j => j.LibraryId == PlaylistId && j.Created && !j.FillingStopped);
+        var missing = job is null ? 0 : job.Total - job.Found;
+        HasMissingDownloads = missing > 0;
+        MissingDownloadsLabel = $"Download missing · {missing}";
+    }
+
+    [RelayCommand]
+    private async Task DownloadMissing()
+    {
+        await Views.StreamingPlaylistImportDialog.TryShowAsync(PlaylistId);
     }
 
     private void OnLibraryUpdated(object? sender, EventArgs e)
@@ -1097,6 +1135,9 @@ public partial class PlaylistViewModel : ViewModelBase, ISearchable, IDisposable
 
     public void Dispose()
     {
+        _streamingDisposed = true;
+        Services.Search.OnlineMusicSearch.CurrentChanged -= OnStreamingFeatureChanged;
+        if (_streamingImports is not null) _streamingImports.Changed -= OnStreamingImportsChanged;
         _player.PropertyChanged -= _playerPropertyChangedHandler;
         _sidebar.PlaylistTracksChanged -= OnPlaylistTracksChanged;
         _sidebar.PlaylistEdited -= OnPlaylistEdited;

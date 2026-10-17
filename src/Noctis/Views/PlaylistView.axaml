@@ -557,6 +557,9 @@
                                 <TextBlock Text="{loc:T Playlist.ShuffleTip}" VerticalAlignment="Center" FontSize="14" FontWeight="Bold" />
                             </StackPanel>
                         </Button>
+                        <Button Classes="glass-pill" Content="{Binding MissingDownloadsLabel}"
+                                Command="{Binding DownloadMissingCommand}" IsVisible="{Binding HasMissingDownloads}"
+                                Padding="16,8" VerticalAlignment="Center" />
                         <!-- No star here (owner 10-09): starring lives in the Edit Playlist pop-up
                              ("Star — keep at the top of the sidebar") and the playlist tile menu. -->
                         <Button Classes="glass-pill"

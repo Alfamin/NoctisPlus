@@ -17,6 +17,10 @@ namespace FreeMusicFinder;
 /// </summary>
 public sealed class FreeMusicPlugin : INoctisPlugin
 {
+    internal static FreeMusicPlugin? Current { get; private set; }
+    internal SpotifyPlaylists? PlaylistImports => _playlists;
+    internal bool IsSignedIn => _telegram?.IsLoggedIn == true;
+    internal string DownloadFolder => Downloader.Folder(_host?.Settings.GetString(DownloadFolderKey), _host!.DataDirectory);
     private const string OpenSearchKey = "openSearch";
     private const string ProxyKey = "proxy";
     private const string ShortcutKey = "shortcut";
@@ -87,6 +91,7 @@ public sealed class FreeMusicPlugin : INoctisPlugin
         _forYou.WarmUp();
         // The app's own Search page reads the catalog and starts downloads through this.
         _online = new FinderOnlineSearch(() => _catalog, _discoveryActions, _artistPages, () => _telegram?.IsLoggedIn == true, ShowSignIn);
+        Current = this;
         Noctis.Services.Search.OnlineMusicSearch.Current = _online;
         _transfers.Changed += Announce;
         _downloads.Finished += Announce;
@@ -119,6 +124,7 @@ public sealed class FreeMusicPlugin : INoctisPlugin
 
     public void Shutdown()
     {
+        if (ReferenceEquals(Current, this)) Current = null;
         if (_host is not null) _host.Settings.Changed -= OnSettingChanged;
         if (ReferenceEquals(Noctis.Services.Search.OnlineMusicSearch.Current, _online)) Noctis.Services.Search.OnlineMusicSearch.Current = null;
         _online?.Detach(); _online = null;
@@ -245,12 +251,14 @@ public sealed class FreeMusicPlugin : INoctisPlugin
         }
     }
 
-    private async void ShowSignIn()
+    private void ShowSignIn() => ShowSignIn(null);
+
+    internal async void ShowSignIn(Window? requestedOwner)
     {
-        if (!Dispatcher.UIThread.CheckAccess()) { Dispatcher.UIThread.Post(ShowSignIn); return; }
+        if (!Dispatcher.UIThread.CheckAccess()) { Dispatcher.UIThread.Post(() => ShowSignIn(requestedOwner)); return; }
         if (_host is null || _telegram is null) return;
         if (_signInDialog is not null) { _signInDialog.Activate(); return; }
-        var owner = (Application.Current?.ApplicationLifetime as IClassicDesktopStyleApplicationLifetime)?.MainWindow;
+        var owner = requestedOwner ?? (Application.Current?.ApplicationLifetime as IClassicDesktopStyleApplicationLifetime)?.MainWindow;
         if (owner is null) return;
         try
         {
