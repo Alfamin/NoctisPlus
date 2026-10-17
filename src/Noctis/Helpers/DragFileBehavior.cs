@@ -67,6 +67,22 @@ public static class DragFileBehavior
     public static readonly AttachedProperty<bool> EnableFileDragProperty =
         AvaloniaProperty.RegisterAttached<Control, bool>("EnableFileDrag", typeof(DragFileBehavior));
 
+    /// <summary>What the drag carries when it is not the control's DataContext (a
+    /// <see cref="Track"/> or <see cref="Album"/>): the player island's DataContext is the
+    /// PlayerViewModel, so its art and title bind this to CurrentTrack and drag the playing
+    /// song like a row (Discord, Luwi 2026-10-17).</summary>
+    public static readonly AttachedProperty<object?> DragItemProperty =
+        AvaloniaProperty.RegisterAttached<Control, object?>("DragItem", typeof(DragFileBehavior));
+
+    public static object? GetDragItem(Control c) => c.GetValue(DragItemProperty);
+    public static void SetDragItem(Control c, object? v) => c.SetValue(DragItemProperty, v);
+
+    /// <summary>How far (px, either axis) a press must travel before it becomes a drag.</summary>
+    public const double DragThreshold = 6;
+
+    /// <summary>The object a drag from <paramref name="ctl"/> carries: its DragItem, else its DataContext.</summary>
+    internal static object? PayloadOf(Control ctl) => GetDragItem(ctl) ?? ctl.DataContext;
+
     private static readonly ConditionalWeakTable<Control, DragState> _states = new();
 
     static DragFileBehavior()
@@ -110,7 +126,7 @@ public static class DragFileBehavior
         if (!e.GetCurrentPoint(ctl).Properties.IsLeftButtonPressed) return;
 
         var pos = e.GetPosition(ctl);
-        if (Math.Abs(pos.X - state.StartPoint.X) < 6 && Math.Abs(pos.Y - state.StartPoint.Y) < 6)
+        if (Math.Abs(pos.X - state.StartPoint.X) < DragThreshold && Math.Abs(pos.Y - state.StartPoint.Y) < DragThreshold)
             return;
 
         state.Started = true;
@@ -120,7 +136,8 @@ public static class DragFileBehavior
 
         try
         {
-            var tracks = GetTracks(ctl.DataContext);
+            var payload = PayloadOf(ctl);
+            var tracks = GetTracks(payload);
             if (tracks == null || tracks.Count == 0) return;
 
             var items = new List<IStorageItem>();
@@ -138,7 +155,7 @@ public static class DragFileBehavior
             // The Track objects ride along (via the slot) so in-app drop targets (sidebar
             // playlists) can add them without a path round-trip through the library.
             using var data = BuildTracksTransfer(tracks, items);
-            var preview = BuildPreview(ctl.DataContext, tracks);
+            var preview = BuildPreview(payload, tracks);
             if (preview != null) DragPreviewStarted?.Invoke(topLevel, preview);
             try
             {
@@ -217,7 +234,7 @@ public static class DragFileBehavior
     private static string? ReadToken(IDataTransfer data, DataFormat<string> format)
         => data.TryGetValue(format);
 
-    private static List<Track>? GetTracks(object? dc)
+    internal static List<Track>? GetTracks(object? dc)
     {
         return dc switch
         {
