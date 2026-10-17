@@ -1088,6 +1088,12 @@ public partial class LyricsStudioViewModel : ViewModelBase
                 $"done={done}/{total}, ready={Queue.Count(i => i.Status == StudioStatus.Ready)}");
             DebugLogger.Info(DebugLogger.Category.Lyrics, "LyricsStudio.SessionClosing", "disposing the speech model");
         }
+        catch (WhisperEngineUnavailableException ex)
+        {
+            // Whisper.net's own text names NuGet packages; the user gets what to do instead.
+            RunStatusText = Loc(OperatingSystem.IsWindows() ? "LyricsStudio.EngineUnavailableWindows" : "LyricsStudio.EngineUnavailable");
+            DebugLogger.Error(DebugLogger.Category.Lyrics, "LyricsStudio.EngineUnavailable", $"{ex.InnerException?.GetType().Name}: {ex.Message}");
+        }
         catch (Exception ex)
         {
             RunStatusText = $"Couldn't start — {ex.Message}";

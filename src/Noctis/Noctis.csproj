@@ -81,6 +81,7 @@
     <PackageReference Include="DiscordRichPresence" Version="1.6.1.70" />
     <PackageReference Include="Whisper.net" Version="1.9.1" />
     <PackageReference Include="Whisper.net.Runtime" Version="1.9.1" />
+    <PackageReference Include="Whisper.net.Runtime.NoAvx" Version="1.9.1" />
   </ItemGroup>
 
   <!-- MVVM -->
