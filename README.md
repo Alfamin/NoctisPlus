@@ -1,50 +1,178 @@
 <div align="center">
 
-<h1>
-  <img src="src/Noctis/Assets/Icons/Noctis.ico" width="48" align="absmiddle" />&nbsp;Noctis Plus
-</h1>
+<img src="src/Noctis/Assets/Icons/Noctis.ico" width="96" />
 
-**Noctis, plus finding music, smarter shuffle and word-by-word lyrics, all built in.**
+# Noctis Plus
 
-A fork of [Noctis by heartached](https://github.com/heartached/Noctis), based on stable 1.6.3.
-Everything Noctis does, with a few extras on top.
+### Your music player, now with a way to find more music.
+
+Everything you love about [Noctis](https://github.com/heartached/Noctis), plus discovery, downloads,<br/>
+smarter shuffle and lyrics that move with the song, all built right into the app.
+
+<br/>
+
+[![Release](https://img.shields.io/github/v/release/Alfamin/NoctisPlus?style=for-the-badge&color=8A5CF6&labelColor=2B2B2B&label=Latest)](https://github.com/Alfamin/NoctisPlus/releases)
+&nbsp;
+[![Windows](https://img.shields.io/badge/Windows-10%20%7C%2011-0078D4?style=for-the-badge&logo=windows&logoColor=white&labelColor=2B2B2B)](#-install)
+&nbsp;
+[![License](https://img.shields.io/badge/License-MIT-2EA043?style=for-the-badge&labelColor=2B2B2B)](LICENSE)
+&nbsp;
+[![Based on Noctis](https://img.shields.io/badge/Based%20on-Noctis%201.6.3-E74856?style=for-the-badge&labelColor=2B2B2B)](https://github.com/heartached/Noctis)
+
+<br/>
+
+**[Install](#-install)** &nbsp;·&nbsp; **[Features](#-whats-inside)** &nbsp;·&nbsp; **[Roadmap](#-where-its-heading)** &nbsp;·&nbsp; **[Credits](#-credits)**
 
 </div>
 
+<br/>
+
 ---
 
-## What's new in Plus
+## ✨ What's inside
 
-| Feature | What it does |
+<table>
+<tr>
+<td width="50%" valign="top">
+
+### 🔎 Free Music Finder
+Look up any artist, album or song, even ones you don't own yet, and pull them straight into your library.
+
+- Artist pages show their **full discography**, not just what's on your drive
+- Albums you **partly own** list the missing songs right under the ones you have
+- Download one song, queue a few, or grab **everything that's missing**
+- Finished downloads land in your library automatically
+
+</td>
+<td width="50%" valign="top">
+
+### 🧭 Search
+One search box for your library **and** the online catalog.
+
+- **Songs, Albums and Artists** tabs, styled just like the rest of Noctis
+- Songs you already have show up as your own tracks, ready to play
+- Works offline too, with a clear notice and a **Retry** button when the catalog can't be reached
+
+</td>
+</tr>
+<tr>
+<td width="50%" valign="top">
+
+### 💜 For you
+Suggestions picked from what you actually listen to.
+
+- **Refresh** shows a progress ring while it builds your list
+- **Not for me** skips a song, and never mutes the whole artist
+- Open any suggestion's artist or album right inside the app
+
+</td>
+<td width="50%" valign="top">
+
+### 🔀 True Shuffle
+Shuffle that feels random, the way you'd expect.
+
+- Spreads **artists and albums apart** so the same one doesn't come back-to-back
+- Different modes, including a **For you** mix
+
+</td>
+</tr>
+<tr>
+<td width="50%" valign="top">
+
+### 🎤 WordLyrics
+Word-by-word timed lyrics, made for you on your own PC.
+
+- Watches your library and **times new songs automatically**
+- Turns plain line-synced lyrics into karaoke-style word timing
+- Runs locally, so nothing is uploaded
+
+</td>
+<td width="50%" valign="top">
+
+### 🌊 Lyric Motion
+Lyrics that move with the music: smooth, subtle and always in sync.
+
+- **Letter-by-letter** animation, with Smooth, Crisp and Flowing styles
+- Choose how strong it feels: **Subtle, Balanced or Expressive**
+- **Right-to-left** support for Persian, Arabic and Hebrew
+
+</td>
+</tr>
+</table>
+
+### 🧩 And a few quality-of-life touches
+
+| | |
 |---|---|
-| **Free Music Finder** | Search for songs, albums and artists you don't own yet, and download them into your library. Artist and album pages show what's missing. |
-| **Search** | One search box for your library and the online catalog, with Songs, Albums and Artists tabs. |
-| **Downloads** | See what's queued, downloading and finished. |
-| **For you** | Song suggestions based on what you listen to. Tap "Not for me" to skip a song without muting its artist. |
-| **True Shuffle** | A shuffle that spreads artists and albums out instead of repeating them. |
-| **WordLyrics** | Automatically times lyrics word by word for new songs in your library. |
-| **Lyric Motion** | Smooth, subtle letter-by-letter animation on synced lyrics, including right-to-left languages like Persian and Arabic. |
+| 🏠 **Lives next to Noctis** | Its own profile, install folder and update feed, so Plus and the original never touch each other's settings. |
+| 📦 **Brings your stuff over** | On first launch, Plus can copy your existing Noctis library, playlists, stats and settings. |
+| 🔄 **Updates itself** | New versions come straight from this repo's Releases, checked against published checksums. |
+| 🎨 **Looks like Noctis** | Every new screen uses Noctis's own controls, themes and accent colors. Nothing feels bolted on. |
 
-Plus also has its own profile, install location and update feed, so it can sit next to the original Noctis without either touching the other's settings.
+<br/>
 
-> **Work in progress:** the features are being rebuilt natively (on the `native` branch) so they look and feel like the rest of Noctis.
+---
 
-## Install (Windows)
+## 📥 Install
 
-Run this in PowerShell:
+Open **PowerShell** and paste:
 
 ```powershell
 irm https://raw.githubusercontent.com/Alfamin/NoctisPlus/main/scripts/install.ps1 | iex
 ```
 
-Or download the Setup from [Releases](https://github.com/Alfamin/NoctisPlus/releases). The first time it runs, Plus can copy over your existing Noctis library and settings.
+Prefer clicking? Grab the **Setup** from the [latest release](https://github.com/Alfamin/NoctisPlus/releases/latest).
 
-Building from source: see [QUICKSTART](docs/fork/QUICKSTART.md). Licensing and credits: see [PROVENANCE](docs/fork/PROVENANCE.md).
+> [!TIP]
+> Already using Noctis? Keep it. Plus installs separately, and you can run both.
 
-## Credits
+Want to build it yourself? See **[QUICKSTART](docs/fork/QUICKSTART.md)**.
 
-- [Noctis](https://github.com/heartached/Noctis) by heartached, the player this is built on. Please support the original.
-- Free Music Finder is based on [noctic-download-plugin](https://github.com/Pr0nE/noctic-download-plugin) by Pr0nE (MIT).
+<br/>
+
+---
+
+## 🛠 Where it's heading
+
+Plus started out with these features as add-on plugins. They're now being rebuilt **natively inside the app** on the [`native`](https://github.com/Alfamin/NoctisPlus/tree/native) branch, so they look, feel and perform like they were always part of Noctis.
+
+| Feature | Native rebuild |
+|---|:---:|
+| Search, artist and album pages | ✅ Done |
+| For you | ✅ Done |
+| Free Music Finder (catalog and downloads) | ✅ Done |
+| Downloads list (play, open, remove finished songs) | 🔨 In progress |
+| Lyric Motion | 🔨 In progress |
+| Lyrics "Sync now" button | 📋 Planned |
+| True Shuffle | 📋 Planned |
+| WordLyrics | 📋 Planned |
+
+<br/>
+
+---
+
+## 💐 Credits
+
+<table>
+<tr>
+<td align="center" width="50%">
+<a href="https://github.com/heartached/Noctis"><b>Noctis</b></a><br/>
+by <a href="https://github.com/heartached">heartached</a><br/>
+<sub>The beautiful player all of this is built on.<br/>Please <a href="https://buymeacoffee.com/heartached">support the original</a>.</sub>
+</td>
+<td align="center" width="50%">
+<a href="https://github.com/Pr0nE/noctic-download-plugin"><b>noctic-download-plugin</b></a><br/>
+by <a href="https://github.com/Pr0nE">Pr0nE</a><br/>
+<sub>The download plugin that Free Music Finder grew from.<br/>MIT licensed.</sub>
+</td>
+</tr>
+</table>
+
+<div align="center">
+<sub>Noctis Plus is released under the <a href="LICENSE">MIT License</a>. Licensing details are in <a href="docs/fork/PROVENANCE.md">PROVENANCE</a>.</sub>
+</div>
+
+<br/>
 
 ---
 
