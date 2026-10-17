@@ -55,6 +55,57 @@ public class PlatformHelperAppImageTests
         Assert.False(psi.Environment.ContainsKey("LD_LIBRARY_PATH"));
     }
 
+    // GitHub #139 log (Fedora 44 KDE): Open Folder's dbus-send, kde-open and gio all loaded
+    // /tmp/.mount_noctisDAPFBb/usr/lib although every one of them was scrubbed. That mount
+    // was an EARLIER Noctis instance's: the updater's relaunch shell inherited its
+    // LD_LIBRARY_PATH, the new AppRun only prepended its own mount, and the scrub dropped
+    // entries under the current APPDIR alone. The old mount stays alive (the new process
+    // tree inherits its runtime's keep-alive pipe), so its Ubuntu libraries still load.
+    private const string EarlierMount = "/tmp/.mount_noctisDAPFBb";
+
+    [Fact]
+    public void StripAppDirEntries_DropsAnEarlierInstancesMount_Too()
+    {
+        var inherited = $"{AppDir}/usr/lib:{AppDir}/usr/lib/vlc:{EarlierMount}/usr/lib:{EarlierMount}/usr/lib/vlc:/usr/lib64";
+        Assert.Equal("/usr/lib64", PlatformHelper.StripAppDirEntries(inherited, AppDir));
+    }
+
+    [Fact]
+    public void StripAppDirEntries_DropsMountsUnderAnyTempDir()
+    {
+        // The runtime mounts under $TMPDIR, not always /tmp.
+        Assert.Equal("/usr/lib", PlatformHelper.StripAppDirEntries("/var/tmp/.mount_NoctisXyz/usr/lib:/usr/lib", null));
+    }
+
+    [Fact]
+    public void Scrub_RemovesAnEarlierInstancesLibraries_FromAHostTool()
+    {
+        var psi = new ProcessStartInfo();
+        psi.Environment["LD_LIBRARY_PATH"] = $"{AppDir}/usr/lib:{AppDir}/usr/lib/vlc:{EarlierMount}/usr/lib:{EarlierMount}/usr/lib/vlc";
+        PlatformHelper.ScrubAppImageEnvironment(psi, AppDir, "/home/user/AppImages/noctis.appimage");
+        Assert.False(psi.Environment.ContainsKey("LD_LIBRARY_PATH"));
+    }
+
+    [Fact]
+    public void ProcessLoaderPaths_AreScrubbedForEveryChild()
+    {
+        var env = new System.Collections.Generic.Dictionary<string, string?>
+        {
+            ["LD_LIBRARY_PATH"] = $"{AppDir}/usr/lib:{EarlierMount}/usr/lib:/opt/custom/lib",
+            ["LD_PRELOAD"] = $"{AppDir}/usr/lib/libfoo.so",
+        };
+        var changes = PlatformHelper.AppImageLoaderPathChanges(k => env.GetValueOrDefault(k), AppDir, null);
+        Assert.Contains(("LD_LIBRARY_PATH", (string?)"/opt/custom/lib"), changes);
+        Assert.Contains(("LD_PRELOAD", (string?)null), changes);
+    }
+
+    [Fact]
+    public void ProcessLoaderPaths_AreLeftAlone_OutsideAnAppImage()
+    {
+        var changes = PlatformHelper.AppImageLoaderPathChanges(_ => "/opt/custom/lib", null, null);
+        Assert.Empty(changes);
+    }
+
     [Fact]
     public void Scrub_IsNoOp_OutsideAnAppImage()
     {

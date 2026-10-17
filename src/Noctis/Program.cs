@@ -19,6 +19,8 @@ internal class Program
     public static void Main(string[] args)
     {
         Services.StartupTrace.Begin();
+        // Before anything can spawn a host tool: children must not inherit the AppImage's libraries.
+        Helpers.PlatformHelper.ScrubAppImageLoaderPathsForChildren();
         // The core's log header must name this app, not the core assembly.
         Services.DebugLog.DescribeBuild = Services.UpdateService.DescribeBuild;
         try
