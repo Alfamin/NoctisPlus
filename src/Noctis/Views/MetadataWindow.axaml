@@ -214,6 +214,15 @@
             <Setter Property="Opacity" Value="1" />
         </Style>
 
+        <!-- The lyrics panels (Border.pill-well, radius 20) clip to their rounded shape, and a
+             ScrollViewer's bar runs its full height at the right edge, so the bar's ends were
+             cut off by the panel's right-hand corners (owner 10-17). The panel's 10px top and
+             bottom padding plus this 10px keeps the bar a full corner radius clear of each
+             end, as SettingsScrollViewer does in its card. Pinned by LyricsWellScrollbarTests. -->
+        <Style Selector="ScrollViewer.well-scroll /template/ ScrollBar:vertical">
+            <Setter Property="Margin" Value="2,10,0,10" />
+        </Style>
+
         <!-- Tab nav: vertical sidebar list on the left, selected content on the right. -->
         <Style Selector="TabControl">
             <Setter Property="Template">
@@ -1603,6 +1612,7 @@
 
                             <!-- Formatted: one row per line, timestamp pill + text -->
                             <ScrollViewer IsVisible="{Binding !#SyncedRawToggle.IsChecked}"
+                                          Classes="well-scroll"
                                           VerticalScrollBarVisibility="Auto"
                                           HorizontalScrollBarVisibility="Disabled"
                                           Padding="12,0,16,0">
@@ -1739,8 +1749,13 @@
                                     FontWeight="SemiBold" FontSize="12"/>
                         </StackPanel>
 
+                        <!-- Padding, not ScrollViewer.Padding, insets the list: rows scroll
+                             through a ScrollViewer's padding up to the panel's edge, where the
+                             rounded corners sliced the last visible row. Same inset as the
+                             Synced Lyrics card. -->
                         <Border ClipToBounds="True"
-                                Classes="pill-well">
+                                Classes="pill-well"
+                                Padding="0,10">
                             <Panel MinHeight="300">
                                 <TextBlock Text="{loc:T Metadata.NoSyncedLyricsYet2}"
                                            IsVisible="{Binding !HasSyncedLines}"
@@ -1754,9 +1769,10 @@
                                            Margin="24" />
 
                                 <ScrollViewer IsVisible="{Binding HasSyncedLines}"
+                                              Classes="well-scroll"
                                               VerticalScrollBarVisibility="Auto"
                                               HorizontalScrollBarVisibility="Disabled"
-                                              Padding="14,10,18,0">
+                                              Padding="14,0,18,0">
                                     <!-- The list is the ScrollViewer's DIRECT child on purpose: wrapped
                                          in the old spacer StackPanel, the virtualizing panel could not
                                          own the viewport (same failure mode as the AlbumDetailView track
@@ -1767,7 +1783,7 @@
                                          and a content Margin are not — the old spacer's reason to exist).
                                          Pinned by TimestampLyricsVirtualizationTests. -->
                                     <ItemsControl ItemsSource="{Binding SyncedLyricLines}"
-                                                  Padding="0,0,0,24">
+                                                  Padding="0,0,0,14">
                                         <ItemsControl.ItemsPanel>
                                             <ItemsPanelTemplate>
                                                 <VirtualizingStackPanel />
