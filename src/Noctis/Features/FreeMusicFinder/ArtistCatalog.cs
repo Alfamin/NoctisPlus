@@ -123,7 +123,7 @@ internal sealed partial class ArtistCatalog : IDisposable
                 using var data = await Get("apple", "/search?entity=musicArtist&media=music&country=US&limit=25&term=" + Uri.EscapeDataString(name), ct);
                 return Results(data.RootElement).Where(a => Text(a, "wrapperType") == "artist").Select(AppleArtist).Where(a => a is not null).Cast<CatalogArtist>().DistinctBy(a => a.Id).ToList();
             }
-        }, ct);
+        }, ct, fallback: artists => artists.Count > 0 && artists.All(a => a.Id.StartsWith("apple:", StringComparison.Ordinal)));
     }
 
     public async Task<CatalogResult<CatalogProfile>> ArtistAsync(CatalogArtist artist, bool refresh, CancellationToken ct)
@@ -265,16 +265,22 @@ internal sealed partial class ArtistCatalog : IDisposable
         return answer;
     }
 
-    private async Task<CatalogResult<T>> Cached<T>(string key, TimeSpan age, bool refresh, Func<Task<T>> fetch, CancellationToken ct)
+    /// <summary>How long an answer from the fallback catalog (Apple, when Deezer could not be
+    /// reached) is reused: Apple has no artist pictures and fewer details, so Deezer is asked
+    /// again soon instead of a whole day later (owner test: picture-less artists all day).</summary>
+    internal static readonly TimeSpan FallbackFresh = TimeSpan.FromMinutes(10);
+
+    private async Task<CatalogResult<T>> Cached<T>(string key, TimeSpan age, bool refresh, Func<Task<T>> fetch, CancellationToken ct, Func<T, bool>? fallback = null)
     {
         ct.ThrowIfCancellationRequested();
+        TimeSpan Fresh(T value) => fallback?.Invoke(value) == true && FallbackFresh < age ? FallbackFresh : age;
         var savedBeforeWait = await ReadAsync<T>(key, ct).ConfigureAwait(false);
         // Fresh local data never queues behind an unrelated slow network operation.
-        if (!refresh && savedBeforeWait is not null && _now() - savedBeforeWait.SavedAt < age) return new(savedBeforeWait.Value, savedBeforeWait.SavedAt, true, savedBeforeWait.Warning);
+        if (!refresh && savedBeforeWait is not null && _now() - savedBeforeWait.SavedAt < Fresh(savedBeforeWait.Value)) return new(savedBeforeWait.Value, savedBeforeWait.SavedAt, true, savedBeforeWait.Warning);
         using (await _locks.EnterAsync(key, ct).ConfigureAwait(false))
         {
             var old = Read<T>(key);
-            if (!refresh && old is not null && _now() - old.SavedAt < age) return new(old.Value, old.SavedAt, true, old.Warning);
+            if (!refresh && old is not null && _now() - old.SavedAt < Fresh(old.Value)) return new(old.Value, old.SavedAt, true, old.Warning);
             try
             {
                 var value = await fetch().ConfigureAwait(false); ct.ThrowIfCancellationRequested();

@@ -24,12 +24,16 @@ internal sealed class TelegramAccount : ITelegramSignIn, IDisposable
     public TelegramAccount(string storePath, Func<string> proxy, Action<string>? log = null, string? defaultsPath = null)
     {
         _store = new TelegramStore(storePath);
+        DataFolder = Path.GetDirectoryName(Path.GetFullPath(storePath))!;
         _defaults = TelegramDefaults.Read(defaultsPath ?? Path.Combine(Path.GetDirectoryName(storePath)!, "telegram-defaults.private.json"));
         _proxy = proxy;
         _log = log;
     }
 
     public bool IsLoggedIn => _store.Account.Length > 0;
+
+    /// <summary>The folder the login file lives in (the feature's data folder).</summary>
+    public string DataFolder { get; }
 
     /// <summary>Display name of the signed-in account; empty when logged out.</summary>
     public string SignedInAs => _store.Account;
@@ -271,8 +275,15 @@ internal sealed class TelegramAccount : ITelegramSignIn, IDisposable
 internal sealed class TelegramBotSource : IHunterBotSource
 {
     public const string Bot = "MusicsHuntersbot";
+    // The longest waits, used until the bot's usual answer times are known (BotTimings).
     private static readonly TimeSpan SearchWait = TimeSpan.FromSeconds(20);
     private static readonly TimeSpan FileWait = TimeSpan.FromMinutes(3);
+    // The shortest: a normal answer is never cut off (owner: 8 to 10 s for a ~2 s bot).
+    private static readonly TimeSpan MinSearchWait = TimeSpan.FromSeconds(8);
+    private static readonly TimeSpan MinFileWait = TimeSpan.FromSeconds(60);
+    internal const string SearchTiming = "hunters-search", FileTiming = "hunters-file";
+    private readonly BotTimings _timings;
+    private bool _seeded;
 
     private readonly TelegramAccount _account;
     private readonly Action<string> _log;
@@ -286,6 +297,7 @@ internal sealed class TelegramBotSource : IHunterBotSource
     {
         _account = account;
         _log = log;
+        _timings = new BotTimings(Path.Combine(account.DataFolder, "bot-timings.json"));
     }
 
     /// <summary>
@@ -300,10 +312,14 @@ internal sealed class TelegramBotSource : IHunterBotSource
         {
             return await RunAsync<IReadOnlyList<BotTrack>>(async (client, bot) =>
             {
+                await LearnFromHistoryAsync(client, bot, ct).ConfigureAwait(false);
+                var wait = _timings.Wait(SearchTiming, SearchWait, MinSearchWait, SearchWait);
+                var clock = System.Diagnostics.Stopwatch.StartNew();
                 var sent = await client.SendMessageAsync(bot, "/search " + query).ConfigureAwait(false);
                 // The answer always carries buttons; without results it has no numbered ones.
-                var results = await WaitForAsync(client, bot, sent.id, m => m.media is not MessageMediaDocument && Buttons(m).Any(), SearchWait, ct).ConfigureAwait(false)
-                    ?? throw new TimeoutException("The bot did not answer.");
+                var results = await WaitForAsync(client, bot, sent.id, m => m.media is not MessageMediaDocument && Buttons(m).Any(), wait, ct).ConfigureAwait(false)
+                    ?? throw new TimeoutException($"The bot did not answer within {wait.TotalSeconds:0} seconds (it usually answers in about {Usual(SearchTiming)}).");
+                _timings.Record(SearchTiming, clock.Elapsed);
 
                 return ParseResults(results,FetchSelectedAsync);
             }, ct).ConfigureAwait(false);
@@ -370,13 +386,16 @@ internal sealed class TelegramBotSource : IHunterBotSource
             if (BotLimits.Read("Music Hunters", notice ?? "", DateTimeOffset.UtcNow) is { } limited) throw limited;
 
             string? other = null;
+            var fileWait = _timings.Wait(FileTiming, FileWait, MinFileWait, FileWait);
+            var fileClock = System.Diagnostics.Stopwatch.StartNew();
             var file = await WaitForAsync(client, bot, newest, m =>
             {
                 if (m.media is not MessageMediaDocument { document: Document sent }) return false;
                 if (Extension(sent) is not null && DeezLoadSource.Fits(request, sent)) return true;
                 other = Describe(sent);
                 return false;
-            }, FileWait, ct).ConfigureAwait(false);
+            }, fileWait, ct).ConfigureAwait(false);
+            if (file is not null) _timings.Record(FileTiming, fileClock.Elapsed);
             if (file is null)
             {
                 throw new TimeoutException(
@@ -400,6 +419,54 @@ internal sealed class TelegramBotSource : IHunterBotSource
             }).ConfigureAwait(false);
             return Extension(document)!;
     }
+    private string Usual(string kind) => _timings.Usual(kind) is { } usual ? $"{usual.TotalSeconds:0.#} seconds" : "an unknown time";
+
+    /// <summary>
+    /// Once per session, while too little is known: how fast the bot answered the searches already
+    /// in this chat (each "/search" and the bot's next message with result buttons). Read through
+    /// the app's own signed-in client, one history request, message dates only.
+    /// </summary>
+    private async Task LearnFromHistoryAsync(Client client, InputPeer bot, CancellationToken ct)
+    {
+        if (_seeded) return;
+        _seeded = true;
+        if (_timings.Count(SearchTiming) >= BotTimings.Enough) return;
+        try
+        {
+            var history = await client.Messages_GetHistory(bot, limit: 100).WaitAsync(TimeSpan.FromSeconds(8), ct).ConfigureAwait(false);
+            var answers = SearchAnswerTimes(history.Messages.OfType<Message>());
+            _timings.Seed(SearchTiming, answers);
+            if (_timings.Usual(SearchTiming) is { } usual)
+                _log($"Music Hunters answered {answers.Count} earlier searches in about {usual.TotalSeconds:0.#} s; waiting up to " +
+                     $"{_timings.Wait(SearchTiming, SearchWait, MinSearchWait, SearchWait).TotalSeconds:0} s before trying DeezLoad.");
+        }
+        catch (Exception ex) when (ex is RpcException or WTException or IOException or TimeoutException) { }
+    }
+
+    /// <summary>For each "/search" sent, how long until the bot's next message carrying result
+    /// buttons (another request in between drops that pair). Telegram dates are whole seconds,
+    /// so a same-second answer counts as half a second.</summary>
+    internal static List<TimeSpan> SearchAnswerTimes(IEnumerable<Message> messages)
+    {
+        var ordered = messages.OrderBy(m => m.id).ToList();
+        var times = new List<TimeSpan>();
+        for (var i = 0; i < ordered.Count; i++)
+        {
+            var asked = ordered[i];
+            if (!asked.flags.HasFlag(Message.Flags.out_) || asked.message?.StartsWith("/search ", StringComparison.Ordinal) != true) continue;
+            for (var j = i + 1; j < ordered.Count; j++)
+            {
+                var next = ordered[j];
+                if (next.flags.HasFlag(Message.Flags.out_)) break;
+                if (next.media is MessageMediaDocument || !Buttons(next).Any()) continue;
+                var took = next.date - asked.date;
+                times.Add(took < TimeSpan.FromSeconds(0.5) ? TimeSpan.FromSeconds(0.5) : took);
+                break;
+            }
+        }
+        return times;
+    }
+
     internal static bool IsStaleCallback(string error)=>new[]{"MESSAGE_ID_INVALID","DATA_INVALID","BUTTON_DATA_INVALID","QUERY_ID_INVALID","RESULT_ID_INVALID"}
         .Any(code=>error.Contains(code,StringComparison.OrdinalIgnoreCase));
 

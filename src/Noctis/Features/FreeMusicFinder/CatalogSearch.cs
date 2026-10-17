@@ -35,7 +35,7 @@ internal sealed partial class ArtistCatalog
                 return Results(data.RootElement).Select(t => AppleSong(t) is {} song ? new CatalogSearchSong(song, AppleRelease(t), Text(t, "artworkUrl100")) : null)
                     .Where(t => t is not null).Cast<CatalogSearchSong>().DistinctBy(t => t.Song.Id).ToList();
             }
-        }, ct);
+        }, ct, fallback: rows => rows.Count > 0 && rows.All(r => r.Song.Id.StartsWith("apple:", StringComparison.Ordinal)));
     }
     public Task<CatalogResult<List<CatalogRelease>>> SearchAlbumsAsync(string query, CancellationToken ct)
     {
@@ -54,7 +54,7 @@ internal sealed partial class ArtistCatalog
                 using var data = await Get("apple", "/search?entity=album&media=music&country=US&explicit=Yes&limit=25&term=" + Uri.EscapeDataString(query), ct);
                 return RelevanceEditions(Results(data.RootElement).Where(a => Text(a, "wrapperType") == "collection").Select(AppleRelease).Where(a => a is not null).Cast<CatalogRelease>());
             }
-        }, ct);
+        }, ct, fallback: rows => rows.Count > 0 && rows.All(r => r.Id.StartsWith("apple:", StringComparison.Ordinal)));
     }
     internal static List<CatalogRelease> RelevanceEditions(IEnumerable<CatalogRelease> values)
     {

@@ -34,6 +34,22 @@ internal static class CatalogRetryTests
         Check.True(await Fails(() => catalog.SearchAsync("Guest", true, CancellationToken.None)), "Retry keeps a wait the service asked for (Retry-After)");
         Check.Equal(calls, http.Calls.Count, "and sends nothing during it");
 
+        Check.Section("catalog fallback: an Apple-only answer is reused briefly, then Deezer is asked again");
+        var clock = DateTimeOffset.UtcNow;
+        var fallbackHttp = new DiscoveryTests.Http { AppleOnly = true };
+        using (var fallbackCatalog = DiscoveryTests.Catalog(Check.NewFolder("catalog-fallback"), fallbackHttp, () => clock))
+        {
+            var apple = await fallbackCatalog.SearchAsync("North Star", false, CancellationToken.None);
+            Check.True(apple.Value.Count > 0 && apple.Value.All(a => a.Id.StartsWith("apple:")), "with Deezer unreachable the search falls back to Apple");
+            fallbackHttp.AppleOnly = false;
+            clock = clock.AddMinutes(5);
+            var reused = await fallbackCatalog.SearchAsync("North Star", false, CancellationToken.None);
+            Check.True(reused.Cached && reused.Value.All(a => a.Id.StartsWith("apple:")), "within ten minutes the fallback answer is reused");
+            clock = clock.AddMinutes(10);
+            var deezer = await fallbackCatalog.SearchAsync("North Star", false, CancellationToken.None);
+            Check.True(deezer.Value.Any(a => a.Id.StartsWith("deezer:")), "after ten minutes Deezer is asked again (pictures come back), not a day later");
+        }
+
         Check.Section("metadata route: a changed way out means fresh connections");
         ProxyChoice? computer = null;
         using var route = new MetadataRoute("", null, (_, _) => computer);

@@ -60,6 +60,7 @@ try
 {
     await LogicTests.RunAsync();
     await CatalogRetryTests.RunAsync();
+    BotTimingTests.Run();
     await TransferTests.RunAsync();
     await QueueManagementTests.RunAsync();
     await BotSelectionTests.RunAsync();
