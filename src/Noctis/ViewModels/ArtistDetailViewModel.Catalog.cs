@@ -21,8 +21,9 @@ public partial class ArtistDetailViewModel
     public ObservableCollection<ArtistCatalogSong> CatalogPopular { get; } = [];
     public ObservableCollection<ArtistCatalogSong> CatalogSongs { get; } = [];
     public bool HasCatalogSongs => _catalogRows.Count > 0;
-    public bool ShowNoPopular => !HasPopular && !HasCatalogSongs;
-    public bool ShowNoAllSongs => !HasAllSongs && !HasCatalogSongs;
+    public int DisplaySongCount => HasCatalogSongs ? _catalogRows.Count : SongCount;
+    public bool ShowNoPopular => HasCatalogSongs ? CatalogPopular.Count == 0 : !HasPopular;
+    public bool ShowNoAllSongs => HasCatalogSongs ? CatalogSongs.Count == 0 : !HasAllSongs;
     [ObservableProperty, NotifyPropertyChangedFor(nameof(HasCatalogSongStatus))]
     private string _catalogSongStatus = "";
     public bool HasCatalogSongStatus => CatalogSongStatus.Length > 0;
@@ -74,6 +75,7 @@ public partial class ArtistDetailViewModel
     {
         _catalogRows = rows;
         OnPropertyChanged(nameof(HasCatalogSongs));
+        OnPropertyChanged(nameof(DisplaySongCount));
         OnPropertyChanged(nameof(ShowNoPopular));
         OnPropertyChanged(nameof(ShowNoAllSongs));
         FilterCatalogSongs();
@@ -83,6 +85,8 @@ public partial class ArtistDetailViewModel
         var rows = _catalogRows.Where(r => SearchText.Matches(r.Song.Title, _query)).ToList();
         SearchViewModel.Sync(CatalogSongs, rows);
         SearchViewModel.Sync(CatalogPopular, rows.Take(MaxPopular).ToList());
+        OnPropertyChanged(nameof(ShowNoPopular));
+        OnPropertyChanged(nameof(ShowNoAllSongs));
     }
 
     private async Task LoadCatalogSongArt(SearchSongItem row, FinderOnlineSearch online, CancellationToken ct)
@@ -145,6 +149,12 @@ public partial class ArtistDetailViewModel
     {
         _catalogSongsStop?.Cancel(); _catalogSongsStop?.Dispose();
         if (_catalogOnline is not null) _catalogOnline.DownloadsChanged -= CatalogDownloadsChanged;
+    }
+    internal void ClearCatalogSongs()
+    {
+        DisposeCatalogSongs();
+        _catalogSongsStop = null; _catalogOnline = null; _catalogArtistId = null;
+        _catalogTracks.Clear(); SetCatalogRows([]); CatalogSongStatus = "";
     }
 }
 

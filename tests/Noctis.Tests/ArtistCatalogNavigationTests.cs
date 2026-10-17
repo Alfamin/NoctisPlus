@@ -2,11 +2,25 @@ using Noctis.Models;
 using Noctis.Services.Search;
 using Noctis.ViewModels;
 using Xunit;
+using Avalonia.Controls;
+using Avalonia.Headless.XUnit;
+using FreeMusicFinder;
 
 namespace Noctis.Tests;
 
 public class ArtistCatalogNavigationTests
 {
+    [AvaloniaFact]
+    public void LatestCover_LoadsArtworkFromTheNativeCommandParameter()
+    {
+        var tile = new object();
+        var tiles = new Dictionary<object, CatalogRelease> { [tile] = new("apple:1", "Latest", new("apple:2", "Artist"), "2026-01-01", "album", 1) };
+        var header = new Button { DataContext = new object(), CommandParameter = tile };
+        Assert.Same(tile, NativeCatalogPages.ArtworkTile(header, tiles));
+        var grid = new Button { DataContext = tile };
+        Assert.Same(tile, NativeCatalogPages.ArtworkTile(grid, tiles));
+        Assert.Null(NativeCatalogPages.ArtworkTile(new Button(), tiles));
+    }
     private static ArtistDetailViewModel Page()
     {
         var library = new FakeLibraryService();
@@ -45,6 +59,7 @@ public class ArtistCatalogNavigationTests
         Assert.Equal(5, page.CatalogPopular.Count);
         page.SelectTabCommand.Execute("songs");
         Assert.Equal(13, page.CatalogSongs.Count);
+        Assert.Equal(13, page.DisplaySongCount);
         Assert.Equal(rows, page.CatalogSongs);
         Assert.Same(owned, page.CatalogSongs[^1].Song.Local);
         Assert.True(page.CatalogSongs[0].Song.CanStartDownload);
@@ -54,5 +69,12 @@ public class ArtistCatalogNavigationTests
         Assert.Equal("Song 12", Assert.Single(page.CatalogSongs).Song.Title);
         page.ApplyFilter("");
         Assert.Equal(13, page.CatalogSongs.Count);
+        page.ApplyFilter("No matching title at all");
+        Assert.True(page.ShowNoAllSongs);
+        Assert.True(page.ShowNoPopular);
+        page.ClearCatalogSongs();
+        Assert.False(page.HasCatalogSongs);
+        Assert.Empty(page.CatalogSongs);
+        Assert.Empty(page.CatalogPopular);
     }
 }

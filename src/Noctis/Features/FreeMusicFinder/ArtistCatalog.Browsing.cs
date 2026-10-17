@@ -86,10 +86,10 @@ internal sealed partial class ArtistCatalog
     /// <summary>Provider-ranked songs, fetched on the artist page, never during Search.
     /// Same-name foreign credits are excluded by id. Apple lookup is a catalog list,
     /// not a promise of a complete discography or a global popularity chart.</summary>
-    internal Task<CatalogResult<List<CatalogSearchSong>>> ArtistSongsAsync(CatalogArtist artist, bool refresh, CancellationToken ct)
+    internal async Task<CatalogResult<List<CatalogSearchSong>>> ArtistSongsAsync(CatalogArtist artist, bool refresh, CancellationToken ct)
     {
         var (provider, id) = Split(artist.Id);
-        return Cached("artist-songs:" + artist.Id, TimeSpan.FromDays(1), refresh, async () =>
+        var result = await Cached("artist-songs:" + artist.Id, TimeSpan.FromDays(1), refresh, async () =>
         {
             if (provider == "deezer")
             {
@@ -105,6 +105,19 @@ internal sealed partial class ArtistCatalog
             return Results(data.RootElement).Select(t => AppleSong(t) is { } song
                 ? new CatalogSearchSong(song, AppleRelease(t), Text(t, "artworkUrl100")) : null)
                 .OfType<CatalogSearchSong>().Where(t => t.Song.Artists.Any(a => a.Id == artist.Id)).DistinctBy(t => t.Song.Id).ToList();
-        }, ct);
+        }, ct).ConfigureAwait(false);
+        return result with { Value = DistinctArtistSongs(result.Value) };
+    }
+    internal static List<CatalogSearchSong> DistinctArtistSongs(IEnumerable<CatalogSearchSong> songs)
+    {
+        var rows = new List<CatalogSearchSong>();
+        foreach (var song in songs)
+        {
+            var at = rows.FindIndex(t => RecordingMatch.Fits(song.Song.Request, string.Join(", ", t.Song.Artists.Select(a => a.Name)), t.Song.Title, t.Song.Request.Duration)
+                && RecordingMatch.Fits(t.Song.Request, string.Join(", ", song.Song.Artists.Select(a => a.Name)), song.Song.Title, song.Song.Request.Duration));
+            if (at < 0) rows.Add(song);
+            else if (song.Song.Explicit == true && rows[at].Song.Explicit != true) rows[at] = song;
+        }
+        return rows;
     }
 }

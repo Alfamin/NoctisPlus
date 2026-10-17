@@ -695,6 +695,8 @@ public partial class ArtistDetailViewModel : ViewModelBase, ISearchable, IDispos
         else { _allSongsRanking = null; ++_songsGeneration; AllSongs.ReplaceAll(Array.Empty<TopSongRow>()); OnPropertyChanged(nameof(HasAllSongs)); }
 
         OnPropertyChanged(nameof(HasPopular));
+        OnPropertyChanged(nameof(ShowNoPopular));
+        OnPropertyChanged(nameof(ShowNoAllSongs));
         OnPropertyChanged(nameof(HasFavorites));
         OnPropertyChanged(nameof(HasReleases));
         OnPropertyChanged(nameof(HasAlbums));
@@ -736,6 +738,7 @@ public partial class ArtistDetailViewModel : ViewModelBase, ISearchable, IDispos
         var generation = ++_songsGeneration;
         StreamingFill.Into(AllSongs, rows, generation, () => _songsGeneration, first: 30, chunk: 40);
         OnPropertyChanged(nameof(HasAllSongs));
+        OnPropertyChanged(nameof(ShowNoAllSongs));
     }
 
     /// <summary>Tiles per slice for the tab grids: one row with the switch, two rows per idle turn.</summary>

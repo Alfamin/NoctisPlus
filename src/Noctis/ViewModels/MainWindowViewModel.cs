@@ -25,6 +25,7 @@ namespace Noctis.ViewModels;
 public partial class MainWindowViewModel : ViewModelBase
 {
     private readonly ILibraryService _library;
+    internal ILibraryService Library => _library;
     private readonly IPersistenceService _persistence;
     private readonly IMetadataService _metadata;
     private readonly IDiscordPresenceService _discord;

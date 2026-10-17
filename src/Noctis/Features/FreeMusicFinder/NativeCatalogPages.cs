@@ -130,6 +130,12 @@ internal sealed class NativeCatalogPages : IDisposable
         }
         if (ReferenceEquals(_observedView, current)) return;
         _observedView = current;
+        foreach (var previous in _artists.Values.Where(s => !ReferenceEquals(s.Vm, current)))
+        {
+            previous.Panel.Children.Remove(previous.Strip);
+            if (previous.Click is not null) previous.Page.RemoveHandler(Button.ClickEvent, previous.Click);
+            if (previous.Context is not null) previous.Page.RemoveHandler(Control.ContextRequestedEvent, previous.Context);
+        }
         if (_openStop is not null && !ReferenceEquals(_openOrigin, current)) _openStop.Cancel();
         foreach (var state in _artists.Values.Where(s => !ReferenceEquals(s.Vm, current) && s.Status.Text?.StartsWith("Opening ", StringComparison.Ordinal) == true)) state.Status.Text = state.ReadyStatus;
         foreach (var (tile, work) in _artLoads.ToArray()) { _artAttempted.Remove(tile); work.Cancel(); }
@@ -155,7 +161,7 @@ internal sealed class NativeCatalogPages : IDisposable
                     if (!_artists.ContainsKey(vm) && _pending.Add(vm)) _ = LoadArtist(page, vm);
                     else if (_artists.TryGetValue(vm, out var state))
                     {
-                        if (!ReferenceEquals(state.Page, page)) ReattachArtist(state, page);
+                        if (!ReferenceEquals(state.Page, page) || state.Strip.Parent is null) ReattachArtist(state, page);
                         if (state.Interrupted && !state.Busy) _ = LoadArtist(page, vm);
                         if (state.Profile is not null && (!Values(Get(vm, "Releases")).SequenceEqual(state.Displayed) || ViewKey(vm) != state.ViewKey)) Apply(state);
                     }
@@ -173,17 +179,20 @@ internal sealed class NativeCatalogPages : IDisposable
                 }
             }
             if (current is null || !_artists.TryGetValue(current, out var shown)) return;
-            foreach (var button in shown.Page.GetVisualDescendants().OfType<Button>().Where(b => b.IsEffectivelyVisible && b.DataContext is {} tile && _tiles.ContainsKey(tile)))
+            foreach (var button in shown.Page.GetVisualDescendants().OfType<Button>().Where(b => b.IsEffectivelyVisible && ArtworkTile(b, shown.CurrentTiles) is not null))
             {
                 var at = button.TranslatePoint(default, window);
                 if (at is not {} point || point.Y + button.Bounds.Height < 0 || point.Y > window.Bounds.Height) continue;
-                var tile = button.DataContext!;
+                var tile = ArtworkTile(button, shown.CurrentTiles)!;
                 var path = Get(tile, "ArtworkPath") as string;
                 if (_tiles[tile].Artwork is { Length: > 0 } url && (string.IsNullOrEmpty(path) || path == _catalog().SavedArtwork(url)) && !_artLoads.ContainsKey(tile) && _artAttempted.Add(tile)) _ = LoadArtwork(tile, url);
             }
         }
         catch (Exception ex) { if (!_reported) { _reported = true; _log("CATALOG_HOST_UNSUPPORTED: " + ex.Message); } }
     }
+    internal static object? ArtworkTile(Button button, IReadOnlyDictionary<object, CatalogRelease> tiles) =>
+        button.DataContext is { } data && tiles.ContainsKey(data) ? data :
+        button.CommandParameter is { } parameter && tiles.ContainsKey(parameter) ? parameter : null;
     public void OpenArtist(CatalogArtist artist)
     {
         var main = _main() ?? throw Unsupported("main window"); NativeCatalogBridge.OpenArtist(main, artist.Name);
@@ -497,6 +506,7 @@ internal sealed class NativeCatalogPages : IDisposable
             if (state.Click is not null) state.Page.RemoveHandler(Button.ClickEvent, state.Click);
             if (state.Context is not null) state.Page.RemoveHandler(Control.ContextRequestedEvent, state.Context);
             state.Panel.Children.Remove(state.Strip); try { RestoreArtist(state.Vm); } catch { }
+            if (state.Vm is Noctis.ViewModels.ArtistDetailViewModel nativeArtist) nativeArtist.ClearCatalogSongs();
         }
         foreach (var work in _artLoads.Values.ToArray()) work.Cancel();
         _albums.Clear(); _artists.Clear(); _tiles.Clear(); _artAttempted.Clear();

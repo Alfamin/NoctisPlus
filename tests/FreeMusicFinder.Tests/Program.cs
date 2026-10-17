@@ -84,7 +84,7 @@ try
     NativeForYouTests.Run();
     WindowTests.Run(string.IsNullOrEmpty(pictures) ? null : pictures);
     PlaylistWindowTests.Run(pictures);
-    NativePlaylistTests.Run(Environment.GetEnvironmentVariable("FMF_NOCTIS_APP"));
+    NativePlaylistTests.Run();
     NativeCatalogTests.Run(Environment.GetEnvironmentVariable("FMF_NOCTIS_APP"), pictures);
     ArtistPortraitTests.RunUi(pictures);
     UnifiedSearchTests.RunUi(pictures);
@@ -111,3 +111,4 @@ internal sealed class TestApp : Application
         Styles.Add(new FluentTheme());
     }
 }
+

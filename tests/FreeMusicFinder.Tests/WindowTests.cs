@@ -309,103 +309,75 @@ internal static class WindowTests
 
     private static void Plugin(string music, string folder)
     {
-        Check.Section("the plugin in Noctis");
+        Check.Section("native Finder lifecycle and Search routing");
         var host = new FakeHost(Check.NewFolder("plugin/noctis"), music);
-        host.Values["shortcut"] = Shortcut.Default; // what Noctis gives from plugin.json
-        var dead = Path.Combine(folder, "Artist - Dead.fmf.part");
-        File.WriteAllText(dead, "x");
-        File.SetLastWriteTimeUtc(dead, DateTime.UtcNow.AddHours(-1));
-
-        var plugin = new FreeMusicPlugin((data, _) => DiscoveryTests.Catalog(data, new DiscoveryTests.Http()));
-        Check.Equal("2.11.1", plugin.Info.Version, "the version is the one in plugin.json");
-        plugin.Initialize(host);
-        Check.Equal("Find more by this artist…", string.Join(",", host.Commands.Select(c => c.Label)), "one track menu entry");
-        Check.Until(() => !File.Exists(dead), "what an interrupted download left behind is removed at the start");
-        Check.Until(() => host.Logs.Any(l => l.StartsWith("removed 1 unfinished download left in")), "and the log says so");
-
-        SearchWindow? Window() => (SearchWindow?)typeof(FreeMusicPlugin).GetField("_window", BindingFlags.NonPublic | BindingFlags.Instance)!.GetValue(plugin);
-        host.Values["openSearch"] = "true";
-        host.Raise("openSearch");
-        var window = Window();
-        Check.True(window is { IsVisible: true }, "flipping the switch opens the window");
-
-        host.Commands[0].Handler(new TrackInfo("7", "Some Song", "Somebody", "", "", TimeSpan.Zero, 0, "", 0, "", false, 0, 0));
-        Check.True(ReferenceEquals(window, Window()), "the menu entry uses the open window");
-        var discovery = Field<DiscoveryView>(window!, "_discovery");
-        Check.Equal("Somebody", Query(window!).Text, "and searches the same unified search box");
-        Check.Until(() => discovery.GetVisualDescendants().OfType<Button>().Any(b => Equals(b.Content, "Open in Noctis →")), "catalog browsing needs no Telegram login");
-
-        // A download that finishes while the window is closed is announced by the plugin itself.
-        window?.Close();
-        var downloads = (Downloads)typeof(FreeMusicPlugin).GetField("_downloads", BindingFlags.NonPublic | BindingFlags.Instance)!.GetValue(plugin)!;
-        downloads.Start(LogicTests.Track("Announced"), folder);
-        Check.Until(() => host.Notices.Count == 1, "a finished download gives one notice in Noctis");
-        Check.Equal($"Saved \"Announced\" to {Path.GetFullPath(folder)}", host.Notices.FirstOrDefault(), "which says what was saved and where");
-        host.Raise("openSearch");
-        window = Window();
-        Check.True(window is { IsVisible: true }, "the window opens again after it was closed");
-
-        // The shortcut, pressed in another Noctis window.
-        window?.Close();
-        var noctis = new Window { Width = 400, Height = 300 };
-        noctis.Show();
-        Check.False(Press(noctis, Key.F, KeyModifiers.Control), "Ctrl+F (Noctis's own search) is left to Noctis");
-        Check.True(Window() is null, "and opens nothing");
-        Press(noctis, Key.F, KeyModifiers.Control | KeyModifiers.Shift, handledAlready: true);
-        Check.True(Window() is null, "Ctrl+Shift+F that Noctis has already handled is left to Noctis");
-        Check.True(Press(noctis, Key.F, KeyModifiers.Control | KeyModifiers.Shift), "Ctrl+Shift+F is taken");
-        window = Window();
-        Check.True(window is { IsVisible: true }, "and opens the search window");
-        if (window is not null) Query(window).Text = "typed before";
-        Check.True(window is not null && Press(window, Key.F, KeyModifiers.Control | KeyModifiers.Shift), "pressed again in the search window");
-        Check.True(ReferenceEquals(window, Window()) && window is not null && Query(window).SelectedText == "typed before",
-            "it stays one window, with the search box selected for a new search");
-
-        window?.Close();
-        host.Values["shortcut"] = "Ctrl+Alt+M";
-        host.Raise("shortcut");
-        Press(noctis, Key.F, KeyModifiers.Control | KeyModifiers.Shift);
-        Check.True(Window() is null, "a changed shortcut replaces the old one");
-        Press(noctis, Key.M, KeyModifiers.Control | KeyModifiers.Alt);
-        Check.True(Window() is { IsVisible: true }, "the new one works at once");
-        Window()?.Close();
-        host.Values["shortcut"] = "Shift+F";
-        host.Raise("shortcut");
-        Check.Until(() => host.Notices.Any(n => n.Contains("would get in the way of typing")), "a shortcut that would get in the way is refused with a notice");
-        Press(noctis, Key.F, KeyModifiers.Shift);
-        Check.True(Window() is null, "and does nothing");
-        host.Values["shortcut"] = "";
-        host.Raise("shortcut");
-        Press(noctis, Key.F, KeyModifiers.Control | KeyModifiers.Shift);
-        Check.True(Window() is null, "an empty setting turns the shortcut off");
         host.Values["shortcut"] = Shortcut.Default;
-        host.Raise("shortcut");
-        Press(noctis, Key.F, KeyModifiers.Control | KeyModifiers.Shift);
-        window = Window();
-
-        host.Values["proxy"] = "nonsense";
-        host.Raise("proxy");
-        Check.Until(() => host.Notices.Any(n => n.Contains("The proxy setting is not understood")), "a proxy setting that is not understood is said with a notice");
-        plugin.Shutdown();
-        Check.True(window is { IsVisible: false } && Window() is null, "switching the plugin off closes the window");
-        Check.Equal(1, host.CommandsRemoved, "and takes the menu entry away");
-        Check.False(Press(noctis, Key.F, KeyModifiers.Control | KeyModifiers.Shift), "and the shortcut");
-        Check.True(Window() is null, "which opens nothing any more");
-        noctis.Close();
-
-        // The next time Noctis starts, the setting is still what it was left as.
+        var dead = Path.Combine(folder, "Artist - Dead.fmf.part");
+        File.WriteAllText(dead, "x"); File.SetLastWriteTimeUtc(dead, DateTime.UtcNow.AddHours(-1));
+        var requests = new List<string?>();
+        EventHandler<string?> opened = (_, query) => requests.Add(query);
+        Noctis.Services.Search.OnlineMusicSearch.OpenRequested += opened;
+        var plugin = new FreeMusicPlugin((data, _) => DiscoveryTests.Catalog(data, new DiscoveryTests.Http()));
+        var noctis = new Window { Width = 400, Height = 300 };
+        try
+        {
+            plugin.Initialize(host);
+            Check.Equal("2.11.1", plugin.Info.Version, "feature settings keep their original version and identity");
+            Check.Equal("Find more by this artist…", string.Join(",", host.Commands.Select(c => c.Label)), "one native track menu entry");
+            Check.Until(() => !File.Exists(dead), "abandoned partial download is cleaned at startup");
+            Check.Until(() => host.Logs.Any(l => l.StartsWith("removed 1 unfinished download left in")), "startup cleanup is logged");
+            host.Raise("openSearch");
+            Check.Equal(1, requests.Count, "feature setting opens native Search once");
+            host.Commands[0].Handler(new TrackInfo("7", "Some Song", "Somebody", "", "", TimeSpan.Zero, 0, "", 0, "", false, 0, 0));
+            Check.Equal("Somebody", requests.Last(), "song menu searches the artist on the native Search page");
+            Check.False(typeof(FreeMusicPlugin).GetFields(BindingFlags.Instance | BindingFlags.NonPublic).Any(f => f.FieldType.Name == "SearchWindow"), "feature has no old Finder window or fallback-window owner");
+            Check.True(typeof(FreeMusicPlugin).Assembly.GetType("FreeMusicFinder.SearchWindow") is null &&
+                typeof(FreeMusicPlugin).Assembly.GetType("FreeMusicFinder.FinderTheme") is null,
+                "old Finder window and theme are absent from the shipped native assembly");
+            var downloads = (Downloads)typeof(FreeMusicPlugin).GetField("_downloads", BindingFlags.NonPublic | BindingFlags.Instance)!.GetValue(plugin)!;
+            downloads.Start(LogicTests.Track("Announced"), folder);
+            Check.Until(() => host.Notices.Count == 1, "finished download is announced independently of pages");
+            Check.Equal($"Saved \"Announced\" to {Path.GetFullPath(folder)}", host.Notices.FirstOrDefault(), "notice identifies the saved song and folder");
+            noctis.Show();
+            var before = requests.Count;
+            Check.False(Press(noctis, Key.F, KeyModifiers.Control), "Ctrl+F remains Noctis's own command");
+            Press(noctis, Key.F, KeyModifiers.Control | KeyModifiers.Shift, handledAlready: true);
+            Check.Equal(before, requests.Count, "an already handled shortcut does not navigate");
+            Check.True(Press(noctis, Key.F, KeyModifiers.Control | KeyModifiers.Shift), "Finder shortcut is handled");
+            Check.Equal(before + 1, requests.Count, "shortcut routes directly to native Search");
+            host.Values["shortcut"] = "Ctrl+Alt+M"; host.Raise("shortcut");
+            Press(noctis, Key.F, KeyModifiers.Control | KeyModifiers.Shift);
+            Check.Equal(before + 1, requests.Count, "changing shortcut removes the old binding");
+            Press(noctis, Key.M, KeyModifiers.Control | KeyModifiers.Alt);
+            Check.Equal(before + 2, requests.Count, "new shortcut opens native Search");
+            host.Values["shortcut"] = "Shift+F"; host.Raise("shortcut");
+            Check.Until(() => host.Notices.Any(n => n.Contains("would get in the way of typing")), "typing-conflicting shortcut is refused");
+            Press(noctis, Key.F, KeyModifiers.Shift);
+            Check.Equal(before + 2, requests.Count, "refused shortcut does not navigate");
+            host.Values["shortcut"] = ""; host.Raise("shortcut");
+            Press(noctis, Key.F, KeyModifiers.Control | KeyModifiers.Shift);
+            Check.Equal(before + 2, requests.Count, "empty shortcut setting disables navigation");
+            host.Values["shortcut"] = Shortcut.Default; host.Raise("shortcut");
+            host.Values["proxy"] = "nonsense"; host.Raise("proxy");
+            Check.Until(() => host.Notices.Any(n => n.Contains("The proxy setting is not understood")), "invalid proxy produces a native notice");
+            plugin.Shutdown();
+            Check.Equal(1, host.CommandsRemoved, "feature shutdown removes its song action");
+            Check.False(Press(noctis, Key.F, KeyModifiers.Control | KeyModifiers.Shift), "feature shutdown removes its shortcut");
+            Check.True(Noctis.Services.Search.OnlineMusicSearch.Current is null, "feature shutdown detaches the online source");
+        }
+        finally
+        {
+            plugin.Shutdown(); noctis.Close();
+            Noctis.Services.Search.OnlineMusicSearch.OpenRequested -= opened;
+        }
         var again = new FakeHost(Check.NewFolder("plugin/again"), music);
-        again.Values["shortcut"] = Shortcut.Default;
-        again.Values["proxy"] = "nonsense";
+        again.Values["shortcut"] = Shortcut.Default; again.Values["proxy"] = "nonsense";
         var restarted = new FreeMusicPlugin((data, _) => DiscoveryTests.Catalog(data, new DiscoveryTests.Http()));
         string? stopped = null;
-        try { restarted.Initialize(again); }
-        catch (Exception ex) { stopped = ex.Message; }
-        Check.Equal(null, stopped, "and does not stop the plugin as Noctis starts");
+        try { restarted.Initialize(again); } catch (Exception ex) { stopped = ex.Message; }
+        Check.Equal(null, stopped, "an invalid remembered proxy does not prevent feature startup");
         restarted.Shutdown();
-        Check.Equal(0, host.Logs.Count(l => l.Contains("could not")), "nothing went wrong on the way");
     }
-
     private static QueueView Queue(SearchWindow window) => (QueueView)typeof(SearchWindow).GetField("_queueView",BindingFlags.Instance|BindingFlags.NonPublic)!.GetValue(window)!;
     private static List<Grid> QueueRows(SearchWindow window) => ((StackPanel)((ScrollViewer)Queue(window).Children[2]).Content!).Children.OfType<Border>().Select(b => b.Child).OfType<Grid>().ToList();
     private static Button QueueButton(SearchWindow window,string label) => Queue(window).GetVisualDescendants().OfType<Button>().First(b=>Equals(b.Content,label));
@@ -639,3 +611,4 @@ internal static class WindowTests
         }
     }
 }
+

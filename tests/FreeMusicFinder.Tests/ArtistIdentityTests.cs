@@ -105,5 +105,12 @@ internal static class ArtistIdentityTests
         using var foreign = DiscoveryTests.Catalog(Check.NewFolder("artist-foreign-top"), foreignHttp);
         Check.Equal(0, (await foreign.ArtistSongsAsync(DiscoveryTests.Star, false, default)).Value.Count,
             "same-name top song credited to another provider id never enters the selected catalog");
+        var clean = Song(actual, "apple:10", "Too Far Close", "Single");
+        var explicitCopy = Song(actual, "apple:11", "Too Far Close", "Album") with { Song = clean.Song with { Id = "apple:11", Explicit = true } };
+        clean = clean with { Song = clean.Song with { Explicit = false } };
+        var liveVersion = Song(actual, "apple:12", "Too Far Close (Live)", "Live album") with { Song = clean.Song with { Id = "apple:12", Title = "Too Far Close (Live)", Seconds = 250 } };
+        var distinct = ArtistCatalog.DistinctArtistSongs([clean, explicitCopy, liveVersion]);
+        Check.True(distinct.Count == 2 && distinct[0].Song.Explicit == true, "duplicate album/single recordings collapse in place with explicit version preferred");
+        Check.True(distinct[1].Song.Title.Contains("Live"), "a different live recording remains separate");
     }
 }

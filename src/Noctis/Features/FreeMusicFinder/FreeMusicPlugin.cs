@@ -10,10 +10,8 @@ namespace FreeMusicFinder;
 /// <summary>
 /// Searches a Telegram music bot through the user's own Telegram account and downloads tracks
 /// into a folder.
-/// API 1.1 has no hook for a page or sidebar entry, so the plugin opens its own window: with a
-/// keyboard shortcut anywhere in Noctis, from the track menu, or from the "Open the search
-/// window" switch in its settings. The downloads belong to the plugin: they go on when the
-/// window is closed and stop with the plugin.
+/// Search, downloads, imports and recommendations live on native Noctis pages. The shared
+/// transfer queue survives navigation and stops when the feature shuts down.
 /// </summary>
 public sealed class FreeMusicPlugin : INoctisPlugin
 {
@@ -38,7 +36,6 @@ public sealed class FreeMusicPlugin : INoctisPlugin
     private PlaylistTransfers? _transfers;
     private SpotifyPlaylists? _playlists;
     private Downloads? _downloads;
-    private SearchWindow? _window;
     private Noctis.Views.TelegramSignInDialog? _signInDialog;
     private ArtistCatalog? _catalog;
     private DiscoveryActions? _discoveryActions;
@@ -105,7 +102,7 @@ public sealed class FreeMusicPlugin : INoctisPlugin
             // A 24×24 SVG path: a magnifying glass.
             "M15.5 14h-.79l-.28-.27A6.47 6.47 0 0 0 16 9.5 6.5 6.5 0 1 0 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19zm-6 0A4.5 4.5 0 1 1 14 9.5 4.5 4.5 0 0 1 9.5 14z",
             // Built into Noctis Plus: the app's own Search page, searched for the artist.
-            (Action<TrackInfo>)(track => { if (!Noctis.Services.Search.OnlineMusicSearch.RequestOpen(track.Artist)) ShowWindow(track.Artist, discover: true); })));
+            (Action<TrackInfo>)(track => ShowSearch(track.Artist))));
 
         host.Settings.Changed += OnSettingChanged;
 
@@ -135,8 +132,6 @@ public sealed class FreeMusicPlugin : INoctisPlugin
         foreach (var r in _registrations) r.Dispose();
         _registrations.Clear();
 
-        _window?.Close();
-        _window = null;
         _signInDialog?.Close();
         _signInDialog = null;
         _forYou?.Dispose(); _forYou = null;
@@ -159,7 +154,7 @@ public sealed class FreeMusicPlugin : INoctisPlugin
 
     private void OnSettingChanged(object? sender, string key)
     {
-        if (key == OpenSearchKey) ShowWindow(null);
+        if (key == OpenSearchKey) ShowSearch(null);
         else if (key == ProxyKey)
         {
             _proxy = _host?.Settings.GetString(ProxyKey) ?? "";
@@ -204,7 +199,7 @@ public sealed class FreeMusicPlugin : INoctisPlugin
         if (e.Handled || _shortcut is not { } shortcut || !shortcut.Matches(e)) return;
         e.Handled = true;
         // Built into Noctis Plus: the shortcut opens the app's Search page.
-        if (!Noctis.Services.Search.OnlineMusicSearch.RequestOpen(null)) ShowWindow(null);
+        ShowSearch(null);
     }
 
     private ArtistCatalog CreateCatalog() => _catalogFactory(Path.Combine(_host!.DataDirectory, "artist-catalog"), _proxy);
@@ -213,10 +208,6 @@ public sealed class FreeMusicPlugin : INoctisPlugin
     private IReadOnlyList<string> DiscoverAlbums(string name) => Dispatcher.UIThread.CheckAccess()
         ? _artistPages?.LocalAlbums(name) ?? []
         : Dispatcher.UIThread.InvokeAsync(() => _artistPages?.LocalAlbums(name) ?? []).GetAwaiter().GetResult();
-    private DiscoveryView CreateDiscovery() => new(() => _catalog ?? throw new InvalidOperationException("Free Music Finder has stopped."),
-        artist => { _artistPages!.OpenArtist(artist); _window?.Close(); }, name => _artistPages?.LocalAlbums(name) ?? [],
-        _discoveryActions, async (album, ct) => { await _artistPages!.OpenAlbumAsync(album, ct); _window?.Close(); }, _forYou);
-
     /// <summary>Noctis's own data folder (two above this plugin's), when the plugin's data sits where Noctis puts it.</summary>
     private static string? NoctisDataOf(string pluginData)
     {
@@ -225,36 +216,13 @@ public sealed class FreeMusicPlugin : INoctisPlugin
         return parent is not null && string.Equals(Path.GetFileName(parent), "plugin-data", StringComparison.OrdinalIgnoreCase) ? Path.GetDirectoryName(parent) : null;
     }
 
-    private void ShowWindow(string? query, bool discover = false)
+    private void ShowSearch(string? query)
     {
-        if (_host is null || _telegram is null || _bot is null || _downloads is null) return;
-        try
-        {
-            if (_window is null)
-            {
-                _window = new SearchWindow(_host, _telegram, _downloads, _bot.SearchAsync,_transfers,_playlists, CreateDiscovery());
-                _window.Closed += (_, _) => _window = null;
-
-                var owner = (Application.Current?.ApplicationLifetime as IClassicDesktopStyleApplicationLifetime)?.MainWindow;
-                if (owner is not null) _window.Show(owner);
-                else _window.Show();
-            }
-            else
-            {
-                if (_window.WindowState == WindowState.Minimized) _window.WindowState = WindowState.Normal;
-                _window.Activate();
-            }
-
-            if (!string.IsNullOrWhiteSpace(query)) { if (discover) _window.BrowseArtist(query); else _window.Search(query); }
-            else _window.FocusSearchBox();
-        }
-        catch (Exception ex)
-        {
-            // An exception out of a callback marks the plugin Failed; a window that will not open is not worth that.
-            _host.Log("could not open the search window: " + ex.Message);
-        }
+        if (!Dispatcher.UIThread.CheckAccess()) { Dispatcher.UIThread.Post(() => ShowSearch(query)); return; }
+        if (_host is null) return;
+        if (!Noctis.Services.Search.OnlineMusicSearch.RequestOpen(query))
+            Log("Search is not ready yet. Wait for the main window to finish opening.");
     }
-
     private void ShowSignIn() => ShowSignIn(null);
 
     internal async void ShowSignIn(Window? requestedOwner)
@@ -307,3 +275,4 @@ public sealed class FreeMusicPlugin : INoctisPlugin
             catch (Exception) { }
         });
 }
+
