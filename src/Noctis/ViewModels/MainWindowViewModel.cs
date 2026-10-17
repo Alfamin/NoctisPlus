@@ -895,6 +895,12 @@ public partial class MainWindowViewModel : ViewModelBase
         Navigate(defaultKey);
         Services.StartupTrace.Mark("first-page-navigated");
 #if DEBUG
+        if (Environment.GetEnvironmentVariable("NOCTISPLUS_DEBUG_DIALOG") is { Length: > 0 } debugDialog)
+            Dispatcher.UIThread.Post(async () =>
+            {
+                if ((Avalonia.Application.Current?.ApplicationLifetime as Avalonia.Controls.ApplicationLifetimes.IClassicDesktopStyleApplicationLifetime)?.MainWindow is { } owner)
+                    await Features.NativeFeaturePreview.ShowAsync(owner, debugDialog);
+            }, DispatcherPriority.Background);
         // Developer check of the Search page on an isolated profile: NOCTISPLUS_DEBUG_SEARCH=<query>
         // opens Search with that query (NOCTISPLUS_DEBUG_FILTER=Songs|Artists|Albums picks a chip).
         if (Environment.GetEnvironmentVariable("NOCTISPLUS_DEBUG_PAGE") is { Length: > 0 } debugPage)

@@ -1,0 +1,68 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:vm="using:Noctis.ViewModels"
+        xmlns:controls="using:Noctis.Controls"
+        x:Class="Noctis.Views.TelegramSignInDialog"
+        x:DataType="vm:TelegramSignInViewModel"
+        Title="Telegram" CanResize="False" WindowDecorations="None"
+        TransparencyLevelHint="Transparent" Background="Transparent"
+        ShowInTaskbar="False" WindowStartupLocation="CenterOwner">
+    <controls:PillDialogHost>
+        <Grid Width="480" MaxWidth="600" RowDefinitions="Auto,Auto,Auto">
+            <Border Padding="28,22,28,18" BorderThickness="0,0,0,1"
+                    BorderBrush="{DynamicResource SystemControlForegroundBaseLowBrush}">
+                <Grid ColumnDefinitions="56,16,*">
+                    <Border Width="56" Height="56" CornerRadius="18" Classes="pill-well">
+                        <controls:LineIcon Data="M22 2 9 15 M22 2 15 22 9 15 2 9 22 2Z"
+                                           Width="24" Height="24" Opacity="0.6"
+                                           HorizontalAlignment="Center" VerticalAlignment="Center" />
+                    </Border>
+                    <StackPanel Grid.Column="2" Spacing="5" VerticalAlignment="Center">
+                        <TextBlock Text="{Binding Title}" FontSize="18" FontWeight="Bold" />
+                        <TextBlock Text="Free Music Finder" FontSize="13" Opacity="0.6" />
+                    </StackPanel>
+                </Grid>
+            </Border>
+            <StackPanel Grid.Row="1" Margin="28,20,28,24" Spacing="18">
+                <TextBlock Text="{Binding Description}" FontSize="13" Opacity="0.75" TextWrapping="Wrap" />
+                <StackPanel IsVisible="{Binding IsPhone}" Spacing="16" IsEnabled="{Binding CanInteract}">
+                    <StackPanel Spacing="6">
+                        <TextBlock Text="Phone number" FontSize="12" Opacity="0.5" Margin="16,0,0,0" />
+                        <TextBox x:Name="PhoneField" Classes="pill-field" Text="{Binding Phone}" Watermark="+98…" />
+                    </StackPanel>
+                    <Button Classes="pill-secondary" Command="{Binding ToggleAdvancedCommand}" HorizontalAlignment="Left">
+                        <StackPanel Orientation="Horizontal" Spacing="8">
+                            <TextBlock Text="Advanced" />
+                            <TextBlock Text="⌄" Opacity="0.6" />
+                        </StackPanel>
+                    </Button>
+                        <StackPanel x:Name="AdvancedFields" Spacing="10" IsVisible="{Binding AdvancedOpen}">
+                            <TextBlock Text="Telegram app settings from my.telegram.org. Existing settings are kept."
+                                       FontSize="12" Opacity="0.65" TextWrapping="Wrap" />
+                            <TextBox Classes="pill-field" Text="{Binding ApiId}" Watermark="API id" />
+                            <TextBox x:Name="ApiHashField" Classes="pill-field" Text="{Binding ApiHash}" Watermark="API hash" PasswordChar="●" />
+                        </StackPanel>
+                </StackPanel>
+                <TextBox x:Name="CodeField" Classes="pill-field" Text="{Binding Code}" Watermark="Login code"
+                         IsVisible="{Binding IsCode}" IsEnabled="{Binding CanInteract}" />
+                <TextBox x:Name="PasswordField" Classes="pill-field" Text="{Binding Password}" Watermark="Password"
+                         PasswordChar="●" IsVisible="{Binding IsPassword}" IsEnabled="{Binding CanInteract}" />
+                <TextBlock Text="{Binding Error}" IsVisible="{Binding HasError}" FontSize="12" TextWrapping="Wrap"
+                           Foreground="{DynamicResource SystemControlErrorTextForegroundBrush}" />
+            </StackPanel>
+            <Border Grid.Row="2" Padding="28,14" BorderThickness="0,1,0,0"
+                    BorderBrush="{DynamicResource SystemControlForegroundBaseLowBrush}">
+                <Grid ColumnDefinitions="Auto,*,Auto,Auto">
+                    <Button Classes="pill-secondary" Content="Start over" Command="{Binding StartOverCommand}" IsVisible="{Binding CanStartOver}" />
+                    <Button Classes="pill-secondary" Content="Disconnect" Click="OnDisconnect" IsVisible="{Binding IsSignedIn}" IsEnabled="{Binding CanInteract}" />
+                    <controls:ProgressRing Grid.Column="1" Width="18" Height="18" IsVisible="{Binding IsBusy}"
+                                           IsIndeterminate="True" HorizontalAlignment="Right" Margin="0,0,12,0" />
+                    <Button Grid.Column="2" Classes="pill-secondary" Content="Cancel" Click="OnCancel"
+                            IsVisible="{Binding !IsSignedIn}" MinWidth="92" Margin="0,0,10,0" />
+                    <Button Grid.Column="3" x:Name="ContinueButton" Classes="pill-primary"
+                            Content="{Binding ContinueLabel}" Command="{Binding ContinueCommand}" MinWidth="108" />
+                </Grid>
+            </Border>
+        </Grid>
+    </controls:PillDialogHost>
+</Window>

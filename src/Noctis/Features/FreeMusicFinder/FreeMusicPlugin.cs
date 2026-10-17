@@ -32,6 +32,7 @@ public sealed class FreeMusicPlugin : INoctisPlugin
     private SpotifyPlaylists? _playlists;
     private Downloads? _downloads;
     private SearchWindow? _window;
+    private Noctis.Views.TelegramSignInDialog? _signInDialog;
     private ArtistCatalog? _catalog;
     private DiscoveryActions? _discoveryActions;
     private NativeCatalogPages? _artistPages;
@@ -85,7 +86,7 @@ public sealed class FreeMusicPlugin : INoctisPlugin
             DiscoverAlbums, new PlaylistLibrary(), NoctisDataOf(host.DataDirectory), Path.Combine(host.DataDirectory, "for-you-hidden.json"), () => _similar, () => _lastFm);
         _forYou.WarmUp();
         // The app's own Search page reads the catalog and starts downloads through this.
-        _online = new FinderOnlineSearch(() => _catalog, _discoveryActions, _artistPages, () => _telegram?.IsLoggedIn == true, () => ShowWindow(null));
+        _online = new FinderOnlineSearch(() => _catalog, _discoveryActions, _artistPages, () => _telegram?.IsLoggedIn == true, ShowSignIn);
         Noctis.Services.Search.OnlineMusicSearch.Current = _online;
         _transfers.Changed += Announce;
         _downloads.Finished += Announce;
@@ -126,6 +127,8 @@ public sealed class FreeMusicPlugin : INoctisPlugin
 
         _window?.Close();
         _window = null;
+        _signInDialog?.Close();
+        _signInDialog = null;
         _forYou?.Dispose(); _forYou = null;
         _artistPages?.Dispose(); _artistPages = null;
         _catalog?.Dispose(); _catalog = null;
@@ -240,6 +243,23 @@ public sealed class FreeMusicPlugin : INoctisPlugin
             // An exception out of a callback marks the plugin Failed; a window that will not open is not worth that.
             _host.Log("could not open the search window: " + ex.Message);
         }
+    }
+
+    private async void ShowSignIn()
+    {
+        if (!Dispatcher.UIThread.CheckAccess()) { Dispatcher.UIThread.Post(ShowSignIn); return; }
+        if (_host is null || _telegram is null) return;
+        if (_signInDialog is not null) { _signInDialog.Activate(); return; }
+        var owner = (Application.Current?.ApplicationLifetime as IClassicDesktopStyleApplicationLifetime)?.MainWindow;
+        if (owner is null) return;
+        try
+        {
+            _signInDialog = new Noctis.Views.TelegramSignInDialog(_telegram, Log);
+            Noctis.Helpers.DialogHelper.SizeToOwner(_signInDialog, owner);
+            await _signInDialog.ShowDialog(owner);
+        }
+        catch (Exception ex) { Log("Could not open Telegram sign-in: " + ex.GetType().Name); }
+        finally { _signInDialog = null; }
     }
 
     private bool Owns(BotTrack track)

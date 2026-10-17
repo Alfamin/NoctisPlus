@@ -206,7 +206,7 @@ internal sealed class SearchWindow : Window
     {
         try
         {
-            await new TelegramLoginWindow(_telegram, _host).ShowDialog(this);
+            await Noctis.Views.TelegramSignInDialog.ShowAsync(this, _telegram, _host.Log);
             ShowTelegramState();
             if (_telegram.IsLoggedIn && _status.Text == LoginFirst) _status.Text = "";
         }

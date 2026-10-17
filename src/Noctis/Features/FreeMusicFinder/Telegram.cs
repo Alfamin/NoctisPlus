@@ -6,7 +6,7 @@ using WTelegram;
 namespace FreeMusicFinder;
 
 /// <summary>The user's own Telegram account: the login steps and the connection the bot source talks through.</summary>
-internal sealed class TelegramAccount : IDisposable
+internal sealed class TelegramAccount : ITelegramSignIn, IDisposable
 {
     private readonly TelegramStore _store;
     private readonly Func<string> _proxy;
