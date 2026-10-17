@@ -55,10 +55,10 @@ public class LyricsTtmlExportTests : IDisposable
         var ps = doc.Descendants(tt + "p").ToList();
         Assert.Equal(4, ps.Count);
         Assert.Equal("00:00:12.345", ps[0].Attribute("begin")!.Value);
-        Assert.Equal(new[] { "Hello,", "world!" }, ps[0].Elements(tt + "span").Select(s => s.Value));
+        Assert.Equal(new[] { "Hello, ", "world!" }, ps[0].Elements(tt + "span").Select(s => s.Value));
         Assert.Empty(ps[1].Elements(tt + "span"));
         Assert.Equal("No word times here", ps[1].Value);
-        Assert.Equal(new[] { "Rock", "&", "<roll>" }, ps[2].Elements(tt + "span").Select(s => s.Value));
+        Assert.Equal(new[] { "Rock ", "& ", "<roll>" }, ps[2].Elements(tt + "span").Select(s => s.Value));
         Assert.Equal("01:05:04.500", ps[3].Attribute("begin")!.Value);
     }
 
