@@ -5687,6 +5687,18 @@
     <value>内蔵の出力エンジンのみ。排他モードはファイル独自のレイアウトを保持します。</value>
     <comment>Upmix footnote</comment>
   </data>
+  <data name="Settings.HeadphoneSurround" xml:space="preserve">
+    <value>ヘッドホンサラウンド</value>
+    <comment>Text in SettingsView.axaml</comment>
+  </data>
+  <data name="Settings.HeadphoneSurroundDesc" xml:space="preserve">
+    <value>5.1chや7.1chのファイルを、平坦なステレオミックスではなくヘッドホン向けの立体音響で再生します。ステレオの曲は変わりません。</value>
+    <comment>Text in SettingsView.axaml</comment>
+  </data>
+  <data name="Settings.HeadphoneSurroundRestart" xml:space="preserve">
+    <value>変更を反映するにはNoctisを再起動してください。</value>
+    <comment>Shown under Headphone Surround after a change, in SettingsView.axaml</comment>
+  </data>
   <data name="Server.AccountsMoved" xml:space="preserve">
     <value>アカウントとデバイスの同期は、アカウントと同期で管理されます。</value>
     <comment>Integrations → Noctis Server card footer</comment>

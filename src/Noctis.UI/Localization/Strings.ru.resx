@@ -2347,6 +2347,9 @@ Deezer и TIDAL: вставьте ссылку.</value></data>
   <data name="Upmix.Surround" xml:space="preserve"><value>Объёмный звук</value><comment>Upmix mode</comment></data>
   <data name="Upmix.SurroundHint" xml:space="preserve"><value>Атмосфера в тыловых колонках, широкая сцена спереди</value><comment>Upmix mode hint</comment></data>
   <data name="Upmix.Note" xml:space="preserve"><value>Только для встроенного движка вывода. Монопольный режим сохраняет собственную раскладку каналов файла.</value><comment>Upmix footnote</comment></data>
+  <data name="Settings.HeadphoneSurround" xml:space="preserve"><value>Объёмный звук в наушниках</value><comment>Text in SettingsView.axaml</comment></data>
+  <data name="Settings.HeadphoneSurroundDesc" xml:space="preserve"><value>Превращает файлы 5.1 и 7.1 в пространственный звук для наушников вместо плоского стереомикса. Стереозаписи не меняются.</value><comment>Text in SettingsView.axaml</comment></data>
+  <data name="Settings.HeadphoneSurroundRestart" xml:space="preserve"><value>Перезапустите Noctis, чтобы применить изменение.</value><comment>Shown under Headphone Surround after a change, in SettingsView.axaml</comment></data>
 
   <data name="Server.AccountsMoved" xml:space="preserve"><value>Аккаунты и синхронизация устройств управляются в разделе «Аккаунт и синхронизация».</value><comment>Integrations → Noctis Server card footer</comment></data>
   <data name="Server.OpenAccountSync" xml:space="preserve"><value>Открыть «Аккаунт и синхронизация»</value><comment>Integrations → Noctis Server card button</comment></data>

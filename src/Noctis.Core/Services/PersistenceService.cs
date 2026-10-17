@@ -145,6 +145,28 @@ public class PersistenceService : IPersistenceService
     /// <inheritdoc />
     public bool SettingsLoadFailed { get; private set; }
 
+    /// <summary>
+    /// One boolean setting straight from <c>settings.json</c>, for the few the audio engine
+    /// needs before <see cref="LoadSettingsAsync"/> has run (Program.Main warms the player while
+    /// the UI starts). Missing file, missing key or a damaged file read as false.
+    /// </summary>
+    public static bool ReadBoolSettingAtLaunch(string dataDirectory, string propertyName)
+    {
+        try
+        {
+            var path = Path.Combine(dataDirectory, "settings.json");
+            if (!File.Exists(path)) return false;
+            using var doc = JsonDocument.Parse(File.ReadAllBytes(path));
+            return doc.RootElement.ValueKind == JsonValueKind.Object &&
+                   doc.RootElement.TryGetProperty(JsonNamingPolicy.CamelCase.ConvertName(propertyName), out var value) &&
+                   value.ValueKind == JsonValueKind.True;
+        }
+        catch
+        {
+            return false;
+        }
+    }
+
     private string SettingsBackupPath => SettingsPath + ".bak";
 
     public async Task SaveSettingsAsync(AppSettings settings)

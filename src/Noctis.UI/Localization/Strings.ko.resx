@@ -5687,6 +5687,18 @@
     <value>내장 출력 엔진에서만 작동합니다. 독점 모드는 파일 고유의 채널 배치를 유지합니다.</value>
     <comment>Upmix footnote</comment>
   </data>
+  <data name="Settings.HeadphoneSurround" xml:space="preserve">
+    <value>헤드폰 서라운드</value>
+    <comment>Text in SettingsView.axaml</comment>
+  </data>
+  <data name="Settings.HeadphoneSurroundDesc" xml:space="preserve">
+    <value>5.1 및 7.1 파일을 평평한 스테레오 믹스 대신 헤드폰용 공간 음향으로 바꿉니다. 스테레오 곡은 바뀌지 않습니다.</value>
+    <comment>Text in SettingsView.axaml</comment>
+  </data>
+  <data name="Settings.HeadphoneSurroundRestart" xml:space="preserve">
+    <value>변경 사항을 적용하려면 Noctis를 다시 시작하세요.</value>
+    <comment>Shown under Headphone Surround after a change, in SettingsView.axaml</comment>
+  </data>
   <data name="Server.AccountsMoved" xml:space="preserve">
     <value>계정과 기기 동기화는 계정 및 동기화에서 관리합니다.</value>
     <comment>Integrations → Noctis Server card footer</comment>

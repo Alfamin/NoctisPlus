@@ -66,6 +66,7 @@ public class SettingsResetTests : IDisposable
             AccentFollowsArtwork = true,
             AccentTrackLinks = false,
             UpmixMode = "Surround",
+            HeadphoneSurround = true,
             Shortcuts = new Dictionary<string, string> { [nameof(ShortcutAction.PlayPause)] = "P" },
             LyricsBackgroundMediaOverrides = new Dictionary<string, string> { ["track:1"] = clip },
             LyricsBackgroundPausesWithPlayback = true,
@@ -101,6 +102,7 @@ public class SettingsResetTests : IDisposable
         Assert.False(vm.ShortcutService.IsDefault(ShortcutAction.PlayPause));
         Assert.True(vm.HasLyricsBackgroundOverride("track:1"));
         Assert.Equal("Surround", audio.UpmixMode);
+        Assert.True(vm.HeadphoneSurround);
 
         // ConfirmResetLibrary's settings half, without its OS and data-folder side effects.
         var defaults = new AppSettings { CommunityPluginsEnabled = false };
@@ -110,6 +112,7 @@ public class SettingsResetTests : IDisposable
         Assert.True(vm.ShortcutService.IsDefault(ShortcutAction.PlayPause));
         Assert.False(vm.HasLyricsBackgroundOverride("track:1"));
         Assert.Equal("Off", audio.UpmixMode);
+        Assert.False(vm.HeadphoneSurround);
 
         // Any toggle, or the unconditional save when the window closes.
         await vm.SaveAsync();

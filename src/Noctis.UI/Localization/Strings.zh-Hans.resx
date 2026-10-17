@@ -5687,6 +5687,18 @@
     <value>仅内置输出引擎。唯一独家模式保持文件的布局。</value>
     <comment>Upmix footnote</comment>
   </data>
+  <data name="Settings.HeadphoneSurround" xml:space="preserve">
+    <value>耳机环绕声</value>
+    <comment>Text in SettingsView.axaml</comment>
+  </data>
+  <data name="Settings.HeadphoneSurroundDesc" xml:space="preserve">
+    <value>将 5.1 和 7.1 文件转换为耳机空间音效，而不是平淡的立体声混音。立体声歌曲不受影响。</value>
+    <comment>Text in SettingsView.axaml</comment>
+  </data>
+  <data name="Settings.HeadphoneSurroundRestart" xml:space="preserve">
+    <value>重新启动 Noctis 以应用此更改。</value>
+    <comment>Shown under Headphone Surround after a change, in SettingsView.axaml</comment>
+  </data>
   <data name="Server.AccountsMoved" xml:space="preserve">
     <value>帐户和设备同步是在帐户和同步中管理的。</value>
     <comment>Integrations → Noctis Server card footer</comment>

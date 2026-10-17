@@ -596,6 +596,11 @@ public class VlcAudioPlayer : IAudioPlayer, IOpenFileHolder
         if (vlcDiag)
             vlcArgs.Add("--verbose=2");
 
+        HeadphoneSurroundActive = HeadphoneSurroundAtLaunch;
+        if (StereoModeArg(HeadphoneSurroundActive) is { } stereoMode)
+            vlcArgs.Add(stereoMode);
+        DebugLogger.Info(DebugLogger.Category.Playback, "Audio.Setting", $"headphoneSurround={HeadphoneSurroundActive}");
+
         // Diagnostic: append arbitrary space-separated LibVLC args so output
         // modules / clock / time-stretch settings can be A/B-tested on real
         // hardware without recompiling (e.g. "--audio-time-stretch" to test
@@ -1691,6 +1696,13 @@ public class VlcAudioPlayer : IAudioPlayer, IOpenFileHolder
     }
 
     public bool ExclusiveModeActive => _exclusiveOut is { IsExclusive: true };
+
+    /// <summary>Settings → Audio → Headphone surround as saved when Noctis started. Program.Main
+    /// sets it before the player is built (see <see cref="StereoModeArg"/>).</summary>
+    public static bool HeadphoneSurroundAtLaunch { get; set; }
+
+    /// <inheritdoc />
+    public bool HeadphoneSurroundActive { get; }
 
     /// <summary>
     /// The players are wired into an NAudio chain with a <see cref="BeatTapProvider"/>:
@@ -5966,6 +5978,11 @@ public class VlcAudioPlayer : IAudioPlayer, IOpenFileHolder
         _player.Dispose();
         _standbyPlayer.Dispose();
         _libVlc.Dispose();
+        lock (_engineInTapLock)
+        {
+            try { _engineInTap?.Dispose(); } catch { }
+            _engineInTap = null;
+        }
         if (lockHeld)
         {
             try { _playbackLock.Release(); } catch { }
@@ -6264,6 +6281,20 @@ public class VlcAudioPlayer : IAudioPlayer, IOpenFileHolder
     /// its per-track output opens at the file's own rate). Pure; internal for tests.
     /// </summary>
     internal static bool ShouldForceSpeexResampler(bool isWindows, bool isLinux) => isWindows || isLinux;
+
+    /// <summary>
+    /// The LibVLC instance option behind Settings → Audio → Headphone surround: stereo-mode 6
+    /// (AOUT_VAR_CHAN_HEADPHONES). It has to be an instance option: every audio output takes its
+    /// stereo mode from it when the output is created, and resets to it at each new track, so it
+    /// reaches all players (both engine slots, standby/crossfade, exclusive, LibVLC's own output)
+    /// from a track's first sample. A per-media ":stereo-mode" never reaches the output, and
+    /// SetChannel after Play lasts one track and restarts the output mid-track (harness, 10-17).
+    /// For input above two channels VLC then adds its "binauralizer" filter (spatialaudio
+    /// module + the hrtfs/*.sofa beside libvlc); stereo and mono pass through bit-identical, and
+    /// a libvlc without the module or the HRTF file skips the filter and downmixes as before.
+    /// Pure; internal for tests.
+    /// </summary>
+    internal static string? StereoModeArg(bool headphoneSurround) => headphoneSurround ? "--stereo-mode=6" : null;
 
     /// <summary>
     /// Whether an MP3 opens on LibVLC's own MP3 demuxer instead of the forced avformat one:

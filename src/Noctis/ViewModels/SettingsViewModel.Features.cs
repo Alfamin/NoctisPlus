@@ -39,6 +39,24 @@ public partial class SettingsViewModel
         _ = SaveAsync();
     }
 
+    // ── Headphone surround (Audio tab; VLC's binauralizer ships with the Windows build) ──
+
+    public bool IsHeadphoneSurroundSupported => OperatingSystem.IsWindows();
+
+    [ObservableProperty] private bool _headphoneSurround;
+
+    /// <summary>The saved choice differs from what the running player started with: it is a
+    /// LibVLC instance option, so it applies at the next launch.</summary>
+    public bool HeadphoneSurroundNeedsRestart =>
+        _audioPlayer != null && HeadphoneSurround != _audioPlayer.HeadphoneSurroundActive;
+
+    partial void OnHeadphoneSurroundChanged(bool value)
+    {
+        OnPropertyChanged(nameof(HeadphoneSurroundNeedsRestart));
+        if (!_settingsLoaded) return;
+        _ = SaveAsync();
+    }
+
     // ── Account & Sync ──
 
     private ILibrarySyncService? _sync;
@@ -499,6 +517,7 @@ public partial class SettingsViewModel
     private void LoadFeatureSettings()
     {
         UpmixMode = GaplessSink.ParseUpmixMode(_settings.UpmixMode).ToString();
+        HeadphoneSurround = _settings.HeadphoneSurround;
 
         if (string.IsNullOrWhiteSpace(_settings.SyncDeviceId))
             _settings.SyncDeviceId = Guid.NewGuid().ToString("N")[..12];
@@ -523,6 +542,7 @@ public partial class SettingsViewModel
     private void SaveFeatureSettings()
     {
         _settings.UpmixMode = UpmixMode ?? "Off";
+        _settings.HeadphoneSurround = HeadphoneSurround;
         if (AccountFeatures.Enabled) _settings.SyncEnabled = SyncEnabled;
         _settings.SyncTurnedOffByUser = _syncTurnedOffByUser;
         _settings.SyncDeviceName = SyncDeviceName ?? string.Empty;
