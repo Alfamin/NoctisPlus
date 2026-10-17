@@ -405,7 +405,7 @@ public partial class AlbumDetailViewModel : ViewModelBase, IDisposable
     [ObservableProperty, NotifyPropertyChangedFor(nameof(ShowAddAlbumDescription))]
     private bool _isAlbumDescriptionLoaded;
 
-    public bool ShowAddAlbumDescription => IsAlbumDescriptionLoaded && !HasAlbumDescription;
+    public bool ShowAddAlbumDescription => IsAlbumDescriptionLoaded && !HasAlbumDescription && !IsCatalogAlbum;
 
     /// <summary>Resolves this album's animated cover from its first track (sidecar or managed cache).</summary>
     private string? ResolveAlbumAnimatedCover()
@@ -413,6 +413,9 @@ public partial class AlbumDetailViewModel : ViewModelBase, IDisposable
 
     private void RefreshFromLibrary()
     {
+        // An online album is not in the library by design: follow which songs are owned now.
+        if (IsCatalogAlbum) { RefreshCatalogOwnership(); return; }
+
         // Try to find album by current ID first
         var updatedAlbum = _library.Albums.FirstOrDefault(a => a.Id == Album.Id);
 
@@ -1251,6 +1254,7 @@ public partial class AlbumDetailViewModel : ViewModelBase, IDisposable
 
     public void Dispose()
     {
+        DisposeCatalog();
         _discFillGeneration++; // halt any in-flight track streaming
         _player.PropertyChanged -= _playerPropertyChangedHandler;
         _library.LibraryUpdated -= _libraryUpdatedHandler;

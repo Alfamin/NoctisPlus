@@ -57,7 +57,19 @@ public class Album : ObservableObject
     /// Path to cached artwork file on disk (%APPDATA%\Noctis\artwork\{id}.jpg).
     /// Null if no artwork was found.
     /// </summary>
-    public string? ArtworkPath { get; set; }
+    public string? ArtworkPath { get => _artworkPath; set => SetProperty(ref _artworkPath, value); }
+    private string? _artworkPath;
+
+    /// <summary>Noctis Plus: set on an online release shown on an artist page (Free Music Finder's
+    /// catalog id, "deezer:123"). Such an album is display-only: never added to the library,
+    /// persisted, scanned or played; its <see cref="Tracks"/> hold real local tracks only.</summary>
+    public string? CatalogReleaseId { get; set; }
+
+    /// <summary>An online release the library does not have: tiles wear the download badge.</summary>
+    public bool IsOnlineOnly => CatalogReleaseId != null && (Tracks == null || Tracks.Count == 0);
+
+    /// <summary>Release kind for an online release with no local tracks to classify it by.</summary>
+    public ReleaseType? CatalogReleaseType { get; set; }
 
     /// <summary>Tracks in this album, ordered by disc then track number.</summary>
     public List<Track> Tracks { get; set; } = new();
@@ -209,6 +221,8 @@ public class Album : ObservableObject
     {
         get
         {
+            // 0. An online release (Noctis Plus) is the kind the catalog says.
+            if (CatalogReleaseType is { } catalogKind) return catalogKind;
             if (Tracks == null || Tracks.Count == 0) return ReleaseType.Album;
 
             // 1. User override always wins.

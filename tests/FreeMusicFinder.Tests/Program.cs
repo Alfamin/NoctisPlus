@@ -60,6 +60,7 @@ try
 {
     await LogicTests.RunAsync();
     await CatalogRetryTests.RunAsync();
+    await CatalogPagesTests.RunAsync();
     BotTimingTests.Run();
     await TransferTests.RunAsync();
     await QueueManagementTests.RunAsync();
@@ -87,7 +88,6 @@ try
     WindowTests.Run(string.IsNullOrEmpty(pictures) ? null : pictures);
     PlaylistWindowTests.Run(pictures);
     NativePlaylistTests.Run();
-    NativeCatalogTests.Run(Environment.GetEnvironmentVariable("FMF_NOCTIS_APP"), pictures);
     ArtistPortraitTests.RunUi(pictures);
     UnifiedSearchTests.RunUi(pictures);
     ForYouDiscoverTests.RunUi();

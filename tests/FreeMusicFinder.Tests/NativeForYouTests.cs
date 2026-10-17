@@ -21,7 +21,7 @@ internal static class NativeForYouTests
         using var downloads = new Downloads(_ => { });
         var loginRequests = 0;
         var actions = new DiscoveryActions(library, downloads, _ => throw new Exception("No transfer is allowed in this fixture"), () => folder, () => false);
-        using var pages = new NativeCatalogPages(() => catalog, actions, _ => { }, () => true, main: () => null, window: () => null);
+        using var pages = new CatalogPages(() => catalog, actions, _ => { }, () => true, library: () => null);
         var online = new FinderOnlineSearch(() => catalog, actions, pages, () => false, () => loginRequests++);
         using var source = new ForYouSource(() => catalog, actions, _ => [], library, null, Path.Combine(folder, "hidden.json"));
         using var vm = new ForYouShelfViewModel(source, online, actions, TimeSpan.FromMilliseconds(120));

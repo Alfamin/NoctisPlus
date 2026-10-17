@@ -16,14 +16,14 @@ internal sealed class FinderOnlineSearch : IOnlineMusicSearch
 
     private readonly Func<ArtistCatalog?> _catalog;
     private readonly DiscoveryActions _actions;
-    private readonly NativeCatalogPages _pages;
+    private readonly CatalogPages _pages;
     private readonly Func<bool> _signedIn;
     private readonly Action _signIn;
     private readonly ConcurrentDictionary<string, CatalogSong> _songs = new();
     private readonly ConcurrentDictionary<string, CatalogArtist> _artists = new();
     private readonly ConcurrentDictionary<string, CatalogRelease> _albums = new();
 
-    public FinderOnlineSearch(Func<ArtistCatalog?> catalog, DiscoveryActions actions, NativeCatalogPages pages, Func<bool> signedIn, Action signIn)
+    public FinderOnlineSearch(Func<ArtistCatalog?> catalog, DiscoveryActions actions, CatalogPages pages, Func<bool> signedIn, Action signIn)
     {
         _catalog = catalog; _actions = actions; _pages = pages; _signedIn = signedIn; _signIn = signIn;
         _actions.Downloads.Changed += OnDownloadChanged;

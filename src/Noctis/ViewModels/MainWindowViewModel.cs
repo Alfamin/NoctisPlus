@@ -454,6 +454,30 @@ public partial class MainWindowViewModel : ViewModelBase
         _searchVm = new SearchViewModel(library, Player, name => ViewArtistByName(name), album => OpenAlbumDetail(album));
         _downloadsVm = new DownloadsViewModel();
         _searchVm.DownloadsRequested += (_, _) => Navigate("downloads");
+        // Noctis Plus: online artists and albums open on the app's own pages (typed calls from
+        // the built-in catalog; no window scanning).
+        FreeMusicFinder.CatalogPages.ArtistRequested += artist => Dispatcher.UIThread.Post(() =>
+        {
+            OpenArtistDiscography(artist.Name);
+            if (CurrentView is ArtistDetailViewModel page) page.UseCatalogIdentity(artist);
+        });
+        FreeMusicFinder.CatalogPages.AlbumRequested += open => Dispatcher.UIThread.Post(() =>
+        {
+            var release = open.Album.Release;
+            var album = new Album
+            {
+                Id = new Guid(System.Security.Cryptography.SHA256.HashData(System.Text.Encoding.UTF8.GetBytes("FreeMusicFinder/catalog/" + release.Id)).AsSpan(0, 16)),
+                Name = release.Title,
+                Artist = release.Artist.Name,
+                Year = int.TryParse(release.Date.Split('-')[0], out var year) ? year : 0,
+                TrackCount = open.Album.Songs.Count,
+                TotalDuration = TimeSpan.FromSeconds(open.Album.Songs.Sum(s => s.Seconds ?? 0)),
+                CatalogReleaseId = release.Id,
+                Genre = "",
+            };
+            OpenAlbumDetail(album);
+            if (CurrentView is AlbumDetailViewModel detail) detail.ShowCatalog(open);
+        });
         _albumsVm = new LibraryAlbumsViewModel(library, Player, Sidebar, Settings);
         // Keep the top-bar dropdown labels in sync with the Albums grid filters/sort.
         _albumsVm.PropertyChanged += (_, e) =>
@@ -913,7 +937,7 @@ public partial class MainWindowViewModel : ViewModelBase
             Dispatcher.UIThread.Post(async () =>
             {
                 OpenSearchPage();
-                if (roundTrip == "artist")
+                if (roundTrip.StartsWith("artist", StringComparison.Ordinal))
                 {
                     TopBar.SearchText = "drake";
                     await Task.Delay(5000);
@@ -922,6 +946,14 @@ public partial class MainWindowViewModel : ViewModelBase
                     if (_searchVm.Artists.FirstOrDefault() is { } first) _searchVm.OpenArtistCommand.Execute(first);
                     else ViewArtistByName("Drake");
                     await Task.Delay(4000);
+                    // =artist-stay: stay on the artist page; =artist-album: open its first online release.
+                    if (roundTrip.StartsWith("artist-", StringComparison.Ordinal))
+                    {
+                        if (roundTrip == "artist-album" && CurrentView is ArtistDetailViewModel artistPage
+                            && artistPage.Releases.FirstOrDefault(a => a.IsOnlineOnly) is { } online)
+                            artistPage.OpenAlbumCommand.Execute(online);
+                        return;
+                    }
                     GoBackInHistory();
                     return;
                 }

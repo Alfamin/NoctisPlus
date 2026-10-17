@@ -11,16 +11,30 @@ namespace Noctis.Tests;
 public class ArtistCatalogNavigationTests
 {
     [AvaloniaFact]
-    public void LatestCover_LoadsArtworkFromTheNativeCommandParameter()
+    public void OnlineReleases_AreShownOnThePage_ButNeverPlayedOrAddedToTheLibrary()
     {
-        var tile = new object();
-        var tiles = new Dictionary<object, CatalogRelease> { [tile] = new("apple:1", "Latest", new("apple:2", "Artist"), "2026-01-01", "album", 1) };
-        var header = new Button { DataContext = new object(), CommandParameter = tile };
-        Assert.Same(tile, NativeCatalogPages.ArtworkTile(header, tiles));
-        var grid = new Button { DataContext = tile };
-        Assert.Same(tile, NativeCatalogPages.ArtworkTile(grid, tiles));
-        Assert.Null(NativeCatalogPages.ArtworkTile(new Button(), tiles));
+        using var page = Page();
+        var artist = new CatalogArtist("deezer:2", "Avenoir");
+        var profile = new CatalogProfile(artist, [], [
+            new("deezer:10", "NOIRE", artist, "2025-05-01", "album", 9),
+            new("deezer:11", "Mirage", artist, "2026-02-01", "single", 1),
+            new("deezer:12", "Guest Spot", new("deezer:3", "Someone"), "2024-01-01", "album", 10),
+        ]);
+        using var catalog = new ArtistCatalog(Path.Combine(Path.GetTempPath(), "noctis-tests-catalog-" + Guid.NewGuid().ToString("N")));
+        page.ApplyCatalogProfile(profile, catalog);
+
+        Assert.Equal(2, page.Releases.Count);
+        Assert.All(page.Releases, a => Assert.True(a.IsOnlineOnly));
+        Assert.Equal("Mirage", page.LatestRelease?.Name);                       // the newest leads the hero
+        Assert.Equal(ReleaseType.Single, page.Releases.Single(a => a.Name == "Mirage").ReleaseType);
+        Assert.Contains(page.AppearsOn, a => a.Name == "Guest Spot");           // another artist's release
+        Assert.Empty(page.GetAllTracks());                                        // play/shuffle stay local-only
+
+        var tile = page.Releases.First(a => a.Name == "NOIRE");
+        page.ApplyCatalogProfile(profile, catalog);                               // a refresh keeps the same tiles (covers stay)
+        Assert.Same(tile, page.Releases.First(a => a.Name == "NOIRE"));
     }
+
     private static ArtistDetailViewModel Page()
     {
         var library = new FakeLibraryService();

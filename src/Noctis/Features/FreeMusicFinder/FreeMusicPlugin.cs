@@ -39,7 +39,10 @@ public sealed class FreeMusicPlugin : INoctisPlugin
     private Noctis.Views.TelegramSignInDialog? _signInDialog;
     private ArtistCatalog? _catalog;
     private DiscoveryActions? _discoveryActions;
-    private NativeCatalogPages? _artistPages;
+    private CatalogPages? _artistPages;
+
+    /// <summary>The catalog behind the app's artist and album pages (null while stopped).</summary>
+    internal CatalogPages? CatalogPages => _artistPages;
     private KeyGesture? _shortcut;
     // Read on the threads that connect to Telegram; settings themselves are only read on the UI thread.
     private volatile string _proxy = "";
@@ -85,7 +88,7 @@ public sealed class FreeMusicPlugin : INoctisPlugin
         if (_lastFmKey.Length > 0 && !LastFmSimilar.ValidKey(_lastFmKey)) Announce("Last.fm API key not understood: paste the 32-character API key, not the secret. For you will use the other catalogs.");
         _discoveryActions = new DiscoveryActions(new PlaylistLibrary(), _downloads, _bot.Track,
             () => Downloader.Folder(host.Settings.GetString(DownloadFolderKey), host.DataDirectory), () => _telegram?.IsLoggedIn == true);
-        _artistPages = new NativeCatalogPages(() => _catalog!, _discoveryActions, Log, () => _host?.Settings.GetBool("artistCatalogOnPages", true) == true, choicesPath: Path.Combine(host.DataDirectory, "artist-catalog", "artist-choices.json"));
+        _artistPages = new CatalogPages(() => _catalog!, _discoveryActions, Log, () => _host?.Settings.GetBool("artistCatalogOnPages", true) == true, choicesPath: Path.Combine(host.DataDirectory, "artist-catalog", "artist-choices.json"));
         _forYou = new ForYouSource(() => _catalog ?? throw new InvalidOperationException("Free Music Finder has stopped."), _discoveryActions,
             DiscoverAlbums, new PlaylistLibrary(), NoctisDataOf(host.DataDirectory), Path.Combine(host.DataDirectory, "for-you-hidden.json"), () => _similar, () => _lastFm);
         // Native For you loads when its shelf is visible. A startup background build

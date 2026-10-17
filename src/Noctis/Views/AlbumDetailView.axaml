@@ -299,6 +299,27 @@
             </Setter>
             <Setter Property="Background" Value="{DynamicResource NowPlayingRowBrush}" />
         </Style>
+        <!-- Noctis Plus: the missing-song row's download button, as quiet as the row's dots. -->
+        <Style Selector="Button.catalog-download">
+            <Setter Property="Width" Value="30" />
+            <Setter Property="Height" Value="30" />
+            <Setter Property="Padding" Value="0" />
+            <Setter Property="CornerRadius" Value="999" />
+            <Setter Property="Background" Value="Transparent" />
+            <Setter Property="BorderThickness" Value="0" />
+            <Setter Property="Opacity" Value="0.7" />
+            <Setter Property="HorizontalContentAlignment" Value="Center" />
+            <Setter Property="VerticalContentAlignment" Value="Center" />
+            <Setter Property="Cursor" Value="Hand" />
+        </Style>
+        <Style Selector="Button.catalog-download:pointerover">
+            <Setter Property="Opacity" Value="1" />
+            <Setter Property="RenderTransform" Value="scale(1)" />
+        </Style>
+        <Style Selector="Button.catalog-download:pointerover /template/ ContentPresenter">
+            <Setter Property="Background" Value="#22808080" />
+            <Setter Property="Foreground" Value="{DynamicResource AccentColorBrush}" />
+        </Style>
     </UserControl.Styles>
 
     <Grid>
@@ -570,6 +591,7 @@
                 <StackPanel Orientation="Horizontal" Spacing="12" Margin="0,28,0,0" VerticalAlignment="Center"
                             Classes.on-tint="{Binding HasTint}">
                     <Button Command="{Binding PlayAllCommand}"
+                            IsVisible="{Binding ShowPlayActions}"
                             Classes="accent-btn album-header-action"
                             Padding="26,8"
                             CornerRadius="999"
@@ -589,6 +611,7 @@
                         </StackPanel>
                     </Button>
                     <Button Command="{Binding ShufflePlayCommand}"
+                            IsVisible="{Binding ShowPlayActions}"
                             Classes="accent-btn album-header-action"
                             Padding="22,8"
                             CornerRadius="999"
@@ -613,7 +636,20 @@
                                        VerticalAlignment="Center" />
                         </StackPanel>
                     </Button>
+                    <!-- Noctis Plus, online album: the songs the library lacks, into Downloads. -->
+                    <Button Command="{Binding DownloadMissingCommand}"
+                            IsVisible="{Binding HasCatalogMissing}"
+                            Classes="accent-btn album-header-action"
+                            Padding="22,8" CornerRadius="999" BorderThickness="1" FontWeight="Bold" Cursor="Hand"
+                            ToolTip.Tip="Download the songs you don't have">
+                        <StackPanel Orientation="Horizontal" Spacing="6">
+                            <Path Data="{StaticResource SearchDownloadGlyph}" Width="13" Height="13" Stretch="Uniform" VerticalAlignment="Center"
+                                  Stroke="{Binding $parent[Button].Foreground}" StrokeThickness="2.2" StrokeLineCap="Round" StrokeJoin="Round" />
+                            <TextBlock Text="Download missing" FontSize="14" FontWeight="Bold" VerticalAlignment="Center" />
+                        </StackPanel>
+                    </Button>
                     <Button Command="{Binding AddAlbumToQueueCommand}"
+                            IsVisible="{Binding ShowPlayActions}"
                             Classes="accent-btn album-header-action"
                             Padding="22,8"
                             CornerRadius="999"
@@ -984,6 +1020,64 @@
                 </DataTemplate>
             </ItemsControl.ItemTemplate>
         </ItemsControl>
+
+        <!-- Noctis Plus, online album: the songs the library lacks, in the track rows' shape
+             (number · title and artist · duration), a download button where the menu sits. -->
+        <StackPanel IsVisible="{Binding HasCatalogMissing}" Margin="0,0,0,0">
+            <TextBlock Text="Not in your library" FontSize="17" FontWeight="Bold" Margin="0,18,0,6"
+                       Foreground="{Binding PageForegroundBrush}" IsVisible="{Binding ShowCatalogMissingHeader}" />
+            <TextBlock Text="{Binding CatalogNotice}" FontSize="12" Opacity="0.55" TextWrapping="Wrap" Margin="0,0,0,6"
+                       Foreground="{Binding PageForegroundBrush}" IsVisible="{Binding HasCatalogNotice}" />
+            <ItemsControl ItemsSource="{Binding CatalogMissing}" Foreground="{Binding PageForegroundBrush}">
+                <ItemsControl.ItemTemplate>
+                    <DataTemplate x:DataType="vm:ArtistCatalogSong">
+                        <Border Classes="row-body catalog-missing" Height="56" CornerRadius="8" Background="Transparent">
+                            <Grid ColumnDefinitions="32,*,Auto" Background="Transparent">
+                                <TextBlock Text="{Binding Rank}" Opacity="0.4" FontSize="14" HorizontalAlignment="Right"
+                                           VerticalAlignment="Center" Margin="0,0,10,0" />
+                                <StackPanel Grid.Column="1" Spacing="2" Margin="2,0,0,0" VerticalAlignment="Center" Opacity="0.7">
+                                    <TextBlock FontSize="15" TextTrimming="CharacterEllipsis" MaxLines="1" MaxWidth="600" HorizontalAlignment="Left">
+                                        <Run Text="{Binding Song.Title}" />
+                                        <InlineUIContainer BaselineAlignment="Center">
+                                            <Border Classes="explicit-badge compact" Margin="6,0,0,0" IsVisible="{Binding Song.IsExplicit}">
+                                                <TextBlock Text="E" Classes="explicit-badge-text compact" FontSize="8" Opacity="0.9" />
+                                            </Border>
+                                        </InlineUIContainer>
+                                    </TextBlock>
+                                    <TextBlock Text="{Binding Song.ArtistDisplay}" FontSize="13" Opacity="0.6" TextTrimming="CharacterEllipsis" MaxLines="1" />
+                                </StackPanel>
+                                <Grid Grid.Column="2" ColumnDefinitions="Auto,22,52,44" VerticalAlignment="Center" Margin="0,0,10,0">
+                                    <TextBlock Grid.Column="2" Text="{Binding Song.DurationText}" FontSize="14" Opacity="0.5" FontFeatures="+tnum"
+                                               HorizontalAlignment="Right" VerticalAlignment="Center" />
+                                    <Panel Grid.Column="3" Width="32" Height="32" HorizontalAlignment="Center" VerticalAlignment="Center">
+                                        <Button Classes="catalog-download" IsVisible="{Binding Song.CanStartDownload}" ToolTip.Tip="Download"
+                                                Command="{Binding $parent[UserControl].((vm:AlbumDetailViewModel)DataContext).DownloadCatalogSongCommand}"
+                                                CommandParameter="{Binding}">
+                                            <Button.ContextMenu>
+                                                <ContextMenu>
+                                                    <MenuItem Header="Download now"
+                                                              Command="{Binding $parent[UserControl].((vm:AlbumDetailViewModel)DataContext).DownloadCatalogSongCommand}" CommandParameter="{Binding}" />
+                                                    <MenuItem Header="Add to downloads"
+                                                              Command="{Binding $parent[UserControl].((vm:AlbumDetailViewModel)DataContext).QueueCatalogSongCommand}" CommandParameter="{Binding}" />
+                                                </ContextMenu>
+                                            </Button.ContextMenu>
+                                            <Path Data="{StaticResource SearchDownloadGlyph}" Width="14" Height="14" Stretch="Uniform"
+                                                  Stroke="{Binding $parent[Button].Foreground}" StrokeThickness="1.9" StrokeLineCap="Round" StrokeJoin="Round" />
+                                        </Button>
+                                        <controls:ProgressRing Width="18" Height="18" Thickness="2" Foreground="{DynamicResource AccentColorBrush}"
+                                                               IsVisible="{Binding Song.IsDownloading}" Value="{Binding Song.Progress}" ToolTip.Tip="Downloading" />
+                                        <controls:ProgressRing Width="18" Height="18" Thickness="2" IsIndeterminate="True"
+                                                               IsVisible="{Binding Song.IsQueued}" ToolTip.Tip="In downloads" />
+                                        <PathIcon Data="{StaticResource CheckmarkIcon}" Width="12" Height="12" Foreground="{DynamicResource AccentColorBrush}"
+                                                  IsVisible="{Binding Song.IsSaved}" ToolTip.Tip="Downloaded · appears when Noctis has scanned it" />
+                                    </Panel>
+                                </Grid>
+                            </Grid>
+                        </Border>
+                    </DataTemplate>
+                </ItemsControl.ItemTemplate>
+            </ItemsControl>
+        </StackPanel>
         </StackPanel>
         </DockPanel>
         </Grid>

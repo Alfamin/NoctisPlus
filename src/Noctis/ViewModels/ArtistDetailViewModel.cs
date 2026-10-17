@@ -218,8 +218,8 @@ public partial class ArtistDetailViewModel : ViewModelBase, ISearchable, IDispos
     public bool HasOverviewCompilations => OverviewCompilations.Count > 0;
     /// <summary>The Live Albums / Compilations tabs only appear for an artist who has any,
     /// searched or not (a search that hides them all leaves the tab with "No releases match").</summary>
-    public bool ShowLiveTab => _allReleases.Any(a => a.ReleaseType == ReleaseType.Live);
-    public bool ShowCompilationsTab => _allReleases.Any(a => a.ReleaseType == ReleaseType.Compilation);
+    public bool ShowLiveTab => DisplayReleases.Any(a => a.ReleaseType == ReleaseType.Live);
+    public bool ShowCompilationsTab => DisplayReleases.Any(a => a.ReleaseType == ReleaseType.Compilation);
     public bool HasAppearsOn => AppearsOn.Count > 0;
     public bool HasAllSongs => AllSongs.Count > 0;
     /// <summary>Overview layout: a row alone spans both columns and shows eight tiles.</summary>
@@ -412,6 +412,8 @@ public partial class ArtistDetailViewModel : ViewModelBase, ISearchable, IDispos
         _ = LoadAboutAsync();
         // The Overview carries a Similar Artists row, so load on open — unless it is folded.
         if (IsOverviewSimilarExpanded) _ = LoadSimilarAsync();
+        // Noctis Plus: the online releases, after the caller had a chance to name the identity.
+        Dispatcher.UIThread.Post(() => { if (_releasesStop is null) StartCatalog(); });
 
         // A scan's progressive fill publishes only the tracks found SO FAR every 1.5 s, so
         // rebuilding on it shrank the lists mid-scan and re-ran Classify each time; the
@@ -616,7 +618,11 @@ public partial class ArtistDetailViewModel : ViewModelBase, ISearchable, IDispos
         OnPropertyChanged(nameof(HasMostPlayed));
         OnPropertyChanged(nameof(HasInLibrarySince));
 
-        ApplyLists();
+        // Online releases follow the library: one just downloaded becomes the library's tile.
+        if (_catalogProfile is { } profile && FreeMusicFinder.FreeMusicPlugin.Current?.CatalogPages is { Enabled: true } pages)
+            ApplyCatalogProfile(profile, pages.Catalog);
+        else
+            ApplyLists();
         if (string.IsNullOrEmpty(ImagePath))
             HeroArtPath = LatestRelease?.ArtworkPath;
         // A library rescan can add or drop artists the Similar tab marks "in your library".
@@ -661,7 +667,7 @@ public partial class ArtistDetailViewModel : ViewModelBase, ISearchable, IDispos
         ReplaceRows(FavoriteSongs, RankPopular(favorites, q, searching ? 0 : MaxFavorites));
         ReplaceRows(PopularSongs, RankPopular(_allSongs, q, searching ? 0 : MaxPopular));
 
-        var matching = _allReleases.Where(a => AlbumMatches(a, q)).ToList();
+        var matching = DisplayReleases.Where(a => AlbumMatches(a, q)).ToList();
         var albums = FilterReleases(matching, "albums").ToList();
         var singles = FilterReleases(matching, "singles").ToList();
         var live = FilterReleases(matching, "live").ToList();
@@ -689,7 +695,7 @@ public partial class ArtistDetailViewModel : ViewModelBase, ISearchable, IDispos
         ReplaceAlbums(OverviewLive, OverviewRow(live, singleCap).ToList());
         ReplaceAlbums(OverviewCompilations, OverviewRow(compilations, singleCap).ToList());
 
-        ReplaceAlbums(AppearsOn, _allAppearsOn.Where(a => AlbumMatches(a, q)).ToList());
+        ReplaceAlbums(AppearsOn, DisplayAppearsOn.Where(a => AlbumMatches(a, q)).ToList());
 
         if (IsTabSongs) FillAllSongs();
         else { _allSongsRanking = null; ++_songsGeneration; AllSongs.ReplaceAll(Array.Empty<TopSongRow>()); OnPropertyChanged(nameof(HasAllSongs)); }
@@ -1061,6 +1067,8 @@ public partial class ArtistDetailViewModel : ViewModelBase, ISearchable, IDispos
     private void PlayLatestRelease()
     {
         var album = LatestRelease;
+        // An online-only latest release has nothing to play yet: open it instead.
+        if (album is { IsOnlineOnly: true }) { _ = OpenCatalogAlbumAsync(album); return; }
         if (album == null || album.Tracks.Count == 0) return;
         var tracks = album.Tracks.OrderBy(t => t.DiscNumber).ThenBy(t => t.TrackNumber).ToList();
         _player.ReplaceQueueAndPlay(tracks, 0);
@@ -1115,6 +1123,7 @@ public partial class ArtistDetailViewModel : ViewModelBase, ISearchable, IDispos
     [RelayCommand]
     private void OpenAlbum(Album? album)
     {
+        if (album?.CatalogReleaseId != null) { _ = OpenCatalogAlbumAsync(album); return; }
         if (album != null) AlbumOpened?.Invoke(this, album);
     }
 
@@ -1192,6 +1201,7 @@ public partial class ArtistDetailViewModel : ViewModelBase, ISearchable, IDispos
     public void Dispose()
     {
         DisposeCatalogSongs();
+        _releasesStop?.Cancel();
         _cts.Cancel();
         _cts.Dispose();
         _songsGeneration++; // stops an in-flight Songs-tab slice fill

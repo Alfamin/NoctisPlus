@@ -193,6 +193,8 @@ public partial class ArtistDetailView : UserControl
     private bool OpenAlbumMenu(Button tile)
     {
         if (tile.DataContext is not Album album) return false;
+        // An online release has no library tracks to act on: no menu (Noctis Plus).
+        if (album.IsOnlineOnly) return true;
         if (DataContext is not ArtistDetailViewModel vm) return false;
         if (vm.LibraryAlbumsVm is not { } albumsVm) return false;
 

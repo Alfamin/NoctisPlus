@@ -376,6 +376,29 @@
             <Setter Property="Padding" Value="12,9" />
             <Setter Property="Margin" Value="0,0,8,8" />
         </Style>
+        <!-- Noctis Plus: online release badge (Search's), and the same-name artist choice chips. -->
+        <Style Selector="Border.online-release-badge">
+            <Setter Property="Width" Value="24" />
+            <Setter Property="Height" Value="24" />
+            <Setter Property="CornerRadius" Value="999" />
+            <Setter Property="Background" Value="#CC1C1C1E" />
+            <Setter Property="HorizontalAlignment" Value="Right" />
+            <Setter Property="VerticalAlignment" Value="Top" />
+            <Setter Property="Margin" Value="0,7,7,0" />
+            <Setter Property="IsHitTestVisible" Value="False" />
+        </Style>
+        <Style Selector="Button.catalog-choice">
+            <Setter Property="Background" Value="{DynamicResource ChipBackground}" />
+            <Setter Property="CornerRadius" Value="999" />
+            <Setter Property="Padding" Value="14,6" />
+            <Setter Property="FontSize" Value="12" />
+            <Setter Property="FontWeight" Value="SemiBold" />
+            <Setter Property="BorderThickness" Value="0" />
+            <Setter Property="Cursor" Value="Hand" />
+        </Style>
+        <Style Selector="Button.catalog-choice:pointerover /template/ ContentPresenter">
+            <Setter Property="Background" Value="{DynamicResource ChipHoverBackground}" />
+        </Style>
     </UserControl.Styles>
 
     <UserControl.Resources>
@@ -414,7 +437,13 @@
                                               IsVisible="{Binding ArtworkPath, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
                                                     <!-- Hover overlay (09-13): dim + Play/Pause + dots; styles in Styles.axaml -->
                                                     <Border Classes="tile-dim" />
+                                                    <!-- Noctis Plus: an online release the library lacks wears Search's download badge. -->
+                                                    <Border Classes="online-release-badge" IsVisible="{Binding IsOnlineOnly}" ToolTip.Tip="Not in your library">
+                                                        <Path Data="{StaticResource SearchDownloadGlyph}" Width="11" Height="11" Stretch="Uniform"
+                                                              Stroke="White" StrokeThickness="2.2" StrokeLineCap="Round" StrokeJoin="Round" />
+                                                    </Border>
                                                     <Button Classes="tile-play"
+                                                            IsVisible="{Binding !IsOnlineOnly}"
                                                             Command="{Binding $parent[UserControl].((vm:ArtistDetailViewModel)DataContext).LibraryAlbumsVm.TogglePlayAlbumCommand}"
                                                             CommandParameter="{Binding}">
                                                         <Panel>
@@ -422,7 +451,7 @@
                                                             <Viewbox Width="12" Height="12" HorizontalAlignment="Center" VerticalAlignment="Center" IsVisible="{Binding IsNowPlaying}"><Path Data="{StaticResource PauseIcon}" Fill="White" /></Viewbox>
                                                         </Panel>
                                                     </Button>
-                                                    <Button Classes="tile-more" Click="OnTileMoreClick">
+                                                    <Button Classes="tile-more" Click="OnTileMoreClick" IsVisible="{Binding !IsOnlineOnly}">
                                                         <Viewbox Width="14" Height="14" HorizontalAlignment="Center" VerticalAlignment="Center"><Path Data="{StaticResource MoreDotsIcon}" Fill="White" /></Viewbox>
                                                     </Button>
                         </Panel>
@@ -913,6 +942,29 @@
                     </StackPanel>
                 </Grid>
             </Grid>
+
+            <!-- Noctis Plus: the online catalog's quiet status (loading, a failure with Retry) and,
+                 when several catalog artists share this name, a one-time choice. -->
+            <StackPanel Margin="32,0,32,8" Spacing="8" IsVisible="{Binding HasCatalogStatus}">
+                <StackPanel Orientation="Horizontal" Spacing="6">
+                    <TextBlock Text="{Binding CatalogStatus}" FontSize="12" Opacity="0.55" VerticalAlignment="Center"
+                               TextWrapping="Wrap" MaxWidth="900" />
+                    <Button Classes="text-link" Content="Retry" IsVisible="{Binding CatalogFailed}"
+                            Command="{Binding RefreshCatalogCommand}" VerticalAlignment="Center" />
+                </StackPanel>
+                <ItemsControl ItemsSource="{Binding CatalogChoices}" IsVisible="{Binding HasCatalogChoices}">
+                    <ItemsControl.ItemsPanel>
+                        <ItemsPanelTemplate><WrapPanel Orientation="Horizontal" /></ItemsPanelTemplate>
+                    </ItemsControl.ItemsPanel>
+                    <ItemsControl.ItemTemplate>
+                        <DataTemplate x:DataType="vm:CatalogArtistChoice">
+                            <Button Classes="catalog-choice" Content="{Binding Label}" Margin="0,0,8,8"
+                                    Command="{Binding $parent[UserControl].((vm:ArtistDetailViewModel)DataContext).ChooseCatalogArtistCommand}"
+                                    CommandParameter="{Binding}" />
+                        </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                </ItemsControl>
+            </StackPanel>
 
             <!-- ── Tabs ─────────────────────────────────────────────── -->
             <StackPanel Margin="32,2,32,0">
