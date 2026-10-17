@@ -88,7 +88,7 @@ public interface IOnlineMusicSearch
 
 /// <summary>One request on the Downloads page. <paramref name="Handle"/> identifies it to the queue.</summary>
 public sealed record DownloadEntry(object Handle, string Title, string Artist, OnlineDownloadState State, double Progress,
-    string Detail, bool IsNext, bool IsHeld);
+    string Detail, bool IsNext, bool IsHeld, string? SavedPath = null, double? Seconds = null);
 
 /// <summary>The download queue (one transfer at a time, a priority lane, a held batch). Calls come
 /// from the UI thread; <see cref="Changed"/> may fire on any thread, often (progress).</summary>

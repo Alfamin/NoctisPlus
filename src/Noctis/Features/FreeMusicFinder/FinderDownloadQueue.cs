@@ -37,7 +37,8 @@ internal sealed class FinderDownloadQueue(Downloads downloads) : IDownloadQueue
             DownloadState.AlreadyThere => (OnlineDownloadState.Saved, "Already in the folder"),
             _ => (OnlineDownloadState.Queued, d.Held ? "Ready · start the queued downloads" : d.Priority ? "Next" : "Queued"),
         };
-        return new DownloadEntry(d, d.Track.Title, d.Track.Artist, state, Math.Clamp(d.Progress, 0, 1), detail, d.Priority, d.Held);
+        return new DownloadEntry(d, d.Track.Title, d.Track.Artist, state, Math.Clamp(d.Progress, 0, 1), detail, d.Priority, d.Held,
+            d.SavedPath, d.Track.Duration?.TotalSeconds);
     }
 
     public void SetPaused(bool paused) => downloads.SetPaused(paused);

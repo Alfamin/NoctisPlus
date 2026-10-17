@@ -11,6 +11,50 @@
          Search page's song rows; actions are the app's grey and accent pills. -->
 
     <UserControl.Resources>
+        <!-- Same song table geometry and artwork/play treatment as Search's Songs table. -->
+        <DataTemplate x:Key="FinishedRowTemplate" x:DataType="vm:DownloadRow">
+            <Button Classes="browse-item song-row" Classes.playing="{Binding Local.IsNowPlaying, FallbackValue=False}"
+                    AutomationProperties.Name="{Binding Title}" BorderThickness="0" CornerRadius="6" Padding="0"
+                    Height="56" Margin="0,1" HorizontalAlignment="Stretch" HorizontalContentAlignment="Stretch"
+                    DoubleTapped="OnFinishedDoubleTapped" ContextRequested="OnFinishedContextRequested">
+                <Grid ColumnDefinitions="52,3*,2*,Auto,36,36">
+                    <Border Width="36" Height="36" CornerRadius="5" ClipToBounds="True" VerticalAlignment="Center"
+                            Background="{DynamicResource SystemControlBackgroundBaseLowBrush}">
+                        <Panel>
+                            <PathIcon Data="{StaticResource SongsIcon}" Width="14" Height="14" Opacity="0.3"
+                                      HorizontalAlignment="Center" VerticalAlignment="Center" />
+                            <controls:CachedImage SourcePath="{Binding Local.AlbumArtworkPath}" DecodeWidth="128"
+                                                  Stretch="UniformToFill" IsVisible="{Binding Local.HasAlbumArt, FallbackValue=False}" />
+                            <Button Classes="art-play-overlay" Background="#66000000" BorderThickness="0" Padding="0" CornerRadius="5"
+                                    HorizontalAlignment="Stretch" VerticalAlignment="Stretch" HorizontalContentAlignment="Center"
+                                    VerticalContentAlignment="Center" IsVisible="{Binding IsActionable}" ToolTip.Tip="Play"
+                                    Command="{Binding $parent[UserControl].((vm:DownloadsViewModel)DataContext).TogglePlayTrackCommand}"
+                                    CommandParameter="{Binding Local}">
+                                <Panel>
+                                    <Viewbox Width="12" Height="12" Margin="1,0,0,0" IsVisible="{Binding !Local.IsCurrentlyPlaying, FallbackValue=True}"><Path Data="{StaticResource PlayIcon}" /></Viewbox>
+                                    <Viewbox Width="12" Height="12" IsVisible="{Binding Local.IsCurrentlyPlaying, FallbackValue=False}"><Path Data="{StaticResource PauseIcon}" /></Viewbox>
+                                </Panel>
+                            </Button>
+                        </Panel>
+                    </Border>
+                    <StackPanel Grid.Column="1" Spacing="1" VerticalAlignment="Center" Margin="2,0,16,0">
+                        <TextBlock Text="{Binding Title}" FontSize="13" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" />
+                        <TextBlock Text="{Binding Artist}" FontSize="11" Opacity="0.55" TextTrimming="CharacterEllipsis" />
+                    </StackPanel>
+                    <TextBlock Grid.Column="2" Text="{Binding Local.Album}" FontSize="12" Opacity="0.55" VerticalAlignment="Center"
+                               TextTrimming="CharacterEllipsis" Margin="0,0,16,0" />
+                    <TextBlock Grid.Column="3" Text="{Binding DisplayDetail}" FontSize="11" Opacity="0.55" VerticalAlignment="Center" Margin="0,0,10,0" />
+                    <Button Grid.Column="4" Classes="row-icon" IsVisible="{Binding IsActionable}" ToolTip.Tip="More options" Click="OnFinishedMoreClick">
+                        <TextBlock Text="⋯" FontSize="18" />
+                    </Button>
+                    <Button Grid.Column="5" Classes="row-icon" ToolTip.Tip="Remove from this list · keeps the file"
+                            Command="{Binding $parent[UserControl].((vm:DownloadsViewModel)DataContext).RemoveCommand}" CommandParameter="{Binding}">
+                        <Path Data="M7 7L17 17 M17 7L7 17" Width="11" Height="11" Stretch="Uniform"
+                              Stroke="{Binding $parent[Button].Foreground}" StrokeThickness="2" StrokeLineCap="Round" />
+                    </Button>
+                </Grid>
+            </Button>
+        </DataTemplate>
         <DataTemplate x:Key="DownloadRowTemplate" x:DataType="vm:DownloadRow">
             <Border Classes="download-row" Classes.failed="{Binding IsFailed}" Height="52" Margin="0,3" CornerRadius="6"
                     Background="{DynamicResource HomeCardBackground}">
@@ -58,6 +102,27 @@
             <Setter Property="FontSize" Value="22" />
             <Setter Property="FontWeight" Value="Bold" />
             <Setter Property="Margin" Value="0,0,0,12" />
+        </Style>
+        <Style Selector="Button.song-row">
+            <Setter Property="Background" Value="Transparent" />
+        </Style>
+        <Style Selector="Button.song-row:pointerover /template/ ContentPresenter">
+            <Setter Property="Background" Value="{DynamicResource HomeCardHoverBackground}" />
+        </Style>
+        <Style Selector="Button.song-row.playing">
+            <Setter Property="Background" Value="{DynamicResource AccentButtonBackground}" />
+        </Style>
+        <Style Selector="Button.song-row.playing:pointerover /template/ ContentPresenter">
+            <Setter Property="Background" Value="{DynamicResource AccentButtonBackground}" />
+        </Style>
+        <Style Selector="Button.song-row.playing TextBlock">
+            <Setter Property="Foreground" Value="{DynamicResource AccentForegroundBrush}" />
+        </Style>
+        <Style Selector="Button.song-row Button.art-play-overlay">
+            <Setter Property="Opacity" Value="0" />
+        </Style>
+        <Style Selector="Button.song-row:pointerover Button.art-play-overlay">
+            <Setter Property="Opacity" Value="1" />
         </Style>
         <Style Selector="Border.download-row.failed TextBlock.download-detail">
             <Setter Property="Foreground" Value="#FF6B6B" />
@@ -121,7 +186,7 @@
 
             <StackPanel IsVisible="{Binding HasFinished}">
                 <TextBlock Classes="section" Text="Downloaded" />
-                <ItemsControl ItemsSource="{Binding Finished}" ItemTemplate="{StaticResource DownloadRowTemplate}" />
+                <ItemsControl ItemsSource="{Binding Finished}" ItemTemplate="{StaticResource FinishedRowTemplate}" />
             </StackPanel>
 
             <StackPanel IsVisible="{Binding IsEmpty}" Spacing="8" HorizontalAlignment="Center" Margin="0,90,0,0">

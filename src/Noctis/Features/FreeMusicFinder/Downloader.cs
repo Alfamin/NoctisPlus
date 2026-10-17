@@ -85,11 +85,16 @@ internal static class Downloader
 
     /// <summary>The file a track was saved as, or null when it is not in the folder.</summary>
     public static string? FindExisting(string folder, string fileName)
-        => AudioExtensions.Select(e => Path.Combine(folder, fileName + "." + e)).FirstOrDefault(File.Exists);
+        => SafeFileName(fileName)
+            ? AudioExtensions.Select(e => Path.Combine(folder, fileName + "." + e)).FirstOrDefault(File.Exists)
+            : null;
+
+    private static bool SafeFileName(string fileName) => !string.IsNullOrWhiteSpace(fileName)
+        && !Path.IsPathRooted(fileName) && fileName.IndexOfAny(['/', '\\', ':', '\0']) < 0 && fileName is not "." and not "..";
 
     public static async Task<DownloadOutcome> DownloadAsync(BotTrack track, string folder, IProgress<double>? progress, CancellationToken ct)
     {
-        if(string.IsNullOrWhiteSpace(track.FileName) || Path.IsPathRooted(track.FileName) || track.FileName.IndexOfAny(new[]{'/', '\\',':','\0'})>=0 || track.FileName is "." or "..")
+        if (!SafeFileName(track.FileName))
             throw new InvalidDataException("UNSAFE_FILE_NAME: the provider did not supply a usable name.");
         Directory.CreateDirectory(folder);
         if (FindExisting(folder, track.FileName) is not null) return DownloadOutcome.AlreadyThere;

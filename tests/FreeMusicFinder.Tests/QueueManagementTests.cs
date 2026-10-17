@@ -19,6 +19,31 @@ internal static class QueueManagementTests
         await RetiredWorkerCannotOverwriteReplacement();
         await Priority(); await RemovalAndRestart(); await CancelRunning(); await ClearAndStorageFailure(); await ClearImports();
         await WorkerSurvivesSaveFailure(); await ReportWhileHeld();
+        await SavedHistoryPaths();
+    }
+    private static async Task SavedHistoryPaths()
+    {
+        Check.Section("saved download history maps to native library rows without touching files");
+        var root = Check.NewFolder("queue-saved-paths"); var store = Path.Combine(root, "queue.json");
+        var track = Track("History");
+        using (var queue = new Downloads(_ => { }, store, r => Track(r.Title)))
+        {
+            var download = queue.Start(track, root);
+            await Check.UntilAsync(() => download.State == DownloadState.Saved, "history path fixture finishes");
+            var expected = Path.Combine(root, track.FileName + ".flac");
+            Check.Equal(expected, download.SavedPath!, "saved history carries the real completed file path");
+            var adapter = new FinderDownloadQueue(queue);
+            Check.Equal(expected, adapter.Snapshot().Single().SavedPath!, "native queue adapter publishes completed path");
+        }
+        using (var restored = new Downloads(_ => { }, store, r => Track(r.Title)))
+        {
+            var adapter = new FinderDownloadQueue(restored); var entry = adapter.Snapshot().Single();
+            Check.True(File.Exists(entry.SavedPath), "completed path restored after restart");
+            var bytes = File.ReadAllBytes(entry.SavedPath!);
+            adapter.Remove(entry);
+            Check.True(adapter.Snapshot().Count == 0 && bytes.SequenceEqual(File.ReadAllBytes(entry.SavedPath!)), "remove saved history only removes entry and preserves exact audio bytes");
+        }
+        Check.True(Downloader.FindExisting(root, "../escape") is null, "legacy filename cannot escape its download folder while resolving history");
     }
     private static async Task RetiredWorkerCannotOverwriteReplacement()
     {

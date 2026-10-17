@@ -3,6 +3,8 @@ using Avalonia.Threading;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using Noctis.Services.Search;
+using Noctis.Services;
+using Noctis.Models;
 
 namespace Noctis.ViewModels;
 
@@ -15,9 +17,26 @@ public sealed partial class DownloadsViewModel : ViewModelBase, IDisposable
     private readonly Dictionary<object, DownloadRow> _rows = new(ReferenceEqualityComparer.Instance);
     private IDownloadQueue? _queue;
     private bool _refreshPosted;
+    private bool _disposed;
+    private readonly ILibraryService? _library;
+    private readonly PlayerViewModel? _player;
+    private readonly Action<Track>? _openAlbum;
+    private readonly Action<string>? _openArtist;
+    private Dictionary<string, Track> _tracksByPath = new(StringComparer.OrdinalIgnoreCase);
+    private IReadOnlyList<Track> _tracks = [];
+    private ILookup<string, Track>? _tracksByTitle;
+    public LibrarySongsViewModel? LibraryActions { get; }
 
-    public DownloadsViewModel()
+    public DownloadsViewModel(ILibraryService? library = null, PlayerViewModel? player = null,
+        LibrarySongsViewModel? libraryActions = null, Action<Track>? openAlbum = null, Action<string>? openArtist = null)
     {
+        _library = library;
+        _player = player;
+        LibraryActions = libraryActions;
+        _openAlbum = openAlbum;
+        _openArtist = openArtist;
+        if (_library is not null) _library.LibraryUpdated += OnLibraryUpdated;
+        RebuildLibrary();
         OnlineMusicSearch.CurrentChanged += OnSourceChanged;
         Attach(OnlineMusicSearch.Current?.Downloads);
     }
@@ -39,9 +58,56 @@ public sealed partial class DownloadsViewModel : ViewModelBase, IDisposable
     public bool IsEmpty => !HasPending && !HasFinished;
     public bool IsAvailable => _queue is not null;
 
-    private void OnSourceChanged(object? sender, EventArgs e) => Dispatcher.UIThread.Post(() => Attach(OnlineMusicSearch.Current?.Downloads));
+    private void OnSourceChanged(object? sender, EventArgs e) => Dispatcher.UIThread.Post(() =>
+    { if (!_disposed) Attach(OnlineMusicSearch.Current?.Downloads); });
 
-    private void Attach(IDownloadQueue? queue)
+    private void OnLibraryUpdated(object? sender, EventArgs e) => Dispatcher.UIThread.Post(() =>
+    {
+        if (_disposed) return;
+        RebuildLibrary();
+        foreach (var row in Finished) Resolve(row);
+    });
+
+    private void RebuildLibrary()
+    {
+        _tracks = _library?.Tracks.ToArray() ?? [];
+        _tracksByTitle = null;
+        _tracksByPath = new(StringComparer.OrdinalIgnoreCase);
+        foreach (var track in _tracks)
+            if (PathKey(track.FilePath) is { } key) _tracksByPath.TryAdd(key, track);
+    }
+
+    private static string? PathKey(string? path)
+    {
+        if (string.IsNullOrWhiteSpace(path) || !Path.IsPathFullyQualified(path)) return null;
+        try { return Path.GetFullPath(path); }
+        catch (Exception ex) when (ex is ArgumentException or NotSupportedException or PathTooLongException) { return null; }
+    }
+
+    private void Resolve(DownloadRow row)
+    {
+        Track? track = null;
+        if (row.Entry is { } entry && row.IsSaved)
+        {
+            if (!string.IsNullOrWhiteSpace(entry.SavedPath))
+            {
+                if (PathKey(entry.SavedPath) is { } key) _tracksByPath.TryGetValue(key, out track);
+            }
+            else
+            {
+                // Old history may not know its output path. Only accept an unambiguous recording,
+                // never a title-only match or a different live/remix/length version.
+                var request = new FreeMusicFinder.MusicRequest(entry.Title, entry.Artist, entry.Seconds);
+                _tracksByTitle ??= _tracks.ToLookup(t => FreeMusicFinder.RecordingMatch.TitleKey(t.Title));
+                var matches = _tracksByTitle[FreeMusicFinder.RecordingMatch.TitleKey(entry.Title)]
+                    .Where(t => FreeMusicFinder.RecordingMatch.Fits(request, t.Artist, t.Title, t.Duration)).Take(2).ToArray();
+                if (matches.Length == 1) track = matches[0];
+            }
+        }
+        row.Local = track;
+    }
+
+    internal void Attach(IDownloadQueue? queue)
     {
         if (ReferenceEquals(queue, _queue)) return;
         if (_queue is not null) _queue.Changed -= OnQueueChanged;
@@ -54,13 +120,16 @@ public sealed partial class DownloadsViewModel : ViewModelBase, IDisposable
     /// <summary>Progress fires many times a second: coalesce into one refresh per frame-ish.</summary>
     private void OnQueueChanged(object? sender, EventArgs e)
     {
-        if (_refreshPosted) return;
+        if (_disposed || _refreshPosted) return;
         _refreshPosted = true;
-        Dispatcher.UIThread.Post(() => { _refreshPosted = false; Refresh(); }, DispatcherPriority.Background);
+        Dispatcher.UIThread.Post(() => { _refreshPosted = false; if (!_disposed) Refresh(); }, DispatcherPriority.Background);
     }
 
     public void Refresh()
     {
+        // Startup cache loading does not always announce an update. Navigation still catches it.
+        var libraryRebuilt = _library is not null && _tracks.Count != _library.Tracks.Count;
+        if (libraryRebuilt) RebuildLibrary();
         var entries = _queue?.Snapshot() ?? [];
         var pending = new List<DownloadRow>();
         var finished = new List<DownloadRow>();
@@ -69,7 +138,9 @@ public sealed partial class DownloadsViewModel : ViewModelBase, IDisposable
         {
             seen.Add(entry.Handle);
             if (!_rows.TryGetValue(entry.Handle, out var row)) _rows[entry.Handle] = row = new DownloadRow();
+            var needsResolve = row.Entry is null || row.State != entry.State || row.Entry.SavedPath != entry.SavedPath;
             row.Apply(entry);
+            if (needsResolve || libraryRebuilt) Resolve(row);
             (entry.State == OnlineDownloadState.Saved ? finished : pending).Add(row);
         }
         foreach (var gone in _rows.Keys.Where(k => !seen.Contains(k)).ToList()) _rows.Remove(gone);
@@ -104,6 +175,21 @@ public sealed partial class DownloadsViewModel : ViewModelBase, IDisposable
     [RelayCommand] private void StartHeld() => Act(() => _queue?.StartHeld());
     [RelayCommand] private void DownloadNext(DownloadRow? row) { if (row?.Entry is { } e) Act(() => _queue?.DownloadNext(e)); }
     [RelayCommand] private void Remove(DownloadRow? row) { if (row?.Entry is { } e) Act(() => _queue?.Remove(e)); }
+    [RelayCommand] private void PlayTrack(Track? track)
+    {
+        if (track is null || _player is null) return;
+        var tracks = Finished.Select(r => r.Local).OfType<Track>().ToList();
+        var at = tracks.IndexOf(track);
+        if (at >= 0) _player.PlayFromRow(tracks, at);
+    }
+    [RelayCommand] private void TogglePlayTrack(Track? track)
+    {
+        if (track?.IsNowPlaying == true) _player?.PlayPauseCommand.Execute(null);
+        else PlayTrack(track);
+    }
+    [RelayCommand] private void ShuffleFinished() => _player?.PlayShuffled(Finished.Select(r => r.Local).OfType<Track>().ToList());
+    [RelayCommand] private void ViewAlbum(Track? track) { if (track is not null) _openAlbum?.Invoke(track); }
+    [RelayCommand] private void ViewArtist(string? artist) { if (!string.IsNullOrWhiteSpace(artist)) _openArtist?.Invoke(artist); }
 
     /// <summary>Clear asks first, in the app's confirmation dialog: the running transfer stops.</summary>
     [RelayCommand]
@@ -120,6 +206,8 @@ public sealed partial class DownloadsViewModel : ViewModelBase, IDisposable
 
     public void Dispose()
     {
+        _disposed = true;
+        if (_library is not null) _library.LibraryUpdated -= OnLibraryUpdated;
         OnlineMusicSearch.CurrentChanged -= OnSourceChanged;
         Attach(null);
     }
@@ -138,6 +226,11 @@ public sealed partial class DownloadRow : ObservableObject
     private OnlineDownloadState _state;
     [ObservableProperty, NotifyPropertyChangedFor(nameof(CanMoveUp))] private bool _isNext;
     [ObservableProperty] private bool _isHeld;
+    [ObservableProperty, NotifyPropertyChangedFor(nameof(IsActionable), nameof(IsAddingToLibrary), nameof(DisplayDetail))]
+    private Track? _local;
+    public bool IsActionable => IsSaved && Local is not null;
+    public bool IsAddingToLibrary => IsSaved && Local is null;
+    public string DisplayDetail => IsAddingToLibrary ? "Adding to library…" : Detail;
 
     public bool IsDownloading => State == OnlineDownloadState.Downloading;
     public bool IsQueued => State == OnlineDownloadState.Queued;
@@ -156,5 +249,8 @@ public sealed partial class DownloadRow : ObservableObject
         State = entry.State;
         IsNext = entry.IsNext;
         IsHeld = entry.IsHeld;
+        OnPropertyChanged(nameof(IsActionable));
+        OnPropertyChanged(nameof(IsAddingToLibrary));
+        OnPropertyChanged(nameof(DisplayDetail));
     }
 }

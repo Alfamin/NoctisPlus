@@ -13,6 +13,7 @@ internal sealed class Download(BotTrack track, string folder)
     public DateTimeOffset? RetryAt { get; internal set; }
     public bool Priority { get; internal set; }
     public bool Held { get; internal set; }
+    public string? SavedPath { get; internal set; }
     public bool IsActive => State is DownloadState.Queued or DownloadState.Running or DownloadState.Waiting;
 }
 
@@ -68,7 +69,12 @@ internal sealed class Downloads : IDisposable
                 var download = new Download(restore(item.Request), item.Folder)
                     { State = item.State, Error = item.Error, RetryAt = item.RetryAt, Priority = item.Priority, Held = item.Held };
                 _known.Add(download);
-                if (item.State is DownloadState.Saved or DownloadState.AlreadyThere or DownloadState.Failed) continue;
+                if (item.State is DownloadState.Saved or DownloadState.AlreadyThere)
+                {
+                    download.SavedPath = Downloader.FindExisting(download.Folder, download.Track.FileName);
+                    continue;
+                }
+                if (item.State == DownloadState.Failed) continue;
                 download.State = item.RetryAt > DateTimeOffset.UtcNow ? DownloadState.Waiting : DownloadState.Queued;
                 _active.Add(download);
             }
@@ -290,7 +296,15 @@ internal sealed class Downloads : IDisposable
             Raise(download);
             var outcome = await Downloader.DownloadAsync(download.Track, download.Folder, new Report(p =>
             { download.Progress = p; Raise(download); }), ct).ConfigureAwait(false);
-            lock (_gate) { if (download.State != DownloadState.Removed) download.State = outcome == DownloadOutcome.Saved ? DownloadState.Saved : DownloadState.AlreadyThere; }
+            var savedPath = Downloader.FindExisting(download.Folder, download.Track.FileName);
+            lock (_gate)
+            {
+                if (download.State != DownloadState.Removed)
+                {
+                    download.SavedPath = savedPath;
+                    download.State = outcome == DownloadOutcome.Saved ? DownloadState.Saved : DownloadState.AlreadyThere;
+                }
+            }
         }
         catch (SourcesWaitingException ex) { SetOutcome(download, DownloadState.Waiting, ex.Message, ex.Until); }
         catch (IOException ex) { SetOutcome(download, DownloadState.Waiting, "Connection or storage interrupted: " + ex.Message, DateTimeOffset.UtcNow.AddMinutes(10)); }

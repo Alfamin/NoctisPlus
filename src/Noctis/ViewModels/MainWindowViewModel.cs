@@ -452,7 +452,8 @@ public partial class MainWindowViewModel : ViewModelBase
         _songsVm = new LibrarySongsViewModel(library, Player, Sidebar, persistence, Settings);
         // Noctis Plus Search: library + online catalog in one page (the rail's Search button).
         _searchVm = new SearchViewModel(library, Player, name => ViewArtistByName(name), album => OpenAlbumDetail(album));
-        _downloadsVm = new DownloadsViewModel();
+        _downloadsVm = new DownloadsViewModel(library, Player, _songsVm,
+            track => OnViewAlbumFromTrack(this, track), ViewArtistByName);
         _searchVm.DownloadsRequested += (_, _) => Navigate("downloads");
         // Noctis Plus: online artists and albums open on the app's own pages (typed calls from
         // the built-in catalog; no window scanning).
