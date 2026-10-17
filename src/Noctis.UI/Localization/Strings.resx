@@ -521,6 +521,10 @@ Deezer and TIDAL: paste the link.</value></data>
   <data name="Settings.MusixmatchHint" xml:space="preserve"><value>Word-synced lyrics · may pause when it asks for a captcha</value><comment>Text in SettingsView.axaml</comment></data>
   <data name="Settings.Kugou" xml:space="preserve"><value>Kugou</value><comment>Text in SettingsView.axaml — lyrics provider name</comment></data>
   <data name="Settings.KugouHint" xml:space="preserve"><value>Word-synced lyrics catalog</value><comment>Text in SettingsView.axaml</comment></data>
+  <data name="Settings.LrcRed" xml:space="preserve"><value>lrc.red</value><comment>Text in SettingsView.axaml — lyrics provider name</comment></data>
+  <data name="Settings.LrcRedHint" xml:space="preserve"><value>Word- and line-synced lyrics with duets</value><comment>Text in SettingsView.axaml</comment></data>
+  <data name="Settings.Unison" xml:space="preserve"><value>Unison</value><comment>Text in SettingsView.axaml — lyrics provider name</comment></data>
+  <data name="Settings.UnisonHint" xml:space="preserve"><value>Better Lyrics community lyrics · Lyrics from Unison (unison.boidu.dev)</value><comment>Text in SettingsView.axaml; keep "Lyrics from Unison (unison.boidu.dev)": the attribution Unison's ODbL licence asks for</comment></data>
   <data name="Settings.YouTubeMusicLyrics" xml:space="preserve"><value>YouTube Music</value><comment>Text in SettingsView.axaml — lyrics provider name</comment></data>
   <data name="Settings.YouTubeMusicLyricsHint" xml:space="preserve"><value>Synced lyrics · slower lookups</value><comment>Text in SettingsView.axaml</comment></data>
   <data name="Settings.LyricsSourcesPickerHint" xml:space="preserve"><value>Choose Source on the lyrics page searches any of these, even when switched off here.</value><comment>Text in SettingsView.axaml, under the online lyrics providers</comment></data>

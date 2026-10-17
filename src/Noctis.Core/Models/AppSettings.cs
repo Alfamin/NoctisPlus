@@ -915,6 +915,16 @@ public class AppSettings
     /// <summary>Whether Kugou (word-synced KRC lyrics) is searched automatically.</summary>
     public bool KugouEnabled { get; set; } = true;
 
+    /// <summary>Whether lrc.red (TTML: word-synced with duet voices, else line-synced or plain) is
+    /// searched automatically. On like Kugou: keyless, its API is "free for the public to use",
+    /// and a lookup is two small requests (2026-10-17).</summary>
+    public bool LrcRedEnabled { get; set; } = true;
+
+    /// <summary>Whether Unison (Better Lyrics' community lyrics, mostly word-synced TTML) is searched
+    /// automatically. On: keyless, documented for third-party reads (120 a minute per IP), two
+    /// small requests per lookup.</summary>
+    public bool UnisonEnabled { get; set; } = true;
+
     /// <summary>Whether YouTube Music (line-synced) is searched automatically. Off on fresh
     /// installs: three round trips and ~1 MB of responses per lookup, on pinned client versions.</summary>
     public bool YouTubeMusicLyricsEnabled { get; set; }

@@ -146,4 +146,12 @@ public class FreshInstallDefaultsTests
         Assert.False(Fresh.MusixmatchEnabled);
         Assert.False(Fresh.YouTubeMusicLyricsEnabled);
     }
+
+    [Fact]
+    public void LrcRedAndUnison_SearchAutomatically()
+    {
+        // Keyless, documented for third-party reads, two small requests a lookup (2026-10-17).
+        Assert.True(Fresh.LrcRedEnabled);
+        Assert.True(Fresh.UnisonEnabled);
+    }
 }
