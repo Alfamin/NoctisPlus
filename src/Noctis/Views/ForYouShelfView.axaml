@@ -73,6 +73,10 @@
         <Style Selector="Button.corner-icon:disabled">
             <Setter Property="Opacity" Value="0.5" />
         </Style>
+        <!-- Refreshing: the ring must read clearly, not greyed out like a disabled button. -->
+        <Style Selector="Button.corner-icon.refresh:disabled">
+            <Setter Property="Opacity" Value="1" />
+        </Style>
         <Style Selector="Border.corner-dot">
             <Setter Property="Width" Value="9" />
             <Setter Property="Height" Value="9" />
@@ -154,16 +158,27 @@
                     </Border>
                 </StackPanel>
             </Button>
-            <!-- Refresh: a corner icon; the accent dot says newer picks are waiting. -->
-            <Panel Grid.Column="1" VerticalAlignment="Center">
-                <Button Classes="corner-icon" Command="{Binding RefreshCommand}" IsEnabled="{Binding !IsLoading}"
-                        ToolTip.Tip="Refresh" AutomationProperties.Name="Refresh">
-                    <Path Data="{StaticResource PluginsRefreshGlyph}" Width="15" Height="15" Stretch="Uniform"
-                          Stroke="{Binding $parent[Button].Foreground}" StrokeThickness="2"
-                          StrokeLineCap="Round" StrokeJoin="Round" Opacity="0.85" />
-                </Button>
-                <Border Classes="corner-dot" IsVisible="{Binding HasNewPicks}" />
-            </Panel>
+            <!-- Refresh: a corner icon; the accent dot says newer picks are waiting. While it works,
+                 the icon becomes the downloads' progress ring (filling as the steps count up) with
+                 "7/20" beside it; the step itself is the tooltip. -->
+            <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
+                <TextBlock Text="{Binding LoadCount}" IsVisible="{Binding HasLoadCount}" FontSize="12" FontWeight="SemiBold"
+                           Opacity="0.7" VerticalAlignment="Center" FontFeatures="+tnum" />
+                <Panel>
+                    <Button Classes="corner-icon refresh" Command="{Binding RefreshCommand}" IsEnabled="{Binding !IsLoading}"
+                            ToolTip.Tip="{Binding RefreshTip}" AutomationProperties.Name="Refresh">
+                        <Panel>
+                            <Path Data="{StaticResource PluginsRefreshGlyph}" Width="15" Height="15" Stretch="Uniform"
+                                  Stroke="{Binding $parent[Button].Foreground}" StrokeThickness="2"
+                                  StrokeLineCap="Round" StrokeJoin="Round" Opacity="0.85" IsVisible="{Binding !IsLoading}" />
+                            <ctrl:ProgressRing Width="20" Height="20" Thickness="2.2" Foreground="{DynamicResource AccentColorBrush}"
+                                               IsVisible="{Binding IsLoading}" IsIndeterminate="{Binding !HasLoadCount}"
+                                               Value="{Binding LoadFraction}" />
+                        </Panel>
+                    </Button>
+                    <Border Classes="corner-dot" IsVisible="{Binding HasNewPicks}" />
+                </Panel>
+            </StackPanel>
         </Grid>
 
         <ctrl:CollapsibleContent IsOpen="{Binding IsExpanded}" Lift="10" Motion="Glide">

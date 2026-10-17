@@ -38,8 +38,8 @@ public sealed partial class ForYouShelfViewModel : ObservableObject, IDisposable
     }
 
     public ObservableCollection<ForYouPick> Picks { get; } = [];
-    [ObservableProperty, NotifyPropertyChangedFor(nameof(ShowSkeletons))] private bool _isLoading;
-    [ObservableProperty] private string _status = "";
+    [ObservableProperty, NotifyPropertyChangedFor(nameof(ShowSkeletons), nameof(RefreshTip))] private bool _isLoading;
+    [ObservableProperty, NotifyPropertyChangedFor(nameof(RefreshTip))] private string _status = "";
     [ObservableProperty] private bool _hasUndo;
     [ObservableProperty] private string _undoLabel = "";
     [ObservableProperty] private bool _hasNewPicks;
@@ -47,6 +47,33 @@ public sealed partial class ForYouShelfViewModel : ObservableObject, IDisposable
     public bool IsAvailable => _source is not null && _online is not null;
     /// <summary>First load with nothing to show yet: cover-shaped placeholders.</summary>
     public bool ShowSkeletons => IsLoading && Picks.Count == 0;
+
+    /// <summary>While loading: how far along (0..1) and "7/20" for the Refresh button's ring,
+    /// read from the steps' "7 of 20" progress; empty while a step has no count.</summary>
+    [ObservableProperty, NotifyPropertyChangedFor(nameof(HasLoadCount))] private double _loadFraction;
+    [ObservableProperty, NotifyPropertyChangedFor(nameof(HasLoadCount))] private string _loadCount = "";
+    public bool HasLoadCount => LoadCount.Length > 0;
+
+    /// <summary>The Refresh button's tooltip: the step in progress while loading.</summary>
+    public string RefreshTip => IsLoading && Status.Length > 0 ? Status : "Refresh";
+
+    private static readonly System.Text.RegularExpressions.Regex StepCount = new(@"(\d+) of (\d+)\s*$");
+
+    private void ShowProgress(string text)
+    {
+        Status = text;
+        if (StepCount.Match(text) is { Success: true } m && int.TryParse(m.Groups[1].Value, out var done) && int.TryParse(m.Groups[2].Value, out var total) && total > 0)
+        {
+            LoadFraction = Math.Clamp((double)done / total, 0, 1);
+            LoadCount = done + "/" + total;
+        }
+        else { LoadFraction = 0; LoadCount = ""; }
+    }
+
+    partial void OnIsLoadingChanged(bool value)
+    {
+        if (!value) { LoadFraction = 0; LoadCount = ""; }
+    }
 
     private void FeatureChanged(object? sender, EventArgs e) => Dispatcher.UIThread.Post(() =>
     {
@@ -94,7 +121,7 @@ public sealed partial class ForYouShelfViewModel : ObservableObject, IDisposable
         Status = Picks.Count > 0 ? "Refreshing…" : "Finding music for you…";
         try
         {
-            var progress = new Progress<string>(text => { if (Current()) Status = text; });
+            var progress = new Progress<string>(text => { if (Current()) ShowProgress(text); });
             var page = !refresh ? await source.SavedAsync(stop.Token) : null;
             page ??= await source.BuildAsync(refresh, progress, stop.Token);
             if (!Current()) return;
