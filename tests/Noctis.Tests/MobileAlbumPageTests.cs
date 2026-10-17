@@ -133,30 +133,38 @@ public class MobileAlbumPageTests : IDisposable
         window.Close();
     }
 
+    /// <summary>A light cover no longer gives a flat light page with black text (the washed-out
+    /// beige page): the page is a deep shade of the cover's colour, Apple's brown page under the
+    /// beige Silk Sonic cover, with white text; the cover's own colour is kept for the fade.</summary>
     [AvaloniaFact]
-    public void LightCover_FlipsThePageTextDark()
+    public void LightCover_DeepensIntoADarkPage_WithWhiteText()
     {
+        var beige = Color.FromRgb(240, 236, 228);
         var (album, tracks) = Sample(FakeCover());
         using var rig = MobileFixtures.MakeRig(tracks, new[] { album },
-            tint: () => new PageTint(_ => Color.FromRgb(240, 236, 228), work => Task.FromResult(work())));
+            tint: () => new PageTint(_ => beige, work => Task.FromResult(work())));
         var window = MobileFixtures.Mount(rig.Shell, out var view);
 
         rig.Shell.OpenAlbumCommand.Execute(album);
         window.UpdateLayout();
 
         var page = MobileFixtures.Find<AlbumPage>(view);
+        var vm = Assert.IsType<AlbumPageViewModel>(rig.Shell.CurrentPage);
+        var deep = Noctis.Services.DominantColorExtractor.DeepPageColor(beige);
         Assert.True(page.Classes.Contains("tinted"));
-        Assert.True(page.Classes.Contains("light"));
-        Assert.Equal(Color.FromRgb(240, 236, 228), ((ISolidColorBrush)page.Background!).Color);
+        Assert.False(page.Classes.Contains("light"));
+        Assert.Equal(deep, ((ISolidColorBrush)page.Background!).Color);
+        Assert.Equal(beige, vm.Tint.CoverColor);
         var title = MobileFixtures.Named<TextBlock>(page, "AlbumTitle");
-        Assert.Equal(Colors.Black, ((ISolidColorBrush)title.Foreground!).Color);
+        Assert.Equal(Colors.White, ((ISolidColorBrush)title.Foreground!).Color);
+        Assert.True(PageTint.ContrastRatio(Colors.White, deep) >= 7, $"white on {deep}");
         window.Close();
     }
 
-    /// <summary>A mid-light tint (luminance ~0.3): the old 0.55 threshold kept white text on it at
-    /// ~3:1; the hero page flips by contrast, so the title is black at ~7:1.</summary>
+    /// <summary>A mid grey cover: the page is its deep shade, and both the title and the secondary
+    /// text clear WCAG AA (4.5:1) on it, the secondary text dimmer than the title.</summary>
     [AvaloniaFact]
-    public void MidLightTint_TakesDarkText_ByContrast()
+    public void MidGreyCover_PageTextClearsWcagAA()
     {
         var mid = Color.FromRgb(0x96, 0x96, 0x96);
         var (album, tracks) = Sample(FakeCover());
@@ -168,13 +176,15 @@ public class MobileAlbumPageTests : IDisposable
         window.UpdateLayout();
 
         var page = MobileFixtures.Find<AlbumPage>(view);
-        Assert.True(page.Classes.Contains("light"));
+        var pageColour = ((ISolidColorBrush)page.Background!).Color;
+        Assert.Equal(Noctis.Services.DominantColorExtractor.DeepPageColor(mid), pageColour);
+        Assert.False(page.Classes.Contains("light"));
         var title = ((ISolidColorBrush)MobileFixtures.Named<TextBlock>(page, "AlbumTitle").Foreground!).Color;
-        Assert.Equal(Colors.Black, title);
-        Assert.True(PageTint.ContrastRatio(title, mid) >= 4.5);
+        Assert.Equal(Colors.White, title);
+        Assert.True(PageTint.ContrastRatio(title, pageColour) >= 4.5);
         var meta = ((ISolidColorBrush)MobileFixtures.Named<TextBlock>(page, "MetaLine").Foreground!).Color;
         Assert.NotEqual(title, meta);
-        Assert.True(PageTint.ContrastRatio(meta, mid) >= 4.5, $"meta {meta} on {mid}");
+        Assert.True(PageTint.ContrastRatio(meta, pageColour) >= 4.5, $"meta {meta} on {pageColour}");
         window.Close();
     }
 

@@ -816,6 +816,14 @@
     <value>작업 표시줄 버튼에 곡 진행률을 표시합니다. 일시정지 중에는 주황색입니다.</value>
     <comment>Text in SettingsView.axaml</comment>
   </data>
+  <data name="Settings.MediaControlsTaskbar" xml:space="preserve">
+    <value>작업 표시줄에 미디어 컨트롤 표시</value>
+    <comment>Text in SettingsView.axaml</comment>
+  </data>
+  <data name="Settings.MediaControlsTaskbarDesc" xml:space="preserve">
+    <value>작업 표시줄 아이콘에 마우스를 올리면 이전, 재생/일시정지, 다음, 즐겨찾기 버튼을 표시합니다.</value>
+    <comment>Text in SettingsView.axaml</comment>
+  </data>
   <data name="Settings.AutomaticAlbumCoverSize" xml:space="preserve">
     <value>앨범 커버 크기 자동 조정</value>
     <comment>Text in SettingsView.axaml</comment>
@@ -1299,6 +1307,26 @@
   <data name="Settings.AddAlbumNameUnder" xml:space="preserve">
     <value>Discord 카드에서 아티스트 아래에 앨범 이름을 표시합니다.</value>
     <comment>Text in SettingsView.axaml</comment>
+  </data>
+  <data name="Settings.DiscordStatusDisplay" xml:space="preserve">
+    <value>Discord 상태</value>
+    <comment>Settings ▸ Integrations ▸ Discord, SettingsView.axaml</comment>
+  </data>
+  <data name="Settings.DiscordStatusDisplayHint" xml:space="preserve">
+    <value>멤버 목록과 프로필의 상태에 Discord가 표시할 내용입니다.</value>
+    <comment>Settings ▸ Integrations ▸ Discord, SettingsView.axaml</comment>
+  </data>
+  <data name="Settings.DiscordStatusDisplay.Artist" xml:space="preserve">
+    <value>아티스트</value>
+    <comment>Discord status line choice (SettingsViewModel)</comment>
+  </data>
+  <data name="Settings.DiscordStatusDisplay.Title" xml:space="preserve">
+    <value>곡 제목</value>
+    <comment>Discord status line choice (SettingsViewModel)</comment>
+  </data>
+  <data name="Settings.DiscordStatusDisplay.AppName" xml:space="preserve">
+    <value>Noctis</value>
+    <comment>Discord status line choice (SettingsViewModel)</comment>
   </data>
   <data name="Settings.LastFmScrobbling" xml:space="preserve">
     <value>Last.fm 스크로블링</value>
@@ -6034,14 +6062,6 @@
   <data name="LyricsStudio.WordsTip" xml:space="preserve">
     <value>각 단어와 시간을 표시합니다. 클릭하면 들을 수 있습니다.</value>
     <comment>Word toggle tooltip</comment>
-  </data>
-  <data name="LyricsStudio.WordEarlier" xml:space="preserve">
-    <value>선택한 단어 50ms 앞으로 (이웃 단어는 그대로)</value>
-    <comment>Word nudge tooltip</comment>
-  </data>
-  <data name="LyricsStudio.WordLater" xml:space="preserve">
-    <value>선택한 단어 50ms 뒤로 (이웃 단어는 그대로)</value>
-    <comment>Word nudge tooltip</comment>
   </data>
   <data name="LyricsStudio.TapWords" xml:space="preserve">
     <value>단어 탭하기</value>

@@ -146,7 +146,8 @@
          shell's SafeArea.Top), so the photo is full-bleed; the buttons and fades float over. -->
     <Panel>
         <ScrollViewer Classes="page-scroll" Name="ArtistScroll" views:ScrollMemory.IsEnabled="True" HorizontalScrollBarVisibility="Disabled">
-            <StackPanel Margin="0,0,0,24">
+            <!-- The body carries the page's ramp below the photo (HeroChrome, as the album page). -->
+            <StackPanel Name="PageBody" Margin="0,0,0,24">
                 <!-- Square (the code-behind sizes it from the width, as the album cover); the
                      bottom fades into the page colour. -->
                 <Panel Name="Hero" Height="412" ClipToBounds="True" Background="{DynamicResource HomeCardBackground}">

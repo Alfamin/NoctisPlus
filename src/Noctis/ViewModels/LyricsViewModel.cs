@@ -2327,6 +2327,32 @@ public partial class LyricsViewModel : ViewModelBase, IDisposable
             LoadLyricsForTrack(current);
     }
 
+    /// <summary>
+    /// The Lyrics Studio's live preview pane (10-14): like <see cref="ShowPreview"/>, but when this
+    /// track's preview is already on screen the new text is applied in place — no fade, no disk
+    /// probe — so a nudge shows at once. A preview of another song is dropped first: it would stay
+    /// on screen (<see cref="ShowPreview"/> only reloads the track it is given).
+    /// </summary>
+    public void UpdatePreview(Track track, string syncedText)
+    {
+        if (_previewTrackId is { } other && other != track.Id) ClearPreview();
+        if (!IsPreviewActive || _previewTrackId != track.Id || _currentTrack is not { } current
+            || current.Id != track.Id || _player.CurrentTrack?.Id != track.Id)
+        {
+            ShowPreview(track, syncedText);
+            return;
+        }
+        if (syncedText == _previewText) return;
+        _previewText = syncedText;
+        var lines = ParseLrcContent(syncedText);
+        if (lines.Count == 0) return;
+        // A probe still in flight (an earlier reload) must not land over these lines.
+        ++_searchGeneration;
+        _timeline.Reset();
+        ActiveLineIndex = -1;
+        ApplyLocalLyricsResult(current, new LocalLyricsProbe(lines, null, PreviewSource, FromCache: false));
+    }
+
     /// <summary>Drops the preview; if it was for the loaded track, its real lyrics reload.</summary>
     public void ClearPreview()
     {

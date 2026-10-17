@@ -45,7 +45,7 @@ public partial class ArtistPage : UserControl
     public ArtistPage()
     {
         InitializeComponent();
-        _chrome = new HeroChrome(this, HeroFade, TopFade, TopScrim, TopBar, "Artist", UpdateScrollChrome, ApplyShades);
+        _chrome = new HeroChrome(this, Hero, HeroFade, TopFade, TopScrim, TopBar, PageBody, "Artist", UpdateScrollChrome, ApplyShades);
         ArtistScroll.SizeChanged += (_, _) => LayoutPage();
         ArtistScroll.ScrollChanged += (_, _) => UpdateScrollChrome();
         ArtistName.SizeChanged += (_, _) => LayoutTitle();
@@ -116,6 +116,7 @@ public partial class ArtistPage : UserControl
         var height = Math.Min(width, Math.Max(320, ArtistScroll.Bounds.Height * HeroMaxViewportShare));
         Hero.Height = height;
         HeroFade.Height = Math.Round(height * HeroFadeShare);
+        _chrome.ApplyFades();   // the fade and the body's ramp follow the hero's size
         var cards = _vm?.Cards.Count ?? 0;
         CardWidth = cards > 1 ? width - PageInset - CardGap - CardPeek : width - 2 * PageInset;
         CardList.Margin = new Thickness(PageInset, 0, cards > 1 ? CardGap + CardPeek : PageInset, 0);
@@ -147,7 +148,7 @@ public partial class ArtistPage : UserControl
     {
         var titleTop = Hero.Height + TitleBlock.Margin.Top - ArtistScroll.Offset.Y;
         var chrome = HeroChrome.ScrollChrome(titleTop, ArtistName.Bounds.Height, _chrome.BarBottom);
-        _chrome.ApplyScrim(chrome.Scrim);
+        _chrome.ApplyScrim(chrome.Scrim, ArtistScroll.Offset.Y + _chrome.BarBottom - Hero.Height);
         ArtistName.Opacity = chrome.BigTitle;
         SmallTitle.Opacity = chrome.SmallTitle;
     }

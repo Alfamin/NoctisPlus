@@ -816,6 +816,14 @@
     <value>タスクバーのボタンに曲の進行状況を表示します。</value>
     <comment>Text in SettingsView.axaml</comment>
   </data>
+  <data name="Settings.MediaControlsTaskbar" xml:space="preserve">
+    <value>タスクバーにメディアコントロールを表示</value>
+    <comment>Text in SettingsView.axaml</comment>
+  </data>
+  <data name="Settings.MediaControlsTaskbarDesc" xml:space="preserve">
+    <value>タスクバーのアイコンにカーソルを合わせたときに、前へ・再生/一時停止・次へ・お気に入りのボタンを表示します。</value>
+    <comment>Text in SettingsView.axaml</comment>
+  </data>
   <data name="Settings.AutomaticAlbumCoverSize" xml:space="preserve">
     <value>アルバムカバーのサイズを自動調整</value>
     <comment>Text in SettingsView.axaml</comment>
@@ -1299,6 +1307,26 @@
   <data name="Settings.AddAlbumNameUnder" xml:space="preserve">
     <value>Discordカードのアーティスト名の下にアルバム名を表示します。</value>
     <comment>Text in SettingsView.axaml</comment>
+  </data>
+  <data name="Settings.DiscordStatusDisplay" xml:space="preserve">
+    <value>Discord のステータス</value>
+    <comment>Settings ▸ Integrations ▸ Discord, SettingsView.axaml</comment>
+  </data>
+  <data name="Settings.DiscordStatusDisplayHint" xml:space="preserve">
+    <value>メンバーリストとプロフィールのステータスに Discord が表示する内容です。</value>
+    <comment>Settings ▸ Integrations ▸ Discord, SettingsView.axaml</comment>
+  </data>
+  <data name="Settings.DiscordStatusDisplay.Artist" xml:space="preserve">
+    <value>アーティスト</value>
+    <comment>Discord status line choice (SettingsViewModel)</comment>
+  </data>
+  <data name="Settings.DiscordStatusDisplay.Title" xml:space="preserve">
+    <value>曲名</value>
+    <comment>Discord status line choice (SettingsViewModel)</comment>
+  </data>
+  <data name="Settings.DiscordStatusDisplay.AppName" xml:space="preserve">
+    <value>Noctis</value>
+    <comment>Discord status line choice (SettingsViewModel)</comment>
   </data>
   <data name="Settings.LastFmScrobbling" xml:space="preserve">
     <value>Last.fm スクロブリング</value>
@@ -6034,14 +6062,6 @@
   <data name="LyricsStudio.WordsTip" xml:space="preserve">
     <value>時間とともにそれぞれの単語を表示します。クリックすると聞こえます。</value>
     <comment>Word toggle tooltip</comment>
-  </data>
-  <data name="LyricsStudio.WordEarlier" xml:space="preserve">
-    <value>選択された単語は50ms以前（隣の単語は留まっています）</value>
-    <comment>Word nudge tooltip</comment>
-  </data>
-  <data name="LyricsStudio.WordLater" xml:space="preserve">
-    <value>選択された単語は50ミリ秒後（隣の単語は置いてあります）</value>
-    <comment>Word nudge tooltip</comment>
   </data>
   <data name="LyricsStudio.TapWords" xml:space="preserve">
     <value>単語をタップ</value>

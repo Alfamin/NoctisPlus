@@ -266,7 +266,12 @@ public class LibraryService : ILibraryService
                     if (snapshot.Length == 0 || snapshot.Length == lastCount) continue;
                     lastCount = snapshot.Length;
 
-                    _tracks = snapshot.Concat(carriedRemote)
+                    // On a rescan the known tracks the walk has not reached yet stay in (the
+                    // snapshot alone made the library shrink to the walked part and grow back,
+                    // seen as songs and albums vanishing after launch with Scan on Startup); a
+                    // file that is gone leaves at the final publish. Snapshot first: a re-read
+                    // file's fresh tags win over the original.
+                    _tracks = snapshot.Concat(originalTracks).Concat(carriedRemote)
                         .GroupBy(t => t.Id).Select(g => g.First())
                         .OrderBy(t => t.Artist).ThenBy(t => t.Album)
                         .ThenBy(t => t.DiscNumber).ThenBy(t => t.TrackNumber).ToList();
@@ -318,7 +323,8 @@ public class LibraryService : ILibraryService
                         if (entry.LastWriteTimeUtc == existing.LastModified && entry.Length == existing.FileSize
                             && !IsStaleCaseSpelling(existing.FilePath, filePath)
                             && !(NeedsWavInfoReread(existing)
-                                 && MetadataService.RiffInfoWouldFill(filePath, existing.Year, existing.Album)))
+                                 && MetadataService.RiffInfoWouldFill(filePath, existing.Year, existing.Album))
+                            && !NeedsAlacDepthReread(existing, entry))
                         {
                             newTracks.Add(existing);
                             Interlocked.Increment(ref unchangedCount);
@@ -3781,6 +3787,17 @@ public class LibraryService : ILibraryService
     /// a year or album to fill, so a WAV that truly has no date stays on the fast path
     /// (and a no-change launch still skips the rebuild). Internal for tests.
     /// </summary>
+    /// <summary>
+    /// A stream-backed (Android) ALAC scanned before its decoder-config atom was read from the
+    /// stream: TagLib# gives ALAC no bit depth, so it was stored with none ("48 kHz ALAC", and a
+    /// 96 kHz file at 48 kHz without its Hi-Res badge). Read once more; with the atom read, the
+    /// depth is known and the fast path holds again.
+    /// </summary>
+    internal static bool NeedsAlacDepthReread(Track existing, ScanEntry entry) =>
+        entry.LocalPath == null
+        && existing.BitsPerSample <= 0
+        && MetadataService.IsAlacContainer(Path.GetExtension(entry.Name).ToLowerInvariant(), existing.Codec);
+
     internal static bool NeedsWavInfoReread(Track existing) =>
         (existing.Year == 0 || existing.Album == "Unknown Album")
         && Path.GetExtension(existing.FilePath) is { } ext

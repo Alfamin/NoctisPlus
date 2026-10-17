@@ -816,6 +816,14 @@
     <value>إظهار تقدم الأغنية على زر شريط المهام. أيضًا أثناء الإيقاف مؤقتاً.</value>
     <comment>Text in SettingsView.axaml</comment>
   </data>
+  <data name="Settings.MediaControlsTaskbar" xml:space="preserve">
+    <value>أزرار التحكم في الوسائط على شريط المهام</value>
+    <comment>Text in SettingsView.axaml</comment>
+  </data>
+  <data name="Settings.MediaControlsTaskbarDesc" xml:space="preserve">
+    <value>إظهار أزرار السابق والتشغيل/الإيقاف المؤقت والتالي والمفضلة عند تمرير المؤشر فوق أيقونة شريط المهام.</value>
+    <comment>Text in SettingsView.axaml</comment>
+  </data>
   <data name="Settings.AutomaticAlbumCoverSize" xml:space="preserve">
     <value>حجم تلقائي لأغلفة الألبومات</value>
     <comment>Text in SettingsView.axaml</comment>
@@ -1299,6 +1307,26 @@
   <data name="Settings.AddAlbumNameUnder" xml:space="preserve">
     <value>إظهار اسم الألبوم تحت الفنان على بطاقة ديسكورد الخاصة بك.</value>
     <comment>Text in SettingsView.axaml</comment>
+  </data>
+  <data name="Settings.DiscordStatusDisplay" xml:space="preserve">
+    <value>الحالة على Discord</value>
+    <comment>Settings ▸ Integrations ▸ Discord, SettingsView.axaml</comment>
+  </data>
+  <data name="Settings.DiscordStatusDisplayHint" xml:space="preserve">
+    <value>ما يعرضه Discord بعد "يستمع إلى" في قائمة الأعضاء وفي ملفك الشخصي.</value>
+    <comment>Settings ▸ Integrations ▸ Discord, SettingsView.axaml</comment>
+  </data>
+  <data name="Settings.DiscordStatusDisplay.Artist" xml:space="preserve">
+    <value>الفنان</value>
+    <comment>Discord status line choice (SettingsViewModel)</comment>
+  </data>
+  <data name="Settings.DiscordStatusDisplay.Title" xml:space="preserve">
+    <value>عنوان الأغنية</value>
+    <comment>Discord status line choice (SettingsViewModel)</comment>
+  </data>
+  <data name="Settings.DiscordStatusDisplay.AppName" xml:space="preserve">
+    <value>Noctis</value>
+    <comment>Discord status line choice (SettingsViewModel)</comment>
   </data>
   <data name="Settings.LastFmScrobbling" xml:space="preserve">
     <value>تسجيل الاستماع في Last.fm</value>
@@ -6034,14 +6062,6 @@
   <data name="LyricsStudio.WordsTip" xml:space="preserve">
     <value>إظهار كل كلمة بوقتها. انقر على كلمة واحدة لسماعها.</value>
     <comment>Word toggle tooltip</comment>
-  </data>
-  <data name="LyricsStudio.WordEarlier" xml:space="preserve">
-    <value>الكلمة المختارة 50 ثانية قبل ذلك (لا يزال جيرانه)</value>
-    <comment>Word nudge tooltip</comment>
-  </data>
-  <data name="LyricsStudio.WordLater" xml:space="preserve">
-    <value>الكلمة المختارة 50 ثانية في وقت لاحق (لا يزال جيرانه)</value>
-    <comment>Word nudge tooltip</comment>
   </data>
   <data name="LyricsStudio.TapWords" xml:space="preserve">
     <value>انقر على الكلمات</value>

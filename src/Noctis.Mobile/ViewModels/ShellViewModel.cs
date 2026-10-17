@@ -219,10 +219,15 @@ public sealed partial class ShellViewModel : ObservableObject
     [NotifyPropertyChangedFor(nameof(PopMenu), nameof(IsMenuOpen))]
     private TrackLinksMenuViewModel? _linksMenu;
 
+    /// <summary>Now Playing's quality badge tapped: what the playing file is (<see cref="ShowQualityCard"/>).</summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(PopMenu), nameof(IsMenuOpen))]
+    private QualityCardViewModel? _qualityCard;
+
     /// <summary>What the glass pop menu shows: the Library menu, a sort or filter menu, the
-    /// playing song's album and artist links, or an item's actions until its playlist list
-    /// takes over.</summary>
-    public object? PopMenu => (object?)LibraryMenu ?? (object?)OptionsMenu ?? (object?)LinksMenu
+    /// playing song's album and artist links or its quality card, or an item's actions until
+    /// its playlist list takes over.</summary>
+    public object? PopMenu => (object?)LibraryMenu ?? (object?)OptionsMenu ?? (object?)LinksMenu ?? (object?)QualityCard
         ?? (Sheet is { IsPickingPlaylist: false } sheet ? sheet : null);
 
     public bool IsMenuOpen => PopMenu != null;
@@ -235,6 +240,7 @@ public sealed partial class ShellViewModel : ObservableObject
         LibraryMenu = null;
         OptionsMenu = null;
         LinksMenu = null;
+        QualityCard = null;
     }
 
     /// <summary>Add to Playlist picked in the menu: the menu closes and the sheet opens on the list.</summary>
@@ -400,8 +406,9 @@ public sealed partial class ShellViewModel : ObservableObject
         MiniProgressLine = new Avalonia.Media.Immutable.ImmutableSolidColorBrush(Avalonia.Media.Color.FromArgb((byte)(neutral ? 0x99 : 0xE6), c.R, c.G, c.B));
     }
 
-    // Settings › Appearance › Player Bar. Both off by default: the capsule is plain glass, as
-    // Apple's. Saved to settings.json (MobilePlayerBarProgress*) and applied live.
+    // Settings › Appearance › Player Bar and Album Colours. The player bar's two are off by
+    // default: the capsule is plain glass, as Apple's. Saved to settings.json
+    // (MobilePlayerBarProgress*, MobileArtworkPageColors) and applied live.
 
     /// <summary>The elapsed fill in the cover's colour (<see cref="MiniProgressFill"/>).</summary>
     [ObservableProperty]
@@ -413,6 +420,11 @@ public sealed partial class ShellViewModel : ObservableObject
     [NotifyPropertyChangedFor(nameof(ShowsMiniProgress))]
     private bool _showMiniProgressLine;
 
+    /// <summary>Album Colours: album and artist pages painted in a deep shade of the cover's
+    /// colour (<see cref="PageTint.Enabled"/>, which the open pages follow); off, they keep the
+    /// theme's plain pages. On by default.</summary>
+    [ObservableProperty] private bool _artworkPageColors = true;
+
     public bool ShowsMiniProgress => ShowMiniProgressFill || ShowMiniProgressLine;
 
     private bool _playerBarLoaded;
@@ -423,6 +435,7 @@ public sealed partial class ShellViewModel : ObservableObject
 
     partial void OnShowMiniProgressFillChanged(bool value) => SavePlayerBarSettings();
     partial void OnShowMiniProgressLineChanged(bool value) => SavePlayerBarSettings();
+    partial void OnArtworkPageColorsChanged(bool value) => SavePlayerBarSettings();
 
     private async Task LoadPlayerBarSettingsAsync()
     {
@@ -431,6 +444,7 @@ public sealed partial class ShellViewModel : ObservableObject
             var settings = await Library.Persistence.LoadSettingsAsync();
             ShowMiniProgressFill = settings.MobilePlayerBarProgressFill;
             ShowMiniProgressLine = settings.MobilePlayerBarProgressLine;
+            ArtworkPageColors = settings.MobileArtworkPageColors;
         }
         catch (Exception ex)
         {
@@ -443,7 +457,7 @@ public sealed partial class ShellViewModel : ObservableObject
     private void SavePlayerBarSettings()
     {
         if (!_playerBarLoaded) return;
-        bool fill = ShowMiniProgressFill, line = ShowMiniProgressLine;
+        bool fill = ShowMiniProgressFill, line = ShowMiniProgressLine, pages = ArtworkPageColors;
         PendingPlayerBarSave = _playerBarSaveChain = _playerBarSaveChain.ContinueWith(async _ =>
         {
             try
@@ -451,6 +465,7 @@ public sealed partial class ShellViewModel : ObservableObject
                 var settings = await Library.Persistence.LoadSettingsAsync();
                 settings.MobilePlayerBarProgressFill = fill;
                 settings.MobilePlayerBarProgressLine = line;
+                settings.MobileArtworkPageColors = pages;
                 await Library.Persistence.SaveSettingsAsync(settings);
             }
             catch (Exception ex)
@@ -662,7 +677,7 @@ public sealed partial class ShellViewModel : ObservableObject
     private void OpenAlbum(Album? album)
     {
         if (album == null) return;
-        Navigate(new AlbumPageViewModel(this, album));
+        Navigate(new AlbumPageViewModel(this, CurrentAlbum(album)));
     }
 
     /// <summary>An artist row or link: the artist page.</summary>
@@ -688,7 +703,7 @@ public sealed partial class ShellViewModel : ObservableObject
     [RelayCommand]
     private void OpenRailItem(RailItem? item)
     {
-        switch (item?.Payload)
+        switch (CurrentPayload(item))
         {
             case Album album:
                 OpenAlbum(album);
@@ -701,8 +716,8 @@ public sealed partial class ShellViewModel : ObservableObject
                 break;
             case Track track:
                 // A song plays the rail it sits on: On Repeat, else the pinned songs.
-                var onRepeat = Library.OnRepeatRail.Select(r => r.Payload).OfType<Track>().ToList();
-                var pinned = Library.PinnedRail.Select(r => r.Payload).OfType<Track>().ToList();
+                var onRepeat = Library.OnRepeatRail.Select(CurrentPayload).OfType<Track>().ToList();
+                var pinned = Library.PinnedRail.Select(CurrentPayload).OfType<Track>().ToList();
                 if (onRepeat.IndexOf(track) is var r and >= 0) Player.PlayTracks(onRepeat, r, "On Repeat");
                 else if (pinned.IndexOf(track) is var p and >= 0) Player.PlayTracks(pinned, p, "Pinned");
                 else Player.PlayTracks(new[] { track }, 0, null);
@@ -719,7 +734,7 @@ public sealed partial class ShellViewModel : ObservableObject
     [RelayCommand]
     private void OpenAlbumSheet(Album? album)
     {
-        if (album != null) Sheet = ContextSheetViewModel.ForAlbum(this, album);
+        if (album != null) Sheet = ContextSheetViewModel.ForAlbum(this, CurrentAlbum(album));
     }
 
     [RelayCommand]
@@ -731,14 +746,27 @@ public sealed partial class ShellViewModel : ObservableObject
     [RelayCommand]
     private void OpenRailItemSheet(RailItem? item)
     {
-        switch (item?.Payload)
+        switch (CurrentPayload(item))
         {
             case Album album: OpenAlbumSheet(album); break;
             case Playlist playlist: OpenPlaylistSheet(playlist); break;
             case Track track: OpenTrackSheet(track); break;
-            case Artist artist: Sheet = ContextSheetViewModel.ForArtist(this, artist, item.ArtworkPath); break;
+            case Artist artist: Sheet = ContextSheetViewModel.ForArtist(this, artist, item!.ArtworkPath); break;
         }
     }
+
+    /// <summary>Album grids and rails keep unchanged tiles across library refreshes, so a tile's
+    /// album can be an object from before a rescan: open the one the library holds now.</summary>
+    private Album CurrentAlbum(Album album) => Library.Service.GetAlbumById(album.Id) ?? album;
+
+    /// <summary>A rail keeps an unchanged tile across library refreshes (<see cref="RailItem.Equals(RailItem?)"/>),
+    /// so its payload can be an object from before a rescan: act on what the library holds now.</summary>
+    private object? CurrentPayload(RailItem? item) => item?.Payload switch
+    {
+        Track track => Library.Service.GetTrackById(track.Id) ?? track,
+        Artist artist => Library.Service.Artists.FirstOrDefault(a => string.Equals(a.Name, artist.Name, StringComparison.OrdinalIgnoreCase)) ?? artist,
+        var other => other,
+    };
 
     /// <summary>A long-pressed artist row: play, queue or pin the artist.</summary>
     [RelayCommand]
@@ -755,6 +783,7 @@ public sealed partial class ShellViewModel : ObservableObject
         LibraryMenu = null;
         OptionsMenu = null;
         LinksMenu = null;
+        QualityCard = null;
     }
 
     /// <summary>Opens a sort or filter menu (or a note) on the glass pop menu, out of the button
@@ -764,6 +793,7 @@ public sealed partial class ShellViewModel : ObservableObject
         Sheet = null;
         LibraryMenu = null;
         LinksMenu = null;
+        QualityCard = null;
         OptionsMenu = menu;
     }
 
@@ -814,6 +844,7 @@ public sealed partial class ShellViewModel : ObservableObject
         Sheet = null;
         OptionsMenu = null;
         LinksMenu = null;
+        QualityCard = null;
         LibraryMenu = new LibraryMenuViewModel(this);
     }
 
@@ -833,7 +864,21 @@ public sealed partial class ShellViewModel : ObservableObject
         Sheet = null;
         LibraryMenu = null;
         OptionsMenu = null;
+        QualityCard = null;
         LinksMenu = new TrackLinksMenuViewModel(this, track);
+    }
+
+    /// <summary>Now Playing's quality badge: what the playing file is, on a glass card out of the
+    /// badge (<see cref="QualityCardViewModel"/>). Nothing without a badge to tap.</summary>
+    [RelayCommand]
+    private void ShowQualityCard()
+    {
+        if (Player.Quality is not { } quality) return;
+        Sheet = null;
+        LibraryMenu = null;
+        OptionsMenu = null;
+        LinksMenu = null;
+        QualityCard = new QualityCardViewModel(this, quality);
     }
 
     [RelayCommand]

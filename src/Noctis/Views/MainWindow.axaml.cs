@@ -1453,6 +1453,8 @@ public partial class MainWindow : Window, IPageKeyOverlayHost
             if (handle == null) return;
 
             _taskbar = new TaskbarIntegrationService();
+            // Before Initialize, so the first add already honours the setting (no flash).
+            _taskbar.SetButtonsVisible(vm.Settings.TaskbarMediaControlsEnabled);
             _taskbar.Initialize(handle.Handle);
 
             // Wire button clicks to player commands (dispatched to UI thread)
@@ -1510,11 +1512,14 @@ public partial class MainWindow : Window, IPageKeyOverlayHost
             RebindCurrentTrack();
 
             // Taskbar progress (GitHub #53) follows its Settings toggle live: switching
-            // it off must clear the overlay, not leave the last frame painted.
+            // it off must clear the overlay, not leave the last frame painted. The
+            // thumbnail buttons follow theirs the same way.
             vm.Settings.PropertyChanged += (_, e) =>
             {
                 if (e.PropertyName == nameof(SettingsViewModel.TaskbarProgressEnabled))
                     UpdateTaskbarProgress(vm);
+                else if (e.PropertyName == nameof(SettingsViewModel.TaskbarMediaControlsEnabled))
+                    _taskbar?.SetButtonsVisible(vm.Settings.TaskbarMediaControlsEnabled);
             };
             UpdateTaskbarProgress(vm);
         }

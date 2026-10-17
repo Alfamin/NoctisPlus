@@ -816,6 +816,14 @@
     <value>在工作列按鈕上顯示歌曲進度。暫停時Amber</value>
     <comment>Text in SettingsView.axaml</comment>
   </data>
+  <data name="Settings.MediaControlsTaskbar" xml:space="preserve">
+    <value>工作列顯示媒體控制按鈕</value>
+    <comment>Text in SettingsView.axaml</comment>
+  </data>
+  <data name="Settings.MediaControlsTaskbarDesc" xml:space="preserve">
+    <value>將滑鼠停留在工作列圖示上時，顯示上一首、播放/暫停、下一首和收藏按鈕。</value>
+    <comment>Text in SettingsView.axaml</comment>
+  </data>
   <data name="Settings.AutomaticAlbumCoverSize" xml:space="preserve">
     <value>自動專輯封面大小</value>
     <comment>Text in SettingsView.axaml</comment>
@@ -1299,6 +1307,26 @@
   <data name="Settings.AddAlbumNameUnder" xml:space="preserve">
     <value>在您的Discord卡上顯示藝人下面的相簿名稱。</value>
     <comment>Text in SettingsView.axaml</comment>
+  </data>
+  <data name="Settings.DiscordStatusDisplay" xml:space="preserve">
+    <value>Discord 狀態</value>
+    <comment>Settings ▸ Integrations ▸ Discord, SettingsView.axaml</comment>
+  </data>
+  <data name="Settings.DiscordStatusDisplayHint" xml:space="preserve">
+    <value>Discord 在成員清單和個人檔案中「正在聆聽」後顯示的內容。</value>
+    <comment>Settings ▸ Integrations ▸ Discord, SettingsView.axaml</comment>
+  </data>
+  <data name="Settings.DiscordStatusDisplay.Artist" xml:space="preserve">
+    <value>藝人</value>
+    <comment>Discord status line choice (SettingsViewModel)</comment>
+  </data>
+  <data name="Settings.DiscordStatusDisplay.Title" xml:space="preserve">
+    <value>歌曲名稱</value>
+    <comment>Discord status line choice (SettingsViewModel)</comment>
+  </data>
+  <data name="Settings.DiscordStatusDisplay.AppName" xml:space="preserve">
+    <value>Noctis</value>
+    <comment>Discord status line choice (SettingsViewModel)</comment>
   </data>
   <data name="Settings.LastFmScrobbling" xml:space="preserve">
     <value>Last.fm 記錄</value>
@@ -6034,14 +6062,6 @@
   <data name="LyricsStudio.WordsTip" xml:space="preserve">
     <value>按時間顯示每個單詞。單擊一個來聽到它。</value>
     <comment>Word toggle tooltip</comment>
-  </data>
-  <data name="LyricsStudio.WordEarlier" xml:space="preserve">
-    <value>較早選中的單詞 50 ms (其鄰居保持put)</value>
-    <comment>Word nudge tooltip</comment>
-  </data>
-  <data name="LyricsStudio.WordLater" xml:space="preserve">
-    <value>選中的單詞50毫秒後(其鄰居保持put)</value>
-    <comment>Word nudge tooltip</comment>
   </data>
   <data name="LyricsStudio.TapWords" xml:space="preserve">
     <value>點選單詞</value>

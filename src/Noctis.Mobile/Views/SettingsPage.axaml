@@ -631,6 +631,20 @@
                                 </Border>
                                 <TextBlock Classes="group-footnote" Text="{Binding AccentName, StringFormat='{}{0}. The accent colours buttons, switches and highlights.'}" />
                             </StackPanel>
+                            <!-- Album and artist pages in a deep shade of the cover's colour (on by
+                                 default); off, the theme's plain pages. The shell applies it at once
+                                 (the open pages follow it) and saves it. -->
+                            <StackPanel>
+                                <TextBlock Classes="group-caption" Text="Album Colours" />
+                                <Border Name="ArtworkColoursCard" Classes="group-card">
+                                    <ToggleButton Name="ArtworkColoursSwitch" Classes="switch-row" AutomationProperties.Name="Colour Pages from Artwork"
+                                                  IsChecked="{Binding Shell.ArtworkPageColors}">
+                                        <TextBlock Classes="row-label" Text="Colour Pages from Artwork" />
+                                    </ToggleButton>
+                                </Border>
+                                <TextBlock Classes="group-footnote"
+                                           Text="Album and artist pages take a deep shade of the cover's colour, with white text. Off, they use the plain Light or Dark theme." />
+                            </StackPanel>
                             <!-- The mini player's progress, both off by default (Apple's plain glass
                                  capsule); the shell applies each switch at once and saves it. -->
                             <StackPanel>

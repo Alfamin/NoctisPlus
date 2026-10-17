@@ -758,15 +758,18 @@ public partial class Track : ObservableObject
     }
 
     /// <summary>
-    /// Whether this track is Hi-Res Lossless.
-    /// Hi-Res Lossless: 24-bit at sample rates above 48 kHz (88.2, 96, 176.4, 192 kHz).
-    /// 24-bit/48 kHz and below is standard Lossless, not Hi-Res.
+    /// Whether this track is Hi-Res Lossless, by Apple Music's tiers (Apple Newsroom, 17 May 2021,
+    /// "Apple Music announces Spatial Audio with Dolby Atmos; will bring Lossless Audio to entire
+    /// catalog": "Apple Music's Lossless tier starts at CD quality, which is 16 bit at 44.1 kHz,
+    /// and goes up to 24 bit at 48 kHz"; "Hi-Resolution Lossless all the way up to 24 bit at
+    /// 192 kHz"). So Lossless reaches 24-bit/48 kHz, and anything lossless beyond it - a sample
+    /// rate above 48 kHz (88.2, 96, 176.4, 192 kHz) or more than 24 bits - is Hi-Res. 24-bit/48 kHz
+    /// is standard Lossless, not Hi-Res; so is 16-bit/48 kHz.
     /// </summary>
     [JsonIgnore]
     public bool IsHiResLossless =>
         IsLossless &&
-        BitsPerSample >= 24 &&
-        SampleRate > 48000;
+        (SampleRate > 48000 || BitsPerSample > 24);
 
     /// <summary>Audio quality badge text: "Lossless", "Hi-Res Lossless",
     /// or the short codec name for lossy formats (e.g. "AAC", "MP3").</summary>
@@ -843,6 +846,36 @@ public partial class Track : ObservableObject
     /// <summary>Detailed audio quality info for tooltip (e.g. "16-bit/96 kHz ALAC").</summary>
     [JsonIgnore]
     public string AudioQualityDetailedInfo => FormatQualityDetail().TrimStart();
+
+    /// <summary>
+    /// The technical line the album badge's detail shows for one track: "24-bit/48 kHz ALAC",
+    /// "256 kbps 44.1 kHz AAC" (bitrate only for a compressed file; bit depth and rate only when
+    /// known), the codec alone when nothing else is, empty when there is no codec either.
+    /// What <see cref="Album.AudioQualityDetailedInfo"/> builds for its representative track, and
+    /// the phone's Now Playing quality card for the playing track.
+    /// </summary>
+    [JsonIgnore]
+    public string QualityDetailLine
+    {
+        get
+        {
+            var parts = new List<string>();
+            if (!IsLossless && Bitrate > 0)
+                parts.Add($"{Bitrate} kbps");
+            if (BitsPerSample > 0 && SampleRate > 0)
+                parts.Add($"{BitsPerSample}-bit/{SampleRate / 1000.0:0.###} kHz");
+            else if (BitsPerSample > 0)
+                parts.Add($"{BitsPerSample}-bit");
+            else if (SampleRate > 0)
+                parts.Add($"{SampleRate / 1000.0:0.###} kHz");
+
+            var codec = CodecShortName;
+            if (!string.IsNullOrEmpty(codec))
+                parts.Add(codec);
+
+            return string.Join(" ", parts);
+        }
+    }
 
     private string FormatQualityDetail()
     {

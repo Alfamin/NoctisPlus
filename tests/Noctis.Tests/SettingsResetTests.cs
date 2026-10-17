@@ -72,6 +72,7 @@ public class SettingsResetTests : IDisposable
             MusicVideosEnabled = false,
             MusicVideoRoundedCorners = false,
             DiscordShowAlbum = false,
+            DiscordStatusDisplay = "Title",
             NoctisServerPort = 5050,
             ShowGenreColumn = false,
             ShowBpmColumn = true,

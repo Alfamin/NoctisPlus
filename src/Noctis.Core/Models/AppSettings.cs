@@ -122,6 +122,10 @@ public class AppSettings
     /// player's bottom edge. Off by default.</summary>
     public bool MobilePlayerBarProgressLine { get; set; }
 
+    /// <summary>Phone, Settings › Appearance › Album Colours: album and artist pages painted in a
+    /// deep shade of the cover's colour. Off, they keep the theme's plain pages. On by default.</summary>
+    public bool MobileArtworkPageColors { get; set; } = true;
+
     /// <summary>User-defined custom themes selectable from the Themes row.</summary>
     public List<CustomThemeDefinition> CustomThemes { get; set; } = new();
 
@@ -370,6 +374,9 @@ public class AppSettings
 
     /// <summary>Also save the timings as a .ttml sidecar, for players that read TTML but not ELRC (Discord: Light Cone).</summary>
     public bool LyricsStudioSaveTtml { get; set; }
+
+    /// <summary>The Studio's live preview pane beside the review is open (10-14).</summary>
+    public bool LyricsStudioLivePreview { get; set; } = true;
 
     // ── Songs page optional columns ──
     // All six were the original set, chosen from the column-header dropdown.
@@ -631,6 +638,11 @@ public class AppSettings
     /// should opt into.</summary>
     public bool TaskbarProgressEnabled { get; set; } = false;
 
+    /// <summary>Windows only: Previous / Play-Pause / Forward / Favorite buttons under the
+    /// taskbar thumbnail (the preview when you hover the app's taskbar icon). On by default,
+    /// as they always were before the toggle existed.</summary>
+    public bool TaskbarMediaControlsEnabled { get; set; } = true;
+
     /// <summary>When true (default), "feat./ft." credits found in track titles — or file names,
     /// which stand in for the title on untagged files — are merged into the artist credit at
     /// scan time so collaborations show the full credit. Off: artist tags are used exactly as
@@ -715,6 +727,10 @@ public class AppSettings
     /// <summary>Whether the Discord card shows the album name under the artist (the large
     /// image's hover text). Off drops that line for a leaner card (Discord ask, 2026-09-03).</summary>
     public bool DiscordShowAlbum { get; set; } = true;
+
+    /// <summary>What Discord's status line reads after "Listening to": "Artist", "Title" or
+    /// "AppName" (see <see cref="Models.DiscordStatusDisplay"/>). Discord ask, 2026-10-14.</summary>
+    public string DiscordStatusDisplay { get; set; } = nameof(Models.DiscordStatusDisplay.Artist);
 
     /// <summary>Loon server URL for Discord cover art (e.g. "wss://loon.example.com").</summary>
     public string LoonServerUrl { get; set; } = "https://noctis-loon.duckdns.org";

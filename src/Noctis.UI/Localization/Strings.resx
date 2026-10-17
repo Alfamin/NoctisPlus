@@ -289,6 +289,8 @@ Deezer and TIDAL: paste the link.</value></data>
   <data name="Settings.Wider" xml:space="preserve"><value>Wider</value><comment>Text in SettingsView.axaml</comment></data>
   <data name="Settings.SongProgressTaskbar" xml:space="preserve"><value>Song Progress on Taskbar</value><comment>Text in SettingsView.axaml</comment></data>
   <data name="Settings.ShowHowFarAlong" xml:space="preserve"><value>Show song progress on the taskbar button. Amber while paused.</value><comment>Text in SettingsView.axaml</comment></data>
+  <data name="Settings.MediaControlsTaskbar" xml:space="preserve"><value>Media Controls on Taskbar</value><comment>Text in SettingsView.axaml</comment></data>
+  <data name="Settings.MediaControlsTaskbarDesc" xml:space="preserve"><value>Show Previous, Play/Pause, Forward and Favorite buttons when you hover the taskbar icon.</value><comment>Text in SettingsView.axaml</comment></data>
   <data name="Settings.AutomaticAlbumCoverSize" xml:space="preserve"><value>Automatic Album Cover Size</value><comment>Text in SettingsView.axaml</comment></data>
   <data name="Settings.AlbumCoverSize" xml:space="preserve"><value>Album cover size</value><comment>Accessible name of the cover size slider (Smaller / Larger) in SettingsView.axaml</comment></data>
   <data name="Settings.FiveCoversPerRow" xml:space="preserve"><value>Five covers per row. Turn off to pick your own cover size.</value><comment>Text in SettingsView.axaml</comment></data>
@@ -474,6 +476,11 @@ Deezer and TIDAL: paste the link.</value></data>
   <data name="Settings.ShowCurrentSongDiscord" xml:space="preserve"><value>Show your current song on Discord.</value><comment>Text in SettingsView.axaml</comment></data>
   <data name="Settings.ShowAlbumDiscord" xml:space="preserve"><value>Show Album on Discord</value><comment>Text in SettingsView.axaml</comment></data>
   <data name="Settings.AddAlbumNameUnder" xml:space="preserve"><value>Show the album name under the artist on your Discord card.</value><comment>Text in SettingsView.axaml</comment></data>
+  <data name="Settings.DiscordStatusDisplay" xml:space="preserve"><value>Status on Discord</value><comment>Settings ▸ Integrations ▸ Discord, SettingsView.axaml</comment></data>
+  <data name="Settings.DiscordStatusDisplayHint" xml:space="preserve"><value>What Discord shows after "Listening to" in the member list and on your profile.</value><comment>Settings ▸ Integrations ▸ Discord, SettingsView.axaml</comment></data>
+  <data name="Settings.DiscordStatusDisplay.Artist" xml:space="preserve"><value>Artist</value><comment>Discord status line choice (SettingsViewModel)</comment></data>
+  <data name="Settings.DiscordStatusDisplay.Title" xml:space="preserve"><value>Song title</value><comment>Discord status line choice (SettingsViewModel)</comment></data>
+  <data name="Settings.DiscordStatusDisplay.AppName" xml:space="preserve"><value>Noctis</value><comment>Discord status line choice (SettingsViewModel)</comment></data>
   <data name="Settings.LastFmScrobbling" xml:space="preserve"><value>Last.fm Scrobbling</value><comment>Text in SettingsView.axaml</comment></data>
   <data name="Settings.SendPlaysLastFm" xml:space="preserve"><value>Send plays to Last.fm.</value><comment>Text in SettingsView.axaml</comment></data>
   <data name="Settings.ACCOUNT" xml:space="preserve"><value>ACCOUNT</value><comment>Text in SettingsView.axaml</comment></data>
@@ -2476,13 +2483,31 @@ The lines and their timings are dropped and an empty lyrics box opens for your o
   <data name="LyricsStudio.Save" xml:space="preserve"><value>Save lyrics</value><comment>Review button</comment></data>
   <data name="LyricsStudio.Words" xml:space="preserve"><value>Words</value><comment>Per-line toggle that opens the word strip</comment></data>
   <data name="LyricsStudio.WordsTip" xml:space="preserve"><value>Show each word with its time. Click one to hear it.</value><comment>Word toggle tooltip</comment></data>
-  <data name="LyricsStudio.WordEarlier" xml:space="preserve"><value>Selected word 50 ms earlier (its neighbours stay put)</value><comment>Word nudge tooltip</comment></data>
-  <data name="LyricsStudio.WordLater" xml:space="preserve"><value>Selected word 50 ms later (its neighbours stay put)</value><comment>Word nudge tooltip</comment></data>
   <data name="LyricsStudio.TapWords" xml:space="preserve"><value>Tap words</value><comment>Starts tap-to-time for one line</comment></data>
   <data name="LyricsStudio.TapTip" xml:space="preserve"><value>Plays the line. Press Space or Tap on each word; one more tap ends the line.</value><comment>Tap button tooltip</comment></data>
   <data name="LyricsStudio.Tap" xml:space="preserve"><value>Tap</value><comment>Tap bar button</comment></data>
   <data name="LyricsStudio.TapCancel" xml:space="preserve"><value>Done</value><comment>Tap bar leave button</comment></data>
   <data name="LyricsStudio.PlayFromHere" xml:space="preserve"><value>Play from here</value><comment>Time pill tooltip</comment></data>
+  <data name="LyricsStudio.NudgeTargetLine" xml:space="preserve"><value>Line {0} – {1}</value><comment>Nudge bar label: the selected line's start and end</comment></data>
+  <data name="LyricsStudio.NudgeTargetWord" xml:space="preserve"><value>“{0}” {1} – {2}</value><comment>Nudge bar label: the selected word, its start and end</comment></data>
+  <data name="LyricsStudio.NudgeNoTarget" xml:space="preserve"><value>Click a line's time or a word to nudge it</value><comment>Nudge bar label when nothing is selected</comment></data>
+  <data name="LyricsStudio.NudgeWhole" xml:space="preserve"><value>Whole</value><comment>Nudge bar segment: move start and end together</comment></data>
+  <data name="LyricsStudio.NudgeWholeTip" xml:space="preserve"><value>Move it as one: start and end together. A whole line takes its words along.</value><comment>Tooltip</comment></data>
+  <data name="LyricsStudio.NudgeStart" xml:space="preserve"><value>Start</value><comment>Nudge bar segment: move only the start</comment></data>
+  <data name="LyricsStudio.NudgeStartTip" xml:space="preserve"><value>Move only where it starts</value><comment>Tooltip</comment></data>
+  <data name="LyricsStudio.NudgeEnd" xml:space="preserve"><value>End</value><comment>Nudge bar segment: move only the end</comment></data>
+  <data name="LyricsStudio.NudgeEndTip" xml:space="preserve"><value>Move only where it ends</value><comment>Tooltip</comment></data>
+  <data name="LyricsStudio.NudgeFineEarlier" xml:space="preserve"><value>10 ms earlier · shortcut ,</value><comment>Tooltip</comment></data>
+  <data name="LyricsStudio.NudgeFineLater" xml:space="preserve"><value>10 ms later · shortcut .</value><comment>Tooltip</comment></data>
+  <data name="LyricsStudio.NudgeCoarseEarlier" xml:space="preserve"><value>100 ms earlier · shortcut Shift+,</value><comment>Tooltip</comment></data>
+  <data name="LyricsStudio.NudgeCoarseLater" xml:space="preserve"><value>100 ms later · shortcut Shift+.</value><comment>Tooltip</comment></data>
+  <data name="LyricsStudio.Hear" xml:space="preserve"><value>Hear it</value><comment>Nudge bar button: play from just before the selection</comment></data>
+  <data name="LyricsStudio.HearTip" xml:space="preserve"><value>Play from a second before the selected line or word · shortcut /</value><comment>Tooltip</comment></data>
+  <data name="LyricsStudio.LivePreview" xml:space="preserve"><value>Live preview</value><comment>Review button: show or hide the lyrics preview beside the editor</comment></data>
+  <data name="LyricsStudio.LivePreviewTip" xml:space="preserve"><value>Show the lyrics as they will look, beside the editor, following the song. Updates as you edit; nothing is saved.</value><comment>Tooltip</comment></data>
+  <data name="LyricsStudio.LivePreviewIdle" xml:space="preserve"><value>Play this song to watch its lyrics here</value><comment>Preview pane, when another song (or none) is playing</comment></data>
+  <data name="LyricsStudio.LivePreviewPlay" xml:space="preserve"><value>Play</value><comment>Preview pane button</comment></data>
+  <data name="LyricsStudio.HidePreview" xml:space="preserve"><value>Hide preview</value><comment>Tooltip of the preview pane's X</comment></data>
   <data name="LyricsStudio.ModelNeededTitle" xml:space="preserve"><value>Download Lullaby to start</value><comment>Model card title: no model on disk yet "Lullaby" is the model's name: keep it untranslated.</comment></data>
   <data name="LyricsStudio.ModelNeededBody" xml:space="preserve"><value>Lyrics Studio listens to songs with Lullaby, the Noctis lyrics model built on OpenAI Whisper, right on this computer. It is a one-time download of {0}.</value><comment>Model card text. {0} = download size, e.g. 1.4 GB "Lullaby" is the model's name: keep it untranslated.</comment></data>
   <data name="LyricsStudio.ModelDownloadSize" xml:space="preserve"><value>Download ({0})</value><comment>Model card button. {0} = download size</comment></data>

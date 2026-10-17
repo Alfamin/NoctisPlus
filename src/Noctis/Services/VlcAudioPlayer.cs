@@ -566,13 +566,15 @@ public class VlcAudioPlayer : IAudioPlayer, IOpenFileHolder
             Environment.GetEnvironmentVariable("NOCTIS_BUNDLED_VLC"));
         if (_avformatDemux)
             vlcArgs.Add("--demux=avformat");
-        // The speex resampler module + its quality flag are not always present
-        // in third-party VLC builds (notably the macOS VLC.app distribution).
-        // mmdevice is Windows-only.
-        if (OperatingSystem.IsWindows())
+        // See ShouldForceSpeexResampler: Linux needs it as much as Windows.
+        if (ShouldForceSpeexResampler(OperatingSystem.IsWindows(), OperatingSystem.IsLinux()))
         {
             vlcArgs.Add("--audio-resampler=speex");
             vlcArgs.Add("--speex-resampler-quality=10");
+        }
+        // mmdevice is Windows-only.
+        if (OperatingSystem.IsWindows())
+        {
             // Diagnostic override: NOCTIS_AOUT lets us A/B the Windows audio
             // output module on real hardware without recompiling. On Bluetooth
             // (AirPods etc.) mmdevice's WASAPI clock can spiral into a permanent
@@ -6250,6 +6252,18 @@ public class VlcAudioPlayer : IAudioPlayer, IOpenFileHolder
     /// Pure; internal for tests.
     /// </summary>
     internal static bool IsGaplessEnginePlatform(bool isWindows, bool isLinux) => isWindows || isLinux;
+
+    /// <summary>
+    /// Whether to pick VLC's speex resampler at quality 10. Every engine platform
+    /// needs it: the engine runs at a fixed rate and amem only delivers S16N, so
+    /// VLC's "samplerate" module refuses and "any" lands on "ugly" (nearest
+    /// neighbour that drops a fractional frame per decoder block, GitHub #139:
+    /// 48/96/192 kHz files crackled on Linux in 1.6.3). The resampler lookup is
+    /// non-strict, so a build without speex falls back rather than failing.
+    /// macOS keeps VLC's default (its VLC.app payload may lack the module and
+    /// its per-track output opens at the file's own rate). Pure; internal for tests.
+    /// </summary>
+    internal static bool ShouldForceSpeexResampler(bool isWindows, bool isLinux) => isWindows || isLinux;
 
     /// <summary>
     /// Whether an MP3 opens on LibVLC's own MP3 demuxer instead of the forced avformat one:

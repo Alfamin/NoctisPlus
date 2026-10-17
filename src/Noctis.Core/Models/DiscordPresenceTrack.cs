@@ -10,4 +10,5 @@ public record DiscordPresenceTrack(
     string Artist,
     string? Album,
     string? ArtworkUrl = null,
-    bool ShowAlbum = true);
+    bool ShowAlbum = true,
+    DiscordStatusDisplay StatusDisplay = DiscordStatusDisplay.Artist);

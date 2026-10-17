@@ -106,6 +106,7 @@ public sealed partial class ArtistPageViewModel : MobilePage, ITintedPage
         Name = name;
         Tint = shell.TintFactory();
         Tint.HeroFade = true;
+        Tint.Enabled = shell.ArtworkPageColors;
         _isFavourite = shell.FavoriteArtists.IsFavorite(name);
         _photo = shell.ArtistPhotos?.CachedPhoto(name);
         Shell.Library.Refreshed += OnRefreshed;
@@ -318,6 +319,8 @@ public sealed partial class ArtistPageViewModel : MobilePage, ITintedPage
         if (e.PropertyName is nameof(ShellViewModel.IsNowPlayingOpen) or nameof(ShellViewModel.IsLyricsOpen)
             or nameof(ShellViewModel.IsQueueOpen))
             SyncNowPlaying();
+        else if (e.PropertyName == nameof(ShellViewModel.ArtworkPageColors))
+            Tint.Enabled = Shell.ArtworkPageColors;   // Settings › Appearance › Album Colours, live
     }
 
     /// <summary>The album page's rule: the player's song shows the bars, moving only while it

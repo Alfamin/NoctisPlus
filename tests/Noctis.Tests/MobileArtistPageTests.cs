@@ -367,11 +367,13 @@ public class MobileArtistPageTests : IDisposable
         Assert.Equal(view.Bounds.Width / 2, BoundsIn(buttons[1], view).Center.X, 1);
         Assert.Equal(view.Bounds.Width / 2, nameBox.Center.X, 1);
 
-        // The buttons wear a shade of the page colour: lighter than this red, white glyphs.
-        var red = Color.FromRgb(0xC8, 0x10, 0x2E);
+        // The page is the deep shade of this red; the buttons wear a shade of the page colour,
+        // lighter than it, with white glyphs.
+        var pageColour = ((ArtistPageViewModel)rig.Shell.CurrentPage!).Tint.TintColor!.Value;
+        Assert.Equal(Noctis.Services.DominantColorExtractor.DeepPageColor(Color.FromRgb(0xC8, 0x10, 0x2E)), pageColour);
         var fill = ((ISolidColorBrush)buttons[1].Background!).Color;
-        Assert.Equal(ArtistPage.Shade(red, ArtistPage.ButtonShade), fill);
-        Assert.True(ArtistPage.Lightness(fill) > ArtistPage.Lightness(red));
+        Assert.Equal(ArtistPage.Shade(pageColour, ArtistPage.ButtonShade), fill);
+        Assert.True(ArtistPage.Lightness(fill) > ArtistPage.Lightness(pageColour));
         Assert.Equal(Colors.White, ((ISolidColorBrush)name.Foreground!).Color);
         Assert.Equal(Colors.White, ((ISolidColorBrush)buttons[1].Foreground!).Color);
 
