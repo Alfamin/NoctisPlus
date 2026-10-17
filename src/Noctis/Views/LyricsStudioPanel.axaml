@@ -638,7 +638,8 @@
                         <StackPanel VerticalAlignment="Center" HorizontalAlignment="Center" Spacing="10" Margin="16">
                             <TextBlock Text="{loc:T LyricsStudio.LivePreviewIdle}" FontSize="12.5" Opacity="0.7" TextWrapping="Wrap"
                                        TextAlignment="Center" MaxWidth="220" />
-                            <Button Classes="studio-btn pill-outline" HorizontalAlignment="Center" Command="{Binding PlayLivePreviewCommand}">
+                            <Button Classes="studio-btn pill-outline" HorizontalAlignment="Center" Command="{Binding PlayLivePreviewCommand}"
+                                    AutomationProperties.Name="{loc:T LyricsStudio.LivePreviewPlay}">
                                 <StackPanel Orientation="Horizontal" Spacing="6">
                                     <PathIcon Data="{StaticResource PlayIcon}" Width="10" Height="10" VerticalAlignment="Center" />
                                     <TextBlock Text="{loc:T LyricsStudio.LivePreviewPlay}" VerticalAlignment="Center" />
@@ -769,7 +770,8 @@
                                     </Button>
                                     <!-- Shows or hides the live preview pane beside the editor (10-14); the dot = open. -->
                                     <Button Command="{Binding ToggleLivePreviewCommand}" IsVisible="{Binding CanLivePreview}"
-                                            Classes="studio-btn pill-outline studio-live-preview" ToolTip.Tip="{loc:T LyricsStudio.LivePreviewTip}">
+                                            Classes="studio-btn pill-outline studio-live-preview" ToolTip.Tip="{loc:T LyricsStudio.LivePreviewTip}"
+                                            AutomationProperties.Name="{loc:T LyricsStudio.LivePreview}">
                                         <StackPanel Orientation="Horizontal" Spacing="6">
                                             <Ellipse Width="6" Height="6" VerticalAlignment="Center" Fill="{DynamicResource AccentColorBrush}"
                                                      IsVisible="{Binding ShowLivePreview}" />
@@ -778,7 +780,8 @@
                                     </Button>
                                     <!-- Plays the song on the real lyrics page with these unsaved timings (09-23). -->
                                     <Button Command="{Binding PreviewOnLyricsPageCommand}" IsVisible="{Binding CanPreview}"
-                                            Classes="studio-btn pill-outline" ToolTip.Tip="{loc:T LyricsStudio.PreviewTip}">
+                                            Classes="studio-btn pill-outline" ToolTip.Tip="{loc:T LyricsStudio.PreviewTip}"
+                                            AutomationProperties.Name="{loc:T LyricsStudio.Preview}">
                                         <StackPanel Orientation="Horizontal" Spacing="6">
                                             <PathIcon Data="{StaticResource PlayIcon}" Width="10" Height="10" VerticalAlignment="Center" />
                                             <TextBlock Text="{loc:T LyricsStudio.Preview}" VerticalAlignment="Center" />
@@ -793,7 +796,8 @@
                                         </Button>
                                         <!-- The rarely used actions behind one round pill: the album page's dots in the
                                              Studio's outline (local Padding: the studio-btn style's would win). -->
-                                        <Button Classes="studio-btn pill-outline studio-more" Padding="8,7" ToolTip.Tip="{loc:T LyricsStudio.MoreTip}">
+                                        <Button Classes="studio-btn pill-outline studio-more" Padding="8,7" ToolTip.Tip="{loc:T LyricsStudio.MoreTip}"
+                                                AutomationProperties.Name="{loc:T LyricsStudio.MoreTip}">
                                             <PathIcon Data="{StaticResource MoreDotsIcon}" Width="15" Height="15" VerticalAlignment="Center" />
                                             <Button.Flyout>
                                                 <MenuFlyout Placement="BottomEdgeAlignedRight" helpers:MenuOpenAnimation.EnableFlyoutClose="True">
@@ -905,7 +909,7 @@
                                     </StackPanel>
                                 </Border>
                                 <Button Classes="studio-btn pill-outline" Padding="12,5" Command="{Binding AuditionCommand}"
-                                        IsEnabled="{Binding HasNudgeTarget}" ToolTip.Tip="{loc:T LyricsStudio.HearTip}">
+                                        IsEnabled="{Binding HasNudgeTarget}" ToolTip.Tip="{loc:T LyricsStudio.HearTip}" AutomationProperties.Name="{loc:T LyricsStudio.Hear}">
                                     <StackPanel Orientation="Horizontal" Spacing="6">
                                         <PathIcon Data="{StaticResource PlayIcon}" Width="10" Height="10" VerticalAlignment="Center" />
                                         <TextBlock Text="{loc:T LyricsStudio.Hear}" VerticalAlignment="Center" />
@@ -955,7 +959,7 @@
                                                 <Button Grid.Column="1" Classes="word-toggle" Classes.open="{Binding IsExpanded}" VerticalAlignment="Center"
                                                         Command="{Binding $parent[views:LyricsStudioPanel].((vm:LyricsStudioViewModel)DataContext).ToggleWordsCommand}"
                                                         CommandParameter="{Binding}"
-                                                        ToolTip.Tip="{loc:T LyricsStudio.WordsTip}">
+                                                        ToolTip.Tip="{loc:T LyricsStudio.WordsTip}" AutomationProperties.Name="{loc:T LyricsStudio.Words}">
                                                     <StackPanel Orientation="Horizontal" Spacing="4">
                                                         <Ellipse Classes="words-dot" Width="6" Height="6" VerticalAlignment="Center"
                                                                  IsVisible="{Binding HasWordTimings}" Fill="{DynamicResource AccentColorBrush}" />
@@ -977,7 +981,7 @@
                                                             </ItemsControl.ItemsPanel>
                                                             <ItemsControl.ItemTemplate>
                                                                 <DataTemplate x:DataType="vm:ReviewWord">
-                                                                    <Button Classes="word-chip" Margin="0,0,4,4"
+                                                                    <Button Classes="word-chip" Margin="0,0,4,4" AutomationProperties.Name="{Binding AccessibleName}"
                                                                             Classes.selected="{Binding IsSelected}" Classes.target="{Binding IsTapTarget}" Classes.tapped="{Binding IsTapped}"
                                                                             Command="{Binding $parent[views:LyricsStudioPanel].((vm:LyricsStudioViewModel)DataContext).SelectWordCommand}"
                                                                             CommandParameter="{Binding}">

@@ -121,6 +121,54 @@ public class LyricsStudioNudgeBarTests : IDisposable
         finally { win.Close(); }
     }
 
+    [AvaloniaFact]
+    public void WordChips_AreNamedByTheirWordAndTime_ForScreenReaders()
+    {
+        var (win, panel, vm) = Mount();
+        try
+        {
+            vm.ToggleWordsCommand.Execute(vm.ReviewLines[0]);
+            Settle(win);
+            var chips = panel.GetVisualDescendants().OfType<Button>().Where(b => b.Classes.Contains("word-chip")).ToList();
+            Assert.Equal(vm.ReviewLines[0].Words.Count, chips.Count);
+            // A chip is a button of two text blocks: without a name UIA read it as a blank button.
+            var first = vm.ReviewLines[0].Words[0];
+            Assert.Equal($"First, {first.TimeText}", UiaName(chips[0]));
+
+            // The name follows a nudge of the word.
+            vm.SelectWordCommand.Execute(first);
+            vm.NudgeSelectionBy(TimeSpan.FromMilliseconds(100));
+            Settle(win);
+            Assert.Equal($"First, {first.TimeText}", UiaName(chips[0]));
+            Assert.Contains("05.10", first.TimeText);
+        }
+        finally { win.Close(); }
+    }
+
+    /// <summary>What UIA reads: a button with panel content and no name reads as the panel's type name.</summary>
+    private static string? UiaName(Control c) => Avalonia.Automation.Peers.ControlAutomationPeer.CreatePeerForElement(c).GetName();
+
+    [AvaloniaFact]
+    public void NoButtonInTheReview_ReadsAsATypeName()
+    {
+        var (win, panel, vm) = Mount();
+        try
+        {
+            // Preview, the live pane's toggle and its idle Play show only when wired: wire them.
+            vm.ShowOnLyricsPage = (_, _) => Task.CompletedTask;
+            vm.UpdateLivePreview = (_, _) => { };
+            vm.ShowLivePreview = true;
+            vm.ToggleWordsCommand.Execute(vm.ReviewLines[0]);
+            Settle(win);
+            var bad = panel.GetVisualDescendants().OfType<Button>().Where(b => b.IsEffectivelyVisible)
+                .Select(b => (b, name: UiaName(b) ?? ""))
+                .Where(x => x.name.StartsWith("Avalonia.", StringComparison.Ordinal) || x.name.StartsWith("Noctis.", StringComparison.Ordinal))
+                .Select(x => string.Join(".", x.b.Classes) + "=" + x.name).ToList();
+            Assert.True(bad.Count == 0, "Buttons read as a type name: " + string.Join("; ", bad));
+        }
+        finally { win.Close(); }
+    }
+
     private sealed class NoRunEngine : ILyricsStudioEngine
     {
         public NoRunEngine(string root) => Models = StudioTestModel.Installed(root);
