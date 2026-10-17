@@ -30,6 +30,7 @@ internal sealed class Downloads : IDisposable
     private Download? _current, _last;
     private CancellationTokenSource? _currentStop;
     private int _done, _saved;
+    private bool _disposed;
     public bool Paused { get { lock (_gate) return _paused; } }
     public IReadOnlyList<Download> History { get { lock (_gate) return _known.ToArray(); } }
     public IReadOnlyList<Download> Active { get { lock (_gate) return _active.ToArray(); } }
@@ -81,6 +82,9 @@ internal sealed class Downloads : IDisposable
     private sealed record QueueFile(int Version, bool Paused, QueueItem[] Items);
     private void Save()
     {
+        // Dispose checkpoints synchronously before relinquishing ownership of the file.
+        // A cancelled worker may finish much later; it must never replace a newer queue.
+        if (_disposed) return;
         var active = _active.ToHashSet();
         if (_store is not null) AtomicJson.Write(_store, new QueueFile(1, _paused,
             _active.Concat(_known.Where(d => !active.Contains(d))).Where(d => d.Track.Request is not null)
@@ -135,7 +139,7 @@ internal sealed class Downloads : IDisposable
             else
             {
                 download = new Download(track, folder) { Priority = priority, Held = held && !priority };
-                if (_stop.IsCancellationRequested) { download.State = DownloadState.Cancelled; return download; }
+                if (_disposed || _stop.IsCancellationRequested) { download.State = DownloadState.Cancelled; return download; }
                 if (_known.Count >= 10000) throw new InvalidOperationException("QUEUE_FULL: clear finished history or remove requests before adding more than 10,000 tracks.");
                 _known.Add(download); Insert(download);
                 try { Save(); } catch { _active.Remove(download); _known.Remove(download); throw; }
@@ -206,7 +210,17 @@ internal sealed class Downloads : IDisposable
         Cancel(cancel); Wake(); foreach (var item in old) Raise(item);
     }
     private static void Cancel(CancellationTokenSource? source) { try { source?.Cancel(); } catch (ObjectDisposedException) { } }
-    public void Dispose() { _stop.Cancel(); Wake(); }
+    public void Dispose()
+    {
+        lock (_gate)
+        {
+            if (_disposed) return;
+            SaveOrLog(); // Running/queued requests are already resumable on restore.
+            _disposed = true;
+        }
+        _stop.Cancel();
+        Wake();
+    }
     private static bool Same(Download d, string name, string folder) =>
         string.Equals(d.Track.FileName, name, StringComparison.OrdinalIgnoreCase) && string.Equals(d.Folder, folder, StringComparison.OrdinalIgnoreCase);
 
@@ -220,6 +234,7 @@ internal sealed class Downloads : IDisposable
                 TimeSpan delay = TimeSpan.FromMinutes(1);
                 lock (_gate)
                 {
+                    if (_disposed) break;
                     var eligible = _active.Where(d => d != _current && Runnable(d)).ToArray();
                     download = eligible.FirstOrDefault(d => d.RetryAt is null || d.RetryAt <= DateTimeOffset.UtcNow);
                     if (download is not null)

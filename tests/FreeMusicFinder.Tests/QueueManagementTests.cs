@@ -16,8 +16,33 @@ internal static class QueueManagementTests
     public static async Task RunAsync()
     {
         SharedCheckpointRead();
+        await RetiredWorkerCannotOverwriteReplacement();
         await Priority(); await RemovalAndRestart(); await CancelRunning(); await ClearAndStorageFailure(); await ClearImports();
         await WorkerSurvivesSaveFailure(); await ReportWhileHeld();
+    }
+    private static async Task RetiredWorkerCannotOverwriteReplacement()
+    {
+        Check.Section("a retired queue worker cannot overwrite its replacement checkpoint");
+        var root = Check.NewFolder("queue-retired-worker"); var path = Path.Combine(root, "queue.json");
+        var entered = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var release = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var retired = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        using var old = new Downloads(_ => { }, path, r => Track(r.Title));
+        old.Changed += d => { if (d.State == DownloadState.Cancelled) retired.TrySetResult(); };
+        old.Start(Track("Old running", async _ => { entered.SetResult(); await release.Task; }), root);
+        await entered.Task;
+        old.Dispose();
+        // Read the synchronous handover checkpoint while the cancelled transfer is still
+        // deliberately held inside a source that has not observed cancellation yet.
+        using var replacement = new Downloads(_ => { }, path, r => Track(r.Title));
+        replacement.Clear();
+        replacement.Start(Track("New held request"), root, held: true);
+        var expected = File.ReadAllBytes(path);
+        release.SetResult();
+        await retired.Task.WaitAsync(TimeSpan.FromSeconds(5));
+        Check.True(expected.SequenceEqual(File.ReadAllBytes(path)), "late cancellation never overwrites a newer checkpoint");
+        Check.Equal("New held request", replacement.Active.Single().Track.Title, "replacement queue retains only its own pending request");
+        Check.Equal(DownloadState.Cancelled, old.Start(Track("After disposal"), root).State, "retired queue cannot accept new requests");
     }
     private static void SharedCheckpointRead()
     {
