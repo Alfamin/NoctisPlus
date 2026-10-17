@@ -142,7 +142,8 @@
     <SolidColorBrush x:Key="SidebarSelectedBrush" Color="#33FFFFFF" />
     <SolidColorBrush x:Key="SidebarSelectedHoverBrush" Color="#40FFFFFF" />
     <SolidColorBrush x:Key="SidebarHoverBrush" Color="#16FFFFFF" />
-    <SolidColorBrush x:Key="QueueDrawerBackground" Color="#EB2A2D38" />
+    <!-- Opaque, see Styles.axaml (the page would show through with glass off). -->
+    <SolidColorBrush x:Key="QueueDrawerBackground" Color="#2A2D38" />
     <SolidColorBrush x:Key="QueueDrawerForeground" Color="#F1F2F6" />
     <!-- Context menu v2 (ContextMenu.v2, 10-09): translucent tints over the menu card. -->
     <SolidColorBrush x:Key="MenuV2BorderBrush" Color="#17FFFFFF" />

@@ -541,6 +541,11 @@ public static class PackThemeBuilder
         var dict = ThemeDerivation.Derive(def);
         foreach (var (key, color) in theme.Colors)
             dict[key] = new SolidColorBrush(color);
+        // The queue drawer's fill is laid on opaque: with Liquid Glass off nothing frosts under
+        // it, so a translucent pack colour showed the page through it sharp; with glass on only
+        // its RGB tints the frost (at Glass Opacity).
+        if (theme.Colors.TryGetValue("QueueDrawerBackground", out var drawer))
+            dict["QueueDrawerBackground"] = new SolidColorBrush(Color.FromRgb(drawer.R, drawer.G, drawer.B));
 
         // Keys that travel together: the Color twins of brushes, and Fluent's own foreground
         // brushes, which otherwise keep the base palette's text colours (see Ink.axaml).

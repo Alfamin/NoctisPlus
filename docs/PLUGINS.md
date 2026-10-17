@@ -581,7 +581,8 @@ sample-pack-1.0.0.zip
 | Sidebar and queue | `SidebarSelectedBrush`, `SidebarSelectedHoverBrush`, `SidebarHoverBrush`, `QueueDrawerBackground`, `QueueDrawerForeground` |
 
 Accent-coloured surfaces (the now-playing row, toggles, sliders, accent buttons) always follow the
-user's accent and cannot be set by a theme. Pack themes appear in Settings → Appearance → Themes
+user's accent and cannot be set by a theme. `QueueDrawerBackground` is always drawn opaque (its
+alpha is ignored), so the page never shows through the queue drawer. Pack themes appear in Settings → Appearance → Themes
 after the built-in and custom ones, labelled *by &lt;pack name&gt;*, and apply live. When the pack
 is switched off or removed, a pack theme that was in use falls back to the default theme (Gray,
 Crimson accent).
