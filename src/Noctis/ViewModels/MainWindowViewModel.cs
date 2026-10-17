@@ -1784,6 +1784,8 @@ public partial class MainWindowViewModel : ViewModelBase
             PlaylistFeaturedArtistsViewModel => Loc.T("TopBar.SearchIn", Loc.T("TopBar.FeaturedArtists")),
             MoreByArtistViewModel => Loc.T("TopBar.SearchIn", Loc.T("Nav.Albums")),
             ArtistDetailViewModel artistPage => Loc.T("TopBar.SearchIn", artistPage.ArtistName),
+            // A page opened from Search (an online album) would read "Search in Search".
+            _ when TopBar.CurrentTabName == "Search" => "Artists, songs, albums",
             _ => Loc.T("TopBar.SearchIn", TopBar.CurrentTabTitle)
         };
 

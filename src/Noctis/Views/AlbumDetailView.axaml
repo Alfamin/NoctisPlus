@@ -689,6 +689,7 @@
 
             <!-- Album-level favorite heart + 3-dots menu (bottom, aligned with track dots) -->
             <StackPanel Grid.Column="2"
+                        IsVisible="{Binding ShowPlayActions}"
                         Orientation="Horizontal"
                         Spacing="4"
                         VerticalAlignment="Bottom"
