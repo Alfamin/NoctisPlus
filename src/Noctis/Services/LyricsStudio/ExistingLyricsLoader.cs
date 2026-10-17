@@ -259,7 +259,7 @@ public static partial class ExistingLyricsLoader
                     if (wText.Length == 0) continue;
                     var end = word.End ?? (w + 1 < words.Count ? words[w + 1].Start : nextStart ?? word.Start + DefaultWordSpan);
                     if (end < word.Start) end = word.Start;
-                    aligned.Add(new AlignedWord(wText, word.Start, end));
+                    aligned.Add(new AlignedWord(wText, word.Start, end) { JoinsNext = FollowedWithoutSpace(words, w) });
                 }
             }
             var lineEnd = aligned.Count > 0 ? aligned[^1].End
@@ -311,8 +311,10 @@ public static partial class ExistingLyricsLoader
                 var delta = line.Start - from.Start;
                 carried = carried with
                 {
-                    Background = background.Select(w => new AlignedWord(w.Text,
-                        TimeSpan.FromTicks(Math.Max(0, (w.Start + delta).Ticks)), TimeSpan.FromTicks(Math.Max(0, (w.End + delta).Ticks)))).ToList(),
+                    Background = background.Select(w => w with
+                    {
+                        Start = TimeSpan.FromTicks(Math.Max(0, (w.Start + delta).Ticks)), End = TimeSpan.FromTicks(Math.Max(0, (w.End + delta).Ticks)),
+                    }).ToList(),
                 };
             }
             result.Add(carried);
@@ -374,10 +376,18 @@ public static partial class ExistingLyricsLoader
             var wText = words[w].Text.Trim();
             if (wText.Length == 0) continue;
             var end = words[w].End ?? (w + 1 < words.Count ? words[w + 1].Start : words[w].Start + DefaultWordSpan);
-            result.Add(new AlignedWord(wText, words[w].Start, end < words[w].Start ? words[w].Start : end));
+            result.Add(new AlignedWord(wText, words[w].Start, end < words[w].Start ? words[w].Start : end) { JoinsNext = FollowedWithoutSpace(words, w) });
         }
         return result.Count > 0 ? result : null;
     }
+
+    /// <summary>
+    /// The parsed word is followed by another with no space between: the ELRC reader keeps the
+    /// space after a word on its text, and leaves CJK characters and lone punctuation unjoined.
+    /// Without this a save put a space between every character of CJK lyrics ("偶 尔").
+    /// </summary>
+    private static bool FollowedWithoutSpace(List<WordTiming> words, int index) =>
+        index + 1 < words.Count && words[index].Text is { Length: > 0 } text && !char.IsWhiteSpace(text[^1]);
 
     private static bool TryParseFile(string path, out IReadOnlyList<AlignedLine> lines)
     {

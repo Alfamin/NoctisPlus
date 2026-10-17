@@ -61,12 +61,18 @@ public static partial class TimedLyricsBuilder
         if (line.Background is not { Count: > 0 } words) return;
         sb.Append("[bg: ");
         if (!timed)
-            sb.Append(string.Join(' ', words.Select(w => w.Text.Trim())));
+        {
+            for (var i = 0; i < words.Count; i++)
+            {
+                if (i > 0 && !words[i - 1].JoinsNext) sb.Append(' ');
+                sb.Append(words[i].Text.Trim());
+            }
+        }
         else
         {
             for (var i = 0; i < words.Count; i++)
             {
-                if (i > 0) sb.Append(' ');
+                if (i > 0 && !words[i - 1].JoinsNext) sb.Append(' ');
                 sb.Append('<').Append(FormatTimestamp(words[i].Start)).Append('>').Append(words[i].Text.Trim());
             }
             sb.Append('<').Append(FormatTimestamp(words[^1].End)).Append('>');
@@ -95,7 +101,7 @@ public static partial class TimedLyricsBuilder
         {
             var w = line.Words[i];
             sb.Append('<').Append(FormatTimestamp(w.Start)).Append('>').Append(w.Text.Trim());
-            if (i + 1 < line.Words.Count) sb.Append(' ');
+            if (i + 1 < line.Words.Count && !w.JoinsNext) sb.Append(' ');
         }
         return sb.Append('<').Append(FormatTimestamp(line.Words[^1].End)).Append('>').ToString();
     }
@@ -180,8 +186,7 @@ public static partial class TimedLyricsBuilder
     /// <summary>
     /// TTML in Apple Music's lyrics layout, for players that read TTML and LRC but not ELRC
     /// (Discord, nutf!xx: Light Cone): one &lt;p&gt; per line, one &lt;span&gt; per timed word with
-    /// a space between spans (the word boundary <see cref="TtmlParser"/> and Apple's own files
-    /// use), clock times hh:mm:ss.fff. A line without word timings is its text; itunes:timing
+    /// the space after the word inside its span (see <see cref="AppendWordSpans"/>), clock times hh:mm:ss.fff. A line without word timings is its text; itunes:timing
     /// is "Word" when any line has words, else "Line". Ad-libs go in Apple's background-vocal
     /// span (ttm:role="x-bg") by the rules the ELRC reader applies to the same text
     /// (<see cref="EnhancedLrcParser.FoldBackgroundLines"/>): a parenthesised run inside a line
@@ -230,13 +235,12 @@ public static partial class TimedLyricsBuilder
                 sb.Append(" ttm:agent=\"").Append(line.Voice switch { LyricVoice.Voice2 => "v2", LyricVoice.Group => "v1000", _ => "v1" }).Append('"');
             sb.Append('>');
             if (line.Words.Count == 0)
-                sb.Append(XmlText(line.Text.Trim()));
-            AppendWordSpans(sb, main);
+                sb.Append(XmlText(line.Text.Trim() + (background.Count > 0 ? " " : string.Empty)));
+            AppendWordSpans(sb, main, spaceAfterLast: background.Count > 0);
             if (background.Count > 0)
             {
-                if (main.Count > 0) sb.Append(' ');
                 sb.Append("<span ttm:role=\"x-bg\">");
-                AppendWordSpans(sb, background);
+                AppendWordSpans(sb, background, spaceAfterLast: false);
                 sb.Append("</span>");
             }
             // Romaji / translation lines (GitHub #116) as the inline layer spans TtmlParser reads.
@@ -269,15 +273,23 @@ public static partial class TimedLyricsBuilder
         }
     }
 
-    private static void AppendWordSpans(StringBuilder sb, IReadOnlyList<AlignedWord> words)
+    /// <summary>
+    /// One span per word, the space after a word inside its span ("&lt;span&gt;Yeah &lt;/span&gt;").
+    /// A space written between the spans is a whitespace-only text node, which XML readers drop
+    /// by default (.NET's XDocument and XmlDocument, pull parsers told to skip whitespace): other
+    /// players showed those files as "YeahIdon'tsleep" (Discord, nutf!xx). <see cref="TtmlParser"/>
+    /// reads both layouts as the same words. <paramref name="spaceAfterLast"/>: a background row follows.
+    /// </summary>
+    private static void AppendWordSpans(StringBuilder sb, IReadOnlyList<AlignedWord> words, bool spaceAfterLast)
     {
         for (var k = 0; k < words.Count; k++)
         {
             var w = words[k];
-            if (k > 0) sb.Append(' ');
+            var text = w.Text.Trim();
+            if (k + 1 < words.Count ? !w.JoinsNext : spaceAfterLast) text += " ";
             sb.Append("<span begin=\"").Append(FormatTtmlTime(w.Start)).Append("\" end=\"")
               .Append(FormatTtmlTime(w.End < w.Start ? w.Start : w.End)).Append("\">")
-              .Append(XmlText(w.Text.Trim())).Append("</span>");
+              .Append(XmlText(text)).Append("</span>");
         }
     }
 

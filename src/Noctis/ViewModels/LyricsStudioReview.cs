@@ -325,8 +325,10 @@ public sealed partial class ReviewLine : ObservableObject
         foreach (var w in Words) w.Start += delta;
         End += delta;
         if (Background is { } background)
-            Background = background.Select(w => new AlignedWord(w.Text,
-                TimeSpan.FromTicks(Math.Max(0, (w.Start + delta).Ticks)), TimeSpan.FromTicks(Math.Max(0, (w.End + delta).Ticks)))).ToList();
+            Background = background.Select(w => w with
+            {
+                Start = TimeSpan.FromTicks(Math.Max(0, (w.Start + delta).Ticks)), End = TimeSpan.FromTicks(Math.Max(0, (w.End + delta).Ticks)),
+            }).ToList();
         SnapshotBaseline();
         RaiseTimes();
         Changed?.Invoke();
@@ -356,8 +358,10 @@ public sealed partial class ReviewLine : ObservableObject
         // A whole line takes its background vocal along, as Shift does.
         var moved = after.WordStarts[0] - before.WordStarts[0];
         if (index < 0 && edge == NudgeEdge.Whole && Background is { } background)
-            Background = background.Select(w => new AlignedWord(w.Text,
-                TimeSpan.FromTicks(Math.Max(0, (w.Start + moved).Ticks)), TimeSpan.FromTicks(Math.Max(0, (w.End + moved).Ticks)))).ToList();
+            Background = background.Select(w => w with
+            {
+                Start = TimeSpan.FromTicks(Math.Max(0, (w.Start + moved).Ticks)), End = TimeSpan.FromTicks(Math.Max(0, (w.End + moved).Ticks)),
+            }).ToList();
         if (index >= 0) HasWordTimings = true;
         SnapshotBaseline();
         RaiseTimes();
