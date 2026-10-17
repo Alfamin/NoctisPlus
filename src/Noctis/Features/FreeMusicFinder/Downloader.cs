@@ -104,7 +104,8 @@ internal static class Downloader
         {
             string extension;
             long length;
-            await using (var output = new FileStream(partial, FileMode.Create, FileAccess.Write, FileShare.None, 81920, useAsync: true))
+            // ReadWrite: the MP3 fallback reads a bot's MP3 back from this file while the other bot is asked for FLAC.
+            await using (var output = new FileStream(partial, FileMode.Create, FileAccess.ReadWrite, FileShare.None, 81920, useAsync: true))
             {
                 extension = await track.Fetch(output, progress, ct).ConfigureAwait(false);
                 length = output.Length;

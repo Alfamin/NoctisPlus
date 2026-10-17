@@ -56,6 +56,15 @@ internal static class TransferTests
             Check.Equal(1,deez.Calls,"the other bot was asked for FLAC first");
             Check.True(notices.Any(n=>n.Contains("MP3")),"the user is told an MP3 was saved");
         }
+        {
+            // The real path: Downloader's part file, not a MemoryStream. The MP3 is read back from it while the other
+            // bot is asked, so a write-only file failed every MP3 fallback with "Stream does not support reading".
+            var folder=Check.NewFolder("mp3-on-disk");
+            var sources=new MusicSources(Mp3("Music Hunters"),Missing("DeezLoad"),_=>{},allowMp3:()=>true);
+            var onDisk=new BotTrack("Leak","Artist",TimeSpan.FromSeconds(180),"Artist - Leak",(output,progress,ct)=>sources.FetchAsync(request,output,progress,ct));
+            Check.Equal(DownloadOutcome.Saved,await Downloader.DownloadAsync(onDisk,folder,null,default),"the MP3 fallback works on a real download file");
+            Check.Equal("ID3 mp3 audio",File.ReadAllText(Path.Combine(folder,"Artist - Leak.mp3")),"and the saved file is the MP3 itself");
+        }
         using(var output=new MemoryStream())
         {
             var flac=new Source("DeezLoad");
