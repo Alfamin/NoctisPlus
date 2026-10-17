@@ -8,7 +8,7 @@ namespace Noctis.Tests;
 public class WebRemoteQrTests
 {
     [AvaloniaFact]
-    public void TryRender_ProducesScannableBlackOnWhiteBitmap()
+    public void TryRender_ProducesSquareBitmapWithQuietZone()
     {
         using var bmp = QrCodeBitmap.TryRender("http://192.168.0.197:9420/?k=6384e0b2c35392bc");
 
@@ -16,8 +16,19 @@ public class WebRemoteQrTests
         Assert.Equal(bmp!.PixelSize.Width, bmp.PixelSize.Height);
         // Smallest QR is 21 modules; plus the 4-module quiet zone on each side.
         Assert.True(bmp.PixelSize.Width >= (21 + 8) * 8);
+    }
 
-        using var fb = bmp.Lock();
+    [AvaloniaFact]
+    public void TryRender_ProducesScannableBlackOnWhiteBitmap()
+    {
+        // The default headless drawing stub does not promise pixel retention across
+        // framebuffer locks. Test pixels with the real renderer, as the other pixel probes do.
+        if (!HeadlessTestApp.RealRendering)
+            Assert.Skip("needs real Skia rendering (NOCTIS_TEST_SKIA=1); bitmap dimensions are checked separately");
+        using var bmp = QrCodeBitmap.TryRender("http://192.168.0.197:9420/?k=6384e0b2c35392bc");
+        Assert.NotNull(bmp);
+
+        using var fb = bmp!.Lock();
         int Pixel(int x, int y) => Marshal.ReadInt32(fb.Address + y * fb.RowBytes + x * 4);
 
         // Quiet zone is opaque white (scannability on dark themes depends on it) and
