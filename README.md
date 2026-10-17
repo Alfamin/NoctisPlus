@@ -1,14 +1,56 @@
-# Noctis Plus (local preview)
+<div align="center">
 
-Fork of [Noctis by heartached](https://github.com/heartached/Noctis), based on stable 1.6.3.
-Includes Finder, True Shuffle, WordLyrics and Lyric Motion, with separate profiles, Windows
-installation identity and update feed. [Run/build instructions](docs/fork/QUICKSTART.md) ·
-[provenance and release requirements](docs/fork/PROVENANCE.md).
+<h1>
+  <img src="src/Noctis/Assets/Icons/Noctis.ico" width="48" align="absmiddle" />&nbsp;Noctis Plus
+</h1>
 
-The original Noctis README follows. Its installers, package-manager commands and website
-refer to official Noctis; use the Plus instructions above for this fork.
+**Noctis, plus finding music, smarter shuffle and word-by-word lyrics, all built in.**
+
+A fork of [Noctis by heartached](https://github.com/heartached/Noctis), based on stable 1.6.3.
+Everything Noctis does, with a few extras on top.
+
+</div>
 
 ---
+
+## What's new in Plus
+
+| Feature | What it does |
+|---|---|
+| **Free Music Finder** | Search for songs, albums and artists you don't own yet, and download them into your library. Artist and album pages show what's missing. |
+| **Search** | One search box for your library and the online catalog, with Songs, Albums and Artists tabs. |
+| **Downloads** | See what's queued, downloading and finished. |
+| **For you** | Song suggestions based on what you listen to. Tap "Not for me" to skip a song without muting its artist. |
+| **True Shuffle** | A shuffle that spreads artists and albums out instead of repeating them. |
+| **WordLyrics** | Automatically times lyrics word by word for new songs in your library. |
+| **Lyric Motion** | Smooth, subtle letter-by-letter animation on synced lyrics, including right-to-left languages like Persian and Arabic. |
+
+Plus also has its own profile, install location and update feed, so it can sit next to the original Noctis without either touching the other's settings.
+
+> **Work in progress:** the features are being rebuilt natively (on the `native` branch) so they look and feel like the rest of Noctis.
+
+## Install (Windows)
+
+Run this in PowerShell:
+
+```powershell
+irm https://raw.githubusercontent.com/Alfamin/NoctisPlus/main/scripts/install.ps1 | iex
+```
+
+Or download the Setup from [Releases](https://github.com/Alfamin/NoctisPlus/releases). The first time it runs, Plus can copy over your existing Noctis library and settings.
+
+Building from source: see [QUICKSTART](docs/fork/QUICKSTART.md). Licensing and credits: see [PROVENANCE](docs/fork/PROVENANCE.md).
+
+## Credits
+
+- [Noctis](https://github.com/heartached/Noctis) by heartached, the player this is built on. Please support the original.
+- Free Music Finder is based on [noctic-download-plugin](https://github.com/Pr0nE/noctic-download-plugin) by Pr0nE (MIT).
+
+---
+
+<details>
+<summary><b>The original Noctis README</b> (its install commands and links point to official Noctis, not Plus)</summary>
+
 
 <div align="center">
 
@@ -279,3 +321,5 @@ MIT, see [LICENSE](LICENSE)
 
 > [!WARNING]
 > Windows may flag the installer as untrusted because it isn't code-signed. This is normal for indie software and the app is safe to use.
+
+</details>
