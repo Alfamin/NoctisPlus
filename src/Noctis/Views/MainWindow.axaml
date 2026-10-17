@@ -804,7 +804,7 @@
                     </controls:GlassPanel.Transitions>
                 </controls:GlassPanel>
 
-                <!-- Queue popup panel (right side, rounded, slightly transparent).
+                <!-- Queue popup panel (right side, rounded, opaque fill while glass is off).
                      Visibility and the fade/slide open-close animation are driven from
                      code-behind (IsQueuePopupOpen handler) so the close can play before
                      the panel leaves the tree — same pattern as the Settings modal.

@@ -159,7 +159,9 @@
                     <SolidColorBrush x:Key="PrimaryTextBrush" Color="White" />
                     <SolidColorBrush x:Key="SecondaryTextBrush" Color="#80FFFFFF" />
                     <SolidColorBrush x:Key="TertiaryTextBrush" Color="#4DFFFFFF" />
-                    <SolidColorBrush x:Key="QueueDrawerBackground" Color="#E61C1C1C" />
+                    <!-- Opaque: with Liquid Glass off nothing frosts under the queue drawer, so any alpha
+                         showed the page through it sharp (10-17). Glass on tints with the RGB only. -->
+                    <SolidColorBrush x:Key="QueueDrawerBackground" Color="#1C1C1C" />
                     <SolidColorBrush x:Key="QueueDrawerForeground" Color="White" />
                     <SolidColorBrush x:Key="InputOutlineBrush" Color="White" />
                     <SolidColorBrush x:Key="TrackListMultiSelectBrush" Color="#3FFFFFFF" />
@@ -316,7 +318,9 @@
                     <SolidColorBrush x:Key="PrimaryTextBrush" Color="Black" />
                     <SolidColorBrush x:Key="SecondaryTextBrush" Color="#80FFFFFF" />
                     <SolidColorBrush x:Key="TertiaryTextBrush" Color="#4DFFFFFF" />
-                    <SolidColorBrush x:Key="QueueDrawerBackground" Color="#E61C1C1C" />
+                    <!-- Opaque: with Liquid Glass off nothing frosts under the queue drawer, so any alpha
+                         showed the page through it sharp (10-17). Glass on tints with the RGB only. -->
+                    <SolidColorBrush x:Key="QueueDrawerBackground" Color="#1C1C1C" />
                     <SolidColorBrush x:Key="QueueDrawerForeground" Color="White" />
                     <SolidColorBrush x:Key="InputOutlineBrush" Color="White" />
                     <SolidColorBrush x:Key="TrackListMultiSelectBrush" Color="#3FFFFFFF" />
