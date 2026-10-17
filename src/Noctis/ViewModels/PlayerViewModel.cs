@@ -812,6 +812,13 @@ public partial class PlayerViewModel : ViewModelBase
     /// END of the list; consumed by <see cref="Previous"/> before <see cref="History"/>.</summary>
     private readonly List<Track> _precedingInQueue = new();
 
+    /// <summary>Noctis Plus True Shuffle: the songs above the one picked, read before it rearranges the queue.</summary>
+    internal IReadOnlyList<Track> PrecedingInQueue => _precedingInQueue;
+
+    /// <summary>Noctis Plus True Shuffle: after it rearranges the upcoming songs, Previous returns to the
+    /// song that played before instead of stepping through the list the song was started from.</summary>
+    internal void ForgetPrecedingInQueue() => _precedingInQueue.Clear();
+
     /// <summary>How many leading <see cref="History"/> entries were pushed by advances inside
     /// the current queue (Next / natural end). <see cref="Previous"/> walks these back before
     /// it steps into <see cref="_precedingInQueue"/>; anything deeper played before the queue
