@@ -121,10 +121,13 @@ public sealed partial class SearchPageViewModel : ObservableObject, ISortable
         var results = MobileSearch.Find(Shell.Library.Service, Query, Cap(SongCap), Cap(AlbumCap), Cap(ArtistCap), Sort,
             Shell.Library.Playlists, Cap(PlaylistCap));
 
-        Songs.ReplaceAll(Shows(SearchScope.Songs) ? results.Songs : Array.Empty<Track>());
-        Albums.ReplaceAll(Shows(SearchScope.Albums) ? results.Albums : Array.Empty<Album>());
-        Playlists.ReplaceAll(Shows(SearchScope.Playlists)
-            ? results.Playlists.Select(p => new PlaylistResult(p, Shell.Library.PlaylistArtwork(p)))
+        // Each list is replaced only when its results differ: a keystroke that narrows nothing
+        // (and every library refresh) used to Reset all of them, re-realising every row and
+        // every album tile — the typing lag on a broad query.
+        MobileLibrary.ReplaceIfChanged(Songs, Shows(SearchScope.Songs) ? results.Songs : Array.Empty<Track>());
+        MobileLibrary.ReplaceIfChanged(Albums, Shows(SearchScope.Albums) ? results.Albums : Array.Empty<Album>());
+        MobileLibrary.ReplaceIfChanged(Playlists, Shows(SearchScope.Playlists)
+            ? results.Playlists.Select(p => new PlaylistResult(p, Shell.Library.PlaylistArtwork(p))).ToList()
             : Array.Empty<PlaylistResult>());
 
         Photos.CancelAll();
@@ -132,14 +135,15 @@ public sealed partial class SearchPageViewModel : ObservableObject, ISortable
         var featured = results.Featured is { } f ? Photos.Fill(f) : null;
         var artists = results.Artists.Select(Photos.Fill).ToList();
         if (Scope == SearchScope.Artists && featured != null) artists.Insert(0, featured);
-        Artists.ReplaceAll(Shows(SearchScope.Artists) ? artists : new List<ArtistListItem>());
+        MobileLibrary.ReplaceIfChanged(Artists, Shows(SearchScope.Artists) ? artists : new List<ArtistListItem>());
         Featured = Scope == SearchScope.All ? featured : null;
-        FeaturedSongs.ReplaceAll(Featured == null
+        MobileLibrary.ReplaceIfChanged(FeaturedSongs, Featured == null
             ? Array.Empty<Track>()
             : MobileLibrary.SongsBy(Shell.Library.Service, Featured.Name)
                 .OrderByDescending(t => t.PlayCount)
                 .ThenBy(t => t.Title, StringComparer.CurrentCultureIgnoreCase)
-                .Take(FeaturedSongCap));
+                .Take(FeaturedSongCap)
+                .ToList());
         if (Featured != null) Photos.Request(Featured, PhotoDelay);
         foreach (var artist in Artists) Photos.Request(artist, PhotoDelay);
 

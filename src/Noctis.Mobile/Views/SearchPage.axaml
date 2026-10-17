@@ -152,16 +152,18 @@
                             <PathIcon Data="{DynamicResource PhChevronRight}" Width="18" Height="18" Opacity="0.6" IsVisible="{Binding IsAllScope}" />
                         </StackPanel>
                     </Button>
+                    <!-- Virtualised sideways (the artist page's rails): every keystroke used to
+                         realise all twelve tiles, each decoding its cover, for the three that fit. -->
                     <ScrollViewer HorizontalScrollBarVisibility="Hidden" VerticalScrollBarVisibility="Disabled" IsVisible="{Binding ShowAlbumRow}">
-                        <ItemsControl Name="AlbumResults" ItemsSource="{Binding Albums}" Margin="8,0">
+                        <ItemsControl Name="AlbumResults" ItemsSource="{Binding Albums}" Margin="8,0,-4,0">
                             <ItemsControl.ItemsPanel>
                                 <ItemsPanelTemplate>
-                                    <StackPanel Orientation="Horizontal" Spacing="12" />
+                                    <VirtualizingStackPanel Orientation="Horizontal" />
                                 </ItemsPanelTemplate>
                             </ItemsControl.ItemsPanel>
                             <ItemsControl.ItemTemplate>
                                 <DataTemplate x:DataType="models:Album">
-                                    <Button Classes="row" Width="140"
+                                    <Button Classes="row" Width="140" Margin="0,0,12,0"
                                             Command="{Binding $parent[views:SearchPage].((vm:SearchPageViewModel)DataContext).Shell.OpenAlbumCommand}"
                                             CommandParameter="{Binding}"
                                             views:LongPress.Command="{Binding $parent[views:ShellView].((vm:ShellViewModel)DataContext).OpenAlbumSheetCommand}">

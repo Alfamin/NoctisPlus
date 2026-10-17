@@ -90,14 +90,19 @@ internal static class MobileLibrary
     /// HomeViewModel.ReplaceRowIfChanged rule). Default equality: reference for Album/Track,
     /// value for RailItem.
     /// </summary>
-    internal static void ReplaceIfChanged<T>(BulkObservableCollection<T> target, IReadOnlyList<T> next)
+    internal static void ReplaceIfChanged<T>(BulkObservableCollection<T> target, IReadOnlyList<T> next) =>
+        ReplaceIfChanged(target, next, EqualityComparer<T>.Default.Equals);
+
+    /// <summary>As <see cref="ReplaceIfChanged{T}(BulkObservableCollection{T}, IReadOnlyList{T})"/>
+    /// with the rows' own notion of sameness (an AlbumRow is the albums on it).</summary>
+    internal static void ReplaceIfChanged<T>(BulkObservableCollection<T> target, IReadOnlyList<T> next, Func<T, T, bool> same)
     {
         if (target.Count == next.Count)
         {
-            var same = true;
-            for (var i = 0; i < next.Count && same; i++)
-                same = EqualityComparer<T>.Default.Equals(target[i], next[i]);
-            if (same) return;
+            var unchanged = true;
+            for (var i = 0; i < next.Count && unchanged; i++)
+                unchanged = same(target[i], next[i]);
+            if (unchanged) return;
         }
         target.ReplaceAll(next);
     }
