@@ -121,6 +121,49 @@ public class LyricsStudioLivePreviewTests : IDisposable
         Assert.Equal(1, clears);
     }
 
+    [AvaloniaFact]
+    public async Task AnEditJustBeforeClosing_IsNotPushedAfterTheDialogClosed()
+    {
+        var pushes = 0;
+        var clears = 0;
+        var vm = Studio(null, livePreview: true, null, SongWithLrc("song"));
+        vm.UpdateLivePreview = (_, _) => pushes++;
+        vm.ClearLivePreview = () => clears++;
+        vm.Selected = vm.Queue[0];
+        await Until(() => pushes == 1, "the review to reach the pane");
+
+        // A nudge, then Close inside the pane's 120 ms coalescing window.
+        vm.SelectLine(vm.ReviewLines[0]);
+        vm.NudgeSelectionBy(TimeSpan.FromMilliseconds(10));
+        await vm.CloseCommand.ExecuteAsync(null);
+        Assert.Equal(1, clears);
+
+        await Task.Delay(LyricsStudioViewModel.LivePreviewDelayMs * 3);
+        Dispatcher.UIThread.RunJobs();
+        Assert.Equal(1, pushes); // the closed dialog's review must not come back on the lyrics page
+    }
+
+    [AvaloniaFact]
+    public async Task ThePreviewButton_KeepsItsPreview_WhenThePageItOpensDetachesTheStudio()
+    {
+        // Preview hands the lyrics page its own preview and navigates there, which detaches the
+        // Studio page: dropping the pane's preview then must not drop the one Preview just set.
+        var clears = 0;
+        var vm = Studio(null, livePreview: true, null, SongWithLrc("song"));
+        vm.UpdateLivePreview = (_, _) => { };
+        vm.ClearLivePreview = () => clears++;
+        vm.ShowOnLyricsPage = (_, _) => Task.CompletedTask;
+        vm.Selected = vm.Queue[0];
+        await Task.Delay(LyricsStudioViewModel.LivePreviewDelayMs * 3);
+        Dispatcher.UIThread.RunJobs();
+
+        await vm.PreviewOnLyricsPageCommand.ExecuteAsync(null);
+        vm.SuspendLivePreview();
+        await Task.Delay(LyricsStudioViewModel.LivePreviewDelayMs * 3);
+        Dispatcher.UIThread.RunJobs();
+        Assert.Equal(0, clears);
+    }
+
     // ── On screen, with the app's lyrics view model ────────────────────────
 
     private sealed class StubLrcLib : ILrcLibService
@@ -211,6 +254,42 @@ public class LyricsStudioLivePreviewTests : IDisposable
             Settle(win);
             Assert.False(pane.IsEffectivelyVisible);
             await Until(() => !lyrics.IsPreviewActive, "the preview to be dropped");
+        }
+        finally { win.Close(); }
+    }
+
+    [AvaloniaFact]
+    public async Task LeavingTheStudioPage_PutsTheSongsOwnLyricsBack()
+    {
+        // The sidebar page's Studio is never closed: navigating away detaches the panel. The
+        // pane's unsaved preview lives in the app's lyrics view model, so it stayed on the lyrics
+        // page and side panel (with Save / Search off) until the song changed.
+        EnsureAppResources();
+        var player = new PlayerViewModel(new FakeAudioPlayer(), new FakeLibraryService(), new TestPersistenceService(), new FakeAnimatedCoverService());
+        var lyrics = new LyricsViewModel(player, new StubLrcLib(), new StubNetEase(), new StubMetadata(), new TestPersistenceService(), new FakeLibraryService());
+        player.Duration = TimeSpan.FromSeconds(30);
+        var track = SongWithLrc("song");
+        var vm = Studio(player, livePreview: true, null, track);
+        var panel = new LyricsStudioPanel { DataContext = vm, ShowHeader = false, PreviewLyrics = lyrics };
+        var win = new Window { Width = 1400, Height = 800, Content = panel };
+        win.Show();
+        try
+        {
+            vm.Selected = vm.Queue[0];
+            player.CurrentTrack = track;
+            lyrics.EnsureLyricsForCurrentTrack();
+            Settle(win);
+            vm.ReviewLines[1].Text = "Second line fixed";
+            await Until(() => lyrics.IsPreviewActive && lyrics.LyricLines.Any(l => l.Text == "Second line fixed"), "the edit in the pane");
+
+            win.Content = null; // another page
+            Settle(win);
+            await Until(() => !lyrics.IsPreviewActive, "the pane's preview to be dropped when the page is left");
+
+            // Back on the page: the pane shows the review again.
+            win.Content = panel;
+            Settle(win);
+            await Until(() => lyrics.IsPreviewActive && lyrics.LyricLines.Any(l => l.Text == "Second line fixed"), "the pane back on return");
         }
         finally { win.Close(); }
     }
