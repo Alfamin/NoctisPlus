@@ -228,6 +228,9 @@ internal sealed class SearchWindow : Window
     }
 
     /// <summary>Puts the cursor into the search box, with what is in it selected, ready for a new search.</summary>
+    /// <summary>Noctis Plus Search's Downloads button: this window on its download queue.</summary>
+    public void ShowDownloads() { _tabs.SelectedItem = _queueTab; ShowQueue(); }
+
     public void FocusSearchBox()
     {
         _query.Focus();

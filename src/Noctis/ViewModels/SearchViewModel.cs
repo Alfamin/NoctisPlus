@@ -423,6 +423,9 @@ public sealed partial class SearchViewModel : ViewModelBase, ISearchable, IDispo
     }
 
     [RelayCommand]
+    private void OpenDownloads() => _source?.OpenDownloads();
+
+    [RelayCommand]
     private void OpenArtist(SearchArtistItem? item)
     {
         if (item is null) return;

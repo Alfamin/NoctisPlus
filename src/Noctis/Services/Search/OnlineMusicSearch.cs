@@ -68,6 +68,9 @@ public interface IOnlineMusicSearch
     /// <summary>Downloads (now = ahead of the queue) or queues the songs. Returns a short message for the user.</summary>
     Task<string> DownloadAsync(IReadOnlyList<OnlineSong> songs, bool now, CancellationToken ct);
 
+    /// <summary>Shows the download queue.</summary>
+    void OpenDownloads();
+
     /// <summary>Opens the native artist page for an online artist.</summary>
     void OpenArtist(OnlineArtist artist);
 
@@ -92,4 +95,16 @@ public static class OnlineMusicSearch
     }
 
     public static event EventHandler? CurrentChanged;
+
+    /// <summary>A feature asks the app to show Search (its shortcut, "Find more by this artist").
+    /// Null keeps the last query.</summary>
+    public static event EventHandler<string?>? OpenRequested;
+
+    /// <summary>False when nothing shows Search (tests, or the app shell not built yet).</summary>
+    public static bool RequestOpen(string? query)
+    {
+        if (OpenRequested is not { } handler) return false;
+        handler(null, query);
+        return true;
+    }
 }

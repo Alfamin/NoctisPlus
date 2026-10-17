@@ -481,6 +481,15 @@
                  this row's left end; the filter chips continue it on the same line, so box and
                  chips read as one toolbar. SearchView.ChipsInset keeps them clear of the pill. -->
             <Grid Height="48" Margin="0,-6,0,-10">
+                <!-- The download queue, at the row's right end (Finder's window until the native page lands). -->
+                <Button Classes="search-chip" HorizontalAlignment="Right" VerticalAlignment="Center" Margin="0"
+                        IsVisible="{Binding HasOnline}" Command="{Binding OpenDownloadsCommand}" ToolTip.Tip="Download queue">
+                    <StackPanel Orientation="Horizontal" Spacing="6">
+                        <Path Data="{StaticResource SearchDownloadGlyph}" Width="11" Height="11" Stretch="Uniform" VerticalAlignment="Center"
+                              Stroke="{Binding $parent[Button].Foreground}" StrokeThickness="2" StrokeLineCap="Round" StrokeJoin="Round" />
+                        <TextBlock Text="Downloads" VerticalAlignment="Center" />
+                    </StackPanel>
+                </Button>
                 <WrapPanel x:Name="Chips" IsVisible="{Binding HasQuery}" Orientation="Horizontal" VerticalAlignment="Center">
                     <Button Classes="search-chip" Classes.active="{Binding IsAllFilter}" Content="All"
                             Command="{Binding SelectFilterCommand}" CommandParameter="All" />

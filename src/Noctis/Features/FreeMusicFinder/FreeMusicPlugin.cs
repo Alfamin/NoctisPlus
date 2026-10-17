@@ -85,7 +85,8 @@ public sealed class FreeMusicPlugin : INoctisPlugin
             DiscoverAlbums, new PlaylistLibrary(), NoctisDataOf(host.DataDirectory), Path.Combine(host.DataDirectory, "for-you-hidden.json"), () => _similar, () => _lastFm);
         _forYou.WarmUp();
         // The app's own Search page reads the catalog and starts downloads through this.
-        _online = new FinderOnlineSearch(() => _catalog, _discoveryActions, _artistPages, () => _telegram?.IsLoggedIn == true, () => ShowWindow(null));
+        _online = new FinderOnlineSearch(() => _catalog, _discoveryActions, _artistPages, () => _telegram?.IsLoggedIn == true, () => ShowWindow(null),
+            () => { ShowWindow(null); _window?.ShowDownloads(); });
         Noctis.Services.Search.OnlineMusicSearch.Current = _online;
         _transfers.Changed += Announce;
         _downloads.Finished += Announce;
@@ -94,7 +95,8 @@ public sealed class FreeMusicPlugin : INoctisPlugin
             "Find more by this artist…",
             // A 24×24 SVG path: a magnifying glass.
             "M15.5 14h-.79l-.28-.27A6.47 6.47 0 0 0 16 9.5 6.5 6.5 0 1 0 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19zm-6 0A4.5 4.5 0 1 1 14 9.5 4.5 4.5 0 0 1 9.5 14z",
-            (Action<TrackInfo>)(track => ShowWindow(track.Artist, discover: true))));
+            // Built into Noctis Plus: the app's own Search page, searched for the artist.
+            (Action<TrackInfo>)(track => { if (!Noctis.Services.Search.OnlineMusicSearch.RequestOpen(track.Artist)) ShowWindow(track.Artist, discover: true); })));
 
         host.Settings.Changed += OnSettingChanged;
 
@@ -189,7 +191,8 @@ public sealed class FreeMusicPlugin : INoctisPlugin
     {
         if (e.Handled || _shortcut is not { } shortcut || !shortcut.Matches(e)) return;
         e.Handled = true;
-        ShowWindow(null);
+        // Built into Noctis Plus: the shortcut opens the app's Search page.
+        if (!Noctis.Services.Search.OnlineMusicSearch.RequestOpen(null)) ShowWindow(null);
     }
 
     private ArtistCatalog CreateCatalog() => _catalogFactory(Path.Combine(_host!.DataDirectory, "artist-catalog"), _proxy);

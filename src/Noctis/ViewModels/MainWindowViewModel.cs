@@ -643,6 +643,12 @@ public partial class MainWindowViewModel : ViewModelBase
         TopBar.SearchTextChanged += OnSearchTextChanged;
         TopBar.HomeSearchRedirectRequested += OnHomeSearchRedirectRequested;
         TopBar.SearchPageRequested += (_, _) => OpenSearchPage();
+        // Built-in features open Search too (Finder's Ctrl+Shift+F, "Find more by this artist").
+        Services.Search.OnlineMusicSearch.OpenRequested += (_, query) => Dispatcher.UIThread.Post(() =>
+        {
+            OpenSearchPage();
+            if (query is not null) TopBar.SearchText = query;
+        });
         // The Search page follows every keystroke (library results are instant); the
         // debounced SearchTextChanged above is for the list pages' filters.
         TopBar.PropertyChanged += (_, e) =>
