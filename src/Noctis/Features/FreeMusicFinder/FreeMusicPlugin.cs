@@ -23,6 +23,7 @@ public sealed class FreeMusicPlugin : INoctisPlugin
     internal bool IsSignedIn => _telegram?.IsLoggedIn == true;
     internal string DownloadFolder => Downloader.Folder(_host?.Settings.GetString(DownloadFolderKey), _host!.DataDirectory);
     private const string OpenSearchKey = "openSearch";
+    private const string TelegramAccountKey = "telegramAccount";
     private const string ProxyKey = "proxy";
     private const string ShortcutKey = "shortcut";
     private const string AllowMp3Key = "allowMp3";
@@ -158,6 +159,8 @@ public sealed class FreeMusicPlugin : INoctisPlugin
     private void OnSettingChanged(object? sender, string key)
     {
         if (key == OpenSearchKey) ShowSearch(null);
+        // Signed in or not: the same window connects, shows the account, or disconnects it.
+        else if (key == TelegramAccountKey) ShowSignIn();
         else if (key == ProxyKey)
         {
             _proxy = _host?.Settings.GetString(ProxyKey) ?? "";

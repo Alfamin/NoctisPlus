@@ -328,6 +328,8 @@ internal static class WindowTests
             Check.Until(() => host.Logs.Any(l => l.StartsWith("removed 1 unfinished download left in")), "startup cleanup is logged");
             host.Raise("openSearch");
             Check.Equal(1, requests.Count, "feature setting opens native Search once");
+            host.Raise("telegramAccount");
+            Check.Equal(1, requests.Count, "the Telegram account setting opens the sign-in window, not Search");
             host.Commands[0].Handler(new TrackInfo("7", "Some Song", "Somebody", "", "", TimeSpan.Zero, 0, "", 0, "", false, 0, 0));
             Check.Equal("Somebody", requests.Last(), "song menu searches the artist on the native Search page");
             Check.False(typeof(FreeMusicPlugin).GetFields(BindingFlags.Instance | BindingFlags.NonPublic).Any(f => f.FieldType.Name == "SearchWindow"), "feature has no old Finder window or fallback-window owner");
