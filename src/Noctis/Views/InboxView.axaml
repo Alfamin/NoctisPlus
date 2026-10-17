@@ -1,0 +1,205 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:loc="using:Noctis.Localization"
+             xmlns:vm="using:Noctis.ViewModels"
+             xmlns:m="using:Noctis.Models"
+             xmlns:controls="using:Noctis.Controls"
+             xmlns:helpers="using:Noctis.Helpers"
+             x:Class="Noctis.Views.InboxView"
+             x:DataType="vm:InboxViewModel"
+             Background="{DynamicResource AppMainBackground}">
+
+    <UserControl.Styles>
+        <!-- Rows: the Folders page's look (one row-body Border carries stripe, hover and the
+             now-playing fill; the ListBoxItem paints nothing). Selected rows keep the
+             list's selection fill so a multi-selection for Add / Delete is visible. -->
+        <Style Selector="ListBox.track-list ListBoxItem">
+            <Setter Property="Padding" Value="0" />
+            <Setter Property="CornerRadius" Value="10" />
+        </Style>
+        <Style Selector="ListBox.track-list ListBoxItem:nth-child(2n)">
+            <Setter Property="Background" Value="Transparent" />
+        </Style>
+        <Style Selector="ListBox.track-list ListBoxItem:pointerover">
+            <Setter Property="Background" Value="Transparent" />
+        </Style>
+        <Style Selector="ListBox.track-list ListBoxItem:nth-child(2n):pointerover">
+            <Setter Property="Background" Value="Transparent" />
+        </Style>
+        <Style Selector="Border.row-body">
+            <Setter Property="Padding" Value="0,8,8,8" />
+            <Setter Property="CornerRadius" Value="10" />
+            <Setter Property="Background" Value="Transparent" />
+        </Style>
+        <Style Selector="ListBox.track-list ListBoxItem:nth-child(2n) Border.row-body">
+            <Setter Property="Background" Value="{DynamicResource TrackListStripeBrush}" />
+        </Style>
+        <Style Selector="Border.row-body:pointerover">
+            <Setter Property="Background" Value="{DynamicResource TrackListHoverBrush}" />
+        </Style>
+        <!-- MUST stay last: equal-origin styles resolve by declaration order. -->
+        <Style Selector="Border.row-body.now-playing">
+            <Setter Property="Background" Value="{DynamicResource NowPlayingRowBrush}" />
+        </Style>
+        <Style Selector="Button.row-icon">
+            <Setter Property="Background" Value="Transparent" />
+            <Setter Property="BorderThickness" Value="0" />
+            <Setter Property="Padding" Value="6" />
+            <Setter Property="CornerRadius" Value="999" />
+            <Setter Property="Cursor" Value="Hand" />
+            <Setter Property="VerticalAlignment" Value="Center" />
+        </Style>
+        <Style Selector="Button.inbox-secondary">
+            <Setter Property="Padding" Value="14,7" />
+            <Setter Property="CornerRadius" Value="999" />
+            <Setter Property="Cursor" Value="Hand" />
+            <Setter Property="FontSize" Value="12" />
+            <Setter Property="FontWeight" Value="SemiBold" />
+            <Setter Property="BorderThickness" Value="0" />
+            <Setter Property="Background" Value="{DynamicResource SystemControlBackgroundListMediumBrush}" />
+        </Style>
+    </UserControl.Styles>
+
+    <Grid RowDefinitions="Auto,*" Margin="16,8,2,16">
+
+        <!-- Header: title, what the page is for, count/size, actions -->
+        <StackPanel Grid.Row="0" Spacing="6" Margin="10,2,10,12">
+            <TextBlock Text="{loc:T Nav.Inbox}" FontSize="24" FontWeight="Bold" />
+            <TextBlock Text="{loc:T Inbox.Subtitle}" FontSize="13" Opacity="0.6" TextWrapping="Wrap" />
+            <TextBlock Text="{Binding SummaryText}" FontSize="13" Opacity="0.6"
+                       IsVisible="{Binding SummaryText, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
+            <WrapPanel Orientation="Horizontal" Margin="0,6,0,0" IsVisible="{Binding !IsEmpty}">
+                <Button Content="{loc:T LibraryAlbums.Play}"
+                        Command="{Binding PlayAllCommand}"
+                        Margin="0,0,8,8"
+                        Padding="22,8" CornerRadius="999" Cursor="Hand">
+                    <Button.Template>
+                        <ControlTemplate>
+                            <ContentPresenter Background="{DynamicResource AccentColorBrush}"
+                                              Foreground="{DynamicResource AccentForegroundBrush}"
+                                              CornerRadius="999"
+                                              Padding="22,8"
+                                              FontSize="13"
+                                              FontWeight="SemiBold"
+                                              Content="{TemplateBinding Content}" />
+                        </ControlTemplate>
+                    </Button.Template>
+                </Button>
+                <Button Classes="inbox-secondary" Margin="0,0,8,8"
+                        Content="{loc:T LibraryAlbums.Shuffle}"
+                        Command="{Binding ShuffleAllCommand}" />
+                <Button x:Name="AddSelectedButton" Classes="inbox-secondary" Margin="0,0,8,8"
+                        Content="{loc:T Inbox.AddSelected}"
+                        IsEnabled="False"
+                        Click="OnAddSelectedClick" />
+                <Button Classes="inbox-secondary" Margin="0,0,8,8"
+                        Content="{loc:T Inbox.AddAll}"
+                        Command="{Binding AcceptAllCommand}" />
+                <Button x:Name="DeleteSelectedButton" Classes="inbox-secondary" Margin="0,0,8,8"
+                        Content="{loc:T Inbox.Delete}"
+                        IsEnabled="False"
+                        Click="OnDeleteSelectedClick" />
+            </WrapPanel>
+        </StackPanel>
+
+        <TextBlock Grid.Row="1"
+                   Text="{loc:T Inbox.Empty}"
+                   IsVisible="{Binding IsEmpty}"
+                   FontSize="14" Opacity="0.55"
+                   TextWrapping="Wrap"
+                   HorizontalAlignment="Center"
+                   Margin="10,40,10,0" />
+
+        <ListBox x:Name="TrackList"
+                 Grid.Row="1"
+                 Classes="track-list"
+                 ItemsSource="{Binding Tracks}"
+                 SelectionMode="Multiple"
+                 IsVisible="{Binding !IsEmpty}"
+                 Padding="0,0,0,115">
+            <ListBox.ItemTemplate>
+                <DataTemplate x:DataType="m:Track">
+                    <Border Classes="row-body" Classes.now-playing="{Binding IsNowPlaying}">
+                        <!-- Drag a row onto a sidebar playlist, as on the Songs and Folders pages. -->
+                        <Grid ColumnDefinitions="48,*,Auto,Auto,64,Auto"
+                              Background="Transparent"
+                              helpers:DragFileBehavior.EnableFileDrag="True">
+
+                            <!-- Row number, swapped for the animated EQ on the playing track. -->
+                            <Panel Grid.Column="0" VerticalAlignment="Center">
+                                <controls:EqVisualizer Width="34" Height="22"
+                                                       HorizontalAlignment="Center"
+                                                       VerticalAlignment="Center"
+                                                       IsVisible="{Binding IsNowPlaying}"
+                                                       IsPlaying="{Binding $parent[UserControl].((vm:InboxViewModel)DataContext).Player.IsPlaying, Mode=OneWay}" />
+                                <TextBlock Text="{Binding RowNumber}"
+                                           Opacity="0.5"
+                                           FontSize="14"
+                                           FontFeatures="+tnum"
+                                           HorizontalAlignment="Right"
+                                           VerticalAlignment="Center"
+                                           Margin="0,0,10,0"
+                                           IsVisible="{Binding !IsNowPlaying}" />
+                            </Panel>
+
+                            <!-- Title, then artist · album (its folder is where it landed). -->
+                            <StackPanel Grid.Column="1" Spacing="1" VerticalAlignment="Center" Margin="0,0,12,0">
+                                <TextBlock Text="{Binding TitleDisplay}" FontSize="14"
+                                           TextTrimming="CharacterEllipsis"
+                                           ToolTip.Tip="{Binding FilePath}" />
+                                <StackPanel Orientation="Horizontal" Spacing="4">
+                                    <TextBlock Text="{Binding ArtistDisplay}" FontSize="12" Opacity="0.55"
+                                               TextTrimming="CharacterEllipsis" MaxWidth="320" />
+                                    <TextBlock Text="·" FontSize="12" Opacity="0.4"
+                                               IsVisible="{Binding Album, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
+                                    <TextBlock Text="{Binding Album}" FontSize="12" Opacity="0.55"
+                                               TextTrimming="CharacterEllipsis" MaxWidth="320" />
+                                </StackPanel>
+                            </StackPanel>
+
+                            <!-- What the file says it is: "24-bit/96 kHz FLAC", then its bitrate —
+                                 a "lossless" file at a lossy bitrate is the usual fake. -->
+                            <TextBlock Grid.Column="2"
+                                       Text="{Binding QualityDetailLine}"
+                                       FontSize="12"
+                                       FontFeatures="+tnum"
+                                       Opacity="0.7"
+                                       VerticalAlignment="Center"
+                                       Margin="0,0,16,0"
+                                       ToolTip.Tip="{Binding Codec}" />
+                            <TextBlock Grid.Column="3"
+                                       Text="{Binding BitrateFormatted}"
+                                       FontSize="12"
+                                       FontFeatures="+tnum"
+                                       Opacity="0.5"
+                                       VerticalAlignment="Center"
+                                       Margin="0,0,16,0" />
+                            <TextBlock Grid.Column="4"
+                                       Text="{Binding DurationFormatted}"
+                                       VerticalAlignment="Center"
+                                       HorizontalAlignment="Right"
+                                       FontFeatures="+tnum"
+                                       Opacity="0.5"
+                                       Margin="0,0,10,0" />
+
+                            <StackPanel Grid.Column="5" Orientation="Horizontal" Spacing="2" VerticalAlignment="Center">
+                                <Button Classes="row-icon"
+                                        ToolTip.Tip="{loc:T Favorites.Spectrogram}"
+                                        Command="{x:Static helpers:SpectrogramLauncher.OpenCommand}"
+                                        CommandParameter="{Binding}">
+                                    <controls:LineIcon Width="16" Height="16" Data="{StaticResource MenuLineSpectrogram}" />
+                                </Button>
+                                <Button Classes="row-icon"
+                                        ToolTip.Tip="{loc:T Inbox.AddSelected}"
+                                        Command="{Binding $parent[UserControl].((vm:InboxViewModel)DataContext).AcceptTrackCommand}"
+                                        CommandParameter="{Binding}">
+                                    <controls:LineIcon Width="16" Height="16" Data="{StaticResource MenuLineCheck}" />
+                                </Button>
+                            </StackPanel>
+                        </Grid>
+                    </Border>
+                </DataTemplate>
+            </ListBox.ItemTemplate>
+        </ListBox>
+    </Grid>
+</UserControl>

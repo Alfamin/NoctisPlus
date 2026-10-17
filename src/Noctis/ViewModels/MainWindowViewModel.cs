@@ -86,6 +86,7 @@ public partial class MainWindowViewModel : ViewModelBase
         _artistsVm.IsActive = ReferenceEquals(current, _artistsVm);
         _foldersVm.IsActive = ReferenceEquals(current, _foldersVm);
         _favoritesVm.IsActive = ReferenceEquals(current, _favoritesVm);
+        _inboxVm.IsActive = ReferenceEquals(current, _inboxVm);
     }
 
     private readonly DispatcherTimer _coveredRefreshTimer;
@@ -102,6 +103,7 @@ public partial class MainWindowViewModel : ViewModelBase
         else if (ReferenceEquals(current, _artistsVm)) _artistsVm.Refresh();
         else if (ReferenceEquals(current, _foldersVm)) _foldersVm.Refresh();
         else if (ReferenceEquals(current, _favoritesVm)) _favoritesVm.Refresh();
+        else if (ReferenceEquals(current, _inboxVm)) _inboxVm.Refresh();
     }
 
     // ── Scrobble tracking ──
@@ -280,6 +282,7 @@ public partial class MainWindowViewModel : ViewModelBase
     private readonly LibraryPlaylistsViewModel _playlistsVm;
     private readonly FavoritesViewModel _favoritesVm;
     private readonly LibraryFoldersViewModel _foldersVm;
+    private readonly InboxViewModel _inboxVm;
     private readonly ServerViewModel _serverVm;
     private readonly AudioCdViewModel _audioCdVm;
     private readonly VisualizerViewModel _visualizerVm;
@@ -512,6 +515,28 @@ public partial class MainWindowViewModel : ViewModelBase
         };
 
         _foldersVm = new LibraryFoldersViewModel(library, Player, persistence, Sidebar);
+        _inboxVm = new InboxViewModel(library, Player, Sidebar);
+        // The Inbox entry follows Settings › Library › Inbox for New Music (and stays while
+        // songs still wait in it). Leaving it shown on a page that no longer has an entry
+        // would strand the user there.
+        void SyncInboxSection()
+        {
+            Sidebar.SetInboxEnabled(Settings.InboxEnabled);
+            if (ReferenceEquals(CurrentView, _inboxVm) && !Sidebar.IsInboxSectionVisible)
+                Navigate("home");
+        }
+        if (Settings.IsSettingsLoaded) SyncInboxSection();
+        else Settings.SettingsLoaded += (_, _) => Dispatcher.UIThread.Post(SyncInboxSection);
+        Settings.PropertyChanged += (_, e) =>
+        {
+            if (e.PropertyName == nameof(SettingsViewModel.InboxEnabled))
+                Dispatcher.UIThread.Post(SyncInboxSection);
+        };
+        _library.LibraryUpdated += (_, _) => Dispatcher.UIThread.Post(() =>
+        {
+            if (ReferenceEquals(CurrentView, _inboxVm) && !Sidebar.IsInboxSectionVisible)
+                Navigate("home");
+        });
         // Folders sort (GitHub #89): mirror into the top bar and persist, adopting the
         // saved choice once settings load — same shape as the Artists sort above.
         var adoptingFoldersSort = false;
@@ -673,6 +698,7 @@ public partial class MainWindowViewModel : ViewModelBase
         _songsVm.SetSearchLyricsAction(SearchLyricsForTrack);
         _favoritesVm.SetSearchLyricsAction(SearchLyricsForTrack);
         _foldersVm.SetSearchLyricsAction(SearchLyricsForTrack);
+        _inboxVm.SetSearchLyricsAction(SearchLyricsForTrack);
         Player.SetSearchLyricsAction(SearchLyricsForTrack);
 
         // Wire up View Artist action on ViewModels that display artist names
@@ -2009,6 +2035,8 @@ public partial class MainWindowViewModel : ViewModelBase
             return GetSectionBackButtonText("server");
         if (ReferenceEquals(view, _audioCdVm))
             return GetSectionBackButtonText("cd");
+        if (ReferenceEquals(view, _inboxVm))
+            return GetSectionBackButtonText("inbox");
         if (ReferenceEquals(view, _visualizerVm))
             return GetSectionBackButtonText("visualizer");
         if (ReferenceEquals(view, _lyricsStudioPageVm))
@@ -2071,6 +2099,8 @@ public partial class MainWindowViewModel : ViewModelBase
             return "server";
         if (ReferenceEquals(view, _audioCdVm))
             return "cd";
+        if (ReferenceEquals(view, _inboxVm))
+            return "inbox";
         if (ReferenceEquals(view, _visualizerVm))
             return "visualizer";
         if (ReferenceEquals(view, _lyricsStudioPageVm))
@@ -2124,6 +2154,7 @@ public partial class MainWindowViewModel : ViewModelBase
                || ReferenceEquals(view, _foldersVm)
                || ReferenceEquals(view, _playlistsVm)
                || ReferenceEquals(view, _favoritesVm)
+               || ReferenceEquals(view, _inboxVm)
 
                || ReferenceEquals(view, _queueVm)
                || ReferenceEquals(view, _lyricsVm)
@@ -2202,6 +2233,7 @@ public partial class MainWindowViewModel : ViewModelBase
                 "lyrics" => EnsureLyricsAndReturn(_lyricsVm),
                 "server" => RefreshAndReturnServer(_serverVm),
                 "cd" => RefreshAndReturnAudioCd(_audioCdVm),
+                "inbox" => RefreshAndReturnInbox(),
                 "visualizer" => _visualizerVm,
                 "lyricsstudio" => RefreshAndReturnLyricsStudio(),
                 "settings" => RefreshAndReturnSettings(),
@@ -2242,6 +2274,7 @@ public partial class MainWindowViewModel : ViewModelBase
             "lyrics" => "Lyrics",
             "server" => "Server",
             "cd" => "Audio CD",
+            "inbox" => "Inbox",
             "visualizer" => "Visualizer",
             "lyricsstudio" => "Lyrics Studio",
             "settings" => "Settings",
@@ -2352,6 +2385,12 @@ public partial class MainWindowViewModel : ViewModelBase
     {
         vm.Refresh();
         return vm;
+    }
+
+    private InboxViewModel RefreshAndReturnInbox()
+    {
+        _inboxVm.Refresh();
+        return _inboxVm;
     }
 
     private StatisticsViewModel RefreshAndReturnStatistics(StatisticsViewModel vm)
@@ -2835,6 +2874,7 @@ public partial class MainWindowViewModel : ViewModelBase
         if (CurrentView == _statisticsVm) return "statistics";
         if (CurrentView == _serverVm) return "server";
         if (CurrentView == _audioCdVm) return "cd";
+        if (CurrentView == _inboxVm) return "inbox";
         if (CurrentView == _visualizerVm) return "visualizer";
         if (CurrentView == _lyricsStudioPageVm) return "lyricsstudio";
         if (CurrentView == Settings) return "settings";

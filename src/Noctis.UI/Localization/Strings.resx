@@ -33,6 +33,7 @@
   <data name="Nav.Favorites" xml:space="preserve"><value>Favorites</value><comment>Sidebar</comment></data>
   <data name="Nav.Server" xml:space="preserve"><value>Server</value><comment>Sidebar, media server section</comment></data>
   <data name="Nav.AudioCd" xml:space="preserve"><value>Audio CD</value><comment>Sidebar, optical drive section</comment></data>
+  <data name="Nav.Inbox" xml:space="preserve"><value>Inbox</value><comment>Sidebar, Settings › Library › Inbox for New Music</comment></data>
 
   <!-- Settings → General → Language -->
   <data name="Settings.Language.Title" xml:space="preserve"><value>Language</value></data>
@@ -565,6 +566,8 @@ Deezer and TIDAL: paste the link.</value></data>
   <data name="Settings.ScanMusicFoldersWhen" xml:space="preserve"><value>Scan music folders when Noctis starts.</value><comment>Text in SettingsView.axaml</comment></data>
   <data name="Settings.WatchFolders" xml:space="preserve"><value>Watch Folders</value><comment>Text in SettingsView.axaml</comment></data>
   <data name="Settings.UpdateLibraryAutomaticallyAs" xml:space="preserve"><value>Update the library automatically as files change.</value><comment>Text in SettingsView.axaml</comment></data>
+  <data name="Settings.Inbox" xml:space="preserve"><value>Inbox for New Music</value><comment>Settings › Library switch</comment></data>
+  <data name="Settings.InboxHint" xml:space="preserve"><value>New songs found in your music folders wait in the sidebar's Inbox until you add them to the library or delete them. Turning this off adds everything waiting to the library.</value><comment>Settings › Library switch hint</comment></data>
   <data name="Settings.UseEmbeddedArtwork" xml:space="preserve"><value>Use Embedded Artwork</value><comment>Text in SettingsView.axaml</comment></data>
   <data name="Settings.UseArtworkEmbeddedFile" xml:space="preserve"><value>Use artwork embedded in file tags for album covers.</value><comment>Text in SettingsView.axaml</comment></data>
   <data name="Settings.SnoozedTracks" xml:space="preserve"><value>Snoozed Tracks</value><comment>Text in SettingsView.axaml</comment></data>
@@ -1022,6 +1025,13 @@ Deezer and TIDAL: paste the link.</value></data>
   <data name="LibraryFolders.ShowInLibrary" xml:space="preserve"><value>Show in Library</value><comment>Folder context menu in the Folders view (FolderContextMenuBuilder)</comment></data>
   <data name="LibraryFolders.HiddenTag" xml:space="preserve"><value>Hidden</value><comment>Tag after a hidden folder's name in LibraryFoldersView.axaml</comment></data>
   <data name="LibraryFolders.HiddenFolderNote" xml:space="preserve"><value>Hidden from Library</value><comment>Header note for a hidden folder in LibraryFoldersView.axaml</comment></data>
+  <data name="Inbox.Subtitle" xml:space="preserve"><value>New songs found in your music folders. Check them, then add them to your library or delete them.</value><comment>InboxView.axaml header</comment></data>
+  <data name="Inbox.SongCountOne" xml:space="preserve"><value>1 song</value><comment>InboxView.axaml header count</comment></data>
+  <data name="Inbox.SongCount" xml:space="preserve"><value>{0} songs</value><comment>InboxView.axaml header count, {0} = number of songs</comment></data>
+  <data name="Inbox.AddSelected" xml:space="preserve"><value>Add to Library</value><comment>InboxView.axaml button, row button and menu item: the selected songs</comment></data>
+  <data name="Inbox.AddAll" xml:space="preserve"><value>Add All</value><comment>InboxView.axaml button: every song in the Inbox</comment></data>
+  <data name="Inbox.Delete" xml:space="preserve"><value>Delete…</value><comment>InboxView.axaml button and menu item: remove the selected songs (Keep Files / Recycle Bin)</comment></data>
+  <data name="Inbox.Empty" xml:space="preserve"><value>Nothing waiting. New songs found in your music folders show up here.</value><comment>InboxView.axaml empty state</comment></data>
 
   <!-- LibraryPlaylistsView.axaml (auto-migrated) -->
   <data name="LibraryPlaylists.Play" xml:space="preserve"><value>Play</value><comment>Text in LibraryPlaylistsView.axaml</comment></data>
