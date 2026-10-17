@@ -68,14 +68,37 @@ public interface IOnlineMusicSearch
     /// <summary>Downloads (now = ahead of the queue) or queues the songs. Returns a short message for the user.</summary>
     Task<string> DownloadAsync(IReadOnlyList<OnlineSong> songs, bool now, CancellationToken ct);
 
-    /// <summary>Shows the download queue.</summary>
-    void OpenDownloads();
+    /// <summary>The download queue behind the Downloads page.</summary>
+    IDownloadQueue Downloads { get; }
 
     /// <summary>Opens the native artist page for an online artist.</summary>
     void OpenArtist(OnlineArtist artist);
 
     /// <summary>Opens the native album page for an online release.</summary>
     Task OpenAlbumAsync(OnlineAlbum album, CancellationToken ct);
+}
+
+/// <summary>One request on the Downloads page. <paramref name="Handle"/> identifies it to the queue.</summary>
+public sealed record DownloadEntry(object Handle, string Title, string Artist, OnlineDownloadState State, double Progress,
+    string Detail, bool IsNext, bool IsHeld);
+
+/// <summary>The download queue (one transfer at a time, a priority lane, a held batch). Calls come
+/// from the UI thread; <see cref="Changed"/> may fire on any thread, often (progress).</summary>
+public interface IDownloadQueue
+{
+    /// <summary>In queue order: the running one, then the priority lane, then the rest; failed after;
+    /// finished ones last (most recent first).</summary>
+    IReadOnlyList<DownloadEntry> Snapshot();
+    bool IsPaused { get; }
+    event EventHandler? Changed;
+    void SetPaused(bool paused);
+    void RetryFailed();
+    /// <summary>Starts songs staged without starting (a playlist's missing songs).</summary>
+    void StartHeld();
+    /// <summary>Removes every request and the finished list. Downloaded files stay.</summary>
+    void Clear();
+    void DownloadNext(DownloadEntry entry);
+    void Remove(DownloadEntry entry);
 }
 
 /// <summary>Where the running online source is published (set by the feature while it runs).</summary>

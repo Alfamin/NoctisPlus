@@ -19,14 +19,13 @@ internal sealed class FinderOnlineSearch : IOnlineMusicSearch
     private readonly NativeCatalogPages _pages;
     private readonly Func<bool> _signedIn;
     private readonly Action _signIn;
-    private readonly Action _downloads;
     private readonly ConcurrentDictionary<string, CatalogSong> _songs = new();
     private readonly ConcurrentDictionary<string, CatalogArtist> _artists = new();
     private readonly ConcurrentDictionary<string, CatalogRelease> _albums = new();
 
-    public FinderOnlineSearch(Func<ArtistCatalog?> catalog, DiscoveryActions actions, NativeCatalogPages pages, Func<bool> signedIn, Action signIn, Action downloads)
+    public FinderOnlineSearch(Func<ArtistCatalog?> catalog, DiscoveryActions actions, NativeCatalogPages pages, Func<bool> signedIn, Action signIn)
     {
-        _catalog = catalog; _actions = actions; _pages = pages; _signedIn = signedIn; _signIn = signIn; _downloads = downloads;
+        _catalog = catalog; _actions = actions; _pages = pages; _signedIn = signedIn; _signIn = signIn;
         _actions.Downloads.Changed += OnDownloadChanged;
     }
 
@@ -153,7 +152,8 @@ internal sealed class FinderOnlineSearch : IOnlineMusicSearch
 
     public void RequestSignIn() => _signIn();
 
-    public void OpenDownloads() => _downloads();
+    public IDownloadQueue Downloads => _queue ??= new FinderDownloadQueue(_actions.Downloads);
+    private FinderDownloadQueue? _queue;
 
     public OnlineDownloadStatus StatusOf(OnlineSong song)
     {

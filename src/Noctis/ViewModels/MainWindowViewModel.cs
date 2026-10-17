@@ -276,6 +276,7 @@ public partial class MainWindowViewModel : ViewModelBase
     private readonly HomeViewModel _homeVm;
     private readonly LibrarySongsViewModel _songsVm;
     private readonly SearchViewModel _searchVm;
+    private readonly DownloadsViewModel _downloadsVm;
     private readonly LibraryAlbumsViewModel _albumsVm;
     private readonly LibraryArtistsViewModel _artistsVm;
     private readonly LibraryPlaylistsViewModel _playlistsVm;
@@ -450,6 +451,8 @@ public partial class MainWindowViewModel : ViewModelBase
         _songsVm = new LibrarySongsViewModel(library, Player, Sidebar, persistence, Settings);
         // Noctis Plus Search: library + online catalog in one page (the rail's Search button).
         _searchVm = new SearchViewModel(library, Player, name => ViewArtistByName(name), album => OpenAlbumDetail(album));
+        _downloadsVm = new DownloadsViewModel();
+        _searchVm.DownloadsRequested += (_, _) => Navigate("downloads");
         _albumsVm = new LibraryAlbumsViewModel(library, Player, Sidebar, Settings);
         // Keep the top-bar dropdown labels in sync with the Albums grid filters/sort.
         _albumsVm.PropertyChanged += (_, e) =>
@@ -894,6 +897,8 @@ public partial class MainWindowViewModel : ViewModelBase
 #if DEBUG
         // Developer check of the Search page on an isolated profile: NOCTISPLUS_DEBUG_SEARCH=<query>
         // opens Search with that query (NOCTISPLUS_DEBUG_FILTER=Songs|Artists|Albums picks a chip).
+        if (Environment.GetEnvironmentVariable("NOCTISPLUS_DEBUG_PAGE") is { Length: > 0 } debugPage)
+            Dispatcher.UIThread.Post(() => Navigate(debugPage), DispatcherPriority.Background);
         if (Environment.GetEnvironmentVariable("NOCTISPLUS_DEBUG_SEARCH") is { Length: > 0 } debugQuery)
             Dispatcher.UIThread.Post(() =>
             {
@@ -2224,6 +2229,7 @@ public partial class MainWindowViewModel : ViewModelBase
             {
                 "home" => RefreshAndReturn(_homeVm),
                 "search" => _searchVm,
+                "downloads" => RefreshAndReturnDownloads(),
                 "songs" => RefreshAndReturnSongs(_songsVm),
                 "albums" => ResetFilterAndReturnAlbums(),
                 "artists" => ResetAndReturnArtists(),
@@ -2265,6 +2271,7 @@ public partial class MainWindowViewModel : ViewModelBase
         {
             "home" => "Home",
             "search" => "Search",
+            "downloads" => "Downloads",
             "songs" => "Songs",
             "albums" => "Albums",
             "artists" => "Artists",
@@ -2312,6 +2319,12 @@ public partial class MainWindowViewModel : ViewModelBase
     {
         if (view is ISearchable { IsSearchCleared: false } searchable)
             searchable.ApplyFilter(string.Empty);
+    }
+
+    private DownloadsViewModel RefreshAndReturnDownloads()
+    {
+        _downloadsVm.Refresh();
+        return _downloadsVm;
     }
 
     /// <summary>Sidebar Lyrics Studio: re-scans the library for songs missing the chosen format
@@ -2869,6 +2882,7 @@ public partial class MainWindowViewModel : ViewModelBase
     {
         if (CurrentView == _homeVm) return "home";
         if (CurrentView == _searchVm) return "search";
+        if (CurrentView == _downloadsVm) return "downloads";
         if (CurrentView == _songsVm) return "songs";
         if (CurrentView == _albumsVm || CurrentView == _coverFlowVm) return "albums";
         if (CurrentView == _artistsVm) return "artists";

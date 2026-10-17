@@ -85,8 +85,7 @@ public sealed class FreeMusicPlugin : INoctisPlugin
             DiscoverAlbums, new PlaylistLibrary(), NoctisDataOf(host.DataDirectory), Path.Combine(host.DataDirectory, "for-you-hidden.json"), () => _similar, () => _lastFm);
         _forYou.WarmUp();
         // The app's own Search page reads the catalog and starts downloads through this.
-        _online = new FinderOnlineSearch(() => _catalog, _discoveryActions, _artistPages, () => _telegram?.IsLoggedIn == true, () => ShowWindow(null),
-            () => { ShowWindow(null); _window?.ShowDownloads(); });
+        _online = new FinderOnlineSearch(() => _catalog, _discoveryActions, _artistPages, () => _telegram?.IsLoggedIn == true, () => ShowWindow(null));
         Noctis.Services.Search.OnlineMusicSearch.Current = _online;
         _transfers.Changed += Announce;
         _downloads.Finished += Announce;

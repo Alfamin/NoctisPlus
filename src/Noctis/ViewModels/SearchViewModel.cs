@@ -424,8 +424,11 @@ public sealed partial class SearchViewModel : ViewModelBase, ISearchable, IDispo
         RefreshDownloadStates();
     }
 
+    /// <summary>The Downloads button: the shell opens the Downloads page.</summary>
+    public event EventHandler? DownloadsRequested;
+
     [RelayCommand]
-    private void OpenDownloads() => _source?.OpenDownloads();
+    private void OpenDownloads() => DownloadsRequested?.Invoke(this, EventArgs.Empty);
 
     /// <summary>Top result "Play" on an artist: their songs in the library, most played first.</summary>
     [RelayCommand]

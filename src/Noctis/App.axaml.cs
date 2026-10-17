@@ -49,6 +49,7 @@ public partial class App : Application
         {
             [typeof(LibrarySongsViewModel)] = () => new LibrarySongsView(),
             [typeof(SearchViewModel)] = () => new SearchView(),
+            [typeof(DownloadsViewModel)] = () => new DownloadsView(),
             [typeof(LibraryAlbumsViewModel)] = () => new LibraryAlbumsView(),
             [typeof(LibraryArtistsViewModel)] = () => new LibraryArtistsView(),
             [typeof(CoverFlowViewModel)] = () => new CoverFlowView(),

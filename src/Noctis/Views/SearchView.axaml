@@ -96,8 +96,8 @@
                                    Opacity="0.55"
                                    TextTrimming="CharacterEllipsis"
                                    MaxLines="1">
-                            <Run Text="{Binding ArtistDisplay}" />
-                            <Run Text="{Binding AlbumTitle, StringFormat=' · {0}'}" />
+                            <Run Text="{Binding ArtistDisplay, Mode=OneWay}" />
+                            <Run Text="{Binding AlbumTitle, Mode=OneWay, StringFormat=' · {0}'}" />
                         </TextBlock>
                     </StackPanel>
 
