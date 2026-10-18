@@ -41,8 +41,11 @@ public partial class MetadataViewModel
 
     partial void OnIsAnimatedArtworkSearchOpenChanged(bool value)
     {
-        // Closed: stop decoding the preview and drop its temp file. A later search rebuilds it.
-        if (!value) ClearAnimatedPreview();
+        // Closed: stop opening album pages, stop decoding the preview and drop its temp file.
+        // Whatever was found stays listed; a later search starts over anyway.
+        if (value) return;
+        _animatedSearchCts?.Cancel();
+        ClearAnimatedPreview();
     }
 
     [RelayCommand(AllowConcurrentExecutions = true)]
