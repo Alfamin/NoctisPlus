@@ -233,7 +233,7 @@
                          grows WHILE the list moves, one motion — a faster spring here
                          popped the line to full size before the glide had visibly
                          started. Duration is pinned to LineMotion.DurationMs by test. -->
-                    <TransformOperationsTransition Property="RenderTransform" Duration="0:0:0.65">
+                    <TransformOperationsTransition Property="RenderTransform" Duration="0:0:1">
                         <TransformOperationsTransition.Easing>
                             <helpers:LineMotionEase/>
                         </TransformOperationsTransition.Easing>

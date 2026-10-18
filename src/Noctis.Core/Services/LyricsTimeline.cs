@@ -229,6 +229,36 @@ public sealed class LyricsTimeline
         return new(changed, ActiveIndex, ActiveLine, changed || setChanged);
     }
 
+    /// <summary>
+    /// The line the LIST should be glided to — <see cref="ActiveIndex"/>, or the next line
+    /// up to <paramref name="scrollLead"/> early. Measured on Apple Music: the list sets off
+    /// toward the next line well before its first word, so the line has arrived when the
+    /// voice starts; a glide that only begins with the line's activation is still moving
+    /// while the first word sweeps. Only the scroll position leads — activation and the
+    /// sweep stay on the word lookahead, for the reason <see cref="Update"/> gives.
+    ///
+    /// Never before every lit line's sung end: the line being sung never scrolls away
+    /// from the anchor. Only a word-timed next line leads (a plain line's activation
+    /// already carries its glide lead), and only a word-timed active line, whose sung end
+    /// is known. Pure function of <paramref name="position"/> and the current state, so a
+    /// seek resolves on the same tick as <see cref="Update"/>.
+    /// </summary>
+    public int ScrollIndex(TimeSpan position, TimeSpan scrollLead)
+    {
+        var active = ActiveIndex;
+        if (active < 0 || active + 1 >= _lines.Count || ActiveLine is not { HasWords: true }) return active;
+        var next = _lines[active + 1];
+        if (next.Timestamp is not { } nextStart || !next.HasWords) return active;
+
+        var leadStart = nextStart - scrollLead;
+        foreach (var lit in _activeLines)
+        {
+            if (SungEnd(lit) is not { } end) return active;
+            if (end > leadStart) leadStart = end;
+        }
+        return position + _wordLookahead >= leadStart ? active + 1 : active;
+    }
+
     private TimeSpan Adjusted(TimeSpan position, LyricLine l) =>
         position + (l.HasWords || l.HasBackgroundWords || l.HasTransliterationWords ? _wordLookahead : _lineLookahead);
 

@@ -467,7 +467,7 @@ public partial class MiniPlayerWindow : Window
     {
         switch (e.PropertyName)
         {
-            case nameof(LyricsViewModel.ActiveLineIndex) when Vm?.IsLyricsForm == true:
+            case nameof(LyricsViewModel.ScrollLineIndex) when Vm?.IsLyricsForm == true:
                 CenterActiveLyric(animated: true);
                 break;
             case nameof(LyricsViewModel.IsColorModeArtwork):
@@ -1951,7 +1951,7 @@ public partial class MiniPlayerWindow : Window
         var vm = Vm;
         if (vm == null) return;
 
-        var index = vm.Lyrics.ActiveLineIndex;
+        var index = vm.Lyrics.ScrollLineIndex;
         if (index < 0) return;
 
         var container = LyricsItems.ContainerFromIndex(index);

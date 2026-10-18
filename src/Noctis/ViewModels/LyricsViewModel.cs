@@ -311,6 +311,17 @@ public partial class LyricsViewModel : ViewModelBase, IDisposable
     [ObservableProperty]
     private int _activeLineIndex = -1;
 
+    /// <summary>The line the lyric list glides to: <see cref="ActiveLineIndex"/>, or the next
+    /// line up to <see cref="Helpers.LineMotion.NinetyTravelMs"/> early (LyricsTimeline.ScrollIndex)
+    /// so the list has arrived when its first word starts. The views scroll on this; the
+    /// highlight and sweep stay on ActiveLineIndex.</summary>
+    [ObservableProperty]
+    private int _scrollLineIndex = -1;
+
+    // Every reset/seek of the active line resets the scroll target with it; the early
+    // lead is re-derived by the next UpdateActiveLine.
+    partial void OnActiveLineIndexChanged(int value) => ScrollLineIndex = value;
+
     /// <summary>Whether to show favorite heart in metadata row (reflects current track's favorite status).</summary>
     public bool ShowMetadataFavoriteHeart => Player?.CurrentTrack?.IsFavorite ?? false;
 
@@ -2649,6 +2660,7 @@ public partial class LyricsViewModel : ViewModelBase, IDisposable
             UpdateActiveLine(GetPlaybackPosition());
             UpdateLineOpacities(ActiveLineIndex);
             OnPropertyChanged(nameof(ActiveLineIndex));
+            OnPropertyChanged(nameof(ScrollLineIndex));
         }
         else
         {
@@ -3566,7 +3578,11 @@ public partial class LyricsViewModel : ViewModelBase, IDisposable
         var step = _timeline.Update(position);
         // The set also changes without a line change: an overlapping (duet) line that
         // stays lit under the active one finishes, so the ramp re-centres on what's left.
-        if (!step.ActiveSetChanged) return;
+        if (!step.ActiveSetChanged)
+        {
+            ScrollLineIndex = _timeline.ScrollIndex(position, ScrollLead);
+            return;
+        }
         if (DebugLog.VlcBridgeEnabled)
         {
             var lit = _timeline.ActiveIndices.Count > 1 ? $" lit [{string.Join(",", _timeline.ActiveIndices)}]" : "";
@@ -3576,9 +3592,12 @@ public partial class LyricsViewModel : ViewModelBase, IDisposable
                 : $"lit set [{string.Join(",", _timeline.ActiveIndices)}] at {position.TotalMilliseconds:0}ms (active {step.ActiveIndex})");
         }
         ActiveLineIndex = step.ActiveIndex;
+        ScrollLineIndex = _timeline.ScrollIndex(position, ScrollLead);
         UpdateLineOpacities(step.ActiveIndex);
         UpdateWordClockSubscription();
     }
+
+    private static readonly TimeSpan ScrollLead = TimeSpan.FromMilliseconds(Helpers.LineMotion.NinetyTravelMs);
 
     /// <summary>
     /// Continuous playback clock for the sweep and line engine. The raw position

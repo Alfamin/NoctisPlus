@@ -516,7 +516,7 @@
             <Setter Property="Transitions">
                 <Transitions>
                     <!-- Same curve/length as the scroll glide (LineMotion) — see the page. -->
-                    <TransformOperationsTransition Property="RenderTransform" Duration="0:0:0.65">
+                    <TransformOperationsTransition Property="RenderTransform" Duration="0:0:1">
                         <TransformOperationsTransition.Easing>
                             <helpers:LineMotionEase/>
                         </TransformOperationsTransition.Easing>
