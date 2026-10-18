@@ -22,6 +22,42 @@ public class LyricsMotionTests
         Path.Combine("src", "Noctis", "Views", "MiniPlayerWindow.axaml"),
     };
 
+    /// <summary>
+    /// Apple Music (iOS, 120 fps capture) starts each line below the active one exactly
+    /// 50 ms after the line above it, on the same curve. Pinned so both lyric surfaces
+    /// share the measured value; the half-travel moments of neighbouring cascade lines
+    /// must then sit about one stagger apart (Apple: 50 ms) instead of the old 35.
+    /// </summary>
+    [Fact]
+    public void Cascade_StaggersLinesByTheMeasuredAppleDelay()
+    {
+        Assert.Equal(50, LineMotion.CascadeDelayPerLineMs);
+
+        const double travelPx = 131;
+        const double hardStepPx = 16;
+        double HalfTimeOfLine(int k)
+        {
+            for (var ms = 0; ms < 1500; ms++)
+            {
+                var baseEase = LineMotion.Ease(ms / (double)LineMotion.DurationMs);
+                var prev = 0.0;
+                for (var i = 1; i <= k; i++)
+                {
+                    var own = LineMotion.Ease((ms - i * LineMotion.CascadeDelayPerLineMs) / LineMotion.DurationMs);
+                    prev = LineMotion.CascadeStep(travelPx * (baseEase - own), prev, hardStepPx);
+                }
+                if (travelPx * baseEase - prev >= travelPx / 2) return ms;
+            }
+            return double.NaN;
+        }
+
+        for (var k = 0; k < 3; k++)
+        {
+            var gap = HalfTimeOfLine(k + 1) - HalfTimeOfLine(k);
+            Assert.InRange(gap, 40, 60);
+        }
+    }
+
     [Fact]
     public void Ease_StartsAtZero_EndsAtOne_OvershootsLessThanAPixel()
     {

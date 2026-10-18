@@ -1270,7 +1270,7 @@ public partial class LyricsView : UserControl
 
     // Cascade tuning: each line below the active one starts its glide this much later,
     // with the stagger depth capped — the Apple Music "settle top-down" feel.
-    private const double CascadeDelayPerLineMs = 35;
+    private const double CascadeDelayPerLineMs = LineMotion.CascadeDelayPerLineMs;
     private const int CascadeMaxLines = 8;
     // A line's lag may exceed the line above's by at most this much — see the lyrics
     // panel's constant of the same name (uncapped stagger made lines overlap mid-glide).

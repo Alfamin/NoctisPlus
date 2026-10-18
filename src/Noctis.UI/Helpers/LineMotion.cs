@@ -27,6 +27,13 @@ public static class LineMotion
     /// 0.8 is where creep-after-stop and overshoot are both under a pixel.</summary>
     public const double Zeta = 0.8;
 
+    /// <summary>Per-line stagger of the cascade: each line below the active one starts
+    /// its glide this much later than the line above it. Measured on Apple Music (iOS,
+    /// 120 fps capture, "Die With A Smile"): four consecutive lines below the active one
+    /// started at exactly +50, +100, +150, +200 ms, each on the same curve — 35 ms read
+    /// as the stack moving nearly as one slab. Shared by the lyrics page and side panel.</summary>
+    public const double CascadeDelayPerLineMs = 50;
+
     // Natural frequency such that the envelope e^(−ζωₙp) / √(1−ζ²) reaches 1% at p = 1.
     private static readonly double Wn = -Math.Log(0.01 * Math.Sqrt(1 - Zeta * Zeta)) / Zeta;
     private static readonly double Wd = Wn * Math.Sqrt(1 - Zeta * Zeta);
@@ -53,9 +60,9 @@ public static class LineMotion
     /// <summary>
     /// Limits one cascade line's lag relative to the line above it. Lines below the
     /// active one lag the base glide by a per-line delay; the raw lag difference
-    /// between neighbours peaks at ~13% of the travel (this curve's steepest slope ×
-    /// the 35ms delay), which on a three-row line exceeds the old 16px hard clamp by
-    /// 9px. A hard clamp is a velocity kink — the line rides the one above for a few
+    /// between neighbours peaks at this curve's steepest slope × the per-line delay
+    /// (~21% of the travel at 50 ms), which exceeds a 16px hard clamp on an ordinary
+    /// line change. A hard clamp is a velocity kink — the line rides the one above for a few
     /// frames, then snaps back to its own curve — right at peak speed.
     ///
     /// A <em>negative</em> step means the lower line is displaced toward the one above
