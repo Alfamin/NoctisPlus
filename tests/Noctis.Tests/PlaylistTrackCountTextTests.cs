@@ -17,10 +17,12 @@ public class PlaylistTrackCountTextTests
         sidebar.Playlists.Add(playlist);
         var vm = new PlaylistViewModel(playlist, player, lib, persistence, sidebar);
         // The constructor's background load ends by writing TrackCount = 0 (empty playlist);
-        // wait for it (TotalDuration is set in the same pass) so it can't overwrite the test's value.
-        var deadline = Environment.TickCount64 + 5000;
-        while (vm.TotalDuration.Length == 0 && Environment.TickCount64 < deadline)
+        // wait for it so it can't overwrite the test's value. (TotalDuration was the signal,
+        // but the import refresh now sets it in the constructor, before the load: CI 10-19.)
+        var deadline = Environment.TickCount64 + 10000;
+        while (vm.LoadsApplied == 0 && Environment.TickCount64 < deadline)
             await Task.Delay(5);
+        Assert.True(vm.LoadsApplied > 0, "the playlist's first load never finished");
         return vm;
     }
 

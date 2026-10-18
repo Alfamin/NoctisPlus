@@ -423,6 +423,9 @@ public partial class PlaylistViewModel : ViewModelBase, ISearchable, IDisposable
     /// <summary>Stale-result guard: LoadTracks runs can overlap (search keystrokes,
     /// LibraryUpdated every ~1.5 s during scans); only the newest result is applied.</summary>
     private int _loadGeneration;
+    private int _loadsApplied;
+    /// <summary>How many loads have reached the rows (tests wait for the first one).</summary>
+    internal int LoadsApplied => Volatile.Read(ref _loadsApplied);
 
     private async void LoadTracks()
     {
@@ -493,6 +496,7 @@ public partial class PlaylistViewModel : ViewModelBase, ISearchable, IDisposable
             RebuildFeaturedArtists(allResolvedTracks);
             RebuildSuggestions();
             OnPropertyChanged(nameof(ModifiedDateDisplay));
+            Interlocked.Increment(ref _loadsApplied);
         }
         catch (Exception ex)
         {
