@@ -1028,6 +1028,14 @@
     <value>當 TTML 歌詞把單字拆成音節時,保持單字完整。</value>
     <comment>Text in SettingsView.axaml</comment>
   </data>
+  <data name="Settings.LyricsGlowAndLift" xml:space="preserve">
+    <value>發光與浮動</value>
+    <comment>Text in SettingsView.axaml</comment>
+  </data>
+  <data name="Settings.LyricsGlowAndLiftHint" xml:space="preserve">
+    <value>已唱的詞會輕輕浮起，長音會發光（類似 Apple Music）。關閉後逐字歌詞保持靜止。</value>
+    <comment>Text in SettingsView.axaml</comment>
+  </data>
   <data name="Settings.PlayerBarOpacity" xml:space="preserve">
     <value>播放列不透明度</value>
     <comment>Text in SettingsView.axaml</comment>

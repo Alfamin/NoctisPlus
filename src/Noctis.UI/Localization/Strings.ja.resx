@@ -1028,6 +1028,14 @@
     <value>TTML 歌詞が単語を音節に分割していても、単語をひとまとまりに保ちます。</value>
     <comment>Text in SettingsView.axaml</comment>
   </data>
+  <data name="Settings.LyricsGlowAndLift" xml:space="preserve">
+    <value>グロー＆リフト</value>
+    <comment>Text in SettingsView.axaml</comment>
+  </data>
+  <data name="Settings.LyricsGlowAndLiftHint" xml:space="preserve">
+    <value>歌われた単語がふわりと浮き上がり、伸ばした音が光ります（Apple Music 風）。オフにすると単語同期の歌詞は動きません。</value>
+    <comment>Text in SettingsView.axaml</comment>
+  </data>
   <data name="Settings.PlayerBarOpacity" xml:space="preserve">
     <value>再生バーの不透明度</value>
     <comment>Text in SettingsView.axaml</comment>

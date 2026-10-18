@@ -616,6 +616,7 @@ public partial class LyricsViewModel : ViewModelBase, IDisposable
     {
         _timeline = new LyricsTimeline(LyricLines, WordLookahead, LyricsLookahead);
         _player = player;
+        _timeline.WordMotion = player.LyricsGlowAndLift;
         _lrcLib = lrcLib;
         _netEase = netEase;
         _metadata = metadata;
@@ -2722,6 +2723,11 @@ public partial class LyricsViewModel : ViewModelBase, IDisposable
         {
             OnPropertyChanged(nameof(IsLyricsFocusActive));
             RefreshFocusDimming();
+        }
+        // Glow & lift flipped: the running lines settle (off) or pick it up next frame (on).
+        else if (e.PropertyName == nameof(PlayerViewModel.LyricsGlowAndLift))
+        {
+            _timeline.WordMotion = _player.LyricsGlowAndLift;
         }
         // Minimum line opacity moved: re-floor the ramp in place.
         else if (e.PropertyName == nameof(PlayerViewModel.LyricsMinLineOpacity))

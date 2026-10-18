@@ -1052,6 +1052,7 @@ public partial class SettingsViewModel : ViewModelBase
     /// <summary>Percent floor (0–60) under the dimmed lyric lines; 0 = default ramp.</summary>
     [ObservableProperty] private int _lyricsMinLineOpacity;
     [ObservableProperty] private bool _lyricsJoinSplitWords;
+    [ObservableProperty] private bool _lyricsGlowAndLift = true;
     [ObservableProperty] private bool _lyricsShowTranslations = true;
     [ObservableProperty] private bool _lyricsShowRomanization = true;
     [ObservableProperty] private bool _lyricsShowBackgroundVocals = true;
@@ -2841,6 +2842,7 @@ public partial class SettingsViewModel : ViewModelBase
             LyricsFullScreenFocusEnabled = _settings.LyricsFullScreenFocusEnabled;
             LyricsMinLineOpacity = Math.Clamp(_settings.LyricsMinLineOpacity, 0, 60);
             LyricsJoinSplitWords = _settings.LyricsJoinSplitWords;
+            LyricsGlowAndLift = _settings.LyricsGlowAndLift;
             LyricsSaveTarget = LyricsSaveOptions.ParseTarget(_settings.LyricsSaveTarget).ToString();
             LyricsAutoDownload = _settings.LyricsAutoDownload;
             LyricsPreferredType = LyricsSaveOptions.ParsePreferredType(_settings.LyricsPreferredType).ToString();
@@ -3322,6 +3324,7 @@ public partial class SettingsViewModel : ViewModelBase
         _settings.LyricsFullScreenFocusEnabled = LyricsFullScreenFocusEnabled;
         _settings.LyricsMinLineOpacity = LyricsMinLineOpacity;
         _settings.LyricsJoinSplitWords = LyricsJoinSplitWords;
+        _settings.LyricsGlowAndLift = LyricsGlowAndLift;
         _settings.LyricsSaveTarget = LyricsSaveOptions.ParseTarget(LyricsSaveTarget).ToString();
         _settings.LyricsAutoDownload = LyricsAutoDownload;
         _settings.LyricsPreferredType = LyricsSaveOptions.ParsePreferredType(LyricsPreferredType).ToString();
@@ -3638,6 +3641,7 @@ public partial class SettingsViewModel : ViewModelBase
         _player.LyricsFullScreenFocusEnabled = LyricsFullScreenFocusEnabled;
         _player.LyricsMinLineOpacity = LyricsMinLineOpacity;
         _player.LyricsJoinSplitWords = LyricsJoinSplitWords;
+        _player.LyricsGlowAndLift = LyricsGlowAndLift;
         _player.LyricsSaveTarget = LyricsSaveTarget;
         _player.LyricsAutoDownload = LyricsAutoDownload;
         _player.LyricsPreferredType = LyricsPreferredType;
@@ -5141,6 +5145,12 @@ public partial class SettingsViewModel : ViewModelBase
     }
 
     partial void OnLyricsJoinSplitWordsChanged(bool value)
+    {
+        ApplyPlayerSettings();
+        if (_settingsLoaded) _ = SaveAsync();
+    }
+
+    partial void OnLyricsGlowAndLiftChanged(bool value)
     {
         ApplyPlayerSettings();
         if (_settingsLoaded) _ = SaveAsync();
@@ -7187,6 +7197,7 @@ public partial class SettingsViewModel : ViewModelBase
             LyricsFullScreenFocusEnabled = defaultSettings.LyricsFullScreenFocusEnabled;
             LyricsMinLineOpacity = defaultSettings.LyricsMinLineOpacity;
             LyricsJoinSplitWords = defaultSettings.LyricsJoinSplitWords;
+            LyricsGlowAndLift = defaultSettings.LyricsGlowAndLift;
             LyricsSaveTarget = defaultSettings.LyricsSaveTarget;
             LyricsAutoDownload = defaultSettings.LyricsAutoDownload;
             LyricsPreferredType = defaultSettings.LyricsPreferredType;

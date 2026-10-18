@@ -3253,6 +3253,20 @@
                                           VerticalAlignment="Center"/>
                 </Grid>
             </Border>
+            <!-- Apple Music word motion (sung words float up, held notes glow). -->
+            <Border Classes="setting-row">
+                <Grid ColumnDefinitions="*,Auto">
+                    <StackPanel Grid.Column="0" Spacing="2">
+                        <TextBlock Text="{loc:T Settings.LyricsGlowAndLift}" FontSize="15" FontWeight="SemiBold"/>
+                        <TextBlock Text="{loc:T Settings.LyricsGlowAndLiftHint}"
+                                   FontSize="12" Opacity="0.5" TextWrapping="Wrap"/>
+                    </StackPanel>
+                    <controls:LottieToggle Grid.Column="1"
+                                          AutomationProperties.Name="{loc:T Settings.LyricsGlowAndLift}"
+                                          IsChecked="{Binding LyricsGlowAndLift}"
+                                          VerticalAlignment="Center"/>
+                </Grid>
+            </Border>
             <!-- Lyric layers (issue #78): display-only, the lyrics are not reloaded. -->
             <Border Classes="setting-row">
                 <Grid ColumnDefinitions="*,Auto">

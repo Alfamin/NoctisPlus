@@ -503,6 +503,9 @@ public partial class PlayerViewModel : ViewModelBase
     /// <summary>Whether TTML words split across several timed spans render unbroken
     /// (issue #32). Driven by Settings; the lyrics VM re-parses when it flips.</summary>
     [ObservableProperty] private bool _lyricsJoinSplitWords;
+    /// <summary>Whether sung words float up and held notes swell and glow (Apple Music word
+    /// motion). Driven by Settings; display-only, applied to the running lyrics at once.</summary>
+    [ObservableProperty] private bool _lyricsGlowAndLift = true;
     /// <summary>Whether the lyrics show TTML translations / romanization / background vocals
     /// under each line (issue #78). Driven by Settings; display-only, no re-parse.</summary>
     [ObservableProperty] private bool _lyricsShowTranslations = true;

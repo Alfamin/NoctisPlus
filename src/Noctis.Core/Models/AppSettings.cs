@@ -898,6 +898,11 @@ public class AppSettings
     /// follows each syllable's own timing. Ships off, keeping the authored spacing.</summary>
     public bool LyricsJoinSplitWords { get; set; }
 
+    /// <summary>Apple Music word motion on word-synced lyrics: sung words float up and held
+    /// notes swell and glow letter by letter. Ships on; off keeps the words still (the
+    /// sweep alone marks the vocal).</summary>
+    public bool LyricsGlowAndLift { get; set; } = true;
+
     /// <summary>Show a TTML file's translation under each lyric line (issue #78).</summary>
     public bool LyricsShowTranslations { get; set; } = true;
 

@@ -266,6 +266,55 @@ public class WordFloatTests
         Assert.False(t.HasEmphasisInFlight);
     }
 
+    /// <summary>Settings → Lyrics "Glow &amp; Lift" (default on) reaches the running line engine.</summary>
+    [Fact]
+    public void GlowAndLiftSetting_DefaultsOn_AndDrivesTheLyricsEngine()
+    {
+        Assert.True(new AppSettings().LyricsGlowAndLift);
+        var player = new PlayerViewModel(
+            new FakeAudioPlayer(), new FakeLibraryService(),
+            new TestPersistenceService(), new FakeAnimatedCoverService());
+        Assert.True(player.LyricsGlowAndLift);
+        var vm = new LyricsViewModel(player, new NullLrcLib(), new NullNetEase(), new NullMetadata(),
+            new TestPersistenceService(), new FakeLibraryService());
+        var timeline = (LyricsTimeline)typeof(LyricsViewModel)
+            .GetField("_timeline", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic)!
+            .GetValue(vm)!;
+        Assert.True(timeline.WordMotion);
+        player.LyricsGlowAndLift = false;
+        Assert.False(timeline.WordMotion);
+        player.LyricsGlowAndLift = true;
+        Assert.True(timeline.WordMotion);
+    }
+
+    private sealed class NullLrcLib : ILrcLibService
+    {
+        public Task<LrcLibResult?> GetLyricsAsync(string artist, string trackName, double durationSeconds, CancellationToken ct = default)
+            => Task.FromResult<LrcLibResult?>(null);
+        public Task<List<LrcLibResult>> SearchLyricsAsync(string artist, string trackName, CancellationToken ct = default)
+            => Task.FromResult(new List<LrcLibResult>());
+    }
+
+    private sealed class NullNetEase : INetEaseService
+    {
+        public Task<LrcLibResult?> SearchLyricsAsync(string artist, string trackName, double durationSeconds, CancellationToken ct = default)
+            => Task.FromResult<LrcLibResult?>(null);
+    }
+
+    private sealed class NullMetadata : IMetadataService
+    {
+        public Track? ReadTrackMetadata(string filePath) => null;
+        public Track? ReadTrackMetadata(string filePath, out byte[]? embeddedArt) { embeddedArt = null; return null; }
+        public byte[]? ExtractAlbumArt(string filePath) => null;
+        public bool WriteTrackMetadata(Track track) => false;
+        public bool WriteTrackMetadata(Track track, string targetFilePath, string? titleOverride = null) => false;
+        public bool WriteAlbumArt(string filePath, byte[]? imageData) => false;
+        public bool WriteRating(string filePath, int rating, bool isDisliked) => false;
+        bool IMetadataService.WriteAdvancedFields(string filePath, AdvancedTagIO.AdvancedFields fields,
+            AdvancedTagIO.AdvancedFields original) => false;
+        public AudioFileInfo? ReadFileInfo(string filePath) => null;
+    }
+
     /// <summary>Line-synced (non word-synced) lyrics have no words to float: the timeline
     /// runs as before and nothing is in flight to keep the frame clock alive.</summary>
     [Fact]
