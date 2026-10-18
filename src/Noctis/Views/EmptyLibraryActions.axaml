@@ -1,0 +1,29 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:loc="using:Noctis.Localization"
+             xmlns:controls="using:Noctis.Controls"
+             x:Class="Noctis.Views.EmptyLibraryActions"
+             HorizontalAlignment="Center">
+    <!-- The two ways into an empty library (owner 10-18: features easy to spot, buttons over text):
+         Find music opens Search, Add music folder is the Settings folder picker + scan. Shared by the
+         Songs / Albums / Artists empty pages in place of "Add music folders in Settings to get started". -->
+    <UserControl.Styles>
+        <StyleInclude Source="avares://Noctis.UI/Assets/PillDialog.axaml" />
+    </UserControl.Styles>
+    <StackPanel Orientation="Horizontal" Spacing="10" Margin="0,10,0,0">
+        <Button Classes="pill-primary" MinHeight="36" Padding="18,0" FontSize="13" FontWeight="SemiBold"
+                Click="OnFindMusic" AutomationProperties.Name="{loc:T Home.FindMusic}">
+            <StackPanel Orientation="Horizontal" Spacing="8">
+                <controls:LineIcon Data="{DynamicResource MenuLineSearch}" Width="15" Height="15" VerticalAlignment="Center" />
+                <TextBlock Text="{loc:T Home.FindMusic}" VerticalAlignment="Center" />
+            </StackPanel>
+        </Button>
+        <Button Classes="pill-secondary" MinHeight="36" Padding="18,0" FontSize="13" FontWeight="SemiBold"
+                Click="OnAddFolder" AutomationProperties.Name="{loc:T Home.AddMusicFolder}">
+            <StackPanel Orientation="Horizontal" Spacing="8">
+                <controls:LineIcon Data="{DynamicResource MenuLineFolder}" Width="15" Height="15" VerticalAlignment="Center" />
+                <TextBlock Text="{loc:T Home.AddMusicFolder}" VerticalAlignment="Center" />
+            </StackPanel>
+        </Button>
+    </StackPanel>
+</UserControl>

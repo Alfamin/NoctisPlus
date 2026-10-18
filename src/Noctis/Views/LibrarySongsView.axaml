@@ -1,5 +1,6 @@
 <UserControl xmlns="https://github.com/avaloniaui"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:views="using:Noctis.Views"
              xmlns:loc="using:Noctis.Localization"
              xmlns:vm="using:Noctis.ViewModels"
              xmlns:m="using:Noctis.Models"
@@ -530,15 +531,12 @@
                         VerticalAlignment="Center"
                         Spacing="8">
                 <TextBlock Text="{loc:T LibrarySongs.NoSongsFound}"
-                           FontSize="18"
-                           Opacity="0.5"
+                           FontSize="20"
+                           FontWeight="Bold"
                            HorizontalAlignment="Center"
                            TextAlignment="Center" />
-                <TextBlock Text="{loc:T LibrarySongs.AddMusicFoldersSettings}"
-                           FontSize="13"
-                           Opacity="0.3"
-                           HorizontalAlignment="Center"
-                           TextAlignment="Center" />
+                <!-- Owner 10-18: buttons, not "add folders in Settings" text. -->
+                <views:EmptyLibraryActions />
             </StackPanel>
         </Grid>
 
