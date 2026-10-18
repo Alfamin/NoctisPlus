@@ -36,12 +36,16 @@ public class LocalizationTests
     [AvaloniaFact]
     public void SwitchingCulture_RaisesIndexerChange_AndFallsBackPerKey()
     {
+        // Start from English BEFORE counting: the process starts on the OS UI culture
+        // ("en-US" on a typical machine), so this first switch is itself a real change and
+        // counting it made the result depend on the machine locale and test order.
+        Loc.Instance.SetCulture("en");
+
         var raised = new List<string?>();
         Loc.Instance.PropertyChanged += (_, e) => raised.Add(e.PropertyName);
         var cultureEvents = 0;
         Loc.Instance.CultureChanged += (_, _) => cultureEvents++;
 
-        Loc.Instance.SetCulture("en");
         try
         {
             Loc.Instance.SetCulture("es");
