@@ -1,6 +1,7 @@
 using System.Xml;
 using System.Xml.Linq;
 using Noctis.Services;
+using Noctis.Services.Lyrics;
 using Noctis.Services.LyricsStudio;
 using Noctis.ViewModels;
 using Xunit;
@@ -179,5 +180,88 @@ public class TtmlWordSpacesTests
 
         Assert.Contains("ttm:agent=\"v2\"", ttml);
         Assert.Equal(new[] { "first voice", "second voice" }, DefaultReaderLines(ttml));
+    }
+
+    // ── Every path that writes a .ttml, and the files released versions wrote ──
+
+    /// <summary>
+    /// The line exactly as v1.6.0–v1.6.3 wrote it (TimedLyricsBuilder.BuildTtml at ad41b97c): the
+    /// space between two words a whitespace-only text node between their spans.
+    /// </summary>
+    private const string ReleasedTtml =
+        "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n" +
+        "<tt xmlns=\"http://www.w3.org/ns/ttml\" xmlns:ttm=\"http://www.w3.org/ns/ttml#metadata\" xmlns:itunes=\"http://music.apple.com/lyric-ttml-internal\" itunes:timing=\"Word\">\n" +
+        "  <head><metadata/></head>\n  <body>\n    <div begin=\"00:00:01.000\" end=\"00:00:04.000\">\n" +
+        "      <p begin=\"00:00:01.000\" end=\"00:00:04.000\" itunes:key=\"L1\"><span begin=\"00:00:01.000\" end=\"00:00:01.300\">Yeah</span> <span begin=\"00:00:01.300\" end=\"00:00:01.500\">I</span> <span begin=\"00:00:01.500\" end=\"00:00:01.800\">don't</span> <span begin=\"00:00:01.800\" end=\"00:00:02.400\">sleep</span> <span begin=\"00:00:02.400\" end=\"00:00:02.700\">please</span> <span begin=\"00:00:02.700\" end=\"00:00:03.000\">don't</span> <span begin=\"00:00:03.000\" end=\"00:00:03.400\">wake</span> <span begin=\"00:00:03.400\" end=\"00:00:04.000\">me</span></p>\n" +
+        "    </div>\n  </body>\n</tt>";
+
+    /// <summary>The same line as Noctis writes it now: each word's space inside its span.</summary>
+    private const string FixedLine =
+        "<p begin=\"00:00:01.000\" end=\"00:00:04.000\" itunes:key=\"L1\"><span begin=\"00:00:01.000\" end=\"00:00:01.300\">Yeah </span><span begin=\"00:00:01.300\" end=\"00:00:01.500\">I </span><span begin=\"00:00:01.500\" end=\"00:00:01.800\">don't </span><span begin=\"00:00:01.800\" end=\"00:00:02.400\">sleep </span><span begin=\"00:00:02.400\" end=\"00:00:02.700\">please </span><span begin=\"00:00:02.700\" end=\"00:00:03.000\">don't </span><span begin=\"00:00:03.000\" end=\"00:00:03.400\">wake </span><span begin=\"00:00:03.400\" end=\"00:00:04.000\">me</span></p>";
+
+    private const string OneLine =
+        "[00:01.00]<00:01.00>Yeah <00:01.30>I <00:01.50>don't <00:01.80>sleep <00:02.40>please <00:02.70>don't <00:03.00>wake <00:03.40>me<00:04.00>";
+
+    /// <summary>The report: a reader that drops whitespace-only text runs the released file's words together.</summary>
+    [Fact]
+    public void ReleasedTtml_ReadByAWhitespaceDroppingParser_RunsTheWordsTogether()
+    {
+        Assert.Equal(new[] { "YeahIdon'tsleeppleasedon'twakeme" }, DefaultReaderLines(ReleasedTtml));
+        Assert.Equal(new[] { "YeahIdon'tsleeppleasedon'twakeme" }, XmlDocumentLines(ReleasedTtml));
+    }
+
+    /// <summary>Noctis keeps whitespace when it reads, so it always showed those files with their spaces.</summary>
+    [Fact]
+    public void ReleasedTtml_ReadByNoctis_HasItsSpaces()
+    {
+        var line = Assert.Single(TtmlParser.Parse(ReleasedTtml).Lines!);
+        Assert.Equal("Yeah I don't sleep please don't wake me", line.Text);
+        Assert.Equal(8, line.Words!.Count);
+    }
+
+    /// <summary>Lyrics page ▸ Save Lyrics to File ▸ TTML (also LRC/ELRC → TTML): the exact line written.</summary>
+    [Fact]
+    public void LyricsPageSave_WritesTheSpaceInsideEachSpan_Exactly()
+    {
+        var ttml = LyricsViewModel.BuildTtmlFromSynced(OneLine)!;
+
+        Assert.Contains("      " + FixedLine + "\n", ttml);
+        Assert.Equal(ReleasedTtml.Replace(ReleasedTtml.Split('\n')[5], "      " + FixedLine), ttml);
+    }
+
+    /// <summary>
+    /// Lyrics Studio ▸ Also save as TTML: Whisper's words carry a leading space (" Yeah"); the
+    /// file has each word's space after it, inside its span, and none before the first.
+    /// </summary>
+    [Fact]
+    public void LyricsStudioSave_WhisperWords_WriteTheSpaceInsideEachSpan_Exactly()
+    {
+        var starts = new[] { 1.0, 1.3, 1.5, 1.8, 2.4, 2.7, 3.0, 3.4, 4.0 };
+        var texts = new[] { " Yeah", " I", " don't", " sleep", " please", " don't", " wake", " me" };
+        var words = texts.Select((t, i) => new AlignedWord(t, TimeSpan.FromSeconds(starts[i]), TimeSpan.FromSeconds(starts[i + 1]))).ToList();
+        var line = ExistingLyricsLoader.ParseTimed(OneLine)[0] with { Words = words };
+
+        var ttml = TimedLyricsBuilder.BuildTtml(new[] { line });
+
+        Assert.Contains("      " + FixedLine + "\n", ttml);
+    }
+
+    /// <summary>
+    /// A released file read back and saved again (Save ▸ TTML of synced lyrics that came from it,
+    /// or online TTML in Apple's between-spans layout from lrc.red / Unison): the new file has
+    /// the space inside the spans, so other players read it.
+    /// </summary>
+    [Fact]
+    public void ReleasedOrAppleLayoutTtml_SavedAgain_MovesTheSpacesIntoTheSpans()
+    {
+        var viaParser = LyricsViewModel.BuildTtmlFromSynced(TtmlParser.ToLrc(ReleasedTtml)!)!;
+        var viaOnline = LyricsViewModel.BuildTtmlFromSynced(OnlineTtml.Convert(ReleasedTtml)!.Value.Synced!)!;
+
+        foreach (var ttml in new[] { viaParser, viaOnline })
+        {
+            Assert.Contains("      " + FixedLine + "\n", ttml);
+            Assert.DoesNotContain("</span> <span", ttml);
+            Assert.Equal(new[] { "Yeah I don't sleep please don't wake me" }, DefaultReaderLines(ttml));
+        }
     }
 }
