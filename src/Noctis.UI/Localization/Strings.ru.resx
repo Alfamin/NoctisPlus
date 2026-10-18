@@ -1466,6 +1466,24 @@ Deezer и TIDAL: вставьте ссылку.</value></data>
   <data name="Metadata.TypeAlbumNamePress" xml:space="preserve"><value>введите название альбома и нажмите Enter или вставьте ссылку Apple Music</value><comment>Text in MetadataWindow.axaml</comment></data>
   <data name="Metadata.ChooseAnimatedArtwork" xml:space="preserve"><value>Выбрать анимированную обложку</value><comment>Text in MetadataWindow.axaml</comment></data>
   <data name="Metadata.NoAnimatedArtwork" xml:space="preserve"><value>Нет анимированной обложки</value><comment>Text in MetadataWindow.axaml</comment></data>
+  <data name="Metadata.AnimSearchUnavailable" xml:space="preserve"><value>Служба поиска недоступна.</value><comment>Animated artwork chooser (MetadataWindow.axaml / MetadataViewModel)</comment></data>
+  <data name="Metadata.AnimSearching" xml:space="preserve"><value>Поиск…</value><comment>Animated artwork chooser (MetadataWindow.axaml / MetadataViewModel)</comment></data>
+  <data name="Metadata.AnimNoneFound" xml:space="preserve"><value>Анимированная обложка не найдена.</value><comment>Animated artwork chooser (MetadataWindow.axaml / MetadataViewModel)</comment></data>
+  <data name="Metadata.AnimNoMatches" xml:space="preserve"><value>В Apple Music нет подходящих альбомов. Попробуйте другое название или вставьте ссылку Apple Music.</value><comment>Animated artwork chooser (MetadataWindow.axaml / MetadataViewModel)</comment></data>
+  <data name="Metadata.AnimNoneOfMatches" xml:space="preserve"><value>Ни у одного из подходящих альбомов ({0}) нет анимированной обложки.</value><comment>Animated artwork chooser (MetadataWindow.axaml / MetadataViewModel)</comment></data>
+  <data name="Metadata.AnimLinkHasNone" xml:space="preserve"><value>По этой ссылке в Apple Music нет анимированной обложки.</value><comment>Animated artwork chooser (MetadataWindow.axaml / MetadataViewModel)</comment></data>
+  <data name="Metadata.AnimSearchFailed" xml:space="preserve"><value>Ошибка поиска: {0}</value><comment>Animated artwork chooser (MetadataWindow.axaml / MetadataViewModel)</comment></data>
+  <data name="Metadata.AnimApplied" xml:space="preserve"><value>Применено. Нажмите «Сохранить», чтобы сохранить.</value><comment>Animated artwork chooser (MetadataWindow.axaml / MetadataViewModel)</comment></data>
+  <data name="Metadata.AnimDownloadFailed" xml:space="preserve"><value>Ошибка загрузки: {0}</value><comment>Animated artwork chooser (MetadataWindow.axaml / MetadataViewModel)</comment></data>
+  <data name="Metadata.AnimCoverDownloadFailed" xml:space="preserve"><value>Не удалось загрузить анимированную обложку.</value><comment>Animated artwork chooser (MetadataWindow.axaml / MetadataViewModel)</comment></data>
+  <data name="Metadata.AnimHlsDownloadFailed" xml:space="preserve"><value>Не удалось загрузить анимированную обложку Apple Music.</value><comment>Animated artwork chooser (MetadataWindow.axaml / MetadataViewModel)</comment></data>
+  <data name="Metadata.AnimCheckingMore" xml:space="preserve"><value>Проверяем другие альбомы…</value><comment>Animated artwork chooser (MetadataWindow.axaml / MetadataViewModel)</comment></data>
+  <data name="Metadata.AnimSearchBoxHint" xml:space="preserve"><value>Альбом, исполнитель или ссылка Apple Music</value><comment>Animated artwork chooser (MetadataWindow.axaml / MetadataViewModel)</comment></data>
+  <data name="Metadata.AnimSearchButton" xml:space="preserve"><value>Найти</value><comment>Animated artwork chooser (MetadataWindow.axaml / MetadataViewModel)</comment></data>
+  <data name="Metadata.AnimPreviewTip" xml:space="preserve"><value>Нажмите, чтобы воспроизвести анимацию</value><comment>Animated artwork chooser (MetadataWindow.axaml / MetadataViewModel)</comment></data>
+  <data name="Metadata.AnimPortrait" xml:space="preserve"><value>Портрет</value><comment>Animated artwork chooser (MetadataWindow.axaml / MetadataViewModel)</comment></data>
+  <data name="Metadata.AnimClean" xml:space="preserve"><value>Цензурная</value><comment>Animated artwork chooser (MetadataWindow.axaml / MetadataViewModel)</comment></data>
+  <data name="Metadata.AnimExplicit" xml:space="preserve"><value>18+</value><comment>Animated artwork chooser (MetadataWindow.axaml / MetadataViewModel)</comment></data>
   <data name="Metadata.PlainLyrics" xml:space="preserve"><value>Обычный текст</value><comment>Header in MetadataWindow.axaml</comment></data>
   <data name="Metadata.Enable" xml:space="preserve"><value>Включить</value><comment>Text in MetadataWindow.axaml</comment></data>
   <data name="Metadata.ImportFile" xml:space="preserve"><value>Импортировать файл</value><comment>Content in MetadataWindow.axaml</comment></data>
