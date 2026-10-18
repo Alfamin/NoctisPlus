@@ -100,14 +100,19 @@ public class AppleFlowShotsTests
             win.Show();
             win.Content = view;
             PumpFor(300);
+            // The view model's own line engine, as the app drives it (it also scrolls the page).
+            var update = typeof(LyricsViewModel).GetMethod("UpdateActiveLine",
+                System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic)!;
+            void At(double s) => update.Invoke(vm, new object[] { TimeSpan.FromSeconds(s) - Lookahead });
             foreach (var (name, seconds) in Shots)
             {
-                var t = new LyricsTimeline(vm.LyricLines, Lookahead, Lookahead);
-                // Walk up to the moment at 30 fps so lines that finished settle as in the app.
-                for (var s = seconds - 3; s < seconds; s += 1 / 30.0)
-                    t.Update(TimeSpan.FromSeconds(s) - Lookahead);
-                t.Update(TimeSpan.FromSeconds(seconds) - Lookahead);
-                PumpFor(700); // let the line glide and opacity transitions land
+                // Walk up to the moment at 30 fps so lines that finished settle as in the app;
+                // the line glide and opacity transitions get their time before the last frame.
+                for (var s = seconds - 3; s < seconds - 0.8; s += 1 / 30.0) At(s);
+                PumpFor(900);
+                for (var s = seconds - 0.8; s < seconds; s += 1 / 30.0) At(s);
+                At(seconds);
+                PumpFor(60);
 
                 var btn = view.GetVisualDescendants().OfType<Button>()
                     .First(b => b.Classes.Contains("lyric-line-btn") && b.Classes.Contains("active"));
@@ -120,7 +125,7 @@ public class AppleFlowShotsTests
                     (int)Math.Min(btn.Bounds.Height + 60, 800 - y));
                 CropSave(bmp, rect, Path.Combine(dir, $"{prefix}-{name}.png"));
                 var em = btn.GetVisualDescendants().OfType<Noctis.Controls.KaraokeWordText>().FirstOrDefault()?.FontSize;
-                _o.WriteLine($"{name} @ {seconds:F2}s: line '{t.ActiveLine?.Text}' rect {rect} em {em}");
+                _o.WriteLine($"{name} @ {seconds:F2}s: line {vm.ActiveLineIndex} rect {rect} em {em}");
             }
         }
         finally

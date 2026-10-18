@@ -95,13 +95,13 @@ public class WordFloatTests
     [Fact]
     public void Glow_IsOffAtRest_AndStrongerTheLongerTheNoteIsHeld()
     {
-        Assert.Equal(0, Noctis.Converters.EmphasisGlowConverter.Opacity(double.NaN, 1700, true, 7));
+        Assert.Equal(0, EmphasisGlow.Opacity(double.NaN, 1700, true, 7));
 
         static double Peak(double heldMs)
         {
             double best = 0;
             for (double t = 0; t < 6000; t += 10)
-                best = Math.Max(best, Noctis.Converters.EmphasisGlowConverter.Opacity(t, heldMs, false, 5));
+                best = Math.Max(best, EmphasisGlow.Opacity(t, heldMs, false, 5));
             return best;
         }
         var short1 = Peak(1000);
@@ -109,6 +109,28 @@ public class WordFloatTests
         var long1 = Peak(3000);
         Assert.True(short1 > 0 && short1 < mid && mid < long1, $"{short1} {mid} {long1}");
         Assert.True(Peak(20000) <= 1);
+    }
+
+    /// <summary>Measured on "goodbye" (1.69 s, last word): ~85% of the halo 0.45 s in, full
+    /// by ~0.6 s, no decline while the note is held, gone soon after it ends.</summary>
+    [Fact]
+    public void Glow_RisesWithTheWord_HoldsWhileHeld_AndLetsGo()
+    {
+        const double held = 1690;
+        double At(double t) => EmphasisGlow.Opacity(t, held, true, 7);
+        var full = EmphasisGlow.PeakOpacity * EmphasisGlow.Strength(held, true);
+        Assert.Equal(1, EmphasisGlow.Strength(held, true), precision: 9);
+        Assert.Equal(0, At(0));
+        Assert.InRange(At(450) / full, 0.8, 0.95);
+        Assert.Equal(full, At(EmphasisGlow.RiseMs), precision: 9);
+        Assert.Equal(full, At(held), precision: 9);
+        Assert.True(At(held + EmphasisGlow.FadeMs / 2) is > 0 and < 0.75 * EmphasisGlow.PeakOpacity);
+        Assert.Equal(0, At(held + EmphasisGlow.FadeMs));
+        // Always dark by the time the held-note clock stops (EmphasisMs -> NaN): no pop.
+        foreach (var h in new[] { 1000.0, 1300, 2500, 6000 })
+            foreach (var n in new[] { 1, 3, 7 })
+                Assert.Equal(0, EmphasisGlow.Opacity(
+                    EmphasisMotion.EndMs(EmphasisMotion.For(h, false), n) - 1e-6, h, false, n), precision: 6);
     }
 
     [Theory]
