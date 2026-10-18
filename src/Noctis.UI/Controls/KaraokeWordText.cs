@@ -245,8 +245,9 @@ public class KaraokeWordText : TextBlock
         }
         if (_pieces.Count == 0 || _glyphWidth <= 0) return;
 
-        var lift = double.IsNaN(Lift) ? 0 : Lift * WordFloat.LiftEm * FontSize;
-        using var offset = context.PushTransform(Matrix.CreateTranslation(origin.X, origin.Y - lift));
+        var transform = Matrix.CreateTranslation(origin.X, origin.Y - LiftPixels());
+        if (IsMoving) transform = Unsnapped * transform;
+        using var offset = context.PushTransform(transform);
         if (!_perLetter)
         {
             _pieces[0].Layout.Draw(context, default);
@@ -259,6 +260,29 @@ public class KaraokeWordText : TextBlock
             using (context.PushTransform(LetterTransform(i, parameters, out _, out _)))
                 _pieces[i].Layout.Draw(context, default);
         }
+    }
+
+    /// <summary>
+    /// Skia draws text under an axis-aligned transform with each glyph's baseline rounded to
+    /// a whole pixel, so a 2 px float rose in two 1 px hops (and the held-note letters
+    /// jumped the same way). A shear too small to see (0.1 px over 100 px; Skia's
+    /// axis-aligned test allows 1/4096) moves glyphs in quarter pixels instead. Only used
+    /// while something moves: at rest the text is drawn exactly as before, crisp on the grid.
+    /// </summary>
+    private static readonly Matrix Unsnapped = new(1, 1e-3, 0, 1, 0, 0);
+
+    private bool IsMoving =>
+        Lift is > 0 and < 1 || (_perLetter && !double.IsNaN(EmphasisMs));
+
+    /// <summary>The float in DIPs. The full lift is rounded to whole device pixels, so a word
+    /// that has finished rising rests on the pixel grid.</summary>
+    private double LiftPixels()
+    {
+        var lift = Lift;
+        if (double.IsNaN(lift) || lift <= 0) return 0;
+        var scaling = VisualRoot is TopLevel { RenderScaling: > 0 and var s } ? s : 1.0;
+        var full = Math.Round(WordFloat.LiftEm * FontSize * scaling) / scaling;
+        return Math.Min(1, lift) * full;
     }
 
     /// <summary>Points the piece's two stops at the band (piece-local pixels, unclamped):
