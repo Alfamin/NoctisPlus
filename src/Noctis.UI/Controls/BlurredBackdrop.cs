@@ -9,6 +9,7 @@ using Avalonia.Media;
 using Avalonia.Media.Imaging;
 using Avalonia.Media.Immutable;
 using Avalonia.Threading;
+using Noctis.Helpers;
 using Noctis.Services;
 
 namespace Noctis.Controls;
@@ -32,6 +33,8 @@ namespace Noctis.Controls;
 /// Without a snapshot (not taken yet, or the backend can't) the layer is the plain
 /// <see cref="Dim"/>; with one, the dim drops to <see cref="BlurDimOpacity"/> of it, the
 /// pop-up's lighter dim, since the blur does most of the separating.
+///
+/// <see cref="LiveBlur"/> swaps the snapshot for a live blur of <see cref="Target"/> itself.
 /// </summary>
 public class BlurredBackdrop : Panel
 {
@@ -72,6 +75,22 @@ public class BlurredBackdrop : Panel
 
     /// <summary>What the snapshot renders: see the class remarks.</summary>
     public Visual? Target { get; set; }
+
+    /// <summary>
+    /// Live mode (owner 10-18: under Settings the lyrics "skip/jump"): instead of a frozen
+    /// snapshot, <see cref="Target"/> itself is blurred in place (a BlurEffect) while the
+    /// layer is up, so what moves under the sheet (synced lyrics, the animated background)
+    /// keeps moving, blurred, instead of standing still and jumping forward on every retake.
+    /// No snapshot, no retakes: a theme switch or a resize shows under it at once. The blur
+    /// follows this layer's Opacity, so it fades in and out with the dim. Falls back to the
+    /// snapshot while Liquid Glass is on (<see cref="AppGlass"/>): a GlassPanel frosts the
+    /// surface it draws on, which inside an effect layer is not what lies beneath it.
+    /// </summary>
+    public bool LiveBlur { get; set; }
+
+    /// <summary>Live mode is on (the effect is, or at Opacity 0 will be, on Target).</summary>
+    private bool _live;
+    private IEffect? _liveEffect;
 
     private readonly Image _image;
     /// <summary>The snapshot a retake replaced, held under the new one while it fades in.</summary>
@@ -143,6 +162,25 @@ public class BlurredBackdrop : Panel
     internal int ReblurCount { get; private set; }
     /// <summary>How many snapshots were taken and shown (tests).</summary>
     internal int CaptureCount { get; private set; }
+    /// <summary>Live mode is on, and the BlurEffect radius currently on Target (tests).</summary>
+    internal bool IsLive => _live;
+    internal double LiveEffectRadius { get; private set; }
+
+    private bool WantsLive => LiveBlur && !AppGlass.IsActive && Target != null;
+
+    /// <summary>
+    /// The BlurEffect radius that blurs as much as the snapshot does at the same Background
+    /// Blur setting: the snapshot's three box passes of radius r at 1/4 scale make a gaussian
+    /// of sigma ~ 4 * sqrt(r(r+1)) logical px, and Skia turns a BlurEffect radius R into sigma
+    /// 0.288675 * R + 0.5 (both measured: BlurredBackdropLiveTests.LiveRadius_MatchesTheSnapshotsBlur).
+    /// The default 1 gives ~18, the slider's 10 gives ~144.
+    /// </summary>
+    internal static double LiveRadiusFor(double blurRadius)
+    {
+        if (!(blurRadius > 0)) return 0;
+        var sigma = Math.Sqrt(blurRadius * (blurRadius + 1)) / BackdropSnapshot.SnapshotScaling;
+        return Math.Max(0, (sigma - 0.5) / 0.288675);
+    }
 
     /// <summary>
     /// Call when the sheet starts to open: takes the snapshot unless one is still up (a
@@ -151,6 +189,13 @@ public class BlurredBackdrop : Panel
     /// </summary>
     public async Task PrepareAsync()
     {
+        if (WantsLive)
+        {
+            StartLive();
+            // One frame at Opacity 0 first, as a snapshot takes one: the fade then animates.
+            await Dispatcher.UIThread.InvokeAsync(static () => { }, DispatcherPriority.Render);
+            return;
+        }
         if (_snapshot != null) return;
         var capture = CaptureAsync();
         await Task.WhenAny(capture, Task.Delay(SnapshotWaitBudget));
@@ -308,6 +353,7 @@ public class BlurredBackdrop : Panel
     /// </summary>
     public void Release()
     {
+        StopLive();
         _epoch++;
         _capture = null;
         _refreshStamp++;
@@ -374,6 +420,13 @@ public class BlurredBackdrop : Panel
     /// </summary>
     private void OnBlurRadiusChanged(object? sender, EventArgs e)
     {
+        if (_live)
+        {
+            // Live: the new strength is just a new radius on the effect, Off the plain dim.
+            if (!BackdropSnapshot.IsBlurEnabled != _blurHidden) SetLiveLayers(animate: IsEffectivelyVisible && Opacity > 0);
+            UpdateLiveEffect();
+            return;
+        }
         if (_snapshot != null)
         {
             var hidden = !BackdropSnapshot.IsBlurEnabled;
@@ -389,6 +442,7 @@ public class BlurredBackdrop : Panel
     {
         base.OnAttachedToVisualTree(e);
         BackdropSnapshot.BlurRadiusChanged += OnBlurRadiusChanged;
+        AppGlass.Changed += OnAppGlassChanged;
     }
 
     protected override void OnSizeChanged(SizeChangedEventArgs e)
@@ -403,7 +457,83 @@ public class BlurredBackdrop : Panel
     {
         base.OnDetachedFromVisualTree(e);
         BackdropSnapshot.BlurRadiusChanged -= OnBlurRadiusChanged;
+        AppGlass.Changed -= OnAppGlassChanged;
         Release();
+    }
+
+    protected override void OnPropertyChanged(AvaloniaPropertyChangedEventArgs change)
+    {
+        base.OnPropertyChanged(change);
+        // The open/close fade of this layer carries the live blur with it.
+        if (_live && change.Property == OpacityProperty) UpdateLiveEffect();
+    }
+
+    /// <summary>Puts live mode on (idempotent): the dim settles at the blur's lighter one
+    /// (the plain dim at Off) and Target gets its BlurEffect for the current Opacity.</summary>
+    private void StartLive()
+    {
+        _live = true;
+        SetLiveLayers(animate: IsEffectivelyVisible && Opacity > 0);
+        UpdateLiveEffect();
+    }
+
+    private void SetLiveLayers(bool animate)
+    {
+        _blurHidden = !BackdropSnapshot.IsBlurEnabled;
+        SetLayers(imageOpacity: 0, dimOpacity: _blurHidden ? 1 : Math.Clamp(BlurDimOpacity, 0, 1), animate: animate);
+    }
+
+    /// <summary>Target's BlurEffect at the Background Blur strength, scaled by this layer's
+    /// Opacity; none at all (no offscreen layer) when that is under half a pixel.</summary>
+    private void UpdateLiveEffect()
+    {
+        if (!_live || Target is not { } target) return;
+        var radius = LiveRadiusFor(BackdropSnapshot.BlurRadius) * Math.Clamp(Opacity, 0, 1);
+        if (radius < 0.5) radius = 0;
+        if (radius == LiveEffectRadius && ReferenceEquals(target.Effect, _liveEffect)) return;
+        LiveEffectRadius = radius;
+        _liveEffect = radius > 0 ? new ImmutableBlurEffect(radius) : null;
+        target.Effect = _liveEffect;
+    }
+
+    /// <summary>Takes the live blur off Target (only the effect this layer put there).</summary>
+    private void StopLive()
+    {
+        if (!_live) return;
+        _live = false;
+        if (Target is { } target && _liveEffect != null && ReferenceEquals(target.Effect, _liveEffect))
+            target.Effect = null;
+        _liveEffect = null;
+        LiveEffectRadius = 0;
+    }
+
+    /// <summary>
+    /// Liquid Glass switched from the open sheet: change mode in place. On: the live blur
+    /// gives way to a snapshot (the plain dim until it lands, as at an open), taken once the
+    /// glass look has rendered. Off: the snapshot is freed and the live blur takes over.
+    /// </summary>
+    private void OnAppGlassChanged(object? sender, EventArgs e)
+    {
+        if (!_live && _snapshot is null) return; // closed: the next open picks the mode
+        if (WantsLive == _live) return;
+        if (_live)
+        {
+            StopLive();
+            _blurHidden = false;
+            SetLayers(imageOpacity: 0, dimOpacity: 1, animate: false);
+            _ = CaptureAfterRenderAsync(_epoch);
+        }
+        else
+        {
+            Release();
+            StartLive();
+        }
+    }
+
+    private async Task CaptureAfterRenderAsync(int epoch)
+    {
+        await Dispatcher.UIThread.InvokeAsync(static () => { }, DispatcherPriority.Background);
+        if (epoch == _epoch && !_live && _snapshot is null && IsVisible) await CaptureAsync();
     }
 
     private void SetLayers(double imageOpacity, double dimOpacity, bool animate)
