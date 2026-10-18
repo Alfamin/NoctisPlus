@@ -37,6 +37,29 @@ internal sealed class SpotifyPlaylists : IDisposable
     private int? _snapshotStamp;
     public event Action? Changed;
     public IReadOnlyList<SpotifyPlaylist> Jobs { get { lock (_gate) return _jobs.ToArray(); } }
+
+    /// <summary>
+    /// Owner #36: the imported songs a native playlist's library lacks, in playlist order, so the playlist
+    /// itself lists them (not only Download missing). Entries whose metadata never arrived have nothing to show.
+    /// </summary>
+    internal IReadOnlyList<(int Position, CatalogSong Song)> MissingFor(Guid playlistId)
+    {
+        var job = Jobs.FirstOrDefault(j => j.LibraryId == playlistId);
+        if (job?.Manifest is not { CompleteIds: true } manifest || job.FillingStopped) return [];
+        var matches = job.Matches;
+        return manifest.Entries.Where(e => e.Request is not null && !matches.ContainsKey(e.Position))
+            .OrderBy(e => e.Position).Select(e => (e.Position, Song(e))).ToArray();
+    }
+
+    // "spotify:track:ID" -> "spotify:ID": the catalog id shape (its Request maps it back to the track URI).
+    private static CatalogSong Song(CatalogEntry entry)
+    {
+        var r = entry.Request!;
+        var parts = entry.Uri.Split(':');
+        var id = parts.Length == 3 ? parts[0] + ":" + parts[2] : entry.Uri;
+        var artists = r.Artist.Split(", ", StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries).Select(n => new CatalogArtist("", n)).ToList();
+        return new(id, r.Title, artists.Count > 0 ? artists : [new("", r.Artist)], r.Seconds, r.Explicit);
+    }
     public bool Busy { get; private set; }
     // Empty at rest: the links box's placeholder says what to do (owner 10-18: minimal text).
     public string Status { get; private set; } = "";

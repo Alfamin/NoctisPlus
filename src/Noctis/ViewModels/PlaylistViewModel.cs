@@ -41,7 +41,8 @@ public partial class PlaylistViewModel : ViewModelBase, ISearchable, IDisposable
     private int _trackCount;
 
     /// <summary>Header stats: "1 track", "12 tracks" (the header read "1 tracks").</summary>
-    public string TrackCountText => TrackCount == 1 ? "1 track" : $"{TrackCount} tracks";
+    // An imported playlist counts its songs not in the library too (owner #36: they are its rows).
+    public string TrackCountText => (TrackCount + CatalogMissingCount) == 1 ? "1 track" : $"{TrackCount + CatalogMissingCount} tracks";
     [ObservableProperty] private string _totalDuration = "";
     [ObservableProperty] private string _totalSize = "";
 
@@ -255,6 +256,8 @@ public partial class PlaylistViewModel : ViewModelBase, ISearchable, IDisposable
         _sidebar.PlaylistEdited += OnPlaylistEdited;
         Services.Search.OnlineMusicSearch.CurrentChanged += OnStreamingFeatureChanged;
         AttachStreamingImports();
+        // After the list has taken the change (Rows forwards it): only then may the header row move.
+        Tracks.CollectionChanged += (_, _) => Dispatcher.UIThread.Post(() => { if (!_streamingDisposed) UpdateCatalogHeader(); });
     }
 
     private void OnStreamingFeatureChanged(object? sender, EventArgs e) => Dispatcher.UIThread.Post(() =>
@@ -281,6 +284,8 @@ public partial class PlaylistViewModel : ViewModelBase, ISearchable, IDisposable
         var missing = job is null ? 0 : job.Total - job.Found;
         HasMissingDownloads = missing > 0;
         MissingDownloadsLabel = $"Download missing · {missing}";
+        RefreshCatalogRows();
+        OnPropertyChanged(nameof(TrackCountText));
     }
 
     [RelayCommand]
@@ -1132,6 +1137,7 @@ public partial class PlaylistViewModel : ViewModelBase, ISearchable, IDisposable
     public void Dispose()
     {
         _streamingDisposed = true;
+        DisposeCatalogRows();
         Services.Search.OnlineMusicSearch.CurrentChanged -= OnStreamingFeatureChanged;
         if (_streamingImports is not null) _streamingImports.Changed -= OnStreamingImportsChanged;
         _player.PropertyChanged -= _playerPropertyChangedHandler;

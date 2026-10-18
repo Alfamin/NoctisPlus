@@ -30,6 +30,13 @@ internal static class StreamingPlaylistImportTests
         Check.Equal(0, downloads.History.Count, "import never queues or downloads audio automatically");
         var spotify = vm.Imports.Single(r => r.Job.Url == SpotifyPlaylistTests.Url(1));
         Check.Equal(2, spotify.Missing.Count, "missing repeated positions remain visible");
+        // Owner #36: the playlist itself lists the songs the library lacks, in playlist order.
+        var rows = imports.MissingFor(spotify.Job.LibraryId);
+        Check.True(rows.Select(r => r.Position).SequenceEqual(new[] { 2, 4 }) && rows.All(r => r.Song.Title == "Song 1"),
+            "the native playlist lists its missing songs at their positions, a repeat included");
+        Check.True(rows[0].Song.Request.OriginUri?.StartsWith("spotify:track:") == true, "a missing row keeps its Spotify track identity");
+        Check.Equal(0, imports.MissingFor(Guid.NewGuid()).Count, "a playlist that is not an import has no missing rows");
+        Check.Equal(0, downloads.History.Count, "listing missing songs downloads nothing");
         Run(vm.QueueMissingCommand.ExecuteAsync(spotify));
         Check.Equal(1, signIns, "explicit missing-download request offers sign-in when needed");
         Check.Equal(0, downloads.History.Count, "missing download is not silently queued while signed out");
@@ -49,6 +56,7 @@ internal static class StreamingPlaylistImportTests
         Run(vm.CheckLibraryCommand.ExecuteAsync(null));
         Check.True(library.Lists[spotify.Job.LibraryId].SequenceEqual(new[] { owned.Id, added.Id, library.Songs[1].Id, added.Id }),
             "new local recording fills its exact repeated source positions");
+        Check.Equal(0, imports.MissingFor(spotify.Job.LibraryId).Count, "songs that land in the library leave the missing rows");
 
         vm.Links = "https://attacker.invalid/playlist/123";
         Run(vm.ImportCommand.ExecuteAsync(null));

@@ -21,6 +21,26 @@
     </UserControl.Resources>
 
     <UserControl.Styles>
+        <!-- Noctis Plus (owner #36): an imported playlist's missing-song buttons, as on album pages. -->
+        <Style Selector="Button.catalog-download">
+            <Setter Property="Width" Value="30" />
+            <Setter Property="Height" Value="30" />
+            <Setter Property="Padding" Value="0" />
+            <Setter Property="CornerRadius" Value="999" />
+            <Setter Property="Background" Value="Transparent" />
+            <Setter Property="BorderThickness" Value="0" />
+            <Setter Property="Opacity" Value="0.7" />
+            <Setter Property="HorizontalContentAlignment" Value="Center" />
+            <Setter Property="VerticalContentAlignment" Value="Center" />
+            <Setter Property="Cursor" Value="Hand" />
+        </Style>
+        <Style Selector="Button.catalog-download:pointerover">
+            <Setter Property="Opacity" Value="1" />
+        </Style>
+        <Style Selector="Button.catalog-download:pointerover /template/ ContentPresenter">
+            <Setter Property="Background" Value="#22808080" />
+            <Setter Property="Foreground" Value="{DynamicResource AccentColorBrush}" />
+        </Style>
         <!-- Section header link: no hover zoom (overrides the global Button scale) -->
         <Style Selector="Button.featured-header:pointerover">
             <Setter Property="RenderTransform" Value="scale(1)" />
@@ -704,7 +724,7 @@
                 <!-- Track list: the only scrolling region (virtualized) -->
                 <Grid Grid.Row="1" x:Name="TrackListWrapper">
                     <ListBox Classes="track-list"
-                             ItemsSource="{Binding Tracks}"
+                             ItemsSource="{Binding Rows}"
                              x:Name="TrackList"
                              Padding="0,0,0,115"
                              ScrollViewer.HorizontalScrollBarVisibility="Disabled"
@@ -714,7 +734,7 @@
                                 <Setter Property="Focusable" Value="False" />
                             </Style>
                         </ListBox.Styles>
-                        <ListBox.ItemTemplate>
+                        <ListBox.DataTemplates>
                             <DataTemplate x:DataType="m:Track">
                                 <StackPanel>
 
@@ -981,8 +1001,68 @@
                                 </Border>
                                 </StackPanel>
                             </DataTemplate>
-                        </ListBox.ItemTemplate>
+                            <!-- Owner #36: an imported song the library lacks, in the album page's catalog-row shape. -->
+                            <DataTemplate x:DataType="vm:ArtistCatalogSong">
+                                <Border Classes="row-body catalog-missing" Height="56" CornerRadius="8" Background="Transparent">
+                                    <Grid ColumnDefinitions="44,*,Auto" Background="Transparent">
+                                        <Panel HorizontalAlignment="Center" VerticalAlignment="Center">
+                                            <Button Classes="catalog-download" ToolTip.Tip="{Binding Song.PlayLabel}" AutomationProperties.Name="{Binding Song.PlayLabel}"
+                                                    Command="{Binding $parent[UserControl].((vm:PlaylistViewModel)DataContext).PlayCatalogSongCommand}"
+                                                    CommandParameter="{Binding}">
+                                                <Panel>
+                                                    <PathIcon Data="{StaticResource PlayIcon}" Width="12" Height="12" IsVisible="{Binding !Song.IsPlaying}" />
+                                                    <PathIcon Data="{StaticResource PauseIcon}" Width="12" Height="12" IsVisible="{Binding Song.IsPlaying}" />
+                                                </Panel>
+                                            </Button>
+                                        </Panel>
+                                        <StackPanel Grid.Column="1" Spacing="2" Margin="6,0,0,0" VerticalAlignment="Center" Opacity="0.6">
+                                            <TextBlock FontSize="14" TextTrimming="CharacterEllipsis" MaxLines="1">
+                                                <Run Text="{Binding Song.Title}" />
+                                                <InlineUIContainer BaselineAlignment="Center">
+                                                    <Border Classes="explicit-badge compact" Margin="6,0,0,0" IsVisible="{Binding Song.IsExplicit}">
+                                                        <TextBlock Text="E" Classes="explicit-badge-text compact" FontSize="8" Opacity="0.9" />
+                                                    </Border>
+                                                </InlineUIContainer>
+                                            </TextBlock>
+                                            <TextBlock Text="{Binding Song.ArtistDisplay}" FontSize="12" Opacity="0.7" TextTrimming="CharacterEllipsis" MaxLines="1" />
+                                        </StackPanel>
+                                        <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="14" VerticalAlignment="Center" Margin="0,0,14,0">
+                                            <TextBlock Text="{Binding Song.DurationText}" FontSize="13" Opacity="0.45" FontFeatures="+tnum" VerticalAlignment="Center" />
+                                            <Panel Width="32" Height="32">
+                                                <Button Classes="catalog-download" IsVisible="{Binding Song.CanStartDownload}" ToolTip.Tip="Download" AutomationProperties.Name="Download"
+                                                        Command="{Binding $parent[UserControl].((vm:PlaylistViewModel)DataContext).DownloadCatalogSongCommand}"
+                                                        CommandParameter="{Binding}">
+                                                    <Button.ContextMenu>
+                                                        <ContextMenu>
+                                                            <MenuItem Header="Download now"
+                                                                      Command="{Binding $parent[UserControl].((vm:PlaylistViewModel)DataContext).DownloadCatalogSongCommand}" CommandParameter="{Binding}" />
+                                                            <MenuItem Header="Add to downloads"
+                                                                      Command="{Binding $parent[UserControl].((vm:PlaylistViewModel)DataContext).QueueCatalogSongCommand}" CommandParameter="{Binding}" />
+                                                        </ContextMenu>
+                                                    </Button.ContextMenu>
+                                                    <Path Data="{StaticResource SearchDownloadGlyph}" Width="14" Height="14" Stretch="Uniform"
+                                                          Stroke="{Binding $parent[Button].Foreground}" StrokeThickness="1.9" StrokeLineCap="Round" StrokeJoin="Round" />
+                                                </Button>
+                                                <controls:ProgressRing Width="18" Height="18" Thickness="2" Foreground="{DynamicResource AccentColorBrush}"
+                                                                       IsVisible="{Binding Song.IsDownloading}" Value="{Binding Song.Progress}" ToolTip.Tip="Downloading" />
+                                                <controls:ProgressRing Width="18" Height="18" Thickness="2" IsIndeterminate="True"
+                                                                       IsVisible="{Binding Song.IsQueued}" ToolTip.Tip="In downloads" />
+                                                <PathIcon Data="{StaticResource CheckmarkIcon}" Width="12" Height="12" Foreground="{DynamicResource AccentColorBrush}"
+                                                          IsVisible="{Binding Song.IsSaved}" ToolTip.Tip="Downloaded · appears when Noctis has scanned it" />
+                                            </Panel>
+                                        </StackPanel>
+                                    </Grid>
+                                </Border>
+                            </DataTemplate>
+                            <DataTemplate x:DataType="vm:PlaylistMissingHeader">
+                                <TextBlock Text="Not in your library" FontSize="17" FontWeight="Bold" Margin="8,18,0,6" IsHitTestVisible="False" />
+                            </DataTemplate>
+                        </ListBox.DataTemplates>
                     </ListBox>
+
+                    <!-- One quiet line for a missing song's Play/Download (sign-in, bot answer). -->
+                    <TextBlock Text="{Binding CatalogNotice}" IsVisible="{Binding HasCatalogNotice}" FontSize="12" Opacity="0.6"
+                               HorizontalAlignment="Center" VerticalAlignment="Bottom" Margin="24,0,24,92" TextWrapping="Wrap" IsHitTestVisible="False" />
 
                     <!-- Floating drag card: lifts and springs after the pointer while
                          reordering (transforms driven per frame by LiquidReorder). -->
