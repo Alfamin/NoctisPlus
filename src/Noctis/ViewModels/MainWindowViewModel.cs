@@ -485,6 +485,8 @@ public partial class MainWindowViewModel : ViewModelBase
             Settings.PluginCatalogClient = new PluginCatalogClient(pluginHttp);
         TrackContextMenuBuilder.PluginCommandSource = () => Plugins.TrackCommands;
         TrackContextMenuBuilder.ArtistPhotoSource = name => HomeViewModel.CachedArtistPhoto(name, _library, _artistImageService);
+        // "Open" buttons in Settings → Features: the action's window or page shows in front, not behind Settings.
+        Plugins.SettingActionInvoked += (_, _) => IsSettingsModalOpen = false;
         Plugins.NotificationRequested += (_, notice) =>
             TransientStatus.Show(nameof(PluginNotice), v => PluginNotice = v, $"{notice.PluginName}: {notice.Message}", TimeSpan.FromSeconds(4));
         // LoadAll walks the plugins folder, loads assemblies and reflects over their

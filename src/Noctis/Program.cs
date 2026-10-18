@@ -15,9 +15,27 @@ namespace Noctis;
 /// </summary>
 internal class Program
 {
+    /// <summary>
+    /// "--warm-audio": the installer runs this once, hidden, right after copying files. The first load of the 325
+    /// freshly written libVLC plugin files (and Windows' scan of each) took ~5.6 s, and the window waits for the audio
+    /// engine; done here, the user's first start after an install or update is as quick as any other (~0.8 s).
+    /// No window, no profile, no single-instance guard; a watchdog ends it after 30 s whatever happens.
+    /// </summary>
+    private static void WarmAudio()
+    {
+        using var watchdog = new Timer(_ => Environment.Exit(0), null, TimeSpan.FromSeconds(30), Timeout.InfiniteTimeSpan);
+        try
+        {
+            LibVLCSharp.Shared.Core.Initialize();
+            using var vlc = new LibVLCSharp.Shared.LibVLC("--no-video", "--quiet", "--no-osd");
+        }
+        catch { /* best effort: the app reports a broken libVLC itself */ }
+    }
+
     [STAThread]
     public static void Main(string[] args)
     {
+        if (OperatingSystem.IsWindows() && Array.IndexOf(args, "--warm-audio") >= 0) { WarmAudio(); return; }
         ConfigureBundledTools();
         Services.StartupTrace.Begin();
         // The core's log header must name this app, not the core assembly.

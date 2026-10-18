@@ -4091,7 +4091,7 @@
   </data>
   <!-- MiniPlayerWindow.axaml (auto-migrated) -->
   <data name="MiniPlayer.NoctisMiniPlayer" xml:space="preserve">
-    <value>Minirreproductor de Noctis</value>
+    <value>Minirreproductor de Noctis Plus</value>
     <comment>Title in MiniPlayerWindow.axaml</comment>
   </data>
   <data name="MiniPlayer.BackFullViewTip" xml:space="preserve">

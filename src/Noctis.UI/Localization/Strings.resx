@@ -1555,7 +1555,7 @@ Saving replaces them with the lyrics on screen. A lyrics file Noctis didn't writ
   <data name="MetadataSearch.F.Bpm" xml:space="preserve"><value>BPM</value><comment>Text in MetadataSearchPanel.axaml</comment></data>
 
   <!-- MiniPlayerWindow.axaml (auto-migrated) -->
-  <data name="MiniPlayer.NoctisMiniPlayer" xml:space="preserve"><value>Noctis Mini Player</value><comment>Title in MiniPlayerWindow.axaml</comment></data>
+  <data name="MiniPlayer.NoctisMiniPlayer" xml:space="preserve"><value>Noctis Plus Mini Player</value><comment>Title in MiniPlayerWindow.axaml</comment></data>
   <data name="MiniPlayer.BackFullViewTip" xml:space="preserve"><value>Back to full view</value><comment>ToolTip.Tip in MiniPlayerWindow.axaml</comment></data>
   <data name="MiniPlayer.ExplicitTip" xml:space="preserve"><value>Explicit</value><comment>ToolTip.Tip in MiniPlayerWindow.axaml</comment></data>
   <data name="MiniPlayer.FavoritesTip" xml:space="preserve"><value>Favorites</value><comment>ToolTip.Tip in MiniPlayerWindow.axaml</comment></data>

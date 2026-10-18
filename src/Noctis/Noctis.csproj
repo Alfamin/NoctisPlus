@@ -96,6 +96,21 @@
     <PackageReference Include="Microsoft.Extensions.DependencyInjection" Version="8.0.1" />
   </ItemGroup>
 
+  <!-- Noctis Plus: a publish for one Windows runtime ships only that runtime's libVLC. The package copies x64, x86
+       and arm64 for AnyCPU (182 MB the win-x64 app never loads). Plain builds and tests keep all three. -->
+  <PropertyGroup Condition="'$(RuntimeIdentifier)' == 'win-x64'">
+    <VlcWindowsX86Enabled>false</VlcWindowsX86Enabled>
+    <VlcWindowsArm64Enabled>false</VlcWindowsArm64Enabled>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(RuntimeIdentifier)' == 'win-arm64'">
+    <VlcWindowsX64Enabled>false</VlcWindowsX64Enabled>
+    <VlcWindowsX86Enabled>false</VlcWindowsX86Enabled>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(RuntimeIdentifier)' == 'win-x86'">
+    <VlcWindowsX64Enabled>false</VlcWindowsX64Enabled>
+    <VlcWindowsArm64Enabled>false</VlcWindowsArm64Enabled>
+  </PropertyGroup>
+
   <!-- Audio playback via libVLC -->
   <ItemGroup>
     <PackageReference Include="LibVLCSharp" Version="3.10.1" />

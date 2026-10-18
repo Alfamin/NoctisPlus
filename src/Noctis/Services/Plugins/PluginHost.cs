@@ -492,6 +492,10 @@ public sealed class PluginHost
     /// <summary>A plugin asked to show a message ("notifications").</summary>
     public event EventHandler<PluginNotice>? NotificationRequested;
 
+    /// <summary>An action setting's button was pressed: the shell closes Settings first, so the window or page
+    /// the action opens is not hidden behind it.</summary>
+    public event EventHandler<string>? SettingActionInvoked;
+
     // ── Discovery and lifecycle ──
 
     /// <summary>Scans the plugins folder and loads everything enabled. Safe to call again: unloads first.</summary>
@@ -1116,7 +1120,15 @@ public sealed class PluginHost
         StoredValues(plugin.Id, create: true)![item.Key] = item.Value;
         if (plugin.IsBundled && _builtInSettingMigrations.TryGetValue(plugin.Id, out var migrate)) migrate(StoredValues(plugin.Id, create: true)!);
         _saveSettings();
-        plugin.Adapter?.RaiseSettingChanged(item.Key);
+        if (item.IsAction && SettingActionInvoked is { } closing)
+        {
+            // Settings closes first (0.14 s); the action runs once it has, so a dialog it opens blurs the real
+            // page behind it, not a snapshot of Settings.
+            closing(this, item.Key);
+            var key = item.Key;
+            Avalonia.Threading.DispatcherTimer.RunOnce(() => plugin.Adapter?.RaiseSettingChanged(key), TimeSpan.FromMilliseconds(220));
+        }
+        else plugin.Adapter?.RaiseSettingChanged(item.Key);
         NativePreferenceChanged?.Invoke(plugin.Id, item.Key);
     }
 

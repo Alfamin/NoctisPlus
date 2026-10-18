@@ -1555,7 +1555,7 @@ Deezer и TIDAL: вставьте ссылку.</value></data>
   <data name="MetadataSearch.F.Bpm" xml:space="preserve"><value>BPM</value><comment>Text in MetadataSearchPanel.axaml</comment></data>
 
   <!-- MiniPlayerWindow.axaml (auto-migrated) -->
-  <data name="MiniPlayer.NoctisMiniPlayer" xml:space="preserve"><value>Мини-плеер Noctis</value><comment>Title in MiniPlayerWindow.axaml</comment></data>
+  <data name="MiniPlayer.NoctisMiniPlayer" xml:space="preserve"><value>Мини-плеер Noctis Plus</value><comment>Title in MiniPlayerWindow.axaml</comment></data>
   <data name="MiniPlayer.BackFullViewTip" xml:space="preserve"><value>Вернуться в обычный вид</value><comment>ToolTip.Tip in MiniPlayerWindow.axaml</comment></data>
   <data name="MiniPlayer.ExplicitTip" xml:space="preserve"><value>Ненормативная лексика</value><comment>ToolTip.Tip in MiniPlayerWindow.axaml</comment></data>
   <data name="MiniPlayer.FavoritesTip" xml:space="preserve"><value>Избранное</value><comment>ToolTip.Tip in MiniPlayerWindow.axaml</comment></data>

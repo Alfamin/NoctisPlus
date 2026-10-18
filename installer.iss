@@ -130,6 +130,10 @@ procedure CurStepChanged(CurStep: TSetupStep);
 var
   ResultCode: Integer;
 begin
+  // Load the freshly copied audio engine once, hidden (Noctis.exe --warm-audio, ends itself within 30 s), so the
+  // first start after an install or update does not wait ~5 s for Windows to open its 325 new plugin files.
+  if CurStep = ssPostInstall then
+    Exec(ExpandConstant('{app}\{#MyAppExeName}'), '--warm-audio', '', SW_HIDE, ewWaitUntilTerminated, ResultCode);
   if (CurStep = ssDone) and WizardSilent() and (ExpandConstant('{param:NOLAUNCH|0}') <> '1') then
     Exec(ExpandConstant('{app}\{#MyAppExeName}'), '', '',
          SW_SHOW, ewNoWait, ResultCode);
