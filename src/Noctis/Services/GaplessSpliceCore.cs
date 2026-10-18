@@ -65,6 +65,13 @@ public sealed class GaplessTrackSegment
     // drive the shared sink).
     public object? Source { get; }
 
+    /// <summary>
+    /// How much this segment must re-buffer after a mid-track underrun before it plays again; 0 = the engine's
+    /// default (a short hold for a local file's brief disk stall). A download that cannot keep up stalls again and
+    /// again: one longer wait then reads as a clean buffering pause instead of a run of stutters.
+    /// </summary>
+    public int UnderrunRefillMs { get; set; }
+
     public GaplessTrackSegment(int sampleRate, int channels, object? source, int capacitySeconds = 15, long basePositionMs = 0)
     {
         SampleRate = Math.Clamp(sampleRate, 1000, 384000);
@@ -742,7 +749,8 @@ public sealed class GaplessSpliceProvider : ISampleProvider
             // render thread, but do not advance past an unfinished segment.
             if (!active.IsFinished)
             {
-                _refillSamplesNeeded = WaveFormat.SampleRate * WaveFormat.Channels * UnderrunRefillMs / 1000;
+                var refillMs = active.UnderrunRefillMs > 0 ? active.UnderrunRefillMs : UnderrunRefillMs;
+                _refillSamplesNeeded = WaveFormat.SampleRate * WaveFormat.Channels * refillMs / 1000;
                 NoteUnderrun(active);
                 break;
             }

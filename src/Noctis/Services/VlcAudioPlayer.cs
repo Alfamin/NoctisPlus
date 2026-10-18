@@ -3174,9 +3174,11 @@ public class VlcAudioPlayer : IAudioPlayer
                 : new Media(_libVlc, filePath, isRemote ? FromType.FromLocation : FromType.FromPath);
             if (media is ProgressiveMedia streamed)
             {
-                streamed.AddOption(Path.GetExtension(filePath).Equals(".mp3", StringComparison.OrdinalIgnoreCase) ? ":demux=mp3" : ":demux=flac");
-                streamed.Buffering += waiting => { if (ReferenceEquals(_currentMedia, streamed)) BufferingChanged?.Invoke(this, waiting); };
+                ProgressiveMedia.Configure(streamed, filePath);
+                // The download can still make playback wait. The view model shows the buffering ring only when the
+                // audible position actually stops (the engine's refill hold, below), not while bytes trickle in.
                 streamed.Finished += () => { if (ReferenceEquals(_currentMedia, streamed)) BufferingChanged?.Invoke(this, false); };
+                BufferingChanged?.Invoke(this, !streamed.Complete);
             }
             if (!isPathless)
                 ApplyReadAhead(media);
@@ -3335,6 +3337,11 @@ public class VlcAudioPlayer : IAudioPlayer
                 // _enginePendingBaseMs, so an input-open flush re-bases to the
                 // same value the :start-time open actually begins at.
                 EngineBeginSegment(_player, Math.Max(0, pendingMs), filePath, mp3TailTrimFrames);
+                // A download that falls behind waits once for a few seconds of audio instead of stuttering on
+                // every late chunk (the segment holds after an underrun until this much has re-buffered).
+                if (_currentMedia is ProgressiveMedia { Complete: false } &&
+                    Volatile.Read(ref _engineSegments[EngineSlotOf(_player)]) is { } downloadSegment)
+                    downloadSegment.UnderrunRefillMs = DownloadUnderrunRefillMs;
                 // Pause parks the sink; a fresh play must un-park it (pause → pick
                 // a new track otherwise renders into a paused stream: silence with
                 // a moving timeline, track after track). Paused restarts stay
@@ -4479,6 +4486,9 @@ public class VlcAudioPlayer : IAudioPlayer
             return active.Source is int slot && slot == playerSlot ? active.PositionMs : 0;
         return progressiveInput ? null : vlcTimeMs;
     }
+
+    /// <summary>Re-buffering after a download-backed input ran dry (see GaplessTrackSegment.UnderrunRefillMs).</summary>
+    internal const int DownloadUnderrunRefillMs = 2500;
 
     internal static void FlushEngineInput(GaplessTrackSegment segment, long seekBaseMs, bool nonseekableDownload, int discardFrames = 0)
     {

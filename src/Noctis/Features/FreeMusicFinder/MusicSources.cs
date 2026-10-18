@@ -68,6 +68,8 @@ internal sealed class MusicSources
 {
     private readonly IMusicSource[] _sources;
     private readonly Dictionary<string, SourceCooldown> _cooldowns = new(StringComparer.Ordinal);
+    private readonly Dictionary<string, DateTimeOffset> _rechecked = new(StringComparer.Ordinal);
+    private static readonly TimeSpan RecheckEvery = TimeSpan.FromMinutes(10);
     // One download at a time and one search at a time, but a search does not wait for a download:
     // each bot keeps its own conversations apart (TelegramBotSource, DeezLoadSource).
     private readonly SemaphoreSlim _gate = new(1, 1), _searchGate = new(1, 1);
@@ -159,13 +161,23 @@ internal sealed class MusicSources
                 if (Cooling(source.Id) && request.CachedFrom != source.Id) { skipped = true; continue; }
                 try
                 {
-                    if (output.CanSeek) { output.SetLength(0); output.Position = 0; }
-                    TransferProgress.Stage(progress, haveMp3
-                        ? "MP3 ready · checking FLAC with " + source.Id + "…"
-                        : "Asking " + source.Id + " for the file…");
-                    // Callbacks and chat message IDs are scoped to one provider. Only recording
-                    // metadata and public track URLs may cross to the fallback bot.
-                    var ext = await source.FetchAsync(BotSelections.ForSource(request,source.Id), output, progress, ct).ConfigureAwait(false);
+                    async Task<string> AskAsync()
+                    {
+                        if (output.CanSeek) { output.SetLength(0); output.Position = 0; }
+                        TransferProgress.Stage(progress, haveMp3
+                            ? "MP3 ready · checking FLAC with " + source.Id + "…"
+                            : "Asking " + source.Id + " for the file…");
+                        // Callbacks and chat message IDs are scoped to one provider. Only recording
+                        // metadata and public track URLs may cross to the fallback bot.
+                        return await source.FetchAsync(BotSelections.ForSource(request, source.Id), output, progress, ct).ConfigureAwait(false);
+                    }
+                    var ext = await AskAsync().ConfigureAwait(false);
+                    // A bot whose format was confirmed sent the other one: its setting may have been changed in the
+                    // bot itself (owner, 2026-10-18). Check its menu once; if it really had moved, ask it again now.
+                    if (preferred is { } want && (want == AudioQuality.FLAC ? ext == "mp3" : ext == "flac")
+                        && !qualityErrors.ContainsKey(source.Id) && source is IQualityMusicSource drifted
+                        && await RecheckQualityAsync(drifted, source.Id, want, ct).ConfigureAwait(false))
+                        ext = await AskAsync().ConfigureAwait(false);
                     if (preferred == AudioQuality.MP3 && ext != "mp3")
                         throw new TrackUnavailableException(source.Id + " returned " + ext + " despite confirming MP3. Trying the other provider; no format was relabelled.");
                     if (ext != "flac")
@@ -206,12 +218,14 @@ internal sealed class MusicSources
         }
         finally { _gate.Release(); }
     }
+    /// <summary>The preference was changed in the app: each bot's menu is checked once more.</summary>
     public async Task SynchronizeQualityAsync(CancellationToken ct)
     {
         await _gate.WaitAsync(ct).ConfigureAwait(false);
         try
         {
             CheckGlobal();
+            foreach (var source in _sources.OfType<IQualityMusicSource>()) source.ForgetQuality();
             var quality = _quality?.Invoke();
             var errors = await ConfigureQualityAsync(null, ct, quality).ConfigureAwait(false);
             foreach (var source in _sources.Where(s => Cooling(s.Id)))
@@ -235,6 +249,8 @@ internal sealed class MusicSources
             {
                 if (Cooling(source.Id)) continue;
                 if (source is not IQualityMusicSource configurable) continue;
+                // Confirmed before (kept with the login): no "/settings" message for this song.
+                if (configurable.QualityConfirmed(quality)) continue;
                 TransferProgress.Stage(progress, "Setting " + source.Id + " quality to " + quality + "…");
                 try { await configurable.SetQualityAsync(quality, ct).ConfigureAwait(false); }
                 catch (SourceLimitException ex) { Block(ex); if (ex.Global) throw Waiting(); errors[source.Id] = ex.Message; }
@@ -251,6 +267,30 @@ internal sealed class MusicSources
         }
         finally { _searchGate.Release(); }
     }
+    /// <returns>True when the bot's setting had moved and was put back, so the song is worth asking for again.</returns>
+    private async Task<bool> RecheckQualityAsync(IQualityMusicSource source, string id, AudioQuality quality, CancellationToken ct)
+    {
+        // Some songs exist only as MP3, so the other format alone is no proof. An album of them must not open the
+        // settings menu for every song: once per bot in ten minutes.
+        lock (_rechecked)
+        {
+            if (_rechecked.TryGetValue(id, out var last) && _now() - last < RecheckEvery) return false;
+            _rechecked[id] = _now();
+        }
+        source.ForgetQuality();
+        // Settings replies have keyboards too. They must not be mistaken for search results.
+        await _searchGate.WaitAsync(ct).ConfigureAwait(false);
+        try
+        {
+            var changed = await source.SetQualityAsync(quality, ct).ConfigureAwait(false);
+            if (changed) _notice(id + " had been switched away from " + quality + " in the bot; it is set back and asked again.");
+            return changed;
+        }
+        catch (Exception ex) when (ex is BotAnswerException or TimeoutException or TL.RpcException)
+        { _notice(id + ": " + ex.Message); return false; }
+        finally { _searchGate.Release(); }
+    }
+
     // Searches and downloads run side by side, so the limits they share are read and written under a lock.
     private bool Cooling(string id) { lock (_cooldowns) return _cooldowns.TryGetValue(id, out var value) && value.Until > _now(); }
     private void CheckGlobal() { if (Cooling("Telegram")) throw Waiting(); }

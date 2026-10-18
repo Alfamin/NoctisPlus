@@ -36,6 +36,33 @@ Live Telegram settings and actual live transfer remain unverified release gates.
 
 Own preview PID16932 was closed after checking its full executable path. Computer-use kernel was reset. No active preview or authentication; only the full test process remains running.
 
+## Owner report: skipping while streaming — root cause and fix (Claude, 2026-10-18 later morning)
+
+Owner (real Telegram, Drake "Marvin's Room" / "2C Slide", Music Hunters down so DeezLoad served): playback "skips
+a few seconds every half second to a second until the download finishes"; the timeline runs on normally.
+
+The earlier synthetic checks missed it: one long stall makes VLC re-sync (handled), but a real transfer delivers
+in bursts and short gaps. Reproduced with the Debug preview's new paced mode (`NOCTISPLUS_PREVIEW_PACE`, with
+`NOCTISPLUS_PREVIEW_SECONDS`) and a generated 90 s song whose second t is a 300 + 20*t Hz tone. The existing
+`NOCTIS_ENGINE_TAP` recordings (what VLC delivered, what was played) were analysed per 100 ms:
+
+- At 0.85x the bitrate, VLC itself never delivered song seconds 4-10 ("buffer too late: dropped" ~80 blocks):
+  it re-syncs its clock to the newest timestamp of the burst read at start, as if the input were a live
+  broadcast, and throws away the audio it now thinks is late. At 1.15x the same start-up drops happened.
+- VLC's `--clock-synchro` off for download-backed inputs only (`ProgressiveMedia.Configure`, `:clock-synchro=0`):
+  all 90 seconds delivered and played in order at both 0.85x and 1.15x. At 1.15x: no gaps, 0 VLC drop warnings,
+  0 engine underruns. At 0.85x (download slower than the song): one clean ~2 s buffering pause; ~5 single
+  ~0.1 s drops remain right where late bytes arrive (VLC's own 60 ms lateness rule); larger caching options do
+  not apply to this input type.
+- Tried and abandoned: pausing VLC to keep a cushion. VLC cannot pause this nonseekable callback input (SetPause
+  is ignored); measuring the cushion from the audible position was also wrong (VLC's clock leads it by the ring).
+- A download that falls behind now waits once instead of stuttering: its engine segment re-buffers 2.5 s after
+  an underrun (`GaplessTrackSegment.UnderrunRefillMs`, default stays ~50 ms for local files). The buffering ring
+  shows while the download is incomplete and the audible position has stopped for a second.
+- Regression tests: `ProgressiveDecoderTests.ABurstThenLateChunks_PlaysEverySecond_NothingDropped` (real VLC,
+  app options, time-coded tone; fails without the fix: 11.23 of 12 s delivered) and
+  `GaplessSpliceCoreTests.DownloadSegment_RebuffersItsOwnLongerHold_AfterAnUnderrun`.
+
 ## Final clock validation (Claude, 2026-10-18 morning)
 
 The overnight flush correction (FlushEngineInput) was built and run in the real app on NEW synthetic profiles only

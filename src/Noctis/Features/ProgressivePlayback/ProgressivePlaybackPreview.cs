@@ -13,13 +13,14 @@ namespace Noctis.Features.ProgressivePlayback;
 /// account, network or external library. Every fixture must be inside the explicit test profile.</summary>
 internal static class ProgressivePlaybackPreview
 {
+    private static int PreviewSeconds => int.TryParse(Environment.GetEnvironmentVariable("NOCTISPLUS_PREVIEW_SECONDS"), out var s) && s > 0 ? s : 24;
     internal static async Task ShowAsync(Window owner, string mode)
     {
         if (owner.DataContext is not MainWindowViewModel main) return;
         var root = Path.GetFullPath(Environment.GetEnvironmentVariable("NOCTIS_PLUS_DATA_DIR") ?? throw new InvalidOperationException());
         var audio = Path.GetFullPath(Environment.GetEnvironmentVariable("NOCTISPLUS_PREVIEW_AUDIO") ?? "missing");
         if (!audio.StartsWith(root.TrimEnd(Path.DirectorySeparatorChar) + Path.DirectorySeparatorChar, StringComparison.OrdinalIgnoreCase)
-            || !File.Exists(audio) || new FileInfo(audio).Length > 10 * 1024 * 1024) return;
+            || !File.Exists(audio) || new FileInfo(audio).Length > 64 * 1024 * 1024) return;
         var ext = Path.GetExtension(audio).TrimStart('.').ToLowerInvariant();
         if (ext is not "mp3" and not "flac") return;
         var folder = Path.Combine(root, "generated-downloads"); Directory.CreateDirectory(folder);
@@ -51,7 +52,7 @@ internal static class ProgressivePlaybackPreview
             var artist = new CatalogArtist("deezer:456", "Synthetic Artist");
             var release = new CatalogRelease("deezer:789", "Night Drive", artist, "2026-10-18", "album", 1);
             main.OpenAlbumDetail(new Album { Name = release.Title, Artist = artist.Name, CatalogReleaseId = release.Id,
-                TrackCount = 1, TotalDuration = TimeSpan.FromSeconds(24), Year = 2026, Genre = "" });
+                TrackCount = 1, TotalDuration = TimeSpan.FromSeconds(PreviewSeconds), Year = 2026, Genre = "" });
             if (main.CurrentView is AlbumDetailViewModel album)
                 album.ShowCatalog(new(new(release, [source.CatalogSong]), new Dictionary<string, DiscoveryMatch>()));
         }
@@ -69,15 +70,33 @@ internal static class ProgressivePlaybackPreview
     private sealed class AudioSource(byte[] audio, string ext) : IMusicSource, IQualityMusicSource
     {
         public string Id => "Synthetic source";
-        public Task SetQualityAsync(AudioQuality quality, CancellationToken ct) => Task.CompletedTask;
+        public Task<bool> SetQualityAsync(AudioQuality quality, CancellationToken ct) => Task.FromResult(false);
+        public bool QualityConfirmed(AudioQuality quality) => true;
+        public void ForgetQuality() { }
         public Task<IReadOnlyList<MusicRequest>> SearchAsync(string query, CancellationToken ct) => Task.FromResult<IReadOnlyList<MusicRequest>>([]);
         public async Task<string> FetchAsync(MusicRequest request, Stream output, IProgress<double>? progress, CancellationToken ct)
         {
             ((IProgressiveAudioWriter)output).BeginAudio(audio.Length, ext);
+            // NOCTISPLUS_PREVIEW_PACE=<multiple of the recording's bitrate>, with NOCTISPLUS_PREVIEW_SECONDS: a steady
+            // transfer with jitter, like a real Telegram download (short stalls rather than one long one).
+            var pace = double.TryParse(Environment.GetEnvironmentVariable("NOCTISPLUS_PREVIEW_PACE"), System.Globalization.NumberStyles.Float,
+                System.Globalization.CultureInfo.InvariantCulture, out var p) && p > 0 ? p : 0;
+            var seconds = double.TryParse(Environment.GetEnvironmentVariable("NOCTISPLUS_PREVIEW_SECONDS"), System.Globalization.NumberStyles.Float,
+                System.Globalization.CultureInfo.InvariantCulture, out var s) && s > 0 ? s : 24;
+            var started = System.Diagnostics.Stopwatch.StartNew();
+            var jitter = new Random(7);
             await AudioFileTransfer.CopyAsync(output, audio.Length, async (offset, count, token) =>
             {
+                if (pace > 0)
+                {
+                    // A fast first burst (Telegram answers the first chunks quickly), then the paced rate.
+                    var due = Math.Max(0, offset - 512 * 1024) / (audio.Length / seconds * pace);
+                    int extra; lock (jitter) extra = jitter.Next(0, 400);
+                    var wait = TimeSpan.FromSeconds(due) + TimeSpan.FromMilliseconds(extra) - started.Elapsed;
+                    if (wait > TimeSpan.Zero) await Task.Delay(wait, token);
+                }
                 // Withhold the tail long enough to inspect active playback and buffering.
-                if (offset >= audio.Length * .6) await Task.Delay(TimeSpan.FromSeconds(45), token);
+                else if (offset >= audio.Length * .6) await Task.Delay(TimeSpan.FromSeconds(45), token);
                 return audio.AsSpan((int)offset, Math.Min(count, audio.Length - (int)offset)).ToArray();
             }, progress, ct);
             return ext;
@@ -89,7 +108,7 @@ internal static class ProgressivePlaybackPreview
         private readonly FreeMusicFinder.Downloads _downloads;
         private readonly CatalogPages _pages;
         private readonly DiscoveryActions _actions;
-        internal readonly CatalogSong CatalogSong = new("deezer:123", "Night Drive", [new("deezer:456", "Synthetic Artist")], 24, false);
+        internal readonly CatalogSong CatalogSong = new("deezer:123", "Night Drive", [new("deezer:456", "Synthetic Artist")], PreviewSeconds, false);
         private readonly OnlineSong _song;
         internal string TransferState => string.Join('+', _downloads.History.Select(d => d.State.ToString()));
         internal PreviewSource(string folder, byte[] audio, string ext, IPlaylistLibrary library)

@@ -14,8 +14,10 @@ internal sealed class HunterMusicSource : IMusicSource, IQualityMusicSource
     internal HunterMusicSource(IHunterBotSource bot,Action<string>? log=null)
     {_bot=bot;_log=log??(_=>{});}
     public string Id => BotSelections.Hunters;
-    public Task SetQualityAsync(AudioQuality quality, CancellationToken ct)
-        => _account?.SetQualityAsync(TelegramBotSource.Bot, Id, quality, ct) ?? Task.CompletedTask;
+    public Task<bool> SetQualityAsync(AudioQuality quality, CancellationToken ct)
+        => _account?.SetQualityAsync(TelegramBotSource.Bot, Id, quality, ct) ?? Task.FromResult(false);
+    public bool QualityConfirmed(AudioQuality quality) => _account?.QualityConfirmed(TelegramBotSource.Bot, quality) ?? true;
+    public void ForgetQuality() => _account?.ForgetQuality(TelegramBotSource.Bot);
     public async Task<IReadOnlyList<MusicRequest>> SearchAsync(string query, CancellationToken ct)
         => (await _bot.SearchAsync(query, ct).ConfigureAwait(false)).Select(t =>
             (t.Request??new MusicRequest(t.Title,t.Artist,t.Duration?.TotalSeconds)) with {PreferredSource=Id}).ToArray();
@@ -122,7 +124,9 @@ internal sealed class DeezLoadSource : IMusicSource, IQualityMusicSource
     public const string Bot = "deezload2bot";
     private static readonly TimeSpan OtherRecordingGrace = TimeSpan.FromMinutes(1);
     public string Id => "DeezLoad";
-    public Task SetQualityAsync(AudioQuality quality, CancellationToken ct) => _account.SetQualityAsync(Bot, Id, quality, ct);
+    public Task<bool> SetQualityAsync(AudioQuality quality, CancellationToken ct) => _account.SetQualityAsync(Bot, Id, quality, ct);
+    public bool QualityConfirmed(AudioQuality quality) => _account.QualityConfirmed(Bot, quality);
+    public void ForgetQuality() => _account.ForgetQuality(Bot);
     private readonly TelegramAccount _account;
     private readonly Action<string> _notice;
     private readonly SemaphoreSlim _conversation = new(1,1);

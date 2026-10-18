@@ -22,7 +22,9 @@ public class FinderPlaybackPipelineTests
         internal CancellationToken TransferToken;
         internal readonly TaskCompletionSource Started = new(TaskCreationOptions.RunContinuationsAsynchronously);
         internal readonly TaskCompletionSource Tail = new(TaskCreationOptions.RunContinuationsAsynchronously);
-        public Task SetQualityAsync(AudioQuality quality, CancellationToken ct) { Configured++; return Task.CompletedTask; }
+        public Task<bool> SetQualityAsync(AudioQuality quality, CancellationToken ct) { Configured++; return Task.FromResult(false); }
+        public bool QualityConfirmed(AudioQuality quality) => false;
+        public void ForgetQuality() { }
         public Task<IReadOnlyList<MusicRequest>> SearchAsync(string query, CancellationToken ct) => Task.FromResult<IReadOnlyList<MusicRequest>>([]);
         public async Task<string> FetchAsync(MusicRequest request, Stream output, IProgress<double>? progress, CancellationToken ct)
         {

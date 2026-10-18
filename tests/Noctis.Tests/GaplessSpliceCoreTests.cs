@@ -259,6 +259,28 @@ public class GaplessSpliceCoreTests
     }
 
     [Fact]
+    public void DownloadSegment_RebuffersItsOwnLongerHold_AfterAnUnderrun()
+    {
+        // A download that cannot keep up must wait once for a few seconds of audio (one clean buffering pause),
+        // not resume after the default ~50 ms and run dry again on every late chunk (owner report 2026-10-18).
+        var provider = new GaplessSpliceProvider(8000, 1);
+        var seg = new GaplessTrackSegment(8000, 1, source: null) { UnderrunRefillMs = 1000 }; // 8000 samples
+        provider.Enqueue(seg);
+
+        Assert.True(seg.Write(ConstantBlock(16384, 100)));
+        var buffer = new float[200];
+        provider.Read(buffer, 0, 200); // underrun arms the hold
+
+        Assert.True(seg.Write(ConstantBlock(16384, 4000))); // far past the default hold, short of the segment's own
+        provider.Read(buffer, 0, 100);
+        Assert.All(buffer.Take(100), s => Assert.Equal(0f, s));
+
+        Assert.True(seg.Write(ConstantBlock(16384, 4000))); // 8000 buffered: plays again
+        provider.Read(buffer, 0, 100);
+        Assert.All(buffer.Take(100), s => Assert.True(s > 0.4f, $"post-refill sample was {s}"));
+    }
+
+    [Fact]
     public void HardCut_RampsToSilence_InsteadOfStepping()
     {
         // A seek flush or track-change abandon cuts LIVE audio inside a stream

@@ -17,6 +17,17 @@ internal sealed class ProgressiveMedia : Media
     }
     private ProgressiveMedia(LibVLC vlc, ProgressiveTransfer.Lease lease, ProgressiveMediaInput input) : base(vlc, input)
     { _lease = lease; _input = input; _lease.Ended += OnFinished; }
+    /// <summary>The VLC options every download-backed input plays with.</summary>
+    internal static void Configure(Media media, string path)
+    {
+        media.AddOption(Path.GetExtension(path).Equals(".mp3", StringComparison.OrdinalIgnoreCase) ? ":demux=mp3" : ":demux=flac");
+        // VLC re-syncs its clock to each new timestamp of this input as if it were a live broadcast: when the bytes
+        // arrive late or in a burst it DROPS the audio it now thinks is late ("buffer too late: dropped"), so the song
+        // skips seconds while the timeline runs on (owner report 2026-10-18; measured with a time-coded song:
+        // seconds 4-10 never delivered). A download is not a broadcast: without the re-sync VLC waits for the bytes.
+        media.AddOption(":clock-synchro=0");
+    }
+
     internal bool Complete => _lease.Buffer.Complete;
     internal TimeSpan? Duration => _lease.Duration;
     internal bool Cancelled => _input.Cancelled;

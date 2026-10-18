@@ -8,10 +8,18 @@ internal enum AudioQuality { FLAC, MP3 }
 
 internal interface IQualityMusicSource
 {
-    Task SetQualityAsync(AudioQuality quality, CancellationToken ct);
+    /// <summary>Makes sure the bot sends this format. Nothing is sent when it was already confirmed for this account
+    /// (owner, 2026-10-18: not "/settings" before every song). True when a setting had to be changed.</summary>
+    Task<bool> SetQualityAsync(AudioQuality quality, CancellationToken ct);
+    /// <summary>True when this format is already confirmed, so asking costs no message.</summary>
+    bool QualityConfirmed(AudioQuality quality);
+    /// <summary>The bot sent another format than confirmed (say its setting was changed in the bot itself):
+    /// check it again next time.</summary>
+    void ForgetQuality();
 }
 
-internal sealed record QualityButton(string Text, byte[]? Callback = null);
+/// <param name="Web">Opens a link or a web page (a Telegram mini app): an app cannot press it like a person.</param>
+internal sealed record QualityButton(string Text, byte[]? Callback = null, bool Web = false);
 internal sealed record QualityReply(int Id, string Text, IReadOnlyList<QualityButton> Buttons);
 
 /// <summary>Provider chat transport, separate from the decision logic so real replies can be replayed in tests.</summary>
@@ -24,7 +32,7 @@ internal interface IQualityConversation
 internal static class BotQuality
 {
     private static string Words(string value) => Regex.Replace(value.ToLowerInvariant(), @"[^\p{L}\p{N}]+", " ").Trim();
-    private static bool QualityLabel(string value) => Regex.IsMatch(Words(value), @"\b(quality|format|calidad|качество|формат|کیفیت)\b");
+    private static bool QualityLabel(string value) => Regex.IsMatch(Words(value), @"\b(quality|calidad|qualité|qualita|qualidade|качество|کیفیت)\b");
     private static AudioQuality? Format(string value)
     {
         var words = Words(value);
@@ -32,47 +40,98 @@ internal static class BotQuality
         var mp3 = Regex.IsMatch(words, @"\b(mp3|320|320kbps|320k)\b");
         return flac == mp3 ? null : flac ? AudioQuality.FLAC : AudioQuality.MP3;
     }
+    // How bots mark the option in use: a tick, a filled dot, or words.
+    private static bool Ticked(string text) =>
+        text.IndexOfAny(['✅', '✓', '✔', '☑', '●', '◉']) >= 0 || text.Contains("🔘") || Regex.IsMatch(text, @"\[x\]|\((current|selected|active)\)|«|»", RegexOptions.IgnoreCase);
+    // Menu entries that never lead to the audio quality (owner, 2026-10-18: DeezLoad shows "Audio quality",
+    // "Naming format" and "Zip"; Music Hunters shows "Audio quality" and "Info").
+    private static readonly Regex NotQuality = new(@"\b(naming|name|names|filename|zip|caption|captions|language|lang|info|about|help|back|close|cancel|search|lyrics|cover|covers|playlist|donate|support|referral|stats)\b");
+    private static readonly Regex Service = new(@"\b(deezer|tidal|qobuz|spotify|apple|youtube|soundcloud|amazon|napster|beatport)\b");
 
     internal static bool Confirmed(QualityReply reply, AudioQuality wanted)
     {
         // An unselected FLAC option in a list of choices is not an acknowledgement.
-        var selected = reply.Buttons.Where(b => b.Text.Contains('✅') || b.Text.Contains('✓') || b.Text.Contains('☑'))
+        var selected = reply.Buttons.Where(b => Ticked(b.Text))
             .Select(b => Format(b.Text)).Where(q => q is not null).Distinct().ToList();
         if (selected.Count > 0) return selected.Count == 1 && selected[0] == wanted;
         foreach (var line in reply.Text.Split('\n'))
-            if (QualityLabel(line) && Format(line) == wanted &&
+            if ((QualityLabel(line) || Regex.IsMatch(Words(line), @"\bformat\b")) && Format(line) == wanted &&
                 (line.Contains(':') || Regex.IsMatch(Words(line), @"\b(set|selected|changed|current|установлено|выбрано|انتخاب)\b"))) return true;
         return false;
     }
 
-    public static async Task ApplyAsync(string provider, IQualityConversation chat, AudioQuality wanted, CancellationToken ct, TimeSpan? timeout = null)
+    /// <returns>True when an option had to be changed; false when the bot already used this format.</returns>
+    public static async Task<bool> ApplyAsync(string provider, IQualityConversation chat, AudioQuality wanted, CancellationToken ct, TimeSpan? timeout = null)
     {
         using var deadline = CancellationTokenSource.CreateLinkedTokenSource(ct);
         deadline.CancelAfter(timeout ?? TimeSpan.FromSeconds(45));
-        try { await ApplyCoreAsync(provider, chat, wanted, deadline.Token).ConfigureAwait(false); }
+        try { return await ApplyCoreAsync(provider, chat, wanted, deadline.Token).ConfigureAwait(false); }
         catch (OperationCanceledException) when (!ct.IsCancellationRequested)
         { throw new TimeoutException($"BOT_QUALITY_TIMEOUT: {provider} did not finish confirming {wanted}. The supplied audio format will be checked; no quality change is assumed."); }
     }
-    private static async Task ApplyCoreAsync(string provider, IQualityConversation chat, AudioQuality wanted, CancellationToken ct)
+
+    /// <summary>
+    /// Walks the bot's own menus the way a person would: settings → audio quality → (a per-service list: Deezer) →
+    /// the format, reading which option is ticked before pressing anything. Only buttons the bot actually showed
+    /// are pressed, and only when exactly one fits.
+    /// </summary>
+    private static async Task<bool> ApplyCoreAsync(string provider, IQualityConversation chat, AudioQuality wanted, CancellationToken ct)
     {
         var reply = await chat.OpenAsync(ct).WaitAsync(ct).ConfigureAwait(false);
-        for (var step = 0; step < 3; step++)
+        var pressed = new HashSet<string>(StringComparer.Ordinal);
+        var changed = false;
+        for (var step = 0; step < 6; step++)
         {
             ct.ThrowIfCancellationRequested();
-            if (Confirmed(reply, wanted)) return;
-            var choices = reply.Buttons.Where(b => Format(b.Text) == wanted).ToList();
+            if (Confirmed(reply, wanted)) return changed;
+            var pressable = reply.Buttons.Where(b => !b.Web).ToList();
+            var choices = pressable.Where(b => Format(b.Text) == wanted).ToList();
             // For MP3 prefer an explicit 320 choice. Never select the first arbitrary bitrate.
             if (wanted == AudioQuality.MP3 && choices.Any(b => Words(b.Text).Contains("320")))
                 choices = choices.Where(b => Words(b.Text).Contains("320")).ToList();
-            if (choices.Count == 0) choices = reply.Buttons.Where(b => QualityLabel(b.Text)).ToList();
-            if (choices.Count != 1) throw Unverified(provider, wanted);
-            reply = await chat.PressAsync(reply, choices[0], ct).WaitAsync(ct).ConfigureAwait(false);
+            // A per-service list that shows each service's format ("Deezer: FLAC", "Tidal: FLAC"): Deezer's.
+            if (choices.Count > 1 && choices.Count(b => Words(b.Text).Contains("deezer")) == 1)
+                choices = choices.Where(b => Words(b.Text).Contains("deezer")).ToList();
+            if (choices.Count > 1) throw Unverified(provider, wanted, reply);
+            var next = choices.Count == 1 ? choices[0] : Navigation(pressable, pressed);
+            if (next is null)
+            {
+                if (reply.Buttons.Any(b => b.Web) && pressable.Count == 0)
+                    throw new BotAnswerException($"BOT_QUALITY_WEB_PAGE: {provider}'s settings open as a web page, which Noctis cannot press. Set it to {wanted} in the bot yourself; every file's actual format is still checked. Menu: {Menu(reply)}");
+                throw Unverified(provider, wanted, reply);
+            }
+            if (!pressed.Add(next.Text)) throw Unverified(provider, wanted, reply); // the same press again would loop
+            if (choices.Count == 1) changed = true;
+            reply = await chat.PressAsync(reply, next, ct).WaitAsync(ct).ConfigureAwait(false);
         }
-        if (!Confirmed(reply, wanted)) throw Unverified(provider, wanted);
+        if (!Confirmed(reply, wanted)) throw Unverified(provider, wanted, reply);
+        return changed;
     }
 
-    private static BotAnswerException Unverified(string provider, AudioQuality quality)
-        => new($"BOT_QUALITY_UNVERIFIED: {provider} did not confirm {quality}. Its settings may have changed or this quality may be unavailable. No arbitrary option was selected; the other provider will be tried.");
+    /// <summary>The one menu entry that leads towards the audio quality, or null when none or several fit.</summary>
+    private static QualityButton? Navigation(IReadOnlyList<QualityButton> buttons, IReadOnlySet<string> pressed)
+    {
+        var services = buttons.Count(b => Service.IsMatch(Words(b.Text)));
+        int Score(QualityButton b)
+        {
+            var words = Words(b.Text);
+            if (pressed.Contains(b.Text)) return 0;
+            if (QualityLabel(b.Text)) return 4;                                    // "Audio quality", "Quality"
+            if (NotQuality.IsMatch(words)) return 0;                               // "Naming format", "Zip", "Info"
+            if (services >= 2 && Regex.IsMatch(words, @"\bdeezer\b")) return 3;   // "per service quality": Deezer
+            if (Regex.IsMatch(words, @"\b(format|bitrate|codec)\b")) return 2;
+            if (Regex.IsMatch(words, @"\b(settings?|preferences|options|настройки|ajustes|تنظیمات)\b")) return 1;
+            return 0;
+        }
+        var best = buttons.Select(b => (Button: b, Score: Score(b))).Where(x => x.Score > 0).OrderByDescending(x => x.Score).ToList();
+        return best.Count == 0 || best.Count > 1 && best[1].Score == best[0].Score ? null : best[0].Button;
+    }
+
+    private static string Menu(QualityReply reply)
+        => reply.Buttons.Count == 0 ? "(no buttons)" : string.Join(" | ", reply.Buttons.Select(b => "\"" + b.Text + "\"" + (b.Web ? " (web page)" : "")));
+
+    private static BotAnswerException Unverified(string provider, AudioQuality quality, QualityReply? reply = null)
+        => new($"BOT_QUALITY_UNVERIFIED: {provider} did not confirm {quality}. Its settings may have changed or this quality may be unavailable. No arbitrary option was selected; the other provider will be tried." + (reply is null ? "" : " Menu: " + Menu(reply)));
 }
 
 /// <summary>Uses the app's one proxy-aware Telegram client. No new login/session and no guessed callback bytes.</summary>
@@ -132,8 +191,9 @@ internal sealed class TelegramQualityConversation(Client client, User user, stri
     {
         IEnumerable<KeyboardInlineButton> inline = message.reply_markup is ReplyInlineMarkup markup
             ? markup.rows.SelectMany(r => r.buttons) : [];
-        var buttons = inline.Where(b => b.type is InlineButtonTypeCallback)
-            .Select(b => new QualityButton(b.text, ((InlineButtonTypeCallback)b.type).data)).ToList();
+        // Link and web-page (mini app) buttons are kept so a menu that only offers those can be reported as such.
+        var buttons = inline.Select(b => b.type is InlineButtonTypeCallback callback
+            ? new QualityButton(b.text, callback.data) : new QualityButton(b.text, Web: true)).ToList();
         if (message.reply_markup is ReplyKeyboardMarkup keyboard)
             buttons.AddRange(keyboard.rows.SelectMany(r => r.buttons).Select(b => new QualityButton(b.text)));
         return new(message.id, message.message ?? "", buttons);

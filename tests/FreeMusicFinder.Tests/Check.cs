@@ -40,6 +40,15 @@ internal static class Check
         }
     }
 
+    /// <summary>Like <see cref="ThrowsAsync{T}"/>, and hands back the exception so its message can be checked.</summary>
+    public static async Task<T?> CatchAsync<T>(Func<Task> action, string what) where T : Exception
+    {
+        try { await action(); True(false, what + ": nothing was thrown"); }
+        catch (T ex) { True(true, what); return ex; }
+        catch (Exception ex) { True(false, $"{what}: {ex.GetType().Name} was thrown ({ex.Message})"); }
+        return null;
+    }
+
     public static async Task ThrowsAsync<T>(Func<Task> action, string what) where T : Exception
     {
         try

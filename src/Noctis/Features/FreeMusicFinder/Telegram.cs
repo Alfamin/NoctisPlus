@@ -84,20 +84,80 @@ internal sealed class TelegramAccount : ITelegramSignIn, IDisposable
     private readonly Dictionary<string, User> _bots = new(StringComparer.OrdinalIgnoreCase);
     private readonly HashSet<string> _started = new(StringComparer.OrdinalIgnoreCase);
     private readonly SemaphoreSlim _qualityGate = new(1, 1);
-    private readonly Dictionary<string, (Client Client, AudioQuality Quality)> _qualities = new(StringComparer.OrdinalIgnoreCase);
 
-    public async Task SetQualityAsync(string username, string provider, AudioQuality quality, CancellationToken ct)
+    /// <summary>A bot's audio format as last confirmed for an account, or why its menu could not be used.</summary>
+    internal sealed record BotQualityState(string Quality, DateTimeOffset At, string? Problem = null);
+    private string QualityFile => Path.Combine(DataFolder, "bot-quality.json");
+    private string QualityKey(string username) => SignedInAs + "|" + username.ToLowerInvariant();
+    // A menu Noctis could not follow is not asked again for each song; it is retried after a day, after a
+    // preference change or when the bot's audio shows its setting moved.
+    private static readonly TimeSpan ProblemRetry = TimeSpan.FromDays(1);
+
+    private Dictionary<string, BotQualityState> ReadQualities()
+    {
+        try
+        {
+            if (File.Exists(QualityFile) && new FileInfo(QualityFile).Length < 64 * 1024)
+                return System.Text.Json.JsonSerializer.Deserialize<Dictionary<string, BotQualityState>>(File.ReadAllText(QualityFile))
+                    ?? new(StringComparer.Ordinal);
+        }
+        catch (Exception ex) when (ex is IOException or System.Text.Json.JsonException or UnauthorizedAccessException) { }
+        return new(StringComparer.Ordinal); // unreadable: the bots are simply checked again
+    }
+
+    public bool QualityConfirmed(string username, AudioQuality quality)
+    {
+        lock (_qualityFileLock)
+            return ReadQualities().TryGetValue(QualityKey(username), out var known) && known.Quality == quality.ToString() && known.Problem is null;
+    }
+
+    public void ForgetQuality(string username)
+    {
+        lock (_qualityFileLock)
+        {
+            var states = ReadQualities();
+            if (states.Remove(QualityKey(username))) AtomicJson.Write(QualityFile, states);
+        }
+    }
+    private readonly object _qualityFileLock = new();
+
+    /// <summary>
+    /// Sets a bot to this format through its own settings menu, once: the result is kept with the login, so later
+    /// songs, reconnects and restarts send nothing. Asked again only when the preference changes or the bot's audio
+    /// shows the setting moved (owner, 2026-10-18).
+    /// </summary>
+    /// <returns>True when the bot's setting had to be changed.</returns>
+    public async Task<bool> SetQualityAsync(string username, string provider, AudioQuality quality, CancellationToken ct)
     {
         await _qualityGate.WaitAsync(ct).ConfigureAwait(false);
         try
         {
+            BotQualityState? known;
+            lock (_qualityFileLock) ReadQualities().TryGetValue(QualityKey(username), out known);
+            if (known is not null && known.Quality == quality.ToString())
+            {
+                if (known.Problem is null) return false;
+                if (DateTimeOffset.UtcNow - known.At < ProblemRetry) throw new BotAnswerException(known.Problem);
+            }
             var client = await ConnectAsync(ct).ConfigureAwait(false);
-            if (_qualities.TryGetValue(username, out var set) && ReferenceEquals(set.Client, client) && set.Quality == quality) return;
             var user = await BotAsync(client, username).ConfigureAwait(false);
             await StartBotAsync(client, user, username, ct).ConfigureAwait(false);
-            await BotQuality.ApplyAsync(provider, new TelegramQualityConversation(client, user, provider), quality, ct).ConfigureAwait(false);
-            _qualities[username] = (client, quality);
-            _log?.Invoke(provider + " confirmed preferred quality: " + quality);
+            BotQualityState result; bool changed = false; BotAnswerException? problem = null;
+            try
+            {
+                changed = await BotQuality.ApplyAsync(provider, new TelegramQualityConversation(client, user, provider), quality, ct).ConfigureAwait(false);
+                result = new(quality.ToString(), DateTimeOffset.UtcNow);
+            }
+            catch (BotAnswerException ex) { problem = ex; result = new(quality.ToString(), DateTimeOffset.UtcNow, ex.Message); }
+            lock (_qualityFileLock)
+            {
+                var states = ReadQualities();
+                states[QualityKey(username)] = result;
+                AtomicJson.Write(QualityFile, states);
+            }
+            if (problem is not null) { _log?.Invoke(problem.Message); throw problem; }
+            _log?.Invoke(provider + (changed ? " switched to " : " already uses ") + quality + ".");
+            return changed;
         }
         finally { _qualityGate.Release(); }
     }
