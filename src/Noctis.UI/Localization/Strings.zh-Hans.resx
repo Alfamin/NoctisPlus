@@ -1313,7 +1313,7 @@
     <comment>Settings ▸ Integrations ▸ Discord, SettingsView.axaml</comment>
   </data>
   <data name="Settings.DiscordStatusDisplayHint" xml:space="preserve">
-    <value>Discord 在成员列表和个人资料中“正在收听”后显示的内容。</value>
+    <value>Discord 在成员列表中“正在收听”后显示的内容。</value>
     <comment>Settings ▸ Integrations ▸ Discord, SettingsView.axaml</comment>
   </data>
   <data name="Settings.DiscordStatusDisplay.Artist" xml:space="preserve">

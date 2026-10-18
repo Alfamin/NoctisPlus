@@ -1,6 +1,10 @@
+using System.Collections.Concurrent;
 using System.Reflection;
 using Avalonia.Headless.XUnit;
 using DiscordRPC;
+using DiscordRPC.IO;
+using DiscordRPC.Logging;
+using Newtonsoft.Json.Linq;
 using Noctis.Localization;
 using Noctis.Models;
 using Noctis.Services;
@@ -149,5 +153,134 @@ public class DiscordStatusDisplayTests : IDisposable
         vm.DiscordShowAlbum = false;
         Assert.Equal(DiscordStatusDisplay.AppName, discord.Updates[^1].StatusDisplay);
         Assert.False(discord.Updates[^1].ShowAlbum);
+    }
+    /// <summary>
+    /// Stands in for Discord's IPC pipe: answers the handshake with READY and every
+    /// SET_ACTIVITY with the activity echoed back, as the real client does, and records the
+    /// activities the library actually wrote.
+    /// </summary>
+    private sealed class FakeDiscordPipe : INamedPipeClient
+    {
+        private readonly ConcurrentQueue<PipeFrame> _inbox = new();
+        public ConcurrentQueue<JObject?> Activities { get; } = new();
+        public ILogger Logger { get; set; } = new NullLogger();
+        public bool IsConnected { get; private set; }
+        [Obsolete] public int ConnectedPipe => 0;
+        public bool Connect(int pipe) => IsConnected = true;
+        public bool ReadFrame(out PipeFrame frame) => _inbox.TryDequeue(out frame);
+
+        public bool WriteFrame(PipeFrame frame)
+        {
+            var body = JObject.Parse(frame.Message);
+            if (frame.Opcode == Opcode.Handshake)
+            {
+                _inbox.Enqueue(new PipeFrame(Opcode.Frame, new JObject
+                {
+                    ["cmd"] = "DISPATCH", ["evt"] = "READY", ["nonce"] = null,
+                    ["data"] = new JObject
+                    {
+                        ["v"] = 1,
+                        ["config"] = new JObject { ["cdn_host"] = "cdn.discordapp.com", ["api_endpoint"] = "//discord.com/api", ["environment"] = "production" },
+                        ["user"] = new JObject { ["id"] = "1", ["username"] = "test", ["discriminator"] = "0" },
+                    },
+                }));
+            }
+            else if (frame.Opcode == Opcode.Frame && (string?)body["cmd"] == "SET_ACTIVITY")
+            {
+                var activity = body["args"]?["activity"] as JObject;
+                Activities.Enqueue(activity);
+                _inbox.Enqueue(new PipeFrame(Opcode.Frame, new JObject
+                {
+                    ["cmd"] = "SET_ACTIVITY", ["evt"] = null, ["nonce"] = body["nonce"],
+                    ["data"] = activity == null ? null : (JToken)activity.DeepClone(),
+                }));
+            }
+            return true;
+        }
+
+        public void Close() => IsConnected = false;
+        public void Dispose() => IsConnected = false;
+    }
+
+    private static async Task<JObject> NextActivityAsync(FakeDiscordPipe pipe)
+    {
+        var deadline = DateTime.UtcNow + TimeSpan.FromSeconds(10);
+        while (DateTime.UtcNow < deadline)
+        {
+            if (pipe.Activities.TryDequeue(out var a) && a != null) return a;
+            await Task.Delay(10);
+        }
+        throw new TimeoutException("No SET_ACTIVITY reached the pipe");
+    }
+
+    private static async Task<DiscordPresenceService> ConnectedServiceAsync(FakeDiscordPipe pipe)
+    {
+        var service = new DiscordPresenceService(() => new DiscordRpcClient("1470224696976085096", client: pipe));
+        Assert.True(await service.ConnectAsync());
+        return service;
+    }
+
+    /// <summary>
+    /// Owner (2026-10-18): changing Status on Discord didn't seem to change Discord. The
+    /// frame DiscordRPC writes must carry status_display_type (Discord: 0 Name, 1 State,
+    /// 2 Details) and a change must go out at once — here while paused, where nothing else
+    /// in the activity differs and the library's identical-presence skip would eat it.
+    /// </summary>
+    [Fact]
+    public async Task ChangingTheChoiceWhilePaused_WritesTheNewStatusDisplayTypeToThePipe()
+    {
+        var pipe = new FakeDiscordPipe();
+        using var service = await ConnectedServiceAsync(pipe);
+
+        var song = new DiscordPresenceTrack("Please Please Please", "Sabrina Carpenter", "Short n' Sweet");
+        await service.UpdateAsync(song, TimeSpan.FromSeconds(30), TimeSpan.FromMinutes(3), isPlaying: false);
+        var first = await NextActivityAsync(pipe);
+        Assert.Equal(2, (int)first["type"]!);                 // Listening
+        Assert.Equal(1, (int)first["status_display_type"]!); // State = artist (default)
+        Assert.Equal("Please Please Please", (string?)first["details"]);
+        Assert.Equal("Sabrina Carpenter", (string?)first["state"]);
+
+        foreach (var (choice, wire) in new[] { (DiscordStatusDisplay.Title, 2), (DiscordStatusDisplay.AppName, 0), (DiscordStatusDisplay.Artist, 1) })
+        {
+            await service.UpdateAsync(song with { StatusDisplay = choice }, TimeSpan.FromSeconds(30), TimeSpan.FromMinutes(3), isPlaying: false);
+            var sent = await NextActivityAsync(pipe);
+            Assert.Equal(wire, (int)sent["status_display_type"]!);
+            Assert.Equal("Please Please Please", (string?)sent["details"]);
+        }
+    }
+
+    [Fact]
+    public async Task ChangingTheChoiceWhilePlaying_WritesTheNewStatusDisplayType()
+    {
+        var pipe = new FakeDiscordPipe();
+        using var service = await ConnectedServiceAsync(pipe);
+
+        var song = new DiscordPresenceTrack("Espresso", "Sabrina Carpenter", null);
+        await service.UpdateAsync(song, TimeSpan.FromSeconds(10), TimeSpan.FromMinutes(3), isPlaying: true);
+        Assert.Equal(1, (int)(await NextActivityAsync(pipe))["status_display_type"]!);
+
+        await service.UpdateAsync(song with { StatusDisplay = DiscordStatusDisplay.Title }, TimeSpan.FromSeconds(11), TimeSpan.FromMinutes(3), isPlaying: true);
+        var sent = await NextActivityAsync(pipe);
+        Assert.Equal(2, (int)sent["status_display_type"]!);
+        Assert.NotNull(sent["timestamps"]);
+    }
+
+    /// <summary>
+    /// Discord answers a 1-character details/state with error 4000 and drops the whole
+    /// activity (checked against the desktop client 2026-10-18). DiscordRPC trims fields, so
+    /// a tag with a stray space ("A ") must still reach the pipe as 2+ characters.
+    /// </summary>
+    [Fact]
+    public async Task OneLetterTagWithAStraySpace_StillGoesOutAsTwoCharacters()
+    {
+        var pipe = new FakeDiscordPipe();
+        using var service = await ConnectedServiceAsync(pipe);
+
+        await service.UpdateAsync(new DiscordPresenceTrack("A ", " B", null), TimeSpan.Zero, TimeSpan.FromMinutes(3), isPlaying: false);
+        var sent = await NextActivityAsync(pipe);
+        Assert.True(((string?)sent["details"])!.Length >= 2, (string?)sent["details"]);
+        Assert.True(((string?)sent["state"])!.Length >= 2, (string?)sent["state"]);
+        Assert.StartsWith("A", (string?)sent["details"]);
+        Assert.StartsWith("B", (string?)sent["state"]);
     }
 }

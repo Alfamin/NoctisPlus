@@ -1313,7 +1313,7 @@
     <comment>Settings ▸ Integrations ▸ Discord, SettingsView.axaml</comment>
   </data>
   <data name="Settings.DiscordStatusDisplayHint" xml:space="preserve">
-    <value>Lo que Discord muestra tras "Escuchando" en la lista de miembros y en tu perfil.</value>
+    <value>Lo que Discord muestra tras "Escuchando" en la lista de miembros.</value>
     <comment>Settings ▸ Integrations ▸ Discord, SettingsView.axaml</comment>
   </data>
   <data name="Settings.DiscordStatusDisplay.Artist" xml:space="preserve">
