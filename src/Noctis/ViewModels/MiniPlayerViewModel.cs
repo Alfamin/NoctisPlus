@@ -546,12 +546,68 @@ public partial class MiniPlayerViewModel : ViewModelBase
             return;
         }
 
-        var upNext = Player.UpNext;
-        var index = row.Index < upNext.Count && ReferenceEquals(upNext[row.Index], row.Track)
-            ? row.Index
-            : upNext.IndexOf(row.Track);
+        var index = UpNextIndexOf(row);
         if (index >= 0)
             Player.PlayFromUpNextAt(index);
+    }
+
+    /// <summary>The Up Next index a row stands for, by its own position (see
+    /// <see cref="PlayFromQueue"/>), or -1 for a played row or one no longer queued.</summary>
+    private int UpNextIndexOf(MiniQueueRow row)
+    {
+        if (row.IsPlayed) return -1;
+        var upNext = Player.UpNext;
+        return row.Index < upNext.Count && ReferenceEquals(upNext[row.Index], row.Track)
+            ? row.Index
+            : upNext.IndexOf(row.Track);
+    }
+
+    /// <summary>Index in <see cref="QueuePreview"/> of the first Up Next row.</summary>
+    public int QueueUpNextStart => QueuePreviewHasPlayed ? QueueBoundaryIndex + 2 : 0;
+
+    /// <summary>
+    /// Row menu ▸ Remove from Queue / Delete on a focused row: the same removal the main Queue
+    /// panel makes. An Up Next row leaves Up Next (and Repeat All's cycle, RemoveFromQueue); a
+    /// played row leaves the played list — it is played row i of the panel's rows too, since
+    /// the drawer lists played songs only while Keep Played Songs is on.
+    /// </summary>
+    [RelayCommand]
+    private void RemoveFromQueue(MiniQueueRow row)
+    {
+        if (row.IsPlayed)
+        {
+            var played = Player.PlayedTracks;
+            var at = row.Index < played.Count && ReferenceEquals(played[row.Index], row.Track)
+                ? row.Index
+                : played.IndexOf(row.Track);
+            if (at < 0 || !Player.KeepPlayedInQueue) return;
+            Player.RemoveQueueRows(new[] { at });
+        }
+        else
+        {
+            var index = UpNextIndexOf(row);
+            if (index < 0) return;
+            Player.RemoveFromQueue(index);
+        }
+        // Rebuilt now, not on the next turn: the row's Index values below it moved.
+        if (Drawer == MiniDrawer.Queue) RefreshQueuePreview();
+    }
+
+    /// <summary>
+    /// Drag to reorder: moves an Up Next row to Up Next slot <paramref name="toUpNextIndex"/>
+    /// (ObservableCollection.Move semantics), as the main Queue panel's drag does. Played rows
+    /// stay put. Returns false when nothing moved.
+    /// </summary>
+    public bool MoveQueueRow(MiniQueueRow row, int toUpNextIndex)
+    {
+        var from = UpNextIndexOf(row);
+        if (from < 0) return false;
+        var to = Math.Clamp(toUpNextIndex, 0, Math.Min(Player.UpNext.Count, QueuePreviewCap) - 1);
+        if (to == from) return false;
+        Player.MoveInQueue(from, to);
+        // Synchronously, so the rows the drag's glide just snapped home already show the move.
+        if (Drawer == MiniDrawer.Queue) RefreshQueuePreview();
+        return true;
     }
 }
 

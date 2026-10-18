@@ -215,11 +215,11 @@ public class MiniPlayerMenuClickTests
             Pump();
 
             // Every form's transport row is in the tree (only one is visible at a time),
-            // so this covers Bar, Card, LargeIcon and Lyrics at once.
+            // so this covers Bar, Card, LargeIcon, Lyrics and the Pill / Sleeve designs at once.
             var repeatButtons = win.GetVisualDescendants().OfType<Button>()
                 .Where(b => ToolTip.GetTip(b) as string == "Repeat")
                 .ToList();
-            Assert.Equal(4, repeatButtons.Count);
+            Assert.Equal(6, repeatButtons.Count);
             Assert.All(repeatButtons, b => Assert.NotNull(b.Command));
 
             var card = win.FindControl<Border>("MenuCard")!;

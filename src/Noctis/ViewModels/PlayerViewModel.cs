@@ -706,6 +706,8 @@ public partial class PlayerViewModel : ViewModelBase
         {
             if (e.PropertyName is nameof(HasContent) or nameof(RepeatMode) or nameof(CurrentTrack))
                 NextCommand.NotifyCanExecuteChanged();
+            if (e.PropertyName is nameof(HasContent) or nameof(IsShuffleEnabled))
+                ReshuffleCommand.NotifyCanExecuteChanged();
         };
 
         // Sync volume to audio player
@@ -1118,6 +1120,63 @@ public partial class PlayerViewModel : ViewModelBase
             }
         }
         return restored;
+    }
+
+    /// <summary>Reshuffle needs Shuffle on and two songs up next to trade places.</summary>
+    private bool CanReshuffle() => IsShuffleEnabled && UpNext.Count > 1;
+
+    /// <summary>
+    /// Queue ▸ Reshuffle (Discord, vari): deals Up Next out again in a new random order while
+    /// Shuffle is on. Only Up Next moves — the playing song, the played songs (History) and
+    /// the Shuffle-off order stay as they are, so Shuffle off still continues after the playing
+    /// song (<see cref="BuildUnshuffledQueue"/> reads Up Next as a set). The order is drawn the
+    /// way <see cref="ToggleShuffle"/> draws it (WeightedShuffle: not-liked and recently played
+    /// songs tend to land later), and like it every queued song takes part, "Play Next" ones
+    /// included. A song the shuffle holds out (Skip When Shuffling, snoozed) that was queued
+    /// while shuffled keeps its slot instead of being dropped.
+    /// </summary>
+    [RelayCommand(CanExecute = nameof(CanReshuffle))]
+    private void Reshuffle()
+    {
+        if (!CanReshuffle()) return;
+
+        var slots = new List<int>(UpNext.Count);
+        var dealt = new List<Track>(UpNext.Count);
+        for (var i = 0; i < UpNext.Count; i++)
+        {
+            if (UpNext[i] is { SkipWhenShuffling: false, IsSnoozed: false } t)
+            {
+                slots.Add(i);
+                dealt.Add(t);
+            }
+        }
+        if (dealt.Count < 2) return;
+
+        // A two-song queue comes back unchanged half the time; a press should always move something.
+        List<Track> shuffled = dealt;
+        for (var attempt = 0; attempt < 8; attempt++)
+        {
+            shuffled = Helpers.ShuffleHelper.WeightedShuffle(dealt, recentlyPlayed: _recentlyPlayed);
+            if (shuffled.Count != dealt.Count) return; // a snooze lapsed mid-call: leave the queue be
+            if (!shuffled.SequenceEqual(dealt)) break;
+        }
+        if (shuffled.SequenceEqual(dealt))
+            shuffled = dealt.Skip(1).Append(dealt[0]).ToList();
+
+        var order = UpNext.ToList();
+        for (var k = 0; k < slots.Count; k++)
+            order[slots[k]] = shuffled[k];
+
+        DebugLogger.Info(DebugLogger.Category.Queue, "Reshuffle", $"queueLen={UpNext.Count}, dealt={dealt.Count}");
+        CancelAutoMixTransition("queue reshuffled");
+        MarkQueueChanged();
+        _suppressHasContentNotify = true;
+        try { UpNext.ReplaceAll(order); }
+        finally
+        {
+            _suppressHasContentNotify = false;
+            OnPropertyChanged(nameof(HasContent));
+        }
     }
 
     [RelayCommand]
