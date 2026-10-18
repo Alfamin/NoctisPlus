@@ -1,4 +1,5 @@
 using System;
+using System.Diagnostics;
 using System.Threading.Tasks;
 using Avalonia;
 using Avalonia.Animation;
@@ -96,6 +97,10 @@ public class BlurredBackdrop : Panel
     /// only the wait that is still the latest retakes.</summary>
     private int _refreshStamp;
     private bool _refreshPending;
+    /// <summary>A <see cref="RefreshSoon"/> retake is waiting for its Background hop.</summary>
+    private bool _soonQueued;
+    /// <summary>When <see cref="RefreshSoon"/> was last called (Stopwatch timestamp, 0 = never).</summary>
+    private long _lastSoonRequest;
     /// <summary>Bumped by <see cref="Release"/>: a capture that started before it lands stale
     /// and is thrown away instead of shown.</summary>
     private int _epoch;
@@ -342,7 +347,16 @@ public class BlurredBackdrop : Panel
     {
         if (_snapshot is null) return;
         _refreshPending = true;
-        _ = RefreshAfterQuietAsync(++_refreshStamp, soon: true);
+        // The rest of this burst: the queued hop retakes after it anyway.
+        if (_soonQueued) return;
+        // Owner 10-18: a slider dragged on the sheet raises a change per pointer move, and
+        // each one retook the whole app back to back (30-57 captures for a one-second drag),
+        // so the thumb stuttered. A request within RefreshDelay of the previous one is such a
+        // stream: it waits for the stream to go quiet and retakes once.
+        var streaming = _lastSoonRequest != 0 && Stopwatch.GetElapsedTime(_lastSoonRequest) < RefreshDelay;
+        _lastSoonRequest = Stopwatch.GetTimestamp();
+        _soonQueued = !streaming;
+        _ = RefreshAfterQuietAsync(++_refreshStamp, soon: !streaming);
     }
 
     /// <summary>Task.Delay (resumed on the UI thread) as PillDialogHost's deferred close,
@@ -352,7 +366,10 @@ public class BlurredBackdrop : Panel
     private async Task RefreshAfterQuietAsync(int stamp, bool soon)
     {
         if (soon)
+        {
             await Dispatcher.UIThread.InvokeAsync(static () => { }, DispatcherPriority.Background);
+            _soonQueued = false;
+        }
         else
             await Task.Delay(RefreshDelay);
         if (stamp != _refreshStamp) return;
