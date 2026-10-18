@@ -484,6 +484,12 @@ public partial class MainWindowViewModel : ViewModelBase
                 TopBar.ArtistSortAscending = _artistsVm.SortAscending;
                 if (!adoptingArtistSort) Settings.ArtistSortAscending = _artistsVm.SortAscending;
             }
+            else if (e.PropertyName == nameof(LibraryArtistsViewModel.ViewMode))
+            {
+                // Grid ↔ list (Discord, vari): mirrored and persisted like the sort.
+                TopBar.IsArtistListView = _artistsVm.IsListView;
+                if (!adoptingArtistSort) Settings.ArtistViewMode = _artistsVm.ViewMode;
+            }
         };
         Settings.ViewStateLoaded += (_, _) =>
         {
@@ -492,6 +498,7 @@ public partial class MainWindowViewModel : ViewModelBase
             {
                 _artistsVm.SortMode = Settings.ArtistSortMode;
                 _artistsVm.SortAscending = Settings.ArtistSortAscending;
+                _artistsVm.ViewMode = Settings.ArtistViewMode;
             }
             finally { adoptingArtistSort = false; }
         };
@@ -2305,7 +2312,8 @@ public partial class MainWindowViewModel : ViewModelBase
         else if (key == "folders")
             TopBar.ShowFoldersActions(_foldersVm.PlayFolderCommand, _foldersVm.ShuffleFolderCommand, _foldersVm.OpenMediaFolderSettingsCommand, _foldersVm.SetSortCommand);
         else if (key == "artists")
-            TopBar.ShowArtistSort(_artistsVm.SetSortCommand, _artistsVm.SortLabel, _artistsVm.SortMode, _artistsVm.SortAscending);
+            TopBar.ShowArtistSort(_artistsVm.SetSortCommand, _artistsVm.SortLabel, _artistsVm.SortMode, _artistsVm.SortAscending,
+                _artistsVm.ToggleViewModeCommand, _artistsVm.IsListView);
 
         RefreshBackButton();
         UiStallWatchdog.ReportIfSlow("Navigate", navigateStart, $"key={key}");
@@ -2863,7 +2871,8 @@ public partial class MainWindowViewModel : ViewModelBase
         else if (ReferenceEquals(view, _foldersVm))
             TopBar.ShowFoldersActions(_foldersVm.PlayFolderCommand, _foldersVm.ShuffleFolderCommand, _foldersVm.OpenMediaFolderSettingsCommand, _foldersVm.SetSortCommand);
         else if (ReferenceEquals(view, _artistsVm))
-            TopBar.ShowArtistSort(_artistsVm.SetSortCommand, _artistsVm.SortLabel, _artistsVm.SortMode, _artistsVm.SortAscending);
+            TopBar.ShowArtistSort(_artistsVm.SetSortCommand, _artistsVm.SortLabel, _artistsVm.SortMode, _artistsVm.SortAscending,
+                _artistsVm.ToggleViewModeCommand, _artistsVm.IsListView);
         // Artist actions for _albumsVm are restored in CaptureRestoreState's lambda
     }
 

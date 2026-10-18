@@ -1031,6 +1031,11 @@ Deezer and TIDAL: paste the link.</value></data>
   <data name="LibraryArtists.AddMusicFoldersSettings" xml:space="preserve"><value>Add music folders in Settings to get started</value><comment>Text in LibraryArtistsView.axaml</comment></data>
   <data name="LibraryArtists.NoFilterMatches" xml:space="preserve"><value>No artists match</value><comment>Artists page empty state while a search is active</comment></data>
   <data name="LibraryArtists.NoFilterMatchesHint" xml:space="preserve"><value>Try another search, or clear it to see every artist</value><comment>Artists page empty state hint while a search is active</comment></data>
+  <data name="LibraryArtists.ColumnArtist" xml:space="preserve"><value>Artist</value><comment>List view column header in LibraryArtistsView.axaml</comment></data>
+  <data name="LibraryArtists.ColumnAlbums" xml:space="preserve"><value>Albums</value><comment>List view column header in LibraryArtistsView.axaml</comment></data>
+  <data name="LibraryArtists.ColumnSongs" xml:space="preserve"><value>Songs</value><comment>List view column header in LibraryArtistsView.axaml</comment></data>
+  <data name="LibraryArtists.ColumnTime" xml:space="preserve"><value>Time</value><comment>List view column header (total length) in LibraryArtistsView.axaml</comment></data>
+  <data name="LibraryArtists.ColumnGenre" xml:space="preserve"><value>Genre</value><comment>List view column header in LibraryArtistsView.axaml</comment></data>
 
   <!-- LibraryFoldersView.axaml (auto-migrated) -->
   <data name="LibraryFolders.ExplicitTip" xml:space="preserve"><value>Explicit</value><comment>ToolTip.Tip in LibraryFoldersView.axaml</comment></data>
@@ -1280,6 +1285,8 @@ Saving replaces them with the lyrics on screen. A lyrics file Noctis didn't writ
   <data name="Main.FilterTip" xml:space="preserve"><value>Filter</value><comment>Top-right corner filter icon tooltip prefix</comment></data>
   <data name="Main.SwitchToCoverFlow" xml:space="preserve"><value>Switch to Cover Flow</value><comment>Top-right view-mode icon tooltip</comment></data>
   <data name="Main.SwitchToLibrary" xml:space="preserve"><value>Switch to Library</value><comment>Top-right view-mode icon tooltip</comment></data>
+  <data name="Main.SwitchToArtistList" xml:space="preserve"><value>Switch to List</value><comment>Artists page top-right layout icon tooltip</comment></data>
+  <data name="Main.SwitchToArtistGrid" xml:space="preserve"><value>Switch to Grid</value><comment>Artists page top-right layout icon tooltip</comment></data>
   <data name="Main.Layout" xml:space="preserve"><value>Layout:</value><comment>Cover Flow layout icon tooltip prefix</comment></data>
   <data name="Main.Carousel" xml:space="preserve"><value>Carousel</value><comment>Header in MainWindow.axaml</comment></data>
   <data name="Main.Cascade" xml:space="preserve"><value>Cascade</value><comment>Header in MainWindow.axaml</comment></data>

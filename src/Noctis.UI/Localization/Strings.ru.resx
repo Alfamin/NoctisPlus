@@ -1031,6 +1031,11 @@ Deezer и TIDAL: вставьте ссылку.</value></data>
   <data name="LibraryArtists.AddMusicFoldersSettings" xml:space="preserve"><value>Чтобы начать, добавьте папки с музыкой в настройках</value><comment>Text in LibraryArtistsView.axaml</comment></data>
   <data name="LibraryArtists.NoFilterMatches" xml:space="preserve"><value>Нет подходящих исполнителей</value><comment>Artists page empty state while a search is active</comment></data>
   <data name="LibraryArtists.NoFilterMatchesHint" xml:space="preserve"><value>Попробуйте другой запрос или очистите поиск, чтобы увидеть всех исполнителей</value><comment>Artists page empty state hint while a search is active</comment></data>
+  <data name="LibraryArtists.ColumnArtist" xml:space="preserve"><value>Исполнитель</value><comment>List view column header in LibraryArtistsView.axaml</comment></data>
+  <data name="LibraryArtists.ColumnAlbums" xml:space="preserve"><value>Альбомы</value><comment>List view column header in LibraryArtistsView.axaml</comment></data>
+  <data name="LibraryArtists.ColumnSongs" xml:space="preserve"><value>Песни</value><comment>List view column header in LibraryArtistsView.axaml</comment></data>
+  <data name="LibraryArtists.ColumnTime" xml:space="preserve"><value>Время</value><comment>List view column header (total length) in LibraryArtistsView.axaml</comment></data>
+  <data name="LibraryArtists.ColumnGenre" xml:space="preserve"><value>Жанр</value><comment>List view column header in LibraryArtistsView.axaml</comment></data>
 
   <!-- LibraryFoldersView.axaml (auto-migrated) -->
   <data name="LibraryFolders.ExplicitTip" xml:space="preserve"><value>Ненормативная лексика</value><comment>ToolTip.Tip in LibraryFoldersView.axaml</comment></data>
@@ -1280,6 +1285,8 @@ Deezer и TIDAL: вставьте ссылку.</value></data>
   <data name="Main.FilterTip" xml:space="preserve"><value>Фильтр</value><comment>Top-right corner filter icon tooltip prefix</comment></data>
   <data name="Main.SwitchToCoverFlow" xml:space="preserve"><value>Переключиться на Cover Flow</value><comment>Top-right view-mode icon tooltip</comment></data>
   <data name="Main.SwitchToLibrary" xml:space="preserve"><value>Переключиться на медиатеку</value><comment>Top-right view-mode icon tooltip</comment></data>
+  <data name="Main.SwitchToArtistList" xml:space="preserve"><value>Переключиться на список</value><comment>Artists page top-right layout icon tooltip</comment></data>
+  <data name="Main.SwitchToArtistGrid" xml:space="preserve"><value>Переключиться на сетку</value><comment>Artists page top-right layout icon tooltip</comment></data>
   <data name="Main.Layout" xml:space="preserve"><value>Макет:</value><comment>Cover Flow layout icon tooltip prefix</comment></data>
   <data name="Main.Carousel" xml:space="preserve"><value>Карусель</value><comment>Header in MainWindow.axaml</comment></data>
   <data name="Main.Cascade" xml:space="preserve"><value>Каскад</value><comment>Header in MainWindow.axaml</comment></data>

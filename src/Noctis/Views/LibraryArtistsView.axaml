@@ -26,6 +26,7 @@
         <Grid>
             <!-- Artist grid: outer ListBox virtualizes rows, inner UniformGrid lays out GridColumns portraits per row -->
             <ListBox x:Name="ArtistListBox"
+                     IsVisible="{Binding !IsListView}"
                      ItemsSource="{Binding ArtistRows}"
                      Background="Transparent"
                      BorderThickness="0"
@@ -145,6 +146,207 @@
                     </DataTemplate>
                 </ListBox.ItemTemplate>
             </ListBox>
+
+            <!-- List view (Discord, vari): one row per artist, laid out like the Songs page —
+                 the same header buttons, row-body box, stripe and hover. The
+                 ListBox virtualizes the rows themselves (default VirtualizingStackPanel), and
+                 a row's height (54px) never depends on the width, so the scrollbar appearing cannot
+                 re-flow it (the grid's old bounce loop). Header Margin 1,_,9,_ mirrors the
+                 row insets exactly as LibrarySongsView explains; the columns of the header
+                 and the row template must stay identical. -->
+            <DockPanel IsVisible="{Binding IsListView}">
+                <Grid DockPanel.Dock="Top" Margin="1,0,9,8">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="Auto" />
+                        <ColumnDefinition Width="Auto" />
+                        <ColumnDefinition Width="Auto" />
+                        <ColumnDefinition Width="Auto" />
+                        <ColumnDefinition Width="42" />
+                    </Grid.ColumnDefinitions>
+                    <Button Grid.Column="0" Content="{loc:T LibraryArtists.ColumnArtist}" Command="{Binding SortByColumnCommand}" CommandParameter="name"
+                            Background="Transparent" BorderThickness="0" Padding="0" MinWidth="0" HorizontalContentAlignment="Left" FontSize="12" FontWeight="SemiBold" Opacity="0.7" Cursor="Hand" HorizontalAlignment="Left" />
+                    <Border Grid.Column="1" Width="80">
+                        <Button Content="{loc:T LibraryArtists.ColumnAlbums}" Command="{Binding SortByColumnCommand}" CommandParameter="albums"
+                                Background="Transparent" BorderThickness="0" Padding="0" MinWidth="0" HorizontalContentAlignment="Center" FontSize="12" FontWeight="SemiBold" Opacity="0.7" Cursor="Hand" HorizontalAlignment="Center" />
+                    </Border>
+                    <Border Grid.Column="2" Width="80">
+                        <Button Content="{loc:T LibraryArtists.ColumnSongs}" Command="{Binding SortByColumnCommand}" CommandParameter="songs"
+                                Background="Transparent" BorderThickness="0" Padding="0" MinWidth="0" HorizontalContentAlignment="Center" FontSize="12" FontWeight="SemiBold" Opacity="0.7" Cursor="Hand" HorizontalAlignment="Center" />
+                    </Border>
+                    <Border Grid.Column="3" Width="90">
+                        <Button Content="{loc:T LibraryArtists.ColumnTime}" Command="{Binding SortByColumnCommand}" CommandParameter="time"
+                                Background="Transparent" BorderThickness="0" Padding="0" MinWidth="0" HorizontalContentAlignment="Center" FontSize="12" FontWeight="SemiBold" Opacity="0.7" Cursor="Hand" HorizontalAlignment="Center" />
+                    </Border>
+                    <Border Grid.Column="4" Width="170">
+                        <Button Content="{loc:T LibraryArtists.ColumnGenre}" Command="{Binding SortByColumnCommand}" CommandParameter="genre"
+                                Background="Transparent" BorderThickness="0" Padding="0" MinWidth="0" HorizontalContentAlignment="Left" FontSize="12" FontWeight="SemiBold" Opacity="0.7" Cursor="Hand" HorizontalAlignment="Left" />
+                    </Border>
+                </Grid>
+
+                <Separator DockPanel.Dock="Top" Margin="0,0,0,4" />
+
+                <!-- -8 left margin + the row-body's 8px left padding: the Songs list's wider
+                     row box with its content unmoved (see LibrarySongsView). Focusable so a
+                     clicked list takes the arrow keys (OnArtistTableKeyDown); its items are not,
+                     like the Songs rows. -->
+                <ListBox x:Name="ArtistTable"
+                         Classes="track-list artist-list"
+                         ItemsSource="{Binding ListRows}"
+                         SelectionMode="Single"
+                         AutoScrollToSelectedItem="False"
+                         Focusable="True"
+                         Margin="-8,0,0,0"
+                         Padding="0,0,0,115"
+                         ScrollViewer.HorizontalScrollBarVisibility="Disabled"
+                         ScrollViewer.VerticalScrollBarVisibility="Auto">
+                    <ListBox.Styles>
+                        <Style Selector="ListBoxItem">
+                            <Setter Property="Focusable" Value="False" />
+                        </Style>
+                        <!-- The row-body Border paints stripe, hover and selection; the
+                             ListBoxItem paints nothing (LibrarySongsView's pattern). -->
+                        <Style Selector="ListBox.artist-list ListBoxItem">
+                            <Setter Property="Padding" Value="0" />
+                            <Setter Property="Background" Value="Transparent" />
+                        </Style>
+                        <Style Selector="ListBox.artist-list ListBoxItem:nth-child(2n)">
+                            <Setter Property="Background" Value="Transparent" />
+                        </Style>
+                        <Style Selector="ListBox.artist-list ListBoxItem:pointerover">
+                            <Setter Property="Background" Value="Transparent" />
+                        </Style>
+                        <Style Selector="ListBox.artist-list ListBoxItem:nth-child(2n):pointerover">
+                            <Setter Property="Background" Value="Transparent" />
+                        </Style>
+                        <Style Selector="ListBox.artist-list ListBoxItem:selected">
+                            <Setter Property="Background" Value="Transparent" />
+                        </Style>
+                        <Style Selector="ListBox.artist-list ListBoxItem:nth-child(2n):selected">
+                            <Setter Property="Background" Value="Transparent" />
+                        </Style>
+                        <Style Selector="Border.row-body">
+                            <Setter Property="Padding" Value="8,8,8,8" />
+                            <Setter Property="CornerRadius" Value="4" />
+                            <Setter Property="Background" Value="Transparent" />
+                            <Setter Property="Transitions">
+                                <Transitions>
+                                    <BrushTransition Property="Background" Duration="0:0:0.04" />
+                                </Transitions>
+                            </Setter>
+                        </Style>
+                        <Style Selector="ListBox.artist-list ListBoxItem:nth-child(2n) Border.row-body">
+                            <Setter Property="Background" Value="{DynamicResource TrackListStripeBrush}" />
+                        </Style>
+                        <Style Selector="Border.row-body:pointerover">
+                            <Setter Property="Background" Value="{DynamicResource TrackListHoverBrush}" />
+                        </Style>
+                        <!-- Last, so it wins on striped and hovered rows: the selected row (click or
+                             arrow keys) takes the Songs list's selection wash. -->
+                        <Style Selector="ListBox.artist-list ListBoxItem:selected Border.row-body">
+                            <Setter Property="Background" Value="{DynamicResource TrackListMultiSelectBrush}" />
+                        </Style>
+                    </ListBox.Styles>
+                    <ListBox.ItemTemplate>
+                        <DataTemplate x:DataType="m:ArtistListRow">
+                            <Border Classes="row-body">
+                                <Grid Background="Transparent">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="Auto" />
+                                        <ColumnDefinition Width="Auto" />
+                                        <ColumnDefinition Width="Auto" />
+                                        <ColumnDefinition Width="Auto" />
+                                        <ColumnDefinition Width="42" />
+                                    </Grid.ColumnDefinitions>
+
+                                    <!-- Round portrait + name. The favorite star rides the portrait's
+                                         rim like the grid tile's, as a sibling of the clipped circle. -->
+                                    <Grid Grid.Column="0" ColumnDefinitions="Auto,*" VerticalAlignment="Center">
+                                        <Panel Grid.Column="0" Width="36" Height="36" Margin="0,0,10,0" VerticalAlignment="Center">
+                                            <Border Width="36" Height="36"
+                                                    CornerRadius="18"
+                                                    ClipToBounds="True"
+                                                    Background="{DynamicResource ArtworkPlaceholderBackground}">
+                                                <Panel>
+                                                    <Path Data="{StaticResource ArtistsIcon}" Stretch="Uniform" Fill="{DynamicResource SystemControlForegroundBaseHighBrush}" Height="14"
+                                                          HorizontalAlignment="Center"
+                                                          VerticalAlignment="Center"
+                                                          Opacity="0.35" />
+                                                    <ctrl:CachedImage SourcePath="{Binding ImagePath}"
+                                                                      DecodeWidth="256"
+                                                                      Stretch="UniformToFill"
+                                                                      Width="36"
+                                                                      Height="36"
+                                                                      RenderOptions.BitmapInterpolationMode="HighQuality"
+                                                                      IsVisible="{Binding ImagePath, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
+                                                </Panel>
+                                            </Border>
+                                            <Border Width="15" Height="15" CornerRadius="7.5"
+                                                    Background="#D91E1E24"
+                                                    HorizontalAlignment="Right" VerticalAlignment="Bottom"
+                                                    Margin="0,0,-3,-3"
+                                                    IsHitTestVisible="False"
+                                                    IsVisible="{Binding IsFavorite}">
+                                                <Path Data="{StaticResource StarIcon}" Stretch="Uniform" Width="9" Height="9" Fill="{DynamicResource AccentColorBrush}"
+                                                      HorizontalAlignment="Center"
+                                                      VerticalAlignment="Center" />
+                                            </Border>
+                                        </Panel>
+                                        <ctrl:HighlightTextBlock Grid.Column="1"
+                                                                 DisplayText="{Binding Name}"
+                                                                 HighlightText="{Binding $parent[UserControl].((vm:LibraryArtistsViewModel)DataContext).SearchText, FallbackValue=''}"
+                                                                 FontSize="13"
+                                                                 FontWeight="SemiBold"
+                                                                 TextWrapping="NoWrap"
+                                                                 MaxLines="1"
+                                                                 Margin="0,0,14,0"
+                                                                 VerticalAlignment="Center"
+                                                                 TextTrimming="CharacterEllipsis" />
+                                    </Grid>
+
+                                    <Border Grid.Column="1" Width="80">
+                                        <TextBlock Text="{Binding AlbumCount}" FontSize="12" Opacity="0.5"
+                                                   HorizontalAlignment="Center" VerticalAlignment="Center" />
+                                    </Border>
+                                    <Border Grid.Column="2" Width="80">
+                                        <TextBlock Text="{Binding TrackCount}" FontSize="12" Opacity="0.5"
+                                                   HorizontalAlignment="Center" VerticalAlignment="Center" />
+                                    </Border>
+                                    <Border Grid.Column="3" Width="90">
+                                        <TextBlock Text="{Binding DurationFormatted}" FontSize="12" Opacity="0.5"
+                                                   HorizontalAlignment="Center" VerticalAlignment="Center" />
+                                    </Border>
+                                    <Border Grid.Column="4" Width="170">
+                                        <TextBlock Text="{Binding Genre}" FontSize="12" Opacity="0.5"
+                                                   TextTrimming="CharacterEllipsis" Margin="0,0,10,0"
+                                                   HorizontalAlignment="Left" VerticalAlignment="Center" />
+                                    </Border>
+
+                                    <!-- 3-dots: the artist tile's right-click menu, as on a Songs row. -->
+                                    <Button Grid.Column="5"
+                                            Background="Transparent"
+                                            BorderThickness="0"
+                                            Padding="0"
+                                            Width="28" Height="28"
+                                            HorizontalAlignment="Center"
+                                            VerticalAlignment="Center"
+                                            Cursor="Hand"
+                                            Tag="{Binding}"
+                                            ToolTip.Tip="{loc:T LibrarySongs.OptionsTip}"
+                                            Click="OnArtistRowOptionsClick">
+                                        <PathIcon Classes="row-dots-icon"
+                                                  Data="{StaticResource MoreDotsIcon}"
+                                                  Width="14" Height="14"
+                                                  HorizontalAlignment="Center"
+                                                  VerticalAlignment="Center" />
+                                    </Button>
+                                </Grid>
+                            </Border>
+                        </DataTemplate>
+                    </ListBox.ItemTemplate>
+                </ListBox>
+            </DockPanel>
 
             <!-- Empty state overlay -->
             <StackPanel IsVisible="{Binding !ArtistRows.Count}"

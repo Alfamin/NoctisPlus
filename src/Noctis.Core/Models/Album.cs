@@ -390,10 +390,13 @@ public class Album : ObservableObject
     public string TrackCountText => TrackCount == 1 ? "1 track" : $"{TrackCount} tracks";
 
     /// <summary>Header duration with seconds ("55m 51s"), hours when long ("1h 12m").</summary>
-    public string HeaderDurationFormatted =>
-        TotalDuration.TotalHours >= 1
-            ? $"{(int)TotalDuration.TotalHours}h {TotalDuration.Minutes}m"
-            : $"{(int)TotalDuration.TotalMinutes}m {TotalDuration.Seconds:00}s";
+    public string HeaderDurationFormatted => FormatHeaderDuration(TotalDuration);
+
+    /// <summary>"55m 51s", or "1h 12m" from an hour up; the Artists list's Time column too.</summary>
+    public static string FormatHeaderDuration(TimeSpan duration) =>
+        duration.TotalHours >= 1
+            ? $"{(int)duration.TotalHours}h {duration.Minutes}m"
+            : $"{(int)duration.TotalMinutes}m {duration.Seconds:00}s";
 
     public override string ToString() => $"{Artist} - {Name}";
 
