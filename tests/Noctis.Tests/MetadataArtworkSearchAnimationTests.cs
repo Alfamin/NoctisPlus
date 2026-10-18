@@ -86,10 +86,10 @@ public class MetadataArtworkSearchAnimationTests
     }
 
     /// <summary>The editor on the given tab, its open animation settled.</summary>
-    private static (MetadataViewModel vm, MetadataWindow win) Editor(string tab)
+    private static (MetadataViewModel vm, MetadataWindow win) Editor(string tab, MetadataViewModel? withVm = null)
     {
         EnsureAppStyles();
-        var vm = Vm();
+        var vm = withVm ?? Vm();
         var win = new MetadataWindow(vm) { RequestedThemeVariant = ThemeVariant.Dark, Width = 1100, Height = 820 };
         win.Show();
         var load = vm.InitializeAsync();
@@ -372,6 +372,67 @@ public class MetadataArtworkSearchAnimationTests
             win.KeyPressQwerty(PhysicalKey.Enter, RawInputModifiers.None);
             Assert.True(PumpUntil(() => vm.AnimatedSearchStatus == "Search service unavailable."),
                 $"Enter did not run the search (status '{vm.AnimatedSearchStatus}')");
+        }
+        finally { win.Close(); PumpUntil(() => !win.IsVisible); }
+    }
+
+    [AvaloniaFact]
+    public void AnimatedArtworkChooser_ShowsAGridOfAlbums_WithWorkingButtons_AndSearchesAgainFromItsOwnBox()
+    {
+        // Was: one album, labelled with the edited track's tags, and no way to refine the query
+        // without closing the pop-up. Now: a card per album with a loop, quality buttons bound to
+        // the window's VM from inside the pop-up, and a search box in the pop-up itself.
+        var apple = new AnimatedArtworkChooserTests.Apple();
+        var http = new System.Net.Http.HttpClient(new AnimatedArtworkChooserTests.StubHandler(apple.Respond));
+        var track = new Track
+        {
+            Id = Guid.NewGuid(), Title = "Taste", Artist = "Sabrina Carpenter", AlbumArtist = "Sabrina Carpenter",
+            Album = "Short n' Sweet", AlbumId = Guid.NewGuid(), FilePath = "C:/m/does-not-exist/taste.flac",
+        };
+        var lib = new FakeLibraryService();
+        lib.TrackList.Add(track);
+        var vm = new MetadataViewModel(track, new SearchPopupsShotsTests.OkTags(), lib, new TestPersistenceService(),
+            new FakeAnimatedCoverService(), itunes: new Noctis.Services.ITunesArtworkService(http),
+            metadataSearch: new MetadataSearchPanelTests.FakeSearch());
+        var (_, win) = Editor("Animated Artwork", vm);
+        try
+        {
+            var search = vm.SearchAnimatedCoverCommand.ExecuteAsync(null);
+            Assert.True(PumpUntil(() => search.IsCompleted, 5000), "search never finished");
+            var motion = win.AnimatedSearchMotion!;
+            var content = motion.Content!;
+            Assert.True(PumpUntil(() => motion.IsOpen && Settled(content)), "chooser never settled open");
+            PumpUntil(() => false, 100);
+
+            var texts = content.GetVisualDescendants().OfType<TextBlock>()
+                .Where(t => t.IsEffectivelyVisible).Select(t => t.Text).ToList();
+            Assert.Contains("Short n' Sweet (Deluxe)", texts);
+            Assert.Equal(3, texts.Count(t => t == "Sabrina Carpenter"));
+            Assert.Contains(texts, t => t != null && t.Contains("Clean", StringComparison.Ordinal));
+
+            var qualityButtons = content.GetVisualDescendants().OfType<Button>()
+                .Where(b => b.IsEffectivelyVisible && b.CommandParameter is AnimatedArtworkChoice).ToList();
+            Assert.Equal(6, qualityButtons.Count);
+            // Bound through $parent[Window] from inside the pop-up: a null command is a dead button.
+            Assert.All(qualityButtons, b => Assert.Same(vm.SelectAnimatedArtworkResultCommand, b.Command));
+            Assert.Equal(3, qualityButtons.Count(b => b.Classes.Contains("pill-primary")));
+            var posters = content.GetVisualDescendants().OfType<Button>()
+                .Where(b => b.IsEffectivelyVisible && b.Classes.Contains("anim-poster")).ToList();
+            Assert.Equal(3, posters.Count);
+            Assert.All(posters, b => Assert.Same(vm.PreviewAnimatedArtworkResultCommand, b.Command));
+
+            // Refine from the chooser's own box: a pasted link, Enter.
+            var box = content.GetVisualDescendants().OfType<TextBox>().Single(b => b.Name == "AnimatedChooserSearchBox");
+            Assert.Equal("Short n' Sweet — Sabrina Carpenter", box.Watermark);
+            box.Focus();
+            Assert.True(PumpUntil(() => box.IsFocused));
+            win.KeyTextInput("https://music.apple.com/gb/album/short-n-sweet-deluxe/1795512297");
+            PumpUntil(() => false, 50);
+            win.KeyPressQwerty(PhysicalKey.Enter, RawInputModifiers.None);
+            Assert.True(PumpUntil(() => !vm.IsSearchingAnimatedCover && vm.AnimatedArtworkSearchResults.Count == 1, 5000),
+                $"re-search from the chooser did not run ({vm.AnimatedArtworkSearchResults.Count} results)");
+            Assert.Equal("Short n' Sweet (Deluxe)", vm.AnimatedArtworkSearchResults[0].CollectionName);
+            Assert.True(motion.IsOpen);
         }
         finally { win.Close(); PumpUntil(() => !win.IsVisible); }
     }
