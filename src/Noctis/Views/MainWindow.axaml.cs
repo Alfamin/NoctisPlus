@@ -179,7 +179,7 @@ public partial class MainWindow : Window, IPageKeyOverlayHost
     /// per drag step on top of that made the slider stutter (owner 10-18).
     /// </summary>
     internal static bool SettingChangeRepaintsUnderSheet(string? propertyName) =>
-        propertyName?.EndsWith("Progress", StringComparison.Ordinal) != true
+        RepaintsAppUnderSettings(propertyName)
         && propertyName is not (nameof(SettingsViewModel.BackgroundBlurAmount) or nameof(SettingsViewModel.BackgroundBlurLabel));
     /// <summary>Bumped on every Settings open/close, so a reveal still waiting for the
     /// backdrop snapshot knows when it has been overtaken.</summary>
@@ -493,6 +493,25 @@ public partial class MainWindow : Window, IPageKeyOverlayHost
         if (opacity is { } o) _settingsScrim.Opacity = o;
     }
 
+    /// <summary>
+    /// Whether a Settings property change can repaint the app under the sheet, so the scrim's
+    /// snapshot is retaken (RefreshSoon). Not the sheet's own state (owner 10-18): moving
+    /// between tabs, typing in its search box, and the status / progress / log lines changed
+    /// nothing under it, yet each retook the snapshot, and with lyrics moving under it the
+    /// frozen background jumped forward at every click or keystroke.
+    /// </summary>
+    internal static bool RepaintsAppUnderSettings(string? propertyName) =>
+        propertyName is not { Length: > 0 } name // "everything changed" (a reset, a load)
+        || !name.EndsWith("Progress", StringComparison.Ordinal)
+        && !name.EndsWith("Status", StringComparison.Ordinal)
+        && !name.EndsWith("StatusText", StringComparison.Ordinal)
+        && !name.EndsWith("StatusIsError", StringComparison.Ordinal)
+        && !(name.StartsWith("Is", StringComparison.Ordinal)
+             && (name.EndsWith("TabSelected", StringComparison.Ordinal) || name.EndsWith("TabVisible", StringComparison.Ordinal)))
+        && name is not (nameof(SettingsViewModel.SelectedSettingsTab) or nameof(SettingsViewModel.SelectedTabTitle)
+            or nameof(SettingsViewModel.SelectedTabDescription) or nameof(SettingsViewModel.SearchQuery)
+            or nameof(SettingsViewModel.DevLogText) or nameof(SettingsViewModel.DevLogsCopied));
+
     /// <summary>Reads a theme surface color from Application resources for the active
     /// theme variant; theme overlays (built-in and custom) win over the base palette.</summary>
     private static Color ResolveThemeColor(string key, Color fallback)
@@ -554,8 +573,9 @@ public partial class MainWindow : Window, IPageKeyOverlayHost
                 // A setting changed from the open sheet (theme, Liquid Glass, accent,
                 // language…) repaints the app under it: retake the blurred backdrop right
                 // after that renders, so it keeps up with the sheet (owner 10-09). No-op while
-                // Settings is closed (no snapshot up). Progress streams (scan, downloads)
-                // change nothing visible under the blur.
+                // Settings is closed (no snapshot up), and with the live blur (Liquid Glass
+                // off) there is no snapshot to retake. Only for what can repaint the app:
+                // see RepaintsAppUnderSettings.
                 _settingsBackdropRefreshHandler = (_, e) =>
                 {
                     if (SettingChangeRepaintsUnderSheet(e.PropertyName))
