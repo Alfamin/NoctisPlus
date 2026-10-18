@@ -118,8 +118,10 @@ public sealed class DiscordPresenceService : IDiscordPresenceService
             var client = _createClient();
             client.SkipIdenticalPresence = true;
 
+            // Discord answers a SET_ACTIVITY it refuses with an error and keeps showing the
+            // previous activity, so this is the only sign an update never took effect.
             client.OnError += (_, e) =>
-                Debug.WriteLine($"[Discord] RPC error: {e.Message}");
+                DebugLog.Write("Discord", $"Discord refused the update: ({e.Code}) {e.Message}");
 
             client.OnConnectionFailed += (_, _) =>
                 Debug.WriteLine("[Discord] Connection failed — Discord may not be running.");
@@ -387,10 +389,15 @@ public sealed class DiscordPresenceService : IDiscordPresenceService
     /// <summary>
     /// Truncates a string to fit Discord's field limits (max 128 chars)
     /// and pads to meet the minimum 2-character requirement.
-    /// Discord silently drops the entire presence update when any text field is 1 char.
+    /// Discord rejects the entire SET_ACTIVITY (error 4000, "length must be at least 2
+    /// characters long") when any text field is 1 char.
     /// </summary>
     internal static string Truncate(string? value, int maxLength)
     {
+        // DiscordRPC trims every field before sending, so measure what it will send: a tag
+        // like "A " passed the length check here, went out as "A" and Discord refused the
+        // whole update, leaving the previous song on the card.
+        value = value?.Trim();
         if (string.IsNullOrEmpty(value)) return string.Empty;
         var cut = maxLength - 3;
         // Never split an emoji (or any surrogate pair) in half: the lone high surrogate is

@@ -264,4 +264,23 @@ public class DiscordStatusDisplayTests : IDisposable
         Assert.Equal(2, (int)sent["status_display_type"]!);
         Assert.NotNull(sent["timestamps"]);
     }
+
+    /// <summary>
+    /// Discord answers a 1-character details/state with error 4000 and drops the whole
+    /// activity (checked against the desktop client 2026-10-18). DiscordRPC trims fields, so
+    /// a tag with a stray space ("A ") must still reach the pipe as 2+ characters.
+    /// </summary>
+    [Fact]
+    public async Task OneLetterTagWithAStraySpace_StillGoesOutAsTwoCharacters()
+    {
+        var pipe = new FakeDiscordPipe();
+        using var service = await ConnectedServiceAsync(pipe);
+
+        await service.UpdateAsync(new DiscordPresenceTrack("A ", " B", null), TimeSpan.Zero, TimeSpan.FromMinutes(3), isPlaying: false);
+        var sent = await NextActivityAsync(pipe);
+        Assert.True(((string?)sent["details"])!.Length >= 2, (string?)sent["details"]);
+        Assert.True(((string?)sent["state"])!.Length >= 2, (string?)sent["state"]);
+        Assert.StartsWith("A", (string?)sent["details"]);
+        Assert.StartsWith("B", (string?)sent["state"]);
+    }
 }
