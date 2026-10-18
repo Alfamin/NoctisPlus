@@ -25,6 +25,12 @@ namespace Noctis.Tests;
 /// </summary>
 public class BlurredBackdropTests
 {
+    private sealed class ResizeProbe : BlurredBackdrop
+    {
+        internal Action? AfterResize;
+        protected override void OnSizeChanged(SizeChangedEventArgs e)
+        { base.OnSizeChanged(e); AfterResize?.Invoke(); }
+    }
     private static bool PumpUntil(Func<bool> condition, int budgetMs = 3000)
     {
         var sw = Stopwatch.StartNew();
@@ -48,7 +54,7 @@ public class BlurredBackdropTests
         for (var i = 0; i < 12; i++)
             content.Children.Add(new Border { Height = 50, Background = fill ?? new SolidColorBrush(Color.Parse(colors[i % colors.Length])) });
         var layer = new Panel { Children = { content } };
-        var backdrop = new BlurredBackdrop { IsVisible = false, Opacity = 0, Target = layer };
+        var backdrop = new ResizeProbe { IsVisible = false, Opacity = 0, Target = layer };
         var win = new Window
         {
             Width = 800, Height = 600, RequestedThemeVariant = ThemeVariant.Dark,
@@ -190,11 +196,17 @@ public class BlurredBackdropTests
             var first = backdrop.Snapshot!;
             var firstWidth = first.PixelSize.Width;
 
+            bool resized = false, wasPending = false;
+            object? sourceAfterResize = null;
+            // Observe immediately after the control schedules its real resize refresh.
+            // A fixed-delay pump can overshoot the debounce on a loaded runner.
+            ((ResizeProbe)backdrop).AfterResize = () =>
+            { wasPending = backdrop.IsRefreshPending; sourceAfterResize = backdrop.SnapshotImage.Source; resized = true; };
             win.Width = 1200;
-            PumpUntil(() => false, 40);
-            Assert.True(backdrop.IsRefreshPending);
+            Assert.True(PumpUntil(() => resized, 3000), "resize never reached the backdrop");
+            Assert.True(wasPending);
             // Meanwhile the old snapshot is still the one shown, stretched to the new size.
-            Assert.Same(first, backdrop.SnapshotImage.Source);
+            Assert.Same(first, sourceAfterResize);
 
             Assert.True(PumpUntil(() => !ReferenceEquals(backdrop.Snapshot, first), 3000),
                 $"never retaken (pending={backdrop.IsRefreshPending})");
