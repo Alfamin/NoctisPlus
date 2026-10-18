@@ -25,7 +25,13 @@ public sealed class DiscordPresenceService : IDiscordPresenceService
     private const int ClearFlushDelayMs = 250;
 
     private readonly SemaphoreSlim _gate = new(1, 1);
+    private readonly Func<DiscordRpcClient> _createClient;
     private DiscordRpcClient? _client;
+
+    public DiscordPresenceService() : this(() => new DiscordRpcClient(ApplicationId)) { }
+
+    /// <summary>Tests hand in a client over a fake pipe to read the frames Discord would get.</summary>
+    internal DiscordPresenceService(Func<DiscordRpcClient> createClient) => _createClient = createClient;
 
     // Monotonic stamp for presence mutations (updates and clears). SemaphoreSlim
     // wakes waiters in no particular order, so when tracks are skipped rapidly an
@@ -109,10 +115,8 @@ public sealed class DiscordPresenceService : IDiscordPresenceService
             // Tear down stale client if it exists
             DisposeClient();
 
-            var client = new DiscordRpcClient(ApplicationId)
-            {
-                SkipIdenticalPresence = true,
-            };
+            var client = _createClient();
+            client.SkipIdenticalPresence = true;
 
             client.OnError += (_, e) =>
                 Debug.WriteLine($"[Discord] RPC error: {e.Message}");
