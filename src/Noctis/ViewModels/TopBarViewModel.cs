@@ -561,11 +561,17 @@ public partial class TopBarViewModel : ViewModelBase
         HasReleaseTypeChips = false;
     }
 
+    /// <summary>The Search page itself is shown (not an artist or album page opened from it).</summary>
+    [ObservableProperty] private bool _isSearchPageShown;
+
+    partial void OnIsSearchPageShownChanged(bool value) => UpdatePageTitleVisibility();
+
     private void UpdatePageTitleVisibility()
     {
         // Search keeps its title with Back armed (coming back to it with a query): its toolbar
         // sits on the line below the bar, and without the bar the page jumped up under it.
-        IsPageTitleVisible = (!IsBackButtonVisible || CurrentTabName == "Search")
+        // Pages opened from Search are detail pages like any other: no "Search" title above them.
+        IsPageTitleVisible = (!IsBackButtonVisible || IsSearchPageShown)
             && CurrentTabName is not ("Lyrics" or "Queue");
     }
 

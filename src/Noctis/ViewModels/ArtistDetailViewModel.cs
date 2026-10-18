@@ -608,7 +608,7 @@ public partial class ArtistDetailViewModel : ViewModelBase, ISearchable, IDispos
         var total = TimeSpan.FromTicks(songs.Sum(t => t.Duration.Ticks));
         ReleaseCount = releases.Count;
         SongCount = songs.Count;
-        TotalLengthDisplay = total.TotalHours >= 1 ? $"{(int)total.TotalHours}h {total.Minutes}m" : $"{(int)total.TotalMinutes}m";
+        TotalLengthDisplay = DurationText.Total(total, "m");
         GenreKicker = DominantGenre(songs) ?? (About?.Genres.FirstOrDefault() ?? string.Empty).ToUpperInvariant();
 
         // Library-side About facts.

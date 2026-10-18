@@ -399,6 +399,26 @@
         <Style Selector="Button.catalog-choice:pointerover /template/ ContentPresenter">
             <Setter Property="Background" Value="{DynamicResource ChipHoverBackground}" />
         </Style>
+        <!-- Noctis Plus: the missing-song download button, the same as the album page's. -->
+        <Style Selector="Button.catalog-download">
+            <Setter Property="Width" Value="30" />
+            <Setter Property="Height" Value="30" />
+            <Setter Property="Padding" Value="0" />
+            <Setter Property="CornerRadius" Value="999" />
+            <Setter Property="Background" Value="Transparent" />
+            <Setter Property="BorderThickness" Value="0" />
+            <Setter Property="Opacity" Value="0.7" />
+            <Setter Property="HorizontalContentAlignment" Value="Center" />
+            <Setter Property="VerticalContentAlignment" Value="Center" />
+            <Setter Property="Cursor" Value="Hand" />
+        </Style>
+        <Style Selector="Button.catalog-download:pointerover">
+            <Setter Property="Opacity" Value="1" />
+        </Style>
+        <Style Selector="Button.catalog-download:pointerover /template/ ContentPresenter">
+            <Setter Property="Background" Value="#22808080" />
+            <Setter Property="Foreground" Value="{DynamicResource AccentColorBrush}" />
+        </Style>
     </UserControl.Styles>
 
     <UserControl.Resources>
@@ -523,15 +543,30 @@
                         <TextBlock Text="{Binding Song.AlbumTitle}" FontSize="11" Opacity="0.55" TextTrimming="CharacterEllipsis" />
                     </StackPanel>
                     <TextBlock Grid.Column="3" Text="{Binding Song.DurationText}" FontSize="12" Opacity="0.7" VerticalAlignment="Center" Margin="0,0,8,0" />
-                    <StackPanel Grid.Column="4" Orientation="Horizontal" VerticalAlignment="Center" Spacing="4">
-                        <Button Classes="header-icon-btn" Content="↓" Background="Transparent" BorderThickness="0" CornerRadius="14" Width="28" Height="28" Padding="0" FontSize="20" IsVisible="{Binding Song.CanStartDownload}"
-                                ToolTip.Tip="Download now" Command="{Binding $parent[UserControl].((vm:ArtistDetailViewModel)DataContext).DownloadCatalogSongNowCommand}" CommandParameter="{Binding}" />
-                        <Button Classes="header-icon-btn" Content="+" Background="Transparent" BorderThickness="0" CornerRadius="14" Width="28" Height="28" Padding="0" FontSize="20" IsVisible="{Binding Song.CanStartDownload}"
-                                ToolTip.Tip="Queue download" Command="{Binding $parent[UserControl].((vm:ArtistDetailViewModel)DataContext).QueueCatalogDownloadCommand}" CommandParameter="{Binding}" />
-                        <ProgressBar Width="32" Height="3" Minimum="0" Maximum="1" Value="{Binding Song.Progress}" IsVisible="{Binding Song.IsDownloading}" />
-                        <TextBlock Text="Queued" FontSize="11" Opacity="0.55" IsVisible="{Binding Song.IsQueued}" />
-                        <TextBlock Text="✓" FontSize="16" Opacity="0.7" IsVisible="{Binding Song.IsSaved}" />
-                    </StackPanel>
+                    <!-- The album page's missing-song control: download icon (right-click: now / add to downloads),
+                         progress ring, waiting ring, checkmark once saved. -->
+                    <Panel Grid.Column="4" Width="32" Height="32" VerticalAlignment="Center">
+                        <Button Classes="catalog-download" IsVisible="{Binding Song.CanStartDownload}" ToolTip.Tip="Download"
+                                AutomationProperties.Name="Download"
+                                Command="{Binding $parent[UserControl].((vm:ArtistDetailViewModel)DataContext).DownloadCatalogSongNowCommand}" CommandParameter="{Binding}">
+                            <Button.ContextMenu>
+                                <ContextMenu>
+                                    <MenuItem Header="Download now"
+                                              Command="{Binding $parent[UserControl].((vm:ArtistDetailViewModel)DataContext).DownloadCatalogSongNowCommand}" CommandParameter="{Binding}" />
+                                    <MenuItem Header="Add to downloads"
+                                              Command="{Binding $parent[UserControl].((vm:ArtistDetailViewModel)DataContext).QueueCatalogDownloadCommand}" CommandParameter="{Binding}" />
+                                </ContextMenu>
+                            </Button.ContextMenu>
+                            <Path Data="{StaticResource SearchDownloadGlyph}" Width="14" Height="14" Stretch="Uniform"
+                                  Stroke="{Binding $parent[Button].Foreground}" StrokeThickness="1.9" StrokeLineCap="Round" StrokeJoin="Round" />
+                        </Button>
+                        <ctrl:ProgressRing Width="18" Height="18" Thickness="2" Foreground="{DynamicResource AccentColorBrush}"
+                                           IsVisible="{Binding Song.IsDownloading}" Value="{Binding Song.Progress}" ToolTip.Tip="Downloading" />
+                        <ctrl:ProgressRing Width="18" Height="18" Thickness="2" IsIndeterminate="True"
+                                           IsVisible="{Binding Song.IsQueued}" ToolTip.Tip="In downloads" />
+                        <PathIcon Data="{StaticResource CheckmarkIcon}" Width="12" Height="12" Foreground="{DynamicResource AccentColorBrush}"
+                                  IsVisible="{Binding Song.IsSaved}" ToolTip.Tip="Downloaded · appears when Noctis has scanned it" />
+                    </Panel>
                 </Grid>
             </Border>
         </DataTemplate>

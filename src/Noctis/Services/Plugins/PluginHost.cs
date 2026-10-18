@@ -201,6 +201,11 @@ public sealed partial class PluginSettingItem : ObservableObject
     public bool IsString => Definition.Type == PluginSettingType.String;
     public bool IsNumber => Definition.Type == PluginSettingType.Number;
     public bool IsChoice => Definition.Type == PluginSettingType.Choice;
+    public bool IsAction => Definition.Type == PluginSettingType.Action;
+
+    /// <summary>An action setting's button: one change per press (the stored value flips).</summary>
+    [CommunityToolkit.Mvvm.Input.RelayCommand]
+    public void Press() => Set(BoolValue ? "false" : "true");
     public IReadOnlyList<string> Choices => Definition.Choices;
     public decimal Minimum => Definition.Min is { } m ? (decimal)Math.Max(m, -1e9) : -1_000_000_000m;
     public decimal Maximum => Definition.Max is { } m ? (decimal)Math.Min(m, 1e9) : 1_000_000_000m;

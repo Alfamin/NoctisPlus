@@ -852,9 +852,7 @@
                         <TextBlock FontSize="14" Opacity="0.75"
                                    TextTrimming="CharacterEllipsis"
                                    MaxWidth="540" HorizontalAlignment="Left">
-                            <Run Text="{Binding NextTrack.TitleDisplay, FallbackValue=''}" FontWeight="SemiBold"/>
-                            <Run Text=" · "/>
-                            <Run Text="{Binding NextTrack.ArtistDisplay, FallbackValue=''}"/>
+                            <Run Text="{Binding NextTrack.TitleDisplay, FallbackValue=''}" FontWeight="SemiBold"/><Run Text=" · "/><Run Text="{Binding NextTrack.ArtistDisplay, FallbackValue=''}"/>
                         </TextBlock>
                     </StackPanel>
                 </StackPanel>

@@ -298,7 +298,7 @@ internal sealed class Worker : IDisposable
             {
                 _saidBadFolder = true;
                 var message = $"The WordLyrics folder in the feature settings is not a usable folder name ({ex.GetType().Name}). Correct it in Settings → Features → WordLyrics; the waiting songs are kept.";
-                _log(message); _notify(message);
+                _log(message);
                 _progress(new ProgressState("Setup is needed", message, Error: true, Finished: true));
             }
             return;
@@ -313,7 +313,6 @@ internal sealed class Worker : IDisposable
                 _saidNotReady = true;
                 _log("songs are waiting, but WordLyrics is not set up in " + tool.Folder);
                 var problem = !repairReady ? "WORDLYRICS_REPAIR_UPDATE_REQUIRED: this backend lacks backed-up rerun support. Use Set up WordLyrics to update it; the request is saved." : NotReady(tool);
-                _notify(problem);
                 _progress(new ProgressState("Setup is needed", problem, Error: true, Finished: true));
             }
             return;
@@ -324,7 +323,7 @@ internal sealed class Worker : IDisposable
         {
             foreach (var item in batch) item.NotBefore = now + TimeSpan.FromMinutes(2);
             var message = $"WORDLYRICS_START_FAILED ({ex.GetType().Name}): the background program could not start. Check the WordLyrics folder and installation. Retrying in two minutes.";
-            _log(message); _notify(message);
+            _log(message);
             _progress(new ProgressState("WordLyrics could not start", message, Total: batch.Count, Finished: true, Error: true));
         }
     }
@@ -593,7 +592,6 @@ internal sealed class Worker : IDisposable
             var finished = counts.Values.Sum();
             _log($"WordLyrics was cancelled: {finished} finished, {dropped} taken off the waiting list");
             _progress(new ProgressState("Cancelled", CancelNotice(finished, dropped) + $"\nDetails: {ResultFile}", finished, batch.Count, Finished: true, Report: report));
-            _notify(CancelNotice(finished, dropped));
             return;
         }
 
@@ -619,10 +617,11 @@ internal sealed class Worker : IDisposable
         _progress(new ProgressState(retrying ? "Retry scheduled" : timed > 0 ? $"{timed} songs received word timestamps" : "No new word timestamps were written",
             detail + (failed > 0 ? $"\n{failed} songs need attention." : "") + (held ? "\nPaused: the songs still waiting start when you press Resume." : ""),
             counts.Values.Sum(), batch.Count, Finished: true, Error: failed > 0 || code != 0, Report: report, Paused: held));
-        if (message is not null && (asked || Options.Notify)) _notify(message);
+        // The result itself is shown by the status pill from the progress above; the summary stays in the log.
+        if (message is not null) _log(message);
         // Said when a song first has to wait, not at every later try.
         if (firstDelays > 0 && (asked || Options.Notify))
-            _notify($"The lyric provider could not be reached. {firstDelays} song{(firstDelays == 1 ? "" : "s")} will be tried again later.");
+            _notify($"Lyrics provider offline · {firstDelays} song{(firstDelays == 1 ? "" : "s")} retry later");
         _timer.Change(TimeSpan.FromSeconds(1), Tick); // anything else waiting?
     }
 

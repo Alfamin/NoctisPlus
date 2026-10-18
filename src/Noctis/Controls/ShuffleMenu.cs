@@ -16,6 +16,9 @@ public sealed class ShuffleMenu : MenuFlyout
     private readonly Dictionary<PlayerShuffleMode, MenuItem> _modes = [];
     private readonly Dictionary<ShuffleScope, MenuItem> _sources = [];
     private readonly MenuItem _status = new() { IsEnabled = false };
+    // One spinner for the "Preparing shuffle…" row. A new ring on every refresh restarted its animation each time
+    // the player raised a change (position ticks included), so it looked stuck (owner, 2026-10-18).
+    private readonly ProgressRing _busyRing = new() { IsIndeterminate = true, Width = 16, Height = 16 };
     private readonly MenuItem _source = new() { Header = "Source" };
     private ShuffleScope? _scope;
     private PlayerViewModel? _listening;
@@ -62,7 +65,12 @@ public sealed class ShuffleMenu : MenuFlyout
         Closed += (_, _) => Unlisten();
     }
 
-    private void Changed(object? sender, PropertyChangedEventArgs e) => Refresh();
+    private void Changed(object? sender, PropertyChangedEventArgs e)
+    {
+        // Only what the menu shows; the player also raises position and level changes many times a second.
+        if (e.PropertyName is null or nameof(PlayerViewModel.ShuffleMode) or nameof(PlayerViewModel.IsShuffleBusy)
+            or nameof(PlayerViewModel.ShuffleStatus) or nameof(PlayerViewModel.TrueShuffleAvailable)) Refresh();
+    }
     private void Unlisten() { if (_listening is not null) _listening.PropertyChanged -= Changed; _listening = null; }
     private void Refresh()
     {
@@ -77,6 +85,7 @@ public sealed class ShuffleMenu : MenuFlyout
         _source.Header = "Source · " + (scope == ShuffleScope.WholeLibrary ? "Whole library" : scope == ShuffleScope.OpenPlaylist ? "Open playlist" : "Current queue");
         _status.IsVisible = player?.IsShuffleBusy == true || !string.IsNullOrWhiteSpace(player?.ShuffleStatus);
         _status.Header = player?.IsShuffleBusy == true ? "Preparing shuffle…" : player?.ShuffleStatus;
-        _status.Icon = player?.IsShuffleBusy == true ? new ProgressRing { IsIndeterminate = true, Width = 16, Height = 16 } : null;
+        var busyIcon = player?.IsShuffleBusy == true ? _busyRing : null;
+        if (!ReferenceEquals(_status.Icon, busyIcon)) _status.Icon = busyIcon;
     }
 }

@@ -22,13 +22,14 @@
     {
       "key": "open",
       "label": "Show shuffle modes",
-      "type": "bool",
+      "type": "action",
       "default": false,
       "description": "Open the native player shuffle menu. Choosing a mode starts it."
     },
     {
       "key": "mode",
       "label": "Default mode",
+      "description": "The mode the shuffle menu offers first while shuffle is off.",
       "type": "choice",
       "default": "No repeats",
       "choices": [
@@ -49,11 +50,12 @@
         "Balanced",
         "Adventurous"
       ],
-      "description": "How many songs you have not heard yet For you mixes in: about one in ten, one in five, or one in three."
+      "description": "How many songs you have not heard yet the For you mode mixes in: about one in ten, one in five, or one in three."
     },
     {
       "key": "scope",
       "label": "Default source",
+      "description": "Which songs a mode shuffles when you pick it without choosing a source: the current queue, the playlist that is open, or your whole library.",
       "type": "choice",
       "default": "Current queue",
       "choices": [

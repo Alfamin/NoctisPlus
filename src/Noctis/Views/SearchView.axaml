@@ -141,8 +141,7 @@
                                    Opacity="0.55"
                                    TextTrimming="CharacterEllipsis"
                                    MaxLines="1">
-                            <Run Text="{Binding ArtistDisplay, Mode=OneWay}" />
-                            <Run Text="{Binding AlbumSuffix, Mode=OneWay}" />
+                            <Run Text="{Binding ArtistDisplay, Mode=OneWay}" /><Run Text="{Binding AlbumSuffix, Mode=OneWay}" />
                         </TextBlock>
                     </StackPanel>
 

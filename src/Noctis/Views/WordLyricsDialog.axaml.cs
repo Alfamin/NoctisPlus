@@ -10,7 +10,11 @@ namespace Noctis.Views;
 
 public partial class WordLyricsDialog : Window
 {
-    public WordLyricsDialog() => InitializeComponent();
+    public WordLyricsDialog()
+    {
+        InitializeComponent();
+        WordPanel.CloseRequested += (_, _) => Close();
+    }
     internal WordLyricsDialog(WordLyricsService service, bool library, Track? track) : this()
     {
         var vm = new WordLyricsViewModel(service, library, track, text => ConfirmationDialog.ShowAsync(this, text));
@@ -21,7 +25,6 @@ public partial class WordLyricsDialog : Window
         var dialog = new WordLyricsDialog(service, library, track);
         DialogHelper.SizeToOwner(dialog, owner); return dialog.ShowDialog(owner);
     }
-    private void OnDone(object? sender, RoutedEventArgs e) => Close();
     protected override void OnKeyDown(KeyEventArgs e)
     { if (e.Key == Key.Escape) { e.Handled = true; Close(); } else base.OnKeyDown(e); }
 }

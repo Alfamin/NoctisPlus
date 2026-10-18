@@ -450,9 +450,7 @@ public partial class PlaylistViewModel : ViewModelBase, ISearchable, IDisposable
 
             TrackCount = Tracks.Count;
             var total = TimeSpan.FromTicks(Tracks.Sum(t => t.Duration.Ticks));
-            TotalDuration = total.TotalHours >= 1
-                ? $"{(int)total.TotalHours}h {total.Minutes}m"
-                : $"{(int)total.TotalMinutes} min";
+            TotalDuration = DurationText.Total(total);
 
             // Compute total file size from the size the library already indexed.
             //
@@ -759,9 +757,7 @@ public partial class PlaylistViewModel : ViewModelBase, ISearchable, IDisposable
         TrackCount = Tracks.Count;
 
         var total = TimeSpan.FromTicks(Tracks.Sum(t => t.Duration.Ticks));
-        TotalDuration = total.TotalHours >= 1
-            ? $"{(int)total.TotalHours}h {total.Minutes}m"
-            : $"{(int)total.TotalMinutes} min";
+        TotalDuration = DurationText.Total(total);
         UpdateEmptyStateFlags(_playlist.TrackIds.Count);
         RebuildFeaturedArtists(Tracks.ToList());
 

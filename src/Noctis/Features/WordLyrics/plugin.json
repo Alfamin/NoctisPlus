@@ -33,6 +33,7 @@
     {
       "key": "notify",
       "label": "Say when a song is done",
+      "description": "A short notification each time a song's word timing is finished.",
       "type": "bool",
       "default": true
     },
@@ -53,7 +54,7 @@
     {
       "key": "setup",
       "label": "Set up WordLyrics\u2026",
-      "type": "bool",
+      "type": "action",
       "default": false,
       "description": "Opens a confirmation before setup downloads anything. The two models need about 1.33 GB, plus Python and packages; existing components are reused. Cancel keeps queued songs and existing lyrics."
     },
@@ -67,14 +68,14 @@
     {
       "key": "progress",
       "label": "Open timing progress\u2026",
-      "type": "bool",
+      "type": "action",
       "default": false,
       "description": "Open native progress, pause/resume, stop and the latest result."
     },
     {
       "key": "library",
       "label": "Time library songs\u2026",
-      "type": "bool",
+      "type": "action",
       "default": false,
       "description": "Open the native folder picker to time missing words. Existing word timing is kept; a large batch asks before starting."
     }

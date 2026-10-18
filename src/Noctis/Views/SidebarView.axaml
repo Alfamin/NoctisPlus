@@ -468,6 +468,7 @@
                                                      Classes="search-box"
                                                      Text="{Binding TopBar.SearchText, Mode=TwoWay}"
                                                      Watermark="{Binding TopBar.SearchWatermark}"
+                                                     AutomationProperties.Name="{Binding TopBar.SearchWatermark}"
                                                      ToolTip.Tip="{loc:T Sidebar.SearchSyntaxTip}"
                                                      ToolTip.Placement="Bottom"
                                                      ToolTip.ShowDelay="700"

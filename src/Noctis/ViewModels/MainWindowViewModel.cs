@@ -128,6 +128,52 @@ public partial class MainWindowViewModel : ViewModelBase
     /// (also the lyrics offset confirmation, GitHub #102).</summary>
     [ObservableProperty] private string _pluginNotice = string.Empty;
 
+    /// <summary>Word timing's compact status pill (icon + a few words); null hides it.</summary>
+    [ObservableProperty] private Features.WordLyrics.TimingPill? _wordTimingPill;
+    private Features.WordLyrics.WordLyricsService? _wordTiming;
+    private DispatcherTimer? _wordPillLinger;
+
+    /// <summary>The pill opens the word timing panel with the full details.</summary>
+    [RelayCommand]
+    private void OpenWordTimingProgress() => _wordTiming?.Show();
+
+    /// <summary>Word timing's panel shown inside the main window (null: closed). Never a separate window.</summary>
+    [ObservableProperty] private WordLyricsViewModel? _wordTimingSheet;
+
+    private void PresentWordTiming(bool library, Track? track)
+    {
+        if (_wordTiming is null) return;
+        CloseWordTimingSheet();
+        var owner = (Avalonia.Application.Current?.ApplicationLifetime as Avalonia.Controls.ApplicationLifetimes.IClassicDesktopStyleApplicationLifetime)?.MainWindow;
+        WordTimingSheet = new WordLyricsViewModel(_wordTiming, library, track,
+            text => owner is null ? Task.FromResult(false) : Views.ConfirmationDialog.ShowAsync(owner, text));
+    }
+
+    [RelayCommand]
+    private void CloseWordTimingSheet()
+    {
+        var sheet = WordTimingSheet;
+        WordTimingSheet = null;
+        sheet?.Dispose();
+    }
+
+    private void ShowWordTimingPill(Features.WordLyrics.TimingPill? pill)
+    {
+        _wordPillLinger?.Stop();
+        WordTimingPill = pill;
+        if (pill is not { Lingers: true }) return;
+        _wordPillLinger ??= new DispatcherTimer { Interval = TimeSpan.FromSeconds(5) };
+        _wordPillLinger.Tick -= OnWordPillLinger;
+        _wordPillLinger.Tick += OnWordPillLinger;
+        _wordPillLinger.Start();
+    }
+
+    private void OnWordPillLinger(object? sender, EventArgs e)
+    {
+        _wordPillLinger?.Stop();
+        if (WordTimingPill is { Lingers: true }) WordTimingPill = null;
+    }
+
     // ── Discord seek throttle ──
     private DateTime _lastDiscordSeekUpdate = DateTime.MinValue;
     private static readonly TimeSpan DiscordSeekThrottle = TimeSpan.FromSeconds(1);
@@ -419,7 +465,13 @@ public partial class MainWindowViewModel : ViewModelBase
         var shuffleQueue = new Features.TrueShuffle.ShuffleQueue(Player, library, () => Player.AllowExplicitContent,
             () => CurrentView as PlaylistViewModel);
         var shuffleService = new Features.TrueShuffle.TrueShuffleService(shuffleQueue, persistence.DataDirectory);
+        // Each stage of a shuffle start (cycle load, snapshot, plan, queue applied) in the session log with Developer
+        // Mode on, so a slow start shows where the time went.
+        shuffleService.Timing = stage => { if (DebugLogger.IsEnabled) DebugLog.Write("Shuffle", stage); };
         var wordService = new Features.WordLyrics.WordLyricsService(library, () => Settings.GetSettings());
+        _wordTiming = wordService;
+        wordService.Presenter = PresentWordTiming;
+        wordService.PillChanged += () => Dispatcher.UIThread.Post(() => ShowWordTimingPill(wordService.Pill));
         Features.BuiltInFeatures.Register(Plugins, shuffleService, wordService);
         Settings.Plugins = Plugins;
         // Get plugins (official list) fetches only when the Plugins page opens.
@@ -1736,6 +1788,7 @@ public partial class MainWindowViewModel : ViewModelBase
         // whatever selection the navigation itself restores.
         var onSearch = ReferenceEquals(newValue, _searchVm);
         Sidebar.IsSearchPageActive = onSearch;
+        TopBar.IsSearchPageShown = onSearch;
         if (onSearch)
             Dispatcher.UIThread.Post(() => { if (ReferenceEquals(CurrentView, _searchVm)) Sidebar.SetSelectedNavItemSilently(null); });
         // Artist pages kept in history stay subscribed to LibraryUpdated; only the shown

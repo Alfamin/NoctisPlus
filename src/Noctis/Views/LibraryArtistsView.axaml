@@ -71,6 +71,7 @@
                                     <!-- 190px disc (user ask 09-15, up from 160); the artist page's Similar Artists tiles match. -->
                                     <Panel HorizontalAlignment="Center" Width="190" Height="190">
                                     <Button Classes="artist-tile"
+                                            AutomationProperties.Name="{Binding Name}"
                                             Focusable="False"
                                             Background="Transparent"
                                             BorderThickness="0"

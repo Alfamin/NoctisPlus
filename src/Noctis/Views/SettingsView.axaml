@@ -84,14 +84,16 @@
                                                        IsVisible="{Binding HasDescription}"/>
                                         </StackPanel>
                                         <Panel Grid.Column="1" VerticalAlignment="Center">
-                                            <controls:LottieToggle IsVisible="{Binding IsBool}"
+                                            <Button IsVisible="{Binding IsAction}" Classes="pill" FontSize="12" Padding="14,6" Content="Open"
+                                                    AutomationProperties.Name="{Binding Label}" Command="{Binding PressCommand}"/>
+                                            <controls:LottieToggle IsVisible="{Binding IsBool}" AutomationProperties.Name="{Binding Label}"
                                                                   IsChecked="{Binding BoolValue, Mode=TwoWay}"/>
-                                            <TextBox IsVisible="{Binding IsString}" Text="{Binding TextValue, Mode=TwoWay}" Watermark="{Binding Placeholder}"
+                                            <TextBox IsVisible="{Binding IsString}" AutomationProperties.Name="{Binding Label}" Text="{Binding TextValue, Mode=TwoWay}" Watermark="{Binding Placeholder}"
                                                      Width="220" CornerRadius="999" Padding="14,6" BorderThickness="1.5" MinHeight="0"/>
-                                            <NumericUpDown IsVisible="{Binding IsNumber}" Value="{Binding NumberValue, Mode=TwoWay}"
+                                            <NumericUpDown IsVisible="{Binding IsNumber}" AutomationProperties.Name="{Binding Label}" Value="{Binding NumberValue, Mode=TwoWay}"
                                                            Minimum="{Binding Minimum}" Maximum="{Binding Maximum}"
                                                            Width="150" CornerRadius="999" FormatString="0.###"/>
-                                            <ComboBox IsVisible="{Binding IsChoice}" Classes="pill-list"
+                                            <ComboBox IsVisible="{Binding IsChoice}" AutomationProperties.Name="{Binding Label}" Classes="pill-list"
                                                       ItemsSource="{Binding Choices}" SelectedItem="{Binding SelectedChoice, Mode=TwoWay}"
                                                       MinWidth="160" CornerRadius="999" Padding="14,6"/>
                                         </Panel>
@@ -5026,9 +5028,7 @@
                              the one profile picture (no second avatar). -->
                         <TextBlock x:Name="AccountIdentityLine" FontSize="12" Opacity="0.6" TextTrimming="CharacterEllipsis"
                                    IsVisible="{Binding HasPrimaryAccount}">
-                            <Run Text="{Binding PrimaryAccount.Name, FallbackValue=''}" FontWeight="SemiBold"/>
-                            <Run Text=" · "/>
-                            <Run Text="{Binding PrimaryAccountSince}"/>
+                            <Run Text="{Binding PrimaryAccount.Name, FallbackValue=''}" FontWeight="SemiBold"/><Run Text=" · "/><Run Text="{Binding PrimaryAccountSince}"/>
                         </TextBlock>
                     </StackPanel>
                 </Grid>
@@ -5993,7 +5993,7 @@
                                             <TextBlock Text="{Binding Error}" FontSize="11" Foreground="#FF6B6B" TextWrapping="Wrap"
                                                        IsVisible="{Binding HasError}"/>
                                         </StackPanel>
-                                        <controls:LottieToggle Grid.Column="1" IsChecked="{Binding IsEnabled, Mode=TwoWay}"
+                                        <controls:LottieToggle Grid.Column="1" IsChecked="{Binding IsEnabled, Mode=TwoWay}" AutomationProperties.Name="{Binding Name}"
                                                               IsEnabled="{Binding CanToggle}" VerticalAlignment="Top"/>
                                     </Grid>
                                     <ItemsControl ItemsSource="{Binding SettingItems}" IsVisible="{Binding HasSettings}">
@@ -6011,14 +6011,16 @@
                                                                    IsVisible="{Binding HasDescription}"/>
                                                     </StackPanel>
                                                     <Panel Grid.Column="1" VerticalAlignment="Center">
-                                                        <controls:LottieToggle IsVisible="{Binding IsBool}"
+                                                        <Button IsVisible="{Binding IsAction}" Classes="pill" FontSize="12" Padding="14,6" Content="Open"
+                                                    AutomationProperties.Name="{Binding Label}" Command="{Binding PressCommand}"/>
+                                            <controls:LottieToggle IsVisible="{Binding IsBool}" AutomationProperties.Name="{Binding Label}"
                                                                               IsChecked="{Binding BoolValue, Mode=TwoWay}"/>
-                                                        <TextBox IsVisible="{Binding IsString}" Text="{Binding TextValue, Mode=TwoWay}" Watermark="{Binding Placeholder}"
+                                                        <TextBox IsVisible="{Binding IsString}" AutomationProperties.Name="{Binding Label}" Text="{Binding TextValue, Mode=TwoWay}" Watermark="{Binding Placeholder}"
                                                                  Width="220" CornerRadius="999" Padding="14,6" BorderThickness="1.5" MinHeight="0"/>
-                                                        <NumericUpDown IsVisible="{Binding IsNumber}" Value="{Binding NumberValue, Mode=TwoWay}"
+                                                        <NumericUpDown IsVisible="{Binding IsNumber}" AutomationProperties.Name="{Binding Label}" Value="{Binding NumberValue, Mode=TwoWay}"
                                                                        Minimum="{Binding Minimum}" Maximum="{Binding Maximum}"
                                                                        Width="150" CornerRadius="999" FormatString="0.###"/>
-                                                        <ComboBox IsVisible="{Binding IsChoice}" Classes="pill-list"
+                                                        <ComboBox IsVisible="{Binding IsChoice}" AutomationProperties.Name="{Binding Label}" Classes="pill-list"
                                                                   ItemsSource="{Binding Choices}" SelectedItem="{Binding SelectedChoice, Mode=TwoWay}"
                                                                   MinWidth="160" CornerRadius="999" Padding="14,6"/>
                                                     </Panel>
@@ -6197,7 +6199,7 @@
                                             </StackPanel>
                                             <!-- Two-way: LoadedPlugin.IsEnabled routes the flip back to the host
                                                  (approval dialog on first enable, start/stop + persist). -->
-                                            <controls:LottieToggle Grid.Column="1" IsChecked="{Binding IsEnabled, Mode=TwoWay}"
+                                            <controls:LottieToggle Grid.Column="1" IsChecked="{Binding IsEnabled, Mode=TwoWay}" AutomationProperties.Name="{Binding Name}"
                                                                   IsEnabled="{Binding CanToggle}"
                                                                   VerticalAlignment="Top"/>
                                         </Grid>
@@ -6393,7 +6395,7 @@
                                      Fill="{DynamicResource AccentColorBrush}"
                                      VerticalAlignment="Center"
                                      IsVisible="{Binding IsUpdateAvailable}"/>
-                            <Button Command="{Binding CheckForUpdateCommand}"
+                            <Button Command="{Binding CheckForUpdateCommand}" AutomationProperties.Name="Check for updates"
                                     Classes="pill update-pill"
                                     Classes.up-to-date="{Binding IsUpToDate}"
                                     Classes.checking="{Binding IsCheckingForUpdate}"
@@ -6555,7 +6557,7 @@
                          each a solid brand fill (star yellow, Discord blurple, Noctis red)
                          with the glyph and text in a contrasting colour. -->
                     <UniformGrid Columns="3" Margin="0,6,0,2">
-                        <Button Classes="brand-tile" Command="{Binding OpenGitHubCommand}" Margin="0,0,5,0">
+                        <Button Classes="brand-tile" Command="{Binding OpenGitHubCommand}" AutomationProperties.Name="{loc:T Settings.StarGitHub}" Margin="0,0,5,0">
                             <Grid>
                                 <Border CornerRadius="16" Background="#F1C40F"/>
                                 <Border Classes="tile-lift" CornerRadius="16"/>
@@ -6577,7 +6579,7 @@
                                 </StackPanel>
                             </Grid>
                         </Button>
-                        <Button Classes="brand-tile" Command="{Binding OpenDiscordCommand}" Margin="5,0,5,0">
+                        <Button Classes="brand-tile" Command="{Binding OpenDiscordCommand}" AutomationProperties.Name="{loc:T Settings.JoinDiscord}" Margin="5,0,5,0">
                             <Grid>
                                 <Border CornerRadius="16" Background="#5865F2"/>
                                 <Border Classes="tile-lift" CornerRadius="16"/>
@@ -6595,7 +6597,7 @@
                                 </StackPanel>
                             </Grid>
                         </Button>
-                        <Button Classes="brand-tile" Command="{Binding OpenWebsiteCommand}" Margin="5,0,0,0">
+                        <Button Classes="brand-tile" Command="{Binding OpenWebsiteCommand}" AutomationProperties.Name="{loc:T Settings.OfficialWebsite}" Margin="5,0,0,0">
                             <Grid>
                                 <Border CornerRadius="16" Background="#E74856"/>
                                 <Border Classes="tile-lift" CornerRadius="16"/>

@@ -44,12 +44,13 @@
                     <TextBlock Grid.Column="2" Text="{Binding Local.Album}" FontSize="12" Opacity="0.55" VerticalAlignment="Center"
                                TextTrimming="CharacterEllipsis" Margin="0,0,16,0" />
                     <TextBlock Grid.Column="3" Text="{Binding DisplayDetail}" FontSize="11" Opacity="0.55" VerticalAlignment="Center" Margin="0,0,10,0" />
-                    <Button Grid.Column="4" Classes="row-icon" IsVisible="{Binding IsActionable}" ToolTip.Tip="More options" Click="OnFinishedMoreClick">
-                        <TextBlock Text="⋯" FontSize="18" />
+                    <Button Grid.Column="4" Classes="row-icon" IsVisible="{Binding IsActionable}" ToolTip.Tip="More options"
+                            AutomationProperties.Name="More options" Click="OnFinishedMoreClick">
+                        <PathIcon Data="{StaticResource MoreDotsIcon}" Width="14" Height="14" />
                     </Button>
                     <Button Grid.Column="4" Classes="grey-pill" IsVisible="{Binding IsAddingToLibrary}" Content="Add to library"
                             Command="{Binding $parent[UserControl].((vm:DownloadsViewModel)DataContext).ImportSavedCommand}" CommandParameter="{Binding}" />
-                    <Button Grid.Column="5" Classes="row-icon" ToolTip.Tip="Remove from this list · keeps the file"
+                    <Button Grid.Column="5" Classes="row-icon" ToolTip.Tip="Remove from this list · keeps the file" AutomationProperties.Name="Remove from this list"
                             Command="{Binding $parent[UserControl].((vm:DownloadsViewModel)DataContext).RemoveCommand}" CommandParameter="{Binding}">
                         <Path Data="M7 7L17 17 M17 7L7 17" Width="11" Height="11" Stretch="Uniform"
                               Stroke="{Binding $parent[Button].Foreground}" StrokeThickness="2" StrokeLineCap="Round" />
@@ -72,14 +73,13 @@
                     </Border>
                     <StackPanel Grid.Column="1" Spacing="1" VerticalAlignment="Center" Margin="2,0,16,0">
                         <TextBlock FontSize="13" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" MaxLines="1">
-                            <Run Text="{Binding Title, Mode=OneWay}" />
-                            <Run Text="{Binding Artist, Mode=OneWay, StringFormat=' · {0}'}" FontWeight="Normal" />
+                            <Run Text="{Binding Title, Mode=OneWay}" /><Run Text="{Binding Artist, Mode=OneWay, StringFormat=' · {0}'}" FontWeight="Normal" />
                         </TextBlock>
                         <TextBlock Classes="download-detail" Text="{Binding Detail}" FontSize="11" Opacity="0.55"
                                    TextTrimming="CharacterEllipsis" MaxLines="1" ToolTip.Tip="{Binding Detail}" />
                     </StackPanel>
                     <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="6" Margin="0,0,10,0" VerticalAlignment="Center">
-                        <Button Classes="row-icon" IsVisible="{Binding CanMoveUp}" ToolTip.Tip="Download next"
+                        <Button Classes="row-icon" IsVisible="{Binding CanMoveUp}" ToolTip.Tip="Download next" AutomationProperties.Name="Download next"
                                 Command="{Binding $parent[UserControl].((vm:DownloadsViewModel)DataContext).DownloadNextCommand}"
                                 CommandParameter="{Binding}">
                             <Path Data="M12 18.5V6 M6.75 11.25L12 6L17.25 11.25" Width="13" Height="13" Stretch="Uniform"
@@ -87,7 +87,7 @@
                         </Button>
                         <PathIcon Data="{StaticResource CheckmarkIcon}" Width="13" Height="13" Margin="8,0"
                                   Foreground="{DynamicResource AccentColorBrush}" IsVisible="{Binding IsSaved}" />
-                        <Button Classes="row-icon" IsVisible="{Binding !IsSaved}" ToolTip.Tip="Remove"
+                        <Button Classes="row-icon" IsVisible="{Binding !IsSaved}" ToolTip.Tip="Remove" AutomationProperties.Name="Remove"
                                 Command="{Binding $parent[UserControl].((vm:DownloadsViewModel)DataContext).RemoveCommand}"
                                 CommandParameter="{Binding}">
                             <Path Data="M7 7L17 17 M17 7L7 17" Width="11" Height="11" Stretch="Uniform"

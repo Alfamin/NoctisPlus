@@ -500,8 +500,7 @@
                                            Opacity="0.72"
                                            TextTrimming="CharacterEllipsis"
                                            MaxLines="1">
-                                    <Run Text="{Binding ContinueTrack.ArtistDisplay, FallbackValue=''}" />
-                                    <Run Text="{Binding ContinueDetail}" />
+                                    <Run Text="{Binding ContinueTrack.ArtistDisplay, FallbackValue=''}" /><Run Text="{Binding ContinueDetail}" />
                                 </TextBlock>
                             </StackPanel>
 

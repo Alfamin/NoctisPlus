@@ -1445,24 +1445,64 @@
 
     <!-- Plugin notice pill (IPluginHost.Notify): same glass pill as the drop-import one,
          near the top so it never covers the playback island; clears itself after a few seconds. -->
-    <Border IsVisible="{Binding PluginNotice, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"
-            IsHitTestVisible="False"
-            HorizontalAlignment="Center"
-            VerticalAlignment="Top"
-            Margin="0,72,0,0"
-            MaxWidth="560"
-            Background="{DynamicResource IslandBackground}"
-            BorderBrush="#22FFFFFF"
-            BorderThickness="1"
-            CornerRadius="999"
-            Padding="16,9"
-            ZIndex="40">
-        <TextBlock Text="{Binding PluginNotice}"
-                   FontSize="13" FontWeight="SemiBold"
-                   TextTrimming="CharacterEllipsis"
-                   Foreground="{DynamicResource IslandForeground}"
-                   VerticalAlignment="Center"/>
-    </Border>
+    <!-- Top status stack: the plugin notice and, under it, word timing's compact pill (icon + a few words; owner
+         2026-10-18: no long sentences popping up). The pill opens the progress window with the details. -->
+    <StackPanel HorizontalAlignment="Center" VerticalAlignment="Top" Margin="0,72,0,0" Spacing="8" ZIndex="40">
+        <Border IsVisible="{Binding PluginNotice, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"
+                IsHitTestVisible="False"
+                HorizontalAlignment="Center"
+                MaxWidth="560"
+                Background="{DynamicResource IslandBackground}"
+                BorderBrush="#22FFFFFF"
+                BorderThickness="1"
+                CornerRadius="999"
+                Padding="16,9"
+    >
+            <TextBlock Text="{Binding PluginNotice}"
+                       FontSize="13" FontWeight="SemiBold"
+                       TextTrimming="CharacterEllipsis"
+                       Foreground="{DynamicResource IslandForeground}"
+                       VerticalAlignment="Center"/>
+        </Border>
+        <Button Classes="word-timing-pill" HorizontalAlignment="Center"
+                IsVisible="{Binding WordTimingPill, Converter={x:Static ObjectConverters.IsNotNull}}"
+                Command="{Binding OpenWordTimingProgressCommand}"
+                ToolTip.Tip="Word timing details"
+                AutomationProperties.Name="{Binding WordTimingPill.Text, FallbackValue='Word timing status', TargetNullValue='Word timing status'}"
+                Background="{DynamicResource IslandBackground}" BorderBrush="#22FFFFFF" BorderThickness="1"
+                CornerRadius="999" Padding="12,7" Cursor="Hand">
+            <StackPanel Orientation="Horizontal" Spacing="8">
+                <Panel Width="14" Height="14" VerticalAlignment="Center">
+                    <controls:ProgressRing Width="14" Height="14" Thickness="1.8" Foreground="{DynamicResource AccentColorBrush}"
+                                           IsVisible="{Binding WordTimingPill.IsWorking, FallbackValue=False}"
+                                           IsIndeterminate="{Binding WordTimingPill.IsIndeterminate, FallbackValue=False}"
+                                           Value="{Binding WordTimingPill.Percent, FallbackValue=0}" />
+                    <PathIcon Data="{StaticResource PauseIcon}" Width="10" Height="10" Foreground="{DynamicResource IslandForeground}"
+                              IsVisible="{Binding WordTimingPill.IsPaused, FallbackValue=False}" />
+                    <PathIcon Data="{StaticResource CheckmarkIcon}" Width="11" Height="11" Foreground="{DynamicResource AccentColorBrush}"
+                              IsVisible="{Binding WordTimingPill.IsDone, FallbackValue=False}" />
+                    <PathIcon Data="{StaticResource InfoIcon}" Width="13" Height="13" Foreground="#FFB454"
+                              IsVisible="{Binding WordTimingPill.IsProblem, FallbackValue=False}" />
+                </Panel>
+                <TextBlock Text="{Binding WordTimingPill.Text, FallbackValue=''}" FontSize="12" FontWeight="SemiBold"
+                           Foreground="{DynamicResource IslandForeground}" VerticalAlignment="Center" />
+            </StackPanel>
+        </Button>
+    </StackPanel>
+
+    <!-- Word timing panel inside the window (owner, 2026-10-18: not a separate window that pops up and takes focus).
+         Opened from the status pill, a song's "Word timing…" or the WordLyrics settings; the backdrop or Done closes it. -->
+    <Panel IsVisible="{Binding WordTimingSheet, Converter={x:Static ObjectConverters.IsNotNull}}" ZIndex="95">
+        <Border Background="#73000000" PointerPressed="OnWordTimingBackdropPressed" />
+        <!-- Created only while open: a closed sheet leaves no hidden panel behind. -->
+        <ContentControl Content="{Binding WordTimingSheet}" HorizontalAlignment="Center" VerticalAlignment="Center" Margin="24">
+            <ContentControl.ContentTemplate>
+                <DataTemplate x:DataType="vm:WordLyricsViewModel">
+                    <views:WordLyricsPanel />
+                </DataTemplate>
+            </ContentControl.ContentTemplate>
+        </ContentControl>
+    </Panel>
 
     <!-- "Added to Queue" / "Playing Next" confirmation (owner 10-08): rises just above the
          island (16 margin + 50 island + 14 gap), above it in Z, never hit-tested. -->

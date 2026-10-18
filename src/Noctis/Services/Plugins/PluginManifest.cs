@@ -6,7 +6,9 @@ using Noctis.Plugins;
 namespace Noctis.Services.Plugins;
 
 /// <summary>Kind of a declared plugin setting; Noctis draws the control, the plugin reads the value.</summary>
-public enum PluginSettingType { Bool, String, Number, Choice }
+/// <summary>Action: a button in Settings (stored like a bool, flipped on every press, so the plugin sees one
+/// change per press) for settings that open something rather than switch something on.</summary>
+public enum PluginSettingType { Bool, String, Number, Choice, Action }
 
 /// <summary>One entry of plugin.json's "settings" array.</summary>
 public sealed record PluginSettingDefinition(
@@ -276,7 +278,8 @@ public sealed class PluginManifest
                 "string" or "text" => PluginSettingType.String,
                 "number" => PluginSettingType.Number,
                 "choice" => PluginSettingType.Choice,
-                _ => throw new PluginManifestException($"Setting \"{key}\": type must be bool, string, number or choice."),
+                "action" or "button" => PluginSettingType.Action,
+                _ => throw new PluginManifestException($"Setting \"{key}\": type must be bool, string, number, choice or action."),
             };
 
             var choices = StringArray(s, "choices").Select(c => c.Trim()).Where(c => c.Length > 0).Distinct().ToList();
@@ -290,7 +293,7 @@ public sealed class PluginManifest
             TryGet(s, "default", out var d);
             switch (type)
             {
-                case PluginSettingType.Bool:
+                case PluginSettingType.Bool or PluginSettingType.Action:
                     if (d.ValueKind is JsonValueKind.True or JsonValueKind.False) def = d.GetBoolean() ? "true" : "false";
                     else if (d.ValueKind is JsonValueKind.Undefined or JsonValueKind.Null) def = "false";
                     else throw new PluginManifestException($"Setting \"{key}\": default must be true or false.");

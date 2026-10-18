@@ -22,7 +22,7 @@
         "Off"
       ],
       "default": "Word by word (smooth)",
-      "description": "Word by word: every word is a step of its own. Smooth lets the end of a word run a moment into the next one; crisp finishes every word exactly on its note. Flowing: the motion passes along the line in one piece. Off: Noctis' own animation."
+      "description": "Word by word: every word is a step of its own. Smooth lets the end of a word run a moment into the next one; crisp finishes every word exactly on its note. Flowing: the motion passes along the line in one piece. Off: Noctis's own animation."
     },
     {
       "key": "style",
@@ -69,6 +69,7 @@
     {
       "key": "sidePanel",
       "label": "Also animate the lyrics side panel",
+      "description": "The same motion in the lyrics panel beside the player. Off: the panel keeps Noctis's own animation; the full lyrics page is unchanged.",
       "type": "bool",
       "default": true
     }

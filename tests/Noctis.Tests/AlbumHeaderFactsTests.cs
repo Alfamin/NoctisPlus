@@ -81,4 +81,13 @@ public class AlbumHeaderFactsTests
         Assert.Equal("3 min", Make(1, seconds: 227).TotalDurationFormatted);
         Assert.Equal("0 min", Make(0).TotalDurationFormatted);
     }
+
+    [Fact]
+    public void TotalLengths_PlaylistAndArtistStyles_NeverSayZeroForShortContent()
+    {
+        Assert.Equal("24 sec", Noctis.Helpers.DurationText.Total(TimeSpan.FromSeconds(24)));
+        Assert.Equal("24 sec", Noctis.Helpers.DurationText.Total(TimeSpan.FromSeconds(24), "m"));
+        Assert.Equal("54m", Noctis.Helpers.DurationText.Total(TimeSpan.FromMinutes(54.5), "m"));
+        Assert.Equal("1h 12m", Noctis.Helpers.DurationText.Total(TimeSpan.FromMinutes(72)));
+    }
 }

@@ -32,6 +32,9 @@ internal sealed class WordLyricsService(ILibraryService library, Func<AppSetting
     internal bool Enabled => !_disposed;
     internal ProgressState State { get; private set; } = new("Ready", "New downloads use the timing mode in Settings → Features.", Finished: true);
     internal event Action? Changed;
+    /// <summary>The compact status pill (null: hidden). Replaces the long top notices for word timing.</summary>
+    internal TimingPill? Pill { get; private set; }
+    internal event Action? PillChanged;
     internal event Action<IReadOnlyList<string>>? LyricsWritten;
     internal int WaitingCount => _worker?.WaitingCount ?? 0;
     internal void SetPreviewState(ProgressState state) => Progress(state);
@@ -130,10 +133,15 @@ internal sealed class WordLyricsService(ILibraryService library, Func<AppSetting
     private void Progress(ProgressState state) => Dispatcher.UIThread.Post(() =>
     {
         if (_disposed) return;
-        var changed = State.Message != state.Message;
         State = state; Changed?.Invoke();
-        // Native notification pill, never a focus-stealing window over playback or a game.
-        if (changed && !state.Finished && _host?.Settings.GetBool("showProgress", true) == true) Notify(state.Message);
+        // A small native pill (icon + a few words), never a focus-stealing window over playback or a game.
+        // "Show timing status" covers work in progress, "Say when a song is done" the result; problems always show.
+        var pill = TimingPill.From(state);
+        var settings = _host?.Settings;
+        if (pill is { Kind: TimingPillKind.Working or TimingPillKind.Paused } && settings?.GetBool("showProgress", true) == false) pill = null;
+        if (pill is { Kind: TimingPillKind.Done } && settings?.GetBool("notify", true) == false && settings.GetBool("showProgress", true) == false) pill = null;
+        if (pill == Pill) return;
+        Pill = pill; PillChanged?.Invoke();
     });
     internal Task PauseAsync(bool paused) => Task.Run(() => _worker?.SetPaused(paused));
     internal Task CancelAsync() => Task.Run(() => _worker?.Cancel());
@@ -161,9 +169,15 @@ internal sealed class WordLyricsService(ILibraryService library, Func<AppSetting
         }
         catch (Exception ex) { Progress(new("Setup could not open", ex.Message, Error: true, Finished: true)); }
     }
+    /// <summary>Shows the progress panel inside the main window (set by the shell); the separate dialog is only the
+    /// fallback when nothing is attached.</summary>
+    internal Action<bool, Track?>? Presenter { get; set; }
+
     internal void Show(bool library = false, Track? track = null)
     {
-        if (_disposed || _dialogOpen || (Application.Current?.ApplicationLifetime as IClassicDesktopStyleApplicationLifetime)?.MainWindow is not { } owner) return;
+        if (_disposed) return;
+        if (Presenter is { } present) { present(library, track); return; }
+        if (_dialogOpen || (Application.Current?.ApplicationLifetime as IClassicDesktopStyleApplicationLifetime)?.MainWindow is not { } owner) return;
         _ = Open();
         async Task Open()
         {

@@ -473,9 +473,7 @@
                                                     <TextBlock Text="{Binding Name}" FontSize="13" FontWeight="SemiBold"
                                                                TextTrimming="CharacterEllipsis" />
                                                     <TextBlock Grid.Column="1" FontSize="12" Opacity="0.55" Margin="10,0,0,0">
-                                                        <Run Text="{Binding ShareLabel}" />
-                                                        <Run Text=" · " />
-                                                        <Run Text="{Binding PlaysLabel}" />
+                                                        <Run Text="{Binding ShareLabel}" /><Run Text=" · " /><Run Text="{Binding PlaysLabel}" />
                                                     </TextBlock>
                                                     <views:WrapBar Grid.Row="2" Grid.ColumnSpan="2" Height="8"
                                                                    Fraction="{Binding BarFraction}" />

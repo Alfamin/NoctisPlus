@@ -163,7 +163,7 @@ public class NativeWordLyricsTests
         var dialog = new WordLyricsDialog(rig.Service, true, null); dialog.Show(); Dispatcher.UIThread.RunJobs();
         try
         {
-            var scroll = dialog.FindControl<ScrollViewer>("WordBodyScroll")!;
+            var scroll = dialog.WordPanel.FindControl<ScrollViewer>("WordBodyScroll")!;
             Assert.Equal(Avalonia.Controls.Primitives.ScrollBarVisibility.Disabled, scroll.HorizontalScrollBarVisibility);
             Assert.True(scroll.Extent.Width <= scroll.Viewport.Width + 1, $"{scroll.Extent.Width} > {scroll.Viewport.Width}");
         }

@@ -213,3 +213,11 @@ public class ArtworkCacheLifetimeTests : IDisposable
         catch (NullReferenceException) { return true; }
     }
 }
+
+/// <summary>
+/// The classes in this collection call <see cref="Noctis.Services.ArtworkCache.ClearForTests"/>, which disposes every
+/// live bitmap, held or not. Run beside other UI tests, it disposed a cover another test's window still showed, and
+/// that window's next layout pass threw ObjectDisposedException (seen as a cleanup error under a loaded full run).
+/// </summary>
+[CollectionDefinition("ArtworkCache", DisableParallelization = true)]
+public class ArtworkCacheCollection { }

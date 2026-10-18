@@ -105,12 +105,7 @@ public class Album : ObservableObject
     public string ArtistDisplay => ArtistCredit.Display(Artist);
 
     /// <summary>Formatted total duration. Under a minute shows seconds ("24 sec"), not "0 min".</summary>
-    public string TotalDurationFormatted =>
-        TotalDuration.TotalHours >= 1
-            ? $"{(int)TotalDuration.TotalHours}h {TotalDuration.Minutes}m"
-            : TotalDuration.TotalMinutes < 1 && TotalDuration > TimeSpan.Zero
-                ? $"{Math.Max(1, (int)TotalDuration.TotalSeconds)} sec"
-                : $"{(int)TotalDuration.TotalMinutes} min";
+    public string TotalDurationFormatted => Noctis.Helpers.DurationText.Total(TotalDuration);
 
     public const string MixedQualityBadge = "Mixed";
     public const string MixedQualityDescription =

@@ -291,6 +291,8 @@ public partial class MainWindow : Window, IPageKeyOverlayHost
 
         InitializeComponent();
         Services.StartupTrace.Mark("mainwindow-xaml-initialized");
+        // The in-app word timing sheet's Done (the panel lives in a template, so its event bubbles up to here).
+        AddHandler(WordLyricsPanel.CloseRequestedEvent, OnWordTimingPanelCloseRequested);
 
         // Windows 10: Avalonia leaves the native caption white under the dark theme.
         // The handle exists from construction, so this lands before the first paint.
@@ -2739,5 +2741,16 @@ public partial class MainWindow : Window, IPageKeyOverlayHost
     private void OnSettingsCardTapped(object? sender, TappedEventArgs e)
     {
         e.Handled = true;
+    }
+
+    private void OnWordTimingBackdropPressed(object? sender, Avalonia.Input.PointerPressedEventArgs e)
+    {
+        if (DataContext is ViewModels.MainWindowViewModel vm) vm.CloseWordTimingSheetCommand.Execute(null);
+        e.Handled = true;
+    }
+
+    private void OnWordTimingPanelCloseRequested(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
+    {
+        if (DataContext is ViewModels.MainWindowViewModel vm) vm.CloseWordTimingSheetCommand.Execute(null);
     }
 }
