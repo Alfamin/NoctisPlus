@@ -29,7 +29,8 @@ public class OnlinePlaybackTests
         public event EventHandler? DownloadsChanged { add { } remove { } }
         public Task<string> DownloadAsync(IReadOnlyList<OnlineSong> songs, bool now, CancellationToken ct) => throw new NotSupportedException();
         public IDownloadQueue Downloads { get; } = new EmptyQueue();
-        public void OpenArtist(OnlineArtist artist) { }
+        internal OnlineArtist? Opened;
+        public void OpenArtist(OnlineArtist artist) => Opened = artist;
         public Task OpenAlbumAsync(OnlineAlbum album, CancellationToken ct) => Task.CompletedTask;
     }
     private sealed class EmptyQueue : IDownloadQueue
@@ -45,6 +46,29 @@ public class OnlinePlaybackTests
         public void Remove(DownloadEntry entry) { }
     }
     private static Track Track(string title) => new() { Title = title, Artist = "Synthetic", Duration = TimeSpan.FromMinutes(3), FilePath = title + ".flac", IsExternal = true };
+
+    [AvaloniaFact]
+    public void LibraryArtistAlsoFoundOnline_OpensWithItsExactOnlineIdentity()
+    {
+        // Owner, 2026-10-18: with one J. Cole song owned, his page showed only that song (opened by name, it had to
+        // guess between two Deezer "J. Cole" accounts).
+        var previous = OnlineMusicSearch.Current; var source = new Source();
+        using var data = new TestPersistenceService(); var library = new FakeLibraryService();
+        var player = new PlayerViewModel(new FakeAudioPlayer(), library, data, new FakeAnimatedCoverService());
+        OnlineMusicSearch.Current = source; string? byName = null;
+        using var search = new SearchViewModel(library, player, name => byName = name, _ => { });
+        try
+        {
+            Dispatcher.UIThread.RunJobs();
+            var merged = new SearchArtistItem(new Artist { Name = "J. Cole" });
+            merged.AttachOnline(new OnlineArtist("deezer:339209", "J. Cole"));
+            search.OpenArtistCommand.Execute(merged);
+            Assert.Equal("deezer:339209", source.Opened?.Id); Assert.Null(byName);
+            search.OpenArtistCommand.Execute(new SearchArtistItem(new Artist { Name = "Only Local" }));
+            Assert.Equal("Only Local", byName);
+        }
+        finally { search.Dispose(); OnlineMusicSearch.Current = previous; }
+    }
 
     [AvaloniaFact]
     public async Task SearchTypedBeforeSourceStartupGetsOnlineResults_AndDisablingSourceRemovesThem()

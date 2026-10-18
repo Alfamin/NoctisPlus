@@ -561,8 +561,11 @@ public sealed partial class SearchViewModel : ViewModelBase, ISearchable, IDispo
     private void OpenArtist(SearchArtistItem? item)
     {
         if (item is null) return;
-        if (item.Local is not null) _openArtist(item.Local.Name);
-        else if (item.Online is { } online && _source is { } source) source.OpenArtist(online);
+        // A library artist that Search also found online opens the same page WITH that exact online identity
+        // (still checked against the library's albums for namesakes). By name alone the page had to guess, and with
+        // two "J. Cole" accounts it could end up showing only the one owned song (owner, 2026-10-18).
+        if (item.Online is { } online && _source is { } source) source.OpenArtist(online);
+        else if (item.Local is not null) _openArtist(item.Local.Name);
     }
 
     [RelayCommand]

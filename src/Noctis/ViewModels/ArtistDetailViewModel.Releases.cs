@@ -27,9 +27,11 @@ public partial class ArtistDetailViewModel
     private CancellationTokenSource? _releasesStop;
 
     /// <summary>A line under the header while the catalog loads or when it could not; empty when all is well.</summary>
-    [ObservableProperty, NotifyPropertyChangedFor(nameof(HasCatalogStatus))]
+    [ObservableProperty, NotifyPropertyChangedFor(nameof(HasCatalogStatus)), NotifyPropertyChangedFor(nameof(IsCatalogLoading))]
     private string _catalogStatus = "";
     public bool HasCatalogStatus => CatalogStatus.Length > 0;
+    /// <summary>Shows the spinner beside "Loading releases…" (owner, 2026-10-18: the text alone was too easy to miss).</summary>
+    public bool IsCatalogLoading => CatalogStatus.StartsWith("Loading", StringComparison.Ordinal);
 
     /// <summary>The catalog could not be read: the status line offers Retry.</summary>
     [ObservableProperty] private bool _catalogFailed;

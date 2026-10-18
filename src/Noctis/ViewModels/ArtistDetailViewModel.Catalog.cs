@@ -24,9 +24,10 @@ public partial class ArtistDetailViewModel
     public int DisplaySongCount => HasCatalogSongs ? _catalogRows.Count : SongCount;
     public bool ShowNoPopular => HasCatalogSongs ? CatalogPopular.Count == 0 : !HasPopular;
     public bool ShowNoAllSongs => HasCatalogSongs ? CatalogSongs.Count == 0 : !HasAllSongs;
-    [ObservableProperty, NotifyPropertyChangedFor(nameof(HasCatalogSongStatus))]
+    [ObservableProperty, NotifyPropertyChangedFor(nameof(HasCatalogSongStatus)), NotifyPropertyChangedFor(nameof(IsCatalogSongsLoading))]
     private string _catalogSongStatus = "";
     public bool HasCatalogSongStatus => CatalogSongStatus.Length > 0;
+    public bool IsCatalogSongsLoading => CatalogSongStatus.StartsWith("Loading", StringComparison.Ordinal);
 
     internal void SetCatalogArtist(ArtistCatalog catalog, CatalogArtist artist, bool refresh = false)
     {
