@@ -1022,6 +1022,36 @@
             </ItemsControl.ItemTemplate>
         </ItemsControl>
 
+        <!-- Owner #34: an online album opens at once; these rows breathe until its songs arrive. -->
+        <StackPanel IsVisible="{Binding IsCatalogLoading}" Spacing="0" Margin="0,4,0,0">
+            <StackPanel.Styles>
+                <Style Selector="Border.row-skeleton">
+                    <Setter Property="Background" Value="{DynamicResource SystemControlForegroundBaseHighBrush}" />
+                    <Setter Property="CornerRadius" Value="4" />
+                    <Style.Animations>
+                        <Animation Duration="0:0:1.1" IterationCount="Infinite" PlaybackDirection="Alternate" Easing="SineEaseInOut">
+                            <KeyFrame Cue="0%"><Setter Property="Opacity" Value="0.05" /></KeyFrame>
+                            <KeyFrame Cue="100%"><Setter Property="Opacity" Value="0.12" /></KeyFrame>
+                        </Animation>
+                    </Style.Animations>
+                </Style>
+            </StackPanel.Styles>
+            <ItemsControl ItemsSource="{Binding CatalogSkeletonRows}">
+                <ItemsControl.ItemTemplate>
+                    <DataTemplate x:DataType="x:Double">
+                        <Grid Height="56" ColumnDefinitions="32,*,Auto">
+                            <Border Classes="row-skeleton" Width="14" Height="12" HorizontalAlignment="Left" VerticalAlignment="Center" />
+                            <StackPanel Grid.Column="1" Spacing="7" VerticalAlignment="Center">
+                                <Border Classes="row-skeleton" Width="{Binding}" Height="12" HorizontalAlignment="Left" />
+                                <Border Classes="row-skeleton" Width="96" Height="10" HorizontalAlignment="Left" />
+                            </StackPanel>
+                            <Border Grid.Column="2" Classes="row-skeleton" Width="34" Height="12" VerticalAlignment="Center" Margin="0,0,12,0" />
+                        </Grid>
+                    </DataTemplate>
+                </ItemsControl.ItemTemplate>
+            </ItemsControl>
+        </StackPanel>
+
         <!-- Noctis Plus, online album: the songs the library lacks, in the track rows' shape
              (number · title and artist · duration), a download button where the menu sits. -->
         <StackPanel IsVisible="{Binding HasCatalogMissing}" Margin="0,0,0,0">

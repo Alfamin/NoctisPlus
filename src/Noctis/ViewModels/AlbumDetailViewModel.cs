@@ -416,7 +416,7 @@ public partial class AlbumDetailViewModel : ViewModelBase, IDisposable
     private void RefreshFromLibrary()
     {
         // An online album is not in the library by design: follow which songs are owned now.
-        if (IsOnlineAlbum) { RefreshCatalogOwnership(); return; }
+        if (IsOnlineAlbum || IsCatalogLoading) { RefreshCatalogOwnership(); return; }
 
         // Try to find album by current ID first
         var updatedAlbum = _library.Albums.FirstOrDefault(a => a.Id == Album.Id);

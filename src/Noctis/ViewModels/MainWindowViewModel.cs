@@ -529,21 +529,40 @@ public partial class MainWindowViewModel : ViewModelBase
             OpenArtistDiscography(artist.Name);
             if (CurrentView is ArtistDetailViewModel page) page.UseCatalogIdentity(artist);
         });
+        static Album CatalogAlbum(FreeMusicFinder.CatalogRelease release, IReadOnlyList<FreeMusicFinder.CatalogSong>? songs) => new()
+        {
+            Id = new Guid(System.Security.Cryptography.SHA256.HashData(System.Text.Encoding.UTF8.GetBytes("FreeMusicFinder/catalog/" + release.Id)).AsSpan(0, 16)),
+            Name = release.Title,
+            Artist = release.Artist.Name,
+            Year = int.TryParse(release.Date.Split('-')[0], out var year) ? year : 0,
+            TrackCount = songs?.Count ?? Math.Max(0, release.Count),
+            TotalDuration = TimeSpan.FromSeconds(songs?.Sum(s => s.Seconds ?? 0) ?? 0),
+            CatalogReleaseId = release.Id,
+            Genre = "",
+        };
+        // Owner #34: the album page opens on the click (skeleton rows) and fills when its songs arrive.
+        // A page left while it loaded is filled where it stands (Back finds it ready), never reopened.
+        var catalogOpening = new Dictionary<string, AlbumDetailViewModel?>();
+        FreeMusicFinder.CatalogPages.AlbumOpening += release => Dispatcher.UIThread.Post(() =>
+        {
+            OpenAlbumDetail(CatalogAlbum(release, null));
+            var page = CurrentView as AlbumDetailViewModel;
+            page?.ShowCatalogLoading(release);
+            catalogOpening[release.Id] = page;
+        });
+        FreeMusicFinder.CatalogPages.AlbumOpenFailed += (release, message) => Dispatcher.UIThread.Post(() =>
+        {
+            if (catalogOpening.Remove(release.Id, out var page) && page?.IsCatalogLoadingFor(release.Id) == true) page.ShowCatalogFailed(message);
+        });
         FreeMusicFinder.CatalogPages.AlbumRequested += open => Dispatcher.UIThread.Post(() =>
         {
             var release = open.Album.Release;
-            var album = new Album
+            if (catalogOpening.Remove(release.Id, out var loading))
             {
-                Id = new Guid(System.Security.Cryptography.SHA256.HashData(System.Text.Encoding.UTF8.GetBytes("FreeMusicFinder/catalog/" + release.Id)).AsSpan(0, 16)),
-                Name = release.Title,
-                Artist = release.Artist.Name,
-                Year = int.TryParse(release.Date.Split('-')[0], out var year) ? year : 0,
-                TrackCount = open.Album.Songs.Count,
-                TotalDuration = TimeSpan.FromSeconds(open.Album.Songs.Sum(s => s.Seconds ?? 0)),
-                CatalogReleaseId = release.Id,
-                Genre = "",
-            };
-            OpenAlbumDetail(album);
+                if (loading?.IsCatalogLoadingFor(release.Id) == true) loading.ShowCatalog(open);
+                return;
+            }
+            OpenAlbumDetail(CatalogAlbum(release, open.Album.Songs));
             if (CurrentView is AlbumDetailViewModel detail) detail.ShowCatalog(open);
         });
         _albumsVm = new LibraryAlbumsViewModel(library, Player, Sidebar, Settings);

@@ -397,10 +397,12 @@ public class Album : ObservableObject
     }
 
     /// <summary>"12 tracks" / "1 track" for the album header's facts line.</summary>
-    public string TrackCountText => TrackCount == 1 ? "1 track" : $"{TrackCount} tracks";
+    // Empty while an online album's songs are still being read (never "0 tracks").
+    public string TrackCountText => TrackCount <= 0 ? "" : TrackCount == 1 ? "1 track" : $"{TrackCount} tracks";
 
     /// <summary>Header duration with seconds ("55m 51s"), hours when long ("1h 12m").</summary>
     public string HeaderDurationFormatted =>
+        TrackCount <= 0 && TotalDuration <= TimeSpan.Zero ? "" :
         TotalDuration.TotalHours >= 1
             ? $"{(int)TotalDuration.TotalHours}h {TotalDuration.Minutes}m"
             : $"{(int)TotalDuration.TotalMinutes}m {TotalDuration.Seconds:00}s";

@@ -36,7 +36,29 @@ public partial class AlbumDetailViewModel
     public bool ShowCatalogMissingHeader => HasCatalogMissing && Tracks.Count > 0;
 
     /// <summary>Play, Shuffle and Add to Queue need local songs: an online album with none hides them.</summary>
-    public bool ShowPlayActions => !IsOnlineAlbum || Tracks.Count > 0;
+    public bool ShowPlayActions => !IsOnlineAlbum && !IsCatalogLoading || Tracks.Count > 0;
+
+    // Owner #34: an online album's page opens at once; skeleton rows stand in until its songs are read.
+    private CatalogRelease? _catalogLoading;
+    public bool IsCatalogLoading => _catalogLoading is not null;
+    internal bool IsCatalogLoadingFor(string releaseId) => _catalogLoading?.Id == releaseId;
+    /// <summary>Title-bar widths of the skeleton rows (varied, like real titles).</summary>
+    public IReadOnlyList<double> CatalogSkeletonRows { get; } = [210, 160, 240, 180, 220, 150];
+
+    internal void ShowCatalogLoading(CatalogRelease release)
+    {
+        _catalogLoading = release;
+        OnPropertyChanged(nameof(IsCatalogLoading));
+        OnPropertyChanged(nameof(ShowPlayActions));
+        _ = LoadCatalogCoverAsync(release);
+    }
+
+    internal void ShowCatalogFailed(string message)
+    {
+        _catalogLoading = null;
+        OnPropertyChanged(nameof(IsCatalogLoading));
+        CatalogNotice = message;
+    }
 
     /// <summary>A quiet line (partial catalog answer, a download message).</summary>
     [ObservableProperty, NotifyPropertyChangedFor(nameof(HasCatalogNotice))] private string _catalogNotice = "";
@@ -86,6 +108,15 @@ public partial class AlbumDetailViewModel
     internal void ShowCatalog(CatalogAlbumOpen open)
     {
         _catalog = open;
+        var wasLoading = _catalogLoading?.Id == open.Album.Release.Id;
+        _catalogLoading = null;
+        OnPropertyChanged(nameof(IsCatalogLoading));
+        if (wasLoading)
+        {
+            Album.TrackCount = open.Album.Songs.Count;
+            Album.TotalDuration = TimeSpan.FromSeconds(open.Album.Songs.Sum(s => s.Seconds ?? 0));
+            OnPropertyChanged(nameof(Album)); // the header's facts read these plain values
+        }
         if (Services.Search.OnlineMusicSearch.Current is { } online && !ReferenceEquals(online, _catalogOnline))
         {
             if (_catalogOnline is not null) _catalogOnline.DownloadsChanged -= CatalogDownloadsChanged;
@@ -98,7 +129,7 @@ public partial class AlbumDetailViewModel
         OnPropertyChanged(nameof(IsCatalogAlbum));
         OnPropertyChanged(nameof(IsOnlineAlbum));
         // A library album keeps its own cover.
-        if (!_catalogEnriches) _ = LoadCatalogCoverAsync(open.Album.Release);
+        if (!_catalogEnriches && !wasLoading) _ = LoadCatalogCoverAsync(open.Album.Release);
     }
 
     /// <summary>Which album songs the library has right now (after a download lands, a scan).
@@ -148,7 +179,7 @@ public partial class AlbumDetailViewModel
         {
             await pages.Catalog.ProgressiveArtworkAsync(release.Artwork, path => Dispatcher.UIThread.InvokeAsync(() =>
             {
-                if (_catalog?.Album.Release == release && File.Exists(path)) { Album.ArtworkPath = path; HeaderArtPath = path; }
+                if ((_catalog?.Album.Release.Id ?? _catalogLoading?.Id) == release.Id && File.Exists(path)) { Album.ArtworkPath = path; HeaderArtPath = path; }
             }).GetTask(), CancellationToken.None);
         }
         catch (Exception ex) when (ex is OperationCanceledException or HttpRequestException or IOException or TimeoutException or InvalidDataException) { }
@@ -193,6 +224,7 @@ public partial class AlbumDetailViewModel
 
     private void DisposeCatalog()
     {
+        _catalogLoading = null; // a closed page is never filled later
         _enrichStop?.Cancel();
         if (_catalogOnline is not null) _catalogOnline.DownloadsChanged -= CatalogDownloadsChanged;
         _catalogOnline = null;

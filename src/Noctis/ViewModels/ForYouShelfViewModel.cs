@@ -206,14 +206,23 @@ public sealed partial class ForYouShelfViewModel : ObservableObject, IDisposable
         }
         catch (Exception ex) { if (!_disposed && generation == _playGeneration) Status = ex.Message; }
     }
-    [RelayCommand] private async Task OpenPick(ForYouPick? pick)
+    // Owner #34: one shared command that refused new runs while an album loaded greyed out every card
+    // at once. Clicks run side by side; the newest one wins and cancels the album still loading.
+    private CancellationTokenSource? _openStop;
+    private string? _openingAlbum;
+    [RelayCommand(AllowConcurrentExecutions = true)] private async Task OpenPick(ForYouPick? pick)
     {
         if (pick is null || _online is not { } online) return;
         if (pick.Pick.Track.Album is { } album)
         {
-            try { await online.OpenAlbumAsync(new(album.Id, album.Title, album.Artist.Name), CancellationToken.None); }
+            if (_openStop is not null && _openingAlbum == album.Id) return; // already opening: its page is up
+            _openStop?.Cancel();
+            var stop = _openStop = new CancellationTokenSource();
+            _openingAlbum = album.Id;
+            try { await online.OpenAlbumAsync(new(album.Id, album.Title, album.Artist.Name), stop.Token); }
             catch (OperationCanceledException) { }
-            catch (Exception ex) { Status = ex.Message; }
+            catch (Exception ex) { if (ReferenceEquals(_openStop, stop)) Status = ex.Message; }
+            finally { if (ReferenceEquals(_openStop, stop)) _openStop = null; stop.Dispose(); }
         }
         else OnlineMusicSearch.RequestOpen(pick.Song.Title + " " + pick.Song.ArtistDisplay);
     }

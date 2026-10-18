@@ -32,6 +32,12 @@ internal sealed class CatalogPages : IDisposable
     /// <summary>An online album should open on the app's album page.</summary>
     internal static event Action<CatalogAlbumOpen>? AlbumRequested;
 
+    /// <summary>An online album was clicked: its page can open now, before its songs are read.</summary>
+    internal static event Action<CatalogRelease>? AlbumOpening;
+
+    /// <summary>Reading the album failed (empty message: cancelled by a newer click).</summary>
+    internal static event Action<CatalogRelease, string>? AlbumOpenFailed;
+
     public CatalogPages(Func<ArtistCatalog> catalog, DiscoveryActions actions, Action<string> log, Func<bool> enabled,
         Func<ILibraryService?>? library = null, string? choicesPath = null)
     {
@@ -115,10 +121,20 @@ internal sealed class CatalogPages : IDisposable
     public async Task OpenAlbumAsync(CatalogRelease release, CancellationToken ct)
     {
         if (!_enabled()) throw new InvalidOperationException("Turn on the online catalog on artist pages (Free Music Finder settings) to open online albums.");
-        var album = await _catalog().AlbumAsync(release, false, ct);
-        var matches = await Actions.MatchAsync(album.Value.Songs, ct);
-        ct.ThrowIfCancellationRequested();
-        AlbumRequested?.Invoke(new(album.Value, matches));
+        // Owner #34: the page opens at once (skeleton rows) and fills when the songs arrive.
+        AlbumOpening?.Invoke(release);
+        try
+        {
+            var album = await _catalog().AlbumAsync(release, false, ct);
+            var matches = await Actions.MatchAsync(album.Value.Songs, ct);
+            ct.ThrowIfCancellationRequested();
+            AlbumRequested?.Invoke(new(album.Value, matches));
+        }
+        catch (Exception ex)
+        {
+            AlbumOpenFailed?.Invoke(release, ex is OperationCanceledException ? "" : ex.Message);
+            throw;
+        }
     }
 
     /// <summary>The library album a catalog release stands for (same title edition, same artist), if any.</summary>
