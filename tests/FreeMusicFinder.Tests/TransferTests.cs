@@ -163,6 +163,15 @@ internal static class TransferTests
         Check.False(RecordingMatch.Fits(new("Night Drive - Remix","Singer",200),"Singer","Night Drive",s(200)),"a remix written Spotify's way is still not the original");
         Check.False(RecordingMatch.Fits(new("Night Drive (with Guest)","Singer",200),"Singer","Night Drive Home",s(200)),"another title stays another song");
         Check.False(RecordingMatch.Fits(new("Dancing with a Stranger","Singer",200),"Singer","Dancing",s(200)),"\"with\" inside a title is part of the title");
+        // Owner #30: Apple times this master 3:51.2, Deezer and both bots 3:47; every right result was refused.
+        var hold=new MusicRequest("Hold On, We're Going Home (feat. Majid Jordan)","Drake",231.193);
+        Check.True(RecordingMatch.Fits(hold,"Drake","Hold On, We're Going Home",s(227)),"one master timed 4 s apart by two catalogs");
+        Check.True(RecordingMatch.Fits(hold,"Drake","Hold On, We're Going Home (Album Version)",s(227)),"with a label-only addition");
+        Check.True(RecordingMatch.Fits(hold,"Drake, Majid Jordan","Hold On, We're Going Home",s(227)),"with the guest in the artist");
+        Check.False(RecordingMatch.Fits(hold,"Drake","Hold On, We're Going Home (Radio Edit)",s(227)),"an edit past 3 s is another cut");
+        Check.False(RecordingMatch.Fits(hold,"Drake","Hold On, We're Going Home - Pt. 2",s(227)),"another addition past 3 s stays another recording");
+        Check.False(RecordingMatch.Fits(hold,"Drake","Hold On, We're Going Home",s(224)),"7 s apart is past the 6 s limit");
+        Check.False(RecordingMatch.Fits(new("Night Drive","Singer",120),"Singer","Night Drive",s(124)),"short songs keep the 3 s limit (2 % of 2:00)");
         var local=PlaylistCatalog.ParseLocal("spotify:local:::Juice+WRLD+-+Unreleased+Song:248",["Juice WRLD"]);
         Check.Equal("Juice WRLD",local!.Artist,"local-file artist/title delimiter is read from metadata");
         Check.Equal("Unreleased Song",local.Title,"local title preserved");

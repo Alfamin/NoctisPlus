@@ -70,20 +70,33 @@ internal static class RecordingMatch
         static string Versions(string name)=>Regex.Replace(name,@"\(with instrumental by[^)]*\)","",RegexOptions.IgnoreCase);
         foreach (var version in new[]{"live","remix","instrumental","acoustic","cover","sped up","slowed"})
             if (Regex.IsMatch(Versions(wanted.Title), @"\b"+version+@"\b",RegexOptions.IgnoreCase) != Regex.IsMatch(Versions(title),@"\b"+version+@"\b",RegexOptions.IgnoreCase)) return false;
-        if (wanted.Duration is {} length && duration is {} other && Math.Abs((length-other).TotalSeconds)>3) return false;
+        // Catalogs time one master differently: Apple lists Drake's "Hold On, We're Going Home" at 3:51.2, Deezer
+        // (where the bots' files come from) at 3:47. Past 3 s only the same title, or one that adds just a label
+        // ("Album Version"), counts; never more than 2 % of the song or 6 s.
+        var off=wanted.Duration is {} length && duration is {} other ? Math.Abs((length-other).TotalSeconds) : 0;
+        if (off>3 && off>Math.Min(6,wanted.Duration!.Value.TotalSeconds*0.02)) return false;
+        var close=off<=3;
         // Several artists are written "A, B", "A & B", "A feat. B"; tags also join them as "A; B" and "A/B".
         static IEnumerable<string> ArtistKeys(string value)=>Regex.Split(value,@"\s*(?:,|&|;|/|\bfeat\.?|\bft\.?|\bfeaturing\b)\s*",RegexOptions.IgnoreCase).Select(Key).Where(k=>k.Length>0);
         var a=Key(wanted.Artist); var b=Key(artist);
         if(a.Length==0 || b.Length==0 || !(a==b || ArtistKeys(wanted.Artist).Intersect(ArtistKeys(artist)).Any())) return false;
         var lengths=wanted.Duration is not null && duration is not null;
-        if(Key(wanted.Title)==Key(title) || lengths && Key(BotText.Plain(wanted.Title))==Key(BotText.Plain(title))) return true;
+        if(Key(wanted.Title)==Key(title)) return true;
         // The same title written another way.
         var (name,extras)=Title(wanted.Title); var (otherName,otherExtras)=Title(title);
+        if(lengths && Key(BotText.Plain(wanted.Title))==Key(BotText.Plain(title)) && (close || LabelsOnly(extras,otherExtras))) return true;
         if(name!=otherName) return false;
         if(extras.SetEquals(otherExtras)) return true;
         // One names an addition the other leaves out ("- Remastered 2011", "(Bonus)"): the same recording when the
         // lengths say so. Two different additions ("- Pt. 1", "- Pt. 2") are two recordings.
-        return lengths && (extras.IsSubsetOf(otherExtras) || otherExtras.IsSubsetOf(extras));
+        return lengths && (extras.IsSubsetOf(otherExtras) || otherExtras.IsSubsetOf(extras)) && (close || LabelsOnly(extras,otherExtras));
+    }
+
+    // Additions that name the release, not another cut of the song ("Album Version", "Remastered 2011", "Explicit").
+    private static bool LabelsOnly(HashSet<string> one,HashSet<string> other)
+    {
+        var differ=new HashSet<string>(one,StringComparer.Ordinal); differ.SymmetricExceptWith(other);
+        return differ.All(e=>Regex.IsMatch(e,@"^(?:albumversion|explicit(?:version)?|originalversion|(?:\d{4})?(?:digital)?remaster(?:ed)?(?:\d{4})?(?:version)?)$"));
     }
 
     /// <summary>The key playlist entries and library songs are looked up by: the title without its additions and credits.</summary>
