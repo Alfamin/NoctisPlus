@@ -43,6 +43,32 @@ public class HomeViewMountTests
     };
 
     [AvaloniaFact]
+    public async Task FirstImportedSongs_WithNoHistory_ShowAUsefulStartInsteadOfBlankHome()
+    {
+        EnsureAppStyles();
+        var library = new FakeLibraryService();
+        library.TrackList.Add(T("First song", "Synthetic", 0));
+        using var persistence = new TestPersistenceService();
+        var player = new PlayerViewModel(new FakeAudioPlayer(), library, persistence, new FakeAnimatedCoverService());
+        using var vm = new HomeViewModel(player, library, new SidebarViewModel(persistence, library));
+        await vm.RefreshAsync();
+        Assert.False(vm.IsLibraryEmpty);
+        Assert.True(vm.ShowWelcome);
+        var view = new HomeView { DataContext = vm };
+        var window = new Window { Content = view, Width = 1280, Height = 900 };
+        try
+        {
+            window.Show(); Dispatcher.UIThread.RunJobs(); window.UpdateLayout();
+            Assert.Contains(view.GetVisualDescendants().OfType<TextBlock>(), t => t.IsEffectivelyVisible && t.Text == "Your music is ready");
+            Assert.Contains(view.GetVisualDescendants().OfType<Button>(), b => b.IsEffectivelyVisible && ReferenceEquals(b.Command, vm.WelcomeActionCommand));
+            player.PlayFromRow(library.TrackList, 0);
+            Dispatcher.UIThread.RunJobs();
+            Assert.False(vm.ShowWelcome); // Never cover Continue listening while playback starts.
+        }
+        finally { window.Close(); }
+    }
+
+    [AvaloniaFact]
     public async Task HomePage_MountsHeroAndSideBySideCharts()
     {
         EnsureAppStyles();

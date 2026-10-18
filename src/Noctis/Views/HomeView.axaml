@@ -1051,20 +1051,21 @@
 
         <!-- Fresh install, no songs: Home was a blank page. Owner 10-18: the good features must be
              easy to spot, with minimal text — the logo, a title, one line, and the three ways in. -->
-        <StackPanel IsVisible="{Binding IsLibraryEmpty}" HorizontalAlignment="Center" VerticalAlignment="Center"
+        <StackPanel IsVisible="{Binding ShowWelcome}" HorizontalAlignment="Center" VerticalAlignment="Center"
                     Spacing="8" Margin="0,0,0,60">
             <Image Source="avares://Noctis.UI/Assets/Icons/Noctis%20Logo%20256.png" Width="64" Height="64"
                    Stretch="Uniform" RenderOptions.BitmapInterpolationMode="HighQuality" HorizontalAlignment="Center" />
-            <TextBlock Text="{loc:T Home.WelcomeTitle}" FontSize="22" FontWeight="Bold" Margin="0,10,0,0"
+            <TextBlock Text="{Binding WelcomeTitle}" FontSize="22" FontWeight="Bold" Margin="0,10,0,0"
                        HorizontalAlignment="Center" TextAlignment="Center" />
-            <TextBlock Text="{loc:T Home.WelcomeLine}" FontSize="13" Opacity="0.55" MaxWidth="420" TextWrapping="Wrap"
+            <TextBlock Text="{Binding WelcomeLine}" FontSize="13" Opacity="0.55" MaxWidth="420" TextWrapping="Wrap"
                        HorizontalAlignment="Center" TextAlignment="Center" />
             <WrapPanel Orientation="Horizontal" HorizontalAlignment="Center" Margin="0,12,0,0" ItemSpacing="10" LineSpacing="10">
                 <Button Classes="pill-primary" MinHeight="36" Padding="18,0" FontSize="13" FontWeight="SemiBold"
-                        Command="{Binding FindMusicCommand}" AutomationProperties.Name="{loc:T Home.FindMusic}">
+                        Command="{Binding WelcomeActionCommand}" AutomationProperties.Name="{Binding WelcomeActionText}">
                     <StackPanel Orientation="Horizontal" Spacing="8">
-                        <controls:LineIcon Data="{DynamicResource MenuLineSearch}" Width="15" Height="15" VerticalAlignment="Center" />
-                        <TextBlock Text="{loc:T Home.FindMusic}" VerticalAlignment="Center" />
+                        <controls:LineIcon Data="{DynamicResource MenuLineSearch}" Width="15" Height="15" VerticalAlignment="Center" IsVisible="{Binding IsLibraryEmpty}" />
+                        <PathIcon Data="{StaticResource PlayIcon}" Width="15" Height="15" VerticalAlignment="Center" IsVisible="{Binding !IsLibraryEmpty}" />
+                        <TextBlock Text="{Binding WelcomeActionText}" VerticalAlignment="Center" />
                     </StackPanel>
                 </Button>
                 <Button Classes="pill-secondary" MinHeight="36" Padding="18,0" FontSize="13" FontWeight="SemiBold"

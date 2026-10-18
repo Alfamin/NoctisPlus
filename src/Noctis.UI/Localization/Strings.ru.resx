@@ -2717,4 +2717,6 @@
   <data name="Lyrics.TimingPaused" xml:space="preserve"><value>Lyrics paused</value></data>
   <data name="Lyrics.TimingRetry" xml:space="preserve"><value>Retry scheduled</value></data>
   <data name="Lyrics.TimingSetup" xml:space="preserve"><value>Setup needed</value></data>
+  <data name="Home.ReadyTitle" xml:space="preserve"><value>Your music is ready</value></data>
+  <data name="Home.ReadyLine" xml:space="preserve"><value>Play a song to get started</value></data>
 </root>

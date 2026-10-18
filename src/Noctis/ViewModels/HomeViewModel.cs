@@ -86,7 +86,7 @@ public partial class HomeViewModel : ViewModelBase, IDisposable
     // what Resume acts on; otherwise the newest history entry.
     private const int MaxRecentAlbums = 6;
 
-    [ObservableProperty] private Track? _continueTrack;
+    [ObservableProperty, NotifyPropertyChangedFor(nameof(ShowWelcome))] private Track? _continueTrack;
     [ObservableProperty] private Album? _continueAlbum;
     /// <summary>" · Album · Year" after the accent-coloured artist name ("" when neither is known).</summary>
     [ObservableProperty] private string _continueDetail = string.Empty;
@@ -218,13 +218,25 @@ public partial class HomeViewModel : ViewModelBase, IDisposable
     public event EventHandler<Album>? AlbumOpened;
 
     /// <summary>No songs at all (fresh install): Home shows the welcome card instead of a blank page.</summary>
-    [ObservableProperty] private bool _isLibraryEmpty;
+    [ObservableProperty, NotifyPropertyChangedFor(nameof(ShowWelcome), nameof(WelcomeTitle), nameof(WelcomeLine), nameof(WelcomeActionText))]
+    private bool _isLibraryEmpty;
+    [ObservableProperty, NotifyPropertyChangedFor(nameof(ShowWelcome))] private bool _isLibraryUnplayed;
+    public bool ShowWelcome => IsLibraryEmpty || IsLibraryUnplayed && ContinueTrack is null;
+    public string WelcomeTitle => Loc.T(IsLibraryEmpty ? "Home.WelcomeTitle" : "Home.ReadyTitle");
+    public string WelcomeLine => Loc.T(IsLibraryEmpty ? "Home.WelcomeLine" : "Home.ReadyLine");
+    public string WelcomeActionText => Loc.T(IsLibraryEmpty ? "Home.FindMusic" : "Home.PlayTip");
 
     /// <summary>Set by the main window: the welcome card's Find music (Search page) and Import playlists.</summary>
     internal Action? OpenSearch { get; set; }
     internal Action? ImportPlaylists { get; set; }
 
     [RelayCommand] private void FindMusic() => OpenSearch?.Invoke();
+    [RelayCommand] private void WelcomeAction()
+    {
+        if (IsLibraryEmpty) { FindMusic(); return; }
+        var songs = _library.Tracks.ToList();
+        if (songs.Count > 0) _player.PlayFromRow(songs, 0);
+    }
     [RelayCommand] private void ImportPlaylistsFromHome() => ImportPlaylists?.Invoke();
 
     /// <summary>The welcome card's Add music folder, after the view's folder picker.</summary>
@@ -486,6 +498,7 @@ public partial class HomeViewModel : ViewModelBase, IDisposable
             // plays to its end, and the shutdown snapshot then saves an empty history,
             // so both rows came back with only the current track after a restart.
             var history = RecentHistoryNewestFirst();
+            IsLibraryUnplayed = allTracks.Count > 0 && history.Count == 0 && allTracks.All(t => t.PlayCount == 0);
             // O(1) lookups via GetAlbumById
             var recentAlbums = history
                 .Take(50)
