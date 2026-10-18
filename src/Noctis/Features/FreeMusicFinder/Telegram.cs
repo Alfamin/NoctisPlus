@@ -50,6 +50,7 @@ internal sealed class TelegramAccount : ITelegramSignIn, IDisposable
         await _gate.WaitAsync(ct).ConfigureAwait(false);
         try
         {
+            ObjectDisposedException.ThrowIf(_disposed, this);
             if (!IsLoggedIn) throw new InvalidOperationException("Not logged in to Telegram.");
             // A connection made through another proxy than the one now set is of no use any more.
             if (_client is not null && (_client.Disconnected || _clientProxy != _proxy()))
@@ -71,6 +72,9 @@ internal sealed class TelegramAccount : ITelegramSignIn, IDisposable
                     client.Dispose();
                     throw;
                 }
+                // Switched off while connecting: this connection must not outlive the account. A new account on the
+                // same login file would otherwise run beside it, and Telegram can end a login used twice at once.
+                if (_disposed) { client.Dispose(); throw new ObjectDisposedException(nameof(TelegramAccount)); }
                 _client = client;
             }
             return _client;
@@ -92,6 +96,8 @@ internal sealed class TelegramAccount : ITelegramSignIn, IDisposable
     // A menu Noctis could not follow is not asked again for each song; it is retried after a day, after a
     // preference change or when the bot's audio shows its setting moved.
     private static readonly TimeSpan ProblemRetry = TimeSpan.FromDays(1);
+    // A bot that did not answer at all is tried again sooner: it is usually back within minutes.
+    private static readonly TimeSpan SilentRetry = TimeSpan.FromMinutes(10);
 
     private Dictionary<string, BotQualityState> ReadQualities()
     {
@@ -137,18 +143,26 @@ internal sealed class TelegramAccount : ITelegramSignIn, IDisposable
             if (known is not null && known.Quality == quality.ToString())
             {
                 if (known.Problem is null) return false;
-                if (DateTimeOffset.UtcNow - known.At < ProblemRetry) throw new BotAnswerException(known.Problem);
+                var silent = known.Problem.StartsWith("BOT_QUALITY_TIMEOUT", StringComparison.Ordinal);
+                if (DateTimeOffset.UtcNow - known.At < (silent ? SilentRetry : ProblemRetry))
+                    throw silent ? new TimeoutException(known.Problem) : new BotAnswerException(known.Problem);
             }
             var client = await ConnectAsync(ct).ConfigureAwait(false);
-            var user = await BotAsync(client, username).ConfigureAwait(false);
-            await StartBotAsync(client, user, username, ct).ConfigureAwait(false);
-            BotQualityState result; bool changed = false; BotAnswerException? problem = null;
+            BotQualityState result; bool changed = false; Exception? problem = null;
             try
             {
+                var user = await BotAsync(client, username).ConfigureAwait(false);
+                await StartBotAsync(client, user, username, ct).ConfigureAwait(false);
                 changed = await BotQuality.ApplyAsync(provider, new TelegramQualityConversation(client, user, provider), quality, ct).ConfigureAwait(false);
                 result = new(quality.ToString(), DateTimeOffset.UtcNow);
             }
-            catch (BotAnswerException ex) { problem = ex; result = new(quality.ToString(), DateTimeOffset.UtcNow, ex.Message); }
+            catch (Exception ex) when (ex is BotAnswerException || ex is TimeoutException && !ct.IsCancellationRequested)
+            {
+                // A bot that does not answer (it is down, say) must not hold up every song for its timeout.
+                var message = ex is TimeoutException && !ex.Message.StartsWith("BOT_QUALITY_TIMEOUT", StringComparison.Ordinal)
+                    ? "BOT_QUALITY_TIMEOUT: " + provider + " did not answer: " + ex.Message : ex.Message;
+                problem = ex; result = new(quality.ToString(), DateTimeOffset.UtcNow, message);
+            }
             lock (_qualityFileLock)
             {
                 var states = ReadQualities();
@@ -212,6 +226,7 @@ internal sealed class TelegramAccount : ITelegramSignIn, IDisposable
         await _gate.WaitAsync().ConfigureAwait(false);
         try
         {
+            ObjectDisposedException.ThrowIf(_disposed, this);
             _client?.Dispose();
             _client = null;
             _store.Begin(apiId, apiHash);
@@ -274,8 +289,10 @@ internal sealed class TelegramAccount : ITelegramSignIn, IDisposable
 
     public void Dispose()
     {
+        _disposed = true;
         Interlocked.Exchange(ref _client, null)?.Dispose();
     }
+    private volatile bool _disposed;
 
     /// <summary>Abort stalled transport/RPCs, keeping the saved login for the next connection.</summary>
     internal async Task RetireConnectionAsync(Client expected)
@@ -299,9 +316,23 @@ internal sealed class TelegramAccount : ITelegramSignIn, IDisposable
         _store.ClearSession();
     }
 
+    /// <summary>How long one sign-in step may take before the dialog says Telegram could not be reached.</summary>
+    internal TimeSpan LoginStepDeadline { get; init; } = TimeSpan.FromSeconds(60);
+
     private async Task<string?> StepAsync(Client client, string answer)
     {
-        var next = await client.Login(answer).ConfigureAwait(false);
+        var step = client.Login(answer);
+        string? next;
+        // A network that swallows packets must not leave the sign-in spinning for ever (audit, 2026-10-18).
+        // This only happens during a login that is not finished, so no saved login is lost; it is started again.
+        try { next = await step.WaitAsync(LoginStepDeadline).ConfigureAwait(false); }
+        catch (TimeoutException)
+        {
+            _ = step.ContinueWith(t => _ = t.Exception, TaskContinuationOptions.OnlyOnFaulted);
+            if (ReferenceEquals(_client, client)) _client = null;
+            client.Dispose();
+            throw;
+        }
         if (next is null) _store.SetAccount(client.User.MainUsername is { Length: > 0 } name ? "@" + name : client.User.first_name);
         return next;
     }

@@ -134,6 +134,10 @@ internal static class BotQualityTests
             Check.False(account.QualityConfirmed("deezload2bot", AudioQuality.FLAC), "forgetting makes the next song check the bot");
             File.WriteAllText(Path.Combine(folder, "bot-quality.json"), "{\"|deezload2bot\":{\"Quality\":\"FLAC\",\"At\":\"" + DateTimeOffset.UtcNow.ToString("O") + "\",\"Problem\":\"BOT_QUALITY_UNVERIFIED: test\"}}");
             await Check.ThrowsAsync<BotAnswerException>(() => account.SetQualityAsync("deezload2bot", "DeezLoad", AudioQuality.FLAC, default), "a menu that failed today is not retried for every song");
+            File.WriteAllText(Path.Combine(folder, "bot-quality.json"), "{\"|deezload2bot\":{\"Quality\":\"FLAC\",\"At\":\"" + DateTimeOffset.UtcNow.AddMinutes(-2).ToString("O") + "\",\"Problem\":\"BOT_QUALITY_TIMEOUT: test\"}}");
+            var started = DateTime.UtcNow;
+            await Check.ThrowsAsync<TimeoutException>(() => account.SetQualityAsync("deezload2bot", "DeezLoad", AudioQuality.FLAC, default), "a bot that did not answer minutes ago is not waited for again (it may be down)");
+            Check.True(DateTime.UtcNow - started < TimeSpan.FromSeconds(1), "the song goes on at once instead of waiting out the timeout");
         }
         finally { Directory.Delete(folder, recursive: true); }
     }

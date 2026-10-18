@@ -59,6 +59,7 @@ if (Environment.GetEnvironmentVariable("FMF_REPLAY_IMPORTS") is { Length: > 0 } 
 try
 {
     await LogicTests.RunAsync();
+    await TelegramLoginDeadlineTests.RunAsync();
     await CatalogRetryTests.RunAsync();
     await CatalogPagesTests.RunAsync();
     BotTimingTests.Run();
