@@ -704,7 +704,7 @@
   <data name="Favorites.RemoveFromLibrary" xml:space="preserve"><value>Kitaplıktan Kaldır</value><comment>Header in FavoritesView.axaml</comment></data>
   <data name="Favorites.Text" xml:space="preserve"><value>♪</value><comment>Text in FavoritesView.axaml</comment></data>
   <data name="Favorites.NoFavoriteTracksYet" xml:space="preserve"><value>Henüz favori parça yok</value><comment>Text in FavoritesView.axaml</comment></data>
-  <data name="Favorites.RightClickTracksSelect" xml:space="preserve"><value>Parçalara sağ tıklayıp 'Favoriler'i seç</value><comment>Text in FavoritesView.axaml</comment></data>
+  <data name="Favorites.RightClickTracksSelect" xml:space="preserve"><value>Herhangi bir şarkıda ♥ simgesine tıkla</value><comment>Text in FavoritesView.axaml</comment></data>
   <data name="Favorites.NoResults" xml:space="preserve"><value>Sonuç yok</value><comment>Text in FavoritesView.axaml</comment></data>
   <data name="Favorites.NoFavoritesMatchSearch" xml:space="preserve"><value>Aramanla eşleşen favori yok</value><comment>Text in FavoritesView.axaml</comment></data>
 
@@ -776,6 +776,14 @@
   <data name="LibraryPlaylists.DeletePlaylist" xml:space="preserve"><value>Çalma Listesini Sil</value><comment>Header in LibraryPlaylistsView.axaml</comment></data>
   <data name="LibraryPlaylists.NoPlaylistsYet" xml:space="preserve"><value>Henüz çalma listesi yok</value><comment>Text in LibraryPlaylistsView.axaml</comment></data>
   <data name="LibraryPlaylists.CreateNewPlaylistGet" xml:space="preserve"><value>Başlamak için yeni bir çalma listesi oluştur</value><comment>Text in LibraryPlaylistsView.axaml</comment></data>
+  <data name="LibraryPlaylists.ImportFromStreaming" xml:space="preserve"><value>Spotify veya Deezer&apos;dan içe aktar</value><comment>Text in LibraryPlaylistsView.axaml</comment></data>
+  <data name="LibraryPlaylists.ImportPitch" xml:space="preserve"><value>Şarkılarınla otomatik eşleşir</value><comment>Text in LibraryPlaylistsView.axaml</comment></data>
+  <data name="LibraryPlaylists.PlaylistFilesToo" xml:space="preserve"><value>.m3u ve .m3u8 dosyaları da olur</value><comment>Text in LibraryPlaylistsView.axaml</comment></data>
+  <data name="Home.WelcomeTitle" xml:space="preserve"><value>Kitaplığını dolduralım</value><comment>Text in HomeView.axaml</comment></data>
+  <data name="Home.WelcomeLine" xml:space="preserve"><value>Bir şarkı bul ya da müziğini ekle</value><comment>Text in HomeView.axaml</comment></data>
+  <data name="Home.FindMusic" xml:space="preserve"><value>Müzik bul</value><comment>Text in HomeView.axaml</comment></data>
+  <data name="Home.AddMusicFolder" xml:space="preserve"><value>Müzik klasörü ekle</value><comment>Text in HomeView.axaml</comment></data>
+  <data name="Home.ImportPlaylists" xml:space="preserve"><value>Çalma listelerini içe aktar</value><comment>Text in HomeView.axaml</comment></data>
   <data name="LibraryPlaylists.NoResults" xml:space="preserve"><value>Sonuç yok</value><comment>Text in LibraryPlaylistsView.axaml</comment></data>
   <data name="LibraryPlaylists.NoPlaylistsMatchSearch" xml:space="preserve"><value>Aramanla eşleşen çalma listesi yok</value><comment>Text in LibraryPlaylistsView.axaml</comment></data>
 

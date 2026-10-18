@@ -2540,7 +2540,7 @@
     <comment>Text in FavoritesView.axaml</comment>
   </data>
   <data name="Favorites.RightClickTracksSelect" xml:space="preserve">
-    <value>Haz clic derecho en las pistas y selecciona «Favoritos»</value>
+    <value>Haz clic en ♥ en cualquier canción</value>
     <comment>Text in FavoritesView.axaml</comment>
   </data>
   <data name="Favorites.NoResults" xml:space="preserve">
@@ -2791,6 +2791,38 @@
   <data name="LibraryPlaylists.CreateNewPlaylistGet" xml:space="preserve">
     <value>Crea una nueva lista de reproducción para empezar</value>
     <comment>Text in LibraryPlaylistsView.axaml</comment>
+  </data>
+  <data name="LibraryPlaylists.ImportFromStreaming" xml:space="preserve">
+    <value>Importar desde Spotify o Deezer</value>
+    <comment>Text in LibraryPlaylistsView.axaml</comment>
+  </data>
+  <data name="LibraryPlaylists.ImportPitch" xml:space="preserve">
+    <value>Se emparejan con tus canciones automáticamente</value>
+    <comment>Text in LibraryPlaylistsView.axaml</comment>
+  </data>
+  <data name="LibraryPlaylists.PlaylistFilesToo" xml:space="preserve">
+    <value>También funcionan los archivos .m3u y .m3u8</value>
+    <comment>Text in LibraryPlaylistsView.axaml</comment>
+  </data>
+  <data name="Home.WelcomeTitle" xml:space="preserve">
+    <value>Llenemos tu biblioteca</value>
+    <comment>Text in HomeView.axaml</comment>
+  </data>
+  <data name="Home.WelcomeLine" xml:space="preserve">
+    <value>Busca cualquier canción o trae tu música</value>
+    <comment>Text in HomeView.axaml</comment>
+  </data>
+  <data name="Home.FindMusic" xml:space="preserve">
+    <value>Buscar música</value>
+    <comment>Text in HomeView.axaml</comment>
+  </data>
+  <data name="Home.AddMusicFolder" xml:space="preserve">
+    <value>Añadir carpeta de música</value>
+    <comment>Text in HomeView.axaml</comment>
+  </data>
+  <data name="Home.ImportPlaylists" xml:space="preserve">
+    <value>Importar listas</value>
+    <comment>Text in HomeView.axaml</comment>
   </data>
   <data name="LibraryPlaylists.NoResults" xml:space="preserve">
     <value>Sin resultados</value>

@@ -69,6 +69,26 @@ public partial class HomeView : UserControl, ITrackSelectionSource
     /// scroll viewer's bar, so five tiles came out a few pixels too wide and the fifth
     /// wrapped (09-13). The 2px slack absorbs layout rounding.
     /// </summary>
+    /// <summary>Welcome card: the same folder picker as Settings › Music folders, then the usual scan.</summary>
+    private async void OnWelcomeAddFolderClicked(object? sender, RoutedEventArgs e)
+    {
+        try
+        {
+            if (DataContext is not HomeViewModel vm || TopLevel.GetTopLevel(this) is not { } top) return;
+            var folders = await top.StorageProvider.OpenFolderPickerAsync(new Avalonia.Platform.Storage.FolderPickerOpenOptions
+            {
+                Title = Loc.T("Home.AddMusicFolder"),
+                AllowMultiple = false
+            });
+            if (folders.Count > 0 && folders[0].Path.LocalPath is { Length: > 0 } path)
+                await vm.AddMusicFolderAsync(path);
+        }
+        catch (Exception ex)
+        {
+            Noctis.Services.DebugLog.Write("Home", $"add folder failed: {ex.Message}");
+        }
+    }
+
     private void OnAlbumsRowSizeChanged(object? sender, SizeChangedEventArgs e)
         => (DataContext as HomeViewModel)?.UpdateAlbumTileSize(e.NewSize.Width - 2);
 

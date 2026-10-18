@@ -45,6 +45,9 @@ public partial class LibraryPlaylistsViewModel : ViewModelBase, ISearchable
     /// <summary>Filtered playlists for display (uses PlaylistNavItem for artwork sync with sidebar).</summary>
     public ObservableCollection<PlaylistNavItem> FilteredPlaylists { get; } = new();
 
+    /// <summary>The New menu's "New Playlist" command, for the empty-page button.</summary>
+    public System.Windows.Input.ICommand CreatePlaylistCommand => _sidebar.CreatePlaylistCommand;
+
     /// <summary>Fires when the user wants to open a playlist's detail view.</summary>
     public event EventHandler<Playlist>? PlaylistOpened;
 

@@ -6346,7 +6346,7 @@
                                  antialiase (the source circle is full-bleed and would otherwise
                                  render with flat spots at 12/3/6/9 o'clock). No clip needed. -->
                             <Border Width="40" Height="40">
-                                <Image Source="avares://Noctis.UI/Assets/Icons/Noctis%20Logo%20Padded.png"
+                                <Image Source="avares://Noctis.UI/Assets/Icons/Noctis%20Logo%20Padded%20256.png"
                                        Stretch="Uniform"
                                        RenderOptions.BitmapInterpolationMode="HighQuality"/>
                             </Border>
@@ -6604,7 +6604,7 @@
                                 <StackPanel Margin="16,16,16,14">
                                     <!-- The real logo (red disc, white double note): on the red tile the
                                          disc merges with the fill and the note reads as the glyph. -->
-                                    <Image Source="avares://Noctis.UI/Assets/Icons/Noctis%20Logo%20Padded.png"
+                                    <Image Source="avares://Noctis.UI/Assets/Icons/Noctis%20Logo%20Padded%20256.png"
                                            Width="28" Height="28" Margin="-2,-2,0,-2"
                                            Stretch="Uniform" HorizontalAlignment="Left"
                                            RenderOptions.BitmapInterpolationMode="HighQuality"/>

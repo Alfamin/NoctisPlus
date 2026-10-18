@@ -2540,7 +2540,7 @@
     <comment>Text in FavoritesView.axaml</comment>
   </data>
   <data name="Favorites.RightClickTracksSelect" xml:space="preserve">
-    <value>在曲目上按右鍵並選擇「收藏」</value>
+    <value>點擊任何歌曲的 ♥</value>
     <comment>Text in FavoritesView.axaml</comment>
   </data>
   <data name="Favorites.NoResults" xml:space="preserve">
@@ -2791,6 +2791,38 @@
   <data name="LibraryPlaylists.CreateNewPlaylistGet" xml:space="preserve">
     <value>建立新播放清單即可開始</value>
     <comment>Text in LibraryPlaylistsView.axaml</comment>
+  </data>
+  <data name="LibraryPlaylists.ImportFromStreaming" xml:space="preserve">
+    <value>從 Spotify 或 Deezer 匯入</value>
+    <comment>Text in LibraryPlaylistsView.axaml</comment>
+  </data>
+  <data name="LibraryPlaylists.ImportPitch" xml:space="preserve">
+    <value>自動比對你的歌曲</value>
+    <comment>Text in LibraryPlaylistsView.axaml</comment>
+  </data>
+  <data name="LibraryPlaylists.PlaylistFilesToo" xml:space="preserve">
+    <value>也支援 .m3u 和 .m3u8 檔案</value>
+    <comment>Text in LibraryPlaylistsView.axaml</comment>
+  </data>
+  <data name="Home.WelcomeTitle" xml:space="preserve">
+    <value>開始建立你的音樂庫</value>
+    <comment>Text in HomeView.axaml</comment>
+  </data>
+  <data name="Home.WelcomeLine" xml:space="preserve">
+    <value>搜尋任何歌曲，或加入已有的音樂</value>
+    <comment>Text in HomeView.axaml</comment>
+  </data>
+  <data name="Home.FindMusic" xml:space="preserve">
+    <value>尋找音樂</value>
+    <comment>Text in HomeView.axaml</comment>
+  </data>
+  <data name="Home.AddMusicFolder" xml:space="preserve">
+    <value>加入音樂資料夾</value>
+    <comment>Text in HomeView.axaml</comment>
+  </data>
+  <data name="Home.ImportPlaylists" xml:space="preserve">
+    <value>匯入播放清單</value>
+    <comment>Text in HomeView.axaml</comment>
   </data>
   <data name="LibraryPlaylists.NoResults" xml:space="preserve">
     <value>沒有結果</value>

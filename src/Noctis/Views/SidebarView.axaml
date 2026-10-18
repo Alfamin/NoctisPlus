@@ -50,6 +50,9 @@
         </Style>
         <Style Selector="ListBox.sidebar Path.fav-heart-glyph">
             <Setter Property="Fill" Value="{DynamicResource AccentForegroundBrush}" />
+            <!-- Size here, not on the Path, so the selected state can enlarge it (owner 10-18: was too small). -->
+            <Setter Property="Width" Value="16" />
+            <Setter Property="Height" Value="12" />
         </Style>
         <Style Selector="ListBox.sidebar ListBoxItem:selected Border.nav-bitmap">
             <Setter Property="Background" Value="{DynamicResource AccentForegroundBrush}" />
@@ -60,11 +63,16 @@
         <Style Selector="ListBox.sidebar ListBoxItem:selected Ellipse.nav-badge">
             <Setter Property="Fill" Value="{DynamicResource AccentForegroundBrush}" />
         </Style>
+        <!-- Selected like every other rail tab: the accent circle with a white glyph. The old
+             inverted look (a white disc with a red heart inside the red circle) read as a badge in
+             a badge (owner 10-18: "doesn't look premium"). -->
         <Style Selector="ListBox.sidebar ListBoxItem:selected Border.fav-heart">
-            <Setter Property="Background" Value="{DynamicResource AccentForegroundBrush}" />
+            <Setter Property="Background" Value="Transparent" />
         </Style>
         <Style Selector="ListBox.sidebar ListBoxItem:selected Path.fav-heart-glyph">
-            <Setter Property="Fill" Value="{DynamicResource AccentColorBrush}" />
+            <Setter Property="Fill" Value="{DynamicResource AccentForegroundBrush}" />
+            <Setter Property="Width" Value="20" />
+            <Setter Property="Height" Value="15" />
         </Style>
 
         <!-- Drop target highlight while a track drag (or a playlist drag onto a folder)
@@ -599,13 +607,12 @@
                                                Y  -> up/down    (positive = DOWN,  negative = UP)
                                              1 = 1 pixel. -->
                                         <Path Data="{StaticResource FavoritesFilledIcon}"
-                                              Width="14" Height="10"
                                               Stretch="Uniform"
                                               Classes="fav-heart-glyph"
                                               HorizontalAlignment="Center"
                                               VerticalAlignment="Center">
                                             <Path.RenderTransform>
-                                                <TranslateTransform X="1.3" Y="0" />
+                                                <!-- Y 1: a heart's weight is in its lobes, so a box-centred heart reads high (measured 10-18). --><TranslateTransform X="1.3" Y="1" />
                                             </Path.RenderTransform>
                                         </Path>
                                     </Border>

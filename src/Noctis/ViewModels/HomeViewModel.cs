@@ -217,6 +217,19 @@ public partial class HomeViewModel : ViewModelBase, IDisposable
     /// <summary>Fires when the user wants to open an album's detail view.</summary>
     public event EventHandler<Album>? AlbumOpened;
 
+    /// <summary>No songs at all (fresh install): Home shows the welcome card instead of a blank page.</summary>
+    [ObservableProperty] private bool _isLibraryEmpty;
+
+    /// <summary>Set by the main window: the welcome card's Find music (Search page) and Import playlists.</summary>
+    internal Action? OpenSearch { get; set; }
+    internal Action? ImportPlaylists { get; set; }
+
+    [RelayCommand] private void FindMusic() => OpenSearch?.Invoke();
+    [RelayCommand] private void ImportPlaylistsFromHome() => ImportPlaylists?.Invoke();
+
+    /// <summary>The welcome card's Add music folder, after the view's folder picker.</summary>
+    internal Task AddMusicFolderAsync(string path) => _settings?.AddFolderPath(path) ?? Task.CompletedTask;
+
     /// <summary>Exposes the sidebar's playlists for the Add to Playlist submenu.</summary>
     public ObservableCollection<Playlist> Playlists => _sidebar.Playlists;
 
@@ -457,6 +470,7 @@ public partial class HomeViewModel : ViewModelBase, IDisposable
 
             // Top songs: tracks with highest play count
             var allTracks = _library.Tracks;
+            IsLibraryEmpty = allTracks.Count == 0;
             if (allTracks.Count > 0)
             {
                 var top = await Task.Run(() => PickTopSongs(allTracks));

@@ -170,6 +170,10 @@ public sealed partial class DownloadsViewModel : ViewModelBase, IDisposable
         Refresh();
     }
 
+    /// <summary>Set by the main window: the empty page's Find music opens Search.</summary>
+    internal Action? OpenSearch { get; set; }
+    [RelayCommand] private void FindMusic() => OpenSearch?.Invoke();
+
     [RelayCommand] private void TogglePause() => Act(() => _queue?.SetPaused(!IsPaused));
     [RelayCommand] private void RetryFailed() => Act(() => _queue?.RetryFailed());
     [RelayCommand] private void StartHeld() => Act(() => _queue?.StartHeld());

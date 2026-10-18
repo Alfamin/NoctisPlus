@@ -2540,7 +2540,7 @@
     <comment>Text in FavoritesView.axaml</comment>
   </data>
   <data name="Favorites.RightClickTracksSelect" xml:space="preserve">
-    <value>트랙을 마우스 오른쪽 버튼으로 클릭하고 '즐겨찾기'를 선택하세요</value>
+    <value>노래의 ♥를 클릭하세요</value>
     <comment>Text in FavoritesView.axaml</comment>
   </data>
   <data name="Favorites.NoResults" xml:space="preserve">
@@ -2791,6 +2791,38 @@
   <data name="LibraryPlaylists.CreateNewPlaylistGet" xml:space="preserve">
     <value>새 재생목록을 만들고 시작하세요</value>
     <comment>Text in LibraryPlaylistsView.axaml</comment>
+  </data>
+  <data name="LibraryPlaylists.ImportFromStreaming" xml:space="preserve">
+    <value>Spotify 또는 Deezer에서 가져오기</value>
+    <comment>Text in LibraryPlaylistsView.axaml</comment>
+  </data>
+  <data name="LibraryPlaylists.ImportPitch" xml:space="preserve">
+    <value>내 노래와 자동으로 맞춰져요</value>
+    <comment>Text in LibraryPlaylistsView.axaml</comment>
+  </data>
+  <data name="LibraryPlaylists.PlaylistFilesToo" xml:space="preserve">
+    <value>.m3u, .m3u8 파일도 지원해요</value>
+    <comment>Text in LibraryPlaylistsView.axaml</comment>
+  </data>
+  <data name="Home.WelcomeTitle" xml:space="preserve">
+    <value>라이브러리를 채워 볼까요</value>
+    <comment>Text in HomeView.axaml</comment>
+  </data>
+  <data name="Home.WelcomeLine" xml:space="preserve">
+    <value>원하는 노래를 찾거나 가진 음악을 추가하세요</value>
+    <comment>Text in HomeView.axaml</comment>
+  </data>
+  <data name="Home.FindMusic" xml:space="preserve">
+    <value>음악 찾기</value>
+    <comment>Text in HomeView.axaml</comment>
+  </data>
+  <data name="Home.AddMusicFolder" xml:space="preserve">
+    <value>음악 폴더 추가</value>
+    <comment>Text in HomeView.axaml</comment>
+  </data>
+  <data name="Home.ImportPlaylists" xml:space="preserve">
+    <value>플레이리스트 가져오기</value>
+    <comment>Text in HomeView.axaml</comment>
   </data>
   <data name="LibraryPlaylists.NoResults" xml:space="preserve">
     <value>결과 없음</value>

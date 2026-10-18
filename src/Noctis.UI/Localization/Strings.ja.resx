@@ -2540,7 +2540,7 @@
     <comment>Text in FavoritesView.axaml</comment>
   </data>
   <data name="Favorites.RightClickTracksSelect" xml:space="preserve">
-    <value>トラックを右クリックして「お気に入り」を選んでください</value>
+    <value>曲の ♥ をクリック</value>
     <comment>Text in FavoritesView.axaml</comment>
   </data>
   <data name="Favorites.NoResults" xml:space="preserve">
@@ -2791,6 +2791,38 @@
   <data name="LibraryPlaylists.CreateNewPlaylistGet" xml:space="preserve">
     <value>新しいプレイリストを作って始めましょう</value>
     <comment>Text in LibraryPlaylistsView.axaml</comment>
+  </data>
+  <data name="LibraryPlaylists.ImportFromStreaming" xml:space="preserve">
+    <value>Spotify または Deezer から読み込む</value>
+    <comment>Text in LibraryPlaylistsView.axaml</comment>
+  </data>
+  <data name="LibraryPlaylists.ImportPitch" xml:space="preserve">
+    <value>手持ちの曲と自動で照合</value>
+    <comment>Text in LibraryPlaylistsView.axaml</comment>
+  </data>
+  <data name="LibraryPlaylists.PlaylistFilesToo" xml:space="preserve">
+    <value>.m3u / .m3u8 ファイルにも対応</value>
+    <comment>Text in LibraryPlaylistsView.axaml</comment>
+  </data>
+  <data name="Home.WelcomeTitle" xml:space="preserve">
+    <value>ライブラリを始めましょう</value>
+    <comment>Text in HomeView.axaml</comment>
+  </data>
+  <data name="Home.WelcomeLine" xml:space="preserve">
+    <value>好きな曲を探すか、手持ちの音楽を追加</value>
+    <comment>Text in HomeView.axaml</comment>
+  </data>
+  <data name="Home.FindMusic" xml:space="preserve">
+    <value>音楽を探す</value>
+    <comment>Text in HomeView.axaml</comment>
+  </data>
+  <data name="Home.AddMusicFolder" xml:space="preserve">
+    <value>音楽フォルダーを追加</value>
+    <comment>Text in HomeView.axaml</comment>
+  </data>
+  <data name="Home.ImportPlaylists" xml:space="preserve">
+    <value>プレイリストを読み込む</value>
+    <comment>Text in HomeView.axaml</comment>
   </data>
   <data name="LibraryPlaylists.NoResults" xml:space="preserve">
     <value>結果なし</value>

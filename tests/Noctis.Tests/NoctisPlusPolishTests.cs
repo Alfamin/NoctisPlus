@@ -43,6 +43,24 @@ public class NoctisPlusPolishTests
     }
 
     [Fact]
+    public void EmptyPlaylistsPage_LeadsWithTheImport_InOneShortLine()
+    {
+        var dir = AppContext.BaseDirectory;
+        while (dir != null && !File.Exists(Path.Combine(dir, "Noctis.sln"))) dir = Path.GetDirectoryName(dir);
+        Assert.NotNull(dir);
+        var view = File.ReadAllText(Path.Combine(dir!, "src", "Noctis", "Views", "LibraryPlaylistsView.axaml"));
+        Assert.Contains("Command=\"{Binding ImportPlaylistCommand}\"", view);
+        Assert.Contains("LibraryPlaylists.ImportFromStreaming", view);
+        // Owner 10-18, app-wide: a label plus at most one short line, in every language.
+        foreach (var resx in Directory.GetFiles(Path.Combine(dir!, "src", "Noctis.UI", "Localization"), "Strings*.resx"))
+        {
+            var pitch = System.Xml.Linq.XDocument.Load(resx).Root!.Elements("data")
+                .Single(d => (string?)d.Attribute("name") == "LibraryPlaylists.ImportPitch").Element("value")!.Value;
+            Assert.True(pitch.Length is > 0 and <= 48, $"{Path.GetFileName(resx)}: \"{pitch}\"");
+        }
+    }
+
+    [Fact]
     public void PagesOpenedFromSearch_HaveNoSearchTitle_WhileSearchKeepsIt()
     {
         var bar = new TopBarViewModel { CurrentTabName = "Search", IsSearchPageShown = true, IsBackButtonVisible = true };

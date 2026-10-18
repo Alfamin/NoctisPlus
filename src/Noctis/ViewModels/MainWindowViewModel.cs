@@ -766,6 +766,10 @@ public partial class MainWindowViewModel : ViewModelBase
 
         // Wire up album detail navigation from home view
         _homeVm.AlbumOpened += OnHomeAlbumOpened;
+        // The empty-library welcome card's shortcuts (owner 10-18: features easy to spot).
+        _homeVm.OpenSearch = OpenSearchPage;
+        _homeVm.ImportPlaylists = () => _playlistsVm.ImportPlaylistCommand.Execute(null);
+        _downloadsVm.OpenSearch = OpenSearchPage;
 
         // Wire up artist → album navigation
         _artistsVm.ArtistOpened += OnArtistOpened;

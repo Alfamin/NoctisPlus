@@ -943,7 +943,7 @@ Deezer и TIDAL: вставьте ссылку.</value></data>
   <data name="Favorites.RemoveFromLibrary" xml:space="preserve"><value>Удалить из медиатеки</value><comment>Header in FavoritesView.axaml</comment></data>
   <data name="Favorites.Text" xml:space="preserve"><value>♪</value><comment>Text in FavoritesView.axaml</comment></data>
   <data name="Favorites.NoFavoriteTracksYet" xml:space="preserve"><value>В избранном пока нет треков</value><comment>Text in FavoritesView.axaml</comment></data>
-  <data name="Favorites.RightClickTracksSelect" xml:space="preserve"><value>Щёлкните правой кнопкой по треку и выберите «В избранное»</value><comment>Text in FavoritesView.axaml</comment></data>
+  <data name="Favorites.RightClickTracksSelect" xml:space="preserve"><value>Нажмите ♥ у любой песни</value><comment>Text in FavoritesView.axaml</comment></data>
   <data name="Favorites.NoResults" xml:space="preserve"><value>Ничего не найдено</value><comment>Text in FavoritesView.axaml</comment></data>
   <data name="Favorites.NoFavoritesMatchSearch" xml:space="preserve"><value>В избранном нет ничего по вашему запросу</value><comment>Text in FavoritesView.axaml</comment></data>
 
@@ -1021,6 +1021,14 @@ Deezer и TIDAL: вставьте ссылку.</value></data>
   <data name="LibraryPlaylists.DeletePlaylist" xml:space="preserve"><value>Удалить плейлист</value><comment>Header in LibraryPlaylistsView.axaml</comment></data>
   <data name="LibraryPlaylists.NoPlaylistsYet" xml:space="preserve"><value>Плейлистов пока нет</value><comment>Text in LibraryPlaylistsView.axaml</comment></data>
   <data name="LibraryPlaylists.CreateNewPlaylistGet" xml:space="preserve"><value>Создайте плейлист, чтобы начать</value><comment>Text in LibraryPlaylistsView.axaml</comment></data>
+  <data name="LibraryPlaylists.ImportFromStreaming" xml:space="preserve"><value>Импорт из Spotify или Deezer</value><comment>Text in LibraryPlaylistsView.axaml</comment></data>
+  <data name="LibraryPlaylists.ImportPitch" xml:space="preserve"><value>Автоматически сопоставляются с вашими песнями</value><comment>Text in LibraryPlaylistsView.axaml</comment></data>
+  <data name="LibraryPlaylists.PlaylistFilesToo" xml:space="preserve"><value>Файлы .m3u и .m3u8 тоже подходят</value><comment>Text in LibraryPlaylistsView.axaml</comment></data>
+  <data name="Home.WelcomeTitle" xml:space="preserve"><value>Наполним вашу медиатеку</value><comment>Text in HomeView.axaml</comment></data>
+  <data name="Home.WelcomeLine" xml:space="preserve"><value>Найдите любую песню или добавьте свою музыку</value><comment>Text in HomeView.axaml</comment></data>
+  <data name="Home.FindMusic" xml:space="preserve"><value>Найти музыку</value><comment>Text in HomeView.axaml</comment></data>
+  <data name="Home.AddMusicFolder" xml:space="preserve"><value>Добавить папку</value><comment>Text in HomeView.axaml</comment></data>
+  <data name="Home.ImportPlaylists" xml:space="preserve"><value>Импорт плейлистов</value><comment>Text in HomeView.axaml</comment></data>
   <data name="LibraryPlaylists.NoResults" xml:space="preserve"><value>Ничего не найдено</value><comment>Text in LibraryPlaylistsView.axaml</comment></data>
   <data name="LibraryPlaylists.NoPlaylistsMatchSearch" xml:space="preserve"><value>Нет плейлистов по вашему запросу</value><comment>Text in LibraryPlaylistsView.axaml</comment></data>
 

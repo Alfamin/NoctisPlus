@@ -2670,6 +2670,14 @@ public partial class SettingsViewModel : ViewModelBase
                 _settings.LiquidGlassEnabled = true;
                 _settings.PlusDefaultsLevel = 1;
             }
+            // Level 2 (owner, 2026-10-18: "full default at dark"): existing profiles move to Dark once;
+            // the theme picker is free afterwards.
+            if (_settings.PlusDefaultsLevel < PlusDefaultsCurrent)
+            {
+                storedTheme = AppSettings.DefaultTheme;
+                _settings.Theme = AppSettings.DefaultTheme;
+                _settings.PlusDefaultsLevel = PlusDefaultsCurrent;
+            }
 
             // The "System" tile was removed on 2026-08-31 (the app no longer follows the OS).
             // Anyone still on it lands on the default theme.
@@ -3138,7 +3146,13 @@ public partial class SettingsViewModel : ViewModelBase
         // Made once at load straight onto _settings (LoadFeatureSettings): pulled back from a
         // file without one, the first save emptied it and the ledger got a new id per launch.
         nameof(AppSettings.SyncDeviceId),
+        // Raised once at load (the Plus defaults): pulled back from disk, the save kept the old
+        // level, so "once" ran every launch and undid the user's shuffle/skip/glass/theme choice.
+        nameof(AppSettings.PlusDefaultsLevel),
     };
+
+    /// <summary>The newest one-time Noctis Plus defaults step (see LoadAsync).</summary>
+    private const int PlusDefaultsCurrent = 2;
 
     private async Task MergeExternalSettingChangesAsync()
     {
@@ -6928,6 +6942,8 @@ public partial class SettingsViewModel : ViewModelBase
         try
         {
             _settings = defaultSettings;
+            // A reset IS the Plus defaults: record that, like a fresh install's first load does.
+            _settings.PlusDefaultsLevel = PlusDefaultsCurrent;
 
             // Theme — reset to the default (AppSettings.DefaultTheme, Dark in Noctis Plus).
             // SetActiveThemeFlags alone left ActiveCustomThemeId and the CustomThemes

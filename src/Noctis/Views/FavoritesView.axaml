@@ -156,14 +156,18 @@
                         HorizontalAlignment="Center"
                         VerticalAlignment="Center"
                         Spacing="8">
+                <!-- Same empty-page layout as Downloads / Playlists: glyph, bold title, one line. -->
+                <PathIcon Data="{StaticResource HeartFillIcon}" Width="36" Height="36" Opacity="0.85"
+                          Foreground="{DynamicResource AccentColorBrush}" HorizontalAlignment="Center" />
                 <TextBlock Text="{loc:T Favorites.NoFavoriteTracksYet}"
-                           FontSize="18"
-                           Opacity="0.5"
+                           FontSize="20"
+                           FontWeight="Bold"
+                           Margin="0,8,0,0"
                            HorizontalAlignment="Center"
                            TextAlignment="Center" />
                 <TextBlock Text="{loc:T Favorites.RightClickTracksSelect}"
                            FontSize="13"
-                           Opacity="0.3"
+                           Opacity="0.55"
                            HorizontalAlignment="Center"
                            TextAlignment="Center" />
             </StackPanel>

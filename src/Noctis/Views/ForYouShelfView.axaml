@@ -276,8 +276,16 @@
 
                 <!-- A quiet line at the end (owner: not important enough for the top): why the
                      shelf is empty, that an old page is shown, or which artists could not load. -->
-                <TextBlock Text="{Binding Status}" FontSize="12" Opacity="0.5" TextWrapping="Wrap"
-                           IsVisible="{Binding Status, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
+                <!-- Not while counting: the corner ring + "16/30" already shows that progress
+                     (owner 10-18: minimal text, no saying the same thing twice). -->
+                <TextBlock Text="{Binding Status}" FontSize="12" Opacity="0.5" TextWrapping="Wrap">
+                    <TextBlock.IsVisible>
+                        <MultiBinding Converter="{x:Static BoolConverters.And}">
+                            <Binding Path="Status" Converter="{x:Static StringConverters.IsNotNullOrEmpty}" />
+                            <Binding Path="!HasLoadCount" />
+                        </MultiBinding>
+                    </TextBlock.IsVisible>
+                </TextBlock>
             </StackPanel>
         </ctrl:CollapsibleContent>
     </StackPanel>

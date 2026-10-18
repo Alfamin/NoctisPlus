@@ -22,13 +22,19 @@
             </Border>
             <StackPanel Grid.Row="1" Margin="28,20,28,16" Spacing="12">
                 <TextBox x:Name="LinksField" Classes="pill-area" Text="{Binding Links}" AcceptsReturn="True" MinHeight="80" MaxHeight="140"
-                         TextWrapping="Wrap" PlaceholderText="Paste playlist links, one per line" IsEnabled="{Binding CanInteract}" />
+                         TextWrapping="Wrap" PlaceholderText="Paste playlist links" IsEnabled="{Binding CanInteract}" />
                 <Grid ColumnDefinitions="*,Auto,Auto">
-                    <TextBlock Text="Uses your local songs. Downloads are your choice." Opacity="0.55" FontSize="12" TextWrapping="Wrap" VerticalAlignment="Center" Margin="0,0,12,0" />
                     <Button Grid.Column="1" Classes="pill-secondary" Content="Check library" Command="{Binding CheckLibraryCommand}" Margin="0,0,10,0" />
                     <Button Grid.Column="2" Classes="pill-primary" Content="Import" Command="{Binding ImportCommand}" MinWidth="100" />
                 </Grid>
+                <!-- Only while something is happening: nothing to read at rest (owner 10-18: minimal text). -->
                 <Grid ColumnDefinitions="Auto,*" ColumnSpacing="10">
+                    <Grid.IsVisible>
+                        <MultiBinding Converter="{x:Static BoolConverters.Or}">
+                            <Binding Path="IsBusy" />
+                            <Binding Path="Status" Converter="{x:Static StringConverters.IsNotNullOrEmpty}" />
+                        </MultiBinding>
+                    </Grid.IsVisible>
                     <controls:ProgressRing Width="16" Height="16" IsIndeterminate="True" IsVisible="{Binding IsBusy}" VerticalAlignment="Center" />
                     <TextBlock Grid.Column="1" Text="{Binding Status}" FontSize="12" Opacity="0.7" TextWrapping="Wrap" />
                 </Grid>

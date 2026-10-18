@@ -38,7 +38,8 @@ internal sealed class SpotifyPlaylists : IDisposable
     public event Action? Changed;
     public IReadOnlyList<SpotifyPlaylist> Jobs { get { lock (_gate) return _jobs.ToArray(); } }
     public bool Busy { get; private set; }
-    public string Status { get; private set; } = "Paste Spotify or Deezer playlist links. Matching uses every Noctis library folder.";
+    // Empty at rest: the links box's placeholder says what to do (owner 10-18: minimal text).
+    public string Status { get; private set; } = "";
     public SpotifyPlaylists(string file, IPlaylistLibrary library, Downloads downloads, Func<MusicRequest, BotTrack> track, PlaylistCatalog? catalog = null)
     {
         _file = file; _library = library; _downloads = downloads; _track = track; _catalog = catalog ?? new();
