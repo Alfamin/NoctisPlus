@@ -137,6 +137,8 @@ internal sealed class MusicSources
             var preferred = _quality?.Invoke();
             var allowMp3 = preferred == AudioQuality.MP3 || _allowMp3();
             var preferFlac = preferred is { } format ? format == AudioQuality.FLAC : _preferFlac();
+            if (output is Noctis.Features.ProgressivePlayback.IProgressiveAudioWriter publisher)
+                publisher.SetFormatPolicy(ext => ext == "flac" ? preferred != AudioQuality.MP3 : ext == "mp3" && allowMp3 && !preferFlac);
             var qualityErrors = await ConfigureQualityAsync(progress, ct, preferred).ConfigureAwait(false);
             if (preferred is not null) request = request with { Quality = preferred };
             // An MP3 a bot sent is kept aside while the other bot is asked for FLAC. It is used only when no

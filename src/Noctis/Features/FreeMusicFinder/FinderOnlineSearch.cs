@@ -206,6 +206,34 @@ internal sealed class FinderOnlineSearch : IOnlineMusicSearch
         return now ? "Downloading." : "Added to downloads.";
     }
 
+    public async Task<Noctis.Models.Track> PreparePlaybackAsync(OnlineSong song, CancellationToken ct)
+    {
+        if (!_songs.TryGetValue(song.Id, out var catalogSong)) throw new InvalidOperationException("Search again, then choose the song.");
+        await _actions.QueueAsync([catalogSong], priority: true, ct);
+        var match = (await _actions.MatchAsync([catalogSong], ct))[catalogSong.Id];
+        if (match.Local is { } local) return Make(local.Path, local.Id, external: false);
+        var download = match.Download ?? throw new IOException("The download request could not be found. Open Downloads to retry it.");
+        while (true)
+        {
+            ct.ThrowIfCancellationRequested();
+            if (download.SavedPath is { } saved && File.Exists(saved)) return Make(saved);
+            if (download.Playback?.ReadyPath is { } ready) return Make(ready);
+            if (download.State is DownloadState.Waiting or DownloadState.Failed)
+                throw new IOException(download.Error.Length > 0 ? download.Error : "The download is waiting. Open Downloads to retry it.");
+            if (download.State is DownloadState.Cancelled or DownloadState.Removed)
+                throw new IOException("The download was removed or interrupted.");
+            await Task.Delay(200, ct);
+        }
+
+        Noctis.Models.Track Make(string path, Guid? id = null, bool external = true) => new()
+        {
+            Id = id ?? Guid.NewGuid(), FilePath = path, Title = song.Title, Artist = song.ArtistDisplay,
+            Album = song.Album, Duration = TimeSpan.FromSeconds(song.Seconds is > 0 ? song.Seconds.Value : 0),
+            IsExplicit = song.Explicit == true, IsExternal = external,
+            AlbumArtworkPath = CachedArtwork(song.ArtworkUrl) ?? ""
+        };
+    }
+
     public void OpenArtist(OnlineArtist artist)
     {
         // Related-artist tiles already carry a provider id; they need not have appeared

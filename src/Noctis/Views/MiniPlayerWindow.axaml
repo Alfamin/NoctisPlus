@@ -837,6 +837,7 @@
                                 Command="{Binding Player.PlayPauseCommand}"
                                 ToolTip.Tip="{Binding Player.PlayPauseTooltip}">
                             <Panel>
+                                <controls:ProgressRing Width="30" Height="30" Thickness="2" IsIndeterminate="True" IsVisible="{Binding Player.IsWaitingForAudio}" Foreground="{DynamicResource AccentColorBrush}" HorizontalAlignment="Center" VerticalAlignment="Center" />
                                 <Viewbox Width="24" Height="24"
                                          IsVisible="{Binding Player.State, Converter={x:Static ObjectConverters.NotEqual}, ConverterParameter={x:Static m:PlaybackState.Playing}}">
                                     <Canvas Width="24" Height="24">
@@ -935,6 +936,7 @@
                     <Slider Grid.Column="1" x:Name="BarSeekSlider" Classes="mini-seek" Classes.waveform="{Binding Player.WaveformSeekBarEnabled}"
                             Minimum="0" Maximum="1" Focusable="False"
                             Value="{Binding Player.PositionFraction, Mode=TwoWay}"
+                            IsEnabled="{Binding Player.CanSeekCurrent}"
                             Margin="6,0" VerticalAlignment="Center"/>
                     <TextBlock Grid.Column="2" Classes="mini-time" Text="{Binding Player.RemainingTimeText}"
                                FontSize="10" Foreground="#A0FFFFFF"
@@ -970,6 +972,7 @@
                             Command="{Binding Player.PlayPauseCommand}"
                             ToolTip.Tip="{Binding Player.PlayPauseTooltip}">
                         <Panel>
+                            <controls:ProgressRing Width="30" Height="30" Thickness="2" IsIndeterminate="True" IsVisible="{Binding Player.IsWaitingForAudio}" Foreground="{DynamicResource AccentColorBrush}" HorizontalAlignment="Center" VerticalAlignment="Center" />
                             <Viewbox Width="22" Height="22"
                                      IsVisible="{Binding Player.State, Converter={x:Static ObjectConverters.NotEqual}, ConverterParameter={x:Static m:PlaybackState.Playing}}">
                                 <Canvas Width="24" Height="24">
@@ -1097,6 +1100,7 @@
                     <Slider Grid.Column="1" x:Name="SeekSlider" Classes="mini-seek" Classes.waveform="{Binding Player.WaveformSeekBarEnabled}"
                             Minimum="0" Maximum="1" Focusable="False"
                             Value="{Binding Player.PositionFraction, Mode=TwoWay}"
+                            IsEnabled="{Binding Player.CanSeekCurrent}"
                             Margin="6,0" VerticalAlignment="Center"/>
                     <TextBlock Grid.Column="2" Classes="mini-time" Text="{Binding Player.RemainingTimeText}"
                                FontSize="10" Foreground="#A0FFFFFF"
@@ -1169,6 +1173,7 @@
                                 Command="{Binding Player.PlayPauseCommand}"
                                 ToolTip.Tip="{Binding Player.PlayPauseTooltip}">
                             <Panel>
+                                <controls:ProgressRing Width="30" Height="30" Thickness="2" IsIndeterminate="True" IsVisible="{Binding Player.IsWaitingForAudio}" Foreground="{DynamicResource AccentColorBrush}" HorizontalAlignment="Center" VerticalAlignment="Center" />
                                 <Viewbox Width="25" Height="25"
                                          IsVisible="{Binding Player.State, Converter={x:Static ObjectConverters.NotEqual}, ConverterParameter={x:Static m:PlaybackState.Playing}}">
                                     <Canvas Width="24" Height="24">
@@ -1355,6 +1360,7 @@
                     <Slider Grid.Column="1" x:Name="LargeSeekSlider" Classes="mini-seek" Classes.waveform="{Binding Player.WaveformSeekBarEnabled}"
                             Minimum="0" Maximum="1" Focusable="False"
                             Value="{Binding Player.PositionFraction, Mode=TwoWay}"
+                            IsEnabled="{Binding Player.CanSeekCurrent}"
                             Margin="6,0" VerticalAlignment="Center"/>
                     <TextBlock Grid.Column="2" Classes="mini-time" Text="{Binding Player.RemainingTimeText}"
                                FontSize="10" Foreground="#A0FFFFFF"
@@ -1425,6 +1431,7 @@
                             Command="{Binding Player.PlayPauseCommand}"
                             ToolTip.Tip="{Binding Player.PlayPauseTooltip}">
                         <Panel>
+                            <controls:ProgressRing Width="30" Height="30" Thickness="2" IsIndeterminate="True" IsVisible="{Binding Player.IsWaitingForAudio}" Foreground="{DynamicResource AccentColorBrush}" HorizontalAlignment="Center" VerticalAlignment="Center" />
                             <Viewbox Width="25" Height="25"
                                      IsVisible="{Binding Player.State, Converter={x:Static ObjectConverters.NotEqual}, ConverterParameter={x:Static m:PlaybackState.Playing}}">
                                 <Canvas Width="24" Height="24">
@@ -1626,6 +1633,7 @@
                     <Slider Grid.Row="1" x:Name="LyricsSeekSlider" Classes="mini-seek" Classes.waveform="{Binding Player.WaveformSeekBarEnabled}"
                             Minimum="0" Maximum="1" Focusable="False"
                             Value="{Binding Player.PositionFraction, Mode=TwoWay}"
+                            IsEnabled="{Binding Player.CanSeekCurrent}"
                             Margin="0,4,0,0" VerticalAlignment="Center"/>
 
                     <!-- Codec quality tag (Lossless / Hi-Res / codec) centered like Apple Music;
@@ -1690,6 +1698,7 @@
                                 Command="{Binding Player.PlayPauseCommand}"
                                 ToolTip.Tip="{Binding Player.PlayPauseTooltip}">
                             <Panel>
+                                <controls:ProgressRing Width="30" Height="30" Thickness="2" IsIndeterminate="True" IsVisible="{Binding Player.IsWaitingForAudio}" Foreground="{DynamicResource AccentColorBrush}" HorizontalAlignment="Center" VerticalAlignment="Center" />
                                 <Viewbox Width="21" Height="21"
                                          IsVisible="{Binding Player.State, Converter={x:Static ObjectConverters.NotEqual}, ConverterParameter={x:Static m:PlaybackState.Playing}}">
                                     <Canvas Width="24" Height="24">
@@ -2129,6 +2138,7 @@
                                 <Slider Grid.Column="1" x:Name="PillSeekSlider" Classes="mini-seek" Classes.waveform="{Binding Player.WaveformSeekBarEnabled}"
                                         Minimum="0" Maximum="1" Focusable="False"
                                         Value="{Binding Player.PositionFraction, Mode=TwoWay}"
+                            IsEnabled="{Binding Player.CanSeekCurrent}"
                                         Margin="4,0" VerticalAlignment="Center"/>
                                 <TextBlock Grid.Column="2" Classes="mini-time" Text="{Binding Player.DurationText}" FontSize="10"
                                            Foreground="{DynamicResource SystemControlForegroundBaseMediumBrush}" VerticalAlignment="Center" MinWidth="26" TextAlignment="Right"/>
@@ -2147,6 +2157,7 @@
                                         Command="{Binding Player.PlayPauseCommand}"
                                         ToolTip.Tip="{Binding Player.PlayPauseTooltip}">
                                     <Panel>
+                                        <controls:ProgressRing Width="30" Height="30" Thickness="2" IsIndeterminate="True" IsVisible="{Binding Player.IsWaitingForAudio}" Foreground="{DynamicResource AccentColorBrush}" HorizontalAlignment="Center" VerticalAlignment="Center" />
                                         <Viewbox Width="20" Height="20"
                                                  IsVisible="{Binding Player.State, Converter={x:Static ObjectConverters.NotEqual}, ConverterParameter={x:Static m:PlaybackState.Playing}}">
                                             <Canvas Width="24" Height="24">
@@ -2270,6 +2281,7 @@
                                 <Slider Grid.Column="1" x:Name="SleeveSeekSlider" Classes="mini-seek" Classes.waveform="{Binding Player.WaveformSeekBarEnabled}"
                                         Minimum="0" Maximum="1" Focusable="False"
                                         Value="{Binding Player.PositionFraction, Mode=TwoWay}"
+                            IsEnabled="{Binding Player.CanSeekCurrent}"
                                         Margin="6,0" VerticalAlignment="Center"/>
                                 <TextBlock Grid.Column="2" Classes="mini-time" Text="{Binding Player.DurationText}" FontSize="11"
                                            Foreground="{DynamicResource SystemControlForegroundBaseMediumBrush}" VerticalAlignment="Center" MinWidth="30" TextAlignment="Right"/>
@@ -2287,6 +2299,7 @@
                                         Command="{Binding Player.PlayPauseCommand}"
                                         ToolTip.Tip="{Binding Player.PlayPauseTooltip}">
                                     <Panel>
+                                        <controls:ProgressRing Width="30" Height="30" Thickness="2" IsIndeterminate="True" IsVisible="{Binding Player.IsWaitingForAudio}" Foreground="{DynamicResource AccentColorBrush}" HorizontalAlignment="Center" VerticalAlignment="Center" />
                                         <Viewbox Width="22" Height="22"
                                                  IsVisible="{Binding Player.State, Converter={x:Static ObjectConverters.NotEqual}, ConverterParameter={x:Static m:PlaybackState.Playing}}">
                                             <Canvas Width="24" Height="24">

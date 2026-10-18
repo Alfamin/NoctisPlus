@@ -3,6 +3,7 @@ using System.Runtime.InteropServices;
 using Noctis.Models;
 using LibVLCSharp.Shared;
 using Noctis.Helpers;
+using Noctis.Features.ProgressivePlayback;
 
 namespace Noctis.Services;
 
@@ -337,7 +338,7 @@ public class VlcAudioPlayer : IAudioPlayer
     private long _endReachedDeadlineTicksUtc;
     private long _endReachedSessionId;
 
-    // VLC's _player.Length can return 0 after EndReached (media considered "finished").
+    // VLC's CurrentLengthMs can return 0 after EndReached (media considered "finished").
     // Store the last known good value so end-of-track position updates always reach
     // the true duration — otherwise lyrics/UI stop updating early.
     private long _lastKnownLengthMs;
@@ -418,6 +419,13 @@ public class VlcAudioPlayer : IAudioPlayer
     public event EventHandler<TimeSpan>? PositionChanged;
     public event EventHandler<string>? PlaybackError;
     public event EventHandler<TimeSpan>? DurationResolved;
+    public event EventHandler<bool>? BufferingChanged;
+    public bool CanSeek => _currentMedia is not ProgressiveMedia { Complete: false };
+    // A growing MP3's length estimate describes the buffered prefix. Keep the
+    // recording's metadata duration until it is reopened as a complete local file.
+    private long CurrentLengthMs => _currentMedia is ProgressiveMedia { Duration: { TotalMilliseconds: > 0 } duration }
+        ? (long)duration.TotalMilliseconds : _player.Length;
+    private long _playRequestVersion;
     public event EventHandler<string>? OutputModeChanged;
 
     public VlcAudioPlayer()
@@ -826,7 +834,7 @@ public class VlcAudioPlayer : IAudioPlayer
         get
         {
             if (_disposed) return TimeSpan.Zero;
-            var len = _player.Length;
+            var len = CurrentLengthMs;
             if (_gaplessEngine)
             {
                 // The ring knows more than VLC's length estimate (see EngineReportedLengthMs).
@@ -1826,6 +1834,9 @@ public class VlcAudioPlayer : IAudioPlayer
         DrainPositionTimerCallback();
         DrainSeekWorker();
         ReleasePreparedNext();
+        var progressiveRestart = _currentMedia is ProgressiveMedia { Complete: false };
+        (_currentMedia as ProgressiveMedia)?.CancelRead();
+        if (progressiveRestart) resumeMs = 0; // a nonseekable live input cannot resume at a byte hole
         try { _player.Stop(); } catch { }
         var oldMedia = _currentMedia;
         _currentMedia = null;
@@ -2583,6 +2594,7 @@ public class VlcAudioPlayer : IAudioPlayer
 
     public void PrepareNext(string filePath, long startPositionMs = -1)
     {
+        if (_currentMedia is ProgressiveMedia || ProgressiveTransfer.IsAvailable(filePath)) return;
         if (_disposed || string.IsNullOrWhiteSpace(filePath))
             return;
         // A media-server URL never passes File.Exists: open it as a location and parse
@@ -2892,7 +2904,8 @@ public class VlcAudioPlayer : IAudioPlayer
     {
         if (_disposed || string.IsNullOrWhiteSpace(filePath)) return;
 
-        var exists = IsPathlessMedia(filePath) || File.Exists(filePath);
+        var progressive = ProgressiveTransfer.Acquire(filePath);
+        var exists = progressive is not null || IsPathlessMedia(filePath) || File.Exists(filePath);
         // Music video audio: a clip deleted since it was found plays the song file.
         if (!exists && fallbackPath != null)
         {
@@ -2903,18 +2916,21 @@ public class VlcAudioPlayer : IAudioPlayer
 
         if (!exists)
         {
+            progressive?.Dispose();
             PlaybackError?.Invoke(this, $"File not found: {filePath}");
             return;
         }
 
         DebugLogger.Info(DebugLogger.Category.Playback, "VLC.Play",
             $"path={(IsRemoteStreamPath(filePath) ? "<remote stream>" : IsAudioCdPath(filePath) ? filePath : Path.GetFileName(filePath))}");
+        var requestVersion = Interlocked.Increment(ref _playRequestVersion);
         var warmUntil = _keepAlive?.WakeForPlayback() ?? 0;
         _currentMediaPath = filePath;
         _currentFallbackPath = fallbackPath;
         // This track supersedes one still opening: abort its header parse so the
         // worker below (queued behind it on the lock) isn't held up for up to 8 s.
         CancelOpenCts();
+        BufferingChanged?.Invoke(this, false);
 
         // Capture on the calling thread so a competing Play() queued right after
         // cannot consume a restart-paused request meant for this call.
@@ -2925,10 +2941,11 @@ public class VlcAudioPlayer : IAudioPlayer
         ThreadPool.QueueUserWorkItem(_ =>
         {
             try { _playbackLock.Wait(); }
-            catch (ObjectDisposedException) { return; } // Dispose() ran after the _disposed check above
+            catch (ObjectDisposedException) { progressive?.Dispose(); return; } // Dispose() ran after the _disposed check above
 
             try
             {
+                if (_disposed || requestVersion != Interlocked.Read(ref _playRequestVersion)) return;
                 // First play after the Linux keep-alive parked (GitHub #70): hold the real
                 // stream until the restarted loop has woken the device. Under the lock so
                 // a Stop/Pause queued after this Play still lands after it; a paused open
@@ -2940,10 +2957,11 @@ public class VlcAudioPlayer : IAudioPlayer
                     Thread.Sleep(holdMs);
                     if (_disposed) return;
                 }
-                PlayInternal(filePath, startPaused, fallbackPath);
+                PlayInternal(filePath, startPaused, fallbackPath, progressive);
             }
             finally
             {
+                progressive?.Dispose(); // successful Media construction owns a separate lease below
                 _playbackLock.Release();
             }
         });
@@ -2967,8 +2985,10 @@ public class VlcAudioPlayer : IAudioPlayer
     /// the AAC/ALAC codec inside the MP4 container, causing silent playback
     /// or immediate EndReached.
     /// </summary>
-    private void PlayInternal(string filePath, bool startPaused = false, string? fallbackPath = null)
+    private void PlayInternal(string filePath, bool startPaused = false, string? fallbackPath = null, ProgressiveTransfer.Lease? progressive = null)
     {
+        using var localPreparation = progressive is null ? ProgressiveTransfer.Acquire(filePath) : null;
+        progressive ??= localPreparation;
         try
         {
             // Cancel any in-progress fade/parse from a previous PlayInternal call
@@ -3011,12 +3031,12 @@ public class VlcAudioPlayer : IAudioPlayer
             // compare Path.GetFullPath-normalized local paths and PrepareNext never
             // stages them for those, so both take the plain open path. The one exception
             // is a stream staged on the splice engine (see the splice below).
-            var isPathless = isRemote || isCd;
+            var isPathless = isRemote || isCd || progressive is not null;
             // Crossfade needs two simultaneous streams; the WASAPI callback sinks
             // are single-stream, so disable the transition fade on those paths.
             var canTransitionFade = _crossfadeEnabled && hadPreviousMedia && !IsMuted &&
                                     _wasapiOut == null && !_exclusiveModeEnabled && !_gaplessEngine &&
-                                    !startPaused && !isPathless;
+                                    !startPaused && !isPathless && _currentMedia is not ProgressiveMedia;
             var fadeOutMs = canTransitionFade && _player.IsPlaying
                 ? Math.Clamp(_crossfadeDurationMs / 2, 100, 6000)
                 : 0;
@@ -3055,7 +3075,7 @@ public class VlcAudioPlayer : IAudioPlayer
             // roles and let the outgoing segment play its tail out of the ring.
             // A remote stream qualifies too: PrepareNext stages URLs on the engine,
             // keyed by the URL itself (not a file path).
-            if (_gaplessEngine && !startPaused && !isCd && hadPreviousMedia &&
+            if (_gaplessEngine && !startPaused && !isCd && progressive is null && hadPreviousMedia &&
                 _engineStagedPath != null && _standbyMedia != null &&
                 string.Equals(_engineStagedPath, isRemote ? filePath : Path.GetFullPath(filePath), StringComparison.OrdinalIgnoreCase))
             {
@@ -3146,10 +3166,19 @@ public class VlcAudioPlayer : IAudioPlayer
             // and decoder-ready before the audible handoff starts.
             // Remote media-server streams are locations, not paths, and their
             // headers must be parsed over the network.
-            var media = isCd
+            // The caller holds a preparation lease across the worker queue. Media gets
+            // its own lease so disposing either cannot close the other's file.
+            var mediaLease = progressive?.Retain();
+            var media = mediaLease is not null ? ProgressiveMedia.Create(_libVlc, mediaLease) : isCd
                 ? CreateAudioCdMedia(_libVlc, filePath)
                 : new Media(_libVlc, filePath, isRemote ? FromType.FromLocation : FromType.FromPath);
-            if (!isCd && !isRemote)
+            if (media is ProgressiveMedia streamed)
+            {
+                streamed.AddOption(Path.GetExtension(filePath).Equals(".mp3", StringComparison.OrdinalIgnoreCase) ? ":demux=mp3" : ":demux=flac");
+                streamed.Buffering += waiting => { if (ReferenceEquals(_currentMedia, streamed)) BufferingChanged?.Invoke(this, waiting); };
+                streamed.Finished += () => { if (ReferenceEquals(_currentMedia, streamed)) BufferingChanged?.Invoke(this, false); };
+            }
+            if (!isPathless)
                 ApplyReadAhead(media);
             // Off the engine the playback-speed button is LibVLC's rate; only media
             // opened with time-stretch keep their pitch at ≠ 1× (scaletempo is a
@@ -3164,7 +3193,9 @@ public class VlcAudioPlayer : IAudioPlayer
             // edit landing mid-parse must not abort the track being opened.
             using var cts = CancellationTokenSource.CreateLinkedTokenSource(openCancel);
             cts.CancelAfter(8000);
-            var parseTask = media.Parse(isRemote ? MediaParseOptions.ParseNetwork : MediaParseOptions.ParseLocal, timeout: 8000);
+            // Parsing a growing input can probe the tail and block until completion.
+            var parseTask = media is ProgressiveMedia ? Task.FromResult(MediaParsedStatus.Done)
+                : media.Parse(isRemote ? MediaParseOptions.ParseNetwork : MediaParseOptions.ParseLocal, timeout: 8000);
             var clipParseTimedOut = false;
             try
             {
@@ -3241,6 +3272,7 @@ public class VlcAudioPlayer : IAudioPlayer
                 if (fadeOutMs > 0)
                     FadePlayerVolumeBlocking(_player.Volume, 0, fadeOutMs, cancel);
 
+                (_currentMedia as ProgressiveMedia)?.CancelRead();
                 _player.Stop();
             }
 
@@ -3390,7 +3422,7 @@ public class VlcAudioPlayer : IAudioPlayer
                 Thread.Sleep(150);
                 if (!_disposed && sessionId == CurrentSessionId && _player.IsPlaying)
                 {
-                    var len = _player.Length;
+                    var len = CurrentLengthMs;
                     if (len > 0)
                     {
                         var dur = TimeSpan.FromMilliseconds(len);
@@ -3589,7 +3621,7 @@ public class VlcAudioPlayer : IAudioPlayer
                 Thread.Sleep(150);
                 if (!_disposed && sessionId == CurrentSessionId && _player.IsPlaying)
                 {
-                    var len = _player.Length;
+                    var len = CurrentLengthMs;
                     if (len > 0)
                         DurationResolved?.Invoke(this, TimeSpan.FromMilliseconds(len));
                 }
@@ -3768,7 +3800,7 @@ public class VlcAudioPlayer : IAudioPlayer
                 Thread.Sleep(150);
                 if (!_disposed && sessionId == CurrentSessionId && _player.IsPlaying)
                 {
-                    var len = _player.Length;
+                    var len = CurrentLengthMs;
                     if (len > 0)
                         DurationResolved?.Invoke(this, TimeSpan.FromMilliseconds(len));
                 }
@@ -3917,7 +3949,7 @@ public class VlcAudioPlayer : IAudioPlayer
                 Thread.Sleep(150);
                 if (!_disposed && sessionId == CurrentSessionId && _player.IsPlaying)
                 {
-                    var len = _player.Length;
+                    var len = CurrentLengthMs;
                     if (len > 0)
                         DurationResolved?.Invoke(this, TimeSpan.FromMilliseconds(len));
                 }
@@ -4027,7 +4059,7 @@ public class VlcAudioPlayer : IAudioPlayer
                 if (_player.State != VLCState.Playing)
                     break;
 
-                var len = _player.Length;
+                var len = CurrentLengthMs;
                 if (len <= 0)
                     len = Interlocked.Read(ref _lastKnownLengthMs);
                 var time = _player.Time;
@@ -4427,10 +4459,19 @@ public class VlcAudioPlayer : IAudioPlayer
             // would eat the un-played tail mid-splice. A drained segment is
             // final — ignore the flush.
             if (seg != null && !seg.EndOfStream)
-                seg.Flush(Interlocked.Read(ref _enginePendingBaseMs[slot]),
+                FlushEngineInput(seg, Interlocked.Read(ref _enginePendingBaseMs[slot]),
+                    ReferenceEquals(_enginePlayers[slot], _player) && _currentMedia is ProgressiveMedia,
                     seg.SampleRate * EngineSeekResamplerTailMs / 1000);
         }
         catch { /* libvlc thread */ }
+    }
+
+    internal static void FlushEngineInput(GaplessTrackSegment segment, long seekBaseMs, bool nonseekableDownload, int discardFrames = 0)
+    {
+        // A growing input cannot seek. VLC's clock resync after a network underrun
+        // must not discard sequential PCM or reset the audible position to the old
+        // seek base (usually zero). Stop/skip already abandon the segment explicitly.
+        if (!nonseekableDownload) segment.Flush(seekBaseMs, discardFrames);
     }
 
     // A user pause is not an input stall: without these the first block after every
@@ -4968,6 +5009,10 @@ public class VlcAudioPlayer : IAudioPlayer
     public void Stop()
     {
         if (_disposed) return;
+        var requestVersion = Interlocked.Increment(ref _playRequestVersion);
+
+        (_currentMedia as ProgressiveMedia)?.CancelRead();
+        BufferingChanged?.Invoke(this, false);
 
         CancelSkipCts();
         CancelOpenCts();
@@ -4987,6 +5032,7 @@ public class VlcAudioPlayer : IAudioPlayer
 
             try
             {
+                if (_disposed || requestVersion != Interlocked.Read(ref _playRequestVersion)) return;
                 if (_gaplessEngine)
                     EngineClearAll(); // unblock all writers before the Stops below
                 ReleasePreparedNext();
@@ -5009,6 +5055,14 @@ public class VlcAudioPlayer : IAudioPlayer
     public void Seek(TimeSpan position)
     {
         if (_disposed) return;
+        if (_currentMedia is ProgressiveMedia growing)
+        {
+            if (!growing.Complete || _currentMediaPath is null || !File.Exists(_currentMediaPath)) return;
+            Interlocked.Exchange(ref _pendingSeekMs, Math.Max(0, (long)position.TotalMilliseconds));
+            _restartPausedRequest = _isPaused;
+            Play(_currentMediaPath); // reopen the validated full file with normal seeking
+            return;
+        }
         if (_currentMedia == null)
         {
             DebugLogger.Info(DebugLogger.Category.Playback, "Seek.Dropped",
@@ -5028,7 +5082,7 @@ public class VlcAudioPlayer : IAudioPlayer
                 (long)position.TotalMilliseconds);
 
         // After a track ends (or is stopped) the audio output is torn down and
-        // _player.Length reports 0, so the in-place seek below early-returns and the
+        // CurrentLengthMs reports 0, so the in-place seek below early-returns and the
         // write is ignored — dragging the slider back from the end then plays nothing.
         // Restart the media and apply the dropped position as a pending seek so audio
         // resumes from there (same mechanism as the start-region restart). Length is
@@ -5037,7 +5091,7 @@ public class VlcAudioPlayer : IAudioPlayer
         if ((state == VLCState.Ended || state == VLCState.Stopped) &&
             !string.IsNullOrEmpty(_currentMediaPath))
         {
-            var endedLen = _player.Length;
+            var endedLen = CurrentLengthMs;
             if (endedLen <= 0) endedLen = Interlocked.Read(ref _lastKnownLengthMs);
             long restartMs = -1;
             if (endedLen > 0)
@@ -5057,7 +5111,7 @@ public class VlcAudioPlayer : IAudioPlayer
             return;
         }
 
-        var len = _player.Length;
+        var len = CurrentLengthMs;
         if (len <= 0)
         {
             DebugLogger.Info(DebugLogger.Category.Playback, "Seek.Dropped",
@@ -5154,6 +5208,7 @@ public class VlcAudioPlayer : IAudioPlayer
     private void OnEndReachedCore(object? sender)
     {
         if (_disposed) return;
+        if (ReferenceEquals(sender, _player) && _currentMedia is ProgressiveMedia { Cancelled: true }) return;
 
         // Engine EOS fallback: VLC 3's amem drain callback "may" fire at end of
         // stream — EndReached is the guaranteed signal. Without EndOfStream the
@@ -5200,7 +5255,7 @@ public class VlcAudioPlayer : IAudioPlayer
             var knownLenMs = Interlocked.Read(ref _lastKnownLengthMs);
             if (knownLenMs <= 0)
             {
-                try { knownLenMs = _player.Length; } catch { /* transitional state */ }
+                try { knownLenMs = CurrentLengthMs; } catch { /* transitional state */ }
             }
             if (knownLenMs <= 0 || knownLenMs >= 500)
             {
@@ -5217,12 +5272,12 @@ public class VlcAudioPlayer : IAudioPlayer
         // VLC fires EndReached before the audio buffer fully drains, which
         // can cause lyrics/UI to cut early if TrackEnded is fired immediately.
         //
-        // CRITICAL: _player.Length can return 0 after EndReached because VLC
+        // CRITICAL: CurrentLengthMs can return 0 after EndReached because VLC
         // considers the media finished. Fall back to the last known good length
         // captured during normal playback.
         try
         {
-            var len = _player.Length;
+            var len = CurrentLengthMs;
             if (len <= 0)
                 len = Interlocked.Read(ref _lastKnownLengthMs);
             // Engine: the audible tail is still rendering — report the honest
@@ -5274,11 +5329,16 @@ public class VlcAudioPlayer : IAudioPlayer
                 return;
             }
 
+            if (_currentMedia is ProgressiveMedia { Cancelled: true }) return;
+
             DebugLogger.Error(DebugLogger.Category.Playback, "VLC.Error", "VLC encountered a playback error");
             ResetEndReachedPending();
             _positionTimer.Stop();
             _isPaused = false;
-            PlaybackError?.Invoke(this, "VLC encountered a playback error.");
+            BufferingChanged?.Invoke(this, false);
+            PlaybackError?.Invoke(this, _currentMedia is ProgressiveMedia { Error: { } error }
+                ? "Audio download interrupted: " + error.GetBaseException().Message + " Open Downloads to check its retry status."
+                : "VLC encountered a playback error.");
         }
         catch (Exception ex)
         {
@@ -5350,7 +5410,7 @@ public class VlcAudioPlayer : IAudioPlayer
 
                 // During grace period, report the full track duration so lyrics/UI
                 // see the complete position. Fall back to last known good length
-                // because _player.Length can return 0 after EndReached.
+                // because CurrentLengthMs can return 0 after EndReached.
                 // Engine: while the audible tail still renders, report the honest
                 // sink position instead (see the deadline note in OnEndReachedCore);
                 // the full-duration snap still happens once the tail drains.
@@ -5360,7 +5420,7 @@ public class VlcAudioPlayer : IAudioPlayer
                 }
                 else
                 {
-                    var len = _player.Length;
+                    var len = CurrentLengthMs;
                     if (len <= 0)
                         len = Interlocked.Read(ref _lastKnownLengthMs);
                     if (len > 0)
@@ -5425,10 +5485,10 @@ public class VlcAudioPlayer : IAudioPlayer
             if (time >= 0)
             {
                 // Track the last known good length during normal playback.
-                // _player.Length is reliable while playing but can return 0
+                // CurrentLengthMs is reliable while playing but can return 0
                 // after EndReached. Capturing it here ensures the grace
                 // handler always has a valid fallback.
-                var len = _player.Length;
+                var len = CurrentLengthMs;
                 if (len > 0)
                     Interlocked.Exchange(ref _lastKnownLengthMs, len);
 
@@ -5525,7 +5585,7 @@ public class VlcAudioPlayer : IAudioPlayer
                     if (_disposed || _currentMedia == null)
                         break;
 
-                    var len = _player.Length;
+                    var len = CurrentLengthMs;
                     if (len <= 0)
                     {
                         DebugLogger.Info(DebugLogger.Category.Playback, "Seek.Dropped",
@@ -5669,6 +5729,7 @@ public class VlcAudioPlayer : IAudioPlayer
 
     private void CancelOpenCts()
     {
+        (_currentMedia as ProgressiveMedia)?.CancelRead();
         try { _openCts.Cancel(); }
         catch (ObjectDisposedException) { }
     }

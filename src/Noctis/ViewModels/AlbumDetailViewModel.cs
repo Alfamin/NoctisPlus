@@ -250,6 +250,8 @@ public partial class AlbumDetailViewModel : ViewModelBase, IDisposable
         IsPlayerPlaying = _player.State == Models.PlaybackState.Playing;
         _playerPropertyChangedHandler = (_, e) =>
         {
+            if (e.PropertyName is nameof(PlayerViewModel.CurrentTrack) or nameof(PlayerViewModel.State) or nameof(PlayerViewModel.OnlinePlayingSongId))
+                RefreshCatalogPlayback();
             if (e.PropertyName == nameof(PlayerViewModel.CurrentTrack))
             {
                 UpdateCurrentPlayingTrack();

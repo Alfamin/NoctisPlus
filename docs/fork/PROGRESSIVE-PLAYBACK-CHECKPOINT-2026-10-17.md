@@ -1,5 +1,8 @@
 # Progressive playback checkpoint — not yet exposed in the app
 
+**Historical checkpoint.** The 2026-10-18 integration supersedes this unwired status;
+read PROGRESSIVE-PLAYBACK-VALIDATION-2026-10-18.md for current code and validation gates.
+
 Order 6 is PARTIAL. Owner reprioritized reliability after friend-facing failures. There is
 no streaming Play button yet and ordinary download/playback behavior is unchanged.
 

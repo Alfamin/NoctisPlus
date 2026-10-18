@@ -76,6 +76,11 @@ public interface IOnlineMusicSearch
     /// <summary>Downloads (now = ahead of the queue) or queues the songs. Returns a short message for the user.</summary>
     Task<string> DownloadAsync(IReadOnlyList<OnlineSong> songs, bool now, CancellationToken ct);
 
+    /// <summary>Explicit Play: reuse the durable download and return a playable local or
+    /// buffered source. Cancelling this wait never cancels the saved download request.</summary>
+    Task<Noctis.Models.Track> PreparePlaybackAsync(OnlineSong song, CancellationToken ct)
+        => Task.FromException<Noctis.Models.Track>(new NotSupportedException("This source does not support online playback."));
+
     /// <summary>The download queue behind the Downloads page.</summary>
     IDownloadQueue Downloads { get; }
 

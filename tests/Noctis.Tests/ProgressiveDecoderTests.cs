@@ -18,21 +18,7 @@ public class ProgressiveDecoderTests(ITestOutputHelper output)
         if (!OperatingSystem.IsWindows()) Assert.Skip("Requires the bundled Windows LibVLC decoder.");
         Core.Initialize();
         using var data = new TestPersistenceService();
-        var audio = Wave(24);
-        if (extension != "wav")
-        {
-            var ffmpeg = Environment.GetEnvironmentVariable("NOCTIS_TEST_FFMPEG") ?? new AudioConverterService(() => "", new MetadataService()).GetFfmpegPath();
-            if (ffmpeg is null) Assert.Skip("FFmpeg is unavailable to encode a generated " + extension + " fixture.");
-            var source = Path.Combine(data.DataDirectory, "tone.wav"); File.WriteAllBytes(source, audio);
-            var encoded = Path.Combine(data.DataDirectory, "tone." + extension);
-            var info = new ProcessStartInfo(ffmpeg) { UseShellExecute = false, CreateNoWindow = true, RedirectStandardError = true };
-            foreach (var arg in new[] { "-hide_banner", "-loglevel", "error", "-y", "-i", source, encoded }) info.ArgumentList.Add(arg);
-            using var encoder = Process.Start(info)!; var errors = encoder.StandardError.ReadToEndAsync();
-            using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(15));
-            try { await encoder.WaitForExitAsync(timeout.Token); }
-            catch { encoder.Kill(entireProcessTree: true); throw; }
-            Assert.True(encoder.ExitCode == 0, await errors); audio = File.ReadAllBytes(encoded);
-        }
+        var audio = await AudioAsync(extension, data.DataDirectory);
         using var buffer = new ProgressiveAudioBuffer(new FileStream(Path.Combine(data.DataDirectory, "generated.part"), FileMode.Create, FileAccess.ReadWrite, FileShare.ReadWrite | FileShare.Delete, 1));
         buffer.Begin(audio.Length); buffer.Writer.Write(audio.AsSpan(0, audio.Length / 3)); // withhold the final two thirds
         using var input = new ProgressiveMediaInput(buffer);
@@ -59,6 +45,27 @@ public class ProgressiveDecoderTests(ITestOutputHelper output)
             await Task.Run(player.Stop).WaitAsync(TimeSpan.FromSeconds(5));
             GC.KeepAlive(play);
         }
+    }
+
+    internal static async Task<byte[]> AudioAsync(string extension, string folder, bool noisy = false)
+    {
+        var audio = Wave(24);
+        if (noisy) new Random(217).NextBytes(audio.AsSpan(44)); // resist FLAC compression for a realistic partial-file size
+        if (extension != "wav")
+        {
+            var ffmpeg = Environment.GetEnvironmentVariable("NOCTIS_TEST_FFMPEG") ?? new AudioConverterService(() => "", new MetadataService()).GetFfmpegPath();
+            if (ffmpeg is null) Assert.Skip("FFmpeg is unavailable to encode a generated " + extension + " fixture.");
+            var source = Path.Combine(folder, "tone.wav"); File.WriteAllBytes(source, audio);
+            var encoded = Path.Combine(folder, "tone." + extension);
+            var info = new ProcessStartInfo(ffmpeg) { UseShellExecute = false, CreateNoWindow = true, RedirectStandardError = true };
+            foreach (var arg in new[] { "-hide_banner", "-loglevel", "error", "-y", "-i", source, encoded }) info.ArgumentList.Add(arg);
+            using var encoder = Process.Start(info)!; var errors = encoder.StandardError.ReadToEndAsync();
+            using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(15));
+            try { await encoder.WaitForExitAsync(timeout.Token); }
+            catch { encoder.Kill(entireProcessTree: true); throw; }
+            Assert.True(encoder.ExitCode == 0, await errors); audio = File.ReadAllBytes(encoded);
+        }
+        return audio;
     }
 
     internal static byte[] Wave(int seconds)

@@ -10,7 +10,7 @@ namespace Noctis.Features.ProgressivePlayback;
 internal sealed class ProgressiveAudioBuffer : IDisposable
 {
     private readonly object _gate = new();
-    private readonly FileStream _file;
+    private FileStream _file;
     private readonly bool _leaveOpen;
     private readonly List<(long Start, long End)> _ranges = [];
     private readonly Stopwatch _clock = Stopwatch.StartNew();
@@ -79,6 +79,21 @@ internal sealed class ProgressiveAudioBuffer : IDisposable
     internal AudioReader OpenReader(CancellationToken ct = default)
     {
         lock (_gate) { ThrowIfDisposed(); return new(this, _generation, ct); }
+    }
+
+    /// <summary>The producer is finished; release write access while preserving the
+    /// decoder's file. TagLib's normal read/share-read open rejects a live write handle.</summary>
+    internal void SealReadOnly(string savedPath)
+    {
+        lock (_gate)
+        {
+            ThrowIfDisposed();
+            if (!_complete || _error is not null) throw new IOException("Only a validated complete transfer can release its writer.");
+            if (_leaveOpen) throw new InvalidOperationException("A borrowed transfer file cannot change ownership.");
+            var read = new FileStream(savedPath, FileMode.Open, FileAccess.Read, FileShare.ReadWrite | FileShare.Delete, 1);
+            if (read.Length != _expected) { read.Dispose(); throw new IOException("The saved audio changed before playback could retain it."); }
+            var write = _file; _file = read; write.Dispose();
+        }
     }
 
     private int Read(int generation, long position, Span<byte> target, CancellationToken ct)

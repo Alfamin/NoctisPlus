@@ -69,6 +69,8 @@ internal static class AudioFileTransfer
     internal static async Task DownloadAsync(TelegramAccount account, Client client, Document document,
         Stream output, IProgress<double>? progress, CancellationToken ct)
     {
+        if (output is Noctis.Features.ProgressivePlayback.IProgressiveAudioWriter publisher)
+            publisher.BeginAudio(document.size, TelegramBotSource.Extension(document) ?? "");
         Client? media = null;
         var initialMedia = new Lazy<Task<Client>>(() => document.dc_id == 0
             ? Task.FromResult(client) : client.GetClientForDC(-document.dc_id, true));

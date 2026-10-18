@@ -63,7 +63,7 @@ public partial class SearchView : UserControl
     // Playing takes a double click, as in every other song list (the cover's Play is one click).
     private void OnSongRowDoubleTapped(object? sender, TappedEventArgs e)
     {
-        if (sender is Control { DataContext: SearchSongItem { IsLocal: true } item } && DataContext is SearchViewModel vm)
+        if (sender is Control { DataContext: SearchSongItem item } && DataContext is SearchViewModel vm)
         {
             vm.PlaySongCommand.Execute(item);
             e.Handled = true;
@@ -72,7 +72,7 @@ public partial class SearchView : UserControl
 
     private void OnTopSongDoubleTapped(object? sender, TappedEventArgs e)
     {
-        if (DataContext is SearchViewModel { TopSong: { IsLocal: true } item } vm)
+        if (DataContext is SearchViewModel { TopSong: { } item } vm)
         {
             vm.PlaySongCommand.Execute(item);
             e.Handled = true;

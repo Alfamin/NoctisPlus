@@ -1,0 +1,35 @@
+using LibVLCSharp.Shared;
+
+namespace Noctis.Features.ProgressivePlayback;
+
+/// <summary>Media owns its callback input and reader lease. Call CancelRead before native
+/// Stop; dispose only after Stop has joined VLC's decoder/callback threads.</summary>
+internal sealed class ProgressiveMedia : Media
+{
+    private readonly ProgressiveTransfer.Lease _lease;
+    private readonly ProgressiveMediaInput _input;
+    private int _disposed;
+    internal static ProgressiveMedia Create(LibVLC vlc, ProgressiveTransfer.Lease lease)
+    {
+        var input = lease.CreateInput();
+        try { return new(vlc, lease, input); }
+        catch { input.Dispose(); lease.Dispose(); throw; }
+    }
+    private ProgressiveMedia(LibVLC vlc, ProgressiveTransfer.Lease lease, ProgressiveMediaInput input) : base(vlc, input)
+    { _lease = lease; _input = input; _lease.Ended += OnFinished; }
+    internal bool Complete => _lease.Buffer.Complete;
+    internal TimeSpan? Duration => _lease.Duration;
+    internal bool Cancelled => _input.Cancelled;
+    internal Exception? Error => _input.Error;
+    internal void CancelRead() => _input.CancelRead();
+    internal event Action<bool>? Buffering { add => _input.Buffering += value; remove => _input.Buffering -= value; }
+    internal event Action? Finished;
+    private void OnFinished() => Finished?.Invoke();
+    protected override void Dispose(bool disposing)
+    {
+        if (!disposing || Interlocked.Exchange(ref _disposed, 1) != 0) return;
+        _lease.Ended -= OnFinished;
+        try { base.Dispose(disposing); }
+        finally { _input.Dispose(); _lease.Dispose(); }
+    }
+}

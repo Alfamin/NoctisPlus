@@ -21,6 +21,9 @@ public interface IAudioPlayer : IDisposable
     /// <summary>Fires when the actual duration is resolved from the decoder (may differ from metadata).</summary>
     event EventHandler<TimeSpan>? DurationResolved;
 
+    /// <summary>Download-backed input is waiting for its next contiguous bytes.</summary>
+    event EventHandler<bool>? BufferingChanged { add { } remove { } }
+
     /// <summary>Fires when the active output path changes (exclusive engaged, fell back to shared, ...)
     /// with a short human-readable status. May fire on a non-UI thread.</summary>
     event EventHandler<string>? OutputModeChanged;
@@ -33,6 +36,9 @@ public interface IAudioPlayer : IDisposable
 
     /// <summary>Current playback position.</summary>
     TimeSpan Position { get; }
+
+    /// <summary>False while a download-backed input cannot safely seek yet.</summary>
+    bool CanSeek => true;
 
     /// <summary>How far <see cref="Position"/> (and PositionChanged) lead the speaker:
     /// the depth of output buffer already filled but not yet heard. Zero when the

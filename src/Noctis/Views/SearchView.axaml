@@ -65,7 +65,7 @@
              the heart would be (a ring while it downloads). -->
         <DataTemplate x:Key="SearchSongRow" x:DataType="vm:SearchSongItem">
             <Button Classes="browse-item song-row"
-                    Classes.playing="{Binding Local.IsNowPlaying, FallbackValue=False}"
+                    Classes.playing="{Binding IsNowPlaying, FallbackValue=False}"
                     Classes.online="{Binding IsOnline}"
                     AutomationProperties.Name="{Binding Title}"
                     Background="{DynamicResource HomeCardBackground}"
@@ -104,13 +104,12 @@
                                         HorizontalContentAlignment="Center"
                                         VerticalContentAlignment="Center"
                                         Cursor="Hand"
-                                        IsVisible="{Binding IsLocal}"
-                                        ToolTip.Tip="Play"
+                                        ToolTip.Tip="{Binding PlayLabel}"
                                         Command="{Binding $parent[UserControl].((vm:SearchViewModel)DataContext).PlaySongCommand}"
                                         CommandParameter="{Binding}">
                                     <Panel>
-                                        <Viewbox Width="14" Height="14" Margin="1,0,0,0" IsVisible="{Binding !Local.IsCurrentlyPlaying, FallbackValue=True}"><Path Data="{StaticResource PlayIcon}" /></Viewbox>
-                                        <Viewbox Width="14" Height="14" IsVisible="{Binding Local.IsCurrentlyPlaying, FallbackValue=False}"><Path Data="{StaticResource PauseIcon}" /></Viewbox>
+                                        <Viewbox Width="14" Height="14" Margin="1,0,0,0" IsVisible="{Binding !IsPlaying, FallbackValue=True}"><Path Data="{StaticResource PlayIcon}" /></Viewbox>
+                                        <Viewbox Width="14" Height="14" IsVisible="{Binding IsPlaying, FallbackValue=False}"><Path Data="{StaticResource PauseIcon}" /></Viewbox>
                                     </Panel>
                                 </Button>
                             </Panel>
@@ -143,7 +142,7 @@
                                    TextTrimming="CharacterEllipsis"
                                    MaxLines="1">
                             <Run Text="{Binding ArtistDisplay, Mode=OneWay}" />
-                            <Run Text="{Binding AlbumTitle, Mode=OneWay, StringFormat=' · {0}'}" />
+                            <Run Text="{Binding AlbumSuffix, Mode=OneWay}" />
                         </TextBlock>
                     </StackPanel>
 
@@ -165,7 +164,7 @@
              album · time · heart or download), no card behind it, the hover wash on it. -->
         <DataTemplate x:Key="SearchSongTableRow" x:DataType="vm:SearchSongItem">
             <Button Classes="browse-item song-row table"
-                    Classes.playing="{Binding Local.IsNowPlaying, FallbackValue=False}"
+                    Classes.playing="{Binding IsNowPlaying, FallbackValue=False}"
                     Classes.online="{Binding IsOnline}"
                     AutomationProperties.Name="{Binding Title}"
                     BorderThickness="0" CornerRadius="6" Padding="0" Height="56" Margin="0,1"
@@ -186,12 +185,12 @@
                                 <Button Classes="art-play-overlay" Background="#66000000" BorderThickness="0" Padding="0" CornerRadius="5"
                                         HorizontalAlignment="Stretch" VerticalAlignment="Stretch"
                                         HorizontalContentAlignment="Center" VerticalContentAlignment="Center" Cursor="Hand"
-                                        IsVisible="{Binding IsLocal}" ToolTip.Tip="Play"
+                                        ToolTip.Tip="{Binding PlayLabel}"
                                         Command="{Binding $parent[UserControl].((vm:SearchViewModel)DataContext).PlaySongCommand}"
                                         CommandParameter="{Binding}">
                                     <Panel>
-                                        <Viewbox Width="13" Height="13" Margin="1,0,0,0" IsVisible="{Binding !Local.IsCurrentlyPlaying, FallbackValue=True}"><Path Data="{StaticResource PlayIcon}" /></Viewbox>
-                                        <Viewbox Width="13" Height="13" IsVisible="{Binding Local.IsCurrentlyPlaying, FallbackValue=False}"><Path Data="{StaticResource PauseIcon}" /></Viewbox>
+                                        <Viewbox Width="13" Height="13" Margin="1,0,0,0" IsVisible="{Binding !IsPlaying, FallbackValue=True}"><Path Data="{StaticResource PlayIcon}" /></Viewbox>
+                                        <Viewbox Width="13" Height="13" IsVisible="{Binding IsPlaying, FallbackValue=False}"><Path Data="{StaticResource PauseIcon}" /></Viewbox>
                                     </Panel>
                                 </Button>
                             </Panel>
@@ -810,29 +809,31 @@
                                     </StackPanel>
                                 </StackPanel>
                             </StackPanel>
-                            <!-- Library: Play. Online: Download. Both the app's accent pill. -->
+                            <!-- Play leads; saving without playback remains a separate action. -->
                             <StackPanel Grid.Row="1" Orientation="Horizontal" Spacing="8" HorizontalAlignment="Right">
                                 <Button Classes="accent-btn" Background="{DynamicResource AccentButtonBackground}" BorderThickness="0"
                                         Padding="16,8" CornerRadius="999" Cursor="Hand"
-                                        IsVisible="{Binding TopSong.IsLocal, FallbackValue=False}"
                                         Command="{Binding PlaySongCommand}" CommandParameter="{Binding TopSong}">
                                     <StackPanel Orientation="Horizontal" Spacing="7">
                                         <PathIcon Data="{StaticResource PlayIcon}" Width="12" Height="12" Margin="1,0,0,0"
+                                                  IsVisible="{Binding !TopSong.IsPlaying, FallbackValue=True}"
                                                   Foreground="{DynamicResource AccentForegroundBrush}" VerticalAlignment="Center" />
-                                        <TextBlock Text="Play" FontSize="13" FontWeight="SemiBold"
+                                        <PathIcon Data="{StaticResource PauseIcon}" Width="12" Height="12" IsVisible="{Binding TopSong.IsPlaying, FallbackValue=False}"
+                                                  Foreground="{DynamicResource AccentForegroundBrush}" VerticalAlignment="Center" />
+                                        <TextBlock Text="{Binding TopSong.PlayLabel, FallbackValue='Play'}" FontSize="13" FontWeight="SemiBold"
                                                    Foreground="{DynamicResource AccentForegroundBrush}" VerticalAlignment="Center" />
                                     </StackPanel>
                                 </Button>
-                                <Button Classes="accent-btn" Background="{DynamicResource AccentButtonBackground}" BorderThickness="0"
+                                <Button Classes="grey-pill" BorderThickness="0"
                                         Padding="16,8" CornerRadius="999" Cursor="Hand"
                                         IsVisible="{Binding TopSong.CanStartDownload, FallbackValue=False}"
                                         Command="{Binding DownloadSongCommand}" CommandParameter="{Binding TopSong}">
                                     <StackPanel Orientation="Horizontal" Spacing="7">
                                         <Path Data="{StaticResource SearchDownloadGlyph}" Width="12" Height="12" Stretch="Uniform"
-                                              Stroke="{DynamicResource AccentForegroundBrush}" StrokeThickness="2"
+                                              Stroke="{Binding $parent[Button].Foreground}" StrokeThickness="2"
                                               StrokeLineCap="Round" StrokeJoin="Round" VerticalAlignment="Center" />
                                         <TextBlock Text="Download" FontSize="13" FontWeight="SemiBold"
-                                                   Foreground="{DynamicResource AccentForegroundBrush}" VerticalAlignment="Center" />
+                                                   Foreground="{Binding $parent[Button].Foreground}" VerticalAlignment="Center" />
                                     </StackPanel>
                                 </Button>
                                 <controls:ProgressRing Width="26" Height="26" Thickness="2.4"

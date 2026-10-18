@@ -17,6 +17,7 @@ using Xunit;
 
 namespace Noctis.Tests;
 
+[Collection("MetadataServiceStatics")] // shares the process-wide saved-download event with importer/pipeline checks
 public class NativeWordLyricsTests
 {
     private sealed class Rig : IDisposable

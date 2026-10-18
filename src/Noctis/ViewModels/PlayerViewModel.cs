@@ -641,6 +641,7 @@ public partial class PlayerViewModel : ViewModelBase
         _audioPlayer.PositionChanged += OnPositionChanged;
         _audioPlayer.TrackEnded += OnTrackEnded;
         _audioPlayer.PlaybackError += OnPlaybackError;
+        _audioPlayer.BufferingChanged += (_, waiting) => Dispatcher.UIThread.Post(() => UpdateInputWaiting(waiting));
         _audioPlayer.DurationResolved += OnDurationResolved;
         // Output path can change after playback starts (exclusive engaged /
         // fell back) — keep the signal-path badge in sync.
@@ -677,6 +678,7 @@ public partial class PlayerViewModel : ViewModelBase
     [RelayCommand]
     private void PlayPause()
     {
+        CancelOnlinePlayback();
         DebugLogger.Info(DebugLogger.Category.Playback, "PlayPause", $"state={State}, track={CurrentTrack?.Title}");
         switch (State)
         {
@@ -726,6 +728,7 @@ public partial class PlayerViewModel : ViewModelBase
     /// </summary>
     public void PauseForShutdown()
     {
+        CancelOnlinePlayback();
         if (State != PlaybackState.Playing) return;
         CancelAutoMixTransition("shutdown");
         _audioPlayer.Pause();
@@ -749,6 +752,7 @@ public partial class PlayerViewModel : ViewModelBase
     [RelayCommand(CanExecute = nameof(CanGoNext))]
     private void Next()
     {
+        CancelOnlinePlayback();
         DebugLogger.Info(DebugLogger.Category.Playback, "Next",
             $"queueLen={UpNext.Count}, shuffle={IsShuffleEnabled}, repeat={RepeatMode}");
         CancelAutoMixTransition("user skipped");
@@ -767,6 +771,7 @@ public partial class PlayerViewModel : ViewModelBase
     [RelayCommand]
     private void Previous()
     {
+        CancelOnlinePlayback();
         DebugLogger.Info(DebugLogger.Category.Playback, "Previous", $"pos={Position.TotalSeconds:F1}s, historyLen={History.Count}");
         if (Position.TotalSeconds > 3)
         {
@@ -865,6 +870,7 @@ public partial class PlayerViewModel : ViewModelBase
     [RelayCommand]
     private void SeekToPosition(double fraction)
     {
+        if (!_audioPlayer.CanSeek) return;
         if (CurrentTrack == null || Duration == TimeSpan.Zero) return;
 
         fraction = Math.Clamp(fraction, 0.0, 1.0);
@@ -1751,6 +1757,7 @@ public partial class PlayerViewModel : ViewModelBase
 
     private void ClearQueueCore(bool notifyShuffle)
     {
+        CancelOnlinePlayback();
         if (notifyShuffle) ShuffleQueueCleared?.Invoke();
         DebugLogger.Info(DebugLogger.Category.Queue, "ClearQueue", $"cleared={UpNext.Count} tracks");
         CancelAutoMixTransition("queue changed");
@@ -1782,6 +1789,7 @@ public partial class PlayerViewModel : ViewModelBase
     /// go back to them; they no longer count as this queue's.</param>
     public void StopAndClear(string reason = "unspecified", bool keepHistory = false)
     {
+        CancelOnlinePlayback();
         ShuffleQueueCleared?.Invoke();
         DebugLogger.Info(DebugLogger.Category.Playback, "StopAndClear",
             $"reason={reason}, track={CurrentTrack?.Id}, upNext={UpNext.Count}, history={History.Count}");
@@ -2341,6 +2349,7 @@ public partial class PlayerViewModel : ViewModelBase
 
     partial void OnCurrentTrackChanged(Track? value)
     {
+        if (value is null) OnlinePlayingSongId = null;
         OnPropertyChanged(nameof(HasContent));
         ViewCurrentTrackAlbumCommand.NotifyCanExecuteChanged();
         ResolveLyricsBackground();
@@ -2384,7 +2393,7 @@ public partial class PlayerViewModel : ViewModelBase
             $"old={oldValue?.Title ?? "<null>"} new={newValue?.Title ?? "<null>"}");
     }
 
-    partial void OnStateChanged(PlaybackState value) => SyncNowPlayingFlags();
+    partial void OnStateChanged(PlaybackState value) { SyncNowPlayingFlags(); UpdateAudibleBuffering(Position); }
 
     private Album? _flaggedAlbum;
 
@@ -2553,6 +2562,7 @@ public partial class PlayerViewModel : ViewModelBase
     /// <summary>Call when the user starts dragging the seek slider.</summary>
     public void BeginSeek()
     {
+        if (!_audioPlayer.CanSeek) return;
         // Cancel any pending debounce seek from the previous EndSeek so it cannot
         // fire mid-drag and send a stale position to VLC while the user is still dragging.
         _seekDebounceTimer?.Dispose();
@@ -2567,6 +2577,7 @@ public partial class PlayerViewModel : ViewModelBase
     {
         if (!_isSeeking) return; // already ended — prevent duplicate seeks
         _isSeeking = false;
+        if (!_audioPlayer.CanSeek) return;
 
         // A committed seek cancels the player's prepared/staged next track
         // (Seek → CancelPreparedNext), but this path never re-armed the prepare
@@ -2710,7 +2721,11 @@ public partial class PlayerViewModel : ViewModelBase
 
     private void PlayTrack(Track track)
     {
+        CancelOnlinePlayback();
         var playTrackStart = Stopwatch.GetTimestamp();
+        IsBuffering = false;
+        _inputWaiting = false; _lastOnlineAdvance = Environment.TickCount64; _lastOnlinePosition = TimeSpan.Zero;
+        OnlinePlayingSongId = null;
         _seekDebounceTimer?.Dispose();
         _seekDebounceTimer = null;
         CancelNaturalEndFallback();
@@ -2732,6 +2747,7 @@ public partial class PlayerViewModel : ViewModelBase
         }
 
         CurrentTrack = track;
+        CanSeekCurrent = !Features.ProgressivePlayback.ProgressiveTransfer.IsAvailable(track.FilePath);
         LoadAlbumArt(track);
         Duration = track.Duration;
         DurationText = FormatTime(track.Duration);
@@ -3431,10 +3447,12 @@ public partial class PlayerViewModel : ViewModelBase
         Dispatcher.UIThread.Post(() =>
         {
             _positionUpdateQueued = false;
+            CanSeekCurrent = _audioPlayer.CanSeek;
             // Audio is demonstrably playing — the error-cascade breaker resets.
             if (_consecutivePlaybackErrors != 0) _consecutivePlaybackErrors = 0;
             if (_errorSkippedTracks.Count != 0) _errorSkippedTracks.Clear();
             var latest = _latestVlcPosition;
+            UpdateAudibleBuffering(latest);
 
             if (_isSeeking) return; // don't update while user is dragging
 
@@ -4089,6 +4107,16 @@ public partial class PlayerViewModel : ViewModelBase
             // publish follows with IsPublishingPartial false — reconcile then.
             if (_library.IsPublishingPartial)
                 return;
+
+            // A progressive song becomes an ordinary library row after the saved-file
+            // importer lands. Adopt that object without restarting the decoder/clock.
+            if (OnlinePlayingSongId is not null && CurrentTrack is { IsExternal: true } streamed
+                && _library.Tracks.FirstOrDefault(t => string.Equals(t.FilePath, streamed.FilePath, StringComparison.OrdinalIgnoreCase)) is { } saved)
+            {
+                saved.PlayCount += streamed.PlayCount;
+                if (streamed.LastPlayed is { } played && (saved.LastPlayed is null || played > saved.LastPlayed)) saved.LastPlayed = played;
+                CurrentTrack = saved; MarkPlayStateDirty(saved); ScheduleLibrarySave();
+            }
 
             // #97: a startup scan that found new albums ended the process with no managed
             // exception logged. Only such a scan reconciles a restored track here (the load

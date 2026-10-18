@@ -699,6 +699,9 @@
                             Height="40">
                         <Panel>
                             <!-- Play icon (shown when not playing) -->
+                            <controls:ProgressRing Width="36" Height="36" Thickness="2" IsIndeterminate="True"
+                                                   IsVisible="{Binding IsWaitingForAudio}" Foreground="{DynamicResource IslandIconFill}"
+                                                   HorizontalAlignment="Center" VerticalAlignment="Center" ToolTip.Tip="Buffering…" />
                             <Viewbox Width="20" Height="20"
                                      IsVisible="{Binding State, Converter={x:Static ObjectConverters.NotEqual}, ConverterParameter={x:Static m:PlaybackState.Playing}}">
                                 <Canvas Width="24" Height="24">
@@ -1292,6 +1295,7 @@
                                later, so it wins the hit test). The drawn line is unchanged; the
                                old 6px strip made a seek near the art open the Mini Player. -->
                           <Slider Value="{Binding PositionFraction, Mode=TwoWay}"
+                                  IsEnabled="{Binding CanSeekCurrent}"
                                   Classes="seek-slider"
                                   Minimum="0" Maximum="1"
                                   Focusable="False"

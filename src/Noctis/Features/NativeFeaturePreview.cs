@@ -15,6 +15,8 @@ internal static class NativeFeaturePreview
     {
         // Explicit profile override is required for any developer preview.
         if (string.IsNullOrWhiteSpace(Environment.GetEnvironmentVariable("NOCTIS_PLUS_DATA_DIR"))) return;
+        if (preview.StartsWith("progressive-", StringComparison.Ordinal))
+        { await ProgressivePlayback.ProgressivePlaybackPreview.ShowAsync(owner, preview); return; }
         if (preview == "downloads-recovery" && owner.DataContext is MainWindowViewModel main)
         {
             var page = new DownloadsViewModel(); page.Attach(new RecoveryQueue()); main.CurrentView = page;

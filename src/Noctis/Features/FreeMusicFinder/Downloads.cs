@@ -21,6 +21,7 @@ internal sealed class Download(BotTrack track, string folder)
     public bool Priority { get; internal set; }
     public bool Held { get; internal set; }
     public string? SavedPath { get; internal set; }
+    internal Noctis.Features.ProgressivePlayback.ProgressiveTransfer? Playback { get; set; }
     public bool IsActive => State is DownloadState.Queued or DownloadState.Running or DownloadState.Waiting;
 }
 
@@ -301,9 +302,10 @@ internal sealed class Downloads : IDisposable
             if (tidy && Downloader.CleanLeftovers(download.Folder) is > 0 and var removed)
                 _log($"removed {removed} unfinished downloads left in {download.Folder}");
             Raise(download);
+            download.Playback = new(download.Folder, download.Track.FileName, download.Track.Duration);
             var outcome = await Downloader.DownloadAsync(download.Track, download.Folder, new Report(p =>
             { download.Progress = double.IsFinite(p) ? Math.Clamp(p, 0, .99) : 0; download.Stage = ""; Raise(download); },
-                stage => { download.Stage = stage; download.Progress = 0; Raise(download); }), ct).ConfigureAwait(false);
+                stage => { download.Stage = stage; download.Progress = 0; Raise(download); }), ct, download.Playback).ConfigureAwait(false);
             var savedPath = Downloader.FindExisting(download.Folder, download.Track.FileName);
             lock (_gate)
             {

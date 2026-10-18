@@ -34,6 +34,7 @@ public sealed partial class SearchViewModel : ViewModelBase, ISearchable, IDispo
     private LibrarySearchResult _local = LibrarySearchResult.Empty;
     private string _query = "";
     private IOnlineMusicSearch? _source;
+    private bool _disposed;
 
     public SearchViewModel(ILibraryService library, PlayerViewModel player, Action<string> openArtist, Action<Album> openAlbum)
     {
@@ -43,6 +44,7 @@ public sealed partial class SearchViewModel : ViewModelBase, ISearchable, IDispo
         _openAlbum = openAlbum;
         _index = new LibrarySearchIndex(library);
         _index.Rebuilt += OnIndexRebuilt;
+        _player.PropertyChanged += OnPlayerChanged;
         OnlineMusicSearch.CurrentChanged += OnSourceChanged;
         AttachSource(OnlineMusicSearch.Current);
     }
@@ -316,6 +318,7 @@ public sealed partial class SearchViewModel : ViewModelBase, ISearchable, IDispo
         Sync(Artists, artists.Take(ArtistCap).ToList());
         Sync(Albums, albums.Take(AlbumCap).ToList());
         RefreshDownloadStates();
+        RefreshPlaybackStates();
         LoadArtwork();
         ResultVersion++;
     }
@@ -497,9 +500,16 @@ public sealed partial class SearchViewModel : ViewModelBase, ISearchable, IDispo
 
     // ── Actions ──
 
-    [RelayCommand]
-    private void PlaySong(SearchSongItem? item)
+    [RelayCommand(AllowConcurrentExecutions = true)]
+    private async Task PlaySong(SearchSongItem? item)
     {
+        if (item?.Online is { } song && _source is { } source)
+        {
+            if (!source.CanDownload) { source.RequestSignIn(); return; }
+            try { Status = "Buffering…"; await _player.PlayOnlineAsync(source, song); Status = ""; }
+            catch (Exception ex) { Status = ex.Message; }
+            return;
+        }
         if (item?.Local is not { } track) return;
         if (track.IsNowPlaying) { _player.PlayPauseCommand.Execute(null); return; }
         var tracks = Songs.Where(s => s.Local is not null).Select(s => s.Local!).ToList();
@@ -588,13 +598,22 @@ public sealed partial class SearchViewModel : ViewModelBase, ISearchable, IDispo
         if (TopSong is { Online: { } top } topItem) topItem.Apply(source.StatusOf(top));
     }
 
-    private void OnDownloadsChanged(object? sender, EventArgs e) => Dispatcher.UIThread.Post(RefreshDownloadStates);
+    private void OnPlayerChanged(object? sender, System.ComponentModel.PropertyChangedEventArgs e)
+    {
+        if (e.PropertyName is nameof(PlayerViewModel.CurrentTrack) or nameof(PlayerViewModel.State) or nameof(PlayerViewModel.OnlinePlayingSongId)) RefreshPlaybackStates();
+    }
+    private void RefreshPlaybackStates()
+    {
+        foreach (var item in Songs.Concat(TopSong is { } top ? [top] : []).Distinct()) item.ApplyPlayback(_player);
+    }
+
+    private void OnDownloadsChanged(object? sender, EventArgs e) => Dispatcher.UIThread.Post(() => { if (!_disposed) RefreshDownloadStates(); });
 
     /// <summary>The library changed (a download landed, a scan finished): search again, which is
     /// instant from the caches, so finished downloads turn into library rows.</summary>
     private void OnIndexRebuilt(object? sender, EventArgs e) => Dispatcher.UIThread.Post(() =>
     {
-        if (_query.Length == 0) return;
+        if (_disposed || _query.Length == 0) return;
         // Library results follow every update (instant). The online half is asked again only
         // once a scan has settled: mid-scan the library updates every second or so, and the
         // ownership check needs the finished library.
@@ -602,7 +621,7 @@ public sealed partial class SearchViewModel : ViewModelBase, ISearchable, IDispo
         else Run(_query, force: true);
     });
 
-    private void OnSourceChanged(object? sender, EventArgs e) => Dispatcher.UIThread.Post(() => AttachSource(OnlineMusicSearch.Current));
+    private void OnSourceChanged(object? sender, EventArgs e) => Dispatcher.UIThread.Post(() => { if (!_disposed) AttachSource(OnlineMusicSearch.Current); });
 
     private void AttachSource(IOnlineMusicSearch? source)
     {
@@ -615,15 +634,22 @@ public sealed partial class SearchViewModel : ViewModelBase, ISearchable, IDispo
         OnPropertyChanged(nameof(ShowEmptyPrompt));
         OnPropertyChanged(nameof(ShowOnlineProblem));
         RefreshDownloadStates();
+        // The first query can arrive before the built-in feature finishes loading.
+        // Switching the source must answer that existing query without another keystroke,
+        // and switching it off must discard its old results and in-flight response.
+        if (!_disposed && _query.Length > 0) Run(_query, force: false, again: true);
     }
 
     public void Dispose()
     {
+        if (_disposed) return;
+        _disposed = true;
         ForYou.Dispose();
         _onlineCts?.Cancel();
         _artCts?.Cancel();
         _reconnect?.Stop();
         _index.Rebuilt -= OnIndexRebuilt;
+        _player.PropertyChanged -= OnPlayerChanged;
         _index.Dispose();
         OnlineMusicSearch.CurrentChanged -= OnSourceChanged;
         AttachSource(null);
@@ -670,6 +696,7 @@ public sealed partial class SearchSongItem : ObservableObject, IOnlineArtwork
     public string Title { get; }
     public string ArtistDisplay { get; }
     public string AlbumTitle { get; }
+    public string AlbumSuffix => AlbumTitle.Length > 0 ? " · " + AlbumTitle : "";
     public string DurationText { get; }
     public bool IsExplicit { get; }
     public string ArtworkUrl { get; }
@@ -695,6 +722,15 @@ public sealed partial class SearchSongItem : ObservableObject, IOnlineArtwork
     public bool IsQueued => IsOnline && DownloadState == OnlineDownloadState.Queued;
     public bool IsSaved => IsOnline && DownloadState == OnlineDownloadState.Saved;
     public bool IsFailed => IsOnline && DownloadState == OnlineDownloadState.Failed;
+
+    [ObservableProperty] private bool _isNowPlaying;
+    [ObservableProperty, NotifyPropertyChangedFor(nameof(PlayLabel))] private bool _isPlaying;
+    public string PlayLabel => IsPlaying ? "Pause" : "Play";
+    internal void ApplyPlayback(PlayerViewModel player)
+    {
+        IsNowPlaying = Local is { } local ? player.CurrentTrack?.Id == local.Id : Online?.Id == player.OnlinePlayingSongId && Online is not null;
+        IsPlaying = IsNowPlaying && player.State == PlaybackState.Playing;
+    }
 
     internal void Apply(OnlineDownloadStatus status)
     {

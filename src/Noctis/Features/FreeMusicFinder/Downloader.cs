@@ -92,12 +92,13 @@ internal static class Downloader
     private static bool SafeFileName(string fileName) => !string.IsNullOrWhiteSpace(fileName)
         && !Path.IsPathRooted(fileName) && fileName.IndexOfAny(['/', '\\', ':', '\0']) < 0 && fileName is not "." and not "..";
 
-    public static async Task<DownloadOutcome> DownloadAsync(BotTrack track, string folder, IProgress<double>? progress, CancellationToken ct)
+    public static async Task<DownloadOutcome> DownloadAsync(BotTrack track, string folder, IProgress<double>? progress, CancellationToken ct,
+        Noctis.Features.ProgressivePlayback.ProgressiveTransfer? playback = null)
     {
         if (!SafeFileName(track.FileName))
             throw new InvalidDataException("UNSAFE_FILE_NAME: the provider did not supply a usable name.");
         Directory.CreateDirectory(folder);
-        if (FindExisting(folder, track.FileName) is not null) return DownloadOutcome.AlreadyThere;
+        if (FindExisting(folder, track.FileName) is { } existing) { playback?.End(existing); return DownloadOutcome.AlreadyThere; }
 
         var partial = Path.Combine(folder, track.FileName + PartSuffix);
         try
@@ -105,7 +106,10 @@ internal static class Downloader
             string extension;
             long length;
             // ReadWrite: the MP3 fallback reads a bot's MP3 back from this file while the other bot is asked for FLAC.
-            await using (var output = new FileStream(partial, FileMode.Create, FileAccess.ReadWrite, FileShare.None, 81920, useAsync: true))
+            var file = new FileStream(partial, FileMode.Create, FileAccess.ReadWrite,
+                playback is null ? FileShare.None : FileShare.ReadWrite | FileShare.Delete,
+                playback is null ? 81920 : 1, useAsync: true);
+            await using (var output = playback?.Attach(file) ?? file)
             {
                 extension = await track.Fetch(output, progress, ct).ConfigureAwait(false);
                 TransferProgress.Stage(progress, "Checking and saving the audio…");
@@ -115,7 +119,7 @@ internal static class Downloader
             if (length == 0) throw new InvalidDataException("The bot sent an empty file.");
             if(track.Request is not null && extension=="flac")
             {
-                using var audio=File.OpenRead(partial);var header=new byte[10];
+                using var audio=new FileStream(partial,FileMode.Open,FileAccess.Read,FileShare.ReadWrite | FileShare.Delete);var header=new byte[10];
                 var read=audio.Read(header,0,header.Length);
                 if(read>=10 && header[0]=='I' && header[1]=='D' && header[2]=='3')
                 {
@@ -133,12 +137,16 @@ internal static class Downloader
             if (File.Exists(target))
             {
                 File.Delete(partial);
+                if (playback is { HasReaders: true }) playback.End(null, new IOException("Another complete file appeared for this song. Play the saved song again."));
+                else playback?.End(target);
                 return DownloadOutcome.AlreadyThere;
             }
             File.Move(partial, target);
+            playback?.End(target);
         }
-        catch
+        catch (Exception ex)
         {
+            playback?.End(null, ex);
             try { File.Delete(partial); } catch (IOException) { } catch (UnauthorizedAccessException) { }
             throw;
         }

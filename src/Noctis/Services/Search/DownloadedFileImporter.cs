@@ -34,7 +34,13 @@ internal sealed class DownloadedFileImporter : IDisposable
             {
                 // LibraryUpdated is UI-owned. The service does its file work asynchronously,
                 // but the call must originate on the dispatcher so its publish returns there.
-                try { await Dispatcher.UIThread.InvokeAsync(() => _library.ImportFilesAsync([path], _stop.Token)); }
+                try
+                {
+                    await Dispatcher.UIThread.InvokeAsync(() => _library.ImportFilesAsync([path], _stop.Token));
+                    var imported = await Dispatcher.UIThread.InvokeAsync(() => _library.AllTracks.Any(t =>
+                        string.Equals(t.FilePath, path, StringComparison.OrdinalIgnoreCase)));
+                    if (!imported) throw new InvalidDataException("Noctis could not read this file's audio metadata. Check the file or retry the download.");
+                }
                 catch (OperationCanceledException) when (_stop.IsCancellationRequested) { break; }
                 catch (Exception ex) { _notice($"DOWNLOAD_IMPORT_FAILED: {Path.GetFileName(path)} is saved, but could not be added to the library ({ex.Message}). Open Downloads and choose Add to library to retry."); }
                 finally { lock (_pending) _pending.Remove(path); }

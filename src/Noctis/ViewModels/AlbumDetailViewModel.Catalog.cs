@@ -16,7 +16,7 @@ namespace Noctis.ViewModels;
 public partial class AlbumDetailViewModel
 {
     private CatalogAlbumOpen? _catalog;
-    private FinderOnlineSearch? _catalogOnline;
+    private Services.Search.IOnlineMusicSearch? _catalogOnline;
     // A library album the catalog completed (its missing songs shown under the owned ones),
     // as opposed to an online album the library has nothing of.
     private bool _catalogEnriches;
@@ -86,7 +86,7 @@ public partial class AlbumDetailViewModel
     internal void ShowCatalog(CatalogAlbumOpen open)
     {
         _catalog = open;
-        if (FreeMusicPlugin.Current?.OnlineSearch is { } online && !ReferenceEquals(online, _catalogOnline))
+        if (Services.Search.OnlineMusicSearch.Current is { } online && !ReferenceEquals(online, _catalogOnline))
         {
             if (_catalogOnline is not null) _catalogOnline.DownloadsChanged -= CatalogDownloadsChanged;
             _catalogOnline = online;
@@ -121,7 +121,7 @@ public partial class AlbumDetailViewModel
             if (_catalogEnriches && Tracks.Any(t => RecordingMatch.Fits(song.Request, t.Artist, t.Title, t.Duration))) continue;
             var existing = CatalogMissing.FirstOrDefault(r => r.CatalogId == song.Id);
             missing.Add(existing ?? new ArtistCatalogSong(song.Number > 0 ? song.Number : number,
-                new SearchSongItem(_catalogOnline?.Remember(new CatalogSearchSong(song, open.Album.Release, open.Album.Release.Artwork))
+                new SearchSongItem((_catalogOnline as FinderOnlineSearch)?.Remember(new CatalogSearchSong(song, open.Album.Release, open.Album.Release.Artwork))
                     ?? new Services.Search.OnlineSong(song.Id, song.Title, string.Join(", ", song.Artists.Select(a => a.Name)), open.Album.Release.Title, song.Seconds, song.Explicit)),
                 song.Id));
         }
@@ -158,11 +158,22 @@ public partial class AlbumDetailViewModel
 
     private void RefreshCatalogDownloads()
     {
+        RefreshCatalogPlayback();
         if (_catalogOnline is not { } online) return;
         foreach (var row in CatalogMissing) if (row.Song.Online is { } song) row.Song.Apply(online.StatusOf(song));
     }
+    private void RefreshCatalogPlayback() { foreach (var row in CatalogMissing) row.Song.ApplyPlayback(_player); }
 
     [RelayCommand] private Task DownloadCatalogSong(ArtistCatalogSong? row) => DownloadCatalogAsync(row is null ? [] : [row], now: true);
+
+    [RelayCommand(AllowConcurrentExecutions = true)]
+    private async Task PlayCatalogSong(ArtistCatalogSong? row)
+    {
+        if (row?.Song.Online is not { } song || _catalogOnline is not { } online) return;
+        if (!online.CanDownload) { online.RequestSignIn(); return; }
+        try { CatalogNotice = "Buffering…"; await _player.PlayOnlineAsync(online, song); CatalogNotice = ""; }
+        catch (Exception ex) { CatalogNotice = ex.Message; }
+    }
     [RelayCommand] private Task QueueCatalogSong(ArtistCatalogSong? row) => DownloadCatalogAsync(row is null ? [] : [row], now: false);
 
     /// <summary>Every song of the album the library lacks, into the download queue (in album order).</summary>
