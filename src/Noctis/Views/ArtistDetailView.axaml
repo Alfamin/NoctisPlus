@@ -525,7 +525,7 @@
                     <TextBlock Grid.Column="3" Text="{Binding Song.DurationText}" FontSize="12" Opacity="0.7" VerticalAlignment="Center" Margin="0,0,8,0" />
                     <StackPanel Grid.Column="4" Orientation="Horizontal" VerticalAlignment="Center" Spacing="4">
                         <Button Classes="header-icon-btn" Content="↓" Background="Transparent" BorderThickness="0" CornerRadius="14" Width="28" Height="28" Padding="0" FontSize="20" IsVisible="{Binding Song.CanStartDownload}"
-                                ToolTip.Tip="Download now" Command="{Binding $parent[UserControl].((vm:ArtistDetailViewModel)DataContext).PlayCatalogSongCommand}" CommandParameter="{Binding}" />
+                                ToolTip.Tip="Download now" Command="{Binding $parent[UserControl].((vm:ArtistDetailViewModel)DataContext).DownloadCatalogSongNowCommand}" CommandParameter="{Binding}" />
                         <Button Classes="header-icon-btn" Content="+" Background="Transparent" BorderThickness="0" CornerRadius="14" Width="28" Height="28" Padding="0" FontSize="20" IsVisible="{Binding Song.CanStartDownload}"
                                 ToolTip.Tip="Queue download" Command="{Binding $parent[UserControl].((vm:ArtistDetailViewModel)DataContext).QueueCatalogDownloadCommand}" CommandParameter="{Binding}" />
                         <ProgressBar Width="32" Height="3" Minimum="0" Maximum="1" Value="{Binding Song.Progress}" IsVisible="{Binding Song.IsDownloading}" />

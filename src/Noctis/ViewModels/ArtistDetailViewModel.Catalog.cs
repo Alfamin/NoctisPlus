@@ -134,8 +134,18 @@ public partial class ArtistDetailViewModel
             var tracks = _catalogRows.Select(r => r.Song.Local).OfType<Track>().Where(t => File.Exists(t.FilePath)).DistinctBy(t => t.Id).ToList();
             _player.PlayFromRow(tracks, tracks.IndexOf(track));
         }
-        else await DownloadCatalogSong(row, true);
+        // An online song plays at once while it downloads, exactly like Search's Play (owner, 2026-10-18: it only
+        // downloaded, then needed a second click to play).
+        else if (row?.Song.Online is { } song && _catalogOnline is { } online)
+        {
+            if (!online.CanDownload) { online.RequestSignIn(); return; }
+            try { await _player.PlayOnlineAsync(online, song); }
+            catch (OperationCanceledException) { }
+            catch (Exception ex) { CatalogSongStatus = ex.Message; }
+            RefreshCatalogDownloads();
+        }
     }
+    [RelayCommand] private Task DownloadCatalogSongNow(ArtistCatalogSong? row) => DownloadCatalogSong(row, true);
     [RelayCommand] private Task QueueCatalogDownload(ArtistCatalogSong? row) => DownloadCatalogSong(row, false);
     private async Task DownloadCatalogSong(ArtistCatalogSong? row, bool now)
     {
