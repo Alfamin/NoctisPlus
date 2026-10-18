@@ -1028,6 +1028,14 @@
     <value>Garde les mots entiers lorsque les paroles TTML les découpent en syllabes.</value>
     <comment>Text in SettingsView.axaml</comment>
   </data>
+  <data name="Settings.LyricsGlowAndLift" xml:space="preserve">
+    <value>Lueur et élévation</value>
+    <comment>Text in SettingsView.axaml</comment>
+  </data>
+  <data name="Settings.LyricsGlowAndLiftHint" xml:space="preserve">
+    <value>Les mots chantés s'élèvent doucement et les notes tenues brillent, comme dans Apple Music. Désactivé, les paroles synchronisées mot à mot restent immobiles.</value>
+    <comment>Text in SettingsView.axaml</comment>
+  </data>
   <data name="Settings.PlayerBarOpacity" xml:space="preserve">
     <value>Opacité de la barre de lecture</value>
     <comment>Text in SettingsView.axaml</comment>

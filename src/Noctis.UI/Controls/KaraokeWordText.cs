@@ -12,7 +12,9 @@ namespace Noctis.Controls;
 /// <summary>
 /// One karaoke word: the dim (unsung) and bright (sung) text in a single draw, split by a
 /// soft edge that follows <see cref="Progress"/>, plus the Apple Music held-note letter
-/// animation (<see cref="EmphasisMotion"/>) for <see cref="IsEmphasis"/> words.
+/// animation (<see cref="EmphasisMotion"/>) for <see cref="IsEmphasis"/> words and the
+/// float every sung word rises by (<see cref="Lift"/>, <see cref="WordFloat"/>). With
+/// <see cref="BaseOpacity"/> 0 it draws only the sung part — the held-note glow layer.
 ///
 /// It replaces a dimmed base TextBlock with a second TextBlock on top whose Foreground was
 /// a new gradient brush every frame: a TextBlock rebuilds its text layout and invalidates
@@ -50,6 +52,9 @@ public class KaraokeWordText : TextBlock
     public static readonly StyledProperty<bool> IsLastInLineProperty =
         AvaloniaProperty.Register<KaraokeWordText, bool>(nameof(IsLastInLine));
 
+    public static readonly StyledProperty<double> LiftProperty =
+        AvaloniaProperty.Register<KaraokeWordText, double>(nameof(Lift));
+
     /// <summary>Front position through the word (driven by <see cref="LyricsTimeline"/>): 0..1
     /// inside it, beyond either end on a neighbour of the current word, sentinels far away.</summary>
     public double Progress { get => GetValue(ProgressProperty); set => SetValue(ProgressProperty, value); }
@@ -63,6 +68,9 @@ public class KaraokeWordText : TextBlock
     public double EmphasisMs { get => GetValue(EmphasisMsProperty); set => SetValue(EmphasisMsProperty, value); }
     public double HeldDurationMs { get => GetValue(HeldDurationMsProperty); set => SetValue(HeldDurationMsProperty, value); }
     public bool IsLastInLine { get => GetValue(IsLastInLineProperty); set => SetValue(IsLastInLineProperty, value); }
+    /// <summary>How far the sung word has floated up, 0..1 of <see cref="WordFloat.LiftEm"/>
+    /// (driven by <see cref="LyricsTimeline"/>). Drawn as an offset: no layout pass.</summary>
+    public double Lift { get => GetValue(LiftProperty); set => SetValue(LiftProperty, value); }
 
     // Styled exactly like the TextBlocks it replaces (app-wide TextBlock font rules apply).
     protected override Type StyleKeyOverride => typeof(TextBlock);
@@ -70,7 +78,7 @@ public class KaraokeWordText : TextBlock
     static KaraokeWordText()
     {
         AffectsRender<KaraokeWordText>(ProgressProperty, BaseOpacityProperty, LeadInProperty, TrailOutProperty,
-            EmphasisMsProperty, HeldDurationMsProperty, IsLastInLineProperty);
+            EmphasisMsProperty, HeldDurationMsProperty, IsLastInLineProperty, LiftProperty);
     }
 
     /// <summary>One drawn piece: the whole word, or one letter of a held-note word.</summary>
@@ -237,7 +245,9 @@ public class KaraokeWordText : TextBlock
         }
         if (_pieces.Count == 0 || _glyphWidth <= 0) return;
 
-        using var offset = context.PushTransform(Matrix.CreateTranslation(origin.X, origin.Y));
+        var transform = Matrix.CreateTranslation(origin.X, origin.Y - LiftPixels());
+        if (IsMoving) transform = Unsnapped * transform;
+        using var offset = context.PushTransform(transform);
         if (!_perLetter)
         {
             _pieces[0].Layout.Draw(context, default);
@@ -250,6 +260,29 @@ public class KaraokeWordText : TextBlock
             using (context.PushTransform(LetterTransform(i, parameters, out _, out _)))
                 _pieces[i].Layout.Draw(context, default);
         }
+    }
+
+    /// <summary>
+    /// Skia draws text under an axis-aligned transform with each glyph's baseline rounded to
+    /// a whole pixel, so a 2 px float rose in two 1 px hops (and the held-note letters
+    /// jumped the same way). A shear too small to see (0.1 px over 100 px; Skia's
+    /// axis-aligned test allows 1/4096) moves glyphs in quarter pixels instead. Only used
+    /// while something moves: at rest the text is drawn exactly as before, crisp on the grid.
+    /// </summary>
+    private static readonly Matrix Unsnapped = new(1, 1e-3, 0, 1, 0, 0);
+
+    private bool IsMoving =>
+        Lift is > 0 and < 1 || (_perLetter && !double.IsNaN(EmphasisMs));
+
+    /// <summary>The float in DIPs. The full lift is rounded to whole device pixels, so a word
+    /// that has finished rising rests on the pixel grid.</summary>
+    private double LiftPixels()
+    {
+        var lift = Lift;
+        if (double.IsNaN(lift) || lift <= 0) return 0;
+        var scaling = VisualRoot is TopLevel { RenderScaling: > 0 and var s } ? s : 1.0;
+        var full = Math.Round(WordFloat.LiftEm * FontSize * scaling) / scaling;
+        return Math.Min(1, lift) * full;
     }
 
     /// <summary>Points the piece's two stops at the band (piece-local pixels, unclamped):

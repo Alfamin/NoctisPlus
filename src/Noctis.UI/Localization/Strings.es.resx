@@ -1028,6 +1028,14 @@
     <value>Mantén las palabras enteras cuando las letras TTML las dividan en sílabas.</value>
     <comment>Text in SettingsView.axaml</comment>
   </data>
+  <data name="Settings.LyricsGlowAndLift" xml:space="preserve">
+    <value>Brillo y elevación</value>
+    <comment>Text in SettingsView.axaml</comment>
+  </data>
+  <data name="Settings.LyricsGlowAndLiftHint" xml:space="preserve">
+    <value>Las palabras cantadas se elevan suavemente y las notas sostenidas brillan, como en Apple Music. Desactivado, la letra sincronizada por palabras queda quieta.</value>
+    <comment>Text in SettingsView.axaml</comment>
+  </data>
   <data name="Settings.PlayerBarOpacity" xml:space="preserve">
     <value>Opacidad de la barra de reproducción</value>
     <comment>Text in SettingsView.axaml</comment>

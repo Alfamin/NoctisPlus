@@ -72,6 +72,24 @@ public sealed class LyricsTimeline
         _lineLookahead = lineLookahead;
     }
 
+    /// <summary>
+    /// The Apple Music word motion: sung words float up (<see cref="WordFloat"/>) and
+    /// held notes swell, lift and glow letter by letter (<see cref="EmphasisMotion"/>).
+    /// On by default; off leaves every word still (lift 0, no held-note clock) and the
+    /// sweep alone marks the vocal. Turning it off settles the words at once.
+    /// </summary>
+    public bool WordMotion
+    {
+        get => _wordMotion;
+        set
+        {
+            if (_wordMotion == value) return;
+            _wordMotion = value;
+            if (!value) ClearMotion();
+        }
+    }
+    private bool _wordMotion = true;
+
     /// <summary>The active line, or null.</summary>
     public LyricLine? ActiveLine { get; private set; }
 
@@ -92,11 +110,11 @@ public sealed class LyricsTimeline
     {
         if (ActiveLine is { } l) l.IsActive = false;
         foreach (var line in _activeLines) line.IsActive = false;
+        ClearMotion();
         _activeLines.Clear();
         _activeIndices.Clear();
         ActiveLine = null;
         ActiveIndex = -1;
-        ClearEmphasisTail();
         Rewind();
     }
 
@@ -251,13 +269,18 @@ public sealed class LyricsTimeline
         foreach (var line in _activeLines)
         {
             if (!_nextLines.Contains(line))
-                Deactivate(line);
+                Deactivate(line, position);
         }
         // Safety: ensure the active lines stay active even if something reset them.
         foreach (var line in _nextLines)
         {
             if (!line.IsActive)
+            {
                 line.IsActive = true;
+                // Back in the set (a seek, an overlap) before its words settled: the
+                // line drives their lift again.
+                if (_floatTail.Count > 0) ReclaimFloat(line);
+            }
         }
 
         (_activeLines, _nextLines) = (_nextLines, _activeLines);
@@ -300,12 +323,16 @@ public sealed class LyricsTimeline
     /// to full opacity. Snapping to -1 here blanked the overlay instantly, which read as
     /// the finished line dimming for a beat. Re-entry recomputes the real index.
     /// </summary>
-    private void Deactivate(LyricLine line)
+    private void Deactivate(LyricLine line, TimeSpan position)
     {
         line.IsActive = false;
         HandOffEmphasis(line.Words);
         HandOffEmphasis(line.BackgroundWords);
         HandOffEmphasis(line.TransliterationWords);
+        var fallStart = (position + _wordLookahead).TotalMilliseconds;
+        HandOffFloat(line.Words, fallStart);
+        HandOffFloat(line.BackgroundWords, fallStart);
+        HandOffFloat(line.TransliterationWords, fallStart);
         if (line.HasWords)
             line.CurrentWordIndex = line.Words!.Count;
         if (line.HasBackgroundWords)
@@ -318,6 +345,8 @@ public sealed class LyricsTimeline
     /// lets held-note animations of lines that just left the set play out.</summary>
     private void UpdateActiveWords(TimeSpan position)
     {
+        // Settling words first: a word the active set drives again ends on its value.
+        DriveFloatTail(position + _wordLookahead);
         for (int i = 0; i < _activeLines.Count; i++)
             UpdateLineWords(_activeLines[i], _activeIndices[i], position);
         DriveEmphasisTail(position + _wordLookahead);
@@ -370,13 +399,14 @@ public sealed class LyricsTimeline
     // dropped a lifted, glowing word back to rest in one frame.
     private readonly List<WordTiming> _emphasisTail = new();
 
-    /// <summary>True while a held-note animation is still playing out on a line that is no
-    /// longer active — the frame clock must keep running for it.</summary>
-    public bool HasEmphasisInFlight => _emphasisTail.Count > 0;
+    /// <summary>True while a held-note animation is still playing out, or sung words are
+    /// still settling, on a line that is no longer active — the frame clock must keep
+    /// running for it.</summary>
+    public bool HasEmphasisInFlight => _emphasisTail.Count > 0 || _floatTail.Count > 0;
 
     /// <summary>Sets <see cref="WordTiming.EmphasisMs"/> on the held-note words of a layer:
     /// the time since the word started while its letter animation is in flight, else NaN.</summary>
-    private static void DriveEmphasis(IReadOnlyList<WordTiming> words, TimeSpan adjusted)
+    private void DriveEmphasis(IReadOnlyList<WordTiming> words, TimeSpan adjusted)
     {
         for (int i = 0; i < words.Count; i++)
         {
@@ -386,10 +416,10 @@ public sealed class LyricsTimeline
     }
 
     /// <returns>True while the word's animation is still in flight.</returns>
-    private static bool SetEmphasisClock(WordTiming w, TimeSpan adjusted)
+    private bool SetEmphasisClock(WordTiming w, TimeSpan adjusted)
     {
         var rel = (adjusted - w.Start).TotalMilliseconds;
-        var inFlight = EmphasisMotion.IsInFlight(rel, w.EmphasisParams, w.EmphasisCharCount);
+        var inFlight = _wordMotion && EmphasisMotion.IsInFlight(rel, w.EmphasisParams, w.EmphasisCharCount);
         var value = inFlight ? rel : double.NaN;
         if (!w.EmphasisMs.Equals(value)) w.EmphasisMs = value;
         return inFlight;
@@ -418,6 +448,107 @@ public sealed class LyricsTimeline
     {
         foreach (var w in _emphasisTail) w.EmphasisMs = double.NaN;
         _emphasisTail.Clear();
+    }
+
+    // Words of lines that left the active set while lifted, settling back to rest
+    // (WordFloat.Fall from where each was). Structs in a reused list: no per-frame garbage.
+    private readonly record struct FloatFall(WordTiming Word, double From, double StartMs);
+    private readonly List<FloatFall> _floatTail = new();
+
+    /// <summary>Sets <see cref="WordTiming.Lift"/> on every word of a driven layer: how far
+    /// it has risen since it started (<see cref="WordFloat.Rise"/>), 0 before.</summary>
+    private void DriveFloat(IReadOnlyList<WordTiming> words, TimeSpan adjusted, TimeSpan? layerEnd, int lineIndex)
+    {
+        for (int i = 0; i < words.Count; i++)
+        {
+            var w = words[i];
+            double lift = 0;
+            if (_wordMotion)
+            {
+                var since = (adjusted - w.Start).TotalMilliseconds;
+                if (since > 0)
+                    lift = WordFloat.Rise(since, (WordEnd(words, i, layerEnd, lineIndex) - w.Start).TotalMilliseconds);
+            }
+            SetLift(w, lift);
+        }
+    }
+
+    private static void SetLift(WordTiming w, double lift)
+    {
+        // ReSharper disable once CompareOfFloatsByEqualityOperator
+        if (w.Lift != lift) w.Lift = lift;
+    }
+
+    private void HandOffFloat(IReadOnlyList<WordTiming>? words, double startMs)
+    {
+        if (words == null) return;
+        foreach (var w in words)
+        {
+            if (w.Lift <= 0) continue;
+            int at = -1;
+            for (int i = 0; i < _floatTail.Count; i++)
+                if (ReferenceEquals(_floatTail[i].Word, w)) { at = i; break; }
+            var fall = new FloatFall(w, w.Lift, startMs);
+            if (at >= 0) _floatTail[at] = fall;
+            else _floatTail.Add(fall);
+        }
+    }
+
+    private void DriveFloatTail(TimeSpan adjusted)
+    {
+        var now = adjusted.TotalMilliseconds;
+        for (int i = _floatTail.Count - 1; i >= 0; i--)
+        {
+            var f = _floatTail[i];
+            // A seek back to before the fall began restarts it from where the word is.
+            if (now < f.StartMs) _floatTail[i] = f = f with { StartMs = now };
+            var lift = WordFloat.Fall(f.From, now - f.StartMs);
+            SetLift(f.Word, lift);
+            if (lift <= 0) _floatTail.RemoveAt(i);
+        }
+    }
+
+    private void ReclaimFloat(LyricLine line)
+    {
+        for (int i = _floatTail.Count - 1; i >= 0; i--)
+        {
+            var w = _floatTail[i].Word;
+            if (Contains(line.Words, w) || Contains(line.BackgroundWords, w) || Contains(line.TransliterationWords, w))
+                _floatTail.RemoveAt(i);
+        }
+
+        static bool Contains(IReadOnlyList<WordTiming>? words, WordTiming w)
+        {
+            if (words == null) return false;
+            for (int i = 0; i < words.Count; i++)
+                if (ReferenceEquals(words[i], w)) return true;
+            return false;
+        }
+    }
+
+    /// <summary>Every word back to rest: no lift, no held-note clock (track change,
+    /// lyrics reload, motion turned off).</summary>
+    private void ClearMotion()
+    {
+        ClearEmphasisTail();
+        foreach (var f in _floatTail) SetLift(f.Word, 0);
+        _floatTail.Clear();
+        foreach (var line in _activeLines)
+        {
+            Rest(line.Words);
+            Rest(line.BackgroundWords);
+            Rest(line.TransliterationWords);
+        }
+
+        static void Rest(IReadOnlyList<WordTiming>? words)
+        {
+            if (words == null) return;
+            foreach (var w in words)
+            {
+                SetLift(w, 0);
+                if (!double.IsNaN(w.EmphasisMs)) w.EmphasisMs = double.NaN;
+            }
+        }
     }
 
     /// <summary>
@@ -462,6 +593,7 @@ public sealed class LyricsTimeline
         // the current one to the inert sentinels, so this frame's values go in after it.
         SetWordIndex(line, layer, target);
         DriveEmphasis(words, adjusted);
+        DriveFloat(words, adjusted, layerEnd, lineIndex);
 
         if (target < 0)
         {
@@ -510,11 +642,7 @@ public sealed class LyricsTimeline
     private double OwnProgress(IReadOnlyList<WordTiming> words, int i, TimeSpan adjusted, TimeSpan? layerEnd, int lineIndex)
     {
         var w = words[i];
-        // Last word of a start-tag-only layer has no end anywhere — bound it by the next
-        // line's start (capped) so it sweeps instead of snapping to lit.
-        var end = w.End ?? (i + 1 < words.Count
-            ? words[i + 1].Start
-            : layerEnd ?? KaraokeSweep.ResolveOpenLastWordEnd(w.Start, NextSyncedLineStart(lineIndex)));
+        var end = WordEnd(words, i, layerEnd, lineIndex);
         var t = adjusted.TotalSeconds;
         var s = w.Start.TotalSeconds;
         var e = end.TotalSeconds;
@@ -523,6 +651,17 @@ public sealed class LyricsTimeline
         return w.Syllables is { Count: > 1 } syllables
             ? KaraokeSweep.SyllableBandProgress(syllables, s, e, t)
             : KaraokeSweep.WordProgress(s, e, t);
+    }
+
+    /// <summary>Where word <paramref name="i"/> of a layer ends: its own end, else the next
+    /// word's start. The last word of a start-tag-only layer has no end anywhere — it is
+    /// bounded by the next line's start (capped) so it sweeps instead of snapping to lit.</summary>
+    private TimeSpan WordEnd(IReadOnlyList<WordTiming> words, int i, TimeSpan? layerEnd, int lineIndex)
+    {
+        var w = words[i];
+        return w.End ?? (i + 1 < words.Count
+            ? words[i + 1].Start
+            : layerEnd ?? KaraokeSweep.ResolveOpenLastWordEnd(w.Start, NextSyncedLineStart(lineIndex)));
     }
 
     /// <summary>Start of the first synced line after line <paramref name="index"/>; null when none.</summary>

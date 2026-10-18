@@ -52,7 +52,7 @@ public class ProgressToSweepForegroundConverter : IMultiValueConverter
         var fg = values.Count > 1 ? values[1] as IBrush : null;
         var color = (fg as ISolidColorBrush)?.Color ?? Colors.White;
 
-        // AMLL's feather is a fixed ~0.5em, not a fraction of the word (see KaraokeBand).
+        // The feather is a fixed ~0.6em, not a fraction of the word (see KaraokeBand).
         var feather = Feather;
         if (values.Count > 3 && values[2] is double width && values[3] is double fontSize)
             feather = KaraokeBand.Feather(width, fontSize);

@@ -1028,6 +1028,14 @@
     <value>يبقي الكلمات كاملة عندما تجزئها كلمات TTML إلى مقاطع صوتية.</value>
     <comment>Text in SettingsView.axaml</comment>
   </data>
+  <data name="Settings.LyricsGlowAndLift" xml:space="preserve">
+    <value>التوهج والارتفاع</value>
+    <comment>Text in SettingsView.axaml</comment>
+  </data>
+  <data name="Settings.LyricsGlowAndLiftHint" xml:space="preserve">
+    <value>ترتفع الكلمات المغنّاة قليلاً وتتوهج النغمات الممتدة، كما في Apple Music. عند الإيقاف تبقى الكلمات المتزامنة كلمة بكلمة ثابتة.</value>
+    <comment>Text in SettingsView.axaml</comment>
+  </data>
   <data name="Settings.PlayerBarOpacity" xml:space="preserve">
     <value>عتامة شريط التشغيل</value>
     <comment>Text in SettingsView.axaml</comment>

@@ -1028,6 +1028,14 @@
     <value>TTML 가사가 단어를 음절로 나누어도 단어를 온전하게 유지합니다.</value>
     <comment>Text in SettingsView.axaml</comment>
   </data>
+  <data name="Settings.LyricsGlowAndLift" xml:space="preserve">
+    <value>글로우 및 리프트</value>
+    <comment>Text in SettingsView.axaml</comment>
+  </data>
+  <data name="Settings.LyricsGlowAndLiftHint" xml:space="preserve">
+    <value>부른 단어가 살짝 떠오르고 길게 끄는 음이 빛납니다(Apple Music처럼). 끄면 단어 동기화 가사가 움직이지 않습니다.</value>
+    <comment>Text in SettingsView.axaml</comment>
+  </data>
   <data name="Settings.PlayerBarOpacity" xml:space="preserve">
     <value>재생 바 불투명도</value>
     <comment>Text in SettingsView.axaml</comment>

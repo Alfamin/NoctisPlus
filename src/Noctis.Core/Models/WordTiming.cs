@@ -90,6 +90,14 @@ public partial class WordTiming : ObservableObject
     [ObservableProperty]
     private double _emphasisMs = double.NaN;
 
+    /// <summary>
+    /// How far the word has floated up as it is sung (<see cref="WordFloat"/>): 0 at rest,
+    /// 1 at the full lift. Driven per frame by <see cref="LyricsTimeline"/> while the word
+    /// rises and while its line settles back; 0 on lines that are not word-synced.
+    /// </summary>
+    [ObservableProperty]
+    private double _lift;
+
     /// <summary>Letters the held-note animation staggers across (text elements of the
     /// visible word) — shared by the timeline's window and the renderer.</summary>
     public int EmphasisCharCount =>

@@ -44,6 +44,7 @@
         <conv:BlurRadiusToEffectConverter x:Key="BlurToEffect"/>
         <conv:PreBlurredArtworkConverter x:Key="PreBlurArt"/>
         <conv:EmphasisGlowConverter x:Key="EmphasisGlow"/>
+        <conv:EmphasisGlowBlurConverter x:Key="EmphasisGlowBlur"/>
         <conv:WordOverflowPaddingConverter x:Key="WordOverflowPad"/>
         <conv:OpacityFloorConverter x:Key="OpacityFloor"/>
         <conv:DoubleScaleConverter x:Key="FontScale"/>
@@ -71,23 +72,33 @@
                 <!-- Glow hosted in a Canvas so the blur surface has headroom without
                      growing the word cell (see the lyrics page template). -->
                 <Canvas ClipToBounds="False">
-                    <TextBlock Text="{Binding Text}"
-                               Classes="word-glow"
-                               IsVisible="{Binding IsEmphasis}"
-                               Canvas.Left="-40"
-                               Canvas.Top="-40"
-                               Padding="40"
-                               FontWeight="Bold"
-                               Foreground="White">
-                        <TextBlock.Opacity>
+                    <controls:KaraokeWordText Text="{Binding Text}"
+                                              Classes="word-glow"
+                                              IsVisible="{Binding IsEmphasis}"
+                                              Canvas.Left="-40"
+                                              Canvas.Top="-40"
+                                              Padding="40"
+                                              FontWeight="Bold"
+                                              Foreground="White"
+                                              BaseOpacity="0"
+                                              Effect="{Binding $self.FontSize, Converter={StaticResource EmphasisGlowBlur}}"
+                                              Progress="{Binding Progress}"
+                                              LeadIn="{Binding SweepLeadIn}"
+                                              TrailOut="{Binding SweepTrailOut}"
+                                              IsEmphasis="{Binding IsEmphasis}"
+                                              EmphasisMs="{Binding EmphasisMs}"
+                                              HeldDurationMs="{Binding HeldDurationMs}"
+                                              IsLastInLine="{Binding IsLastInLine}"
+                                              Lift="{Binding Lift}">
+                        <controls:KaraokeWordText.Opacity>
                             <MultiBinding Converter="{StaticResource EmphasisGlow}">
                                 <Binding Path="EmphasisMs"/>
                                 <Binding Path="HeldDurationMs"/>
                                 <Binding Path="IsLastInLine"/>
                                 <Binding Path="EmphasisCharCount"/>
                             </MultiBinding>
-                        </TextBlock.Opacity>
-                    </TextBlock>
+                        </controls:KaraokeWordText.Opacity>
+                    </controls:KaraokeWordText>
                 </Canvas>
                 <controls:KaraokeWordText Text="{Binding Text}"
                                           Classes="word-sweep"
@@ -100,7 +111,8 @@
                                           IsEmphasis="{Binding IsEmphasis}"
                                           EmphasisMs="{Binding EmphasisMs}"
                                           HeldDurationMs="{Binding HeldDurationMs}"
-                                          IsLastInLine="{Binding IsLastInLine}"/>
+                                          IsLastInLine="{Binding IsLastInLine}"
+                                          Lift="{Binding Lift}"/>
                 </Panel>
                 </Viewbox>
             </Panel>
@@ -534,18 +546,15 @@
             <Setter Property="RenderTransform" Value="scale(1)"/>
         </Style>
 
-        <!-- Regular words do not move while sung (as on the page); only emphasis swells. -->
+        <!-- No cell transform: sung words float and held notes swell inside KaraokeWordText (as on the page). -->
         <Style Selector="Panel.word-cell">
             <Setter Property="RenderTransformOrigin" Value="0.5,1"/>
             <Setter Property="RenderTransform" Value="translate(0px,0px) scale(1)"/>
         </Style>
 
-        <!-- Glow opacity is bound per-frame in the template (EmphasisGlow bell over
+        <!-- Glow opacity (per frame) and blur (per font size) are bound in the template (EmphasisGlow bell over
              the hold). No Opacity setter/transition here: a transition would low-pass
              the per-frame values and lag the vocal. -->
-        <Style Selector="TextBlock.word-glow">
-            <Setter Property="Effect" Value="blur(6)"/>
-        </Style>
 
         <!-- Word base layer: full brightness on inactive lines, soft ghost under the
              sweep while the line is active. -->
@@ -558,7 +567,7 @@
             </Setter>
         </Style>
         <Style Selector="ItemsControl.word-layer.active TextBlock.word-sweep">
-            <Setter Property="controls:KaraokeWordText.BaseOpacity" Value="0.45"/>
+            <Setter Property="controls:KaraokeWordText.BaseOpacity" Value="0.4"/>
         </Style>
 
         <!-- Plain (line-timed) lyric text cross-fades its dimming. -->

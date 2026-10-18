@@ -14,13 +14,17 @@ public static class KaraokeBand
     public const double FallbackFeather = 0.06;
 
     /// <summary>
-    /// Half-width of the band as a fraction of the word: a fixed ~0.25 em (AMLL's fade is
-    /// a fixed fraction of the line height, not of the word), bounded so wide melisma words
-    /// keep a visible soft edge and narrow single-character cells stay inside the
-    /// sentinel contract.
+    /// Half-width of the band as a fraction of the word: a fixed <see cref="FeatherEm"/>
+    /// (the fade is a fixed fraction of the type size, not of the word), bounded so wide
+    /// melisma words keep a visible soft edge and narrow single-character cells stay
+    /// inside the sentinel contract.
     /// </summary>
     public static double Feather(double glyphWidth, double fontSize) =>
-        glyphWidth > 0 && fontSize > 0 ? Math.Clamp(0.25 * fontSize / glyphWidth, 0.04, 0.45) : FallbackFeather;
+        glyphWidth > 0 && fontSize > 0 ? Math.Clamp(FeatherEm * fontSize / glyphWidth, 0.04, 0.45) : FallbackFeather;
+
+    /// <summary>Half-width of the band in em. Measured on Apple Music (iOS): the ramp from
+    /// sung to unsung white spans ~0.6 em of glyphs (10-90% over ~45 px at a ~97 px em).</summary>
+    public const double FeatherEm = 0.3;
 
     /// <summary>
     /// Band centre for a front at <paramref name="progress"/> through the word. Next to a
