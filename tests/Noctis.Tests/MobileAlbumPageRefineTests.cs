@@ -261,10 +261,10 @@ public class MobileAlbumPageRefineTests
         window.Close();
     }
 
-    /// <summary>A compressed album (AAC) shows the lossy glyph on its badge and footer, never the
-    /// lossless waveform it used to carry beside "AAC".</summary>
+    /// <summary>A compressed album (AAC) shows the desktop's waveform beside "AAC" on its badge and
+    /// footer, as the PC does beside every quality label (owner 10-18).</summary>
     [AvaloniaFact]
-    public void QualityGlyph_IsTheLossyOne_OnACompressedAlbum()
+    public void QualityGlyph_IsTheDesktopsWaveform_OnACompressedAlbum()
     {
         var (album, tracks) = Sample(3, (t, i) => { t.Codec = "AAC"; t.SampleRate = 44100; t.Bitrate = 256; });
         using var rig = Rig(tracks, album);
@@ -275,8 +275,8 @@ public class MobileAlbumPageRefineTests
         var page = MobileFixtures.Find<AlbumPage>(view);
         bool Shown(string name) => MobileFixtures.Named<Control>(page, name).IsVisible;
         Assert.Equal("AAC", MobileFixtures.Named<TextBlock>(page, "QualityBadgeText").Text);
-        Assert.True(Shown("BadgeLossyGlyph") && Shown("FooterLossyGlyph"));
-        Assert.False(Shown("BadgeLosslessGlyph") || Shown("FooterLosslessGlyph"));
+        Assert.True(Shown("BadgeGlyph") && Shown("FooterGlyph"));
+        Assert.Same(page.FindResource("PhLossless"), ((Avalonia.Controls.Shapes.Path)((Viewbox)MobileFixtures.Named<Control>(page, "BadgeGlyph")).Child!).Data);
         window.Close();
     }
 

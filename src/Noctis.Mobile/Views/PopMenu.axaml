@@ -232,33 +232,29 @@
                                         </StackPanel>
                                     </DataTemplate>
                                     <!-- Now Playing's quality badge: what the playing file is - its class
-                                         under the badge's glyph, the technical line, one plain line on what
-                                         it means, then OK on its own row. Centred over the badge (the
-                                         code-behind), growing out of it. -->
+                                         under the desktop's waveform (every class, as the badge), the
+                                         technical line, one plain line on what it means, then OK on its own
+                                         row. Compact (owner 10-18): a small note, not a dialog. Centred
+                                         over the badge (the code-behind), growing out of it. -->
                                     <DataTemplate DataType="vm:QualityCardViewModel">
-                                        <StackPanel Name="QualityRows" Margin="0,6,0,6">
-                                            <StackPanel Name="QualityNote" Margin="24,20,24,16" Spacing="4">
-                                                <Viewbox Name="QualityLosslessGlyph" Width="48" Height="27" Margin="0,0,0,10"
-                                                         HorizontalAlignment="Center" IsVisible="{Binding IsLossless}">
+                                        <StackPanel Name="QualityRows" Margin="0,2,0,2">
+                                            <StackPanel Name="QualityNote" Margin="16,12,16,10" Spacing="2">
+                                                <Viewbox Name="QualityGlyph" Width="32" Height="18" Margin="0,0,0,6"
+                                                         HorizontalAlignment="Center">
                                                     <Path Data="{DynamicResource PhLossless}" Fill="{DynamicResource MenuGlassText}" />
                                                 </Viewbox>
-                                                <Viewbox Name="QualityLossyGlyph" Width="30" Height="27" Margin="0,0,0,10"
-                                                         HorizontalAlignment="Center" IsVisible="{Binding IsLossy}">
-                                                    <Path Data="{DynamicResource PhLossySteps}" Stroke="{DynamicResource MenuGlassText}"
-                                                          StrokeThickness="2.25" StrokeLineCap="Round" StrokeJoin="Round" />
-                                                </Viewbox>
-                                                <TextBlock Name="QualityLabel" Text="{Binding Label}" FontSize="20" FontWeight="SemiBold"
+                                                <TextBlock Name="QualityLabel" Text="{Binding Label}" FontSize="17" FontWeight="SemiBold"
                                                            TextAlignment="Center" TextWrapping="Wrap" Foreground="{DynamicResource MenuGlassText}" />
-                                                <TextBlock Name="QualityDetail" Text="{Binding Detail}" FontSize="15" TextAlignment="Center"
+                                                <TextBlock Name="QualityDetail" Text="{Binding Detail}" FontSize="13" TextAlignment="Center"
                                                            TextWrapping="Wrap" Foreground="{DynamicResource MenuGlassSecondaryText}"
                                                            IsVisible="{Binding HasDetail}" />
                                                 <TextBlock Name="QualityMeaning" Classes="np-note" Text="{Binding Meaning}" TextAlignment="Center"
-                                                           Margin="0,10,0,0" />
+                                                           FontSize="13" Margin="0,6,0,0" />
                                             </StackPanel>
-                                            <Button Name="QualityDone" Classes="row np-row" Command="{Binding DoneCommand}" AutomationProperties.Name="OK">
+                                            <Button Name="QualityDone" Classes="row np-row" MinHeight="44" Command="{Binding DoneCommand}" AutomationProperties.Name="OK">
                                                 <Panel>
-                                                    <Border Classes="np-line" Margin="20,0,20,0" />
-                                                    <TextBlock Text="OK" FontSize="17" FontWeight="SemiBold" HorizontalAlignment="Center"
+                                                    <Border Classes="np-line" Margin="16,0,16,0" />
+                                                    <TextBlock Text="OK" FontSize="16" FontWeight="SemiBold" HorizontalAlignment="Center"
                                                                VerticalAlignment="Center" Foreground="{DynamicResource MenuGlassText}" />
                                                 </Panel>
                                             </Button>

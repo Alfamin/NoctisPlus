@@ -318,8 +318,7 @@ public class MobilePopMenuTests(ITestOutputHelper output)
         Assert.InRange(badgeBox.Center.X, view.Bounds.Width / 2 - 1, view.Bounds.Width / 2 + 1);
         Assert.InRange(badgeBox.Center.Y, elapsed.Center.Y - 2, elapsed.Center.Y + 2);
         Assert.Equal("Lossless", MobileFixtures.Named<TextBlock>(page, "QualityBadgeText").Text);
-        Assert.True(MobileFixtures.Named<Control>(page, "QualityLosslessGlyph").IsVisible);
-        Assert.False(MobileFixtures.Named<Control>(page, "QualityLossyGlyph").IsVisible);
+        AssertWaveform(page);
 
         // A tap's order (Click, then the command): the card starts small at the badge's centre.
         badge.RaiseEvent(new Avalonia.Interactivity.RoutedEventArgs(Button.ClickEvent));
@@ -342,11 +341,17 @@ public class MobilePopMenuTests(ITestOutputHelper output)
         Assert.Equal(badgeBox.Top - PopMenu.CardGap, cardBox.Bottom, 1);
         Assert.Equal(PopMenu.CardWidth, cardBox.Width, 1);
         Assert.True(cardBox.Top > 0);
+        // Compact (owner 10-18): a small note, not a dialog (it was 300 wide, a 27-high glyph, a
+        // 20 pt class and a 52-high OK row) - yet OK keeps a full 44 dp tap target. Heights are
+        // checked per part: the headless font wraps the lines wider than Inter does.
+        Assert.InRange(cardBox.Width, 200, 260);
+        Assert.InRange(MobileFixtures.Named<Control>(menu, "QualityGlyph").Bounds.Height, 1, 20);
+        Assert.True(MobileFixtures.Named<TextBlock>(menu, "QualityLabel").FontSize <= 17);
+        Assert.Equal(44, MobileFixtures.Named<Button>(menu, "QualityDone").Bounds.Height, 1);
 
         var texts = menu.GetVisualDescendants().OfType<TextBlock>().Where(t => t.IsEffectivelyVisible).Select(t => t.Text).ToList();
         Assert.Equal(new[] { "Lossless", "24-bit/48 kHz ALAC", Track.LosslessDescription, "OK" }, texts);
-        Assert.True(MobileFixtures.Named<Control>(menu, "QualityLosslessGlyph").IsEffectivelyVisible);
-        Assert.False(MobileFixtures.Named<Control>(menu, "QualityLossyGlyph").IsVisible);
+        AssertWaveform(menu);
         Assert.DoesNotContain(menu.GetVisualDescendants().OfType<Control>(), c => c.Name is "Tiles" or "MenuAddToQueue" or "OptionItems");
 
         // OK: only the card closes, with the menu's close.
@@ -375,20 +380,78 @@ public class MobilePopMenuTests(ITestOutputHelper output)
         Assert.True(rig.Shell.IsNowPlayingOpen);
         Pump(15);
 
-        // A compressed file: the stepped glyph and the codec, on the badge and the card.
+        // A compressed file: the same waveform (the desktop's, beside every label) and the codec,
+        // on the badge and the card.
         var mp3 = MobileFixtures.Song("Tone");
         mp3.Codec = "MPEG Version 1 Audio, Layer 3"; mp3.SampleRate = 44100; mp3.Bitrate = 320;
         rig.Shell.Player.PlayTracks(new[] { mp3 }, 0);
         window.UpdateLayout();
         Assert.Equal("MP3", MobileFixtures.Named<TextBlock>(page, "QualityBadgeText").Text);
-        Assert.False(MobileFixtures.Named<Control>(page, "QualityLosslessGlyph").IsVisible);
-        Assert.True(MobileFixtures.Named<Control>(page, "QualityLossyGlyph").IsVisible);
+        AssertWaveform(page);
         Tap(window, badge);
         Pump(25);
         texts = menu.GetVisualDescendants().OfType<TextBlock>().Where(t => t.IsEffectivelyVisible).Select(t => t.Text).ToList();
         Assert.Equal(new[] { "MP3", "320 kbps 44.1 kHz MP3", Track.LossyDescription, "OK" }, texts);
-        Assert.True(MobileFixtures.Named<Control>(menu, "QualityLossyGlyph").IsEffectivelyVisible);
+        AssertWaveform(menu);
         window.Close();
+    }
+
+    /// <summary>The compact quality card (owner 10-18) still fits the longest class and line - "Hi-Res
+    /// Lossless", "24-bit/192 kHz FLAC" - on one line each, in the light glass and the dark, the
+    /// waveform above them. Under NOCTIS_TEST_SKIA=1 (real fonts) the one-line checks run and
+    /// NOCTIS_QUALITY_SHOTS=dir saves each to a PNG.</summary>
+    [AvaloniaFact]
+    public void TheQualityCard_FitsTheLongestClass_InLightAndDark()
+    {
+        var song = MobileFixtures.Song("Hi-Res", artist: "Band");
+        song.Codec = "FLAC"; song.BitsPerSample = 24; song.SampleRate = 192000;
+        using var rig = MobileFixtures.MakeRig(new[] { song });
+        var window = MobileFixtures.Mount(rig.Shell, out var view);
+        rig.Shell.Player.PlayTracks(rig.Library.TrackList, 0);
+        rig.Shell.OpenNowPlayingCommand.Execute(null);
+        MobileFixtures.Land(window);
+        var menu = MenuOf(view);
+        var page = view.FindControl<NowPlayingPage>("NowPlaying")!;
+        Assert.Equal("Hi-Res Lossless", MobileFixtures.Named<TextBlock>(page, "QualityBadgeText").Text);
+        AssertWaveform(page);
+        Tap(window, MobileFixtures.Named<Button>(page, "QualityBadge"));
+        Pump(30);
+        var dir = Environment.GetEnvironmentVariable("NOCTIS_QUALITY_SHOTS");
+        foreach (var variant in new[] { ThemeVariant.Dark, ThemeVariant.Light })
+        {
+            menu.FindControl<ThemeVariantScope>("Scope")!.RequestedThemeVariant = variant;
+            Pump(3);
+            var card = BoxIn(menu.FindControl<Panel>("Card")!, view);
+            Assert.Equal(PopMenu.CardWidth, card.Width, 1);
+            foreach (var (name, text) in new[] { ("QualityLabel", "Hi-Res Lossless"), ("QualityDetail", "24-bit/192 kHz FLAC") })
+            {
+                var block = MobileFixtures.Named<TextBlock>(menu, name);
+                Assert.Equal(text, block.Text);
+                // The stub text layout's glyphs are wider than Inter's: one line is checked on real fonts.
+                if (HeadlessTestApp.RealRendering)
+                    Assert.True(block.Bounds.Height < block.FontSize * 1.9, $"{name} wrapped: {block.Bounds}");
+            }
+            var meaning = MobileFixtures.Named<TextBlock>(menu, "QualityMeaning");
+            Assert.Equal(TrackQuality.HiResMeaning, meaning.Text);
+            Assert.True(BoxIn(meaning, view).Right <= card.Right && BoxIn(meaning, view).Left >= card.Left);
+            AssertWaveform(menu);
+            output.WriteLine($"{variant}: card {card}");
+            if (HeadlessTestApp.RealRendering && !string.IsNullOrEmpty(dir))
+            {
+                System.IO.Directory.CreateDirectory(dir);
+                window.CaptureRenderedFrame()!.Save(System.IO.Path.Combine(dir, $"quality-card-hires-{variant}.png"));
+            }
+        }
+        window.Close();
+    }
+
+    /// <summary>The quality glyph is shown and is the desktop's waveform (PhLossless), whatever the class.</summary>
+    private static void AssertWaveform(Control root)
+    {
+        var glyph = MobileFixtures.Named<Viewbox>(root, "QualityGlyph");
+        Assert.True(glyph.IsEffectivelyVisible);
+        Assert.Same(root.FindResource("PhLossless"), Assert.IsType<Avalonia.Controls.Shapes.Path>(glyph.Child).Data);
+        Assert.Empty(root.GetVisualDescendants().OfType<Control>().Where(c => c.Name is "QualityLosslessGlyph" or "QualityLossyGlyph"));
     }
 
     [AvaloniaFact]

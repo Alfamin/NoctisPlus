@@ -38,16 +38,15 @@ public class TrackQualityTests
         Assert.Equal(label, q.Label);
         Assert.Equal(detail, q.Detail);
         Assert.True(q.IsLossless);
-        Assert.False(q.IsLossy);
         Assert.Equal(label == "Hi-Res Lossless" ? TrackQuality.HiResMeaning : Track.LosslessDescription, q.Meaning);
     }
 
     [Theory]
     [InlineData("MPEG-4 Audio (mp4a)", "a.m4a", 256, 44100, "AAC", "256 kbps 44.1 kHz AAC")]
     [InlineData("MPEG Version 1 Audio, Layer 3", "a.mp3", 320, 48000, "MP3", "320 kbps 48 kHz MP3")]
-    // The codec's own spelling, not Core's OPUS/OGG badge, in the label and at the end of the line.
-    [InlineData("Opus Version 1 Audio", "a.opus", 128, 48000, "Opus", "128 kbps 48 kHz Opus")]
-    [InlineData("Vorbis Version 0 Audio", "a.ogg", 192, 44100, "Vorbis", "192 kbps 44.1 kHz Vorbis")]
+    // The desktop's label word for word (Track.AudioQualityBadge): OPUS and OGG, as the PC shows them.
+    [InlineData("Opus Version 1 Audio", "a.opus", 128, 48000, "OPUS", "128 kbps 48 kHz OPUS")]
+    [InlineData("Vorbis Version 0 Audio", "a.ogg", 192, 44100, "OGG", "192 kbps 44.1 kHz OGG")]
     [InlineData("Microsoft WMA2 Audio", "a.wma", 128, 44100, "WMA", "128 kbps 44.1 kHz WMA")]
     // No bitrate known: the line is what is left.
     [InlineData("MPEG-4 Audio (mp4a)", "a.m4a", 0, 44100, "AAC", "44.1 kHz AAC")]
@@ -58,7 +57,6 @@ public class TrackQualityTests
         Assert.Equal(label, q.Label);
         Assert.Equal(detail, q.Detail);
         Assert.False(q.IsLossless);
-        Assert.True(q.IsLossy);
         Assert.Equal(Track.LossyDescription, q.Meaning);
     }
 

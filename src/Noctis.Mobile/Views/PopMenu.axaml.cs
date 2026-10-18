@@ -55,7 +55,7 @@ public partial class PopMenu : UserControl
     /// glyph column sits out to the left of the text, the labels inside it).</summary>
     internal const double LinksLead = 12;
     /// <summary>The quality card's width, and the gap it keeps from the badge it grows out of.</summary>
-    internal const double CardWidth = 300, CardGap = 10;
+    internal const double CardWidth = 260, CardGap = 10;
 
     private ShellViewModel? _shell;
     private TopLevel? _top;

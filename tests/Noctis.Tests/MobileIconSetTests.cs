@@ -21,9 +21,8 @@ public class MobileIconSetTests
     private static readonly string[] Dictionaries = { "PhoneIcons", "TabIcons", "LibraryIcons" };
 
     /// <summary>Glyphs drawn as a Path in a Viewbox at their own box, never as a PathIcon: the
-    /// quality badges' lossless waveform (the desktop's, kept identical by the parity test) and
-    /// the compressed file's stepped wave (a stroked centre line).</summary>
-    private static readonly string[] OwnBox = { "PhLossless", "PhLossySteps" };
+    /// quality badges' waveform (the desktop's, kept identical by the parity test).</summary>
+    private static readonly string[] OwnBox = { "PhLossless" };
 
     private static ResourceDictionary Load(string name) =>
         (ResourceDictionary)new ResourceInclude(new Uri("avares://Noctis.Mobile/"))

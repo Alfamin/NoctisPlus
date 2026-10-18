@@ -161,8 +161,9 @@
                     <Grid Grid.Row="1" ColumnDefinitions="*,Auto,*" Margin="0,-4,0,0">
                         <TextBlock Name="ElapsedText" Classes="np-time" Text="{Binding Player.ElapsedText}" HorizontalAlignment="Left" VerticalAlignment="Center" />
                         <!-- The quality badge (owner 10-14): the playing file's class between the
-                             times - Lossless / Hi-Res Lossless under the desktop's waveform, a
-                             compressed file's codec under a stepped wave - on a quiet capsule of the
+                             times - Hi-Res Lossless, Lossless or the codec (AAC, MP3...), the
+                             desktop's label, beside the desktop's waveform as on the PC (every
+                             label, lossless or not) - on a quiet capsule of the
                              menus' hairline over a breath of white, the text a shade under full
                              white so it sits back from the times. A tap opens the quality card
                              (ShowQualityCard), which grows out of it. -->
@@ -170,14 +171,8 @@
                                 IsVisible="{Binding Player.HasQuality}" AutomationProperties.Name="Audio quality">
                             <Border Name="QualityPill" Classes="np-badge-pill">
                                 <StackPanel Orientation="Horizontal" Spacing="5">
-                                    <Viewbox Name="QualityLosslessGlyph" Width="15" Height="9" VerticalAlignment="Center"
-                                             IsVisible="{Binding Player.Quality.IsLossless, FallbackValue=False}">
+                                    <Viewbox Name="QualityGlyph" Width="16" Height="11" Margin="0,1,0,0" VerticalAlignment="Center">
                                         <Path Data="{DynamicResource PhLossless}" Fill="{DynamicResource NowPlayingBadgeText}" />
-                                    </Viewbox>
-                                    <Viewbox Name="QualityLossyGlyph" Width="13" Height="11" VerticalAlignment="Center"
-                                             IsVisible="{Binding Player.Quality.IsLossy, FallbackValue=False}">
-                                        <Path Data="{DynamicResource PhLossySteps}" Stroke="{DynamicResource NowPlayingBadgeText}"
-                                              StrokeThickness="2.25" StrokeLineCap="Round" StrokeJoin="Round" />
                                     </Viewbox>
                                     <TextBlock Name="QualityBadgeText" Text="{Binding Player.Quality.Label}" FontSize="12"
                                                FontWeight="SemiBold" VerticalAlignment="Center" Foreground="{DynamicResource NowPlayingBadgeText}" />
