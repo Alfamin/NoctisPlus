@@ -16,14 +16,14 @@
     <RootNamespace>Noctis</RootNamespace>
     <Product>Noctis Plus</Product>
     <Company>Alfamin; based on Noctis by heartached</Company>
-    <!-- Noctis Plus releases are numbered on top of their Noctis base: 1.6.3.1, 1.6.3.2, ...
+    <!-- Noctis Plus has its own release numbers (1.6.3.1, 1.6.3.2, then 2.0.0).
          Plugins still see the base version (1.6.3) for minAppVersion checks. -->
-    <Version>1.6.3.3</Version>
+    <Version>2.0.0</Version>
     <!-- Pre-release marker: numeric Version stays 1.1.16 (update checks + the
          displayed number are unchanged); the "-prerelease" SemVer suffix on the
          informational version is what lights the "Pre-release" badge in Settings.
          Remove this line (or drop the suffix) when cutting a stable release. -->
-    <InformationalVersion>1.6.3.3</InformationalVersion>
+    <InformationalVersion>2.0.0</InformationalVersion>
     <ApplicationManifest Condition="$([MSBuild]::IsOSPlatform('Windows'))">app.manifest</ApplicationManifest>
 
     <!-- Avalonia requires this for XAML compilation -->
@@ -184,6 +184,8 @@
     <Content Include="Features\TrueShuffle\LICENSE" Link="features\dev.moshi.trueshuffle\LICENSE"
              CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
     <Content Include="Features\LyricMotion\LICENSE" Link="features\dev.moshi.lyricmotion\LICENSE"
+             CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
+    <Content Include="Features\FreeMusicFinder\LICENSE" Link="features\dev.moshi.freemusicfinder\LICENSE"
              CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
   </ItemGroup>
   <ItemGroup>

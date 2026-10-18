@@ -16,7 +16,7 @@ Our own changes are listed by file in Git history.
 
 | Feature | Source repository | Author / rights |
 |---|---|---|
-| Free Music Finder (catalog, downloads) | Alfamin/noctic-download-plugin, forked from Pr0nE/noctic-download-plugin (first commit 4d7ae1b) | Original code by Pr0nE, MIT. The owner, a maintainer, added the MIT LICENSE upstream in 1503a6c on 2026-10-17 (afternoon handoff). Alfamin's fork changes are MIT as well. This supersedes the initial permission-only status. |
+| Free Music Finder (catalog, downloads) | Alfamin/noctic-download-plugin, forked from Pr0nE/noctic-download-plugin (first commit 4d7ae1b) | Original code by Pr0nE, MIT. The owner, a maintainer, added the MIT LICENSE upstream in 1503a6c on 2026-10-17 (afternoon handoff). Alfamin's fork changes are MIT as well. This supersedes the initial permission-only status. The exact upstream LICENSE is kept at `src/Noctis/Features/FreeMusicFinder/LICENSE` and delivered as `features/dev.moshi.freemusicfinder/LICENSE` (2.0.0). |
 | True Shuffle | Alfamin/TrueShuffle | Alfamin (owner), MIT (LICENSE added 2026-10-16) |
 | Lyric Motion | Alfamin/LyricMotion | Alfamin (owner), MIT (LICENSE added 2026-10-16) |
 | WordLyrics (plugin and program) | Alfamin/WordLyrics | Alfamin (owner), MIT (LICENSE added 2026-10-16) |
