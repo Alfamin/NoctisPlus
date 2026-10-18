@@ -21,6 +21,8 @@ internal sealed class Download(BotTrack track, string folder)
     public bool Priority { get; internal set; }
     public bool Held { get; internal set; }
     public string? SavedPath { get; internal set; }
+    /// <summary>When this run failed (this session only): a quick repeat click shows the error instead of asking the bots again.</summary>
+    internal DateTimeOffset? FailedAt { get; set; }
     internal Noctis.Features.ProgressivePlayback.ProgressiveTransfer? Playback { get; set; }
     public bool IsActive => State is DownloadState.Queued or DownloadState.Running or DownloadState.Waiting;
 }
@@ -331,7 +333,7 @@ internal sealed class Downloads : IDisposable
         }
     }
     private void SetOutcome(Download d, DownloadState state, string error, DateTimeOffset? retry = null)
-    { lock (_gate) { if (d.State == DownloadState.Removed) return; d.State = state; d.Error = error; d.RetryAt = retry; } }
+    { lock (_gate) { if (d.State == DownloadState.Removed) return; d.State = state; d.Error = error; d.RetryAt = retry; d.FailedAt = state == DownloadState.Failed ? DateTimeOffset.UtcNow : null; } }
     private string? Summary()
     {
         if (_last is null) return null;

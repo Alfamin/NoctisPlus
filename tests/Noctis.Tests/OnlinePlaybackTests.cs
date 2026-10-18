@@ -14,8 +14,9 @@ public class OnlinePlaybackTests
     {
         internal readonly Dictionary<string, TaskCompletionSource<Track>> Pending = [];
         internal readonly Dictionary<string, CancellationToken> Tokens = [];
+        internal int Asked;
         public Task<Track> PreparePlaybackAsync(OnlineSong song, CancellationToken ct)
-        { Tokens[song.Id] = ct; return (Pending[song.Id] = new(TaskCreationOptions.RunContinuationsAsynchronously)).Task; }
+        { Asked++; Tokens[song.Id] = ct; return (Pending[song.Id] = new(TaskCreationOptions.RunContinuationsAsynchronously)).Task; }
         public void WarmUp() { }
         public void Retry() { }
         public string Route => "synthetic";
@@ -105,6 +106,24 @@ public class OnlinePlaybackTests
         Assert.Equal("Second", player.CurrentTrack?.Title); Assert.Single(audio.PlayedPaths);
         Assert.Same(next, Assert.Single(player.UpNext)); Assert.False(player.IsWaitingForAudio);
         player.StopAndClear();
+    }
+
+    [AvaloniaFact]
+    public async Task RepeatClicksOnTheSongBeingPrepared_ShareOneRequest()
+    {
+        // Owner #29: every click on a song sent the bots the same request again.
+        using var data = new TestPersistenceService(); var audio = new FakeAudioPlayer(); var source = new Source();
+        var player = new PlayerViewModel(audio, new FakeLibraryService(), data, new FakeAnimatedCoverService());
+        var song = new OnlineSong("online", "Online", "Synthetic");
+        var first = player.PlayOnlineAsync(source, song);
+        var again = player.PlayOnlineAsync(source, song); var third = player.PlayOnlineAsync(source, song);
+        Assert.Same(first, again); Assert.Same(first, third); Assert.Equal(1, source.Asked);
+        Assert.False(source.Tokens["online"].IsCancellationRequested);
+        source.Pending["online"].SetResult(Track("Online")); await first;
+        Assert.Single(audio.PlayedPaths); Assert.Equal("Online", player.CurrentTrack?.Title);
+        // Another song still takes over at once.
+        var other = player.PlayOnlineAsync(source, new("other", "Other", "Synthetic")); Assert.Equal(2, source.Asked);
+        source.Pending["other"].SetResult(Track("Other")); await other; player.StopAndClear();
     }
 
     [AvaloniaTheory]

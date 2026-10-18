@@ -10,6 +10,8 @@ internal sealed class DiscoveryActions(IPlaylistLibrary library, Downloads downl
     private readonly SemaphoreSlim _gate = new(1, 1);
     private (long Key, DateTimeOffset At, PlaylistMatcher Matcher)? _matcher;
     public Downloads Downloads => downloads;
+    internal static readonly TimeSpan RetryPause = TimeSpan.FromSeconds(15);
+    internal static bool JustFailed(Download d) => d.FailedAt is { } at && DateTimeOffset.UtcNow - at < RetryPause;
 
     /// <summary>The matcher checks every library file still exists, ~2,000 disk lookups. Search
     /// asks on every query, so one matcher serves while the library is unchanged (same songs,
@@ -65,7 +67,8 @@ internal sealed class DiscoveryActions(IPlaylistLibrary library, Downloads downl
                 if (match.Local is not null) { owned++; continue; }
                 if (match.Download is {} current)
                 {
-                    if (priority && (current.IsActive || current.State == DownloadState.Failed)) downloads.DownloadNext(current);
+                    // Owner #29: a burst of clicks on a song that just failed retries it once, not once per click.
+                    if (priority && (current.IsActive || current.State == DownloadState.Failed && !JustFailed(current))) downloads.DownloadNext(current);
                     existing++; continue;
                 }
                 try { downloads.Start(track(song.Request), target, priority); added++; }

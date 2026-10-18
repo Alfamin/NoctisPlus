@@ -6,6 +6,8 @@ namespace Noctis.ViewModels;
 public partial class PlayerViewModel
 {
     private CancellationTokenSource? _onlinePlay;
+    private string? _onlinePreparingSongId;
+    private Task? _onlinePlayTask;
     [ObservableProperty, NotifyPropertyChangedFor(nameof(IsWaitingForAudio))] private bool _isPreparingOnlinePlayback;
     [ObservableProperty, NotifyPropertyChangedFor(nameof(IsWaitingForAudio))] private bool _isBuffering;
     public bool IsWaitingForAudio => IsPreparingOnlinePlayback || IsBuffering;
@@ -32,11 +34,19 @@ public partial class PlayerViewModel
 
     /// <summary>Latest Play wins across Search and album pages. Local playback, pause,
     /// skip and shutdown revoke preparation; the durable download continues separately.</summary>
-    internal async Task PlayOnlineAsync(IOnlineMusicSearch source, OnlineSong song)
+    internal Task PlayOnlineAsync(IOnlineMusicSearch source, OnlineSong song)
+    {
+        // Owner #29: more clicks on the song being prepared wait for the same request; only another song restarts it.
+        if (_onlinePlay is not null && _onlinePreparingSongId == song.Id && _onlinePlayTask is { } pending) return pending;
+        return _onlinePlayTask = PlayOnlineCoreAsync(source, song);
+    }
+
+    private async Task PlayOnlineCoreAsync(IOnlineMusicSearch source, OnlineSong song)
     {
         CancelOnlinePlayback();
         if (OnlinePlayingSongId == song.Id && CurrentTrack is not null) { PlayPauseCommand.Execute(null); return; }
         var stop = _onlinePlay = new();
+        _onlinePreparingSongId = song.Id;
         IsPreparingOnlinePlayback = true;
         try
         {
@@ -53,14 +63,14 @@ public partial class PlayerViewModel
         finally
         {
             if (ReferenceEquals(_onlinePlay, stop)) _onlinePlay = null;
-            if (_onlinePlay is null) IsPreparingOnlinePlayback = false;
+            if (_onlinePlay is null) { IsPreparingOnlinePlayback = false; _onlinePreparingSongId = null; }
             stop.Dispose();
         }
     }
 
     private void CancelOnlinePlayback()
     {
-        var stop = _onlinePlay; _onlinePlay = null;
+        var stop = _onlinePlay; _onlinePlay = null; _onlinePreparingSongId = null;
         stop?.Cancel();
         IsPreparingOnlinePlayback = false;
     }

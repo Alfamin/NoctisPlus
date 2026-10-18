@@ -219,9 +219,9 @@ internal static class DiscoveryTests
         var owned = library.Add(Path.Combine(folder, "root-a/sub"), "Owned", "North Star");
         var second = library.Add(Path.Combine(folder, "root-b"), "Second root", "North Star");
         library.Add(folder, "Wrong length", "North Star", 400);
-        var original = File.ReadAllBytes(owned.Path); int fetched = 0; bool login = false;
+        var original = File.ReadAllBytes(owned.Path); int fetched = 0, refused = 0; bool login = false;
         BotTrack Track(MusicRequest r) => new(r.Title, r.Artist, r.Duration, r.Title + "-" + r.Identity.GetHashCode(), async (output, progress, ct) =>
-        { Interlocked.Increment(ref fetched); await output.WriteAsync(new byte[] { 1, 2, 3 }, ct); return "mp3"; }) { Request = r };
+        { if (r.Title == "Fails") { Interlocked.Increment(ref refused); throw new TrackUnavailableException("No matching recording."); } Interlocked.Increment(ref fetched); await output.WriteAsync(new byte[] { 1, 2, 3 }, ct); return "mp3"; }) { Request = r };
         using var downloads = new Downloads(_ => { }); downloads.SetPaused(true);
         var actions = new DiscoveryActions(library, downloads, Track, () => Path.Combine(folder, "download"), () => login);
         var rows = new[] { Song("deezer:101", "Owned"), Song("deezer:102", "Missing"), Song("deezer:103", "Second root"), Song("deezer:104", "Wrong length") };
@@ -249,5 +249,14 @@ internal static class DiscoveryTests
         var hidden = second with { Visible = false }; library.Songs.Remove(second); library.Songs.Add(hidden);
         Check.True((await actions.MatchAsync([rows[2]], default))[rows[2].Id].Detail.Contains("hidden folder"), "hidden music is reported and not needlessly fetched");
         Check.True(!SpotifyPlaylists.SameRecording(rows[1].Request, (rows[1] with { Explicit = false }).Request), "known explicit and clean recordings never deduplicate together");
+        // Owner #29: clicks on a song that just failed asked the bots again, once per click.
+        var failing = Song("deezer:105", "Fails");
+        await actions.QueueAsync([failing], true, default);
+        await Check.UntilAsync(() => downloads.History.Any(d => d.Track.Title == "Fails" && d.State == DownloadState.Failed), "a refused song fails");
+        await actions.QueueAsync([failing], true, default); await actions.QueueAsync([failing], true, default); await Task.Delay(300);
+        Check.Equal(1, refused, "a burst of clicks right after the failure asks the bots no more");
+        downloads.History.First(d => d.Track.Title == "Fails").FailedAt = DateTimeOffset.UtcNow - DiscoveryActions.RetryPause;
+        await actions.QueueAsync([failing], true, default);
+        await Check.UntilAsync(() => Volatile.Read(ref refused) == 2, "a click after the pause retries it once");
     }
 }
