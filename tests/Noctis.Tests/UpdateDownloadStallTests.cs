@@ -50,11 +50,13 @@ public class UpdateDownloadStallTests : IDisposable
     [Fact]
     public async Task SlowButSteadyStream_CompletesPastManyStallWindows()
     {
-        // 20 chunks, 100 ms apart = ~2 s total, five times the 400 ms stall window.
+        // 40 chunks, 50 ms apart = ~2 s total, over three times the 600 ms stall window.
         // Under the old absolute deadline this shape could never outlive the deadline.
-        const int chunks = 20;
-        var handler = new StreamHandler(ct => new PacedStream(chunks, TimeSpan.FromMilliseconds(100), stallAfter: null));
-        var service = new UpdateService(new HttpClient(handler)) { DownloadOptions = Options(TimeSpan.FromMilliseconds(400)) };
+        // Each gap is 12x shorter than the window: a busy CI runner once stretched one
+        // 100 ms gap past a 400 ms window and the download retried (2026-10-19).
+        const int chunks = 40;
+        var handler = new StreamHandler(ct => new PacedStream(chunks, TimeSpan.FromMilliseconds(50), stallAfter: null));
+        var service = new UpdateService(new HttpClient(handler)) { DownloadOptions = Options(TimeSpan.FromMilliseconds(600)) };
 
         var path = await service.DownloadInstallerAsync(Info(chunks * ChunkSize), ct: TestContext.Current.CancellationToken, destinationPath: Destination);
 
