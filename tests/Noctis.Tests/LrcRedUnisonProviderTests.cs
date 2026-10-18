@@ -283,7 +283,10 @@ public class LrcRedUnisonProviderTests
         var off = new AppSettings { LrcRedEnabled = false, UnisonEnabled = false };
         Assert.False(sources[1].IsEnabled(off));
         Assert.False(sources[2].IsEnabled(off));
-        Assert.True(sources[1].IsEnabled(new AppSettings()));
+        var on = new AppSettings { LrcRedEnabled = true, UnisonEnabled = true };
+        Assert.True(sources[1].IsEnabled(on));
+        Assert.True(sources[2].IsEnabled(on));
+        Assert.False(sources[1].IsEnabled(new AppSettings())); // lrc.red is opt-in
         Assert.True(sources[2].IsEnabled(new AppSettings()));
     }
 }

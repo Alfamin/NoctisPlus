@@ -930,9 +930,10 @@ public class AppSettings
     public bool KugouEnabled { get; set; } = true;
 
     /// <summary>Whether lrc.red (TTML: word-synced with duet voices, else line-synced or plain) is
-    /// searched automatically. On like Kugou: keyless, its API is "free for the public to use",
-    /// and a lookup is two small requests (2026-10-17).</summary>
-    public bool LrcRedEnabled { get; set; } = true;
+    /// searched automatically. Off on fresh installs: its word-synced files carry Apple Music's
+    /// agent ids and fields, and Apple Music lyrics stay plugin-only (#119); opt in here
+    /// (2026-10-17). Always available in the Search Lyrics source picker.</summary>
+    public bool LrcRedEnabled { get; set; }
 
     /// <summary>Whether Unison (Better Lyrics' community lyrics, mostly word-synced TTML) is searched
     /// automatically. On: keyless, documented for third-party reads (120 a minute per IP), two

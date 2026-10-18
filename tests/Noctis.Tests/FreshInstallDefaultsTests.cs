@@ -148,10 +148,11 @@ public class FreshInstallDefaultsTests
     }
 
     [Fact]
-    public void LrcRedAndUnison_SearchAutomatically()
+    public void Unison_SearchesAutomatically_LrcRed_IsOptIn()
     {
-        // Keyless, documented for third-party reads, two small requests a lookup (2026-10-17).
-        Assert.True(Fresh.LrcRedEnabled);
+        // Unison: keyless, documented for third-party reads (2026-10-17). lrc.red's word-synced
+        // files look Apple-sourced, so it waits for the user to switch it on.
+        Assert.False(Fresh.LrcRedEnabled);
         Assert.True(Fresh.UnisonEnabled);
     }
 }
