@@ -88,8 +88,9 @@ public class InboxPageTests : IDisposable
         await WaitUntil(() => library.InboxTracks.Count == 0);
         Assert.Equal(4, library.Tracks.Count);
         Assert.False((await persistence.LoadSettingsAsync()).InboxEnabled);
-        var json = await File.ReadAllTextAsync(Path.Combine(_root, "library.json"));
-        Assert.DoesNotContain("\"isInInbox\":true", json);
+        // The Inbox empties the moment the list is swapped; library.json is written after
+        // the index rebuild, so wait for the save instead of reading the file straight away.
+        await WaitUntil(() => !File.ReadAllText(Path.Combine(_root, "library.json")).Contains("\"isInInbox\":true"));
     }
 
     [AvaloniaFact]
