@@ -2103,8 +2103,31 @@
                                 <TextBlock Grid.Column="2" Classes="mini-time" Text="{Binding Player.DurationText}" FontSize="10"
                                            Foreground="{DynamicResource SystemControlForegroundBaseMediumBrush}" VerticalAlignment="Center" MinWidth="26" TextAlignment="Right"/>
                             </Grid>
-                            <StackPanel Grid.Row="2" Orientation="Horizontal" Spacing="26"
-                                        HorizontalAlignment="Center" VerticalAlignment="Center" Margin="0,4,0,0">
+                            <!-- Transport: shuffle | prev play next | repeat, the classic card's order
+                                 and toggles (same commands, glyphs and accent "on" state); off glyphs
+                                 take the "…" glyph's soft theme ink. MaxWidth keeps the five together
+                                 on a stretched card instead of pushing the toggles to its far ends;
+                                 on a card too narrow for five the toggles step aside (SyncPillToggles). -->
+                            <Grid Grid.Row="2" x:Name="PillTransport" ColumnDefinitions="Auto,*,Auto" MaxWidth="240"
+                                  VerticalAlignment="Center" Margin="0,4,0,0">
+                            <Button Grid.Column="0" x:Name="PillShuffleButton" Classes="mini-transport" Width="26" Height="26"
+                                    HorizontalAlignment="Left" VerticalAlignment="Center"
+                                    Command="{Binding Player.ToggleShuffleCommand}" ToolTip.Tip="{loc:T MiniPlayer.ShuffleTip}">
+                                <Panel>
+                                    <Viewbox Width="15" Height="15" IsVisible="{Binding !Player.IsShuffleEnabled}">
+                                        <Canvas Width="24" Height="24">
+                                            <Path Fill="{DynamicResource SystemControlForegroundBaseMediumBrush}" Data="{StaticResource ShuffleIcon}"/>
+                                        </Canvas>
+                                    </Viewbox>
+                                    <Viewbox Width="15" Height="15" IsVisible="{Binding Player.IsShuffleEnabled}">
+                                        <Canvas Width="24" Height="24">
+                                            <Path Fill="{DynamicResource AccentColorBrush}" Data="{StaticResource ShuffleIcon}"/>
+                                        </Canvas>
+                                    </Viewbox>
+                                </Panel>
+                            </Button>
+                            <StackPanel Grid.Column="1" x:Name="PillTransportCenter" Orientation="Horizontal" Spacing="18"
+                                        HorizontalAlignment="Center" VerticalAlignment="Center">
                                 <Button Classes="mini-transport" Width="30" Height="30"
                                         Command="{Binding Player.PreviousCommand}" ToolTip.Tip="{loc:T MiniPlayer.PreviousTip}">
                                     <Viewbox Width="17" Height="17">
@@ -2140,6 +2163,31 @@
                                     </Viewbox>
                                 </Button>
                             </StackPanel>
+                            <Button Grid.Column="2" x:Name="PillRepeatButton" Classes="mini-transport" Width="26" Height="26"
+                                    HorizontalAlignment="Right" VerticalAlignment="Center"
+                                    Command="{Binding Player.CycleRepeatCommand}" ToolTip.Tip="{loc:T MiniPlayer.RepeatTip}">
+                                <Panel>
+                                    <Viewbox Width="15" Height="15"
+                                             IsVisible="{Binding Player.RepeatMode, Converter={x:Static ObjectConverters.Equal}, ConverterParameter={x:Static m:RepeatMode.Off}}">
+                                        <Canvas Width="24" Height="24">
+                                            <Path Fill="{DynamicResource SystemControlForegroundBaseMediumBrush}" Data="{StaticResource RepeatAllIcon}"/>
+                                        </Canvas>
+                                    </Viewbox>
+                                    <Viewbox Width="15" Height="15"
+                                             IsVisible="{Binding Player.RepeatMode, Converter={x:Static ObjectConverters.Equal}, ConverterParameter={x:Static m:RepeatMode.All}}">
+                                        <Canvas Width="24" Height="24">
+                                            <Path Fill="{DynamicResource AccentColorBrush}" Data="{StaticResource RepeatAllIcon}"/>
+                                        </Canvas>
+                                    </Viewbox>
+                                    <Viewbox Width="15" Height="15"
+                                             IsVisible="{Binding Player.RepeatMode, Converter={x:Static ObjectConverters.Equal}, ConverterParameter={x:Static m:RepeatMode.One}}">
+                                        <Canvas Width="24" Height="24">
+                                            <Path Fill="{DynamicResource AccentColorBrush}" Data="{StaticResource RepeatOneIcon}"/>
+                                        </Canvas>
+                                    </Viewbox>
+                                </Panel>
+                            </Button>
+                            </Grid>
                         </Grid>
                     </Border>
                     <!-- Round cover, its centre on the card's left edge. -->
@@ -2244,7 +2292,26 @@
                                 <TextBlock Grid.Column="2" Classes="mini-time" Text="{Binding Player.DurationText}" FontSize="11"
                                            Foreground="{DynamicResource SystemControlForegroundBaseMediumBrush}" VerticalAlignment="Center" MinWidth="30" TextAlignment="Right"/>
                             </Grid>
-                            <StackPanel Orientation="Horizontal" Spacing="22" HorizontalAlignment="Center" Margin="0,8,0,0">
+                            <!-- Transport: shuffle | prev play next | repeat, as on the Pill (see there);
+                                 the row spans the seek row, so the toggles line up under its times. -->
+                            <Grid x:Name="SleeveTransport" ColumnDefinitions="Auto,*,Auto" Margin="0,8,0,0">
+                            <Button Grid.Column="0" x:Name="SleeveShuffleButton" Classes="mini-transport" Width="30" Height="30"
+                                    HorizontalAlignment="Left" VerticalAlignment="Center"
+                                    Command="{Binding Player.ToggleShuffleCommand}" ToolTip.Tip="{loc:T MiniPlayer.ShuffleTip}">
+                                <Panel>
+                                    <Viewbox Width="17" Height="17" IsVisible="{Binding !Player.IsShuffleEnabled}">
+                                        <Canvas Width="24" Height="24">
+                                            <Path Fill="{DynamicResource SystemControlForegroundBaseMediumBrush}" Data="{StaticResource ShuffleIcon}"/>
+                                        </Canvas>
+                                    </Viewbox>
+                                    <Viewbox Width="17" Height="17" IsVisible="{Binding Player.IsShuffleEnabled}">
+                                        <Canvas Width="24" Height="24">
+                                            <Path Fill="{DynamicResource AccentColorBrush}" Data="{StaticResource ShuffleIcon}"/>
+                                        </Canvas>
+                                    </Viewbox>
+                                </Panel>
+                            </Button>
+                            <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="22" HorizontalAlignment="Center" VerticalAlignment="Center">
                                 <Button Classes="mini-transport" Width="32" Height="32"
                                         Command="{Binding Player.PreviousCommand}" ToolTip.Tip="{loc:T MiniPlayer.PreviousTip}">
                                     <Viewbox Width="18" Height="18">
@@ -2280,6 +2347,31 @@
                                     </Viewbox>
                                 </Button>
                             </StackPanel>
+                            <Button Grid.Column="2" x:Name="SleeveRepeatButton" Classes="mini-transport" Width="30" Height="30"
+                                    HorizontalAlignment="Right" VerticalAlignment="Center"
+                                    Command="{Binding Player.CycleRepeatCommand}" ToolTip.Tip="{loc:T MiniPlayer.RepeatTip}">
+                                <Panel>
+                                    <Viewbox Width="17" Height="17"
+                                             IsVisible="{Binding Player.RepeatMode, Converter={x:Static ObjectConverters.Equal}, ConverterParameter={x:Static m:RepeatMode.Off}}">
+                                        <Canvas Width="24" Height="24">
+                                            <Path Fill="{DynamicResource SystemControlForegroundBaseMediumBrush}" Data="{StaticResource RepeatAllIcon}"/>
+                                        </Canvas>
+                                    </Viewbox>
+                                    <Viewbox Width="17" Height="17"
+                                             IsVisible="{Binding Player.RepeatMode, Converter={x:Static ObjectConverters.Equal}, ConverterParameter={x:Static m:RepeatMode.All}}">
+                                        <Canvas Width="24" Height="24">
+                                            <Path Fill="{DynamicResource AccentColorBrush}" Data="{StaticResource RepeatAllIcon}"/>
+                                        </Canvas>
+                                    </Viewbox>
+                                    <Viewbox Width="17" Height="17"
+                                             IsVisible="{Binding Player.RepeatMode, Converter={x:Static ObjectConverters.Equal}, ConverterParameter={x:Static m:RepeatMode.One}}">
+                                        <Canvas Width="24" Height="24">
+                                            <Path Fill="{DynamicResource AccentColorBrush}" Data="{StaticResource RepeatOneIcon}"/>
+                                        </Canvas>
+                                    </Viewbox>
+                                </Panel>
+                            </Button>
+                            </Grid>
                         </StackPanel>
                     </Grid>
                 </Border>

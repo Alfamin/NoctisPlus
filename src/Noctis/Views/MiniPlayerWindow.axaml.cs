@@ -204,6 +204,7 @@ public partial class MiniPlayerWindow : Window
         // pass; LayoutUpdated above is the catch-all a frame later.
         FormGrid.SizeChanged += (_, _) => SyncDesignGround();
         PillFormRoot.SizeChanged += (_, _) => SyncDesignGround();
+        PillTransport.SizeChanged += (_, e) => SyncPillToggles(e.NewSize.Width);
         SleeveFormRoot.SizeChanged += (_, _) => SyncDesignGround();
         ActualThemeVariantChanged += (_, _) => SyncDrawerPalette();
         LargeFrostBand.OpacityMask = _largeFrostMask;
@@ -1301,6 +1302,25 @@ public partial class MiniPlayerWindow : Window
     private void OnRootPointerReleased(object? sender, PointerReleasedEventArgs e) => _armedDrag = null;
 
     private void OnRootPointerCaptureLost(object? sender, PointerCaptureLostEventArgs e) => _armedDrag = null;
+
+    /// <summary>Least room between a Pill toggle and the transport beside it.</summary>
+    private const double PillToggleGap = 4;
+
+    /// <summary>
+    /// The Pill's Shuffle / Repeat need ~190 px beside prev / play / next — the canonical card
+    /// has it, but the window resizes down to 160 wide. Narrower than that the toggles step
+    /// aside and the row is the three buttons it was before them, rather than five that
+    /// overlap. Their slots are Auto columns of a stretched grid, so hiding them does not
+    /// change the width this reads.
+    /// </summary>
+    private void SyncPillToggles(double width)
+    {
+        var need = PillShuffleButton.Width + PillRepeatButton.Width
+                   + PillTransportCenter.DesiredSize.Width + 2 * PillToggleGap;
+        var show = width >= need;
+        PillShuffleButton.IsVisible = show;
+        PillRepeatButton.IsVisible = show;
+    }
 
     /// <summary>
     /// True when a press landed on the window's own glass rather than on a control.
