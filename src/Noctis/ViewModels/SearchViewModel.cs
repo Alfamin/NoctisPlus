@@ -40,6 +40,7 @@ public sealed partial class SearchViewModel : ViewModelBase, ISearchable, IDispo
     {
         _library = library;
         _player = player;
+        ForYou.PlayRequested = player.PlayOnlineAsync;
         _openArtist = openArtist;
         _openAlbum = openAlbum;
         _index = new LibrarySearchIndex(library);

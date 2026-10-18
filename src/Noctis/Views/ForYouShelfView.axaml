@@ -7,7 +7,7 @@
 
     <!-- For you (Noctis Plus), built as one of Home's sections: the folding title with the
          chevron box, then a left-packed row of covers in the Albums-row tile shape. Hover dims
-         the cover and shows two circles (Home's tile-play / tile-more): Download bottom-left,
+         the cover and shows two circles (Home's tile-play / tile-more): Play bottom-left,
          the options menu bottom-right. No scroll bar, no extra buttons under the covers. -->
 
     <UserControl.Styles>
@@ -122,8 +122,8 @@
         <Style Selector="Button.foryou-tile:pressed">
             <Setter Property="RenderTransform" Value="scale(1)" />
         </Style>
-        <!-- The download circle lights in the accent, as Home's Play circle does. -->
-        <Style Selector="Button.tile-play.download:pointerover /template/ ContentPresenter">
+        <!-- Same Play circle and accent hover as Home. -->
+        <Style Selector="Button.tile-play:pointerover /template/ ContentPresenter">
             <Setter Property="Background" Value="{DynamicResource AccentColorBrush}" />
         </Style>
         <!-- Cards fade up as a page arrives (Search's section recipe). -->
@@ -234,28 +234,15 @@
                                                               RenderOptions.BitmapInterpolationMode="HighQuality"
                                                               IsVisible="{Binding Song.HasArtwork}" />
                                             <Border Classes="tile-dim" />
-                                            <!-- Bottom-left: Download (Home's Play circle); a ring while it runs. -->
-                                            <Button Classes="tile-play download" IsVisible="{Binding Song.CanStartDownload}"
-                                                    ToolTip.Tip="Download" AutomationProperties.Name="Download"
-                                                    Command="{Binding $parent[UserControl].((vm:ForYouShelfViewModel)DataContext).DownloadCommand}"
+                                            <!-- Play remains available while queued/downloading or already saved. -->
+                                            <Button Classes="tile-play"
+                                                    ToolTip.Tip="Play" AutomationProperties.Name="Play"
+                                                    Command="{Binding $parent[UserControl].((vm:ForYouShelfViewModel)DataContext).PlayCommand}"
                                                     CommandParameter="{Binding}">
-                                                <Viewbox Width="13" Height="13">
-                                                    <Path Data="{StaticResource SearchDownloadGlyph}" Fill="{x:Null}" Stroke="White"
-                                                          StrokeThickness="2.4" StrokeLineCap="Round" StrokeJoin="Round" />
+                                                <Viewbox Width="13" Height="13" Margin="1,0,0,0">
+                                                    <Path Data="{StaticResource PlayIcon}" Fill="White" />
                                                 </Viewbox>
                                             </Button>
-                                            <Border Width="32" Height="32" CornerRadius="16" Margin="8" Background="#B3232325"
-                                                    HorizontalAlignment="Left" VerticalAlignment="Bottom"
-                                                    IsVisible="{Binding !Song.CanStartDownload}">
-                                                <Panel>
-                                                    <ctrl:ProgressRing Width="20" Height="20" Thickness="2" Foreground="{DynamicResource AccentColorBrush}"
-                                                                       IsVisible="{Binding Song.IsDownloading}" Value="{Binding Song.Progress}" ToolTip.Tip="Downloading" />
-                                                    <ctrl:ProgressRing Width="20" Height="20" Thickness="2" Foreground="White"
-                                                                       IsVisible="{Binding Song.IsQueued}" IsIndeterminate="True" ToolTip.Tip="In downloads" />
-                                                    <PathIcon Data="{StaticResource CheckmarkIcon}" Width="12" Height="12" Foreground="{DynamicResource AccentColorBrush}"
-                                                              IsVisible="{Binding Song.IsSaved}" ToolTip.Tip="Downloaded" />
-                                                </Panel>
-                                            </Border>
                                             <!-- Bottom-right: the options (the same menu as right-click). -->
                                             <Button Classes="tile-more" Click="OnMoreClick">
                                                 <Viewbox Width="14" Height="14"><Path Data="{StaticResource MoreDotsIcon}" /></Viewbox>

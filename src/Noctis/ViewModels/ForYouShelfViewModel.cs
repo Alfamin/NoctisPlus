@@ -20,6 +20,8 @@ public sealed partial class ForYouShelfViewModel : ObservableObject, IDisposable
     private (ForYouPick Pick, int Index, DiscoverResult? Page, ForYouSource Source)? _dismissed;
     private long _generation;
     private bool _active, _disposed;
+    internal Func<IOnlineMusicSearch, OnlineSong, Task>? PlayRequested { get; set; }
+    private long _playGeneration;
 
     public ForYouShelfViewModel()
     {
@@ -190,6 +192,20 @@ public sealed partial class ForYouShelfViewModel : ObservableObject, IDisposable
 
     [RelayCommand] private Task Download(ForYouPick? pick) => DownloadAsync(pick, true);
     [RelayCommand] private Task QueueDownload(ForYouPick? pick) => DownloadAsync(pick, false);
+    [RelayCommand(AllowConcurrentExecutions = true)]
+    private async Task Play(ForYouPick? pick)
+    {
+        if (_disposed || pick?.Song.Online is not { } song || _online is not { } online || PlayRequested is not { } play) return;
+        if (!online.CanDownload) { online.RequestSignIn(); return; }
+        var generation = ++_playGeneration;
+        try
+        {
+            Status = "Buffering…";
+            await play(online, song);
+            if (!_disposed && generation == _playGeneration) Status = "";
+        }
+        catch (Exception ex) { if (!_disposed && generation == _playGeneration) Status = ex.Message; }
+    }
     [RelayCommand] private async Task OpenPick(ForYouPick? pick)
     {
         if (pick is null || _online is not { } online) return;

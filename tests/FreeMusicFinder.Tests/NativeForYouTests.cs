@@ -20,9 +20,10 @@ internal static class NativeForYouTests
         using var catalog = DiscoveryTests.Catalog(Path.Combine(folder, "catalog"), http);
         using var downloads = new Downloads(_ => { });
         var loginRequests = 0;
+        var signedIn = false;
         var actions = new DiscoveryActions(library, downloads, _ => throw new Exception("No transfer is allowed in this fixture"), () => folder, () => false);
         using var pages = new CatalogPages(() => catalog, actions, _ => { }, () => true, library: () => null);
-        var online = new FinderOnlineSearch(() => catalog, actions, pages, () => false, () => loginRequests++);
+        var online = new FinderOnlineSearch(() => catalog, actions, pages, () => signedIn, () => loginRequests++);
         using var source = new ForYouSource(() => catalog, actions, _ => [], library, null, Path.Combine(folder, "hidden.json"));
         using var vm = new ForYouShelfViewModel(source, online, actions, TimeSpan.FromMilliseconds(120));
         vm.SetActive(true);
@@ -35,6 +36,23 @@ internal static class NativeForYouTests
         signIn.GetAwaiter().GetResult();
         Check.Equal(1, loginRequests, "signed-out Download now opens the native sign-in flow");
         Check.Equal(0, downloads.History.Count, "sign-in offer does not create a fake pending download");
+        var played = new List<string>();
+        vm.PlayRequested = (source, song) =>
+        {
+            Check.True(ReferenceEquals(online, source), "For you uses its own online source for progressive playback");
+            played.Add(song.Id); return Task.CompletedTask;
+        };
+        var signedOutPlay = vm.PlayCommand.ExecuteAsync(first);
+        Check.Until(() => signedOutPlay.IsCompleted, "signed-out Play completes the sign-in offer");
+        signedOutPlay.GetAwaiter().GetResult();
+        Check.Equal(2, loginRequests, "signed-out Play uses the existing sign-in flow");
+        Check.Equal(0, played.Count, "signed-out Play cannot start a hidden transfer");
+        signedIn = true;
+        var play = vm.PlayCommand.ExecuteAsync(first);
+        Check.Until(() => play.IsCompleted, "Play forwards to the native player");
+        play.GetAwaiter().GetResult();
+        Check.True(played.SequenceEqual(new[] { first.Song.Online!.Id }), "Play forwards exactly the chosen song to the existing progressive player");
+        Check.Equal(0, downloads.History.Count, "the shelf does not also issue a duplicate direct-download request");
         vm.NotForMeCommand.Execute(first);
         Check.True(vm.HasUndo && vm.Picks.Count == 1 && source.Hidden.HidesSong(first.Pick.Track.Song), "Not for me hides just the chosen song immediately");
         Check.False(source.Hidden.HidesSong(vm.Picks[0].Pick.Track.Song), "another song by the same artist stays recommended");
