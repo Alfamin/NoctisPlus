@@ -12,6 +12,7 @@ public class OnlinePlaybackTests
 {
     private sealed class Source : IOnlineMusicSearch
     {
+        internal IReadOnlyList<OnlineArtist> ArtistRows = [];
         internal readonly Dictionary<string, TaskCompletionSource<Track>> Pending = [];
         internal readonly Dictionary<string, CancellationToken> Tokens = [];
         internal int Asked;
@@ -21,7 +22,7 @@ public class OnlinePlaybackTests
         public void Retry() { }
         public string Route => "synthetic";
         public async IAsyncEnumerable<OnlineSearchResult> SearchAsync(string query, [EnumeratorCancellation] CancellationToken ct)
-        { await Task.Yield(); ct.ThrowIfCancellationRequested(); yield return new(query, [new("online", query, "Synthetic", Score: 97)], [], [], true); }
+        { await Task.Yield(); ct.ThrowIfCancellationRequested(); yield return new(query, [new("online", query, "Synthetic", Score: 97)], ArtistRows, [], true); }
         public string? CachedArtwork(string url) => null;
         public Task<string?> ArtworkAsync(string url, CancellationToken ct) => Task.FromResult<string?>(null);
         public bool CanDownload => true;
@@ -47,6 +48,29 @@ public class OnlinePlaybackTests
         public void Remove(DownloadEntry entry) { }
     }
     private static Track Track(string title) => new() { Title = title, Artist = "Synthetic", Duration = TimeSpan.FromMinutes(3), FilePath = title + ".flac", IsExternal = true };
+
+    [AvaloniaFact]
+    public async Task OnlineNamesakes_DoNotReceiveALibraryBonus_OrHideEachOthersIdentity()
+    {
+        var previous = OnlineMusicSearch.Current;
+        var source = new Source { ArtistRows = [new("kanye", "Kanye West", Score: 96),
+            new("namesake-one", "Runaway", Score: 91), new("namesake-two", "Runaway", Score: 90)] };
+        using var data = new TestPersistenceService();
+        var library = new FakeLibraryService();
+        var player = new PlayerViewModel(new FakeAudioPlayer(), library, data, new FakeAnimatedCoverService());
+        OnlineMusicSearch.Current = source;
+        using var search = new SearchViewModel(library, player, _ => { }, _ => { });
+        try
+        {
+            search.SetQuery("runaway");
+            var until = DateTime.UtcNow.AddSeconds(3);
+            while (search.IsOnlineLoading && DateTime.UtcNow < until) { await Task.Delay(20); Dispatcher.UIThread.RunJobs(); }
+            Assert.False(search.IsOnlineLoading);
+            Assert.Equal("kanye", search.Artists.First().Online?.Id);
+            Assert.Equal(new[] { "kanye", "namesake-one", "namesake-two" }, search.Artists.Select(a => a.Online?.Id));
+        }
+        finally { search.Dispose(); OnlineMusicSearch.Current = previous; }
+    }
 
     [AvaloniaFact]
     public void LibraryArtistAlsoFoundOnline_OpensWithItsExactOnlineIdentity()

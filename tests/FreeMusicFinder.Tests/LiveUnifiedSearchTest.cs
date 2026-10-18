@@ -24,17 +24,18 @@ internal static class LiveUnifiedSearchTest
             var songs = await catalog.SearchSongsAsync(query.Term, stop.Token);
             var albums = await catalog.SearchAlbumsAsync(query.Term, stop.Token);
             songs = songs with { Value = await catalog.RefineTitleAsync(query, songs.Value, stop.Token) };
-            var hits = SearchRanking.Build(query, artists.Value, songs.Value, albums.Value);
+            var hits = SearchRanking.Build(query, artists.Value, songs.Value, albums.Value, fansOf: catalog.FansOf);
             if (hits.FirstOrDefault()?.Artist is {} leading && BotText.Key(leading.Name) == BotText.Key(query.Text))
             {
                 var byArtist = await catalog.ArtistSongsAsync(leading, stop.Token);
                 songs = songs with { Value = byArtist.Value.Concat(songs.Value).DistinctBy(s => s.Song.Id).ToList() };
-                hits = SearchRanking.Build(query, artists.Value, songs.Value, albums.Value);
+                hits = SearchRanking.Build(query, artists.Value, songs.Value, albums.Value, fansOf: catalog.FansOf);
                 Check.True(byArtist.Value.Count > 0 && byArtist.Value.All(s => s.Song.Artists.Any(a => a.Id == leading.Id)), "artist query retrieves songs using its exact source identity");
             }
             Check.True(hits.Count > 0, "live unified query has public results: " + part);
             var top = hits.First(); Console.WriteLine($"  TOP {top.Kind}: {top.Title} / {top.Subtitle}; {artists.Value.Count} artists, {songs.Value.Count} songs, {albums.Value.Count} albums; {timer.Elapsed.TotalSeconds:F1}s");
             foreach (var hit in hits.Take(12)) Console.WriteLine($"  SCORE {hit.Score:F3} {hit.Kind}: {hit.Title} / {hit.Subtitle}; popularity={hit.Track?.Song.Popularity}");
+            foreach (var hit in SearchRanking.Artists(hits).Take(6)) Console.WriteLine($"  ARTIST {hit.ArtistRank ?? hit.Score:F3}: {hit.Id} / {hit.Title}");
             if (query.Artist.Length > 0) Check.True(top.Track is not null && top.Track.Song.Artists.Any(a => BotText.Key(a.Name) == BotText.Key(query.Artist)), "song-by-artist query leads with the named artist's recording");
             else if (part.Equals("runaway", StringComparison.OrdinalIgnoreCase))
                 Check.True(top.Track?.Song.Artists.Any(a => a.Name == "Kanye West") == true, "Runaway leads with Kanye West's recording");
@@ -48,6 +49,20 @@ internal static class LiveUnifiedSearchTest
             else if (part == "Take Care") Check.True(top.Kind == "Albums" && top.Album?.Artist.Name == "Drake", "album title preserves provider relevance and leads with Drake's album");
             else Check.True(top.Artist is not null && BotText.Key(top.Title) == BotText.Key(part), "artist query leads with its exact artist");
             var repeat = await catalog.SearchSongsAsync(query.Term, stop.Token); Check.True(repeat.Cached, "repeat live query reuses its saved metadata");
+            using var downloads = new Downloads(_ => { });
+            var actions = new DiscoveryActions(new SpotifyPlaylistTests.Library(), downloads,
+                _ => throw new InvalidOperationException("No audio in the metadata probe"), () => folder, () => false);
+            using var pages = new CatalogPages(() => catalog, actions, _ => { }, () => true);
+            var native = new FinderOnlineSearch(() => catalog, actions, pages, () => false, () => { });
+            try
+            {
+                Noctis.Services.Search.OnlineSearchResult? final = null;
+                await foreach (var update in native.SearchAsync(part, stop.Token)) final = update;
+                foreach (var artist in final?.Artists.Take(6) ?? []) Console.WriteLine($"  NATIVE ARTIST {artist.Score:R}: {artist.Id} / {artist.Name}");
+                Check.Equal(SearchRanking.Artists(hits).First().Artist?.Id, final?.Artists.First().Id,
+                    "native catalog bridge preserves the same leading artist");
+            }
+            finally { native.Detach(); }
         }
         Console.WriteLine($"{Check.Passed} ok, {Check.Failed} wrong. Public metadata only; zero Telegram requests, audio downloads or library writes.");
         if (Check.Failed > 0) throw new InvalidOperationException("Live unified search checks failed.");

@@ -368,7 +368,8 @@ public sealed partial class SearchViewModel : ViewModelBase, ISearchable, IDispo
                 rows[at] = (rows[at].Item, Math.Max(rows[at].Score, artist.Score + LibraryBonus));
                 continue;
             }
-            byName[key] = rows.Count;
+            // Only library rows belong in byName. Two online namesakes have different
+            // provider identities; neither is owned or entitled to LibraryBonus.
             rows.Add((Artist("o:" + artist.Id, () => new SearchArtistItem(artist)), artist.Score));
         }
         return rows.OrderByDescending(r => r.Score).Select(r => r.Item).ToList();
