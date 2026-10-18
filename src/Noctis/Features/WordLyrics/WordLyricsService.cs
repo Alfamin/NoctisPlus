@@ -130,6 +130,34 @@ internal sealed class WordLyricsService(ILibraryService library, Func<AppSetting
         });
     }
 
+    /// <summary>Explicit lyrics-page request for one complete local song. Setup remains opt-in.</summary>
+    internal async Task TimeSongAsync(Track track)
+    {
+        if (!Enabled) { OpenSettings?.Invoke(); return; }
+        if (track.IsRemoteStream || ProgressivePlayback.ProgressiveTransfer.IsDownloading(track.FilePath)) return;
+        if (!File.Exists(track.FilePath))
+        {
+            Progress(new("Song unavailable", "The local file is missing.", Error: true, Finished: true));
+            return;
+        }
+        try
+        {
+            // The worker retains the request across setup/restarts; never call OpenSetup here.
+            if (_worker is not { } worker) return;
+            var result = await Task.Run(() =>
+            {
+                var message = worker.Ask(track.FilePath, TimingAction.Missing, null, out var accepted);
+                return (Message: message, Accepted: accepted);
+            });
+            if (_disposed || !ReferenceEquals(worker, _worker)) return;
+            Log(result.Message ?? "Queued for word timing");
+            // Ready jobs report through the existing worker/pill. Setup/rejected
+            // requests open the panel; there is no false "running" status.
+            if (!result.Accepted || !BackendReady) Show(track: track);
+        }
+        catch (Exception ex) { Progress(new("Could not queue song", ex.Message, Error: true, Finished: true)); }
+    }
+
     private void Progress(ProgressState state) => Dispatcher.UIThread.Post(() =>
     {
         if (_disposed) return;
@@ -153,7 +181,7 @@ internal sealed class WordLyricsService(ILibraryService library, Func<AppSetting
             throw new IOException("The result report is not available in the WordLyrics folder. The queue and current lyrics are kept.");
         System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo(path) { UseShellExecute = true })?.Dispose();
     }
-    internal const string SetupConsent = "Download and set up WordLyrics? The two AI models need about 1.33 GB, plus Python and required packages. Existing downloads are reused. This is optional; queued songs and existing lyrics are kept if you cancel.";
+    internal const string SetupConsent = "Download WordLyrics?\n~1.33 GB models + Python/packages (optional).";
     internal async Task SetupAsync(Func<string, Task<bool>>? confirm = null)
     {
         if (_worker is not { } worker || _host is not { } host) return;

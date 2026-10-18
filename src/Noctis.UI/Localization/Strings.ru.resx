@@ -1,4 +1,4 @@
-﻿<?xml version="1.0" encoding="utf-8"?>
+<?xml version="1.0" encoding="utf-8"?>
 <root>
   <!--
     English UI strings — the fallback every other language falls back to.
@@ -61,9 +61,7 @@
   <data name="Import.LinkWatermark" xml:space="preserve"><value>Вставьте ссылку Deezer или TIDAL</value></data>
   <data name="Import.DropTitle" xml:space="preserve"><value>Перетащите сюда файл плейлиста</value></data>
   <data name="Import.Formats" xml:space="preserve"><value>CSV, JSON или M3U</value></data>
-  <data name="Import.FormatsTip" xml:space="preserve"><value>Spotify: экспортируйте CSV через Exportify.
-Apple Music, YouTube Music, Amazon: экспортируйте файл через TuneMyMusic.
-Deezer и TIDAL: вставьте ссылку.</value></data>
+  <data name="Import.FormatsTip" xml:space="preserve"><value>CSV: Exportify/TuneMyMusic. Links: Deezer/TIDAL.</value></data>
   <data name="Import.CreatePlaylist" xml:space="preserve"><value>Создать плейлист</value></data>
   <data name="Import.Done" xml:space="preserve"><value>Готово</value></data>
   <data name="Import.StatusMatching" xml:space="preserve"><value>Сопоставление с медиатекой…</value></data>
@@ -140,7 +138,7 @@ Deezer и TIDAL: вставьте ссылку.</value></data>
   <data name="Settings.FirstCreditedArtistEachTip" xml:space="preserve"><value>Первый исполнитель, указанный в теге «Исполнитель» каждой песни</value><comment>ToolTip.Tip in SettingsView.axaml</comment></data>
   <data name="Settings.Artist" xml:space="preserve"><value>Исполнитель</value><comment>Text in SettingsView.axaml</comment></data>
   <data name="Settings.SongSArtistTag" xml:space="preserve"><value>Тег исполнителя песни</value><comment>Text in SettingsView.axaml</comment></data>
-  <data name="Settings.AlbumArtistTagSongsTip" xml:space="preserve"><value>Тег «Исполнитель альбома»; для песен без него используется исполнитель</value><comment>ToolTip.Tip in SettingsView.axaml</comment></data>
+  <data name="Settings.AlbumArtistTagSongsTip" xml:space="preserve"><value>Use Album Artist; fall back to Artist when empty</value><comment>ToolTip.Tip in SettingsView.axaml</comment></data>
   <data name="Settings.AlbumArtist" xml:space="preserve"><value>Исполнитель альбома</value><comment>Text in SettingsView.axaml</comment></data>
   <data name="Settings.ReleaseSAlbumArtist" xml:space="preserve"><value>Тег исполнителя альбома</value><comment>Text in SettingsView.axaml</comment></data>
   <data name="Settings.ArtistTagSeparators" xml:space="preserve"><value>Разделители в теге исполнителя</value><comment>Text in SettingsView.axaml</comment></data>
@@ -238,17 +236,17 @@ Deezer и TIDAL: вставьте ссылку.</value></data>
   <data name="Settings.Cassette" xml:space="preserve"><value>Кассета</value><comment>Text in SettingsView.axaml</comment></data>
   <data name="Settings.CoverFlowLayout" xml:space="preserve"><value>Макет Cover Flow</value><comment>Text in SettingsView.axaml</comment></data>
   <data name="Settings.HowCoverFlowPage" xml:space="preserve"><value>Как страница Cover Flow располагает обложки из очереди.</value><comment>Text in SettingsView.axaml</comment></data>
-  <data name="Settings.ClassicRowPlayingCoverTip" xml:space="preserve"><value>Классический ряд: текущая обложка по центру, история и следующие треки по сторонам</value><comment>ToolTip.Tip in SettingsView.axaml</comment></data>
+  <data name="Settings.ClassicRowPlayingCoverTip" xml:space="preserve"><value>Playing cover between history and up next</value><comment>ToolTip.Tip in SettingsView.axaml</comment></data>
   <data name="Settings.Carousel" xml:space="preserve"><value>Карусель</value><comment>Text in SettingsView.axaml</comment></data>
-  <data name="Settings.TiltedCoversDiagonalPathTip" xml:space="preserve"><value>Наклонённые обложки по диагонали, рядом сведения о треке</value><comment>ToolTip.Tip in SettingsView.axaml</comment></data>
+  <data name="Settings.TiltedCoversDiagonalPathTip" xml:space="preserve"><value>Tilted covers with track details</value><comment>ToolTip.Tip in SettingsView.axaml</comment></data>
   <data name="Settings.Cascade" xml:space="preserve"><value>Каскад</value><comment>Text in SettingsView.axaml</comment></data>
   <data name="Settings.MosaicQueueSCoversTip" xml:space="preserve"><value>Мозаика из обложек очереди</value><comment>ToolTip.Tip in SettingsView.axaml</comment></data>
   <data name="Settings.Collage" xml:space="preserve"><value>Коллаж</value><comment>Text in SettingsView.axaml</comment></data>
   <data name="Settings.MiniPlayerDesign" xml:space="preserve"><value>Дизайн мини-плеера</value><comment>Text in SettingsView.axaml</comment></data>
   <data name="Settings.HowMiniPlayerLooks" xml:space="preserve"><value>«Классический» подстраивается под размер. «Капсула» и «Конверт» имеют фиксированный дизайн.</value><comment>Text in SettingsView.axaml</comment></data>
-  <data name="Settings.ResizableGlassCardIconTip" xml:space="preserve"><value>Стеклянная карточка с изменяемым размером: значок, полоса, карточка, большой значок и текст песни</value><comment>ToolTip.Tip in SettingsView.axaml</comment></data>
+  <data name="Settings.ResizableGlassCardIconTip" xml:space="preserve"><value>Resizable glass: icon, bar, card or lyrics</value><comment>ToolTip.Tip in SettingsView.axaml</comment></data>
   <data name="Settings.Classic" xml:space="preserve"><value>Классический</value><comment>Text in SettingsView.axaml</comment></data>
-  <data name="Settings.RoundCoverOverlappingLightTip" xml:space="preserve"><value>Круглая обложка поверх светлой карточки с названием и кнопками управления</value><comment>ToolTip.Tip in SettingsView.axaml</comment></data>
+  <data name="Settings.RoundCoverOverlappingLightTip" xml:space="preserve"><value>Round cover over a light playback card</value><comment>ToolTip.Tip in SettingsView.axaml</comment></data>
   <data name="Settings.Pill" xml:space="preserve"><value>Капсула</value><comment>Text in SettingsView.axaml</comment></data>
   <data name="Settings.SpinningDiscPeekingOutTip" xml:space="preserve"><value>Вращающийся диск, выглядывающий из-за верхнего края светлой карточки</value><comment>ToolTip.Tip in SettingsView.axaml</comment></data>
   <data name="Settings.Sleeve" xml:space="preserve"><value>Конверт</value><comment>Text in SettingsView.axaml</comment></data>
@@ -304,12 +302,12 @@ Deezer и TIDAL: вставьте ссылку.</value></data>
   <data name="Settings.SmoothFilledCurveTip" xml:space="preserve"><value>Плавная заполненная кривая</value><comment>ToolTip.Tip in SettingsView.axaml</comment></data>
   <data name="Settings.Wave" xml:space="preserve"><value>Волна</value><comment>Text in SettingsView.axaml</comment></data>
   <data name="Settings.MusicVideos" xml:space="preserve"><value>Музыкальные клипы</value><comment>Lyrics Studio card in LyricsStudioView.axaml</comment></data>
-  <data name="Settings.MusicVideosHint" xml:space="preserve"><value>Видео с таким же именем, как у песни, лежащее рядом с ней или в папке videos, заменяет обложку на странице текста.</value><comment>Lyrics Studio card hint</comment></data>
+  <data name="Settings.MusicVideosHint" xml:space="preserve"><value>Matching videos replace the cover on the lyrics page</value><comment>Lyrics Studio card hint</comment></data>
   <data name="Settings.MusicVideoRounded" xml:space="preserve"><value>Скруглённые углы</value><comment>Lyrics Studio card toggle</comment></data>
   <data name="Settings.MusicVideoRoundedHint" xml:space="preserve"><value>Скруглённые углы, как у обложки, или прямая рамка</value><comment>Lyrics Studio card toggle tooltip</comment></data>
   <data name="PlaybackBar.MusicVideo" xml:space="preserve"><value>Клип</value><comment>Options menu toggle in PlaybackBarView.axaml</comment></data>
   <data name="PlaybackBar.MusicVideoAudio" xml:space="preserve"><value>Звук из клипа</value><comment>Options menu toggle in PlaybackBarView.axaml, under Music video</comment></data>
-  <data name="Settings.MusicVideoAudioHint" xml:space="preserve"><value>Воспроизводить звук самого видео вместо файла песни. Действует со следующей песни.</value><comment>Music video audio toggle tooltip (Lyrics Studio card and options menu)</comment></data>
+  <data name="Settings.MusicVideoAudioHint" xml:space="preserve"><value>Use video audio from the next song</value><comment>Music video audio toggle tooltip (Lyrics Studio card and options menu)</comment></data>
   <data name="Settings.LyricsBackgroundVideo" xml:space="preserve"><value>Фоновое видео для текста</value><comment>Text in SettingsView.axaml</comment></data>
   <data name="Settings.LoopVideoGIFBehind" xml:space="preserve"><value>Зацикленное видео или GIF за текстом песни.</value><comment>Text in SettingsView.axaml</comment></data>
   <data name="Settings.Choose" xml:space="preserve"><value>Выбрать</value><comment>Content in SettingsView.axaml</comment></data>
@@ -412,11 +410,11 @@ Deezer и TIDAL: вставьте ссылку.</value></data>
   <data name="Settings.Equalizer" xml:space="preserve"><value>Эквалайзер</value><comment>Text in SettingsView.axaml</comment></data>
   <data name="Settings.ParametricEQTuneEach" xml:space="preserve"><value>Настройте частоту, усиление и ширину каждой полосы.</value><comment>Text in SettingsView.axaml</comment></data>
   <data name="Settings.Preamp" xml:space="preserve"><value>Предусиление</value><comment>Text in SettingsView.axaml</comment></data>
-  <data name="Settings.LevelBeforeEQLowerTip" xml:space="preserve"><value>Уровень перед эквалайзером — понизьте, если усиленные полосы искажаются. Двойной щелчок — сброс.</value><comment>ToolTip.Tip in SettingsView.axaml</comment></data>
+  <data name="Settings.LevelBeforeEQLowerTip" xml:space="preserve"><value>Lower to prevent EQ distortion; double-tap to reset</value><comment>ToolTip.Tip in SettingsView.axaml</comment></data>
   <data name="Settings.FREQUENCY" xml:space="preserve"><value>ЧАСТОТА</value><comment>Text in SettingsView.axaml</comment></data>
   <data name="Settings.GAIN" xml:space="preserve"><value>УСИЛЕНИЕ</value><comment>Text in SettingsView.axaml</comment></data>
   <data name="Settings.CenterFrequencyHzTypeTip" xml:space="preserve"><value>Центральная частота (Гц) — введите, прокрутите или используйте стрелки</value><comment>ToolTip.Tip in SettingsView.axaml</comment></data>
-  <data name="Settings.QBandWidthHigherTip" xml:space="preserve"><value>Q (ширина полосы) — чем выше значение, тем уже диапазон вокруг частоты</value><comment>ToolTip.Tip in SettingsView.axaml</comment></data>
+  <data name="Settings.QBandWidthHigherTip" xml:space="preserve"><value>Higher Q affects a narrower frequency range</value><comment>ToolTip.Tip in SettingsView.axaml</comment></data>
   <data name="Settings.RemoveBandTip" xml:space="preserve"><value>Удалить полосу</value><comment>ToolTip.Tip in SettingsView.axaml</comment></data>
   <data name="Settings.AddBand" xml:space="preserve"><value>+ Добавить полосу</value><comment>Text in SettingsView.axaml</comment></data>
   <data name="Settings.EqualizerOnOffTip" xml:space="preserve"><value>Включить или выключить эквалайзер. Ваша кривая в любом случае сохраняется.</value><comment>Equalizer card master switch tooltip (GitHub #94)</comment></data>
@@ -430,7 +428,7 @@ Deezer и TIDAL: вставьте ссылку.</value></data>
   <data name="Settings.EqPresetNameTooLong" xml:space="preserve"><value>Название пресета — не более 40 символов.</value><comment>Save preset flyout error</comment></data>
   <data name="Settings.EqPresetNameReserved" xml:space="preserve"><value>Это имя занято встроенным пресетом. Выберите другое.</value><comment>Save preset flyout error (built-in names, Custom, None)</comment></data>
   <data name="Settings.DeleteEqPreset" xml:space="preserve"><value>Удалить</value><comment>Equalizer card: deletes the selected preset</comment></data>
-  <data name="Settings.DeleteEqPresetTip" xml:space="preserve"><value>Удалить выбранный пресет. «Custom» и «Flat» удалить нельзя.</value><comment>Equalizer card Delete button tooltip</comment></data>
+  <data name="Settings.DeleteEqPresetTip" xml:space="preserve"><value>Delete this preset; Custom and Flat are kept</value><comment>Equalizer card Delete button tooltip</comment></data>
   <data name="Settings.RestoreEqPresets" xml:space="preserve"><value>Восстановить пресеты</value><comment>Equalizer card: brings back deleted built-in presets</comment></data>
   <data name="Settings.RestoreEqPresetsTip" xml:space="preserve"><value>Вернуть удалённые встроенные пресеты</value><comment>Equalizer card Restore presets tooltip</comment></data>
   <data name="Settings.AUDIOTOOLS" xml:space="preserve"><value>АУДИОИНСТРУМЕНТЫ</value><comment>Text in SettingsView.axaml</comment></data>
@@ -462,7 +460,7 @@ Deezer и TIDAL: вставьте ссылку.</value></data>
   <data name="Settings.LocalApiShowToken" xml:space="preserve"><value>Показать</value><comment>Reveals the Local API token</comment></data>
   <data name="Settings.LocalApiHideToken" xml:space="preserve"><value>Скрыть</value><comment>Masks the Local API token</comment></data>
   <data name="Settings.LocalApiRegenerate" xml:space="preserve"><value>Создать новый токен</value><comment>Text in SettingsView.axaml</comment></data>
-  <data name="Settings.LocalApiRegenerateTip" xml:space="preserve"><value>Создать новый токен. Приложения со старым токеном перестанут работать, пока вы не передадите им новый.</value><comment>ToolTip.Tip in SettingsView.axaml</comment></data>
+  <data name="Settings.LocalApiRegenerateTip" xml:space="preserve"><value>Replace token; connected apps must use the new one</value><comment>ToolTip.Tip in SettingsView.axaml</comment></data>
   <data name="Settings.LocalApiWarning" xml:space="preserve"><value>Любое приложение с этим токеном может управлять Noctis и читать вашу медиатеку. Давайте его только приложениям, которым доверяете.</value><comment>Text in SettingsView.axaml</comment></data>
   <data name="Settings.LocalApiDiscovery" xml:space="preserve"><value>Приложения также могут взять его из файла local-api.json в папке данных Noctis.</value><comment>Text in SettingsView.axaml</comment></data>
   <data name="Settings.ACCOUNTS" xml:space="preserve"><value>АККАУНТЫ</value><comment>Text in SettingsView.axaml</comment></data>
@@ -797,9 +795,9 @@ Deezer и TIDAL: вставьте ссылку.</value></data>
   <data name="AudioConverter.OptCopyTags" xml:space="preserve"><value>Копировать теги</value><comment>Option in AudioConverterDialog.axaml</comment></data>
   <data name="AudioConverter.TipCopyTags" xml:space="preserve"><value>Скопировать все теги из исходного файла</value><comment>Tooltip of the Copy tags option in AudioConverterDialog.axaml</comment></data>
   <data name="AudioConverter.OptEmbedArtwork" xml:space="preserve"><value>Встроить обложку</value><comment>Option in AudioConverterDialog.axaml</comment></data>
-  <data name="AudioConverter.TipEmbedArtwork" xml:space="preserve"><value>Поместить обложку внутрь нового файла (поддерживают MP3, AAC (.m4a), FLAC и ALAC)</value><comment>Tooltip of the Embed artwork option in AudioConverterDialog.axaml</comment></data>
+  <data name="AudioConverter.TipEmbedArtwork" xml:space="preserve"><value>Embed the cover in supported audio formats</value><comment>Tooltip of the Embed artwork option in AudioConverterDialog.axaml</comment></data>
   <data name="AudioConverter.OptOverwrite" xml:space="preserve"><value>Перезаписывать</value><comment>Option in AudioConverterDialog.axaml</comment></data>
-  <data name="AudioConverter.TipOverwrite" xml:space="preserve"><value>Заменять файл с таким же именем; иначе трек пропускается</value><comment>Tooltip of the Overwrite existing option in AudioConverterDialog.axaml</comment></data>
+  <data name="AudioConverter.TipOverwrite" xml:space="preserve"><value>Replace existing files; otherwise skip them</value><comment>Tooltip of the Overwrite existing option in AudioConverterDialog.axaml</comment></data>
   <data name="AudioConverter.OptAddToLibrary" xml:space="preserve"><value>Добавить в медиатеку</value><comment>Option in AudioConverterDialog.axaml</comment></data>
   <data name="AudioConverter.TipAddToLibrary" xml:space="preserve"><value>Показывать копии в Noctis с названиями вида «Песня (FLAC)»</value><comment>Tooltip of the Add to library option in AudioConverterDialog.axaml</comment></data>
   <data name="AudioConverter.DepthSource" xml:space="preserve"><value>Как в исходном</value><comment>Bit depth choice "Auto" in AudioConverterDialog</comment></data>
@@ -1054,7 +1052,7 @@ Deezer и TIDAL: вставьте ссылку.</value></data>
   <!-- LrcEditorDialog.axaml (auto-migrated) -->
   <data name="LrcEditor.SyncLyrics" xml:space="preserve"><value>Синхронизация текста</value><comment>Title in LrcEditorDialog.axaml</comment></data>
   <data name="LrcEditor.PlayPause" xml:space="preserve"><value>Воспроизведение / пауза</value><comment>Content in LrcEditorDialog.axaml</comment></data>
-  <data name="LrcEditor.StampPlayingPositionOntoTip" xml:space="preserve"><value>Поставить текущую позицию на выделенную строку и перейти к следующей (Пробел)</value><comment>ToolTip.Tip in LrcEditorDialog.axaml</comment></data>
+  <data name="LrcEditor.StampPlayingPositionOntoTip" xml:space="preserve"><value>Stamp this line and move to the next (Space)</value><comment>ToolTip.Tip in LrcEditorDialog.axaml</comment></data>
   <data name="LrcEditor.StampLineSpace" xml:space="preserve"><value>⏱  Отметить строку  (Пробел)</value><comment>Text in LrcEditorDialog.axaml</comment></data>
   <data name="LrcEditor.PlayFrom1sBeforeTip" xml:space="preserve"><value>Играть с точки за 1 с до этой строки</value><comment>ToolTip.Tip in LrcEditorDialog.axaml</comment></data>
   <data name="LrcEditor.Nudge01sEarlierTip" xml:space="preserve"><value>Сдвинуть на 0,1 с раньше</value><comment>ToolTip.Tip in LrcEditorDialog.axaml</comment></data>
@@ -1135,7 +1133,7 @@ Deezer и TIDAL: вставьте ссылку.</value></data>
   <data name="Lyrics.SearchLyrics" xml:space="preserve"><value>Найти текст</value><comment>Text in LyricsView.axaml</comment></data>
   <data name="Lyrics.SearchingLyrics" xml:space="preserve"><value>Поиск текста</value><comment>Text in LyricsView.axaml</comment></data>
   <data name="LyricsSearch.Title" xml:space="preserve"><value>Поиск текста</value><comment>LyricsSearchDialog.axaml title</comment></data>
-  <data name="LyricsSearch.Hint" xml:space="preserve"><value>«Авто» ищет в источниках, включённых в настройках, и предпочитает синхронизацию по словам, затем по строкам, затем обычный текст.</value><comment>Tooltip on the info icon and the source picker in LyricsSearchDialog.axaml</comment></data>
+  <data name="LyricsSearch.Hint" xml:space="preserve"><value>Search enabled sources; prefer word-synced lyrics</value><comment>Tooltip on the info icon and the source picker in LyricsSearchDialog.axaml</comment></data>
   <data name="LyricsSearch.Subtitle" xml:space="preserve"><value>Найдите текст в интернете и выберите нужную версию.</value><comment>One-line subtitle under the title in LyricsSearchDialog.axaml</comment></data>
   <data name="LyricsSearch.Auto" xml:space="preserve"><value>Авто (лучшее совпадение)</value><comment>First source-picker entry (LyricsSearchViewModel)</comment></data>
   <data name="LyricsSearch.ArtistWatermark" xml:space="preserve"><value>Исполнитель</value><comment>Placeholder in LyricsSearchDialog.axaml</comment></data>
@@ -1358,7 +1356,7 @@ Deezer и TIDAL: вставьте ссылку.</value></data>
   <data name="Metadata.Movement" xml:space="preserve"><value>часть</value><comment>Text in MetadataWindow.axaml</comment></data>
   <data name="Metadata.Album2" xml:space="preserve"><value>альбом</value><comment>Text in MetadataWindow.axaml</comment></data>
   <data name="Metadata.AlbumCompilation" xml:space="preserve"><value>Альбом — сборник</value><comment>Content in MetadataWindow.axaml</comment></data>
-  <data name="Metadata.MarksContentAsExplicitTip" xml:space="preserve"><value>Помечает содержимое как ненормативное (тег iTunes advisory). Настройка «Ненормативный контент» использует его, чтобы пропускать песни.</value><comment>ToolTip.Tip in MetadataWindow.axaml</comment></data>
+  <data name="Metadata.MarksContentAsExplicitTip" xml:space="preserve"><value>Mark explicit; skipped when explicit content is off</value><comment>ToolTip.Tip in MetadataWindow.axaml</comment></data>
   <data name="Metadata.Artist" xml:space="preserve"><value>исполнитель</value><comment>Text in MetadataWindow.axaml</comment></data>
   <data name="Metadata.AlbumArtist" xml:space="preserve"><value>исполнитель альбома</value><comment>Text in MetadataWindow.axaml</comment></data>
   <data name="Metadata.Performer" xml:space="preserve"><value>исполнитель партии</value><comment>Text in MetadataWindow.axaml</comment></data>
@@ -1430,7 +1428,7 @@ Deezer и TIDAL: вставьте ссылку.</value></data>
   <data name="Metadata.PlainLyrics" xml:space="preserve"><value>Обычный текст</value><comment>Header in MetadataWindow.axaml</comment></data>
   <data name="Metadata.Enable" xml:space="preserve"><value>Включить</value><comment>Text in MetadataWindow.axaml</comment></data>
   <data name="Metadata.ImportFile" xml:space="preserve"><value>Импортировать файл</value><comment>Content in MetadataWindow.axaml</comment></data>
-  <data name="Metadata.LoadTxtPlainLrcTip" xml:space="preserve"><value>Загрузить с диска файл текста .txt (обычный) или .lrc, .elrc, .ttml (синхронизированный)</value><comment>ToolTip.Tip in MetadataWindow.axaml</comment></data>
+  <data name="Metadata.LoadTxtPlainLrcTip" xml:space="preserve"><value>Load plain TXT, or synced LRC, ELRC or TTML</value><comment>ToolTip.Tip in MetadataWindow.axaml</comment></data>
   <data name="Metadata.ShareLyrics" xml:space="preserve"><value>Поделиться текстом</value><comment>Content in MetadataWindow.axaml</comment></data>
   <data name="Metadata.SyncedLyrics" xml:space="preserve"><value>Синхронизированный текст</value><comment>Header in MetadataWindow.axaml</comment></data>
   <data name="Metadata.LinesCarryPerWordTip" xml:space="preserve"><value>Строки содержат метки времени для каждого слова; переключитесь на «Исходный», чтобы их увидеть</value><comment>ToolTip.Tip in MetadataWindow.axaml</comment></data>
@@ -1439,8 +1437,8 @@ Deezer и TIDAL: вставьте ссылку.</value></data>
   <data name="Metadata.ShowRawLRCTextTip" xml:space="preserve"><value>Показать исходный текст LRC с метками времени</value><comment>ToolTip.Tip in MetadataWindow.axaml</comment></data>
   <data name="Metadata.Copied" xml:space="preserve"><value>Скопировано!</value><comment>Text in MetadataWindow.axaml</comment></data>
   <data name="Metadata.CopyLyrics" xml:space="preserve"><value>Копировать текст</value><comment>Content in MetadataWindow.axaml</comment></data>
-  <data name="Metadata.CopySyncedLyricsLRCTip" xml:space="preserve"><value>Скопировать синхронизированный текст (LRC с метками времени) в буфер обмена</value><comment>ToolTip.Tip in MetadataWindow.axaml</comment></data>
-  <data name="Metadata.LoadLrcSyncedTxtTip" xml:space="preserve"><value>Загрузить с диска файл текста .lrc, .elrc, .ttml (синхронизированный) или .txt (обычный)</value><comment>ToolTip.Tip in MetadataWindow.axaml</comment></data>
+  <data name="Metadata.CopySyncedLyricsLRCTip" xml:space="preserve"><value>Copy timestamped LRC lyrics</value><comment>ToolTip.Tip in MetadataWindow.axaml</comment></data>
+  <data name="Metadata.LoadLrcSyncedTxtTip" xml:space="preserve"><value>Load synced LRC, ELRC or TTML, or plain TXT</value><comment>ToolTip.Tip in MetadataWindow.axaml</comment></data>
   <data name="Metadata.SearchLyrics" xml:space="preserve"><value>Найти текст</value><comment>Content in MetadataWindow.axaml</comment></data>
   <data name="Metadata.NoSyncedLyricsYet" xml:space="preserve"><value>Синхронизированного текста пока нет. Добавьте его через «Найти текст».</value><comment>Text in MetadataWindow.axaml</comment></data>
   <data name="Metadata.TimestampLyrics" xml:space="preserve"><value>Метки времени</value><comment>Header in MetadataWindow.axaml</comment></data>
@@ -1725,7 +1723,7 @@ Deezer и TIDAL: вставьте ссылку.</value></data>
   <data name="Playlist.AddSongs" xml:space="preserve"><value>Добавить песни</value><comment>Header in PlaylistView.axaml</comment></data>
   <data name="Playlist.EditPlaylist" xml:space="preserve"><value>Изменить плейлист</value><comment>Header in PlaylistView.axaml</comment></data>
   <data name="Playlist.DeletePlaylist" xml:space="preserve"><value>Удалить плейлист</value><comment>Header in PlaylistView.axaml</comment></data>
-  <data name="Playlist.ChangeDisplayedOrderManualTip" xml:space="preserve"><value>Изменить порядок отображения. «Вручную» — сохранённый порядок плейлиста.</value><comment>ToolTip.Tip in PlaylistView.axaml</comment></data>
+  <data name="Playlist.ChangeDisplayedOrderManualTip" xml:space="preserve"><value>Change sorting; Manual restores your saved order</value><comment>ToolTip.Tip in PlaylistView.axaml</comment></data>
   <data name="Playlist.Text" xml:space="preserve"><value>&#xE70D;</value><comment>Text in PlaylistView.axaml</comment></data>
   <data name="Playlist.ManualPlaylistOrder" xml:space="preserve"><value>Вручную (порядок плейлиста)</value><comment>Header in PlaylistView.axaml</comment></data>
   <data name="Playlist.Title" xml:space="preserve"><value>Название</value><comment>Header in PlaylistView.axaml</comment></data>
@@ -1806,11 +1804,11 @@ Deezer и TIDAL: вставьте ссылку.</value></data>
   <data name="ReplayGainScanner.Queue" xml:space="preserve"><value>Очередь</value><comment>Text in ReplayGainScannerDialog.axaml</comment></data>
   <data name="ReplayGainScanner.AddFiles" xml:space="preserve"><value>Добавить файлы…</value><comment>Button in ReplayGainScannerDialog.axaml</comment></data>
   <data name="ReplayGainScanner.Subtitle" xml:space="preserve"><value>Измерить громкость и записать теги ReplayGain.</value><comment>Header line under the title in ReplayGainScannerDialog.axaml</comment></data>
-  <data name="ReplayGainScanner.SubtitleTip" xml:space="preserve"><value>Громкость по EBU R128, записывается как теги ReplayGain 2.0 (опорный уровень −18 LUFS)</value><comment>Tooltip on the header line in ReplayGainScannerDialog.axaml</comment></data>
+  <data name="ReplayGainScanner.SubtitleTip" xml:space="preserve"><value>EBU R128 loudness; ReplayGain 2.0 tags at -18 LUFS</value><comment>Tooltip on the header line in ReplayGainScannerDialog.axaml</comment></data>
   <data name="ReplayGainScanner.TitleOne" xml:space="preserve"><value>Сканирование ReplayGain · 1 трек</value><comment>Title in ReplayGainScannerViewModel, one ticked track</comment></data>
   <data name="ReplayGainScanner.TitleMany" xml:space="preserve"><value>Сканирование ReplayGain · треков: {0}</value><comment>Title in ReplayGainScannerViewModel; {0} ticked tracks</comment></data>
   <data name="ReplayGainScanner.AlbumGain" xml:space="preserve"><value>Усиление альбома — рассматривать каждый альбом целиком</value><comment>Option in ReplayGainScannerDialog.axaml</comment></data>
-  <data name="ReplayGainScanner.AlbumGainTip" xml:space="preserve"><value>Также записывает усиление альбома, чтобы песни сохраняли громкость относительно остальных песен альбома</value><comment>Tooltip of the album gain option in ReplayGainScannerDialog.axaml</comment></data>
+  <data name="ReplayGainScanner.AlbumGainTip" xml:space="preserve"><value>Keep relative loudness between songs on the same album</value><comment>Tooltip of the album gain option in ReplayGainScannerDialog.axaml</comment></data>
   <data name="ReplayGainScanner.Scan" xml:space="preserve"><value>Сканировать</value><comment>Primary button in ReplayGainScannerDialog</comment></data>
   <data name="ReplayGainScanner.Done" xml:space="preserve"><value>Готово</value><comment>Primary button after a scan finished, ReplayGainScannerDialog</comment></data>
   <data name="ReplayGainScanner.Stop" xml:space="preserve"><value>Остановить</value><comment>Cancel button while a scan runs, ReplayGainScannerDialog</comment></data>
@@ -1908,7 +1906,7 @@ Deezer и TIDAL: вставьте ссылку.</value></data>
 
   <!-- StatisticsView.axaml (auto-migrated) -->
   <data name="Statistics.ListeningStatistics" xml:space="preserve"><value>Статистика прослушивания</value><comment>Text in StatisticsView.axaml</comment></data>
-  <data name="Statistics.ListeningRecapTopTracksTip" xml:space="preserve"><value>Итоги прослушивания — лучшие треки, исполнители и минуты, с карточкой, которой можно поделиться</value><comment>ToolTip.Tip in StatisticsView.axaml</comment></data>
+  <data name="Statistics.ListeningRecapTopTracksTip" xml:space="preserve"><value>Share your top songs, artists and listening time</value><comment>ToolTip.Tip in StatisticsView.axaml</comment></data>
   <data name="Statistics.NoctisWrap" xml:space="preserve"><value>Noctis Wrap</value><comment>Text in StatisticsView.axaml</comment></data>
   <data name="Statistics.Overview" xml:space="preserve"><value>Обзор</value><comment>Text in StatisticsView.axaml</comment></data>
   <data name="Statistics.PlayHistory" xml:space="preserve"><value>История прослушиваний</value><comment>Text in StatisticsView.axaml</comment></data>
@@ -2377,7 +2375,7 @@ Deezer и TIDAL: вставьте ссылку.</value></data>
   <data name="LyricsStudioSettings.EmbedTags" xml:space="preserve"><value>Также записывать текст в теги файла</value><comment>Toggle title</comment></data>
   <data name="LyricsStudioSettings.EmbedTagsHint" xml:space="preserve"><value>Также сохранять обычный текст внутри аудиофайла.</value><comment>Toggle help</comment></data>
   <data name="LyricsStudioSettings.SaveTtml" xml:space="preserve"><value>Также сохранять в TTML</value><comment>Toggle title</comment></data>
-  <data name="LyricsStudioSettings.SaveTtmlHint" xml:space="preserve"><value>Также создавать рядом с песней файл .ttml для плееров, которые читают TTML, но не тайминг слов ELRC.</value><comment>Toggle help</comment></data>
+  <data name="LyricsStudioSettings.SaveTtmlHint" xml:space="preserve"><value>Also save TTML for compatible players</value><comment>Toggle help</comment></data>
   <data name="LyricsStudioSettings.RunSection" xml:space="preserve"><value>ЗАПУСК</value><comment>Section title</comment></data>
   <data name="LyricsStudioSettings.OpenTitle" xml:space="preserve"><value>Песни без выбранного формата</value><comment>Run card title</comment></data>
   <data name="LyricsStudioSettings.OpenHelp" xml:space="preserve"><value>До 40 песен, у которых нет указанного выше формата.</value><comment>Run card help</comment></data>
@@ -2395,11 +2393,11 @@ Deezer и TIDAL: вставьте ссылку.</value></data>
   <data name="LyricsStudio.Language" xml:space="preserve"><value>Язык</value><comment>Footer label</comment></data>
   <data name="LyricsStudio.WordTimings" xml:space="preserve"><value>Тайминг по словам</value><comment>Footer checkbox</comment></data>
   <data name="LyricsStudio.SkipAlreadyTimed" xml:space="preserve"><value>Пропускать песни, у которых уже есть этот формат</value><comment>Footer checkbox</comment></data>
-  <data name="LyricsStudio.SkipAlreadyTimedTip" xml:space="preserve"><value>Тайминг по словам (ELRC) и по строкам (LRC) — разные форматы. Песни только с таймингом по строкам всё равно обрабатываются.</value><comment>Footer checkbox tooltip</comment></data>
+  <data name="LyricsStudio.SkipAlreadyTimedTip" xml:space="preserve"><value>Skip matching formats; line-only songs can gain word timing</value><comment>Footer checkbox tooltip</comment></data>
   <data name="LyricsStudio.TranscribeOnly" xml:space="preserve"><value>Распознавать вместо готового текста · Экспериментально</value><comment>Footer checkbox</comment></data>
-  <data name="LyricsStudio.TranscribeOnlyTip" xml:space="preserve"><value>Lullaby прослушивает каждую песню и сам записывает слова, даже если у песни уже есть текст. Пение часто распознаётся с ошибками: каждая расшифровка открывается в поле текста, чтобы вы исправили её до выравнивания.</value><comment>Footer checkbox tooltip "Lullaby" is the model's name: keep it untranslated.</comment></data>
+  <data name="LyricsStudio.TranscribeOnlyTip" xml:space="preserve"><value>Transcribe every song; review the words before timing</value><comment>Footer checkbox tooltip "Lullaby" is the model's name: keep it untranslated.</comment></data>
   <data name="LyricsStudio.OnlineLyrics" xml:space="preserve"><value>Искать текст в интернете, если у песни его нет</value><comment>Footer checkbox</comment></data>
-  <data name="LyricsStudio.OnlineLyricsTip" xml:space="preserve"><value>Сначала обычный текст ищется в LRCLIB, чтобы модели оставалось только расставить тайминг. Если выключено или ничего не найдено, песня ждёт, пока вы вставите текст.</value><comment>Footer checkbox tooltip</comment></data>
+  <data name="LyricsStudio.OnlineLyricsTip" xml:space="preserve"><value>Fetch words from LRCLIB; paste your own if none are found</value><comment>Footer checkbox tooltip</comment></data>
   <data name="LyricsStudio.DownloadModel" xml:space="preserve"><value>Скачать модель</value><comment>Footer button</comment></data>
   <data name="LyricsStudio.Start" xml:space="preserve"><value>Начать</value><comment>Footer button</comment></data>
   <data name="LyricsStudio.Stop" xml:space="preserve"><value>Остановить</value><comment>Footer button</comment></data>
@@ -2407,13 +2405,13 @@ Deezer и TIDAL: вставьте ссылку.</value></data>
   <data name="LyricsStudio.Backdrops" xml:space="preserve"><value>Фоны страницы текста</value><comment>Header disclosure in LyricsStudioView.axaml</comment></data>
   <data name="LyricsStudio.Options" xml:space="preserve"><value>Параметры</value><comment>Footer dropdown holding the run options</comment></data>
   <data name="LyricsStudio.Loading" xml:space="preserve"><value>Загрузка</value><comment>Page scan in progress</comment></data>
-  <data name="LyricsStudio.BackdropsTip" xml:space="preserve"><value>Зацикленное видео за текстом и музыкальные клипы на месте обложки</value><comment>Tooltip in LyricsStudioView.axaml</comment></data>
+  <data name="LyricsStudio.BackdropsTip" xml:space="preserve"><value>Lyrics backgrounds and cover-slot music videos</value><comment>Tooltip in LyricsStudioView.axaml</comment></data>
   <data name="LyricsStudio.ChooseSongs" xml:space="preserve"><value>Выбрать песни</value><comment>Header chip in LyricsStudioView.axaml: opens the song/album picker</comment></data>
-  <data name="LyricsStudio.ChooseSongsTip" xml:space="preserve"><value>Выберите песни или целые альбомы для Студии и формат: тайминг по словам или по строкам</value><comment>Tooltip in LyricsStudioView.axaml</comment></data>
+  <data name="LyricsStudio.ChooseSongsTip" xml:space="preserve"><value>Choose songs, albums and timing format</value><comment>Tooltip in LyricsStudioView.axaml</comment></data>
   <data name="LyricsStudioPicker.Title" xml:space="preserve"><value>Выбор песен и альбомов</value><comment>Picker dialog title</comment></data>
   <data name="LyricsStudioPicker.Subtitle" xml:space="preserve"><value>Что Студия обработает дальше и в каком формате запишет.</value><comment>Picker dialog subtitle</comment></data>
   <data name="LyricsStudioPicker.Format" xml:space="preserve"><value>Формат</value><comment>Picker: format card title</comment></data>
-  <data name="LyricsStudioPicker.FormatHint" xml:space="preserve"><value>Тайминг по словам подсвечивает слово за словом (ELRC); по строкам — строку за строкой (LRC).</value><comment>Picker: format card hint</comment></data>
+  <data name="LyricsStudioPicker.FormatHint" xml:space="preserve"><value>ELRC: word timings. LRC: line timings.</value><comment>Picker: format card hint</comment></data>
   <data name="LyricsStudioPicker.WordTimings" xml:space="preserve"><value>По словам · ELRC</value><comment>Picker: format chip</comment></data>
   <data name="LyricsStudioPicker.LineTimings" xml:space="preserve"><value>По строкам · LRC</value><comment>Picker: format chip</comment></data>
   <data name="LyricsStudioPicker.Search" xml:space="preserve"><value>Поиск песен и альбомов…</value><comment>Picker search box</comment></data>
@@ -2435,15 +2433,15 @@ Deezer и TIDAL: вставьте ссылку.</value></data>
   <data name="LyricsStudio.ReviewEmptyTitle" xml:space="preserve"><value>Пока нечего проверять</value><comment>Review pane empty state</comment></data>
   <data name="LyricsStudio.ReviewEmptyBody" xml:space="preserve"><value>Выберите песню в списке. Песни с текстом синхронизируются, когда вы нажмёте «Начать»; для песен без текста откроется поле, куда его можно вставить.</value><comment>Review pane empty state</comment></data>
   <data name="LyricsStudio.Upgrade" xml:space="preserve"><value>Расставить тайминг слов</value><comment>Review button, shown for line-level lyrics</comment></data>
-  <data name="LyricsStudio.UpgradeTip" xml:space="preserve"><value>Расставляет время для каждого слова этих строк. Файл с таймингом по строкам сохраняется.</value><comment>Review button tooltip</comment></data>
+  <data name="LyricsStudio.UpgradeTip" xml:space="preserve"><value>Add word timings; keep the line-timed file</value><comment>Review button tooltip</comment></data>
   <data name="LyricsStudio.ReviewHint" xml:space="preserve"><value>Нажмите на время, чтобы прослушать строку. Текст можно править на месте. Подсвеченные строки стоит перепроверить.</value><comment>Review pane hint</comment></data>
   <data name="LyricsStudio.NudgeEarlier" xml:space="preserve"><value>Все строки на 0,1 с раньше · клавиша [</value><comment>Tooltip</comment></data>
   <data name="LyricsStudio.NudgeLater" xml:space="preserve"><value>Все строки на 0,1 с позже · клавиша ]</value><comment>Tooltip</comment></data>
   <data name="LyricsStudio.Redo" xml:space="preserve"><value>Распознать вместо этого · Экспериментально</value><comment>Review "…" menu item</comment></data>
-  <data name="LyricsStudio.RedoTip" xml:space="preserve"><value>Игнорировать этот текст и дать Lullaby записать то, что поётся. Пение часто распознаётся плохо; вы исправите слова до выравнивания.</value><comment>Tooltip "Lullaby" is the model's name: keep it untranslated.</comment></data>
+  <data name="LyricsStudio.RedoTip" xml:space="preserve"><value>Transcribe again; correct the words before timing</value><comment>Tooltip "Lullaby" is the model's name: keep it untranslated.</comment></data>
   <data name="LyricsStudio.Skip" xml:space="preserve"><value>Пропустить</value><comment>Review "…" menu item</comment></data>
   <data name="LyricsStudio.ClearLyrics" xml:space="preserve"><value>Очистить текст</value><comment>Review "…" menu item: drop the lyrics on screen and paste your own</comment></data>
-  <data name="LyricsStudio.ClearLyricsTip" xml:space="preserve"><value>Неправильный текст? Очистите его и вставьте или введите правильный; Lullaby расставит тайминг для вашего текста. На диске ничего не изменится, пока вы не сохраните.</value><comment>Tooltip "Lullaby" is the model's name: keep it untranslated.</comment></data>
+  <data name="LyricsStudio.ClearLyricsTip" xml:space="preserve"><value>Replace the words; changes stay unsaved until you save</value><comment>Tooltip "Lullaby" is the model's name: keep it untranslated.</comment></data>
   <data name="LyricsStudio.ClearLyricsConfirm" xml:space="preserve"><value>Очистить текст, показанный для «{0}»?
 
 Строки и их тайминг будут удалены, и откроется пустое поле для вашего текста. На диске ничего не изменится, пока вы не нажмёте «Сохранить текст».</value><comment>Confirm before Clear lyrics ({0} = song title)</comment></data>
@@ -2460,21 +2458,21 @@ Deezer и TIDAL: вставьте ссылку.</value></data>
   <data name="LyricsStudio.TranscriptBanner" xml:space="preserve"><value>Экспериментальная расшифровка. Пение часто распознаётся плохо, поэтому исправьте слова ниже, затем нажмите «Выровнять текст», чтобы расставить тайминг.</value><comment>Lyrics box banner after a transcription</comment></data>
   <data name="LyricsStudio.PasteWatermark" xml:space="preserve"><value>Вставьте сюда текст, по одной строке на каждую спетую строку…</value><comment>Lyrics box watermark</comment></data>
   <data name="LyricsStudio.ImportFile" xml:space="preserve"><value>Импортировать файл…</value><comment>Lyrics box button</comment></data>
-  <data name="LyricsStudio.ImportFileTip" xml:space="preserve"><value>Загрузить текст из файла .txt, .lrc, .elrc или .ttml (метки времени отбрасываются и расставляются заново)</value><comment>Tooltip</comment></data>
+  <data name="LyricsStudio.ImportFileTip" xml:space="preserve"><value>Load TXT, LRC, ELRC or TTML; replace existing timings</value><comment>Tooltip</comment></data>
   <data name="LyricsStudio.TranscribeDraft" xml:space="preserve"><value>Распознать на слух · Экспериментально</value><comment>Lyrics box button: transcribe the song into the box</comment></data>
-  <data name="LyricsStudio.TranscribeDraftTip" xml:space="preserve"><value>Lullaby записывает то, что слышит. Пение часто распознаётся плохо: исправьте слова до выравнивания.</value><comment>Tooltip "Lullaby" is the model's name: keep it untranslated.</comment></data>
+  <data name="LyricsStudio.TranscribeDraftTip" xml:space="preserve"><value>Transcribe, then correct the words before timing</value><comment>Tooltip "Lullaby" is the model's name: keep it untranslated.</comment></data>
   <data name="LyricsStudio.Align" xml:space="preserve"><value>Выровнять текст</value><comment>Lyrics box primary button</comment></data>
   <data name="LyricsStudio.Beta" xml:space="preserve"><value>Бета</value><comment>Pill next to the Lyrics Studio title (top bar and dialog header)</comment></data>
   <data name="LyricsStudio.Preview" xml:space="preserve"><value>Предпросмотр</value><comment>Review button: play the song on the lyrics page with the unsaved timings</comment></data>
-  <data name="LyricsStudio.PreviewTip" xml:space="preserve"><value>Воспроизвести песню и посмотреть несохранённый тайминг на странице текста в выбранном формате. Ничего не сохраняется.</value><comment>Tooltip</comment></data>
-  <data name="LyricsStudio.AlignTip" xml:space="preserve"><value>Синхронизировать этот текст с песней в выбранном формате, затем проверить перед сохранением</value><comment>Tooltip</comment></data>
+  <data name="LyricsStudio.PreviewTip" xml:space="preserve"><value>Preview unsaved timings on the lyrics page</value><comment>Tooltip</comment></data>
+  <data name="LyricsStudio.AlignTip" xml:space="preserve"><value>Time these words, then review before saving</value><comment>Tooltip</comment></data>
   <data name="LyricsStudio.Save" xml:space="preserve"><value>Сохранить текст</value><comment>Review button</comment></data>
   <data name="LyricsStudio.Words" xml:space="preserve"><value>Слова</value><comment>Per-line toggle that opens the word strip</comment></data>
   <data name="LyricsStudio.WordsTip" xml:space="preserve"><value>Показать каждое слово с его временем. Нажмите на слово, чтобы его прослушать.</value><comment>Word toggle tooltip</comment></data>
   <data name="LyricsStudio.WordEarlier" xml:space="preserve"><value>Выбранное слово на 50 мс раньше (соседние остаются на месте)</value><comment>Word nudge tooltip</comment></data>
   <data name="LyricsStudio.WordLater" xml:space="preserve"><value>Выбранное слово на 50 мс позже (соседние остаются на месте)</value><comment>Word nudge tooltip</comment></data>
   <data name="LyricsStudio.TapWords" xml:space="preserve"><value>Отстучать слова</value><comment>Starts tap-to-time for one line</comment></data>
-  <data name="LyricsStudio.TapTip" xml:space="preserve"><value>Воспроизводит строку. Нажимайте Пробел или «Тап» на каждом слове; ещё одно нажатие завершает строку.</value><comment>Tap button tooltip</comment></data>
+  <data name="LyricsStudio.TapTip" xml:space="preserve"><value>Tap each word (Space); tap once more to end the line</value><comment>Tap button tooltip</comment></data>
   <data name="LyricsStudio.Tap" xml:space="preserve"><value>Тап</value><comment>Tap bar button</comment></data>
   <data name="LyricsStudio.TapCancel" xml:space="preserve"><value>Готово</value><comment>Tap bar leave button</comment></data>
   <data name="LyricsStudio.PlayFromHere" xml:space="preserve"><value>Играть отсюда</value><comment>Time pill tooltip</comment></data>
@@ -2505,7 +2503,7 @@ Deezer и TIDAL: вставьте ссылку.</value></data>
   <data name="LyricsStudio.ModelDamagedBody" xml:space="preserve"><value>Он не совпадает с опубликованной моделью, поэтому использоваться не будет. Скачайте его заново ({0}).</value><comment>Model card text. {0} = download size</comment></data>
   <data name="LyricsStudio.ModelDownloadAgain" xml:space="preserve"><value>Скачать заново</value><comment>Model card button for a damaged file</comment></data>
   <data name="LyricsStudio.ModelCancel" xml:space="preserve"><value>Отмена</value><comment>Model card button while downloading</comment></data>
-  <data name="LyricsStudio.ModelCancelTip" xml:space="preserve"><value>Остановить загрузку. Загруженная часть сохраняется, так что позже можно продолжить.</value><comment>Tooltip</comment></data>
+  <data name="LyricsStudio.ModelCancelTip" xml:space="preserve"><value>Stop downloading; keep progress for later</value><comment>Tooltip</comment></data>
   <data name="LyricsStudio.ModelLoadingTitle" xml:space="preserve"><value>Загрузка Lullaby</value><comment>Model card while the model loads at the start of a run "Lullaby" is the model's name: keep it untranslated.</comment></data>
   <data name="LyricsStudio.ModelLoadingBody" xml:space="preserve"><value>Модель загружается один раз за запуск и занимает несколько секунд, в первый раз — дольше.</value><comment>Model card text while the model loads</comment></data>
   <data name="LyricsStudio.StepDecode" xml:space="preserve"><value>Декодирование</value><comment>Step row while a song runs: step 1</comment></data>
@@ -2657,7 +2655,7 @@ Deezer и TIDAL: вставьте ссылку.</value></data>
   <data name="Phone.LastSynced" xml:space="preserve"><value>Последняя синхронизация: {0}</value><comment>Under the sync switch; {0} = relative time</comment></data>
   <data name="Phone.NotSyncedYet" xml:space="preserve"><value>Ещё не синхронизировано</value><comment>Under the sync switch when no phone has synced</comment></data>
   <data name="Phone.SyncFailed" xml:space="preserve"><value>Не удалось прочитать данные синхронизации: {0}</value><comment>Under the sync switch; {0} = error message</comment></data>
-  <data name="Phone.SignOutTip" xml:space="preserve"><value>Выйти из аккаунта на этом телефоне. Чтобы снова подключиться, понадобится пароль.</value><comment>Tooltip on a phone's Sign out button</comment></data>
+  <data name="Phone.SignOutTip" xml:space="preserve"><value>Sign out; reconnecting requires your password</value><comment>Tooltip on a phone's Sign out button</comment></data>
   <data name="Phone.OtherAppsTitle" xml:space="preserve"><value>Другие музыкальные приложения</value><comment>Phone app card row title (Subsonic apps)</comment></data>
   <data name="Phone.OtherAppsDesc" xml:space="preserve"><value>Приложения Subsonic, например Symfonium, могут входить по email и API-ключу.</value><comment>Phone app card row text</comment></data>
   <data name="Phone.NewApiKeyTip" xml:space="preserve"><value>Создаёт новый ключ. Приложениям со старым ключом понадобится новый.</value><comment>Tooltip on New API key</comment></data>
@@ -2709,4 +2707,9 @@ Deezer и TIDAL: вставьте ссылку.</value></data>
   <data name="Shortcuts.Action.GoSongs" xml:space="preserve"><value>Перейти к песням</value><comment>Settings › Shortcuts (GitHub #131)</comment></data>
   <data name="Shortcuts.Action.GoAlbums" xml:space="preserve"><value>Перейти к альбомам</value><comment>Settings › Shortcuts (GitHub #131)</comment></data>
   <data name="Shortcuts.Action.GoArtists" xml:space="preserve"><value>Перейти к исполнителям</value><comment>Settings › Shortcuts (GitHub #131)</comment></data>
+  <data name="Lyrics.WordTiming" xml:space="preserve"><value>Word timing</value></data>
+  <data name="Queue.ForYou" xml:space="preserve"><value>For you</value></data>
+  <data name="Queue.ForYouTip" xml:space="preserve"><value>Mix from your listening history</value></data>
+  <data name="Lyrics.TimeWords" xml:space="preserve"><value>Time words</value></data>
+  <data name="Lyrics.TimeWordsLocalOnly" xml:space="preserve"><value>Finish saving this song locally first</value></data>
 </root>

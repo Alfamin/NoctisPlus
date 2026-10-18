@@ -1,4 +1,4 @@
-﻿<?xml version="1.0" encoding="utf-8"?>
+<?xml version="1.0" encoding="utf-8"?>
 <root>
   <!--
     English UI strings — the fallback every other language falls back to.
@@ -113,7 +113,7 @@
   <data name="Settings.FirstCreditedArtistEachTip" xml:space="preserve"><value>Her şarkının Sanatçı etiketindeki ilk sanatçı</value><comment>ToolTip.Tip in SettingsView.axaml</comment></data>
   <data name="Settings.Artist" xml:space="preserve"><value>Sanatçı</value><comment>Text in SettingsView.axaml</comment></data>
   <data name="Settings.SongSArtistTag" xml:space="preserve"><value>Şarkının sanatçı etiketi</value><comment>Text in SettingsView.axaml</comment></data>
-  <data name="Settings.AlbumArtistTagSongsTip" xml:space="preserve"><value>Albüm Sanatçısı etiketi; etiketi olmayan şarkılar sanatçısına döner</value><comment>ToolTip.Tip in SettingsView.axaml</comment></data>
+  <data name="Settings.AlbumArtistTagSongsTip" xml:space="preserve"><value>Use Album Artist; fall back to Artist when empty</value><comment>ToolTip.Tip in SettingsView.axaml</comment></data>
   <data name="Settings.AlbumArtist" xml:space="preserve"><value>Albüm Sanatçısı</value><comment>Text in SettingsView.axaml</comment></data>
   <data name="Settings.ReleaseSAlbumArtist" xml:space="preserve"><value>Yayının albüm sanatçısı etiketi</value><comment>Text in SettingsView.axaml</comment></data>
   <data name="Settings.ArtistTagSeparators" xml:space="preserve"><value>Sanatçı Etiketi Ayırıcıları</value><comment>Text in SettingsView.axaml</comment></data>
@@ -196,17 +196,17 @@
   <data name="Settings.Cassette" xml:space="preserve"><value>Kaset</value><comment>Text in SettingsView.axaml</comment></data>
   <data name="Settings.CoverFlowLayout" xml:space="preserve"><value>Cover Flow Düzeni</value><comment>Text in SettingsView.axaml</comment></data>
   <data name="Settings.HowCoverFlowPage" xml:space="preserve"><value>Cover Flow sayfasının kuyruğun kapaklarını nasıl dizdiği.</value><comment>Text in SettingsView.axaml</comment></data>
-  <data name="Settings.ClassicRowPlayingCoverTip" xml:space="preserve"><value>Klasik sıra: çalan kapak ortada, geçmiş ve sıradakiler iki yanda</value><comment>ToolTip.Tip in SettingsView.axaml</comment></data>
+  <data name="Settings.ClassicRowPlayingCoverTip" xml:space="preserve"><value>Playing cover between history and up next</value><comment>ToolTip.Tip in SettingsView.axaml</comment></data>
   <data name="Settings.Carousel" xml:space="preserve"><value>Karusel</value><comment>Text in SettingsView.axaml</comment></data>
-  <data name="Settings.TiltedCoversDiagonalPathTip" xml:space="preserve"><value>Çapraz bir yolda eğik kapaklar, yanlarında parça bilgileri</value><comment>ToolTip.Tip in SettingsView.axaml</comment></data>
+  <data name="Settings.TiltedCoversDiagonalPathTip" xml:space="preserve"><value>Tilted covers with track details</value><comment>ToolTip.Tip in SettingsView.axaml</comment></data>
   <data name="Settings.Cascade" xml:space="preserve"><value>Şelale</value><comment>Text in SettingsView.axaml</comment></data>
   <data name="Settings.MosaicQueueSCoversTip" xml:space="preserve"><value>Kuyruğun kapaklarından bir mozaik</value><comment>ToolTip.Tip in SettingsView.axaml</comment></data>
   <data name="Settings.Collage" xml:space="preserve"><value>Kolaj</value><comment>Text in SettingsView.axaml</comment></data>
   <data name="Settings.MiniPlayerDesign" xml:space="preserve"><value>Mini Oynatıcı Tasarımı</value><comment>Text in SettingsView.axaml</comment></data>
   <data name="Settings.HowMiniPlayerLooks" xml:space="preserve"><value>Klasik, boyutunu izler. Hap ve Kılıf sabit tasarımlardır.</value><comment>Text in SettingsView.axaml</comment></data>
-  <data name="Settings.ResizableGlassCardIconTip" xml:space="preserve"><value>Boyutlandırılabilir cam kart: simge, çubuk, kart, büyük simge ve söz biçimleri</value><comment>ToolTip.Tip in SettingsView.axaml</comment></data>
+  <data name="Settings.ResizableGlassCardIconTip" xml:space="preserve"><value>Resizable glass: icon, bar, card or lyrics</value><comment>ToolTip.Tip in SettingsView.axaml</comment></data>
   <data name="Settings.Classic" xml:space="preserve"><value>Klasik</value><comment>Text in SettingsView.axaml</comment></data>
-  <data name="Settings.RoundCoverOverlappingLightTip" xml:space="preserve"><value>Başlık ve kontrollerin olduğu açık renkli bir kartın üzerine taşan yuvarlak kapak</value><comment>ToolTip.Tip in SettingsView.axaml</comment></data>
+  <data name="Settings.RoundCoverOverlappingLightTip" xml:space="preserve"><value>Round cover over a light playback card</value><comment>ToolTip.Tip in SettingsView.axaml</comment></data>
   <data name="Settings.Pill" xml:space="preserve"><value>Hap</value><comment>Text in SettingsView.axaml</comment></data>
   <data name="Settings.SpinningDiscPeekingOutTip" xml:space="preserve"><value>Açık renkli bir kartın üstünden dışarı çıkan dönen disk</value><comment>ToolTip.Tip in SettingsView.axaml</comment></data>
   <data name="Settings.Sleeve" xml:space="preserve"><value>Kılıf</value><comment>Text in SettingsView.axaml</comment></data>
@@ -252,7 +252,7 @@
   <data name="Settings.SmoothFilledCurveTip" xml:space="preserve"><value>Yumuşak dolgulu bir eğri</value><comment>ToolTip.Tip in SettingsView.axaml</comment></data>
   <data name="Settings.Wave" xml:space="preserve"><value>Dalga</value><comment>Text in SettingsView.axaml</comment></data>
   <data name="Settings.MusicVideos" xml:space="preserve"><value>Müzik videoları</value><comment>Lyrics Studio card in LyricsStudioView.axaml</comment></data>
-  <data name="Settings.MusicVideosHint" xml:space="preserve"><value>Şarkıyla aynı adı taşıyan, yanında veya bir videos klasöründe bulunan video, söz sayfasında kapağın yerini alır.</value><comment>Lyrics Studio card hint</comment></data>
+  <data name="Settings.MusicVideosHint" xml:space="preserve"><value>Matching videos replace the cover on the lyrics page</value><comment>Lyrics Studio card hint</comment></data>
   <data name="Settings.MusicVideoRounded" xml:space="preserve"><value>Yuvarlatılmış</value><comment>Lyrics Studio card toggle</comment></data>
   <data name="Settings.MusicVideoRoundedHint" xml:space="preserve"><value>Kapak gibi yuvarlatılmış köşeler ya da düz bir çerçeve</value><comment>Lyrics Studio card toggle tooltip</comment></data>
   <data name="PlaybackBar.MusicVideo" xml:space="preserve"><value>Müzik videosu</value><comment>Options menu toggle in PlaybackBarView.axaml</comment></data>
@@ -334,11 +334,11 @@
   <data name="Settings.Equalizer" xml:space="preserve"><value>Ekolayzer</value><comment>Text in SettingsView.axaml</comment></data>
   <data name="Settings.ParametricEQTuneEach" xml:space="preserve"><value>Her bandın frekansını, kazancını ve genişliğini ayarla.</value><comment>Text in SettingsView.axaml</comment></data>
   <data name="Settings.Preamp" xml:space="preserve"><value>Ön yükseltici</value><comment>Text in SettingsView.axaml</comment></data>
-  <data name="Settings.LevelBeforeEQLowerTip" xml:space="preserve"><value>EQ öncesi seviye — yükseltilen bantlar bozuluyorsa düşür. Sıfırlamak için çift dokun.</value><comment>ToolTip.Tip in SettingsView.axaml</comment></data>
+  <data name="Settings.LevelBeforeEQLowerTip" xml:space="preserve"><value>Lower to prevent EQ distortion; double-tap to reset</value><comment>ToolTip.Tip in SettingsView.axaml</comment></data>
   <data name="Settings.FREQUENCY" xml:space="preserve"><value>FREKANS</value><comment>Text in SettingsView.axaml</comment></data>
   <data name="Settings.GAIN" xml:space="preserve"><value>KAZANÇ</value><comment>Text in SettingsView.axaml</comment></data>
   <data name="Settings.CenterFrequencyHzTypeTip" xml:space="preserve"><value>Merkez frekans (Hz) — yaz, kaydır veya ok tuşlarını kullan</value><comment>ToolTip.Tip in SettingsView.axaml</comment></data>
-  <data name="Settings.QBandWidthHigherTip" xml:space="preserve"><value>Q (bant genişliği) — daha yüksek değerler frekans çevresinde daha dar bir aralığı etkiler</value><comment>ToolTip.Tip in SettingsView.axaml</comment></data>
+  <data name="Settings.QBandWidthHigherTip" xml:space="preserve"><value>Higher Q affects a narrower frequency range</value><comment>ToolTip.Tip in SettingsView.axaml</comment></data>
   <data name="Settings.RemoveBandTip" xml:space="preserve"><value>Bandı kaldır</value><comment>ToolTip.Tip in SettingsView.axaml</comment></data>
   <data name="Settings.AddBand" xml:space="preserve"><value>+ Bant Ekle</value><comment>Text in SettingsView.axaml</comment></data>
   <data name="Settings.AUDIOTOOLS" xml:space="preserve"><value>SES ARAÇLARI</value><comment>Text in SettingsView.axaml</comment></data>
@@ -809,7 +809,7 @@
   <!-- LrcEditorDialog.axaml (auto-migrated) -->
   <data name="LrcEditor.SyncLyrics" xml:space="preserve"><value>Sözleri senkronize et</value><comment>Title in LrcEditorDialog.axaml</comment></data>
   <data name="LrcEditor.PlayPause" xml:space="preserve"><value>Çal / Duraklat</value><comment>Content in LrcEditorDialog.axaml</comment></data>
-  <data name="LrcEditor.StampPlayingPositionOntoTip" xml:space="preserve"><value>Çalma konumunu vurgulanan satıra damgala ve sonrakine geç (Boşluk)</value><comment>ToolTip.Tip in LrcEditorDialog.axaml</comment></data>
+  <data name="LrcEditor.StampPlayingPositionOntoTip" xml:space="preserve"><value>Stamp this line and move to the next (Space)</value><comment>ToolTip.Tip in LrcEditorDialog.axaml</comment></data>
   <data name="LrcEditor.StampLineSpace" xml:space="preserve"><value>⏱  Satırı damgala  (Boşluk)</value><comment>Text in LrcEditorDialog.axaml</comment></data>
   <data name="LrcEditor.PlayFrom1sBeforeTip" xml:space="preserve"><value>Bu satırdan 1 sn önce başlat</value><comment>ToolTip.Tip in LrcEditorDialog.axaml</comment></data>
   <data name="LrcEditor.Nudge01sEarlierTip" xml:space="preserve"><value>0,1 sn öne al</value><comment>ToolTip.Tip in LrcEditorDialog.axaml</comment></data>
@@ -999,7 +999,7 @@
   <data name="Metadata.Movement" xml:space="preserve"><value>bölüm</value><comment>Text in MetadataWindow.axaml</comment></data>
   <data name="Metadata.Album2" xml:space="preserve"><value>albüm</value><comment>Text in MetadataWindow.axaml</comment></data>
   <data name="Metadata.AlbumCompilation" xml:space="preserve"><value>Albüm bir derleme</value><comment>Content in MetadataWindow.axaml</comment></data>
-  <data name="Metadata.MarksContentAsExplicitTip" xml:space="preserve"><value>İçeriği müstehcen olarak işaretler (iTunes uyarı etiketi). Müstehcen İçerik ayarı şarkıları atlamak için bunu kullanır.</value><comment>ToolTip.Tip in MetadataWindow.axaml</comment></data>
+  <data name="Metadata.MarksContentAsExplicitTip" xml:space="preserve"><value>Mark explicit; skipped when explicit content is off</value><comment>ToolTip.Tip in MetadataWindow.axaml</comment></data>
   <data name="Metadata.Artist" xml:space="preserve"><value>sanatçı</value><comment>Text in MetadataWindow.axaml</comment></data>
   <data name="Metadata.AlbumArtist" xml:space="preserve"><value>albüm sanatçısı</value><comment>Text in MetadataWindow.axaml</comment></data>
   <data name="Metadata.Performer" xml:space="preserve"><value>icracı</value><comment>Text in MetadataWindow.axaml</comment></data>
@@ -1070,7 +1070,7 @@
   <data name="Metadata.PlainLyrics" xml:space="preserve"><value>Düz Sözler</value><comment>Header in MetadataWindow.axaml</comment></data>
   <data name="Metadata.Enable" xml:space="preserve"><value>Etkinleştir</value><comment>Text in MetadataWindow.axaml</comment></data>
   <data name="Metadata.ImportFile" xml:space="preserve"><value>Dosya içe aktar</value><comment>Content in MetadataWindow.axaml</comment></data>
-  <data name="Metadata.LoadTxtPlainLrcTip" xml:space="preserve"><value>Diskten bir .txt (düz) veya .lrc (senkronize) söz dosyası yükle</value><comment>ToolTip.Tip in MetadataWindow.axaml</comment></data>
+  <data name="Metadata.LoadTxtPlainLrcTip" xml:space="preserve"><value>Load plain TXT, or synced LRC, ELRC or TTML</value><comment>ToolTip.Tip in MetadataWindow.axaml</comment></data>
   <data name="Metadata.ShareLyrics" xml:space="preserve"><value>Sözleri paylaş</value><comment>Content in MetadataWindow.axaml</comment></data>
   <data name="Metadata.SyncedLyrics" xml:space="preserve"><value>Senkronize Sözler</value><comment>Header in MetadataWindow.axaml</comment></data>
   <data name="Metadata.LinesCarryPerWordTip" xml:space="preserve"><value>Satırlarda kelime bazlı zaman etiketleri var; görmek için Ham'a geç</value><comment>ToolTip.Tip in MetadataWindow.axaml</comment></data>
@@ -1079,8 +1079,8 @@
   <data name="Metadata.ShowRawLRCTextTip" xml:space="preserve"><value>Zaman etiketleriyle ham LRC metnini göster</value><comment>ToolTip.Tip in MetadataWindow.axaml</comment></data>
   <data name="Metadata.Copied" xml:space="preserve"><value>Kopyalandı!</value><comment>Text in MetadataWindow.axaml</comment></data>
   <data name="Metadata.CopyLyrics" xml:space="preserve"><value>Sözleri kopyala</value><comment>Content in MetadataWindow.axaml</comment></data>
-  <data name="Metadata.CopySyncedLyricsLRCTip" xml:space="preserve"><value>Senkronize sözleri (zaman damgalı LRC) panoya kopyala</value><comment>ToolTip.Tip in MetadataWindow.axaml</comment></data>
-  <data name="Metadata.LoadLrcSyncedTxtTip" xml:space="preserve"><value>Diskten bir .lrc (senkronize) veya .txt (düz) söz dosyası yükle</value><comment>ToolTip.Tip in MetadataWindow.axaml</comment></data>
+  <data name="Metadata.CopySyncedLyricsLRCTip" xml:space="preserve"><value>Copy timestamped LRC lyrics</value><comment>ToolTip.Tip in MetadataWindow.axaml</comment></data>
+  <data name="Metadata.LoadLrcSyncedTxtTip" xml:space="preserve"><value>Load synced LRC, ELRC or TTML, or plain TXT</value><comment>ToolTip.Tip in MetadataWindow.axaml</comment></data>
   <data name="Metadata.SearchLyrics" xml:space="preserve"><value>Söz ara</value><comment>Content in MetadataWindow.axaml</comment></data>
   <data name="Metadata.NoSyncedLyricsYet" xml:space="preserve"><value>Henüz senkronize söz yok. Eklemek için “Söz ara”yı kullan.</value><comment>Text in MetadataWindow.axaml</comment></data>
   <data name="Metadata.TimestampLyrics" xml:space="preserve"><value>Sözleri Zamanla</value><comment>Header in MetadataWindow.axaml</comment></data>
@@ -1257,7 +1257,7 @@
   <data name="Playlist.AddSongs" xml:space="preserve"><value>Şarkı Ekle</value><comment>Header in PlaylistView.axaml</comment></data>
   <data name="Playlist.EditPlaylist" xml:space="preserve"><value>Çalma Listesini Düzenle</value><comment>Header in PlaylistView.axaml</comment></data>
   <data name="Playlist.DeletePlaylist" xml:space="preserve"><value>Çalma Listesini Sil</value><comment>Header in PlaylistView.axaml</comment></data>
-  <data name="Playlist.ChangeDisplayedOrderManualTip" xml:space="preserve"><value>Görüntülenen sırayı değiştir. Elle, kaydedilmiş çalma listesi sıranızdır.</value><comment>ToolTip.Tip in PlaylistView.axaml</comment></data>
+  <data name="Playlist.ChangeDisplayedOrderManualTip" xml:space="preserve"><value>Change sorting; Manual restores your saved order</value><comment>ToolTip.Tip in PlaylistView.axaml</comment></data>
   <data name="Playlist.Text" xml:space="preserve"><value>&#xE70D;</value><comment>Text in PlaylistView.axaml</comment></data>
   <data name="Playlist.ManualPlaylistOrder" xml:space="preserve"><value>Elle (çalma listesi sırası)</value><comment>Header in PlaylistView.axaml</comment></data>
   <data name="Playlist.Title" xml:space="preserve"><value>Başlık</value><comment>Header in PlaylistView.axaml</comment></data>
@@ -1389,7 +1389,7 @@
 
   <!-- StatisticsView.axaml (auto-migrated) -->
   <data name="Statistics.ListeningStatistics" xml:space="preserve"><value>Dinleme İstatistikleri</value><comment>Text in StatisticsView.axaml</comment></data>
-  <data name="Statistics.ListeningRecapTopTracksTip" xml:space="preserve"><value>Dinleme özetin — en çok dinlenen parçalar, sanatçılar ve dakikalar, paylaşılabilir kartla</value><comment>ToolTip.Tip in StatisticsView.axaml</comment></data>
+  <data name="Statistics.ListeningRecapTopTracksTip" xml:space="preserve"><value>Share your top songs, artists and listening time</value><comment>ToolTip.Tip in StatisticsView.axaml</comment></data>
   <data name="Statistics.NoctisWrap" xml:space="preserve"><value>Noctis Wrap</value><comment>Text in StatisticsView.axaml</comment></data>
   <data name="Statistics.Overview" xml:space="preserve"><value>Genel Bakış</value><comment>Text in StatisticsView.axaml</comment></data>
   <data name="Statistics.PlayHistory" xml:space="preserve"><value>Çalma Geçmişi</value><comment>Text in StatisticsView.axaml</comment></data>
@@ -1630,7 +1630,7 @@
   <data name="LyricsStudio.Language" xml:space="preserve"><value>Dil</value><comment>Footer label</comment></data>
   <data name="LyricsStudio.WordTimings" xml:space="preserve"><value>Kelime zamanlaması</value><comment>Footer checkbox</comment></data>
   <data name="LyricsStudio.SkipAlreadyTimed" xml:space="preserve"><value>Zaten bu biçimde olan şarkıları atla</value><comment>Footer checkbox</comment></data>
-  <data name="LyricsStudio.SkipAlreadyTimedTip" xml:space="preserve"><value>Kelime zamanlaması (ELRC) ve satır zamanlaması (LRC) farklı biçimlerdir. Yalnızca satır zamanlaması olan şarkılar yine işlenir.</value><comment>Footer checkbox tooltip</comment></data>
+  <data name="LyricsStudio.SkipAlreadyTimedTip" xml:space="preserve"><value>Skip matching formats; line-only songs can gain word timing</value><comment>Footer checkbox tooltip</comment></data>
   <data name="LyricsStudio.TranscribeOnly" xml:space="preserve"><value>Kulaktan yazıya dök (mevcut sözleri yok say)</value><comment>Footer checkbox</comment></data>
   <data name="LyricsStudio.OnlineLyrics" xml:space="preserve"><value>Şarkının sözü yoksa çevrimiçi ara</value><comment>Footer checkbox</comment></data>
   <data name="LyricsStudio.DownloadModel" xml:space="preserve"><value>Modeli indir</value><comment>Footer button</comment></data>
@@ -1640,13 +1640,13 @@
   <data name="LyricsStudio.Backdrops" xml:space="preserve"><value>Arka planlar</value><comment>Header disclosure in LyricsStudioView.axaml</comment></data>
   <data name="LyricsStudio.Options" xml:space="preserve"><value>Seçenekler</value><comment>Footer dropdown holding the run options</comment></data>
   <data name="LyricsStudio.Loading" xml:space="preserve"><value>Yükleniyor</value><comment>Page scan in progress</comment></data>
-  <data name="LyricsStudio.BackdropsTip" xml:space="preserve"><value>Sözlerin arkasındaki döngü video ve kapak yuvasındaki müzik videoları</value><comment>Tooltip in LyricsStudioView.axaml</comment></data>
+  <data name="LyricsStudio.BackdropsTip" xml:space="preserve"><value>Lyrics backgrounds and cover-slot music videos</value><comment>Tooltip in LyricsStudioView.axaml</comment></data>
   <data name="LyricsStudio.ChooseSongs" xml:space="preserve"><value>Şarkı seç</value><comment>Header chip in LyricsStudioView.axaml: opens the song/album picker</comment></data>
-  <data name="LyricsStudio.ChooseSongsTip" xml:space="preserve"><value>Stüdyo için şarkılar veya bütün albümler seç ve kelime mi satır mı zamanlaması yazılacağını belirle</value><comment>Tooltip in LyricsStudioView.axaml</comment></data>
+  <data name="LyricsStudio.ChooseSongsTip" xml:space="preserve"><value>Choose songs, albums and timing format</value><comment>Tooltip in LyricsStudioView.axaml</comment></data>
   <data name="LyricsStudioPicker.Title" xml:space="preserve"><value>Şarkı ve albüm seç</value><comment>Picker dialog title</comment></data>
   <data name="LyricsStudioPicker.Subtitle" xml:space="preserve"><value>Stüdyonun sıradaki zamanlayacağı şarkılar ve yazacağı biçim.</value><comment>Picker dialog subtitle</comment></data>
   <data name="LyricsStudioPicker.Format" xml:space="preserve"><value>Biçim</value><comment>Picker: format card title</comment></data>
-  <data name="LyricsStudioPicker.FormatHint" xml:space="preserve"><value>Kelime zamanlaması kelime kelime ilerler (ELRC); satır zamanlaması satır satır ilerler (LRC).</value><comment>Picker: format card hint</comment></data>
+  <data name="LyricsStudioPicker.FormatHint" xml:space="preserve"><value>ELRC: word timings. LRC: line timings.</value><comment>Picker: format card hint</comment></data>
   <data name="LyricsStudioPicker.WordTimings" xml:space="preserve"><value>Kelime zamanlaması · ELRC</value><comment>Picker: format chip</comment></data>
   <data name="LyricsStudioPicker.LineTimings" xml:space="preserve"><value>Satır zamanlaması · LRC</value><comment>Picker: format chip</comment></data>
   <data name="LyricsStudioPicker.Search" xml:space="preserve"><value>Şarkı ve albüm ara…</value><comment>Picker search box</comment></data>
@@ -1662,12 +1662,12 @@
   <data name="LyricsStudio.ReviewEmptyTitle" xml:space="preserve"><value>Henüz incelenecek bir şey yok</value><comment>Review pane empty state</comment></data>
   <data name="LyricsStudio.ReviewEmptyBody" xml:space="preserve"><value>Bir şarkı seç ve Başlat'a bas.</value><comment>Review pane empty state</comment></data>
   <data name="LyricsStudio.Upgrade" xml:space="preserve"><value>Her kelimeyi zamanla</value><comment>Review button, shown for line-level lyrics</comment></data>
-  <data name="LyricsStudio.UpgradeTip" xml:space="preserve"><value>Bu satırların her kelimesini zamanlar. Satır düzeyindeki dosya korunur.</value><comment>Review button tooltip</comment></data>
+  <data name="LyricsStudio.UpgradeTip" xml:space="preserve"><value>Add word timings; keep the line-timed file</value><comment>Review button tooltip</comment></data>
   <data name="LyricsStudio.ReviewHint" xml:space="preserve"><value>Satırı dinlemek için bir zamana tıkla. Metni yerinde düzenle. Renkli satırlara bir daha bak.</value><comment>Review pane hint</comment></data>
   <data name="LyricsStudio.NudgeEarlier" xml:space="preserve"><value>Tüm satırlar 0,1 sn öne</value><comment>Tooltip</comment></data>
   <data name="LyricsStudio.NudgeLater" xml:space="preserve"><value>Tüm satırlar 0,1 sn geriye</value><comment>Tooltip</comment></data>
   <data name="LyricsStudio.Redo" xml:space="preserve"><value>Yerine yazıya dök</value><comment>Review button</comment></data>
-  <data name="LyricsStudio.RedoTip" xml:space="preserve"><value>Bu sözleri yok say ve söyleneni yazıya dök</value><comment>Tooltip</comment></data>
+  <data name="LyricsStudio.RedoTip" xml:space="preserve"><value>Transcribe again; correct the words before timing</value><comment>Tooltip</comment></data>
   <data name="LyricsStudio.Skip" xml:space="preserve"><value>Atla</value><comment>Review button</comment></data>
   <data name="LyricsStudio.Save" xml:space="preserve"><value>Sözleri kaydet</value><comment>Review button</comment></data>
   <data name="LyricsStudio.Words" xml:space="preserve"><value>Kelimeler</value><comment>Per-line toggle that opens the word strip</comment></data>
@@ -1675,7 +1675,7 @@
   <data name="LyricsStudio.WordEarlier" xml:space="preserve"><value>Seçili kelime 50 ms öne (komşuları yerinde kalır)</value><comment>Word nudge tooltip</comment></data>
   <data name="LyricsStudio.WordLater" xml:space="preserve"><value>Seçili kelime 50 ms geriye (komşuları yerinde kalır)</value><comment>Word nudge tooltip</comment></data>
   <data name="LyricsStudio.TapWords" xml:space="preserve"><value>Kelimelere dokun</value><comment>Starts tap-to-time for one line</comment></data>
-  <data name="LyricsStudio.TapTip" xml:space="preserve"><value>Satırı çalar. Her kelimede Boşluk'a veya Dokun'a bas; bir dokunuş daha satırı bitirir.</value><comment>Tap button tooltip</comment></data>
+  <data name="LyricsStudio.TapTip" xml:space="preserve"><value>Tap each word (Space); tap once more to end the line</value><comment>Tap button tooltip</comment></data>
   <data name="LyricsStudio.Tap" xml:space="preserve"><value>Dokun</value><comment>Tap bar button</comment></data>
   <data name="LyricsStudio.TapCancel" xml:space="preserve"><value>Bitti</value><comment>Tap bar leave button</comment></data>
   <data name="LyricsStudio.PlayFromHere" xml:space="preserve"><value>Buradan çal</value><comment>Time pill tooltip</comment></data>
@@ -1778,7 +1778,7 @@
   <data name="Phone.LastSynced" xml:space="preserve"><value>Son eşitleme: {0}</value><comment>Under the sync switch; {0} = relative time</comment></data>
   <data name="Phone.NotSyncedYet" xml:space="preserve"><value>Henüz eşitlenmedi</value><comment>Under the sync switch when no phone has synced</comment></data>
   <data name="Phone.SyncFailed" xml:space="preserve"><value>Eşitleme verileri okunamadı: {0}</value><comment>Under the sync switch; {0} = error message</comment></data>
-  <data name="Phone.SignOutTip" xml:space="preserve"><value>Bu telefonun oturumunu kapat. Yeniden bağlanmak için parolan gerekir.</value><comment>Tooltip on a phone's Sign out button</comment></data>
+  <data name="Phone.SignOutTip" xml:space="preserve"><value>Sign out; reconnecting requires your password</value><comment>Tooltip on a phone's Sign out button</comment></data>
   <data name="Phone.OtherAppsTitle" xml:space="preserve"><value>Diğer müzik uygulamaları</value><comment>Phone app card row title (Subsonic apps)</comment></data>
   <data name="Phone.OtherAppsDesc" xml:space="preserve"><value>Symfonium gibi Subsonic uygulamaları e-posta adresin ve bir API anahtarıyla oturum açabilir.</value><comment>Phone app card row text</comment></data>
   <data name="Phone.NewApiKeyTip" xml:space="preserve"><value>Yeni bir anahtar oluşturur. Eski anahtarı kullanan uygulamaların yenisine ihtiyacı olur.</value><comment>Tooltip on New API key</comment></data>
@@ -1838,4 +1838,9 @@
   <data name="Shortcuts.Action.GoSongs" xml:space="preserve"><value>Şarkılar'a git</value><comment>Settings › Shortcuts (GitHub #131)</comment></data>
   <data name="Shortcuts.Action.GoAlbums" xml:space="preserve"><value>Albümler'e git</value><comment>Settings › Shortcuts (GitHub #131)</comment></data>
   <data name="Shortcuts.Action.GoArtists" xml:space="preserve"><value>Sanatçılar'a git</value><comment>Settings › Shortcuts (GitHub #131)</comment></data>
+  <data name="Lyrics.WordTiming" xml:space="preserve"><value>Word timing</value></data>
+  <data name="Queue.ForYou" xml:space="preserve"><value>For you</value></data>
+  <data name="Queue.ForYouTip" xml:space="preserve"><value>Mix from your listening history</value></data>
+  <data name="Lyrics.TimeWords" xml:space="preserve"><value>Time words</value></data>
+  <data name="Lyrics.TimeWordsLocalOnly" xml:space="preserve"><value>Finish saving this song locally first</value></data>
 </root>

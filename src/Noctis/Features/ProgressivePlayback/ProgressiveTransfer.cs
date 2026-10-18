@@ -101,6 +101,9 @@ internal sealed class ProgressiveTransfer(string folder, string fileName, TimeSp
         }
     }
     internal static bool IsAvailable(string path) => Ready.ContainsKey(path);
+    // A completed transfer stays registered while a player owns its reader.
+    // That lease must not keep complete-file actions disabled for the rest of the song.
+    internal static bool IsDownloading(string path) => Ready.TryGetValue(path, out var transfer) && !transfer.Finished;
 
     internal sealed class Lease(ProgressiveTransfer owner, ProgressiveAudioBuffer buffer) : IDisposable
     {

@@ -64,6 +64,29 @@ public class LyricsSettingsToggleTests
 
     private const int LineCount = 31;
 
+    [AvaloniaFact]
+    public void WordTimingEntry_OpensOnlyTheCurrentLocalSong_WithoutStartingAJob()
+    {
+        var (vm, player) = MakeViewModel();
+        try
+        {
+            Track? opened = null;
+            vm.WordTimingRequested = track => opened = track;
+            Assert.False(vm.OpenWordTimingCommand.CanExecute(null));
+            var local = new Track { Title = "Synthetic", FilePath = @"C:\scratch\song.wav" };
+            player.CurrentTrack = local;
+            Assert.True(vm.OpenWordTimingCommand.CanExecute(null));
+            vm.OpenWordTimingCommand.Execute(null);
+            Assert.Same(local, opened);
+            opened = null;
+            player.CurrentTrack = new Track { Title = "Stream", FilePath = "https://example.invalid/song", SourceType = SourceType.Navidrome };
+            Assert.False(vm.OpenWordTimingCommand.CanExecute(null));
+            vm.OpenWordTimingCommand.Execute(null); // also guard a direct Execute call
+            Assert.Null(opened);
+        }
+        finally { vm.Dispose(); player.StopAndClear("test complete"); }
+    }
+
     private static string MakeLrc() => string.Join("\n",
         Enumerable.Range(0, LineCount).Select(i =>
         {

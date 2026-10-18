@@ -1,4 +1,4 @@
-﻿<?xml version="1.0" encoding="utf-8"?>
+<?xml version="1.0" encoding="utf-8"?>
 <root>
   <!--
     English UI strings — the fallback every other language falls back to.
@@ -329,7 +329,7 @@
     <comment>Text in SettingsView.axaml</comment>
   </data>
   <data name="Settings.AlbumArtistTagSongsTip" xml:space="preserve">
-    <value>La etiqueta Artista del álbum; las canciones que no la tengan usan su artista</value>
+    <value>Use Album Artist; fall back to Artist when empty</value>
     <comment>ToolTip.Tip in SettingsView.axaml</comment>
   </data>
   <data name="Settings.AlbumArtist" xml:space="preserve">
@@ -661,7 +661,7 @@
     <comment>Text in SettingsView.axaml</comment>
   </data>
   <data name="Settings.ClassicRowPlayingCoverTip" xml:space="preserve">
-    <value>La fila clásica: la portada en reproducción centrada, con el historial y lo siguiente a cada lado</value>
+    <value>Playing cover between history and up next</value>
     <comment>ToolTip.Tip in SettingsView.axaml</comment>
   </data>
   <data name="Settings.Carousel" xml:space="preserve">
@@ -669,7 +669,7 @@
     <comment>Text in SettingsView.axaml</comment>
   </data>
   <data name="Settings.TiltedCoversDiagonalPathTip" xml:space="preserve">
-    <value>Portadas inclinadas en una trayectoria diagonal con los detalles de la pista al lado</value>
+    <value>Tilted covers with track details</value>
     <comment>ToolTip.Tip in SettingsView.axaml</comment>
   </data>
   <data name="Settings.Cascade" xml:space="preserve">
@@ -693,7 +693,7 @@
     <comment>Text in SettingsView.axaml</comment>
   </data>
   <data name="Settings.ResizableGlassCardIconTip" xml:space="preserve">
-    <value>La tarjeta de cristal redimensionable: formas de icono, barra, tarjeta, icono grande y letras</value>
+    <value>Resizable glass: icon, bar, card or lyrics</value>
     <comment>ToolTip.Tip in SettingsView.axaml</comment>
   </data>
   <data name="Settings.Classic" xml:space="preserve">
@@ -701,7 +701,7 @@
     <comment>Text in SettingsView.axaml</comment>
   </data>
   <data name="Settings.RoundCoverOverlappingLightTip" xml:space="preserve">
-    <value>Una portada redonda superpuesta a una tarjeta clara con el título y los controles</value>
+    <value>Round cover over a light playback card</value>
     <comment>ToolTip.Tip in SettingsView.axaml</comment>
   </data>
   <data name="Settings.Pill" xml:space="preserve">
@@ -885,7 +885,7 @@
     <comment>Lyrics Studio card in LyricsStudioView.axaml</comment>
   </data>
   <data name="Settings.MusicVideosHint" xml:space="preserve">
-    <value>Un vídeo llamado como la canción, junto a ella o en una carpeta de vídeos, reemplaza la portada de la página de la letra.</value>
+    <value>Matching videos replace the cover on the lyrics page</value>
     <comment>Lyrics Studio card hint</comment>
   </data>
   <data name="Settings.MusicVideoRounded" xml:space="preserve">
@@ -1165,7 +1165,7 @@
     <comment>Text in SettingsView.axaml</comment>
   </data>
   <data name="Settings.LevelBeforeEQLowerTip" xml:space="preserve">
-    <value>Nivel previo al EQ: bájalo si las bandas realzadas distorsionan. Doble toque para restablecer.</value>
+    <value>Lower to prevent EQ distortion; double-tap to reset</value>
     <comment>ToolTip.Tip in SettingsView.axaml</comment>
   </data>
   <data name="Settings.FREQUENCY" xml:space="preserve">
@@ -1181,7 +1181,7 @@
     <comment>ToolTip.Tip in SettingsView.axaml</comment>
   </data>
   <data name="Settings.QBandWidthHigherTip" xml:space="preserve">
-    <value>Q (ancho de banda): los valores altos afectan a un rango más estrecho alrededor de la frecuencia</value>
+    <value>Higher Q affects a narrower frequency range</value>
     <comment>ToolTip.Tip in SettingsView.axaml</comment>
   </data>
   <data name="Settings.RemoveBandTip" xml:space="preserve">
@@ -2911,7 +2911,7 @@
     <comment>Content in LrcEditorDialog.axaml</comment>
   </data>
   <data name="LrcEditor.StampPlayingPositionOntoTip" xml:space="preserve">
-    <value>Marca la posición de reproducción en la línea resaltada y pasa a la siguiente (Espacio)</value>
+    <value>Stamp this line and move to the next (Space)</value>
     <comment>ToolTip.Tip in LrcEditorDialog.axaml</comment>
   </data>
   <data name="LrcEditor.StampLineSpace" xml:space="preserve">
@@ -3626,7 +3626,7 @@
     <comment>Content in MetadataWindow.axaml</comment>
   </data>
   <data name="Metadata.MarksContentAsExplicitTip" xml:space="preserve">
-    <value>Marca el contenido como explícito (etiqueta de advertencia de iTunes). El ajuste de contenido explícito la usa para omitir canciones.</value>
+    <value>Mark explicit; skipped when explicit content is off</value>
     <comment>ToolTip.Tip in MetadataWindow.axaml</comment>
   </data>
   <data name="Metadata.Artist" xml:space="preserve">
@@ -3910,7 +3910,7 @@
     <comment>Content in MetadataWindow.axaml</comment>
   </data>
   <data name="Metadata.LoadTxtPlainLrcTip" xml:space="preserve">
-    <value>Carga un archivo de letras .txt (sin sincronizar) o .lrc (sincronizado) desde el disco</value>
+    <value>Load plain TXT, or synced LRC, ELRC or TTML</value>
     <comment>ToolTip.Tip in MetadataWindow.axaml</comment>
   </data>
   <data name="Metadata.ShareLyrics" xml:space="preserve">
@@ -3946,11 +3946,11 @@
     <comment>Content in MetadataWindow.axaml</comment>
   </data>
   <data name="Metadata.CopySyncedLyricsLRCTip" xml:space="preserve">
-    <value>Copia las letras sincronizadas (LRC con marcas de tiempo) al portapapeles</value>
+    <value>Copy timestamped LRC lyrics</value>
     <comment>ToolTip.Tip in MetadataWindow.axaml</comment>
   </data>
   <data name="Metadata.LoadLrcSyncedTxtTip" xml:space="preserve">
-    <value>Carga un archivo de letras .lrc (sincronizado) o .txt (sin sincronizar) desde el disco</value>
+    <value>Load synced LRC, ELRC or TTML, or plain TXT</value>
     <comment>ToolTip.Tip in MetadataWindow.axaml</comment>
   </data>
   <data name="Metadata.SearchLyrics" xml:space="preserve">
@@ -4580,7 +4580,7 @@
     <comment>Header in PlaylistView.axaml</comment>
   </data>
   <data name="Playlist.ChangeDisplayedOrderManualTip" xml:space="preserve">
-    <value>Cambia el orden mostrado. Manual es el orden guardado de tu lista.</value>
+    <value>Change sorting; Manual restores your saved order</value>
     <comment>ToolTip.Tip in PlaylistView.axaml</comment>
   </data>
   <data name="Playlist.Text" xml:space="preserve">
@@ -5052,7 +5052,7 @@
     <comment>Text in StatisticsView.axaml</comment>
   </data>
   <data name="Statistics.ListeningRecapTopTracksTip" xml:space="preserve">
-    <value>Tu resumen de escucha: pistas, artistas y minutos destacados, con una tarjeta para compartir</value>
+    <value>Share your top songs, artists and listening time</value>
     <comment>ToolTip.Tip in StatisticsView.axaml</comment>
   </data>
   <data name="Statistics.NoctisWrap" xml:space="preserve">
@@ -5901,7 +5901,7 @@
     <comment>Footer checkbox</comment>
   </data>
   <data name="LyricsStudio.SkipAlreadyTimedTip" xml:space="preserve">
-    <value>Las temporizaciones de palabras (ELRC) y las temporizaciones de línea (LRC) son diferentes formatos.</value>
+    <value>Skip matching formats; line-only songs can gain word timing</value>
     <comment>Footer checkbox tooltip</comment>
   </data>
   <data name="LyricsStudio.TranscribeOnly" xml:space="preserve">
@@ -5941,7 +5941,7 @@
     <comment>Page scan in progress</comment>
   </data>
   <data name="LyricsStudio.BackdropsTip" xml:space="preserve">
-    <value>El vídeo de bucle detrás de la letra y los vídeos de música en la ranura de portada</value>
+    <value>Lyrics backgrounds and cover-slot music videos</value>
     <comment>Tooltip in LyricsStudioView.axaml</comment>
   </data>
   <data name="LyricsStudio.ChooseSongs" xml:space="preserve">
@@ -5949,7 +5949,7 @@
     <comment>Header chip in LyricsStudioView.axaml: opens the song/album picker</comment>
   </data>
   <data name="LyricsStudio.ChooseSongsTip" xml:space="preserve">
-    <value>Escoge canciones o álbumes completos para el Studio, y si escribir temporizaciones de palabras o líneas</value>
+    <value>Choose songs, albums and timing format</value>
     <comment>Tooltip in LyricsStudioView.axaml</comment>
   </data>
   <data name="LyricsStudioPicker.Title" xml:space="preserve">
@@ -5965,7 +5965,7 @@
     <comment>Picker: format card title</comment>
   </data>
   <data name="LyricsStudioPicker.FormatHint" xml:space="preserve">
-    <value>Los cronogramas de palabras mueven palabra por palabra (ELRC); los temporizadores de línea mueven línea por línea (LRC).</value>
+    <value>ELRC: word timings. LRC: line timings.</value>
     <comment>Picker: format card hint</comment>
   </data>
   <data name="LyricsStudioPicker.WordTimings" xml:space="preserve">
@@ -6029,7 +6029,7 @@
     <comment>Review button, shown for line-level lyrics</comment>
   </data>
   <data name="LyricsStudio.UpgradeTip" xml:space="preserve">
-    <value>Tiempos de cada palabra de estas líneas. El archivo de nivel de línea es tal.</value>
+    <value>Add word timings; keep the line-timed file</value>
     <comment>Review button tooltip</comment>
   </data>
   <data name="LyricsStudio.ReviewHint" xml:space="preserve">
@@ -6049,7 +6049,7 @@
     <comment>Review button</comment>
   </data>
   <data name="LyricsStudio.RedoTip" xml:space="preserve">
-    <value>Ignorar esta letra y transcribir lo que es cantado</value>
+    <value>Transcribe again; correct the words before timing</value>
     <comment>Tooltip</comment>
   </data>
   <data name="LyricsStudio.Skip" xml:space="preserve">
@@ -6081,7 +6081,7 @@
     <comment>Starts tap-to-time for one line</comment>
   </data>
   <data name="LyricsStudio.TapTip" xml:space="preserve">
-    <value>Reproduce la línea. Presione Espacio o Toque en cada palabra; un toque más termina la línea.</value>
+    <value>Tap each word (Space); tap once more to end the line</value>
     <comment>Tap button tooltip</comment>
   </data>
   <data name="LyricsStudio.Tap" xml:space="preserve">
@@ -6475,7 +6475,7 @@
     <comment>Under the sync switch; {0} = error message</comment>
   </data>
   <data name="Phone.SignOutTip" xml:space="preserve">
-    <value>Cierra la sesión en este teléfono. Necesitará tu contraseña para volver a conectarse.</value>
+    <value>Sign out; reconnecting requires your password</value>
     <comment>Tooltip on a phone's Sign out button</comment>
   </data>
   <data name="Phone.OtherAppsTitle" xml:space="preserve">
@@ -6713,4 +6713,9 @@
     <value>Ir a Artistas</value>
     <comment>Settings › Shortcuts (GitHub #131)</comment>
   </data>
+  <data name="Lyrics.WordTiming" xml:space="preserve"><value>Word timing</value></data>
+  <data name="Queue.ForYou" xml:space="preserve"><value>For you</value></data>
+  <data name="Queue.ForYouTip" xml:space="preserve"><value>Mix from your listening history</value></data>
+  <data name="Lyrics.TimeWords" xml:space="preserve"><value>Time words</value></data>
+  <data name="Lyrics.TimeWordsLocalOnly" xml:space="preserve"><value>Finish saving this song locally first</value></data>
 </root>

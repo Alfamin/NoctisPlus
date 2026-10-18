@@ -668,6 +668,12 @@ public partial class MainWindowViewModel : ViewModelBase
         _favoritesVm = new FavoritesViewModel(Player, library, persistence, Sidebar, Settings);
         _queueVm = new QueueViewModel(Player);
         _lyricsVm = new LyricsViewModel(Player, lrcLib, netEase, metadata, persistence, library);
+        _lyricsVm.WordTimingRequested = track =>
+        {
+            if (wordService.Enabled) wordService.Show(track: track);
+            else wordService.OpenSettings?.Invoke();
+        };
+        _lyricsVm.WordTimingStartRequested = wordService.TimeSongAsync;
         wordService.LyricsWritten += _lyricsVm.ReloadWrittenLyrics;
         _downloadImporter = new(library, text => Dispatcher.UIThread.Post(() =>
             TransientStatus.Show(nameof(PluginNotice), v => PluginNotice = v, text, TimeSpan.FromSeconds(12))));

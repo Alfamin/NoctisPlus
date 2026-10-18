@@ -19,6 +19,21 @@ public class NativeTrueShuffleTests
         Task<QueueState?> IPersistenceService.LoadQueueStateAsync() => Task.FromResult(Queue);
     }
 
+    [AvaloniaFact]
+    public void ForYouShortcut_UsesNativeModeAndClearsItsAccentWhenModeChanges()
+    {
+        using var rig = new Rig(); rig.Start();
+        var changes = new List<string?>();
+        rig.Player.PropertyChanged += (_, e) => changes.Add(e.PropertyName);
+        Pump(rig.Player.SelectShuffleModeCommand.ExecuteAsync(PlayerShuffleMode.ForYou));
+        Assert.True(rig.Player.IsForYouShuffle);
+        Assert.True(rig.Player.IsShuffleLit);
+        Assert.Contains(nameof(PlayerViewModel.IsForYouShuffle), changes);
+        rig.Choose(PlayerShuffleMode.NoRepeats);
+        Assert.False(rig.Player.IsForYouShuffle);
+        Assert.True(rig.Player.IsShuffleLit);
+    }
+
     private sealed class Rig : IDisposable
     {
         public readonly FakeLibraryService Library = new();

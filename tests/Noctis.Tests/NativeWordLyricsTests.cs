@@ -66,6 +66,34 @@ public class NativeWordLyricsTests
         Assert.Equal("true", raw["auto"]); Assert.Equal("Half", raw["speed"]);
         Assert.Equal("Medium", raw["defaultMode"]);
     }
+
+    [AvaloniaFact]
+    public void LyricsPageTimeWords_QueuesOnlyThatSong_AndMissingSetupNeverDownloads()
+    {
+        using var rig = new Rig(off: true);
+        var song = rig.Library.TrackList[0];
+        Track? shown = null;
+        rig.Service.Presenter = (library, track) => { Assert.False(library); shown = track; };
+        var request = rig.Service.TimeSongAsync(song);
+        Until(() => request.IsCompleted); request.GetAwaiter().GetResult();
+        Assert.Equal(1, rig.Service.WaitingCount);
+        Assert.Same(song, shown);
+        Assert.False(Directory.Exists(Path.Combine(rig.Data.DataDirectory, "absent backend")));
+        Assert.False(File.Exists(Path.Combine(rig.Service.DataDirectory, "setup.cmd")));
+        Assert.True(File.Exists(song.FilePath));
+    }
+
+    [AvaloniaFact]
+    public void LyricsPageTimeWords_RejectsRemoteSongsWithoutOpeningSetup()
+    {
+        using var rig = new Rig(off: true);
+        var shown = false;
+        rig.Service.Presenter = (_, _) => shown = true;
+        var request = rig.Service.TimeSongAsync(new Track { SourceType = SourceType.Navidrome, FilePath = "https://example.invalid/song" });
+        Until(() => request.IsCompleted); request.GetAwaiter().GetResult();
+        Assert.Equal(0, rig.Service.WaitingCount);
+        Assert.False(shown);
+    }
     [AvaloniaFact]
     public void ExistingLibraryIsNotBackfilled_AndNewDownloadsAreQueuedOnce()
     {
@@ -151,6 +179,8 @@ public class NativeWordLyricsTests
         var request = rig.Service.SetupAsync(text => { prompt = text; return Task.FromResult(false); });
         Until(() => request.IsCompleted); request.GetAwaiter().GetResult();
         Assert.Contains("1.33 GB", prompt); Assert.Contains("optional", prompt);
+        Assert.Equal(2, prompt!.Split('\n').Length);
+        Assert.All(prompt.Split('\n'), line => Assert.True(line.Length <= 50));
         Assert.False(File.Exists(Path.Combine(rig.Service.DataDirectory, "setup.cmd")));
         Assert.False(Directory.Exists(Path.Combine(rig.Data.DataDirectory, "absent backend")));
     }

@@ -17,13 +17,15 @@
       <ScrollViewer x:Name="WordBodyScroll" Grid.Row="1" MaxHeight="540" HorizontalScrollBarVisibility="Disabled">
         <StackPanel Margin="28,20" Spacing="14">
           <Grid ColumnDefinitions="Auto,*" ColumnSpacing="12">
-            <controls:ProgressRing Width="20" Height="20" IsIndeterminate="{Binding Indeterminate}" Value="{Binding Progress}" />
+            <controls:ProgressRing Width="20" Height="20" IsIndeterminate="{Binding Indeterminate}" Value="{Binding Progress}" IsVisible="{Binding !IsError}" />
+            <PathIcon Data="{StaticResource InfoIcon}" Width="20" Height="20"
+                      Foreground="{DynamicResource SystemControlErrorTextForegroundBrush}" IsVisible="{Binding IsError}"/>
             <StackPanel Grid.Column="1" Spacing="4">
               <TextBlock Text="{Binding Message}" Classes.problem="{Binding IsError}" FontWeight="SemiBold" FontSize="14" TextWrapping="Wrap" />
               <TextBlock Text="{Binding Counts}" FontSize="12" Opacity="0.55" />
             </StackPanel>
           </Grid>
-          <TextBlock Text="{Binding Detail}" FontSize="12" Opacity="0.65" TextWrapping="Wrap" MaxHeight="130" />
+          <TextBlock Text="{Binding DetailLine}" FontSize="12" Opacity="0.65" TextTrimming="CharacterEllipsis" MaxLines="1" />
           <StackPanel Orientation="Horizontal" Spacing="8">
             <Button Content="{Binding PauseLabel}" Classes="pill-secondary" Command="{Binding TogglePauseCommand}" />
             <Button Content="Stop" Classes="pill-secondary" Command="{Binding StopCommand}" />
@@ -42,8 +44,6 @@
             <TextBox x:Name="WordsField" Text="{Binding Words}" AcceptsReturn="True" TextWrapping="Wrap" Classes="pill-area"
                      MinHeight="180" MaxHeight="300" MaxLength="500000" IsEnabled="{Binding CanInteract}" PlaceholderText="Paste or edit plain or line-synced lyrics. Empty lines are ignored." />
           </StackPanel>
-          <TextBlock Text="Existing lyrics are replaced only after backed-up timing succeeds. Audio stays unchanged."
-                     IsVisible="{Binding IsSong}" FontSize="12" Opacity="0.5" TextWrapping="Wrap" />
           <TextBlock Text="{Binding Error}" IsVisible="{Binding Error, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"
                      Foreground="{DynamicResource SystemControlErrorTextForegroundBrush}" FontSize="12" TextWrapping="Wrap" />
         </StackPanel>

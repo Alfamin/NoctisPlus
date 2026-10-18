@@ -20,6 +20,15 @@ namespace Noctis.Views;
 
 public partial class SettingsView : UserControl
 {
+    protected override Size MeasureOverride(Size availableSize)
+    {
+        if (!DebugLogger.IsEnabled) return base.MeasureOverride(availableSize);
+        var watch = System.Diagnostics.Stopwatch.StartNew();
+        var size = base.MeasureOverride(availableSize);
+        if (watch.Elapsed.TotalMilliseconds >= 10)
+            DebugLog.Write("Settings.Perf", $"measure={watch.Elapsed.TotalMilliseconds:F1} ms");
+        return size;
+    }
     private const double PreampThumbSize = 14;
     private const double PreampDefault = 0.0;
     private const double CrossfadeDurationDefault = 6.0; // matches the Settings reset value

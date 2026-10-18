@@ -2645,6 +2645,12 @@ public partial class LyricsViewModel : ViewModelBase, IDisposable
 
     private void OnPlayerPropertyChanged(object? sender, System.ComponentModel.PropertyChangedEventArgs e)
     {
+        if (e.PropertyName is nameof(PlayerViewModel.CurrentTrack) or nameof(PlayerViewModel.CanSeekCurrent))
+        {
+            OnPropertyChanged(nameof(CanTimeCurrentWords));
+            OpenWordTimingCommand.NotifyCanExecuteChanged();
+            TimeWordsCommand.NotifyCanExecuteChanged();
+        }
         if (e.PropertyName == nameof(PlayerViewModel.CurrentTrack)
             || e.PropertyName == nameof(PlayerViewModel.State) && _player.State == Models.PlaybackState.Stopped
             || e.PropertyName == nameof(PlayerViewModel.IsSeeking) && _player.IsSeeking)
@@ -3322,6 +3328,22 @@ public partial class LyricsViewModel : ViewModelBase, IDisposable
 
     /// <summary>Whether the lyric share-card entry point should be visible.</summary>
     public bool ShareAvailable => _player.CurrentTrack != null && !IsSearching && !ShowSearchButton;
+
+    /// <summary>Native entry from the lyrics page; opening the panel never starts a timing job.</summary>
+    internal Action<Track>? WordTimingRequested { get; set; }
+    internal Func<Track, Task>? WordTimingStartRequested { get; set; }
+    public bool CanTimeCurrentWords => _player.CurrentTrack is { IsRemoteStream: false } track
+        && !Features.ProgressivePlayback.ProgressiveTransfer.IsDownloading(track.FilePath);
+
+    [RelayCommand(CanExecute = nameof(CanTimeCurrentWords))]
+    private void OpenWordTiming()
+    {
+        if (CanTimeCurrentWords && _player.CurrentTrack is { } track) WordTimingRequested?.Invoke(track);
+    }
+
+    [RelayCommand(CanExecute = nameof(CanTimeCurrentWords))]
+    private Task TimeWords() => CanTimeCurrentWords && _player.CurrentTrack is { } track
+        ? WordTimingStartRequested?.Invoke(track) ?? Task.CompletedTask : Task.CompletedTask;
 
     partial void OnShowSearchButtonChanged(bool value) => OnPropertyChanged(nameof(ShareAvailable));
     partial void OnIsSearchingChanged(bool value) => OnPropertyChanged(nameof(ShareAvailable));

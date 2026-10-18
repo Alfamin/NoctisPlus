@@ -261,12 +261,33 @@ public class CachedImageRecycleTests : IDisposable
     private static async Task PumpUntil(Func<bool> condition, int budgetMs = 60000)
     {
         var deadline = Environment.TickCount64 + budgetMs;
-        while (!condition() && Environment.TickCount64 < deadline)
+        var settled = 0;
+        while (Environment.TickCount64 < deadline)
         {
             Dispatcher.UIThread.RunJobs();
             Avalonia.Headless.AvaloniaHeadlessPlatform.ForceRenderTimerTick();
+            // Layout can queue a new decode and clear a tile that was ready at
+            // the top of the loop. Check AFTER draining, and across two turns;
+            // the old final RunJobs could invalidate the condition just before
+            // AssertShowsItsOwnCover, producing a null Source under full load.
+            settled = condition() ? settled + 1 : 0;
+            if (settled >= 2) return;
             await Task.Delay(10);
         }
-        Dispatcher.UIThread.RunJobs();
+        Assert.True(condition(), "Cover pipeline did not settle before the test deadline.");
+    }
+
+    [AvaloniaFact]
+    public async Task PumpUntil_DoesNotReturnWhenItsFinalDispatcherDrainInvalidatesReadiness()
+    {
+        var ready = true;
+        Dispatcher.UIThread.Post(() =>
+        {
+            ready = false;
+            _ = Restore();
+        }, DispatcherPriority.Background);
+        async Task Restore() { await Task.Delay(30); ready = true; }
+        await PumpUntil(() => ready, budgetMs: 2000);
+        Assert.True(ready);
     }
 }

@@ -191,7 +191,11 @@ internal sealed class Worker : IDisposable
 
     /// <summary>The user asked for this song. Returns what to tell them right away, or null.</summary>
     public string? Ask(string path, TimingAction action = TimingAction.Missing, string? draft = null)
+        => Ask(path, action, draft, out _);
+
+    internal string? Ask(string path, TimingAction action, string? draft, out bool accepted)
     {
+        accepted = false;
         if (string.IsNullOrWhiteSpace(path) || !File.Exists(path)) return "The song's file is not there.";
         if (!Audio.Contains(Path.GetExtension(path))) return "WordLyrics cannot read this kind of file.";
         if (action == TimingAction.Missing && (HasWordLyrics(path) || EmbeddedWordLyrics.HasWords(path))) return "Word-timed lyrics already exist. To fix wrong words or timing, right-click this song and choose Wrong lyrics / redo with fresh lyrics (WordLyrics), or Edit / paste custom lyrics.";
@@ -205,6 +209,7 @@ internal sealed class Worker : IDisposable
             if (_disposed) return null;
             _items[path] = new Item { Path = path, Root = root, Asked = true, Action = action, Draft = draft, Seen = now, QuietSince = now, NotBefore = now };
             SaveState();
+            accepted = true;
         }
         _timer.Change(TimeSpan.Zero, Tick);
         return !tool.Ready ? "Queued. WordLyrics setup is needed; the request is saved." : _run is null ? "Queued for word timing…" : "Queued: WordLyrics is busy with another song.";

@@ -1,4 +1,4 @@
-﻿<?xml version="1.0" encoding="utf-8"?>
+<?xml version="1.0" encoding="utf-8"?>
 <root>
   <!--
     English UI strings — the fallback every other language falls back to.
@@ -329,7 +329,7 @@
     <comment>Text in SettingsView.axaml</comment>
   </data>
   <data name="Settings.AlbumArtistTagSongsTip" xml:space="preserve">
-    <value>专辑艺人标签;没有该标签的歌曲会回退到其艺人标签</value>
+    <value>Use Album Artist; fall back to Artist when empty</value>
     <comment>ToolTip.Tip in SettingsView.axaml</comment>
   </data>
   <data name="Settings.AlbumArtist" xml:space="preserve">
@@ -661,7 +661,7 @@
     <comment>Text in SettingsView.axaml</comment>
   </data>
   <data name="Settings.ClassicRowPlayingCoverTip" xml:space="preserve">
-    <value>经典横排:正在播放的封面居中,历史和接下来的分列两侧</value>
+    <value>Playing cover between history and up next</value>
     <comment>ToolTip.Tip in SettingsView.axaml</comment>
   </data>
   <data name="Settings.Carousel" xml:space="preserve">
@@ -669,7 +669,7 @@
     <comment>Text in SettingsView.axaml</comment>
   </data>
   <data name="Settings.TiltedCoversDiagonalPathTip" xml:space="preserve">
-    <value>沿对角线排列的倾斜封面,旁边显示曲目信息</value>
+    <value>Tilted covers with track details</value>
     <comment>ToolTip.Tip in SettingsView.axaml</comment>
   </data>
   <data name="Settings.Cascade" xml:space="preserve">
@@ -693,7 +693,7 @@
     <comment>Text in SettingsView.axaml</comment>
   </data>
   <data name="Settings.ResizableGlassCardIconTip" xml:space="preserve">
-    <value>可调整大小的玻璃卡片:图标、条形、卡片、大图标和歌词形态</value>
+    <value>Resizable glass: icon, bar, card or lyrics</value>
     <comment>ToolTip.Tip in SettingsView.axaml</comment>
   </data>
   <data name="Settings.Classic" xml:space="preserve">
@@ -701,7 +701,7 @@
     <comment>Text in SettingsView.axaml</comment>
   </data>
   <data name="Settings.RoundCoverOverlappingLightTip" xml:space="preserve">
-    <value>圆形封面叠在浅色卡片上,附标题和播放控制</value>
+    <value>Round cover over a light playback card</value>
     <comment>ToolTip.Tip in SettingsView.axaml</comment>
   </data>
   <data name="Settings.Pill" xml:space="preserve">
@@ -885,7 +885,7 @@
     <comment>Lyrics Studio card in LyricsStudioView.axaml</comment>
   </data>
   <data name="Settings.MusicVideosHint" xml:space="preserve">
-    <value>视频名称如歌曲，旁边或视频文件夹，替换歌词页面上的封面。</value>
+    <value>Matching videos replace the cover on the lyrics page</value>
     <comment>Lyrics Studio card hint</comment>
   </data>
   <data name="Settings.MusicVideoRounded" xml:space="preserve">
@@ -1165,7 +1165,7 @@
     <comment>Text in SettingsView.axaml</comment>
   </data>
   <data name="Settings.LevelBeforeEQLowerTip" xml:space="preserve">
-    <value>均衡器前的电平 — 如果提升的频段出现失真就调低。双击可重置。</value>
+    <value>Lower to prevent EQ distortion; double-tap to reset</value>
     <comment>ToolTip.Tip in SettingsView.axaml</comment>
   </data>
   <data name="Settings.FREQUENCY" xml:space="preserve">
@@ -1181,7 +1181,7 @@
     <comment>ToolTip.Tip in SettingsView.axaml</comment>
   </data>
   <data name="Settings.QBandWidthHigherTip" xml:space="preserve">
-    <value>Q (频段宽度) — 数值越大,影响的频率范围越窄</value>
+    <value>Higher Q affects a narrower frequency range</value>
     <comment>ToolTip.Tip in SettingsView.axaml</comment>
   </data>
   <data name="Settings.RemoveBandTip" xml:space="preserve">
@@ -2911,7 +2911,7 @@
     <comment>Content in LrcEditorDialog.axaml</comment>
   </data>
   <data name="LrcEditor.StampPlayingPositionOntoTip" xml:space="preserve">
-    <value>把当前播放位置打到高亮行上并移到下一行 (空格)</value>
+    <value>Stamp this line and move to the next (Space)</value>
     <comment>ToolTip.Tip in LrcEditorDialog.axaml</comment>
   </data>
   <data name="LrcEditor.StampLineSpace" xml:space="preserve">
@@ -3626,7 +3626,7 @@
     <comment>Content in MetadataWindow.axaml</comment>
   </data>
   <data name="Metadata.MarksContentAsExplicitTip" xml:space="preserve">
-    <value>将内容标记为儿童不宜 (iTunes 提示标签)。"儿童不宜内容"设置会据此跳过歌曲。</value>
+    <value>Mark explicit; skipped when explicit content is off</value>
     <comment>ToolTip.Tip in MetadataWindow.axaml</comment>
   </data>
   <data name="Metadata.Artist" xml:space="preserve">
@@ -3910,7 +3910,7 @@
     <comment>Content in MetadataWindow.axaml</comment>
   </data>
   <data name="Metadata.LoadTxtPlainLrcTip" xml:space="preserve">
-    <value>从磁盘加载 .txt (纯文本) 或 .lrc (同步) 歌词文件</value>
+    <value>Load plain TXT, or synced LRC, ELRC or TTML</value>
     <comment>ToolTip.Tip in MetadataWindow.axaml</comment>
   </data>
   <data name="Metadata.ShareLyrics" xml:space="preserve">
@@ -3946,11 +3946,11 @@
     <comment>Content in MetadataWindow.axaml</comment>
   </data>
   <data name="Metadata.CopySyncedLyricsLRCTip" xml:space="preserve">
-    <value>把同步歌词 (含时间戳的 LRC) 复制到剪贴板</value>
+    <value>Copy timestamped LRC lyrics</value>
     <comment>ToolTip.Tip in MetadataWindow.axaml</comment>
   </data>
   <data name="Metadata.LoadLrcSyncedTxtTip" xml:space="preserve">
-    <value>从磁盘加载 .lrc (同步) 或 .txt (纯文本) 歌词文件</value>
+    <value>Load synced LRC, ELRC or TTML, or plain TXT</value>
     <comment>ToolTip.Tip in MetadataWindow.axaml</comment>
   </data>
   <data name="Metadata.SearchLyrics" xml:space="preserve">
@@ -4580,7 +4580,7 @@
     <comment>Header in PlaylistView.axaml</comment>
   </data>
   <data name="Playlist.ChangeDisplayedOrderManualTip" xml:space="preserve">
-    <value>更改显示顺序。"手动"是你保存的播放列表顺序。</value>
+    <value>Change sorting; Manual restores your saved order</value>
     <comment>ToolTip.Tip in PlaylistView.axaml</comment>
   </data>
   <data name="Playlist.Text" xml:space="preserve">
@@ -5052,7 +5052,7 @@
     <comment>Text in StatisticsView.axaml</comment>
   </data>
   <data name="Statistics.ListeningRecapTopTracksTip" xml:space="preserve">
-    <value>你的聆听回顾 — 最常听的曲目、艺人和分钟数,还有可分享的卡片</value>
+    <value>Share your top songs, artists and listening time</value>
     <comment>ToolTip.Tip in StatisticsView.axaml</comment>
   </data>
   <data name="Statistics.NoctisWrap" xml:space="preserve">
@@ -5901,7 +5901,7 @@
     <comment>Footer checkbox</comment>
   </data>
   <data name="LyricsStudio.SkipAlreadyTimedTip" xml:space="preserve">
-    <value>单词计时(LLRC)和直线计时(LRC)是不同的格式。仅有直线计时的歌曲仍在处理中。</value>
+    <value>Skip matching formats; line-only songs can gain word timing</value>
     <comment>Footer checkbox tooltip</comment>
   </data>
   <data name="LyricsStudio.TranscribeOnly" xml:space="preserve">
@@ -5941,7 +5941,7 @@
     <comment>Page scan in progress</comment>
   </data>
   <data name="LyricsStudio.BackdropsTip" xml:space="preserve">
-    <value>歌词背后的循环视频和封面栏位中的音乐视频</value>
+    <value>Lyrics backgrounds and cover-slot music videos</value>
     <comment>Tooltip in LyricsStudioView.axaml</comment>
   </data>
   <data name="LyricsStudio.ChooseSongs" xml:space="preserve">
@@ -5949,7 +5949,7 @@
     <comment>Header chip in LyricsStudioView.axaml: opens the song/album picker</comment>
   </data>
   <data name="LyricsStudio.ChooseSongsTip" xml:space="preserve">
-    <value>为工作室选择歌曲或整张专辑，是否写单词或行时钟</value>
+    <value>Choose songs, albums and timing format</value>
     <comment>Tooltip in LyricsStudioView.axaml</comment>
   </data>
   <data name="LyricsStudioPicker.Title" xml:space="preserve">
@@ -5965,7 +5965,7 @@
     <comment>Picker: format card title</comment>
   </data>
   <data name="LyricsStudioPicker.FormatHint" xml:space="preserve">
-    <value>单词时钟以单词移动(ELRC)；行时钟按单词移动(LRC)。</value>
+    <value>ELRC: word timings. LRC: line timings.</value>
     <comment>Picker: format card hint</comment>
   </data>
   <data name="LyricsStudioPicker.WordTimings" xml:space="preserve">
@@ -6029,7 +6029,7 @@
     <comment>Review button, shown for line-level lyrics</comment>
   </data>
   <data name="LyricsStudio.UpgradeTip" xml:space="preserve">
-    <value>这些行的每个单词都有时间。保持行级文件。</value>
+    <value>Add word timings; keep the line-timed file</value>
     <comment>Review button tooltip</comment>
   </data>
   <data name="LyricsStudio.ReviewHint" xml:space="preserve">
@@ -6049,7 +6049,7 @@
     <comment>Review button</comment>
   </data>
   <data name="LyricsStudio.RedoTip" xml:space="preserve">
-    <value>忽略这些歌词并翻译正在发生的事件</value>
+    <value>Transcribe again; correct the words before timing</value>
     <comment>Tooltip</comment>
   </data>
   <data name="LyricsStudio.Skip" xml:space="preserve">
@@ -6081,7 +6081,7 @@
     <comment>Starts tap-to-time for one line</comment>
   </data>
   <data name="LyricsStudio.TapTip" xml:space="preserve">
-    <value>播放直线。按空格键或点击每个单词；再点击一段末尾。</value>
+    <value>Tap each word (Space); tap once more to end the line</value>
     <comment>Tap button tooltip</comment>
   </data>
   <data name="LyricsStudio.Tap" xml:space="preserve">
@@ -6475,7 +6475,7 @@
     <comment>Under the sync switch; {0} = error message</comment>
   </data>
   <data name="Phone.SignOutTip" xml:space="preserve">
-    <value>让这部手机退出登录。再次连接时需要输入密码。</value>
+    <value>Sign out; reconnecting requires your password</value>
     <comment>Tooltip on a phone's Sign out button</comment>
   </data>
   <data name="Phone.OtherAppsTitle" xml:space="preserve">
@@ -6713,4 +6713,9 @@
     <value>转到艺人</value>
     <comment>Settings › Shortcuts (GitHub #131)</comment>
   </data>
+  <data name="Lyrics.WordTiming" xml:space="preserve"><value>Word timing</value></data>
+  <data name="Queue.ForYou" xml:space="preserve"><value>For you</value></data>
+  <data name="Queue.ForYouTip" xml:space="preserve"><value>Mix from your listening history</value></data>
+  <data name="Lyrics.TimeWords" xml:space="preserve"><value>Time words</value></data>
+  <data name="Lyrics.TimeWordsLocalOnly" xml:space="preserve"><value>Finish saving this song locally first</value></data>
 </root>

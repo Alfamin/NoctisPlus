@@ -1,4 +1,4 @@
-﻿<?xml version="1.0" encoding="utf-8"?>
+<?xml version="1.0" encoding="utf-8"?>
 <root>
   <!--
     English UI strings — the fallback every other language falls back to.
@@ -61,9 +61,7 @@
   <data name="Import.LinkWatermark" xml:space="preserve"><value>Paste a Deezer or TIDAL link</value></data>
   <data name="Import.DropTitle" xml:space="preserve"><value>Drop a playlist file here</value></data>
   <data name="Import.Formats" xml:space="preserve"><value>CSV, JSON or M3U</value></data>
-  <data name="Import.FormatsTip" xml:space="preserve"><value>Spotify: export a CSV with Exportify.
-Apple Music, YouTube Music, Amazon: export a file with TuneMyMusic.
-Deezer and TIDAL: paste the link.</value></data>
+  <data name="Import.FormatsTip" xml:space="preserve"><value>CSV: Exportify/TuneMyMusic. Links: Deezer/TIDAL.</value></data>
   <data name="Import.CreatePlaylist" xml:space="preserve"><value>Create playlist</value></data>
   <data name="Import.Done" xml:space="preserve"><value>Done</value></data>
   <data name="Import.StatusMatching" xml:space="preserve"><value>Matching with your library…</value></data>
@@ -140,7 +138,7 @@ Deezer and TIDAL: paste the link.</value></data>
   <data name="Settings.FirstCreditedArtistEachTip" xml:space="preserve"><value>The first credited artist of each song's Artist tag</value><comment>ToolTip.Tip in SettingsView.axaml</comment></data>
   <data name="Settings.Artist" xml:space="preserve"><value>Artist</value><comment>Text in SettingsView.axaml</comment></data>
   <data name="Settings.SongSArtistTag" xml:space="preserve"><value>Song's artist tag</value><comment>Text in SettingsView.axaml</comment></data>
-  <data name="Settings.AlbumArtistTagSongsTip" xml:space="preserve"><value>The Album Artist tag; songs without one fall back to their artist</value><comment>ToolTip.Tip in SettingsView.axaml</comment></data>
+  <data name="Settings.AlbumArtistTagSongsTip" xml:space="preserve"><value>Use Album Artist; fall back to Artist when empty</value><comment>ToolTip.Tip in SettingsView.axaml</comment></data>
   <data name="Settings.AlbumArtist" xml:space="preserve"><value>Album Artist</value><comment>Text in SettingsView.axaml</comment></data>
   <data name="Settings.ReleaseSAlbumArtist" xml:space="preserve"><value>Release's album artist tag</value><comment>Text in SettingsView.axaml</comment></data>
   <data name="Settings.ArtistTagSeparators" xml:space="preserve"><value>Artist Tag Separators</value><comment>Text in SettingsView.axaml</comment></data>
@@ -238,17 +236,17 @@ Deezer and TIDAL: paste the link.</value></data>
   <data name="Settings.Cassette" xml:space="preserve"><value>Cassette</value><comment>Text in SettingsView.axaml</comment></data>
   <data name="Settings.CoverFlowLayout" xml:space="preserve"><value>Cover Flow Layout</value><comment>Text in SettingsView.axaml</comment></data>
   <data name="Settings.HowCoverFlowPage" xml:space="preserve"><value>How the Cover Flow page arranges the queue's covers.</value><comment>Text in SettingsView.axaml</comment></data>
-  <data name="Settings.ClassicRowPlayingCoverTip" xml:space="preserve"><value>The classic row: playing cover centred, history and up next to each side</value><comment>ToolTip.Tip in SettingsView.axaml</comment></data>
+  <data name="Settings.ClassicRowPlayingCoverTip" xml:space="preserve"><value>Playing cover between history and up next</value><comment>ToolTip.Tip in SettingsView.axaml</comment></data>
   <data name="Settings.Carousel" xml:space="preserve"><value>Carousel</value><comment>Text in SettingsView.axaml</comment></data>
-  <data name="Settings.TiltedCoversDiagonalPathTip" xml:space="preserve"><value>Tilted covers on a diagonal path with the track details beside them</value><comment>ToolTip.Tip in SettingsView.axaml</comment></data>
+  <data name="Settings.TiltedCoversDiagonalPathTip" xml:space="preserve"><value>Tilted covers with track details</value><comment>ToolTip.Tip in SettingsView.axaml</comment></data>
   <data name="Settings.Cascade" xml:space="preserve"><value>Cascade</value><comment>Text in SettingsView.axaml</comment></data>
   <data name="Settings.MosaicQueueSCoversTip" xml:space="preserve"><value>A mosaic of the queue's covers</value><comment>ToolTip.Tip in SettingsView.axaml</comment></data>
   <data name="Settings.Collage" xml:space="preserve"><value>Collage</value><comment>Text in SettingsView.axaml</comment></data>
   <data name="Settings.MiniPlayerDesign" xml:space="preserve"><value>Mini Player Design</value><comment>Text in SettingsView.axaml</comment></data>
   <data name="Settings.HowMiniPlayerLooks" xml:space="preserve"><value>Classic follows its size. Pill and Sleeve are fixed designs.</value><comment>Text in SettingsView.axaml</comment></data>
-  <data name="Settings.ResizableGlassCardIconTip" xml:space="preserve"><value>The resizable glass card: icon, bar, card, large icon and lyrics forms</value><comment>ToolTip.Tip in SettingsView.axaml</comment></data>
+  <data name="Settings.ResizableGlassCardIconTip" xml:space="preserve"><value>Resizable glass: icon, bar, card or lyrics</value><comment>ToolTip.Tip in SettingsView.axaml</comment></data>
   <data name="Settings.Classic" xml:space="preserve"><value>Classic</value><comment>Text in SettingsView.axaml</comment></data>
-  <data name="Settings.RoundCoverOverlappingLightTip" xml:space="preserve"><value>A round cover overlapping a light card with the title and transport</value><comment>ToolTip.Tip in SettingsView.axaml</comment></data>
+  <data name="Settings.RoundCoverOverlappingLightTip" xml:space="preserve"><value>Round cover over a light playback card</value><comment>ToolTip.Tip in SettingsView.axaml</comment></data>
   <data name="Settings.Pill" xml:space="preserve"><value>Pill</value><comment>Text in SettingsView.axaml</comment></data>
   <data name="Settings.SpinningDiscPeekingOutTip" xml:space="preserve"><value>A spinning disc peeking out of the top of a light card</value><comment>ToolTip.Tip in SettingsView.axaml</comment></data>
   <data name="Settings.Sleeve" xml:space="preserve"><value>Sleeve</value><comment>Text in SettingsView.axaml</comment></data>
@@ -304,12 +302,12 @@ Deezer and TIDAL: paste the link.</value></data>
   <data name="Settings.SmoothFilledCurveTip" xml:space="preserve"><value>A smooth filled curve</value><comment>ToolTip.Tip in SettingsView.axaml</comment></data>
   <data name="Settings.Wave" xml:space="preserve"><value>Wave</value><comment>Text in SettingsView.axaml</comment></data>
   <data name="Settings.MusicVideos" xml:space="preserve"><value>Music videos</value><comment>Lyrics Studio card in LyricsStudioView.axaml</comment></data>
-  <data name="Settings.MusicVideosHint" xml:space="preserve"><value>A video named like the song, next to it or in a videos folder, replaces the cover on the lyrics page.</value><comment>Lyrics Studio card hint</comment></data>
+  <data name="Settings.MusicVideosHint" xml:space="preserve"><value>Matching videos replace the cover on the lyrics page</value><comment>Lyrics Studio card hint</comment></data>
   <data name="Settings.MusicVideoRounded" xml:space="preserve"><value>Rounded</value><comment>Lyrics Studio card toggle</comment></data>
   <data name="Settings.MusicVideoRoundedHint" xml:space="preserve"><value>Rounded corners like the cover, or a flat frame</value><comment>Lyrics Studio card toggle tooltip</comment></data>
   <data name="PlaybackBar.MusicVideo" xml:space="preserve"><value>Music video</value><comment>Options menu toggle in PlaybackBarView.axaml</comment></data>
   <data name="PlaybackBar.MusicVideoAudio" xml:space="preserve"><value>Music video audio</value><comment>Options menu toggle in PlaybackBarView.axaml, under Music video</comment></data>
-  <data name="Settings.MusicVideoAudioHint" xml:space="preserve"><value>Play the video's own audio instead of the song file. Takes effect from the next song.</value><comment>Music video audio toggle tooltip (Lyrics Studio card and options menu)</comment></data>
+  <data name="Settings.MusicVideoAudioHint" xml:space="preserve"><value>Use video audio from the next song</value><comment>Music video audio toggle tooltip (Lyrics Studio card and options menu)</comment></data>
   <data name="Settings.LyricsBackgroundVideo" xml:space="preserve"><value>Lyrics Background Video</value><comment>Text in SettingsView.axaml</comment></data>
   <data name="Settings.LoopVideoGIFBehind" xml:space="preserve"><value>A looping video or GIF behind the lyrics.</value><comment>Text in SettingsView.axaml</comment></data>
   <data name="Settings.Choose" xml:space="preserve"><value>Choose</value><comment>Content in SettingsView.axaml</comment></data>
@@ -412,11 +410,11 @@ Deezer and TIDAL: paste the link.</value></data>
   <data name="Settings.Equalizer" xml:space="preserve"><value>Equalizer</value><comment>Text in SettingsView.axaml</comment></data>
   <data name="Settings.ParametricEQTuneEach" xml:space="preserve"><value>Tune each band's frequency, gain and width.</value><comment>Text in SettingsView.axaml</comment></data>
   <data name="Settings.Preamp" xml:space="preserve"><value>Preamp</value><comment>Text in SettingsView.axaml</comment></data>
-  <data name="Settings.LevelBeforeEQLowerTip" xml:space="preserve"><value>Level before the EQ — lower it if boosted bands distort. Double-tap to reset.</value><comment>ToolTip.Tip in SettingsView.axaml</comment></data>
+  <data name="Settings.LevelBeforeEQLowerTip" xml:space="preserve"><value>Lower to prevent EQ distortion; double-tap to reset</value><comment>ToolTip.Tip in SettingsView.axaml</comment></data>
   <data name="Settings.FREQUENCY" xml:space="preserve"><value>FREQUENCY</value><comment>Text in SettingsView.axaml</comment></data>
   <data name="Settings.GAIN" xml:space="preserve"><value>GAIN</value><comment>Text in SettingsView.axaml</comment></data>
   <data name="Settings.CenterFrequencyHzTypeTip" xml:space="preserve"><value>Center frequency (Hz) — type, scroll, or use arrow keys</value><comment>ToolTip.Tip in SettingsView.axaml</comment></data>
-  <data name="Settings.QBandWidthHigherTip" xml:space="preserve"><value>Q (band width) — higher values affect a narrower range around the frequency</value><comment>ToolTip.Tip in SettingsView.axaml</comment></data>
+  <data name="Settings.QBandWidthHigherTip" xml:space="preserve"><value>Higher Q affects a narrower frequency range</value><comment>ToolTip.Tip in SettingsView.axaml</comment></data>
   <data name="Settings.RemoveBandTip" xml:space="preserve"><value>Remove band</value><comment>ToolTip.Tip in SettingsView.axaml</comment></data>
   <data name="Settings.AddBand" xml:space="preserve"><value>+ Add Band</value><comment>Text in SettingsView.axaml</comment></data>
   <data name="Settings.EqualizerOnOffTip" xml:space="preserve"><value>Turn the equalizer on or off. Your curve is kept either way.</value><comment>Equalizer card master switch tooltip (GitHub #94)</comment></data>
@@ -430,7 +428,7 @@ Deezer and TIDAL: paste the link.</value></data>
   <data name="Settings.EqPresetNameTooLong" xml:space="preserve"><value>Preset names can be at most 40 characters.</value><comment>Save preset flyout error</comment></data>
   <data name="Settings.EqPresetNameReserved" xml:space="preserve"><value>That name is taken by a built-in preset. Pick another one.</value><comment>Save preset flyout error (built-in names, Custom, None)</comment></data>
   <data name="Settings.DeleteEqPreset" xml:space="preserve"><value>Delete</value><comment>Equalizer card: deletes the selected preset</comment></data>
-  <data name="Settings.DeleteEqPresetTip" xml:space="preserve"><value>Delete the selected preset. Custom and Flat can't be deleted.</value><comment>Equalizer card Delete button tooltip</comment></data>
+  <data name="Settings.DeleteEqPresetTip" xml:space="preserve"><value>Delete this preset; Custom and Flat are kept</value><comment>Equalizer card Delete button tooltip</comment></data>
   <data name="Settings.RestoreEqPresets" xml:space="preserve"><value>Restore presets</value><comment>Equalizer card: brings back deleted built-in presets</comment></data>
   <data name="Settings.RestoreEqPresetsTip" xml:space="preserve"><value>Bring back the built-in presets you deleted</value><comment>Equalizer card Restore presets tooltip</comment></data>
   <data name="Settings.AUDIOTOOLS" xml:space="preserve"><value>AUDIO TOOLS</value><comment>Text in SettingsView.axaml</comment></data>
@@ -462,7 +460,7 @@ Deezer and TIDAL: paste the link.</value></data>
   <data name="Settings.LocalApiShowToken" xml:space="preserve"><value>Show</value><comment>Reveals the Local API token</comment></data>
   <data name="Settings.LocalApiHideToken" xml:space="preserve"><value>Hide</value><comment>Masks the Local API token</comment></data>
   <data name="Settings.LocalApiRegenerate" xml:space="preserve"><value>Regenerate token</value><comment>Text in SettingsView.axaml</comment></data>
-  <data name="Settings.LocalApiRegenerateTip" xml:space="preserve"><value>Make a new token. Apps using the old one stop working until you give them the new one.</value><comment>ToolTip.Tip in SettingsView.axaml</comment></data>
+  <data name="Settings.LocalApiRegenerateTip" xml:space="preserve"><value>Replace token; connected apps must use the new one</value><comment>ToolTip.Tip in SettingsView.axaml</comment></data>
   <data name="Settings.LocalApiWarning" xml:space="preserve"><value>Any app with this token can control Noctis and read your library. Only give it to apps you trust.</value><comment>Text in SettingsView.axaml</comment></data>
   <data name="Settings.LocalApiDiscovery" xml:space="preserve"><value>Apps can also read it from local-api.json in the Noctis data folder.</value><comment>Text in SettingsView.axaml</comment></data>
   <data name="Settings.ACCOUNTS" xml:space="preserve"><value>ACCOUNTS</value><comment>Text in SettingsView.axaml</comment></data>
@@ -797,9 +795,9 @@ Deezer and TIDAL: paste the link.</value></data>
   <data name="AudioConverter.OptCopyTags" xml:space="preserve"><value>Copy tags</value><comment>Option in AudioConverterDialog.axaml</comment></data>
   <data name="AudioConverter.TipCopyTags" xml:space="preserve"><value>Copy every tag from the original file</value><comment>Tooltip of the Copy tags option in AudioConverterDialog.axaml</comment></data>
   <data name="AudioConverter.OptEmbedArtwork" xml:space="preserve"><value>Embed artwork</value><comment>Option in AudioConverterDialog.axaml</comment></data>
-  <data name="AudioConverter.TipEmbedArtwork" xml:space="preserve"><value>Put the cover inside the new file (MP3, AAC (.m4a), FLAC and ALAC can hold one)</value><comment>Tooltip of the Embed artwork option in AudioConverterDialog.axaml</comment></data>
+  <data name="AudioConverter.TipEmbedArtwork" xml:space="preserve"><value>Embed the cover in supported audio formats</value><comment>Tooltip of the Embed artwork option in AudioConverterDialog.axaml</comment></data>
   <data name="AudioConverter.OptOverwrite" xml:space="preserve"><value>Overwrite existing</value><comment>Option in AudioConverterDialog.axaml</comment></data>
-  <data name="AudioConverter.TipOverwrite" xml:space="preserve"><value>Replace a file that already has the same name; otherwise that track is skipped</value><comment>Tooltip of the Overwrite existing option in AudioConverterDialog.axaml</comment></data>
+  <data name="AudioConverter.TipOverwrite" xml:space="preserve"><value>Replace existing files; otherwise skip them</value><comment>Tooltip of the Overwrite existing option in AudioConverterDialog.axaml</comment></data>
   <data name="AudioConverter.OptAddToLibrary" xml:space="preserve"><value>Add to library</value><comment>Option in AudioConverterDialog.axaml</comment></data>
   <data name="AudioConverter.TipAddToLibrary" xml:space="preserve"><value>Show the copies in Noctis, titled like “Song (FLAC)”</value><comment>Tooltip of the Add to library option in AudioConverterDialog.axaml</comment></data>
   <data name="AudioConverter.DepthSource" xml:space="preserve"><value>Same as source</value><comment>Bit depth choice "Auto" in AudioConverterDialog</comment></data>
@@ -1054,7 +1052,7 @@ Deezer and TIDAL: paste the link.</value></data>
   <!-- LrcEditorDialog.axaml (auto-migrated) -->
   <data name="LrcEditor.SyncLyrics" xml:space="preserve"><value>Sync lyrics</value><comment>Title in LrcEditorDialog.axaml</comment></data>
   <data name="LrcEditor.PlayPause" xml:space="preserve"><value>Play / Pause</value><comment>Content in LrcEditorDialog.axaml</comment></data>
-  <data name="LrcEditor.StampPlayingPositionOntoTip" xml:space="preserve"><value>Stamp the playing position onto the highlighted line and move to the next (Space)</value><comment>ToolTip.Tip in LrcEditorDialog.axaml</comment></data>
+  <data name="LrcEditor.StampPlayingPositionOntoTip" xml:space="preserve"><value>Stamp this line and move to the next (Space)</value><comment>ToolTip.Tip in LrcEditorDialog.axaml</comment></data>
   <data name="LrcEditor.StampLineSpace" xml:space="preserve"><value>⏱  Stamp line  (Space)</value><comment>Text in LrcEditorDialog.axaml</comment></data>
   <data name="LrcEditor.PlayFrom1sBeforeTip" xml:space="preserve"><value>Play from 1s before this line</value><comment>ToolTip.Tip in LrcEditorDialog.axaml</comment></data>
   <data name="LrcEditor.Nudge01sEarlierTip" xml:space="preserve"><value>Nudge 0.1s earlier</value><comment>ToolTip.Tip in LrcEditorDialog.axaml</comment></data>
@@ -1135,7 +1133,7 @@ Deezer and TIDAL: paste the link.</value></data>
   <data name="Lyrics.SearchLyrics" xml:space="preserve"><value>Search Lyrics</value><comment>Text in LyricsView.axaml</comment></data>
   <data name="Lyrics.SearchingLyrics" xml:space="preserve"><value>Searching for Lyrics</value><comment>Text in LyricsView.axaml</comment></data>
   <data name="LyricsSearch.Title" xml:space="preserve"><value>Search Lyrics</value><comment>LyricsSearchDialog.axaml title</comment></data>
-  <data name="LyricsSearch.Hint" xml:space="preserve"><value>Auto searches the sources on in Settings and prefers word-synced, then synced, then plain.</value><comment>Tooltip on the info icon and the source picker in LyricsSearchDialog.axaml</comment></data>
+  <data name="LyricsSearch.Hint" xml:space="preserve"><value>Search enabled sources; prefer word-synced lyrics</value><comment>Tooltip on the info icon and the source picker in LyricsSearchDialog.axaml</comment></data>
   <data name="LyricsSearch.Subtitle" xml:space="preserve"><value>Find lyrics online and pick the version to use.</value><comment>One-line subtitle under the title in LyricsSearchDialog.axaml</comment></data>
   <data name="LyricsSearch.Auto" xml:space="preserve"><value>Auto (best match)</value><comment>First source-picker entry (LyricsSearchViewModel)</comment></data>
   <data name="LyricsSearch.ArtistWatermark" xml:space="preserve"><value>Artist</value><comment>Placeholder in LyricsSearchDialog.axaml</comment></data>
@@ -1358,7 +1356,7 @@ Saving replaces them with the lyrics on screen. A lyrics file Noctis didn't writ
   <data name="Metadata.Movement" xml:space="preserve"><value>movement</value><comment>Text in MetadataWindow.axaml</comment></data>
   <data name="Metadata.Album2" xml:space="preserve"><value>album</value><comment>Text in MetadataWindow.axaml</comment></data>
   <data name="Metadata.AlbumCompilation" xml:space="preserve"><value>Album is compilation</value><comment>Content in MetadataWindow.axaml</comment></data>
-  <data name="Metadata.MarksContentAsExplicitTip" xml:space="preserve"><value>Marks the content as explicit (iTunes advisory tag). The Explicit Content setting uses this to skip songs.</value><comment>ToolTip.Tip in MetadataWindow.axaml</comment></data>
+  <data name="Metadata.MarksContentAsExplicitTip" xml:space="preserve"><value>Mark explicit; skipped when explicit content is off</value><comment>ToolTip.Tip in MetadataWindow.axaml</comment></data>
   <data name="Metadata.Artist" xml:space="preserve"><value>artist</value><comment>Text in MetadataWindow.axaml</comment></data>
   <data name="Metadata.AlbumArtist" xml:space="preserve"><value>album artist</value><comment>Text in MetadataWindow.axaml</comment></data>
   <data name="Metadata.Performer" xml:space="preserve"><value>performer</value><comment>Text in MetadataWindow.axaml</comment></data>
@@ -1430,7 +1428,7 @@ Saving replaces them with the lyrics on screen. A lyrics file Noctis didn't writ
   <data name="Metadata.PlainLyrics" xml:space="preserve"><value>Plain Lyrics</value><comment>Header in MetadataWindow.axaml</comment></data>
   <data name="Metadata.Enable" xml:space="preserve"><value>Enable</value><comment>Text in MetadataWindow.axaml</comment></data>
   <data name="Metadata.ImportFile" xml:space="preserve"><value>Import file</value><comment>Content in MetadataWindow.axaml</comment></data>
-  <data name="Metadata.LoadTxtPlainLrcTip" xml:space="preserve"><value>Load a .txt (plain) or .lrc, .elrc, .ttml (synced) lyrics file from disk</value><comment>ToolTip.Tip in MetadataWindow.axaml</comment></data>
+  <data name="Metadata.LoadTxtPlainLrcTip" xml:space="preserve"><value>Load plain TXT, or synced LRC, ELRC or TTML</value><comment>ToolTip.Tip in MetadataWindow.axaml</comment></data>
   <data name="Metadata.ShareLyrics" xml:space="preserve"><value>Share lyrics</value><comment>Content in MetadataWindow.axaml</comment></data>
   <data name="Metadata.SyncedLyrics" xml:space="preserve"><value>Synced Lyrics</value><comment>Header in MetadataWindow.axaml</comment></data>
   <data name="Metadata.LinesCarryPerWordTip" xml:space="preserve"><value>Lines carry per-word timing tags; switch to Raw to see them</value><comment>ToolTip.Tip in MetadataWindow.axaml</comment></data>
@@ -1439,8 +1437,8 @@ Saving replaces them with the lyrics on screen. A lyrics file Noctis didn't writ
   <data name="Metadata.ShowRawLRCTextTip" xml:space="preserve"><value>Show the raw LRC text with timing tags</value><comment>ToolTip.Tip in MetadataWindow.axaml</comment></data>
   <data name="Metadata.Copied" xml:space="preserve"><value>Copied!</value><comment>Text in MetadataWindow.axaml</comment></data>
   <data name="Metadata.CopyLyrics" xml:space="preserve"><value>Copy lyrics</value><comment>Content in MetadataWindow.axaml</comment></data>
-  <data name="Metadata.CopySyncedLyricsLRCTip" xml:space="preserve"><value>Copy the synced lyrics (LRC with timestamps) to the clipboard</value><comment>ToolTip.Tip in MetadataWindow.axaml</comment></data>
-  <data name="Metadata.LoadLrcSyncedTxtTip" xml:space="preserve"><value>Load an .lrc, .elrc, .ttml (synced) or .txt (plain) lyrics file from disk</value><comment>ToolTip.Tip in MetadataWindow.axaml</comment></data>
+  <data name="Metadata.CopySyncedLyricsLRCTip" xml:space="preserve"><value>Copy timestamped LRC lyrics</value><comment>ToolTip.Tip in MetadataWindow.axaml</comment></data>
+  <data name="Metadata.LoadLrcSyncedTxtTip" xml:space="preserve"><value>Load synced LRC, ELRC or TTML, or plain TXT</value><comment>ToolTip.Tip in MetadataWindow.axaml</comment></data>
   <data name="Metadata.SearchLyrics" xml:space="preserve"><value>Search lyrics</value><comment>Content in MetadataWindow.axaml</comment></data>
   <data name="Metadata.NoSyncedLyricsYet" xml:space="preserve"><value>No synced lyrics yet. Use “Search lyrics” to add them.</value><comment>Text in MetadataWindow.axaml</comment></data>
   <data name="Metadata.TimestampLyrics" xml:space="preserve"><value>Timestamp Lyrics</value><comment>Header in MetadataWindow.axaml</comment></data>
@@ -1725,7 +1723,7 @@ Saving replaces them with the lyrics on screen. A lyrics file Noctis didn't writ
   <data name="Playlist.AddSongs" xml:space="preserve"><value>Add Songs</value><comment>Header in PlaylistView.axaml</comment></data>
   <data name="Playlist.EditPlaylist" xml:space="preserve"><value>Edit Playlist</value><comment>Header in PlaylistView.axaml</comment></data>
   <data name="Playlist.DeletePlaylist" xml:space="preserve"><value>Delete Playlist</value><comment>Header in PlaylistView.axaml</comment></data>
-  <data name="Playlist.ChangeDisplayedOrderManualTip" xml:space="preserve"><value>Change the displayed order. Manual is your saved playlist order.</value><comment>ToolTip.Tip in PlaylistView.axaml</comment></data>
+  <data name="Playlist.ChangeDisplayedOrderManualTip" xml:space="preserve"><value>Change sorting; Manual restores your saved order</value><comment>ToolTip.Tip in PlaylistView.axaml</comment></data>
   <data name="Playlist.Text" xml:space="preserve"><value>&#xE70D;</value><comment>Text in PlaylistView.axaml</comment></data>
   <data name="Playlist.ManualPlaylistOrder" xml:space="preserve"><value>Manual (playlist order)</value><comment>Header in PlaylistView.axaml</comment></data>
   <data name="Playlist.Title" xml:space="preserve"><value>Title</value><comment>Header in PlaylistView.axaml</comment></data>
@@ -1806,11 +1804,11 @@ Saving replaces them with the lyrics on screen. A lyrics file Noctis didn't writ
   <data name="ReplayGainScanner.Queue" xml:space="preserve"><value>Queue</value><comment>Text in ReplayGainScannerDialog.axaml</comment></data>
   <data name="ReplayGainScanner.AddFiles" xml:space="preserve"><value>Add files…</value><comment>Button in ReplayGainScannerDialog.axaml</comment></data>
   <data name="ReplayGainScanner.Subtitle" xml:space="preserve"><value>Measure loudness and write ReplayGain tags.</value><comment>Header line under the title in ReplayGainScannerDialog.axaml</comment></data>
-  <data name="ReplayGainScanner.SubtitleTip" xml:space="preserve"><value>EBU R128 loudness, written as ReplayGain 2.0 tags (−18 LUFS reference)</value><comment>Tooltip on the header line in ReplayGainScannerDialog.axaml</comment></data>
+  <data name="ReplayGainScanner.SubtitleTip" xml:space="preserve"><value>EBU R128 loudness; ReplayGain 2.0 tags at -18 LUFS</value><comment>Tooltip on the header line in ReplayGainScannerDialog.axaml</comment></data>
   <data name="ReplayGainScanner.TitleOne" xml:space="preserve"><value>Scan ReplayGain · 1 track</value><comment>Title in ReplayGainScannerViewModel, one ticked track</comment></data>
   <data name="ReplayGainScanner.TitleMany" xml:space="preserve"><value>Scan ReplayGain · {0} tracks</value><comment>Title in ReplayGainScannerViewModel; {0} ticked tracks</comment></data>
   <data name="ReplayGainScanner.AlbumGain" xml:space="preserve"><value>Album gain — treat each album as a whole</value><comment>Option in ReplayGainScannerDialog.axaml</comment></data>
-  <data name="ReplayGainScanner.AlbumGainTip" xml:space="preserve"><value>Also writes an album gain, so songs keep their loudness relative to the rest of their album</value><comment>Tooltip of the album gain option in ReplayGainScannerDialog.axaml</comment></data>
+  <data name="ReplayGainScanner.AlbumGainTip" xml:space="preserve"><value>Keep relative loudness between songs on the same album</value><comment>Tooltip of the album gain option in ReplayGainScannerDialog.axaml</comment></data>
   <data name="ReplayGainScanner.Scan" xml:space="preserve"><value>Scan</value><comment>Primary button in ReplayGainScannerDialog</comment></data>
   <data name="ReplayGainScanner.Done" xml:space="preserve"><value>Done</value><comment>Primary button after a scan finished, ReplayGainScannerDialog</comment></data>
   <data name="ReplayGainScanner.Stop" xml:space="preserve"><value>Stop</value><comment>Cancel button while a scan runs, ReplayGainScannerDialog</comment></data>
@@ -1908,7 +1906,7 @@ Quote phrases: album:"ok computer" · Years: year:1990-1999, year:&gt;2000</valu
 
   <!-- StatisticsView.axaml (auto-migrated) -->
   <data name="Statistics.ListeningStatistics" xml:space="preserve"><value>Listening Statistics</value><comment>Text in StatisticsView.axaml</comment></data>
-  <data name="Statistics.ListeningRecapTopTracksTip" xml:space="preserve"><value>Your listening recap — top tracks, artists and minutes, with a shareable card</value><comment>ToolTip.Tip in StatisticsView.axaml</comment></data>
+  <data name="Statistics.ListeningRecapTopTracksTip" xml:space="preserve"><value>Share your top songs, artists and listening time</value><comment>ToolTip.Tip in StatisticsView.axaml</comment></data>
   <data name="Statistics.NoctisWrap" xml:space="preserve"><value>Noctis Wrap</value><comment>Text in StatisticsView.axaml</comment></data>
   <data name="Statistics.Overview" xml:space="preserve"><value>Overview</value><comment>Text in StatisticsView.axaml</comment></data>
   <data name="Statistics.PlayHistory" xml:space="preserve"><value>Play History</value><comment>Text in StatisticsView.axaml</comment></data>
@@ -2377,7 +2375,7 @@ Quote phrases: album:"ok computer" · Years: year:1990-1999, year:&gt;2000</valu
   <data name="LyricsStudioSettings.EmbedTags" xml:space="preserve"><value>Also write lyrics into the file's tags</value><comment>Toggle title</comment></data>
   <data name="LyricsStudioSettings.EmbedTagsHint" xml:space="preserve"><value>Also store the plain lyrics inside the audio file.</value><comment>Toggle help</comment></data>
   <data name="LyricsStudioSettings.SaveTtml" xml:space="preserve"><value>Also save as TTML</value><comment>Toggle title</comment></data>
-  <data name="LyricsStudioSettings.SaveTtmlHint" xml:space="preserve"><value>Also write a .ttml file next to the song, for players that read TTML but not ELRC word timings.</value><comment>Toggle help</comment></data>
+  <data name="LyricsStudioSettings.SaveTtmlHint" xml:space="preserve"><value>Also save TTML for compatible players</value><comment>Toggle help</comment></data>
   <data name="LyricsStudioSettings.RunSection" xml:space="preserve"><value>RUN</value><comment>Section title</comment></data>
   <data name="LyricsStudioSettings.OpenTitle" xml:space="preserve"><value>Songs missing the chosen format</value><comment>Run card title</comment></data>
   <data name="LyricsStudioSettings.OpenHelp" xml:space="preserve"><value>Up to 40 songs that lack the format above.</value><comment>Run card help</comment></data>
@@ -2395,11 +2393,11 @@ Quote phrases: album:"ok computer" · Years: year:1990-1999, year:&gt;2000</valu
   <data name="LyricsStudio.Language" xml:space="preserve"><value>Language</value><comment>Footer label</comment></data>
   <data name="LyricsStudio.WordTimings" xml:space="preserve"><value>Word timings</value><comment>Footer checkbox</comment></data>
   <data name="LyricsStudio.SkipAlreadyTimed" xml:space="preserve"><value>Skip songs already in this format</value><comment>Footer checkbox</comment></data>
-  <data name="LyricsStudio.SkipAlreadyTimedTip" xml:space="preserve"><value>Word timings (ELRC) and line timings (LRC) are different formats. Songs that only have line timings are still processed.</value><comment>Footer checkbox tooltip</comment></data>
+  <data name="LyricsStudio.SkipAlreadyTimedTip" xml:space="preserve"><value>Skip matching formats; line-only songs can gain word timing</value><comment>Footer checkbox tooltip</comment></data>
   <data name="LyricsStudio.TranscribeOnly" xml:space="preserve"><value>Transcribe instead of using lyrics · Experimental</value><comment>Footer checkbox</comment></data>
-  <data name="LyricsStudio.TranscribeOnlyTip" xml:space="preserve"><value>Lullaby listens to every song and writes the words itself, even when the song already has lyrics. Sung vocals often come out wrong: each transcript opens in the lyrics box for you to fix before it is aligned.</value><comment>Footer checkbox tooltip "Lullaby" is the model's name: keep it untranslated.</comment></data>
+  <data name="LyricsStudio.TranscribeOnlyTip" xml:space="preserve"><value>Transcribe every song; review the words before timing</value><comment>Footer checkbox tooltip "Lullaby" is the model's name: keep it untranslated.</comment></data>
   <data name="LyricsStudio.OnlineLyrics" xml:space="preserve"><value>Look up lyrics online when a song has none</value><comment>Footer checkbox</comment></data>
-  <data name="LyricsStudio.OnlineLyricsTip" xml:space="preserve"><value>Plain lyrics are fetched from LRCLIB first, so the model only has to time them. Off, or when nothing is found, the song waits for you to paste its lyrics.</value><comment>Footer checkbox tooltip</comment></data>
+  <data name="LyricsStudio.OnlineLyricsTip" xml:space="preserve"><value>Fetch words from LRCLIB; paste your own if none are found</value><comment>Footer checkbox tooltip</comment></data>
   <data name="LyricsStudio.DownloadModel" xml:space="preserve"><value>Download model</value><comment>Footer button</comment></data>
   <data name="LyricsStudio.Start" xml:space="preserve"><value>Start</value><comment>Footer button</comment></data>
   <data name="LyricsStudio.Stop" xml:space="preserve"><value>Stop</value><comment>Footer button</comment></data>
@@ -2407,13 +2405,13 @@ Quote phrases: album:"ok computer" · Years: year:1990-1999, year:&gt;2000</valu
   <data name="LyricsStudio.Backdrops" xml:space="preserve"><value>Lyrics page backdrops</value><comment>Header disclosure in LyricsStudioView.axaml</comment></data>
   <data name="LyricsStudio.Options" xml:space="preserve"><value>Options</value><comment>Footer dropdown holding the run options</comment></data>
   <data name="LyricsStudio.Loading" xml:space="preserve"><value>Loading</value><comment>Page scan in progress</comment></data>
-  <data name="LyricsStudio.BackdropsTip" xml:space="preserve"><value>The looping video behind the lyrics, and music videos in the cover slot</value><comment>Tooltip in LyricsStudioView.axaml</comment></data>
+  <data name="LyricsStudio.BackdropsTip" xml:space="preserve"><value>Lyrics backgrounds and cover-slot music videos</value><comment>Tooltip in LyricsStudioView.axaml</comment></data>
   <data name="LyricsStudio.ChooseSongs" xml:space="preserve"><value>Choose songs</value><comment>Header chip in LyricsStudioView.axaml: opens the song/album picker</comment></data>
-  <data name="LyricsStudio.ChooseSongsTip" xml:space="preserve"><value>Pick songs or whole albums for the Studio, and whether to write word or line timings</value><comment>Tooltip in LyricsStudioView.axaml</comment></data>
+  <data name="LyricsStudio.ChooseSongsTip" xml:space="preserve"><value>Choose songs, albums and timing format</value><comment>Tooltip in LyricsStudioView.axaml</comment></data>
   <data name="LyricsStudioPicker.Title" xml:space="preserve"><value>Choose songs &amp; albums</value><comment>Picker dialog title</comment></data>
   <data name="LyricsStudioPicker.Subtitle" xml:space="preserve"><value>What the Studio times next, and the format it writes.</value><comment>Picker dialog subtitle</comment></data>
   <data name="LyricsStudioPicker.Format" xml:space="preserve"><value>Format</value><comment>Picker: format card title</comment></data>
-  <data name="LyricsStudioPicker.FormatHint" xml:space="preserve"><value>Word timings move word by word (ELRC); line timings move line by line (LRC).</value><comment>Picker: format card hint</comment></data>
+  <data name="LyricsStudioPicker.FormatHint" xml:space="preserve"><value>ELRC: word timings. LRC: line timings.</value><comment>Picker: format card hint</comment></data>
   <data name="LyricsStudioPicker.WordTimings" xml:space="preserve"><value>Word timings · ELRC</value><comment>Picker: format chip</comment></data>
   <data name="LyricsStudioPicker.LineTimings" xml:space="preserve"><value>Line timings · LRC</value><comment>Picker: format chip</comment></data>
   <data name="LyricsStudioPicker.Search" xml:space="preserve"><value>Search songs and albums…</value><comment>Picker search box</comment></data>
@@ -2435,15 +2433,15 @@ Quote phrases: album:"ok computer" · Years: year:1990-1999, year:&gt;2000</valu
   <data name="LyricsStudio.ReviewEmptyTitle" xml:space="preserve"><value>Nothing to review yet</value><comment>Review pane empty state</comment></data>
   <data name="LyricsStudio.ReviewEmptyBody" xml:space="preserve"><value>Pick a song in the list. Songs with lyrics are timed when you press Start; songs without open a box to paste them.</value><comment>Review pane empty state</comment></data>
   <data name="LyricsStudio.Upgrade" xml:space="preserve"><value>Time every word</value><comment>Review button, shown for line-level lyrics</comment></data>
-  <data name="LyricsStudio.UpgradeTip" xml:space="preserve"><value>Times every word of these lines. The line-level file is kept.</value><comment>Review button tooltip</comment></data>
+  <data name="LyricsStudio.UpgradeTip" xml:space="preserve"><value>Add word timings; keep the line-timed file</value><comment>Review button tooltip</comment></data>
   <data name="LyricsStudio.ReviewHint" xml:space="preserve"><value>Click a time to hear that line. Edit text in place. Tinted lines need a second look.</value><comment>Review pane hint</comment></data>
   <data name="LyricsStudio.NudgeEarlier" xml:space="preserve"><value>All lines 0.1 s earlier · shortcut [</value><comment>Tooltip</comment></data>
   <data name="LyricsStudio.NudgeLater" xml:space="preserve"><value>All lines 0.1 s later · shortcut ]</value><comment>Tooltip</comment></data>
   <data name="LyricsStudio.Redo" xml:space="preserve"><value>Transcribe instead · Experimental</value><comment>Review "…" menu item</comment></data>
-  <data name="LyricsStudio.RedoTip" xml:space="preserve"><value>Ignore these lyrics and let Lullaby write down what is sung. Sung vocals often transcribe poorly; you fix the words before they are aligned.</value><comment>Tooltip "Lullaby" is the model's name: keep it untranslated.</comment></data>
+  <data name="LyricsStudio.RedoTip" xml:space="preserve"><value>Transcribe again; correct the words before timing</value><comment>Tooltip "Lullaby" is the model's name: keep it untranslated.</comment></data>
   <data name="LyricsStudio.Skip" xml:space="preserve"><value>Skip</value><comment>Review "…" menu item</comment></data>
   <data name="LyricsStudio.ClearLyrics" xml:space="preserve"><value>Clear lyrics</value><comment>Review "…" menu item: drop the lyrics on screen and paste your own</comment></data>
-  <data name="LyricsStudio.ClearLyricsTip" xml:space="preserve"><value>Wrong lyrics? Clear them and paste or type the right ones; Lullaby then times yours. Nothing changes on disk until you save.</value><comment>Tooltip "Lullaby" is the model's name: keep it untranslated.</comment></data>
+  <data name="LyricsStudio.ClearLyricsTip" xml:space="preserve"><value>Replace the words; changes stay unsaved until you save</value><comment>Tooltip "Lullaby" is the model's name: keep it untranslated.</comment></data>
   <data name="LyricsStudio.ClearLyricsConfirm" xml:space="preserve"><value>Clear the lyrics shown for “{0}”?
 
 The lines and their timings are dropped and an empty lyrics box opens for your own lyrics. Nothing changes on disk until you press Save lyrics.</value><comment>Confirm before Clear lyrics ({0} = song title)</comment></data>
@@ -2460,21 +2458,21 @@ The lines and their timings are dropped and an empty lyrics box opens for your o
   <data name="LyricsStudio.TranscriptBanner" xml:space="preserve"><value>Experimental transcript. Sung vocals often transcribe poorly, so fix the words below, then press Align lyrics to time them.</value><comment>Lyrics box banner after a transcription</comment></data>
   <data name="LyricsStudio.PasteWatermark" xml:space="preserve"><value>Paste the lyrics here, one line per sung line…</value><comment>Lyrics box watermark</comment></data>
   <data name="LyricsStudio.ImportFile" xml:space="preserve"><value>Import file…</value><comment>Lyrics box button</comment></data>
-  <data name="LyricsStudio.ImportFileTip" xml:space="preserve"><value>Load lyrics from a .txt, .lrc, .elrc or .ttml file (timestamps are dropped and re-timed)</value><comment>Tooltip</comment></data>
+  <data name="LyricsStudio.ImportFileTip" xml:space="preserve"><value>Load TXT, LRC, ELRC or TTML; replace existing timings</value><comment>Tooltip</comment></data>
   <data name="LyricsStudio.TranscribeDraft" xml:space="preserve"><value>Listen instead · Experimental</value><comment>Lyrics box button: transcribe the song into the box</comment></data>
-  <data name="LyricsStudio.TranscribeDraftTip" xml:space="preserve"><value>Lullaby writes down what it hears. Sung vocals often transcribe poorly: fix the words before aligning.</value><comment>Tooltip "Lullaby" is the model's name: keep it untranslated.</comment></data>
+  <data name="LyricsStudio.TranscribeDraftTip" xml:space="preserve"><value>Transcribe, then correct the words before timing</value><comment>Tooltip "Lullaby" is the model's name: keep it untranslated.</comment></data>
   <data name="LyricsStudio.Align" xml:space="preserve"><value>Align lyrics</value><comment>Lyrics box primary button</comment></data>
   <data name="LyricsStudio.Beta" xml:space="preserve"><value>Beta</value><comment>Pill next to the Lyrics Studio title (top bar and dialog header)</comment></data>
   <data name="LyricsStudio.Preview" xml:space="preserve"><value>Preview</value><comment>Review button: play the song on the lyrics page with the unsaved timings</comment></data>
-  <data name="LyricsStudio.PreviewTip" xml:space="preserve"><value>Play the song and watch these unsaved timings on the lyrics page, in the chosen format. Nothing is saved.</value><comment>Tooltip</comment></data>
-  <data name="LyricsStudio.AlignTip" xml:space="preserve"><value>Time these lyrics against the song in the chosen format, then review before saving</value><comment>Tooltip</comment></data>
+  <data name="LyricsStudio.PreviewTip" xml:space="preserve"><value>Preview unsaved timings on the lyrics page</value><comment>Tooltip</comment></data>
+  <data name="LyricsStudio.AlignTip" xml:space="preserve"><value>Time these words, then review before saving</value><comment>Tooltip</comment></data>
   <data name="LyricsStudio.Save" xml:space="preserve"><value>Save lyrics</value><comment>Review button</comment></data>
   <data name="LyricsStudio.Words" xml:space="preserve"><value>Words</value><comment>Per-line toggle that opens the word strip</comment></data>
   <data name="LyricsStudio.WordsTip" xml:space="preserve"><value>Show each word with its time. Click one to hear it.</value><comment>Word toggle tooltip</comment></data>
   <data name="LyricsStudio.WordEarlier" xml:space="preserve"><value>Selected word 50 ms earlier (its neighbours stay put)</value><comment>Word nudge tooltip</comment></data>
   <data name="LyricsStudio.WordLater" xml:space="preserve"><value>Selected word 50 ms later (its neighbours stay put)</value><comment>Word nudge tooltip</comment></data>
   <data name="LyricsStudio.TapWords" xml:space="preserve"><value>Tap words</value><comment>Starts tap-to-time for one line</comment></data>
-  <data name="LyricsStudio.TapTip" xml:space="preserve"><value>Plays the line. Press Space or Tap on each word; one more tap ends the line.</value><comment>Tap button tooltip</comment></data>
+  <data name="LyricsStudio.TapTip" xml:space="preserve"><value>Tap each word (Space); tap once more to end the line</value><comment>Tap button tooltip</comment></data>
   <data name="LyricsStudio.Tap" xml:space="preserve"><value>Tap</value><comment>Tap bar button</comment></data>
   <data name="LyricsStudio.TapCancel" xml:space="preserve"><value>Done</value><comment>Tap bar leave button</comment></data>
   <data name="LyricsStudio.PlayFromHere" xml:space="preserve"><value>Play from here</value><comment>Time pill tooltip</comment></data>
@@ -2505,7 +2503,7 @@ The lines and their timings are dropped and an empty lyrics box opens for your o
   <data name="LyricsStudio.ModelDamagedBody" xml:space="preserve"><value>It does not match the published model, so it will not be used. Download it again ({0}).</value><comment>Model card text. {0} = download size</comment></data>
   <data name="LyricsStudio.ModelDownloadAgain" xml:space="preserve"><value>Download again</value><comment>Model card button for a damaged file</comment></data>
   <data name="LyricsStudio.ModelCancel" xml:space="preserve"><value>Cancel</value><comment>Model card button while downloading</comment></data>
-  <data name="LyricsStudio.ModelCancelTip" xml:space="preserve"><value>Stop the download. What has arrived is kept, so you can resume later.</value><comment>Tooltip</comment></data>
+  <data name="LyricsStudio.ModelCancelTip" xml:space="preserve"><value>Stop downloading; keep progress for later</value><comment>Tooltip</comment></data>
   <data name="LyricsStudio.ModelLoadingTitle" xml:space="preserve"><value>Loading Lullaby</value><comment>Model card while the model loads at the start of a run "Lullaby" is the model's name: keep it untranslated.</comment></data>
   <data name="LyricsStudio.ModelLoadingBody" xml:space="preserve"><value>It loads once per run and takes a few seconds, longer the first time.</value><comment>Model card text while the model loads</comment></data>
   <data name="LyricsStudio.StepDecode" xml:space="preserve"><value>Decode audio</value><comment>Step row while a song runs: step 1</comment></data>
@@ -2657,7 +2655,7 @@ The lines and their timings are dropped and an empty lyrics box opens for your o
   <data name="Phone.LastSynced" xml:space="preserve"><value>Last synced {0}</value><comment>Under the sync switch; {0} = relative time</comment></data>
   <data name="Phone.NotSyncedYet" xml:space="preserve"><value>Not synced yet</value><comment>Under the sync switch when no phone has synced</comment></data>
   <data name="Phone.SyncFailed" xml:space="preserve"><value>Couldn't read the sync data: {0}</value><comment>Under the sync switch; {0} = error message</comment></data>
-  <data name="Phone.SignOutTip" xml:space="preserve"><value>Sign this phone out. It needs your password to connect again.</value><comment>Tooltip on a phone's Sign out button</comment></data>
+  <data name="Phone.SignOutTip" xml:space="preserve"><value>Sign out; reconnecting requires your password</value><comment>Tooltip on a phone's Sign out button</comment></data>
   <data name="Phone.OtherAppsTitle" xml:space="preserve"><value>Other music apps</value><comment>Phone app card row title (Subsonic apps)</comment></data>
   <data name="Phone.OtherAppsDesc" xml:space="preserve"><value>Subsonic apps like Symfonium can sign in with your email and an API key.</value><comment>Phone app card row text</comment></data>
   <data name="Phone.NewApiKeyTip" xml:space="preserve"><value>Makes a new key. Apps using the old one need the new one.</value><comment>Tooltip on New API key</comment></data>
@@ -2709,4 +2707,9 @@ The lines and their timings are dropped and an empty lyrics box opens for your o
   <data name="Shortcuts.Action.GoSongs" xml:space="preserve"><value>Go to Songs</value><comment>Settings › Shortcuts (GitHub #131)</comment></data>
   <data name="Shortcuts.Action.GoAlbums" xml:space="preserve"><value>Go to Albums</value><comment>Settings › Shortcuts (GitHub #131)</comment></data>
   <data name="Shortcuts.Action.GoArtists" xml:space="preserve"><value>Go to Artists</value><comment>Settings › Shortcuts (GitHub #131)</comment></data>
+  <data name="Lyrics.WordTiming" xml:space="preserve"><value>Word timing</value></data>
+  <data name="Queue.ForYou" xml:space="preserve"><value>For you</value></data>
+  <data name="Queue.ForYouTip" xml:space="preserve"><value>Mix from your listening history</value></data>
+  <data name="Lyrics.TimeWords" xml:space="preserve"><value>Time words</value></data>
+  <data name="Lyrics.TimeWordsLocalOnly" xml:space="preserve"><value>Finish saving this song locally first</value></data>
 </root>

@@ -11,13 +11,14 @@ public partial class PlayerViewModel
 {
     internal TrueShuffleService? NativeShuffle { get; set; }
 
-    [ObservableProperty, NotifyPropertyChangedFor(nameof(IsShuffleLit))]
+    [ObservableProperty, NotifyPropertyChangedFor(nameof(IsShuffleLit)), NotifyPropertyChangedFor(nameof(IsForYouShuffle))]
     private PlayerShuffleMode _shuffleMode;
     [ObservableProperty] private bool _isShuffleBusy;
     [ObservableProperty] private string _shuffleStatus = "";
     [ObservableProperty] private bool _trueShuffleAvailable;
 
     public bool IsShuffleLit => ShuffleMode != PlayerShuffleMode.Off || IsShuffleEnabled;
+    public bool IsForYouShuffle => ShuffleMode == PlayerShuffleMode.ForYou;
     internal event Func<bool>? ShuffleMenuRequested;
     internal bool RequestShuffleModes()
     {

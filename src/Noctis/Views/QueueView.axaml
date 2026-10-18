@@ -117,6 +117,23 @@
                                FontSize="18"
                                FontWeight="SemiBold"
                                VerticalAlignment="Center" />
+                    <Button x:Name="ForYouShuffleButton" Classes="pill" Padding="10,5"
+                            IsVisible="{Binding Player.TrueShuffleAvailable}"
+                            Command="{Binding Player.SelectShuffleModeCommand}"
+                            CommandParameter="{x:Static vm:PlayerShuffleMode.ForYou}"
+                            ToolTip.Tip="{loc:T Queue.ForYouTip}"
+                            AutomationProperties.Name="{loc:T Queue.ForYou}">
+                        <Button.Flyout><controls:ShuffleMenu Player="{Binding #ForYouShuffleButton.((vm:QueueViewModel)DataContext).Player}" /></Button.Flyout>
+                        <StackPanel Orientation="Horizontal" Spacing="5">
+                            <Panel Width="14" Height="14">
+                                <PathIcon Data="{DynamicResource RailSparkleIcon}" Width="14" Height="14"
+                                          IsVisible="{Binding !Player.IsForYouShuffle}"/>
+                                <PathIcon Data="{DynamicResource RailSparkleIcon}" Width="14" Height="14"
+                                          Foreground="{DynamicResource AccentColorBrush}" IsVisible="{Binding Player.IsForYouShuffle}"/>
+                            </Panel>
+                            <TextBlock Text="{loc:T Queue.ForYou}" FontSize="12" VerticalAlignment="Center"/>
+                        </StackPanel>
+                    </Button>
                     <!-- Shuffle/Repeat active state, Apple-Music style: accent-tinted
                          glyph over a soft rounded accent wash. The wash Border reuses
                          AccentColorBrush (kept in sync with Settings by App.SetAccent)

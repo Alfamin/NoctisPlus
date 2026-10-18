@@ -39,8 +39,9 @@ public sealed partial class WordLyricsViewModel : ObservableObject, IDisposable
     public bool IsCustom => IsSong && ActionIndex == 3;
     [ObservableProperty] private string _words = "";
     [ObservableProperty] private string _geniusPage = "";
-    [ObservableProperty] private string _message = "Ready";
-    [ObservableProperty] private string _detail = "";
+    [ObservableProperty, NotifyPropertyChangedFor(nameof(DetailLine))] private string _message = "Ready";
+    [ObservableProperty, NotifyPropertyChangedFor(nameof(DetailLine))] private string _detail = "";
+    public string DetailLine => Message == "Setup is needed" ? "Install WordLyrics to continue" : Detail.Split('\n')[0].Trim();
     [ObservableProperty] private string _counts = "";
     [ObservableProperty] private double _progress;
     [ObservableProperty] private bool _indeterminate = true;

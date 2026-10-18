@@ -857,7 +857,12 @@ public partial class MainWindow : Window, IPageKeyOverlayHost
         var host = this.FindControl<ContentControl>("SettingsViewHost");
         if (host is null || host.Content is not null) return;
 
-        host.Content = new SettingsView { Background = Avalonia.Media.Brushes.Transparent };
+        var watch = System.Diagnostics.Stopwatch.StartNew();
+        var view = new SettingsView { Background = Avalonia.Media.Brushes.Transparent };
+        var createMs = watch.Elapsed.TotalMilliseconds;
+        host.Content = view;
+        if (Services.DebugLogger.IsEnabled)
+            Services.DebugLog.Write("Settings.Perf", $"create={createMs:F1} ms, attach={watch.Elapsed.TotalMilliseconds - createMs:F1} ms");
     }
 
     private void WireWindowLevelHandlers()

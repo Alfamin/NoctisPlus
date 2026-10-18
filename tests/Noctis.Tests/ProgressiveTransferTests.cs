@@ -44,10 +44,13 @@ public class ProgressiveTransferTests
         rig.Writer.Write(Audio());
         Assert.Equal(rig.Target, await Ready(rig.Transfer)); Assert.False(File.Exists(rig.Target));
         using var lease = ProgressiveTransfer.Acquire(rig.Target)!;
+        Assert.True(ProgressiveTransfer.IsDownloading(rig.Target));
         Assert.NotNull(lease); using var reader = lease.Buffer.OpenReader();
         Assert.Equal(512 * 1024, reader.Read(new byte[1024 * 1024]));
         rig.Writer.Write(new byte[512 * 1024]); File.Move(rig.Part, rig.Target);
         rig.Transfer.End(rig.Target);
+        Assert.True(ProgressiveTransfer.IsAvailable(rig.Target)); // reader still held
+        Assert.False(ProgressiveTransfer.IsDownloading(rig.Target));
         Assert.True(lease.Buffer.Complete);
         // This is TagLib's ordinary read/share-read pattern, which must work while
         // VLC still owns its lease. Holding the original write handle fails here.
