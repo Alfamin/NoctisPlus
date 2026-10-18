@@ -214,8 +214,22 @@ internal sealed class TelegramAccount : ITelegramSignIn, IDisposable
 
     public void Dispose()
     {
-        _client?.Dispose();
-        _client = null;
+        Interlocked.Exchange(ref _client, null)?.Dispose();
+    }
+
+    /// <summary>Abort stalled transport/RPCs, keeping the saved login for the next connection.</summary>
+    internal async Task RetireConnectionAsync(Client expected)
+    {
+        await _gate.WaitAsync().ConfigureAwait(false);
+        try
+        {
+            if (!ReferenceEquals(_client, expected)) return;
+            var retired = Interlocked.Exchange(ref _client, null);
+            if (retired is null) return;
+            await retired.DisposeAsync().ConfigureAwait(false);
+            _log?.Invoke("Telegram connection reset after an interrupted transfer; saved login retained.");
+        }
+        finally { _gate.Release(); }
     }
 
     private void Forget()
@@ -434,12 +448,7 @@ internal sealed class TelegramBotSource : IHunterBotSource
     {
             var document=await RequestSelectedDocumentAsync(request,ct).ConfigureAwait(false);
             var client=await _account.ConnectAsync(ct).ConfigureAwait(false);
-            var lastReport = 0.0;
-            await client.DownloadFileAsync(document, output, (PhotoSizeBase?)null, (done, total) =>
-            {
-                ct.ThrowIfCancellationRequested();
-                if (total > 0 && (double)done / total - lastReport >= 0.02) progress?.Report(lastReport = (double)done / total);
-            }).ConfigureAwait(false);
+            await AudioFileTransfer.DownloadAsync(_account, client, document, output, progress, ct).ConfigureAwait(false);
             return Extension(document)!;
     }
     private string Usual(string kind) => _timings.Usual(kind) is { } usual ? $"{usual.TotalSeconds:0.#} seconds" : "an unknown time";

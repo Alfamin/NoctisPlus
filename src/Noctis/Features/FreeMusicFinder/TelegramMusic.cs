@@ -41,7 +41,7 @@ internal sealed class HunterMusicSource : IMusicSource, IQualityMusicSource
         var cachedPeer=await account.BotAsync(cachedClient,TelegramBotSource.Bot).ConfigureAwait(false);
         if(await TelegramAudioCache.Find(cachedClient,cachedPeer,request,ct).ConfigureAwait(false) is {} existing)
         {
-            await cachedClient.DownloadFileAsync(existing,output,(PhotoSizeBase?)null,TransferProgress.Steps(progress,ct)).WaitAsync(ct).ConfigureAwait(false);
+            await AudioFileTransfer.DownloadAsync(account,cachedClient,existing,output,progress,ct).ConfigureAwait(false);
             return TelegramBotSource.Extension(existing)!;
         }
         if (request.MessageId is {} id && request.CachedFrom == Id)
@@ -51,7 +51,7 @@ internal sealed class HunterMusicSource : IMusicSource, IQualityMusicSource
             var old=await client.Messages_GetHistory(bot,offset_id:id+1,limit:1).WaitAsync(TimeSpan.FromSeconds(25), ct).ConfigureAwait(false);
             if(old.Messages.OfType<Message>().FirstOrDefault(m=>m.id==id)?.media is MessageMediaDocument{document:Document doc} && DeezLoadSource.Fits(request,doc) && TelegramAudioCache.AcceptsQuality(request, doc))
             {
-                await client.DownloadFileAsync(doc,output,(PhotoSizeBase?)null,TransferProgress.Steps(progress,ct)).WaitAsync(ct).ConfigureAwait(false);
+                await AudioFileTransfer.DownloadAsync(account,client,doc,output,progress,ct).ConfigureAwait(false);
                 return TelegramBotSource.Extension(doc)!;
             }
         }
@@ -239,10 +239,10 @@ internal sealed class DeezLoadSource : IMusicSource, IQualityMusicSource
         var sent=Request(doc,null);
         return sent is not null && RecordingMatch.Fits(wanted,sent.Artist,sent.Title,sent.Duration);
     }
-    private static async Task<string> Download(Client client,Document doc,Stream output,IProgress<double>? progress,CancellationToken ct)
+    private async Task<string> Download(Client client,Document doc,Stream output,IProgress<double>? progress,CancellationToken ct)
     {
         var ext = TransferExtension(doc);
-        await client.DownloadFileAsync(doc,output,(PhotoSizeBase?)null,TransferProgress.Steps(progress,ct)).WaitAsync(ct).ConfigureAwait(false);
+        await AudioFileTransfer.DownloadAsync(_account,client,doc,output,progress,ct).ConfigureAwait(false);
         return ext;
     }
     internal static string TransferExtension(Document doc)

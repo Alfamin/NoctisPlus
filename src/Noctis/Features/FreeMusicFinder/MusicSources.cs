@@ -177,6 +177,11 @@ internal sealed class MusicSources
                     }
                     return ext;
                 }
+                catch (AudioTransferStalledException ex)
+                {
+                    Block(new(source.Id, source.Id + ": " + ex.Message, _now().AddMinutes(2)));
+                    errors.Add(ex.Message); skipped = true;
+                }
                 catch (SourceLimitException ex) { Block(ex); if (ex.Global) throw Waiting(); errors.Add(ex.Message); skipped = true; }
                 catch (TL.RpcException ex) when (BotLimits.Read(source.Id,ex.Message,_now()) is not null)
                 {var limit=BotLimits.Read(source.Id,ex.Message,_now())!;Block(limit);if(limit.Global)throw Waiting();errors.Add(limit.Message);skipped=true;}
