@@ -127,6 +127,46 @@ public class AppleFlowShotsTests
                 var em = btn.GetVisualDescendants().OfType<Noctis.Controls.KaraokeWordText>().FirstOrDefault()?.FontSize;
                 _o.WriteLine($"{name} @ {seconds:F2}s: line {vm.ActiveLineIndex} rect {rect} em {em}");
             }
+
+            // Dense sequences for curve measurement: NOCTIS_APPLEFLOW_SEQ="name:from:to:stepMs;..."
+            // renders the line active at `to` every step (paced near real time) into dir/name/.
+            var seqs = Environment.GetEnvironmentVariable("NOCTIS_APPLEFLOW_SEQ");
+            if (!string.IsNullOrEmpty(seqs))
+            {
+                foreach (var spec in seqs.Split(';', StringSplitOptions.RemoveEmptyEntries))
+                {
+                    var f = spec.Split(':');
+                    var (sname, from, to, step) = (f[0], double.Parse(f[1], System.Globalization.CultureInfo.InvariantCulture),
+                        double.Parse(f[2], System.Globalization.CultureInfo.InvariantCulture),
+                        double.Parse(f[3], System.Globalization.CultureInfo.InvariantCulture) / 1000);
+                    for (var s = from - 3; s < to; s += 1 / 30.0) At(s);
+                    PumpFor(900);
+                    var btn = view.GetVisualDescendants().OfType<Button>()
+                        .First(b => b.Classes.Contains("lyric-line-btn") && b.Classes.Contains("active"));
+                    var origin = btn.TranslatePoint(new Point(0, 0), win)!.Value;
+                    var x = Math.Max(0, (int)origin.X - 20);
+                    var y = Math.Max(0, (int)origin.Y - 30);
+                    var rect = new PixelRect(x, y,
+                        (int)Math.Min(btn.Bounds.Width + 60, 1280 - x),
+                        (int)Math.Min(btn.Bounds.Height + 60, 800 - y));
+                    // Rewind and walk in to `from` so the line arrives as it does in play.
+                    At(0); PumpFor(30);
+                    for (var s = from - 3; s < from; s += 1 / 30.0) At(s);
+                    PumpFor(900);
+                    var outDir = Path.Combine(dir, sname);
+                    Directory.CreateDirectory(outDir);
+                    int n = 0;
+                    for (var s = from; s <= to + 1e-9; s += step)
+                    {
+                        At(s);
+                        PumpFor((int)Math.Round(step * 1000));
+                        using var bmp = win.CaptureRenderedFrame()!;
+                        CropSave(bmp, rect, Path.Combine(outDir, $"f_{n++:D4}.png"));
+                    }
+                    var em = btn.GetVisualDescendants().OfType<Noctis.Controls.KaraokeWordText>().FirstOrDefault()?.FontSize;
+                    _o.WriteLine($"seq {sname} {from}-{to} step {step * 1000}ms: {n} frames rect {rect} em {em}");
+                }
+            }
         }
         finally
         {

@@ -46,24 +46,50 @@ public class WordFloatTests
         }
     }
 
-    /// <summary>Measured on the Apple capture for short words ("had", "to"): ~53-60% up after
-    /// 0.4 s, ~87-88% after 0.8 s, settled by ~1.2 s.</summary>
-    [Fact]
-    public void Rise_MatchesTheMeasuredAppleCurve_ForAShortWord()
+    /// <summary>Dense 60 fps tracking of the Apple capture ("Where", "and", "had", averaged):
+    /// ~8% up after 0.1 s, ~19% after 0.2 s, ~48% after 0.4 s, ~84% after 0.8 s, settled by
+    /// ~1.2 s. The old CSS ease-out was already 16% up at 0.1 s and 31% at 0.2 s.</summary>
+    [Theory]
+    [InlineData(100, 0.075)]
+    [InlineData(200, 0.19)]
+    [InlineData(400, 0.48)]
+    [InlineData(600, 0.72)]
+    [InlineData(800, 0.835)]
+    public void Rise_MatchesTheMeasuredAppleCurve_ForAShortWord(double ms, double apple)
     {
         const double word = 240; // "had": 17.17 → 17.41
-        Assert.Equal(0, WordFloat.Rise(0, word));
-        Assert.InRange(WordFloat.Rise(400, word), 0.50, 0.62);
-        Assert.InRange(WordFloat.Rise(800, word), 0.85, 0.96);
-        Assert.Equal(1, WordFloat.Rise(1200, word));
+        Assert.InRange(WordFloat.Rise(ms, word), apple - 0.06, apple + 0.06);
     }
+
+    [Fact]
+    public void Rise_EasesIn_AndSettles()
+    {
+        Assert.Equal(0, WordFloat.Rise(0, 240));
+        // Soft start: the first frame moves far less than a linear ramp would.
+        Assert.True(WordFloat.Rise(16, 240) < 16 / WordFloat.MinDurationMs);
+        Assert.Equal(1, WordFloat.Rise(WordFloat.MinDurationMs, 240));
+        double prev = 0;
+        for (int ms = 1; ms <= 1250; ms++)
+        {
+            var v = WordFloat.Rise(ms, 240);
+            Assert.True(v >= prev - 1e-9, $"dips at {ms} ms");
+            prev = v;
+        }
+    }
+
+    [Theory]
+    [InlineData(0.5, 0.5)]   // symmetric control points: the midpoint maps to itself
+    [InlineData(0.0, 0.0)]
+    [InlineData(1.0, 1.0)]
+    public void CubicBezier_HitsItsEndpointsAndSymmetry(double x, double y)
+        => Assert.Equal(y, WordFloat.CubicBezier(x, 0.42, 0, 0.58, 1), precision: 4);
 
     [Fact]
     public void Rise_TakesTheWordsLength_WhenLongerThanTheFloor()
     {
         // A 2 s held word rises over its whole hold, not in the first second.
         Assert.True(WordFloat.Rise(1000, 2000) < 0.9);
-        Assert.Equal(WordFloat.Rise(500, 1000), WordFloat.Rise(1000, 2000), precision: 9);
+        Assert.Equal(WordFloat.Rise(1000, 1250), WordFloat.Rise(1600, 2000), precision: 9);
         Assert.Equal(1, WordFloat.Rise(2000, 2000));
     }
 
