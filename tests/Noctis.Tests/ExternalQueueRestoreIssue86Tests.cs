@@ -126,6 +126,36 @@ public class ExternalQueueRestoreIssue86Tests : IDisposable
     }
 
     [AvaloniaFact]
+    public async Task Restore_FindsTheCurrentLibrarySongByItsFile_WhenTheLibraryLostItsId()
+    {
+        // Owner #35: paused for minutes, then "it went back on its own". The song had joined the library while
+        // playing (played while downloading); the app restarted before library.json held it, the saved Id was
+        // unknown, and the restore loaded the next queued song from 0:00 instead.
+        var persistence = new PersistenceService(Path.Combine(_root, "data"));
+        var song = new Track { Id = Guid.NewGuid(), Title = "Joke", FilePath = AudioFile("joke"), Duration = TimeSpan.FromMinutes(3) };
+        var next = new Track { Id = Guid.NewGuid(), Title = "Earlier", FilePath = AudioFile("earlier"), Duration = TimeSpan.FromMinutes(3) };
+        var before = new FakeLibraryService(); before.TrackList.AddRange([song, next]);
+        var player = new PlayerViewModel(new FakeAudioPlayer(), before, persistence, new FakeAnimatedCoverService());
+        player.ReplaceQueueAndPlay(new List<Track> { song, next }, 0);
+        player.Position = TimeSpan.FromSeconds(42);
+        await player.SaveQueueStateAsync();
+
+        var lost = new FakeLibraryService(); lost.TrackList.Add(next); // library.json without the new song
+        var after = new PlayerViewModel(new FakeAudioPlayer(), lost, persistence, new FakeAnimatedCoverService(), new StubMetadata());
+        await after.RestoreQueueStateAsync();
+        Assert.Equal("joke", after.CurrentTrack?.Title);           // the song itself, from its file
+        Assert.Equal(TimeSpan.FromSeconds(42), after.Position);   // where it was paused
+        Assert.Equal(next.Id, Assert.Single(after.UpNext).Id);
+
+        var rescanned = new FakeLibraryService();
+        var copy = new Track { Id = Guid.NewGuid(), Title = "Joke (library)", FilePath = song.FilePath, Duration = TimeSpan.FromMinutes(3) };
+        rescanned.TrackList.AddRange([copy, next]);
+        var third = new PlayerViewModel(new FakeAudioPlayer(), rescanned, persistence, new FakeAnimatedCoverService(), new StubMetadata());
+        await third.RestoreQueueStateAsync();
+        Assert.Same(copy, third.CurrentTrack);                     // a new library Id for the same file is used
+    }
+
+    [AvaloniaFact]
     public async Task HomeLastPlayed_ResolvesTheRestoredExternalTracks()
     {
         var persistence = new PersistenceService(Path.Combine(_root, "data"));

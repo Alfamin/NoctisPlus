@@ -2061,12 +2061,16 @@ public partial class PlayerViewModel : ViewModelBase
     private Dictionary<Guid, string>? BuildExternalTrackPaths()
     {
         Dictionary<Guid, string>? map = null;
-        void Add(Track? t)
+        void Add(Track? t, bool library = false)
         {
-            if (t is not { IsExternal: true } || string.IsNullOrEmpty(t.FilePath)) return;
+            if (t is null || string.IsNullOrEmpty(t.FilePath) || !(t.IsExternal || library && !t.IsRemoteStream)) return;
             (map ??= new Dictionary<Guid, string>())[t.Id] = t.FilePath;
         }
-        Add(CurrentTrack);
+        // Owner #35: the current song too, even a library one. A song played while downloading joins the
+        // library during playback; if the app ends before library.json is saved, its Id is unknown on the
+        // next start and the restore fell back to the next queued song at 0:00 ("it went back"). Its file
+        // finds it again (by path in the library, else re-read), at its saved position.
+        Add(CurrentTrack, library: true);
         foreach (var t in UpNext) Add(t);
         foreach (var t in History) Add(t);
         foreach (var t in _repeatCycleTracks) Add(t);
