@@ -134,18 +134,17 @@ Want to build it yourself? See **[QUICKSTART](docs/fork/QUICKSTART.md)**.
 
 ## 🛠 Where it's heading
 
-Plus started out with these features as add-on plugins. They're now being rebuilt **natively inside the app** on the [`native`](https://github.com/Alfamin/NoctisPlus/tree/native) branch, so they look, feel and perform like they were always part of Noctis.
+Plus started out with these features as add-on plugins. Since **2.0** they are all built **natively into the app**, so they look, feel and perform like they were always part of Noctis.
 
-| Feature | Native rebuild |
+| Feature | Native |
 |---|:---:|
-| Search, artist and album pages | ✅ Done |
-| For you | ✅ Done |
-| Free Music Finder (catalog and downloads) | ✅ Done |
-| Downloads list (play, open, remove finished songs) | 🔨 In progress |
-| Lyric Motion | 🔨 In progress |
-| Lyrics "Sync now" button | 📋 Planned |
-| True Shuffle | 📋 Planned |
-| WordLyrics | 📋 Planned |
+| Search, artist, album and playlist pages | ✅ 2.0 |
+| For you | ✅ 2.0 |
+| Free Music Finder (catalog, downloads, play while downloading) | ✅ 2.0 |
+| Downloads list | ✅ 2.0 |
+| Lyric Motion and the lyrics Sync button | ✅ 2.0 |
+| True Shuffle | ✅ 2.0 |
+| WordLyrics | ✅ 2.0 |
 
 <br/>
 
