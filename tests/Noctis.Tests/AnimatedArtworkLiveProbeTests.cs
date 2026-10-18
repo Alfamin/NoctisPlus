@@ -28,6 +28,10 @@ public class AnimatedArtworkLiveProbeTests
     [InlineData("https://music.apple.com/us/album/1000000-ep/1628626875")]
     [InlineData("HIT ME HARD AND SOFT Billie Eilish")]
     [InlineData("Die With A Smile Lady Gaga")]
+    [InlineData("Short n' Sweet")]
+    [InlineData("Short n' Sweet Sabrina Carpenter")]
+    [InlineData("https://music.apple.com/gb/album/short-n-sweet-deluxe/1795512297")]
+    [InlineData("https://music.apple.com/us/playlist/todays-hits/pl.f4d106fed2bd41149aaacabb233eb5eb")]
     public async Task TypedQuery(string typed)
     {
         if (Environment.GetEnvironmentVariable("NOCTIS_LIVE_ANIMATED") != "1")
@@ -47,7 +51,9 @@ public class AnimatedArtworkLiveProbeTests
         _out.WriteLine($"'{typed}' -> {vm.AnimatedArtworkSearchResults.Count} result(s) in {sw.ElapsedMilliseconds} ms, " +
                        $"status '{vm.AnimatedSearchStatus}'");
         foreach (var r in vm.AnimatedArtworkSearchResults)
-            _out.WriteLine($"   {r.Variant.Label} {r.Variant.Width}x{r.Variant.Height} {r.Variant.Codec}");
+            _out.WriteLine($"   [{r.Score:0.#}] \"{r.CollectionName}\" by {r.ArtistName} ({r.Detail}) " +
+                           string.Join(", ", r.Choices.Select(c => $"{c.Label} {c.Variant.Width}x{c.Variant.Height} {c.Variant.Codec}")) +
+                           (r.Album.HasTall ? " +tall" : string.Empty));
         foreach (var line in DebugLog.Snapshot().Split('\n')
                      .Where(l => l.Contains("[AnimatedArt]") && !before.Contains(l)))
             _out.WriteLine("   log: " + line);

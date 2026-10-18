@@ -1313,7 +1313,7 @@
     <comment>Settings ▸ Integrations ▸ Discord, SettingsView.axaml</comment>
   </data>
   <data name="Settings.DiscordStatusDisplayHint" xml:space="preserve">
-    <value>멤버 목록과 프로필의 상태에 Discord가 표시할 내용입니다.</value>
+    <value>멤버 목록의 상태에 Discord가 표시할 내용입니다.</value>
     <comment>Settings ▸ Integrations ▸ Discord, SettingsView.axaml</comment>
   </data>
   <data name="Settings.DiscordStatusDisplay.Artist" xml:space="preserve">

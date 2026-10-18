@@ -1313,7 +1313,7 @@
     <comment>Settings ▸ Integrations ▸ Discord, SettingsView.axaml</comment>
   </data>
   <data name="Settings.DiscordStatusDisplayHint" xml:space="preserve">
-    <value>ما يعرضه Discord بعد "يستمع إلى" في قائمة الأعضاء وفي ملفك الشخصي.</value>
+    <value>ما يعرضه Discord بعد "يستمع إلى" في قائمة الأعضاء.</value>
     <comment>Settings ▸ Integrations ▸ Discord, SettingsView.axaml</comment>
   </data>
   <data name="Settings.DiscordStatusDisplay.Artist" xml:space="preserve">

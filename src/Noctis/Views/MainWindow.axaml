@@ -1619,10 +1619,13 @@
     <!-- Owner 10-08 "make the background blur just like the metadata pop up": the scrim
          holds a blurred snapshot of AppContentLayer (taken once per open, freed on close)
          under the dim, the PillDialogHost look. Dim alone until the snapshot lands, or where
-         the backend can't take one. -->
+         the backend can't take one. Owner 10-18: that frozen copy stood still and jumped
+         forward on every retake while the lyrics moved under it, so LiveBlur blurs
+         AppContentLayer itself instead (the snapshot stays the Liquid Glass fallback). -->
     <controls:BlurredBackdrop Name="SettingsScrim"
             IsVisible="False"
             Opacity="0"
+            LiveBlur="True"
             Dim="#A6000000"
             ZIndex="99">
         <controls:BlurredBackdrop.Transitions>

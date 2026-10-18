@@ -322,6 +322,7 @@ public partial class MetadataViewModel
     public void DisposeSearch()
     {
         _searchPanel?.Dispose();
+        DisposeAnimatedSearch();
         DiscardSearchUndo();
         // Closed before the cover load replaced the library's thumbnail: hand it back, or the
         // cache could never dispose it after an eviction (this is the window's Closed hook).
