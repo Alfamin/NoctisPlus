@@ -21,6 +21,18 @@ public class ProgressivePlaybackClockTests
     }
 
     [Fact]
+    public void DrainedDownloadSegment_NeverFallsBackToVlcsLaggingClock()
+    {
+        // Real app, generated 24 s MP3 with a 45 s underrun: once the ring drained at the end the
+        // timer read VLC's clock (21 976 ms) and the bar jumped back from 23.9 s before the end grace.
+        var segment = new GaplessTrackSegment(8000, 1, 0, basePositionMs: 23_000);
+        Assert.Equal(23_000, VlcAudioPlayer.EngineTickTimeMs(segment, 0, progressiveInput: true, vlcTimeMs: 21_976));
+        Assert.Equal(0, VlcAudioPlayer.EngineTickTimeMs(segment, 1, progressiveInput: true, vlcTimeMs: 21_976)); // another player's tail
+        Assert.Null(VlcAudioPlayer.EngineTickTimeMs(null, 0, progressiveInput: true, vlcTimeMs: 21_976));
+        Assert.Equal(21_976, VlcAudioPlayer.EngineTickTimeMs(null, 0, progressiveInput: false, vlcTimeMs: 21_976)); // local files unchanged
+    }
+
+    [Fact]
     public void OrdinaryLocalSeekStillFlushesTheRingAndUsesItsRequestedPosition()
     {
         var segment = new GaplessTrackSegment(8000, 1, null);

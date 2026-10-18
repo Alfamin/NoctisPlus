@@ -4466,6 +4466,20 @@ public class VlcAudioPlayer : IAudioPlayer
         catch { /* libvlc thread */ }
     }
 
+    /// <summary>
+    /// The position-timer reading on the engine: the sink's consumed frames for this player's
+    /// segment, 0 while another player's tail still renders, and VLC's clock once no segment is
+    /// active. A download-backed input gets no reading then (null): after an underrun VLC's clock
+    /// for it runs seconds behind the audio actually played (real app: 21.98 s at the end of a
+    /// 24 s MP3), and that one tick snapped the shown position back before the end grace took over.
+    /// </summary>
+    internal static long? EngineTickTimeMs(GaplessTrackSegment? active, int playerSlot, bool progressiveInput, long vlcTimeMs)
+    {
+        if (active != null)
+            return active.Source is int slot && slot == playerSlot ? active.PositionMs : 0;
+        return progressiveInput ? null : vlcTimeMs;
+    }
+
     internal static void FlushEngineInput(GaplessTrackSegment segment, long seekBaseMs, bool nonseekableDownload, int discardFrames = 0)
     {
         // A growing input cannot seek. VLC's clock resync after a network underrun
@@ -5476,10 +5490,13 @@ public class VlcAudioPlayer : IAudioPlayer
             // (segment belongs to the swapped-out player), the incoming track
             // hasn't audibly started — report 0 for it.
             long time;
-            if (_gaplessEngine && _gaplessSink?.Provider.ActiveSegment is { } audibleSeg)
-                time = audibleSeg.Source is int audibleSlot && audibleSlot == EngineSlotOf(_player)
-                    ? audibleSeg.PositionMs
-                    : 0;
+            if (_gaplessEngine)
+            {
+                if (EngineTickTimeMs(_gaplessSink?.Provider.ActiveSegment, EngineSlotOf(_player),
+                        _currentMedia is ProgressiveMedia, _player.Time) is not { } engineTime)
+                    return;
+                time = engineTime;
+            }
             else
                 time = _player.Time;
             if (time >= 0)

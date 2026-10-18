@@ -34,6 +34,17 @@ internal static class ProgressivePlaybackPreview
             catch (IOException) { }
         });
         timer.Start();
+        // Every position change, not just the samples: a single backward tick is what the eye catches.
+        var lastPosition = TimeSpan.Zero;
+        main.Player.PropertyChanged += (_, e) =>
+        {
+            if (e.PropertyName != nameof(PlayerViewModel.Position)) return;
+            var now = main.Player.Position;
+            if (now < lastPosition - TimeSpan.FromMilliseconds(250))
+                try { File.AppendAllText(trace, FormattableString.Invariant($"{DateTime.UtcNow:O},BACKWARD,{lastPosition.TotalSeconds:0.000}->{now.TotalSeconds:0.000},{main.Player.Duration.TotalSeconds:0.000},{main.Player.IsBuffering},{main.Player.CanSeekCurrent},{main.Player.CurrentTrack?.IsExternal},{main.Library.Tracks.Count},{source.TransferState}\n")); }
+                catch (IOException) { }
+            lastPosition = now;
+        };
         owner.Closed += (_, _) => { timer.Stop(); if (ReferenceEquals(OnlineMusicSearch.Current, source)) OnlineMusicSearch.Current = null; source.Dispose(); };
         if (mode == "progressive-album")
         {

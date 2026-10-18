@@ -1,6 +1,6 @@
 # Progressive playback — native integration, 2026-10-18
 
-Status at 90% wrap: IN PROGRESS / LOCAL WIP ONLY. Wired and exercised, but the final underrun-clock correction and debug trace/tooltip adjustments are UNBUILT. Do not push or call order 6 DONE yet. No release or installer.
+Status: DONE for the scope below after the final clock validation (see "Final clock validation" at the end). No release or installer. Live Telegram bots remain an unverified release gate.
 
 ## Behavior and ownership
 
@@ -35,3 +35,35 @@ An isolated synthetic profile, Finder disabled, no Telegram session/credentials 
 Live Telegram settings and actual live transfer remain unverified release gates. No claims that the exact friend's 1.6.3.3 stall was reproduced, every network/codec works, or lyric accuracy changed.
 
 Own preview PID16932 was closed after checking its full executable path. Computer-use kernel was reset. No active preview or authentication; only the full test process remains running.
+
+## Final clock validation (Claude, 2026-10-18 morning)
+
+The overnight flush correction (FlushEngineInput) was built and run in the real app on NEW synthetic profiles only
+(`artifacts/plus/progressive-visual/profile-clock` to `profile-clock8`: settings.json + generated audio copied from
+profile-album, nothing else; Finder disabled, volume 0/muted, no session or credentials). Play was pressed through
+Windows UI Automation (the real Play buttons' Invoke), not autoplay. Screenshots: `progressive-visual/clock-shots`.
+
+- FLAC album, two forced underruns: clock stopped at 14.304 s and 19.296 s with buffering shown (main bar and mini
+  ring), resumed from exactly there, no backward jump, no restart/skip. Saved file byte-identical to the source,
+  imported (library 0 → 1, row became the native local song), seek enabled, played to the end. No DOWNLOAD_IMPORT_FAILED,
+  no VLC error.
+- Pause while partial held the position (6.09 → 6.19 s), resume continued. Mini player: seek disabled while partial,
+  enabled after the save.
+- Seek (Local API on a synthetic profile; it uses the same player seek as the slider): while partial it is ignored
+  (14.304 s kept, no error); after the save while paused it reopened the full local file at 6.000 s and stayed paused;
+  Play continued from 6 s to the end.
+- MP3 from native Search: one underrun (16.2 s), resumed, saved, imported.
+
+**New bug found and fixed:** at the very end of a download-backed MP3 the bar jumped back about 1.5 s (23.5 → 21.98 s)
+just before stopping. A temporary trace showed why: once the engine's segment drained, the position timer fell back to
+VLC's own clock, which for an input that stalled runs ~2 s behind the audio actually played. `EngineTickTimeMs` now
+gives no reading for a download-backed input when no engine segment is active (the end grace reports the real end);
+local files keep VLC's clock exactly as before. Regression: `ProgressivePlaybackClockTests.
+DrainedDownloadSegment_NeverFallsBackToVlcsLaggingClock`. The Debug preview now also records every backward position
+step (`BACKWARD` rows), not only 500 ms samples. After the fix: FLAC (2 underruns) and MP3 twice, each on a fresh
+profile, reached 24.000 s with no backward step other than the normal reset to 0 at the stop.
+
+Gates on the final code: full Noctis suite 6,566 total / 0 failed / 43 skipped, 494.5 s
+(`artifacts/plus/claude-clock-final-suite.log`); Finder 1,132 ok / 0 wrong (`claude-clock-final-finder.log`).
+Focused progressive/importer/WordLyrics classes 38/38 and buffer/clock 8/8 before the end-of-track fix; progressive
+classes 27/27 after it.
