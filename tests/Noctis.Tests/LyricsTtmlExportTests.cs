@@ -189,6 +189,21 @@ public class LyricsTtmlExportTests : IDisposable
         Assert.False(File.Exists(Side(".ttml")), "the app's own .ttml goes with Remove");
     }
 
+    /// <summary>The file on disk keeps each word's space inside its span, as built (Discord, nutf!xx).</summary>
+    [Fact]
+    public void Writer_WithTtml_KeepsTheWordSpacesInsideTheSpans_OnDisk()
+    {
+        var song = Song();
+        var (writer, track, _) = NewWriter();
+
+        writer.SaveDetailed(track, null, TimedLyricsBuilder.BuildElrc(song), embedInTags: false, replaceForeignSidecar: true, TimedLyricsBuilder.BuildTtml(song));
+
+        var onDisk = File.ReadAllText(Side(".ttml"));
+        Assert.Contains("\">Hello, </span><span begin=\"00:00:12.800\" end=\"00:00:13.400\">world!</span></p>", onDisk);
+        Assert.Contains("\">Rock </span><span begin=\"00:00:18.400\" end=\"00:00:18.600\">&amp; </span><span", onDisk);
+        Assert.DoesNotContain("</span> <span", onDisk);
+    }
+
     [Fact]
     public void Writer_StudioSave_ReplacesALeftoverTtmlAndLyricsfile_ThatWouldHideIt()
     {
