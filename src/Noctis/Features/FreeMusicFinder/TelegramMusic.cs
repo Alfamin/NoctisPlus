@@ -24,7 +24,9 @@ internal sealed class HunterMusicSource : IMusicSource, IQualityMusicSource
     public async Task<string> FetchAsync(MusicRequest request, Stream output, IProgress<double>? progress, CancellationToken ct)
     {
         request=BotSelections.ForSource(request,Id);
+        var clock=System.Diagnostics.Stopwatch.StartNew();
         if(_account is not null && await TryCachedAsync(request,output,progress,ct).ConfigureAwait(false) is {} cached)return cached;
+        Noctis.Services.DebugLog.Write("Finder",$"Music Hunters: chat history checked in {clock.Elapsed.TotalSeconds:0.0} s");
         if(request.Selection is not null)
         {
             try {return await _bot.FetchSelectedAsync(request,output,progress,ct).ConfigureAwait(false);}

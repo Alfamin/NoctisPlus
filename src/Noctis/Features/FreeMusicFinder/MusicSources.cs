@@ -132,7 +132,11 @@ internal sealed class MusicSources
     }
     public async Task<string> FetchAsync(MusicRequest request, Stream output, IProgress<double>? progress, CancellationToken ct)
     {
+        // Owner 10-18: a click took about a minute before any bot saw a message; these lines (always in
+        // session.log) say where the time went: this gate, the quality check, or a bot.
+        var clock = System.Diagnostics.Stopwatch.StartNew();
         await _gate.WaitAsync(ct).ConfigureAwait(false);
+        Trace($"fetch \"{request.Title}\": gate {clock.Elapsed.TotalSeconds:0.0} s");
         try
         {
             CheckGlobal(); var errors = new List<string>();
@@ -142,6 +146,7 @@ internal sealed class MusicSources
             if (output is Noctis.Features.ProgressivePlayback.IProgressiveAudioWriter publisher)
                 publisher.SetFormatPolicy(ext => ext == "flac" ? preferred != AudioQuality.MP3 : ext == "mp3" && allowMp3 && !preferFlac);
             var qualityErrors = await ConfigureQualityAsync(progress, ct, preferred).ConfigureAwait(false);
+            Trace($"fetch \"{request.Title}\": quality checked at {clock.Elapsed.TotalSeconds:0.0} s ({qualityErrors.Count} unconfirmed)");
             if (preferred is not null) request = request with { Quality = preferred };
             // An MP3 a bot sent is kept aside while the other bot is asked for FLAC. It is used only when no
             // bot has the recording in FLAC and the setting allows it.
@@ -169,7 +174,10 @@ internal sealed class MusicSources
                             : "Asking " + source.Id + " for the file…");
                         // Callbacks and chat message IDs are scoped to one provider. Only recording
                         // metadata and public track URLs may cross to the fallback bot.
-                        return await source.FetchAsync(BotSelections.ForSource(request, source.Id), output, progress, ct).ConfigureAwait(false);
+                        Trace($"fetch \"{request.Title}\": asking {source.Id} at {clock.Elapsed.TotalSeconds:0.0} s");
+                        var got = await source.FetchAsync(BotSelections.ForSource(request, source.Id), output, progress, ct).ConfigureAwait(false);
+                        Trace($"fetch \"{request.Title}\": {source.Id} sent {got} at {clock.Elapsed.TotalSeconds:0.0} s");
+                        return got;
                     }
                     var ext = await AskAsync().ConfigureAwait(false);
                     // A bot whose format was confirmed sent the other one: its setting may have been changed in the
@@ -202,7 +210,7 @@ internal sealed class MusicSources
                 catch(System.Net.Sockets.SocketException ex)
                 {Block(new(source.Id,"TELEGRAM_CONNECTION_FAILED: "+ex.Message+" Check the VPN/proxy; queued work is preserved.",_now().AddMinutes(10),true));throw Waiting();}
                 catch (Exception ex) when (ex is TimeoutException or BotAnswerException or TrackUnavailableException or StaleSelectionException)
-                { errors.Add(source.Id + ": " + ex.Message); _notice(source.Id + " could not supply “" + request.Title + "”; trying the backup."); }
+                { errors.Add(source.Id + ": " + ex.Message); Trace($"fetch \"{request.Title}\": {source.Id} failed at {clock.Elapsed.TotalSeconds:0.0} s: {ex.Message}"); _notice(source.Id + " could not supply “" + request.Title + "”; trying the backup."); }
             }
             // A bot that is waiting out a limit (not asked, or it just said so) may still have FLAC: the song waits for it.
             if (haveMp3 && !skipped)
@@ -218,6 +226,8 @@ internal sealed class MusicSources
         }
         finally { _gate.Release(); }
     }
+    private static void Trace(string line) => Noctis.Services.DebugLog.Write("Finder", line);
+
     /// <summary>The preference was changed in the app: each bot's menu is checked once more.</summary>
     public async Task SynchronizeQualityAsync(CancellationToken ct)
     {

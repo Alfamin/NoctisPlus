@@ -446,12 +446,14 @@ internal sealed class TelegramBotSource : IHunterBotSource
     /// </summary>
     public async Task<IReadOnlyList<BotTrack>> SearchAsync(string query, CancellationToken ct)
     {
+        var waited = System.Diagnostics.Stopwatch.StartNew();
         await _searching.WaitAsync(ct).ConfigureAwait(false);
         try
         {
             return await RunAsync<IReadOnlyList<BotTrack>>(async (client, bot) =>
             {
                 await LearnFromHistoryAsync(client, bot, ct).ConfigureAwait(false);
+                Noctis.Services.DebugLog.Write("Finder", $"Music Hunters: /search sent {waited.Elapsed.TotalSeconds:0.0} s after it was asked");
                 var wait = _timings.Wait(SearchTiming, SearchWait, MinSearchWait, SearchWait);
                 var clock = System.Diagnostics.Stopwatch.StartNew();
                 var sent = await client.SendMessageAsync(bot, "/search " + query).WaitAsync(TimeSpan.FromSeconds(25), ct).ConfigureAwait(false);
