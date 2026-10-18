@@ -92,13 +92,13 @@ public class FreshInstallDefaultsTests
     [Fact]
     public void LookAndFeelMatchesTheShippedDesign()
     {
-        Assert.Equal("Gray", Fresh.Theme);
+        Assert.Equal("Dark", Fresh.Theme); // Noctis Plus default (owner, 2026-10-18)
         Assert.Equal("Crimson", Fresh.AccentPresetName);
         Assert.Equal("#E74856", Fresh.AccentColorHex);
-        // Animated artwork is the only Appearance extra that ships on; liquid glass,
+        // Animated artwork and (Noctis Plus, owner 2026-10-18) Liquid Glass ship on;
         // flowing lyrics, fullscreen focus and join-split-words are all opt-in.
         Assert.True(Fresh.EnableAnimatedCovers);
-        Assert.False(Fresh.LiquidGlassEnabled);
+        Assert.True(Fresh.LiquidGlassEnabled);
         Assert.False(Fresh.LyricsFlowingLightEnabled);
         Assert.False(Fresh.LyricsFullScreenFocusEnabled);
         Assert.False(Fresh.LyricsJoinSplitWords);

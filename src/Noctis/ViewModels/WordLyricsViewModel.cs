@@ -22,7 +22,12 @@ public sealed partial class WordLyricsViewModel : ObservableObject, IDisposable
         if (service.Folders.Length == 1) FolderIndex = 1;
         _service.Changed += Refresh; Refresh();
         if (track is not null) _ = LoadWordsAsync(track.FilePath);
+        IsSetUp = service.BackendReady;
     }
+    /// <summary>WordLyrics is installed with its models: the footer button opens its settings instead of setup
+    /// (owner, 2026-10-18: it asked to download 1.33 GB that was already there).</summary>
+    public bool IsSetUp { get; }
+    public string SetupLabel => IsSetUp ? "WordLyrics settings" : "Set up WordLyrics";
     public string Title { get; }
     public bool IsLibrary { get; }
     public bool IsSong { get; }
@@ -115,7 +120,12 @@ public sealed partial class WordLyricsViewModel : ObservableObject, IDisposable
     });
     [RelayCommand] private async Task TogglePause() { await _service.PauseAsync(!Paused); Refresh(); }
     [RelayCommand] private async Task Stop() { await _service.CancelAsync(); Refresh(); }
-    [RelayCommand(CanExecute = nameof(CanInteract))] private Task Setup() => Act(() => _service.SetupAsync(_confirm));
+    [RelayCommand(CanExecute = nameof(CanInteract))]
+    private Task Setup()
+    {
+        if (IsSetUp && _service.OpenSettings is { } open) { open(); return Task.CompletedTask; }
+        return Act(() => _service.SetupAsync(_confirm));
+    }
     [RelayCommand] private void OpenReport() { try { _service.OpenReport(); } catch (Exception ex) { Error = ex.Message; } }
     public void Dispose() { _disposed = true; _stop.Cancel(); _service.Changed -= Refresh; _stop.Dispose(); }
 }

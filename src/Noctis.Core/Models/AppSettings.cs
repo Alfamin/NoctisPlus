@@ -54,7 +54,10 @@ public class AppSettings
     public List<string> IgnoredFolderNames { get; set; } = new() { ".git", "node_modules", "$recycle.bin", "system volume information" };
 
     /// <summary>Current theme: "Gray", "Dark", "MidnightBlack", "Light", or "System".</summary>
-    public string Theme { get; set; } = "Gray";
+    /// <summary>Noctis Plus: Dark by default (owner, 2026-10-18). Fresh installs, Reset and every fallback use it.</summary>
+    public const string DefaultTheme = "Dark";
+
+    public string Theme { get; set; } = DefaultTheme;
 
     /// <summary>UI language: a culture name shipped in Localization/ ("es") or "" to follow the OS.</summary>
     public string Language { get; set; } = "";
@@ -86,7 +89,9 @@ public class AppSettings
     /// so existing users keep their visual; future explicit "Dark" picks set this true and
     /// are honoured as the new dark theme.
     /// </summary>
-    public bool ThemeV2Migrated { get; set; } = false;
+    // True for new profiles (Noctis Plus defaults to Dark): their "Dark" is today's Dark, not the v1 name for Gray.
+    // Older profiles carry the flag written by the build that introduced the v2 themes.
+    public bool ThemeV2Migrated { get; set; } = true;
 
     /// <summary>Display name shown in the Settings profile section.</summary>
     public string ProfileName { get; set; } = string.Empty;
@@ -542,8 +547,8 @@ public class AppSettings
     /// <summary>Player island extras (Settings → Appearance → Player Island Buttons) for
     /// podcast / audiobook listening: skip back/forward by <see cref="PlaybackBarSkipSeconds"/>,
     /// a playback-speed button and a sleep-timer button. All off by default so the bar stays
-    /// the music-first transport.</summary>
-    public bool PlaybackBarShowSkipButtons { get; set; }
+    /// the music-first transport. Noctis Plus (owner, 2026-10-18): skip buttons on by default.</summary>
+    public bool PlaybackBarShowSkipButtons { get; set; } = true;
 
     /// <summary>Seconds the island's skip buttons jump: 10, 15 or 30.</summary>
     public int PlaybackBarSkipSeconds { get; set; } = 15;
@@ -552,9 +557,14 @@ public class AppSettings
 
     public bool PlaybackBarShowSleepTimer { get; set; }
 
-    /// <summary>GitHub #59: a shuffle button on the island, after Repeat. Off by default —
-    /// shuffle already lives in the Queue panel header.</summary>
-    public bool PlaybackBarShowShuffle { get; set; }
+    /// <summary>GitHub #59: a shuffle button on the island, after Repeat. Noctis Plus: on by default (owner,
+    /// 2026-10-18), since its shuffle modes live there.</summary>
+    public bool PlaybackBarShowShuffle { get; set; } = true;
+
+    /// <summary>Noctis Plus defaults applied once to profiles made before them (1: island shuffle + skip buttons and
+    /// Liquid Glass on).
+    /// Later choices are kept: it runs only while this is below the current level.</summary>
+    public int PlusDefaultsLevel { get; set; }
 
     /// <summary>GitHub #94: an EQ on/off button on the island, after Shuffle. Off by
     /// default like the other extras (the switch also lives in Settings → Audio).</summary>
@@ -611,7 +621,8 @@ public class AppSettings
     /// surfaces (window background, sidebar, content panels) switch to translucent
     /// tints so the blur shows through. Main window only — dialogs keep their opaque
     /// surfaces. Off by default; when off, rendering is identical to before.</summary>
-    public bool LiquidGlassEnabled { get; set; } = false;
+    /// <summary>Noctis Plus: on by default (owner, 2026-10-18). Linux never applies it (MainWindow gate).</summary>
+    public bool LiquidGlassEnabled { get; set; } = true;
 
     /// <summary>When true, the album grids collapse multiple editions/issues of the same release
     /// (same album-artist + normalized base title) into a single representative tile. Hidden

@@ -138,11 +138,11 @@ public class MobileSettingsTests
         var shell = new ShellViewModel(rig.Shell.Library, rig.Shell.Player, rig.Shell.Lyrics) { Theme = host };
         var page = await OpenSettings(shell);
         Assert.Equal("System", page.Appearance);
-        Assert.Equal("Ink", page.DarkTheme);                       // AppSettings.Theme defaults to the desktop's "Gray"
+        Assert.Equal("Dark", page.DarkTheme);                      // AppSettings.Theme defaults to "Dark" (Noctis Plus)
         Assert.Null(host.Last);                                    // loading applies nothing
 
         page.Appearance = "Light";
-        Assert.Equal(("Light", "Ink", "#E74856"), host.Last);
+        Assert.Equal(("Light", "Dark", "#E74856"), host.Last);
         page.DarkTheme = "Midnight";
         page.SelectedAccent = SettingsPageViewModel.Accents.Single(a => a.Name == "Emerald");
         Assert.Equal(("Light", "Midnight", "#12C76F"), host.Last);

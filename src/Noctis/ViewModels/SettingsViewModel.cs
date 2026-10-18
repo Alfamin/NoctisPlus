@@ -2662,12 +2662,21 @@ public partial class SettingsViewModel : ViewModelBase
             }
             _settings.ThemeV2Migrated = true;
 
-            // The "System" tile was removed on 2026-08-31 (Gray is the default and the
-            // app no longer follows the OS). Anyone still on it lands on Gray.
+            // Noctis Plus defaults, once per profile (owner, 2026-10-18): shuffle and skip buttons on the island.
+            if (_settings.PlusDefaultsLevel < 1)
+            {
+                _settings.PlaybackBarShowShuffle = true;
+                _settings.PlaybackBarShowSkipButtons = true;
+                _settings.LiquidGlassEnabled = true;
+                _settings.PlusDefaultsLevel = 1;
+            }
+
+            // The "System" tile was removed on 2026-08-31 (the app no longer follows the OS).
+            // Anyone still on it lands on the default theme.
             if (storedTheme == "System")
             {
-                storedTheme = "Gray";
-                _settings.Theme = "Gray";
+                storedTheme = AppSettings.DefaultTheme;
+                _settings.Theme = AppSettings.DefaultTheme;
             }
             SetActiveThemeFlags(storedTheme);
 
@@ -2684,10 +2693,10 @@ public partial class SettingsViewModel : ViewModelBase
                 foreach (var t in CustomThemes) t.IsActive = t.Id == id;
                 if (!CustomThemes.Any(t => t.Id == id))
                 {
-                    // Stale reference — fall back to Gray and persist.
+                    // Stale reference — fall back to the default theme and persist.
                     ActiveCustomThemeId = null;
-                    SetActiveThemeFlags("Gray");
-                    _settings.Theme = "Gray";
+                    SetActiveThemeFlags(AppSettings.DefaultTheme);
+                    _settings.Theme = AppSettings.DefaultTheme;
                 }
                 else
                 {
@@ -3865,7 +3874,7 @@ public partial class SettingsViewModel : ViewModelBase
         if (ActiveCustomThemeId == id)
         {
             ActiveCustomThemeId = null;
-            SetActiveThemeFlags("Gray");
+            SetActiveThemeFlags(AppSettings.DefaultTheme);
             ApplyAccent("#E74856", "Crimson");
             ThemeChanged?.Invoke(this, ResolveActiveThemeKey());
         }
@@ -6920,7 +6929,7 @@ public partial class SettingsViewModel : ViewModelBase
         {
             _settings = defaultSettings;
 
-            // Theme — reset to default (Gray).
+            // Theme — reset to the default (AppSettings.DefaultTheme, Dark in Noctis Plus).
             // SetActiveThemeFlags alone left ActiveCustomThemeId and the CustomThemes
             // collection intact, so ResolveActiveThemeKey() still returned "Custom:<id>"
             // and SyncToSettings wrote it straight back — the reset visibly undid itself.
@@ -6928,7 +6937,7 @@ public partial class SettingsViewModel : ViewModelBase
             CustomThemes.Clear();
             ActivePackThemeKey = null;
             foreach (var t in PackThemes) t.IsActive = false;
-            SetActiveThemeFlags("Gray");
+            SetActiveThemeFlags(defaultSettings.Theme);
 
             // Accent colour — reset to default (Crimson)
             ActiveAccentHex = defaultSettings.AccentColorHex;

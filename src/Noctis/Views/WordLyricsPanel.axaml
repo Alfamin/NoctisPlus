@@ -50,7 +50,7 @@
       </ScrollViewer>
       <Border Grid.Row="2" Padding="28,14" BorderThickness="0,1,0,0" BorderBrush="{DynamicResource SystemControlForegroundBaseLowBrush}">
         <Grid ColumnDefinitions="Auto,*,Auto,Auto" ColumnSpacing="10">
-          <Button Content="Set up WordLyrics" Classes="pill-secondary" Command="{Binding SetupCommand}" />
+          <Button Content="{Binding SetupLabel}" Classes="pill-secondary" Command="{Binding SetupCommand}" />
             <Button Grid.Column="2" Content="Start timing" IsVisible="{Binding CanQueue}" Classes="pill-primary" Command="{Binding StartCommand}" />
           <Button Grid.Column="3" Content="Done" Classes="pill-secondary" Click="OnDone" />
         </Grid>

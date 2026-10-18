@@ -68,6 +68,16 @@ internal static class CatalogPagesTests
         Check.Equal("deezer:42", SearchRanking.Artists(hits).First().Id, "the popular exact namesake leads even when Deezer lists the tiny one first");
         Check.Equal(calls, http.Calls.Count, "ranking makes no additional metadata requests");
 
+        // Owner 2026-10-18: "post melone" showed a 1-fan namesake instead of Post Malone.
+        var typo = new List<CatalogArtist> { new("deezer:9", "Post Melone"), new("deezer:7", "Post Malone") };
+        var typoFans = new Dictionary<string, long> { ["deezer:9"] = 1, ["deezer:7"] = 4_000_000 };
+        var typoHits = SearchRanking.Build(FinderQuery.Parse("post melone"), typo, [], [], fansOf: a => typoFans[a.Id]);
+        Check.Equal("deezer:7", SearchRanking.Artists(typoHits).First().Id, "a one-letter typo of a hugely more popular artist finds that artist");
+        var peers = new Dictionary<string, long> { ["deezer:9"] = 300_000, ["deezer:7"] = 4_000_000 };
+        var peerHits = SearchRanking.Build(FinderQuery.Parse("post melone"), typo, [], [], fansOf: a => peers[a.Id]);
+        Check.Equal("deezer:9", SearchRanking.Artists(peerHits).First().Id, "a real, comparably popular exact namesake keeps the lead");
+        Check.True(SearchRanking.NearName("post melone", "post malone") && !SearchRanking.NearName("drake", "blake shelton") && !SearchRanking.NearName("sza", "sia"), "near names are small typos only, never short or different names");
+
         using var downloads = new Downloads(_ => { });
         var actions = new DiscoveryActions(new SpotifyPlaylistTests.Library(), downloads, _ => throw new Exception("No audio"), () => folder, () => false);
         foreach (var artist in artists) ArtistIdentityTests.Seed(folder, "artist-songs:" + artist.Id, new List<CatalogSearchSong>());

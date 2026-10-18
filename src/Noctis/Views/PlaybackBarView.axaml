@@ -553,7 +553,10 @@
                  With Liquid Glass on the same brush becomes the tint over a live frost of the
                  content scrolling under the pill. Negative margin reaches back across the
                  Border's 12px padding so the fill covers the whole pill as before. -->
-            <controls:GlassPanel CornerRadius="999" Margin="-12,0" Padding="12,0" BlurRadius="14">
+            <!-- Noctis Plus (owner, 2026-10-18): the island is always frosted, Liquid Glass or not. A see-through
+                 40% fill over sharp content made the controls hard to read; the blur keeps the glass look readable. -->
+            <controls:GlassPanel CornerRadius="999" Margin="-12,0" Padding="12,0" BlurRadius="20"
+                                 UseAppGlass="False" IsGlassActive="True">
               <controls:GlassPanel.Background>
                 <SolidColorBrush Color="{DynamicResource IslandBackgroundColor}" Opacity="{Binding IslandBackgroundOpacity}"/>
               </controls:GlassPanel.Background>

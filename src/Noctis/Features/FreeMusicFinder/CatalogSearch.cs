@@ -125,6 +125,29 @@ internal static class SearchRanking
 {
     private static HashSet<string> Words(string text) => Regex.Matches(text.Normalize(System.Text.NormalizationForm.FormKC).ToLowerInvariant(), @"[\p{L}\p{N}]+")
         .Select(m => m.Value).ToHashSet(StringComparer.Ordinal);
+    /// <summary>The same name with a small typo: at most one edit for short names, two from 10 letters on.</summary>
+    internal static bool NearName(string queryKey, string nameKey)
+    {
+        if (queryKey.Length < 4 || nameKey.Length < 4 || Math.Abs(queryKey.Length - nameKey.Length) > 2) return false;
+        var limit = Math.Max(queryKey.Length, nameKey.Length) >= 10 ? 2 : 1;
+        var previous = new int[nameKey.Length + 1];
+        var current = new int[nameKey.Length + 1];
+        for (var j = 0; j <= nameKey.Length; j++) previous[j] = j;
+        for (var i = 1; i <= queryKey.Length; i++)
+        {
+            current[0] = i; var best = i;
+            for (var j = 1; j <= nameKey.Length; j++)
+            {
+                var cost = queryKey[i - 1] == nameKey[j - 1] ? 0 : 1;
+                current[j] = Math.Min(Math.Min(previous[j] + 1, current[j - 1] + 1), previous[j - 1] + cost);
+                best = Math.Min(best, current[j]);
+            }
+            if (best > limit) return false;
+            (previous, current) = (current, previous);
+        }
+        return previous[nameKey.Length] is > 0 and var distance && distance <= limit;
+    }
+
     private static double Fit(string query, string title, string artist = "")
     {
         var q = BotText.Key(query); var t = BotText.Key(title);
@@ -141,18 +164,28 @@ internal static class SearchRanking
         Func<CatalogArtist, long?>? fansOf = null)
     {
         var output = new List<FinderHit>();
+        // A typed name one or two letters off ("post melone") still means the famous artist ("Post Malone") when that
+        // artist is vastly more popular than a tiny exact namesake (owner, 2026-10-18). Comparable namesakes keep the
+        // exact match first.
+        var queryKey = BotText.Key(query.Text);
+        var exactFans = artists.Where(a => BotText.Key(a.Name) == queryKey).Select(a => fansOf?.Invoke(a) ?? -1).DefaultIfEmpty(-1).Max();
+        var dominant = new HashSet<string>(StringComparer.Ordinal);
         for (var i = 0; i < artists.Count; i++)
         {
-            var a = artists[i]; var exact = BotText.Key(a.Name) == BotText.Key(query.Text);
+            var a = artists[i]; var key = BotText.Key(a.Name); var exact = key == queryKey;
+            var near = !exact && query.Artist.Length == 0 && NearName(queryKey, key);
+            var fans = fansOf?.Invoke(a) ?? -1;
+            if (near && fans >= 100_000 && fans >= 1000 * Math.Max(1, exactFans)) dominant.Add(a.Id);
             var support = songs.Count(s => s.Song.Artists.Any(by => by.Id == a.Id));
-            var score = Fit(query.Artist.Length > 0 ? query.Artist : query.Text, a.Name) + (exact ? 18 : 0) + Math.Min(12, support * 2) - Math.Min(4, i * .15);
-            if (fansOf?.Invoke(a) is >= 0 and var fans) score += Math.Min(12, 2 * Math.Log10(1d + fans));
+            var fit = near ? 82 : Fit(query.Artist.Length > 0 ? query.Artist : query.Text, a.Name);
+            var score = fit + (exact || dominant.Contains(a.Id) ? 18 : 0) + Math.Min(12, support * 2) - Math.Min(4, i * .15);
+            if (fans >= 0) score += Math.Min(12, 2 * Math.Log10(1d + fans));
             if (query.Artist.Length > 0) score -= 28;
             var matched = identity?.LibraryMatch == true && identity.Artist?.Id == a.Id;
             if (matched) score += 16;
             output.Add(new("Artists", a.Id, a.Name, matched ? "Matches your library · " + string.Join(", ", identity!.Albums.Take(3)) : "Artist" + (a.Genre.Length > 0 ? " · " + a.Genre : ""), score, Artist: a));
         }
-        var artistIntent = identity?.Artist ?? output.Where(h => h.Artist is not null && BotText.Key(h.Artist.Name) == BotText.Key(query.Text))
+        var artistIntent = identity?.Artist ?? output.Where(h => h.Artist is not null && (BotText.Key(h.Artist.Name) == queryKey || dominant.Contains(h.Artist.Id)))
             .OrderByDescending(h => h.Score).Select(h => h.Artist).FirstOrDefault();
         foreach (var s in DeduplicateSongs(songs))
         {

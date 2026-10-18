@@ -471,6 +471,12 @@ public partial class MainWindowViewModel : ViewModelBase
         var wordService = new Features.WordLyrics.WordLyricsService(library, () => Settings.GetSettings());
         _wordTiming = wordService;
         wordService.Presenter = PresentWordTiming;
+        wordService.OpenSettings = () =>
+        {
+            CloseWordTimingSheet();
+            Settings.SelectedSettingsTab = SettingsViewModel.TabFeatures;
+            OpenSettingsCommand.Execute(null);
+        };
         wordService.PillChanged += () => Dispatcher.UIThread.Post(() => ShowWordTimingPill(wordService.Pill));
         Features.BuiltInFeatures.Register(Plugins, shuffleService, wordService);
         Settings.Plugins = Plugins;

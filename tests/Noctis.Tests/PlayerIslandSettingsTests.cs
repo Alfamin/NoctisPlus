@@ -6,13 +6,14 @@ namespace Noctis.Tests;
 public class PlayerIslandSettingsTests
 {
     [Fact]
-    public void FreshInstall_HasNoIslandExtras_And15SecondSkip()
+    public void FreshInstall_HasShuffleAndSkipOnly_And15SecondSkip()
     {
         var s = new AppSettings();
-        Assert.False(s.PlaybackBarShowSkipButtons);
+        // Noctis Plus (owner, 2026-10-18): shuffle (its modes live there) and skip back/forward start on.
+        Assert.True(s.PlaybackBarShowSkipButtons);
         Assert.False(s.PlaybackBarShowPlaybackSpeed);
         Assert.False(s.PlaybackBarShowSleepTimer);
-        Assert.False(s.PlaybackBarShowShuffle);
+        Assert.True(s.PlaybackBarShowShuffle);
         // Repeat and the favorite heart became opt-in with the track-box layout.
         Assert.False(s.PlaybackBarShowRepeat);
         Assert.False(s.PlaybackBarShowFavorite);

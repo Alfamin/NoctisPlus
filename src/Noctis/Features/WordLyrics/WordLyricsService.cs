@@ -173,6 +173,19 @@ internal sealed class WordLyricsService(ILibraryService library, Func<AppSetting
     /// fallback when nothing is attached.</summary>
     internal Action<bool, Track?>? Presenter { get; set; }
 
+    /// <summary>Opens Settings → Features at WordLyrics (set by the shell).</summary>
+    internal Action? OpenSettings { get; set; }
+
+    /// <summary>Installed, new enough, Python and both models present: nothing would be downloaded.</summary>
+    internal bool BackendReady
+    {
+        get
+        {
+            try { return _worker is { } worker && new Tool(worker.Options.Folder).Ready; }
+            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or ArgumentException) { return false; }
+        }
+    }
+
     internal void Show(bool library = false, Track? track = null)
     {
         if (_disposed) return;
