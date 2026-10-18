@@ -1609,6 +1609,8 @@ Saving replaces them with the lyrics on screen. A lyrics file Noctis didn't writ
   <data name="MiniPlayer.ClearTip" xml:space="preserve"><value>Clear</value><comment>ToolTip.Tip in MiniPlayerWindow.axaml</comment></data>
   <data name="MiniPlayer.PlayTip" xml:space="preserve"><value>Play</value><comment>ToolTip.Tip in MiniPlayerWindow.axaml</comment></data>
   <data name="MiniPlayer.UpNext" xml:space="preserve"><value>Up Next</value><comment>Text in MiniPlayerWindow.axaml</comment></data>
+  <data name="MiniPlayer.Reshuffle" xml:space="preserve"><value>Reshuffle</value><comment>ToolTip.Tip in MiniPlayerWindow.axaml: Queue drawer header button, a new random order for Up Next (Shuffle on)</comment></data>
+  <data name="MiniPlayer.RemoveFromQueue" xml:space="preserve"><value>Remove from Queue</value><comment>Queue drawer row menu in MiniPlayerWindow.axaml</comment></data>
   <data name="MiniPlayer.ShowingFirst100" xml:space="preserve"><value>showing first 100</value><comment>Text in MiniPlayerWindow.axaml</comment></data>
   <data name="MiniPlayer.Search" xml:space="preserve"><value>Search</value><comment>Text in MiniPlayerWindow.axaml</comment></data>
   <data name="MiniPlayer.Queue" xml:space="preserve"><value>Queue</value><comment>Text in MiniPlayerWindow.axaml</comment></data>
