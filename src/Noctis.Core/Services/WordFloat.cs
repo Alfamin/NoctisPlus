@@ -6,10 +6,13 @@ namespace Noctis.Services;
 /// smooth wave instead of standing still under the sweep.
 ///
 /// Measured on an iOS Apple Music capture ("Die With A Smile", 1320 px wide, em ~97 px):
-/// each word lifts 5-6 px (~0.055 em) from the moment the front reaches it, along an
-/// ease-out that is ~55% up after 0.4 s, ~88% after 0.8 s and settled by ~1.2 s, for short
-/// words and long ones alike. That matches AMLL's per-word float (translateY to -0.05em,
-/// CSS ease-out, over max(1 s, word duration)). Pure and frame-exact (unit-tested).
+/// each word lifts 5-6 px (~0.055 em) from the moment the front reaches it. Dense 60 fps
+/// tracking of "Where", "and" and "had" (ink centroid per frame) gives a soft start, not an
+/// ease-out: ~8% up after 0.1 s, ~19% after 0.2 s, ~48% after 0.4 s, ~84% after 0.8 s,
+/// settled by ~1.2 s. cubic-bezier(0.15, 0, 0.4, 1) over 1.25 s fits that (summed squared
+/// error 0.004 against 0.060 for the CSS ease-out over 1 s this used, which popped a word
+/// up 16% in its first 0.1 s). Words held longer rise over their hold. Pure and frame-exact
+/// (unit-tested).
 /// </summary>
 public static class WordFloat
 {
@@ -17,7 +20,7 @@ public static class WordFloat
     public const double LiftEm = 0.055;
 
     /// <summary>The rise never runs faster than this, however short the word.</summary>
-    public const double MinDurationMs = 1000;
+    public const double MinDurationMs = 1250;
 
     /// <summary>A line that stops being sung lets its words settle back over this long.</summary>
     public const double FallMs = 600;
@@ -31,8 +34,12 @@ public static class WordFloat
     public static double Rise(double sinceStartMs, double wordMs)
     {
         if (double.IsNaN(sinceStartMs) || sinceStartMs <= 0) return 0;
-        return EaseOut(sinceStartMs / RiseMs(wordMs));
+        return Ease(sinceStartMs / RiseMs(wordMs));
     }
+
+    /// <summary>The rise curve, cubic-bezier(0.15, 0, 0.4, 1), at <paramref name="x"/> (clamped
+    /// to 0..1): eases in over the first ~10% so a word starts to float instead of jumping.</summary>
+    public static double Ease(double x) => CubicBezier(x, 0.15, 0, 0.4, 1);
 
     /// <summary>Lift of a word that was at <paramref name="from"/> when its line stopped being
     /// sung, <paramref name="sinceFallMs"/> later: back to rest along an ease-in-out.</summary>
@@ -46,16 +53,22 @@ public static class WordFloat
     }
 
     /// <summary>CSS <c>ease-out</c>, cubic-bezier(0, 0, 0.58, 1), at <paramref name="x"/>
+    /// (clamped to 0..1).</summary>
+    public static double EaseOut(double x) => CubicBezier(x, 0, 0, 0.58, 1);
+
+    /// <summary>A CSS cubic-bezier(<paramref name="p1x"/>, <paramref name="p1y"/>,
+    /// <paramref name="p2x"/>, <paramref name="p2y"/>) timing function at <paramref name="x"/>
     /// (clamped to 0..1). No allocation: a few Newton steps on x(s), bisection as a guard.</summary>
-    public static double EaseOut(double x)
+    public static double CubicBezier(double x, double p1x, double p1y, double p2x, double p2y)
     {
         if (x <= 0) return 0;
         if (x >= 1) return 1;
-        const double p1x = 0, p1y = 0, p2x = 0.58, p2y = 1;
         // Bezier with endpoints (0,0) and (1,1): B(s) = 3(1-s)^2 s p1 + 3(1-s) s^2 p2 + s^3.
-        static double Bx(double s) => ((1 + 3 * p1x - 3 * p2x) * s + (3 * p2x - 6 * p1x)) * s * s + 3 * p1x * s;
-        static double By(double s) => ((1 + 3 * p1y - 3 * p2y) * s + (3 * p2y - 6 * p1y)) * s * s + 3 * p1y * s;
-        static double Dx(double s) => 3 * (1 + 3 * p1x - 3 * p2x) * s * s + 2 * (3 * p2x - 6 * p1x) * s + 3 * p1x;
+        double ax = 1 + 3 * p1x - 3 * p2x, bx = 3 * p2x - 6 * p1x, cx = 3 * p1x;
+        double ay = 1 + 3 * p1y - 3 * p2y, by = 3 * p2y - 6 * p1y, cy = 3 * p1y;
+        double Bx(double s) => ((ax * s + bx) * s + cx) * s;
+        double By(double s) => ((ay * s + by) * s + cy) * s;
+        double Dx(double s) => (3 * ax * s + 2 * bx) * s + cx;
 
         var t = x;
         for (int i = 0; i < 8; i++)
