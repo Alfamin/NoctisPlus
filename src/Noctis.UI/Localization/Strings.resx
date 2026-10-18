@@ -989,6 +989,15 @@ Deezer and TIDAL: paste the link.</value></data>
   <data name="Home.Pause" xml:space="preserve"><value>Pause</value><comment>Home hero primary button while its track is playing</comment></data>
   <data name="Home.PlayAlbum" xml:space="preserve"><value>Play album</value><comment>Home hero secondary button</comment></data>
   <data name="Home.TimeLeft" xml:space="preserve"><value>{0} left</value><comment>Home hero: remaining time of the last played track, e.g. "1:06 left"</comment></data>
+  <data name="Home.LibraryEmpty" xml:space="preserve"><value>Your library is empty</value><comment>Home empty-library state title</comment></data>
+  <data name="Home.LibraryEmptyBody" xml:space="preserve"><value>Noctis plays music from folders on this computer. Add a folder to get started.</value><comment>Home empty-library state body</comment></data>
+  <data name="Home.AddMusicFolder" xml:space="preserve"><value>Add Music Folder</value><comment>Home empty-library state primary button</comment></data>
+  <data name="Home.OpenSettings" xml:space="preserve"><value>Open Settings</value><comment>Home empty-library state link to Settings › Library</comment></data>
+  <data name="Home.Scanning" xml:space="preserve"><value>Scanning your music…</value><comment>Home state while the first library scan runs</comment></data>
+  <data name="Home.ScanningBody" xml:space="preserve"><value>This can take a minute for a large library.</value><comment>Home state while the first library scan runs, under Home.Scanning</comment></data>
+  <data name="Home.NothingPlayed" xml:space="preserve"><value>Start listening</value><comment>Home state when the library has songs but nothing has been played</comment></data>
+  <data name="Home.NothingPlayedBody" xml:space="preserve"><value>Your most played songs, artists and albums show up here as you listen.</value><comment>Home state when nothing has been played, under Home.NothingPlayed</comment></data>
+  <data name="Home.ShuffleAll" xml:space="preserve"><value>Shuffle All</value><comment>Home nothing-played state button: shuffle the whole library</comment></data>
 
   <!-- LibraryAlbumsView.axaml (auto-migrated) -->
   <data name="LibraryAlbums.Text" xml:space="preserve"><value>&#x266A;</value><comment>Text in LibraryAlbumsView.axaml</comment></data>

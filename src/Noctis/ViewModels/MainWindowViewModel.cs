@@ -558,6 +558,12 @@ public partial class MainWindowViewModel : ViewModelBase
             OpenSettings();
             Dispatcher.UIThread.Post(Settings.RequestMediaFoldersSection);
         };
+        // Home's empty-library "Open Settings" lands on the same media-folders card.
+        _homeVm.NavigateToSettingsRequested += (_, _) =>
+        {
+            OpenSettings();
+            Dispatcher.UIThread.Post(Settings.RequestMediaFoldersSection);
+        };
         // The Settings modal leaves the page beneath it visible around the card, yet counts
         // it as hidden (UpdateSectionActiveFlags) so settings toggles don't rebuild it
         // mid-animation. A scan or a folder add/remove then never reached that page until
