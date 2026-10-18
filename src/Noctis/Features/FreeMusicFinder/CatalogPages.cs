@@ -82,6 +82,12 @@ internal sealed class CatalogPages : IDisposable
             var verified = await catalog.SeparateNamesakesAsync(candidate, albums, titles, ct);
             if (verified.Id.StartsWith("apple:")) { Save(name, verified); return (verified, []); }
         }
+        if (await catalog.PopularNamesakeAsync(name, result.Candidates, ct).ConfigureAwait(false) is { } popular)
+        {
+            var separated = await catalog.SeparateNamesakesAsync(popular, albums, titles, ct).ConfigureAwait(false);
+            Save(name, separated);
+            return (separated, []);
+        }
         return (null, result.Candidates);
     }
 

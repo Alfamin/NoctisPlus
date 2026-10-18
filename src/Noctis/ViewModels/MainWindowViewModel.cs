@@ -35,6 +35,7 @@ public partial class MainWindowViewModel : ViewModelBase
     private readonly ArtistImageService _artistImageService;
     private readonly LoonClient _loon;
     private readonly IPlayHistoryService _playHistory;
+    private readonly Services.Search.SearchBoxBinding _searchBoxBinding;
 
     // ── Settings modal ──
     [ObservableProperty] private bool _isSettingsModalOpen;
@@ -688,11 +689,8 @@ public partial class MainWindowViewModel : ViewModelBase
         });
         // The Search page follows every keystroke (library results are instant); the
         // debounced SearchTextChanged above is for the list pages' filters.
-        TopBar.PropertyChanged += (_, e) =>
-        {
-            if (e.PropertyName == nameof(TopBarViewModel.SearchText) && ReferenceEquals(CurrentView, _searchVm))
-                _searchVm.SetQuery(TopBar.SearchText);
-        };
+        _searchBoxBinding = new(TopBar, _searchVm, () => ReferenceEquals(CurrentView, _searchVm));
+        _searchBoxBinding.Attach();
 
         // Wire up album detail navigation from albums view
         _albumsVm.AlbumOpened += OnAlbumOpened;
@@ -1156,6 +1154,7 @@ public partial class MainWindowViewModel : ViewModelBase
     /// </summary>
     public async Task ShutdownAsync()
     {
+        _searchBoxBinding.Dispose();
         _downloadImporter.Dispose();
         // Silence playback first. The saves below run for seconds after the window
         // is already gone, and nothing else stops the audio engine before process
@@ -2058,7 +2057,8 @@ public partial class MainWindowViewModel : ViewModelBase
         ClearAllTopBarActions();
         target.RestoreState();
         TopBar.CurrentTabName = target.TabName;
-        TopBar.SearchText = target.SearchText;
+        _searchBoxBinding.SetPageText(target.SearchText);
+        if (target.View is SearchViewModel restoredSearch) restoredSearch.SetQuery(target.SearchText);
         _currentSectionKey = target.SectionKey;
         _albumDetailBackButtonText = target.View is AlbumDetailViewModel
             ? NormalizeAlbumDetailBackButtonText(target.BackButtonText)
@@ -2069,6 +2069,8 @@ public partial class MainWindowViewModel : ViewModelBase
 
         // Restore page-specific top bar actions for the target view
         RestoreTopBarActionsForView(target.View);
+        if (target.View is SearchViewModel && TopBar.IsSearchVisible)
+            TopBar.OpenSearchCommand.Execute(null);
         RefreshBackButton();
         SyncSidebarSelectionToHistoryEntry(target);
     }
@@ -2351,7 +2353,7 @@ public partial class MainWindowViewModel : ViewModelBase
         // follow the user to the new page. Queue popup stays open across navigation —
         // it's only dismissed by toggling the Queue button itself or by Escape.
         TopBar.IsSearchOpen = false;
-        TopBar.SearchText = string.Empty;
+        _searchBoxBinding.SetPageText(ReferenceEquals(CurrentView, _searchVm) ? _searchVm.QueryText : string.Empty);
         // Assigning SearchText only dispatches ApplyFilter when the box value actually
         // changes (and via a debounce). If the box was already empty from a prior visit,
         // the destination view keeps whatever filter it was last given — so it can show
@@ -2546,7 +2548,7 @@ public partial class MainWindowViewModel : ViewModelBase
         // Re-scope the top-bar search to the detail view (the history entry above
         // captured the grid's query, so Back restores it). Without this the grid's
         // stale query lingers in the box and the watermark stays "Search in Playlists".
-        TopBar.SearchText = string.Empty;
+        _searchBoxBinding.SetPageText(string.Empty);
         TopBar.CurrentTabName = "Playlist";
 
         var detail = new PlaylistViewModel(playlist, Player, _library, _persistence, Sidebar, _artistImageService);
@@ -2614,7 +2616,7 @@ public partial class MainWindowViewModel : ViewModelBase
         ClearAllTopBarActions();
         // The originating page's query is captured in history for back-restore;
         // the More By grid starts unfiltered.
-        TopBar.SearchText = string.Empty;
+        _searchBoxBinding.SetPageText(string.Empty);
 
         var page = new MoreByArtistViewModel(artistName, albums, Player, _albumsVm);
         page.BackRequested += (_, _) => GoBackInHistory();
@@ -2637,7 +2639,7 @@ public partial class MainWindowViewModel : ViewModelBase
         TopBar.IsCoverFlowMode = false;
         _preCoverFlowView = null;
         // The originating page's query is captured in history for back-restore.
-        TopBar.SearchText = string.Empty;
+        _searchBoxBinding.SetPageText(string.Empty);
 
         // About-the-artist facts (MusicBrainz + Wikipedia); resolved lazily so the
         // long-lived shell constructor doesn't grow another parameter.
@@ -2685,7 +2687,7 @@ public partial class MainWindowViewModel : ViewModelBase
         ClearAllTopBarActions();
         // The originating page's query is captured in history for back-restore;
         // the featured-artists grid starts unfiltered.
-        TopBar.SearchText = string.Empty;
+        _searchBoxBinding.SetPageText(string.Empty);
 
         var page = new PlaylistFeaturedArtistsViewModel(artists);
         page.SetViewArtistAction(ViewArtistByName);
@@ -2697,6 +2699,8 @@ public partial class MainWindowViewModel : ViewModelBase
 
     private void OnSearchTextChanged(object? sender, string query)
     {
+        // A debounce already posted to the UI queue may belong to the page we just left.
+        if (query != TopBar.SearchText) return;
         DebugLogger.Info(DebugLogger.Category.Search, "ApplyFilter", $"query=\"{query}\", target={CurrentView?.GetType().Name}");
         if (CurrentView is ISearchable searchable)
         {
@@ -2721,8 +2725,8 @@ public partial class MainWindowViewModel : ViewModelBase
         if (!ReferenceEquals(CurrentView, _searchVm))
         {
             Navigate("search");
-            // Navigate clears the pill; Search keeps its last query (back to where you were).
-            TopBar.SearchText = _searchVm.QueryText;
+            // Restoring the box is not a new query; keep the page's results and filter chip.
+            _searchBoxBinding.SetPageText(_searchVm.QueryText);
         }
         _searchVm.OnShown();
         if (TopBar.IsSearchVisible)
@@ -3228,7 +3232,7 @@ public partial class MainWindowViewModel : ViewModelBase
         EnsureLyricsAndReturn(_lyricsVm);
         CurrentView = _lyricsVm;
         Player.IsQueuePopupOpen = false;
-        TopBar.SearchText = string.Empty;
+        _searchBoxBinding.SetPageText(string.Empty);
         TopBar.CurrentTabName = "Lyrics";
         ClearAllTopBarActions();
         WireLyricsPageToPlayer();

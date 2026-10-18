@@ -65,6 +65,34 @@ internal static class BotQualityTests
         Check.True(await BotQuality.ApplyAsync("Music Hunters", hunters, AudioQuality.FLAC, default), "Music Hunters: set through its per-service menu");
         Check.Equal("Audio quality,Deezer,FLAC", string.Join(",", hunters.Pressed), "Music Hunters: Audio quality → Deezer → FLAC, never Info");
 
+        // Actual desktop chat, 2026-10-18: there is a separate submenu and a caption-info toggle beside it.
+        var liveHunters = new Chat(new QualityReply(1, "Open Settings to configure quality, downloads, captions, language, and default search behavior.",
+                [new("⚙ General", [1]), new("🔊 Audio Quality & Info", [2]), new("Downloads", [3]), new("Captions & Templates", [4]), new("Open Settings", Web: true)]),
+            new(1, "Audio Quality", [new("🔊 Per-Service Quality", [5]), new("ℹ Quality Info", [6]), new("✅", [7]), new("◀", [8])]),
+            new(1, "Per-Service Quality", [new("Deezer", [9]), new("Tidal", [10]), new("Qobuz", [11])]),
+            new(1, "Deezer quality", [new("FLAC ✅", [12]), new("MP3 320", [13])]));
+        Check.False(await BotQuality.ApplyAsync("Music Hunters", liveHunters, AudioQuality.FLAC, default), "actual Music Hunters menu reaches the existing FLAC choice");
+        Check.Equal("🔊 Audio Quality & Info,🔊 Per-Service Quality,Deezer", string.Join(",", liveHunters.Pressed), "actual menu never toggles Quality Info or opens the web app");
+
+        var lateCallback = new TaskCompletionSource<string?>(TaskCreationOptions.RunContinuationsAsynchronously);
+        var edited = new QualityReply(3, "Audio quality", [new("FLAC ✅", [1])]);
+        using (var deadline = new CancellationTokenSource(TimeSpan.FromSeconds(2)))
+        {
+            var arrived = await TelegramQualityConversation.AfterPressAsync("provider", 3, lateCallback.Task, _ => Task.FromResult(edited), deadline.Token);
+            Check.Equal(edited, arrived, "an edited menu wins without waiting for the bot's callback acknowledgement");
+            Check.False(lateCallback.Task.IsCompleted, "no callback acknowledgement was needed to read the menu");
+            lateCallback.SetException(new IOException("late transport failure"));
+        }
+        var menuStopped = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
+        var acknowledgement = await TelegramQualityConversation.AfterPressAsync("provider", 3, Task.FromResult<string?>("Quality: FLAC"), async token =>
+        {
+            try { await Task.Delay(Timeout.Infinite, token); return edited; }
+            finally { menuStopped.TrySetResult(true); }
+        }, default);
+        Check.True(BotQuality.Confirmed(acknowledgement, AudioQuality.FLAC), "an explicit callback confirmation can also finish the settings change");
+        await menuStopped.Task.WaitAsync(TimeSpan.FromSeconds(2));
+        Check.True(menuStopped.Task.IsCompletedSuccessfully, "callback confirmation cancels its outstanding menu poll");
+
         var webOnly = new Chat(new QualityReply(1, "Open settings", [new("Open settings", Web: true)]));
         var web = await Check.CatchAsync<BotAnswerException>(() => BotQuality.ApplyAsync("Music Hunters", webOnly, AudioQuality.FLAC, default), "a web-page-only settings menu is reported, not guessed");
         Check.True(web?.Message.Contains("BOT_QUALITY_WEB_PAGE") == true, "it says the settings open as a web page");

@@ -105,15 +105,17 @@ internal sealed partial class ArtistCatalog : IDisposable
         });
     }
 
-    public Task<CatalogResult<List<CatalogArtist>>> SearchAsync(string name, bool refresh, CancellationToken ct)
+    public async Task<CatalogResult<List<CatalogArtist>>> SearchAsync(string name, bool refresh, CancellationToken ct)
     {
         name = name.Trim();
         if (name.Length is < 1 or > 200 || name.Any(char.IsControl)) throw new ArgumentException("Enter an artist name (up to 200 characters).");
-        return Cached("search:" + name.ToUpperInvariant(), TimeSpan.FromDays(1), refresh, async () =>
+        await LoadArtistFansAsync(ct).ConfigureAwait(false);
+        return await Cached("search:" + name.ToUpperInvariant(), TimeSpan.FromDays(1), refresh, async () =>
         {
             try
             {
                 using var data = await Get("deezer", "/search/artist?q=" + Uri.EscapeDataString(name) + "&limit=25", ct);
+                await RememberArtistFansAsync(Data(data.RootElement), ct).ConfigureAwait(false);
                 var artists = Data(data.RootElement).Select(DeezerArtist).Where(a => a is not null).Cast<CatalogArtist>().DistinctBy(a => a.Id).ToList();
                 if (artists.Count == 0) throw Invalid("Deezer returned no artist matches; trying Apple.");
                 return artists;
@@ -123,7 +125,7 @@ internal sealed partial class ArtistCatalog : IDisposable
                 using var data = await Get("apple", "/search?entity=musicArtist&media=music&country=US&limit=25&term=" + Uri.EscapeDataString(name), ct);
                 return Results(data.RootElement).Where(a => Text(a, "wrapperType") == "artist").Select(AppleArtist).Where(a => a is not null).Cast<CatalogArtist>().DistinctBy(a => a.Id).ToList();
             }
-        }, ct, fallback: artists => artists.Count > 0 && artists.All(a => a.Id.StartsWith("apple:", StringComparison.Ordinal)));
+        }, ct, fallback: artists => artists.Count > 0 && artists.All(a => a.Id.StartsWith("apple:", StringComparison.Ordinal))).ConfigureAwait(false);
     }
 
     public async Task<CatalogResult<CatalogProfile>> ArtistAsync(CatalogArtist artist, bool refresh, CancellationToken ct)

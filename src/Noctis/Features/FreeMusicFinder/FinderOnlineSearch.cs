@@ -76,14 +76,14 @@ internal sealed class FinderOnlineSearch : IOnlineMusicSearch
             var done = await Task.WhenAny(pending).ConfigureAwait(false);
             pending.Remove(done);
             ct.ThrowIfCancellationRequested();
-            yield return Build(query, artists, songs, albums, matches, complete: false, warnings);
+            yield return Build(catalog, query, artists, songs, albums, matches, complete: false, warnings);
         }
 
         songs = await catalog.RefineTitleAsync(query, songs, ct).ConfigureAwait(false);
-        yield return Build(query, artists, songs, albums, matches, complete: false, warnings);
+        yield return Build(catalog, query, artists, songs, albums, matches, complete: false, warnings);
 
         // An artist search ("drake"): that artist's own top songs lead the song list.
-        var hits = SearchRanking.Build(query, artists, songs, albums);
+        var hits = SearchRanking.Build(query, artists, songs, albums, fansOf: catalog.FansOf);
         if (hits.FirstOrDefault() is { Artist: { } leading } && BotText.Key(leading.Name) == BotText.Key(text))
         {
             var added = false;
@@ -94,7 +94,7 @@ internal sealed class FinderOnlineSearch : IOnlineMusicSearch
                 added = true;
             }
             catch (Exception ex) when (ex is not OperationCanceledException) { warnings.Enqueue("Artist songs: " + ArtistCatalog.Explain(ex)); }
-            if (added) yield return Build(query, artists, songs, albums, matches, complete: false, warnings);
+            if (added) yield return Build(catalog, query, artists, songs, albums, matches, complete: false, warnings);
         }
 
         // Which of these the library already has (same recording: title, artist, length).
@@ -103,13 +103,13 @@ internal sealed class FinderOnlineSearch : IOnlineMusicSearch
             try { matches = await _actions.MatchAsync(songs.Select(s => s.Song), ct, reuse: true).ConfigureAwait(false); }
             catch (Exception ex) when (ex is not OperationCanceledException) { warnings.Enqueue("Library check: " + ex.Message); }
         }
-        yield return Build(query, artists, songs, albums, matches, complete: true, warnings);
+        yield return Build(catalog, query, artists, songs, albums, matches, complete: true, warnings);
     }
 
-    private OnlineSearchResult Build(FinderQuery query, List<CatalogArtist> artists, List<CatalogSearchSong> songs, List<CatalogRelease> albums,
+    private OnlineSearchResult Build(ArtistCatalog catalog, FinderQuery query, List<CatalogArtist> artists, List<CatalogSearchSong> songs, List<CatalogRelease> albums,
         Dictionary<string, DiscoveryMatch>? matches, bool complete, ConcurrentQueue<string> warnings)
     {
-        var hits = SearchRanking.Build(query, artists, songs, albums);
+        var hits = SearchRanking.Build(query, artists, songs, albums, fansOf: catalog.FansOf);
         // Searching an artist: their own songs lead, songs they only feature on follow.
         var leading = hits.FirstOrDefault() is { Artist: { } a } && BotText.Key(a.Name) == BotText.Key(query.Text) ? a.Id : null;
         var songRows = new List<OnlineSong>();

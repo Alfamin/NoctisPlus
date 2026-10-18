@@ -137,7 +137,8 @@ internal static class SearchRanking
         return coverage * 64 + titleCoverage * 12 + (t.StartsWith(q, StringComparison.Ordinal) ? 5 : 0);
     }
     internal static List<FinderHit> Build(FinderQuery query, IReadOnlyList<CatalogArtist> artists,
-        IReadOnlyList<CatalogSearchSong> songs, IReadOnlyList<CatalogRelease> albums, ArtistIdentity? identity = null)
+        IReadOnlyList<CatalogSearchSong> songs, IReadOnlyList<CatalogRelease> albums, ArtistIdentity? identity = null,
+        Func<CatalogArtist, long?>? fansOf = null)
     {
         var output = new List<FinderHit>();
         for (var i = 0; i < artists.Count; i++)
@@ -145,12 +146,14 @@ internal static class SearchRanking
             var a = artists[i]; var exact = BotText.Key(a.Name) == BotText.Key(query.Text);
             var support = songs.Count(s => s.Song.Artists.Any(by => by.Id == a.Id));
             var score = Fit(query.Artist.Length > 0 ? query.Artist : query.Text, a.Name) + (exact ? 18 : 0) + Math.Min(12, support * 2) - Math.Min(4, i * .15);
+            if (fansOf?.Invoke(a) is >= 0 and var fans) score += Math.Min(12, 2 * Math.Log10(1d + fans));
             if (query.Artist.Length > 0) score -= 28;
             var matched = identity?.LibraryMatch == true && identity.Artist?.Id == a.Id;
             if (matched) score += 16;
             output.Add(new("Artists", a.Id, a.Name, matched ? "Matches your library · " + string.Join(", ", identity!.Albums.Take(3)) : "Artist" + (a.Genre.Length > 0 ? " · " + a.Genre : ""), score, Artist: a));
         }
-        var artistIntent = identity?.Artist ?? artists.FirstOrDefault(a => BotText.Key(a.Name) == BotText.Key(query.Text));
+        var artistIntent = identity?.Artist ?? output.Where(h => h.Artist is not null && BotText.Key(h.Artist.Name) == BotText.Key(query.Text))
+            .OrderByDescending(h => h.Score).Select(h => h.Artist).FirstOrDefault();
         foreach (var s in DeduplicateSongs(songs))
         {
             var by = string.Join(", ", s.Song.Artists.Select(a => a.Name));

@@ -50,5 +50,61 @@ internal static class CatalogPagesTests
         finally { CatalogPages.AlbumRequested -= OnAlbum; }
         Check.True(album is { Album.Songs.Count: > 0 } && album.Matches.Count == album.Album.Songs.Count, "opening an online album hands the page its songs and which ones the library has");
         Check.Equal(0, downloads.History.Count, "opening an album never downloads audio");
+        await PopularityAsync();
+    }
+
+    private static async Task PopularityAsync()
+    {
+        Check.Section("artist popularity: stable IDs, album evidence, offline caches and comparable namesakes");
+        var folder = Check.NewFolder("artist-fans");
+        var http = new DiscoveryTests.Http { Override = (_, _) => Task.FromResult(new System.Net.Http.HttpResponseMessage(System.Net.HttpStatusCode.OK)
+        { Content = new System.Net.Http.StringContent("{\"data\":[{\"id\":43,\"name\":\"North Star\",\"nb_fan\":40},{\"id\":42,\"name\":\"North Star\",\"nb_fan\":2000000}]}") }) };
+        using var catalog = DiscoveryTests.Catalog(folder, http);
+        var artists = (await catalog.SearchAsync("North Star", false, default)).Value;
+        Check.Equal(2000000L, catalog.FansOf(artists[1]) ?? -1, "nb_fan is retained outside the artist record");
+        Check.Equal(new CatalogArtist("deezer:42", "North Star"), artists[1], "popularity does not change CatalogArtist value equality");
+        var calls = http.Calls.Count;
+        var hits = SearchRanking.Build(FinderQuery.Parse("North Star"), artists, [], [], fansOf: catalog.FansOf);
+        Check.Equal("deezer:42", SearchRanking.Artists(hits).First().Id, "the popular exact namesake leads even when Deezer lists the tiny one first");
+        Check.Equal(calls, http.Calls.Count, "ranking makes no additional metadata requests");
+
+        using var downloads = new Downloads(_ => { });
+        var actions = new DiscoveryActions(new SpotifyPlaylistTests.Library(), downloads, _ => throw new Exception("No audio"), () => folder, () => false);
+        foreach (var artist in artists) ArtistIdentityTests.Seed(folder, "artist-songs:" + artist.Id, new List<CatalogSearchSong>());
+        using var pages = new CatalogPages(() => catalog, actions, _ => { }, () => true, () => null);
+        var selected = await pages.IdentifyAsync("North Star", [], [], default);
+        Check.Equal("deezer:42", selected.Artist?.Id, "name-only artist navigation chooses a decisive fan-count winner without prompting");
+        Check.Equal(calls, http.Calls.Count, "known popularity does not fetch every artist profile");
+
+        var offlineHttp = new DiscoveryTests.Http { Offline = true };
+        using var offline = DiscoveryTests.Catalog(folder, offlineHttp);
+        Check.Equal("deezer:42", (await offline.PopularNamesakeAsync("North Star", artists, default))?.Id, "popularity survives restarting offline");
+        Check.Equal(0, offlineHttp.Calls.Count, "saved popularity adds no offline network wait");
+
+        // Even the less popular artist wins when the user's actual recordings prove that identity.
+        ArtistIdentityTests.Seed(folder, "artist:deezer:43", new CatalogProfile(artists[0], [], [new("deezer:123", "Second Light", artists[0], "2026", "album", 12)]));
+        Check.Equal("deezer:43", (await pages.IdentifyAsync("North Star", ["Second Light"], [], default)).Artist?.Id, "library album evidence outranks popularity");
+        pages.Choose("North Star", artists[0]);
+        Check.Equal("deezer:43", (await pages.IdentifyAsync("North Star", [], [], default)).Artist?.Id, "an explicit choice is never overruled by popularity");
+
+        foreach (var counts in new[] { "1000,1500", "1000,null", "999,0", "1000,\"wrong type\"" })
+        {
+            var values = counts.Split(',');
+            var input = "{\"data\":[{\"id\":43,\"name\":\"North Star\",\"nb_fan\":" + values[0] + "},{\"id\":42,\"name\":\"North Star\",\"nb_fan\":" + values[1] + "}]}";
+            var otherHttp = new DiscoveryTests.Http { Override = (_, _) => Task.FromResult(new System.Net.Http.HttpResponseMessage(System.Net.HttpStatusCode.OK) { Content = new System.Net.Http.StringContent(input) }) };
+            using var other = DiscoveryTests.Catalog(Check.NewFolder("comparable-fans"), otherHttp);
+            var matches = (await other.SearchAsync("North Star", false, default)).Value;
+            Check.True(await other.PopularNamesakeAsync("North Star", matches, default) is null, "comparable, missing or malformed popularity does not invent an identity: " + counts);
+            var requests = otherHttp.Calls.Count;
+            await other.PopularNamesakeAsync("North Star", matches, default);
+            Check.Equal(requests, otherHttp.Calls.Count, "missing counts are refreshed at most once, not on every artist visit");
+        }
+
+        var legacyFolder = Check.NewFolder("legacy-artist-fans");
+        ArtistIdentityTests.Seed(legacyFolder, "search:NORTH STAR", artists);
+        var legacyHttp = new DiscoveryTests.Http { Override = http.Override };
+        using var legacy = DiscoveryTests.Catalog(legacyFolder, legacyHttp);
+        Check.Equal("deezer:42", (await legacy.PopularNamesakeAsync("North Star", artists, default))?.Id, "legacy namesake caches gain popularity through one search refresh");
+        Check.Equal(1, legacyHttp.Calls.Count, "legacy repair is one search request, not one request per candidate");
     }
 }

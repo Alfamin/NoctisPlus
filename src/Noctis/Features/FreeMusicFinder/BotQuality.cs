@@ -116,8 +116,12 @@ internal static class BotQuality
         {
             var words = Words(b.Text);
             if (pressed.Contains(b.Text)) return 0;
+            // Music Hunters (live, 2026-10-18) puts its format selector beside a Quality Info
+            // caption toggle. Both contain "quality"; only the per-service entry changes audio.
+            if (Regex.IsMatch(words, @"\bper service quality\b")) return 5;
+            if (Regex.IsMatch(words, @"\baudio quality\b")) return 4;           // "Audio Quality & Info" opens the submenu
+            if (NotQuality.IsMatch(words)) return 0;
             if (QualityLabel(b.Text)) return 4;                                    // "Audio quality", "Quality"
-            if (NotQuality.IsMatch(words)) return 0;                               // "Naming format", "Zip", "Info"
             if (services >= 2 && Regex.IsMatch(words, @"\bdeezer\b")) return 3;   // "per service quality": Deezer
             if (Regex.IsMatch(words, @"\b(format|bitrate|codec)\b")) return 2;
             if (Regex.IsMatch(words, @"\b(settings?|preferences|options|настройки|ajustes|تنظیمات)\b")) return 1;
@@ -139,6 +143,15 @@ internal sealed class TelegramQualityConversation(Client client, User user, stri
 {
     private InputPeer Peer => user;
 
+    private void Trace(string stage, QualityReply? reply = null)
+    {
+        if (!Noctis.Services.DebugLogger.IsEnabled) return;
+        // Local troubleshooting only: menu labels/types, never callback bytes, credentials or account details.
+        var menu = reply is null ? "" : " | " + string.Join(" / ", reply.Buttons.Take(12)
+            .Select(b => b.Text.ReplaceLineEndings(" ") + (b.Web ? " [web]" : b.Callback is null ? " [text]" : " [callback]")));
+        Noctis.Services.DebugLog.Write("Finder.Quality", provider + ": " + stage + menu);
+    }
+
     public async Task<QualityReply> OpenAsync(CancellationToken ct)
     {
         var info = await client.Users_GetFullUser(user).WaitAsync(TimeSpan.FromSeconds(25), ct).ConfigureAwait(false);
@@ -147,29 +160,58 @@ internal sealed class TelegramQualityConversation(Client client, User user, stri
             ?? commands.FirstOrDefault(c => c.command is "quality" or "setquality" or "set_quality")?.command
             ?? "settings";
         var sent = await client.SendMessageAsync(Peer, "/" + command).WaitAsync(TimeSpan.FromSeconds(25), ct).ConfigureAwait(false);
+        Trace("sent /" + command);
         return await WaitAsync(sent.id, null, ct).ConfigureAwait(false);
     }
 
     public async Task<QualityReply> PressAsync(QualityReply reply, QualityButton button, CancellationToken ct)
     {
+        Trace("press " + button.Text, reply);
         var latest = await client.Messages_GetHistory(Peer, limit: 1).WaitAsync(TimeSpan.FromSeconds(25), ct).ConfigureAwait(false);
         var after = latest.Messages.FirstOrDefault()?.ID ?? reply.Id;
-        string? answer = null;
         if (button.Callback is { } data)
         {
-            // A bot that is slow to acknowledge still received the press; it then edits its message.
-            try { answer = (await client.Messages_GetBotCallbackAnswer(Peer, reply.Id, data).WaitAsync(TimeSpan.FromSeconds(25), ct).ConfigureAwait(false))?.message; }
-            catch (RpcException ex) when (ex.Message.Contains("BOT_RESPONSE_TIMEOUT", StringComparison.Ordinal)) { }
+            // A menu edit is the reply too. Some bots edit it immediately but never acknowledge the callback
+            // (Telegram then waits ~15 s). Four serial acknowledgement waits exceed the entire settings deadline.
+            var callback = ReadCallbackAsync();
+            return await AfterPressAsync(provider, reply.Id, callback, token => WaitAsync(after, reply, token, button.Text), ct).ConfigureAwait(false);
+            async Task<string?> ReadCallbackAsync()
+                => (await client.Messages_GetBotCallbackAnswer(Peer, reply.Id, data)
+                    .WaitAsync(TimeSpan.FromSeconds(25), ct).ConfigureAwait(false))?.message;
         }
         else after = (await client.SendMessageAsync(Peer, button.Text).WaitAsync(TimeSpan.FromSeconds(25), ct).ConfigureAwait(false)).id;
-        if (BotLimits.Read(provider, answer ?? "", DateTimeOffset.UtcNow) is { } limited) throw limited;
-        // A callback can acknowledge the change in an alert rather than editing its message.
-        var ack = new QualityReply(reply.Id, answer ?? "", []);
-        if (BotQuality.Confirmed(ack, AudioQuality.FLAC) || BotQuality.Confirmed(ack, AudioQuality.MP3)) return ack;
-        return await WaitAsync(after, reply, ct).ConfigureAwait(false);
+        return await WaitAsync(after, reply, ct, button.Text).ConfigureAwait(false);
     }
 
-    private async Task<QualityReply> WaitAsync(int after, QualityReply? previous, CancellationToken ct)
+    internal static async Task<QualityReply> AfterPressAsync(string provider, int id, Task<string?> callback,
+        Func<CancellationToken, Task<QualityReply>> readMenu, CancellationToken ct)
+    {
+        using var stop = CancellationTokenSource.CreateLinkedTokenSource(ct);
+        var menu = readMenu(stop.Token);
+        try
+        {
+            var first = await Task.WhenAny(callback, menu).WaitAsync(ct).ConfigureAwait(false);
+            if (first == menu) return await menu.ConfigureAwait(false);
+            string? answer = null;
+            try { answer = await callback.ConfigureAwait(false); }
+            catch (RpcException ex) when (ex.Message.Contains("BOT_RESPONSE_TIMEOUT", StringComparison.Ordinal)) { }
+            if (BotLimits.Read(provider, answer ?? "", DateTimeOffset.UtcNow) is { } limited) throw limited;
+            var ack = new QualityReply(id, answer ?? "", []);
+            if (BotQuality.Confirmed(ack, AudioQuality.FLAC) || BotQuality.Confirmed(ack, AudioQuality.MP3)) return ack;
+            return await menu.WaitAsync(ct).ConfigureAwait(false);
+        }
+        finally
+        {
+            stop.Cancel();
+            // Neither task sends another press. A late acknowledgement cannot change our selected menu/quality,
+            // but its exception still needs observing if the menu won or the user cancelled.
+            _ = ObserveAsync(callback);
+            _ = ObserveAsync(menu);
+        }
+        static async Task ObserveAsync(Task task) { try { await task.ConfigureAwait(false); } catch { /* owned, bounded RPC/read; result no longer needed */ } }
+    }
+
+    private async Task<QualityReply> WaitAsync(int after, QualityReply? previous, CancellationToken ct, string? pressed = null)
     {
         var clock = System.Diagnostics.Stopwatch.StartNew();
         while (clock.Elapsed < TimeSpan.FromSeconds(20))
@@ -182,11 +224,14 @@ internal sealed class TelegramQualityConversation(Client client, User user, stri
                 if (BotLimits.Read(provider, message.message ?? "", DateTimeOffset.UtcNow) is { } limited) throw limited;
                 var reply = Read(message);
                 if (previous is not null && reply.Id == previous.Id && Fingerprint(reply) == Fingerprint(previous)) continue;
-                if (reply.Buttons.Count > 0 || BotQuality.Confirmed(reply, AudioQuality.FLAC) || BotQuality.Confirmed(reply, AudioQuality.MP3)) return reply;
+                if (reply.Buttons.Count > 0 || BotQuality.Confirmed(reply, AudioQuality.FLAC) || BotQuality.Confirmed(reply, AudioQuality.MP3))
+                { Trace("read menu", reply); return reply; }
             }
             await Task.Delay(1000, ct).ConfigureAwait(false);
         }
-        throw new TimeoutException($"BOT_QUALITY_TIMEOUT: {provider} did not answer the audio-quality setting within 20 seconds. Downloads are kept; check its chat or retry.");
+        Trace("menu wait timed out" + (pressed is null ? "" : " after " + pressed), previous);
+        var step = pressed is null ? "opening settings" : "pressing “" + pressed + "”";
+        throw new TimeoutException($"BOT_QUALITY_TIMEOUT: {provider} did not update its menu within 20 seconds after {step}. Your queue is kept and the other bot can continue. If this repeats, set audio quality in the bot's chat, then retry.");
     }
 
     private static string Fingerprint(QualityReply reply) => reply.Text + "\n" + string.Join("|", reply.Buttons.Select(b => b.Text + ":" + (b.Callback is null ? "text" : Convert.ToHexString(b.Callback))));
