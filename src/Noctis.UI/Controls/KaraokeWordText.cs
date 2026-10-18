@@ -79,6 +79,9 @@ public class KaraokeWordText : TextBlock
     {
         AffectsRender<KaraokeWordText>(ProgressProperty, BaseOpacityProperty, LeadInProperty, TrailOutProperty,
             EmphasisMsProperty, HeldDurationMsProperty, IsLastInLineProperty, LiftProperty);
+        // A TextBlock clips to its layout box by default (Avalonia 12), which sliced every
+        // ink pixel drawn past it: the float, the held-note swell, glyph overhang.
+        ClipToBoundsProperty.OverrideDefaultValue<KaraokeWordText>(false);
     }
 
     /// <summary>One drawn piece: the whole word, or one letter of a held-note word.</summary>
