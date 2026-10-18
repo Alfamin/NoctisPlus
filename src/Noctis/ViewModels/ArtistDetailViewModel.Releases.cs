@@ -127,7 +127,9 @@ public partial class ArtistDetailViewModel
             if (owned.Contains((CatalogEditions.Key(release.Title), BotText.Key(release.Artist.Name)))) continue;
             if (!_catalogAlbums.TryGetValue(release.Id, out var album))
                 _catalogAlbums[release.Id] = album = CatalogAlbumFor(release);
-            album.ArtworkPath ??= catalog.SavedArtwork(release.Artwork);
+            // The sharpest copy already on disk: the album page's large cover once it was opened (owner
+            // 10-18: Back still showed the blurry one), then a tile-size copy, then the catalog's small one.
+            if (BestSavedCover(catalog, release.Artwork) is { } best) album.ArtworkPath = best;
             _catalogReleaseOf[album] = release;
             (release.Artist.Id == profile.Artist.Id ? mine : featured).Add(album);
         }
@@ -138,6 +140,33 @@ public partial class ArtistDetailViewModel
         if (newest is not null && (LatestRelease is null || newest.Year > LatestRelease.Year)) LatestRelease = newest;
         ApplyLists();
         _ = LoadCatalogCoversAsync(catalog, _releasesStop?.Token ?? _cts.Token);
+        _ = FillLatestReleaseCountAsync(catalog, _releasesStop?.Token ?? _cts.Token);
+    }
+
+    /// <summary>The catalog's artist album list carries no track counts, so the hero's online latest
+    /// release fetches its own tracklist once (the album page's cached lookup) for "25 songs · 1:02:10".</summary>
+    private async Task FillLatestReleaseCountAsync(ArtistCatalog catalog, CancellationToken ct)
+    {
+        if (LatestRelease is not { TrackCount: <= 0 } album || !_catalogReleaseOf.TryGetValue(album, out var release)) return;
+        try
+        {
+            var answer = await catalog.AlbumAsync(release, false, ct);
+            if (ct.IsCancellationRequested || answer.Value.Songs.Count == 0) return;
+            var songs = answer.Value.Songs;
+            Avalonia.Threading.Dispatcher.UIThread.Post(() =>
+            {
+                if (ct.IsCancellationRequested) return;
+                album.TrackCount = songs.Count;
+                if (album.TotalDuration <= TimeSpan.Zero)
+                    album.TotalDuration = TimeSpan.FromSeconds(songs.Sum(s => s.Seconds ?? 0));
+                if (ReferenceEquals(LatestRelease, album)) OnPropertyChanged(nameof(LatestReleaseSongsLine));
+            });
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            Noctis.Services.DebugLog.Write("Artist", $"latest release count unavailable: {ex.Message}");
+        }
+        catch (OperationCanceledException) { }
     }
 
     private static Album CatalogAlbumFor(CatalogRelease release) => new()
@@ -162,23 +191,48 @@ public partial class ArtistDetailViewModel
     /// (the catalog's own artwork gate limits the downloads).</summary>
     private async Task LoadCatalogCoversAsync(ArtistCatalog catalog, CancellationToken ct)
     {
+        // Pass 1: the catalog's small cover where a tile has none, so every tile fills fast.
         var missing = _catalogReleaseOf.Where(p => p.Key.ArtworkPath is null && p.Value.Artwork.Length > 0)
             .OrderByDescending(p => p.Key.Year).ToList();
-        foreach (var batch in missing.Chunk(6))
+        await FetchCoversAsync(missing, pair => pair.Value.Artwork, catalog, ct, replace: false);
+        // Pass 2: a tile-size copy (sharp at 2x) replaces the small one — the small cover alone looked
+        // blurry however long the page stayed open (owner 10-18).
+        var blurry = _catalogReleaseOf.Where(p => p.Value.Artwork.Length > 0 && SharpSavedCover(catalog, p.Value.Artwork) is null)
+            .OrderByDescending(p => p.Key.Year).ToList();
+        await FetchCoversAsync(blurry, pair => CatalogArtwork.SizedUrl(pair.Value.Artwork, TileArtwork) ?? pair.Value.Artwork, catalog, ct, replace: true);
+    }
+
+    private static async Task FetchCoversAsync(List<KeyValuePair<Album, CatalogRelease>> covers, Func<KeyValuePair<Album, CatalogRelease>, string> url,
+        ArtistCatalog catalog, CancellationToken ct, bool replace)
+    {
+        foreach (var batch in covers.Chunk(6))
         {
             if (ct.IsCancellationRequested) return;
             await Task.WhenAll(batch.Select(async pair =>
             {
                 try
                 {
-                    var path = await catalog.ArtworkAsync(pair.Value.Artwork, ct);
+                    var path = await catalog.ArtworkAsync(url(pair), ct);
                     if (path is not null && !ct.IsCancellationRequested)
-                        Avalonia.Threading.Dispatcher.UIThread.Post(() => pair.Key.ArtworkPath ??= path);
+                        Avalonia.Threading.Dispatcher.UIThread.Post(() =>
+                        {
+                            if (replace) pair.Key.ArtworkPath = path; else pair.Key.ArtworkPath ??= path;
+                        });
                 }
                 catch (Exception ex) when (ex is OperationCanceledException or HttpRequestException or IOException or TimeoutException or InvalidDataException) { }
             }));
         }
     }
+
+    /// <summary>Release tiles are 190-216 px: 600 px stays sharp at 2x without a 1000 px cover per release.</summary>
+    private const int TileArtwork = 600;
+
+    private static string? SharpSavedCover(ArtistCatalog catalog, string artwork) =>
+        catalog.SavedArtwork(CatalogArtwork.LargeUrl(artwork), highQuality: true)
+        ?? catalog.SavedArtwork(CatalogArtwork.SizedUrl(artwork, TileArtwork));
+
+    private static string? BestSavedCover(ArtistCatalog catalog, string artwork) =>
+        SharpSavedCover(catalog, artwork) ?? catalog.SavedArtwork(artwork);
 
     /// <summary>A catalog tile was clicked: its songs on the album page (metadata only).</summary>
     private async Task OpenCatalogAlbumAsync(Album album)

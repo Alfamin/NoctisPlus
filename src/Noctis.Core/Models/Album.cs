@@ -379,7 +379,8 @@ public class Album : ObservableObject
     public string ReleaseKindYearLine => Year > 0 ? $"{ReleaseKindTitle} · {Year}" : ReleaseKindTitle;
 
     /// <summary>Album-page related tile caption: "1982 · 8 songs"; the count alone when the year is unknown.</summary>
-    public string YearSongsLine => Year > 0 ? $"{Year} · {SongCountText}" : SongCountText;
+    // An online release whose count the catalog has not given yet (0) shows the year alone, never "0 songs".
+    public string YearSongsLine => TrackCount <= 0 ? (Year > 0 ? Year.ToString() : "") : Year > 0 ? $"{Year} · {SongCountText}" : SongCountText;
 
     private string SongCountText => TrackCount == 1 ? "1 song" : $"{TrackCount} songs";
 

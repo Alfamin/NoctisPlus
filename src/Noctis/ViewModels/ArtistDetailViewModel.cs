@@ -279,6 +279,9 @@ public partial class ArtistDetailViewModel : ViewModelBase, ISearchable, IDispos
 
     internal static string LatestReleaseSongsLineFor(Album a)
     {
+        // An online release's count is unknown (0) until its tracklist arrives: say nothing, never "0 songs"
+        // (owner 10-18: JPEGMafia's 25-song album read "0 songs").
+        if (a.TrackCount <= 0) return "";
         var count = a.TrackCount == 1 ? "1 song" : $"{a.TrackCount} songs";
         var total = a.TotalDuration > TimeSpan.Zero
             ? a.TotalDuration
