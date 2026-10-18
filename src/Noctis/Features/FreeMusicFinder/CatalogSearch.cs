@@ -164,9 +164,20 @@ internal static class SearchRanking
             if (BotText.Key(query.Title) == BotText.Key(BotText.Plain(s.Song.Title)))
                 score += 24 * Math.Clamp(s.Song.Popularity / 1_000_000d, 0, 1) +
                     (s.Song.ArtistReach > 0 ? 8 * Math.Log10(1 + s.Song.ArtistReach) : 0);
-            if (artistIntent is not null && query.Artist.Length == 0 && s.Song.Artists.Any(a => a.Id == artistIntent.Id)) score = Math.Min(95, score + 40);
+            // "drake passionfruit" / "passionfruit drake": the artist's name and the title, without "by". The words
+            // that name the credited artist are the artist; the rest must be the title. Otherwise a cover titled
+            // "Passionfruit (Drake Cover)" wins on title words over Drake's own song (owner, 2026-10-18).
+            if (query.Artist.Length == 0 && TitleBesideArtist(query.Text, s.Song) is { } rest && BotText.Key(rest) == BotText.Key(BotText.Plain(s.Song.Title)))
+                score = Math.Max(score, 88 + 8 + 24 * Math.Clamp(s.Song.Popularity / 1_000_000d, 0, 1) +
+                    (s.Song.ArtistReach > 0 ? 8 * Math.Log10(1 + s.Song.ArtistReach) : 0));
+            // Typing an artist's name ("drake") means songs BY that artist, before songs merely called "Drake"
+            // (owner, 2026-10-18). Their order then follows popularity, below.
+            if (artistIntent is not null && query.Artist.Length == 0 && s.Song.Artists.Any(a => a.Id == artistIntent.Id)) score += 40;
             var position = songs.ToList().FindIndex(a => a.Song.Id == s.Song.Id);
-            output.Add(new("Songs", s.Song.Id, s.Song.Title, "Song · " + by, score + 3 + 8d / (1 + position * .2), Track: s));
+            // Among comparable matches the more popular recording leads (Deezer's own rank), so covers, karaoke and
+            // "in the style of" versions sit below the song people mean.
+            var popular = 20 * Math.Clamp(s.Song.Popularity / 1_000_000d, 0, 1);
+            output.Add(new("Songs", s.Song.Id, s.Song.Title, "Song · " + by, score + popular + 3 + 8d / (1 + position * .2), Track: s));
         }
         var orderedAlbums = ArtistCatalog.RelevanceEditions(albums);
         for (var position = 0; position < orderedAlbums.Count; position++)
@@ -190,7 +201,8 @@ internal static class SearchRanking
             foreach (var by in hit.Track!.Song.Artists)
             {
                 var titleMatch = Fit(query.Title, hit.Title) >= 60;
-                if (!titleMatch && Fit(query.Text, by.Name) < 60 && (query.Artist.Length == 0 || Fit(query.Artist, by.Name) < 60)) continue;
+                var named = query.Artist.Length == 0 && TitleBesideArtist(query.Text, hit.Track!.Song) is not null && Words(by.Name) is { Count: > 0 } byWords && byWords.All(Words(query.Text).Contains);
+                if (!titleMatch && !named && Fit(query.Text, by.Name) < 60 && (query.Artist.Length == 0 || Fit(query.Artist, by.Name) < 60)) continue;
                 Remember(by, hit.Score + 18, hit.Score, titleMatch ? "Artist of “" + hit.Title + "”" : "Artist · " + by.Name);
             }
         }
@@ -206,11 +218,34 @@ internal static class SearchRanking
             }
             else output.Add(new("Artists", context.Artist.Id, context.Artist.Name, context.Reason, context.SourceScore - 1, Artist: context.Artist, ArtistRank: context.Rank));
         }
+        // Typing an artist's name leads with that artist (and its releases) above its own songs. A more popular
+        // recording with that exact title by someone else may still lead.
+        if (artistIntent is not null && query.Artist.Length == 0 && output.FindIndex(h => h.Artist?.Id == artistIntent.Id) is var leading and >= 0)
+        {
+            var best = output.Where(h => h.Kind != "Artists").OrderByDescending(h => h.Score).FirstOrDefault();
+            if (best?.Track is { } track && track.Song.Artists.Any(a => a.Id == artistIntent.Id) && best.Score >= output[leading].Score)
+                output[leading] = output[leading] with { Score = best.Score + 1 };
+        }
         return output.OrderByDescending(h => h.Score).ThenBy(h => h.Kind == "Albums" ? 0 : h.Kind == "Songs" ? 1 : 2).ToList();
         void Remember(CatalogArtist by, double rank, double sourceScore, string reason)
         {
             if (!related.TryGetValue(by.Id, out var old) || rank > old.Rank) related[by.Id] = (by, rank, sourceScore, reason);
         }
+    }
+    /// <summary>The query without the words of one credited artist's name, when it contains all of them and
+    /// something else; otherwise null.</summary>
+    private static string? TitleBesideArtist(string query, CatalogSong song)
+    {
+        var words = Regex.Matches(query.Normalize(System.Text.NormalizationForm.FormKC).ToLowerInvariant(), @"[\p{L}\p{N}]+").Select(m => m.Value).ToList();
+        foreach (var artist in song.Artists)
+        {
+            var name = Words(artist.Name);
+            if (name.Count == 0 || !name.All(words.Contains)) continue;
+            var rest = words.ToList();
+            foreach (var word in name) rest.Remove(word);
+            if (rest.Count > 0) return string.Join(" ", rest);
+        }
+        return null;
     }
     internal static IEnumerable<FinderHit> Artists(IEnumerable<FinderHit> hits) => hits.Where(h => h.Artist is not null).OrderByDescending(h => h.ArtistRank ?? h.Score);
     internal static IEnumerable<CatalogSearchSong> DeduplicateSongs(IEnumerable<CatalogSearchSong> songs) => songs

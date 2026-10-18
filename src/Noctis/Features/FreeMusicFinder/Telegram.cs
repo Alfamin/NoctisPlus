@@ -127,6 +127,16 @@ internal sealed class TelegramAccount : ITelegramSignIn, IDisposable
     }
     private readonly object _qualityFileLock = new();
 
+    private void RecordQuality(string username, BotQualityState state)
+    {
+        lock (_qualityFileLock)
+        {
+            var states = ReadQualities();
+            states[QualityKey(username)] = state;
+            AtomicJson.Write(QualityFile, states);
+        }
+    }
+
     /// <summary>
     /// Sets a bot to this format through its own settings menu, once: the result is kept with the login, so later
     /// songs, reconnects and restarts send nothing. Asked again only when the preference changes or the bot's audio
@@ -148,28 +158,29 @@ internal sealed class TelegramAccount : ITelegramSignIn, IDisposable
                     throw silent ? new TimeoutException(known.Problem) : new BotAnswerException(known.Problem);
             }
             var client = await ConnectAsync(ct).ConfigureAwait(false);
-            BotQualityState result; bool changed = false; Exception? problem = null;
+            // Recorded BEFORE anything is typed: whatever happens next (an answer Noctis does not know, a Telegram
+            // error, a crash), the next song does not send "/settings" again; it is tried again after ten minutes at
+            // the earliest (owner, 2026-10-18: it was typed before every song).
+            RecordQuality(username, new(quality.ToString(), DateTimeOffset.UtcNow, "BOT_QUALITY_TIMEOUT: " + provider + "'s settings were being checked."));
+            bool changed;
             try
             {
                 var user = await BotAsync(client, username).ConfigureAwait(false);
                 await StartBotAsync(client, user, username, ct).ConfigureAwait(false);
                 changed = await BotQuality.ApplyAsync(provider, new TelegramQualityConversation(client, user, provider), quality, ct).ConfigureAwait(false);
-                result = new(quality.ToString(), DateTimeOffset.UtcNow);
             }
-            catch (Exception ex) when (ex is BotAnswerException || ex is TimeoutException && !ct.IsCancellationRequested)
+            catch (Exception ex) when (!(ex is OperationCanceledException && ct.IsCancellationRequested))
             {
-                // A bot that does not answer (it is down, say) must not hold up every song for its timeout.
-                var message = ex is TimeoutException && !ex.Message.StartsWith("BOT_QUALITY_TIMEOUT", StringComparison.Ordinal)
-                    ? "BOT_QUALITY_TIMEOUT: " + provider + " did not answer: " + ex.Message : ex.Message;
-                problem = ex; result = new(quality.ToString(), DateTimeOffset.UtcNow, message);
+                // A menu Noctis could not follow waits a day; a bot or network that did not answer, ten minutes.
+                var message = ex is BotAnswerException || ex.Message.StartsWith("BOT_QUALITY_", StringComparison.Ordinal) ? ex.Message
+                    : ex is TimeoutException or RpcException or IOException or System.Net.Sockets.SocketException
+                        ? "BOT_QUALITY_TIMEOUT: " + provider + " did not answer: " + ex.Message
+                        : "BOT_QUALITY_UNVERIFIED: " + provider + "'s settings failed: " + ex.Message;
+                RecordQuality(username, new(quality.ToString(), DateTimeOffset.UtcNow, message));
+                _log?.Invoke(message);
+                throw;
             }
-            lock (_qualityFileLock)
-            {
-                var states = ReadQualities();
-                states[QualityKey(username)] = result;
-                AtomicJson.Write(QualityFile, states);
-            }
-            if (problem is not null) { _log?.Invoke(problem.Message); throw problem; }
+            RecordQuality(username, new(quality.ToString(), DateTimeOffset.UtcNow));
             _log?.Invoke(provider + (changed ? " switched to " : " already uses ") + quality + ".");
             return changed;
         }

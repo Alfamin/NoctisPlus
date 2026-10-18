@@ -50,6 +50,29 @@ internal static class UnifiedSearchTests
         Check.Equal("Flaws & Sins North Star", query.Term, "natural title by artist becomes a catalog query without the connector");
         Check.Equal("Stand by Me", FinderQuery.Parse("Stand by Me").Text, "the original user search is retained");
         Check.Equal("Stand by Me", SearchRanking.Build(FinderQuery.Parse("Stand by Me"), [], [Song(108, "Stand by Me", new("deezer:800", "Ben E. King"))], [])[0].Title, "a by inside the song's actual title is not discarded by intent ranking");
+        // Owner, 2026-10-18: "drake passionfruit" showed covers and karaoke, not Drake's song. Deezer's real answer, in its order and ranks.
+        var drake = new CatalogArtist("deezer:246791", "Drake");
+        CatalogSearchSong Ranked(int id, string title, CatalogArtist by, int rank) => Song(id, title, by) with { Song = new("deezer:" + id, title, [by], 200, true, Popularity: rank) };
+        var passionfruit = new[]
+        {
+            Ranked(1, "Passionfruit", drake, 873309), Ranked(2, "Passionfruit (Drake Cover)", new("deezer:2", "Prudence"), 280486),
+            Ranked(3, "Passionfruit (In the Style of Drake)", new("deezer:3", "UK Top 40 Backing Tracks 2017"), 18203),
+            Ranked(4, "Passionfruit by Drake", new("deezer:4", "YEAST"), 15553), Ranked(5, "Passionfruit Drake", new("deezer:5", "Aiden Yoo"), 21112),
+            Ranked(13, "Passionfruit (made popular by Drake) [karaoke version]", new("deezer:13", "Party Tyme Karaoke"), 68313),
+        };
+        foreach (var typed in new[] { "drake passionfruit", "passionfruit drake", "Drake Passionfruit" })
+        {
+            var hits = SearchRanking.Build(FinderQuery.Parse(typed), [], passionfruit, []);
+            Check.Equal("deezer:1", hits.First(h => h.Kind == "Songs").Id, $"\"{typed}\" leads with Drake's own Passionfruit, not a cover");
+            Check.Equal(drake.Id, SearchRanking.Artists(hits).First().Artist?.Id, $"\"{typed}\": Drake is the first artist shown");
+        }
+        var drakeSongs = new[]
+        {
+            Ranked(20, "Drake", new("deezer:20", "Small Band"), 9000), Ranked(21, "God's Plan", drake, 900000),
+            Ranked(22, "Hotline Bling", drake, 850000), Ranked(23, "Drake (Interlude)", new("deezer:23", "Someone"), 4000),
+        };
+        var byName = SearchRanking.Build(FinderQuery.Parse("drake"), [drake], drakeSongs, []).Where(h => h.Kind == "Songs").Select(h => h.Id).ToList();
+        Check.Equal("deezer:21,deezer:22", string.Join(",", byName.Take(2)), "typing \"drake\": Drake's songs, most popular first, before songs called \"Drake\"");
         var songs = new[] { Song(101, "Flaws & Sins"), Song(102, "Night"), Song(103, "Morning") };
         var rank = SearchRanking.Build(FinderQuery.Parse("North Star"), [Other, Main], songs, [Orbit]);
         Check.Equal(Main.Id, rank[0].Artist?.Id, "an artist query leads with the exact artist supported by song identities, even after a namesake");

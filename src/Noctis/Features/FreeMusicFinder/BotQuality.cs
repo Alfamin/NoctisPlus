@@ -156,7 +156,11 @@ internal sealed class TelegramQualityConversation(Client client, User user, stri
         var after = latest.Messages.FirstOrDefault()?.ID ?? reply.Id;
         string? answer = null;
         if (button.Callback is { } data)
-            answer = (await client.Messages_GetBotCallbackAnswer(Peer, reply.Id, data).WaitAsync(TimeSpan.FromSeconds(25), ct).ConfigureAwait(false))?.message;
+        {
+            // A bot that is slow to acknowledge still received the press; it then edits its message.
+            try { answer = (await client.Messages_GetBotCallbackAnswer(Peer, reply.Id, data).WaitAsync(TimeSpan.FromSeconds(25), ct).ConfigureAwait(false))?.message; }
+            catch (RpcException ex) when (ex.Message.Contains("BOT_RESPONSE_TIMEOUT", StringComparison.Ordinal)) { }
+        }
         else after = (await client.SendMessageAsync(Peer, button.Text).WaitAsync(TimeSpan.FromSeconds(25), ct).ConfigureAwait(false)).id;
         if (BotLimits.Read(provider, answer ?? "", DateTimeOffset.UtcNow) is { } limited) throw limited;
         // A callback can acknowledge the change in an alert rather than editing its message.
