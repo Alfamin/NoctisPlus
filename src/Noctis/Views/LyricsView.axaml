@@ -280,7 +280,9 @@
              would low-pass the per-frame values and lag the vocal. -->
 
         <!-- Word base layer: full brightness on inactive lines (matches plain line text),
-             fades to a soft ghost while the line is active so the sweep reads on top. -->
+             fades to a soft ghost while the line is active so the sweep reads on top. The
+             word layers' "active" class is IsSweepFocused: also on while the list leads
+             into the line, which already sits at full line opacity then. -->
         <Style Selector="ItemsControl.word-layer TextBlock.word-sweep">
             <Setter Property="controls:KaraokeWordText.BaseOpacity" Value="1.0"/>
             <Setter Property="Transitions">
@@ -1060,7 +1062,7 @@
                                              base layer at full opacity — indistinguishable from plain line text. -->
                                         <ItemsControl ItemsSource="{Binding Words}"
                                                       Classes="word-layer"
-                                                      Classes.active="{Binding IsActive}"
+                                                      Classes.active="{Binding IsSweepFocused}"
                                                       IsVisible="{Binding ShowWords}"
                                                       Opacity="{Binding LineOpacity}"
                                                       HorizontalAlignment="Left"
@@ -1151,7 +1153,7 @@
                                          line has one, so wrap geometry never changes on activation. -->
                                     <ItemsControl ItemsSource="{Binding BackgroundWords}"
                                                   Classes="word-layer bg-vocals"
-                                                  Classes.active="{Binding IsActive}"
+                                                  Classes.active="{Binding IsSweepFocused}"
                                                   Opacity="{Binding LineOpacity}"
                                                   HorizontalAlignment="{Binding Voice, Converter={StaticResource VoiceAlign}}"
                                                   ClipToBounds="False"
@@ -1183,7 +1185,7 @@
                                          lights and dims with the line. Each row also answers its Settings toggle. -->
                                     <ItemsControl ItemsSource="{Binding TransliterationWords}"
                                                   Classes="word-layer romanization"
-                                                  Classes.active="{Binding IsActive}"
+                                                  Classes.active="{Binding IsSweepFocused}"
                                                   Opacity="{Binding LineOpacity}"
                                                   HorizontalAlignment="{Binding Voice, Converter={StaticResource VoiceAlign}}"
                                                   ClipToBounds="False"

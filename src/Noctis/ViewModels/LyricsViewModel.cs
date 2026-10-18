@@ -3591,7 +3591,7 @@ public partial class LyricsViewModel : ViewModelBase, IDisposable
         // stays lit under the active one finishes, so the ramp re-centres on what's left.
         if (!step.ActiveSetChanged)
         {
-            ScrollLineIndex = _timeline.ScrollIndex(position, ScrollLead);
+            ScrollLineIndex = _timeline.Lead(position, ScrollLead);
             return;
         }
         if (DebugLog.VlcBridgeEnabled)
@@ -3603,7 +3603,7 @@ public partial class LyricsViewModel : ViewModelBase, IDisposable
                 : $"lit set [{string.Join(",", _timeline.ActiveIndices)}] at {position.TotalMilliseconds:0}ms (active {step.ActiveIndex})");
         }
         ActiveLineIndex = step.ActiveIndex;
-        ScrollLineIndex = _timeline.ScrollIndex(position, ScrollLead);
+        ScrollLineIndex = _timeline.Lead(position, ScrollLead);
         UpdateLineOpacities(step.ActiveIndex);
         UpdateWordClockSubscription();
     }
