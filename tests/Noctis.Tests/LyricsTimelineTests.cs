@@ -85,6 +85,86 @@ public class LyricsTimelineTests
         Assert.Equal(0, t.ScrollIndex(TimeSpan.FromSeconds(4.6), Lead));
     }
 
+    // ── Lead (owner 10-18, Thriller): the line the list leads into gets the active line's
+    // opacity, so it must show the unsung look, never its words fully lit. ──
+    private static void Step(LyricsTimeline t, double s)
+    {
+        t.Update(TimeSpan.FromSeconds(s));
+        t.Lead(TimeSpan.FromSeconds(s), Lead);
+    }
+
+    [Fact]
+    public void Lead_marks_the_incoming_line_unsung_until_it_activates()
+    {
+        var a = WordLine(1, ("a", 1, 2)); var b = WordLine(5, ("b1", 5, 5.5), ("b2", 5.5, 6));
+        var t = Make(a, b);
+
+        Step(t, 4.5);
+        Assert.False(b.IsLeading);
+        Assert.False(b.IsSweepFocused);
+
+        Step(t, 4.6);                                    // list leads into b
+        Assert.True(b.IsLeading);
+        Assert.True(b.IsSweepFocused);
+        Assert.False(b.IsActive);
+        Assert.Equal(-1, b.CurrentWordIndex);
+        Assert.All(b.Words!, w => Assert.True(w.Progress <= 0));
+
+        // Activation: IsSweepFocused never drops between the lead and the active state.
+        var focusDropped = false;
+        b.PropertyChanged += (_, e) =>
+        {
+            if (e.PropertyName == nameof(LyricLine.IsSweepFocused) && !b.IsSweepFocused) focusDropped = true;
+        };
+        Step(t, 4.95);
+        Assert.True(b.IsActive);
+        Assert.False(b.IsLeading);
+        Assert.True(b.IsSweepFocused);
+        Assert.False(focusDropped);
+    }
+
+    [Fact]
+    public void Lead_into_a_line_sung_before_a_seek_back_resets_its_words_to_unsung()
+    {
+        var a = WordLine(1, ("a", 1, 2)); var b = WordLine(5, ("b1", 5, 5.5), ("b2", 5.5, 6)); var c = WordLine(9, ("c", 9, 10));
+        var t = Make(a, b, c);
+        for (var s = 1.0; s <= 9.5; s += 0.1) Step(t, s);   // b sung, then left fully swept
+        Assert.Equal(b.Words!.Count, b.CurrentWordIndex);
+
+        Step(t, 4.6);                                        // seek back into b's lead
+        Assert.Equal(0, t.ActiveIndex);
+        Assert.True(b.IsLeading);
+        Assert.Equal(-1, b.CurrentWordIndex);
+        Assert.All(b.Words!, w => Assert.True(w.Progress <= 0, $"{w.Text} progress {w.Progress}"));
+    }
+
+    [Fact]
+    public void Lead_clears_on_a_seek_out_of_the_window_and_on_reset()
+    {
+        var a = WordLine(1, ("a", 1, 2)); var b = WordLine(5, ("b", 5, 6));
+        var t = Make(a, b);
+        Step(t, 4.6);
+        Assert.True(b.IsLeading);
+
+        Step(t, 1.5);                                        // seek back before the lead
+        Assert.False(b.IsLeading);
+        Assert.False(b.IsSweepFocused);
+
+        Step(t, 4.6);
+        Assert.True(b.IsLeading);
+        t.Reset();                                           // track change / reload
+        Assert.False(b.IsLeading);
+    }
+
+    [Fact]
+    public void Lead_does_not_mark_plain_lines()
+    {
+        var a = WordLine(1, ("a", 1, 2)); var b = Line(5, "b");
+        var t = Make(a, b);
+        Step(t, 4.6);
+        Assert.False(b.IsLeading);
+    }
+
     [Fact]
     public void Before_first_line_nothing_is_active()
     {

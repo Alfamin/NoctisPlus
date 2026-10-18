@@ -29,7 +29,22 @@ public partial class LyricLine : ObservableObject
 
     /// <summary>Whether this line is currently active (highlighted during playback).</summary>
     [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(IsSweepFocused))]
     private bool _isActive;
+
+    /// <summary>
+    /// True while the lyric list glides into this line ahead of its activation
+    /// (LyricsTimeline.Lead): the focus ramp already gives it full opacity, so its words
+    /// must already show the unsung look — the inactive look draws unsung text at full
+    /// brightness, which read as the whole line lit white before its first word.
+    /// </summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(IsSweepFocused))]
+    private bool _isLeading;
+
+    /// <summary>The word layers show the karaoke look (dim unsung text, the sweep lit on
+    /// top): the line is active, or the list is leading into it.</summary>
+    public bool IsSweepFocused => IsActive || IsLeading;
 
     /// <summary>
     /// Display opacity based on distance from active line (1.0=active, 0.25=next, 0.0=hidden).

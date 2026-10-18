@@ -110,6 +110,7 @@ public sealed class LyricsTimeline
     {
         if (ActiveLine is { } l) l.IsActive = false;
         foreach (var line in _activeLines) line.IsActive = false;
+        ClearLead();
         ClearMotion();
         _activeLines.Clear();
         _activeIndices.Clear();
@@ -257,6 +258,40 @@ public sealed class LyricsTimeline
             if (end > leadStart) leadStart = end;
         }
         return position + _wordLookahead >= leadStart ? active + 1 : active;
+    }
+
+    /// <summary>
+    /// <see cref="ScrollIndex"/>, applied to the lines: while the list leads into the next
+    /// line, that line is <see cref="LyricLine.IsLeading"/> with every word layer reset to
+    /// unsung (a line sung before a seek back still holds its words fully swept), so it
+    /// comes in at the unsung level and lights only as the sweep reaches it. Call after
+    /// <see cref="Update"/>: a lead line that just activated is already
+    /// <see cref="LyricLine.IsActive"/> when its lead flag drops, so its word layers never
+    /// flip back to the inactive look in between.
+    /// </summary>
+    public int Lead(TimeSpan position, TimeSpan scrollLead)
+    {
+        var index = ScrollIndex(position, scrollLead);
+        var lead = index >= 0 && index != ActiveIndex && index < _lines.Count ? _lines[index] : null;
+        if (ReferenceEquals(lead, _leadLine)) return index;
+        if (lead != null)
+        {
+            if (lead.HasWords) lead.CurrentWordIndex = -1;
+            if (lead.HasBackgroundWords) lead.BackgroundWordIndex = -1;
+            if (lead.HasTransliterationWords) lead.TransliterationWordIndex = -1;
+            lead.IsLeading = true;
+        }
+        if (_leadLine != null) _leadLine.IsLeading = false;
+        _leadLine = lead;
+        return index;
+    }
+
+    private LyricLine? _leadLine;
+
+    private void ClearLead()
+    {
+        if (_leadLine != null) _leadLine.IsLeading = false;
+        _leadLine = null;
     }
 
     private TimeSpan Adjusted(TimeSpan position, LyricLine l) =>
