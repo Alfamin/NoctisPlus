@@ -901,8 +901,28 @@
                         <!-- Compact header: "Queue • N", and with Keep Played Songs on a
                              Clear Played button at the right end (GitHub #134). -->
                         <DockPanel DockPanel.Dock="Top" Margin="20,16,16,6">
+                        <!-- Reshuffle (Discord, vari): the same quiet chip, icon-only so it fits
+                             beside Clear Played in every language; shown while Shuffle is on, as
+                             Clear Played is while Keep Played Songs is, and dimmed with fewer
+                             than two songs up next (the command's CanExecute). -->
+                        <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" Spacing="6"
+                                    VerticalAlignment="Center">
+                        <Button x:Name="QueueReshuffleButton"
+                                Classes="queue-clear-played"
+                                Command="{Binding Player.ReshuffleCommand}"
+                                IsVisible="{Binding Player.IsShuffleEnabled}"
+                                ToolTip.Tip="{loc:T Queue.Reshuffle}"
+                                Width="28" Height="24"
+                                Padding="0"
+                                CornerRadius="999"
+                                HorizontalContentAlignment="Center"
+                                VerticalContentAlignment="Center"
+                                VerticalAlignment="Center"
+                                Cursor="Hand">
+                            <PathIcon Data="{StaticResource ShuffleIcon}" Width="13" Height="13"
+                                      Foreground="{DynamicResource QueueDrawerForeground}"/>
+                        </Button>
                         <Button x:Name="QueueClearPlayedButton"
-                                DockPanel.Dock="Right"
                                 Classes="queue-clear-played"
                                 Content="{loc:T Queue.ClearPlayed}"
                                 Click="OnQueueClearPlayedClick"
@@ -914,6 +934,7 @@
                                 CornerRadius="999"
                                 VerticalAlignment="Center"
                                 Cursor="Hand" />
+                        </StackPanel>
                         <StackPanel Orientation="Horizontal" Spacing="7"
                                     VerticalAlignment="Center">
                             <TextBlock Text="{loc:T Main.Queue}"

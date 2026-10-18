@@ -1284,6 +1284,7 @@ Deezer и TIDAL: вставьте ссылку.</value></data>
   <data name="Main.QueueNothingUpNextTitle" xml:space="preserve"><value>Дальше ничего нет</value><comment>Queue popup in MainWindow.axaml (GitHub #134)</comment></data>
   <data name="Main.QueueNothingUpNextHint" xml:space="preserve"><value>Перетащите сюда песни или выберите «Играть следующим» / «В очередь», чтобы музыка не останавливалась.</value><comment>Queue popup in MainWindow.axaml (GitHub #134)</comment></data>
   <data name="Queue.ClearPlayed" xml:space="preserve"><value>Очистить прослушанные</value><comment>Queue popup header button and row menu in MainWindow.axaml (GitHub #134)</comment></data>
+  <data name="Queue.Reshuffle" xml:space="preserve"><value>Перемешать заново</value><comment>Queue popup header button tooltip in MainWindow.axaml: a new random order for Up Next, shown while Shuffle is on</comment></data>
   <data name="Main.RemoveFromQueue" xml:space="preserve"><value>Удалить из очереди</value><comment>Header in MainWindow.axaml</comment></data>
   <data name="Main.ScanReplayGain" xml:space="preserve"><value>Сканировать ReplayGain</value><comment>Queue row menu in MainWindow.axaml</comment></data>
   <data name="Main.ExplicitTip" xml:space="preserve"><value>Ненормативная лексика</value><comment>ToolTip.Tip in MainWindow.axaml</comment></data>

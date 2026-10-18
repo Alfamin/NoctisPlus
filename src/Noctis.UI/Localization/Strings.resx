@@ -1284,6 +1284,7 @@ Saving replaces them with the lyrics on screen. A lyrics file Noctis didn't writ
   <data name="Main.QueueNothingUpNextTitle" xml:space="preserve"><value>Nothing up next</value><comment>Queue popup in MainWindow.axaml (GitHub #134)</comment></data>
   <data name="Main.QueueNothingUpNextHint" xml:space="preserve"><value>Drag songs here, or use Play Next / Add to Queue to keep the music going.</value><comment>Queue popup in MainWindow.axaml (GitHub #134)</comment></data>
   <data name="Queue.ClearPlayed" xml:space="preserve"><value>Clear Played</value><comment>Queue popup header button and row menu in MainWindow.axaml (GitHub #134)</comment></data>
+  <data name="Queue.Reshuffle" xml:space="preserve"><value>Reshuffle</value><comment>Queue popup header button tooltip in MainWindow.axaml: a new random order for Up Next, shown while Shuffle is on</comment></data>
   <data name="Main.RemoveFromQueue" xml:space="preserve"><value>Remove from Queue</value><comment>Header in MainWindow.axaml</comment></data>
   <data name="Main.ScanReplayGain" xml:space="preserve"><value>Scan ReplayGain</value><comment>Queue row menu in MainWindow.axaml</comment></data>
   <data name="Main.ExplicitTip" xml:space="preserve"><value>Explicit</value><comment>ToolTip.Tip in MainWindow.axaml</comment></data>
