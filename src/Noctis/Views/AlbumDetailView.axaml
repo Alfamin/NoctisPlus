@@ -836,7 +836,7 @@
                        FontSize="13"
                        Opacity="0.45"
                        IsVisible="{Binding Album.HasReleaseDate}" />
-            <TextBlock FontSize="13" Opacity="0.45">
+            <TextBlock x:Name="AlbumFooterStats" FontSize="13" Opacity="0.45">
                 <TextBlock.Text>
                     <MultiBinding Converter="{x:Static helpers:AlbumFacts.SongsAndLength}">
                         <Binding Path="Album.TrackCount" />

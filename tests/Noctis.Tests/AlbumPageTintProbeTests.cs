@@ -127,8 +127,7 @@ public class AlbumPageTintProbeTests
         Assert.True(scroller.Viewport.Height > 300);
         Assert.True(block.Bounds.Height >= scroller.Viewport.Height - 0.5, "tinted block must reach the bottom of the viewport");
         Assert.False(related.IsVisible, "no related albums → no related block");
-        var footer = view.GetVisualDescendants().OfType<TextBlock>()
-            .First(t => t.Text?.Contains("songs,") == true);
+        var footer = view.FindControl<TextBlock>("AlbumFooterStats")!;
         var footerBottom = footer.TranslatePoint(new Point(0, footer.Bounds.Height), block)!.Value.Y;
         _out.WriteLine($"footer bottom={footerBottom} block bottom={block.Bounds.Height}");
         Assert.InRange(block.Bounds.Height - footerBottom, 100, 160); // bar clearance, not mid-page
@@ -185,7 +184,7 @@ public class AlbumPageTintProbeTests
         var bg = view.FindControl<Border>("AlbumTintBg")!;
         var related = view.FindControl<StackPanel>("RelatedSections")!;
         var scroller = view.FindControl<ScrollViewer>("TrackScrollViewer")!;
-        var footer = view.GetVisualDescendants().OfType<TextBlock>().First(t => t.Text?.Contains("songs,") == true);
+        var footer = view.FindControl<TextBlock>("AlbumFooterStats")!;
         double Top(Visual v) => v.TranslatePoint(default, view)!.Value.Y;
         double Bottom(Visual v) => v.TranslatePoint(new Point(0, v.Bounds.Height), view)!.Value.Y;
 

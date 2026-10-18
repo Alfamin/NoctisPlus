@@ -1,9 +1,12 @@
 using Avalonia.Headless.XUnit;
+using Avalonia.Controls;
+using Avalonia.VisualTree;
 using Avalonia.Threading;
 using FreeMusicFinder;
 using Noctis.Models;
 using Noctis.Services;
 using Noctis.ViewModels;
+using Noctis.Views;
 using Xunit;
 
 namespace Noctis.Tests;
@@ -82,5 +85,28 @@ public class OnlineAlbumOpeningTests
         closed.ShowCatalogLoading(release);
         closed.Dispose();
         Assert.False(closed.IsCatalogLoadingFor(release.Id)); // a late answer never fills a closed page
+    }
+
+    [AvaloniaFact]
+    public void FilledAlbumFacts_UpdateTheExistingView_AndNeverClaimZeroLength()
+    {
+        AddToPlaylistDialogTests.EnsureAppStyles();
+        var artist = new CatalogArtist("deezer:9", "Synthetic Band");
+        var release = new CatalogRelease("deezer:90", "Loading facts", artist, "2020", "album", 2);
+        var vm = Page(release);
+        vm.Album.TrackCount = 2;
+        vm.ShowCatalogLoading(release);
+        var view = new AlbumDetailView { DataContext = vm };
+        var window = new Window { Content = view, Width = 1280, Height = 900 };
+        try
+        {
+            window.Show(); Dispatcher.UIThread.RunJobs(); window.UpdateLayout();
+            Assert.DoesNotContain(view.GetVisualDescendants().OfType<TextBlock>(), t => t.Text?.Contains("0m 00s") == true);
+            vm.ShowCatalog(new(new(release, [new("deezer:91", "One", [artist], 200, false), new("deezer:92", "Two", [artist], 180, false)]), new Dictionary<string, DiscoveryMatch>()));
+            Dispatcher.UIThread.RunJobs(); window.UpdateLayout();
+            Assert.Contains(view.GetVisualDescendants().OfType<TextBlock>(), t => t.Text?.Contains("6m 20s") == true);
+            Assert.DoesNotContain(view.GetVisualDescendants().OfType<TextBlock>(), t => t.Text?.Contains("0 min") == true);
+        }
+        finally { window.Close(); vm.Dispose(); }
     }
 }

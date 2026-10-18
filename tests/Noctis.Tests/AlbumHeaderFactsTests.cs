@@ -79,7 +79,22 @@ public class AlbumHeaderFactsTests
     {
         Assert.Equal("24 sec", Make(1, seconds: 24).TotalDurationFormatted);
         Assert.Equal("3 min", Make(1, seconds: 227).TotalDurationFormatted);
-        Assert.Equal("0 min", Make(0).TotalDurationFormatted);
+        Assert.Equal("", Make(0).TotalDurationFormatted);
+    }
+
+    [Fact]
+    public void CatalogFacts_NotifyNestedBindings_WhenTheSameAlbumObjectFills()
+    {
+        var album = new Album { TrackCount = 32 };
+        var changed = new List<string?>();
+        album.PropertyChanged += (_, e) => changed.Add(e.PropertyName);
+        Assert.Equal("", album.HeaderDurationFormatted);
+        album.TrackCount = 2;
+        album.TotalDuration = TimeSpan.FromSeconds(380);
+        Assert.Contains(nameof(Album.TrackCountText), changed);
+        Assert.Contains(nameof(Album.HeaderDurationFormatted), changed);
+        Assert.Contains(nameof(Album.TotalDurationFormatted), changed);
+        Assert.Equal("6m 20s", album.HeaderDurationFormatted);
     }
 
     [Fact]

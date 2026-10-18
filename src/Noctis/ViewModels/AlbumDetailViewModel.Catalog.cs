@@ -113,8 +113,9 @@ public partial class AlbumDetailViewModel
         OnPropertyChanged(nameof(IsCatalogLoading));
         if (wasLoading)
         {
-            Album.TrackCount = open.Album.Songs.Count;
-            Album.TotalDuration = TimeSpan.FromSeconds(open.Album.Songs.Sum(s => s.Seconds ?? 0));
+            Album.TrackCount = Math.Max(open.Album.Release.Count, open.Album.Songs.Count);
+            Album.TotalDuration = open.Album.Songs.Count >= Album.TrackCount && open.Album.Songs.All(s => s.Seconds is > 0)
+                ? TimeSpan.FromSeconds(open.Album.Songs.Sum(s => s.Seconds!.Value)) : TimeSpan.Zero;
             OnPropertyChanged(nameof(Album)); // the header's facts read these plain values
         }
         if (Services.Search.OnlineMusicSearch.Current is { } online && !ReferenceEquals(online, _catalogOnline))

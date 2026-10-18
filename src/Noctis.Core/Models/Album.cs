@@ -48,10 +48,25 @@ public class Album : ObservableObject
     public string Genre { get; set; } = "Unknown";
 
     /// <summary>Number of tracks in this album.</summary>
-    public int TrackCount { get; set; }
+    public int TrackCount
+    {
+        get => _trackCount;
+        set { if (SetProperty(ref _trackCount, value)) OnPropertyChanged(nameof(TrackCountText)); }
+    }
+    private int _trackCount;
 
     /// <summary>Sum of all track durations.</summary>
-    public TimeSpan TotalDuration { get; set; }
+    public TimeSpan TotalDuration
+    {
+        get => _totalDuration;
+        set
+        {
+            if (!SetProperty(ref _totalDuration, value)) return;
+            OnPropertyChanged(nameof(TotalDurationFormatted));
+            OnPropertyChanged(nameof(HeaderDurationFormatted));
+        }
+    }
+    private TimeSpan _totalDuration;
 
     /// <summary>
     /// Path to cached artwork file on disk (%APPDATA%\Noctis\artwork\{id}.jpg).
@@ -105,7 +120,7 @@ public class Album : ObservableObject
     public string ArtistDisplay => ArtistCredit.Display(Artist);
 
     /// <summary>Formatted total duration. Under a minute shows seconds ("24 sec"), not "0 min".</summary>
-    public string TotalDurationFormatted => Noctis.Helpers.DurationText.Total(TotalDuration);
+    public string TotalDurationFormatted => TotalDuration <= TimeSpan.Zero ? "" : Noctis.Helpers.DurationText.Total(TotalDuration);
 
     public const string MixedQualityBadge = "Mixed";
     public const string MixedQualityDescription =
@@ -402,7 +417,7 @@ public class Album : ObservableObject
 
     /// <summary>Header duration with seconds ("55m 51s"), hours when long ("1h 12m").</summary>
     public string HeaderDurationFormatted =>
-        TrackCount <= 0 && TotalDuration <= TimeSpan.Zero ? "" :
+        TotalDuration <= TimeSpan.Zero ? "" :
         TotalDuration.TotalHours >= 1
             ? $"{(int)TotalDuration.TotalHours}h {TotalDuration.Minutes}m"
             : $"{(int)TotalDuration.TotalMinutes}m {TotalDuration.Seconds:00}s";

@@ -15,6 +15,7 @@ public static class AlbumFacts
         var list = values.ToList();
         var count = list.Count > 0 && list[0] is int n ? n : 0;
         var length = list.Count > 1 ? list[1]?.ToString() ?? string.Empty : string.Empty;
+        if (length.Length == 0) return count <= 0 ? "" : count == 1 ? "1 song" : $"{count} songs";
         return count == 1
             ? Loc.T("AlbumDetail.FooterOneSong", length)
             : Loc.T("AlbumDetail.FooterSongs", count, length);
