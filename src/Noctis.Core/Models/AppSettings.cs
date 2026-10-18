@@ -431,11 +431,16 @@ public class AppSettings
     /// "albumartist" or "year".</summary>
     public string AlbumSortMode { get; set; } = "default";
 
-    /// <summary>Artists grid sort: "name", "songs" (track count) or "albums" (album count).</summary>
+    /// <summary>Artists grid sort: "name", "songs" (track count), "albums" (album count),
+    /// "time" (total length) or "genre".</summary>
     public string ArtistSortMode { get; set; } = "name";
 
     /// <summary>Artists grid sort direction.</summary>
     public bool ArtistSortAscending { get; set; } = true;
+
+    /// <summary>Artists page layout: "grid" (portrait tiles, the default) or "list" (rows
+    /// with Albums / Songs / Time / Genre columns, like the Songs page).</summary>
+    public string ArtistViewMode { get; set; } = "grid";
 
     /// <summary>Artist page Albums / Singles &amp; EPs tab order (GitHub #100): "newest"
     /// (release date), "oldest" (undated releases last) or "name" (A–Z). One setting for
