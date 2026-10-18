@@ -311,6 +311,28 @@ public partial class LyricsViewModel : ViewModelBase, IDisposable
     [ObservableProperty]
     private int _activeLineIndex = -1;
 
+    /// <summary>The line the lyric list glides to: <see cref="ActiveLineIndex"/>, or the next
+    /// line up to <see cref="Helpers.LineMotion.NinetyTravelMs"/> early (LyricsTimeline.ScrollIndex)
+    /// so the list has arrived when its first word starts. The views scroll on this; the
+    /// highlight and sweep stay on ActiveLineIndex.</summary>
+    [ObservableProperty]
+    private int _scrollLineIndex = -1;
+
+    // Every reset/seek of the active line resets the scroll target with it; the early
+    // lead is re-derived by the next UpdateActiveLine.
+    partial void OnActiveLineIndexChanged(int value) => ScrollLineIndex = value;
+
+    // Apple Music brightens and un-blurs the incoming line as the list sets off toward
+    // it, not when its first word starts — measured: incoming sharpness and brightness
+    // follow the glide (half-way ~160 ms in), the outgoing line dims within ~100 ms. So
+    // the focus ramp moves with the early glide; the sweep stays on activation.
+    partial void OnScrollLineIndexChanged(int value)
+    {
+        if (value >= 0 && value == ActiveLineIndex + 1 && ActiveLineIndex >= 0
+            && _hasSyncedLyrics && IsSyncTabSelected)
+            UpdateLineOpacities(ActiveLineIndex);
+    }
+
     /// <summary>Whether to show favorite heart in metadata row (reflects current track's favorite status).</summary>
     public bool ShowMetadataFavoriteHeart => Player?.CurrentTrack?.IsFavorite ?? false;
 
@@ -2649,6 +2671,7 @@ public partial class LyricsViewModel : ViewModelBase, IDisposable
             UpdateActiveLine(GetPlaybackPosition());
             UpdateLineOpacities(ActiveLineIndex);
             OnPropertyChanged(nameof(ActiveLineIndex));
+            OnPropertyChanged(nameof(ScrollLineIndex));
         }
         else
         {
@@ -3566,7 +3589,11 @@ public partial class LyricsViewModel : ViewModelBase, IDisposable
         var step = _timeline.Update(position);
         // The set also changes without a line change: an overlapping (duet) line that
         // stays lit under the active one finishes, so the ramp re-centres on what's left.
-        if (!step.ActiveSetChanged) return;
+        if (!step.ActiveSetChanged)
+        {
+            ScrollLineIndex = _timeline.ScrollIndex(position, ScrollLead);
+            return;
+        }
         if (DebugLog.VlcBridgeEnabled)
         {
             var lit = _timeline.ActiveIndices.Count > 1 ? $" lit [{string.Join(",", _timeline.ActiveIndices)}]" : "";
@@ -3576,9 +3603,12 @@ public partial class LyricsViewModel : ViewModelBase, IDisposable
                 : $"lit set [{string.Join(",", _timeline.ActiveIndices)}] at {position.TotalMilliseconds:0}ms (active {step.ActiveIndex})");
         }
         ActiveLineIndex = step.ActiveIndex;
+        ScrollLineIndex = _timeline.ScrollIndex(position, ScrollLead);
         UpdateLineOpacities(step.ActiveIndex);
         UpdateWordClockSubscription();
     }
+
+    private static readonly TimeSpan ScrollLead = TimeSpan.FromMilliseconds(Helpers.LineMotion.NinetyTravelMs);
 
     /// <summary>
     /// Continuous playback clock for the sweep and line engine. The raw position
@@ -3750,7 +3780,14 @@ public partial class LyricsViewModel : ViewModelBase, IDisposable
         var floor = Math.Clamp(_player.LyricsMinLineOpacity, 0, 100) / 100.0;
 
         // Distance to the NEAREST lit line: overlapping duet lines all sit at full focus.
-        var lit = _timeline.ActiveIndices;
+        // While the list leads into the next line (ScrollLineIndex), focus is on that line
+        // alone — the lead only starts once every lit line has finished being sung.
+        IReadOnlyList<int> lit = _timeline.ActiveIndices;
+        if (ScrollLineIndex == activeIndex + 1)
+        {
+            activeIndex = ScrollLineIndex;
+            lit = Array.Empty<int>();
+        }
         for (int i = 0; i < LyricLines.Count; i++)
         {
             var absDist = LyricsTimeline.DistanceToNearestActive(i, activeIndex, lit);

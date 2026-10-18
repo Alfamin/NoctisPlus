@@ -30,6 +30,61 @@ public class LyricsTimelineTests
     private static LyricsTimeline Make(params LyricLine[] lines)
         => new(lines, TimeSpan.FromMilliseconds(80), TimeSpan.FromMilliseconds(280));
 
+    // ── Early scroll (ScrollIndex) ──────────────────────────────────────────────
+    private static readonly TimeSpan Lead = TimeSpan.FromMilliseconds(350);
+
+    [Fact]
+    public void ScrollIndex_leads_the_next_word_line_by_the_scroll_lead_after_a_gap()
+    {
+        // Line a is sung 1–2 s; b starts at 5 s. The list sets off at 5 − 0.35 − 0.08 s.
+        var a = WordLine(1, ("a", 1, 2)); var b = WordLine(5, ("b", 5, 6));
+        var t = Make(a, b);
+
+        t.Update(TimeSpan.FromSeconds(4.5));
+        Assert.Equal(0, t.ActiveIndex);
+        Assert.Equal(0, t.ScrollIndex(TimeSpan.FromSeconds(4.5), Lead));
+
+        t.Update(TimeSpan.FromSeconds(4.6));
+        Assert.Equal(0, t.ActiveIndex);                      // highlight stays put
+        Assert.Equal(1, t.ScrollIndex(TimeSpan.FromSeconds(4.6), Lead)); // list leads
+    }
+
+    [Fact]
+    public void ScrollIndex_never_leaves_a_line_that_is_still_being_sung()
+    {
+        // a's last word ends at 4.9 s, inside b's lead window: the scroll waits for it.
+        var a = WordLine(1, ("a", 1, 2), ("held", 2, 4.9)); var b = WordLine(5, ("b", 5, 6));
+        var t = Make(a, b);
+
+        t.Update(TimeSpan.FromSeconds(4.7));
+        Assert.Equal(0, t.ScrollIndex(TimeSpan.FromSeconds(4.7), Lead));
+        t.Update(TimeSpan.FromSeconds(4.85));
+        Assert.Equal(1, t.ScrollIndex(TimeSpan.FromSeconds(4.85), Lead)); // 4.85 + 0.08 ≥ 4.9
+    }
+
+    [Fact]
+    public void ScrollIndex_follows_a_seek_back_on_the_same_tick()
+    {
+        var a = WordLine(1, ("a", 1, 2)); var b = WordLine(5, ("b", 5, 6)); var c = WordLine(9, ("c", 9, 10));
+        var t = Make(a, b, c);
+        t.Update(TimeSpan.FromSeconds(8.7));
+        Assert.Equal(2, t.ScrollIndex(TimeSpan.FromSeconds(8.7), Lead));
+
+        t.Update(TimeSpan.FromSeconds(1.5));
+        Assert.Equal(0, t.ActiveIndex);
+        Assert.Equal(0, t.ScrollIndex(TimeSpan.FromSeconds(1.5), Lead));
+    }
+
+    [Fact]
+    public void ScrollIndex_does_not_lead_plain_lines()
+    {
+        // Plain lines already activate on the longer line lookahead.
+        var a = Line(1, "a", 2); var b = Line(5, "b");
+        var t = Make(a, b);
+        t.Update(TimeSpan.FromSeconds(4.6));
+        Assert.Equal(0, t.ScrollIndex(TimeSpan.FromSeconds(4.6), Lead));
+    }
+
     [Fact]
     public void Before_first_line_nothing_is_active()
     {

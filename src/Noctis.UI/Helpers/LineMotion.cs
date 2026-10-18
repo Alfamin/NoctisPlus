@@ -8,27 +8,38 @@ namespace Noctis.Helpers;
 /// <see cref="LineMotionEase"/>) share it, so size and position arrive together
 /// instead of the line popping to full size before the list has started to move.
 ///
-/// Spring step response, damping ratio <see cref="Zeta"/> = 0.8, settled to 1% at
-/// p = 1 and normalized to end exactly at 1. Opens at zero velocity but accelerates at
-/// once (27% travelled at 15% of the duration; smootherstep managed 3%), and arrives
-/// CRISPLY: a critically damped spring was tried first and its exponential tail left
-/// ~3.5px of sub-threshold creep after the eye had read the line as stopped (the
-/// "stops, then drifts again" report). At ζ = 0.8 both the creep after the perceived
-/// stop and the overshoot are 0.7px on a 131px line change — below a pixel either
-/// way (ζ = 0.85: 1.5px creep; ζ = 0.75: 2.5px overshoot). Pinned by LyricsMotionTests.
+/// Spring step response matched to Apple Music: a 120 fps capture of a line change
+/// (iOS, "Die With A Smile") fits a spring with damping ratio <see cref="Zeta"/> = 0.77
+/// and natural frequency <see cref="NaturalFrequency"/> = 8.25 rad/s to 0.7px RMS —
+/// 5/50/90/99% of the travel at 48/181/348/448 ms, a ~2% overshoot peaking near
+/// 560 ms, then a slow settle back. The old curve (ζ = 0.8 squeezed into 650 ms,
+/// 0.5% overshoot) reached the same points 12–25 ms sooner and landed flat. The
+/// curve runs in real time and is normalized to end exactly at 1 at
+/// <see cref="DurationMs"/>, where the residual is 0.3% of the travel (under half a
+/// pixel on a 131px line change). Pinned by LyricsMotionTests.
 /// </summary>
 public static class LineMotion
 {
-    /// <summary>Length of a line-change motion. The XAML line transitions carry the
-    /// same value ("0:0:0.65") — pinned by LyricsMotionTests.</summary>
-    public const int DurationMs = 650;
+    /// <summary>Length of a line-change motion — long enough for the spring's overshoot
+    /// to settle back. The XAML line transitions carry the same value ("0:0:1") — pinned
+    /// by LyricsMotionTests.</summary>
+    public const int DurationMs = 1000;
 
-    /// <summary>Damping ratio. 1 = critically damped (creeps), lower = bouncier;
-    /// 0.8 is where creep-after-stop and overshoot are both under a pixel.</summary>
-    public const double Zeta = 0.8;
+    /// <summary>Damping ratio (Apple Music fit). 1 = critically damped, lower = bouncier.</summary>
+    public const double Zeta = 0.77;
 
-    // Natural frequency such that the envelope e^(−ζωₙp) / √(1−ζ²) reaches 1% at p = 1.
-    private static readonly double Wn = -Math.Log(0.01 * Math.Sqrt(1 - Zeta * Zeta)) / Zeta;
+    /// <summary>Natural frequency in rad/s (Apple Music fit).</summary>
+    public const double NaturalFrequency = 8.25;
+
+    /// <summary>Per-line stagger of the cascade: each line below the active one starts
+    /// its glide this much later than the line above it. Measured on Apple Music (iOS,
+    /// 120 fps capture, "Die With A Smile"): four consecutive lines below the active one
+    /// started at exactly +50, +100, +150, +200 ms, each on the same curve — 35 ms read
+    /// as the stack moving nearly as one slab. Shared by the lyrics page and side panel.</summary>
+    public const double CascadeDelayPerLineMs = 50;
+
+    // Natural frequency per unit of normalized progress (p = 1 at DurationMs).
+    private static readonly double Wn = NaturalFrequency * DurationMs / 1000.0;
     private static readonly double Wd = Wn * Math.Sqrt(1 - Zeta * Zeta);
     private static readonly double Norm = Raw(1);
 
@@ -48,14 +59,19 @@ public static class LineMotion
 
     /// <summary>Time at which the motion has covered half its travel — the moment the
     /// eye reads the line as "arrived". The line-only lyric lead is derived from it.</summary>
-    public static readonly double HalfTravelMs = SolveHalfTravel();
+    public static readonly double HalfTravelMs = SolveTravel(0.5);
+
+    /// <summary>Time at which the motion has covered 90% of its travel. The scroll leads
+    /// a word-timed line by this much, so the list has all but arrived when its first
+    /// word starts (see LyricsTimeline.ScrollIndex).</summary>
+    public static readonly double NinetyTravelMs = SolveTravel(0.9);
 
     /// <summary>
     /// Limits one cascade line's lag relative to the line above it. Lines below the
     /// active one lag the base glide by a per-line delay; the raw lag difference
-    /// between neighbours peaks at ~13% of the travel (this curve's steepest slope ×
-    /// the 35ms delay), which on a three-row line exceeds the old 16px hard clamp by
-    /// 9px. A hard clamp is a velocity kink — the line rides the one above for a few
+    /// between neighbours peaks at this curve's steepest slope × the per-line delay
+    /// (~21% of the travel at 50 ms), which exceeds a 16px hard clamp on an ordinary
+    /// line change. A hard clamp is a velocity kink — the line rides the one above for a few
     /// frames, then snaps back to its own curve — right at peak speed.
     ///
     /// A <em>negative</em> step means the lower line is displaced toward the one above
@@ -73,13 +89,13 @@ public static class LineMotion
         return prevLag + hardStepPx + hardStepPx * Math.Tanh(excess / hardStepPx);
     }
 
-    private static double SolveHalfTravel()
+    private static double SolveTravel(double fraction)
     {
         double lo = 0, hi = 1;
         for (var i = 0; i < 60; i++)
         {
             var mid = (lo + hi) / 2;
-            if (Ease(mid) < 0.5) lo = mid; else hi = mid;
+            if (Ease(mid) < fraction) lo = mid; else hi = mid;
         }
         return (lo + hi) / 2 * DurationMs;
     }

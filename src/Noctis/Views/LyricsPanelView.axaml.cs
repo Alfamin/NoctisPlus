@@ -38,7 +38,7 @@ public partial class LyricsPanelView : UserControl
     // Cascade tuning (mirrors the lyrics page): each line below the active one starts
     // its glide this much later, with the stagger depth capped — the Apple Music
     // "settle top-down" feel.
-    private const double CascadeDelayPerLineMs = 35;
+    private const double CascadeDelayPerLineMs = LineMotion.CascadeDelayPerLineMs;
     private const int CascadeMaxLines = 8;
     // A line's lag may exceed the line above's by at most this much. Uncapped, the
     // stagger displaced a line by up to a full line height relative to its neighbour
@@ -81,8 +81,8 @@ public partial class LyricsPanelView : UserControl
                 _countedAsVisible = true;
             }
 
-            if (_vm is { ActiveLineIndex: >= 0 } vm)
-                JumpToLineWhenReady(vm.ActiveLineIndex);
+            if (_vm is { ScrollLineIndex: >= 0 } vm)
+                JumpToLineWhenReady(vm.ScrollLineIndex);
             UpdateFlowAnimationState();
         };
         DetachedFromVisualTree += (_, _) =>
@@ -249,14 +249,14 @@ public partial class LyricsPanelView : UserControl
         // opening the panel re-anchors via EnsureLyricsForCurrentTrack.
         if (_vm == null || this.VisualRoot == null || !IsEffectivelyVisible) return;
 
-        if (e.PropertyName == nameof(LyricsViewModel.ActiveLineIndex))
+        if (e.PropertyName == nameof(LyricsViewModel.ScrollLineIndex))
         {
             // Mid-swap index churn must not start an animated glide — the
             // ActiveLyricLines re-anchor below jumps once the swap lands.
             if (_lyricsSwapInProgress) return;
             if (_followPaused || !_vm.IsSyncTabSelected) return;
-            if (_vm.ActiveLineIndex >= 0)
-                ScrollToLine(_vm.ActiveLineIndex);
+            if (_vm.ScrollLineIndex >= 0)
+                ScrollToLine(_vm.ScrollLineIndex);
         }
         else if (e.PropertyName == nameof(LyricsViewModel.ActiveLyricLines))
         {
@@ -264,7 +264,7 @@ public partial class LyricsPanelView : UserControl
             _lastScrolledIndex = -1;
             _followPaused = false;
             CancelFollowResumeTimer();
-            var index = _vm.IsSyncTabSelected ? _vm.ActiveLineIndex : -1;
+            var index = _vm.IsSyncTabSelected ? _vm.ScrollLineIndex : -1;
             if (index >= 0)
                 JumpToLineWhenReady(index);
             else
@@ -288,8 +288,8 @@ public partial class LyricsPanelView : UserControl
         {
             CancelFollowResumeTimer();
             _followPaused = false;
-            if (_vm is { IsSyncTabSelected: true, ActiveLineIndex: >= 0 } vm)
-                ScrollToLine(vm.ActiveLineIndex, force: true);
+            if (_vm is { IsSyncTabSelected: true, ScrollLineIndex: >= 0 } vm)
+                ScrollToLine(vm.ScrollLineIndex, force: true);
         };
         _followResumeTimer.Start();
     }

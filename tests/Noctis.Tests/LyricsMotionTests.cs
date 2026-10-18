@@ -22,52 +22,83 @@ public class LyricsMotionTests
         Path.Combine("src", "Noctis", "Views", "MiniPlayerWindow.axaml"),
     };
 
+    /// <summary>
+    /// Apple Music (iOS, 120 fps capture) starts each line below the active one exactly
+    /// 50 ms after the line above it, on the same curve. Pinned so both lyric surfaces
+    /// share the measured value; the half-travel moments of neighbouring cascade lines
+    /// must then sit about one stagger apart (Apple: 50 ms) instead of the old 35.
+    /// </summary>
     [Fact]
-    public void Ease_StartsAtZero_EndsAtOne_OvershootsLessThanAPixel()
+    public void Cascade_StaggersLinesByTheMeasuredAppleDelay()
+    {
+        Assert.Equal(50, LineMotion.CascadeDelayPerLineMs);
+
+        const double travelPx = 131;
+        const double hardStepPx = 16;
+        double HalfTimeOfLine(int k)
+        {
+            for (var ms = 0; ms < 1500; ms++)
+            {
+                var baseEase = LineMotion.Ease(ms / (double)LineMotion.DurationMs);
+                var prev = 0.0;
+                for (var i = 1; i <= k; i++)
+                {
+                    var own = LineMotion.Ease((ms - i * LineMotion.CascadeDelayPerLineMs) / LineMotion.DurationMs);
+                    prev = LineMotion.CascadeStep(travelPx * (baseEase - own), prev, hardStepPx);
+                }
+                if (travelPx * baseEase - prev >= travelPx / 2) return ms;
+            }
+            return double.NaN;
+        }
+
+        for (var k = 0; k < 3; k++)
+        {
+            var gap = HalfTimeOfLine(k + 1) - HalfTimeOfLine(k);
+            Assert.InRange(gap, 40, 60);
+        }
+    }
+
+    [Fact]
+    public void Ease_StartsAtZero_EndsAtOne_MonotoneUntilArrival()
     {
         Assert.Equal(0, LineMotion.Ease(0));
         Assert.Equal(1, LineMotion.Ease(1));
         var prev = 0.0;
-        var crossed = false;
         for (var i = 1; i <= 400; i++)
         {
             var v = LineMotion.Ease(i / 400.0);
-            if (!crossed && v >= 0.99) crossed = true;
-            if (!crossed)
-                Assert.True(v >= prev, $"not monotone at {i / 400.0} before arrival");
-            // A 131px line change can't show less than a pixel of overshoot.
-            Assert.True(v <= 1 + 1.0 / 131, $"visible overshoot at {i / 400.0}: {v}");
+            if (v >= 0.99) break;
+            Assert.True(v >= prev, $"not monotone at {i / 400.0} before arrival");
             prev = v;
         }
-        // Settled at the end of the duration — no tail after the transition ends.
-        Assert.True(LineMotion.Ease(0.999) > 0.99);
+        // The end of the duration lands within half a pixel of a 131px line change,
+        // so clamping to exactly 1 there is invisible.
+        Assert.InRange(LineMotion.Ease(0.999), 1 - 0.5 / 131, 1 + 0.5 / 131);
     }
 
     /// <summary>
-    /// The report that drove the curve choice: "it flows, stops, then moves again for a
-    /// split second." A critically damped spring's exponential tail left ~3.5px of
-    /// travel AFTER its speed had dropped below what the eye tracks (~30px/s on a
-    /// 131px line change), read as a second small drift. The curve must arrive with
-    /// under a pixel left once it looks stopped.
+    /// Matches the Apple Music line change measured from a 120 fps capture (iOS, "Die
+    /// With A Smile", line change at video 6.044 s): 5/50/90/99% of the travel at
+    /// 48/181/348/448 ms and a ~2% overshoot (peak 1.020) that settles back slowly.
     /// </summary>
     [Fact]
-    public void Ease_ArrivesCrisply_NoCreepAfterThePerceivedStop()
+    public void Ease_MatchesTheMeasuredAppleMusicCurve()
     {
-        const double travelPx = 131;       // one ordinary line change
-        const double perceptualPxPerSec = 30;
-        const int n = 6500;
-        var t = LineMotion.DurationMs / 1000.0;
-        var pos = Enumerable.Range(0, n + 1).Select(i => travelPx * LineMotion.Ease(i / (double)n)).ToArray();
-        var lastFast = 0;
-        for (var i = 0; i < n; i++)
+        double Reach(double fraction)
         {
-            var v = Math.Abs(pos[i + 1] - pos[i]) / (t / n);
-            if (v > perceptualPxPerSec) lastFast = i;
+            for (var ms = 0; ms <= LineMotion.DurationMs; ms++)
+                if (LineMotion.Ease(ms / (double)LineMotion.DurationMs) >= fraction) return ms;
+            return double.NaN;
         }
-        var creep = pos.Skip(lastFast).Max(p => Math.Abs(travelPx - p));
-        Assert.True(creep < 1.0, $"{creep:F2}px of travel left after the motion reads as stopped at {lastFast * t / n * 1000:F0}ms");
-        // And it still opens fast — that is the whole point of the spring over smootherstep.
-        Assert.True(LineMotion.Ease(0.15) > 0.2);
+        Assert.InRange(Reach(0.05), 48 - 15, 48 + 15);
+        Assert.InRange(Reach(0.50), 181 - 15, 181 + 15);
+        Assert.InRange(Reach(0.90), 348 - 15, 348 + 15);
+        Assert.InRange(Reach(0.99), 448 - 15, 448 + 15);
+
+        var peak = Enumerable.Range(0, LineMotion.DurationMs + 1)
+            .Max(ms => LineMotion.Ease(ms / (double)LineMotion.DurationMs));
+        Assert.InRange(peak, 1.015, 1.025);
+        Assert.Equal(0.9, LineMotion.Ease(LineMotion.NinetyTravelMs / LineMotion.DurationMs), 0.001);
     }
 
     [Fact]
