@@ -4,6 +4,7 @@ using Noctis.Services;
 namespace Noctis.Features.WordLyrics;
 
 internal enum TimingAction { Missing, Current, Fresh, Custom }
+internal enum SongTimingStatus { None, Queued, Processing, Paused, Retry, SetupNeeded }
 internal sealed record ProgressState(string Message, string Detail = "", int Completed = 0, int Total = 0,
     double? Fraction = null, bool Finished = false, bool Error = false, string Report = "",
     bool Controllable = false, bool Paused = false, bool Cancelling = false);

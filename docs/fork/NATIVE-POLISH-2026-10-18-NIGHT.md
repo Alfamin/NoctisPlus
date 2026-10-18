@@ -33,6 +33,16 @@ Final FastGates run: `codex-night-final-copy`.
 
 The handoff FastGates/ShardedSuite tools outside this repository were fixed to return failure and skip publishing on failed checks. Their successful counts above were inspected, rather than inferred from a success banner.
 
+## Owner follow-up: timing already underway
+
+The missing-lyrics action now reflects the current song's persisted queue and active batch: Lyrics queued / Processing lyrics / Lyrics paused / Retry scheduled / Setup needed. Processing uses the native ring; clicking status opens the existing controls. Work for another song does not borrow the current song's label. Repeated missing-timing requests preserve the active item's identity instead of scheduling it twice. Turning automatic mode Off does not hide a batch already processing.
+
+Real-app check used a new synthetic profile and a synthetic Python backend that speaks the actual job/control/report protocol. Sparse zero-filled files satisfy size metadata without real model contents; the fixture cannot download or align audio. The visible action changed to Processing lyrics with a ring, opened the controls, changed to Lyrics paused without a ring, and returned to Time words after Stop. This verifies the native integration and visuals, not AI accuracy. The preview/child process exited and computer use was reset.
+
+Related cancellation wording no longer counts failed/not-timed outcomes as saved lyrics. It is one short result line. Backend-process tests cover that result and automatic-mode changes, plus pause, resume, retry and duplicate submission. Native view-model tests cover switching songs, missing setup and cancel.
+
+Final follow-up gates: `codex-song-timing-final`, **6,590 total / 0 failed / 43 skipped**, Finder **1,207/0**, ReadyToRun publish successful (109 seconds together). The final accessibility name, concise cancellation line and automatic-mode edge case were covered after the live check; no additional screenshot was taken for those small changes.
+
 ## Test app replacement
 
 `scripts/Update-NoctisPlus-Test.ps1` copies a complete publish first, verifies executable/assembly hashes, refuses a running test app, then swaps only app directories. It retains the previous app for rollback and never copies a profile. It has no recursive delete. The actual closed-app replacement and fresh-profile startup are recorded in the external handoff.

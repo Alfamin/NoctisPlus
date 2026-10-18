@@ -55,6 +55,23 @@ public class NativeWordLyricsTests
         Assert.True(condition());
     }
     [AvaloniaFact]
+    public void AutomaticTimingStatus_IsPerSong_AndCancelClearsItWithoutDownloading()
+    {
+        using var rig = new Rig();
+        var song = rig.Song("New download");
+        rig.Service.Presenter = (_, _) => { };
+        var other = rig.Song("Other song");
+        OnlineMusicSearch.PublishSavedFile(song.FilePath);
+        Until(() => rig.Service.StatusFor(song.FilePath) == SongTimingStatus.SetupNeeded);
+        Assert.Equal(SongTimingStatus.None, rig.Service.StatusFor(other.FilePath));
+        var duplicate = rig.Service.TimeSongAsync(song);
+        Until(() => duplicate.IsCompleted); duplicate.GetAwaiter().GetResult();
+        Assert.Equal(1, rig.Service.WaitingCount);
+        var cancel = rig.Service.CancelAsync(); Until(() => cancel.IsCompleted);
+        Until(() => rig.Service.StatusFor(song.FilePath) == SongTimingStatus.None);
+        Assert.False(Directory.Exists(Path.Combine(rig.Data.DataDirectory, "absent backend")));
+    }
+    [AvaloniaFact]
     public void NativeMigrationRunsBeforeDefaults_AndNewChoiceKeepsRollbackKeys()
     {
         using var rig = new Rig(off: true);

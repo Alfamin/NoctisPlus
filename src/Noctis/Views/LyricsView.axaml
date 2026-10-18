@@ -942,18 +942,31 @@
                            Foreground="{Binding LyricsSubtleFg}"
                            HorizontalAlignment="Center"
                            IsVisible="{Binding SearchFailedMessage, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"/>
-                <!-- Opens the Search Lyrics dialog (issue #113): Auto searches every enabled
-                     source straight away, and any one source can be picked there. -->
+                <!-- Existing per-song work replaces the idle action; click status for its panel. -->
                 <Button Classes="pill-btn"
                         Padding="20,9"
                         CornerRadius="22"
                         Command="{Binding TimeWordsCommand}"
+                        IsVisible="{Binding !HasPendingWordTiming}"
                         HorizontalAlignment="Center">
                     <TextBlock Text="{loc:T Lyrics.TimeWords}"
                                FontSize="13"
                                FontWeight="SemiBold"
                                Foreground="White"
                                VerticalAlignment="Center"/>
+                </Button>
+                <Button Classes="pill-btn" Padding="20,9" CornerRadius="22"
+                        IsVisible="{Binding HasPendingWordTiming}" Command="{Binding OpenWordTimingCommand}"
+                        AutomationProperties.Name="{Binding WordTimingStatusText}"
+                        HorizontalAlignment="Center">
+                    <StackPanel Orientation="Horizontal" Spacing="8">
+                        <controls:ProgressRing Width="16" Height="16" IsIndeterminate="True"
+                                               IsVisible="{Binding IsWordTimingProcessing}"/>
+                        <PathIcon Data="{DynamicResource SidebarLyricsStudioIcon}" Width="16" Height="16"
+                                  IsVisible="{Binding !IsWordTimingProcessing}"/>
+                        <TextBlock Text="{Binding WordTimingStatusText}" FontSize="13" FontWeight="SemiBold"
+                                   Foreground="White" VerticalAlignment="Center"/>
+                    </StackPanel>
                 </Button>
                 <TextBlock Text="{loc:T Lyrics.TimeWordsLocalOnly}" FontSize="12"
                            Foreground="{Binding LyricsSubtleFg}" HorizontalAlignment="Center"

@@ -50,6 +50,8 @@ internal sealed class Worker : IDisposable
     private Options _options;
     private Process? _run;
     private Job? _job;
+    private readonly HashSet<string> _activePaths = new(StringComparer.OrdinalIgnoreCase);
+    internal event Action? StatusChanged;
     private DateTime _stateSaved = DateTime.MinValue;
     private DateTime _lastSeen;
     private bool _saidNotReady;
@@ -113,6 +115,17 @@ internal sealed class Worker : IDisposable
     public bool HasCheckpoint { get; }
     public DateTime LastSeenUtc => _lastSeen;
     internal int WaitingCount { get { lock (_gate) return _items.Count; } }
+    internal SongTimingStatus StatusFor(string path)
+    {
+        lock (_gate)
+        {
+            if (_disposed || !_items.TryGetValue(path, out var item)) return SongTimingStatus.None;
+            if (!_activePaths.Contains(path) && !item.Asked && !_options.Auto) return SongTimingStatus.None;
+            if (_paused) return SongTimingStatus.Paused;
+            if (_activePaths.Contains(path)) return SongTimingStatus.Processing;
+            return item.NotBefore > DateTime.UtcNow ? SongTimingStatus.Retry : SongTimingStatus.Queued;
+        }
+    }
     public bool EnqueueAutomatic(string path, string root, bool complete = false)
         => Consider(Path.GetFullPath(path), Path.GetFullPath(root), complete ? QuietAfterRename : QuietAfterCreate);
     internal void TickNow() => OnTick();
@@ -131,6 +144,7 @@ internal sealed class Worker : IDisposable
         {
             if (_disposed || _paused == paused) return;
             _paused = paused;
+            StatusChanged?.Invoke();
             if (_run is not null && _controlled && !_cancelling) WriteControl(paused ? "pause" : "run");
             if (_run is null && !paused)
             {
@@ -207,6 +221,15 @@ internal sealed class Worker : IDisposable
         lock (_gate)
         {
             if (_disposed) return null;
+            // The empty-lyrics action is idempotent, including a download racing
+            // its automatic request. Do not replace a live item's identity.
+            if (action == TimingAction.Missing && _items.TryGetValue(path, out var existing))
+            {
+                existing.Asked = true;
+                SaveState();
+                accepted = true;
+                return "Already queued for word timing.";
+            }
             _items[path] = new Item { Path = path, Root = root, Asked = true, Action = action, Draft = draft, Seen = now, QuietSince = now, NotBefore = now };
             SaveState();
             accepted = true;
@@ -429,6 +452,8 @@ internal sealed class Worker : IDisposable
             run = _run = tool.StartQuietRun(batch[0].Root, ListFile, ResultFile, OutputFile, speed, options.Backup, retry: batch[0].Asked, ProgressFile,
                 controlled ? ControlFile : null, batch[0].Action, batch[0].Draft);
             _job = Job.Around(run);
+            _activePaths.Clear();
+            _activePaths.UnionWith(batch.Select(i => i.Path));
             _controlled = controlled;
             _cancelling = false;
             _view = new View("Starting WordLyrics", $"{batch.Count} songs queued. Preparing backup and lyric search...", 0, batch.Count, null, false);
@@ -531,6 +556,7 @@ internal sealed class Worker : IDisposable
             if (ReferenceEquals(_run, run))
             {
                 _run = null;
+                _activePaths.Clear();
                 _job?.Dispose();
                 _job = null;
                 _cancelling = false;
@@ -594,7 +620,7 @@ internal sealed class Worker : IDisposable
 
         if (cancelled)
         {
-            var finished = counts.Values.Sum();
+            var finished = counts.GetValueOrDefault("timed") + counts.GetValueOrDefault("lines_only");
             _log($"WordLyrics was cancelled: {finished} finished, {dropped} taken off the waiting list");
             _progress(new ProgressState("Cancelled", CancelNotice(finished, dropped) + $"\nDetails: {ResultFile}", finished, batch.Count, Finished: true, Report: report));
             return;
@@ -630,20 +656,14 @@ internal sealed class Worker : IDisposable
         _timer.Change(TimeSpan.FromSeconds(1), Tick); // anything else waiting?
     }
 
-    /// <summary>The one notice after Cancel: what was kept, what was dropped, and how to start those songs again.</summary>
+    /// <summary>One short result line; only successfully written lyrics count as saved.</summary>
     internal static string CancelNotice(int finished, int dropped)
-    {
-        static string Songs(int n) => n == 1 ? "1 song" : $"{n} songs";
-        var done = finished == 0 ? "" : $" {Songs(finished)} finished before the stop and keep their lyrics.";
-        return dropped == 0
-            ? "WordLyrics stopped." + done + " Nothing else was waiting."
-            : $"WordLyrics stopped.{done} {Songs(dropped)} {(dropped == 1 ? "was" : "were")} taken off the waiting list. " +
-              $"Start {(dropped == 1 ? "it" : "them")} again from the song's right-click menu (Time the words) or from the WordLyrics program.";
-    }
+        => $"{finished} saved · {dropped} removed from queue";
 
     /// <summary>Tells the progress window how things stand, with pause and cancel added to what the program last said. Called under the lock.</summary>
     private void Emit()
     {
+        StatusChanged?.Invoke();
         if (_run is null)
         {
             if (_paused)
@@ -811,6 +831,7 @@ internal sealed class Worker : IDisposable
         {
             _log("the list of waiting songs could not be saved: " + ex.Message);
         }
+        StatusChanged?.Invoke();
     }
 
     // ── small helpers ──

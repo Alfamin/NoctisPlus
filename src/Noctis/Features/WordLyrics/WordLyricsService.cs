@@ -37,6 +37,12 @@ internal sealed class WordLyricsService(ILibraryService library, Func<AppSetting
     internal event Action? PillChanged;
     internal event Action<IReadOnlyList<string>>? LyricsWritten;
     internal int WaitingCount => _worker?.WaitingCount ?? 0;
+    internal SongTimingStatus StatusFor(string path)
+    {
+        var state = _worker?.StatusFor(path) ?? SongTimingStatus.None;
+        return state is SongTimingStatus.Queued or SongTimingStatus.Retry && !BackendReady ? SongTimingStatus.SetupNeeded : state;
+    }
+    private void SongStatusChanged() => Dispatcher.UIThread.Post(() => { if (!_disposed) Changed?.Invoke(); });
     internal void SetPreviewState(ProgressState state) => Progress(state);
     internal string[] Folders => _folders;
     internal IReadOnlyList<Track> Tracks => library.AllTracks;
@@ -48,6 +54,7 @@ internal sealed class WordLyricsService(ILibraryService library, Func<AppSetting
         _folders = settings().MusicFolders.ToArray();
         _worker = new Worker(host.DataDirectory, () => _folders, ReadOptions(), Log, Notify, Progress,
             lyricsWritten: paths => Dispatcher.UIThread.Post(() => { if (!_disposed) LyricsWritten?.Invoke(paths); }));
+        _worker.StatusChanged += SongStatusChanged;
         library.LibraryUpdated += LibraryChanged;
         library.MusicFoldersChanged += FoldersChanged;
         OnlineMusicSearch.FileSaved += DownloadSaved;
@@ -66,6 +73,7 @@ internal sealed class WordLyricsService(ILibraryService library, Func<AppSetting
     {
         if (_worker is null) return;
         _worker.Options = ReadOptions();
+        Changed?.Invoke();
         if (key == "setup") _ = SetupAsync();
         else if (key is "progress" or "library") Show(key == "library");
     }

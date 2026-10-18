@@ -87,6 +87,41 @@ public class LyricsSettingsToggleTests
         finally { vm.Dispose(); player.StopAndClear("test complete"); }
     }
 
+    [AvaloniaFact]
+    public async Task WordTimingStatus_FollowsCurrentSongAndCancel_RatherThanGlobalProgress()
+    {
+        using var data = new TestPersistenceService();
+        var settings = new AppSettings { MusicFolders = [data.DataDirectory] };
+        settings.PluginSettingValues = new() { ["dev.moshi.wordlyrics"] = new() { ["folder"] = Path.Combine(data.DataDirectory, "absent backend") } };
+        var library = new FakeLibraryService();
+        using var service = new Noctis.Features.WordLyrics.WordLyricsService(library, () => settings);
+        var host = new Noctis.Services.Plugins.PluginHost(null, data.DataDirectory, () => settings, () => { }, "1.6.3", library);
+        Noctis.Features.BuiltInFeatures.Register(host, words: service); host.LoadAll();
+        var (vm, player) = MakeViewModel();
+        try
+        {
+            var song = new Track { FilePath = Path.Combine(data.DataDirectory, "first.wav") };
+            File.WriteAllText(song.FilePath, "synthetic fixture");
+            player.CurrentTrack = song; vm.AttachWordTiming(service);
+            Assert.False(vm.HasPendingWordTiming);
+            await service.QueueAsync([song.FilePath]);
+            await WaitUntil(() => vm.HasPendingWordTiming, "per-song queued state");
+            Assert.Equal("Setup needed", vm.WordTimingStatusText);
+            Assert.False(vm.IsWordTimingProcessing);
+            Assert.False(vm.TimeWordsCommand.CanExecute(null));
+            Assert.True(vm.OpenWordTimingCommand.CanExecute(null));
+            player.CurrentTrack = new Track { FilePath = Path.Combine(data.DataDirectory, "second.wav") };
+            Assert.False(vm.HasPendingWordTiming);
+            Assert.True(vm.TimeWordsCommand.CanExecute(null));
+            player.CurrentTrack = song;
+            Assert.True(vm.HasPendingWordTiming);
+            await service.CancelAsync();
+            await WaitUntil(() => !vm.HasPendingWordTiming, "cancel clears queued state");
+            Assert.True(vm.TimeWordsCommand.CanExecute(null));
+        }
+        finally { vm.Dispose(); player.StopAndClear("test complete"); host.UnloadAll(); }
+    }
+
     private static string MakeLrc() => string.Join("\n",
         Enumerable.Range(0, LineCount).Select(i =>
         {

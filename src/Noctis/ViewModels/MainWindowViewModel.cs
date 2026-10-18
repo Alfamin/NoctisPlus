@@ -674,6 +674,7 @@ public partial class MainWindowViewModel : ViewModelBase
             else wordService.OpenSettings?.Invoke();
         };
         _lyricsVm.WordTimingStartRequested = wordService.TimeSongAsync;
+        _lyricsVm.AttachWordTiming(wordService);
         wordService.LyricsWritten += _lyricsVm.ReloadWrittenLyrics;
         _downloadImporter = new(library, text => Dispatcher.UIThread.Post(() =>
             TransientStatus.Show(nameof(PluginNotice), v => PluginNotice = v, text, TimeSpan.FromSeconds(12))));

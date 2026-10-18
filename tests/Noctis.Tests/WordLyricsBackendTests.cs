@@ -88,15 +88,36 @@ public class WordLyricsBackendTests
     [Fact]
     public async Task NativePauseResumeStopUseBackendControl_AndKeepMusic()
     {
-        using var rig = new Rig(hold: true); var states = new ConcurrentQueue<ProgressState>();
+        using var rig = new Rig(hold: true, outcome: "not_timed"); var states = new ConcurrentQueue<ProgressState>();
         using var worker = rig.Worker(states.Enqueue);
         worker.Ask(rig.Song);
         await Until(() => states.Any(s => s.Controllable));
+        Assert.Equal(SongTimingStatus.Processing, worker.StatusFor(rig.Song));
+        Assert.Equal(SongTimingStatus.None, worker.StatusFor(Path.Combine(rig.Music, "not queued.mp3")));
+        worker.Ask(rig.Song); // repeated empty-state click must not replace the active item
+        Assert.Equal(1, worker.WaitingCount);
         worker.SetPaused(true); Assert.Equal("pause", File.ReadAllText(Path.Combine(rig.Work, "control.txt")));
+        Assert.Equal(SongTimingStatus.Paused, worker.StatusFor(rig.Song));
         worker.SetPaused(false); Assert.Equal("run", File.ReadAllText(Path.Combine(rig.Work, "control.txt")));
+        Assert.Equal(SongTimingStatus.Processing, worker.StatusFor(rig.Song));
         worker.Cancel();
         await Until(() => states.Any(s => s.Message == "Cancelled"));
         Assert.Equal(0, worker.WaitingCount); Assert.True(File.Exists(rig.Song));
+        Assert.Equal(SongTimingStatus.None, worker.StatusFor(rig.Song));
+        Assert.StartsWith("0 saved", states.Last(s => s.Message == "Cancelled").Detail);
+    }
+    [Fact]
+    public async Task TurningAutomaticModeOff_DoesNotHideAnAlreadyProcessingDownload()
+    {
+        using var rig = new Rig(hold: true); var states = new ConcurrentQueue<ProgressState>();
+        using var worker = rig.Worker(states.Enqueue);
+        Assert.True(worker.EnqueueAutomatic(rig.Song, rig.Music, complete: true));
+        await Until(() => worker.StatusFor(rig.Song) == SongTimingStatus.Processing);
+        worker.Options = worker.Options with { Auto = false };
+        Assert.Equal(SongTimingStatus.Processing, worker.StatusFor(rig.Song));
+        worker.Cancel();
+        await Until(() => states.Any(s => s.Message == "Cancelled"));
+        Assert.Equal(SongTimingStatus.None, worker.StatusFor(rig.Song));
     }
     [Fact]
     public async Task NetworkFailureKeepsCheckpointAndRetryTimeAcrossRestart()
@@ -107,6 +128,7 @@ public class WordLyricsBackendTests
             worker.Ask(rig.Song);
             await Until(() => states.Any(s => s.Finished));
             Assert.Equal(1, worker.WaitingCount);
+            Assert.Equal(SongTimingStatus.Retry, worker.StatusFor(rig.Song));
         }
         using var checkpoint = JsonDocument.Parse(File.ReadAllText(Path.Combine(rig.Work, "state.json")));
         var row = Assert.Single(checkpoint.RootElement.GetProperty("waiting").EnumerateArray());

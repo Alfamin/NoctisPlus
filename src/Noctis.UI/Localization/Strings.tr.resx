@@ -1843,4 +1843,9 @@
   <data name="Queue.ForYouTip" xml:space="preserve"><value>Mix from your listening history</value></data>
   <data name="Lyrics.TimeWords" xml:space="preserve"><value>Time words</value></data>
   <data name="Lyrics.TimeWordsLocalOnly" xml:space="preserve"><value>Finish saving this song locally first</value></data>
+  <data name="Lyrics.TimingQueued" xml:space="preserve"><value>Lyrics queued</value></data>
+  <data name="Lyrics.TimingProcessing" xml:space="preserve"><value>Processing lyrics</value></data>
+  <data name="Lyrics.TimingPaused" xml:space="preserve"><value>Lyrics paused</value></data>
+  <data name="Lyrics.TimingRetry" xml:space="preserve"><value>Retry scheduled</value></data>
+  <data name="Lyrics.TimingSetup" xml:space="preserve"><value>Setup needed</value></data>
 </root>
