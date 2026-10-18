@@ -23,6 +23,10 @@ public partial class PlaylistViewModel
     private TracksThenRows? _rows;
     public TracksThenRows Rows => _rows ??= new TracksThenRows(Tracks, CatalogRows, BuildOrderedPlaylistRows);
     public bool HasCatalogMissing => CatalogRows.Count > 0;
+    // Owner #48: header Play/Shuffle/queue act on owned songs only. With none owned they would do nothing, so they
+    // hide, as on an online album; each missing row keeps its own Play.
+    public bool ShowPlayActions => Tracks.Count > 0 || !HasCatalogMissing;
+    partial void OnTrackCountChanged(int value) => OnPropertyChanged(nameof(ShowPlayActions));
     private int CatalogMissingCount => CatalogRows.Count;
     private IReadOnlyList<ImportedPlaylistEntry>? _importedEntries;
     // Source positions include unowned songs. Reordering just the local subset would detach the import
@@ -70,6 +74,7 @@ public partial class PlaylistViewModel
         else _rows?.Refresh();
         RefreshCatalogDownloads();
         OnPropertyChanged(nameof(HasCatalogMissing));
+        OnPropertyChanged(nameof(ShowPlayActions));
         OnPropertyChanged(nameof(CanReorder));
         OnPropertyChanged(nameof(TrackCountText));
         UpdateEmptyStateFlags(entries?.Count ?? Tracks.Count);

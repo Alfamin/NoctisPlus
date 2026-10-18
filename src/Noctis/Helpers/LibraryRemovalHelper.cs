@@ -214,8 +214,8 @@ public static class LibraryRemovalHelper
     }
 
     /// <summary>Lyric sidecars living next to a track as
-    /// <c>Path.ChangeExtension(track, ext)</c>: synced .lrc/.ttml and plain .txt.</summary>
-    private static readonly string[] SidecarExtensions = { ".lrc", ".ttml", ".txt" };
+    /// <c>Path.ChangeExtension(track, ext)</c>: synced .lrc/.ttml, word-timed .elrc and plain .txt.</summary>
+    private static readonly string[] SidecarExtensions = { ".lrc", ".elrc", ".ttml", ".txt" };
 
     /// <summary>Trashes each trashed audio file's same-basename lyric sidecars.</summary>
     internal static void TrashSidecarFiles(IEnumerable<string> trashedAudioPaths, Func<string, bool> tryTrash)
@@ -238,7 +238,7 @@ public static class LibraryRemovalHelper
     // (.m3u/.m3u8 playlists, .cue sheets, .nfo/.txt/.log notes) deliberately
     // keep the folder alive — sweeping them trashed real user data unprompted.
     private static readonly HashSet<string> DisposableLeftoverExtensions = new(StringComparer.OrdinalIgnoreCase)
-    { ".lrc", ".ttml", ".jpg", ".jpeg", ".png", ".webp", ".gif", ".bmp" };
+    { ".lrc", ".elrc", ".ttml", ".jpg", ".jpeg", ".png", ".webp", ".gif", ".bmp" };
 
     private static readonly HashSet<string> DisposableLeftoverNames = new(StringComparer.OrdinalIgnoreCase)
     { "Thumbs.db", "desktop.ini", ".DS_Store" };

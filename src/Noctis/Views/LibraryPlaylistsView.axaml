@@ -138,6 +138,7 @@
                                                  class); the dots open this tile's context menu. -->
                                             <Border Classes="tile-dim" />
                                             <Button Classes="tile-play"
+                                                    IsVisible="{Binding CanPlay}"
                                                     Command="{Binding $parent[UserControl].((vm:LibraryPlaylistsViewModel)DataContext).PlayPlaylistCommand}"
                                                     CommandParameter="{Binding}">
                                                 <Viewbox Width="12" Height="12" HorizontalAlignment="Center" VerticalAlignment="Center" Margin="1,0,0,0"><Path Data="{StaticResource PlayIcon}" Fill="White" /></Viewbox>

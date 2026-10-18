@@ -129,8 +129,10 @@ public class LibraryRemovalHelperTests
         {
             var lrc = Path.Combine(dir, "01 song.lrc");
             var txt = Path.Combine(dir, "01 song.txt");
+            var elrc = Path.Combine(dir, "01 song.elrc"); // WordLyrics' word timing (#49: it was left behind)
             File.WriteAllText(lrc, "[00:01.00] hi");
             File.WriteAllText(txt, "hi");
+            File.WriteAllText(elrc, "[00:01.00]<00:01.00>hi");
 
             var trashed = new List<string>();
             LibraryRemovalHelper.TrashSidecarFiles(
@@ -139,7 +141,7 @@ public class LibraryRemovalHelperTests
 
             // Both existing sidecars (synced .lrc, plain .txt) are trashed;
             // the track without any is skipped.
-            Assert.Equal(new[] { lrc, txt }, trashed);
+            Assert.Equal(new[] { lrc, elrc, txt }, trashed);
         }
         finally { Directory.Delete(dir, true); }
     }

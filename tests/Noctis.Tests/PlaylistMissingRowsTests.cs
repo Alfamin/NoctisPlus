@@ -90,6 +90,69 @@ public class PlaylistMissingRowsTests
         Assert.Empty(vm.Rows);
     }
 
+    // Owner #48: the header's Play/Shuffle play owned songs only, so with none owned they hide (rows keep Play).
+    [AvaloniaFact]
+    public async Task HeaderPlayActions_HideWhileNoSongIsOwned_AndReturnWhenOneLands()
+    {
+        AddToPlaylistDialogTests.EnsureAppStyles();
+        var lib = new FakeLibraryService();
+        using var persistence = new TestPersistenceService();
+        var player = new PlayerViewModel(new FakeAudioPlayer(), lib, persistence, new FakeAnimatedCoverService());
+        var sidebar = new SidebarViewModel(persistence, lib);
+        var vm = new PlaylistViewModel(new Playlist { Name = "All missing" }, player, lib, persistence, sidebar);
+        var view = new PlaylistView { DataContext = vm };
+        var window = new Window { Width = 1280, Height = 900, Content = view };
+        try
+        {
+            window.Show();
+            await Task.Delay(20); Dispatcher.UIThread.RunJobs();
+            Assert.True(vm.ShowPlayActions); // an ordinary playlist keeps its header as before
+            ImportedPlaylistEntry[] entries = [new(1, new("spotify:a", "One", [new("", "Singer")], 180, null), null, "")];
+            vm.ShowImportedEntries(entries);
+            for (var i = 0; i < 3; i++) { Dispatcher.UIThread.RunJobs(); window.UpdateLayout(); }
+            Assert.False(vm.ShowPlayActions);
+            var play = view.GetVisualDescendants().OfType<Button>().Single(b => ReferenceEquals(b.Command, vm.PlayAllCommand));
+            var shuffle = view.GetVisualDescendants().OfType<Button>().Single(b => ReferenceEquals(b.Command, vm.ShuffleAllCommand));
+            Assert.False(play.IsVisible); Assert.False(shuffle.IsVisible);
+            Assert.Equal("", vm.TotalSizeSuffix); // nothing on disk: no "0 KB" in the header line
+
+            var landed = new Track { Id = Guid.NewGuid(), Title = "One", Artist = "Singer", Duration = TimeSpan.FromSeconds(180) };
+            vm.Tracks.ReplaceAll([landed]);
+            vm.ShowImportedEntries([entries[0] with { LocalId = landed.Id }]);
+            for (var i = 0; i < 3; i++) { Dispatcher.UIThread.RunJobs(); window.UpdateLayout(); }
+            Assert.True(vm.ShowPlayActions);
+            Assert.True(play.IsVisible);
+        }
+        finally { window.Close(); vm.Dispose(); }
+    }
+
+    // Owner #48: the Playlists card counted only owned songs ("0 tracks · 0 min") over a page of 225.
+    [AvaloniaFact]
+    public void PlaylistCard_CountsEveryImportedSong_AndHidesPlayWithNoneOwned()
+    {
+        var owned = new Track { Id = Guid.NewGuid(), Title = "Owned", Artist = "Singer", Duration = TimeSpan.FromMinutes(3) };
+        var lib = new FakeLibraryService(); lib.TrackList.Add(owned);
+        using var persistence = new TestPersistenceService();
+        var sidebar = new SidebarViewModel(persistence, lib);
+        var playlist = new Playlist { Name = "Imported", TrackIds = [owned.Id] };
+        CatalogSong missing = new("spotify:a", "Missing", [new("", "Singer")], 201, null);
+        ImportedPlaylistEntry[] entries = [new(1, missing, null, ""), new(2, null, owned.Id, ""), new(3, missing with { Seconds = null }, null, ""), new(4, null, null, "Unavailable")];
+
+        var card = sidebar.BuildPlaylistNavItem(playlist, entries);
+        Assert.Equal(4, card.TrackCount);
+        Assert.Equal("4 tracks · 6 min", card.MetaText);
+        Assert.True(card.CanPlay);
+
+        var none = sidebar.BuildPlaylistNavItem(new Playlist { Name = "None owned" }, [entries[0], entries[2]]);
+        Assert.Equal(2, none.TrackCount);
+        Assert.Equal("2 tracks · 3 min", none.MetaText);
+        Assert.False(none.CanPlay);
+
+        var ordinary = sidebar.BuildPlaylistNavItem(playlist, null);
+        Assert.Equal(1, ordinary.TrackCount);
+        Assert.True(ordinary.CanPlay);
+    }
+
     private static async Task WaitFor(Func<bool> ready)
     {
         var until = Environment.TickCount64 + 5000;

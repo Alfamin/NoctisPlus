@@ -107,6 +107,8 @@ public partial class SidebarViewModel : ViewModelBase
         _library = library;
         _library.LibraryUpdated += (_, _) => RefreshFavoritesCount();
         _library.LibraryUpdated += (_, _) => Dispatcher.UIThread.Post(RefreshPlaylistCounts);
+        // Imported playlists' cards read the music feature's saved import lists once it starts.
+        Services.Search.OnlineMusicSearch.CurrentChanged += (_, _) => OnImportsChanged();
         _library.FavoritesChanged += (_, _) => RefreshFavoritesCount();
         Loc.Instance.CultureChanged += (_, _) => RelabelSections();
     }
@@ -540,6 +542,7 @@ public partial class SidebarViewModel : ViewModelBase
     private static void ApplyRebuilt(PlaylistNavItem navItem, PlaylistNavItem rebuilt)
     {
         navItem.TrackCount = rebuilt.TrackCount;
+        navItem.CanPlay = rebuilt.CanPlay;
         navItem.MetaText = rebuilt.MetaText;
         navItem.Art1 = rebuilt.Art1;
         navItem.Art2 = rebuilt.Art2;
@@ -547,8 +550,33 @@ public partial class SidebarViewModel : ViewModelBase
         navItem.Art4 = rebuilt.Art4;
     }
 
+    private FreeMusicFinder.SpotifyPlaylists? _watchedImports;
+    private int _importsRefreshQueued;
+
+    /// <summary>The saved import list of a Spotify/Deezer playlist (no network), or null for an ordinary playlist.</summary>
+    private IReadOnlyList<FreeMusicFinder.ImportedPlaylistEntry>? ImportedEntries(Playlist pl)
+    {
+        if (pl.IsSmartPlaylist || FreeMusicFinder.FreeMusicPlugin.Current?.PlaylistImports is not { } imports) return null;
+        if (!ReferenceEquals(imports, _watchedImports))
+        {
+            if (_watchedImports is not null) _watchedImports.Changed -= OnImportsChanged;
+            _watchedImports = imports;
+            imports.Changed += OnImportsChanged;
+        }
+        return imports.EntriesFor(pl.Id);
+    }
+
+    // Imports publish often while they read or fill; one refresh per burst.
+    private void OnImportsChanged()
+    {
+        if (Interlocked.Exchange(ref _importsRefreshQueued, 1) != 0) return;
+        Dispatcher.UIThread.Post(() => { Volatile.Write(ref _importsRefreshQueued, 0); RefreshPlaylistCounts(); }, DispatcherPriority.Background);
+    }
+
     /// <summary>Builds a PlaylistNavItem with resolved artwork for sidebar display.</summary>
-    private PlaylistNavItem BuildPlaylistNavItem(Playlist pl)
+    private PlaylistNavItem BuildPlaylistNavItem(Playlist pl) => BuildPlaylistNavItem(pl, ImportedEntries(pl));
+
+    internal PlaylistNavItem BuildPlaylistNavItem(Playlist pl, IReadOnlyList<FreeMusicFinder.ImportedPlaylistEntry>? imported)
     {
         var item = new PlaylistNavItem
         {
@@ -566,10 +594,32 @@ public partial class SidebarViewModel : ViewModelBase
 
         // "16 tracks · 54 min" meta line for the Playlists grid tiles
         var totalDuration = TimeSpan.Zero;
-        foreach (var trackId in pl.TrackIds)
+        if (imported is not null)
         {
-            var t = _library.GetTrackById(trackId);
-            if (t != null) totalDuration += t.Duration;
+            // Owner #48: an imported playlist's card counts every imported song its page lists, owned or not.
+            var shown = 0;
+            foreach (var entry in imported)
+            {
+                if (entry.LocalId is { } id)
+                {
+                    var owned = _library.GetTrackById(id);
+                    if (owned is null && _library.Tracks.Count > 0) continue;
+                    totalDuration += owned?.Duration ?? TimeSpan.Zero;
+                }
+                else if (entry.Song?.Seconds is { } seconds and > 0 and <= 86400)
+                    totalDuration += TimeSpan.FromSeconds(seconds);
+                shown++;
+            }
+            item.TrackCount = shown;
+            item.CanPlay = imported.Any(e => e.LocalId is { } id && (_library.Tracks.Count == 0 || _library.GetTrackById(id) != null));
+        }
+        else
+        {
+            foreach (var trackId in pl.TrackIds)
+            {
+                var t = _library.GetTrackById(trackId);
+                if (t != null) totalDuration += t.Duration;
+            }
         }
         var tracksLabel = item.TrackCount == 1 ? "1 track" : $"{item.TrackCount:N0} tracks";
         var durationLabel = totalDuration.TotalHours >= 1
@@ -582,12 +632,28 @@ public partial class SidebarViewModel : ViewModelBase
         {
             var uniqueArts = new List<string>();
             var seenAlbums = new HashSet<Guid>();
-            foreach (var trackId in pl.TrackIds)
+            if (imported is not null)
             {
-                if (uniqueArts.Count >= 4) break;
-                var track = _library.GetTrackById(trackId);
-                if (track?.AlbumArtworkPath != null && seenAlbums.Add(track.AlbumId))
-                    uniqueArts.Add(track.AlbumArtworkPath);
+                // Source order; a missing song adds its cover only when it is already saved (never fetched here).
+                var online = Services.Search.OnlineMusicSearch.Current;
+                foreach (var entry in imported.Take(60))
+                {
+                    if (uniqueArts.Count >= 4) break;
+                    var art = entry.LocalId is { } id
+                        ? _library.GetTrackById(id) is { AlbumArtworkPath: { } path } track && seenAlbums.Add(track.AlbumId) ? path : null
+                        : entry.Artwork.Length > 0 ? online?.CachedArtwork(entry.Artwork) : null;
+                    if (art != null && !uniqueArts.Contains(art)) uniqueArts.Add(art);
+                }
+            }
+            else
+            {
+                foreach (var trackId in pl.TrackIds)
+                {
+                    if (uniqueArts.Count >= 4) break;
+                    var track = _library.GetTrackById(trackId);
+                    if (track?.AlbumArtworkPath != null && seenAlbums.Add(track.AlbumId))
+                        uniqueArts.Add(track.AlbumArtworkPath);
+                }
             }
             if (uniqueArts.Count > 0) item.Art1 = uniqueArts[0];
             if (uniqueArts.Count > 1) item.Art2 = uniqueArts[1];

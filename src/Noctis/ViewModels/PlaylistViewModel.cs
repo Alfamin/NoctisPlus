@@ -51,7 +51,9 @@ public partial class PlaylistViewModel : ViewModelBase, ISearchable, IDisposable
         }
     }
     [ObservableProperty] private string _totalDuration = "";
-    [ObservableProperty] private string _totalSize = "";
+    [ObservableProperty, NotifyPropertyChangedFor(nameof(TotalSizeSuffix))] private string _totalSize = "";
+    /// <summary>" · 1.2 GB" for the header line, or nothing when there is no size.</summary>
+    public string TotalSizeSuffix => TotalSize.Length > 0 ? " · " + TotalSize : "";
 
     /// <summary>This load's copy of <see cref="Playlist.TrackAddedAt"/>: the rows' "Added" date and
     /// NEW badge read it (PlaylistAddedConverter), falling back to the track's library date.</summary>
@@ -474,8 +476,10 @@ public partial class PlaylistViewModel : ViewModelBase, ISearchable, IDisposable
             long totalBytes = 0;
             foreach (var t in Tracks)
                 totalBytes += t.FileSize;
+            // Nothing on disk (an import that owns no song yet) has no size: never "0 KB".
             TotalSize = totalBytes switch
             {
+                <= 0 => "",
                 >= 1_073_741_824 => $"{totalBytes / 1_073_741_824.0:F1} GB",
                 >= 1_048_576 => $"{totalBytes / 1_048_576.0:F1} MB",
                 _ => $"{totalBytes / 1024.0:F0} KB"

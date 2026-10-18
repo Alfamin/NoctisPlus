@@ -12,6 +12,9 @@ public partial class PlaylistNavItem : NavItem
     /// <summary>"16 tracks · 54 min" line shown under the tile name on the Playlists grid.</summary>
     [ObservableProperty] private string _metaText = string.Empty;
 
+    /// <summary>False for an imported playlist that owns none of its songs: the tile's Play would do nothing.</summary>
+    [ObservableProperty] private bool _canPlay = true;
+
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(HasCustomArt))]
     [NotifyPropertyChangedFor(nameof(HasCollageArt))]
