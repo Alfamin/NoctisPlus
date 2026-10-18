@@ -170,6 +170,17 @@ public partial class MainWindow : Window, IPageKeyOverlayHost
     private DockPanel? _rootPanel;
     private Border? _settingsOverlay;
     private Controls.BlurredBackdrop? _settingsScrim;
+
+    /// <summary>
+    /// Whether a Settings property change repaints the app under the open sheet, so the
+    /// scrim's blurred snapshot of it is retaken. Progress streams (scan, downloads) change
+    /// nothing visible under the blur. Background Blur changes only the blur itself: the scrim
+    /// re-blurs the snapshot it holds (BackdropSnapshot.BlurRadiusChanged), and a full retake
+    /// per drag step on top of that made the slider stutter (owner 10-18).
+    /// </summary>
+    internal static bool SettingChangeRepaintsUnderSheet(string? propertyName) =>
+        propertyName?.EndsWith("Progress", StringComparison.Ordinal) != true
+        && propertyName is not (nameof(SettingsViewModel.BackgroundBlurAmount) or nameof(SettingsViewModel.BackgroundBlurLabel));
     /// <summary>Bumped on every Settings open/close, so a reveal still waiting for the
     /// backdrop snapshot knows when it has been overtaken.</summary>
     private int _settingsSheetEpoch;
@@ -547,7 +558,7 @@ public partial class MainWindow : Window, IPageKeyOverlayHost
                 // change nothing visible under the blur.
                 _settingsBackdropRefreshHandler = (_, e) =>
                 {
-                    if (e.PropertyName?.EndsWith("Progress", StringComparison.Ordinal) != true)
+                    if (SettingChangeRepaintsUnderSheet(e.PropertyName))
                         _settingsScrim?.RefreshSoon();
                 };
                 vm.Settings.PropertyChanged += _settingsBackdropRefreshHandler;
