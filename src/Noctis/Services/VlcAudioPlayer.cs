@@ -4562,6 +4562,16 @@ public class VlcAudioPlayer : IAudioPlayer
     internal const int EngineLengthSlackMs = 250;
     /// <summary>A download-backed input ending this far before its recording's length ended early (see OnEndReachedCore).</summary>
     internal const int EarlyDownloadEndMs = 5000;
+
+    // EndReached is decoder EOF, which may lead audible EOF by the entire PCM ring.
+    // Recover only if even the decoded tail is short; a normal buffered ending must drain once.
+    internal static long? EarlyDownloadResumeMs(long lengthMs, GaplessTrackSegment? segment, long vlcTimeMs)
+    {
+        if (lengthMs <= 0 || segment is { Abandoned: true }) return null;
+        var heardMs = segment?.PositionMs ?? Math.Max(0, vlcTimeMs);
+        var bufferedMs = segment is null ? 0 : (long)segment.BufferedSamples * 1000 / (segment.SampleRate * segment.Channels);
+        return lengthMs - heardMs - bufferedMs > EarlyDownloadEndMs ? heardMs : null;
+    }
     // Kept ahead of what the ring holds while the input still decodes: above the view model's
     // 0.5 s handoff lead plus the ~1 s decode-ahead window, so the advance can never land
     // before the input's own end.
@@ -5245,9 +5255,8 @@ public class VlcAudioPlayer : IAudioPlayer
         if (ReferenceEquals(sender, _player) && _currentMedia is ProgressiveMedia { Complete: true, Duration: { TotalMilliseconds: > 0 } full }
             && _currentMediaPath is { } savedPath && File.Exists(savedPath))
         {
-            var heardMs = _gaplessEngine && Volatile.Read(ref _engineSegments[EngineSlotOf(_player)]) is { Abandoned: false } heardSeg
-                ? heardSeg.PositionMs : Math.Max(0, _player.Time);
-            if (full.TotalMilliseconds - heardMs > EarlyDownloadEndMs)
+            var segment = _gaplessEngine ? Volatile.Read(ref _engineSegments[EngineSlotOf(_player)]) : null;
+            if (!_transitionInFlight && EarlyDownloadResumeMs((long)full.TotalMilliseconds, segment, _player.Time) is { } heardMs)
             {
                 DebugLog.Write("Playback", $"download input ended at {heardMs / 1000.0:0.0} s of {full.TotalSeconds:0.0} s; continuing from the saved file");
                 Interlocked.Exchange(ref _pendingSeekMs, heardMs);
