@@ -835,7 +835,9 @@ public class VlcAudioPlayer : IAudioPlayer
         {
             if (_disposed) return TimeSpan.Zero;
             var len = CurrentLengthMs;
-            if (_gaplessEngine)
+            // A download-backed input knows its recording's length; what the ring delivered before an early input
+            // end is not it (owner 10-18: 0:36 of "0:47" on a 2:49 song).
+            if (_gaplessEngine && _currentMedia is not ProgressiveMedia { Duration: { TotalMilliseconds: > 0 } })
             {
                 // The ring knows more than VLC's length estimate (see EngineReportedLengthMs).
                 var seg = Volatile.Read(ref _engineSegments[EngineSlotOf(_player)]);
@@ -4558,6 +4560,8 @@ public class VlcAudioPlayer : IAudioPlayer
     // Encoder padding / the resampler tail run a few ms past the claimed length; that is not an
     // under-report.
     internal const int EngineLengthSlackMs = 250;
+    /// <summary>A download-backed input ending this far before its recording's length ended early (see OnEndReachedCore).</summary>
+    internal const int EarlyDownloadEndMs = 5000;
     // Kept ahead of what the ring holds while the input still decodes: above the view model's
     // 0.5 s handoff lead plus the ~1 s decode-ahead window, so the advance can never land
     // before the input's own end.
@@ -5233,6 +5237,25 @@ public class VlcAudioPlayer : IAudioPlayer
     {
         if (_disposed) return;
         if (ReferenceEquals(sender, _player) && _currentMedia is ProgressiveMedia { Cancelled: true }) return;
+
+        // Owner 10-18 ("Which One", paused, resumed, then the timeline jumped to 0:36 of 0:47 on a 2:49 song): a
+        // download-backed input can end long before the recording does. Its download is complete and saved, so the
+        // saved file goes on from the spot being heard (what a click on the timeline did), instead of the song
+        // ending there and the ring's delivered length becoming its length.
+        if (ReferenceEquals(sender, _player) && _currentMedia is ProgressiveMedia { Complete: true, Duration: { TotalMilliseconds: > 0 } full }
+            && _currentMediaPath is { } savedPath && File.Exists(savedPath))
+        {
+            var heardMs = _gaplessEngine && Volatile.Read(ref _engineSegments[EngineSlotOf(_player)]) is { Abandoned: false } heardSeg
+                ? heardSeg.PositionMs : Math.Max(0, _player.Time);
+            if (full.TotalMilliseconds - heardMs > EarlyDownloadEndMs)
+            {
+                DebugLog.Write("Playback", $"download input ended at {heardMs / 1000.0:0.0} s of {full.TotalSeconds:0.0} s; continuing from the saved file");
+                Interlocked.Exchange(ref _pendingSeekMs, heardMs);
+                _restartPausedRequest = _isPaused;
+                Play(savedPath);
+                return;
+            }
+        }
 
         // Engine EOS fallback: VLC 3's amem drain callback "may" fire at end of
         // stream — EndReached is the guaranteed signal. Without EndOfStream the

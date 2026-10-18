@@ -35,7 +35,13 @@ internal sealed class ProgressiveMediaInput : MediaInput
             if (read > 0) Marshal.Copy(_scratch, 0, target, read);
             return read;
         }
-        catch (Exception ex) { Error = ex; return -1; } // never unwind a native callback
+        catch (Exception ex)
+        {
+            // Once per input, always in session.log: an early end of a download-backed song names its cause.
+            if (Error is null && !_cancel.IsCancellationRequested)
+                try { Noctis.Services.DebugLog.Write("Playback", $"download input read failed: {ex.GetType().Name}: {ex.Message}"); } catch { }
+            Error = ex; return -1; // never unwind a native callback
+        }
         finally { if (waiting) NotifyBuffering(false); }
     }
     private void NotifyBuffering(bool waiting) { try { Buffering?.Invoke(waiting); } catch { /* native callbacks must not unwind observers */ } }
