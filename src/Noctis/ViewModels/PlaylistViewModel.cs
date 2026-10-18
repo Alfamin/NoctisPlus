@@ -42,7 +42,14 @@ public partial class PlaylistViewModel : ViewModelBase, ISearchable, IDisposable
 
     /// <summary>Header stats: "1 track", "12 tracks" (the header read "1 tracks").</summary>
     // An imported playlist counts its songs not in the library too (owner #36: they are its rows).
-    public string TrackCountText => (TrackCount + CatalogMissingCount) == 1 ? "1 track" : $"{TrackCount + CatalogMissingCount} tracks";
+    public string TrackCountText
+    {
+        get
+        {
+            var count = _importedEntries is not null ? Rows.Count : TrackCount + CatalogMissingCount;
+            return count == 1 ? "1 track" : $"{count} tracks";
+        }
+    }
     [ObservableProperty] private string _totalDuration = "";
     [ObservableProperty] private string _totalSize = "";
 
@@ -66,7 +73,7 @@ public partial class PlaylistViewModel : ViewModelBase, ISearchable, IDisposable
 
     /// <summary>True when drag-reorder is possible: manual playlist, manual sort, no active filter.
     /// Drives the row grip-handle affordance in the # column.</summary>
-    public bool CanReorder => IsManualPlaylist && IsManualSort && string.IsNullOrWhiteSpace(SearchText);
+    public bool CanReorder => IsManualPlaylist && IsManualSort && string.IsNullOrWhiteSpace(SearchText) && !HasUnownedImportEntries;
 
     partial void OnSearchTextChanged(string value)
     {
@@ -246,6 +253,8 @@ public partial class PlaylistViewModel : ViewModelBase, ISearchable, IDisposable
                 CurrentPlayingTrackId = _player.CurrentTrack?.Id;
             if (e.PropertyName == nameof(PlayerViewModel.State))
                 IsPlayerPlaying = _player.State == PlaybackState.Playing;
+            if (e.PropertyName is nameof(PlayerViewModel.CurrentTrack) or nameof(PlayerViewModel.State) or nameof(PlayerViewModel.OnlinePlayingSongId))
+                RefreshCatalogDownloads();
         };
         _player.PropertyChanged += _playerPropertyChangedHandler;
 
@@ -256,8 +265,6 @@ public partial class PlaylistViewModel : ViewModelBase, ISearchable, IDisposable
         _sidebar.PlaylistEdited += OnPlaylistEdited;
         Services.Search.OnlineMusicSearch.CurrentChanged += OnStreamingFeatureChanged;
         AttachStreamingImports();
-        // After the list has taken the change (Rows forwards it): only then may the header row move.
-        Tracks.CollectionChanged += (_, _) => Dispatcher.UIThread.Post(() => { if (!_streamingDisposed) UpdateCatalogHeader(); });
     }
 
     private void OnStreamingFeatureChanged(object? sender, EventArgs e) => Dispatcher.UIThread.Post(() =>
@@ -454,8 +461,7 @@ public partial class PlaylistViewModel : ViewModelBase, ISearchable, IDisposable
             Tracks.ReplaceAll(sorted);
 
             TrackCount = Tracks.Count;
-            var total = TimeSpan.FromTicks(Tracks.Sum(t => t.Duration.Ticks));
-            TotalDuration = DurationText.Total(total);
+            RefreshPlaylistDuration();
 
             // Compute total file size from the size the library already indexed.
             //
@@ -591,9 +597,10 @@ public partial class PlaylistViewModel : ViewModelBase, ISearchable, IDisposable
     private void UpdateEmptyStateFlags(int unfilteredCount)
     {
         var filterActive = !string.IsNullOrWhiteSpace(_currentFilter);
-        ShowNoResults = Tracks.Count == 0 && filterActive && unfilteredCount > 0;
-        ShowEmptyManual = Tracks.Count == 0 && !ShowNoResults && !IsSmartPlaylist;
-        ShowEmptySmart = Tracks.Count == 0 && !ShowNoResults && IsSmartPlaylist;
+        var count = Rows.Count;
+        ShowNoResults = count == 0 && filterActive && (_importedEntries?.Count ?? unfilteredCount) > 0;
+        ShowEmptyManual = count == 0 && !ShowNoResults && !IsSmartPlaylist;
+        ShowEmptySmart = count == 0 && !ShowNoResults && IsSmartPlaylist;
     }
 
     private void RebuildFeaturedArtists(IReadOnlyList<Track> tracks)
@@ -1136,6 +1143,7 @@ public partial class PlaylistViewModel : ViewModelBase, ISearchable, IDisposable
 
     public void Dispose()
     {
+        if (_streamingDisposed) return;
         _streamingDisposed = true;
         DisposeCatalogRows();
         Services.Search.OnlineMusicSearch.CurrentChanged -= OnStreamingFeatureChanged;

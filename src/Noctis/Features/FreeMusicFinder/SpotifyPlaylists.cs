@@ -21,6 +21,8 @@ internal sealed class SpotifyPlaylist
     public int Total => Manifest?.Total ?? 0;
 }
 
+internal sealed record ImportedPlaylistEntry(int Position, CatalogSong? Song, Guid? LocalId, string Issue, string Artwork = "", string Album = "");
+
 /// <summary>Metadata imports create normal playlists of shared local references. The saved
 /// manifest fills download gaps, without fetching Spotify again or duplicating the audio.</summary>
 internal sealed class SpotifyPlaylists : IDisposable
@@ -49,6 +51,19 @@ internal sealed class SpotifyPlaylists : IDisposable
         var matches = job.Matches;
         return manifest.Entries.Where(e => e.Request is not null && !matches.ContainsKey(e.Position))
             .OrderBy(e => e.Position).Select(e => (e.Position, Song(e))).ToArray();
+    }
+
+    // A snapshot for the native page, including positions with unavailable metadata.
+    // A duplicate recording remains two entries; no audio or metadata requests happen here.
+    internal IReadOnlyList<ImportedPlaylistEntry>? EntriesFor(Guid playlistId)
+    {
+        var job = Jobs.FirstOrDefault(j => j.LibraryId == playlistId);
+        if (job?.Manifest is not { CompleteIds: true } manifest || job.FillingStopped) return null;
+        var matches = job.Matches;
+        return manifest.Entries.OrderBy(e => e.Position).Select(e => new ImportedPlaylistEntry(
+            e.Position, e.Request is null ? null : Song(e),
+            matches.TryGetValue(e.Position, out var id) ? id : null, e.Issue,
+            ArtistCatalog.ArtworkUrl(e.Artwork) ? e.Artwork : "", e.Album ?? "")).ToArray();
     }
 
     // "spotify:track:ID" -> "spotify:ID": the catalog id shape (its Request maps it back to the track URI).

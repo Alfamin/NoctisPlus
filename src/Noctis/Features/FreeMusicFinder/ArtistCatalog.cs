@@ -439,7 +439,7 @@ internal sealed partial class ArtistCatalog : IDisposable
         ? new(id, title, [artist], Duration(Number(t, "trackTimeMillis") / 1000d), Explicit(t, "trackExplicitness"), (int)Math.Clamp(Number(t, "discNumber"), 1, 100), (int)Math.Clamp(Number(t, "trackNumber"), 0, 10000)) : null;
     private static double? Duration(double seconds) => seconds is > 0 and <= 86400 ? seconds : null;
     internal static bool ArtworkUrl(string? value) => Uri.TryCreate(value, UriKind.Absolute, out var uri) && uri.Scheme == "https" && uri.IsDefaultPort && uri.UserInfo.Length == 0 &&
-        (uri.Host == "cdn-images.dzcdn.net" || System.Text.RegularExpressions.Regex.IsMatch(uri.Host, @"^is[1-9][0-9]?-ssl\.mzstatic\.com$"));
+        (uri.Host is "cdn-images.dzcdn.net" or "i.scdn.co" || System.Text.RegularExpressions.Regex.IsMatch(uri.Host, @"^is[1-9][0-9]?-ssl\.mzstatic\.com$"));
     public string? SavedArtwork(string? url, bool highQuality = false)
     {
         if (!ArtworkUrl(url)) return null;

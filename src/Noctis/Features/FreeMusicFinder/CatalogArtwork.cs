@@ -12,6 +12,7 @@ internal static class CatalogArtwork
     {
         if (!ArtistCatalog.ArtworkUrl(value)) return null;
         var url = new Uri(value!);
+        if (url.Host == "i.scdn.co") return value; // Spotify image ids encode the variant; never rewrite their paths.
         var match = Regex.Match(url.AbsolutePath, @"/(?<w>[1-9][0-9]{0,3})x(?<h>[1-9][0-9]{0,3})(?<mode>bb|cw|cc|-[a-zA-Z0-9-]+)?\.(jpg|jpeg|png|webp)$", RegexOptions.IgnoreCase, TimeSpan.FromSeconds(1));
         if (!match.Success || int.Parse(match.Groups["w"].Value) >= size) return value;
         var mode = url.Host == "cdn-images.dzcdn.net" ? match.Groups["mode"].Value : "bb";
@@ -22,6 +23,7 @@ internal static class CatalogArtwork
     {
         if (!ArtistCatalog.ArtworkUrl(value)) return null;
         var url = new Uri(value!); var target = url.Host == "cdn-images.dzcdn.net" ? 1000 : Math.Clamp(size, 320, 1200);
+        if (url.Host == "i.scdn.co") return value;
         var match = Regex.Match(url.AbsolutePath, @"/(?<w>[1-9][0-9]{0,3})x(?<h>[1-9][0-9]{0,3})(?<mode>bb|cw|cc|-[a-zA-Z0-9-]+)?\.(jpg|jpeg|png|webp)$", RegexOptions.IgnoreCase, TimeSpan.FromSeconds(1));
         if (!match.Success) return value;
         if (int.Parse(match.Groups["w"].Value) >= target && int.Parse(match.Groups["h"].Value) >= target) return value;

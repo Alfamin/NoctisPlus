@@ -37,6 +37,19 @@ internal static class StreamingPlaylistImportTests
         Check.True(rows[0].Song.Request.OriginUri?.StartsWith("spotify:track:") == true, "a missing row keeps its Spotify track identity");
         Check.Equal(0, imports.MissingFor(Guid.NewGuid()).Count, "a playlist that is not an import has no missing rows");
         Check.Equal(0, downloads.History.Count, "listing missing songs downloads nothing");
+        var ordered = imports.EntriesFor(spotify.Job.LibraryId)!;
+        Check.True(ordered.Select(r => r.Position).SequenceEqual(new[] { 1, 2, 3, 4 }) && ordered[0].LocalId == owned.Id && ordered[1].LocalId is null,
+            "native page receives all positions, not owned-first groups");
+        Check.Equal(ordered[1].Song!.Id, ordered[3].Song!.Id, "duplicate missing positions retain their shared recording identity");
+        using (var metadata = JsonDocument.Parse("""{"album":{"name":"Night"},"coverArt":{"sources":[{"url":"https://untrusted.invalid/a.png"},{"url":"https://i.scdn.co/image/known-cover"}]}}"""))
+        {
+            var details = PlaylistCatalog.TrackDetails(metadata.RootElement);
+            Check.Equal("Night", details.Album, "available album metadata is retained");
+            Check.Equal("https://i.scdn.co/image/known-cover", details.Artwork, "only trusted Spotify artwork is retained");
+            Check.Equal(details.Artwork, CatalogArtwork.LargeUrl(details.Artwork), "Spotify artwork ids are not rewritten as Apple paths");
+        }
+        Check.False(ArtistCatalog.ArtworkUrl("https://i.scdn.co.untrusted.invalid/image/a"), "lookalike artwork hosts are refused");
+        Check.False(ArtistCatalog.ArtworkUrl("https://i.scdn.co:999/image/a"), "artwork custom ports are refused");
         Run(vm.QueueMissingCommand.ExecuteAsync(spotify));
         Check.Equal(1, signIns, "explicit missing-download request offers sign-in when needed");
         Check.Equal(0, downloads.History.Count, "missing download is not silently queued while signed out");

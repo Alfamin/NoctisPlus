@@ -11,6 +11,8 @@ internal sealed class CatalogEntry
     public string Uri { get; set; } = "";
     public MusicRequest? Request { get; set; }
     public string Issue { get; set; } = "";
+    public string Artwork { get; set; } = "";
+    public string Album { get; set; } = "";
 }
 internal sealed class PlaylistManifest
 {
@@ -39,6 +41,7 @@ internal sealed class PlaylistCatalog : IDisposable
         var manifest=saved is {CompleteIds:true} && saved.Url==link.Url ? saved : new PlaylistManifest{Url=link.Url};
         if(link.Service=="deezer") return await Deezer(link,manifest,checkpoint,progress,ct).ConfigureAwait(false);
         Dictionary<string,MusicRequest> known=new();
+        Dictionary<string,(string Artwork,string Album)> details=new();
         string? token=null;
         if(!manifest.CompleteIds)
         {
@@ -48,7 +51,7 @@ internal sealed class PlaylistCatalog : IDisposable
             manifest.Name=String(entity,"name",String(entity,"title","Spotify import"));
             if(entity.TryGetProperty("trackList",out var tracks) && tracks.ValueKind==JsonValueKind.Array)
                 foreach(var track in tracks.EnumerateArray())
-                    if(ParseTrack(track) is {} item && item.Url is {} url) known[url]=item;
+                    if(ParseTrack(track) is {} item && item.Url is {} url) { known[url]=item; details[url]=TrackDetails(track); }
             if(link.Kind=="track")
             {
                 var request=ParseTrack(entity,link.Id)??throw new InvalidDataException("METADATA_UNAVAILABLE: Spotify did not provide this track's title and artist.");
@@ -76,7 +79,11 @@ internal sealed class PlaylistCatalog : IDisposable
                 }
                 if(manifest.Entries.Count!=manifest.Total) throw new InvalidDataException("METADATA_INCOMPLETE: Spotify's playlist count changed or does not match the returned entries. No audio requested.");
                 foreach(var entry in manifest.Entries)
-                    if(known.TryGetValue(TrackUrl(entry.Uri),out var request)) entry.Request=request;
+                    if(known.TryGetValue(TrackUrl(entry.Uri),out var request))
+                    {
+                        entry.Request=request;
+                        if(details.TryGetValue(TrackUrl(entry.Uri),out var info)) { entry.Artwork=info.Artwork;entry.Album=info.Album; }
+                    }
             }
             manifest.CompleteIds=true;checkpoint(manifest);
         }
@@ -88,7 +95,9 @@ internal sealed class PlaylistCatalog : IDisposable
             {
                 var id=entry.Uri["spotify:track:".Length..];
                 using var data=Embed(await Get("https://open.spotify.com/embed/track/"+id,null,cancel).ConfigureAwait(false));
-                entry.Request=ParseTrack(Entity(data.RootElement),id);
+                var entity=Entity(data.RootElement);
+                entry.Request=ParseTrack(entity,id);
+                (entry.Artwork,entry.Album)=TrackDetails(entity);
                 entry.Issue=entry.Request is null?"METADATA_UNAVAILABLE: this track has no usable title/artist.":"";
             }
             catch(Exception ex) when(ex is InvalidDataException or HttpRequestException or TimeoutException)
@@ -174,6 +183,16 @@ internal sealed class PlaylistCatalog : IDisposable
         bool? explicitFlag=track.TryGetProperty("isExplicit",out var explicitValue) && explicitValue.ValueKind is JsonValueKind.True or JsonValueKind.False?explicitValue.GetBoolean():null;
         return new(title,artist,seconds,TrackUrl(uri),explicitFlag);
     }
+    internal static (string Artwork,string Album) TrackDetails(JsonElement track)
+    {
+        var album=track.TryGetProperty("album",out var a)?String(a,"name",""):"";
+        var urls=new List<string>();
+        if(track.TryGetProperty("coverArt",out var art) && art.ValueKind==JsonValueKind.Object && art.TryGetProperty("sources",out var sources) && sources.ValueKind==JsonValueKind.Array)
+            urls.AddRange(sources.EnumerateArray().Select(s=>String(s,"url","")));
+        if(track.TryGetProperty("visualIdentity",out var visual) && visual.ValueKind==JsonValueKind.Object && visual.TryGetProperty("image",out var images) && images.ValueKind==JsonValueKind.Array)
+            urls.AddRange(images.EnumerateArray().Select(s=>String(s,"url","")));
+        return (urls.FirstOrDefault(ArtistCatalog.ArtworkUrl)??"",new string(album.Where(c=>!char.IsControl(c)).Take(1000).ToArray()));
+    }
     private static string TrackUrl(string uri)=>uri.StartsWith("spotify:track:")?"https://open.spotify.com/track/"+uri["spotify:track:".Length..]:"";
     private static string String(JsonElement element,string key,string fallback)
         =>element.ValueKind==JsonValueKind.Object && element.TryGetProperty(key,out var value) && value.ValueKind==JsonValueKind.String?value.GetString()??fallback:fallback;
@@ -237,7 +256,11 @@ internal sealed class PlaylistCatalog : IDisposable
             if(title.Length==0 || artist.Length==0)throw new InvalidDataException("METADATA_INCOMPLETE: missing title/artist.");
             double? seconds=item.TryGetProperty("duration",out var d)&&d.TryGetDouble(out var sec)?sec:null;
             bool? explicitFlag=item.TryGetProperty("explicit_lyrics",out var e)&&e.ValueKind is JsonValueKind.True or JsonValueKind.False?e.GetBoolean():null;
-            var position=manifest.Entries.Count+1;manifest.Entries.Add(new(){Position=position,Uri="deezer:track:"+number,Request=new(title,artist,seconds,"https://www.deezer.com/track/"+number,explicitFlag,manifest.Url,position)});
+            var position=manifest.Entries.Count+1;
+            var album=item.TryGetProperty("album",out var record)?record:default;
+            var cover=String(album,"cover_medium",String(album,"cover",""));
+            manifest.Entries.Add(new(){Position=position,Uri="deezer:track:"+number,Request=new(title,artist,seconds,"https://www.deezer.com/track/"+number,explicitFlag,manifest.Url,position),
+                Album=String(album,"title",""),Artwork=ArtistCatalog.ArtworkUrl(cover)?cover:""});
         }
     }
     public void Dispose()=>_http.Dispose();

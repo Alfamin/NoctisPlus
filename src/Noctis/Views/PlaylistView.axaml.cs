@@ -98,13 +98,13 @@ public partial class PlaylistView : UserControl, ITrackSelectionSource
             _observedVm.CtrlSelectedTracks = new List<Track>();
             _observedVm.SelectedCount = 0;
             _observedVm.PropertyChanged -= OnVmPropertyChanged;
-            _observedVm.Tracks.CollectionChanged -= OnTracksCollectionChanged;
+            _observedVm.Rows.CollectionChanged -= OnTracksCollectionChanged;
         }
         _observedVm = DataContext as PlaylistViewModel;
         if (_observedVm != null)
         {
             _observedVm.PropertyChanged += OnVmPropertyChanged;
-            _observedVm.Tracks.CollectionChanged += OnTracksCollectionChanged;
+            _observedVm.Rows.CollectionChanged += OnTracksCollectionChanged;
         }
     }
 
@@ -173,7 +173,7 @@ public partial class PlaylistView : UserControl, ITrackSelectionSource
     {
         if (DataContext is not PlaylistViewModel vm) return false;
         var index = knownIndex >= 0 ? knownIndex : TrackList.IndexFromContainer(item);
-        if (index < 0 || index >= vm.Tracks.Count) return false;
+        if (index < 0 || index >= vm.Rows.Count || vm.Rows[index] is not Track track) return false;
 
         var descendants = item.GetVisualDescendants().ToList();
 
@@ -182,10 +182,11 @@ public partial class PlaylistView : UserControl, ITrackSelectionSource
         if (indexText != null)
             indexText.Text = (index + 1).ToString();
 
-        var album = vm.Tracks[index].Album;
+        var album = track.Album;
         var sameAsPrevious = index > 0
                              && !string.IsNullOrEmpty(album)
-                             && string.Equals(album, vm.Tracks[index - 1].Album,
+                             && vm.Rows[index - 1] is Track previous
+                             && string.Equals(album, previous.Album,
                                  StringComparison.OrdinalIgnoreCase);
 
         var albumBtn = descendants.OfType<Button>()
@@ -225,8 +226,9 @@ public partial class PlaylistView : UserControl, ITrackSelectionSource
         header.Margin = index == 0 ? new Thickness(8, 4, 8, 6) : new Thickness(8, 18, 8, 6);
 
         var runLength = 1;
-        while (index + runLength < vm.Tracks.Count
-               && string.Equals(vm.Tracks[index + runLength].Album, album,
+        while (index + runLength < vm.Rows.Count
+               && vm.Rows[index + runLength] is Track next
+               && string.Equals(next.Album, album,
                    StringComparison.OrdinalIgnoreCase))
             runLength++;
 
@@ -515,6 +517,8 @@ public partial class PlaylistView : UserControl, ITrackSelectionSource
             // valid while this event is being raised.
             item.ApplyTemplate();
             item.Presenter?.UpdateChild();
+            if (item.DataContext is ArtistCatalogSong catalog && DataContext is PlaylistViewModel playlist)
+                playlist.EnsureCatalogArtwork(catalog);
             if (!UpdateRowIndexVisuals(item, e.Index))
             {
                 // Template still not realized — fall back to the old timing so a row
@@ -654,6 +658,7 @@ public partial class PlaylistView : UserControl, ITrackSelectionSource
         if (!e.GetCurrentPoint(item).Properties.IsLeftButtonPressed) return;
         if (DataContext is not PlaylistViewModel vm) return;
         if (vm.IsSmartPlaylist) return;
+        if (!vm.CanReorder) return;
         // No reordering while a search filter is active: indexes refer to the
         // filtered view, and persisting from it would drop the hidden tracks.
         if (!string.IsNullOrWhiteSpace(vm.SearchText)) return;
@@ -817,7 +822,7 @@ public partial class PlaylistView : UserControl, ITrackSelectionSource
         if (_observedVm != null)
         {
             _observedVm.PropertyChanged -= OnVmPropertyChanged;
-            _observedVm.Tracks.CollectionChanged -= OnTracksCollectionChanged;
+            _observedVm.Rows.CollectionChanged -= OnTracksCollectionChanged;
             _observedVm = null;
         }
 
@@ -861,7 +866,7 @@ public partial class PlaylistView : UserControl, ITrackSelectionSource
         {
             _observedVm = observed;
             _observedVm.PropertyChanged += OnVmPropertyChanged;
-            _observedVm.Tracks.CollectionChanged += OnTracksCollectionChanged;
+            _observedVm.Rows.CollectionChanged += OnTracksCollectionChanged;
         }
 
         if (DataContext is PlaylistViewModel vm && vm.SavedScrollOffset > 0)

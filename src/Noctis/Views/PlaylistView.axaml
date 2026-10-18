@@ -1004,7 +1004,7 @@
                             <!-- Owner #36: an imported song the library lacks, in the album page's catalog-row shape. -->
                             <DataTemplate x:DataType="vm:ArtistCatalogSong">
                                 <Border Classes="row-body catalog-missing" Height="56" CornerRadius="8" Background="Transparent">
-                                    <Grid ColumnDefinitions="44,*,Auto" Background="Transparent">
+                                    <Grid ColumnDefinitions="44,44,*,Auto" Background="Transparent">
                                         <Panel HorizontalAlignment="Center" VerticalAlignment="Center">
                                             <Button Classes="catalog-download" ToolTip.Tip="{Binding Song.PlayLabel}" AutomationProperties.Name="{Binding Song.PlayLabel}"
                                                     Command="{Binding $parent[UserControl].((vm:PlaylistViewModel)DataContext).PlayCatalogSongCommand}"
@@ -1015,7 +1015,10 @@
                                                 </Panel>
                                             </Button>
                                         </Panel>
-                                        <StackPanel Grid.Column="1" Spacing="2" Margin="6,0,0,0" VerticalAlignment="Center" Opacity="0.6">
+                                        <Border Grid.Column="1" Width="40" Height="40" CornerRadius="4" ClipToBounds="True" VerticalAlignment="Center" Opacity="0.6" Background="{DynamicResource SystemControlBackgroundBaseLowBrush}">
+                                            <controls:CachedImage SourcePath="{Binding Song.ArtworkPath}" Stretch="UniformToFill" />
+                                        </Border>
+                                        <StackPanel Grid.Column="2" Spacing="2" Margin="8,0,0,0" VerticalAlignment="Center" Opacity="0.6">
                                             <TextBlock FontSize="14" TextTrimming="CharacterEllipsis" MaxLines="1">
                                                 <Run Text="{Binding Song.Title}" />
                                                 <InlineUIContainer BaselineAlignment="Center">
@@ -1026,7 +1029,7 @@
                                             </TextBlock>
                                             <TextBlock Text="{Binding Song.ArtistDisplay}" FontSize="12" Opacity="0.7" TextTrimming="CharacterEllipsis" MaxLines="1" />
                                         </StackPanel>
-                                        <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="14" VerticalAlignment="Center" Margin="0,0,14,0">
+                                        <StackPanel Grid.Column="3" Orientation="Horizontal" Spacing="14" VerticalAlignment="Center" Margin="0,0,14,0">
                                             <TextBlock Text="{Binding Song.DurationText}" FontSize="13" Opacity="0.45" FontFeatures="+tnum" VerticalAlignment="Center" />
                                             <Panel Width="32" Height="32">
                                                 <Button Classes="catalog-download" IsVisible="{Binding Song.CanStartDownload}" ToolTip.Tip="Download" AutomationProperties.Name="Download"
@@ -1054,8 +1057,11 @@
                                     </Grid>
                                 </Border>
                             </DataTemplate>
-                            <DataTemplate x:DataType="vm:PlaylistMissingHeader">
-                                <TextBlock Text="Not in your library" FontSize="17" FontWeight="Bold" Margin="8,18,0,6" IsHitTestVisible="False" />
+                            <DataTemplate x:DataType="vm:PlaylistUnavailableRow">
+                                <Grid ColumnDefinitions="44,*" Height="56" Opacity="0.45" IsHitTestVisible="False">
+                                    <TextBlock Text="{Binding Position}" HorizontalAlignment="Center" VerticalAlignment="Center" FontFeatures="+tnum" />
+                                    <TextBlock Grid.Column="1" Text="Unavailable track" VerticalAlignment="Center" Margin="6,0" />
+                                </Grid>
                             </DataTemplate>
                         </ListBox.DataTemplates>
                     </ListBox>
