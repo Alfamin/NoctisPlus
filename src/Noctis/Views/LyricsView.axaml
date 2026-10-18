@@ -239,6 +239,11 @@
                         </TransformOperationsTransition.Easing>
                     </TransformOperationsTransition>
                     <DoubleTransition Property="Opacity" Duration="0:0:0.5" Easing="CubicEaseInOut"/>
+                    <!-- Depth blur eases instead of snapping: Apple Music's outgoing line
+                         blurs within ~100 ms of the glide starting, the incoming one
+                         sharpens along the glide (half-way ~160 ms). Ease-out lands
+                         between the two; a spring would overshoot the radius below 0. -->
+                    <EffectTransition Property="Effect" Duration="0:0:0.4" Easing="CubicEaseOut"/>
                 </Transitions>
             </Setter>
         </Style>

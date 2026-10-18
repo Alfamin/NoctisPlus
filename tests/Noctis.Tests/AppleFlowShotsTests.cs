@@ -134,6 +134,77 @@ public class AppleFlowShotsTests
         }
     }
 
+    /// <summary>
+    /// Line-change strip: plays the song clock in real time through a line change
+    /// (NOCTIS_APPLEFLOW_STRIP_AT, song seconds of the next line's first word; default
+    /// 15.87 "Where you and I had") and saves every rendered frame with its song time,
+    /// for a frame-by-frame comparison with the Apple capture. Same gating as SaveShots.
+    /// </summary>
+    [AvaloniaFact]
+    public void SaveLineChangeStrip()
+    {
+        var lrc = Environment.GetEnvironmentVariable("NOCTIS_APPLEFLOW_LRC");
+        var dir = Environment.GetEnvironmentVariable("NOCTIS_APPLEFLOW_DIR");
+        var prefix = Environment.GetEnvironmentVariable("NOCTIS_APPLEFLOW_PREFIX") ?? "noctis";
+        if (!HeadlessTestApp.RealRendering || string.IsNullOrEmpty(lrc) || string.IsNullOrEmpty(dir) || !File.Exists(lrc)) return;
+        var at = double.TryParse(Environment.GetEnvironmentVariable("NOCTIS_APPLEFLOW_STRIP_AT"),
+            System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out var v) ? v : 15.87;
+        Directory.CreateDirectory(dir);
+
+        var player = new PlayerViewModel(
+            new FakeAudioPlayer(), new FakeLibraryService(),
+            new TestPersistenceService(), new FakeAnimatedCoverService());
+        var vm = new LyricsViewModel(
+            player, new StubLrcLib(), new StubNetEase(), new StubMetadata(),
+            new TestPersistenceService(), new FakeLibraryService());
+        vm.LyricLines.ReplaceAll(LyricsViewModel.ParseLrcContent(File.ReadAllText(lrc)));
+        var view = new LyricsView { DataContext = vm };
+        var win = new Window { Width = 1280, Height = 800, Background = new SolidColorBrush(Color.Parse("#22303C")) };
+        var update = typeof(LyricsViewModel).GetMethod("UpdateActiveLine",
+            System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic)!;
+        void At(double s) => update.Invoke(vm, new object[] { TimeSpan.FromSeconds(s) - Lookahead });
+        void Pump()
+        {
+            Dispatcher.UIThread.RunJobs();
+            AvaloniaHeadlessPlatform.ForceRenderTimerTick();
+            Dispatcher.UIThread.RunJobs();
+        }
+
+        try
+        {
+            win.Show();
+            win.Content = view;
+            for (var i = 0; i < 100; i++) { Pump(); Thread.Sleep(3); }
+            // Settle on the previous line well before the change.
+            for (var s = at - 4; s < at - 1.2; s += 0.1) { At(s); Pump(); Thread.Sleep(3); }
+            var settle = System.Diagnostics.Stopwatch.StartNew();
+            while (settle.ElapsedMilliseconds < 1500) { Pump(); Thread.Sleep(3); }
+
+            var start = at - 1.2;
+            var sw = System.Diagnostics.Stopwatch.StartNew();
+            // Encode after the run: saving inside the loop cut the sampling to ~7 fps.
+            var frames = new List<(double Song, Avalonia.Media.Imaging.Bitmap Bmp)>();
+            while (sw.Elapsed.TotalSeconds < 2.2)
+            {
+                var song = start + sw.Elapsed.TotalSeconds;
+                At(song);
+                Pump();
+                frames.Add((song, win.CaptureRenderedFrame()!));
+            }
+            for (var i = 0; i < frames.Count; i++)
+            {
+                CropSave(frames[i].Bmp, new PixelRect(620, 0, 640, 800),
+                    Path.Combine(dir, $"{prefix}-strip-{i:000}-{(frames[i].Song - at) * 1000:+0000;-0000}ms.png"));
+                frames[i].Bmp.Dispose();
+            }
+            _o.WriteLine($"{frames.Count} frames, line {vm.ActiveLineIndex}");
+        }
+        finally
+        {
+            win.Close();
+        }
+    }
+
     private static void CropSave(Avalonia.Media.Imaging.Bitmap bmp, PixelRect rect, string path)
     {
         using var ms = new MemoryStream();

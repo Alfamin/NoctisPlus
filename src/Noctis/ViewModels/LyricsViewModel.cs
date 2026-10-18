@@ -322,6 +322,17 @@ public partial class LyricsViewModel : ViewModelBase, IDisposable
     // lead is re-derived by the next UpdateActiveLine.
     partial void OnActiveLineIndexChanged(int value) => ScrollLineIndex = value;
 
+    // Apple Music brightens and un-blurs the incoming line as the list sets off toward
+    // it, not when its first word starts — measured: incoming sharpness and brightness
+    // follow the glide (half-way ~160 ms in), the outgoing line dims within ~100 ms. So
+    // the focus ramp moves with the early glide; the sweep stays on activation.
+    partial void OnScrollLineIndexChanged(int value)
+    {
+        if (value >= 0 && value == ActiveLineIndex + 1 && ActiveLineIndex >= 0
+            && _hasSyncedLyrics && IsSyncTabSelected)
+            UpdateLineOpacities(ActiveLineIndex);
+    }
+
     /// <summary>Whether to show favorite heart in metadata row (reflects current track's favorite status).</summary>
     public bool ShowMetadataFavoriteHeart => Player?.CurrentTrack?.IsFavorite ?? false;
 
@@ -3769,7 +3780,14 @@ public partial class LyricsViewModel : ViewModelBase, IDisposable
         var floor = Math.Clamp(_player.LyricsMinLineOpacity, 0, 100) / 100.0;
 
         // Distance to the NEAREST lit line: overlapping duet lines all sit at full focus.
-        var lit = _timeline.ActiveIndices;
+        // While the list leads into the next line (ScrollLineIndex), focus is on that line
+        // alone — the lead only starts once every lit line has finished being sung.
+        IReadOnlyList<int> lit = _timeline.ActiveIndices;
+        if (ScrollLineIndex == activeIndex + 1)
+        {
+            activeIndex = ScrollLineIndex;
+            lit = Array.Empty<int>();
+        }
         for (int i = 0; i < LyricLines.Count; i++)
         {
             var absDist = LyricsTimeline.DistanceToNearestActive(i, activeIndex, lit);
