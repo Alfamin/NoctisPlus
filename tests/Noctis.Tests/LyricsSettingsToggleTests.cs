@@ -3,6 +3,7 @@ using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Headless;
 using Avalonia.Headless.XUnit;
+using Avalonia.LogicalTree;
 using Avalonia.Threading;
 using Avalonia.VisualTree;
 using Noctis.Models;
@@ -120,6 +121,39 @@ public class LyricsSettingsToggleTests
             Assert.True(vm.TimeWordsCommand.CanExecute(null));
         }
         finally { vm.Dispose(); player.StopAndClear("test complete"); host.UnloadAll(); }
+    }
+
+    [AvaloniaFact]
+    public async Task BottomTimingPill_ShowsOnlyWhileThisSongIsTimed_AlsoWithLyricsShowing()
+    {
+        // Owner #33: no indicator once line lyrics showed while words were still being timed.
+        // Owner #32: a finished song shows no persistent Word timing button (repair is in the song menu).
+        using var data = new TestPersistenceService();
+        var settings = new AppSettings { MusicFolders = [data.DataDirectory] };
+        settings.PluginSettingValues = new() { ["dev.moshi.wordlyrics"] = new() { ["folder"] = Path.Combine(data.DataDirectory, "absent backend") } };
+        var library = new FakeLibraryService();
+        using var service = new Noctis.Features.WordLyrics.WordLyricsService(library, () => settings);
+        var host = new Noctis.Services.Plugins.PluginHost(null, data.DataDirectory, () => settings, () => { }, "1.6.3", library);
+        Noctis.Features.BuiltInFeatures.Register(host, words: service); host.LoadAll();
+        var (vm, player) = MakeViewModel();
+        var view = new Noctis.Views.LyricsView { DataContext = vm };
+        var win = new Avalonia.Controls.Window { Width = 1600, Height = 900, Content = view };
+        try
+        {
+            var song = new Track { Title = "Synthetic", FilePath = Path.Combine(data.DataDirectory, "first.wav") };
+            File.WriteAllText(song.FilePath, "synthetic fixture");
+            player.CurrentTrack = song; vm.AttachWordTiming(service);
+            win.Show();
+            var pill = view.FindControl<Avalonia.Controls.Button>("WordTimingButton")!;
+            bool Showing() { vm.ShowSearchButton = false; Dispatcher.UIThread.RunJobs(); return pill.IsVisible; }
+            Assert.False(Showing());
+            await service.QueueAsync([song.FilePath]);
+            await WaitUntil(Showing, "the pill follows this song's queued timing with lyrics showing");
+            Assert.Contains(pill.GetLogicalDescendants().OfType<Avalonia.Controls.TextBlock>(), t => t.Text == vm.WordTimingStatusText);
+            await service.CancelAsync();
+            await WaitUntil(() => !Showing(), "the pill leaves once nothing is pending");
+        }
+        finally { win.Close(); vm.Dispose(); player.StopAndClear("test complete"); host.UnloadAll(); }
     }
 
     private static string MakeLrc() => string.Join("\n",

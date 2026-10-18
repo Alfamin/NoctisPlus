@@ -864,24 +864,28 @@
                                         HorizontalAlignment="Stretch"
                                         Margin="0,12,0,0"/>
 
-                <!-- Native timing entry stays visible without opening the song menu. -->
+                <!-- This song's word timing while it is queued/running, also once line lyrics are already showing
+                     (owner #33). Finished songs show nothing here; repair lives in the song menu (owner #32). -->
                 <StackPanel Orientation="Horizontal"
                             HorizontalAlignment="Center"
                             Spacing="8"
                             Margin="0,24,0,0">
                     <Button x:Name="WordTimingButton" Classes="pill-btn"
                             Command="{Binding OpenWordTimingCommand}"
-                            AutomationProperties.Name="{loc:T Lyrics.WordTiming}">
+                            AutomationProperties.Name="{Binding WordTimingStatusText}">
                         <Button.IsVisible>
                             <MultiBinding Converter="{x:Static BoolConverters.And}">
                                 <Binding Path="Player.CurrentTrack" Converter="{x:Static ObjectConverters.IsNotNull}"/>
                                 <Binding Path="!ShowSearchButton"/>
+                                <Binding Path="HasPendingWordTiming"/>
                             </MultiBinding>
                         </Button.IsVisible>
                         <StackPanel Orientation="Horizontal" Spacing="6">
+                            <controls:ProgressRing Width="14" Height="14" IsIndeterminate="True"
+                                                   IsVisible="{Binding IsWordTimingProcessing}"/>
                             <PathIcon Data="{DynamicResource SidebarLyricsStudioIcon}" Width="14" Height="14"
-                                      Foreground="{Binding LyricsPrimaryFg}"/>
-                            <TextBlock Text="{loc:T Lyrics.WordTiming}" FontSize="11" Foreground="{Binding LyricsPrimaryFg}"
+                                      Foreground="{Binding LyricsPrimaryFg}" IsVisible="{Binding !IsWordTimingProcessing}"/>
+                            <TextBlock Text="{Binding WordTimingStatusText}" FontSize="11" Foreground="{Binding LyricsPrimaryFg}"
                                        VerticalAlignment="Center"/>
                         </StackPanel>
                     </Button>
