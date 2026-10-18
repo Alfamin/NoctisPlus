@@ -704,12 +704,13 @@
 
                     <!-- Artist -->
                     <Button Classes="top-result" Height="238" IsVisible="{Binding TopArtist, Converter={x:Static ObjectConverters.IsNotNull}}"
+                            AutomationProperties.Name="{Binding TopArtist.Name, StringFormat='{}{0}, artist', FallbackValue='Artist'}"
                             Command="{Binding OpenArtistCommand}" CommandParameter="{Binding TopArtist}">
                         <Grid>
                         <!-- In the library: Play their songs (the app's accent pill, as Home's Resume). -->
                         <Button Classes="accent-btn" Background="{DynamicResource AccentButtonBackground}" BorderThickness="0"
                                 Padding="16,8" CornerRadius="999" Cursor="Hand" HorizontalAlignment="Right" VerticalAlignment="Bottom"
-                                IsVisible="{Binding TopArtist.HasLibrarySongs, FallbackValue=False}"
+                                IsVisible="{Binding TopArtist.HasLibrarySongs, FallbackValue=False}" AutomationProperties.Name="Play"
                                 Command="{Binding PlayArtistCommand}" CommandParameter="{Binding TopArtist}">
                             <StackPanel Orientation="Horizontal" Spacing="7">
                                 <PathIcon Data="{StaticResource PlayIcon}" Width="12" Height="12" Margin="1,0,0,0"
@@ -742,6 +743,7 @@
 
                     <!-- Album -->
                     <Button Classes="top-result" Height="238" IsVisible="{Binding TopAlbum, Converter={x:Static ObjectConverters.IsNotNull}}"
+                            AutomationProperties.Name="{Binding TopAlbum.Title, StringFormat='{}{0}, album', FallbackValue='Album'}"
                             Command="{Binding OpenAlbumCommand}" CommandParameter="{Binding TopAlbum}">
                         <StackPanel Spacing="14" VerticalAlignment="Center">
                             <Panel Width="110" Height="110" HorizontalAlignment="Left">
@@ -777,6 +779,7 @@
 
                     <!-- Song -->
                     <Button Classes="top-result" Height="238" IsVisible="{Binding TopSong, Converter={x:Static ObjectConverters.IsNotNull}}"
+                            AutomationProperties.Name="{Binding TopSong.Title, StringFormat='{}{0}, song', FallbackValue='Song'}"
                             DoubleTapped="OnTopSongDoubleTapped">
                         <Grid RowDefinitions="*,Auto">
                             <StackPanel Spacing="14" VerticalAlignment="Center">
@@ -813,6 +816,7 @@
                             <StackPanel Grid.Row="1" Orientation="Horizontal" Spacing="8" HorizontalAlignment="Right">
                                 <Button Classes="accent-btn" Background="{DynamicResource AccentButtonBackground}" BorderThickness="0"
                                         Padding="16,8" CornerRadius="999" Cursor="Hand"
+                                        AutomationProperties.Name="{Binding TopSong.PlayLabel, FallbackValue='Play'}"
                                         Command="{Binding PlaySongCommand}" CommandParameter="{Binding TopSong}">
                                     <StackPanel Orientation="Horizontal" Spacing="7">
                                         <PathIcon Data="{StaticResource PlayIcon}" Width="12" Height="12" Margin="1,0,0,0"
@@ -827,6 +831,7 @@
                                 <Button Classes="grey-pill" BorderThickness="0"
                                         Padding="16,8" CornerRadius="999" Cursor="Hand"
                                         IsVisible="{Binding TopSong.CanStartDownload, FallbackValue=False}"
+                                        AutomationProperties.Name="Download"
                                         Command="{Binding DownloadSongCommand}" CommandParameter="{Binding TopSong}">
                                     <StackPanel Orientation="Horizontal" Spacing="7">
                                         <Path Data="{StaticResource SearchDownloadGlyph}" Width="12" Height="12" Stretch="Uniform"

@@ -74,6 +74,12 @@ internal static class BotQualityTests
         Check.False(await BotQuality.ApplyAsync("Music Hunters", liveHunters, AudioQuality.FLAC, default), "actual Music Hunters menu reaches the existing FLAC choice");
         Check.Equal("🔊 Audio Quality & Info,🔊 Per-Service Quality,Deezer", string.Join(",", liveHunters.Pressed), "actual menu never toggles Quality Info or opens the web app");
 
+        // Live 2026-10-18: Music Hunters dropped "Audio Quality & Info" each time it came in the same second as
+        // /settings, and took it 2 s later. Each step waits for that gap; nothing is pressed twice.
+        Check.Equal(TelegramQualityConversation.MinimumStep, TelegramQualityConversation.PaceDelay(TimeSpan.Zero), "a press straight after /settings waits the full gap");
+        Check.Equal(TimeSpan.FromMilliseconds(1500), TelegramQualityConversation.PaceDelay(TimeSpan.FromMilliseconds(500)), "only the rest of the gap is waited");
+        Check.Equal(TimeSpan.Zero, TelegramQualityConversation.PaceDelay(TimeSpan.FromSeconds(3)), "a slow bot reply costs no extra wait");
+
         var lateCallback = new TaskCompletionSource<string?>(TaskCreationOptions.RunContinuationsAsynchronously);
         var edited = new QualityReply(3, "Audio quality", [new("FLAC ✅", [1])]);
         using (var deadline = new CancellationTokenSource(TimeSpan.FromSeconds(2)))

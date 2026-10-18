@@ -142,6 +142,28 @@ internal static class BotQuality
 internal sealed class TelegramQualityConversation(Client client, User user, string provider) : IQualityConversation
 {
     private InputPeer Peer => user;
+    private long _lastSent = long.MinValue;
+
+    /// <summary>
+    /// The shortest time between two things sent to the bot. Music Hunters (live, 2026-10-18) ignored "Audio Quality
+    /// &amp; Info" all three times it was pressed in the same second as /settings, and took it when pressed 2 s later:
+    /// a press that follows the command too fast is dropped as flooding. DeezLoad does not mind; settings are rare.
+    /// </summary>
+    internal static readonly TimeSpan MinimumStep = TimeSpan.FromSeconds(2);
+
+    internal static TimeSpan PaceDelay(TimeSpan sinceLastSent)
+        => sinceLastSent >= MinimumStep ? TimeSpan.Zero : MinimumStep - (sinceLastSent < TimeSpan.Zero ? TimeSpan.Zero : sinceLastSent);
+
+    // One press, sent at a person's pace: waits, never repeats.
+    private async Task PaceAsync(CancellationToken ct)
+    {
+        if (_lastSent != long.MinValue)
+        {
+            var wait = PaceDelay(System.Diagnostics.Stopwatch.GetElapsedTime(_lastSent));
+            if (wait > TimeSpan.Zero) await Task.Delay(wait, ct).ConfigureAwait(false);
+        }
+        _lastSent = System.Diagnostics.Stopwatch.GetTimestamp();
+    }
 
     private void Trace(string stage, QualityReply? reply = null)
     {
@@ -159,16 +181,18 @@ internal sealed class TelegramQualityConversation(Client client, User user, stri
         var command = commands.FirstOrDefault(c => c.command is "settings" or "setting")?.command
             ?? commands.FirstOrDefault(c => c.command is "quality" or "setquality" or "set_quality")?.command
             ?? "settings";
-        var sent = await client.SendMessageAsync(Peer, "/" + command).WaitAsync(TimeSpan.FromSeconds(25), ct).ConfigureAwait(false);
+        await PaceAsync(ct).ConfigureAwait(false);
+        var sent =await client.SendMessageAsync(Peer, "/" + command).WaitAsync(TimeSpan.FromSeconds(25), ct).ConfigureAwait(false);
         Trace("sent /" + command);
         return await WaitAsync(sent.id, null, ct).ConfigureAwait(false);
     }
 
     public async Task<QualityReply> PressAsync(QualityReply reply, QualityButton button, CancellationToken ct)
     {
-        Trace("press " + button.Text, reply);
         var latest = await client.Messages_GetHistory(Peer, limit: 1).WaitAsync(TimeSpan.FromSeconds(25), ct).ConfigureAwait(false);
         var after = latest.Messages.FirstOrDefault()?.ID ?? reply.Id;
+        await PaceAsync(ct).ConfigureAwait(false);
+        Trace("press " + button.Text, reply);
         if (button.Callback is { } data)
         {
             // A menu edit is the reply too. Some bots edit it immediately but never acknowledge the callback

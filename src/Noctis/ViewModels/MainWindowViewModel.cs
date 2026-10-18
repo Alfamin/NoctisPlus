@@ -411,9 +411,10 @@ public partial class MainWindowViewModel : ViewModelBase
             () => Settings.GetSettings().LyricsStudioWordTimings, MetadataHelper.CreateLyricsStudioViewModel);
 
         // Plugins load once settings are read so the disabled list is honoured on the first pass.
-        // Plugins see the bare version ("1.5.3"), which is also what plugin.json's minAppVersion is checked against.
+        // Plugins see the Noctis base version ("1.6.3"), not Noctis Plus's own number (2.0.0): plugin.json's
+        // minAppVersion names a Noctis release.
         Plugins = new PluginHost(Player, persistence.DataDirectory, () => Settings.GetSettings(),
-            () => _ = Settings.SaveAsync(), UpdateService.CurrentVersion.ToString(3), library,
+            () => _ = Settings.SaveAsync(), ProductIdentity.NoctisBaseVersion, library,
             Path.Combine(AppContext.BaseDirectory, "bundled-plugins"));
         var shuffleQueue = new Features.TrueShuffle.ShuffleQueue(Player, library, () => Player.AllowExplicitContent,
             () => CurrentView as PlaylistViewModel);

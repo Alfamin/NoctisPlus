@@ -8147,7 +8147,7 @@ public partial class SettingsViewModel : ViewModelBase
     [RelayCommand]
     private async Task CopyVersionInfoAsync()
     {
-        var info = $"{ProductIdentity.Name} {AutoUpdatePolicy.Format(UpdateService.CurrentVersion)} (based on Noctis) — " +
+        var info = $"{ProductIdentity.Name} {AutoUpdatePolicy.Format(UpdateService.CurrentVersion)} (based on Noctis {ProductIdentity.NoctisBaseVersion}) — " +
                    $"{System.Runtime.InteropServices.RuntimeInformation.OSDescription} " +
                    $"({System.Runtime.InteropServices.RuntimeInformation.OSArchitecture})";
 

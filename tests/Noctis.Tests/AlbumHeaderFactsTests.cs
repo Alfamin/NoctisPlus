@@ -73,4 +73,12 @@ public class AlbumHeaderFactsTests
         Assert.Equal("20 tracks", longAlbum.TrackCountText);
         Assert.Equal("1h 20m", longAlbum.HeaderDurationFormatted);
     }
+
+    [Fact]
+    public void Footer_ShortAlbum_ShowsSecondsNotZeroMinutes()
+    {
+        Assert.Equal("24 sec", Make(1, seconds: 24).TotalDurationFormatted);
+        Assert.Equal("3 min", Make(1, seconds: 227).TotalDurationFormatted);
+        Assert.Equal("0 min", Make(0).TotalDurationFormatted);
+    }
 }
