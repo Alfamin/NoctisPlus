@@ -262,7 +262,23 @@ internal static class SearchRanking
             if (best?.Track is { } track && track.Song.Artists.Any(a => a.Id == artistIntent.Id) && best.Score >= output[leading].Score)
                 output[leading] = output[leading] with { Score = best.Score + 1 };
         }
-        return output.OrderByDescending(h => h.Score).ThenBy(h => h.Kind == "Albums" ? 0 : h.Kind == "Songs" ? 1 : 2).ToList();
+        var ranked = output.OrderByDescending(h => h.Score).ThenBy(h => h.Kind == "Albums" ? 0 : h.Kind == "Songs" ? 1 : 2).ToList();
+        // Keep the Artists shelf consistent with this search's strongest result. Related album
+        // context must not push a literal namesake ahead of the artist of the leading song.
+        var credited = ranked.FirstOrDefault() switch
+        {
+            { Track: { } first } => first.Song.Artists.Select(a => a.Id).ToArray(),
+            { Album: { } first } => [first.Artist.Id],
+            _ => [],
+        };
+        if (credited.Length > 0)
+        {
+            var rank = ranked.Where(h => h.Artist is not null).Select(h => h.ArtistRank ?? h.Score).DefaultIfEmpty(0).Max() + 1;
+            for (var i = 0; i < ranked.Count; i++)
+                if (ranked[i].Artist is { } by && Array.IndexOf(credited, by.Id) is var credit && credit >= 0)
+                    ranked[i] = ranked[i] with { ArtistRank = rank - credit * .01 };
+        }
+        return ranked;
         void Remember(CatalogArtist by, double rank, double sourceScore, string reason)
         {
             if (!related.TryGetValue(by.Id, out var old) || rank > old.Rank) related[by.Id] = (by, rank, sourceScore, reason);

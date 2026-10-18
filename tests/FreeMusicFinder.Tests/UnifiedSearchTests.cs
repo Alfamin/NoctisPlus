@@ -82,6 +82,14 @@ internal static class UnifiedSearchTests
         var titleRank = SearchRanking.Build(FinderQuery.Parse("runaway"), [new("deezer:9999", "Runaway")],
             [Song(9001, "Runaway", new("deezer:2", "Unknown singer")) with { Song = new("deezer:9001", "Runaway", [new("deezer:2", "Unknown singer")], 180, true, Popularity: 1000) }, runaway], []);
         Check.Equal(runaway.Song.Id, titleRank.First().Track?.Song.Id, "a popular exact recording beats an obscure exact artist and low-popularity recording");
+        Check.Equal(runaway.Song.Artists[0].Id, SearchRanking.Artists(titleRank).First().Artist?.Id,
+            "Runaway's Artists shelf agrees with the song top result");
+        // An exact-title album can give a literal namesake a stronger contextual rank without making it the top result.
+        var namesake = new CatalogArtist("deezer:9999", "Runaway");
+        var contextual = SearchRanking.Build(FinderQuery.Parse("runaway"), [namesake], [runaway],
+            [new("deezer:777", "Runaway", namesake, "2020", "single", 1)], fansOf: _ => 1000);
+        Check.Equal(runaway.Song.Artists[0].Id, SearchRanking.Artists(contextual).First().Artist?.Id,
+            "a matching namesake album cannot replace the leading song's artist");
         Check.Equal(Main.Id, SearchRanking.Artists(songArtist).First().Artist?.Id, "Artists filter for a song title leads with the credited performer rather than a literal-name namesake");
         Check.True(SearchRanking.Artists(songArtist).First().Subtitle.Contains("Artist of “Flaws & Sins”"), "artist result explains the song relationship using catalog metadata");
         Check.True(songArtist.Any(h => h.Artist?.Id == "deezer:999"), "literal name match is retained below relevant song artists");
