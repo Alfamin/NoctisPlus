@@ -267,7 +267,9 @@ public class WordFloatTests
     }
 
     /// <summary>Settings → Lyrics "Glow &amp; Lift" (default on) reaches the running line engine.</summary>
-    [Fact]
+    // On the UI thread: the view model subscribes to app-wide accent changes and builds
+    // brushes, which must belong to the dispatcher thread the later tests run on.
+    [Avalonia.Headless.XUnit.AvaloniaFact]
     public void GlowAndLiftSetting_DefaultsOn_AndDrivesTheLyricsEngine()
     {
         Assert.True(new AppSettings().LyricsGlowAndLift);
