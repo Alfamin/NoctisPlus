@@ -3644,14 +3644,31 @@ public partial class SettingsViewModel : ViewModelBase
         _player.LyricsShowTranslations = LyricsShowTranslations;
         _player.LyricsShowRomanization = LyricsShowRomanization;
         _player.LyricsShowBackgroundVocals = LyricsShowBackgroundVocals;
-        Controls.MarqueeTextBlock.GlobalCoverFlowScrollEnabled = CoverFlowMarqueeEnabled;
-        Controls.MarqueeTextBlock.GlobalCoverFlowArtistScrollEnabled = CoverFlowArtistMarqueeEnabled;
-        Controls.MarqueeTextBlock.GlobalCoverFlowAlbumScrollEnabled = CoverFlowAlbumMarqueeEnabled;
-        Controls.MarqueeTextBlock.GlobalLyricsTitleScrollEnabled = LyricsTitleMarqueeEnabled;
-        Controls.MarqueeTextBlock.GlobalLyricsArtistScrollEnabled = LyricsArtistMarqueeEnabled;
-        Controls.MarqueeTextBlock.GlobalMiniPlayerTitleScrollEnabled = MiniPlayerTitleMarqueeEnabled;
-        Controls.MarqueeTextBlock.GlobalMiniPlayerAlbumScrollEnabled = MiniPlayerAlbumMarqueeEnabled;
-        Controls.MarqueeTextBlock.NotifyGlobalSettingsChanged();
+        ApplyMarqueeSwitches();
+    }
+
+    /// <summary>
+    /// Writes the marquee switches and re-raises them only when one changed: the notification
+    /// sends every attached marquee back to its start for another 7 s rest, and ApplyPlayerSettings
+    /// runs for dozens of unrelated settings (10-18).
+    /// </summary>
+    private void ApplyMarqueeSwitches()
+    {
+        var changed = false;
+        void Set(bool current, bool value, Action<bool> write)
+        {
+            if (current == value) return;
+            write(value);
+            changed = true;
+        }
+        Set(Controls.MarqueeTextBlock.GlobalCoverFlowScrollEnabled, CoverFlowMarqueeEnabled, v => Controls.MarqueeTextBlock.GlobalCoverFlowScrollEnabled = v);
+        Set(Controls.MarqueeTextBlock.GlobalCoverFlowArtistScrollEnabled, CoverFlowArtistMarqueeEnabled, v => Controls.MarqueeTextBlock.GlobalCoverFlowArtistScrollEnabled = v);
+        Set(Controls.MarqueeTextBlock.GlobalCoverFlowAlbumScrollEnabled, CoverFlowAlbumMarqueeEnabled, v => Controls.MarqueeTextBlock.GlobalCoverFlowAlbumScrollEnabled = v);
+        Set(Controls.MarqueeTextBlock.GlobalLyricsTitleScrollEnabled, LyricsTitleMarqueeEnabled, v => Controls.MarqueeTextBlock.GlobalLyricsTitleScrollEnabled = v);
+        Set(Controls.MarqueeTextBlock.GlobalLyricsArtistScrollEnabled, LyricsArtistMarqueeEnabled, v => Controls.MarqueeTextBlock.GlobalLyricsArtistScrollEnabled = v);
+        Set(Controls.MarqueeTextBlock.GlobalMiniPlayerTitleScrollEnabled, MiniPlayerTitleMarqueeEnabled, v => Controls.MarqueeTextBlock.GlobalMiniPlayerTitleScrollEnabled = v);
+        Set(Controls.MarqueeTextBlock.GlobalMiniPlayerAlbumScrollEnabled, MiniPlayerAlbumMarqueeEnabled, v => Controls.MarqueeTextBlock.GlobalMiniPlayerAlbumScrollEnabled = v);
+        if (changed) Controls.MarqueeTextBlock.NotifyGlobalSettingsChanged();
     }
 
     private void ApplyEqualizer()
@@ -4277,7 +4294,8 @@ public partial class SettingsViewModel : ViewModelBase
             PlayPauseFadeMs = clamped;
             return;
         }
-        ApplyAudioSettings();
+        // Slider-driven: only the fade length moved (see OnCrossfadeDurationChanged).
+        _audioPlayer?.SetPlayPauseFade(PlayPauseFadeEnabled, (int)Math.Round(PlayPauseFadeMs));
         if (_settingsLoaded) QueueSettingsSave();
     }
 
@@ -4343,7 +4361,9 @@ public partial class SettingsViewModel : ViewModelBase
             return;
         }
 
-        ApplyAudioSettings();
+        // Slider-driven: only the crossfade length moved. The whole ApplyAudioSettings per drag
+        // sample also rebuilt the EQ curve and re-applied it and ReplayGain (10-18).
+        _audioPlayer?.SetCrossfade(SongTransitionsEnabled && IsCrossfadeStyle, (int)Math.Round(CrossfadeDuration));
         QueueSettingsSave();
     }
 
@@ -4390,7 +4410,9 @@ public partial class SettingsViewModel : ViewModelBase
             return;
         }
 
-        ApplyPlayerSettings();
+        // Slider-driven: push just this value. The whole ApplyPlayerSettings per drag sample
+        // also re-raised the marquee switches, snapping every scrolling title back (10-18).
+        if (_player != null) _player.IslandBackgroundOpacity = value;
         if (_settingsLoaded && !_suspendSettingPersistence) QueueSettingsSave();
     }
 
@@ -4418,7 +4440,8 @@ public partial class SettingsViewModel : ViewModelBase
             return;
         }
 
-        ApplyPlayerSettings();
+        // Slider-driven: push just this value (see OnPlaybackBarBackgroundOpacityChanged).
+        if (_player != null) _player.IslandTrackBoxOpacity = value;
         if (_settingsLoaded && !_suspendSettingPersistence) QueueSettingsSave();
     }
 
@@ -4734,7 +4757,8 @@ public partial class SettingsViewModel : ViewModelBase
     partial void OnAlbumPageTintStrengthChanged(int value)
     {
         // Same as the toggle: open album pages watch this VM and re-blend their tint.
-        if (_settingsLoaded) _ = SaveAsync();
+        // Slider-driven, so the write is debounced: a full save per step stalled the drag (10-18).
+        if (_settingsLoaded) QueueSettingsSave();
     }
 
     partial void OnAlbumPageTintWholePageChanged(bool value)
@@ -5136,8 +5160,9 @@ public partial class SettingsViewModel : ViewModelBase
 
     partial void OnLyricsMinLineOpacityChanged(int value)
     {
-        ApplyPlayerSettings();
-        if (_settingsLoaded) _ = SaveAsync();
+        // Slider-driven: push just this value and persist on the trailing edge (10-18).
+        if (_player != null) _player.LyricsMinLineOpacity = value;
+        if (_settingsLoaded) QueueSettingsSave();
     }
 
     partial void OnLyricsJoinSplitWordsChanged(bool value)
