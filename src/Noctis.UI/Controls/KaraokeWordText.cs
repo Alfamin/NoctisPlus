@@ -12,7 +12,9 @@ namespace Noctis.Controls;
 /// <summary>
 /// One karaoke word: the dim (unsung) and bright (sung) text in a single draw, split by a
 /// soft edge that follows <see cref="Progress"/>, plus the Apple Music held-note letter
-/// animation (<see cref="EmphasisMotion"/>) for <see cref="IsEmphasis"/> words.
+/// animation (<see cref="EmphasisMotion"/>) for <see cref="IsEmphasis"/> words and the
+/// float every sung word rises by (<see cref="Lift"/>, <see cref="WordFloat"/>). With
+/// <see cref="BaseOpacity"/> 0 it draws only the sung part — the held-note glow layer.
 ///
 /// It replaces a dimmed base TextBlock with a second TextBlock on top whose Foreground was
 /// a new gradient brush every frame: a TextBlock rebuilds its text layout and invalidates
@@ -50,6 +52,9 @@ public class KaraokeWordText : TextBlock
     public static readonly StyledProperty<bool> IsLastInLineProperty =
         AvaloniaProperty.Register<KaraokeWordText, bool>(nameof(IsLastInLine));
 
+    public static readonly StyledProperty<double> LiftProperty =
+        AvaloniaProperty.Register<KaraokeWordText, double>(nameof(Lift));
+
     /// <summary>Front position through the word (driven by <see cref="LyricsTimeline"/>): 0..1
     /// inside it, beyond either end on a neighbour of the current word, sentinels far away.</summary>
     public double Progress { get => GetValue(ProgressProperty); set => SetValue(ProgressProperty, value); }
@@ -63,6 +68,9 @@ public class KaraokeWordText : TextBlock
     public double EmphasisMs { get => GetValue(EmphasisMsProperty); set => SetValue(EmphasisMsProperty, value); }
     public double HeldDurationMs { get => GetValue(HeldDurationMsProperty); set => SetValue(HeldDurationMsProperty, value); }
     public bool IsLastInLine { get => GetValue(IsLastInLineProperty); set => SetValue(IsLastInLineProperty, value); }
+    /// <summary>How far the sung word has floated up, 0..1 of <see cref="WordFloat.LiftEm"/>
+    /// (driven by <see cref="LyricsTimeline"/>). Drawn as an offset: no layout pass.</summary>
+    public double Lift { get => GetValue(LiftProperty); set => SetValue(LiftProperty, value); }
 
     // Styled exactly like the TextBlocks it replaces (app-wide TextBlock font rules apply).
     protected override Type StyleKeyOverride => typeof(TextBlock);
@@ -70,7 +78,7 @@ public class KaraokeWordText : TextBlock
     static KaraokeWordText()
     {
         AffectsRender<KaraokeWordText>(ProgressProperty, BaseOpacityProperty, LeadInProperty, TrailOutProperty,
-            EmphasisMsProperty, HeldDurationMsProperty, IsLastInLineProperty);
+            EmphasisMsProperty, HeldDurationMsProperty, IsLastInLineProperty, LiftProperty);
     }
 
     /// <summary>One drawn piece: the whole word, or one letter of a held-note word.</summary>
@@ -237,7 +245,8 @@ public class KaraokeWordText : TextBlock
         }
         if (_pieces.Count == 0 || _glyphWidth <= 0) return;
 
-        using var offset = context.PushTransform(Matrix.CreateTranslation(origin.X, origin.Y));
+        var lift = double.IsNaN(Lift) ? 0 : Lift * WordFloat.LiftEm * FontSize;
+        using var offset = context.PushTransform(Matrix.CreateTranslation(origin.X, origin.Y - lift));
         if (!_perLetter)
         {
             _pieces[0].Layout.Draw(context, default);

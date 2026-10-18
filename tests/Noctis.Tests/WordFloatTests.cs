@@ -90,6 +90,39 @@ public class WordFloatTests
         }
     }
 
+    // ── The held-note glow ──────────────────────────────────────────────────────────
+
+    [Fact]
+    public void Glow_IsOffAtRest_AndStrongerTheLongerTheNoteIsHeld()
+    {
+        Assert.Equal(0, Noctis.Converters.EmphasisGlowConverter.Opacity(double.NaN, 1700, true, 7));
+
+        static double Peak(double heldMs)
+        {
+            double best = 0;
+            for (double t = 0; t < 6000; t += 10)
+                best = Math.Max(best, Noctis.Converters.EmphasisGlowConverter.Opacity(t, heldMs, false, 5));
+            return best;
+        }
+        var short1 = Peak(1000);
+        var mid = Peak(1700);
+        var long1 = Peak(3000);
+        Assert.True(short1 > 0 && short1 < mid && mid < long1, $"{short1} {mid} {long1}");
+        Assert.True(Peak(20000) <= 1);
+    }
+
+    [Theory]
+    [InlineData(46.0)]
+    [InlineData(25.0)]
+    [InlineData(15.0)]
+    public void GlowBlur_ScalesWithTheFontSize(double fontSize)
+    {
+        var effect = Assert.IsType<Avalonia.Media.BlurEffect>(
+            new Noctis.Converters.EmphasisGlowBlurConverter().Convert(fontSize, typeof(object), null,
+                System.Globalization.CultureInfo.InvariantCulture));
+        Assert.Equal(fontSize * Noctis.Converters.EmphasisGlowBlurConverter.RadiusEm, effect.Radius, precision: 1);
+    }
+
     // ── The timeline ────────────────────────────────────────────────────────────────
 
     private static void At(LyricsTimeline t, double seconds) =>

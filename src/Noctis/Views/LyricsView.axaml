@@ -15,6 +15,7 @@
     <UserControl.Resources>
         <conv:ArtworkPathConverter x:Key="ArtworkConverter"/>
         <conv:EmphasisGlowConverter x:Key="EmphasisGlow"/>
+        <conv:EmphasisGlowBlurConverter x:Key="EmphasisGlowBlur"/>
         <conv:WordOverflowPaddingConverter x:Key="WordOverflowPad"/>
         <conv:BlurRadiusToEffectConverter x:Key="BlurToEffect"/>
         <conv:PreBlurredArtworkConverter x:Key="PreBlurArt"/>
@@ -43,7 +44,9 @@
                      render 1:1 as before. -->
                 <Viewbox Stretch="Uniform" StretchDirection="DownOnly" ClipToBounds="False">
                 <Panel>
-                <!-- Soft glow under held-note words; fades in via word-glow styles.
+                <!-- Soft glow under held-note words: the sung part of the word only
+                     (BaseOpacity 0, same sweep, letter swell and float as the word on top),
+                     blurred by the word-glow style, opacity off the hold below.
                      Hosted in a Canvas so its blur surface can be padded out for the
                      gaussian tail WITHOUT growing the word cell (which would space words
                      apart). A negative Margin does NOT work here: unlike WPF, Avalonia
@@ -53,26 +56,36 @@
                      glow's Padding gives the blur room and the matching negative offset
                      re-aligns its glyphs onto the base layer. -->
                 <Canvas ClipToBounds="False">
-                    <TextBlock Text="{Binding Text}"
-                               Classes="word-glow"
-                               IsVisible="{Binding IsEmphasis}"
-                               Canvas.Left="-40"
-                               Canvas.Top="-40"
-                               Padding="40"
-                               FontWeight="Bold"
-                               Foreground="{Binding $parent[UserControl].((vm:LyricsViewModel)DataContext).LyricsPrimaryFg}">
+                    <controls:KaraokeWordText Text="{Binding Text}"
+                                              Classes="word-glow"
+                                              IsVisible="{Binding IsEmphasis}"
+                                              Canvas.Left="-60"
+                                              Canvas.Top="-60"
+                                              Padding="60"
+                                              FontWeight="Bold"
+                                              Foreground="{Binding $parent[UserControl].((vm:LyricsViewModel)DataContext).LyricsPrimaryFg}"
+                                              BaseOpacity="0"
+                                              Effect="{Binding $self.FontSize, Converter={StaticResource EmphasisGlowBlur}}"
+                                              Progress="{Binding Progress}"
+                                              LeadIn="{Binding SweepLeadIn}"
+                                              TrailOut="{Binding SweepTrailOut}"
+                                              IsEmphasis="{Binding IsEmphasis}"
+                                              EmphasisMs="{Binding EmphasisMs}"
+                                              HeldDurationMs="{Binding HeldDurationMs}"
+                                              IsLastInLine="{Binding IsLastInLine}"
+                                              Lift="{Binding Lift}">
                         <!-- AMLL per-letter glow bells (mean over the word): they rise and
                              release letter by letter across the hold, peak scaled by hold
                              length. Driven per frame off the word's EmphasisMs clock. -->
-                        <TextBlock.Opacity>
+                        <controls:KaraokeWordText.Opacity>
                             <MultiBinding Converter="{StaticResource EmphasisGlow}">
                                 <Binding Path="EmphasisMs"/>
                                 <Binding Path="HeldDurationMs"/>
                                 <Binding Path="IsLastInLine"/>
                                 <Binding Path="EmphasisCharCount"/>
                             </MultiBinding>
-                        </TextBlock.Opacity>
-                    </TextBlock>
+                        </controls:KaraokeWordText.Opacity>
+                    </controls:KaraokeWordText>
                 </Canvas>
                 <!-- The word: unsung text (full opacity while the line is inactive, a soft
                      ghost while active — word-sweep styles) and sung text in one draw, split
@@ -90,7 +103,8 @@
                                           IsEmphasis="{Binding IsEmphasis}"
                                           EmphasisMs="{Binding EmphasisMs}"
                                           HeldDurationMs="{Binding HeldDurationMs}"
-                                          IsLastInLine="{Binding IsLastInLine}"/>
+                                          IsLastInLine="{Binding IsLastInLine}"
+                                          Lift="{Binding Lift}"/>
                 </Panel>
                 </Viewbox>
             </Panel>
@@ -247,20 +261,18 @@
             <Setter Property="RenderTransform" Value="scale(1)"/>
         </Style>
 
-        <!-- Regular words do NOT move as they are sung — the sweep is the cue, as in
-             Apple Music. (They used to lift 1px and grow 1% each, a chain of small
-             hops on every fast passage.) Only held-note emphasis words swell below. -->
+        <!-- No transform on the cell: every sung word floats up inside KaraokeWordText
+             (Lift, a smooth ~1 s ease-out per word, as in Apple Music) and held notes
+             swell letter by letter there. (Cells used to lift 1px and grow 1% through
+             transitions, a chain of small hops on every fast passage.) -->
         <Style Selector="Panel.word-cell">
             <Setter Property="RenderTransformOrigin" Value="0.5,1"/>
             <Setter Property="RenderTransform" Value="translate(0px,0px) scale(1)"/>
         </Style>
 
-        <!-- Glow opacity is bound per-frame in the template (EmphasisGlowConverter
+        <!-- Glow opacity (per frame) and blur (per font size) are bound in the template (EmphasisGlowConverter
              bell over the hold). No Opacity setter or transition here: a transition
              would low-pass the per-frame values and lag the vocal. -->
-        <Style Selector="TextBlock.word-glow">
-            <Setter Property="Effect" Value="blur(6)"/>
-        </Style>
 
         <!-- Word base layer: full brightness on inactive lines (matches plain line text),
              fades to a soft ghost while the line is active so the sweep reads on top. -->
@@ -272,8 +284,9 @@
                 </Transitions>
             </Setter>
         </Style>
+        <!-- 0.4: Apple Music's unsung text measured at ~41% white over the backdrop. -->
         <Style Selector="ItemsControl.word-layer.active TextBlock.word-sweep">
-            <Setter Property="controls:KaraokeWordText.BaseOpacity" Value="0.45"/>
+            <Setter Property="controls:KaraokeWordText.BaseOpacity" Value="0.4"/>
         </Style>
 
         <!-- Lyric line: keep active emphasis in opacity/color only, without size/position zoom. -->
