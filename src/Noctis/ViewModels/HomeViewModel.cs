@@ -220,6 +220,69 @@ public partial class HomeViewModel : ViewModelBase, IDisposable
     /// <summary>Exposes the sidebar's playlists for the Add to Playlist submenu.</summary>
     public ObservableCollection<Playlist> Playlists => _sidebar.Playlists;
 
+    // ── Empty library (10-17) ──
+    //
+    // A brand-new profile opened on a blank Home: no rows, no hint, no way forward. Home now
+    // says the library is empty and offers Settings' own Add Folder flow; while the scan that
+    // follows has found nothing yet it says so instead.
+
+    /// <summary>No songs anywhere (hidden folders and the Inbox included) and no scan running.</summary>
+    [ObservableProperty] private bool _showEmptyLibrary;
+
+    /// <summary>No songs yet, and a library scan is running (the first one after Add Folder).</summary>
+    [ObservableProperty] private bool _showLibraryScanning;
+
+    /// <summary>
+    /// Songs in the library, yet every Home section is empty: nothing has been played. That
+    /// is where Add Folder lands a new user, and Home was just as blank there.
+    /// </summary>
+    [ObservableProperty] private bool _showNothingPlayed;
+
+    /// <summary>
+    /// Set by the first <see cref="RefreshAsync"/>. That runs once the window has loaded the
+    /// library (startup navigation or its first publish), so an existing library never
+    /// flashes the empty state while library.json is still being read.
+    /// </summary>
+    private bool _hasBuilt;
+
+    /// <summary>Set once a full rebuild has filled the rows, so an existing listener never
+    /// sees "nothing played" while the first rebuild is still ranking off the UI thread.</summary>
+    private bool _rowsBuilt;
+
+    private bool HasHomeContent =>
+        ContinueTrack != null || TopArtists.Count > 0 || TopSongRows.Count > 0 || LastPlayedRows.Count > 0
+        || RecentlyPlayedAlbums.Count > 0 || TimeRotationTracks.Count > 0 || IsHeavyRotationVisible
+        || RediscoveredTracks.Count > 0;
+
+    private void UpdateEmptyLibraryState()
+    {
+        var empty = _hasBuilt && _library.AllTracks.Count == 0;
+        var scanning = _settings?.IsScanning == true;
+        ShowEmptyLibrary = empty && !scanning;
+        ShowLibraryScanning = empty && scanning;
+        ShowNothingPlayed = _rowsBuilt && _library.Tracks.Count > 0 && !HasHomeContent;
+    }
+
+    partial void OnContinueTrackChanged(Track? value) => UpdateEmptyLibraryState();
+
+    /// <summary>"Nothing played yet": shuffle the whole library (Songs' Shuffle All).</summary>
+    [RelayCommand]
+    private void ShuffleLibrary()
+    {
+        var tracks = _library.Tracks.ToList();
+        if (tracks.Count == 0) return;
+        _player.PlayShuffled(tracks);
+    }
+
+    /// <summary>Settings › Library › Add Folder, the same command (picker + add + scan).</summary>
+    public IAsyncRelayCommand? AddMusicFolderCommand => _settings?.AddMusicFolderCommand;
+
+    /// <summary>Fires when the user wants Settings opened at the media folders.</summary>
+    public event EventHandler? NavigateToSettingsRequested;
+
+    [RelayCommand]
+    private void OpenMediaFolderSettings() => NavigateToSettingsRequested?.Invoke(this, EventArgs.Empty);
+
     public HomeViewModel(PlayerViewModel player, ILibraryService library, SidebarViewModel sidebar,
         ArtistImageService? artistImages = null, IPlayHistoryService? playHistory = null,
         SettingsViewModel? settings = null)
@@ -234,14 +297,23 @@ public partial class HomeViewModel : ViewModelBase, IDisposable
         AdoptPersistedSectionState();
 
         HeavyRotationTracks.CollectionChanged += (_, _) => OnPropertyChanged(nameof(IsHeavyRotationVisible));
+        // Any row filling or emptying moves the "nothing played yet" state.
+        foreach (var rows in new System.Collections.Specialized.INotifyCollectionChanged[]
+                 { TopArtists, TopSongRows, LastPlayedRows, RecentlyPlayedAlbums, TimeRotationTracks, HeavyRotationTracks, RediscoveredTracks })
+            rows.CollectionChanged += (_, _) => UpdateEmptyLibraryState();
         if (_settings != null)
         {
             _settings.PropertyChanged += (_, e) =>
             {
                 if (e.PropertyName == nameof(SettingsViewModel.HomeShowHeavyRotation))
+                {
                     OnPropertyChanged(nameof(IsHeavyRotationVisible));
+                    UpdateEmptyLibraryState();
+                }
                 else if (e.PropertyName is nameof(SettingsViewModel.AlbumTileSizeAuto) or nameof(SettingsViewModel.AlbumTileTargetSize))
                     UpdateAlbumTileSize(_lastAlbumUsableWidth);
+                else if (e.PropertyName == nameof(SettingsViewModel.IsScanning))
+                    UpdateEmptyLibraryState();
             };
         }
 
@@ -261,7 +333,8 @@ public partial class HomeViewModel : ViewModelBase, IDisposable
         // and catch up once on activation, like the other library view models.
         // FavoritesChanged rides the same 500 ms debounce — a heart click used to
         // trigger an immediate full rebuild.
-        _libraryUpdatedHandler = (_, _) => { _isDirty = true; if (_isActive) Dispatcher.UIThread.Post(() =>
+        // The empty-library state follows every publish, Home visible or not (cheap: a count).
+        _libraryUpdatedHandler = (_, _) => { _isDirty = true; Dispatcher.UIThread.Post(UpdateEmptyLibraryState); if (_isActive) Dispatcher.UIThread.Post(() =>
         {
             _refreshDebounce.Stop();
             _refreshDebounce.Start();
@@ -429,6 +502,9 @@ public partial class HomeViewModel : ViewModelBase, IDisposable
 
     internal async Task RefreshAsync()
     {
+        _hasBuilt = true;
+        UpdateEmptyLibraryState();
+
         if (!_isDirty && TopSongs.Count > 0)
         {
             Greeting = GetGreeting();
@@ -538,6 +614,8 @@ public partial class HomeViewModel : ViewModelBase, IDisposable
                 _ = FetchTopArtistImagesAsync(TopArtists.ToList());
 
             await RefreshTimeAwareRowsAsync();
+            _rowsBuilt = true;
+            UpdateEmptyLibraryState();
             if (log) DebugLog.Write("Home", $"rebuild #{rebuild}: done");
         }
         catch (Exception ex)

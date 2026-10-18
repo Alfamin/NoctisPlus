@@ -4126,6 +4126,7 @@
                         <Button Grid.Column="1"
                                 AutomationProperties.Name="{loc:T Settings.AddFolder}"
                                 x:Name="AddFolderButton"
+                                Command="{Binding AddMusicFolderCommand}"
                                 Classes="pill-action"
                                 Padding="14,8"
                                 CornerRadius="999"

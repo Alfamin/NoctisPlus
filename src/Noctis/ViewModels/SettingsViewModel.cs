@@ -6556,6 +6556,45 @@ public partial class SettingsViewModel : ViewModelBase
 
     // ── Files / folder commands ──
 
+    /// <summary>
+    /// The folder picker behind <see cref="AddMusicFolderCommand"/>: the main window's native
+    /// folder dialog, returning the picked path or null when cancelled. Internal for tests
+    /// (InternalsVisibleTo Noctis.Tests).
+    /// </summary>
+    internal Func<Task<string?>> PickMusicFolder { get; set; } = PickMusicFolderFromMainWindowAsync;
+
+    private static async Task<string?> PickMusicFolderFromMainWindowAsync()
+    {
+        var owner = (Avalonia.Application.Current?.ApplicationLifetime as Avalonia.Controls.ApplicationLifetimes.IClassicDesktopStyleApplicationLifetime)?.MainWindow;
+        var top = owner is null ? null : Avalonia.Controls.TopLevel.GetTopLevel(owner);
+        if (top is null) return null;
+        var folders = await top.StorageProvider.OpenFolderPickerAsync(new Avalonia.Platform.Storage.FolderPickerOpenOptions
+        {
+            Title = "Select Music Folder",
+            AllowMultiple = false
+        });
+        return folders.Count > 0 ? folders[0].Path.LocalPath : null;
+    }
+
+    /// <summary>
+    /// Add Folder: pick a folder, then <see cref="AddFolderPath"/> (register it and scan).
+    /// The one flow behind Settings › Library › Add Folder and Home's empty-library button.
+    /// </summary>
+    [RelayCommand]
+    private async Task AddMusicFolder()
+    {
+        try
+        {
+            var path = await PickMusicFolder();
+            if (path != null)
+                await AddFolderPath(path);
+        }
+        catch (Exception ex)
+        {
+            System.Diagnostics.Debug.WriteLine($"[Settings] Failed to add folder: {ex.Message}");
+        }
+    }
+
     /// <summary>Called from the View after the folder picker dialog returns a path.</summary>
     /// <param name="autoScan">
     /// When false the root is registered without kicking off a library scan. The
