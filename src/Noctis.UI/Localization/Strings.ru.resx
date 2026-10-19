@@ -2520,6 +2520,14 @@ Deezer и TIDAL: вставьте ссылку.</value></data>
   <data name="LyricsStudio.ReviewEmptyBody" xml:space="preserve"><value>Выберите песню в списке. Песни с текстом синхронизируются, когда вы нажмёте «Начать»; для песен без текста откроется поле, куда его можно вставить.</value><comment>Review pane empty state</comment></data>
   <data name="LyricsStudio.Upgrade" xml:space="preserve"><value>Расставить тайминг слов</value><comment>Review button, shown for line-level lyrics</comment></data>
   <data name="LyricsStudio.UpgradeTip" xml:space="preserve"><value>Расставляет время для каждого слова этих строк. Файл с таймингом по строкам сохраняется.</value><comment>Review button tooltip</comment></data>
+  <data name="LyricsStudio.LrcRedSync" xml:space="preserve"><value>Синхронизировать моделью lrc.red</value><comment>Review / lyrics box button, shown when lrc.red has the song only line-synced or plain</comment></data>
+  <data name="LyricsStudio.LrcRedSyncTip" xml:space="preserve"><value>Намного быстрее, чем Lullaby: собственная модель lrc.red расставляет время каждого слова в своей копии этой песни. Её текст заменит показанный; на диск ничего не записывается, пока вы не нажмёте «Сохранить текст».</value><comment>Tooltip of the lrc.red model button</comment></data>
+  <data name="LyricsStudio.LrcRedSyncConfirm" xml:space="preserve"><value>Текст lrc.red с синхронизацией по словам заменит текст и тайминг, показанные для «{0}».
+
+На диске ничего не изменится, пока вы не нажмёте «Сохранить текст».</value><comment>Confirm before lrc.red's model replaces a review or typed lyrics ({0} = song title)</comment></data>
+  <data name="LyricsStudio.LrcRedSyncWorking" xml:space="preserve"><value>Модель lrc.red расставляет время каждого слова…</value><comment>Song status and button label while lrc.red's model runs</comment></data>
+  <data name="LyricsStudio.LrcRedSynced" xml:space="preserve"><value>Синхронизировано по словам моделью lrc.red · проверьте</value><comment>Song status after lrc.red's model word-synced it</comment></data>
+  <data name="LyricsStudio.LrcRedSource" xml:space="preserve"><value>С lrc.red · синхронизировано по словам его моделью</value><comment>Review source line for lyrics lrc.red's model word-synced</comment></data>
   <data name="LyricsStudio.ReviewHint" xml:space="preserve"><value>Нажмите на время, чтобы прослушать строку. Текст можно править на месте. Подсвеченные строки стоит перепроверить.</value><comment>Review pane hint</comment></data>
   <data name="LyricsStudio.NudgeEarlier" xml:space="preserve"><value>Все строки на 0,1 с раньше · клавиша [</value><comment>Tooltip</comment></data>
   <data name="LyricsStudio.NudgeLater" xml:space="preserve"><value>Все строки на 0,1 с позже · клавиша ]</value><comment>Tooltip</comment></data>

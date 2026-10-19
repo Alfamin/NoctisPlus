@@ -2520,6 +2520,14 @@ Quote phrases: album:"ok computer" · Years: year:1990-1999, year:&gt;2000</valu
   <data name="LyricsStudio.ReviewEmptyBody" xml:space="preserve"><value>Pick a song in the list. Songs with lyrics are timed when you press Start; songs without open a box to paste them.</value><comment>Review pane empty state</comment></data>
   <data name="LyricsStudio.Upgrade" xml:space="preserve"><value>Time every word</value><comment>Review button, shown for line-level lyrics</comment></data>
   <data name="LyricsStudio.UpgradeTip" xml:space="preserve"><value>Times every word of these lines. The line-level file is kept.</value><comment>Review button tooltip</comment></data>
+  <data name="LyricsStudio.LrcRedSync" xml:space="preserve"><value>Sync with lrc.red's model</value><comment>Review / lyrics box button, shown when lrc.red has the song only line-synced or plain</comment></data>
+  <data name="LyricsStudio.LrcRedSyncTip" xml:space="preserve"><value>Much faster than Lullaby: lrc.red's in-house model times every word of its own copy of this song. Its lyrics replace the ones shown; nothing is written until you press Save lyrics.</value><comment>Tooltip of the lrc.red model button</comment></data>
+  <data name="LyricsStudio.LrcRedSyncConfirm" xml:space="preserve"><value>lrc.red's word-synced lyrics will replace the lyrics and timings shown for “{0}”.
+
+Nothing is written to disk until you press Save lyrics.</value><comment>Confirm before lrc.red's model replaces a review or typed lyrics ({0} = song title)</comment></data>
+  <data name="LyricsStudio.LrcRedSyncWorking" xml:space="preserve"><value>lrc.red's model is timing every word…</value><comment>Song status and button label while lrc.red's model runs</comment></data>
+  <data name="LyricsStudio.LrcRedSynced" xml:space="preserve"><value>Word-synced by lrc.red's model · review</value><comment>Song status after lrc.red's model word-synced it</comment></data>
+  <data name="LyricsStudio.LrcRedSource" xml:space="preserve"><value>From lrc.red · word-synced by its model</value><comment>Review source line for lyrics lrc.red's model word-synced</comment></data>
   <data name="LyricsStudio.ReviewHint" xml:space="preserve"><value>Click a time to hear that line. Edit text in place. Tinted lines need a second look.</value><comment>Review pane hint</comment></data>
   <data name="LyricsStudio.NudgeEarlier" xml:space="preserve"><value>All lines 0.1 s earlier · shortcut [</value><comment>Tooltip</comment></data>
   <data name="LyricsStudio.NudgeLater" xml:space="preserve"><value>All lines 0.1 s later · shortcut ]</value><comment>Tooltip</comment></data>
