@@ -1202,13 +1202,20 @@ Deezer и TIDAL: вставьте ссылку.</value></data>
   <data name="Lyrics.SaveReplaceOne" xml:space="preserve"><value>У «{0}» уже есть {1}.
 
 При сохранении он будет заменён текстом на экране. Файл текста, созданный не Noctis, сначала отправляется в корзину.</value><comment>Save Lyrics to File prompt in LyricsViewModel; {0} = song title, {1} = one quoted file name</comment></data>
+  <data name="Lyrics.SaveReplaceOneTrash" xml:space="preserve"><value>У «{0}» уже есть {1}.
+
+При сохранении он будет заменён текстом на экране. Файл текста, созданный не Noctis, сначала отправляется в корзину.</value><comment>Save Lyrics to File prompt in LyricsViewModel; {0} = song title, {1} = one quoted file name</comment></data>
   <data name="Lyrics.SaveReplaceMany" xml:space="preserve"><value>У «{0}» уже есть {1}.
+
+При сохранении они будут заменены текстом на экране. Файл текста, созданный не Noctis, сначала отправляется в корзину.</value><comment>Save Lyrics to File prompt in LyricsViewModel; {0} = song title, {1} = quoted file names joined by Lyrics.SaveFilesJoin</comment></data>
+  <data name="Lyrics.SaveReplaceManyTrash" xml:space="preserve"><value>У «{0}» уже есть {1}.
 
 При сохранении они будут заменены текстом на экране. Файл текста, созданный не Noctis, сначала отправляется в корзину.</value><comment>Save Lyrics to File prompt in LyricsViewModel; {0} = song title, {1} = quoted file names joined by Lyrics.SaveFilesJoin</comment></data>
   <data name="Lyrics.SaveFilesJoin" xml:space="preserve"><value> и </value><comment>Joins the file names in Lyrics.SaveReplaceMany (keep the spaces)</comment></data>
   <data name="Lyrics.SaveReplaceTags" xml:space="preserve"><value>текст внутри аудиофайла</value><comment>Save Lyrics to File prompt: joined into {1} of Lyrics.SaveReplaceOne/Many when the save replaces lyrics in the audio file's tags (GitHub #135)</comment></data>
   <data name="Lyrics.Saved" xml:space="preserve"><value>Текст сохранён</value><comment>Lyrics page status after Save Lyrics to File</comment></data>
   <data name="Lyrics.SaveKeptOld" xml:space="preserve"><value>Сохранено · старый файл текста остался, его не удалось переместить в корзину</value><comment>Lyrics page status after Save Lyrics to File</comment></data>
+  <data name="Lyrics.SaveKeptOldTrash" xml:space="preserve"><value>Сохранено · старый файл текста остался, его не удалось переместить в корзину</value><comment>Lyrics page status after Save Lyrics to File</comment></data>
   <data name="Lyrics.SaveFailed" xml:space="preserve"><value>Не удалось сохранить — проверьте права доступа к файлу</value><comment>Lyrics page status after Save Lyrics to File</comment></data>
   <data name="Lyrics.OffsetEarlier" xml:space="preserve"><value>Текст раньше на {0:0.0} с</value><comment>Notice pill after Ctrl+scroll over the lyrics (LyricsViewModel); {0} = seconds</comment></data>
   <data name="Lyrics.OffsetLater" xml:space="preserve"><value>Текст позже на {0:0.0} с</value><comment>Notice pill after Ctrl+scroll over the lyrics (LyricsViewModel); {0} = seconds</comment></data>
