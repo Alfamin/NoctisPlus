@@ -307,8 +307,11 @@ public partial class PlaybackBarView : UserControl
             e.PropertyName == nameof(PlayerViewModel.IslandShowRepeat) ||
             e.PropertyName == nameof(PlayerViewModel.IslandShowFavorite) ||
             e.PropertyName == nameof(PlayerViewModel.IslandShowMiniPlayer) ||
-            e.PropertyName == nameof(PlayerViewModel.IslandShowTime))
+            e.PropertyName == nameof(PlayerViewModel.IslandShowTime) ||
+            e.PropertyName == nameof(PlayerViewModel.IsStreamedTrack) ||
+            e.PropertyName == nameof(PlayerViewModel.JustAddedToSongs))
         {
+            UpdateIslandMaxWidth(); // owner #90: what fits may have changed
             UpdateIslandWidth();
         }
 
@@ -1478,15 +1481,10 @@ public partial class PlaybackBarView : UserControl
         get
         {
             if (_observedPlayerViewModel is not { } vm) return 0;
-            var buttons = (vm.IslandShowSkipButtons ? 2 : 0)
-                        + (vm.IslandShowPlaybackSpeed ? 1 : 0)
-                        + (vm.IslandShowSleepTimer ? 1 : 0)
-                        + (vm.IslandShowShuffle ? 1 : 0)
-                        + (vm.IslandShowEqualizer ? 1 : 0)
-                        + (vm.IslandShowRepeat ? 1 : 0)
-                        + (vm.IslandShowFavorite ? 1 : 0)
-                        + (vm.IslandShowMiniPlayer ? 1 : 0);
-            return buttons * ExtraTransportButtonWidth + (vm.IslandShowTime ? IslandTimeWidth : 0);
+            // Owner #90: only the extras on show (the window may have asked some to step aside), plus the Add button
+            // of a played-only song.
+            var buttons = OptionalButtons().Count(e => e.Wanted(vm) && !_squeezed.ContainsKey(e.Button));
+            return buttons * ExtraTransportButtonWidth + (vm.IslandShowTime ? IslandTimeWidth : 0) + AddButtonWidth(vm);
         }
     }
 
@@ -1552,9 +1550,81 @@ public partial class PlaybackBarView : UserControl
     private void UpdateIslandMaxWidth()
     {
         if (_resizeHost == null) return;
-        var available = _resizeHost.Bounds.Width - IslandEdgeMargin * 2;
+        var available = AvailableIslandWidth();
         if (available <= 0) return;
         IslandBorder.MaxWidth = Math.Max(IslandMinUserWidth, available);
+        if (Squeeze(available)) UpdateIslandWidth();
+    }
+
+    // ── Owner #90: the island always fits ──
+    // It is centred on the window, so the collapsed sidebar on the left is kept clear on both sides. When everything
+    // switched on does not fit, optional buttons step aside one at a time (least needed first) while the song stays
+    // shown; only when none of them fits is the song info hidden (the compact pill) and buttons come back as room
+    // allows. A wider window brings every one of them back.
+    private const double SidebarCollapsedWidth = 60, AddPillWidth = 70, AddedCheckWidth = 21;
+    private readonly Dictionary<Control, IDisposable?> _squeezed = new();
+    private Border? _sidebar;
+
+    /// <summary>The optional buttons, in the order they step aside.</summary>
+    private (Control Button, Func<PlayerViewModel, bool> Wanted)[] OptionalButtons() =>
+    [
+        (MiniPlayerButton, v => v.IslandShowMiniPlayer),
+        (SleepTimerButton, v => v.IslandShowSleepTimer),
+        (PlaybackSpeedButton, v => v.IslandShowPlaybackSpeed),
+        (EqualizerButton, v => v.IslandShowEqualizer),
+        (SkipForwardButton, v => v.IslandShowSkipButtons),
+        (SkipBackButton, v => v.IslandShowSkipButtons),
+        (RepeatButton, v => v.IslandShowRepeat),
+        (FavoriteButton, v => v.IslandShowFavorite),
+        (NativeShuffleButton, v => v.IslandShowShuffle),
+    ];
+
+    private static double AddButtonWidth(PlayerViewModel vm) => (vm.IsStreamedTrack ? AddPillWidth : 0) + (vm.JustAddedToSongs ? AddedCheckWidth : 0);
+
+    private double AvailableIslandWidth()
+    {
+        if (_resizeHost == null) return 0;
+        var reserve = IslandEdgeMargin;
+        // A window without the sidebar (tests, a mini window) or without a name scope simply has nothing to keep clear.
+        _sidebar ??= TopLevel.GetTopLevel(this) is Window window ? NameScope.GetNameScope(window)?.Find<Border>("SidebarWrapper") : null;
+        if (_sidebar is { IsVisible: true } sidebar)
+            reserve = Math.Max(reserve, sidebar.Margin.Left + Math.Min(SidebarCollapsedWidth, sidebar.Bounds.Width > 0 ? sidebar.Bounds.Width : SidebarCollapsedWidth) + IslandEdgeMargin);
+        return _resizeHost.Bounds.Width - reserve * 2;
+    }
+
+    /// <summary>Lets optional buttons step aside (or come back) for <paramref name="available"/>. True when the set changed.</summary>
+    private bool Squeeze(double available)
+    {
+        if (_observedPlayerViewModel is not { } vm || CompactWhenLyricsPageActive || available <= 0) return ReleaseSqueezed();
+        var wanted = OptionalButtons().Where(e => e.Wanted(vm)).Select(e => e.Button).ToList();
+        var fixedPart = (vm.IslandShowTime ? IslandTimeWidth : 0) + AddButtonWidth(vm);
+        var keep = wanted.Count;
+        while (keep > 0 && IslandMidShapeMinWidth + fixedPart + keep * ExtraTransportButtonWidth > available) keep--;
+        if (IslandMidShapeMinWidth + fixedPart + keep * ExtraTransportButtonWidth > available)
+        {
+            // Not even the song info fits beside the controls: the compact pill, with as many buttons as fit.
+            keep = wanted.Count;
+            while (keep > 0 && IslandMinUserWidth + AddButtonWidth(vm) + keep * ExtraTransportButtonWidth > available) keep--;
+        }
+        var aside = wanted.Take(wanted.Count - keep).ToHashSet();
+        var changed = false;
+        foreach (var (button, _) in OptionalButtons())
+        {
+            var hide = aside.Contains(button);
+            if (hide == _squeezed.ContainsKey(button)) continue;
+            changed = true;
+            if (hide) _squeezed[button] = button.SetValue(IsVisibleProperty, false, Avalonia.Data.BindingPriority.Animation);
+            else { _squeezed[button]?.Dispose(); _squeezed.Remove(button); }
+        }
+        return changed;
+    }
+
+    private bool ReleaseSqueezed()
+    {
+        if (_squeezed.Count == 0) return false;
+        foreach (var hold in _squeezed.Values) hold?.Dispose();
+        _squeezed.Clear();
+        return true;
     }
 
     private void UpdateResizeGripVisibility()

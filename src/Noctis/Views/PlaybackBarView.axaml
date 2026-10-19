@@ -654,7 +654,7 @@
                     </Button>
 
                     <!-- Skip back N seconds (island extra) -->
-                    <Button Classes="pill-btn transport-btn"
+                    <Button x:Name="SkipBackButton" Classes="pill-btn transport-btn"
                             Command="{Binding SkipBackCommand}"
                             ToolTip.Tip="{Binding SkipBackTooltip}"
                             IsVisible="{Binding IslandShowSkipButtons}"
@@ -744,7 +744,7 @@
                     </Button>
 
                     <!-- Skip forward N seconds (island extra) -->
-                    <Button Classes="pill-btn transport-btn"
+                    <Button x:Name="SkipForwardButton" Classes="pill-btn transport-btn"
                             Command="{Binding SkipForwardCommand}"
                             ToolTip.Tip="{Binding SkipForwardTooltip}"
                             IsVisible="{Binding IslandShowSkipButtons}"
@@ -848,7 +848,7 @@
                          knocked back by Border.Opacity — never a solid accent fill.
                          Opt-in like the other island extras (Settings → Player Island
                          Buttons → Repeat). -->
-                    <Button Classes="pill-btn transport-btn"
+                    <Button x:Name="RepeatButton" Classes="pill-btn transport-btn"
                             Command="{Binding CycleRepeatCommand}"
                             ToolTip.Tip="{loc:T PlaybackBar.RepeatTip}"
                             IsVisible="{Binding IslandShowRepeat}"
@@ -916,7 +916,7 @@
 
                     <!-- EQ on/off (island extra, GitHub #94): the Settings → Audio master switch,
                          same accent pill + accent glyph as Shuffle while the EQ is on. -->
-                    <Button Classes="pill-btn transport-btn"
+                    <Button x:Name="EqualizerButton" Classes="pill-btn transport-btn"
                             Command="{Binding ToggleEqualizerCommand}"
                             ToolTip.Tip="{loc:T PlaybackBar.EqualizerTip}"
                             IsVisible="{Binding IslandShowEqualizer}"
