@@ -677,6 +677,11 @@ public class AppSettings
     /// Applies to both artist and album-artist tags; see ArtistCredit.DefaultSeparators.</summary>
     public List<string> ArtistTagSeparators { get; set; } = ArtistCredit.DefaultSeparators.ToList();
 
+    /// <summary>"Keep these names together": artist names never cut apart by the separators
+    /// ("Tyler, The Creator", "AC/DC"). Settings saved before the list existed load the
+    /// built-ins (ArtistCredit.DefaultProtectedNames); an emptied list stays empty.</summary>
+    public List<string> ArtistProtectedNames { get; set; } = ArtistCredit.DefaultProtectedNames.ToList();
+
     /// <summary>The join (ArtistCredit.JoinText) the indexed artist credits were read with —
     /// multi-value artist tags are joined with it. Every build before GitHub #117 used ", ".
     /// When the active join differs, LibraryService.ApplyArtistCreditJoinAsync re-reads the
