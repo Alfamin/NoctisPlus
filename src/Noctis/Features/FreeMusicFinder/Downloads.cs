@@ -26,6 +26,8 @@ internal sealed class Download(BotTrack track, string folder)
     /// <summary>When this run failed (this session only): a quick repeat click shows the error instead of asking the bots again.</summary>
     internal DateTimeOffset? FailedAt { get; set; }
     internal Noctis.Features.ProgressivePlayback.ProgressiveTransfer? Playback { get; set; }
+    /// <summary>Held back for the song clicked to play after it (owner #83); it goes back to the queue, not to Failed.</summary>
+    internal bool Preempted { get; set; }
     public bool IsActive => State is DownloadState.Queued or DownloadState.Running or DownloadState.Waiting;
 }
 
@@ -44,7 +46,7 @@ internal sealed class Downloads : IDisposable
     private readonly Action<string> _log;
     private readonly string? _store;
     private bool _paused, _saveFailing;
-    private Download? _last;
+    private Download? _last, _now;
     private readonly Dictionary<Download, CancellationTokenSource> _running = new();
     private int _done, _saved;
     private bool _disposed;
@@ -205,6 +207,27 @@ internal sealed class Downloads : IDisposable
         }
         Wake(); Raise(item);
     }
+    /// <summary>
+    /// Owner #83: the song clicked to play last is wanted now. It goes first and starts at once; the other transfers are
+    /// held back to the queue until it is done (they resume from the bot's chat, the bot is not asked again), except
+    /// the one still being heard, so it does not stop while the new one arrives.
+    /// </summary>
+    public void PlayNow(Download item)
+    {
+        CancellationTokenSource[] hold;
+        lock (_gate)
+        {
+            if (!_active.Contains(item)) return;
+            item.Priority = true; item.Held = false;
+            _active.Remove(item); _active.Insert(0, item); _now = item;
+            var others = _running.Where(r => r.Key != item && r.Key.Playback?.HasReaders != true).ToArray();
+            foreach (var (other, _) in others) other.Preempted = true;
+            hold = others.Select(r => r.Value).ToArray();
+            SaveOrLog();
+        }
+        foreach (var source in hold) Cancel(source);
+        Wake(); Raise(item);
+    }
     public bool Remove(Download item)
     {
         CancellationTokenSource? cancel;
@@ -259,9 +282,15 @@ internal sealed class Downloads : IDisposable
                 {
                     if (_disposed) break;
                     var eligible = _active.Where(d => !_running.ContainsKey(d) && Runnable(d)).ToArray();
-                    // The second lane takes only Play / download-now requests; the backlog keeps to one.
-                    download = eligible.FirstOrDefault(d => (d.RetryAt is null || d.RetryAt <= DateTimeOffset.UtcNow) &&
-                        (_running.Count == 0 || _running.Count < Lanes && d.Priority));
+                    // A song that has to wait (a bot limit) or was removed does not hold the others back.
+                    if (_now is { } now && (!_active.Contains(now) || !Runnable(now) || now.RetryAt > DateTimeOffset.UtcNow)) _now = null;
+                    // The song clicked to play last starts at once, even while held-back transfers are still stopping;
+                    // nothing else starts until it is done. Otherwise the second lane takes only Play / download-now
+                    // requests and the backlog keeps to one.
+                    download = _now is { } wanted
+                        ? eligible.FirstOrDefault(d => d == wanted && (d.RetryAt is null || d.RetryAt <= DateTimeOffset.UtcNow))
+                        : eligible.FirstOrDefault(d => (d.RetryAt is null || d.RetryAt <= DateTimeOffset.UtcNow) &&
+                            (_running.Count == 0 || _running.Count < Lanes && d.Priority));
                     if (download is not null)
                     {
                         transfer = CancellationTokenSource.CreateLinkedTokenSource(_stop.Token);
@@ -297,9 +326,10 @@ internal sealed class Downloads : IDisposable
             string? summary = null;
             lock (_gate)
             {
+                if (_now == download && download.State != DownloadState.Queued) _now = null;
                 if (_known.Contains(download))
                 {
-                    if (download.State != DownloadState.Waiting)
+                    if (download.State is not (DownloadState.Waiting or DownloadState.Queued))
                     {
                         _active.Remove(download); _done++;
                         if (download.State == DownloadState.Saved) _saved++;
@@ -341,6 +371,9 @@ internal sealed class Downloads : IDisposable
             if (outcome == DownloadOutcome.Saved && savedPath is not null)
                 Noctis.Services.Search.OnlineMusicSearch.PublishSavedFile(savedPath);
         }
+        // Whatever the stopped transfer threw: a held-back song goes back to the queue.
+        catch (Exception) when (ct.IsCancellationRequested && download.Preempted && !_stop.IsCancellationRequested)
+        { SetOutcome(download, DownloadState.Queued, ""); lock (_gate) { download.Preempted = false; download.Progress = 0; } }
         catch (SourcesWaitingException ex) { SetOutcome(download, DownloadState.Waiting, ex.Message, ex.Until); }
         catch (IOException ex) { SetOutcome(download, DownloadState.Waiting, "Connection or storage interrupted: " + ex.Message, DateTimeOffset.UtcNow.AddMinutes(10)); }
         catch (System.Net.Sockets.SocketException ex) { SetOutcome(download, DownloadState.Waiting, "TELEGRAM_CONNECTION_FAILED: " + ex.Message, DateTimeOffset.UtcNow.AddMinutes(10)); }

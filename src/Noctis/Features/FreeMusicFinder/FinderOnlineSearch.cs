@@ -256,6 +256,8 @@ internal sealed class FinderOnlineSearch : IOnlineMusicSearch
         var match = (await _actions.MatchAsync([catalogSong], ct))[catalogSong.Id];
         if (match.Local is { } local) return Make(local.Path, local.Id, external: false);
         var download = match.Download ?? throw new IOException("The download request could not be found. Open Downloads to retry it.");
+        // Owner #83: the song clicked to play last is fetched now, ahead of every song clicked before it.
+        _actions.Downloads.PlayNow(download);
         while (true)
         {
             ct.ThrowIfCancellationRequested();

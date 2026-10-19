@@ -174,6 +174,30 @@ internal static class QueueManagementTests
         Check.True(removed && two.State == DownloadState.Removed && one.State == DownloadState.Running, "only the removed transfer was cancelled");
         release.SetResult();
         await Check.UntilAsync(() => one.State == DownloadState.Saved && three.State == DownloadState.Saved, "both remaining lanes finish");
+        await LatestPlayFirst();
+    }
+    private static async Task LatestPlayFirst()
+    {
+        // Owner #83: Kevin's Heart, Blessings, Sundress... the song clicked last waited for the earlier ones' transfers.
+        Check.Section("the song clicked to play last starts at once; earlier ones wait until it is done");
+        var root = Check.NewFolder("queue-play-now"); var starts = new List<string>();
+        var hold = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var now = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        using var queue = new Downloads(_ => { });
+        Download Play(string title, Task until) => queue.Start(Track(title, async ct => { lock (starts) starts.Add(title); await until.WaitAsync(ct); }), root, priority: true);
+        var kevin = Play("Kevin's Heart", hold.Task); var blessings = Play("Blessings", hold.Task);
+        var batch = queue.Start(Track("Batch song", ct => { lock (starts) starts.Add("Batch song"); return Task.CompletedTask; }), root);
+        await Check.UntilAsync(() => { lock (starts) return starts.Count == 2; }, "two earlier songs are transferring");
+        var sundress = Play("Sundress", now.Task);
+        queue.PlayNow(sundress);
+        await Check.UntilAsync(() => { lock (starts) return starts.Contains("Sundress"); }, "the latest Play starts at once although both lanes were busy");
+        await Check.UntilAsync(() => kevin.State == DownloadState.Queued && blessings.State == DownloadState.Queued, "the earlier songs are held back to the queue, not failed");
+        await Task.Delay(150);
+        Check.Equal("Kevin's Heart,Blessings,Sundress", string.Join(",", starts), "nothing else starts while the latest Play is transferring");
+        Check.Equal("Sundress", queue.Active[0].Track.Title, "the latest Play is first in the queue");
+        now.SetResult(); hold.SetResult();
+        await Check.UntilAsync(() => sundress.State == DownloadState.Saved && kevin.State == DownloadState.Saved && blessings.State == DownloadState.Saved && batch.State == DownloadState.Saved, "afterwards the held songs and the backlog finish too");
+        Check.Equal(2, starts.Count(s => s == "Kevin's Heart"), "a held song is started again exactly once afterwards");
     }
     private static async Task RemovalAndRestart()
     {

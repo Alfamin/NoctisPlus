@@ -366,7 +366,13 @@ internal static class AtomicJson
             using (var stream = new FileStream(temp, FileMode.CreateNew, FileAccess.Write, FileShare.None))
             { JsonSerializer.Serialize(stream, value); stream.Flush(true); }
             if (!OperatingSystem.IsWindows()) File.SetUnixFileMode(temp, UnixFileMode.UserRead | UnixFileMode.UserWrite);
-            File.Move(temp, path, overwrite: true);
+            // A virus scanner or the search indexer can hold the old file for a moment ("Access to the path is denied",
+            // seen in the checks under load): three short retries (60 ms in all; callers may hold the queue lock) before giving up.
+            for (var attempt = 1; ; attempt++)
+            {
+                try { File.Move(temp, path, overwrite: true); break; }
+                catch (Exception ex) when (attempt < 4 && ex is UnauthorizedAccessException or IOException) { Thread.Sleep(10 * attempt); }
+            }
         }
         finally
         {
