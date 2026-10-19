@@ -308,6 +308,30 @@ public class InboxScanTests : IDisposable
         Assert.Single(library.InboxTracks);
     }
 
+    /// <summary>A conversion or download saved into a music folder: the folder watcher's batch
+    /// (1.5 s debounce) usually reaches the file before the converter's or downloader's own
+    /// import, which runs once every file is done. That user add must still take the song into
+    /// the library, unchanged since the watcher read it or re-tagged in between.</summary>
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task UsersOwnImport_OfAFileTheWatcherPutInTheInbox_TakesItIntoTheLibrary(bool changedSince)
+    {
+        var (library, _) = await LibraryAsync(inbox: true);
+        await library.ScanAsync(new[] { _music });
+
+        WriteMp3(NewDownload, "New One");
+        await ((ILibraryService)library).ImportDiscoveredFilesAsync(new[] { NewDownload });
+        Assert.Single(library.InboxTracks);
+
+        if (changedSince) Retag(NewDownload, "New One (cover added)");
+        await library.ImportFilesAsync(new[] { NewDownload });
+
+        Assert.Empty(library.InboxTracks);
+        var song = Assert.Single(library.Tracks, t => t.FilePath == NewDownload);
+        Assert.False(song.IsInInbox);
+    }
+
     [Fact]
     public async Task InboxSongUnderAHiddenFolder_IsInNeitherList()
     {
