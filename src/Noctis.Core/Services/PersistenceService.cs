@@ -624,7 +624,7 @@ public class PersistenceService : IPersistenceService
             TryRestrictToOwner(tempPath, isDirectory: false);
 
             // Atomic rename (on NTFS this is atomic for same-volume moves)
-            File.Move(tempPath, path, overwrite: true);
+            await ReplaceAsync(tempPath, path);
         }
         catch (Exception ex)
         {
@@ -641,4 +641,36 @@ public class PersistenceService : IPersistenceService
             throw;
         }
     }
+
+    // Waits between rename attempts once the first one was refused (see ReplaceAsync).
+    private static readonly int[] ReplaceRetryDelaysMs = [10, 25, 50, 100, 200, 400];
+
+    /// <summary>
+    /// Renames the written temp file over <paramref name="path"/>. Windows refuses to replace
+    /// a file while any handle on it is open, and every load holds one while it reads: a save
+    /// landing on such a moment threw "Access to the path is denied" and was lost (Settings
+    /// saving settings.json while a library pass or another page was reading it). A read lasts
+    /// milliseconds, so a refused rename is retried briefly before the save gives up.
+    /// </summary>
+    private static async Task ReplaceAsync(string tempPath, string path)
+    {
+        for (var attempt = 0; ; attempt++)
+        {
+            try
+            {
+                File.Move(tempPath, path, overwrite: true);
+                return;
+            }
+            catch (Exception ex) when (IsFileInUse(ex) && attempt < ReplaceRetryDelaysMs.Length)
+            {
+                await Task.Delay(ReplaceRetryDelaysMs[attempt]);
+            }
+        }
+    }
+
+    /// <summary>What a rename over a file something has open throws: access denied, or a
+    /// sharing violation. A missing file or folder is not worth a retry.</summary>
+    private static bool IsFileInUse(Exception ex) =>
+        ex is UnauthorizedAccessException ||
+        (ex is IOException && ex is not FileNotFoundException && ex is not DirectoryNotFoundException);
 }

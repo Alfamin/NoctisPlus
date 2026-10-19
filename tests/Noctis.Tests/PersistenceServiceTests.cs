@@ -174,6 +174,27 @@ public class PersistenceServiceTests : IDisposable
         Assert.Null((await svc.LoadSettingsAsync()).CommunityPluginsEnabled);
     }
 
+    /// <summary>CI 10-18 (InboxPageTests): Windows refuses to rename over a file a reader has
+    /// open, so a save landing while anything was reading settings.json threw "Access to the
+    /// path is denied" and the setting was lost. The save now waits the read out.</summary>
+    [Fact]
+    public async Task Save_WhileTheFileIsBeingRead_LandsOnceTheReadEnds()
+    {
+        var svc = Create();
+        await svc.SaveSettingsAsync(new AppSettings { Volume = 10 });
+
+        Task save;
+        // Opened the way every load opens it, held a little longer than a read takes.
+        using (new FileStream(Path.Combine(_root, "settings.json"), FileMode.Open, FileAccess.Read, FileShare.Read))
+        {
+            save = svc.SaveSettingsAsync(new AppSettings { Volume = 20 });
+            await Task.Delay(150, TestContext.Current.CancellationToken);
+        }
+        await save;
+
+        Assert.Equal(20, (await svc.LoadSettingsAsync()).Volume);
+    }
+
     [Fact]
     public async Task OutOfRangeNumbers_AreClampedOnLoad()
     {
