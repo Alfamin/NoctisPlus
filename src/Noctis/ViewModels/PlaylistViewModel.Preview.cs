@@ -119,6 +119,12 @@ public partial class PlaylistViewModel
         try
         {
             var id = await imports.SaveAsync(found.Url, CancellationToken.None);
+            // Owner #88: songs of it that were already played join Songs now that it is one of your playlists (from their
+            // cached copies, no new bot request). A failure here never undoes the save.
+            var played = CatalogRows.OfType<ArtistCatalogSong>().Where(r => r.Song.IsStreamed && r.Song.Online is not null).Select(r => r.Song.Online!).ToList();
+            if (played.Count > 0 && _catalogOnline is { } online)
+                try { await online.DownloadAsync(played, now: true, CancellationToken.None); }
+                catch (Exception ex) { DebugLog.Write("Playlist", "Played songs of the saved playlist not added: " + ex.Message); }
             if (_playlist.CoverArtPath is { } cover)
                 try { await _sidebar.KeepFoundCoverAsync(id, cover); }
                 catch (Exception ex) when (ex is IOException or UnauthorizedAccessException) { DebugLog.Write("Playlist", "Found cover not kept: " + ex.GetType().Name); }

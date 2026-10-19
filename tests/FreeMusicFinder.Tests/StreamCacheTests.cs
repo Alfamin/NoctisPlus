@@ -43,12 +43,22 @@ internal static class StreamCacheTests
         var roaming = Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData);
         var local = Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData);
         var data = Path.Combine(roaming, "Noctis Plus", "plugin-data", "dev.moshi.freemusicfinder");
-        Check.Equal(Path.Combine(local, "Noctis Plus", "plugin-data", "dev.moshi.freemusicfinder", "stream-cache"), StreamCache.Folder(data),
+        Check.Equal(Path.Combine(local, "Noctis Plus", "stream-cache"), StreamCache.Folder(data),
             "a roaming profile keeps its gigabytes of audio in the local AppData folder");
         var test = @"C:\Some\Profile\plugin-data\dev.moshi.freemusicfinder";
         Check.Equal(Path.Combine(test, "stream-cache"), StreamCache.Folder(test), "any other profile keeps it beside its data");
         Check.True(StreamCache.Contains(@"C:\Cache", @"C:\Cache\Artist - Song.flac") && !StreamCache.Contains(@"C:\Cache", @"C:\Cache2\x.flac")
             && !StreamCache.Contains(@"C:\Cache", null), "only files inside the cache count as streamed");
+
+        // Fallbacks: Play must always work, so a cache that cannot be used saves into the library as before.
+        var usable = Path.Combine(Check.NewFolder("stream-usable"), "stream-cache");
+        Check.True(StreamCache.Usable(usable) && Directory.Exists(usable) && !Directory.EnumerateFileSystemEntries(usable).Any(),
+            "a writable cache is used, is made when missing, and its write check leaves nothing behind");
+        var blocked = Path.Combine(Check.NewFolder("stream-blocked"), "a-file");
+        File.WriteAllText(blocked, "a file where the cache folder should be");
+        Check.True(!StreamCache.Usable(blocked), "a cache that cannot be made or written is not used");
+        Check.True(StreamCache.Fits(@"C:\Users\Someone\AppData\Local\Noctis Plus\stream-cache", "Artist - Song [1234abcd]"), "a normal name fits");
+        Check.True(!StreamCache.Fits(@"C:\Users\Someone\AppData\Local\Noctis Plus\stream-cache", new string('x', 200)), "a name past the player's path limit does not");
     }
 
     private static void Purging()

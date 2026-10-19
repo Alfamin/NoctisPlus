@@ -17,10 +17,39 @@ internal static class StreamCache
         var data = Path.GetFullPath(pluginDataDirectory);
         var roaming = Path.TrimEndingDirectorySeparator(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData));
         var local = Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData);
+        // Short on purpose: long song names plus a long folder could pass the 260-character path limit the player has.
         if (roaming.Length > 0 && local.Length > 0 && data.StartsWith(roaming + Path.DirectorySeparatorChar, StringComparison.OrdinalIgnoreCase))
-            return Path.Combine(local, data[(roaming.Length + 1)..], "stream-cache");
+            return Path.Combine(local, data[(roaming.Length + 1)..].Split(Path.DirectorySeparatorChar)[0], "stream-cache");
         return Path.Combine(data, "stream-cache");
     }
+
+    internal const int MaxPath = 250;
+    internal const long MinFree = 300L * 1024 * 1024;
+    private static (string Folder, DateTime At, bool Usable) _checked;
+
+    /// <summary>Can played songs go into the cache right now? It can be made and written, and its drive has room. When it
+    /// cannot (no permission, full drive), Play saves into the library as before rather than failing. Checked at most
+    /// once a minute.</summary>
+    public static bool Usable(string folder)
+    {
+        var last = _checked;
+        if (string.Equals(last.Folder, folder, StringComparison.OrdinalIgnoreCase) && DateTime.UtcNow - last.At < TimeSpan.FromMinutes(1)) return last.Usable;
+        bool usable;
+        try
+        {
+            Directory.CreateDirectory(folder);
+            var probe = Path.Combine(folder, ".write-check");
+            File.WriteAllText(probe, "");
+            File.Delete(probe);
+            usable = FreeSpace(folder) >= MinFree;
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or ArgumentException or NotSupportedException) { usable = false; }
+        _checked = (folder, DateTime.UtcNow, usable);
+        return usable;
+    }
+
+    /// <summary>Would this song's cached file name stay within the path limit?</summary>
+    public static bool Fits(string folder, string fileName) => Path.Combine(folder, fileName).Length + ".flac.part".Length <= MaxPath;
 
     /// <summary>Days a streamed song is kept after it was last played; null = forever.</summary>
     public static int? Days(string? choice) => choice?.Trim() switch

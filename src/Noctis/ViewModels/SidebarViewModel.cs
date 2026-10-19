@@ -1,4 +1,4 @@
-﻿using System.Collections.ObjectModel;
+using System.Collections.ObjectModel;
 using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Threading;
@@ -992,6 +992,7 @@ public partial class SidebarViewModel : ViewModelBase
     {
         var playlist = Playlists.FirstOrDefault(p => p.Id == playlistId);
         if (playlist == null || playlist.IsSmartPlaylist) return;
+        tracks = await InLibraryAsync(tracks);
 
         // Only add tracks that aren't already in the playlist to prevent duplicates
         var existingIds = new HashSet<Guid>(playlist.TrackIds);
@@ -1021,6 +1022,36 @@ public partial class SidebarViewModel : ViewModelBase
 
         await _persistence.SavePlaylistsAsync(Playlists.ToList());
         PlaylistTracksChanged?.Invoke(this, playlistId);
+    }
+
+    /// <summary>
+    /// Owner #88: Songs are all the songs you have. A song that was only played (stream cache) joins Songs when it is
+    /// added to a playlist, and the playlist holds its library copy: a track id follows from its path, so it is right even
+    /// while the copy is still arriving or being imported. A song that cannot be copied keeps its own entry.
+    /// </summary>
+    internal static async Task<IList<Track>> InLibraryAsync(IEnumerable<Track> tracks, Noctis.Services.Search.IOnlineMusicSearch? source = null)
+    {
+        var list = tracks.ToList();
+        source ??= Noctis.Services.Search.OnlineMusicSearch.Current;
+        if (source is null) return list;
+        for (var i = 0; i < list.Count; i++)
+        {
+            if (list[i] is not { IsExternal: true, FilePath: { } path } streamed || !source.IsCachedFile(path)) continue;
+            try
+            {
+                if ((await source.AddStreamedAsync(path, CancellationToken.None)).LibraryPath is not { } libraryPath) continue;
+                list[i] = new Track
+                {
+                    Id = LibraryService.TrackIdForPath(libraryPath), FilePath = libraryPath, Title = streamed.Title, Artist = streamed.Artist,
+                    Album = streamed.Album, Duration = streamed.Duration, IsExplicit = streamed.IsExplicit,
+                };
+            }
+            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or InvalidOperationException)
+            {
+                DebugLog.Write("Playlists", "a played song could not be added to Songs: " + ex.Message);
+            }
+        }
+        return list;
     }
 
     /// <summary>
@@ -1182,7 +1213,7 @@ public partial class SidebarViewModel : ViewModelBase
             Description = newDescription,
             Color = Playlist.GetRandomColor()
         };
-        foreach (var t in tracks)
+        foreach (var t in await InLibraryAsync(tracks))
             playlist.TrackIds.Add(t.Id);
 
         Playlists.Add(playlist);

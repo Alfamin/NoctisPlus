@@ -37,14 +37,14 @@ public partial class PlayerViewModel
 
     /// <summary>Latest Play wins across Search and album pages. Local playback, pause,
     /// skip and shutdown revoke preparation; the durable download continues separately.</summary>
-    internal Task PlayOnlineAsync(IOnlineMusicSearch source, OnlineSong song)
+    internal Task PlayOnlineAsync(IOnlineMusicSearch source, OnlineSong song, bool keep = false)
     {
         // Owner #29: more clicks on the song being prepared wait for the same request; only another song restarts it.
         if (_onlinePlay is not null && _onlinePreparingSongId == song.Id && _onlinePlayTask is { } pending) return pending;
-        return _onlinePlayTask = PlayOnlineCoreAsync(source, song);
+        return _onlinePlayTask = PlayOnlineCoreAsync(source, song, keep);
     }
 
-    private async Task PlayOnlineCoreAsync(IOnlineMusicSearch source, OnlineSong song)
+    private async Task PlayOnlineCoreAsync(IOnlineMusicSearch source, OnlineSong song, bool keep)
     {
         CancelOnlinePlayback();
         if (OnlinePlayingSongId == song.Id && CurrentTrack is not null) { PlayPauseCommand.Execute(null); return; }
@@ -64,7 +64,7 @@ public partial class PlayerViewModel
         source.DownloadsChanged += StepChanged;
         try
         {
-            var track = await source.PreparePlaybackAsync(song, stop.Token);
+            var track = await source.PreparePlaybackAsync(song, keep, stop.Token);
             if (stop.IsCancellationRequested || !ReferenceEquals(_onlinePlay, stop)) return;
             _onlinePlay = null;
             // Preserve the current queue. This one explicit request replaces its playing
@@ -93,8 +93,15 @@ public partial class PlayerViewModel
     /// <summary>The button's tooltip: why the last Add failed, else what it does.</summary>
     public string AddToSongsTip => IsStreamedTrack && AddToSongsMessage.Length > 0 && !JustAddedToSongs ? AddToSongsMessage : "Add to songs";
 
+    private bool _watchingAdds;
     private void UpdateStreamedTrack()
     {
+        // Owner #88: a song added from anywhere (a playlist, Search) hides the bar's Add for it at once.
+        if (!_watchingAdds)
+        {
+            _watchingAdds = true;
+            OnlineMusicSearch.FileSaved += (_, _) => Avalonia.Threading.Dispatcher.UIThread.Post(() => { if (IsStreamedTrack) UpdateStreamedTrack(); });
+        }
         try { IsStreamedTrack = CurrentTrack is { IsExternal: true, FilePath: { } path } && OnlineMusicSearch.Current?.IsStreamedFile(path) == true; }
         catch (Exception) { IsStreamedTrack = false; } // a feature fault must never break track changes
         if (!IsStreamedTrack) JustAddedToSongs = false;
@@ -108,7 +115,7 @@ public partial class PlayerViewModel
         var track = CurrentTrack;
         try
         {
-            AddToSongsMessage = await source.AddStreamedAsync(path, CancellationToken.None);
+            AddToSongsMessage = (await source.AddStreamedAsync(path, CancellationToken.None)).Message;
             if (!ReferenceEquals(CurrentTrack, track)) return;
             IsStreamedTrack = false;
             JustAddedToSongs = true;

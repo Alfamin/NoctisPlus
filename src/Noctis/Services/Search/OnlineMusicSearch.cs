@@ -94,12 +94,19 @@ public interface IOnlineMusicSearch
     Task<Noctis.Models.Track> PreparePlaybackAsync(OnlineSong song, CancellationToken ct)
         => Task.FromException<Noctis.Models.Track>(new NotSupportedException("This source does not support online playback."));
 
+    /// <summary>Owner #88: <paramref name="keep"/> = the song belongs to one of the user's playlists, so it joins Songs
+    /// instead of only streaming.</summary>
+    Task<Noctis.Models.Track> PreparePlaybackAsync(OnlineSong song, bool keep, CancellationToken ct) => PreparePlaybackAsync(song, ct);
+
     /// <summary>Owner #87: a file that was only played (in the stream cache, not added to Songs).</summary>
     bool IsStreamedFile(string? path) => false;
 
-    /// <summary>Owner #87: "Add to songs" for a played file. Copies it into the library now, or as soon as it is saved;
-    /// returns a short message for the user.</summary>
-    Task<string> AddStreamedAsync(string path, CancellationToken ct) => Task.FromResult("This song cannot be added here.");
+    /// <summary>Owner #88: a file in the stream cache (played, added or not).</summary>
+    bool IsCachedFile(string? path) => false;
+
+    /// <summary>Owner #87: "Add to songs" for a played file. Copies it into the library now, or as soon as it is saved.
+    /// <see cref="StreamedAdd.LibraryPath"/> is where its library copy is (or will be), also when it was added before.</summary>
+    Task<StreamedAdd> AddStreamedAsync(string path, CancellationToken ct) => Task.FromResult(new StreamedAdd("This song cannot be added here.", null));
 
     /// <summary>The download queue behind the Downloads page.</summary>
     IDownloadQueue Downloads { get; }
@@ -115,6 +122,9 @@ public interface IOnlineMusicSearch
     Task<IReadOnlyList<OnlinePlaylist>> MorePlaylistsAsync(string query, int offset, CancellationToken ct)
         => Task.FromResult<IReadOnlyList<OnlinePlaylist>>([]);
 }
+
+/// <summary>Owner #87: the outcome of Add to songs: a short message, and the library copy's path.</summary>
+public sealed record StreamedAdd(string Message, string? LibraryPath);
 
 /// <summary>One request on the Downloads page. <paramref name="Handle"/> identifies it to the queue.</summary>
 public sealed record DownloadEntry(object Handle, string Title, string Artist, OnlineDownloadState State, double Progress,
@@ -153,6 +163,10 @@ public static class OnlineMusicSearch
             try { listener(null, path); }
             catch (Exception ex) { System.Diagnostics.Trace.WriteLine("Saved-file observer failed: " + ex.GetType().Name); }
     }
+    private static IReadOnlyList<string> _filesInPlayer = [];
+    /// <summary>Owner #87: the files the player holds (now playing, up next, history), kept up to date by the player so the
+    /// stream cache never deletes a song that is still queued.</summary>
+    public static IReadOnlyList<string> FilesInPlayer { get => Volatile.Read(ref _filesInPlayer); set => Volatile.Write(ref _filesInPlayer, value); }
     private static IOnlineMusicSearch? _current;
 
     public static IOnlineMusicSearch? Current

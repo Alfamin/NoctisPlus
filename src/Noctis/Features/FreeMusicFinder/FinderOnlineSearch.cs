@@ -260,21 +260,27 @@ internal sealed class FinderOnlineSearch : IOnlineMusicSearch
         catch (Exception ex) when (ex is ArgumentException or IOException or UnauthorizedAccessException) { return true; }
     }
 
-    /// <summary>Owner #87: "Add to songs" from the player. The copy runs off the UI thread.</summary>
-    public Task<string> AddStreamedAsync(string path, CancellationToken ct) => Task.Run(() =>
+    public bool IsCachedFile(string? path) => _actions.Downloads.CacheFolder is { } cache && StreamCache.Contains(cache, path);
+
+    /// <summary>Owner #87: "Add to songs" from the player (and #88: a playlist add). The copy runs off the UI thread.</summary>
+    public Task<StreamedAdd> AddStreamedAsync(string path, CancellationToken ct) => Task.Run(() =>
     {
-        if (!IsStreamedFile(path)) return "Already in your songs.";
-        var library = _actions.LibraryFolder;
-        if (StreamedDownload(path) is { } download)
+        if (!IsCachedFile(path)) return new StreamedAdd("Already in your songs.", null);
+        // Where the library copy is: the download folder it went to, else the one it goes to now.
+        var download = StreamedDownload(path);
+        var library = download?.KeepIn ?? _actions.LibraryFolder;
+        var target = Path.Combine(library, Path.GetFileName(path));
+        if (!IsStreamedFile(path)) return new StreamedAdd("Already in your songs.", target);
+        if (download is not null)
         {
-            var (_, pending) = _actions.Downloads.Keep(download, library);
-            return pending ? "Added. It joins your songs when it finishes downloading." : "Added to your songs.";
+            var (copy, pending) = _actions.Downloads.Keep(download, library);
+            return new StreamedAdd(pending ? "Added. It joins your songs when it finishes downloading." : "Added to your songs.", copy ?? target);
         }
         // Its download was cleared from the list: the cached file itself is copied.
-        if (!File.Exists(path)) return "This song is no longer in the stream cache. Play it again, then add it.";
-        var copy = StreamCache.CopyToLibrary(path, library);
-        Noctis.Services.Search.OnlineMusicSearch.PublishSavedFile(copy);
-        return "Added to your songs.";
+        if (!File.Exists(path)) throw new IOException("This song is no longer in the stream cache. Play it again, then add it.");
+        var copied = StreamCache.CopyToLibrary(path, library);
+        Noctis.Services.Search.OnlineMusicSearch.PublishSavedFile(copied);
+        return new StreamedAdd("Added to your songs.", copied);
     }, ct);
 
     /// <summary>The played-only download behind a cached file (saved, or still arriving under that name).</summary>
@@ -286,11 +292,13 @@ internal sealed class FinderOnlineSearch : IOnlineMusicSearch
                 : string.Equals(d.Track.FileName, name, StringComparison.OrdinalIgnoreCase)));
     }
 
-    public async Task<Noctis.Models.Track> PreparePlaybackAsync(OnlineSong song, CancellationToken ct)
+    public Task<Noctis.Models.Track> PreparePlaybackAsync(OnlineSong song, CancellationToken ct) => PreparePlaybackAsync(song, keep: false, ct);
+
+    public async Task<Noctis.Models.Track> PreparePlaybackAsync(OnlineSong song, bool keep, CancellationToken ct)
     {
         if (!_songs.TryGetValue(song.Id, out var catalogSong)) throw new InvalidOperationException("Search again, then choose the song.");
         // Owner #87: Play only streams; the song is kept in the stream cache, not added to Songs.
-        await _actions.QueueAsync([catalogSong], priority: true, ct, stream: true);
+        await _actions.QueueAsync([catalogSong], priority: true, ct, stream: !keep);
         var match = (await _actions.MatchAsync([catalogSong], ct))[catalogSong.Id];
         if (match.Local is { } local) return Make(local.Path, local.Id, external: false);
         var download = match.Download ?? throw new IOException("The download request could not be found. Open Downloads to retry it.");

@@ -229,7 +229,8 @@ public sealed class FreeMusicPlugin : INoctisPlugin
             var days = StreamCache.Days(_host?.Settings.GetString(StreamCache.SettingKey));
             var busy = downloads.Active.Where(d => downloads.IsCached(d)).Select(d => d.Track.FileName).ToHashSet(StringComparer.OrdinalIgnoreCase);
             _lastPurge = DateTime.UtcNow;
-            var removed = StreamCache.Purge(cache, days, DateTime.UtcNow, file => busy.Contains(Path.GetFileNameWithoutExtension(file)),
+            var held = Noctis.Services.Search.OnlineMusicSearch.FilesInPlayer.ToHashSet(StringComparer.OrdinalIgnoreCase);
+            var removed = StreamCache.Purge(cache, days, DateTime.UtcNow, file => busy.Contains(Path.GetFileNameWithoutExtension(file)) || held.Contains(file),
                 StreamCache.Cap(days, StreamCache.FreeSpace(cache)));
             if (removed > 0) Log($"removed {removed} played-only song file{(removed == 1 ? "" : "s")} from the stream cache");
         }

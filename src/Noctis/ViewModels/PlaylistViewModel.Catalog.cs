@@ -158,7 +158,8 @@ public partial class PlaylistViewModel
     {
         if (row?.Song.Online is not { } song || _catalogOnline is not { } online) return;
         if (!online.CanDownload) { online.RequestSignIn(); return; }
-        try { CatalogNotice = ""; await _player.PlayOnlineAsync(online, song); CatalogNotice = ""; }
+        // Owner #88: a song of one of your playlists is one of your songs: Play keeps it; a preview only streams.
+        try { CatalogNotice = ""; await _player.PlayOnlineAsync(online, song, keep: !IsPreview); CatalogNotice = ""; }
         catch (Exception ex) { CatalogNotice = ex.Message; }
     }
 

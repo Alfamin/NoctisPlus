@@ -2083,6 +2083,8 @@ public partial class PlayerViewModel : ViewModelBase
         foreach (var t in UpNext) Add(t);
         foreach (var t in History) Add(t);
         foreach (var t in _repeatCycleTracks) Add(t);
+        // Owner #87: queued songs from the stream cache are kept by its clean-up while the player holds them.
+        Noctis.Services.Search.OnlineMusicSearch.FilesInPlayer = map?.Values.ToArray() ?? [];
         return map;
     }
 

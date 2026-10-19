@@ -76,7 +76,16 @@ internal sealed class DiscoveryActions(IPlaylistLibrary library, Downloads downl
                     if (priority && (current.IsActive || current.State == DownloadState.Failed && !JustFailed(current))) downloads.DownloadNext(current);
                     existing++; continue;
                 }
-                try { downloads.Start(track(song.Request), target, priority); added++; }
+                var request = track(song.Request);
+                // Owner #87 fallbacks: a cache that cannot be written (permissions, full drive) or a name too long for the
+                // player's path limit saves the song into the library as before, so Play always works.
+                var into = target;
+                if (stream && string.Equals(target, downloads.CacheFolder, StringComparison.OrdinalIgnoreCase) && !(StreamCache.Usable(target) && StreamCache.Fits(target, request.FileName)))
+                {
+                    into = folder();
+                    Noctis.Services.DebugLog.Write("Finder", $"stream cache not usable for \"{song.Request.Title}\"; saving it into the library instead");
+                }
+                try { downloads.Start(request, into, priority); added++; }
                 catch (Exception ex) { throw new IOException($"Queued {added} song(s) before the queue could not be saved. Those requests are kept; open Queue to review them. " + ex.Message, ex); }
             }
             return new(added, existing, owned);

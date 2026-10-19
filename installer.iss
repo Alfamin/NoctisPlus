@@ -113,6 +113,10 @@ Root: HKA; Subkey: "Software\Classes\.dff\OpenWithProgids"; ValueType: none; Val
 ; and nothing in the app consumes it.
 Source: "{#PublishDir}\*"; DestDir: "{app}"; Excludes: "*.pdb"; Flags: ignoreversion recursesubdirs createallsubdirs
 
+[UninstallDelete]
+; Owner #87: songs that were only played (the stream cache) are re-downloadable, not the user's data; they do not stay behind.
+Type: filesandordirs; Name: "{localappdata}\Noctis Plus\stream-cache"
+
 [Icons]
 Name: "{group}\{#MyAppName}"; Filename: "{app}\{#MyAppExeName}"
 Name: "{group}\Uninstall {#MyAppName}"; Filename: "{uninstallexe}"
