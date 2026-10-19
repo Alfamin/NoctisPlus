@@ -209,6 +209,10 @@ public class LibraryService : ILibraryService
         var skippedCount = 0;
         // Developer Mode: names each new/changed file right before TagLib opens it (#97).
         var tagOpen = new CappedBreadcrumb("Scan", "tags: open");
+        // Always on: a file the tag read refused left only a count behind ("skipped=N", and not
+        // even that on a scan that changed nothing), so a song missing after a scan could not be
+        // traced. Names the first few per scan.
+        var skippedNote = new CappedBreadcrumb("Scan", "skipped, unreadable:", cap: 10, isEnabled: () => true);
 
         // Snapshot the current track index for read-only access during parallel scan.
         // Hidden folders included: matched against the visible index only, their files
@@ -397,6 +401,7 @@ public class LibraryService : ILibraryService
                         if (existing != null)
                             newTracks.Add(existing);
                         Interlocked.Increment(ref skippedCount);
+                        skippedNote.Note(existing != null ? filePath + " (known, kept)" : filePath);
                     }
 
                     ReportProgress(Interlocked.Increment(ref fileCount));
@@ -408,6 +413,7 @@ public class LibraryService : ILibraryService
                     if (existing != null)
                         newTracks.Add(existing);
                     Interlocked.Increment(ref skippedCount);
+                    skippedNote.Note($"{filePath}{(existing != null ? " (known, kept)" : "")}: {ex.GetType().Name}: {ex.Message}");
                     ReportProgress(Interlocked.Increment(ref fileCount));
                 }
             }
@@ -1238,6 +1244,8 @@ public class LibraryService : ILibraryService
         var didPublishPartial = false;
         var imported = new ConcurrentBag<Track>();
         var unchangedKnown = new ConcurrentBag<Track>();
+        // Same as the scan's: a file the tag read refused is named, not just left out.
+        var skippedNote = new CappedBreadcrumb("Library", "import skipped, unreadable:", cap: 10, isEnabled: () => true);
 
         void RestoreOriginalLibrary()
         {
@@ -1332,7 +1340,11 @@ public class LibraryService : ILibraryService
             }
 
             var track = _metadata.ReadTrackMetadata(filePath, out var embeddedArt);
-            if (track == null) continue;
+            if (track == null)
+            {
+                skippedNote.Note(filePath);
+                continue;
+            }
 
             track.Id = trackId;
             if (existing != null)

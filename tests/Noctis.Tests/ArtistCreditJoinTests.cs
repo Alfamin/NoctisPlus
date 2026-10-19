@@ -156,6 +156,7 @@ public class ArtistCreditJoinTests : IDisposable
 
         // Scanned by an older build / under the defaults: stored with ", ".
         await library.ScanAsync(new[] { Path.Combine(_root, "music") });
+        if (library.AllTracks.Count != 2) Assert.Fail(ScanMissReport.Describe(library, Path.Combine(_root, "music")));
         var track = library.AllTracks.Single(t => t.FilePath == multi);
         Assert.Equal("Dìyù, Lena", track.Artist);
         track.IsFavorite = true;
