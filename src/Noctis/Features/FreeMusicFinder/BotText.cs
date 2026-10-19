@@ -72,6 +72,15 @@ internal static partial class BotText
     public static bool IsSearchLimit(string? text) => text is { Length: > 0 } &&
         Regex.IsMatch(text, @"^\s*[^\p{L}\p{N}]*(?:(?:your\s+)?(?:daily|day's)\s+search\s+limit(?:\s+(?:has\s+been|is))?\s+(?:reached|exceeded)|search\s+limit\s+(?:is\s+)?reached|limit\s+reached\s+for\s+today)", RegexOptions.IgnoreCase);
 
+    /// <summary>Music Hunters' answer to a request sent while it still sends another song ("Please wait for the current
+    /// download to complete before starting a new one", owner #84). Anchored like the other bot signals.</summary>
+    public static bool IsBusy(string? text) => text is { Length: > 0 } &&
+        Regex.IsMatch(text, @"^\s*[^\p{L}\p{N}]*(?:please\s+)?wait\s+(?:for|until)\s+(?:the\s+|your\s+)?(?:current|previous|last)\s+download\s+(?:to\s+)?(?:complete|completes|finish|finishes|is\s+(?:complete|finished|done))", RegexOptions.IgnoreCase);
+
+    /// <summary>The bot saying its current download is done, so it takes the next request.</summary>
+    public static bool IsDownloadDone(string? text) => text is { Length: > 0 } && !IsBusy(text) &&
+        Regex.IsMatch(text, @"^\s*[^\p{L}\p{N}]*(?:(?:the\s+)?(?:current\s+|previous\s+)?download\s+(?:is\s+|has\s+)?(?:been\s+)?(?:complete|completed|finished|done)\b|(?:completed|finished|done)\s*[.!]?\s*$)", RegexOptions.IgnoreCase);
+
     public static bool IsEmptySearch(string? text) => text is { Length: > 0 } &&
         Regex.IsMatch(text, @"^\s*[^\p{L}\p{N}]*(?:no (?:results|songs|tracks) (?:were )?found\b|nothing found\b|no results[.!]?\s*$)", RegexOptions.IgnoreCase);
 

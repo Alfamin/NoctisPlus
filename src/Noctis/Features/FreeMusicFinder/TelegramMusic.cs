@@ -4,7 +4,7 @@ using WTelegram;
 
 namespace FreeMusicFinder;
 
-internal sealed class HunterMusicSource : IMusicSource, IQualityMusicSource
+internal sealed class HunterMusicSource : IRacingMusicSource, IQualityMusicSource
 {
     private readonly TelegramAccount? _account;
     private readonly IHunterBotSource _bot;
@@ -72,6 +72,24 @@ internal sealed class HunterMusicSource : IMusicSource, IQualityMusicSource
             throw new TrackUnavailableException("No matching recording in Music Hunters' results.");
         }
         finally { resolving.Cancel(); }
+    }
+    /// <summary>
+    /// Owner #84: after Music Hunters said "please wait for the current download", it races DeezLoad. The song's link is
+    /// sent again the moment it is free; a second "please wait" moves that point on, a third gives up.
+    /// </summary>
+    public async Task<BotFile> RequestFileAsync(MusicRequest request, int? afterBusyReply, CancellationToken ct)
+    {
+        request=BotSelections.ForSource(request,Id);
+        using var resolving = CancellationTokenSource.CreateLinkedTokenSource(ct);
+        resolving.CancelAfter(LinkBudget);
+        var url = await ResolveLinkAsync(request, resolving.Token).ConfigureAwait(false);
+        ct.ThrowIfCancellationRequested();
+        if (url is null) throw new TrackUnavailableException("No track link was found to send Music Hunters.");
+        for (var attempt = 0; ; attempt++)
+        {
+            try { return await _bot.RequestLinkFileAsync(request with { Url = url }, afterBusyReply, ct).ConfigureAwait(false); }
+            catch (BotBusyException again) when (attempt < 2) { afterBusyReply = again.ReplyId; }
+        }
     }
     private async Task<string?> ResolveLinkAsync(MusicRequest request, CancellationToken ct)
     {
@@ -214,7 +232,7 @@ internal static class RecordingMatch
     }
 }
 
-internal sealed class DeezLoadSource : IMusicSource, IQualityMusicSource
+internal sealed class DeezLoadSource : IRacingMusicSource, IQualityMusicSource
 {
     public const string Bot = "deezload2bot";
     private static readonly TimeSpan OtherRecordingGrace = TimeSpan.FromMinutes(1);
@@ -268,6 +286,10 @@ internal sealed class DeezLoadSource : IMusicSource, IQualityMusicSource
         return new(title,artist,Url:link!.Url);
     }
     public async Task<string> FetchAsync(MusicRequest request,Stream output,IProgress<double>? progress,CancellationToken ct)
+        => await (await RequestFileAsync(request,null,ct).ConfigureAwait(false)).Transfer(output,progress,ct).ConfigureAwait(false);
+    /// <summary>DeezLoad's matching file (its chat first, then a request), not yet transferred: transferred by the caller,
+    /// so it can race Music Hunters for the song clicked last (owner #84).</summary>
+    public async Task<BotFile> RequestFileAsync(MusicRequest request,int? afterBusyReply,CancellationToken ct)
     {
         var phaseClock = System.Diagnostics.Stopwatch.StartNew();
         using var resolving = CancellationTokenSource.CreateLinkedTokenSource(ct);
@@ -282,29 +304,30 @@ internal sealed class DeezLoadSource : IMusicSource, IQualityMusicSource
             // One history read serves the cache check and learning how fast the bot usually answers.
             var chat=(await client.Messages_GetHistory(bot,limit:100).WaitAsync(TimeSpan.FromSeconds(25), ct).ConfigureAwait(false)).Messages.OfType<Message>().ToArray();
             _timings.Seed(ReplyTiming, ReplyTimes(chat));
-            if(TelegramAudioCache.Find(chat,request) is {} existing)
-                return await Download(client,existing,output,progress,ct).ConfigureAwait(false);
+            if(TelegramAudioCache.Find(chat,request) is {} existing) return Ready(client,existing);
             if(request.MessageId is {} id && request.CachedFrom == Id)
             {
                 // The message is already in this bot's chat; reading its file does not request another bot download.
                 var old=await client.Messages_GetHistory(bot,offset_id:id+1,limit:1).WaitAsync(TimeSpan.FromSeconds(25), ct).ConfigureAwait(false);
                 var message=old.Messages.OfType<Message>().FirstOrDefault(m=>m.id==id);
                 if(message?.media is MessageMediaDocument {document:Document cached} && Fits(request,cached) && TelegramAudioCache.AcceptsQuality(request, cached))
-                    return await Download(client,cached,output,progress,ct).ConfigureAwait(false);
+                    return Ready(client,cached);
             }
             Noctis.Services.DebugLog.Write("Finder", $"DeezLoad: cache checks finished at {phaseClock.Elapsed.TotalSeconds:0.0}s");
             await _conversation.WaitAsync(ct).ConfigureAwait(false);
             Noctis.Services.DebugLog.Write("Finder", $"DeezLoad: conversation acquired at {phaseClock.Elapsed.TotalSeconds:0.0}s");
-            Document found;
-            try { found=await ConverseAsync(client,bot,request,linkTask,phaseClock,ct).ConfigureAwait(false); }
+            // Owner #79: once the file is known the conversation is free, so the next song does not wait for these bytes.
+            try { return Ready(client,await ConverseAsync(client,bot,request,linkTask,phaseClock,ct).ConfigureAwait(false)); }
             catch(RpcException ex) { throw Translate(ex); }
             finally { _conversation.Release(); }
-            // Owner #79: the file is known, so the next song's conversation does not wait for these bytes.
-            try { return await Download(client,found,output,progress,ct).ConfigureAwait(false); }
-            catch(RpcException ex) { throw Translate(ex); }
         }
         finally { resolving.Cancel(); }
     }
+    private BotFile Ready(Client client,Document doc) => new(Id, async (output,progress,ct) =>
+    {
+        try { return await Download(client,doc,output,progress,ct).ConfigureAwait(false); }
+        catch(RpcException ex) { throw Translate(ex); }
+    });
     private async Task<string?> ResolveLinkAsync(MusicRequest request, CancellationToken ct)
     {
         if (MusicLink.TryParse(request.Url, out var given) && given!.Kind == "track") return request.Url;
@@ -360,6 +383,7 @@ internal sealed class DeezLoadSource : IMusicSource, IQualityMusicSource
         while(DateTimeOffset.UtcNow<end)
         {
             ct.ThrowIfCancellationRequested();
+            var next=_account.NextUpdate();
             var replies=await ReadNew(client,bot,sent.id,ct).ConfigureAwait(false);
             if(!heard && replies.Count>0) _timings.Record(ReplyTiming,DateTimeOffset.UtcNow-asked);
             heard|=replies.Count>0;
@@ -387,7 +411,8 @@ internal sealed class DeezLoadSource : IMusicSource, IQualityMusicSource
             // tried, instead of every other song and search waiting out the whole quarter of an hour.
             if(otherSince is {} since && DateTimeOffset.UtcNow-since>=OtherRecordingGrace)
                 throw new TrackUnavailableException($"DeezLoad sent another recording ({other}) and not this one.");
-            await Task.Delay(TimeSpan.FromSeconds(4),ct).ConfigureAwait(false);
+            // Owner #84: woken the moment DeezLoad's file or status arrives; the poll is only the fallback.
+            await TelegramAccount.UntilUpdateAsync(next,TimeSpan.FromSeconds(2),ct).ConfigureAwait(false);
         }
         throw new TimeoutException("DeezLoad did not deliver the track within 15 minutes. The backup will be tried.");
     }

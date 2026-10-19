@@ -85,6 +85,30 @@ internal sealed class TelegramAccount : ITelegramSignIn, IDisposable
         }
     }
 
+    // Owner #84: a bot's file is taken the moment Telegram pushes it, not at the next poll (1-4 s later).
+    private readonly object _updatesSync = new();
+    private TaskCompletionSource _nextUpdate = new(TaskCreationOptions.RunContinuationsAsynchronously);
+    /// <summary>Completes when Telegram next pushes anything (a bot's answer among it). Taken BEFORE reading the chat, so an
+    /// answer landing between the read and the wait is not missed.</summary>
+    internal Task NextUpdate() { lock (_updatesSync) return _nextUpdate.Task; }
+    // Only the bots' own messages wake the waiters: the account may be in busy groups, and every wake reads the chat.
+    private bool FromBot(UpdatesBase updates)
+    {
+        long[] bots; lock (_bots) bots = _bots.Values.Select(b => b.id).ToArray();
+        if (updates is UpdateShortMessage single) return bots.Contains(single.user_id);
+        return updates.UpdateList.Any(u => u is UpdateNewMessage { message: Message { peer_id: PeerUser user } } && bots.Contains(user.user_id)
+            || u is UpdateEditMessage { message: Message { peer_id: PeerUser edited } } && bots.Contains(edited.user_id));
+    }
+    internal void PulseUpdates()
+    {
+        TaskCompletionSource done;
+        lock (_updatesSync) { done = _nextUpdate; _nextUpdate = new(TaskCreationOptions.RunContinuationsAsynchronously); }
+        done.TrySetResult();
+    }
+    /// <summary>Waits until Telegram pushes something or <paramref name="poll"/> passes, whichever is first.</summary>
+    internal static async Task UntilUpdateAsync(Task next, TimeSpan poll, CancellationToken ct)
+        => await Task.WhenAny(next, Task.Delay(poll, ct)).ConfigureAwait(false);
+
     private readonly Dictionary<string, User> _bots = new(StringComparer.OrdinalIgnoreCase);
     private readonly HashSet<string> _started = new(StringComparer.OrdinalIgnoreCase);
     private readonly SemaphoreSlim _qualityGate = new(1, 1);
@@ -354,6 +378,7 @@ internal sealed class TelegramAccount : ITelegramSignIn, IDisposable
         var setting = _proxy();
         var proxy = ProxyChoice.Parse(setting);
         var client = new Client(Config, _store.OpenSession());
+        client.OnUpdates += updates => { if (FromBot(updates)) PulseUpdates(); return Task.CompletedTask; };
         switch (proxy?.Kind)
         {
             case null: // "direct"
@@ -565,6 +590,7 @@ internal sealed class TelegramBotSource : IHunterBotSource
                 catch (TimeoutException) { }
                 catch(RpcException ex) when(IsStaleCallback(ex.Message))
                 {throw new StaleSelectionException("Music Hunters' selection expired; finding a fresh matching result.");}
+                if (BotText.IsBusy(notice)) throw new BotBusyException(BotSelections.Hunters, "Music Hunters is finishing another download.", newest);
                 if (BotLimits.Read("Music Hunters", notice ?? "", DateTimeOffset.UtcNow) is { } limited) throw limited;
                 Noctis.Services.DebugLog.Write("Finder", $"Music Hunters: pressed {selection.Number}" + (press > 1 ? $" again at {fileClock.Elapsed.TotalSeconds:0.0} s" : ""));
 
@@ -614,8 +640,25 @@ internal sealed class TelegramBotSource : IHunterBotSource
     }
 
     public async Task<string> FetchLinkAsync(MusicRequest request, Stream output, IProgress<double>? progress, CancellationToken ct)
+        => await (await RequestLinkFileAsync(request, null, ct).ConfigureAwait(false)).Transfer(output, progress, ct).ConfigureAwait(false);
+
+    /// <summary>How long a busy Music Hunters is watched for "free again" before the link is simply sent once more.</summary>
+    internal static readonly TimeSpan FreeWait = TimeSpan.FromMinutes(2);
+
+    /// <summary>
+    /// Sends the track link and returns the bot's matching file, not yet transferred. After a "please wait" answer
+    /// (<paramref name="afterBusyReply"/>) the link goes out again the moment the bot is free: its next file (the song
+    /// it was busy with) or a "download complete" message (owner #84).
+    /// </summary>
+    public async Task<BotFile> RequestLinkFileAsync(MusicRequest request, int? afterBusyReply, CancellationToken ct)
     {
         if (!MusicLink.TryParse(request.Url, out var link) || link!.Kind != "track") throw new TrackUnavailableException("No supported track link was found for Music Hunters.");
+        if (afterBusyReply is { } busy)
+        {
+            var clock = System.Diagnostics.Stopwatch.StartNew();
+            await RunAsync((client, bot) => WaitForAsync(client, bot, busy, m => m.media is MessageMediaDocument || BotText.IsDownloadDone(m.message), FreeWait, ct, busyAnswers: false), ct).ConfigureAwait(false);
+            Noctis.Services.DebugLog.Write("Finder", $"Music Hunters: free again after {clock.Elapsed.TotalSeconds:0.0} s; sending the link again");
+        }
         Document document;
         await _searching.WaitAsync(ct).ConfigureAwait(false);
         try
@@ -640,9 +683,12 @@ internal sealed class TelegramBotSource : IHunterBotSource
         }
         finally { _searching.Release(); }
         // Once a matched document is known, independent name searches need not wait for its bytes.
-        var transferClient = await _account.ConnectAsync(ct).ConfigureAwait(false);
-        await AudioFileTransfer.DownloadAsync(_account, transferClient, document, output, progress, ct).ConfigureAwait(false);
-        return Extension(document)!;
+        return new BotFile(BotSelections.Hunters, async (output, progress, token) =>
+        {
+            var transferClient = await _account.ConnectAsync(token).ConfigureAwait(false);
+            await AudioFileTransfer.DownloadAsync(_account, transferClient, document, output, progress, token).ConfigureAwait(false);
+            return Extension(document)!;
+        });
     }
 
     internal static async Task<Message?> WaitForLinkReplyAsync(Func<CancellationToken, Task<Message?>> wait, CancellationToken ct, TimeSpan? budget = null)
@@ -735,19 +781,22 @@ internal sealed class TelegramBotSource : IHunterBotSource
     /// when none came in time. Asks often at first, when an answer is most likely, and less
     /// often the longer it takes: an account that asks Telegram too much gets limited.
     /// </summary>
-    private static async Task<Message?> WaitForAsync(Client client, InputPeer bot, int afterId, Func<Message, bool> matches,
-        TimeSpan timeout, CancellationToken ct)
+    private async Task<Message?> WaitForAsync(Client client, InputPeer bot, int afterId, Func<Message, bool> matches,
+        TimeSpan timeout, CancellationToken ct, bool busyAnswers = true)
     {
         var started = Environment.TickCount64;
         while (true)
         {
             ct.ThrowIfCancellationRequested();
+            var next = _account.NextUpdate();
             var history = await client.Messages_GetHistory(bot, min_id: afterId, limit: 30).WaitAsync(TimeSpan.FromSeconds(25), ct).ConfigureAwait(false);
             foreach (var reply in history.Messages.OfType<Message>().Where(m => !m.flags.HasFlag(Message.Flags.out_)))
             {
                 // A name-search quota is not a file/download quota. Let SearchAsync scope it correctly.
                 // Owner #79: a download waiting for its file never takes another search's quota answer as its own.
                 if (BotText.IsSearchLimit(reply.message)) { if (matches(reply)) return reply; continue; }
+                // Owner #84: the bot is still sending another song; the caller races the other bot meanwhile.
+                if (BotText.IsBusy(reply.message)) { if (busyAnswers) throw new BotBusyException(BotSelections.Hunters, "Music Hunters is finishing another download.", reply.id); continue; }
                 if (BotLimits.Read("Music Hunters", reply.message ?? "", DateTimeOffset.UtcNow) is { } limited) throw limited;
             }
             var found = history.Messages.OfType<Message>().Reverse()
@@ -756,7 +805,7 @@ internal sealed class TelegramBotSource : IHunterBotSource
 
             var waited = TimeSpan.FromMilliseconds(Environment.TickCount64 - started);
             if (waited >= timeout) return null;
-            await Task.Delay(PollInterval(waited), ct).ConfigureAwait(false);
+            await TelegramAccount.UntilUpdateAsync(next, PollInterval(waited), ct).ConfigureAwait(false);
         }
     }
 

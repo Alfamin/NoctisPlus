@@ -32,6 +32,24 @@ internal sealed class SourcesWaitingException(string message, DateTimeOffset unt
 }
 internal sealed class TrackUnavailableException(string message) : Exception(message);
 
+/// <summary>A bot that answered "wait for the current download to complete" (owner #84). <see cref="ReplyId"/> is that
+/// answer, so its "free again" can be watched for after it.</summary>
+internal sealed class BotBusyException(string provider, string message, int replyId) : Exception(message)
+{
+    public string Provider { get; } = provider;
+    public int ReplyId { get; } = replyId;
+}
+
+/// <summary>A bot's matching file, found but not yet transferred: the first bot to supply one is transferred.</summary>
+internal sealed record BotFile(string Source, Func<Stream, IProgress<double>?, CancellationToken, Task<string>> Transfer);
+
+/// <summary>Owner #84: a bot that is busy with another song races the other bot for the song clicked last.</summary>
+internal interface IRacingMusicSource : IMusicSource
+{
+    /// <param name="afterBusyReply">The busy bot's "please wait" answer: it is asked again as soon as it is free.</param>
+    Task<BotFile> RequestFileAsync(MusicRequest request, int? afterBusyReply, CancellationToken ct);
+}
+
 /// <summary>Limits are observations from bot replies, never guessed allowances. Unknown resets get a conservative retry.</summary>
 internal static partial class BotLimits
 {
@@ -222,6 +240,17 @@ internal sealed class MusicSources
                     }
                     return ext;
                 }
+                // Owner #84: "please wait for the current download" — the other bot is asked at once, and this one again the
+                // moment it is free; whichever sends the matching file first is transferred.
+                catch (BotBusyException busy) when (source is IRacingMusicSource busySource &&
+                    _sources.FirstOrDefault(s => s != source && !Cooling(s.Id)) is IRacingMusicSource other)
+                {
+                    Trace($"fetch \"{request.Title}\": {source.Id} busy at {clock.Elapsed.TotalSeconds:0.0} s; asking {other.Id} now and {source.Id} again once it is free");
+                    var ext = await RaceAsync(request, other, busySource, busy.ReplyId, output, progress, clock, ct).ConfigureAwait(false);
+                    if (ext != "flac" && !(ext == "mp3" && allowMp3))
+                        throw new TrackUnavailableException("FLAC was requested, but the first bot to answer returned " + ext + ".");
+                    return ext;
+                }
                 catch (AudioTransferStalledException ex)
                 {
                     Block(new(source.Id, source.Id + ": " + ex.Message, _now().AddMinutes(2)));
@@ -250,6 +279,48 @@ internal sealed class MusicSources
         finally { _gate.Release(); }
     }
     private static void Trace(string line) => Noctis.Services.DebugLog.Write("Finder", line);
+
+    private async Task<string> RaceAsync(MusicRequest request, IRacingMusicSource other, IRacingMusicSource busy, int busyReply,
+        Stream output, IProgress<double>? progress, System.Diagnostics.Stopwatch clock, CancellationToken ct)
+    {
+        using var race = CancellationTokenSource.CreateLinkedTokenSource(ct);
+        TransferProgress.Stage(progress, "Asking " + other.Id + " while " + busy.Id + " finishes another song…", Noctis.Services.Search.OnlineDownloadStep.Switching);
+        var pending = new List<Task<BotFile>>
+        {
+            other.RequestFileAsync(BotSelections.ForSource(request, other.Id), null, race.Token),
+            busy.RequestFileAsync(BotSelections.ForSource(request, busy.Id), busyReply, race.Token),
+        };
+        foreach (var ask in pending)
+            _ = ask.ContinueWith(t => _ = t.Exception, CancellationToken.None, TaskContinuationOptions.OnlyOnFaulted | TaskContinuationOptions.ExecuteSynchronously, TaskScheduler.Default);
+        var errors = new List<string>();
+        try
+        {
+            while (pending.Count > 0)
+            {
+                var done = await Task.WhenAny(pending).ConfigureAwait(false);
+                pending.Remove(done);
+                if (done.IsCompletedSuccessfully)
+                {
+                    race.Cancel(); // the slower bot stops waiting; a file it sends later stays in its chat for next time
+                    var file = done.Result;
+                    Trace($"fetch \"{request.Title}\": {file.Source} supplied the file first at {clock.Elapsed.TotalSeconds:0.0} s");
+                    if (output.CanSeek) { output.SetLength(0); output.Position = 0; }
+                    var ext = await file.Transfer(output, progress, ct).ConfigureAwait(false);
+                    Trace($"fetch \"{request.Title}\": {file.Source} sent {ext} at {clock.Elapsed.TotalSeconds:0.0} s");
+                    return ext;
+                }
+                ct.ThrowIfCancellationRequested();
+                switch (done.Exception?.GetBaseException())
+                {
+                    case SourceLimitException limit: Block(limit); if (limit.Global) throw Waiting(); errors.Add(limit.Message); break;
+                    case { } error: errors.Add(error.Message); break;
+                }
+            }
+        }
+        finally { race.Cancel(); }
+        if (_sources.Any(s => Cooling(s.Id))) throw Waiting();
+        throw new TrackUnavailableException("Neither bot supplied a matching recording. " + string.Join(" ", errors));
+    }
 
     private IEnumerable<IMusicSource> InPreferredOrder()
     {

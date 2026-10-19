@@ -37,6 +37,58 @@ internal static class BotPreferenceTests
         Check.Equal(2, deez.Calls, "no reserve request after global flood wait");
         await LegacySearchLimitAsync();
         await TwoFetchLanesAsync();
+        await BusyRaceAsync();
+    }
+
+    private sealed class RaceSource(string id) : IRacingMusicSource
+    {
+        public string Id => id;
+        public int Fetches, Requests; public int? AfterBusy; public bool Cancelled;
+        public Func<MusicRequest, Stream, Task<string>> Fetch = (_, _) => Task.FromResult("flac");
+        public Func<CancellationToken, Task> Answer = _ => Task.CompletedTask;
+        public Task<IReadOnlyList<MusicRequest>> SearchAsync(string query, CancellationToken ct) => Task.FromResult<IReadOnlyList<MusicRequest>>([]);
+        public Task<string> FetchAsync(MusicRequest request, Stream output, IProgress<double>? progress, CancellationToken ct) { Fetches++; return Fetch(request, output); }
+        public async Task<BotFile> RequestFileAsync(MusicRequest request, int? afterBusyReply, CancellationToken ct)
+        {
+            Requests++; AfterBusy = afterBusyReply;
+            try { await Answer(ct); } catch (OperationCanceledException) { Cancelled = true; throw; }
+            return new(id, async (output, _, token) => { await output.WriteAsync(System.Text.Encoding.ASCII.GetBytes("fLaC " + id), token); return "flac"; });
+        }
+    }
+
+    private static async Task BusyRaceAsync()
+    {
+        // Owner #84: clicking fast made Music Hunters answer "Please wait for the current download to complete before
+        // starting a new one" and the song went nowhere.
+        Check.Section("a busy Music Hunters races DeezLoad: whichever bot sends the file first is used");
+        Check.True(BotText.IsBusy("Please wait for the current download to complete before starting a new one."), "the busy answer is recognised");
+        Check.True(BotText.IsBusy("⏳ Please wait until the previous download is finished."), "in other wording too");
+        Check.True(!BotText.IsBusy("1. Weezer - Wait for the Current (3:12)") && !BotText.IsBusy(null), "a result line or a song title is not a busy answer");
+        Check.True(BotText.IsDownloadDone("Download completed!") && BotText.IsDownloadDone("✅ Done"), "the bot saying it is free again is recognised");
+        Check.True(!BotText.IsDownloadDone("Please wait for the current download to complete before starting a new one."), "the busy answer is not taken for 'done'");
+
+        using var output = new MemoryStream();
+        var hunters = new RaceSource(BotSelections.Hunters) { Fetch = (_, _) => throw new BotBusyException(BotSelections.Hunters, "busy", 77) };
+        var deezRelease = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var deez = new RaceSource("DeezLoad") { Answer = ct => deezRelease.Task.WaitAsync(ct) };
+        var sources = new MusicSources(hunters, deez, _ => { }, firstBot: () => BotSelections.Hunters);
+        var ext = await sources.FetchAsync(new("Sundress", "A$AP Rocky"), output, null, default);
+        Check.True(ext == "flac" && System.Text.Encoding.ASCII.GetString(output.ToArray()) == "fLaC " + BotSelections.Hunters, "Music Hunters, free again first, supplies the file");
+        Check.Equal(77, hunters.AfterBusy ?? 0, "Music Hunters is asked again after its own 'please wait' answer");
+        Check.True(deez.Requests == 1 && deez.Cancelled, "DeezLoad was asked at once, and its wait was dropped when Music Hunters won");
+
+        var slowHunters = new RaceSource(BotSelections.Hunters) { Fetch = (_, _) => throw new BotBusyException(BotSelections.Hunters, "busy", 5), Answer = ct => Task.Delay(Timeout.Infinite, ct) };
+        var quick = new RaceSource("DeezLoad");
+        using var second = new MemoryStream();
+        await new MusicSources(slowHunters, quick, _ => { }, firstBot: () => BotSelections.Hunters).FetchAsync(new("Kevin's Heart", "J. Cole"), second, null, default);
+        Check.Equal("fLaC DeezLoad", System.Text.Encoding.ASCII.GetString(second.ToArray()), "DeezLoad first: its file is used");
+        await Check.UntilAsync(() => slowHunters.Cancelled, "and the Music Hunters wait stops");
+
+        var noHunters = new RaceSource(BotSelections.Hunters) { Fetch = (_, _) => throw new BotBusyException(BotSelections.Hunters, "busy", 5), Answer = _ => throw new TrackUnavailableException("no link") };
+        var silent = new RaceSource("DeezLoad") { Answer = _ => throw new SourceLimitException("DeezLoad", "DeezLoad did not answer", DateTimeOffset.UtcNow.AddMinutes(10)) };
+        using var third = new MemoryStream();
+        await Check.ThrowsAsync<SourcesWaitingException>(() => new MusicSources(noHunters, silent, _ => { }, firstBot: () => BotSelections.Hunters).FetchAsync(new("Blessings", "Big Sean"), third, null, default),
+            "both failing keeps the song for later (DeezLoad's silence is remembered), not lost");
     }
 
     private static async Task LegacySearchLimitAsync()

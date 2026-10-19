@@ -92,8 +92,9 @@ internal static class AudioFileTransfer
         try { await CopyAsync(output, document.size, Read, progress, ct).ConfigureAwait(false); }
         catch (AudioTransferStalledException)
         { await account.RetireConnectionAsync(client).ConfigureAwait(false); throw; }
-        catch (OperationCanceledException) when (ct.IsCancellationRequested)
-        { await account.RetireConnectionAsync(client).ConfigureAwait(false); throw; }
+        // A cancelled transfer (removed, or held back for a newer Play, owner #83/#84) keeps the connection: the other
+        // transfers and bot conversations share it, and its late chunk answers are simply dropped. Retiring it here
+        // disposed the client under them (ObjectDisposedException, a linked reply missed in the TEST log).
         catch (InvalidDataException ex) { throw new TrackUnavailableException(ex.Message); }
     }
 }
