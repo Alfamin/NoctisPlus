@@ -102,7 +102,7 @@ public class LyricsBackgroundModeTests : IDisposable
         => new(player, new StubLrcLib(), new StubNetEase(), new StubMetadata(),
             persistence ?? new TestPersistenceService(), new FakeLibraryService());
 
-    private static Color ColorOf(IBrush brush) => Assert.IsType<SolidColorBrush>(brush, exactMatch: false).Color;
+    private static Color ColorOf(IBrush brush) => Assert.IsAssignableFrom<ISolidColorBrush>(brush).Color;
 
     /// <summary>
     /// Bug: the Artwork mode text palette was picked for the cover under a 40% scrim
@@ -145,6 +145,33 @@ public class LyricsBackgroundModeTests : IDisposable
         Assert.Equal(Color.Parse("#33FFFFFF"), ColorOf(picked.LyricsBtnBg));
         Assert.Equal(ColorOf(picked.LyricsBtnBg), ColorOf(restored.LyricsBtnBg));
         Assert.Equal(ColorOf(picked.LyricsSecondaryFg), ColorOf(restored.LyricsSecondaryFg));
+    }
+
+    /// <summary>
+    /// CI flake: the light, medium and dark palettes are shared by every lyrics page, and were
+    /// SolidColorBrushes owned by whichever thread first touched LyricsViewModel. When that was
+    /// a plain test on the thread pool (one reading LyricsCacheDir), every lyrics page after it
+    /// threw "a different thread owns it" reading or drawing them. Shared brushes are immutable.
+    /// </summary>
+    [AvaloniaFact]
+    public async Task SharedPalettes_ReadFromAnyThread()
+    {
+        foreach (var (hex, btnBg) in new[] { ("#FFFFFF", "#22000000"), ("#808080", "#44000000"), ("#000000", "#33FFFFFF") })
+        {
+            var vm = NewVm(NewPlayer(Cover("#C8C8C8")));
+            vm.SelectColorModeSolidCommand.Execute(null);
+            vm.SetBackgroundColorCommand.Execute(hex);
+            Dispatcher.UIThread.RunJobs();
+            var palette = new[]
+            {
+                vm.LyricsSecondaryFg, vm.LyricsSubtleFg, vm.LyricsSliderFilled, vm.LyricsSliderUnfilled,
+                vm.LyricsBtnBg, vm.LyricsBtnBgHover, vm.LyricsSliderThumb,
+            };
+
+            var colors = await Task.Run(() => palette.Select(ColorOf).ToList());
+
+            Assert.Equal(Color.Parse(btnBg), colors[4]);
+        }
     }
 
     /// <summary>
