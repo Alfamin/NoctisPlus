@@ -66,6 +66,18 @@ internal static class UnifiedSearchTests
             Check.Equal("deezer:1", hits.First(h => h.Kind == "Songs").Id, $"\"{typed}\" leads with Drake's own Passionfruit, not a cover");
             Check.Equal(drake.Id, SearchRanking.Artists(hits).First().Artist?.Id, $"\"{typed}\": Drake is the first artist shown");
         }
+        // #59, live 2026-10-19: "rosalia despecha" led with a karaoke cover spelled without accents; ROSALÍA's own
+        // DESPECHÁ (the most popular result) scored lowest because the typed words kept no accents and hers did.
+        var rosalia = new CatalogArtist("apple:313845115", "ROSALÍA");
+        var despecha = new[]
+        {
+            Ranked(30, "Despecha (Made Popular By Rosalia) [Karaoke Version]", new("deezer:30", "Party Tyme Karaoke"), 25980),
+            Ranked(31, "Despechá (Rosalia) (Dance Version)", new("deezer:31", "Manu Sambad"), 42229),
+            Ranked(32, "DESPECHÁ", rosalia, 920501), Ranked(33, "DESPECHÁ RMX", rosalia, 488965),
+        };
+        var accentHits = SearchRanking.Build(FinderQuery.Parse("rosalia despecha"), [], despecha, []);
+        Check.Equal("deezer:32", accentHits.First(h => h.Kind == "Songs").Id, "\"rosalia despecha\" (no accents) leads with ROSALÍA's own DESPECHÁ, not a karaoke cover");
+        Check.Equal(rosalia.Id, SearchRanking.Artists(accentHits).First().Artist?.Id, "\"rosalia despecha\": ROSALÍA is the first artist shown");
         var drakeSongs = new[]
         {
             Ranked(20, "Drake", new("deezer:20", "Small Band"), 9000), Ranked(21, "God's Plan", drake, 900000),

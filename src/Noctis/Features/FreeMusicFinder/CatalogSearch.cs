@@ -123,8 +123,11 @@ internal sealed record FinderHit(string Kind, string Id, string Title, string Su
 /// popularity cutoff, generative model, download or cross-provider identity substitution.</summary>
 internal static class SearchRanking
 {
-    private static HashSet<string> Words(string text) => Regex.Matches(text.Normalize(System.Text.NormalizationForm.FormKC).ToLowerInvariant(), @"[\p{L}\p{N}]+")
-        .Select(m => m.Value).ToHashSet(StringComparer.Ordinal);
+    // Each word without accents, as BotText.Key compares names: "rosalia despecha" finds ROSALÍA - DESPECHÁ (#59, live:
+    // with accents kept, only a karaoke cover spelled without them matched and became the Top result).
+    private static HashSet<string> Words(string text) => WordList(text).ToHashSet(StringComparer.Ordinal);
+    private static List<string> WordList(string text) => Regex.Matches(text.Normalize(System.Text.NormalizationForm.FormKC).ToLowerInvariant(), @"[\p{L}\p{N}]+")
+        .Select(m => BotText.Key(m.Value)).Where(w => w.Length > 0).ToList();
     /// <summary>The same name with a small typo: at most one edit for short names, two from 10 letters on.</summary>
     internal static bool NearName(string queryKey, string nameKey)
     {
@@ -288,7 +291,7 @@ internal static class SearchRanking
     /// something else; otherwise null.</summary>
     private static string? TitleBesideArtist(string query, CatalogSong song)
     {
-        var words = Regex.Matches(query.Normalize(System.Text.NormalizationForm.FormKC).ToLowerInvariant(), @"[\p{L}\p{N}]+").Select(m => m.Value).ToList();
+        var words = WordList(query);
         foreach (var artist in song.Artists)
         {
             var name = Words(artist.Name);
