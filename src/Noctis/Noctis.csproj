@@ -69,6 +69,13 @@
        other dependencies stay precompiled. -->
   <ItemGroup Condition="$(RuntimeIdentifier.EndsWith('-arm64'))">
     <PublishReadyToRunExclude Include="Noctis.dll" />
+    <!-- Mitigation, root cause not found: with these two precompiled, osx-arm64 builds died
+         at startup in roughly a third of cold launches (SIGSEGV in libSkiaSharp
+         sk_codec_new_from_stream on a thread-pool artwork decode, the stream's vtable
+         already freed): 18 of 52 launches across the shipped-1.6.4 config and this one.
+         With both JIT-compiled: 0 of 24. Same code either way, only precompiled or not. -->
+    <PublishReadyToRunExclude Include="SkiaSharp.dll" />
+    <PublishReadyToRunExclude Include="Avalonia.Skia.dll" />
   </ItemGroup>
 
   <!-- The official plugin list (plugins/index.json), used by Settings → Plugins → Get plugins
