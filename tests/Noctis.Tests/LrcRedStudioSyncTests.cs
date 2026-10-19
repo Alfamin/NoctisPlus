@@ -132,6 +132,7 @@ public class LrcRedStudioSyncTests : IDisposable
 
         // Romaji and translation ride along to the save, as companion lines at each line's start.
         var saved = LrcParser.Parse(vm.BuildReviewText()).Where(l => l.IsSynced && !l.IsIntroPlaceholder).ToList();
+        Assert.Equal("遥か遠くに浮かぶ星を", saved[0].Text); // CJK timed a piece at a time: no spaces added
         Assert.Equal("haruka tooku ni ukabu hoshi o", saved[0].Transliteration);
         Assert.Equal("You think of the stars floating", saved[0].Translation);
         Assert.Equal(8, saved[0].Words!.Count);

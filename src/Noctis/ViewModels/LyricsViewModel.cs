@@ -1651,8 +1651,16 @@ public partial class LyricsViewModel : ViewModelBase, IDisposable
         (sources, artist, title, ct) => SearchSourcesAsync(sources, artist, title, track.Duration.TotalSeconds, track.Album ?? "", ct),
         (result, source) => ApplySearchedLyrics(track, result, source))
     {
-        // lrc.red's row offers its model only while lrc.red is on in Settings.
-        SyncWithLrcRedModel = LrcRed is { } lrcRed ? lrcRed.SyncWithModelAsync : null,
+        // lrc.red's row offers its model only while lrc.red is on in Settings. Its answer, once
+        // used, is credited on the page as the model's.
+        SyncWithLrcRedModel = LrcRed is { } lrcRed
+            ? async (isrc, ct) =>
+            {
+                var synced = await lrcRed.SyncWithModelAsync(isrc, ct);
+                _lrcRedModelResult = synced;
+                return synced;
+            }
+            : null,
         CanOfferLrcRedModel = async () => LrcRed != null && await LrcRedModelAllowedAsync(),
     };
 
@@ -1755,6 +1763,7 @@ public partial class LyricsViewModel : ViewModelBase, IDisposable
         if (source == Services.Lyrics.OnlineLyricsSource.LrcRed)
             _ = OfferLrcRedSyncAsync(track, result);
         RefreshLrcRedOffer();
+        RefreshLyricsCredit(); // lrc.red to lrc.red (its model's answer) leaves the name as it was
     }
 
     // ── Word-sync with lrc.red's model ──

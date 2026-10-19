@@ -474,6 +474,31 @@ public class LrcRedModelSyncPageTests
     }
 
     [AvaloniaFact]
+    public async Task SearchDialogFromThePage_ModelSyncedPick_IsShownCreditedToTheModel()
+    {
+        var m = Mount(x => x.LrcRed.SearchAnswer = Answer(LineLrc));
+        m.LrcRed.Sync = (_, _) => Task.FromResult(Answer(WordElrc));
+        try
+        {
+            await SearchAsync(m, OnlineLyricsSource.LrcRed);
+            var picker = m.Vm.CreateLyricsSearchViewModel(m.Track);
+            picker.SelectedSource = OnlineLyricsSource.LrcRed;
+            await PumpUntilAsync(() => picker.Results.Count == 1 && !picker.IsSearching);
+            var row = Assert.Single(picker.Results);
+            Assert.True(row.CanModelSync);
+
+            await picker.WordSyncWithLrcRedCommand.ExecuteAsync(row);
+            picker.ApplyCommand.Execute(null);
+
+            Assert.Single(m.LrcRed.SyncCalls);
+            Assert.True(ShowsWordTiming(m.Vm));
+            Assert.Equal("Word-synced by lrc.red's model", m.Vm.LyricsCreditText);
+            Assert.False(m.Vm.ShowLrcRedSync);
+        }
+        finally { Cleanup(m); }
+    }
+
+    [AvaloniaFact]
     public async Task SearchDialog_NoOffer_WhenLrcRedIsOff_OrItsAnswerIsWordSynced()
     {
         var off = Picker(Answer(LineLrc), lrcRedOn: false, (_, _) => throw new InvalidOperationException());
