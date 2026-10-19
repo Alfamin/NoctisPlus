@@ -4,6 +4,7 @@
         xmlns:loc="using:Noctis.Localization"
         xmlns:vm="using:Noctis.ViewModels"
         xmlns:controls="using:Noctis.Controls"
+        xmlns:helpers="using:Noctis.Helpers"
         x:Class="Noctis.Views.LyricsSearchDialog"
         x:DataType="vm:LyricsSearchViewModel"
         Title="{loc:T LyricsSearch.Title}"
@@ -39,6 +40,10 @@
             <Setter Property="Padding" Value="0" />
             <Setter Property="Margin" Value="0,0,0,8" />
             <Setter Property="Cursor" Value="Hand" />
+        </Style>
+        <!-- Screen readers read a row as "lrc.red, Word-synced" (its ToString otherwise, 10-19). -->
+        <Style Selector="ListBox.ls-results ListBoxItem" x:DataType="vm:LyricsSearchResultRow">
+            <Setter Property="AutomationProperties.Name" Value="{Binding Converter={x:Static helpers:AccessibleNames.ItemName}}" />
         </Style>
         <Style Selector="ListBox.ls-results ListBoxItem /template/ ContentPresenter#PART_ContentPresenter">
             <Setter Property="Background" Value="Transparent" />
