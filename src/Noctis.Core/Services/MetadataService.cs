@@ -209,6 +209,8 @@ public class MetadataService : IMetadataService
                 if (IsFileBusy(ex))
                     DebugLog.Write("Metadata", $"Skipped '{Path.GetFileName(filePath)}': still in use by "
                         + $"another program after {ReadRetryDelaysMs.Sum()} ms");
+                else if (ex is not TagLib.CorruptFileException and not TagLib.UnsupportedFormatException)
+                    UnexpectedReadFailure.Note($"'{Path.GetFileName(filePath)}': {ex.GetType().Name}: {ex.Message}");
                 return null;
             }
         }
@@ -216,6 +218,11 @@ public class MetadataService : IMetadataService
 
     // Waits between tag-read attempts while another program holds the file (see ReadTrackMetadata).
     private static readonly int[] ReadRetryDelaysMs = [50, 100, 200, 400, 800];
+
+    // A tag read that failed for a reason other than a corrupt or unsupported file drops the
+    // song just as silently; the first few per session are named with the exception.
+    private static readonly CappedBreadcrumb UnexpectedReadFailure =
+        new("Metadata", "tag read failed:", cap: 20, isEnabled: () => true);
 
     /// <summary>
     /// What reading a file another program has open throws: a sharing violation at the open

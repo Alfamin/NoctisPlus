@@ -151,6 +151,7 @@ public class ScanBusyFileTests : IDisposable
         Assert.Equal("First", Assert.Single(library.Tracks).Title);
         // Named in the session log, not only counted.
         var log = DebugLog.Snapshot();
+        Assert.Contains("skipped, unreadable: " + Song("02 - Second.mp3"), log);
         Assert.Contains("Skipped '02 - Second.mp3': still in use", log);
 
         await library.ScanAsync(new[] { _music }, TestContext.Current.CancellationToken);
