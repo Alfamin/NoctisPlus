@@ -51,30 +51,8 @@ public class RemoveLastFolderScanTests : IDisposable
             new SqliteLibraryIndexService(persistence), new NoOpAudit());
         await persistence.SaveSettingsAsync(new AppSettings { MusicFolders = { _music } });
         await library.ScanAsync(new[] { _music });
-        if (library.Tracks.Count != 2) Assert.Fail(DescribeScan(library));
+        if (library.Tracks.Count != 2) Assert.Fail(ScanMissReport.Describe(library, _music));
         return (library, persistence);
-    }
-
-    /// <summary>CI 10-18 once found 1 of the 2 fresh files (not reproduced locally in ~1,000
-    /// scans, loaded or not). On a failure, say which songs came in, whether each file reads
-    /// now, and the scan's own count line (skipped = a file it could not read).</summary>
-    private string DescribeScan(LibraryService library)
-    {
-        var files = Directory.GetFiles(_music, "*.mp3", SearchOption.AllDirectories).Select(f =>
-        {
-            try
-            {
-                using var file = TagLib.File.Create(f);
-                return $"{Path.GetFileName(f)} reads now";
-            }
-            catch (Exception ex)
-            {
-                return $"{Path.GetFileName(f)}: {ex.GetType().Name}: {ex.Message}";
-            }
-        });
-        var scanLog = DebugLog.Snapshot().Split(Environment.NewLine).Where(l => l.Contains("[Scan] published")).TakeLast(1);
-        return $"{library.Tracks.Count} track(s) [{string.Join(", ", library.Tracks.Select(t => t.Title))}]; "
-               + $"files: {string.Join("; ", files)}; log: {string.Join(" ", scanLog)}";
     }
 
     [Fact]

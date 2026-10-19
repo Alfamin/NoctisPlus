@@ -60,7 +60,7 @@ public sealed class SendToFolderMoveTests : IDisposable
         var library = new LibraryService(new MetadataService(), persistence,
             new SqliteLibraryIndexService(persistence), new FolderMetadataBackfillTests.FakeAuditTrail());
         await library.ScanAsync(new[] { _music });
-        Assert.Equal(2, library.Tracks.Count);
+        if (library.Tracks.Count != 2) Assert.Fail(ScanMissReport.Describe(library, _music));
         return library;
     }
 
