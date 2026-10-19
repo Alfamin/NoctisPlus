@@ -152,6 +152,10 @@ Deezer and TIDAL: paste the link.</value></data>
   <data name="Settings.Text" xml:space="preserve"><value>&#x2715;</value><comment>Content in SettingsView.axaml</comment></data>
   <data name="Settings.RemoveSeparatorTip" xml:space="preserve"><value>Remove separator</value><comment>ToolTip.Tip in SettingsView.axaml</comment></data>
   <data name="Settings.AddSeparatorEG" xml:space="preserve"><value>Add a separator, e.g. feat. or /</value><comment>Watermark in SettingsView.axaml</comment></data>
+  <data name="Settings.KeepNamesTogether" xml:space="preserve"><value>Keep these names together</value><comment>Text in SettingsView.axaml</comment></data>
+  <data name="Settings.KeepNamesTogetherHint" xml:space="preserve"><value>Artist names the separators never split, like &quot;Tyler, The Creator&quot; or &quot;AC/DC&quot;. Collaborations such as &quot;A, B&quot; still split.</value><comment>Text in SettingsView.axaml</comment></data>
+  <data name="Settings.RemoveNameTip" xml:space="preserve"><value>Remove name</value><comment>ToolTip.Tip in SettingsView.axaml</comment></data>
+  <data name="Settings.AddArtistNameEG" xml:space="preserve"><value>Add an artist, e.g. Tyler, The Creator</value><comment>Watermark in SettingsView.axaml</comment></data>
   <data name="Settings.Add" xml:space="preserve"><value>Add</value><comment>Content in SettingsView.axaml</comment></data>
   <data name="Settings.IgnoreLeadingWordsInArtistSort" xml:space="preserve"><value>Ignore Leading Words When Sorting Artists</value><comment>Text in SettingsView.axaml</comment></data>
   <data name="Settings.IgnoreLeadingWordsInArtistSortHint" xml:space="preserve"><value>Sort &quot;The Beatles&quot; under B. Names still show in full.</value><comment>Text in SettingsView.axaml</comment></data>
