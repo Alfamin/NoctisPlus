@@ -126,9 +126,9 @@ internal sealed class SpotifyPlaylists : IDisposable
     private void Publish(string? status = null) { if (status is not null) Status = status; try { Changed?.Invoke(); } catch { } }
 
     /// <summary>Owner #69: public playlists by name, each marked with the Noctis playlist it was already saved as.</summary>
-    internal async Task<(IReadOnlyList<(FoundPlaylist Found, Guid? SavedAs)> Playlists, string Source)> SearchAsync(string query, int limit, CancellationToken ct)
+    internal async Task<(IReadOnlyList<(FoundPlaylist Found, Guid? SavedAs)> Playlists, string Source)> SearchAsync(string query, int limit, CancellationToken ct, int offset = 0)
     {
-        var (found, source) = await _catalog.SearchPlaylistsAsync(query, limit, ct).ConfigureAwait(false);
+        var (found, source) = await _catalog.SearchPlaylistsAsync(query, limit, ct, offset).ConfigureAwait(false);
         var saved = Jobs.Where(j => j.Created && !j.FillingStopped).ToDictionary(j => j.Url, j => j.LibraryId);
         return (found.Select(f => (f, saved.TryGetValue(f.Url, out var id) ? id : (Guid?)null)).ToList(), source);
     }

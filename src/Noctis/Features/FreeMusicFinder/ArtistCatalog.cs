@@ -440,8 +440,8 @@ internal sealed partial class ArtistCatalog : IDisposable
     private static double? Duration(double seconds) => seconds is > 0 and <= 86400 ? seconds : null;
     internal static bool ArtworkUrl(string? value) => Uri.TryCreate(value, UriKind.Absolute, out var uri) && uri.Scheme == "https" && uri.IsDefaultPort && uri.UserInfo.Length == 0 &&
         (uri.Host is "cdn-images.dzcdn.net" or "i.scdn.co" or "mosaic.scdn.co" || System.Text.RegularExpressions.Regex.IsMatch(uri.Host, @"^is[1-9][0-9]?-ssl\.mzstatic\.com$")
-            // Playlist covers (#69): Spotify's four-cover mosaics and the covers people upload.
-            || System.Text.RegularExpressions.Regex.IsMatch(uri.Host, @"^image-cdn-[a-z]{2}\.spotifycdn\.com$"));
+            // Playlist covers (#69): Spotify's four-cover mosaics, the covers people upload and Spotify's own mixes.
+            || System.Text.RegularExpressions.Regex.IsMatch(uri.Host, @"^[a-z0-9-]{1,40}\.spotifycdn\.com$"));
     public string? SavedArtwork(string? url, bool highQuality = false)
     {
         if (!ArtworkUrl(url)) return null;

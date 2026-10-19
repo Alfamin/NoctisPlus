@@ -27,28 +27,30 @@ internal sealed partial class PlaylistCatalog
     private string? _token;
     private DateTimeOffset _tokenUntil;
 
-    /// <summary>Playlists named like <paramref name="query"/>, best first, and which service answered.</summary>
-    public async Task<(IReadOnlyList<FoundPlaylist> Playlists, string Source)> SearchPlaylistsAsync(string query, int limit, CancellationToken ct)
+    /// <summary>Playlists named like <paramref name="query"/>, best first, and which service answered. <paramref name="offset"/>
+    /// asks for a later page (owner #71: more as the list is scrolled); each page is ranked on its own, so cards already
+    /// on screen never move.</summary>
+    public async Task<(IReadOnlyList<FoundPlaylist> Playlists, string Source)> SearchPlaylistsAsync(string query, int limit, CancellationToken ct, int offset = 0)
     {
         query = query.Trim();
         if (query.Length is 0 or > 200) return ([], "");
         try
         {
-            var found = await SpotifySearchAsync(query, limit, ct).ConfigureAwait(false);
+            var found = await SpotifySearchAsync(query, limit, ct, offset).ConfigureAwait(false);
             if (found.Count > 0) return (found, "Spotify");
         }
         catch (Exception ex) when (ex is not OperationCanceledException || !ct.IsCancellationRequested)
         {
             Noctis.Services.DebugLog.Write("Search", "Spotify playlists unavailable, using Deezer: " + ex.Message);
         }
-        return (await DeezerSearchAsync(query, limit, ct).ConfigureAwait(false), "Deezer");
+        return (await DeezerSearchAsync(query, limit, ct, offset).ConfigureAwait(false), "Deezer");
     }
 
-    internal async Task<IReadOnlyList<FoundPlaylist>> SpotifySearchAsync(string query, int limit, CancellationToken ct)
+    internal async Task<IReadOnlyList<FoundPlaylist>> SpotifySearchAsync(string query, int limit, CancellationToken ct, int offset = 0)
     {
         var variables = JsonSerializer.Serialize(new
         {
-            searchTerm = query, offset = 0, limit, numberOfTopResults = 5, includeAudiobooks = false,
+            searchTerm = query, offset, limit, numberOfTopResults = 5, includeAudiobooks = false,
             includePreReleases = false, includeLocalConcertsField = false, includeArtistHasConcertsField = false,
         });
         var url = "https://api-partner.spotify.com/pathfinder/v1/query?operationName=searchPlaylists&variables=" + Uri.EscapeDataString(variables) +
@@ -162,9 +164,9 @@ internal sealed partial class PlaylistCatalog
         }).OrderByDescending(r => r.named).ThenByDescending(r => r.score).ThenBy(r => r.position).Select(r => r.f).ToList();
     }
 
-    internal async Task<IReadOnlyList<FoundPlaylist>> DeezerSearchAsync(string query, int limit, CancellationToken ct)
+    internal async Task<IReadOnlyList<FoundPlaylist>> DeezerSearchAsync(string query, int limit, CancellationToken ct, int offset = 0)
     {
-        var raw = await Get("https://api.deezer.com/search/playlist?q=" + Uri.EscapeDataString(query) + "&limit=" + limit, null, ct).ConfigureAwait(false);
+        var raw = await Get("https://api.deezer.com/search/playlist?q=" + Uri.EscapeDataString(query) + "&limit=" + limit + (offset > 0 ? "&index=" + offset : ""), null, ct).ConfigureAwait(false);
         return ParseDeezerSearch(raw);
     }
 

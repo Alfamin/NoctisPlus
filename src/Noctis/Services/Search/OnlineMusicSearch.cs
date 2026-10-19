@@ -101,6 +101,11 @@ public interface IOnlineMusicSearch
 
     /// <summary>Opens the native album page for an online release.</summary>
     Task OpenAlbumAsync(OnlineAlbum album, CancellationToken ct);
+
+    /// <summary>The next page of playlists for <paramref name="query"/> after the first <paramref name="offset"/>
+    /// (owner #71: more load as the Playlists tab is scrolled). Empty when there are no more.</summary>
+    Task<IReadOnlyList<OnlinePlaylist>> MorePlaylistsAsync(string query, int offset, CancellationToken ct)
+        => Task.FromResult<IReadOnlyList<OnlinePlaylist>>([]);
 }
 
 /// <summary>One request on the Downloads page. <paramref name="Handle"/> identifies it to the queue.</summary>

@@ -176,16 +176,25 @@ internal sealed class FinderOnlineSearch : IOnlineMusicSearch
 
     private static async Task<IReadOnlyList<OnlinePlaylist>> FindPlaylistsAsync(SpotifyPlaylists imports, string text, ConcurrentQueue<string> warnings, CancellationToken ct)
     {
-        try
-        {
-            var clock = System.Diagnostics.Stopwatch.StartNew();
-            var (found, source) = await imports.SearchAsync(text, PlaylistLimit, ct).ConfigureAwait(false);
-            Noctis.Services.DebugLog.Write("Search", $"\"{text}\": {found.Count} playlists from {source} in {clock.ElapsedMilliseconds} ms ({PlaylistCatalog.LastCounts})");
-            // Best first; the score only keeps that order through the page's merge.
-            return found.Select((p, i) => new OnlinePlaylist(p.Found.Url, p.Found.Name, p.Found.Owner, p.Found.Url, p.Found.Artwork,
-                p.Found.Tracks, p.Found.Saves, p.SavedAs, found.Count - i)).ToList();
-        }
+        try { return await PlaylistPageAsync(imports, text, 0, ct).ConfigureAwait(false); }
         catch (Exception ex) when (ex is not OperationCanceledException) { warnings.Enqueue("Playlists: " + ArtistCatalog.Explain(ex)); return []; }
+    }
+
+    public async Task<IReadOnlyList<OnlinePlaylist>> MorePlaylistsAsync(string query, int offset, CancellationToken ct)
+    {
+        query = query.Trim();
+        if (_playlists() is not { } imports || query.Length is < 2 or > 200 || offset is <= 0 or > 1000) return [];
+        return await PlaylistPageAsync(imports, query, offset, ct).ConfigureAwait(false);
+    }
+
+    // One page of PlaylistLimit, best first. Scores fall with the page, so a later page always sorts below an earlier one.
+    private static async Task<IReadOnlyList<OnlinePlaylist>> PlaylistPageAsync(SpotifyPlaylists imports, string text, int offset, CancellationToken ct)
+    {
+        var clock = System.Diagnostics.Stopwatch.StartNew();
+        var (found, source) = await imports.SearchAsync(text, PlaylistLimit, ct, offset).ConfigureAwait(false);
+        Noctis.Services.DebugLog.Write("Search", $"\"{text}\" from {offset}: {found.Count} playlists from {source} in {clock.ElapsedMilliseconds} ms ({PlaylistCatalog.LastCounts})");
+        return found.Select((p, i) => new OnlinePlaylist(p.Found.Url, p.Found.Name, p.Found.Owner, p.Found.Url, p.Found.Artwork,
+            p.Found.Tracks, p.Found.Saves, p.SavedAs, 10_000 - offset - i)).ToList();
     }
 
     public string? CachedArtwork(string url) => url.Length == 0 ? null : _catalog()?.SavedArtwork(url);

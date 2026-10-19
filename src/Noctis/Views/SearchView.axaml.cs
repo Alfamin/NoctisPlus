@@ -25,7 +25,15 @@ public partial class SearchView : UserControl
         LayoutUpdated += (_, _) => PlaceChips();
         Scroller.SizeChanged += (_, e) => UpdateRowCapacity(e.NewSize.Width);
         // The toolbar stays put; once results run under it, the top bar's hairline marks its edge.
-        Scroller.ScrollChanged += (_, _) => HeaderRule.IsVisible = Scroller.Offset.Y > 0.5;
+        Scroller.ScrollChanged += (_, _) =>
+        {
+            HeaderRule.IsVisible = Scroller.Offset.Y > 0.5;
+            // Owner #71: a screen and a half before the end of the Playlists tab, the next page starts loading by itself (the extent also grows
+            // when a page lands, so a page that does not fill the window asks for the one after it).
+            if (DataContext is SearchViewModel { CanLoadMorePlaylists: true } vm &&
+                Scroller.Offset.Y + Scroller.Viewport.Height >= Scroller.Extent.Height - 1.5 * Scroller.Viewport.Height)
+                vm.LoadMorePlaylistsCommand.Execute(null);
+        };
     }
 
     /// <summary>Puts the chips on the pill's line, just past its right end. Measured from the

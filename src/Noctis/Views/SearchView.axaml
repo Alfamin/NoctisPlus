@@ -950,6 +950,9 @@
                     </ItemsControl.ItemsPanel>
                 </ItemsControl>
             </StackPanel>
+            <!-- The next page of playlists on its way (owner #71). -->
+            <controls:ProgressRing Width="22" Height="22" Thickness="2.2" IsIndeterminate="True" HorizontalAlignment="Center"
+                                   IsVisible="{Binding IsLoadingMorePlaylists}" Foreground="{DynamicResource AccentColorBrush}" />
             <StackPanel IsVisible="{Binding ShowPlaylistSkeletons}" Orientation="Horizontal" Spacing="14">
                 <Border Classes="skeleton" Width="168" Height="168" CornerRadius="6" />
                 <Border Classes="skeleton" Width="168" Height="168" CornerRadius="6" />

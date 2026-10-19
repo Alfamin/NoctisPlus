@@ -100,6 +100,32 @@ public class LyricsTrackChangeTimingTests : IDisposable
         }
     }
 
+    /// <summary>Owner #70: word timing finishing for the song on screen swapped its lyrics like a track change (fade
+    /// to black, every line dark for a moment): a flash. Now the same lines are replaced in place, in one frame.</summary>
+    [AvaloniaFact]
+    public async Task CompletedWordTimingOfThePlayingSong_SwapsInPlace_WithoutFadeOrLosingTheLine()
+    {
+        using var persistence = new TestPersistenceService();
+        var player = new PlayerViewModel(new FakeAudioPlayer(), new FakeLibraryService(), persistence, new FakeAnimatedCoverService());
+        using var vm = new LyricsViewModel(player, new StubLrcLib(), new StubNetEase(), new StubMetadata(), persistence, new FakeLibraryService());
+        var song = MakeTrack("timed", "[00:00.30]line one\n[00:03.00]line two\n[00:06.00]line three\n");
+        vm.SetLyricsSurfaceVisible(true); // a lyrics view is on screen
+        player.ReplaceQueueAndPlay([song], 0); await Pump(300);
+        player.Position = TimeSpan.FromSeconds(3.5); await Pump(100);
+        Assert.Null(vm.LyricLines[1].Words);
+        Assert.True(vm.ActiveLineIndex >= 0, "a line is on screen before the reload");
+
+        var fades = 0; var lostLine = false;
+        vm.LyricsSwapPending += (_, _) => fades++;
+        vm.PropertyChanged += (_, e) => { if (e.PropertyName == nameof(LyricsViewModel.ActiveLineIndex) && vm.ActiveLineIndex < 0) lostLine = true; };
+        File.WriteAllText(Path.ChangeExtension(song.FilePath, ".elrc"), Elrc("line"));
+        vm.ReloadWrittenLyrics([song.FilePath]); await Pump(300);
+
+        Assert.NotNull(vm.LyricLines[1].Words); // the word timing is shown
+        Assert.Equal(0, fades);                 // no fade to black
+        Assert.False(lostLine);                 // the line on screen is never dropped
+    }
+
     [AvaloniaFact]
     public async Task CompletedWordTimingReloadsOnlyItsCurrentSong_AndPreservesStudioPreview()
     {

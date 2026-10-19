@@ -1651,6 +1651,7 @@
                     <Button Classes="secondary-btn"
                             Click="OnLyricsButtonClick"
                             ToolTip.Tip="{loc:T PlaybackBar.LyricsTip}"
+                            AutomationProperties.Name="{loc:T PlaybackBar.LyricsTip}"
                             Width="34" Height="34">
                         <Panel Width="34" Height="34">
                             <Border Width="28" Height="28"

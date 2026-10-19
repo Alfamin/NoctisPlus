@@ -34,7 +34,20 @@ public class PlaylistSearchTabTests
         public IDownloadQueue Downloads { get; } = new NoQueue();
         public void OpenArtist(OnlineArtist artist) { }
         public Task OpenAlbumAsync(OnlineAlbum album, CancellationToken ct) => Task.CompletedTask;
+        internal int LaterPages = 0, LastPageSize = PlaylistPage;
+        internal readonly List<int> Offsets = [];
+        public Task<IReadOnlyList<OnlinePlaylist>> MorePlaylistsAsync(string query, int offset, CancellationToken ct)
+        {
+            Offsets.Add(offset);
+            var page = offset / PlaylistPage;
+            var size = page < LaterPages ? PlaylistPage : page == LaterPages ? LastPageSize : 0;
+            return Task.FromResult<IReadOnlyList<OnlinePlaylist>>(Page(offset, size));
+        }
     }
+
+    private const int PlaylistPage = SearchViewModel.PlaylistPage;
+    private static OnlinePlaylist[] Page(int offset, int size) => Enumerable.Range(offset, size)
+        .Select(i => new OnlinePlaylist("p" + i, "Playlist " + i, "Owner", "https://open.spotify.com/playlist/p" + i, "", 10, 100, Score: 10_000 - i)).ToArray();
 
     private sealed class NoQueue : IDownloadQueue
     {
@@ -99,6 +112,47 @@ public class PlaylistSearchTabTests
             while (search.IsOnlineLoading && DateTime.UtcNow < until) { await Task.Delay(20); Dispatcher.UIThread.RunJobs(); }
             Assert.Empty(search.Playlists);
             Assert.True(search.ShowNoResults);
+        }
+        finally { search.Dispose(); OnlineMusicSearch.Current = previous; }
+    }
+
+    [AvaloniaFact]
+    public async Task PlaylistsTab_LoadsMorePagesInOrder_UntilAShortPage_AndANewQueryStartsOver()
+    {
+        var previous = OnlineMusicSearch.Current;
+        var source = new Source { Found = Page(0, PlaylistPage), LaterPages = 2, LastPageSize = 5 };
+        using var data = new TestPersistenceService();
+        var library = new FakeLibraryService();
+        var player = new PlayerViewModel(new FakeAudioPlayer(), library, data, new FakeAnimatedCoverService());
+        OnlineMusicSearch.Current = source;
+        using var search = new SearchViewModel(library, player, _ => { }, _ => { });
+        async Task Settle() { var until = DateTime.UtcNow.AddSeconds(3); do { await Task.Delay(20); Dispatcher.UIThread.RunJobs(); } while ((search.IsOnlineLoading || search.IsLoadingMorePlaylists) && DateTime.UtcNow < until); }
+        try
+        {
+            search.SetQuery("gym");
+            await Settle();
+            Assert.False(search.CanLoadMorePlaylists); // only the Playlists tab pages
+            search.SelectFilterCommand.Execute("Playlists");
+            Assert.True(search.CanLoadMorePlaylists);
+            Assert.Equal(PlaylistPage, search.Playlists.Count);
+
+            await search.LoadMorePlaylistsCommand.ExecuteAsync(null); await Settle();
+            Assert.Equal(2 * PlaylistPage, search.Playlists.Count);
+            Assert.Equal(Enumerable.Range(0, 2 * PlaylistPage).Select(i => "Playlist " + i), search.Playlists.Select(p => p.Title)); // appended below, in order
+            await search.LoadMorePlaylistsCommand.ExecuteAsync(null); await Settle();
+            Assert.Equal(2 * PlaylistPage + 5, search.Playlists.Count);
+            Assert.False(search.CanLoadMorePlaylists); // a short page was the last
+            await search.LoadMorePlaylistsCommand.ExecuteAsync(null); await Settle();
+            Assert.Equal(new[] { PlaylistPage, 2 * PlaylistPage }, source.Offsets);
+
+            search.SelectFilterCommand.Execute("All");
+            Assert.True(search.Playlists.Count < PlaylistPage); // All keeps one row
+
+            search.SetQuery("gym two");
+            await Settle();
+            search.SelectFilterCommand.Execute("Playlists");
+            Assert.Equal(PlaylistPage, search.Playlists.Count); // a new query starts from its own first page
+            Assert.True(search.CanLoadMorePlaylists);
         }
         finally { search.Dispose(); OnlineMusicSearch.Current = previous; }
     }

@@ -183,6 +183,25 @@ public partial class LyricLine : ObservableObject
         return false;
     }
 
+    /// <summary>
+    /// Owner #70: the same line, now word-timed (WordLyrics finished the song on screen). Takes the new timing onto
+    /// this object, which its views already show, so only this line's word layer is built: no whole-list rebuild.
+    /// </summary>
+    public void TakeTimingFrom(LyricLine timed)
+    {
+        Timestamp = timed.Timestamp;
+        EndTimestamp = timed.EndTimestamp;
+        BackgroundEndTimestamp = timed.BackgroundEndTimestamp;
+        TransliterationEndTimestamp = timed.TransliterationEndTimestamp;
+        Words = timed.Words;
+        BackgroundWords = timed.BackgroundWords;
+        TransliterationWords = timed.TransliterationWords;
+        CurrentWordIndex = BackgroundWordIndex = TransliterationWordIndex = -1;
+        foreach (var name in new[] { nameof(Words), nameof(HasWords), nameof(ShowWords), nameof(ShowLineText), nameof(BackgroundWords),
+                     nameof(HasBackgroundWords), nameof(ShowBackgroundWords), nameof(TransliterationWords), nameof(HasTransliterationWords),
+                     nameof(HasTransliteration), nameof(ShowTransliterationWords), nameof(ShowTransliterationText) })
+            OnPropertyChanged(name);
+    }
     /// <summary>True when the line has word-level timing data.</summary>
     public bool HasWords => Words != null && Words.Count > 0;
 

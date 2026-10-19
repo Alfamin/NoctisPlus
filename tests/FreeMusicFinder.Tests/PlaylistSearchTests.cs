@@ -17,6 +17,7 @@ internal static class PlaylistSearchTests
         public int PagedTotal;
         public bool ShortPage;
         public int PageCalls;
+        public string LastSearch = "", LastDeezer = "";
         public int Unauthorized;
         public int TokenPages, Searches, CountCalls, DeezerSearches, ListReads;
         // name, owner, saves (null: no count), songs, cover width (null: an uploaded cover without a size)
@@ -55,6 +56,7 @@ internal static class PlaylistSearchTests
             if (uri.Host == "api-partner.spotify.com")
             {
                 Searches++;
+                LastSearch = Uri.UnescapeDataString(uri.Query);
                 if (SpotifyDown) return new(HttpStatusCode.NotFound);
                 if (Unauthorized > 0) { Unauthorized--; return new(HttpStatusCode.Unauthorized); }
                 Check.True(request.Headers.Authorization?.Parameter == "search-token", "the search carries the embed page's token");
@@ -86,6 +88,7 @@ internal static class PlaylistSearchTests
             if (uri.Host == "api.deezer.com" && uri.AbsolutePath == "/search/playlist")
             {
                 DeezerSearches++;
+                LastDeezer = uri.Query;
                 return Json(new { data = new object[]
                 {
                     new { id = 111, title = "drake hype", nb_tracks = 32, picture_medium = "https://cdn-images.dzcdn.net/images/playlist/a/250x250-000000-80-0-0.jpg", user = new { name = "amz" } },
@@ -187,6 +190,10 @@ internal static class PlaylistSearchTests
         Check.Equal("", deezer[0].Artwork, "a cover from an unknown host is not fetched");
         Check.Equal(10000, deezer[0].Tracks, "an absurd song count is capped");
         Check.Equal("https://www.deezer.com/playlist/5", deezer[0].Url, "Deezer results open as Deezer playlist links");
+        Check.True(ArtistCatalog.ArtworkUrl("https://seed-mix-image.spotifycdn.com/v6/img/desc/Workout/en/default") && ArtistCatalog.ArtworkUrl("https://mosaic.scdn.co/300/ab67"),
+            "covers of Spotify's own mixes and mosaics are fetched");
+        Check.True(!ArtistCatalog.ArtworkUrl("https://seed.spotifycdn.com.evil.example/x.jpg") && !ArtistCatalog.ArtworkUrl("http://seed-mix-image.spotifycdn.com/x"),
+            "a look-alike host or plain http is not");
     }
 
     private static async Task Searching()
@@ -233,6 +240,18 @@ internal static class PlaylistSearchTests
             Check.Equal("drake hype,Hype", string.Join(",", found.Select(f => f.Name)), "with Deezer's results");
             Check.Equal(32, found[0].Tracks, "and Deezer's song counts");
             Check.Equal(0, down.CountCalls, "no Spotify counts are asked for Deezer results");
+        }
+        var paged = new Http();
+        using (var catalog = new PlaylistCatalog(paged))
+        {
+            await catalog.SearchPlaylistsAsync("hype drake", 24, default, offset: 24);
+            Check.True(paged.LastSearch.Contains("\"offset\":24"), "a later page asks Spotify from that offset (owner #71)");
+        }
+        var pagedDown = new Http { SpotifyDown = true };
+        using (var catalog = new PlaylistCatalog(pagedDown))
+        {
+            await catalog.SearchPlaylistsAsync("hype drake", 24, default, offset: 48);
+            Check.True(pagedDown.LastDeezer.Contains("index=48"), "and Deezer from the same place");
         }
         var nothing = await new PlaylistCatalog(new Http()).SearchPlaylistsAsync("   ", 24, default);
         Check.Equal(0, nothing.Playlists.Count, "an empty query asks nobody");

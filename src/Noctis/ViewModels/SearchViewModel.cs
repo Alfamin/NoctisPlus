@@ -139,7 +139,7 @@ public sealed partial class SearchViewModel : ViewModelBase, ISearchable, IDispo
     private int SongCap => Filter == "All" ? 5 : 50;
     private int ArtistCap => Filter == "All" ? _artistsPerRow : 40;
     private int AlbumCap => Filter == "All" ? _albumsPerRow : 40;
-    private int PlaylistCap => Filter == "All" ? _albumsPerRow : 40;
+    private int PlaylistCap => Filter == "All" ? _albumsPerRow : int.MaxValue;
     private int _artistsPerRow = 7, _albumsPerRow = 7;
 
     /// <summary>The All view shows one full row of artists and of albums; the view says how many fit.</summary>
@@ -177,7 +177,7 @@ public sealed partial class SearchViewModel : ViewModelBase, ISearchable, IDispo
         if (!force) IsOnlineUnreachable = false;
         // A re-run for a library change keeps what is on screen (no skeleton flash); the online
         // half answers again from its caches and refreshes which songs are now owned.
-        if (!force) { _online = null; Status = ""; }
+        if (!force) { _online = null; Status = ""; ResetMorePlaylists(); }
         if (query.Length == 0)
         {
             _local = LibrarySearchResult.Empty;
@@ -415,8 +415,58 @@ public sealed partial class SearchViewModel : ViewModelBase, ISearchable, IDispo
 
     // Online only, in the source's order (relevance lifted by saves, owner #69). A card is kept while its playlist
     // is unchanged, so its loaded cover stays.
-    private List<SearchPlaylistItem> MergePlaylists() => (_online?.Playlists ?? []).OrderByDescending(p => p.Score)
+    private List<SearchPlaylistItem> MergePlaylists() => (_online?.Playlists ?? []).Concat(_morePlaylists).DistinctBy(p => p.Id).OrderByDescending(p => p.Score)
         .Select(p => _playlistItems.TryGetValue(p.Id, out var item) && item.Online == p ? item : _playlistItems[p.Id] = new SearchPlaylistItem(p)).ToList();
+
+    // ── More playlists (owner #71): the next page loads as the Playlists tab is scrolled to its end ──
+
+    internal const int PlaylistPage = 24, MaxPlaylistPages = 10;
+    private readonly List<OnlinePlaylist> _morePlaylists = [];
+    private int _playlistPages = 1;
+    private bool _playlistsExhausted;
+    private CancellationTokenSource? _moreCts;
+
+    [ObservableProperty, NotifyPropertyChangedFor(nameof(CanLoadMorePlaylists))] private bool _isLoadingMorePlaylists;
+
+    /// <summary>On the Playlists tab, after a full first page, while Spotify may have more.</summary>
+    public bool CanLoadMorePlaylists => IsPlaylistsFilter && !IsLoadingMorePlaylists && !_playlistsExhausted && _source is not null &&
+        _online is { Complete: true } online && online.Playlists.Count >= PlaylistPage && _playlistPages < MaxPlaylistPages;
+
+    private void ResetMorePlaylists()
+    {
+        _moreCts?.Cancel();
+        _moreCts = null;
+        _morePlaylists.Clear();
+        _playlistPages = 1;
+        _playlistsExhausted = false;
+        IsLoadingMorePlaylists = false;
+    }
+
+    [RelayCommand]
+    private async Task LoadMorePlaylists()
+    {
+        if (!CanLoadMorePlaylists || _source is not { } source) return;
+        var query = _query;
+        var cts = _moreCts = new CancellationTokenSource();
+        IsLoadingMorePlaylists = true;
+        try
+        {
+            var page = await source.MorePlaylistsAsync(query, _playlistPages * PlaylistPage, cts.Token);
+            if (cts.IsCancellationRequested || query != _query) return;
+            _playlistPages++;
+            var added = page.Where(p => _morePlaylists.All(m => m.Id != p.Id) && _online?.Playlists.All(o => o.Id != p.Id) != false).ToList();
+            _morePlaylists.AddRange(added);
+            // A short page is the last; a page of nothing new would only repeat itself.
+            if (page.Count < PlaylistPage || added.Count == 0) _playlistsExhausted = true;
+            Publish();
+        }
+        catch (OperationCanceledException) { }
+        catch (Exception ex) { _playlistsExhausted = true; Trace("more playlists failed: " + ex.Message); }
+        finally
+        {
+            if (ReferenceEquals(cts, _moreCts)) { IsLoadingMorePlaylists = false; OnPropertyChanged(nameof(CanLoadMorePlaylists)); }
+        }
+    }
 
     private object? PickTop(List<SearchSongItem> songs, List<SearchArtistItem> artists, List<SearchAlbumItem> albums)
         => ChooseTop(_query, songs, artists, albums, _online);
@@ -679,6 +729,7 @@ public sealed partial class SearchViewModel : ViewModelBase, ISearchable, IDispo
         _disposed = true;
         ForYou.Dispose();
         _onlineCts?.Cancel();
+        _moreCts?.Cancel();
         _artCts?.Cancel();
         _reconnect?.Stop();
         _index.Rebuilt -= OnIndexRebuilt;

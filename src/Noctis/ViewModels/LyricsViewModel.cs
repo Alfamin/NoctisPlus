@@ -2561,8 +2561,10 @@ public partial class LyricsViewModel : ViewModelBase, IDisposable
     {
         // A sidecar is not a Track tag edit. Reload the currently shown song directly;
         // ordinary library rescans must not interrupt the word clock or a Studio preview.
+        // Owner #70: the song playing is usually the one just timed (a fresh download). Its lyrics are the same
+        // lines with word timing added, so they switch in place: no fade to black, no reset of the line on screen.
         if (_currentTrack is { } track && !IsPreviewActive && paths.Contains(track.FilePath, StringComparer.OrdinalIgnoreCase))
-            LoadLyricsForTrack(track);
+            LoadLyricsForTrack(track, inPlace: LyricLines.Count > 0);
     }
 
     private void OnLibraryUpdated(object? sender, EventArgs e)
@@ -2777,7 +2779,9 @@ public partial class LyricsViewModel : ViewModelBase, IDisposable
     /// <summary>How long views get to fade out after <see cref="LyricsSwapPending"/>.</summary>
     public const int LyricsSwapFadeOutMs = 130;
 
-    private void LoadLyricsForTrack(Track track)
+    /// <param name="inPlace">The same song's lyrics were rewritten (word timing finished): keep what is on screen
+    /// until the new lines replace it in one frame, already positioned, instead of the track-change fade.</param>
+    private void LoadLyricsForTrack(Track track, bool inPlace = false)
     {
         DebugLogger.Info(DebugLogger.Category.Lyrics, "LoadLyricsForTrack", $"title={track.Title}, id={track.Id}");
         _currentTrack = track;
@@ -2803,17 +2807,20 @@ public partial class LyricsViewModel : ViewModelBase, IDisposable
         // swaps them wholesale behind the views' fade — the upfront clear was the
         // blank flash in the track-change flicker. Every populated apply path uses
         // ReplaceAll; the no-lyrics path clears explicitly.
-        _timeline.Reset();
-        _hasSyncedLyrics = false;
-        IsSynced = false;
-        HasSyncedLyricsAvailable = false;
-        ActiveLineIndex = -1;
-        _lyricsSyncTimer.Interval = TimeSpan.FromMilliseconds(LineSyncIntervalMs);
+        if (!inPlace)
+        {
+            _timeline.Reset();
+            _hasSyncedLyrics = false;
+            IsSynced = false;
+            HasSyncedLyricsAvailable = false;
+            ActiveLineIndex = -1;
+            _lyricsSyncTimer.Interval = TimeSpan.FromMilliseconds(LineSyncIntervalMs);
+        }
 
         // Fire-and-forget: all file I/O runs off the UI thread, result is posted back.
         // The task is kept so SearchLyricsForTrack can await the probe's outcome.
         _localProbeTask = LoadLocalLyricsAsync(track, generation,
-            _previewTrackId == track.Id ? _previewText : null);
+            _previewTrackId == track.Id ? _previewText : null, inPlace);
     }
 
     // Completes only after the probe result has been APPLIED on the UI thread —
@@ -2827,7 +2834,7 @@ public partial class LyricsViewModel : ViewModelBase, IDisposable
     ///
     /// Priority: .lyricsfile sidecar → .ttml sidecar → .lrc sidecar → embedded tags → cache file.
     /// </summary>
-    private async Task LoadLocalLyricsAsync(Track track, int generation, string? previewText = null)
+    private async Task LoadLocalLyricsAsync(Track track, int generation, string? previewText = null, bool inPlace = false)
     {
         // Read the parse-affecting setting here, on the UI thread that owns it.
         var joinSplitWords = _player.LyricsJoinSplitWords;
@@ -2841,7 +2848,7 @@ public partial class LyricsViewModel : ViewModelBase, IDisposable
         // the time the previous track's lyrics stayed up after the new track had
         // already started. Measured: LyricsTrackChangeTimingTests.
         var fadeOut = Task.CompletedTask;
-        if (LyricsSwapPending != null)
+        if (LyricsSwapPending != null && !inPlace)
         {
             if (Dispatcher.UIThread.CheckAccess())
                 LyricsSwapPending?.Invoke(this, EventArgs.Empty);
@@ -2890,8 +2897,17 @@ public partial class LyricsViewModel : ViewModelBase, IDisposable
                     // realizes the new line controls has run — Loaded-priority work
                     // runs after layout. Off → no stopwatch, no extra post.
                     var swapClock = DebugLogger.IsEnabled ? System.Diagnostics.Stopwatch.StartNew() : null;
-                    ApplyLocalLyricsResult(track, probe);
-                    LyricsSwapped?.Invoke(this, EventArgs.Empty);
+                    if (inPlace && TryTakeTimingInPlace(track, probe, generation))
+                    {
+                        // The lines on screen keep their controls; their word layers fill in over the next frames.
+                    }
+                    else
+                    {
+                        // In place: the old lines leave in this same frame, so the timeline lets go of them only now.
+                        if (inPlace) _timeline.Reset();
+                        ApplyLocalLyricsResult(track, probe);
+                        LyricsSwapped?.Invoke(this, EventArgs.Empty);
+                    }
                     if (swapClock != null)
                     {
                         var swapMs = swapClock.ElapsedMilliseconds;
@@ -2909,6 +2925,48 @@ public partial class LyricsViewModel : ViewModelBase, IDisposable
             }
         });
         await applied.Task;
+    }
+
+    /// <summary>Lines given word timing per dispatcher turn: each one builds its word cells, so a few at a time keep frames flowing.</summary>
+    internal const int TimingLinesPerFrame = 2;
+
+    /// <summary>
+    /// Owner #70: word timing just finished for the song on screen. The new file is the same lines with word
+    /// timing, so the existing lines take it over, the line being sung first and then outwards, a couple per frame.
+    /// Rebuilding the whole list at once froze the window for ~450 ms (UI.Stall in the session log). Different lines
+    /// (other lyrics were found) take the ordinary swap.
+    /// </summary>
+    private bool TryTakeTimingInPlace(Track track, LocalLyricsProbe probe, int generation)
+    {
+        if (probe.Lines is not { Count: > 0 } timed || !timed.Any(l => l.IsSynced) || !_hasSyncedLyrics) return false;
+        LrcParser.InsertIntroPlaceholderIfNeeded(timed);
+        if (timed.Count != LyricLines.Count) return false;
+        for (var i = 0; i < timed.Count; i++)
+            if (timed[i].Text != LyricLines[i].Text || timed[i].IsIntroPlaceholder != LyricLines[i].IsIntroPlaceholder ||
+                timed[i].Voice != LyricLines[i].Voice || timed[i].IsBackgroundOnly != LyricLines[i].IsBackgroundOnly)
+                return false;
+        var shown = LyricLines.ToArray();
+        var from = Math.Max(0, ActiveLineIndex);
+        var order = new Queue<int>(Enumerable.Range(0, shown.Length).OrderBy(i => Math.Abs(i - from)).ThenBy(i => i));
+        OfferTtmlSave(track, probe.SyncedText);
+        if (probe.FromCache) CanRemoveLyrics = true;
+        void Next()
+        {
+            if (generation != _searchGeneration || _currentTrack != track) return; // another song or reload took over
+            for (var n = 0; n < TimingLinesPerFrame && order.Count > 0; n++)
+            {
+                var i = order.Dequeue();
+                shown[i].TakeTimingFrom(timed[i]);
+            }
+            UpdateWordClockSubscription(); // the line being sung has its words from the first turn on
+            if (order.Count > 0) { Dispatcher.UIThread.Post(Next, DispatcherPriority.Background); return; }
+            // Line starts may have moved a little: let the timeline find the line again from the top.
+            _timeline.Rewind();
+            if (_player.State == Models.PlaybackState.Playing) UpdateActiveLine(GetPlaybackPosition());
+            DebugLogger.Info(DebugLogger.Category.Lyrics, "LyricsTimedInPlace", $"lines={shown.Length}");
+        }
+        Next();
+        return true;
     }
 
     /// <param name="SyncedText">The source as LRC/ELRC text, for "Save Lyrics to File ▸ TTML"; null for a .ttml or a preview.</param>
