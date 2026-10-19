@@ -183,21 +183,50 @@ public class MetadataService : IMetadataService
         if (Path.GetExtension(filePath).Equals(".dff", StringComparison.OrdinalIgnoreCase))
             return ReadDsdiffTrack(filePath, out embeddedArt);
 
-        try
+        for (var attempt = 0; ; attempt++)
         {
-            // PictureLazy: pictures load only when SelectBestEmbeddedPicture reads
-            // their bytes below, so a file whose art is not wanted (embedded artwork
-            // off) never materialises it.
-            using var file = TagLib.File.Create(filePath, TagLib.ReadStyle.Average | TagLib.ReadStyle.PictureLazy);
-            var fileInfo = new FileInfo(filePath);
-            return BuildTrack(file, filePath, fileInfo.Name, fileInfo.Length, fileInfo.LastWriteTimeUtc, localPath: filePath, out embeddedArt);
-        }
-        catch (Exception)
-        {
-            // File is corrupted, unsupported, or locked — skip it
-            return null;
+            try
+            {
+                // PictureLazy: pictures load only when SelectBestEmbeddedPicture reads
+                // their bytes below, so a file whose art is not wanted (embedded artwork
+                // off) never materialises it.
+                using var file = TagLib.File.Create(filePath, TagLib.ReadStyle.Average | TagLib.ReadStyle.PictureLazy);
+                var fileInfo = new FileInfo(filePath);
+                return BuildTrack(file, filePath, fileInfo.Name, fileInfo.Length, fileInfo.LastWriteTimeUtc, localPath: filePath, out embeddedArt);
+            }
+            catch (Exception ex) when (IsFileBusy(ex) && attempt < ReadRetryDelaysMs.Length)
+            {
+                // Another program has the file open right now: a download or copy finishing,
+                // a tag editor saving, an antivirus or indexer scan. Giving up at once left a
+                // new song out of the scan (or the folder watcher's import) with nothing to
+                // bring it back before the next full scan, so a short hold is waited out.
+                Thread.Sleep(ReadRetryDelaysMs[attempt]);
+            }
+            catch (Exception ex)
+            {
+                // File is corrupted, unsupported, or still held after the waits — skip it
+                // (a scan records nothing for it, so the next pass reads it again).
+                if (IsFileBusy(ex))
+                    DebugLog.Write("Metadata", $"Skipped '{Path.GetFileName(filePath)}': still in use by "
+                        + $"another program after {ReadRetryDelaysMs.Sum()} ms");
+                return null;
+            }
         }
     }
+
+    // Waits between tag-read attempts while another program holds the file (see ReadTrackMetadata).
+    private static readonly int[] ReadRetryDelaysMs = [50, 100, 200, 400, 800];
+
+    /// <summary>
+    /// What reading a file another program has open throws: a sharing violation at the open
+    /// (a writer, or anything that opened it exclusively) or a lock violation on a locked
+    /// range. Windows names both by code, so a failing disk or a vanished share is not waited
+    /// on; elsewhere the only refusal is .NET's own share-mode lock, and any I/O error but a
+    /// missing file counts.
+    /// </summary>
+    private static bool IsFileBusy(Exception ex) => ex is IOException io && (OperatingSystem.IsWindows()
+        ? io.HResult is unchecked((int)0x80070020) or unchecked((int)0x80070021) // ERROR_SHARING_VIOLATION, ERROR_LOCK_VIOLATION
+        : io is not FileNotFoundException and not DirectoryNotFoundException and not EndOfStreamException);
 
     /// <summary>
     /// Reads a scan entry: by path when the entry has one (the desktop path with its
