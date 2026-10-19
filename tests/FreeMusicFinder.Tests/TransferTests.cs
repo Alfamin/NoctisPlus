@@ -150,6 +150,11 @@ internal static class TransferTests
         Check.True(RecordingMatch.Fits(starred,"Future","I'M DAT N****",TimeSpan.FromSeconds(232)),"a censored word starred differently is the same title");
         Check.False(RecordingMatch.Fits(starred,"Future","I'M DAT N**** (Instrumental)",TimeSpan.FromSeconds(232)),"its instrumental is still another recording");
         Check.False(RecordingMatch.Fits(starred,"Future","I'M DAT BOY",TimeSpan.FromSeconds(232)),"a starred word does not match an uncensored different word");
+        // Owner #81: Apple's "Saturn" is 186.2 s, the bots' Deezer file 181 s; Music Hunters was never sent its link.
+        var saturn=new MusicRequest("Saturn","SZA",186.192);
+        Check.True(RecordingMatch.Fits(saturn,"SZA","Saturn",TimeSpan.FromSeconds(181)),"the same title by the same artist 2.8 % shorter on Deezer is that song");
+        Check.False(RecordingMatch.Fits(saturn,"SZA","Saturn (Sped Up)",TimeSpan.FromSeconds(181)),"its sped-up version stays another recording");
+        Check.False(RecordingMatch.Fits(saturn,"SZA","Saturn",TimeSpan.FromSeconds(176)),"more than 3 % apart is still another cut");
         Check.False(RecordingMatch.Fits(wanted,"","",null),"unidentified files rejected");
         Check.False(RecordingMatch.Fits(new("Same Song","Drake",180),"Drake Bell","Same Song",TimeSpan.FromSeconds(180)),"artist substring does not accept another performer");
         Check.True(RecordingMatch.Fits(new("Song","Artist feat. Guest",180),"Artist","Song",TimeSpan.FromSeconds(180)),"guest-credit differences retain the primary artist");

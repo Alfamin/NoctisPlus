@@ -16,6 +16,14 @@ internal sealed class BotTimings
     private readonly Dictionary<string, List<double>> _seconds;
     private readonly object _sync = new();
 
+    private static readonly Dictionary<string, BotTimings> SharedByPath = new(StringComparer.OrdinalIgnoreCase);
+    /// <summary>One per file: both bots keep their answer times in the same bot-timings.json.</summary>
+    internal static BotTimings Shared(string path)
+    {
+        var full = Path.GetFullPath(path);
+        lock (SharedByPath) { if (!SharedByPath.TryGetValue(full, out var timings)) SharedByPath[full] = timings = new(full); return timings; }
+    }
+
     public BotTimings(string? path)
     {
         _path = path;

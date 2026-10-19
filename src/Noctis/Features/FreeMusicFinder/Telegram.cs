@@ -447,7 +447,7 @@ internal sealed class TelegramBotSource : IHunterBotSource
     {
         _account = account;
         _log = log;
-        _timings = new BotTimings(Path.Combine(account.DataFolder, "bot-timings.json"));
+        _timings = BotTimings.Shared(Path.Combine(account.DataFolder, "bot-timings.json"));
         try
         {
             if (File.Exists(SearchLimitPath) && new FileInfo(SearchLimitPath).Length < 1024)

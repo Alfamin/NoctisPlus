@@ -37,6 +37,14 @@ internal sealed partial class ArtistCatalog
             }
         }, ct, fallback: rows => rows.Count > 0 && rows.All(r => r.Song.Id.StartsWith("apple:", StringComparison.Ordinal)));
     }
+    /// <summary>Deezer's songs for a bot's track link, asked afresh: the day-cached search above can hold only Apple
+    /// songs (no link a bot takes) when Deezer failed once (owner #81, SZA "Saturn").</summary>
+    public async Task<List<CatalogSong>> DeezerTracksAsync(string query, CancellationToken ct)
+    {
+        query = SearchText(query);
+        using var data = await Get("deezer", "/search/track?limit=25&q=" + Uri.EscapeDataString(query), ct);
+        return Data(data.RootElement).Select(DeezerSong).OfType<CatalogSong>().ToList();
+    }
     public Task<CatalogResult<List<CatalogRelease>>> SearchAlbumsAsync(string query, CancellationToken ct)
     {
         query = SearchText(query);

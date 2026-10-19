@@ -34,6 +34,7 @@ public sealed class FreeMusicPlugin : INoctisPlugin
     private IPluginHost? _host;
     private TelegramAccount? _telegram;
     private MusicSources? _bot;
+    private DeezLoadSource? _deezLoad;
     private CancellationTokenSource _qualityStop = new();
     private PlaylistTransfers? _transfers;
     private SpotifyPlaylists? _playlists;
@@ -83,7 +84,8 @@ public sealed class FreeMusicPlugin : INoctisPlugin
         _firstBot = host.Settings.GetString("firstBot") == "DeezLoad" ? "DeezLoad" : BotSelections.Hunters;
         _lastFmKey = host.Settings.GetString(LastFmKey)?.Trim() ?? "";
         _telegram = new TelegramAccount(Path.Combine(host.DataDirectory, "telegram.dat"), () => _proxy, Log);
-        _bot = new MusicSources(new HunterMusicSource(_telegram,Log, ResolveHunterLinkAsync),new DeezLoadSource(_telegram,Announce),Announce,
+        _deezLoad = new DeezLoadSource(_telegram,Announce, ResolveDeezLoadLinkAsync);
+        _bot = new MusicSources(new HunterMusicSource(_telegram,Log, ResolveHunterLinkAsync),_deezLoad,Announce,
             Path.Combine(host.DataDirectory,"source-limits.json"),allowMp3:()=>_preferredQuality == AudioQuality.MP3 || _allowMp3,
             preferFlac: () => _preferredQuality == AudioQuality.FLAC, quality: () => _preferredQuality, firstBot: () => _firstBot);
         _downloads = new Downloads(Log,Path.Combine(host.DataDirectory,"download-queue.json"),_bot.Track);
@@ -200,14 +202,19 @@ public sealed class FreeMusicPlugin : INoctisPlugin
         }
     }
 
-    private async Task<string?> ResolveHunterLinkAsync(MusicRequest request, CancellationToken ct)
-    {
-        var catalog = _catalog;
-        if (catalog is null) return null;
-        var matches = await catalog.SearchSongsAsync(BotQuery.For(request), ct).ConfigureAwait(false);
-        return matches.Value.Select(s => s.Song.Request)
-            .FirstOrDefault(s => HunterMusicSource.IsTrackLink(s.Url) && RecordingMatch.Fits(request, s.Artist, s.Title, s.Duration))?.Url;
-    }
+    // Owner #81: Music Hunters is never declared unable before it was sent the song's link. The catalog search (cached),
+    // then Deezer asked afresh, then DeezLoad's own inline search (slowest, ~7 s), which found SZA "Saturn".
+    private Task<string?> ResolveHunterLinkAsync(MusicRequest request, CancellationToken ct)
+        => TrackLinkLookup.FirstAsync(request, [CatalogLinks, FreshDeezerLinks, InlineLinks], ct);
+    // DeezLoad runs its own inline search after these.
+    private Task<string?> ResolveDeezLoadLinkAsync(MusicRequest request, CancellationToken ct)
+        => TrackLinkLookup.FirstAsync(request, [CatalogLinks, FreshDeezerLinks], ct);
+    private async Task<IEnumerable<MusicRequest>> CatalogLinks(MusicRequest request, CancellationToken ct)
+        => _catalog is { } catalog ? (await catalog.SearchSongsAsync(BotQuery.For(request), ct).ConfigureAwait(false)).Value.Select(s => s.Song.Request) : [];
+    private async Task<IEnumerable<MusicRequest>> FreshDeezerLinks(MusicRequest request, CancellationToken ct)
+        => _catalog is { } catalog ? (await catalog.DeezerTracksAsync(BotQuery.For(request), ct).ConfigureAwait(false)).Select(s => s.Request) : [];
+    private async Task<IEnumerable<MusicRequest>> InlineLinks(MusicRequest request, CancellationToken ct)
+        => _deezLoad is { } deezLoad ? await deezLoad.SearchAsync(BotQuery.For(request), ct).ConfigureAwait(false) : [];
 
     private async Task SynchronizeQualityAsync()
     {

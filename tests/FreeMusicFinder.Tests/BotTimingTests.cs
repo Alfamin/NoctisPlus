@@ -53,6 +53,42 @@ internal static class BotTimingTests
         Check.Equal(s(1.5), TelegramBotSource.FileWindow(2, s(4.5)), "a slow press acknowledgement shortens the next window, not the budget");
         Check.True(DeezLoadSource.SilentLimit <= s(20), "a DeezLoad that says nothing at all is given up within 20 s");
 
+        // Owner #80: DeezLoad was given a fixed 20 s of silence before the other bot, for every song.
+        Check.Section("DeezLoad: the silence allowed follows its usual first answer, learned from its chat");
+        var links = new[]
+        {
+            Out(10, asked, "https://www.deezer.com/track/2672689962"), Plain(11, asked.AddSeconds(1)),
+            Out(12, asked.AddMinutes(1), "https://open.spotify.com/track/0flSGzqHO12p9fU9kqaHGE"), Plain(13, asked.AddMinutes(1)),
+            Out(14, asked.AddMinutes(2), "hello"), Plain(15, asked.AddMinutes(2).AddSeconds(9)),             // not a track link
+            Out(16, asked.AddMinutes(3), "https://www.deezer.com/track/1"), Out(17, asked.AddMinutes(3), "/start"), Plain(18, asked.AddMinutes(3).AddSeconds(20)),
+        };
+        var replies = DeezLoadSource.ReplyTimes(links.Reverse());
+        Check.Equal("1,0.5", string.Join(",", replies.Select(t => t.TotalSeconds.ToString(System.Globalization.CultureInfo.InvariantCulture))), "each track link is paired with the bot's next message only");
+        var deez = new BotTimings(Path.Combine(folder, "deez.json"));
+        Check.Equal(DeezLoadSource.SilentFirst, deez.Wait(DeezLoadSource.ReplyTiming, DeezLoadSource.SilentFirst, DeezLoadSource.SilentMin, DeezLoadSource.SilentLimit), "8 s until its answers are known, not 20");
+        deez.Seed(DeezLoadSource.ReplyTiming, [s(1), s(1), s(0.5), s(2), s(1)]);
+        Check.Equal(DeezLoadSource.SilentMin, deez.Wait(DeezLoadSource.ReplyTiming, DeezLoadSource.SilentFirst, DeezLoadSource.SilentMin, DeezLoadSource.SilentLimit), "a bot that answers in about a second is given up after 4 s");
+        Check.True(DeezLoadSource.SilentRest >= TimeSpan.FromMinutes(5), "a silent DeezLoad is left out for a while, so the next songs go straight to the other bot");
+
+        // Owner #81: SZA "Saturn" (Apple catalog, no link): Music Hunters was declared unable without being sent a link.
+        Check.Section("track links: every way is tried before a bot is declared unable");
+        var wanted = new MusicRequest("Saturn", "SZA", 186.192);
+        var asks = new List<string>();
+        Func<MusicRequest, CancellationToken, Task<IEnumerable<MusicRequest>>> Way(string name, Func<IEnumerable<MusicRequest>> rows)
+            => (_, _) => { asks.Add(name); return Task.FromResult(rows()); };
+        var link = TrackLinkLookup.FirstAsync(wanted, [
+            Way("catalog", () => [new("Saturn", "SZA", 186, Url: null)]),                                      // Apple-only answer
+            Way("fresh", () => throw new HttpRequestException("Deezer did not answer")),
+            Way("inline", () => [new("Saturn (Sped Up)", "SZA", 159, Url: "https://www.deezer.com/track/2672689982"), new("Saturn", "SZA", Url: "https://www.deezer.com/track/2672689962")]),
+        ], default).GetAwaiter().GetResult();
+        Check.Equal("https://www.deezer.com/track/2672689962", link!, "an Apple-only answer and a failing lookup hand over to the next way, which finds the song");
+        Check.Equal("catalog,fresh,inline", string.Join(",", asks), "in order, stopping at the first match");
+        asks.Clear();
+        Check.Equal("https://www.deezer.com/track/2672689962", TrackLinkLookup.FirstAsync(wanted, [
+            Way("catalog", () => [new("Saturn", "SZA", 181, Url: "https://www.deezer.com/track/2672689962")]), Way("inline", () => [])], default).GetAwaiter().GetResult()!,
+            "Deezer's 181 s Saturn is the song (it was refused on length before)");
+        Check.Equal("catalog", string.Join(",", asks), "the slow inline search is not asked once a link is found");
+
         // Owner #57, live: Spotify's "JACKBOYS,<no-break space>Sheck Wes" made Music Hunters find nothing.
         Check.Section("bot queries: plain spaces, first artist, title without credits");
         Check.Equal("JACKBOYS GANG GANG", BotQuery.For(new MusicRequest("GANG GANG", "JACKBOYS, Sheck Wes")), "no-break space and extra credits dropped");
@@ -66,6 +102,8 @@ internal static class BotTimingTests
     }
 
     private static Message Out(int id, DateTime at, string text) => new() { id = id, date = at, message = text, flags = Message.Flags.out_ };
+
+    private static Message Plain(int id, DateTime at) => new() { id = id, date = at, message = "Downloading…" };
 
     private static Message Answer(int id, DateTime at) => new()
     {
