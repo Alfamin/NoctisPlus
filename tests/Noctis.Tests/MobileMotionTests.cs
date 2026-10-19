@@ -94,16 +94,27 @@ public class MobileMotionTests
         File.WriteAllLines(Path.Combine(dir, scenario + ".csv"), lines);
     }
 
+    /// <summary>The most of a run's distance Motion's curve covers per unit of the run's time
+    /// (its steepest slope, about 4.2 for the glide curve).</summary>
+    private static readonly double Steepest =
+        Enumerable.Range(0, 1000).Max(i => Motion.Ease.Ease((i + 1) / 1000.0) - Motion.Ease.Ease(i / 1000.0)) * 1000;
+
     /// <summary>
     /// The target's <paramref name="axis"/> glides from <paramref name="from"/> to <paramref name="to"/>:
     /// it starts there, ends there, passes through at least five states in between, only ever
     /// moves one way, and no frame jumps more than <paramref name="maxStep"/> of the distance (the
     /// headless frames come unevenly, so a step can be large; a snap is all of it in one).
-    /// Frames where the target is absent or transparent (a page not yet on screen) are skipped.
+    /// A frame the machine took long over (a loaded CI runner: 80 ms and more between two
+    /// samples, or a first step drawn well after the run's clock began) may carry the glide
+    /// further, up to what its curve covers, over <paramref name="run"/>, in the time since the
+    /// target last moved (the run's length, <see cref="Motion.Push"/> unless given; a shorter
+    /// one only loosens this). Frames where the target is absent or transparent (a page not
+    /// yet on screen) are skipped.
     /// </summary>
     private static void AssertGlides(List<Sample> all, string target, Func<Sample, double> axis, double from, double to,
-        double maxStep = 0.6, int minMs = 200, int maxMs = 900, bool shownOnly = true, int minBetween = 5)
+        double maxStep = 0.6, int minMs = 200, int maxMs = 900, bool shownOnly = true, int minBetween = 5, TimeSpan? run = null)
     {
+        var runMs = (run ?? Motion.Push).TotalMilliseconds;
         var s = all.Where(x => x.Target == target && x.Ms >= 0 && x.Present && (!shownOnly || x.Opacity > 0.01)).ToList();
         Assert.NotEmpty(s);
         var values = s.Select(axis).ToList();
@@ -114,11 +125,15 @@ public class MobileMotionTests
         var between = values.Count(v => v > Math.Min(from, to) + tol && v < Math.Max(from, to) - tol);
         Assert.True(between >= minBetween, $"{target}: {between} frames between {from} and {to} (a snap has none)");
         var sign = Math.Sign(to - from);
+        var since = s[0].Ms;   // when the target took the value it holds: a glide has run at most since then
         for (var i = 1; i < values.Count; i++)
         {
             var step = values[i] - values[i - 1];
             Assert.True(step * sign >= -Math.Min(0.5, span * 0.01), $"{target} turned back at {s[i].Ms:0} ms ({values[i - 1]:0.#} -> {values[i]:0.#})");
-            Assert.True(Math.Abs(step) <= span * maxStep, $"{target} jumped {step:0.#} at {s[i].Ms:0} ms");
+            var movingMs = s[i].Ms - since;
+            Assert.True(Math.Abs(step) <= span * Math.Max(maxStep, Steepest * movingMs / runMs),
+                $"{target} jumped {step:0.#} at {s[i].Ms:0} ms ({movingMs:0} ms after it last moved)");
+            if (Math.Abs(step) > tol) since = s[i].Ms;
         }
         var landed = s.First(x => Math.Abs(axis(x) - to) <= Math.Min(0.5, span * 0.01)).Ms;
         Assert.InRange(landed, minMs, maxMs);
@@ -331,7 +346,7 @@ public class MobileMotionTests
         Settle(window);
         var s = Record("13_lyrics_open", window, () => rig.Shell.ToggleLyricsCommand.Execute(null), 600,
             ("lyrics", () => Find<LyricsPage>(view)));
-        AssertGlides(s.Where(x => x.Ms > 0).ToList().Prepend(s.First(x => x.Ms >= 0) with { Opacity = 1e-3 }).ToList(), "lyrics", x => x.Opacity, 0, 1, minMs: 100, maxMs: 500, maxStep: 0.7, minBetween: 2);
+        AssertGlides(s.Where(x => x.Ms > 0).ToList().Prepend(s.First(x => x.Ms >= 0) with { Opacity = 1e-3 }).ToList(), "lyrics", x => x.Opacity, 0, 1, minMs: 100, maxMs: 500, maxStep: 0.7, minBetween: 2, run: Motion.Fade);
         var close = Record("14_lyrics_close", window, () => rig.Shell.TryHandleBack(), 600,
             ("lyrics", () => Find<LyricsPage>(view)));
         Assert.Contains(close, x => x.Opacity is > 0.05 and < 0.95);   // faded, not snapped
