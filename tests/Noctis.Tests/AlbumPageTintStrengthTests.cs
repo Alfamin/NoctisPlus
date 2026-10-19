@@ -146,7 +146,9 @@ public class AlbumPageTintStrengthTests : IDisposable
     {
         var vm = CreateSettings();
         await vm.LoadAsync();
-        Assert.False(vm.AlbumPageTintEnabled);
+        // Ships on (2026-10-18); start from off to watch the toggle open the slider.
+        Assert.True(vm.AlbumPageTintEnabled);
+        vm.AlbumPageTintEnabled = false;
         vm.SelectedSettingsTab = SettingsViewModel.TabAppearance;
         var view = new SettingsView { DataContext = vm };
         var window = new Window { Width = 1000, Height = 720, Content = view };

@@ -1,9 +1,11 @@
+using System.Text.Json.Serialization;
+
 namespace Noctis.Models;
 
 /// <summary>
 /// Application settings, persisted to settings.json in %APPDATA%\Noctis\.
 /// </summary>
-public class AppSettings
+public class AppSettings : IJsonOnDeserializing
 {
     /// <summary>Directories to scan for music files.</summary>
     public List<string> MusicFolders { get; set; } = new();
@@ -208,8 +210,10 @@ public class AppSettings
     public double CrossfadeDuration { get; set; } = 6;
 
     /// <summary>GitHub #73: fade the level out before a pause lands and back in after a
-    /// resume (off = the hard cut), over <see cref="PlayPauseFadeMs"/> milliseconds.</summary>
-    public bool PlayPauseFadeEnabled { get; set; }
+    /// resume (off = the hard cut), over <see cref="PlayPauseFadeMs"/> milliseconds. On for new
+    /// installs (2026-10-18); a settings.json saved before the toggle existed keeps it off
+    /// (<see cref="OnDeserializing"/>).</summary>
+    public bool PlayPauseFadeEnabled { get; set; } = true;
 
     public int PlayPauseFadeMs { get; set; } = 300;
 
@@ -273,9 +277,11 @@ public class AppSettings
     public bool EnableAnimatedCovers { get; set; } = true;
 
     /// <summary>Album pages take their background colour from the cover's edge colour,
-    /// Apple-Music style, with the page text flipping dark on light covers. Ships on;
-    /// the Appearance toggle turns it off for users who want the flat theme page.</summary>
-    public bool AlbumPageTintEnabled { get; set; } = false;
+    /// Apple-Music style, with the page text flipping dark on light covers. Ships on
+    /// (2026-10-18; a settings.json saved before the toggle existed keeps it off, see
+    /// <see cref="OnDeserializing"/>); the Appearance toggle turns it off for users who want
+    /// the flat theme page.</summary>
+    public bool AlbumPageTintEnabled { get; set; } = true;
 
     /// <summary>Fresh-install value of <see cref="AlbumPageTintStrength"/>: the full cover
     /// colour, the look the album page had before the slider existed. Double-tapping the
@@ -689,8 +695,10 @@ public class AppSettings
     public string ArtistCreditJoin { get; set; } = ", ";
 
     /// <summary>GitHub #99: the Artists grid's name sort skips a leading word from
-    /// <see cref="ArtistSortIgnoredWords"/> ("The Beatles" sorts under B). Off by default.</summary>
-    public bool IgnoreLeadingWordsInArtistSort { get; set; } = false;
+    /// <see cref="ArtistSortIgnoredWords"/> ("The Beatles" sorts under B). On for new installs
+    /// (2026-10-18); a settings.json saved before the toggle existed keeps it off
+    /// (<see cref="OnDeserializing"/>).</summary>
+    public bool IgnoreLeadingWordsInArtistSort { get; set; } = true;
 
     /// <summary>Leading words skipped while <see cref="IgnoreLeadingWordsInArtistSort"/> is on;
     /// see ArtistSortWords.SortKey for the matching rule.</summary>
@@ -1054,6 +1062,21 @@ public class AppSettings
         // old default, so it follows the new one instead of leaving a stretched pill.
         if (PlaybackBarWidth == 626) PlaybackBarWidth = 536;
         PlaybackBarSkipSeconds = PlaybackBarSkipSeconds is 10 or 15 or 30 ? PlaybackBarSkipSeconds : 15;
+    }
+
+    /// <summary>
+    /// Runs when a stored settings file is read, after the initializers and before the file's
+    /// own values go in. Defaults that went from off to on after release (2026-10-18) start
+    /// back at their old value here: a key the file has still wins, and a file without the
+    /// key was saved by a build that predates the setting, so that user never saw it and keeps
+    /// the old behaviour. Only a brand-new install (and Reset, both <c>new AppSettings()</c>)
+    /// gets the new default. Every save writes every key, so this only matters once per file.
+    /// </summary>
+    public void OnDeserializing()
+    {
+        AlbumPageTintEnabled = false;
+        PlayPauseFadeEnabled = false;
+        IgnoreLeadingWordsInArtistSort = false;
     }
 }
 
