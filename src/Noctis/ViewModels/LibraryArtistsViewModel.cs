@@ -78,10 +78,13 @@ public partial class LibraryArtistsViewModel : ViewModelBase, ISearchable, IDisp
     {
         "songs" => "Song count",
         "albums" => "Album count",
+        "time" => "Time",
+        "genre" => "Genre",
         _ => "Name",
     };
 
-    /// <summary>Top-bar sort menu: a mode ("name" / "songs" / "albums") or "Ascending" / "Descending".</summary>
+    /// <summary>Top-bar sort menu: a mode ("name" / "songs" / "albums" / "time" / "genre")
+    /// or "Ascending" / "Descending".</summary>
     [RelayCommand]
     private void SetSort(string? parameter)
     {
@@ -89,14 +92,47 @@ public partial class LibraryArtistsViewModel : ViewModelBase, ISearchable, IDisp
         {
             case "Ascending": SortAscending = true; break;
             case "Descending": SortAscending = false; break;
-            case "name" or "songs" or "albums":
+            case "name" or "songs" or "albums" or "time" or "genre":
                 if (SortMode == parameter) return;
                 SortMode = parameter;
-                // Counts read naturally biggest-first; names A→Z.
-                SortAscending = parameter == "name";
+                // Counts and lengths read naturally biggest-first; names and genres A→Z.
+                SortAscending = parameter is "name" or "genre";
                 break;
             default: return;
         }
+    }
+
+    /// <summary>
+    /// List view column header click: a new column sorts by it (<see cref="SetSort"/>),
+    /// the current one flips the direction, the same as the Songs list's headers
+    /// (LibrarySongsViewModel.Sort).
+    /// </summary>
+    [RelayCommand]
+    private void SortByColumn(string? column)
+    {
+        if (column == null) return;
+        if (column == SortMode) SortAscending = !SortAscending;
+        else SetSort(column);
+    }
+
+    // ── Layout: portrait grid (default) or Songs-style list ──
+    // Persisted through SettingsViewModel.ArtistViewMode by MainWindowViewModel, the same
+    // route the sort takes. Both collections are rebuilt together by ApplyFilter, so a
+    // switch shows the current search and sort at once without a rebuild.
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(IsListView))]
+    private string _viewMode = "grid";
+
+    public bool IsListView => ViewMode == "list";
+
+    /// <summary>Top-bar view icon: grid ↔ list.</summary>
+    [RelayCommand]
+    private void ToggleViewMode() => ViewMode = IsListView ? "grid" : "list";
+
+    partial void OnViewModeChanged(string value)
+    {
+        // Only "grid" and "list" exist; anything else (a hand-edited settings file) is the grid.
+        if (value is not ("grid" or "list")) ViewMode = "grid";
     }
 
     partial void OnSortModeChanged(string value) => ApplyFilter(_currentFilter);
@@ -124,6 +160,18 @@ public partial class LibraryArtistsViewModel : ViewModelBase, ISearchable, IDisp
 
     /// <summary>Rows of artists for the virtualized grid display.</summary>
     public BulkObservableCollection<ArtistRow> ArtistRows { get; } = new();
+
+    /// <summary>The same artists, in the same order, one per row for the list view.</summary>
+    public BulkObservableCollection<ArtistListRow> ListRows { get; } = new();
+
+    /// <summary>Per-artist totals the list view's Time and Genre columns (and sorts) read.</summary>
+    internal readonly record struct ArtistStats(TimeSpan Duration, string Genre);
+
+    private static readonly Dictionary<string, ArtistStats> NoStats = new(StringComparer.OrdinalIgnoreCase);
+
+    /// <summary>Totals for the library snapshot the last Refresh took; computed on first use,
+    /// on the rebuild's worker thread, and reused by every rebuild until the library changes.</summary>
+    private Lazy<Dictionary<string, ArtistStats>> _stats = new(() => NoStats);
 
     /// <summary>Fires when the user opens a specific artist's page.</summary>
     public event EventHandler<Artist>? ArtistOpened;
@@ -185,9 +233,28 @@ public partial class LibraryArtistsViewModel : ViewModelBase, ISearchable, IDisp
         }
         _isDirty = false;
 
-        _allArtists = _library.Artists.ToList();
+        // A scan publish (every 1.5 s while scanning) hands over new Artist objects with no
+        // ImagePath. Keep the portrait the previous object had, in memory: the rows below
+        // used to be built from the empty ones and blanked every tile until a sweep
+        // surfaced them again (GitHub #137). The two sweeps below still correct it.
+        var shownPaths = new Dictionary<Guid, string>(_allArtists.Count);
         foreach (var artist in _allArtists)
+            if (artist.ImagePath != null)
+                shownPaths[artist.Id] = artist.ImagePath;
+
+        _allArtists = _library.Artists.ToList();
+        // The list view's Time / Genre totals: the visible songs only (LibraryService.Tracks,
+        // like the counts on Artist), grouped by the same key the Artist buckets use. The
+        // list is swapped, never edited, by the library, so the worker can read it later.
+        var tracks = _library.Tracks;
+        var groupMode = ArtistCredit.GroupMode;
+        _stats = new Lazy<Dictionary<string, ArtistStats>>(() => ComputeStats(tracks, groupMode));
+        foreach (var artist in _allArtists)
+        {
             artist.IsFavorite = _favoriteArtists.IsFavorite(artist.Name);
+            if (artist.ImagePath == null && shownPaths.TryGetValue(artist.Id, out var path))
+                artist.ImagePath = path;
+        }
         ApplyFilter(_currentFilter);
 
         // Clearing ImagePath for portraits whose file has gone missing used to be a
@@ -229,11 +296,13 @@ public partial class LibraryArtistsViewModel : ViewModelBase, ISearchable, IDisp
 
         _ = _artistImageService.FetchAndCacheAsync(_allArtists, (artist, path) =>
         {
-            // Debounce list rebuild — batch image updates every 2 seconds
+            // Batch image updates every 2 seconds. Not restarted per update: a paced
+            // first sweep lands a portrait every ~150 ms, so restarting the timer held
+            // every tile back until the whole sweep was over (GitHub #137).
             Dispatcher.UIThread.Post(() =>
             {
-                _imageRefreshDebounce.Stop();
-                _imageRefreshDebounce.Start();
+                if (!_imageRefreshDebounce.IsEnabled)
+                    _imageRefreshDebounce.Start();
             });
         });
     }
@@ -285,14 +354,19 @@ public partial class LibraryArtistsViewModel : ViewModelBase, ISearchable, IDisp
         var ascending = SortAscending;
         var ignoredWords = _sortIgnoredWords;
         var columns = GridColumns;
+        var stats = _stats;
         ThreadPool.QueueUserWorkItem(_ =>
         {
-            var rows = BuildRows(artists, query, sortMode, ascending, ignoredWords, columns);
+            var statsByName = stats.Value;
+            var ordered = OrderArtists(artists, query, sortMode, ascending, ignoredWords, statsByName);
+            var rows = ChunkRows(ordered, columns);
+            var listRows = BuildListRows(ordered, statsByName);
             if (Volatile.Read(ref _rebuildGeneration) == generation)
                 Dispatcher.UIThread.Post(() =>
                 {
                     if (Volatile.Read(ref _rebuildGeneration) != generation) return;
                     ArtistRows.ReplaceAll(rows);
+                    ListRows.ReplaceAll(listRows);
                 });
         });
     }
@@ -306,7 +380,28 @@ public partial class LibraryArtistsViewModel : ViewModelBase, ISearchable, IDisp
     /// <paramref name="ignoredWords"/> are leading words the name key skips (GitHub #99).
     /// </summary>
     internal static List<ArtistRow> BuildRows(List<Artist> allArtists, string query, string sortMode, bool ascending,
-        IReadOnlyList<string>? ignoredWords = null, int columns = ArtistsPerRow)
+        IReadOnlyList<string>? ignoredWords = null, int columns = ArtistsPerRow,
+        IReadOnlyDictionary<string, ArtistStats>? stats = null)
+        => ChunkRows(OrderArtists(allArtists, query, sortMode, ascending, ignoredWords, stats ?? NoStats), columns);
+
+    /// <summary>The list view's rows over the same ordering (static for unit tests).</summary>
+    internal static List<ArtistListRow> BuildListRows(List<Artist> allArtists, string query, string sortMode, bool ascending,
+        IReadOnlyDictionary<string, ArtistStats> stats, IReadOnlyList<string>? ignoredWords = null)
+        => BuildListRows(OrderArtists(allArtists, query, sortMode, ascending, ignoredWords, stats), stats);
+
+    private static List<ArtistListRow> BuildListRows(List<Artist> ordered, IReadOnlyDictionary<string, ArtistStats> stats)
+    {
+        var rows = new List<ArtistListRow>(ordered.Count);
+        foreach (var artist in ordered)
+        {
+            var s = StatsOf(stats, artist);
+            rows.Add(new ArtistListRow { Artist = artist, TotalDuration = s.Duration, Genre = s.Genre });
+        }
+        return rows;
+    }
+
+    private static List<Artist> OrderArtists(List<Artist> allArtists, string query, string sortMode, bool ascending,
+        IReadOnlyList<string>? ignoredWords, IReadOnlyDictionary<string, ArtistStats> stats)
     {
         IEnumerable<Artist> filtered;
         if (!string.IsNullOrWhiteSpace(query))
@@ -319,17 +414,21 @@ public partial class LibraryArtistsViewModel : ViewModelBase, ISearchable, IDisp
             filtered = ApplySort(
                 allArtists.Where(a => parsed.MatchesName(a.Name, RemoveWhitespace(a.Name ?? string.Empty)))
                           .OrderBy(a => RankMatch(a.Name, q, qNoSpaces)),
-                sortMode, ascending, ignoredWords);
+                sortMode, ascending, ignoredWords, stats);
         }
         else
         {
-            filtered = ApplySort(allArtists, sortMode, ascending, ignoredWords);
+            filtered = ApplySort(allArtists, sortMode, ascending, ignoredWords, stats);
         }
+        return filtered.ToList();
+    }
 
-        // Chunk into fixed-width rows so the outer ListBox can virtualize
+    /// <summary>Chunks the ordered artists into fixed-width rows so the outer ListBox can virtualize.</summary>
+    private static List<ArtistRow> ChunkRows(List<Artist> ordered, int columns)
+    {
         var rows = new List<ArtistRow>();
         ArtistRow? row = null;
-        foreach (var artist in filtered)
+        foreach (var artist in ordered)
         {
             if (row == null || row.Artists.Count >= columns)
             {
@@ -342,13 +441,61 @@ public partial class LibraryArtistsViewModel : ViewModelBase, ISearchable, IDisp
         return rows;
     }
 
+    private static ArtistStats StatsOf(IReadOnlyDictionary<string, ArtistStats> stats, Artist artist)
+        => artist.Name != null && stats.TryGetValue(artist.Name, out var s) ? s : new ArtistStats(TimeSpan.Zero, string.Empty);
+
+    /// <summary>
+    /// Per-artist total length and dominant genre over <paramref name="tracks"/>, bucketed by
+    /// the grouping artist exactly like LibraryService's Artist counts, so Time covers the
+    /// songs the Songs column counts. The genre follows ArtistDetailViewModel.DominantGenre
+    /// (each tag of a multi-genre song counts, ties alphabetical) in the artist page's GENRE
+    /// fact casing. One pass, no LINQ grouping: it runs on every library change.
+    /// </summary>
+    internal static Dictionary<string, ArtistStats> ComputeStats(IReadOnlyList<Track> tracks, ArtistGroupMode mode)
+    {
+        var acc = new Dictionary<string, (long Ticks, Dictionary<string, int>? Genres)>(StringComparer.OrdinalIgnoreCase);
+        foreach (var track in tracks)
+        {
+            var key = track.GetGroupingArtist(mode);
+            acc.TryGetValue(key, out var a);
+            a.Ticks += track.Duration.Ticks;
+            if (!string.IsNullOrWhiteSpace(track.Genre))
+            {
+                foreach (var genre in Track.SplitGenres(track.Genre))
+                {
+                    a.Genres ??= new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
+                    a.Genres[genre] = a.Genres.GetValueOrDefault(genre) + 1;
+                }
+            }
+            acc[key] = a;
+        }
+
+        var textInfo = System.Globalization.CultureInfo.InvariantCulture.TextInfo;
+        var result = new Dictionary<string, ArtistStats>(acc.Count, StringComparer.OrdinalIgnoreCase);
+        foreach (var (name, a) in acc)
+        {
+            string? top = null;
+            var topCount = 0;
+            if (a.Genres != null)
+                foreach (var (genre, count) in a.Genres)
+                    if (count > topCount || (count == topCount && StringComparer.OrdinalIgnoreCase.Compare(genre, top) < 0))
+                    {
+                        top = genre;
+                        topCount = count;
+                    }
+            result[name] = new ArtistStats(TimeSpan.FromTicks(a.Ticks),
+                top == null ? string.Empty : textInfo.ToTitleCase(top.ToLowerInvariant()));
+        }
+        return result;
+    }
+
     /// <summary>
     /// Applies the grid sort. Works on an already-ordered sequence too (search rank),
     /// in which case it only orders within equal ranks. Favorites stay on top for the
     /// name sort (GitHub #41); count sorts rank everyone by the number.
     /// </summary>
     private static IEnumerable<Artist> ApplySort(IEnumerable<Artist> source, string sortMode, bool ascending,
-        IReadOnlyList<string>? ignoredWords)
+        IReadOnlyList<string>? ignoredWords, IReadOnlyDictionary<string, ArtistStats> stats)
     {
         var ordered = source as IOrderedEnumerable<Artist> ?? source.OrderBy(_ => 0);
         var nameCmp = StringComparer.OrdinalIgnoreCase;
@@ -366,6 +513,18 @@ public partial class LibraryArtistsViewModel : ViewModelBase, ISearchable, IDisp
                 return ascending
                     ? ordered.ThenBy(a => a.AlbumCount).ThenBy(name, nameCmp)
                     : ordered.ThenByDescending(a => a.AlbumCount).ThenBy(name, nameCmp);
+            case "time":
+                return ascending
+                    ? ordered.ThenBy(a => StatsOf(stats, a).Duration).ThenBy(name, nameCmp)
+                    : ordered.ThenByDescending(a => StatsOf(stats, a).Duration).ThenBy(name, nameCmp);
+            case "genre":
+                // Untagged artists sit after every genre in both directions: a blank is no
+                // genre, not one that sorts first.
+                var withGenre = ordered.ThenBy(a => StatsOf(stats, a).Genre.Length == 0);
+                return (ascending
+                        ? withGenre.ThenBy(a => StatsOf(stats, a).Genre, nameCmp)
+                        : withGenre.ThenByDescending(a => StatsOf(stats, a).Genre, nameCmp))
+                    .ThenBy(name, nameCmp);
             default:
                 return ascending
                     ? ordered.ThenByDescending(a => a.IsFavorite).ThenBy(name, nameCmp)

@@ -1,0 +1,89 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:Noctis.Mobile.ViewModels"
+             xmlns:views="using:Noctis.Mobile.Views"
+             xmlns:loc="using:Noctis.Localization"
+             x:Class="Noctis.Mobile.Views.HomePage"
+             x:DataType="vm:ShellViewModel">
+
+    <!-- The Home tab root (the start tab, Apple Music's Home for an offline player): what the
+         user listens to — Pinned, Recently Played, On Repeat — as rails. The Library tab keeps
+         the lists themselves and Recently Added. -->
+    <UserControl.Resources>
+        <!-- One rail tile: three covers across with the fourth peeking, like the Library's. -->
+        <DataTemplate x:Key="RailTileTemplate" x:DataType="vm:RailItem">
+            <Button Classes="row" Width="140" VerticalAlignment="Top"
+                    views:LongPress.Command="{Binding $parent[views:ShellView].((vm:ShellViewModel)DataContext).OpenRailItemSheetCommand}"
+                    Command="{Binding $parent[views:HomePage].((vm:ShellViewModel)DataContext).OpenRailItemCommand}"
+                    CommandParameter="{Binding}">
+                <views:RailTile />
+            </Button>
+        </DataTemplate>
+        <ItemsPanelTemplate x:Key="RailPanel">
+            <StackPanel Orientation="Horizontal" Spacing="12" />
+        </ItemsPanelTemplate>
+    </UserControl.Resources>
+
+    <Grid RowDefinitions="Auto,*">
+        <Grid Grid.Row="0" Name="HomeHeader" ColumnDefinitions="*,Auto" Classes="tab-header">
+            <TextBlock Name="HomeTitle" Classes="title" Text="{loc:T Nav.Home}" />
+            <views:ProfileButton Grid.Column="1" Name="HomeProfile" VerticalAlignment="Center"
+                                 AvatarPath="{Binding ProfileAvatarPath}" Command="{Binding OpenSettingsCommand}" />
+        </Grid>
+
+        <ScrollViewer Grid.Row="1" Classes="page-scroll" Name="HomeScroll" HorizontalScrollBarVisibility="Disabled">
+            <!-- No side margin here: rails scroll edge to edge; headers and cards inset themselves. -->
+            <StackPanel Name="HomeContent" Margin="0,0,0,24" Spacing="22">
+                <!-- The start tab: a new phone lands here, so the first-run card shows here too. -->
+                <views:LibraryNotices IsVisible="{Binding Library.HasNotice}" />
+
+                <!-- Pinned: always shown once there is music, so the pin system is discoverable. -->
+                <StackPanel Name="PinnedSection" Spacing="10" IsVisible="{Binding Library.ShowSections}">
+                    <Button Name="PinnedHeader" Classes="row section-header" Command="{Binding OpenPinnedCommand}">
+                        <StackPanel Orientation="Horizontal">
+                            <PathIcon Data="{DynamicResource LibPinIcon}" />
+                            <TextBlock Classes="section" Text="Pinned" />
+                            <PathIcon Classes="chevron" Data="{DynamicResource LibChevronIcon}" />
+                        </StackPanel>
+                    </Button>
+                    <ScrollViewer HorizontalScrollBarVisibility="Hidden" VerticalScrollBarVisibility="Disabled" IsVisible="{Binding Library.HasPinned}">
+                        <ItemsControl Name="PinnedRail" Margin="20,0" ItemsSource="{Binding Library.PinnedRail}"
+                                      ItemTemplate="{StaticResource RailTileTemplate}" ItemsPanel="{StaticResource RailPanel}" />
+                    </ScrollViewer>
+                    <Border Name="PinnedHint" Classes="card" Margin="20,0" Padding="16,14" IsVisible="{Binding !Library.HasPinned}">
+                        <TextBlock Classes="subtle" TextWrapping="Wrap"
+                                   Text="Long-press an album, artist, playlist or song and choose Pin to keep it here." />
+                    </Border>
+                </StackPanel>
+
+                <StackPanel Name="RecentlyPlayedSection" Spacing="10" IsVisible="{Binding Library.HasShelf}">
+                    <Button Name="RecentlyPlayedHeader" Classes="row section-header" Command="{Binding OpenRecentlyPlayedCommand}">
+                        <StackPanel Orientation="Horizontal">
+                            <PathIcon Data="{DynamicResource LibRecentlyPlayedIcon}" />
+                            <TextBlock Classes="section" Text="Recently Played" />
+                            <PathIcon Classes="chevron" Data="{DynamicResource LibChevronIcon}" />
+                        </StackPanel>
+                    </Button>
+                    <ScrollViewer HorizontalScrollBarVisibility="Hidden" VerticalScrollBarVisibility="Disabled">
+                        <ItemsControl Name="RecentlyPlayedRail" Margin="20,0" ItemsSource="{Binding Library.RecentlyPlayedRail}"
+                                      ItemTemplate="{StaticResource RailTileTemplate}" ItemsPanel="{StaticResource RailPanel}" />
+                    </ScrollViewer>
+                </StackPanel>
+
+                <StackPanel Name="OnRepeatSection" Spacing="10" IsVisible="{Binding Library.HasOnRepeat}">
+                    <Button Name="OnRepeatHeader" Classes="row section-header" Command="{Binding OpenOnRepeatCommand}">
+                        <StackPanel Orientation="Horizontal">
+                            <PathIcon Data="{DynamicResource LibOnRepeatIcon}" />
+                            <TextBlock Classes="section" Text="On Repeat" />
+                            <PathIcon Classes="chevron" Data="{DynamicResource LibChevronIcon}" />
+                        </StackPanel>
+                    </Button>
+                    <ScrollViewer HorizontalScrollBarVisibility="Hidden" VerticalScrollBarVisibility="Disabled">
+                        <ItemsControl Name="OnRepeatRail" Margin="20,0" ItemsSource="{Binding Library.OnRepeatRail}"
+                                      ItemTemplate="{StaticResource RailTileTemplate}" ItemsPanel="{StaticResource RailPanel}" />
+                    </ScrollViewer>
+                </StackPanel>
+            </StackPanel>
+        </ScrollViewer>
+    </Grid>
+</UserControl>

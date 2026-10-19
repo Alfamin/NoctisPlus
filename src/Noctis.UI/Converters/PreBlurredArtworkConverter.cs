@@ -43,6 +43,15 @@ public class PreBlurredArtworkConverter : IValueConverter, IMultiValueConverter
 
     private static readonly ConditionalWeakTable<Bitmap, Bitmap> Cache = new();
 
+    /// <summary>
+    /// ConverterParameter "wash": the phone's Now Playing backdrop, blurred three times as wide
+    /// (<see cref="WashSigma"/>) so no shape of the cover survives - only its colours, which the
+    /// page then stretches over the whole screen and shades. Its own cache, one per cover.
+    /// </summary>
+    public const string WashParameter = "wash";
+    private const double WashSigma = Sigma * 3;
+    private static readonly ConditionalWeakTable<Bitmap, Bitmap> WashCache = new();
+
     /// <summary>Per source: its downscaled pixels and the last tuned bitmap made from them.</summary>
     private sealed class TunedArt
     {
@@ -90,7 +99,7 @@ public class PreBlurredArtworkConverter : IValueConverter, IMultiValueConverter
         if (value is not Bitmap src) return null;
         try
         {
-            return Cache.GetValue(src, CreateBlurred);
+            return parameter is WashParameter ? WashCache.GetValue(src, CreateWash) : Cache.GetValue(src, CreateBlurred);
         }
         catch (Exception ex)
         {
@@ -112,6 +121,13 @@ public class PreBlurredArtworkConverter : IValueConverter, IMultiValueConverter
         // Separable gaussian, clamp-to-edge. Channel-order agnostic: every byte
         // channel is blurred independently, so BGRA vs RGBA needs no branching.
         Blur(pixels, w, h, Sigma);
+        return ToBitmap(pixels, w, h);
+    }
+
+    private static Bitmap CreateWash(Bitmap source)
+    {
+        var pixels = ReadDownscaled(source, out var w, out var h);
+        Blur(pixels, w, h, WashSigma);
         return ToBitmap(pixels, w, h);
     }
 

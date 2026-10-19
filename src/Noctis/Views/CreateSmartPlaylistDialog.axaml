@@ -216,6 +216,7 @@
                     </Grid>
                     <TextBox x:Name="NameTextBox"
                              Classes="pill-field"
+                             AutomationProperties.Name="{loc:T CreateSmartPlaylist.Name}"
                              Text="{Binding PlaylistName}"
                              Watermark="{loc:T CreateSmartPlaylist.PlaylistName}">
                         <TextBox.KeyBindings>
@@ -232,6 +233,7 @@
                             <TextBlock Classes="sp-label" Text="{loc:T CreateSmartPlaylist.Description}" Margin="16,0,0,0" />
                             <TextBox x:Name="DescriptionTextBox"
                                      Classes="pill-field"
+                                     AutomationProperties.Name="{loc:T CreateSmartPlaylist.Description}"
                                      Text="{Binding PlaylistDescription}"
                                      Watermark="{loc:T CreateSmartPlaylist.Optional}" />
                         </StackPanel>
@@ -329,6 +331,7 @@
                     <!-- Add rule: quiet pill so Create stays the only accent action. -->
                     <Button Classes="pill-secondary"
                             Command="{Binding AddRuleCommand}"
+                            AutomationProperties.Name="{loc:T CreateSmartPlaylist.AddRule}"
                             HorizontalAlignment="Left"
                             MinHeight="32"
                             Padding="14,0"
@@ -349,6 +352,7 @@
                               Content="{loc:T CreateSmartPlaylist.Limit}"
                               VerticalAlignment="Center" />
                     <NumericUpDown x:Name="LimitBox"
+                                   AutomationProperties.Name="{loc:T CreateSmartPlaylist.LimitCount}"
                                    Classes="limit-pill-number sp-limit"
                                    Value="{Binding LimitCount}"
                                    Minimum="1" Maximum="1000"
@@ -363,6 +367,7 @@
                                Classes.sp-off="{Binding !HasLimit}"
                                FontSize="13" VerticalAlignment="Center" />
                     <ComboBox x:Name="SortBox"
+                              AutomationProperties.Name="{loc:T CreateSmartPlaylist.SortBy}"
                               Classes="pill-field"
                               ItemsSource="{Binding AllSortOptions}"
                               SelectedItem="{Binding SortBy}"

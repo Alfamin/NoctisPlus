@@ -104,17 +104,17 @@ public partial class LyricsView : UserControl
         _recenterOnNextLayout = false;
 
         if (DataContext is not LyricsViewModel vm) return;
-        if (!vm.IsSyncTabSelected || vm.IsAutoFollowPaused || vm.ActiveLineIndex < 0) return;
+        if (!vm.IsSyncTabSelected || vm.IsAutoFollowPaused || vm.ScrollLineIndex < 0) return;
 
         _lastScrolledIndex = -1; // force the jump even if the index didn't change
-        JumpToActiveLineWhenReady(vm.ActiveLineIndex);
+        JumpToActiveLineWhenReady(vm.ScrollLineIndex);
     }
 
     private void OnHostWindowPropertyChanged(object? sender, AvaloniaPropertyChangedEventArgs e)
     {
         if (e.Property != Window.WindowStateProperty) return;
         // Defer to the next layout pass, when the rewrapped line heights are final.
-        if (DataContext is LyricsViewModel { IsSyncTabSelected: true, IsAutoFollowPaused: false, ActiveLineIndex: >= 0 })
+        if (DataContext is LyricsViewModel { IsSyncTabSelected: true, IsAutoFollowPaused: false, ScrollLineIndex: >= 0 })
             _recenterOnNextLayout = true;
     }
 
@@ -127,9 +127,9 @@ public partial class LyricsView : UserControl
     private void OnHostWindowActivated(object? sender, EventArgs e)
     {
         if (DataContext is not LyricsViewModel vm) return;
-        if (!vm.IsSyncTabSelected || vm.IsAutoFollowPaused || vm.ActiveLineIndex < 0) return;
+        if (!vm.IsSyncTabSelected || vm.IsAutoFollowPaused || vm.ScrollLineIndex < 0) return;
 
-        JumpToActiveLineWhenReady(vm.ActiveLineIndex);
+        JumpToActiveLineWhenReady(vm.ScrollLineIndex);
     }
 
     protected override void OnAttachedToVisualTree(VisualTreeAttachmentEventArgs e)
@@ -170,7 +170,7 @@ public partial class LyricsView : UserControl
             {
                 _isJumpingOnAttach = false;
             }
-            JumpToActiveLineWhenReady(vm.ActiveLineIndex);
+            JumpToActiveLineWhenReady(vm.ScrollLineIndex);
 
             // Start the artwork flow if the artwork background mode is active.
             UpdateFlowAnimationState(vm);
@@ -381,10 +381,10 @@ public partial class LyricsView : UserControl
 
             if (DataContext is not LyricsViewModel vm) return;
             if (!vm.IsSyncTabSelected || vm.IsAutoFollowPaused) return;
-            if (vm.ActiveLineIndex < 0) return;
+            if (vm.ScrollLineIndex < 0) return;
 
             _lastScrolledIndex = -1; // force the jump even if the index didn't change
-            JumpToActiveLineWhenReady(vm.ActiveLineIndex);
+            JumpToActiveLineWhenReady(vm.ScrollLineIndex);
         };
         _resizeRecenterTimer.Start();
     }
@@ -467,7 +467,7 @@ public partial class LyricsView : UserControl
             CancelAutoFollowResumeTimer();
             vm.IsAutoFollowPaused = false;
 
-            var index = vm.IsSyncTabSelected ? vm.ActiveLineIndex : -1;
+            var index = vm.IsSyncTabSelected ? vm.ScrollLineIndex : -1;
             if (index >= 0)
                 JumpToActiveLineWhenReady(index);
             else if (LyricsScrollViewer != null)
@@ -525,7 +525,7 @@ public partial class LyricsView : UserControl
 
     private void OnViewModelPropertyChanged(object? sender, System.ComponentModel.PropertyChangedEventArgs e)
     {
-        if (e.PropertyName == nameof(LyricsViewModel.ActiveLineIndex))
+        if (e.PropertyName == nameof(LyricsViewModel.ScrollLineIndex))
         {
             if (sender is LyricsViewModel vm)
             {
@@ -546,8 +546,8 @@ public partial class LyricsView : UserControl
                     return;
                 }
 
-                if (vm.ActiveLineIndex >= 0)
-                    ScrollToActiveLine(vm.ActiveLineIndex);
+                if (vm.ScrollLineIndex >= 0)
+                    ScrollToActiveLine(vm.ScrollLineIndex);
                 else
                 {
                     _lastScrolledIndex = -1;
@@ -574,7 +574,7 @@ public partial class LyricsView : UserControl
                 vm2.IsAutoFollowPaused = false;
 
                 var targetIndex = vm2.IsSyncTabSelected
-                    ? vm2.ActiveLineIndex
+                    ? vm2.ScrollLineIndex
                     : MapSyncedToUnsyncedIndex(vm2);
 
                 if (targetIndex >= 0)
@@ -589,7 +589,7 @@ public partial class LyricsView : UserControl
             // the layout pass the margin change triggers — same guarded path as a
             // min/maximize/restore. If auto-follow is paused, only the padding moves.
             UpdateLyricsCenterPadding();
-            if (DataContext is LyricsViewModel { IsSyncTabSelected: true, IsAutoFollowPaused: false, ActiveLineIndex: >= 0 })
+            if (DataContext is LyricsViewModel { IsSyncTabSelected: true, IsAutoFollowPaused: false, ScrollLineIndex: >= 0 })
                 _recenterOnNextLayout = true;
         }
         else if (e.PropertyName == nameof(LyricsViewModel.IsAutoFollowPaused))
@@ -602,10 +602,10 @@ public partial class LyricsView : UserControl
                 && !_lyricsSwapInProgress && !_isJumpingOnAttach)
             {
                 CancelAutoFollowResumeTimer();
-                if (resumed.IsSyncTabSelected && resumed.ActiveLineIndex >= 0)
+                if (resumed.IsSyncTabSelected && resumed.ScrollLineIndex >= 0)
                 {
                     _lastScrolledIndex = -1;
-                    ScrollToActiveLine(resumed.ActiveLineIndex);
+                    ScrollToActiveLine(resumed.ScrollLineIndex);
                 }
             }
         }
@@ -1270,7 +1270,7 @@ public partial class LyricsView : UserControl
 
     // Cascade tuning: each line below the active one starts its glide this much later,
     // with the stagger depth capped — the Apple Music "settle top-down" feel.
-    private const double CascadeDelayPerLineMs = 35;
+    private const double CascadeDelayPerLineMs = LineMotion.CascadeDelayPerLineMs;
     private const int CascadeMaxLines = 8;
     // A line's lag may exceed the line above's by at most this much — see the lyrics
     // panel's constant of the same name (uncapped stagger made lines overlap mid-glide).

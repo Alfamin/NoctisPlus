@@ -235,6 +235,8 @@
   <data name="Settings.Wider" xml:space="preserve"><value>Daha geniş</value><comment>Text in SettingsView.axaml</comment></data>
   <data name="Settings.SongProgressTaskbar" xml:space="preserve"><value>Görev Çubuğunda Şarkı İlerlemesi</value><comment>Text in SettingsView.axaml</comment></data>
   <data name="Settings.ShowHowFarAlong" xml:space="preserve"><value>Şarkı ilerlemesini görev çubuğu düğmesinde göster. Duraklatınca kehribar rengi.</value><comment>Text in SettingsView.axaml</comment></data>
+  <data name="Settings.MediaControlsTaskbar" xml:space="preserve"><value>Görev Çubuğunda Medya Kontrolleri</value><comment>Text in SettingsView.axaml</comment></data>
+  <data name="Settings.MediaControlsTaskbarDesc" xml:space="preserve"><value>Görev çubuğu simgesinin üzerine gelince Önceki, Oynat/Duraklat, İleri ve Favori düğmelerini göster.</value><comment>Text in SettingsView.axaml</comment></data>
   <data name="Settings.AutomaticAlbumCoverSize" xml:space="preserve"><value>Otomatik Albüm Kapağı Boyutu</value><comment>Text in SettingsView.axaml</comment></data>
   <data name="Settings.FiveCoversPerRow" xml:space="preserve"><value>Satır başına beş kapak. Kendi kapak boyutunu seçmek için kapat.</value><comment>Text in SettingsView.axaml</comment></data>
   <data name="Settings.Smaller" xml:space="preserve"><value>Daha küçük</value><comment>Text in SettingsView.axaml</comment></data>
@@ -286,6 +288,8 @@
   <data name="Settings.LyricsMinLineOpacityHint" xml:space="preserve"><value>Her söz satırını hafifçe görünür tut; böylece herhangi bir satıra tıklayıp oraya atlayabilirsin. %0 geçerli satırdan uzak satırları gizler.</value><comment>Text in SettingsView.axaml</comment></data>
   <data name="Settings.JoinSplitWords" xml:space="preserve"><value>Bölünmüş Kelimeleri Birleştir</value><comment>Text in SettingsView.axaml</comment></data>
   <data name="Settings.KeepWordsWholeWhen" xml:space="preserve"><value>TTML sözleri kelimeleri hecelere böldüğünde kelimeleri bütün tut.</value><comment>Text in SettingsView.axaml</comment></data>
+  <data name="Settings.LyricsGlowAndLift" xml:space="preserve"><value>Parlama ve Yükselme</value><comment>Text in SettingsView.axaml</comment></data>
+  <data name="Settings.LyricsGlowAndLiftHint" xml:space="preserve"><value>Söylenen kelimeler hafifçe yükselir, uzatılan notalar parlar (Apple Music gibi). Kapalıyken kelime senkronlu sözler sabit kalır.</value><comment>Text in SettingsView.axaml</comment></data>
   <data name="Settings.PlayerBarOpacity" xml:space="preserve"><value>Oynatıcı Çubuğu Opaklığı</value><comment>Text in SettingsView.axaml</comment></data>
   <data name="Settings.HowSolidPlaybackBar" xml:space="preserve"><value>Oynatma çubuğunun arka planının ne kadar dolgun göründüğü.</value><comment>Text in SettingsView.axaml</comment></data>
   <data name="Settings.MiniPlayerOpacity" xml:space="preserve"><value>Mini Oynatıcı Opaklığı</value><comment>Text in SettingsView.axaml</comment></data>
@@ -368,6 +372,11 @@
   <data name="Settings.ShowCurrentSongDiscord" xml:space="preserve"><value>Çalan şarkını Discord'da göster.</value><comment>Text in SettingsView.axaml</comment></data>
   <data name="Settings.ShowAlbumDiscord" xml:space="preserve"><value>Discord'da Albümü Göster</value><comment>Text in SettingsView.axaml</comment></data>
   <data name="Settings.AddAlbumNameUnder" xml:space="preserve"><value>Discord kartında sanatçının altında albüm adını göster.</value><comment>Text in SettingsView.axaml</comment></data>
+  <data name="Settings.DiscordStatusDisplay" xml:space="preserve"><value>Discord Durumu</value><comment>Settings ▸ Integrations ▸ Discord, SettingsView.axaml</comment></data>
+  <data name="Settings.DiscordStatusDisplayHint" xml:space="preserve"><value>Discord'un üye listesinde "Dinliyor" ifadesinden sonra gösterdiği bilgi.</value><comment>Settings ▸ Integrations ▸ Discord, SettingsView.axaml</comment></data>
+  <data name="Settings.DiscordStatusDisplay.Artist" xml:space="preserve"><value>Sanatçı</value><comment>Discord status line choice (SettingsViewModel)</comment></data>
+  <data name="Settings.DiscordStatusDisplay.Title" xml:space="preserve"><value>Şarkı adı</value><comment>Discord status line choice (SettingsViewModel)</comment></data>
+  <data name="Settings.DiscordStatusDisplay.AppName" xml:space="preserve"><value>Noctis</value><comment>Discord status line choice (SettingsViewModel)</comment></data>
   <data name="Settings.LastFmScrobbling" xml:space="preserve"><value>Last.fm Scrobble</value><comment>Text in SettingsView.axaml</comment></data>
   <data name="Settings.SendPlaysLastFm" xml:space="preserve"><value>Dinlemeleri Last.fm'e gönder.</value><comment>Text in SettingsView.axaml</comment></data>
   <data name="Settings.ACCOUNT" xml:space="preserve"><value>HESAP</value><comment>Text in SettingsView.axaml</comment></data>
@@ -1202,6 +1211,7 @@
   <data name="PlaybackBar.FavoriteTip" xml:space="preserve"><value>Favori</value><comment>ToolTip.Tip in PlaybackBarView.axaml</comment></data>
   <data name="PlaybackBar.OptionsTip" xml:space="preserve"><value>Seçenekler</value><comment>ToolTip.Tip in PlaybackBarView.axaml</comment></data>
   <data name="PlaybackBar.Play" xml:space="preserve"><value>Çal</value><comment>Text in PlaybackBarView.axaml</comment></data>
+  <data name="PlaybackBar.Pause" xml:space="preserve"><value>Duraklat</value><comment>Play/pause button tooltip and accessible name while playing</comment></data>
   <data name="PlaybackBar.PlayNext" xml:space="preserve"><value>Sonraki Çal</value><comment>Header in PlaybackBarView.axaml</comment></data>
   <data name="PlaybackBar.AddQueue" xml:space="preserve"><value>Kuyruğa Ekle</value><comment>Header in PlaybackBarView.axaml</comment></data>
   <data name="PlaybackBar.AddPlaylist" xml:space="preserve"><value>Çalma Listesine Ekle</value><comment>Header in PlaybackBarView.axaml</comment></data>
@@ -1564,6 +1574,9 @@
   <data name="Upmix.Surround" xml:space="preserve"><value>Surround</value><comment>Upmix mode</comment></data>
   <data name="Upmix.SurroundHint" xml:space="preserve"><value>Ortam sesi arkalara, geniş sahne öne</value><comment>Upmix mode hint</comment></data>
   <data name="Upmix.Note" xml:space="preserve"><value>Yalnızca yerleşik çıkış motoru. Özel Mod dosyanın kendi düzenini korur.</value><comment>Upmix footnote</comment></data>
+  <data name="Settings.HeadphoneSurround" xml:space="preserve"><value>Kulaklık Surround</value><comment>Text in SettingsView.axaml</comment></data>
+  <data name="Settings.HeadphoneSurroundDesc" xml:space="preserve"><value>5.1 ve 7.1 dosyalarını düz bir stereo miks yerine kulaklıkta uzamsal sese dönüştürür. Stereo şarkılar değişmez.</value><comment>Text in SettingsView.axaml</comment></data>
+  <data name="Settings.HeadphoneSurroundRestart" xml:space="preserve"><value>Bu değişikliği uygulamak için Noctis'i yeniden başlatın.</value><comment>Shown under Headphone Surround after a change, in SettingsView.axaml</comment></data>
 
   <data name="Server.AccountsMoved" xml:space="preserve"><value>Hesaplar ve cihaz eşitleme, Hesap ve Eşitleme'den yönetilir.</value><comment>Integrations → Noctis Server card footer</comment></data>
   <data name="Server.OpenAccountSync" xml:space="preserve"><value>Hesap ve Eşitleme'yi Aç</value><comment>Integrations → Noctis Server card button</comment></data>
@@ -1663,8 +1676,6 @@
   <data name="LyricsStudio.Save" xml:space="preserve"><value>Sözleri kaydet</value><comment>Review button</comment></data>
   <data name="LyricsStudio.Words" xml:space="preserve"><value>Kelimeler</value><comment>Per-line toggle that opens the word strip</comment></data>
   <data name="LyricsStudio.WordsTip" xml:space="preserve"><value>Her kelimeyi zamanıyla göster. Duymak için birine tıkla.</value><comment>Word toggle tooltip</comment></data>
-  <data name="LyricsStudio.WordEarlier" xml:space="preserve"><value>Seçili kelime 50 ms öne (komşuları yerinde kalır)</value><comment>Word nudge tooltip</comment></data>
-  <data name="LyricsStudio.WordLater" xml:space="preserve"><value>Seçili kelime 50 ms geriye (komşuları yerinde kalır)</value><comment>Word nudge tooltip</comment></data>
   <data name="LyricsStudio.TapWords" xml:space="preserve"><value>Kelimelere dokun</value><comment>Starts tap-to-time for one line</comment></data>
   <data name="LyricsStudio.TapTip" xml:space="preserve"><value>Satırı çalar. Her kelimede Boşluk'a veya Dokun'a bas; bir dokunuş daha satırı bitirir.</value><comment>Tap button tooltip</comment></data>
   <data name="LyricsStudio.Tap" xml:space="preserve"><value>Dokun</value><comment>Tap bar button</comment></data>

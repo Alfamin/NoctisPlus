@@ -8,6 +8,7 @@ using Avalonia.Controls.Primitives;
 using Avalonia.Input;
 using Avalonia.Interactivity;
 using Avalonia.Media;
+using Avalonia.Media.Immutable;
 using Avalonia.Threading;
 using Avalonia.VisualTree;
 using Noctis.Controls;
@@ -180,6 +181,7 @@ public partial class PlaybackBarView : UserControl
             RoutingStrategies.Bubble, handledEventsToo: true);
         ArtistNameButton.PointerMoved += OnArtistNamePointerMoved;
         ArtistNameButton.PointerExited += OnArtistNamePointerExited;
+        ArtistNameButton.PropertyChanged += OnArtistNameButtonPropertyChanged;
         ArtistNameButton.Click += OnArtistNameClick;
         AttachedToVisualTree += OnPlaybackBarAttachedToVisualTree;
         DetachedFromVisualTree += OnPlaybackBarDetachedFromVisualTree;
@@ -605,11 +607,15 @@ public partial class PlaybackBarView : UserControl
         if (e.Property == TextBlock.TextProperty)
         {
             ScheduleArtistNameMarqueeUpdate(resetAnimation: true);
+            RefreshArtistNameHover();
             return;
         }
 
         if (e.Property == Visual.BoundsProperty)
+        {
             ScheduleArtistNameMarqueeUpdate();
+            RefreshArtistNameHover();
+        }
     }
 
     private void OnArtistNameViewportPropertyChanged(object? sender, AvaloniaPropertyChangedEventArgs e)
@@ -625,21 +631,53 @@ public partial class PlaybackBarView : UserControl
     // Consequence" showed and behaved as a single artist.
     private string? _artistNameUnderPointer;
 
+    // Per-name hover box (Discord, Luwi 2026-10-17: "the individual outlines/highlighting in
+    // the Player Island too"): the box the rows' ArtistCreditLink paints behind the hovered
+    // name, drawn here as the hovered marquee run's own Background so it rides the ticker's
+    // TranslateTransform. Fills = the title link's artist-text-hover style (#22FFFFFF hover,
+    // #33FFFFFF pressed, PlaybackBarView.axaml Button.artist-link-btn rules).
+    private static readonly IBrush ArtistNameHoverFill = new ImmutableSolidColorBrush(Color.FromArgb(0x22, 0xFF, 0xFF, 0xFF));
+    private static readonly IBrush ArtistNamePressedFill = new ImmutableSolidColorBrush(Color.FromArgb(0x33, 0xFF, 0xFF, 0xFF));
+    private const double ArtistNameBoxRadius = 2;
+
+    /// <summary>Last pointer position over the artist link, in ArtistNameButton coordinates
+    /// (null while the pointer is elsewhere). Kept so a ticker scrolling under a still pointer
+    /// moves the box — and the click target — on to the next name.</summary>
+    private Point? _artistNamePointer;
+    private (TextBlock Run, int Left, int Right, bool Pressed, Size Size)? _artistNameBoxPainted;
+
     private void OnArtistNamePointerPressed(object? sender, PointerPressedEventArgs e) => UpdateArtistNameUnderPointer(e);
 
     private void OnArtistNamePointerMoved(object? sender, PointerEventArgs e) => UpdateArtistNameUnderPointer(e);
 
     private void OnArtistNamePointerExited(object? sender, PointerEventArgs e)
     {
-        if (_artistNameUnderPointer == null) return;
-        _artistNameUnderPointer = null;
-        ToolTip.SetTip(ArtistNameButton, Loc.T("PlaybackBar.ViewArtistTip"));
+        _artistNamePointer = null;
+        RefreshArtistNameHover();
+    }
+
+    private void OnArtistNameButtonPropertyChanged(object? sender, AvaloniaPropertyChangedEventArgs e)
+    {
+        if (e.Property == Button.IsPressedProperty)
+            RefreshArtistNameHover();
     }
 
     private void UpdateArtistNameUnderPointer(PointerEventArgs e)
     {
+        _artistNamePointer = e.GetPosition(ArtistNameButton);
+        RefreshArtistNameHover();
+    }
+
+    /// <summary>Re-resolves the name under the last pointer position: paints its box and
+    /// sets the click target + tooltip. A single-name credit boxes the name but keeps the
+    /// primary-artist click (and tooltip), as before.</summary>
+    internal void RefreshArtistNameHover()
+    {
+        var hit = _artistNamePointer is { } p ? ArtistNameHitAt(p) : null;
+        PaintArtistNameBox(hit is { } h && h.Right - h.Left >= 1 ? h : null);
+
         var text = ArtistNameTextBlock.Text;
-        var name = ArtistCreditSpans.Locate(text).Count > 1 ? ResolveArtistNameAt(text, e) : null;
+        var name = hit is { } named && ArtistCreditSpans.Locate(text).Count > 1 ? named.Span.Name : null;
         if (name == _artistNameUnderPointer) return;
         _artistNameUnderPointer = name;
         ToolTip.SetTip(ArtistNameButton, name != null
@@ -647,21 +685,47 @@ public partial class PlaybackBarView : UserControl
             : Loc.T("PlaybackBar.ViewArtistTip"));
     }
 
-    /// <summary>The credited name under the pointer, from whichever of the two marquee runs
-    /// (text or its loop copy) the pointer is over; null over a separator or outside both.
-    /// GetPosition includes the runs' TranslateTransform, so a scrolling ticker resolves too.</summary>
-    private string? ResolveArtistNameAt(string? text, PointerEventArgs e)
+    /// <summary>The credited name at <paramref name="buttonPoint"/> on whichever of the two
+    /// marquee runs (text or its loop copy) is there, with its edges in that run's
+    /// coordinates; null over a separator or outside both. TranslatePoint includes the runs'
+    /// TranslateTransform, so a scrolling ticker resolves too.</summary>
+    internal (TextBlock Run, ArtistCreditSpans.Span Span, double Left, double Right)? ArtistNameHitAt(Point buttonPoint)
     {
+        var text = ArtistNameTextBlock.Text;
         if (string.IsNullOrEmpty(text)) return null;
         foreach (var run in new[] { ArtistNameTextBlock, ArtistNameLoopCopy })
         {
             if (!run.IsVisible) continue;
-            var p = e.GetPosition(run);
-            if (p.X < 0 || p.Y < 0 || p.X > run.Bounds.Width || p.Y > run.Bounds.Height) continue;
-            var hit = run.TextLayout.HitTestPoint(p);
-            return ArtistCreditSpans.NameAt(text, hit.TextPosition);
+            if (ArtistNameButton.TranslatePoint(buttonPoint, run) is not { } local) continue;
+            if (local.X < 0 || local.Y < 0 || local.X > run.Bounds.Width || local.Y > run.Bounds.Height) continue;
+            return ArtistCreditLink.NameExtentAt(run, text, local) is { } hit
+                ? (run, hit.Span, hit.Left, hit.Right)
+                : null;
         }
         return null;
+    }
+
+    private void PaintArtistNameBox((TextBlock Run, ArtistCreditSpans.Span Span, double Left, double Right)? hit)
+    {
+        (TextBlock Run, int Left, int Right, bool Pressed, Size Size)? key = hit is { } h
+            ? (h.Run, (int)Math.Round(h.Left), (int)Math.Round(h.Right), ArtistNameButton.IsPressed, h.Run.Bounds.Size)
+            : null;
+        if (Nullable.Equals(key, _artistNameBoxPainted)) return;
+        _artistNameBoxPainted = key;
+
+        foreach (var run in new[] { ArtistNameTextBlock, ArtistNameLoopCopy })
+        {
+            if (hit is not { } box || !ReferenceEquals(run, box.Run))
+            {
+                run.ClearValue(TextBlock.BackgroundProperty);
+                continue;
+            }
+            var size = run.Bounds.Size;
+            run.Background = ArtistCreditLink.NameBoxBrush(size,
+                new Rect(box.Left, 0, box.Right - box.Left, size.Height),
+                ArtistNameButton.IsPressed ? ArtistNamePressedFill : ArtistNameHoverFill,
+                ArtistNameBoxRadius);
+        }
     }
 
     private void OnArtistNameClick(object? sender, RoutedEventArgs e)
@@ -797,6 +861,9 @@ public partial class PlaybackBarView : UserControl
             transform.X = offset;
         if (ArtistNameLoopCopy.RenderTransform is TranslateTransform copyTransform)
             copyTransform.X = offset;
+        // The text moved under a still pointer: the box and click target follow the name now there.
+        if (_artistNamePointer != null)
+            RefreshArtistNameHover();
     }
 
     private void OnVolumeSliderPropertyChanged(object? sender, AvaloniaPropertyChangedEventArgs e)
@@ -898,12 +965,24 @@ public partial class PlaybackBarView : UserControl
     // The art toggles the Mini Player on a completed click (press AND release over it),
     // not on press: a press that turned into a drag, or slid off the art, used to open it.
     private bool _albumArtPressed;
+    private Point _albumArtPressPoint;
 
     private void OnAlbumArtPressed(object? sender, PointerPressedEventArgs e)
     {
         if (!e.GetCurrentPoint(this).Properties.IsLeftButtonPressed) return;
         _albumArtPressed = true;
+        _albumArtPressPoint = e.GetPosition(this);
         e.Handled = true;
+    }
+
+    // A press that travels past the drag threshold is a song drag (DragFileBehavior on the
+    // art), not a click: a release back over the art after it must not toggle the Mini Player.
+    private void OnAlbumArtMoved(object? sender, PointerEventArgs e)
+    {
+        if (!_albumArtPressed) return;
+        var delta = e.GetPosition(this) - _albumArtPressPoint;
+        if (Math.Abs(delta.X) >= DragFileBehavior.DragThreshold || Math.Abs(delta.Y) >= DragFileBehavior.DragThreshold)
+            _albumArtPressed = false;
     }
 
     private void OnAlbumArtReleased(object? sender, PointerReleasedEventArgs e)
@@ -1678,6 +1757,7 @@ public partial class PlaybackBarView : UserControl
 
         var track = vm.CurrentTrack;
         BindViewArtist(vm, track);
+        BindChapters(vm);
 
         LyricsBackgroundClearMenuItem.IsVisible = track != null &&
             LyricsBackgroundOverrides.HasOverride(LyricsBackgroundOverrides.KeyForTrack(track));
@@ -1710,6 +1790,40 @@ public partial class PlaybackBarView : UserControl
             });
         if (TrackContextMenuBuilder.ArtistPhotoSource is { } source)
             ArtistAvatarsLoaded = LoadArtistAvatarsAsync(generation, names, photos, source);
+    }
+
+    /// <summary>
+    /// Chapters ▸ (audiobooks): one row per chapter — its title, its start time muted on the
+    /// right — seeking there on click, with the chapter under the playhead ticked like the
+    /// speed and timer menus' current choice. Visibility follows HasChapters (XAML).
+    /// </summary>
+    private void BindChapters(PlayerViewModel vm)
+    {
+        var item = ChaptersMenuItem;
+        item.Items.Clear();
+        if (!vm.HasChapters) return;
+        var chapters = vm.Chapters;
+        var current = TrackChapter.IndexAt(chapters, vm.Position);
+        for (var i = 0; i < chapters.Count; i++)
+        {
+            var chapter = chapters[i];
+            var title = new TextBlock
+            {
+                Text = chapter.Title.Length > 0 ? chapter.Title : Loc.T("PlaybackBar.ChapterNumber", i + 1),
+                MaxWidth = 320, TextTrimming = TextTrimming.CharacterEllipsis, MaxLines = 1,
+            };
+            var start = new TextBlock { Text = PlayerViewModel.FormatTime(chapter.Start), Opacity = 0.6, Margin = new Thickness(16, 0, 0, 0) };
+            Grid.SetColumn(start, 1);
+            var header = new Grid { ColumnDefinitions = new ColumnDefinitions("*,Auto") };
+            header.Children.Add(title);
+            header.Children.Add(start);
+            var row = new MenuItem { Header = header, Command = vm.SeekToChapterCommand, CommandParameter = chapter };
+            // A Grid header gives the row no accessible name; spell out title and start.
+            Avalonia.Automation.AutomationProperties.SetName(row, $"{title.Text}, {start.Text}");
+            if (i == current)
+                row.Icon = new LineIcon { Data = MenuV2.FindGeometry(this, "MenuLineCheck"), Classes = { "mv2-icon", "mv2-check" } };
+            item.Items.Add(row);
+        }
     }
 
     private int _artistAvatarGeneration;

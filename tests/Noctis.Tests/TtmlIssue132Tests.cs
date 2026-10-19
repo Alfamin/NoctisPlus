@@ -301,6 +301,53 @@ public class TtmlIssue132Tests
     }
 
     [Fact]
+    public void ToLrc_KeepsSyllableTimings_InMainAndBackgroundWords()
+    {
+        // Apple word-timed TTML times syllables as separate spans with no space between.
+        // The ELRC must tag each syllable, or the reparsed word sweeps at one even pace.
+        const string ttml = """
+            <tt xmlns="http://www.w3.org/ns/ttml" xmlns:ttm="http://www.w3.org/ns/ttml#metadata"><body><div>
+              <p begin="1" end="4"><span begin="1" end="1.5">tal</span><span begin="1.5" end="2">king</span> <span begin="2" end="3">now</span><span ttm:role="x-bg"><span begin="3" end="3.2">(o</span><span begin="3.2" end="4">oh)</span></span></p>
+            </div></body></tt>
+            """;
+        var source = Assert.Single(TtmlParser.Parse(ttml).Lines!);
+        var reparsed = Assert.Single(LrcParser.Parse(TtmlParser.ToLrc(ttml)!));
+
+        Assert.Equal(Syllables(source.Words![0]), Syllables(reparsed.Words![0]));
+        Assert.Equal(Syllables(source.BackgroundWords![0]), Syllables(reparsed.BackgroundWords![0]));
+        Assert.Equal(new[] { "talking", "now" }, reparsed.Words!.Select(w => w.Text.Trim()));
+        Assert.Equal("(ooh)", reparsed.BackgroundWords![0].Text.Trim());
+
+        static (TimeSpan, TimeSpan?, int)[] Syllables(WordTiming w) =>
+            w.Syllables?.Select(s => (s.Start, s.End, s.Length)).ToArray() ?? Array.Empty<(TimeSpan, TimeSpan?, int)>();
+    }
+
+    [Fact]
+    public void ToLrc_TranslationOfABackgroundOnlyLine_NeverBecomesASungLine()
+    {
+        // A paragraph that is only a "(…)" background vocal is written as an adlib line, which
+        // the LRC reader folds into the line before it. Its translation written at the same
+        // stamp has nothing to attach to there and came back as a lyric line of its own.
+        const string ttml = """
+            <tt xmlns="http://www.w3.org/ns/ttml" xmlns:ttm="http://www.w3.org/ns/ttml#metadata" xmlns:itunes="http://music.apple.com/lyric-ttml-internal">
+              <head><metadata><iTunesMetadata xmlns="http://music.apple.com/lyric-ttml-internal"><translations><translation xml:lang="en">
+                <text for="L1">first translated</text><text for="L2">adlib translated</text>
+              </translation></translations></iTunesMetadata></metadata></head>
+              <body><div>
+                <p begin="1" end="3" itunes:key="L1"><span begin="1" end="2">first</span> <span begin="2" end="3">line</span></p>
+                <p begin="3" end="4" itunes:key="L2"><span ttm:role="x-bg"><span begin="3" end="4">(adlib)</span></span></p>
+                <p begin="5" end="6" itunes:key="L3"><span begin="5" end="6">next</span></p>
+              </div></body>
+            </tt>
+            """;
+        var reparsed = LrcParser.Parse(TtmlParser.ToLrc(ttml)!);
+
+        Assert.Equal(new[] { "first line", "next" }, reparsed.Select(l => l.Text));
+        Assert.Equal("first translated", reparsed[0].Translation);
+        Assert.Equal("(adlib)", Assert.Single(reparsed[0].BackgroundWords!).Text.Trim());
+    }
+
+    [Fact]
     public void ToLrc_Untimed_GivesPlainText_AndMalformed_GivesNull()
     {
         Assert.Equal("a\nb", TtmlParser.ToLrc("<tt xmlns=\"http://www.w3.org/ns/ttml\"><body><p>a</p><p>b</p></body></tt>"));

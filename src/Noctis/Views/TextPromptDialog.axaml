@@ -80,6 +80,7 @@
                                FontSize="16"
                                FontWeight="SemiBold" />
                     <TextBox x:Name="InputBox"
+                             AutomationProperties.Name="{Binding #TitleText.Text}"
                              CornerRadius="999"
                              Padding="14,8"
                              KeyDown="OnInputKeyDown" />

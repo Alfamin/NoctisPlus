@@ -3,6 +3,7 @@ using System.Windows.Input;
 using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Input;
+using Avalonia.Interactivity;
 using Avalonia.Platform.Storage;
 using Avalonia.Threading;
 using Avalonia.VisualTree;
@@ -25,7 +26,121 @@ public partial class LibraryArtistsView : UserControl
     {
         InitializeComponent();
 
+        // List view (Discord, vari): double-click / Enter opens the artist, the arrow keys
+        // move the selection, right-click anywhere on a row gives the tile's menu.
+        ArtistTable.DoubleTapped += OnArtistTableDoubleTapped;
+        ArtistTable.AddHandler(KeyDownEvent, OnArtistTableKeyDown, RoutingStrategies.Tunnel);
+        ArtistTable.AddHandler(PointerPressedEvent, OnArtistTablePointerPressed, RoutingStrategies.Tunnel);
+        ArtistTable.ContainerPrepared += OnArtistTableContainerPrepared;
+        ArtistTable.ContainerClearing += OnArtistTableContainerClearing;
+
         DataContextChanged += OnDataContextChanged;
+    }
+
+    /// <summary>The list the page shows now: the portrait grid, or the list view's rows.</summary>
+    private ListBox ActiveList => _vm?.IsListView == true ? ArtistTable : ArtistListBox;
+
+    /// <summary>Height of one list row: the 36px portrait, the row-body's 8px top and bottom, and the
+    /// track-list ListBoxItem's 1px border (Styles.axaml) top and bottom, as on a Songs row.</summary>
+    internal const double ListRowHeight = 54;
+
+    private void OnArtistTablePointerPressed(object? sender, PointerPressedEventArgs e)
+    {
+        // The rows are not focusable (Songs' pattern), so a click hands the keyboard to the
+        // list itself; OnArtistTableKeyDown then moves the selection.
+        if (!ArtistTable.IsKeyboardFocusWithin)
+            ArtistTable.Focus();
+    }
+
+    private void OnArtistTableKeyDown(object? sender, KeyEventArgs e)
+    {
+        if (e.KeyModifiers != KeyModifiers.None) return;
+        var count = ArtistTable.ItemCount;
+        if (count == 0) return;
+        var index = ArtistTable.SelectedIndex;
+
+        int target;
+        switch (e.Key)
+        {
+            case Key.Enter:
+                if (ArtistTable.SelectedItem is ArtistListRow row)
+                {
+                    OpenArtist(row.Artist);
+                    e.Handled = true;
+                }
+                return;
+            case Key.Down: target = index < 0 ? 0 : index + 1; break;
+            case Key.Up: target = index < 0 ? 0 : index - 1; break;
+            case Key.Home: target = 0; break;
+            case Key.End: target = count - 1; break;
+            case Key.PageDown: target = (index < 0 ? 0 : index) + PageRows(); break;
+            case Key.PageUp: target = (index < 0 ? 0 : index) - PageRows(); break;
+            default: return;
+        }
+
+        target = Math.Clamp(target, 0, count - 1);
+        ArtistTable.SelectedIndex = target;
+        ArtistTable.ScrollIntoView(target);
+        e.Handled = true;
+    }
+
+    /// <summary>Rows one viewport holds, for Page Up / Page Down (at least one).</summary>
+    private int PageRows()
+    {
+        var sv = ArtistTable.FindDescendantOfType<ScrollViewer>();
+        var viewport = sv?.Viewport.Height ?? 0;
+        return Math.Max(1, (int)(viewport / ListRowHeight) - 1);
+    }
+
+    private void OnArtistTableDoubleTapped(object? sender, TappedEventArgs e)
+    {
+        // A double-click on the 3-dots button only opens its menu.
+        if (e.Source is Control source && source.FindAncestorOfType<Button>(includeSelf: true) != null)
+            return;
+        if ((e.Source as Visual)?.FindAncestorOfType<ListBoxItem>(includeSelf: true)?.DataContext is ArtistListRow row)
+            OpenArtist(row.Artist);
+    }
+
+    private void OpenArtist(Artist artist)
+    {
+        if (DataContext is LibraryArtistsViewModel vm)
+            vm.OpenArtistCommand.Execute(artist);
+    }
+
+    private void OnArtistTableContainerPrepared(object? sender, ContainerPreparedEventArgs e)
+    {
+        if (e.Container is ListBoxItem item)
+            item.ContextRequested += OnArtistRowContextRequested;
+    }
+
+    private void OnArtistTableContainerClearing(object? sender, ContainerClearingEventArgs e)
+    {
+        if (e.Container is not ListBoxItem item) return;
+        item.ContextRequested -= OnArtistRowContextRequested;
+        if (ReferenceEquals(_menuOwner, item))
+        {
+            item.ContextMenu = null;
+            _menuOwner = null;
+        }
+    }
+
+    private void OnArtistRowContextRequested(object? sender, ContextRequestedEventArgs e)
+    {
+        if (sender is ListBoxItem item && item.DataContext is ArtistListRow row
+            && OpenArtistMenu(item, row.Artist, PlacementMode.Pointer))
+            e.Handled = true;
+    }
+
+    private void OnArtistRowOptionsClick(object? sender, RoutedEventArgs e)
+    {
+        if (sender is not Button button || button.Tag is not ArtistListRow row) return;
+        if (_artistMenu?.Menu is { IsOpen: true } open && ReferenceEquals(_menuOwner, button))
+        {
+            open.Close();
+            return;
+        }
+        if (OpenArtistMenu(button, row.Artist, PlacementMode.BottomEdgeAlignedRight))
+            e.Handled = true;
     }
 
     // ── Artist tiles: one shared v2 menu (10-09 redesign), bound to the tile on open ──
@@ -39,13 +154,14 @@ public partial class LibraryArtistsView : UserControl
 
     private void OnArtistTileContextRequested(object? sender, ContextRequestedEventArgs e)
     {
-        if (sender is Button tile && OpenArtistMenu(tile))
+        if (sender is Button tile && tile.DataContext is Artist artist && OpenArtistMenu(tile, artist, PlacementMode.Pointer))
             e.Handled = true;
     }
 
-    private bool OpenArtistMenu(Button tile)
+    /// <summary>Opens the shared artist menu for <paramref name="artist"/> on <paramref name="tile"/>
+    /// (a grid tile, a list row, or a list row's 3-dots button).</summary>
+    private bool OpenArtistMenu(Control tile, Artist artist, PlacementMode placement)
     {
-        if (tile.DataContext is not Artist artist) return false;
         if (DataContext is not LibraryArtistsViewModel) return false;
 
         // Rebuilt after a live language switch so the menu follows it.
@@ -76,7 +192,7 @@ public partial class LibraryArtistsView : UserControl
             prev.ContextMenu = null;
         _menuOwner = tile;
         tile.ContextMenu = menu;
-        menu.Placement = PlacementMode.Pointer;
+        menu.Placement = placement;
         menu.Open(tile);
         return true;
     }
@@ -252,9 +368,10 @@ public partial class LibraryArtistsView : UserControl
 
         Dispatcher.UIThread.Post(() =>
         {
-            var sv = ArtistListBox.FindDescendantOfType<ScrollViewer>();
-            if (sv != null)
-                sv.Offset = new Vector(0, 0);
+            // Both layouts carry the same results (ApplyFilter rebuilds them together).
+            foreach (var list in new[] { ArtistListBox, ArtistTable })
+                if (list.FindDescendantOfType<ScrollViewer>() is { } sv)
+                    sv.Offset = new Vector(0, 0);
         }, DispatcherPriority.Background);
     }
 
@@ -264,7 +381,7 @@ public partial class LibraryArtistsView : UserControl
 
         if (DataContext is LibraryArtistsViewModel vm)
         {
-            var sv = ArtistListBox.FindDescendantOfType<ScrollViewer>();
+            var sv = ActiveList.FindDescendantOfType<ScrollViewer>();
             if (sv != null)
                 vm.SavedScrollOffset = sv.Offset.Y;
         }
@@ -273,14 +390,18 @@ public partial class LibraryArtistsView : UserControl
         base.OnDetachedFromVisualTree(e);
     }
 
+    /// <summary>The list a pending scroll restore is waiting on (hidden until it lands).</summary>
+    private ListBox? _scrollRestoreList;
+
     private void CancelPendingScrollRestore()
     {
-        if (_pendingScrollRestore != null)
+        if (_pendingScrollRestore != null && _scrollRestoreList != null)
         {
-            ArtistListBox.LayoutUpdated -= _pendingScrollRestore;
-            _pendingScrollRestore = null;
-            ArtistListBox.Opacity = 1;
+            _scrollRestoreList.LayoutUpdated -= _pendingScrollRestore;
+            _scrollRestoreList.Opacity = 1;
         }
+        _pendingScrollRestore = null;
+        _scrollRestoreList = null;
     }
 
     protected override void OnSizeChanged(SizeChangedEventArgs e)
@@ -313,15 +434,16 @@ public partial class LibraryArtistsView : UserControl
 
         if (DataContext is LibraryArtistsViewModel vm && vm.SavedScrollOffset > 0)
         {
-            // Hide ListBox until scroll is restored to prevent flash-at-top flicker
-            ArtistListBox.Opacity = 0;
+            // Hide the list until scroll is restored to prevent flash-at-top flicker
+            var list = ActiveList;
+            list.Opacity = 0;
             var targetOffset = vm.SavedScrollOffset;
             var attempts = 0;
 
             _pendingScrollRestore = (s, args) =>
             {
                 attempts++;
-                var sv = ArtistListBox.FindDescendantOfType<ScrollViewer>();
+                var sv = list.FindDescendantOfType<ScrollViewer>();
                 if (sv == null) return;
 
                 // Wait until the ScrollViewer extent is tall enough, with safety limit
@@ -331,11 +453,12 @@ public partial class LibraryArtistsView : UserControl
                 // Clamp to actual extent if content shrank since last visit
                 var clampedOffset = Math.Min(targetOffset, Math.Max(0, sv.Extent.Height - sv.Viewport.Height));
                 sv.Offset = new Vector(0, clampedOffset);
-                ArtistListBox.Opacity = 1;
+                list.Opacity = 1;
                 CancelPendingScrollRestore();
             };
 
-            ArtistListBox.LayoutUpdated += _pendingScrollRestore;
+            _scrollRestoreList = list;
+            list.LayoutUpdated += _pendingScrollRestore;
         }
     }
 }

@@ -25,7 +25,7 @@ public static class WindowsFileAssociations
     public static readonly string[] Extensions =
     {
         ".mp3", ".flac", ".ogg", ".oga", ".m4a", ".wav", ".wma", ".aac",
-        ".opus", ".aiff", ".aif", ".aifc", ".ape", ".wv", ".alac", ".dsf", ".dff",
+        ".opus", ".aiff", ".aif", ".aifc", ".ape", ".wv", ".alac", ".dsf", ".dff", ".m4b",
     };
 
     [DllImport("shell32.dll")]

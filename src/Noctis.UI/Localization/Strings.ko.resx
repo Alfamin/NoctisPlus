@@ -816,6 +816,14 @@
     <value>작업 표시줄 버튼에 곡 진행률을 표시합니다. 일시정지 중에는 주황색입니다.</value>
     <comment>Text in SettingsView.axaml</comment>
   </data>
+  <data name="Settings.MediaControlsTaskbar" xml:space="preserve">
+    <value>작업 표시줄에 미디어 컨트롤 표시</value>
+    <comment>Text in SettingsView.axaml</comment>
+  </data>
+  <data name="Settings.MediaControlsTaskbarDesc" xml:space="preserve">
+    <value>작업 표시줄 아이콘에 마우스를 올리면 이전, 재생/일시정지, 다음, 즐겨찾기 버튼을 표시합니다.</value>
+    <comment>Text in SettingsView.axaml</comment>
+  </data>
   <data name="Settings.AutomaticAlbumCoverSize" xml:space="preserve">
     <value>앨범 커버 크기 자동 조정</value>
     <comment>Text in SettingsView.axaml</comment>
@@ -1018,6 +1026,14 @@
   </data>
   <data name="Settings.KeepWordsWholeWhen" xml:space="preserve">
     <value>TTML 가사가 단어를 음절로 나누어도 단어를 온전하게 유지합니다.</value>
+    <comment>Text in SettingsView.axaml</comment>
+  </data>
+  <data name="Settings.LyricsGlowAndLift" xml:space="preserve">
+    <value>글로우 및 리프트</value>
+    <comment>Text in SettingsView.axaml</comment>
+  </data>
+  <data name="Settings.LyricsGlowAndLiftHint" xml:space="preserve">
+    <value>부른 단어가 살짝 떠오르고 길게 끄는 음이 빛납니다(Apple Music처럼). 끄면 단어 동기화 가사가 움직이지 않습니다.</value>
     <comment>Text in SettingsView.axaml</comment>
   </data>
   <data name="Settings.PlayerBarOpacity" xml:space="preserve">
@@ -1299,6 +1315,26 @@
   <data name="Settings.AddAlbumNameUnder" xml:space="preserve">
     <value>Discord 카드에서 아티스트 아래에 앨범 이름을 표시합니다.</value>
     <comment>Text in SettingsView.axaml</comment>
+  </data>
+  <data name="Settings.DiscordStatusDisplay" xml:space="preserve">
+    <value>Discord 상태</value>
+    <comment>Settings ▸ Integrations ▸ Discord, SettingsView.axaml</comment>
+  </data>
+  <data name="Settings.DiscordStatusDisplayHint" xml:space="preserve">
+    <value>멤버 목록의 상태에 Discord가 표시할 내용입니다.</value>
+    <comment>Settings ▸ Integrations ▸ Discord, SettingsView.axaml</comment>
+  </data>
+  <data name="Settings.DiscordStatusDisplay.Artist" xml:space="preserve">
+    <value>아티스트</value>
+    <comment>Discord status line choice (SettingsViewModel)</comment>
+  </data>
+  <data name="Settings.DiscordStatusDisplay.Title" xml:space="preserve">
+    <value>곡 제목</value>
+    <comment>Discord status line choice (SettingsViewModel)</comment>
+  </data>
+  <data name="Settings.DiscordStatusDisplay.AppName" xml:space="preserve">
+    <value>Noctis</value>
+    <comment>Discord status line choice (SettingsViewModel)</comment>
   </data>
   <data name="Settings.LastFmScrobbling" xml:space="preserve">
     <value>Last.fm 스크로블링</value>
@@ -4376,6 +4412,10 @@
     <value>재생</value>
     <comment>Text in PlaybackBarView.axaml</comment>
   </data>
+  <data name="PlaybackBar.Pause" xml:space="preserve">
+    <value>일시정지</value>
+    <comment>Play/pause button tooltip and accessible name while playing</comment>
+  </data>
   <data name="PlaybackBar.PlayNext" xml:space="preserve">
     <value>다음에 재생</value>
     <comment>Header in PlaybackBarView.axaml</comment>
@@ -5659,6 +5699,18 @@
     <value>내장 출력 엔진에서만 작동합니다. 독점 모드는 파일 고유의 채널 배치를 유지합니다.</value>
     <comment>Upmix footnote</comment>
   </data>
+  <data name="Settings.HeadphoneSurround" xml:space="preserve">
+    <value>헤드폰 서라운드</value>
+    <comment>Text in SettingsView.axaml</comment>
+  </data>
+  <data name="Settings.HeadphoneSurroundDesc" xml:space="preserve">
+    <value>5.1 및 7.1 파일을 평평한 스테레오 믹스 대신 헤드폰용 공간 음향으로 바꿉니다. 스테레오 곡은 바뀌지 않습니다.</value>
+    <comment>Text in SettingsView.axaml</comment>
+  </data>
+  <data name="Settings.HeadphoneSurroundRestart" xml:space="preserve">
+    <value>변경 사항을 적용하려면 Noctis를 다시 시작하세요.</value>
+    <comment>Shown under Headphone Surround after a change, in SettingsView.axaml</comment>
+  </data>
   <data name="Server.AccountsMoved" xml:space="preserve">
     <value>계정과 기기 동기화는 계정 및 동기화에서 관리합니다.</value>
     <comment>Integrations → Noctis Server card footer</comment>
@@ -6034,14 +6086,6 @@
   <data name="LyricsStudio.WordsTip" xml:space="preserve">
     <value>각 단어와 시간을 표시합니다. 클릭하면 들을 수 있습니다.</value>
     <comment>Word toggle tooltip</comment>
-  </data>
-  <data name="LyricsStudio.WordEarlier" xml:space="preserve">
-    <value>선택한 단어 50ms 앞으로 (이웃 단어는 그대로)</value>
-    <comment>Word nudge tooltip</comment>
-  </data>
-  <data name="LyricsStudio.WordLater" xml:space="preserve">
-    <value>선택한 단어 50ms 뒤로 (이웃 단어는 그대로)</value>
-    <comment>Word nudge tooltip</comment>
   </data>
   <data name="LyricsStudio.TapWords" xml:space="preserve">
     <value>단어 탭하기</value>

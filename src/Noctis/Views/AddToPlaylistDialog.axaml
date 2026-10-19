@@ -132,6 +132,7 @@
             <StackPanel x:Name="ListPane" VerticalAlignment="Top" Margin="28,20,28,22" Spacing="16">
                 <Button x:Name="CreateNewButton"
                         Classes="pill-primary"
+                        AutomationProperties.Name="{loc:T AddToPlaylist.CreateNewPlaylist}"
                         HorizontalAlignment="Stretch"
                         Command="{Binding ShowCreateCommand}">
                     <StackPanel Orientation="Horizontal" Spacing="8">
@@ -154,6 +155,7 @@
                             <ItemsControl.ItemTemplate>
                                 <DataTemplate x:DataType="vm:AddToPlaylistRow">
                                     <Button Classes="atp-row"
+                                            AutomationProperties.Name="{Binding Playlist.Label}"
                                             Classes.on-playlist="{Binding IsAlreadyOnPlaylist}"
                                             Command="{Binding $parent[Window].((vm:AddToPlaylistDialogViewModel)DataContext).SelectPlaylistCommand}"
                                             CommandParameter="{Binding Playlist}">
@@ -242,6 +244,7 @@
                     <TextBlock Classes="atp-label" Text="{loc:T AddToPlaylist.Name}" />
                     <TextBox x:Name="NameTextBox"
                              Classes="pill-field"
+                             AutomationProperties.Name="{loc:T AddToPlaylist.Name}"
                              Text="{Binding NewPlaylistName}"
                              Watermark="{loc:T AddToPlaylist.PlaylistName}">
                         <TextBox.KeyBindings>
@@ -253,6 +256,7 @@
                     <TextBlock Classes="atp-label" Text="{loc:T AddToPlaylist.Description}" />
                     <TextBox x:Name="DescriptionTextBox"
                              Classes="pill-field"
+                             AutomationProperties.Name="{loc:T AddToPlaylist.Description}"
                              Text="{Binding NewPlaylistDescription}"
                              Watermark="{loc:T AddToPlaylist.Optional}" />
                 </StackPanel>

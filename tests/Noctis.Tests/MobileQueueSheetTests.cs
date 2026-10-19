@@ -329,8 +329,9 @@ public class MobileQueueSheetTests
         var (rig, window, view, page, _) = OpenQueue();
         using var _rig = rig;
         var chrome = view.FindControl<Panel>("BottomChrome")!;
+        var layer = view.FindControl<Panel>("ChromeLayer")!;   // the bar's full-screen layer, raised over the Queue
         var sheet = MobileFixtures.Named<Border>(page, "Sheet");
-        Assert.True(chrome.ZIndex > page.ZIndex);
+        Assert.True(layer.ZIndex > page.ZIndex);
 
         Assert.True(rig.Shell.TryHandleBack());
         var gaps = new System.Collections.Generic.List<double>();
@@ -343,7 +344,7 @@ public class MobileQueueSheetTests
         Assert.True(rig.Shell.IsNowPlayingOpen);
         Assert.Contains(gaps, g => g == 0);
         Assert.All(gaps, g => Assert.True(g < 1, $"the bar and the sheet {g} apart"));
-        Assert.True(chrome.ZIndex <= page.ZIndex, "the bar still sits over Now Playing");
+        Assert.True(layer.ZIndex <= page.ZIndex, "the bar still sits over Now Playing");
         Assert.Equal(0, chrome.RenderTransform?.Value.M32 ?? 0);   // back in place for when the player closes
         window.Close();
     }

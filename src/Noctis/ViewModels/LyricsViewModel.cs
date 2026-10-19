@@ -311,6 +311,29 @@ public partial class LyricsViewModel : ViewModelBase, IDisposable
     [ObservableProperty]
     private int _activeLineIndex = -1;
 
+    /// <summary>The line the lyric list glides to: <see cref="ActiveLineIndex"/>, or the next
+    /// line up to <see cref="Helpers.LineMotion.NinetyTravelMs"/> early (LyricsTimeline.ScrollIndex)
+    /// so the list has arrived when its first word starts. The views scroll on this; the
+    /// highlight and sweep stay on ActiveLineIndex.</summary>
+    [ObservableProperty]
+    private int _scrollLineIndex = -1;
+
+    // Every reset/seek of the active line resets the scroll target with it; the early
+    // lead is re-derived by the next UpdateActiveLine.
+    partial void OnActiveLineIndexChanged(int value) => ScrollLineIndex = value;
+
+    // Apple Music brightens and un-blurs the incoming line as the list sets off toward
+    // it, not when its first word starts — measured: incoming sharpness and brightness
+    // follow the glide (half-way ~160 ms in), the outgoing line dims within ~100 ms. So
+    // the focus ramp moves with the early glide; the sweep stays on activation. A lead
+    // dropped with the line unchanged (a seek back within it) brings the focus back.
+    partial void OnScrollLineIndexChanged(int oldValue, int newValue)
+    {
+        if (ActiveLineIndex >= 0 && _hasSyncedLyrics && IsSyncTabSelected
+            && (newValue == ActiveLineIndex + 1 || oldValue == ActiveLineIndex + 1 && newValue == ActiveLineIndex))
+            UpdateLineOpacities(ActiveLineIndex);
+    }
+
     /// <summary>Whether to show favorite heart in metadata row (reflects current track's favorite status).</summary>
     public bool ShowMetadataFavoriteHeart => Player?.CurrentTrack?.IsFavorite ?? false;
 
@@ -616,6 +639,7 @@ public partial class LyricsViewModel : ViewModelBase, IDisposable
     {
         _timeline = new LyricsTimeline(LyricLines, WordLookahead, LyricsLookahead);
         _player = player;
+        _timeline.WordMotion = player.LyricsGlowAndLift;
         _lrcLib = lrcLib;
         _netEase = netEase;
         _metadata = metadata;
@@ -2327,6 +2351,32 @@ public partial class LyricsViewModel : ViewModelBase, IDisposable
             LoadLyricsForTrack(current);
     }
 
+    /// <summary>
+    /// The Lyrics Studio's live preview pane (10-14): like <see cref="ShowPreview"/>, but when this
+    /// track's preview is already on screen the new text is applied in place — no fade, no disk
+    /// probe — so a nudge shows at once. A preview of another song is dropped first: it would stay
+    /// on screen (<see cref="ShowPreview"/> only reloads the track it is given).
+    /// </summary>
+    public void UpdatePreview(Track track, string syncedText)
+    {
+        if (_previewTrackId is { } other && other != track.Id) ClearPreview();
+        if (!IsPreviewActive || _previewTrackId != track.Id || _currentTrack is not { } current
+            || current.Id != track.Id || _player.CurrentTrack?.Id != track.Id)
+        {
+            ShowPreview(track, syncedText);
+            return;
+        }
+        if (syncedText == _previewText) return;
+        _previewText = syncedText;
+        var lines = ParseLrcContent(syncedText);
+        if (lines.Count == 0) return;
+        // A probe still in flight (an earlier reload) must not land over these lines.
+        ++_searchGeneration;
+        _timeline.Reset();
+        ActiveLineIndex = -1;
+        ApplyLocalLyricsResult(current, new LocalLyricsProbe(lines, null, PreviewSource, FromCache: false));
+    }
+
     /// <summary>Drops the preview; if it was for the loaded track, its real lyrics reload.</summary>
     public void ClearPreview()
     {
@@ -2622,6 +2672,7 @@ public partial class LyricsViewModel : ViewModelBase, IDisposable
             UpdateActiveLine(GetPlaybackPosition());
             UpdateLineOpacities(ActiveLineIndex);
             OnPropertyChanged(nameof(ActiveLineIndex));
+            OnPropertyChanged(nameof(ScrollLineIndex));
         }
         else
         {
@@ -2696,6 +2747,11 @@ public partial class LyricsViewModel : ViewModelBase, IDisposable
         {
             OnPropertyChanged(nameof(IsLyricsFocusActive));
             RefreshFocusDimming();
+        }
+        // Glow & lift flipped: the running lines settle (off) or pick it up next frame (on).
+        else if (e.PropertyName == nameof(PlayerViewModel.LyricsGlowAndLift))
+        {
+            _timeline.WordMotion = _player.LyricsGlowAndLift;
         }
         // Minimum line opacity moved: re-floor the ramp in place.
         else if (e.PropertyName == nameof(PlayerViewModel.LyricsMinLineOpacity))
@@ -2948,12 +3004,16 @@ public partial class LyricsViewModel : ViewModelBase, IDisposable
         // or lyrics saved for the song since.
         var hasSyncedField = !string.IsNullOrWhiteSpace(track.SyncedLyrics);
         var hasPlainField = !string.IsNullOrWhiteSpace(track.Lyrics);
+        // A whole TTML document as the song's lyrics text (pasted into a tagger's lyrics field,
+        // GitHub #132) is Apple's timed lyrics, not words to print: it showed as its markup.
+        if (!hasSyncedField && ProbeTtmlText(track.Lyrics, joinSplitWords, uiLanguage) is { } ttmlField)
+            return ttmlField;
         // Without timed lyrics there, the file's tags are read now (GitHub #135): a SYLT frame,
         // a SYNCEDLYRICS comment or an UNSYNCEDLYRICS alias was never scanned before #135, and
         // a library is not rescanned until its files change. Before the online cache, which
         // must not shadow the file's own lyrics.
         if (!hasSyncedField && !LrcParser.ContainsTimestamp(track.Lyrics)
-            && ProbeEmbeddedTags(track, hasPlainField ? track.Lyrics : null) is { } fromTags)
+            && ProbeEmbeddedTags(track, hasPlainField ? track.Lyrics : null, joinSplitWords, uiLanguage) is { } fromTags)
             return fromTags;
         if (hasSyncedField || hasPlainField)
             return new LocalLyricsProbe(null, null, "Embedded", FromCache: false);
@@ -2991,12 +3051,15 @@ public partial class LyricsViewModel : ViewModelBase, IDisposable
     /// <paramref name="rowPlain"/> on the Plain tab when given), or plain text when the row has
     /// none. Null when the file adds nothing, or is not a local file that exists.
     /// </summary>
-    private static LocalLyricsProbe? ProbeEmbeddedTags(Track track, string? rowPlain)
+    private static LocalLyricsProbe? ProbeEmbeddedTags(Track track, string? rowPlain, bool joinSplitWords, string uiLanguage)
     {
         var path = track.FilePath;
         if (track.SourceType != SourceType.Local || string.IsNullOrWhiteSpace(path) || !File.Exists(path)) return null;
         var embedded = EmbeddedLyrics.ReadFile(path);
         if (embedded.IsEmpty) return null;
+
+        if (string.IsNullOrWhiteSpace(rowPlain) && ProbeTtmlText(embedded.Text, joinSplitWords, uiLanguage) is { } ttml)
+            return ttml;
 
         var timed = embedded.TimedText;
         if (!string.IsNullOrWhiteSpace(timed))
@@ -3013,6 +3076,20 @@ public partial class LyricsViewModel : ViewModelBase, IDisposable
         if (string.IsNullOrWhiteSpace(text)) return null;
         var rows = LrcParser.SplitPlain(text).Select(l => new LyricLine { Text = LrcParser.SoftWrap(l), IsActive = true }).ToList();
         return rows.Count == 0 ? null : new LocalLyricsProbe(rows, text, "Embedded:Tags", FromCache: false);
+    }
+
+    /// <summary>
+    /// Lyrics text that is a TTML document, read as a .ttml beside the song would be (word and
+    /// line timing, singers, layers); its LRC form backs "Save Lyrics to File". Null when the
+    /// text is not TTML or does not parse.
+    /// </summary>
+    private static LocalLyricsProbe? ProbeTtmlText(string? text, bool joinSplitWords, string uiLanguage)
+    {
+        if (!TtmlParser.LooksLikeTtml(text)) return null;
+        var (lines, plain) = TtmlParser.Parse(text, joinSplitWords, uiLanguage);
+        if (lines is not { Count: > 0 }) return null;
+        return new LocalLyricsProbe(lines, plain, "Embedded:Ttml", FromCache: false,
+            TtmlParser.ToLrc(text, joinSplitWords, uiLanguage));
     }
 
     private void ApplyLocalLyricsResult(Track track, LocalLyricsProbe probe)
@@ -3381,17 +3458,16 @@ public partial class LyricsViewModel : ViewModelBase, IDisposable
     {
         if (!_hasSyncedLyrics || LyricLines.Count == 0) return null;
 
-        // A line's romanization / translation go back as lines at its own timestamp
-        // (GitHub #116) — the LRC shape they load from — so the editor's save keeps them.
         var lines = LyricLines
             .Where(l => !string.IsNullOrWhiteSpace(l.Text) && l.Text != "...")
-            .SelectMany(l => LrcParser.CompanionLines(l)
-                .Prepend(l.Text.Replace("\r\n", " ").Replace('\n', ' ').Trim())
-                .Select(text => (l.Timestamp, Text: text)))
             .ToList();
 
+        // Written back in the LRC shape each layer loads from: word tags, "v2:"/"v3:" voices,
+        // the "[bg: …]" vocal, romanization / translation at the line's own timestamp (GitHub
+        // #116). Plain "[mm:ss.xx]text" lost all but the last, so a save from the editor —
+        // a line untouched, even — turned a word-timed sidecar into line timing.
         return lines.Any(l => l.Timestamp.HasValue)
-            ? LrcEditorViewModel.BuildLrcPreservingUntimed(lines)
+            ? TtmlParser.ToLrc(lines)
             : null;
     }
 
@@ -3512,14 +3588,28 @@ public partial class LyricsViewModel : ViewModelBase, IDisposable
         position -= LyricsOffset;
         if (position < TimeSpan.Zero) position = TimeSpan.Zero;
         var step = _timeline.Update(position);
-        if (!step.LineChanged) return;
+        // The set also changes without a line change: an overlapping (duet) line that
+        // stays lit under the active one finishes, so the ramp re-centres on what's left.
+        if (!step.ActiveSetChanged)
+        {
+            ScrollLineIndex = _timeline.Lead(position, ScrollLead);
+            return;
+        }
         if (DebugLog.VlcBridgeEnabled)
-            Views.LyricsView.Trace($"active {ActiveLineIndex}→{step.ActiveIndex} at {position.TotalMilliseconds:0}ms" +
-                                   (step.ActiveLine?.Timestamp is { } ts ? $" (line starts {ts.TotalMilliseconds:0}ms)" : ""));
+        {
+            var lit = _timeline.ActiveIndices.Count > 1 ? $" lit [{string.Join(",", _timeline.ActiveIndices)}]" : "";
+            Views.LyricsView.Trace(step.LineChanged
+                ? $"active {ActiveLineIndex}→{step.ActiveIndex} at {position.TotalMilliseconds:0}ms" +
+                  (step.ActiveLine?.Timestamp is { } ts ? $" (line starts {ts.TotalMilliseconds:0}ms)" : "") + lit
+                : $"lit set [{string.Join(",", _timeline.ActiveIndices)}] at {position.TotalMilliseconds:0}ms (active {step.ActiveIndex})");
+        }
         ActiveLineIndex = step.ActiveIndex;
+        ScrollLineIndex = _timeline.Lead(position, ScrollLead);
         UpdateLineOpacities(step.ActiveIndex);
         UpdateWordClockSubscription();
     }
+
+    private static readonly TimeSpan ScrollLead = TimeSpan.FromMilliseconds(Helpers.LineMotion.NinetyTravelMs);
 
     /// <summary>
     /// Continuous playback clock for the sweep and line engine. The raw position
@@ -3622,8 +3712,20 @@ public partial class LyricsViewModel : ViewModelBase, IDisposable
         && IsAnyLyricsSurfaceVisible
         && _player.State == Models.PlaybackState.Playing
         && _lyricsSyncTimer.IsEnabled
-        && (_timeline.ActiveLine?.HasWords == true || _timeline.ActiveLine?.HasBackgroundWords == true
-            || _timeline.ActiveLine?.HasTransliterationWords == true);
+        && AnyActiveLineHasWordLayer();
+
+    // Any lit line, not just the active one: an overlapping duet line keeps sweeping
+    // under a plain active line and would freeze if only the active line counted.
+    private bool AnyActiveLineHasWordLayer()
+    {
+        // A held note finishing its letter animation on a line that just went inactive
+        // still needs frames, even when the new line is plain text.
+        if (_timeline.HasEmphasisInFlight) return true;
+        foreach (var line in _timeline.ActiveLines)
+            if (line.HasWords || line.HasBackgroundWords || line.HasTransliterationWords)
+                return true;
+        return false;
+    }
 
     private void OnWordClockFrame(TimeSpan _)
     {
@@ -3648,7 +3750,9 @@ public partial class LyricsViewModel : ViewModelBase, IDisposable
     }
 
     /// <summary>
-    /// Sets LineOpacity on each lyric line based on distance from the active line.
+    /// Sets LineOpacity on each lyric line based on distance from the nearest lit line
+    /// (the active line or an overlapping duet line still being sung, see
+    /// <see cref="LyricsTimeline.ActiveIndices"/>).
     /// Active=1.0, adjacent lines fade gradually over ±9 lines, rest=0.0 (hidden);
     /// fullscreen focus (opt-in) tightens the ramp to the active line ±2.
     /// Pass activeIndex=-1 to restore all lines to full opacity (e.g. unsynced or reset).
@@ -3676,10 +3780,18 @@ public partial class LyricsViewModel : ViewModelBase, IDisposable
         // from its lyrics. 0 keeps the ramp as designed.
         var floor = Math.Clamp(_player.LyricsMinLineOpacity, 0, 100) / 100.0;
 
+        // Distance to the NEAREST lit line: overlapping duet lines all sit at full focus.
+        // While the list leads into the next line (ScrollLineIndex), focus is on that line
+        // alone — the lead only starts once every lit line has finished being sung.
+        IReadOnlyList<int> lit = _timeline.ActiveIndices;
+        if (ScrollLineIndex == activeIndex + 1)
+        {
+            activeIndex = ScrollLineIndex;
+            lit = Array.Empty<int>();
+        }
         for (int i = 0; i < LyricLines.Count; i++)
         {
-            var dist = i - activeIndex;
-            var absDist = Math.Abs(dist);
+            var absDist = LyricsTimeline.DistanceToNearestActive(i, activeIndex, lit);
             var opacity = focus
                 ? absDist switch
                 {

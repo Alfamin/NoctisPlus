@@ -170,6 +170,17 @@ public partial class MainWindow : Window, IPageKeyOverlayHost
     private DockPanel? _rootPanel;
     private Border? _settingsOverlay;
     private Controls.BlurredBackdrop? _settingsScrim;
+
+    /// <summary>
+    /// Whether a Settings property change repaints the app under the open sheet, so the
+    /// scrim's blurred snapshot of it is retaken. Progress streams (scan, downloads) change
+    /// nothing visible under the blur. Background Blur changes only the blur itself: the scrim
+    /// re-blurs the snapshot it holds (BackdropSnapshot.BlurRadiusChanged), and a full retake
+    /// per drag step on top of that made the slider stutter (owner 10-18).
+    /// </summary>
+    internal static bool SettingChangeRepaintsUnderSheet(string? propertyName) =>
+        RepaintsAppUnderSettings(propertyName)
+        && propertyName is not (nameof(SettingsViewModel.BackgroundBlurAmount) or nameof(SettingsViewModel.BackgroundBlurLabel));
     /// <summary>Bumped on every Settings open/close, so a reveal still waiting for the
     /// backdrop snapshot knows when it has been overtaken.</summary>
     private int _settingsSheetEpoch;
@@ -482,6 +493,25 @@ public partial class MainWindow : Window, IPageKeyOverlayHost
         if (opacity is { } o) _settingsScrim.Opacity = o;
     }
 
+    /// <summary>
+    /// Whether a Settings property change can repaint the app under the sheet, so the scrim's
+    /// snapshot is retaken (RefreshSoon). Not the sheet's own state (owner 10-18): moving
+    /// between tabs, typing in its search box, and the status / progress / log lines changed
+    /// nothing under it, yet each retook the snapshot, and with lyrics moving under it the
+    /// frozen background jumped forward at every click or keystroke.
+    /// </summary>
+    internal static bool RepaintsAppUnderSettings(string? propertyName) =>
+        propertyName is not { Length: > 0 } name // "everything changed" (a reset, a load)
+        || !name.EndsWith("Progress", StringComparison.Ordinal)
+        && !name.EndsWith("Status", StringComparison.Ordinal)
+        && !name.EndsWith("StatusText", StringComparison.Ordinal)
+        && !name.EndsWith("StatusIsError", StringComparison.Ordinal)
+        && !(name.StartsWith("Is", StringComparison.Ordinal)
+             && (name.EndsWith("TabSelected", StringComparison.Ordinal) || name.EndsWith("TabVisible", StringComparison.Ordinal)))
+        && name is not (nameof(SettingsViewModel.SelectedSettingsTab) or nameof(SettingsViewModel.SelectedTabTitle)
+            or nameof(SettingsViewModel.SelectedTabDescription) or nameof(SettingsViewModel.SearchQuery)
+            or nameof(SettingsViewModel.DevLogText) or nameof(SettingsViewModel.DevLogsCopied));
+
     /// <summary>Reads a theme surface color from Application resources for the active
     /// theme variant; theme overlays (built-in and custom) win over the base palette.</summary>
     private static Color ResolveThemeColor(string key, Color fallback)
@@ -543,11 +573,12 @@ public partial class MainWindow : Window, IPageKeyOverlayHost
                 // A setting changed from the open sheet (theme, Liquid Glass, accent,
                 // language…) repaints the app under it: retake the blurred backdrop right
                 // after that renders, so it keeps up with the sheet (owner 10-09). No-op while
-                // Settings is closed (no snapshot up). Progress streams (scan, downloads)
-                // change nothing visible under the blur.
+                // Settings is closed (no snapshot up), and with the live blur (Liquid Glass
+                // off) there is no snapshot to retake. Only for what can repaint the app:
+                // see RepaintsAppUnderSettings.
                 _settingsBackdropRefreshHandler = (_, e) =>
                 {
-                    if (e.PropertyName?.EndsWith("Progress", StringComparison.Ordinal) != true)
+                    if (SettingChangeRepaintsUnderSheet(e.PropertyName))
                         _settingsScrim?.RefreshSoon();
                 };
                 vm.Settings.PropertyChanged += _settingsBackdropRefreshHandler;
@@ -1453,6 +1484,8 @@ public partial class MainWindow : Window, IPageKeyOverlayHost
             if (handle == null) return;
 
             _taskbar = new TaskbarIntegrationService();
+            // Before Initialize, so the first add already honours the setting (no flash).
+            _taskbar.SetButtonsVisible(vm.Settings.TaskbarMediaControlsEnabled);
             _taskbar.Initialize(handle.Handle);
 
             // Wire button clicks to player commands (dispatched to UI thread)
@@ -1510,11 +1543,14 @@ public partial class MainWindow : Window, IPageKeyOverlayHost
             RebindCurrentTrack();
 
             // Taskbar progress (GitHub #53) follows its Settings toggle live: switching
-            // it off must clear the overlay, not leave the last frame painted.
+            // it off must clear the overlay, not leave the last frame painted. The
+            // thumbnail buttons follow theirs the same way.
             vm.Settings.PropertyChanged += (_, e) =>
             {
                 if (e.PropertyName == nameof(SettingsViewModel.TaskbarProgressEnabled))
                     UpdateTaskbarProgress(vm);
+                else if (e.PropertyName == nameof(SettingsViewModel.TaskbarMediaControlsEnabled))
+                    _taskbar?.SetButtonsVisible(vm.Settings.TaskbarMediaControlsEnabled);
             };
             UpdateTaskbarProgress(vm);
         }

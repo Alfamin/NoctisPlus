@@ -140,7 +140,8 @@ public partial class LibraryFoldersViewModel : ViewModelBase, ISearchable, IDisp
         // the authoritative publish that follows refreshes again.
         var partial = _library.IsPublishingPartial;
         // AllTracks: a hidden folder stays in the tree (dimmed) so it can be shown again.
-        var tracks = _library.AllTracks.ToList();
+        // Inbox songs are not in the library yet; the Inbox page lists them.
+        var tracks = _library.AllTracks.Where(t => !t.IsInInbox).ToList();
         var hidden = _library.HiddenFolders.ToArray();
         // Tracks added on their own (GitHub #108) show under their own folder.
         var roots = FolderTreeBuilder.WithAddedFileFolders(settings.MusicFolders,

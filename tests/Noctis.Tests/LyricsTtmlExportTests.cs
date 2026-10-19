@@ -55,10 +55,10 @@ public class LyricsTtmlExportTests : IDisposable
         var ps = doc.Descendants(tt + "p").ToList();
         Assert.Equal(4, ps.Count);
         Assert.Equal("00:00:12.345", ps[0].Attribute("begin")!.Value);
-        Assert.Equal(new[] { "Hello,", "world!" }, ps[0].Elements(tt + "span").Select(s => s.Value));
+        Assert.Equal(new[] { "Hello, ", "world!" }, ps[0].Elements(tt + "span").Select(s => s.Value));
         Assert.Empty(ps[1].Elements(tt + "span"));
         Assert.Equal("No word times here", ps[1].Value);
-        Assert.Equal(new[] { "Rock", "&", "<roll>" }, ps[2].Elements(tt + "span").Select(s => s.Value));
+        Assert.Equal(new[] { "Rock ", "& ", "<roll>" }, ps[2].Elements(tt + "span").Select(s => s.Value));
         Assert.Equal("01:05:04.500", ps[3].Attribute("begin")!.Value);
     }
 
@@ -120,6 +120,32 @@ public class LyricsTtmlExportTests : IDisposable
         Assert.Empty(Row(fromTtml[3].BackgroundWords)); // unmatched "(" leaves the line alone
     }
 
+    /// <summary>
+    /// "Save Lyrics to File ▸ TTML" of a duet: the page reads the .ttml before the .lrc, so a
+    /// file without agents turned the duet layout into plain left-aligned lines after the save.
+    /// </summary>
+    [Fact]
+    public void SaveAsTtml_OfADuet_ReadsBackWithTheSameVoices()
+    {
+        const string synced =
+            "[00:01.00]v1:<00:01.00>first <00:01.50>voice<00:02.00>\n" +
+            "[00:02.00]v2:<00:02.00>second <00:02.50>voice<00:03.00>\n" +
+            "[00:03.00]v3:both together\n" +
+            "[00:04.00]no marker";
+
+        var ttml = LyricsViewModel.BuildTtmlFromSynced(synced)!;
+        var (lines, _) = TtmlParser.Parse(ttml);
+
+        Assert.Equal(LyricsViewModel.ParseLrcContent(synced).Select(l => l.Voice), lines!.Select(l => l.Voice));
+        Assert.Equal(new[] { LyricVoice.Default, LyricVoice.Voice2, LyricVoice.Group, LyricVoice.Default }, lines!.Select(l => l.Voice));
+    }
+
+    [Fact]
+    public void BuildTtml_WithoutVoices_WritesNoAgents()
+    {
+        Assert.DoesNotContain("agent", TimedLyricsBuilder.BuildTtml(Song()));
+    }
+
     [Fact]
     public void BuildTtml_LineLevelOnly_SaysLine_AndEmptyIsStillValid()
     {
@@ -161,6 +187,21 @@ public class LyricsTtmlExportTests : IDisposable
 
         writer.Remove(track, clearTags: false);
         Assert.False(File.Exists(Side(".ttml")), "the app's own .ttml goes with Remove");
+    }
+
+    /// <summary>The file on disk keeps each word's space inside its span, as built (Discord, nutf!xx).</summary>
+    [Fact]
+    public void Writer_WithTtml_KeepsTheWordSpacesInsideTheSpans_OnDisk()
+    {
+        var song = Song();
+        var (writer, track, _) = NewWriter();
+
+        writer.SaveDetailed(track, null, TimedLyricsBuilder.BuildElrc(song), embedInTags: false, replaceForeignSidecar: true, TimedLyricsBuilder.BuildTtml(song));
+
+        var onDisk = File.ReadAllText(Side(".ttml"));
+        Assert.Contains("\">Hello, </span><span begin=\"00:00:12.800\" end=\"00:00:13.400\">world!</span></p>", onDisk);
+        Assert.Contains("\">Rock </span><span begin=\"00:00:18.400\" end=\"00:00:18.600\">&amp; </span><span", onDisk);
+        Assert.DoesNotContain("</span> <span", onDisk);
     }
 
     [Fact]

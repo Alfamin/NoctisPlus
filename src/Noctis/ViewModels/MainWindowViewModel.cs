@@ -86,6 +86,7 @@ public partial class MainWindowViewModel : ViewModelBase
         _artistsVm.IsActive = ReferenceEquals(current, _artistsVm);
         _foldersVm.IsActive = ReferenceEquals(current, _foldersVm);
         _favoritesVm.IsActive = ReferenceEquals(current, _favoritesVm);
+        _inboxVm.IsActive = ReferenceEquals(current, _inboxVm);
     }
 
     private readonly DispatcherTimer _coveredRefreshTimer;
@@ -102,6 +103,7 @@ public partial class MainWindowViewModel : ViewModelBase
         else if (ReferenceEquals(current, _artistsVm)) _artistsVm.Refresh();
         else if (ReferenceEquals(current, _foldersVm)) _foldersVm.Refresh();
         else if (ReferenceEquals(current, _favoritesVm)) _favoritesVm.Refresh();
+        else if (ReferenceEquals(current, _inboxVm)) _inboxVm.Refresh();
     }
 
     // ── Scrobble tracking ──
@@ -280,6 +282,7 @@ public partial class MainWindowViewModel : ViewModelBase
     private readonly LibraryPlaylistsViewModel _playlistsVm;
     private readonly FavoritesViewModel _favoritesVm;
     private readonly LibraryFoldersViewModel _foldersVm;
+    private readonly InboxViewModel _inboxVm;
     private readonly ServerViewModel _serverVm;
     private readonly AudioCdViewModel _audioCdVm;
     private readonly VisualizerViewModel _visualizerVm;
@@ -481,6 +484,12 @@ public partial class MainWindowViewModel : ViewModelBase
                 TopBar.ArtistSortAscending = _artistsVm.SortAscending;
                 if (!adoptingArtistSort) Settings.ArtistSortAscending = _artistsVm.SortAscending;
             }
+            else if (e.PropertyName == nameof(LibraryArtistsViewModel.ViewMode))
+            {
+                // Grid ↔ list (Discord, vari): mirrored and persisted like the sort.
+                TopBar.IsArtistListView = _artistsVm.IsListView;
+                if (!adoptingArtistSort) Settings.ArtistViewMode = _artistsVm.ViewMode;
+            }
         };
         Settings.ViewStateLoaded += (_, _) =>
         {
@@ -489,6 +498,7 @@ public partial class MainWindowViewModel : ViewModelBase
             {
                 _artistsVm.SortMode = Settings.ArtistSortMode;
                 _artistsVm.SortAscending = Settings.ArtistSortAscending;
+                _artistsVm.ViewMode = Settings.ArtistViewMode;
             }
             finally { adoptingArtistSort = false; }
         };
@@ -512,6 +522,28 @@ public partial class MainWindowViewModel : ViewModelBase
         };
 
         _foldersVm = new LibraryFoldersViewModel(library, Player, persistence, Sidebar);
+        _inboxVm = new InboxViewModel(library, Player, Sidebar);
+        // The Inbox entry follows Settings › Library › Inbox for New Music (and stays while
+        // songs still wait in it). Leaving it shown on a page that no longer has an entry
+        // would strand the user there.
+        void SyncInboxSection()
+        {
+            Sidebar.SetInboxEnabled(Settings.InboxEnabled);
+            if (ReferenceEquals(CurrentView, _inboxVm) && !Sidebar.IsInboxSectionVisible)
+                Navigate("home");
+        }
+        if (Settings.IsSettingsLoaded) SyncInboxSection();
+        else Settings.SettingsLoaded += (_, _) => Dispatcher.UIThread.Post(SyncInboxSection);
+        Settings.PropertyChanged += (_, e) =>
+        {
+            if (e.PropertyName == nameof(SettingsViewModel.InboxEnabled))
+                Dispatcher.UIThread.Post(SyncInboxSection);
+        };
+        _library.LibraryUpdated += (_, _) => Dispatcher.UIThread.Post(() =>
+        {
+            if (ReferenceEquals(CurrentView, _inboxVm) && !Sidebar.IsInboxSectionVisible)
+                Navigate("home");
+        });
         // Folders sort (GitHub #89): mirror into the top bar and persist, adopting the
         // saved choice once settings load — same shape as the Artists sort above.
         var adoptingFoldersSort = false;
@@ -529,6 +561,12 @@ public partial class MainWindowViewModel : ViewModelBase
             finally { adoptingFoldersSort = false; }
         };
         _foldersVm.NavigateToSettingsRequested += (_, _) =>
+        {
+            OpenSettings();
+            Dispatcher.UIThread.Post(Settings.RequestMediaFoldersSection);
+        };
+        // Home's empty-library "Open Settings" lands on the same media-folders card.
+        _homeVm.NavigateToSettingsRequested += (_, _) =>
         {
             OpenSettings();
             Dispatcher.UIThread.Post(Settings.RequestMediaFoldersSection);
@@ -568,12 +606,14 @@ public partial class MainWindowViewModel : ViewModelBase
         _queueVm = new QueueViewModel(Player);
         _lyricsVm = new LyricsViewModel(Player, lrcLib, netEase, metadata, persistence, library);
         _lyricsVm.PluginLyricsSources = () => Plugins.LyricsProviders;
-        // Musixmatch, Kugou and YouTube Music (issue #113): searched when switched on in
-        // Settings, and always offered by the lyrics page's Choose Source dialog.
+        // Musixmatch, lrc.red, Unison, Kugou and YouTube Music (issue #113): searched when switched
+        // on in Settings, and always offered by the lyrics page's Choose Source dialog.
         if (App.Services?.GetService<IMusixmatchService>() is { } musixmatch
             && App.Services.GetService<IKugouLyricsService>() is { } kugou
-            && App.Services.GetService<IYouTubeMusicLyricsService>() is { } youTubeMusic)
-            _lyricsVm.ExtraLyricsSources = Services.Lyrics.OnlineLyricsSource.BuiltIns(musixmatch, kugou, youTubeMusic);
+            && App.Services.GetService<IYouTubeMusicLyricsService>() is { } youTubeMusic
+            && App.Services.GetService<ILrcRedLyricsService>() is { } lrcRed
+            && App.Services.GetService<IUnisonLyricsService>() is { } unison)
+            _lyricsVm.ExtraLyricsSources = Services.Lyrics.OnlineLyricsSource.BuiltIns(musixmatch, kugou, youTubeMusic, lrcRed, unison);
         _lyricsVm.ShowLyricsSearchDialog = MetadataHelper.OpenLyricsSearchDialog;
         // Lyrics saved inside audio files (GitHub #135) wait until the song is not playing.
         _lyricsVm.TagWriter = App.Services?.GetService<IDeferredTagWriter>();
@@ -673,6 +713,7 @@ public partial class MainWindowViewModel : ViewModelBase
         _songsVm.SetSearchLyricsAction(SearchLyricsForTrack);
         _favoritesVm.SetSearchLyricsAction(SearchLyricsForTrack);
         _foldersVm.SetSearchLyricsAction(SearchLyricsForTrack);
+        _inboxVm.SetSearchLyricsAction(SearchLyricsForTrack);
         Player.SetSearchLyricsAction(SearchLyricsForTrack);
 
         // Wire up View Artist action on ViewModels that display artist names
@@ -2009,6 +2050,8 @@ public partial class MainWindowViewModel : ViewModelBase
             return GetSectionBackButtonText("server");
         if (ReferenceEquals(view, _audioCdVm))
             return GetSectionBackButtonText("cd");
+        if (ReferenceEquals(view, _inboxVm))
+            return GetSectionBackButtonText("inbox");
         if (ReferenceEquals(view, _visualizerVm))
             return GetSectionBackButtonText("visualizer");
         if (ReferenceEquals(view, _lyricsStudioPageVm))
@@ -2071,6 +2114,8 @@ public partial class MainWindowViewModel : ViewModelBase
             return "server";
         if (ReferenceEquals(view, _audioCdVm))
             return "cd";
+        if (ReferenceEquals(view, _inboxVm))
+            return "inbox";
         if (ReferenceEquals(view, _visualizerVm))
             return "visualizer";
         if (ReferenceEquals(view, _lyricsStudioPageVm))
@@ -2124,6 +2169,7 @@ public partial class MainWindowViewModel : ViewModelBase
                || ReferenceEquals(view, _foldersVm)
                || ReferenceEquals(view, _playlistsVm)
                || ReferenceEquals(view, _favoritesVm)
+               || ReferenceEquals(view, _inboxVm)
 
                || ReferenceEquals(view, _queueVm)
                || ReferenceEquals(view, _lyricsVm)
@@ -2202,6 +2248,7 @@ public partial class MainWindowViewModel : ViewModelBase
                 "lyrics" => EnsureLyricsAndReturn(_lyricsVm),
                 "server" => RefreshAndReturnServer(_serverVm),
                 "cd" => RefreshAndReturnAudioCd(_audioCdVm),
+                "inbox" => RefreshAndReturnInbox(),
                 "visualizer" => _visualizerVm,
                 "lyricsstudio" => RefreshAndReturnLyricsStudio(),
                 "settings" => RefreshAndReturnSettings(),
@@ -2242,6 +2289,7 @@ public partial class MainWindowViewModel : ViewModelBase
             "lyrics" => "Lyrics",
             "server" => "Server",
             "cd" => "Audio CD",
+            "inbox" => "Inbox",
             "visualizer" => "Visualizer",
             "lyricsstudio" => "Lyrics Studio",
             "settings" => "Settings",
@@ -2264,7 +2312,8 @@ public partial class MainWindowViewModel : ViewModelBase
         else if (key == "folders")
             TopBar.ShowFoldersActions(_foldersVm.PlayFolderCommand, _foldersVm.ShuffleFolderCommand, _foldersVm.OpenMediaFolderSettingsCommand, _foldersVm.SetSortCommand);
         else if (key == "artists")
-            TopBar.ShowArtistSort(_artistsVm.SetSortCommand, _artistsVm.SortLabel, _artistsVm.SortMode, _artistsVm.SortAscending);
+            TopBar.ShowArtistSort(_artistsVm.SetSortCommand, _artistsVm.SortLabel, _artistsVm.SortMode, _artistsVm.SortAscending,
+                _artistsVm.ToggleViewModeCommand, _artistsVm.IsListView);
 
         RefreshBackButton();
         UiStallWatchdog.ReportIfSlow("Navigate", navigateStart, $"key={key}");
@@ -2352,6 +2401,12 @@ public partial class MainWindowViewModel : ViewModelBase
     {
         vm.Refresh();
         return vm;
+    }
+
+    private InboxViewModel RefreshAndReturnInbox()
+    {
+        _inboxVm.Refresh();
+        return _inboxVm;
     }
 
     private StatisticsViewModel RefreshAndReturnStatistics(StatisticsViewModel vm)
@@ -2816,7 +2871,8 @@ public partial class MainWindowViewModel : ViewModelBase
         else if (ReferenceEquals(view, _foldersVm))
             TopBar.ShowFoldersActions(_foldersVm.PlayFolderCommand, _foldersVm.ShuffleFolderCommand, _foldersVm.OpenMediaFolderSettingsCommand, _foldersVm.SetSortCommand);
         else if (ReferenceEquals(view, _artistsVm))
-            TopBar.ShowArtistSort(_artistsVm.SetSortCommand, _artistsVm.SortLabel, _artistsVm.SortMode, _artistsVm.SortAscending);
+            TopBar.ShowArtistSort(_artistsVm.SetSortCommand, _artistsVm.SortLabel, _artistsVm.SortMode, _artistsVm.SortAscending,
+                _artistsVm.ToggleViewModeCommand, _artistsVm.IsListView);
         // Artist actions for _albumsVm are restored in CaptureRestoreState's lambda
     }
 
@@ -2835,6 +2891,7 @@ public partial class MainWindowViewModel : ViewModelBase
         if (CurrentView == _statisticsVm) return "statistics";
         if (CurrentView == _serverVm) return "server";
         if (CurrentView == _audioCdVm) return "cd";
+        if (CurrentView == _inboxVm) return "inbox";
         if (CurrentView == _visualizerVm) return "visualizer";
         if (CurrentView == _lyricsStudioPageVm) return "lyricsstudio";
         if (CurrentView == Settings) return "settings";
@@ -3206,7 +3263,8 @@ public partial class MainWindowViewModel : ViewModelBase
                 track.Artist ?? "Unknown Artist",
                 track.Album,
                 artworkUrl,
-                ShowAlbum: Settings.DiscordShowAlbum);
+                ShowAlbum: Settings.DiscordShowAlbum,
+                StatusDisplay: DiscordPresenceOptions.ParseStatusDisplay(Settings.DiscordStatusDisplay));
             // Music video audio: the clip's length, as the engine reports it, not the song file's.
             var duration = Player.IsPlayingMusicVideoAudio ? Player.Duration : track.Duration;
             await _discord.UpdateAsync(dto, position, duration, isPlaying);

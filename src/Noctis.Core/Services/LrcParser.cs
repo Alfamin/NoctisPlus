@@ -341,20 +341,30 @@ public static partial class LrcParser
         EnhancedLrcParser.AppendBackground(target, bg, bg[^1].End);
     }
 
-    /// <summary>Applies the global LRC offset to absolute word timings.</summary>
+    /// <summary>Applies the global LRC offset to absolute word timings, syllables included.</summary>
     private static List<WordTiming> ShiftWords(List<WordTiming> words, int offsetMs)
     {
         var delta = TimeSpan.FromMilliseconds(offsetMs);
         var shifted = new List<WordTiming>(words.Count);
         foreach (var w in words)
         {
-            var start = w.Start + delta;
-            if (start < TimeSpan.Zero) start = TimeSpan.Zero;
-            TimeSpan? end = w.End.HasValue ? w.End.Value + delta : null;
-            if (end < TimeSpan.Zero) end = TimeSpan.Zero;
-            shifted.Add(new WordTiming { Text = w.Text, Start = start, End = end });
+            shifted.Add(new WordTiming
+            {
+                Text = w.Text,
+                Start = Shift(w.Start),
+                End = w.End.HasValue ? Shift(w.End.Value) : null,
+                // Merged words keep their syllables' own clocks; dropping them made the
+                // sweep cross a multi-syllable word at one even pace under an offset.
+                Syllables = w.Syllables?.Select(s => s with
+                {
+                    Start = Shift(s.Start),
+                    End = s.End.HasValue ? Shift(s.End.Value) : null,
+                }).ToList(),
+            });
         }
         return shifted;
+
+        TimeSpan Shift(TimeSpan t) => t + delta < TimeSpan.Zero ? TimeSpan.Zero : t + delta;
     }
 
     private static int ParseLrcOffsetMilliseconds(string[] rawLines)

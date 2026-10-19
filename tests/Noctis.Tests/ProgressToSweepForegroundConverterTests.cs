@@ -148,15 +148,15 @@ public class ProgressToSweepForegroundConverterTests
     [AvaloniaFact]
     public void NarrowTokens_GetAWiderRelativeFeather()
     {
-        // AMLL's feather is a fixed ~0.5em regardless of word width. A single CJK
+        // The feather is a fixed ~0.6em regardless of word width. A single CJK
         // character cell is ~1em wide — a width-relative 6% feather renders a near
         // hard edge there and reads as per-character stepping. When the view passes
-        // layout width [2] and font size [3], the feather becomes 0.25em each side.
+        // layout width [2] and font size [3], the feather becomes 0.3em each side.
         var brush = Assert.IsType<LinearGradientBrush>(
             new ProgressToSweepForegroundConverter().Convert(
                 new object?[] { 0.5, Brushes.White, 30.0, 30.0 }, typeof(IBrush), null,
                 System.Globalization.CultureInfo.InvariantCulture));
-        Assert.Equal(0.25, brush.GradientStops[0].Offset, precision: 10);
-        Assert.Equal(0.75, brush.GradientStops[1].Offset, precision: 10);
+        Assert.Equal(0.2, brush.GradientStops[0].Offset, precision: 10);
+        Assert.Equal(0.8, brush.GradientStops[1].Offset, precision: 10);
     }
 }

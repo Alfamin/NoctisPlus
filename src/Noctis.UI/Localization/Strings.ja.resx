@@ -816,6 +816,14 @@
     <value>タスクバーのボタンに曲の進行状況を表示します。</value>
     <comment>Text in SettingsView.axaml</comment>
   </data>
+  <data name="Settings.MediaControlsTaskbar" xml:space="preserve">
+    <value>タスクバーにメディアコントロールを表示</value>
+    <comment>Text in SettingsView.axaml</comment>
+  </data>
+  <data name="Settings.MediaControlsTaskbarDesc" xml:space="preserve">
+    <value>タスクバーのアイコンにカーソルを合わせたときに、前へ・再生/一時停止・次へ・お気に入りのボタンを表示します。</value>
+    <comment>Text in SettingsView.axaml</comment>
+  </data>
   <data name="Settings.AutomaticAlbumCoverSize" xml:space="preserve">
     <value>アルバムカバーのサイズを自動調整</value>
     <comment>Text in SettingsView.axaml</comment>
@@ -1018,6 +1026,14 @@
   </data>
   <data name="Settings.KeepWordsWholeWhen" xml:space="preserve">
     <value>TTML 歌詞が単語を音節に分割していても、単語をひとまとまりに保ちます。</value>
+    <comment>Text in SettingsView.axaml</comment>
+  </data>
+  <data name="Settings.LyricsGlowAndLift" xml:space="preserve">
+    <value>グロー＆リフト</value>
+    <comment>Text in SettingsView.axaml</comment>
+  </data>
+  <data name="Settings.LyricsGlowAndLiftHint" xml:space="preserve">
+    <value>歌われた単語がふわりと浮き上がり、伸ばした音が光ります（Apple Music 風）。オフにすると単語同期の歌詞は動きません。</value>
     <comment>Text in SettingsView.axaml</comment>
   </data>
   <data name="Settings.PlayerBarOpacity" xml:space="preserve">
@@ -1299,6 +1315,26 @@
   <data name="Settings.AddAlbumNameUnder" xml:space="preserve">
     <value>Discordカードのアーティスト名の下にアルバム名を表示します。</value>
     <comment>Text in SettingsView.axaml</comment>
+  </data>
+  <data name="Settings.DiscordStatusDisplay" xml:space="preserve">
+    <value>Discord のステータス</value>
+    <comment>Settings ▸ Integrations ▸ Discord, SettingsView.axaml</comment>
+  </data>
+  <data name="Settings.DiscordStatusDisplayHint" xml:space="preserve">
+    <value>メンバーリストのステータスに Discord が表示する内容です。</value>
+    <comment>Settings ▸ Integrations ▸ Discord, SettingsView.axaml</comment>
+  </data>
+  <data name="Settings.DiscordStatusDisplay.Artist" xml:space="preserve">
+    <value>アーティスト</value>
+    <comment>Discord status line choice (SettingsViewModel)</comment>
+  </data>
+  <data name="Settings.DiscordStatusDisplay.Title" xml:space="preserve">
+    <value>曲名</value>
+    <comment>Discord status line choice (SettingsViewModel)</comment>
+  </data>
+  <data name="Settings.DiscordStatusDisplay.AppName" xml:space="preserve">
+    <value>Noctis</value>
+    <comment>Discord status line choice (SettingsViewModel)</comment>
   </data>
   <data name="Settings.LastFmScrobbling" xml:space="preserve">
     <value>Last.fm スクロブリング</value>
@@ -4376,6 +4412,10 @@
     <value>再生</value>
     <comment>Text in PlaybackBarView.axaml</comment>
   </data>
+  <data name="PlaybackBar.Pause" xml:space="preserve">
+    <value>一時停止</value>
+    <comment>Play/pause button tooltip and accessible name while playing</comment>
+  </data>
   <data name="PlaybackBar.PlayNext" xml:space="preserve">
     <value>次に再生</value>
     <comment>Header in PlaybackBarView.axaml</comment>
@@ -5659,6 +5699,18 @@
     <value>内蔵の出力エンジンのみ。排他モードはファイル独自のレイアウトを保持します。</value>
     <comment>Upmix footnote</comment>
   </data>
+  <data name="Settings.HeadphoneSurround" xml:space="preserve">
+    <value>ヘッドホンサラウンド</value>
+    <comment>Text in SettingsView.axaml</comment>
+  </data>
+  <data name="Settings.HeadphoneSurroundDesc" xml:space="preserve">
+    <value>5.1chや7.1chのファイルを、平坦なステレオミックスではなくヘッドホン向けの立体音響で再生します。ステレオの曲は変わりません。</value>
+    <comment>Text in SettingsView.axaml</comment>
+  </data>
+  <data name="Settings.HeadphoneSurroundRestart" xml:space="preserve">
+    <value>変更を反映するにはNoctisを再起動してください。</value>
+    <comment>Shown under Headphone Surround after a change, in SettingsView.axaml</comment>
+  </data>
   <data name="Server.AccountsMoved" xml:space="preserve">
     <value>アカウントとデバイスの同期は、アカウントと同期で管理されます。</value>
     <comment>Integrations → Noctis Server card footer</comment>
@@ -6034,14 +6086,6 @@
   <data name="LyricsStudio.WordsTip" xml:space="preserve">
     <value>時間とともにそれぞれの単語を表示します。クリックすると聞こえます。</value>
     <comment>Word toggle tooltip</comment>
-  </data>
-  <data name="LyricsStudio.WordEarlier" xml:space="preserve">
-    <value>選択された単語は50ms以前（隣の単語は留まっています）</value>
-    <comment>Word nudge tooltip</comment>
-  </data>
-  <data name="LyricsStudio.WordLater" xml:space="preserve">
-    <value>選択された単語は50ミリ秒後（隣の単語は置いてあります）</value>
-    <comment>Word nudge tooltip</comment>
   </data>
   <data name="LyricsStudio.TapWords" xml:space="preserve">
     <value>単語をタップ</value>

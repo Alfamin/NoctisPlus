@@ -43,8 +43,8 @@
         </LinearGradientBrush>
         <conv:BlurRadiusToEffectConverter x:Key="BlurToEffect"/>
         <conv:PreBlurredArtworkConverter x:Key="PreBlurArt"/>
-        <conv:ProgressToSweepForegroundConverter x:Key="ProgressToSweepFg"/>
         <conv:EmphasisGlowConverter x:Key="EmphasisGlow"/>
+        <conv:EmphasisGlowBlurConverter x:Key="EmphasisGlowBlur"/>
         <conv:WordOverflowPaddingConverter x:Key="WordOverflowPad"/>
         <conv:OpacityFloorConverter x:Key="OpacityFloor"/>
         <conv:DoubleScaleConverter x:Key="FontScale"/>
@@ -72,39 +72,47 @@
                 <!-- Glow hosted in a Canvas so the blur surface has headroom without
                      growing the word cell (see the lyrics page template). -->
                 <Canvas ClipToBounds="False">
-                    <TextBlock Text="{Binding Text}"
-                               Classes="word-glow"
-                               IsVisible="{Binding IsEmphasis}"
-                               Canvas.Left="-40"
-                               Canvas.Top="-40"
-                               Padding="40"
-                               FontWeight="Bold"
-                               Foreground="White">
-                        <TextBlock.Opacity>
+                    <controls:KaraokeWordText Text="{Binding Text}"
+                                              Classes="word-glow"
+                                              IsVisible="{Binding IsEmphasis}"
+                                              Canvas.Left="-40"
+                                              Canvas.Top="-40"
+                                              Padding="40"
+                                              FontWeight="Bold"
+                                              Foreground="White"
+                                              BaseOpacity="0"
+                                              Effect="{Binding $self.FontSize, Converter={StaticResource EmphasisGlowBlur}}"
+                                              Progress="{Binding Progress}"
+                                              LeadIn="{Binding SweepLeadIn}"
+                                              TrailOut="{Binding SweepTrailOut}"
+                                              IsEmphasis="{Binding IsEmphasis}"
+                                              EmphasisMs="{Binding EmphasisMs}"
+                                              HeldDurationMs="{Binding HeldDurationMs}"
+                                              IsLastInLine="{Binding IsLastInLine}"
+                                              Lift="{Binding Lift}">
+                        <controls:KaraokeWordText.Opacity>
                             <MultiBinding Converter="{StaticResource EmphasisGlow}">
-                                <Binding Path="Progress"/>
+                                <Binding Path="EmphasisMs"/>
                                 <Binding Path="HeldDurationMs"/>
+                                <Binding Path="IsLastInLine"/>
+                                <Binding Path="EmphasisCharCount"/>
                             </MultiBinding>
-                        </TextBlock.Opacity>
-                    </TextBlock>
+                        </controls:KaraokeWordText.Opacity>
+                    </controls:KaraokeWordText>
                 </Canvas>
-                <TextBlock Text="{Binding Text}"
-                           Classes="word-base"
-                           Padding="{Binding Text, Converter={StaticResource WordOverflowPad}}"
-                           FontWeight="Bold"
-                           Foreground="White"/>
-                <TextBlock Text="{Binding SweepText}"
-                           HorizontalAlignment="Left"
-                           FontWeight="Bold">
-                    <TextBlock.Foreground>
-                        <MultiBinding Converter="{StaticResource ProgressToSweepFg}">
-                            <Binding Path="Progress"/>
-                            <Binding Source="{x:Static Brushes.White}"/>
-                            <Binding Path="Bounds.Width" RelativeSource="{RelativeSource Self}"/>
-                            <Binding Path="FontSize" RelativeSource="{RelativeSource Self}"/>
-                        </MultiBinding>
-                    </TextBlock.Foreground>
-                </TextBlock>
+                <controls:KaraokeWordText Text="{Binding Text}"
+                                          Classes="word-sweep"
+                                          Padding="{Binding Text, Converter={StaticResource WordOverflowPad}}"
+                                          FontWeight="Bold"
+                                          Foreground="White"
+                                          Progress="{Binding Progress}"
+                                          LeadIn="{Binding SweepLeadIn}"
+                                          TrailOut="{Binding SweepTrailOut}"
+                                          IsEmphasis="{Binding IsEmphasis}"
+                                          EmphasisMs="{Binding EmphasisMs}"
+                                          HeldDurationMs="{Binding HeldDurationMs}"
+                                          IsLastInLine="{Binding IsLastInLine}"
+                                          Lift="{Binding Lift}"/>
                 </Panel>
                 </Viewbox>
             </Panel>
@@ -197,6 +205,9 @@
             <Setter Property="Foreground" Value="{DynamicResource MiniDrawerTextSoft}"/>
         </Style>
         <Style Selector="Slider.mini-seek">
+            <!-- Every design's seek bar reads what it is; unnamed, its peer had no name
+                 at all beside the "0:00" time label. -->
+            <Setter Property="AutomationProperties.Name" Value="{loc:T PlaybackBar.Seek}"/>
             <Setter Property="Height" Value="16"/>
             <Setter Property="ClipToBounds" Value="True"/>
             <Setter Property="Foreground" Value="{DynamicResource AccentColorBrush}"/>
@@ -383,6 +394,10 @@
         <Style Selector="Border.mini-row:pointerover">
             <Setter Property="Background" Value="{DynamicResource MiniDrawerRowHover}"/>
         </Style>
+        <!-- A clicked queue row keeps focus: Delete removes it, so it keeps the hover wash. -->
+        <Style Selector="Border.mini-row.mini-queue-row:focus">
+            <Setter Property="Background" Value="{DynamicResource MiniDrawerRowHover}"/>
+        </Style>
         <!-- Queue drawer, Keep Played Songs (GitHub #124): played rows sit back, the
              hovered one comes forward so its play button reads as live. -->
         <Style Selector="Border.mini-row.mini-played">
@@ -501,12 +516,17 @@
             <Setter Property="Transitions">
                 <Transitions>
                     <!-- Same curve/length as the scroll glide (LineMotion) — see the page. -->
-                    <TransformOperationsTransition Property="RenderTransform" Duration="0:0:0.65">
+                    <TransformOperationsTransition Property="RenderTransform" Duration="0:0:1">
                         <TransformOperationsTransition.Easing>
                             <helpers:LineMotionEase/>
                         </TransformOperationsTransition.Easing>
                     </TransformOperationsTransition>
                     <DoubleTransition Property="Opacity" Duration="0:0:0.5" Easing="CubicEaseInOut"/>
+                    <!-- Depth blur eases instead of snapping: Apple Music's outgoing line
+                         blurs within ~100 ms of the glide starting, the incoming one
+                         sharpens along the glide (half-way ~160 ms). Ease-out lands
+                         between the two; a spring would overshoot the radius below 0. -->
+                    <EffectTransition Property="Effect" Duration="0:0:0.4" Easing="CubicEaseOut"/>
                 </Transitions>
             </Setter>
         </Style>
@@ -531,42 +551,28 @@
             <Setter Property="RenderTransform" Value="scale(1)"/>
         </Style>
 
-        <!-- Regular words do not move while sung (as on the page); only emphasis swells. -->
+        <!-- No cell transform: sung words float and held notes swell inside KaraokeWordText (as on the page). -->
         <Style Selector="Panel.word-cell">
             <Setter Property="RenderTransformOrigin" Value="0.5,1"/>
             <Setter Property="RenderTransform" Value="translate(0px,0px) scale(1)"/>
         </Style>
 
-        <!-- Held-note emphasis: slow swell + soft glow, as on the lyrics page. -->
-        <Style Selector="Panel.word-cell.emphasis">
-            <Setter Property="Transitions">
-                <Transitions>
-                    <TransformOperationsTransition Property="RenderTransform" Duration="0:0:0.8" Easing="CubicEaseOut"/>
-                </Transitions>
-            </Setter>
-        </Style>
-        <Style Selector="Panel.word-cell.emphasis.current">
-            <Setter Property="RenderTransform" Value="translate(0px,-2px) scale(1.04)"/>
-        </Style>
-        <!-- Glow opacity is bound per-frame in the template (EmphasisGlow bell over
+        <!-- Glow opacity (per frame) and blur (per font size) are bound in the template (EmphasisGlow bell over
              the hold). No Opacity setter/transition here: a transition would low-pass
              the per-frame values and lag the vocal. -->
-        <Style Selector="TextBlock.word-glow">
-            <Setter Property="Effect" Value="blur(6)"/>
-        </Style>
 
         <!-- Word base layer: full brightness on inactive lines, soft ghost under the
-             sweep while the line is active. -->
-        <Style Selector="ItemsControl.word-layer TextBlock.word-base">
-            <Setter Property="Opacity" Value="1.0"/>
+             sweep while the line is active or the list leads into it (IsSweepFocused). -->
+        <Style Selector="ItemsControl.word-layer TextBlock.word-sweep">
+            <Setter Property="controls:KaraokeWordText.BaseOpacity" Value="1.0"/>
             <Setter Property="Transitions">
                 <Transitions>
-                    <DoubleTransition Property="Opacity" Duration="0:0:0.35" Easing="CubicEaseInOut"/>
+                    <DoubleTransition Property="controls:KaraokeWordText.BaseOpacity" Duration="0:0:0.35" Easing="CubicEaseInOut"/>
                 </Transitions>
             </Setter>
         </Style>
-        <Style Selector="ItemsControl.word-layer.active TextBlock.word-base">
-            <Setter Property="Opacity" Value="0.45"/>
+        <Style Selector="ItemsControl.word-layer.active TextBlock.word-sweep">
+            <Setter Property="controls:KaraokeWordText.BaseOpacity" Value="0.4"/>
         </Style>
 
         <!-- Plain (line-timed) lyric text cross-fades its dimming. -->
@@ -1867,7 +1873,7 @@
                                                 <!-- Word-level karaoke layer -->
                                                 <ItemsControl ItemsSource="{Binding Words}"
                                                               Classes="word-layer"
-                                                              Classes.active="{Binding IsActive}"
+                                                              Classes.active="{Binding IsSweepFocused}"
                                                               IsVisible="{Binding ShowWords}"
                                                               Opacity="{Binding LineOpacity, Converter={StaticResource OpacityFloor}, ConverterParameter=0.3}"
                                                               HorizontalAlignment="Left"
@@ -1905,7 +1911,7 @@
                                             <!-- Background vocals (adlibs): smaller karaoke row -->
                                             <ItemsControl ItemsSource="{Binding BackgroundWords}"
                                                           Classes="word-layer bg-vocals"
-                                                          Classes.active="{Binding IsActive}"
+                                                          Classes.active="{Binding IsSweepFocused}"
                                                           Opacity="{Binding LineOpacity, Converter={StaticResource OpacityFloor}, ConverterParameter=0.3}"
                                                           HorizontalAlignment="{Binding Voice, Converter={StaticResource VoiceAlign}}"
                                                           ClipToBounds="False"
@@ -1935,7 +1941,7 @@
                                                  mirroring the lyrics page. -->
                                             <ItemsControl ItemsSource="{Binding TransliterationWords}"
                                                           Classes="word-layer romanization"
-                                                          Classes.active="{Binding IsActive}"
+                                                          Classes.active="{Binding IsSweepFocused}"
                                                           Opacity="{Binding LineOpacity, Converter={StaticResource OpacityFloor}, ConverterParameter=0.3}"
                                                           HorizontalAlignment="{Binding Voice, Converter={StaticResource VoiceAlign}}"
                                                           ClipToBounds="False"
@@ -2115,8 +2121,31 @@
                                 <TextBlock Grid.Column="2" Classes="mini-time" Text="{Binding Player.DurationText}" FontSize="10"
                                            Foreground="{DynamicResource SystemControlForegroundBaseMediumBrush}" VerticalAlignment="Center" MinWidth="26" TextAlignment="Right"/>
                             </Grid>
-                            <StackPanel Grid.Row="2" Orientation="Horizontal" Spacing="26"
-                                        HorizontalAlignment="Center" VerticalAlignment="Center" Margin="0,4,0,0">
+                            <!-- Transport: shuffle | prev play next | repeat, the classic card's order
+                                 and toggles (same commands, glyphs and accent "on" state); off glyphs
+                                 take the "…" glyph's soft theme ink. MaxWidth keeps the five together
+                                 on a stretched card instead of pushing the toggles to its far ends;
+                                 on a card too narrow for five the toggles step aside (SyncPillToggles). -->
+                            <Grid Grid.Row="2" x:Name="PillTransport" ColumnDefinitions="Auto,*,Auto" MaxWidth="240"
+                                  VerticalAlignment="Center" Margin="0,4,0,0">
+                            <Button Grid.Column="0" x:Name="PillShuffleButton" Classes="mini-transport" Width="26" Height="26"
+                                    HorizontalAlignment="Left" VerticalAlignment="Center"
+                                    Command="{Binding Player.ToggleShuffleCommand}" ToolTip.Tip="{loc:T MiniPlayer.ShuffleTip}">
+                                <Panel>
+                                    <Viewbox Width="15" Height="15" IsVisible="{Binding !Player.IsShuffleEnabled}">
+                                        <Canvas Width="24" Height="24">
+                                            <Path Fill="{DynamicResource SystemControlForegroundBaseMediumBrush}" Data="{StaticResource ShuffleIcon}"/>
+                                        </Canvas>
+                                    </Viewbox>
+                                    <Viewbox Width="15" Height="15" IsVisible="{Binding Player.IsShuffleEnabled}">
+                                        <Canvas Width="24" Height="24">
+                                            <Path Fill="{DynamicResource AccentColorBrush}" Data="{StaticResource ShuffleIcon}"/>
+                                        </Canvas>
+                                    </Viewbox>
+                                </Panel>
+                            </Button>
+                            <StackPanel Grid.Column="1" x:Name="PillTransportCenter" Orientation="Horizontal" Spacing="18"
+                                        HorizontalAlignment="Center" VerticalAlignment="Center">
                                 <Button Classes="mini-transport" Width="30" Height="30"
                                         Command="{Binding Player.PreviousCommand}" ToolTip.Tip="{loc:T MiniPlayer.PreviousTip}">
                                     <Viewbox Width="17" Height="17">
@@ -2152,6 +2181,31 @@
                                     </Viewbox>
                                 </Button>
                             </StackPanel>
+                            <Button Grid.Column="2" x:Name="PillRepeatButton" Classes="mini-transport" Width="26" Height="26"
+                                    HorizontalAlignment="Right" VerticalAlignment="Center"
+                                    Command="{Binding Player.CycleRepeatCommand}" ToolTip.Tip="{loc:T MiniPlayer.RepeatTip}">
+                                <Panel>
+                                    <Viewbox Width="15" Height="15"
+                                             IsVisible="{Binding Player.RepeatMode, Converter={x:Static ObjectConverters.Equal}, ConverterParameter={x:Static m:RepeatMode.Off}}">
+                                        <Canvas Width="24" Height="24">
+                                            <Path Fill="{DynamicResource SystemControlForegroundBaseMediumBrush}" Data="{StaticResource RepeatAllIcon}"/>
+                                        </Canvas>
+                                    </Viewbox>
+                                    <Viewbox Width="15" Height="15"
+                                             IsVisible="{Binding Player.RepeatMode, Converter={x:Static ObjectConverters.Equal}, ConverterParameter={x:Static m:RepeatMode.All}}">
+                                        <Canvas Width="24" Height="24">
+                                            <Path Fill="{DynamicResource AccentColorBrush}" Data="{StaticResource RepeatAllIcon}"/>
+                                        </Canvas>
+                                    </Viewbox>
+                                    <Viewbox Width="15" Height="15"
+                                             IsVisible="{Binding Player.RepeatMode, Converter={x:Static ObjectConverters.Equal}, ConverterParameter={x:Static m:RepeatMode.One}}">
+                                        <Canvas Width="24" Height="24">
+                                            <Path Fill="{DynamicResource AccentColorBrush}" Data="{StaticResource RepeatOneIcon}"/>
+                                        </Canvas>
+                                    </Viewbox>
+                                </Panel>
+                            </Button>
+                            </Grid>
                         </Grid>
                     </Border>
                     <!-- Round cover, its centre on the card's left edge. -->
@@ -2256,7 +2310,26 @@
                                 <TextBlock Grid.Column="2" Classes="mini-time" Text="{Binding Player.DurationText}" FontSize="11"
                                            Foreground="{DynamicResource SystemControlForegroundBaseMediumBrush}" VerticalAlignment="Center" MinWidth="30" TextAlignment="Right"/>
                             </Grid>
-                            <StackPanel Orientation="Horizontal" Spacing="22" HorizontalAlignment="Center" Margin="0,8,0,0">
+                            <!-- Transport: shuffle | prev play next | repeat, as on the Pill (see there);
+                                 the row spans the seek row, so the toggles line up under its times. -->
+                            <Grid x:Name="SleeveTransport" ColumnDefinitions="Auto,*,Auto" Margin="0,8,0,0">
+                            <Button Grid.Column="0" x:Name="SleeveShuffleButton" Classes="mini-transport" Width="30" Height="30"
+                                    HorizontalAlignment="Left" VerticalAlignment="Center"
+                                    Command="{Binding Player.ToggleShuffleCommand}" ToolTip.Tip="{loc:T MiniPlayer.ShuffleTip}">
+                                <Panel>
+                                    <Viewbox Width="17" Height="17" IsVisible="{Binding !Player.IsShuffleEnabled}">
+                                        <Canvas Width="24" Height="24">
+                                            <Path Fill="{DynamicResource SystemControlForegroundBaseMediumBrush}" Data="{StaticResource ShuffleIcon}"/>
+                                        </Canvas>
+                                    </Viewbox>
+                                    <Viewbox Width="17" Height="17" IsVisible="{Binding Player.IsShuffleEnabled}">
+                                        <Canvas Width="24" Height="24">
+                                            <Path Fill="{DynamicResource AccentColorBrush}" Data="{StaticResource ShuffleIcon}"/>
+                                        </Canvas>
+                                    </Viewbox>
+                                </Panel>
+                            </Button>
+                            <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="22" HorizontalAlignment="Center" VerticalAlignment="Center">
                                 <Button Classes="mini-transport" Width="32" Height="32"
                                         Command="{Binding Player.PreviousCommand}" ToolTip.Tip="{loc:T MiniPlayer.PreviousTip}">
                                     <Viewbox Width="18" Height="18">
@@ -2292,6 +2365,31 @@
                                     </Viewbox>
                                 </Button>
                             </StackPanel>
+                            <Button Grid.Column="2" x:Name="SleeveRepeatButton" Classes="mini-transport" Width="30" Height="30"
+                                    HorizontalAlignment="Right" VerticalAlignment="Center"
+                                    Command="{Binding Player.CycleRepeatCommand}" ToolTip.Tip="{loc:T MiniPlayer.RepeatTip}">
+                                <Panel>
+                                    <Viewbox Width="17" Height="17"
+                                             IsVisible="{Binding Player.RepeatMode, Converter={x:Static ObjectConverters.Equal}, ConverterParameter={x:Static m:RepeatMode.Off}}">
+                                        <Canvas Width="24" Height="24">
+                                            <Path Fill="{DynamicResource SystemControlForegroundBaseMediumBrush}" Data="{StaticResource RepeatAllIcon}"/>
+                                        </Canvas>
+                                    </Viewbox>
+                                    <Viewbox Width="17" Height="17"
+                                             IsVisible="{Binding Player.RepeatMode, Converter={x:Static ObjectConverters.Equal}, ConverterParameter={x:Static m:RepeatMode.All}}">
+                                        <Canvas Width="24" Height="24">
+                                            <Path Fill="{DynamicResource AccentColorBrush}" Data="{StaticResource RepeatAllIcon}"/>
+                                        </Canvas>
+                                    </Viewbox>
+                                    <Viewbox Width="17" Height="17"
+                                             IsVisible="{Binding Player.RepeatMode, Converter={x:Static ObjectConverters.Equal}, ConverterParameter={x:Static m:RepeatMode.One}}">
+                                        <Canvas Width="24" Height="24">
+                                            <Path Fill="{DynamicResource AccentColorBrush}" Data="{StaticResource RepeatOneIcon}"/>
+                                        </Canvas>
+                                    </Viewbox>
+                                </Panel>
+                            </Button>
+                            </Grid>
                         </StackPanel>
                     </Grid>
                 </Border>
@@ -2432,15 +2530,31 @@
                     <Grid RowDefinitions="Auto,*" IsVisible="{Binding IsQueueDrawer}">
                         <!-- With played songs listed (GitHub #124) the list carries its own
                              Played / Up Next headers (MiniQueueHeader rows), so this one steps aside. -->
-                        <Grid Grid.Row="0" ColumnDefinitions="*,Auto" Margin="6,0,6,6"
+                        <!-- Reshuffle (Discord, vari): a new random order for Up Next, shown while
+                             Shuffle is on, as in the main Queue panel's header. The negative margin
+                             keeps the disc from making the header taller when it appears. -->
+                        <Grid Grid.Row="0" ColumnDefinitions="*,Auto,Auto" Margin="6,0,6,6"
                               IsVisible="{Binding !QueuePreviewHasPlayed}">
                             <TextBlock Grid.Column="0" Text="{loc:T MiniPlayer.UpNext}" FontSize="12" FontWeight="SemiBold"
                                        Foreground="{DynamicResource MiniDrawerTextHeader}"/>
                             <TextBlock Grid.Column="1" Text="{loc:T MiniPlayer.ShowingFirst100}" FontSize="10"
                                        Foreground="{DynamicResource MiniDrawerTextFaint}" VerticalAlignment="Center"
                                        IsVisible="{Binding QueuePreviewTruncated}"/>
+                            <Button Grid.Column="2" x:Name="QueueReshuffleButton" Classes="mini-transport glass-circle" Width="22" Height="22"
+                                    Margin="8,-4,0,-4" VerticalAlignment="Center"
+                                    Command="{Binding Player.ReshuffleCommand}"
+                                    IsVisible="{Binding Player.IsShuffleEnabled}"
+                                    ToolTip.Tip="{loc:T MiniPlayer.Reshuffle}">
+                                <PathIcon Data="{StaticResource ShuffleIcon}" Width="11" Height="11" Foreground="{DynamicResource MiniDrawerText}"/>
+                            </Button>
                         </Grid>
-                        <ScrollViewer Grid.Row="1" x:Name="QueueScroller" HorizontalScrollBarVisibility="Disabled">
+                        <!-- A row drag captures the pointer on the scroller, not on the row: the edge
+                             scroll carries the row out of view and the list recycles its container,
+                             which dropped a capture held by the row. -->
+                        <ScrollViewer Grid.Row="1" x:Name="QueueScroller" HorizontalScrollBarVisibility="Disabled"
+                                      PointerMoved="OnMiniQueueDragPointerMoved"
+                                      PointerReleased="OnMiniQueueDragPointerReleased"
+                                      PointerCaptureLost="OnMiniQueueDragPointerCaptureLost">
                             <ItemsControl x:Name="QueueList" ItemsSource="{Binding QueuePreview}">
                                 <!-- Virtualized. A plain StackPanel inflates one row per queued
                                      track the moment it is added: measured 1.6-2.5 ms per row,
@@ -2461,7 +2575,7 @@
                                 <ItemsControl.DataTemplates>
                                     <DataTemplate x:DataType="vm:MiniQueueHeader">
                                         <!-- Up Next sits under the played rows: the gap above sets the sections apart. -->
-                                        <Grid Classes="mini-queue-header" Classes.up-next="{Binding IsUpNext}" ColumnDefinitions="*,Auto">
+                                        <Grid Classes="mini-queue-header" Classes.up-next="{Binding IsUpNext}" ColumnDefinitions="*,Auto,Auto">
                                             <TextBlock Grid.Column="0" Text="{loc:T MiniPlayer.Played}" FontSize="12" FontWeight="SemiBold"
                                                        Foreground="{DynamicResource MiniDrawerTextHeader}"
                                                        IsVisible="{Binding IsPlayed}"/>
@@ -2471,11 +2585,38 @@
                                             <TextBlock Grid.Column="1" Text="{loc:T MiniPlayer.ShowingFirst100}" FontSize="10"
                                                        Foreground="{DynamicResource MiniDrawerTextFaint}" VerticalAlignment="Center"
                                                        IsVisible="{Binding ShowTruncated}"/>
+                                            <!-- The fixed header's Reshuffle, on the in-list Up Next header. -->
+                                            <Panel Grid.Column="2" IsVisible="{Binding IsUpNext}">
+                                                <Button Classes="mini-transport glass-circle" Width="22" Height="22"
+                                                        Margin="8,-4,0,-4" VerticalAlignment="Center"
+                                                        Command="{Binding $parent[Window].((vm:MiniPlayerViewModel)DataContext).Player.ReshuffleCommand}"
+                                                        IsVisible="{Binding $parent[Window].((vm:MiniPlayerViewModel)DataContext).Player.IsShuffleEnabled}"
+                                                        ToolTip.Tip="{loc:T MiniPlayer.Reshuffle}">
+                                                    <PathIcon Data="{StaticResource ShuffleIcon}" Width="11" Height="11" Foreground="{DynamicResource MiniDrawerText}"/>
+                                                </Button>
+                                            </Panel>
                                         </Grid>
                                     </DataTemplate>
                                     <DataTemplate x:DataType="vm:MiniQueueRow">
-                                        <!-- Played rows are dimmed (brighter on hover) — what already played, not what's next. -->
-                                        <Border Classes="mini-row" Classes.mini-played="{Binding IsPlayed}">
+                                        <!-- Played rows are dimmed (brighter on hover) — what already played, not what's next.
+                                             Like the main Queue panel's rows: drag an Up Next row to reorder it,
+                                             right-click ▸ Remove from Queue, or click it and press Delete
+                                             (handlers in code-behind). A press here never drags the window. -->
+                                        <Border Classes="mini-row mini-queue-row" Classes.mini-played="{Binding IsPlayed}"
+                                                Focusable="True"
+                                                AutomationProperties.Name="{Binding Track, Converter={x:Static helpers:AccessibleNames.ItemName}}"
+                                                PointerPressed="OnMiniQueueRowPointerPressed"
+                                                KeyDown="OnMiniQueueRowKeyDown">
+                                            <Border.ContextMenu>
+                                                <ContextMenu>
+                                                    <MenuItem Header="{loc:T MiniPlayer.RemoveFromQueue}"
+                                                              Click="OnMiniQueueRemoveClick">
+                                                        <MenuItem.Icon>
+                                                            <controls:LineIcon Classes="mv2-icon" Data="{StaticResource MenuLineQueueRemove}"/>
+                                                        </MenuItem.Icon>
+                                                    </MenuItem>
+                                                </ContextMenu>
+                                            </Border.ContextMenu>
                                             <Grid ColumnDefinitions="Auto,*,Auto">
                                                 <Border Grid.Column="0" Width="36" Height="36" CornerRadius="8">
                                                     <Panel>
@@ -2525,6 +2666,43 @@
                                 </ItemsControl.DataTemplates>
                             </ItemsControl>
                         </ScrollViewer>
+                        <!-- The floating card a dragged row rides on (LiquidReorder), the main
+                             panel's accent card at this list's row size. It shares the list's cell,
+                             so its Y is in the scroller's coordinates. -->
+                        <Border Grid.Row="1" x:Name="MiniQueueDragPreview"
+                                x:DataType="m:Track"
+                                DataContext="{x:Null}"
+                                IsHitTestVisible="False"
+                                IsVisible="False"
+                                Padding="6"
+                                CornerRadius="10"
+                                Background="{DynamicResource AccentColorBrush}"
+                                HorizontalAlignment="Stretch"
+                                VerticalAlignment="Top"
+                                BoxShadow="0 8 22 0 #66000000"
+                                RenderTransformOrigin="50%,50%">
+                            <Border.RenderTransform>
+                                <TransformGroup>
+                                    <ScaleTransform/>
+                                    <TranslateTransform/>
+                                </TransformGroup>
+                            </Border.RenderTransform>
+                            <Grid ColumnDefinitions="Auto,*">
+                                <Border Grid.Column="0" Width="36" Height="36" CornerRadius="8" ClipToBounds="True">
+                                    <controls:CachedImage SourcePath="{Binding AlbumArtworkPath}"
+                                                          DecodeWidth="128" Width="36" Height="36"
+                                                          Stretch="UniformToFill"/>
+                                </Border>
+                                <StackPanel Grid.Column="1" VerticalAlignment="Center" Margin="10,0,6,0" Spacing="1">
+                                    <TextBlock Text="{Binding TitleDisplay}" FontSize="13" FontWeight="SemiBold"
+                                               Foreground="{DynamicResource AccentForegroundBrush}"
+                                               TextTrimming="CharacterEllipsis" MaxLines="1"/>
+                                    <TextBlock Text="{Binding ArtistDisplay}" FontSize="11"
+                                               Foreground="{DynamicResource AccentForegroundBrush}" Opacity="0.75"
+                                               TextTrimming="CharacterEllipsis" MaxLines="1"/>
+                                </StackPanel>
+                            </Grid>
+                        </Border>
                     </Grid>
 
                     <!-- Volume layer -->

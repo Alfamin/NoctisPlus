@@ -66,12 +66,14 @@ public class SettingsResetTests : IDisposable
             AccentFollowsArtwork = true,
             AccentTrackLinks = false,
             UpmixMode = "Surround",
+            HeadphoneSurround = true,
             Shortcuts = new Dictionary<string, string> { [nameof(ShortcutAction.PlayPause)] = "P" },
             LyricsBackgroundMediaOverrides = new Dictionary<string, string> { ["track:1"] = clip },
             LyricsBackgroundPausesWithPlayback = true,
             MusicVideosEnabled = false,
             MusicVideoRoundedCorners = false,
             DiscordShowAlbum = false,
+            DiscordStatusDisplay = "Title",
             NoctisServerPort = 5050,
             ShowGenreColumn = false,
             ShowBpmColumn = true,
@@ -86,7 +88,9 @@ public class SettingsResetTests : IDisposable
             LyricsStudioSkipAlreadyTimed = false,
             LyricsStudioEmbedTags = true,
             LyricsStudioOnlineLyrics = false,
-            IgnoreLeadingWordsInArtistSort = true,
+            IgnoreLeadingWordsInArtistSort = false,
+            AlbumPageTintEnabled = false,
+            PlayPauseFadeEnabled = false,
             ArtistSortIgnoredWords = new List<string> { "The", "Los" },
             PlayCountThresholdPercent = 75,
         });
@@ -100,6 +104,7 @@ public class SettingsResetTests : IDisposable
         Assert.False(vm.ShortcutService.IsDefault(ShortcutAction.PlayPause));
         Assert.True(vm.HasLyricsBackgroundOverride("track:1"));
         Assert.Equal("Surround", audio.UpmixMode);
+        Assert.True(vm.HeadphoneSurround);
 
         // ConfirmResetLibrary's settings half, without its OS and data-folder side effects.
         var defaults = new AppSettings { CommunityPluginsEnabled = false };
@@ -109,10 +114,15 @@ public class SettingsResetTests : IDisposable
         Assert.True(vm.ShortcutService.IsDefault(ShortcutAction.PlayPause));
         Assert.False(vm.HasLyricsBackgroundOverride("track:1"));
         Assert.Equal("Off", audio.UpmixMode);
+        Assert.False(vm.HeadphoneSurround);
 
         // Any toggle, or the unconditional save when the window closes.
         await vm.SaveAsync();
         var afterReset = await persistence.LoadSettingsAsync();
+        // The defaults that went on for new installs (2026-10-18) come back on.
+        Assert.True(afterReset.AlbumPageTintEnabled);
+        Assert.True(afterReset.PlayPauseFadeEnabled);
+        Assert.True(afterReset.IgnoreLeadingWordsInArtistSort);
 
         // Except the sync id: made once per install, at random (a fresh install has its own), and
         // kept through a reset so phones still see the same computer in the sync ledger.

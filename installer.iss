@@ -3,7 +3,7 @@
 ; Compile with: ISCC.exe installer.iss
 
 #define MyAppName "Noctis"
-#define MyAppVersion "1.6.3"
+#define MyAppVersion "1.6.4"
 #define MyAppPublisher "heartached"
 #define MyAppExeName "Noctis.exe"
 #define MyAppURL "https://github.com/heartached/Noctis"
@@ -90,6 +90,8 @@ Root: HKA; Subkey: "Software\Noctis\Capabilities\FileAssociations"; ValueType: s
 Root: HKA; Subkey: "Software\Classes\.dsf\OpenWithProgids"; ValueType: none; ValueName: "Noctis.AudioFile"; Flags: uninsdeletevalue; Tasks: fileassoc
 Root: HKA; Subkey: "Software\Noctis\Capabilities\FileAssociations"; ValueType: string; ValueName: ".dff"; ValueData: "Noctis.AudioFile"; Tasks: fileassoc
 Root: HKA; Subkey: "Software\Classes\.dff\OpenWithProgids"; ValueType: none; ValueName: "Noctis.AudioFile"; Flags: uninsdeletevalue; Tasks: fileassoc
+Root: HKA; Subkey: "Software\Noctis\Capabilities\FileAssociations"; ValueType: string; ValueName: ".m4b"; ValueData: "Noctis.AudioFile"; Tasks: fileassoc
+Root: HKA; Subkey: "Software\Classes\.m4b\OpenWithProgids"; ValueType: none; ValueName: "Noctis.AudioFile"; Flags: uninsdeletevalue; Tasks: fileassoc
 
 [Files]
 ; Copy everything CI published rather than an allowlist of patterns. The old

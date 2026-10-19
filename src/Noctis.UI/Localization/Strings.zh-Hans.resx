@@ -816,6 +816,14 @@
     <value>在任务栏按钮上显示歌曲进度。暂停时Amber</value>
     <comment>Text in SettingsView.axaml</comment>
   </data>
+  <data name="Settings.MediaControlsTaskbar" xml:space="preserve">
+    <value>任务栏显示媒体控制按钮</value>
+    <comment>Text in SettingsView.axaml</comment>
+  </data>
+  <data name="Settings.MediaControlsTaskbarDesc" xml:space="preserve">
+    <value>将鼠标悬停在任务栏图标上时，显示上一首、播放/暂停、下一首和收藏按钮。</value>
+    <comment>Text in SettingsView.axaml</comment>
+  </data>
   <data name="Settings.AutomaticAlbumCoverSize" xml:space="preserve">
     <value>自动专辑封面大小</value>
     <comment>Text in SettingsView.axaml</comment>
@@ -1018,6 +1026,14 @@
   </data>
   <data name="Settings.KeepWordsWholeWhen" xml:space="preserve">
     <value>当 TTML 歌词把单词拆成音节时,保持单词完整。</value>
+    <comment>Text in SettingsView.axaml</comment>
+  </data>
+  <data name="Settings.LyricsGlowAndLift" xml:space="preserve">
+    <value>发光与浮动</value>
+    <comment>Text in SettingsView.axaml</comment>
+  </data>
+  <data name="Settings.LyricsGlowAndLiftHint" xml:space="preserve">
+    <value>已唱的词会轻轻浮起，长音会发光（类似 Apple Music）。关闭后逐字歌词保持静止。</value>
     <comment>Text in SettingsView.axaml</comment>
   </data>
   <data name="Settings.PlayerBarOpacity" xml:space="preserve">
@@ -1299,6 +1315,26 @@
   <data name="Settings.AddAlbumNameUnder" xml:space="preserve">
     <value>在您的Discord卡上显示艺人下面的相册名称。</value>
     <comment>Text in SettingsView.axaml</comment>
+  </data>
+  <data name="Settings.DiscordStatusDisplay" xml:space="preserve">
+    <value>Discord 状态</value>
+    <comment>Settings ▸ Integrations ▸ Discord, SettingsView.axaml</comment>
+  </data>
+  <data name="Settings.DiscordStatusDisplayHint" xml:space="preserve">
+    <value>Discord 在成员列表中“正在收听”后显示的内容。</value>
+    <comment>Settings ▸ Integrations ▸ Discord, SettingsView.axaml</comment>
+  </data>
+  <data name="Settings.DiscordStatusDisplay.Artist" xml:space="preserve">
+    <value>艺人</value>
+    <comment>Discord status line choice (SettingsViewModel)</comment>
+  </data>
+  <data name="Settings.DiscordStatusDisplay.Title" xml:space="preserve">
+    <value>歌曲名</value>
+    <comment>Discord status line choice (SettingsViewModel)</comment>
+  </data>
+  <data name="Settings.DiscordStatusDisplay.AppName" xml:space="preserve">
+    <value>Noctis</value>
+    <comment>Discord status line choice (SettingsViewModel)</comment>
   </data>
   <data name="Settings.LastFmScrobbling" xml:space="preserve">
     <value>Last.fm 记录</value>
@@ -4376,6 +4412,10 @@
     <value>播放</value>
     <comment>Text in PlaybackBarView.axaml</comment>
   </data>
+  <data name="PlaybackBar.Pause" xml:space="preserve">
+    <value>暂停</value>
+    <comment>Play/pause button tooltip and accessible name while playing</comment>
+  </data>
   <data name="PlaybackBar.PlayNext" xml:space="preserve">
     <value>下一首播放</value>
     <comment>Header in PlaybackBarView.axaml</comment>
@@ -5659,6 +5699,18 @@
     <value>仅内置输出引擎。唯一独家模式保持文件的布局。</value>
     <comment>Upmix footnote</comment>
   </data>
+  <data name="Settings.HeadphoneSurround" xml:space="preserve">
+    <value>耳机环绕声</value>
+    <comment>Text in SettingsView.axaml</comment>
+  </data>
+  <data name="Settings.HeadphoneSurroundDesc" xml:space="preserve">
+    <value>将 5.1 和 7.1 文件转换为耳机空间音效，而不是平淡的立体声混音。立体声歌曲不受影响。</value>
+    <comment>Text in SettingsView.axaml</comment>
+  </data>
+  <data name="Settings.HeadphoneSurroundRestart" xml:space="preserve">
+    <value>重新启动 Noctis 以应用此更改。</value>
+    <comment>Shown under Headphone Surround after a change, in SettingsView.axaml</comment>
+  </data>
   <data name="Server.AccountsMoved" xml:space="preserve">
     <value>帐户和设备同步是在帐户和同步中管理的。</value>
     <comment>Integrations → Noctis Server card footer</comment>
@@ -6034,14 +6086,6 @@
   <data name="LyricsStudio.WordsTip" xml:space="preserve">
     <value>按时间显示每个单词。单击一个来听到它。</value>
     <comment>Word toggle tooltip</comment>
-  </data>
-  <data name="LyricsStudio.WordEarlier" xml:space="preserve">
-    <value>较早选中的单词 50 ms (其邻居保持put)</value>
-    <comment>Word nudge tooltip</comment>
-  </data>
-  <data name="LyricsStudio.WordLater" xml:space="preserve">
-    <value>选中的单词50毫秒后(其邻居保持put)</value>
-    <comment>Word nudge tooltip</comment>
   </data>
   <data name="LyricsStudio.TapWords" xml:space="preserve">
     <value>点击单词</value>

@@ -1,0 +1,328 @@
+<!-- The grouped look Settings and Account share, after Apple Music's iOS 26 account sheet: a
+     grouped grey page (PhoneGroupedBackgroundBrush), white / raised cards with 24 dp corners,
+     52 dp rows of 17 sp text, accent outline icons, grey chevrons and hairlines inset to the
+     text on both sides, a header of glyph + title with a round glass close button, accent text
+     cards with a footnote under them, and a row of equal accent action tiles. Every colour is
+     a palette key (MobileTheme.BuildPalette) or the accent, so it follows light and dark. -->
+<Styles xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:views="using:Noctis.Mobile.Views">
+
+    <!-- Page: the grouped grey as a sheet whose rounded top sits just under the status bar, the
+         window's own colour around it, as Apple's sheet rises over the app. (The shell clips a
+         page to its slot below the status bar, so the grey cannot reach up under it.) -->
+    <Style Selector="Border.grouped-backdrop">
+        <Setter Property="Background" Value="{DynamicResource PhoneGroupedBackgroundBrush}" />
+        <Setter Property="CornerRadius" Value="30,30,0,0" />
+        <Setter Property="Margin" Value="0,4,0,0" />
+    </Style>
+    <!-- Apple's rows are regular weight; Noctis.UI gives every TextBlock the Inter SemiBold file
+         (which ignores FontWeight). Inside a grouped page, the Inter family with real weights. -->
+    <Style Selector="Panel.grouped-root TextBlock">
+        <Setter Property="FontFamily" Value="fonts:Inter#Inter, $Default" />
+    </Style>
+    <Style Selector="Panel.grouped-root TextBox">
+        <Setter Property="FontFamily" Value="fonts:Inter#Inter, $Default" />
+    </Style>
+    <Style Selector="StackPanel.grouped-content">
+        <Setter Property="Margin" Value="16,12,16,24" />
+        <Setter Property="Spacing" Value="28" />
+    </Style>
+
+    <!-- Header: the page's glyph on an accent disc, its title, the round close button. -->
+    <Style Selector="Grid.sheet-header">
+        <Setter Property="Margin" Value="16,10,12,6" />
+        <Setter Property="MinHeight" Value="52" />
+    </Style>
+    <Style Selector="Border.sheet-glyph">
+        <Setter Property="Width" Value="30" />
+        <Setter Property="Height" Value="30" />
+        <Setter Property="CornerRadius" Value="15" />
+        <Setter Property="Background" Value="{DynamicResource AccentColorBrush}" />
+        <Setter Property="VerticalAlignment" Value="Center" />
+    </Style>
+    <Style Selector="Border.sheet-glyph views|GridIcon">
+        <Setter Property="Width" Value="18" />
+        <Setter Property="Height" Value="18" />
+        <Setter Property="Foreground" Value="{DynamicResource AccentForegroundBrush}" />
+        <Setter Property="HorizontalAlignment" Value="Center" />
+        <Setter Property="VerticalAlignment" Value="Center" />
+    </Style>
+    <Style Selector="TextBlock.sheet-title">
+        <Setter Property="FontSize" Value="21" />
+        <Setter Property="FontWeight" Value="SemiBold" />
+        <Setter Property="Margin" Value="12,0,0,0" />
+        <Setter Property="VerticalAlignment" Value="Center" />
+        <Setter Property="TextTrimming" Value="CharacterEllipsis" />
+    </Style>
+    <!-- The close button: a glass circle with a thin outline, the island's look. -->
+    <Style Selector="Button.sheet-close">
+        <Setter Property="Width" Value="46" />
+        <Setter Property="Height" Value="46" />
+        <Setter Property="Padding" Value="0" />
+        <Setter Property="CornerRadius" Value="23" />
+        <Setter Property="Background" Value="{DynamicResource PhoneChromeBrush}" />
+        <Setter Property="BorderBrush" Value="{DynamicResource PhoneChromeOutlineBrush}" />
+        <Setter Property="BorderThickness" Value="1" />
+        <Setter Property="HorizontalContentAlignment" Value="Center" />
+        <Setter Property="VerticalContentAlignment" Value="Center" />
+        <Setter Property="VerticalAlignment" Value="Center" />
+        <Setter Property="RenderTransform" Value="scale(1)" />
+        <Setter Property="Transitions">
+            <Transitions>
+                <DoubleTransition Property="Opacity" Duration="0:0:0.12">
+                    <DoubleTransition.Easing><CubicEaseOut /></DoubleTransition.Easing>
+                </DoubleTransition>
+                <TransformOperationsTransition Property="RenderTransform" Duration="0:0:0.16">
+                    <TransformOperationsTransition.Easing><CubicEaseOut /></TransformOperationsTransition.Easing>
+                </TransformOperationsTransition>
+            </Transitions>
+        </Setter>
+    </Style>
+    <Style Selector="Button.sheet-close views|GridIcon">
+        <Setter Property="Width" Value="22" />
+        <Setter Property="Height" Value="22" />
+        <Setter Property="Foreground" Value="{DynamicResource PrimaryTextBrush}" />
+    </Style>
+    <Style Selector="Button.sheet-close:pressed">
+        <Setter Property="Opacity" Value="0.6" />
+        <Setter Property="RenderTransform" Value="scale(0.94)" />
+    </Style>
+    <!-- Fluent repaints the presenter on hover / press; the circle keeps its glass. -->
+    <Style Selector="Button.sheet-close:pointerover /template/ ContentPresenter#PART_ContentPresenter, Button.sheet-close:pressed /template/ ContentPresenter#PART_ContentPresenter, Button.action-tile:pointerover /template/ ContentPresenter#PART_ContentPresenter, Button.action-tile:pressed /template/ ContentPresenter#PART_ContentPresenter">
+        <Setter Property="Background" Value="{Binding $parent[Button].Background}" />
+        <Setter Property="BorderBrush" Value="{Binding $parent[Button].BorderBrush}" />
+        <Setter Property="Foreground" Value="{Binding $parent[Button].Foreground}" />
+    </Style>
+
+    <!-- Section heads over a card: the desktop Settings rail's icon in the accent, the name grey. -->
+    <Style Selector="Grid.group-head">
+        <Setter Property="Margin" Value="16,0,16,8" />
+    </Style>
+    <Style Selector="Grid.group-head views|GridIcon">
+        <Setter Property="Width" Value="18" />
+        <Setter Property="Height" Value="18" />
+        <Setter Property="Foreground" Value="{DynamicResource AccentTextExactBrush}" />
+        <Setter Property="VerticalAlignment" Value="Center" />
+    </Style>
+    <Style Selector="TextBlock.group-title">
+        <Setter Property="FontSize" Value="15" />
+        <Setter Property="FontWeight" Value="SemiBold" />
+        <Setter Property="Foreground" Value="{DynamicResource PhoneSecondaryTextBrush}" />
+        <Setter Property="Margin" Value="8,0,0,0" />
+        <Setter Property="VerticalAlignment" Value="Center" />
+    </Style>
+
+    <!-- Cards -->
+    <Style Selector="Border.group-card">
+        <Setter Property="Background" Value="{DynamicResource PhoneCardBrush}" />
+        <Setter Property="CornerRadius" Value="24" />
+        <Setter Property="ClipToBounds" Value="True" />
+    </Style>
+    <!-- The small grey line under a card. -->
+    <Style Selector="TextBlock.group-footnote">
+        <Setter Property="FontSize" Value="13.5" />
+        <Setter Property="Foreground" Value="{DynamicResource PhoneSecondaryTextBrush}" />
+        <Setter Property="TextWrapping" Value="Wrap" />
+        <Setter Property="Margin" Value="16,8,16,0" />
+    </Style>
+
+    <!-- Rows: 16 dp in, a 24 dp accent outline icon, 16 dp gap, the 17 sp label. -->
+    <Style Selector="Grid.setting-row">
+        <Setter Property="MinHeight" Value="52" />
+        <Setter Property="Margin" Value="16,0" />
+    </Style>
+    <Style Selector="views|GridIcon.row-icon">
+        <Setter Property="Width" Value="24" />
+        <Setter Property="Height" Value="24" />
+        <Setter Property="Margin" Value="0,0,16,0" />
+        <Setter Property="VerticalAlignment" Value="Center" />
+        <Setter Property="Foreground" Value="{DynamicResource AccentTextExactBrush}" />
+    </Style>
+    <Style Selector="TextBlock.row-label">
+        <Setter Property="FontSize" Value="17" />
+        <Setter Property="VerticalAlignment" Value="Center" />
+        <Setter Property="TextWrapping" Value="Wrap" />
+    </Style>
+    <Style Selector="TextBlock.row-sub">
+        <Setter Property="FontSize" Value="13.5" />
+        <Setter Property="Foreground" Value="{DynamicResource PhoneSecondaryTextBrush}" />
+        <Setter Property="TextWrapping" Value="Wrap" />
+        <Setter Property="Margin" Value="0,2,0,0" />
+    </Style>
+    <Style Selector="TextBlock.row-value">
+        <Setter Property="FontSize" Value="17" />
+        <Setter Property="Foreground" Value="{DynamicResource PhoneSecondaryTextBrush}" />
+        <Setter Property="VerticalAlignment" Value="Center" />
+        <Setter Property="Margin" Value="12,0,0,0" />
+    </Style>
+    <!-- GridIcon: PhChevronRight drawn on its 24-grid (a PathIcon shrank it to a speck). -->
+    <Style Selector="views|GridIcon.row-chevron">
+        <Setter Property="Width" Value="22" />
+        <Setter Property="Height" Value="22" />
+        <Setter Property="Margin" Value="8,0,-4,0" />
+        <Setter Property="VerticalAlignment" Value="Center" />
+        <Setter Property="Foreground" Value="{DynamicResource PhoneChevronBrush}" />
+    </Style>
+    <!-- Hairline between rows, inset to the label on the left (16 + 24 + 16) and 16 on the right. -->
+    <Style Selector="Border.row-separator">
+        <Setter Property="Height" Value="0.5" />
+        <Setter Property="Margin" Value="56,0,16,0" />
+        <Setter Property="Background" Value="{DynamicResource PhoneSeparatorBrush}" />
+    </Style>
+    <!-- Accent action rows ("Set Up Family"): label in the accent too. -->
+    <Style Selector="Button.accent-row TextBlock.row-label">
+        <Setter Property="Foreground" Value="{DynamicResource AccentTextBrush}" />
+    </Style>
+    <Style Selector="Button.row:disabled">
+        <Setter Property="Opacity" Value="0.45" />
+    </Style>
+    <!-- Fluent fills a disabled button's presenter grey: a greyed row stays on its card's colour. -->
+    <Style Selector="Button.row:disabled /template/ ContentPresenter#PART_ContentPresenter">
+        <Setter Property="Background" Value="Transparent" />
+    </Style>
+    <!-- One accent text row filling its card ("Join Apple Music"). -->
+    <Style Selector="Button.accent-card">
+        <Setter Property="MinHeight" Value="52" />
+        <Setter Property="Padding" Value="16,0" />
+    </Style>
+    <Style Selector="Button.accent-card TextBlock">
+        <Setter Property="FontSize" Value="17" />
+        <Setter Property="Foreground" Value="{DynamicResource AccentTextBrush}" />
+        <Setter Property="VerticalAlignment" Value="Center" />
+    </Style>
+
+    <!-- Action tiles: equal capsule cards, accent icon over accent label ("Add Money"). -->
+    <Style Selector="Button.action-tile">
+        <Setter Property="Background" Value="{DynamicResource PhoneCardBrush}" />
+        <Setter Property="BorderThickness" Value="0" />
+        <Setter Property="CornerRadius" Value="28" />
+        <Setter Property="MinHeight" Value="60" />
+        <Setter Property="Padding" Value="6,8" />
+        <Setter Property="HorizontalAlignment" Value="Stretch" />
+        <!-- One height for the row: a one-line label's tile matches its two-line neighbours. -->
+        <Setter Property="VerticalAlignment" Value="Stretch" />
+        <Setter Property="HorizontalContentAlignment" Value="Center" />
+        <Setter Property="VerticalContentAlignment" Value="Center" />
+        <Setter Property="RenderTransform" Value="scale(1)" />
+        <Setter Property="Transitions">
+            <Transitions>
+                <DoubleTransition Property="Opacity" Duration="0:0:0.12">
+                    <DoubleTransition.Easing><CubicEaseOut /></DoubleTransition.Easing>
+                </DoubleTransition>
+                <TransformOperationsTransition Property="RenderTransform" Duration="0:0:0.16">
+                    <TransformOperationsTransition.Easing><CubicEaseOut /></TransformOperationsTransition.Easing>
+                </TransformOperationsTransition>
+            </Transitions>
+        </Setter>
+    </Style>
+    <Style Selector="Button.action-tile:pressed">
+        <Setter Property="Opacity" Value="0.6" />
+        <Setter Property="RenderTransform" Value="scale(0.96)" />
+    </Style>
+    <Style Selector="Button.action-tile:disabled">
+        <Setter Property="Opacity" Value="0.45" />
+    </Style>
+    <Style Selector="Button.action-tile views|GridIcon">
+        <Setter Property="Width" Value="20" />
+        <Setter Property="Height" Value="20" />
+        <Setter Property="HorizontalAlignment" Value="Center" />
+        <Setter Property="Foreground" Value="{DynamicResource AccentTextExactBrush}" />
+    </Style>
+    <Style Selector="Button.action-tile TextBlock">
+        <Setter Property="FontSize" Value="14" />
+        <Setter Property="Foreground" Value="{DynamicResource AccentTextBrush}" />
+        <Setter Property="HorizontalAlignment" Value="Center" />
+        <Setter Property="TextAlignment" Value="Center" />
+        <Setter Property="TextWrapping" Value="Wrap" />
+        <Setter Property="Margin" Value="0,4,0,0" />
+    </Style>
+
+    <!-- On/off rows: the whole row is the toggle, drawn as label + an iOS-sized switch. -->
+    <Style Selector="ToggleButton.switch-row">
+        <Setter Property="Background" Value="Transparent" />
+        <Setter Property="BorderThickness" Value="0" />
+        <Setter Property="Padding" Value="16,0" />
+        <Setter Property="MinHeight" Value="52" />
+        <Setter Property="HorizontalAlignment" Value="Stretch" />
+        <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+        <Setter Property="Template">
+            <ControlTemplate>
+                <Border Background="Transparent" Padding="{TemplateBinding Padding}">
+                    <Grid ColumnDefinitions="*,Auto">
+                        <ContentPresenter Content="{TemplateBinding Content}" VerticalAlignment="Center" />
+                        <Border Name="PART_Track" Grid.Column="1" Width="51" Height="31" CornerRadius="15.5"
+                                Margin="12,0,0,0" VerticalAlignment="Center">
+                            <Border Name="PART_Knob" Width="27" Height="27" CornerRadius="13.5" Margin="2"
+                                    HorizontalAlignment="Left" Background="White" BoxShadow="0 2 4 0 #26000000" />
+                        </Border>
+                    </Grid>
+                </Border>
+            </ControlTemplate>
+        </Setter>
+    </Style>
+    <Style Selector="ToggleButton.switch-row /template/ Border#PART_Track">
+        <Setter Property="Background" Value="#4D787880" />
+        <Setter Property="Transitions">
+            <Transitions>
+                <BrushTransition Property="Background" Duration="0:0:0.18" />
+            </Transitions>
+        </Setter>
+    </Style>
+    <Style Selector="ToggleButton.switch-row:checked /template/ Border#PART_Track">
+        <Setter Property="Background" Value="{DynamicResource AccentColorBrush}" />
+    </Style>
+    <Style Selector="ToggleButton.switch-row /template/ Border#PART_Knob">
+        <Setter Property="RenderTransform" Value="translateX(0px)" />
+        <Setter Property="Transitions">
+            <Transitions>
+                <TransformOperationsTransition Property="RenderTransform" Duration="0:0:0.18">
+                    <TransformOperationsTransition.Easing><CubicEaseOut /></TransformOperationsTransition.Easing>
+                </TransformOperationsTransition>
+            </Transitions>
+        </Setter>
+    </Style>
+    <Style Selector="ToggleButton.switch-row:checked /template/ Border#PART_Knob">
+        <Setter Property="RenderTransform" Value="translateX(20px)" />
+    </Style>
+    <Style Selector="ToggleButton.switch-row:pressed">
+        <Setter Property="Opacity" Value="0.6" />
+    </Style>
+
+    <!-- Avatars: a circle, the picture filling it, else initials or the person glyph on the accent. -->
+    <Style Selector="Border.avatar">
+        <Setter Property="ClipToBounds" Value="True" />
+        <Setter Property="Background" Value="{DynamicResource AccentColorBrush}" />
+        <Setter Property="VerticalAlignment" Value="Center" />
+    </Style>
+    <Style Selector="Border.avatar.large">
+        <Setter Property="Width" Value="56" />
+        <Setter Property="Height" Value="56" />
+        <Setter Property="CornerRadius" Value="28" />
+    </Style>
+    <Style Selector="Border.avatar TextBlock.initials">
+        <Setter Property="FontSize" Value="21" />
+        <Setter Property="FontWeight" Value="SemiBold" />
+        <Setter Property="Foreground" Value="{DynamicResource AccentForegroundBrush}" />
+        <Setter Property="HorizontalAlignment" Value="Center" />
+        <Setter Property="VerticalAlignment" Value="Center" />
+    </Style>
+    <Style Selector="Border.avatar views|GridIcon">
+        <Setter Property="Width" Value="30" />
+        <Setter Property="Height" Value="30" />
+        <Setter Property="Foreground" Value="{DynamicResource AccentForegroundBrush}" />
+        <Setter Property="HorizontalAlignment" Value="Center" />
+        <Setter Property="VerticalAlignment" Value="Center" />
+    </Style>
+    <Style Selector="TextBlock.profile-name">
+        <Setter Property="FontSize" Value="19" />
+        <Setter Property="FontWeight" Value="SemiBold" />
+        <Setter Property="TextTrimming" Value="CharacterEllipsis" />
+    </Style>
+    <Style Selector="TextBlock.profile-sub">
+        <Setter Property="FontSize" Value="15" />
+        <Setter Property="Foreground" Value="{DynamicResource PhoneSecondaryTextBrush}" />
+        <Setter Property="TextTrimming" Value="CharacterEllipsis" />
+        <Setter Property="Margin" Value="0,2,0,0" />
+    </Style>
+</Styles>

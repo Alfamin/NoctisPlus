@@ -13,7 +13,7 @@ public sealed record ExistingLyrics(LyricsFormat Format, IReadOnlyList<AlignedLi
 
 /// <summary>
 /// Finds and parses the synced lyrics a track already carries, in the order Lyrics Studio
-/// trusts them: a <c>.elrc</c> sidecar, then a <c>.lrc</c> sidecar, then the embedded/stored
+/// trusts them: a <c>.ttml</c> sidecar, then a <c>.elrc</c>, then a <c>.lrc</c>, then the embedded/stored
 /// synced text. Plain (untimed) lyrics are not "existing synced lyrics" and return null.
 /// </summary>
 public static partial class ExistingLyricsLoader
@@ -30,11 +30,22 @@ public static partial class ExistingLyricsLoader
 
     private static readonly TimeSpan DefaultWordSpan = TimeSpan.FromMilliseconds(420);
 
+    /// <summary>An ELRC background-vocal line: "[bg: &lt;mm:ss.xx&gt;word …&lt;mm:ss.xx&gt;]".</summary>
+    private const string BgLinePrefix = "[bg:";
+
     public static ExistingLyrics? Load(Track track)
     {
         var path = track.FilePath;
         if (!string.IsNullOrWhiteSpace(path))
         {
+            // A .ttml first, as on the lyrics page and in DetectFormat: a song whose only timed
+            // lyrics were a word-timed .ttml showed nothing here, and Start re-timed it from
+            // LRCLIB or a transcript instead of its own words.
+            var ttml = FindSidecar(path, TtmlExtensions);
+            if (ttml is not null && TryRead(ttml, out var ttmlText)
+                && TtmlParser.ToLrc(ttmlText) is { } ttmlLrc && ParseTimed(ttmlLrc) is { Count: > 0 } ttmlLines)
+                return new ExistingLyrics(HasWordTimings(ttmlLines) ? LyricsFormat.Elrc : LyricsFormat.Lrc, ttmlLines, ".ttml file", ttml);
+
             var elrc = FindSidecar(path, ElrcExtensions);
             if (elrc is not null && TryParseFile(elrc, out var elrcLines))
                 return new ExistingLyrics(HasWordTimings(elrcLines) ? LyricsFormat.Elrc : LyricsFormat.Lrc, elrcLines, ".elrc file", elrc);
@@ -189,10 +200,22 @@ public static partial class ExistingLyricsLoader
     /// </summary>
     public static IReadOnlyList<AlignedLine> ParseTimed(string text)
     {
-        var raw = new List<(TimeSpan Start, string Text, List<WordTiming>? Words, LyricVoice Voice)>();
+        var raw = new List<(TimeSpan Start, string Text, List<WordTiming>? Words, LyricVoice Voice, List<AlignedWord>? Background)>();
         foreach (var rawLine in text.Replace("\r\n", "\n").Replace('\r', '\n').Split('\n'))
         {
             var line = rawLine.Trim();
+            // A "[bg: …]" background vocal belongs to the timed line above it in the file, as on
+            // the lyrics page (LrcParser). It looks like a header tag and was dropped with them,
+            // so a Studio save wrote the song without its background vocals.
+            if (line.StartsWith(BgLinePrefix, StringComparison.Ordinal))
+            {
+                if (raw.Count > 0 && ParseBackground(line, raw[^1].Start) is { } bg)
+                {
+                    var last = raw[^1];
+                    raw[^1] = last with { Background = last.Background is null ? bg : [.. last.Background, .. bg] };
+                }
+                continue;
+            }
             if (line.Length == 0 || MetadataTag().IsMatch(line)) continue;
 
             // Compressed lines carry several timestamps: one entry per stamp.
@@ -215,7 +238,7 @@ public static partial class ExistingLyricsLoader
             if (string.IsNullOrWhiteSpace(plain)) continue;
             // Word times are absolute, so they only make sense on a single-stamp line.
             var lineWords = stamps.Count == 1 ? words : null;
-            foreach (var s in stamps) raw.Add((s, plain.Trim(), lineWords, voice));
+            foreach (var s in stamps) raw.Add((s, plain.Trim(), lineWords, voice, null));
         }
         // Stable: List.Sort reordered lines sharing a start once a file passed 16 lines.
         raw = raw.OrderBy(r => r.Start).ToList();
@@ -224,7 +247,7 @@ public static partial class ExistingLyricsLoader
         var result = new List<AlignedLine>(raw.Count);
         for (var i = 0; i < raw.Count; i++)
         {
-            var (start, plain, words, _) = raw[i];
+            var (start, plain, words, voice, background) = raw[i];
             var nextStart = i + 1 < raw.Count ? raw[i + 1].Start : (TimeSpan?)null;
             var aligned = new List<AlignedWord>();
             if (words is { Count: > 0 })
@@ -236,7 +259,7 @@ public static partial class ExistingLyricsLoader
                     if (wText.Length == 0) continue;
                     var end = word.End ?? (w + 1 < words.Count ? words[w + 1].Start : nextStart ?? word.Start + DefaultWordSpan);
                     if (end < word.Start) end = word.Start;
-                    aligned.Add(new AlignedWord(wText, word.Start, end));
+                    aligned.Add(new AlignedWord(wText, word.Start, end) { JoinsNext = FollowedWithoutSpace(words, w) });
                 }
             }
             var lineEnd = aligned.Count > 0 ? aligned[^1].End
@@ -245,35 +268,56 @@ public static partial class ExistingLyricsLoader
             result.Add(new AlignedLine(plain, start, lineEnd, aligned, Confidence: 1, Interpolated: false)
             {
                 Companions = companions[i],
+                Voice = voice,
+                Background = background,
             });
         }
         return result;
     }
 
     /// <summary>
-    /// Gives re-timed lines back the <see cref="AlignedLine.Companions"/> of the source lines
-    /// they were timed from: the engine aligns only the sung text, so without this a re-time
-    /// and save dropped the romaji and translation (GitHub #116). Matched in order by text.
+    /// Gives re-timed lines back what the source lines they were timed from carried besides the
+    /// sung text: the <see cref="AlignedLine.Companions"/>, the duet <see cref="AlignedLine.Voice"/>
+    /// and the <see cref="AlignedLine.Background"/> vocal. The engine aligns only the sung text,
+    /// so without this a re-time and save dropped the romaji and translation (GitHub #116), put
+    /// every line in the first singer's place and lost the adlibs. Nothing times the background
+    /// vocal, so it moves by as much as its line did — as the review's line shift moves it.
+    /// Matched in order by text.
     /// </summary>
     public static IReadOnlyList<AlignedLine> CarryCompanions(IReadOnlyList<AlignedLine> source, IReadOnlyList<AlignedLine> timed)
     {
-        if (!source.Any(l => l.Companions is { Count: > 0 })) return timed;
+        if (!source.Any(l => l.Companions is { Count: > 0 } || l.Background is { Count: > 0 } || l.Voice != LyricVoice.Default))
+            return timed;
         var result = new List<AlignedLine>(timed.Count);
         var j = 0;
         foreach (var line in timed)
         {
             var k = j;
             while (k < source.Count && !string.Equals(source[k].Text.Trim(), line.Text.Trim(), StringComparison.Ordinal)) k++;
-            if (k < source.Count)
+            if (k >= source.Count)
             {
-                j = k + 1;
-                if (source[k].Companions is { Count: > 0 } companions && line.Companions is null)
-                {
-                    result.Add(line with { Companions = companions });
-                    continue;
-                }
+                result.Add(line);
+                continue;
             }
-            result.Add(line);
+            j = k + 1;
+            var from = source[k];
+            var carried = line;
+            if (from.Companions is { Count: > 0 } companions && line.Companions is null)
+                carried = carried with { Companions = companions };
+            if (from.Voice != LyricVoice.Default && line.Voice == LyricVoice.Default)
+                carried = carried with { Voice = from.Voice };
+            if (from.Background is { Count: > 0 } background && line.Background is null)
+            {
+                var delta = line.Start - from.Start;
+                carried = carried with
+                {
+                    Background = background.Select(w => w with
+                    {
+                        Start = TimeSpan.FromTicks(Math.Max(0, (w.Start + delta).Ticks)), End = TimeSpan.FromTicks(Math.Max(0, (w.End + delta).Ticks)),
+                    }).ToList(),
+                };
+            }
+            result.Add(carried);
         }
         return result;
     }
@@ -282,10 +326,10 @@ public static partial class ExistingLyricsLoader
     /// Pulls companion lines (plain, same start, same voice as an earlier line there) out of
     /// <paramref name="raw"/>; returns each remaining line's companions, index-aligned with it.
     /// </summary>
-    private static List<List<string>?> GroupCompanions(List<(TimeSpan Start, string Text, List<WordTiming>? Words, LyricVoice Voice)> raw)
+    private static List<List<string>?> GroupCompanions(List<(TimeSpan Start, string Text, List<WordTiming>? Words, LyricVoice Voice, List<AlignedWord>? Background)> raw)
     {
         var companions = new List<List<string>?>(raw.Count);
-        var kept = new List<(TimeSpan, string, List<WordTiming>?, LyricVoice)>(raw.Count);
+        var kept = new List<(TimeSpan, string, List<WordTiming>?, LyricVoice, List<AlignedWord>?)>(raw.Count);
         var taken = new bool[raw.Count];
         for (var i = 0; i < raw.Count; i++)
         {
@@ -300,6 +344,8 @@ public static partial class ExistingLyricsLoader
                 var other = raw[k];
                 if (taken[k] || other.Words is { Count: > 0 } || other.Voice != main.Voice) continue;
                 taken[k] = true;
+                // A companion's background vocal is the line's (LrcParser moves it the same way).
+                if (other.Background is { } bg) main.Background = main.Background is null ? bg : [.. main.Background, .. bg];
                 if (seen.Add(other.Text)) (mine ??= new List<string>()).Add(other.Text);
             }
             kept.Add(main);
@@ -309,6 +355,39 @@ public static partial class ExistingLyricsLoader
         raw.AddRange(kept);
         return companions;
     }
+
+    /// <summary>
+    /// A "[bg: …]" line as timed words. Word tags give the times (a word with no end runs to the
+    /// next one, the last for <see cref="DefaultWordSpan"/>); a body with no tags is one word at
+    /// <paramref name="lineStart"/>, where the lyrics page puts it. Null when it holds no text.
+    /// </summary>
+    private static List<AlignedWord>? ParseBackground(string line, TimeSpan lineStart)
+    {
+        var body = line[BgLinePrefix.Length..];
+        if (body.EndsWith(']')) body = body[..^1];
+        var (plain, words) = EnhancedLrcParser.ParseLine(body);
+        if (string.IsNullOrWhiteSpace(plain)) return null;
+        if (words is not { Count: > 0 })
+            return [new AlignedWord(plain.Trim(), lineStart, lineStart + DefaultWordSpan)];
+
+        var result = new List<AlignedWord>(words.Count);
+        for (var w = 0; w < words.Count; w++)
+        {
+            var wText = words[w].Text.Trim();
+            if (wText.Length == 0) continue;
+            var end = words[w].End ?? (w + 1 < words.Count ? words[w + 1].Start : words[w].Start + DefaultWordSpan);
+            result.Add(new AlignedWord(wText, words[w].Start, end < words[w].Start ? words[w].Start : end) { JoinsNext = FollowedWithoutSpace(words, w) });
+        }
+        return result.Count > 0 ? result : null;
+    }
+
+    /// <summary>
+    /// The parsed word is followed by another with no space between: the ELRC reader keeps the
+    /// space after a word on its text, and leaves CJK characters and lone punctuation unjoined.
+    /// Without this a save put a space between every character of CJK lyrics ("偶 尔").
+    /// </summary>
+    private static bool FollowedWithoutSpace(List<WordTiming> words, int index) =>
+        index + 1 < words.Count && words[index].Text is { Length: > 0 } text && !char.IsWhiteSpace(text[^1]);
 
     private static bool TryParseFile(string path, out IReadOnlyList<AlignedLine> lines)
     {

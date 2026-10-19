@@ -18,12 +18,9 @@
          rows are Buttons, whose presenter takes the Button's Foreground, hence the Button setters.
          Status bar: a theme-coloured fade softens the cover top under the clock and the buttons
          (white in Light, dark in Dark), so the theme's own icons read on every cover; scrolled,
-         the page colour comes in behind the bar and the title moves into it (AlbumPage.axaml.cs). -->
-    <UserControl.Resources>
-        <!-- The desktop album page's audio-quality waveform (AlbumDetailView.axaml). -->
-        <StreamGeometry x:Key="AlbumQualityIcon">M8.184,0.35C9.944,0.35 10.703,3.296 11.338,5.238C11.673,3.842 11.497,3.542 11.857,3.542C11.99,3.542 12.126,3.633 12.126,3.798C12.126,3.809 12.123,3.839 12.117,3.883L12.091,4.058C12.02,4.522 11.845,5.494 11.654,6.144C13.198,10.191 14.345,4.861 14.474,3.772C14.493,3.615 14.612,3.542 14.731,3.542C14.891,3.542 15.022,3.662 14.997,3.843C14.72,5.605 14.295,8.35 12.547,8.35C11.582,8.35 11.04,7.595 10.611,6.73C9.54,4.626 9.047,1.093 7.997,1.093C7.66,1.093 7.411,1.444 7.394,1.444C7.362,1.444 7.337,1.301 7.023,0.909C7.322,0.567 7.734,0.35 8.184,0.35ZM2.458,0.354C5.211,0.354 5.456,7.618 7.014,7.618C7.197,7.618 7.394,7.507 7.61,7.256C7.729,7.458 7.851,7.638 7.978,7.796C7.667,8.151 7.28,8.35 6.795,8.35C5.054,8.349 4.306,5.434 3.663,3.466C3.511,4.097 3.432,4.669 3.402,4.925C3.382,5.088 3.263,5.163 3.143,5.163C3.009,5.163 2.874,5.071 2.874,4.908L2.874,4.908L2.877,4.87C2.966,4.223 3.146,3.243 3.347,2.56C3.079,1.858 2.745,1.091 2.252,1.091C1.257,1.091 0.687,3.591 0.527,4.925C0.508,5.088 0.388,5.163 0.268,5.163C0.135,5.163 0,5.071 0,4.908C0,4.896 0.001,4.883 0.002,4.87C0.283,2.836 0.808,0.354 2.458,0.354ZM5.315,0.35C5.809,0.35 6.339,0.608 6.797,1.211C6.822,1.241 7.078,1.639 7.159,1.777C8.277,3.802 8.818,7.627 9.881,7.627C10.065,7.627 10.264,7.513 10.484,7.256C10.604,7.458 10.726,7.638 10.852,7.796C10.542,8.15 10.155,8.35 9.67,8.35C6.933,8.349 6.636,1.09 5.128,1.09C4.788,1.09 4.536,1.444 4.519,1.444C4.487,1.444 4.462,1.301 4.148,0.909C4.455,0.558 4.87,0.35 5.315,0.35Z</StreamGeometry>
-    </UserControl.Resources>
-
+         the page colour comes in behind the bar and the title moves into it (AlbumPage.axaml.cs).
+         The quality badge's waveform is PhoneIcons' PhLossless (the desktop's), shared with Now Playing,
+         beside every quality label (Lossless or a codec such as AAC), as on the PC. -->
     <UserControl.Styles>
         <Style Selector="views|AlbumPage">
             <Setter Property="Foreground" Value="{DynamicResource PrimaryTextBrush}" />
@@ -103,12 +100,14 @@
             <Setter Property="Background" Value="{DynamicResource AlbumRule}" />
         </Style>
 
-        <!-- The playing row's equalizer (PlayingBars, the desktop's row indicator) in the text colour. -->
+        <!-- The playing row's equalizer (PlayingBars, the desktop's row indicator) in the accent, as
+             the desktop's: the theme-guarded accent text colour, and on a cover's tint the accent
+             stepped toward the tint's text colour until it reads (HeroChrome's AlbumAccent). -->
         <Style Selector="views|AlbumPage views|PlayingBars">
-            <Setter Property="Fill" Value="{DynamicResource PrimaryTextBrush}" />
+            <Setter Property="Fill" Value="{DynamicResource AccentTextBrush}" />
         </Style>
         <Style Selector="views|AlbumPage.tinted views|PlayingBars">
-            <Setter Property="Fill" Value="{DynamicResource AlbumText}" />
+            <Setter Property="Fill" Value="{DynamicResource AlbumAccent}" />
         </Style>
 
         <!-- Shuffle and the heart beside the Play pill: Apple's ~44 pt circles, one height with it. -->
@@ -131,7 +130,9 @@
          is full-bleed; the floating buttons and the scrim are laid over the scroller. -->
     <Panel>
         <ScrollViewer Classes="page-scroll" Name="AlbumScroll" views:ScrollMemory.IsEnabled="True" HorizontalScrollBarVisibility="Disabled">
-            <StackPanel Margin="0,0,0,24">
+            <!-- The body carries the page's ramp (HeroChrome): the cover's colour deepening into
+                 the page colour over the first stretch below the cover, as Apple's. -->
+            <StackPanel Name="PageBody" Margin="0,0,0,24">
                 <!-- Square (the code-behind sizes it from the width); the bottom of the cover
                      fades into the page colour, so the cover never ends in a hard line. -->
                 <Panel Name="Hero" Height="412" ClipToBounds="True" Background="{DynamicResource HomeCardBackground}">
@@ -171,25 +172,16 @@
                                 </MultiBinding>
                             </TextBlock.IsVisible>
                         </TextBlock>
+                        <!-- What the badge means, on the glass pop menu out of the badge (ShowQualityNote). -->
                         <Button Name="QualityBadge" Classes="row" HorizontalAlignment="Left" VerticalAlignment="Center"
-                                IsVisible="{Binding HasQualityBadge}">
+                                IsVisible="{Binding HasQualityBadge}" Command="{Binding ShowQualityNoteCommand}">
                             <StackPanel Orientation="Horizontal" Spacing="4" Margin="0,4">
-                                <Viewbox Width="16" Height="11" Margin="0,1,0,0" VerticalAlignment="Center">
-                                    <Path Classes="album-subtle" Data="{StaticResource AlbumQualityIcon}" />
+                                <Viewbox Name="BadgeGlyph" Width="16" Height="11" Margin="0,1,0,0" VerticalAlignment="Center">
+                                    <Path Classes="album-subtle" Data="{DynamicResource PhLossless}" />
                                 </Viewbox>
                                 <TextBlock Name="QualityBadgeText" Classes="album-subtle" FontSize="13" FontWeight="SemiBold"
                                            Text="{Binding QualityBadge}" VerticalAlignment="Center" />
                             </StackPanel>
-                            <Button.Flyout>
-                                <Flyout Placement="Bottom">
-                                    <StackPanel Width="240" Spacing="4">
-                                        <TextBlock Text="{Binding QualityBadge}" FontSize="14" FontWeight="SemiBold" />
-                                        <TextBlock Text="{Binding QualityDetail}" FontSize="13" Opacity="0.85" />
-                                        <TextBlock Text="{Binding QualityDescription}" FontSize="12" TextWrapping="Wrap" Opacity="0.8"
-                                                   Margin="0,4,0,0" />
-                                    </StackPanel>
-                                </Flyout>
-                            </Button.Flyout>
                         </Button>
                     </StackPanel>
                 </StackPanel>
@@ -221,8 +213,17 @@
                     <Panel>
                         <Border Name="DescriptionClip" ClipToBounds="True" VerticalAlignment="Top">
                             <StackPanel Name="DescriptionContent" VerticalAlignment="Top">
-                                <TextBlock Name="DescriptionText" Text="{Binding Description}" FontSize="15" LineHeight="20"
-                                           TextWrapping="Wrap" />
+                                <!-- Folded, the full text hides behind a copy cut at the last line by
+                                     character, not by word, so that line runs on under MORE (Apple's) instead
+                                     of stopping short where the next word wrapped away. -->
+                                <Panel>
+                                    <TextBlock Name="DescriptionText" Text="{Binding Description}" FontSize="15" LineHeight="20"
+                                               TextWrapping="Wrap" />
+                                    <StackPanel Name="DescriptionFolded" VerticalAlignment="Top" IsVisible="False">
+                                        <TextBlock Name="DescriptionFoldedHead" FontSize="15" LineHeight="20" TextWrapping="Wrap" />
+                                        <TextBlock Name="DescriptionFoldedTail" FontSize="15" LineHeight="20" TextWrapping="NoWrap" />
+                                    </StackPanel>
+                                </Panel>
                                 <TextBlock Name="DescriptionLess" Classes="album-more" Text="LESS" HorizontalAlignment="Right"
                                            Margin="0,2,0,0" />
                             </StackPanel>
@@ -300,8 +301,8 @@
                 <StackPanel Name="Footer" Margin="18,22,18,0">
                     <StackPanel Name="FooterQuality" Orientation="Horizontal" Spacing="6" Margin="0,0,0,12"
                                 IsVisible="{Binding HasQualityLine}">
-                        <Viewbox Width="18" Height="12" VerticalAlignment="Center">
-                            <Path Classes="album-subtle" Data="{StaticResource AlbumQualityIcon}" />
+                        <Viewbox Name="FooterGlyph" Width="18" Height="12" VerticalAlignment="Center">
+                            <Path Classes="album-subtle" Data="{DynamicResource PhLossless}" />
                         </Viewbox>
                         <TextBlock Name="FooterQualityText" Classes="album-subtle" FontSize="14" Text="{Binding QualityLine}"
                                    VerticalAlignment="Center" />

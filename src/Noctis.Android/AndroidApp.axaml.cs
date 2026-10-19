@@ -50,6 +50,10 @@ public partial class AndroidApp : Avalonia.Application, IThemeHost
 
     public override void Initialize()
     {
+        // First thing after the platform set the dispatcher up: until then every timer due
+        // within ~30 ms spins the main thread at a full core (see DispatcherClock).
+        if (!DispatcherClock.Align(Dispatcher.UIThread))
+            ALog.Warn(LogTag, "Dispatcher clock not aligned: this Avalonia renamed its fields");
         AvaloniaXamlLoader.Load(this);
     }
 
@@ -64,6 +68,16 @@ public partial class AndroidApp : Avalonia.Application, IThemeHost
         // service construction — nothing above may touch PersistenceService, PlayHistoryService
         // or AppWrittenSidecarRegistry.
         AppPaths.OverrideDataRoot(context.FilesDir!.AbsolutePath);
+
+        // What the desktop App wires at the same point. Without the first, a cover the scan
+        // replaced (a re-tagged album) kept showing its old picture in every list until a
+        // restart: CachedImage reloads only on ArtworkCache.Invalidate. Without the second,
+        // every cold decode of a cover read the full-size file: a 3000 px PNG (most real
+        // covers) cannot shrink while decoding, so each grid tile that scrolled in past the
+        // bitmap budget cost a full decode again. The thumbnails live in the cache dir, which
+        // Android may clear; a missing one is simply decoded from the source once more.
+        LibraryService.ArtworkFileReplaced += ArtworkCache.Invalidate;
+        ArtworkThumbnailCache.Enable(Path.Combine((context.CacheDir ?? context.FilesDir!).AbsolutePath, "artwork_thumbs"));
 
         // DebugLog is an in-memory ring with no output of its own, so every handled error the
         // app logs — startup, library scan, playback, SAF listing — would be invisible on a
@@ -252,12 +266,16 @@ public partial class AndroidApp : Avalonia.Application, IThemeHost
             var settings = await persistence.LoadSettingsAsync();
             Loc.Instance.SetCulture(settings.Language);
             ApplyTheme(settings.MobileAppearance, settings.Theme, settings.AccentColorHex);
+            // The Library rows need only the settings: on screen now, not after the loads below.
+            _shell!.Library.ApplySettings(settings);
             // No SetGapless(settings.GaplessPlaybackEnabled): the phone is always gapless
             // (NowPlayingViewModel turns it on), whatever a desktop-written settings.json says.
             await history.PreloadAsync();
             await library.LoadAsync();
             _libraryLoaded.TrySetResult();
             await _shell!.InitializeAsync();
+            // Scan on Startup (desktop parity): new songs in the folders show up on their own.
+            _ = _shell.Library.ScanAtStartupAsync();
         }
         catch (Exception ex)
         {

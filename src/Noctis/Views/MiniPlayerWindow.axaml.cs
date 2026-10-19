@@ -204,6 +204,7 @@ public partial class MiniPlayerWindow : Window
         // pass; LayoutUpdated above is the catch-all a frame later.
         FormGrid.SizeChanged += (_, _) => SyncDesignGround();
         PillFormRoot.SizeChanged += (_, _) => SyncDesignGround();
+        PillTransport.SizeChanged += (_, e) => SyncPillToggles(e.NewSize.Width);
         SleeveFormRoot.SizeChanged += (_, _) => SyncDesignGround();
         ActualThemeVariantChanged += (_, _) => SyncDrawerPalette();
         LargeFrostBand.OpacityMask = _largeFrostMask;
@@ -466,7 +467,7 @@ public partial class MiniPlayerWindow : Window
     {
         switch (e.PropertyName)
         {
-            case nameof(LyricsViewModel.ActiveLineIndex) when Vm?.IsLyricsForm == true:
+            case nameof(LyricsViewModel.ScrollLineIndex) when Vm?.IsLyricsForm == true:
                 CenterActiveLyric(animated: true);
                 break;
             case nameof(LyricsViewModel.IsColorModeArtwork):
@@ -1302,6 +1303,266 @@ public partial class MiniPlayerWindow : Window
 
     private void OnRootPointerCaptureLost(object? sender, PointerCaptureLostEventArgs e) => _armedDrag = null;
 
+    /// <summary>Least room between a Pill toggle and the transport beside it.</summary>
+    private const double PillToggleGap = 4;
+
+    /// <summary>
+    /// The Pill's Shuffle / Repeat need ~190 px beside prev / play / next — the canonical card
+    /// has it, but the window resizes down to 160 wide. Narrower than that the toggles step
+    /// aside and the row is the three buttons it was before them, rather than five that
+    /// overlap. Their slots are Auto columns of a stretched grid, so hiding them does not
+    /// change the width this reads.
+    /// </summary>
+    private void SyncPillToggles(double width)
+    {
+        var need = PillShuffleButton.Width + PillRepeatButton.Width
+                   + PillTransportCenter.DesiredSize.Width + 2 * PillToggleGap;
+        var show = width >= need;
+        PillShuffleButton.IsVisible = show;
+        PillRepeatButton.IsVisible = show;
+    }
+
+    // ── Queue drawer: drag to reorder, Delete to remove ──────────
+    //
+    // The main Queue panel's pointer-tracked drag (MainWindow "Queue drag-to-reorder") on the
+    // drawer's list: a press arms it, crossing the threshold captures the pointer and lifts the
+    // row onto MiniQueueDragPreview (LiquidReorder opens the gap), release glides it in and
+    // MoveQueueRow commits. Up Next rows only: played rows (Keep Played Songs) stay put and a
+    // drag can't land among them. Queue rows are excluded from the window drag
+    // (ShouldBeginWindowDrag), so a row drag never moves the window as well. The drawer shows
+    // three or four rows, so a card held at its top or bottom edge scrolls the list (the main
+    // panel's band-selection edge scroll, QueueBandAutoScroll, on the frame clock).
+
+    private const double QueueDragThreshold = 6.0;
+    private const double QueueDragEdge = 28.0;
+    private Point _queueDragStart;
+    private bool _queueDragActive;
+    private MiniQueueRow? _queueDragRow;
+    private Control? _queueDragRowControl;
+    private double _queueDragRowOffsetY;
+    private double _queueDragRowHeight;
+    /// <summary>The row the last press landed on; a click (no drag) focuses it for Delete.</summary>
+    private Control? _queuePressedRow;
+    /// <summary>Last pointer Y in QueueScroller coordinates.</summary>
+    private double _queueDragPointerY;
+    private bool _queueDragFrameQueued;
+    private long _queueDragLastFrameTicks;
+    private LiquidReorder? _queueLiquid;
+
+    private LiquidReorder QueueLiquid => _queueLiquid ??=
+        new LiquidReorder(this, QueueList, MiniQueueDragPreview, () => MiniQueueDragPreview.DataContext = null);
+
+    /// <summary>The dragged row's index in the list now: its container's, while that still
+    /// shows the same song (a refresh can recycle it); else the song's Up Next row.</summary>
+    private int QueueDragSourceIndex(MiniPlayerViewModel vm)
+    {
+        if (_queueDragRow is not { } dragged) return -1;
+        var rows = vm.QueuePreview;
+        // The row Border is its template's root, so its visual parent is the item container.
+        if (_queueDragRowControl?.GetVisualParent() is Control container
+            && QueueList.IndexFromContainer(container) is var i and >= 0
+            && i < rows.Count && rows[i] is MiniQueueRow { IsPlayed: false } row
+            && ReferenceEquals(row.Track, dragged.Track))
+            return i;
+        // Recycled (the edge scroll): the row at its own Up Next index, so the second copy of
+        // a song queued twice is not taken for the first; the song's first row only when a
+        // live edit has moved it since.
+        var own = vm.QueueUpNextStart + dragged.Index;
+        if (own < rows.Count && rows[own] is MiniQueueRow { IsPlayed: false } same
+            && ReferenceEquals(same.Track, dragged.Track))
+            return own;
+        for (var k = vm.QueueUpNextStart; k < rows.Count; k++)
+            if (rows[k] is MiniQueueRow { IsPlayed: false } r && ReferenceEquals(r.Track, dragged.Track))
+                return k;
+        return -1;
+    }
+
+    private void OnMiniQueueRowPointerPressed(object? sender, PointerPressedEventArgs e)
+    {
+        if (sender is not Control rowControl || rowControl.DataContext is not MiniQueueRow row) return;
+        if (!e.GetCurrentPoint(rowControl).Properties.IsLeftButtonPressed) return;
+
+        // A new press lands before the last drop's glide finished: commit it now.
+        QueueLiquid.FinishNow();
+        _queuePressedRow = rowControl;
+        if (row.IsPlayed) return;
+
+        _queueDragRow = row;
+        _queueDragRowControl = rowControl;
+        _queueDragRowOffsetY = e.GetPosition(rowControl).Y;
+        _queueDragStart = e.GetPosition(this);
+        _queueDragActive = false;
+    }
+
+    /// <summary>Moves bubble here from the pressed row until the drag starts, then arrive
+    /// captured (see QueueScroller in the XAML).</summary>
+    private void OnMiniQueueDragPointerMoved(object? sender, PointerEventArgs e)
+    {
+        if (_queueDragRow == null || QueueLiquid is not { IsSettling: false } liquid) return;
+        if (_queueDragRowControl is not { } rowControl || Vm is not { } vm) return;
+        if (!e.GetCurrentPoint(this).Properties.IsLeftButtonPressed) return;
+
+        var pos = e.GetPosition(this);
+        if (!_queueDragActive)
+        {
+            if (Math.Abs(pos.X - _queueDragStart.X) < QueueDragThreshold &&
+                Math.Abs(pos.Y - _queueDragStart.Y) < QueueDragThreshold)
+                return;
+            if (!StartQueueDrag(rowControl, e, liquid, vm)) return;
+        }
+
+        _queueDragPointerY = e.GetPosition(QueueScroller).Y;
+        liquid.MoveCardTo(_queueDragPointerY - _queueDragRowOffsetY);
+        UpdateQueueDragTarget(liquid, vm);
+        QueueDragFrameRequest();
+    }
+
+    /// <summary>Source and target from the card's position over the rows as laid out now.</summary>
+    private void UpdateQueueDragTarget(LiquidReorder liquid, MiniPlayerViewModel vm)
+    {
+        liquid.SourceIndex = QueueDragSourceIndex(vm);
+        var cardTop = _queueDragPointerY - _queueDragRowOffsetY;
+        var target = LiquidReorder.NearestSlot(QueueList, QueueScroller, cardTop + _queueDragRowHeight / 2);
+        if (target >= 0) liquid.TargetIndex = Math.Clamp(target, vm.QueueUpNextStart, Math.Max(vm.QueueUpNextStart, vm.QueuePreview.Count - 1));
+    }
+
+    private void QueueDragFrameRequest()
+    {
+        if (!_queueDragActive || _queueDragFrameQueued) return;
+        _queueDragFrameQueued = true;
+        _queueDragLastFrameTicks = System.Diagnostics.Stopwatch.GetTimestamp();
+        RequestAnimationFrame(QueueDragFrame);
+    }
+
+    /// <summary>Edge scroll while the card is held near the list's top or bottom.</summary>
+    private void QueueDragFrame(TimeSpan _)
+    {
+        _queueDragFrameQueued = false;
+        if (!_queueDragActive || Vm is not { } vm || _queueLiquid is not { IsDragging: true } liquid) return;
+
+        var now = System.Diagnostics.Stopwatch.GetTimestamp();
+        // Real elapsed time, clamped so a stalled UI thread can't produce one giant jump.
+        var dt = Math.Min((now - _queueDragLastFrameTicks) / (double)System.Diagnostics.Stopwatch.Frequency, 0.1);
+        _queueDragLastFrameTicks = now;
+        var delta = QueueBandAutoScroll.Step(_queueDragPointerY, QueueScroller.Bounds.Height, QueueDragEdge, dt);
+        if (delta != 0)
+        {
+            var max = Math.Max(0, QueueScroller.Extent.Height - QueueScroller.Viewport.Height);
+            var next = Math.Clamp(QueueScroller.Offset.Y + delta, 0, max);
+            if (Math.Abs(next - QueueScroller.Offset.Y) > 0.01)
+            {
+                QueueScroller.Offset = QueueScroller.Offset.WithY(next);
+                // Realize/arrange the rows at the new offset before measuring off them.
+                QueueList.UpdateLayout();
+                UpdateQueueDragTarget(liquid, vm);
+            }
+        }
+        _queueDragFrameQueued = true;
+        RequestAnimationFrame(QueueDragFrame);
+    }
+
+    private bool StartQueueDrag(Control rowControl, PointerEventArgs e, LiquidReorder liquid, MiniPlayerViewModel vm)
+    {
+        var source = QueueDragSourceIndex(vm);
+        if (source < 0 || _queueDragRow == null) return false;
+        _queueDragActive = true;
+        _queueDragRowHeight = rowControl.Bounds.Height;
+        // Keep the move/release events even when the pointer leaves the row, or the row its
+        // container (the edge scroll recycles it).
+        e.Pointer.Capture(QueueScroller);
+
+        MiniQueueDragPreview.DataContext = _queueDragRow.Track;
+        var container = QueueList.ContainerFromIndex(source);
+        liquid.Pitch = container == null ? rowControl.Bounds.Height : container.Bounds.Height + container.Margin.Top + container.Margin.Bottom;
+        liquid.SourceIndex = liquid.TargetIndex = source;
+        // Start exactly over the grabbed row so the lift reads as the row rising.
+        var rowTop = rowControl.TranslatePoint(new Point(0, 0), QueueScroller)?.Y
+                     ?? e.GetPosition(QueueScroller).Y - _queueDragRowOffsetY;
+        liquid.Begin(rowTop);
+        return true;
+    }
+
+    private void OnMiniQueueDragPointerReleased(object? sender, PointerReleasedEventArgs e)
+    {
+        if (_queueDragActive) BeginQueueSettle();
+        else
+        {
+            ResetQueueDragState();
+            // A click: the row takes focus, so Delete removes it (and it keeps the hover wash).
+            // Not on the press, where focus would scroll a half-visible row under the pointer
+            // just as a drag starts.
+            if (_queuePressedRow is { } pressed && e.Source is Visual source
+                && (ReferenceEquals(pressed, source) || pressed.IsVisualAncestorOf(source)))
+                pressed.Focus(NavigationMethod.Pointer);
+        }
+        _queuePressedRow = null;
+        if (ReferenceEquals(e.Pointer.Captured, QueueScroller)) e.Pointer.Capture(null);
+    }
+
+    private void OnMiniQueueDragPointerCaptureLost(object? sender, PointerCaptureLostEventArgs e)
+    {
+        // Releasing the capture on drop raises this too; the glide owns cleanup then.
+        if (QueueLiquid.IsSettling) return;
+        ResetQueueDragState();
+    }
+
+    /// <summary>Release: glide the card into the gap; the move commits when it lands.</summary>
+    private void BeginQueueSettle()
+    {
+        if (Vm is not { } vm || _queueDragRow is not { } row)
+        {
+            ResetQueueDragState();
+            return;
+        }
+        var liquid = QueueLiquid;
+        var from = QueueDragSourceIndex(vm);
+        if (from < 0)
+        {
+            ResetQueueDragState();
+            return;
+        }
+        var start = vm.QueueUpNextStart;
+        var to = Math.Clamp(liquid.TargetIndex, start, Math.Max(start, vm.QueuePreview.Count - 1));
+        liquid.SourceIndex = from;
+        liquid.TargetIndex = to;
+        var landing = LiquidReorder.SlotTop(QueueList, to, QueueScroller) ?? liquid.CardY;
+        _queueDragActive = false;
+        _queueDragRow = null;
+        _queueDragRowControl = null;
+        // Rows, not list slots: the row's own Up Next index moves to the target's.
+        var fromRow = vm.QueuePreview[from] as MiniQueueRow;
+        liquid.Settle(landing, () =>
+        {
+            if (from != to && fromRow != null && ReferenceEquals(fromRow.Track, row.Track))
+                vm.MoveQueueRow(fromRow, to - start);
+        });
+    }
+
+    private void ResetQueueDragState()
+    {
+        _queueLiquid?.Cancel();
+        _queueDragActive = false;
+        _queueDragRow = null;
+        _queueDragRowControl = null;
+    }
+
+    /// <summary>Row menu ▸ Remove from Queue. A Click handler, as the main Queue panel's menu
+    /// uses: the menu item's DataContext is the row it opened on.</summary>
+    private void OnMiniQueueRemoveClick(object? sender, RoutedEventArgs e)
+    {
+        if (sender is MenuItem { DataContext: MiniQueueRow row })
+            Vm?.RemoveFromQueueCommand.Execute(row);
+    }
+
+    /// <summary>Delete on a clicked (focused) queue row removes it, as in the main Queue panel.</summary>
+    private void OnMiniQueueRowKeyDown(object? sender, KeyEventArgs e)
+    {
+        if (e.Key != Key.Delete || e.KeyModifiers != KeyModifiers.None) return;
+        if (sender is not Control { DataContext: MiniQueueRow row } || Vm is not { } vm) return;
+        vm.RemoveFromQueueCommand.Execute(row);
+        e.Handled = true;
+    }
+
     /// <summary>
     /// True when a press landed on the window's own glass rather than on a control.
     /// The "…" menu lives in a popup whose input still routes through this window, so
@@ -1323,6 +1584,9 @@ public partial class MiniPlayerWindow : Window
             if (ancestor is Button or Slider or TextBox)
                 return false;
             if (ancestor is Border b && b.Classes.Contains("resize-grip"))
+                return false;
+            // Queue drawer rows are dragged to reorder (OnMiniQueueRowPointerPressed).
+            if (ancestor is Border row && row.Classes.Contains("mini-queue-row"))
                 return false;
         }
 
@@ -1694,7 +1958,7 @@ public partial class MiniPlayerWindow : Window
         var vm = Vm;
         if (vm == null) return;
 
-        var index = vm.Lyrics.ActiveLineIndex;
+        var index = vm.Lyrics.ScrollLineIndex;
         if (index < 0) return;
 
         var container = LyricsItems.ContainerFromIndex(index);

@@ -6,12 +6,19 @@ using Noctis.Models;
 
 namespace Noctis.Mobile.ViewModels;
 
-/// <summary>The saved playlists (playlists.json), pinned first.</summary>
-public sealed partial class PlaylistListPageViewModel : MobilePage
+/// <summary>The saved playlists (playlists.json), pinned first; searchable and sortable from
+/// the header's tools, as a song list is.</summary>
+public sealed partial class PlaylistListPageViewModel : MobilePage, ISortable
 {
     public PlaylistListPageViewModel(ShellViewModel shell)
     {
         Shell = shell;
+        SortChoices = new[]
+        {
+            new SortChoice("Title", PlaylistSort.Title) { IsSelected = true },
+            new SortChoice("Recently Updated", PlaylistSort.RecentlyUpdated),
+            new SortChoice("Recently Added", PlaylistSort.RecentlyAdded),
+        };
         Shell.Library.Refreshed += OnRefreshed;
         Refresh();
     }
@@ -20,7 +27,11 @@ public sealed partial class PlaylistListPageViewModel : MobilePage
 
     public override string Title => Loc.T("Nav.Playlists");
 
+    /// <summary>The playlists the page shows, in order (the search and sort applied).</summary>
     public BulkObservableCollection<Playlist> Playlists { get; } = new();
+
+    /// <summary>The same, as rows: the cover and "1 song" / "12 songs".</summary>
+    public BulkObservableCollection<PlaylistRow> Rows { get; } = new();
 
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(HasPlaylists))]
@@ -28,12 +39,64 @@ public sealed partial class PlaylistListPageViewModel : MobilePage
 
     public bool HasPlaylists => PlaylistCount > 0;
 
+    /// <summary>The search found nothing (the tools stay up so it can be cleared).</summary>
+    public bool ShowNoMatches => HasPlaylists && Playlists.Count == 0;
+
+    [ObservableProperty] private bool _isSearchOpen;
+    [ObservableProperty] private string _filterText = string.Empty;
+
+    partial void OnFilterTextChanged(string value) => Refresh();
+
+    [RelayCommand]
+    private void ToggleSearch()
+    {
+        IsSearchOpen = !IsSearchOpen;
+        if (!IsSearchOpen) FilterText = string.Empty;
+    }
+
+    public IReadOnlyList<SortChoice> SortChoices { get; }
+
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(IsSorted))]
+    private PlaylistSort _sort = PlaylistSort.Title;
+
+    public bool IsSorted => Sort != PlaylistSort.Title;
+
+    public bool HasSortDirection => false;
+    public bool IsDescending => false;
+    /// <summary>The toolbar's sort button: the sort menu on the glass pop menu, out of the button.</summary>
+    [RelayCommand]
+    private void ShowSortMenu() => Shell.ShowOptions(OptionsMenuViewModel.ForSort(Shell, this));
+
+    public void ChooseDirection(bool descending) { }
+
+    public void ChooseSort(SortChoice choice)
+    {
+        foreach (var c in SortChoices) c.IsSelected = ReferenceEquals(c, choice);
+        Sort = (PlaylistSort)choice.Key;
+        Refresh();
+    }
+
     public void Refresh()
     {
-        Playlists.ReplaceAll(Shell.Library.Playlists
-            .OrderByDescending(p => p.IsPinned)
-            .ThenBy(p => p.Name, StringComparer.CurrentCultureIgnoreCase));
-        PlaylistCount = Playlists.Count;
+        IEnumerable<Playlist> list = Shell.Library.Playlists;
+        PlaylistCount = Shell.Library.Playlists.Count;
+        if (!string.IsNullOrWhiteSpace(FilterText))
+        {
+            var match = new MobileSearch.Matcher(FilterText);
+            list = list.Where(p => match.Hit(p.Name, SearchText.Normalize(p.Name)));
+        }
+        var pinnedFirst = list.OrderByDescending(p => p.IsPinned);
+        var sorted = Sort switch
+        {
+            PlaylistSort.RecentlyUpdated => pinnedFirst.ThenByDescending(p => p.ModifiedAt),
+            PlaylistSort.RecentlyAdded => pinnedFirst.ThenByDescending(p => p.CreatedAt),
+            _ => pinnedFirst.ThenBy(p => p.Name, StringComparer.CurrentCultureIgnoreCase),
+        };
+        // Only when something changed: a refresh of the same playlists must not Reset the list.
+        MobileLibrary.ReplaceIfChanged(Playlists, sorted.ToList());
+        MobileLibrary.ReplaceIfChanged(Rows, Playlists.Select(p => new PlaylistRow(p, Shell.Library.PlaylistArtwork(p))).ToList());
+        OnPropertyChanged(nameof(ShowNoMatches));
     }
 
     [RelayCommand]
@@ -42,4 +105,13 @@ public sealed partial class PlaylistListPageViewModel : MobilePage
     private void OnRefreshed(object? sender, EventArgs e) => Refresh();
 
     public override void OnClosed() => Shell.Library.Refreshed -= OnRefreshed;
+}
+
+public enum PlaylistSort { Title, RecentlyUpdated, RecentlyAdded }
+
+/// <summary>A playlist row: its cover (the first of its songs that has one) and its song count.</summary>
+public sealed record PlaylistRow(Playlist Playlist, string? ArtworkPath)
+{
+    public string Name => Playlist.Name;
+    public string Subtitle => Playlist.TrackIds.Count == 1 ? "1 song" : $"{Playlist.TrackIds.Count} songs";
 }

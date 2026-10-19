@@ -5,6 +5,7 @@ using Android.Runtime;
 using AndroidX.Media3.Common;
 using AndroidX.Media3.DataSource;
 using AndroidX.Media3.ExoPlayer;
+using AndroidX.Media3.ExoPlayer.Audio;
 using AndroidX.Media3.ExoPlayer.Source;
 using AndroidX.Media3.ExoPlayer.Upstream;
 using Avalonia.Threading;
@@ -47,6 +48,7 @@ public sealed class Media3AudioPlayer : IAudioPlayer
     private volatile StreamAuth? _streamAuth;
     private readonly Listener _listener;
     private readonly SessionForwardingPlayer _sessionPlayer;
+    private readonly MeterTap _meterTap = new(RowEqLevels.Shared);
     // The position poll runs on the main looper's own Handler, not a DispatcherTimer. At
     // DispatcherPriority.Background Avalonia pumps the timer together with frames, so it
     // stopped whenever the app drew nothing, screen off included (device run 2026-09-22:
@@ -125,7 +127,8 @@ public sealed class Media3AudioPlayer : IAudioPlayer
         var httpSources = new ResolvingDataSource.Factory(http, new StreamAuthResolver(this));
         // ExtensionRendererModeOn: the bundled FFmpeg renderer is tried only after the phone's
         // own decoders, so it is used for ALAC (no MediaCodec on most phones) and nothing else.
-        var renderers = new DefaultRenderersFactory(context)
+        // The audio sink carries the meter tap (MeterTap), which feeds the playing row's bars.
+        var renderers = new TappedRenderersFactory(context, _meterTap)
             .SetExtensionRendererMode(DefaultRenderersFactory.ExtensionRendererModeOn);
         _player = new ExoPlayerBuilder(context, renderers)
             .SetMediaSourceFactory(new DefaultMediaSourceFactory(new DefaultDataSource.Factory(context, httpSources))
@@ -148,6 +151,7 @@ public sealed class Media3AudioPlayer : IAudioPlayer
         PlaybackEngine.SessionPlayer = _sessionPlayer;
 
         OutputLatency = EstimateOutputLatency(context);
+        _meterTap.HardwareLatencyMs = (int)OutputLatency.TotalMilliseconds;
         _library.LibraryUpdated += OnLibraryUpdated;
     }
 
@@ -702,6 +706,32 @@ public sealed class Media3AudioPlayer : IAudioPlayer
 
     /// <summary>Adds the device key header to the signed-in desktop's stream requests; every
     /// other request passes through untouched. Runs on ExoPlayer's loader threads.</summary>
+    /// <summary>
+    /// The stock renderers over a stock DefaultAudioSink (what DefaultRenderersFactory.buildAudioSink
+    /// builds in Media3 1.11) with one audio processor added: a TeeAudioProcessor into the meter
+    /// tap. Both the platform decoders' renderer and the FFmpeg one write to this one sink.
+    /// </summary>
+    private sealed class TappedRenderersFactory : DefaultRenderersFactory
+    {
+        private readonly MeterTap _tap;
+
+        public TappedRenderersFactory(Context context, MeterTap tap) : base(context)
+        {
+            _tap = tap;
+        }
+
+        protected override IAudioSink? BuildAudioSink(Context context, bool enableFloatOutput, bool enableAudioOutputPlaybackParameters)
+        {
+            var sink = new DefaultAudioSink.Builder(context)
+                .SetEnableFloatOutput(enableFloatOutput)
+                .SetEnableAudioOutputPlaybackParameters(enableAudioOutputPlaybackParameters)
+                .SetAudioProcessors(new AndroidX.Media3.Common.Audio.IAudioProcessor[] { new TeeAudioProcessor(_tap) })
+                .Build();
+            _tap.Sink = sink;
+            return sink;
+        }
+    }
+
     private sealed class StreamAuthResolver : Java.Lang.Object, ResolvingDataSource.IResolver
     {
         private readonly Media3AudioPlayer _owner;

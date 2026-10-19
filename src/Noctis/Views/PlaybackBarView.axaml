@@ -966,9 +966,13 @@
                          below reaches up over the art's bottom edge. Flush against the line,
                          a seek aimed a pixel high opened the Mini Player (Discord Luwi
                          2026-10-05). It toggles on RELEASE over the art, so a drag that starts
-                         on it no longer fires. -->
+                         on it no longer fires. Dragged past the threshold, the art (and the
+                         title/artist block) drags the playing song like a library row — onto a
+                         sidebar playlist or the queue (Discord, Luwi 2026-10-17). -->
                     <Border Grid.Column="0"
                             x:Name="AlbumArtThumb"
+                            helpers:DragFileBehavior.DragItem="{Binding CurrentTrack}"
+                            helpers:DragFileBehavior.EnableFileDrag="True"
                             Width="32" Height="32"
                             CornerRadius="7"
                             ClipToBounds="True"
@@ -979,6 +983,7 @@
                             ToolTip.Placement="Top"
                             ToolTip.VerticalOffset="-6"
                             PointerPressed="OnAlbumArtPressed"
+                            PointerMoved="OnAlbumArtMoved"
                             PointerReleased="OnAlbumArtReleased"
                             Background="{DynamicResource IslandAlbumArtPlaceholder}">
                         <Panel>
@@ -1004,6 +1009,8 @@
                     <!-- Track info: title + artist (the seek bar is the box's bottom row) -->
                     <Grid Grid.Column="1"
                           x:Name="TrackInfoContent"
+                          helpers:DragFileBehavior.DragItem="{Binding CurrentTrack}"
+                          helpers:DragFileBehavior.EnableFileDrag="True"
                           VerticalAlignment="Center"
                           MinWidth="80"
                           MaxWidth="520"
@@ -1134,8 +1141,12 @@
                                         Cursor="Hand" HorizontalAlignment="Left"
                                         ToolTip.Tip="{loc:T PlaybackBar.ViewArtistTip}">
                                     <StackPanel Orientation="Horizontal">
-                                        <Border Classes="artist-text-hover"
-                                                CornerRadius="2"
+                                        <!-- No artist-text-hover class: the hover/press box is painted
+                                             behind the ONE name under the pointer, on the marquee run
+                                             itself so it scrolls with the text (code-behind
+                                             PaintArtistNameBox; the rows' ArtistCreditLink box).
+                                             Discord (Luwi, 2026-10-17). -->
+                                        <Border CornerRadius="2"
                                                 Padding="1,0,2,0"
                                                 Margin="0,0,0,-2">
                                             <!-- Converter form (same shape as the title above): binding through
@@ -1293,6 +1304,7 @@
                                old 6px strip made a seek near the art open the Mini Player. -->
                           <Slider Value="{Binding PositionFraction, Mode=TwoWay}"
                                   Classes="seek-slider"
+                                  AutomationProperties.Name="{loc:T PlaybackBar.Seek}"
                                   Minimum="0" Maximum="1"
                                   Focusable="False"
                                   Height="14"
@@ -1493,6 +1505,15 @@
                                     </MenuItem>
                                 </MenuItem>
                                 <Separator />
+                                <!-- Audiobook chapters (.m4b, Discord Luwi): one row per chapter, filled
+                                     per open (BindChapters); shown only when the file has two or more. -->
+                                <MenuItem x:Name="ChaptersMenuItem"
+                                          Header="{loc:T PlaybackBar.Chapters}"
+                                          IsVisible="{Binding HasChapters}">
+                                    <MenuItem.Icon>
+                                        <controls:LineIcon Classes="mv2-icon" Data="{StaticResource MenuLineChapters}"/>
+                                    </MenuItem.Icon>
+                                </MenuItem>
                                 <MenuItem Header="{loc:T PlaybackBar.SleepTimer}"
                                           x:Name="SleepTimerMenuItem">
                                     <MenuItem.Icon>

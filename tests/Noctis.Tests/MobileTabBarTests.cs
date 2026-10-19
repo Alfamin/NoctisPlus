@@ -66,11 +66,11 @@ public class MobileTabBarTests : IDisposable
         var shell = rig.Shell;
         var window = MobileFixtures.Mount(shell, out var view);
 
-        Assert.True(shell.IsLibrarySelected);                     // Library is the start tab
+        Assert.True(shell.IsHomeSelected);                        // Home is the start tab
         shell.SelectTabCommand.Execute(MobileTab.Favorites);
         window.UpdateLayout();
         Assert.True(shell.IsFavoritesRootVisible);
-        Assert.False(shell.IsLibraryRootVisible);
+        Assert.False(shell.IsHomeRootVisible);
         Assert.True(shell.FavoritesRoot.IsEmbedded);
         Assert.Equal(new[] { "Loved" }, shell.FavoritesRoot.Songs.Select(t => t.Title));
         Assert.True(view.FindControl<Grid>("FavoritesRoot")!.IsVisible);
@@ -204,12 +204,14 @@ public class MobileTabBarTests : IDisposable
     }
 
     [AvaloniaFact]
-    public void TheBar_HasFourTabs_InOrder()
+    public void TheBar_HasFiveTabs_InOrder()
     {
         var shell = MakeShell();
         var window = MobileFixtures.Mount(shell, out var view);
 
-        var names = new[] { "LibraryTab", "FavoritesTab", "PlaylistsTab", "SearchTab" };
+        // Apple Music's order: Home first, Search last.
+        var names = new[] { "HomeTab", "FavoritesTab", "PlaylistsTab", "LibraryTab", "SearchTab" };
+        Assert.Equal(names.Length, view.FindControl<Grid>("TabBar")!.Children.Count);
         var xs = names.Select(n => view.FindControl<Button>(n)!).Select(b => b.TranslatePoint(default, view)!.Value.X).ToArray();
         Assert.Equal(xs.OrderBy(x => x), xs);
         window.Close();

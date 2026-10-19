@@ -3,8 +3,13 @@ using CommunityToolkit.Mvvm.ComponentModel;
 
 namespace Noctis.Mobile.ViewModels;
 
-/// <summary>The three tabs of the phone UI. Library is the start tab (Back from the others returns to it).</summary>
-public enum MobileTab { Library, Search, Playlists, Favorites }
+/// <summary>The tabs of the phone UI, in the bar's order (Apple Music's: Home first, Search last).
+/// Home is the start tab (Back from the others returns to it).</summary>
+public enum MobileTab { Home, Favorites, Playlists, Library, Search }
+
+/// <summary>How the page stack last changed: a page pushed (or presented), the top one popped,
+/// or a jump straight to the root (a tab tap) that no page slides through.</summary>
+public enum PageMove { Push, Pop, Reset }
 
 /// <summary>
 /// A page pushed over a tab's root (Songs, an album, an artist, Settings…). ShellView shows
@@ -20,11 +25,20 @@ public abstract partial class MobilePage : ObservableObject
     /// than pushed: the view hides its own back/title header.</summary>
     public bool IsEmbedded { get; init; }
 
+    /// <summary>Presented as a sheet (Settings): it rises over the tabs and the tab bar rather
+    /// than sliding in over the tab, and the pages pushed after it open inside it. Set by
+    /// <see cref="ShellViewModel.Present"/>.</summary>
+    public bool IsSheet { get; internal set; }
+
     [ObservableProperty] private Vector _scrollOffset;
 
     /// <summary>The page left the stack for good (Back, a tab switch): drop
     /// event subscriptions so a closed page stops rebuilding on every library refresh.</summary>
     public virtual void OnClosed() { }
+
+    /// <summary>Android Back, before the page itself is popped: a page with pages of its own
+    /// (Settings' Music Folders, Appearance, Lyrics) returns to its top level and says so.</summary>
+    public virtual bool TryGoBackWithin() => false;
 
     public override string ToString() => Title;
 }

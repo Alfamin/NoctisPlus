@@ -1,4 +1,3 @@
-using System.Diagnostics;
 using System.Net;
 using System.Text.Json;
 using System.Text.RegularExpressions;
@@ -43,12 +42,25 @@ public sealed class ITunesArtworkService
         "(https?:[^\"\\\\\\s]+?\\.(?:m3u8|mp4))",
         RegexOptions.Compiled | RegexOptions.IgnoreCase);
 
+    // Session-log tag for every stage of the animated-artwork lookup. These failures used to
+    // go to Debug.WriteLine, which a release build drops, so a miss left nothing to go on.
+    internal const string LogSource = "AnimatedArt";
+
     private readonly HttpClient _http;
 
     public ITunesArtworkService(HttpClient http)
     {
         _http = http;
     }
+
+    /// <summary>
+    /// The largest box Apple's artwork CDN accepts: it serves the master (3000 px, or 4000 for
+    /// OK Computer) for any box up to 10000, and answers 400 "Invalid request parameter" above
+    /// it. Verified 2026-10-17: 10000x10000-999 → 200, 10001x10001-999 and the old
+    /// 100000x100000-999 → 400, and the uncompressed original on a5.mzstatic.com/us/r1000/0/
+    /// → 403 for every album tried — so Max fell through to the 300 px thumbnail.
+    /// </summary>
+    internal const int MaxArtworkBox = 10000;
 
     /// <summary>One iTunes search hit, with both a thumbnail and a hi-res URL.</summary>
     public sealed record ArtworkCandidate(
@@ -58,7 +70,28 @@ public sealed class ITunesArtworkService
         string ThumbUrl,
         string StandardUrl,
         string HiResUrl,
-        string ViewUrl);
+        string ViewUrl)
+    {
+        /// <summary>
+        /// URLs to try for a pick, best first. Max goes to the master at maximum quality, then
+        /// the master at the CDN's normal quality (a large master at -999 can pass the 24 MB
+        /// image cap), then the standard 1000 px; the thumbnail is the last resort for both,
+        /// so a failed Max never lands below Standard.
+        /// </summary>
+        public IReadOnlyList<string> DownloadUrls(bool highestResolution)
+        {
+            var urls = highestResolution
+                ? new[] { HiResUrl, RewriteArtworkUrl(StandardUrl, $"{MaxArtworkBox}x{MaxArtworkBox}bb"), StandardUrl, ThumbUrl }
+                : new[] { StandardUrl, ThumbUrl };
+            return urls.Where(u => !string.IsNullOrWhiteSpace(u)).Distinct(StringComparer.Ordinal).ToList();
+        }
+
+        /// <summary>The store's explicitness: "explicit", "cleaned" or "notExplicit" (may be empty).</summary>
+        public string Explicitness { get; init; } = string.Empty;
+
+        /// <summary>Release year from the store, 0 when it gave none.</summary>
+        public int ReleaseYear { get; init; }
+    }
 
     public sealed record AnimatedArtworkVariant(
         string Label,
@@ -68,6 +101,29 @@ public sealed class ITunesArtworkService
         string Codec,
         long Bandwidth,
         bool IsHls);
+
+    /// <summary>
+    /// One album (or playlist) that has motion artwork, as the chooser shows it: what it is, a
+    /// still of the loop, and the variants worth offering.
+    /// </summary>
+    public sealed record AnimatedArtworkAlbum(
+        long CollectionId,
+        string Title,
+        string Artist,
+        string PageUrl,
+        string? PosterUrl,
+        string? CoverThumbUrl,
+        IReadOnlyList<AnimatedArtworkVariant> Variants,
+        AnimatedArtworkVariant? PreviewVariant,
+        bool HasSquare,
+        bool HasTall)
+    {
+        /// <summary>Only the 3:4 portrait loop exists; the offered variants are that crop.</summary>
+        public bool IsTallOnly => HasTall && !HasSquare;
+
+        public string Explicitness { get; init; } = string.Empty;
+        public int ReleaseYear { get; init; }
+    }
 
     /// <summary>
     /// Searches Apple's catalogue for album artwork, using the same iTunes Search API
@@ -106,7 +162,7 @@ public sealed class ITunesArtworkService
         }
         catch (Exception ex)
         {
-            Debug.WriteLine($"[iTunes] search failed: {ex.Message}");
+            DebugLog.Write(LogSource, $"iTunes album search for \"{albumTerm}\" failed: {ex.Message}");
             return Array.Empty<ArtworkCandidate>();
         }
     }
@@ -144,7 +200,7 @@ public sealed class ITunesArtworkService
         }
         catch (Exception ex)
         {
-            Debug.WriteLine($"[iTunes] download failed: {ex.Message}");
+            DebugLog.Write(LogSource, $"download of {url} failed: {ex.Message}");
             return null;
         }
     }
@@ -161,10 +217,20 @@ public sealed class ITunesArtworkService
             using var req = new HttpRequestMessage(HttpMethod.Get, albumViewUrl);
             req.Headers.UserAgent.ParseAdd(AppleMusicHtmlUserAgent);
             using var resp = await _http.SendAsync(req, ct);
-            if (!resp.IsSuccessStatusCode) return Array.Empty<AnimatedArtworkVariant>();
+            if (!resp.IsSuccessStatusCode)
+            {
+                DebugLog.Write(LogSource, $"album page {albumViewUrl} returned HTTP {(int)resp.StatusCode}");
+                return Array.Empty<AnimatedArtworkVariant>();
+            }
 
             var html = await HttpSafety.ReadStringBoundedAsync(resp.Content, ct: ct);
             var mediaUrls = ExtractAnimatedMediaUrls(html, albumViewUrl);
+            if (mediaUrls.Count == 0)
+            {
+                DebugLog.Write(LogSource, $"album page {albumViewUrl}: {DescribeMissingAnimatedArtwork(html)}");
+                return Array.Empty<AnimatedArtworkVariant>();
+            }
+
             var variants = new List<AnimatedArtworkVariant>();
 
             foreach (var mediaUrl in mediaUrls)
@@ -185,7 +251,10 @@ public sealed class ITunesArtworkService
                 if (!mediaUrl.Contains(".m3u8", StringComparison.OrdinalIgnoreCase))
                     continue;
 
-                variants.AddRange(await ParseHlsMasterVariantsAsync(mediaUrl, ct));
+                var parsed = await ParseHlsMasterVariantsAsync(mediaUrl, ct);
+                if (parsed.Count == 0)
+                    DebugLog.Write(LogSource, $"HLS master {mediaUrl} gave no usable variants");
+                variants.AddRange(parsed);
             }
 
             var deduped = variants
@@ -197,13 +266,191 @@ public sealed class ITunesArtworkService
         }
         catch (Exception ex)
         {
-            Debug.WriteLine($"[iTunes] animated lookup failed: {ex.Message}");
+            DebugLog.Write(LogSource, $"animated lookup of {albumViewUrl} failed: {ex.Message}");
             return Array.Empty<AnimatedArtworkVariant>();
         }
     }
 
     public async Task<string?> FindAnimatedCoverUrlAsync(string albumViewUrl, CancellationToken ct = default)
         => (await SearchAnimatedArtworkVariantsAsync(albumViewUrl, ct)).FirstOrDefault()?.Url;
+
+    /// <summary>What the animated-artwork chooser searches for.</summary>
+    /// <param name="Album">The album title, or the whole typed query when <paramref name="Typed"/>.</param>
+    /// <param name="Artist">The artist to search and rank with (empty for a typed query).</param>
+    /// <param name="PreferArtist">The edited track's artist: only a tiebreak for typed queries.</param>
+    public sealed record AnimatedArtworkQuery(string Album, string Artist, string PreferArtist, bool Typed);
+
+    public sealed record RankedAlbumCandidate(ArtworkCandidate Candidate, double Score);
+
+    /// <summary>
+    /// Albums worth opening for an animated-artwork search, best first. Both catalogues are
+    /// asked at once — the Apple Music search page (ranks well, finds what the iTunes index
+    /// misses, e.g. Bad Bunny's "YHLQMDLG") and the iTunes Search API (a plain JSON API that
+    /// keeps answering if the page's markup shifts) — merged, then scored by
+    /// <see cref="RankAnimatedCandidates"/>. Whether each one has a loop is the caller's next
+    /// step (<see cref="GetAnimatedArtworkAlbumAsync"/>).
+    /// </summary>
+    public async Task<IReadOnlyList<RankedAlbumCandidate>> FindAnimatedArtworkCandidatesAsync(
+        AnimatedArtworkQuery query, int max = 10, CancellationToken ct = default)
+    {
+        if (string.IsNullOrWhiteSpace(query.Album))
+            return Array.Empty<RankedAlbumCandidate>();
+
+        var apple = SearchAppleMusicAlbumsAsync(query.Artist, query.Album, limit: 14, ct);
+        var itunes = SearchAlbumsAsync(query.Artist, query.Album, limit: 10, ct);
+        await Task.WhenAll(apple, itunes);
+
+        var merged = new List<ArtworkCandidate>();
+        var seen = new HashSet<long>();
+        foreach (var c in apple.Result.Concat(itunes.Result))
+        {
+            if (seen.Add(c.CollectionId))
+                merged.Add(c);
+        }
+
+        var ranked = RankAnimatedCandidates(merged, query, max);
+        DebugLog.Write(LogSource,
+            $"search \"{query.Album}\"{(query.Artist.Length > 0 ? $" by \"{query.Artist}\"" : string.Empty)}: " +
+            $"{apple.Result.Count} Apple Music + {itunes.Result.Count} iTunes candidate(s), {ranked.Count} relevant" +
+            (ranked.Count > 0 ? $"; top \"{ranked[0].Candidate.CollectionName}\" by {ranked[0].Candidate.ArtistName}" : string.Empty));
+        return ranked;
+    }
+
+    /// <summary>
+    /// Scores and orders candidates (in the order the sources returned them), dropping the
+    /// irrelevant ones: a title that does not resemble the query at all. When no title is
+    /// close, the wanted artist's albums are kept instead, so a mistagged album still turns
+    /// up something to choose from.
+    /// </summary>
+    internal static IReadOnlyList<RankedAlbumCandidate> RankAnimatedCandidates(
+        IReadOnlyList<ArtworkCandidate> candidates, AnimatedArtworkQuery query, int max)
+    {
+        var scored = candidates
+            .Select((c, i) => (c, i,
+                relevance: AnimatedArtworkMatcher.TitleRelevance(c.CollectionName, c.ArtistName, query.Album, query.Typed),
+                score: AnimatedArtworkMatcher.Score(c.CollectionName, c.ArtistName, query.Album, query.Artist,
+                    query.PreferArtist, query.Typed, i)))
+            .ToList();
+
+        var relevant = scored.Where(s => s.relevance >= 0.3).ToList();
+        if (relevant.Count == 0)
+        {
+            var artist = query.Typed ? query.PreferArtist : query.Artist;
+            relevant = scored.Where(s => AnimatedArtworkMatcher.ArtistSimilarity(s.c.ArtistName, artist) >= 0.85).ToList();
+        }
+
+        return relevant
+            .OrderByDescending(s => s.score)
+            .ThenBy(s => s.i)
+            .Take(Math.Max(1, max))
+            .Select(s => new RankedAlbumCandidate(s.c, s.score))
+            .ToList();
+    }
+
+    private static readonly Regex StorefrontCodeRegex = new("^[a-z]{2}$", RegexOptions.Compiled);
+
+    /// <summary>A two-letter storefront for the store endpoints; anything else is the US store.</summary>
+    internal static string Storefront(string? country)
+    {
+        var c = (country ?? string.Empty).Trim().ToLowerInvariant();
+        return StorefrontCodeRegex.IsMatch(c) ? c : "us";
+    }
+
+    /// <summary>
+    /// Opens one album (or playlist) page and reads its motion artwork for the chooser: the
+    /// square loop's variants (the tall 3:4 loop only when there is no square one — the player
+    /// draws covers into a square, so a portrait loop would be squashed), the smallest variant
+    /// for a cheap live preview, and a still of the loop. Null when the page has no loop.
+    /// <paramref name="known"/> names the album when /lookup already did; otherwise the page's
+    /// own title and credit are used (pasted playlist links, storefront-only albums).
+    /// </summary>
+    public async Task<AnimatedArtworkAlbum?> GetAnimatedArtworkAlbumAsync(
+        string pageUrl, ArtworkCandidate? known = null, CancellationToken ct = default)
+    {
+        if (string.IsNullOrWhiteSpace(pageUrl) ||
+            !Uri.TryCreate(pageUrl, UriKind.Absolute, out var pageUri) ||
+            !pageUri.Host.Equals("music.apple.com", StringComparison.OrdinalIgnoreCase))
+            return null;
+
+        try
+        {
+            using var req = new HttpRequestMessage(HttpMethod.Get, pageUrl);
+            req.Headers.UserAgent.ParseAdd(AppleMusicHtmlUserAgent);
+            using var resp = await _http.SendAsync(req, ct);
+            if (!resp.IsSuccessStatusCode)
+            {
+                DebugLog.Write(LogSource, $"album page {pageUrl} returned HTTP {(int)resp.StatusCode}");
+                return null;
+            }
+
+            var html = await HttpSafety.ReadStringBoundedAsync(resp.Content, ct: ct);
+            var page = MotionArtworkPage.Parse(html);
+
+            var square = new List<AnimatedArtworkVariant>();
+            var tall = new List<AnimatedArtworkVariant>();
+            if (page.SquareVideoUrl != null)
+                square.AddRange(await ParseHlsMasterAllVariantsAsync(page.SquareVideoUrl, ct));
+            if (square.Count == 0 && page.TallVideoUrl != null)
+                tall.AddRange(await ParseHlsMasterAllVariantsAsync(page.TallVideoUrl, ct));
+
+            // A page whose JSON moved: fall back to the older extraction, which reads the
+            // rendered element and a host-only sweep. Its streams cannot be told apart by crop.
+            if (square.Count == 0 && tall.Count == 0 && !page.HasMotion)
+            {
+                foreach (var media in ExtractAnimatedMediaUrls(html, pageUrl))
+                {
+                    if (media.Contains(".m3u8", StringComparison.OrdinalIgnoreCase))
+                        square.AddRange(await ParseHlsMasterAllVariantsAsync(media, ct));
+                }
+            }
+
+            var pool = square.Count > 0 ? square : tall;
+            if (pool.Count == 0)
+            {
+                DebugLog.Write(LogSource, $"album page {pageUrl}: {DescribeMissingAnimatedArtwork(html)}");
+                return null;
+            }
+
+            var deduped = pool
+                .GroupBy(v => $"{v.Width}x{v.Height}:{GetCodecFamily(v.Codec)}", StringComparer.OrdinalIgnoreCase)
+                .Select(g => g.OrderByDescending(v => v.Bandwidth).First())
+                .ToList();
+            var tiers = PickTierVariants(deduped);
+            var preview = deduped
+                .Where(v => v.Width > 0)
+                .OrderBy(v => Math.Max(v.Width, v.Height))
+                .ThenBy(v => v.Bandwidth)
+                .FirstOrDefault() ?? tiers.FirstOrDefault();
+
+            var title = known?.CollectionName ?? page.Title ?? string.Empty;
+            var artist = known?.ArtistName ?? page.Artist ?? string.Empty;
+            var poster = MotionArtworkPage.SizeImageTemplate(
+                square.Count > 0 ? page.SquarePosterUrl : page.TallPosterUrl, 300);
+            var cover = known?.ThumbUrl ?? page.ImageUrl;
+
+            DebugLog.Write(LogSource, $"\"{title}\" ({pageUrl}): {tiers.Count} tier(s) from {deduped.Count} variant(s)" +
+                (square.Count == 0 ? " (tall only)" : page.TallVideoUrl != null ? " (tall too)" : string.Empty));
+
+            return new AnimatedArtworkAlbum(
+                known?.CollectionId ?? 0, title, artist, pageUrl,
+                poster, cover, tiers, preview,
+                HasSquare: square.Count > 0,
+                HasTall: page.TallVideoUrl != null)
+            {
+                Explicitness = known?.Explicitness ?? string.Empty,
+                ReleaseYear = known?.ReleaseYear ?? 0,
+            };
+        }
+        catch (OperationCanceledException) when (ct.IsCancellationRequested)
+        {
+            throw;
+        }
+        catch (Exception ex)
+        {
+            DebugLog.Write(LogSource, $"animated lookup of {pageUrl} failed: {ex.Message}");
+            return null;
+        }
+    }
 
     public async Task<bool> DownloadHlsVariantAsMp4Async(
         AnimatedArtworkVariant variant,
@@ -269,11 +516,14 @@ public sealed class ITunesArtworkService
                 await output.WriteAsync(data, ct);
             }
 
-            return new FileInfo(destinationPath).Length > 0;
+            // The stream's own length: the file on disk lags behind its write buffer until the
+            // stream is flushed, so a short loop (one part under the 4 kB buffer) read as empty.
+            await output.FlushAsync(ct);
+            return output.Length > 0;
         }
         catch (Exception ex)
         {
-            Debug.WriteLine($"[iTunes] HLS download failed: {ex.Message}");
+            DebugLog.Write(LogSource, $"HLS download of {variant.Url} failed: {ex.Message}");
             return false;
         }
     }
@@ -285,15 +535,20 @@ public sealed class ITunesArtworkService
     /// endpoint. Used as a manual fallback when /search fails to surface an album
     /// (some catalog entries are reachable by ID but not by free-text search).
     /// </summary>
-    public async Task<ArtworkCandidate?> LookupAlbumByIdAsync(long collectionId, CancellationToken ct = default)
+    public async Task<ArtworkCandidate?> LookupAlbumByIdAsync(long collectionId, CancellationToken ct = default,
+        string? country = null)
     {
         if (collectionId <= 0) return null;
 
         try
         {
-            var url = $"{LookupUrl}?id={collectionId}&country=us";
+            var url = $"{LookupUrl}?id={collectionId}&country={Storefront(country)}";
             using var resp = await _http.GetAsync(url, ct);
-            if (!resp.IsSuccessStatusCode) return null;
+            if (!resp.IsSuccessStatusCode)
+            {
+                DebugLog.Write(LogSource, $"lookup of {collectionId} returned HTTP {(int)resp.StatusCode}");
+                return null;
+            }
 
             var json = await HttpSafety.ReadStringBoundedAsync(resp.Content, ct: ct);
             using var doc = JsonDocument.Parse(json);
@@ -307,10 +562,12 @@ public sealed class ITunesArtworkService
                 if (TryReadCandidate(item, out var candidate))
                     return candidate;
             }
+
+            DebugLog.Write(LogSource, $"lookup of {collectionId} found no album in the {Storefront(country)} store");
         }
         catch (Exception ex)
         {
-            Debug.WriteLine($"[iTunes] lookup failed: {ex.Message}");
+            DebugLog.Write(LogSource, $"lookup of {collectionId} failed: {ex.Message}");
         }
 
         return null;
@@ -349,12 +606,20 @@ public sealed class ITunesArtworkService
             req.Headers.UserAgent.ParseAdd(AppleMusicHtmlUserAgent);
             using var resp = await _http.SendAsync(req, ct);
             if (!resp.IsSuccessStatusCode)
+            {
+                DebugLog.Write(LogSource, $"Apple Music search for \"{term}\" returned HTTP {(int)resp.StatusCode}");
                 return Array.Empty<ArtworkCandidate>();
+            }
 
             var html = await HttpSafety.ReadStringBoundedAsync(resp.Content, ct: ct);
             var ids = ExtractAppleMusicAlbumIds(html).Take(Math.Max(1, limit)).ToList();
             if (ids.Count == 0)
+            {
+                // A page with no album link at all is likelier a markup change than an empty
+                // catalogue, so the size goes in too.
+                DebugLog.Write(LogSource, $"Apple Music search for \"{term}\" linked no albums ({html.Length} chars of page)");
                 return Array.Empty<ArtworkCandidate>();
+            }
 
             // The page gives IDs but no dependable title/artist text, and the caller has to
             // check both — so let /lookup name them authoritatively, in one request.
@@ -362,7 +627,7 @@ public sealed class ITunesArtworkService
         }
         catch (Exception ex)
         {
-            Debug.WriteLine($"[iTunes] Apple Music search failed: {ex.Message}");
+            DebugLog.Write(LogSource, $"Apple Music search for \"{term}\" failed: {ex.Message}");
             return Array.Empty<ArtworkCandidate>();
         }
     }
@@ -386,7 +651,7 @@ public sealed class ITunesArtworkService
     /// that order is the search ranking, and the endpoint does not honour it.
     /// </summary>
     public async Task<IReadOnlyList<ArtworkCandidate>> LookupAlbumsByIdAsync(
-        IReadOnlyList<long> ids, CancellationToken ct = default)
+        IReadOnlyList<long> ids, CancellationToken ct = default, string? country = null)
     {
         var wanted = ids.Where(i => i > 0).Distinct().ToList();
         if (wanted.Count == 0)
@@ -394,16 +659,23 @@ public sealed class ITunesArtworkService
 
         try
         {
-            var url = $"{LookupUrl}?id={string.Join(",", wanted)}&country=us&entity=album";
+            var url = $"{LookupUrl}?id={string.Join(",", wanted)}&country={Storefront(country)}&entity=album";
             using var resp = await _http.GetAsync(url, ct);
-            if (!resp.IsSuccessStatusCode) return Array.Empty<ArtworkCandidate>();
+            if (!resp.IsSuccessStatusCode)
+            {
+                DebugLog.Write(LogSource, $"lookup of {wanted.Count} album(s) returned HTTP {(int)resp.StatusCode}");
+                return Array.Empty<ArtworkCandidate>();
+            }
 
             var json = await HttpSafety.ReadStringBoundedAsync(resp.Content, ct: ct);
             using var doc = JsonDocument.Parse(json);
 
             if (!doc.RootElement.TryGetProperty("results", out var results) ||
                 results.ValueKind != JsonValueKind.Array)
+            {
+                DebugLog.Write(LogSource, $"lookup of {wanted.Count} album(s) had no results array");
                 return Array.Empty<ArtworkCandidate>();
+            }
 
             var byId = new Dictionary<long, ArtworkCandidate>();
             foreach (var item in results.EnumerateArray())
@@ -419,7 +691,7 @@ public sealed class ITunesArtworkService
         }
         catch (Exception ex)
         {
-            Debug.WriteLine($"[iTunes] batch lookup failed: {ex.Message}");
+            DebugLog.Write(LogSource, $"lookup of {wanted.Count} album(s) failed: {ex.Message}");
             return Array.Empty<ArtworkCandidate>();
         }
     }
@@ -442,8 +714,20 @@ public sealed class ITunesArtworkService
 
         var thumb = RewriteArtworkUrl(artworkUrl, "300x300bb");
         var standard = RewriteArtworkUrl(artworkUrl, "1000x1000bb");
-        var hiRes = BuildUncompressedArtworkUrl(artworkUrl) ?? RewriteArtworkUrl(artworkUrl, "100000x100000-999");
-        candidate = new ArtworkCandidate(id, name, artistName, thumb, standard, hiRes, viewUrl);
+        var hiRes = RewriteArtworkUrl(artworkUrl, $"{MaxArtworkBox}x{MaxArtworkBox}-999");
+        var explicitness = item.TryGetProperty("collectionExplicitness", out var e) && e.ValueKind == JsonValueKind.String
+            ? e.GetString() ?? string.Empty
+            : string.Empty;
+        var year = 0;
+        if (item.TryGetProperty("releaseDate", out var r) && r.ValueKind == JsonValueKind.String &&
+            r.GetString() is { Length: >= 4 } date)
+            int.TryParse(date.AsSpan(0, 4), System.Globalization.NumberStyles.None,
+                System.Globalization.CultureInfo.InvariantCulture, out year);
+        candidate = new ArtworkCandidate(id, name, artistName, thumb, standard, hiRes, viewUrl)
+        {
+            Explicitness = explicitness,
+            ReleaseYear = year,
+        };
         return true;
     }
 
@@ -522,6 +806,24 @@ public sealed class ITunesArtworkService
     }
 
     /// <summary>
+    /// Why an album page yielded no stream, for the log. Apple's page says it outright:
+    /// <c>"videoArtwork":null</c> is an album without a loop (HIT ME HARD AND SOFT — the
+    /// catalog API's editorialVideo agrees), while a page with no such key at all means the
+    /// markup moved and the scraper needs looking at.
+    /// </summary>
+    internal static string DescribeMissingAnimatedArtwork(string html)
+    {
+        if (NullVideoArtworkRegex.IsMatch(html))
+            return "videoArtwork is null (Apple has no animated artwork for this album)";
+        if (html.Contains("videoArtwork", StringComparison.Ordinal))
+            return "videoArtwork present but no stream URL matched (page format may have changed)";
+        return $"no videoArtwork field in {html.Length} chars of page (page format may have changed)";
+    }
+
+    private static readonly Regex NullVideoArtworkRegex = new(
+        "\"videoArtwork\"\\s*:\\s*null", RegexOptions.Compiled);
+
+    /// <summary>
     /// True only for absolute http(s). On Windows a protocol-relative "//host/path" parses as
     /// an absolute UNC path, i.e. file://host/path — which would sail through the Apple-host
     /// check below while pointing at something that is not a web URL at all.
@@ -546,6 +848,12 @@ public sealed class ITunesArtworkService
            host.EndsWith("." + domain, StringComparison.OrdinalIgnoreCase);
 
     private async Task<IReadOnlyList<AnimatedArtworkVariant>> ParseHlsMasterVariantsAsync(
+        string masterUrl,
+        CancellationToken ct)
+        => PickTierVariants(await ParseHlsMasterAllVariantsAsync(masterUrl, ct));
+
+    /// <summary>Every playable variant in an HLS master, unfiltered.</summary>
+    private async Task<IReadOnlyList<AnimatedArtworkVariant>> ParseHlsMasterAllVariantsAsync(
         string masterUrl,
         CancellationToken ct)
     {
@@ -594,7 +902,7 @@ public sealed class ITunesArtworkService
             pendingInfo = null;
         }
 
-        return PickTierVariants(list);
+        return list;
     }
 
     // From every parsed HLS variant, keep at most two clean choices the UI can
@@ -739,6 +1047,43 @@ public sealed class ITunesArtworkService
                wanted.Contains(got, StringComparison.Ordinal);
     }
 
+    /// <summary>
+    /// Whether a candidate is the album someone typed into the animated-artwork box. People
+    /// type "Happier Than Ever Billie Eilish", not just the title, and Apple's search page ranks
+    /// those queries perfectly — but read as a title, "album artist" never equals the store's
+    /// album name, so every right answer was rejected before its page was opened. Accepted:
+    /// the title alone (<see cref="IsLikelySameAlbum"/>'s exact rule), or the title with the
+    /// artist before or after it ("by" and dashes allowed). The leftover must be a whole-word
+    /// run of the candidate's credit ("Lady Gaga" in "Lady Gaga &amp; Bruno Mars"), never the
+    /// other way round, or "1989 Taylor's Version Taylor Swift" would read as the original 1989.
+    /// </summary>
+    internal static bool MatchesTypedAlbumQuery(string? candidateAlbum, string? candidateArtist, string? typed)
+    {
+        if (IsLikelySameAlbum(candidateAlbum, candidateArtist, typed, null))
+            return true;
+
+        var query = NormalizeSearchText(typed);
+        var album = NormalizeAlbumForMatch(candidateAlbum);
+        var credit = NormalizeSearchText(candidateArtist);
+        if (query.Length == 0 || album.Length == 0 || credit.Length == 0)
+            return false;
+
+        string rest;
+        if (query.StartsWith(album + " ", StringComparison.Ordinal))
+            rest = query[(album.Length + 1)..];
+        else if (query.EndsWith(" " + album, StringComparison.Ordinal))
+            rest = query[..^(album.Length + 1)];
+        else
+            return false;
+
+        if (rest.StartsWith("by ", StringComparison.Ordinal))
+            rest = rest[3..];
+        else if (rest.EndsWith(" by", StringComparison.Ordinal))
+            rest = rest[..^3];
+
+        return rest.Length > 0 && $" {credit} ".Contains($" {rest} ", StringComparison.Ordinal);
+    }
+
     // Edition wrappers a local tag and the store routinely spell differently. Only these are
     // erased: anything else in brackets ("(Taylor's Version)", "(The Til Dawn Edition)") names
     // a distinct release with its own artwork and has to keep the albums apart.
@@ -806,25 +1151,5 @@ public sealed class ITunesArtworkService
         var rewritten = Regex.Replace(url, @"\d+x\d+bb\.(jpg|png|jpeg)$", $"{sizeSuffix}.$1",
             RegexOptions.IgnoreCase);
         return rewritten;
-    }
-
-    private static string? BuildUncompressedArtworkUrl(string url)
-    {
-        var hiRes = RewriteArtworkUrl(url, "100000x100000-999");
-        if (!Uri.TryCreate(hiRes, UriKind.Absolute, out var uri))
-            return null;
-
-        var marker = "/image/thumb/";
-        var path = uri.AbsolutePath;
-        var markerIndex = path.IndexOf(marker, StringComparison.OrdinalIgnoreCase);
-        if (markerIndex < 0)
-            return null;
-
-        var assetPath = path[(markerIndex + marker.Length)..];
-        var slash = assetPath.LastIndexOf('/');
-        if (slash <= 0)
-            return null;
-
-        return "https://a5.mzstatic.com/us/r1000/0/" + assetPath[..slash];
     }
 }

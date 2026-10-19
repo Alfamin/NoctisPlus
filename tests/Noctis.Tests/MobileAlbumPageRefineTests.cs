@@ -197,7 +197,7 @@ public class MobileAlbumPageRefineTests
         using var rig = Rig(tracks, album);
         var window = MobileFixtures.Mount(rig.Shell, out var view);
         rig.Shell.OpenAlbumCommand.Execute(album);
-        window.UpdateLayout();
+        MobileFixtures.Land(window);
         var vm = Assert.IsType<AlbumPageViewModel>(rig.Shell.CurrentPage);
         vm.PlayTrackCommand.Execute(vm.Tracks[1]);
         window.UpdateLayout();
@@ -222,7 +222,7 @@ public class MobileAlbumPageRefineTests
         Pump(4);
         Assert.True(bars.IsRunning);
         rig.Shell.NavigateBackCommand.Execute(null);
-        window.UpdateLayout();
+        MobileFixtures.Land(window);   // the page slides away, then goes
         Pump(4);
         Assert.False(bars.IsRunning);
         window.Close();
@@ -258,6 +258,25 @@ public class MobileAlbumPageRefineTests
         Assert.Equal("℗ 2021 Aftermath Entertainment and Atlantic Recording Corporation", Text("FooterCopyright"));
         Assert.Equal("Aftermath Entertainment", Text("FooterLabelName"));
         Assert.True(Shown("FooterQuality") && Shown("FooterDate") && Shown("FooterCopyright") && Shown("FooterLabel"));
+        window.Close();
+    }
+
+    /// <summary>A compressed album (AAC) shows the desktop's waveform beside "AAC" on its badge and
+    /// footer, as the PC does beside every quality label (owner 10-18).</summary>
+    [AvaloniaFact]
+    public void QualityGlyph_IsTheDesktopsWaveform_OnACompressedAlbum()
+    {
+        var (album, tracks) = Sample(3, (t, i) => { t.Codec = "AAC"; t.SampleRate = 44100; t.Bitrate = 256; });
+        using var rig = Rig(tracks, album);
+        var window = MobileFixtures.Mount(rig.Shell, out var view);
+        rig.Shell.OpenAlbumCommand.Execute(album);
+        window.UpdateLayout();
+
+        var page = MobileFixtures.Find<AlbumPage>(view);
+        bool Shown(string name) => MobileFixtures.Named<Control>(page, name).IsVisible;
+        Assert.Equal("AAC", MobileFixtures.Named<TextBlock>(page, "QualityBadgeText").Text);
+        Assert.True(Shown("BadgeGlyph") && Shown("FooterGlyph"));
+        Assert.Same(page.FindResource("PhLossless"), ((Avalonia.Controls.Shapes.Path)((Viewbox)MobileFixtures.Named<Control>(page, "BadgeGlyph")).Child!).Data);
         window.Close();
     }
 
@@ -342,7 +361,8 @@ public class MobileAlbumPageRefineTests
         Assert.Equal(0, big.Opacity, 2);
         Assert.Equal(1, small.Opacity, 2);
         var smallBox = BoundsIn(small, view);
-        Assert.Equal(view.Bounds.Width / 2, smallBox.Center.X, 1);
+        // Within a pixel: layout rounding puts an odd-width title half a pixel off centre.
+        Assert.InRange(smallBox.Center.X, view.Bounds.Width / 2 - 1, view.Bounds.Width / 2 + 1);
         var back = BoundsIn(MobileFixtures.Named<Button>(page, "BackButton"), view);
         Assert.InRange(smallBox.Center.Y, back.Center.Y - 1, back.Center.Y + 1);
         Assert.True(smallBox.Left >= back.Right);

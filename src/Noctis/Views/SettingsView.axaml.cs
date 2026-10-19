@@ -40,9 +40,6 @@ public partial class SettingsView : UserControl
             eqPresetFlyout.Closing += OnEqPresetFlyoutClosing;
         }
 
-        // Wire up the Add Folder button to open a native folder picker
-        AddFolderButton.Click += OnAddFolderClicked;
-
         // Settings search: the card index is built lazily on the first keystroke (all tab
         // panels exist by then) and applied on every change. Watch the property, not
         // TextChanged: the latter does not fire for a programmatic/bound Text set.
@@ -749,34 +746,6 @@ public partial class SettingsView : UserControl
         var dx = position.X - _lastPreampPressPosition.X;
         var dy = position.Y - _lastPreampPressPosition.Y;
         return dx * dx + dy * dy <= 36;
-    }
-
-    private async void OnAddFolderClicked(object? sender, RoutedEventArgs e)
-    {
-        try
-        {
-            if (DataContext is not SettingsViewModel vm) return;
-
-            // Get the top-level window for the dialog
-            var topLevel = TopLevel.GetTopLevel(this);
-            if (topLevel == null) return;
-
-            var folders = await topLevel.StorageProvider.OpenFolderPickerAsync(new FolderPickerOpenOptions
-            {
-                Title = "Select Music Folder",
-                AllowMultiple = false
-            });
-
-            if (folders.Count > 0)
-            {
-                var path = folders[0].Path.LocalPath;
-                await vm.AddFolderPath(path);
-            }
-        }
-        catch (Exception ex)
-        {
-            System.Diagnostics.Debug.WriteLine($"[Settings] Failed to add folder: {ex.Message}");
-        }
     }
 
 }

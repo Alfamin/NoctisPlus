@@ -143,6 +143,41 @@ public partial class MetadataViewModel : ViewModelBase
     [ObservableProperty] private bool _hasCustomLyrics;
     [ObservableProperty] private bool _hasCustomSyncedLyrics;
 
+    // True while ApplyLyrics fills the lyric fields from the song: that text is no paste.
+    private bool _applyingLyrics;
+
+    // The last TTML imported or pasted as the synced lyrics, with the LRC it became.
+    private (string Ttml, string Lrc)? _importedTtml;
+
+    /// <summary>
+    /// The imported TTML when the synced lyrics being saved are still exactly what it became.
+    /// LRC has no line ends, so the .lrc alone lit an overlapping duet one line at a time; the
+    /// document saved beside it (read first by the lyrics page) keeps them, as the same .ttml
+    /// put there by hand does. Null once the lines were edited, shifted or replaced.
+    /// </summary>
+    private string? ImportedTtmlToSave() =>
+        _importedTtml is { } imported
+        && string.Equals(NormalizeNewlines(_track.SyncedLyrics).Trim(), imported.Lrc, StringComparison.Ordinal)
+            ? imported.Ttml
+            : null;
+
+    /// <summary>
+    /// A TTML document pasted into the Plain Lyrics box — the dialog's only free-text lyrics
+    /// field — is imported as Import file does it (GitHub #132): its timing becomes the synced
+    /// lyrics, its words the plain lyrics. Kept as pasted, the markup was saved as plain lyrics
+    /// (the .txt, the lyrics tag) and listed as untimed rows on the Timestamp Lyrics tab.
+    /// Text that is not a whole document yet (still being typed) is left alone, and so is
+    /// TTML the song's own tag holds, loaded with the dialog.
+    /// </summary>
+    partial void OnLyricsChanged(string value)
+    {
+        if (_applyingLyrics || !TtmlParser.LooksLikeTtml(value)) return;
+        var (lines, plain) = TtmlParser.Parse(value);
+        if (lines is not { Count: > 0 } || plain is null) return;
+        ImportLyricsText(value, "pasted TTML");
+        Lyrics = plain;
+    }
+
     // ── Synced lyrics manual editor ──
     // Per-line timestamp editing (type/nudge/clear) presented instead of the raw
     // [mm:ss.xx] textarea. The list is the source the user touches; edits flow back
@@ -1334,7 +1369,12 @@ public partial class MetadataViewModel : ViewModelBase
             // is not the user's to have removed.
             _syncedLyricsRemovedByUser = false;
         }
-        if (!KeepsEdit(nameof(Lyrics))) Lyrics = plain;
+        if (!KeepsEdit(nameof(Lyrics)))
+        {
+            _applyingLyrics = true;
+            try { Lyrics = plain; }
+            finally { _applyingLyrics = false; }
+        }
         // A Custom Lyrics switch the user flipped stays flipped (on: the loaded text shows
         // in the now-enabled box; off: the lyrics are being removed on purpose).
         if (!KeepsEdit(nameof(HasCustomLyrics))) HasCustomLyrics = !string.IsNullOrWhiteSpace(Lyrics);
@@ -1665,10 +1705,14 @@ public partial class MetadataViewModel : ViewModelBase
         ArtworkSearchStatus = "Downloading…";
         try
         {
-            var url = useHighestResolution ? candidate.HiResUrl : candidate.StandardUrl;
-            var data = await _itunes.DownloadAsync(url)
-                       ?? await _itunes.DownloadAsync(candidate.ThumbUrl);
-            if (data is null or { Length: 0 } || !Services.HttpSafety.LooksLikeImage(data))
+            byte[]? data = null;
+            foreach (var url in candidate.DownloadUrls(useHighestResolution))
+            {
+                data = await _itunes.DownloadAsync(url);
+                if (data is { Length: > 0 } && Services.HttpSafety.LooksLikeImage(data)) break;
+                data = null;
+            }
+            if (data is null)
             {
                 ArtworkSearchStatus = "Download failed.";
                 return;
@@ -1700,172 +1744,17 @@ public partial class MetadataViewModel : ViewModelBase
     [RelayCommand]
     private void CloseArtworkSearch() => IsArtworkSearchOpen = false;
 
-    [RelayCommand]
-    private async Task SearchAnimatedCover()
-    {
-        if (_itunes == null) { AnimatedSearchStatus = "Search service unavailable."; return; }
-        if (IsSearchingAnimatedCover) return;
-
-        IsSearchingAnimatedCover = true;
-        AnimatedSearchStatus = "Searching…";
-        AnimatedArtworkSearchResults.Clear();
-        HasAnimatedArtworkSearchResults = false;
-        IsAnimatedArtworkSearchOpen = true;
-        ClearAnimatedPreview();
-        try
-        {
-            var variants = new List<ITunesArtworkService.AnimatedArtworkVariant>();
-
-            // Manual override: a pasted Apple Music URL or album ID names the album outright,
-            // so it skips search on both sources.
-            if (TryExtractAppleAlbumId(AnimatedSearchInput, out var pastedId))
-            {
-                var candidate = _itunes == null ? null : await _itunes.LookupAlbumByIdAsync(pastedId);
-                if (candidate != null)
-                    variants.AddRange(await _itunes!.SearchAnimatedArtworkVariantsAsync(candidate.ViewUrl));
-            }
-            else
-            {
-                // A typed album name steers the search away from the loaded track's tags.
-                // The artist is then unknown, and IsLikelySameAlbum falls back to matching on
-                // title alone — which is what the user asked for by typing it.
-                var typed = (AnimatedSearchInput ?? string.Empty).Trim();
-                var manual = typed.Length > 0;
-                var trackArtist = !string.IsNullOrWhiteSpace(AlbumArtist) ? AlbumArtist : Artist;
-                var album = manual ? typed : GetArtworkSearchAlbumTerm();
-                // A typed name is the whole query, so there is no artist to corroborate with
-                // and the match falls back to the title alone. That alone would hand over a
-                // karaoke record: typing "YHLQMDLG" matches a cover act's identically titled
-                // album just as well as Bad Bunny's. The track's artist can't be a requirement
-                // (the user may be searching for someone else's album entirely), so it is
-                // passed as a preference that only orders equally-titled matches.
-                var artist = manual ? string.Empty : trackArtist;
-
-                variants.AddRange(await SearchAppleMusicVariantsAsync(album, artist, trackArtist));
-                if (variants.Count == 0)
-                    variants.AddRange(await SearchITunesVariantsAsync(album, artist, trackArtist));
-            }
-
-            foreach (var variant in variants)
-                AnimatedArtworkSearchResults.Add(new AnimatedArtworkSearchResult(variant));
-
-            HasAnimatedArtworkSearchResults = AnimatedArtworkSearchResults.Count > 0;
-            if (!HasAnimatedArtworkSearchResults)
-            {
-                // Deliberately source-agnostic: which catalogue was consulted, and how many,
-                // is Noctis's business — the user only needs to know there is nothing to offer.
-                AnimatedSearchStatus = "No animated artwork found.";
-                return;
-            }
-
-            // No informational status once results are showing — the buttons speak for
-            // themselves; the status line stays reserved for errors.
-            AnimatedSearchStatus = string.Empty;
-
-            // Download the lowest-bitrate variant in the background to drive the
-            // live preview inside the popup. The user keeps a snappy UI; the
-            // preview swaps in when ready.
-            _ = LoadAnimatedPreviewAsync(variants);
-        }
-        catch (Exception ex)
-        {
-            AnimatedSearchStatus = $"Search failed: {ex.Message}";
-        }
-        finally
-        {
-            IsSearchingAnimatedCover = false;
-        }
-    }
-
-    // ── Animated-artwork sources, in fall-through order ───────────────────────
-    // 1. The Apple Music catalogue, via its web search page. 2. The iTunes Search API.
-    // Both end at the same album-page scrape; only the way the album is found differs.
-    // iTunes stays as the second source because its index has holes — it finds nothing for
-    // albums like Bad Bunny's "YHLQMDLG" — but it is a plain JSON API, so it keeps answering
-    // if the web page's markup shifts under the first one.
-
-    private async Task<IReadOnlyList<ITunesArtworkService.AnimatedArtworkVariant>> SearchAppleMusicVariantsAsync(
-        string album, string artist, string preferArtist)
-    {
-        if (_itunes == null || string.IsNullOrWhiteSpace(album))
-            return Array.Empty<ITunesArtworkService.AnimatedArtworkVariant>();
-
-        var results = await _itunes.SearchAppleMusicAlbumsAsync(artist, album);
-        return await FirstMatchingVariantsAsync(results, album, artist, preferArtist);
-    }
-
-    // 0 sorts ahead of 1: candidates by the artist we already know about win ties. Only a
-    // tiebreak — a list with no such candidate is left in the source's own ranked order.
-    private static int PreferredArtistRank(string? candidateArtist, string? preferArtist)
-    {
-        if (string.IsNullOrWhiteSpace(preferArtist) || string.IsNullOrWhiteSpace(candidateArtist))
-            return 1;
-
-        return ITunesArtworkService.IsLikelySameArtist(candidateArtist, preferArtist) ? 0 : 1;
-    }
-
-    private async Task<IReadOnlyList<ITunesArtworkService.AnimatedArtworkVariant>> SearchITunesVariantsAsync(
-        string album, string artist, string preferArtist)
-    {
-        if (_itunes == null)
-            return Array.Empty<ITunesArtworkService.AnimatedArtworkVariant>();
-
-        // Ask for a wider list than we intend to open: ranking puts the right album first
-        // only when the title is distinctive, and self-titled albums sit behind a wall of
-        // karaoke and cover records.
-        var results = await _itunes.SearchAlbumsAsync(artist, album, limit: 8);
-        return await FirstMatchingVariantsAsync(results, album, artist, preferArtist);
-    }
-
-    /// <summary>
-    /// Opens candidates in order and returns the first album that actually has a loop.
-    /// Ranking orders candidates but never rejects one, so taking the first that happened to
-    /// have a video handed people another album's cover — searching Drake's "Nothing Was the
-    /// Same" offered Take Care's loop. Only candidates that really are this album are opened.
-    /// </summary>
-    private async Task<IReadOnlyList<ITunesArtworkService.AnimatedArtworkVariant>> FirstMatchingVariantsAsync(
-        IReadOnlyList<ITunesArtworkService.ArtworkCandidate> results,
-        string album, string artist, string preferArtist)
-    {
-        foreach (var r in results
-                     .Where(r => ITunesArtworkService.IsLikelySameAlbum(
-                         r.CollectionName, r.ArtistName, album, artist))
-                     .OrderBy(r => PreferredArtistRank(r.ArtistName, preferArtist)))
-        {
-            var variants = await _itunes!.SearchAnimatedArtworkVariantsAsync(r.ViewUrl);
-            if (variants.Count > 0)
-                return variants;
-        }
-
-        return Array.Empty<ITunesArtworkService.AnimatedArtworkVariant>();
-    }
-
-    // Pulls a numeric album ID from a pasted Apple Music URL or a bare ID.
-    // Accepts:  music.apple.com/us/album/<slug>/1710982865[?...]
-    //           https://music.apple.com/.../id1710982865
-    //           1710982865
-    //
-    // The box doubles as an album-name field, so this has to be a real classification. The
-    // old rule took any 6+ digit run *anywhere* in the input, which would read a typed album
-    // name that happens to contain a long number as an ID and search for the wrong thing.
+    // Pulls a numeric album (or song) ID from a pasted Apple Music URL or a bare ID. The box
+    // doubles as an album-name field, so this is a real classification (AppleMusicLink): a typed
+    // album name that happens to contain a long number is never read as an ID. Playlist links
+    // carry no numeric ID and answer false here; the search reads them as links on its own.
     internal static bool TryExtractAppleAlbumId(string? input, out long id)
     {
         id = 0;
-        if (string.IsNullOrWhiteSpace(input)) return false;
-
-        var trimmed = input.Trim();
-
-        // A bare ID: nothing but digits.
-        if (trimmed.All(char.IsAsciiDigit))
-            return trimmed.Length >= 6 && long.TryParse(trimmed, out id);
-
-        // Otherwise it only counts as an ID if it is actually an Apple Music link.
-        if (!Uri.TryCreate(trimmed, UriKind.Absolute, out var uri) ||
-            !uri.Host.EndsWith("apple.com", StringComparison.OrdinalIgnoreCase))
+        if (!AppleMusicLink.TryParse(input, out var link) || link.Kind == AppleMusicLinkKind.Playlist)
             return false;
-
-        var match = System.Text.RegularExpressions.Regex.Match(trimmed, @"\d{6,}");
-        return match.Success && long.TryParse(match.Value, out id);
+        id = link.Id;
+        return true;
     }
 
     // Set only when the user explicitly clears synced lyrics via the Remove button.
@@ -1977,12 +1866,16 @@ public partial class MetadataViewModel : ViewModelBase
         SyncedLyricLines.Clear();
 
         var source = !string.IsNullOrWhiteSpace(SyncedLyrics) ? SyncedLyrics : Lyrics;
-        foreach (var (time, text) in LrcEditorViewModel.ParseLrc(source ?? string.Empty))
+        var (rows, background) = LrcEditorViewModel.SplitBackgroundLines(source ?? string.Empty);
+        for (var i = 0; i < rows.Count; i++)
         {
-            var line = new SyncedLyricEditorLine(time, text);
+            var line = new SyncedLyricEditorLine(rows[i].Time, rows[i].Text, rows[i].WordAnchor) { BackgroundLines = background.GetValueOrDefault(i) };
             line.Changed += OnSyncedLineChanged;
             SyncedLyricLines.Add(line);
         }
+        var owners = LrcEditorViewModel.CompanionOwners(rows.Select(r => (r.Time, r.Text)).ToList());
+        for (var i = 0; i < owners.Length; i++)
+            if (owners[i] >= 0) (SyncedLyricLines[owners[i]].Companions ??= new List<SyncedLyricEditorLine>()).Add(SyncedLyricLines[i]);
 
         HasSyncedLines = SyncedLyricLines.Count > 0;
         HasWordTimedLines = SyncedLyricLines.Any(l => l.HasWordTiming);
@@ -1994,9 +1887,10 @@ public partial class MetadataViewModel : ViewModelBase
     private void RebuildSyncedTextFromLines()
     {
         SyncedLyrics = string.Join("\n", SyncedLyricLines.Select(l =>
-            l.Timestamp is { } t
-                ? $"[{LrcEditorViewModel.FormatTimestamp(t)}]{l.Text}"
-                : l.Text));
+            (l.Timestamp is { } t
+                ? $"[{LrcEditorViewModel.FormatTimestamp(t)}]{l.SavedText}"
+                : l.SavedText)
+            + (l.SavedBackgroundLines is { Count: > 0 } bg ? "\n" + string.Join("\n", bg) : string.Empty)));
 
         // Manually timing lines counts as having custom synced lyrics. Save gates
         // the synced write on HasCustomSyncedLyrics, which stays false when the
@@ -2094,8 +1988,12 @@ public partial class MetadataViewModel : ViewModelBase
     internal void ImportLyricsText(string text, string fileName)
     {
         text ??= string.Empty;
+        string? ttml = null;
         if (fileName.EndsWith(".ttml", StringComparison.OrdinalIgnoreCase) || TtmlParser.LooksLikeTtml(text))
+        {
+            ttml = text;
             text = TtmlParser.ToLrc(text) ?? string.Join("\n", LyricsLoader.RawTextLines(text));
+        }
 
         var normalized = text.Replace("\r\n", "\n").Trim();
         if (normalized.Length == 0)
@@ -2107,6 +2005,7 @@ public partial class MetadataViewModel : ViewModelBase
         if (LyricsTextHelper.ContainsTimestamps(normalized))
         {
             SyncedLyrics = normalized;
+            _importedTtml = ttml is null ? null : (ttml, normalized);
             HasCustomSyncedLyrics = true;
             SyncedLyricsSearchStatus = $"Imported {fileName}";
             RebuildSyncedLinesFromText();
@@ -2182,101 +2081,9 @@ public partial class MetadataViewModel : ViewModelBase
         }
     }
 
-    private async Task LoadAnimatedPreviewAsync(IReadOnlyList<ITunesArtworkService.AnimatedArtworkVariant> variants)
-    {
-        if (variants.Count == 0) return;
-
-        // Smallest variant by max pixel dimension, then by bandwidth — gives us
-        // the fastest download for a preview-quality loop.
-        var preview = variants
-            .OrderBy(v => Math.Max(v.Width, v.Height))
-            .ThenBy(v => v.Bandwidth)
-            .First();
-
-        try
-        {
-            var path = await DownloadAnimatedVariantAsync(preview);
-            if (string.IsNullOrWhiteSpace(path) || !IsAnimatedArtworkSearchOpen)
-            {
-                if (!string.IsNullOrWhiteSpace(path)) TryDeleteFile(path);
-                return;
-            }
-
-            ClearAnimatedPreview();
-            AnimatedPreviewPath = path;
-        }
-        catch { /* preview is optional */ }
-    }
-
-    private void ClearAnimatedPreview()
-    {
-        var old = AnimatedPreviewPath;
-        AnimatedPreviewPath = null;
-        if (!string.IsNullOrWhiteSpace(old)) TryDeleteFile(old);
-    }
-
     private static void TryDeleteFile(string path)
     {
         try { if (File.Exists(path)) File.Delete(path); } catch { }
-    }
-
-    [RelayCommand]
-    private async Task SelectAnimatedArtworkResult(AnimatedArtworkSearchResult? result)
-    {
-        if (result == null || _itunes == null)
-            return;
-
-        IsDownloadingAnimatedCover = true;
-        // Clear any prior error; the spinner row carries its own "Downloading…" label.
-        AnimatedSearchStatus = string.Empty;
-        try
-        {
-            var tempPath = await DownloadAnimatedVariantAsync(result.Variant);
-            if (string.IsNullOrWhiteSpace(tempPath))
-                return;
-
-            _newAnimatedCoverSource = tempPath;
-            _animatedCoverRemoved = false;
-            AnimatedCoverPath = string.Empty;
-            AnimatedCoverPath = tempPath;
-            HasAnimatedCover = true;
-            AnimatedSearchStatus = "Applied. Click Save to keep.";
-            IsAnimatedArtworkSearchOpen = false;
-        }
-        catch (Exception ex)
-        {
-            AnimatedSearchStatus = $"Download failed: {ex.Message}";
-        }
-        finally
-        {
-            IsDownloadingAnimatedCover = false;
-        }
-    }
-
-    private async Task<string?> DownloadAnimatedVariantAsync(ITunesArtworkService.AnimatedArtworkVariant variant)
-    {
-        var tempPath = Path.Combine(Path.GetTempPath(), $"noctis-animatedcover-{Guid.NewGuid():N}.mp4");
-        if (!variant.IsHls)
-        {
-            var data = await _itunes!.DownloadAsync(variant.Url,
-                maxBytes: ITunesArtworkService.MaxAnimatedCoverBytes);
-            if (data is null or { Length: 0 })
-            {
-                AnimatedSearchStatus = "Animated cover download failed.";
-                return null;
-            }
-
-            await File.WriteAllBytesAsync(tempPath, data);
-            return tempPath;
-        }
-
-        if (!await _itunes!.DownloadHlsVariantAsMp4Async(variant, tempPath))
-        {
-            AnimatedSearchStatus = "Could not download Apple Music animated artwork.";
-            return null;
-        }
-
-        return tempPath;
     }
 
     /// <summary>Lowercases and strips punctuation/joiners so artist strings from
@@ -2690,7 +2497,11 @@ public partial class MetadataViewModel : ViewModelBase
                     if (File.Exists(lrcPath) || (SyncedLyricsWereChanged && lyricsTarget.WritesSidecars()))
                         await File.WriteAllTextAsync(lrcPath, _track.SyncedLyrics);
                     if (SyncedLyricsWereChanged)
+                    {
                         await Task.Run(() => TrashSidecarsAboveLrc(_track.FilePath));
+                        if (lyricsTarget.WritesSidecars() && ImportedTtmlToSave() is { } ttml)
+                            await File.WriteAllTextAsync(Path.ChangeExtension(_track.FilePath, ".ttml"), ttml);
+                    }
                 }
                 else if (SyncedLyricsWereRemoved)
                 {
@@ -2935,15 +2746,16 @@ public partial class MetadataViewModel : ViewModelBase
         ChangesSaved?.Invoke(this, EventArgs.Empty);
 
         // Keep the dialog open when the tags did not actually reach disk, so the edit
-        // isn't silently lost on the next rescan. The most common cause is the file
-        // being held open by the player or another app.
+        // isn't silently lost on the next rescan. The player lets go of the playing file
+        // for the save (OpenFileHolders), so what is left is another app holding the file
+        // open, or a file that cannot be written at all.
         if (failedWrites.Count > 0)
         {
             SaveErrorMessage = failedWrites.Count == 1
-                ? $"Couldn't write tags to \"{failedWrites[0]}\". The file may be in use — " +
-                  "stop playback or close other apps using it, then try again."
+                ? $"Couldn't write tags to \"{failedWrites[0]}\". Another app may have the file open, " +
+                  "or it may be read-only — close it there or check the file, then try again."
                 : $"Couldn't write tags to {failedWrites.Count} files (e.g. \"{failedWrites[0]}\"). " +
-                  "They may be in use — stop playback or close other apps using them, then try again.";
+                  "Another app may have them open, or they may be read-only — close them there or check the files, then try again.";
             return;
         }
 
@@ -3199,19 +3011,4 @@ public sealed class ArtworkSearchResult : IDisposable
     public string ArtistName => Candidate.ArtistName;
 
     public void Dispose() => Thumbnail?.Dispose();
-}
-
-public sealed class AnimatedArtworkSearchResult
-{
-    public AnimatedArtworkSearchResult(ITunesArtworkService.AnimatedArtworkVariant variant)
-    {
-        Variant = variant;
-    }
-
-    public ITunesArtworkService.AnimatedArtworkVariant Variant { get; }
-    public string Label => Variant.Label;
-    public string Detail
-        => Variant.Bandwidth > 0
-            ? $"{Variant.Bandwidth / 1_000_000.0:0.#} Mbps"
-            : string.Empty;
 }

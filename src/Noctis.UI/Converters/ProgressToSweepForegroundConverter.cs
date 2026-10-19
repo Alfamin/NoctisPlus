@@ -4,6 +4,7 @@ using System.Globalization;
 using Avalonia;
 using Avalonia.Data.Converters;
 using Avalonia.Media;
+using Noctis.Controls;
 
 namespace Noctis.Converters;
 
@@ -14,7 +15,12 @@ namespace Noctis.Converters;
 /// slides left-to-right with progress; its stops clamp to the word box and carry the
 /// alpha the band would have at the clamped position, so the visible edges move at
 /// constant velocity and the band straddles token boundaries (progress runs a
-/// little past [0..1] on neighbouring words — see KaraokeSweep.BandProgress).
+/// little past [0..1] on neighbouring words — see LyricsTimeline.DriveWordLayer).
+/// Optional <c>[4]=SweepLeadIn</c> / <c>[5]=SweepTrailOut</c> bring the band in from
+/// dark / out fully lit next to a rest (<see cref="Noctis.Controls.KaraokeBand.Center"/>).
+/// The desktop lyrics surfaces draw with <see cref="Noctis.Controls.KaraokeWordText"/>
+/// instead (a new Foreground brush per frame re-measures a TextBlock); this converter
+/// serves the mobile page.
 ///
 /// The previous collapsing feather (width = min(F, raw, 1-raw)) kept the stop
 /// midpoint linear but parked the solid edge at the start of every token and rushed
@@ -31,7 +37,7 @@ public class ProgressToSweepForegroundConverter : IMultiValueConverter
 {
     /// <summary>Half-width of the band as a fraction of the token — fallback when
     /// the view doesn't supply layout width + font size.</summary>
-    public const double Feather = 0.06;
+    public const double Feather = KaraokeBand.FallbackFeather;
 
     public object? Convert(IList<object?> values, Type targetType, object? parameter, CultureInfo culture)
     {
@@ -46,18 +52,16 @@ public class ProgressToSweepForegroundConverter : IMultiValueConverter
         var fg = values.Count > 1 ? values[1] as IBrush : null;
         var color = (fg as ISolidColorBrush)?.Color ?? Colors.White;
 
-        // AMLL's feather is a fixed ~0.5em, not a fraction of the word: with the
-        // width-relative fallback a narrow token (a single CJK character cell) gets
-        // a near hard edge. When the view passes its layout width and font size,
-        // use a 0.25em half-band instead, bounded so wide melisma words keep a
-        // visible soft edge and narrow cells stay inside the sentinel contract.
+        // The feather is a fixed ~0.6em, not a fraction of the word (see KaraokeBand).
         var feather = Feather;
-        if (values.Count > 3
-            && values[2] is double width && width > 0
-            && values[3] is double fontSize && fontSize > 0)
-        {
-            feather = Math.Clamp(0.25 * fontSize / width, 0.04, 0.45);
-        }
+        if (values.Count > 3 && values[2] is double width && values[3] is double fontSize)
+            feather = KaraokeBand.Feather(width, fontSize);
+
+        // Optional [4]=SweepLeadIn, [5]=SweepTrailOut: next to a rest the band enters from
+        // dark / leaves fully lit inside the word's own window.
+        var leadIn = values.Count > 4 && values[4] is true;
+        var trailOut = values.Count > 5 && values[5] is true;
+        raw = KaraokeBand.Center(raw, feather, leadIn, trailOut);
 
         // Band fully before / fully past the token (covers the inert sentinels).
         if (raw <= -feather) return Brushes.Transparent;
@@ -70,12 +74,12 @@ public class ProgressToSweepForegroundConverter : IMultiValueConverter
         var hiT = raw + feather;
         var lo = Math.Max(loT, 0.0);
         var hi = Math.Min(hiT, 1.0);
-        double AlphaAt(double x) => Math.Clamp((hiT - x) / (hiT - loT), 0.0, 1.0);
+        double AlphaAt(double x) => KaraokeBand.LitAt(x, loT, hiT);
 
         // NOTE: this allocates a brush per evaluation, and the lyrics timer rewrites each
         // active word's Progress continuously — so this is a real per-frame allocation
         // during karaoke playback. It is NOT safe to cache a brush on the converter: the
-        // converter is declared with x:Key in LyricsView/LyricsPanelView, i.e. a single
+        // converter is declared with x:Key in the mobile LyricsPage, i.e. a single
         // shared instance across every word cell, so a cached brush would be handed to
         // all of them and every word would render the last-written word's offsets.
         // Fixing it properly means moving the gradient onto the word cell itself (bind

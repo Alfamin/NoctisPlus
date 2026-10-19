@@ -178,7 +178,8 @@ public class MobileArtistPageTests : IDisposable
 
         var page = MobileFixtures.Find<ArtistPage>(view);
         var pages = MobileFixtures.Named<ItemsControl>(page, "TopSongPages");
-        var first = (Control)pages.GetRealizedContainers().First();
+        // The column itself: its container also holds the gap after it (the column's margin).
+        var first = ((Control)pages.GetRealizedContainers().First()).GetVisualDescendants().OfType<ItemsControl>().First();
         Assert.Equal(412 - ArtistPage.PageInset - ArtistPage.ColumnGap - ArtistPage.ColumnPeek, first.Bounds.Width, 1);
         var grid = MobileFixtures.Named<ScrollViewer>(page, "TopSongScroll");
         Assert.True(grid.Extent.Width > grid.Viewport.Width);   // the next column peeks in
@@ -338,9 +339,9 @@ public class MobileArtistPageTests : IDisposable
         using var rig = MobileFixtures.MakeRig(tracks, albums, tint: Tint(Color.FromRgb(0xC8, 0x10, 0x2E)));
         rig.Shell.SafeArea = new Thickness(0, 40, 0, 0);
         var window = MobileFixtures.Mount(rig.Shell, out var view);
-        var host = MobileFixtures.Named<ContentControl>(view, "PageHost");
         rig.Shell.OpenArtistCommand.Execute("Band");
         window.UpdateLayout();
+        var host = MobileFixtures.PageView(view, rig.Shell.CurrentPage!);
 
         var page = MobileFixtures.Find<ArtistPage>(view);
         var hero = MobileFixtures.Named<Panel>(page, "Hero");
@@ -366,16 +367,18 @@ public class MobileArtistPageTests : IDisposable
         Assert.Equal(view.Bounds.Width / 2, BoundsIn(buttons[1], view).Center.X, 1);
         Assert.Equal(view.Bounds.Width / 2, nameBox.Center.X, 1);
 
-        // The buttons wear a shade of the page colour: lighter than this red, white glyphs.
-        var red = Color.FromRgb(0xC8, 0x10, 0x2E);
+        // The page is the deep shade of this red; the buttons wear a shade of the page colour,
+        // lighter than it, with white glyphs.
+        var pageColour = ((ArtistPageViewModel)rig.Shell.CurrentPage!).Tint.TintColor!.Value;
+        Assert.Equal(Noctis.Services.DominantColorExtractor.DeepPageColor(Color.FromRgb(0xC8, 0x10, 0x2E)), pageColour);
         var fill = ((ISolidColorBrush)buttons[1].Background!).Color;
-        Assert.Equal(ArtistPage.Shade(red, ArtistPage.ButtonShade), fill);
-        Assert.True(ArtistPage.Lightness(fill) > ArtistPage.Lightness(red));
+        Assert.Equal(ArtistPage.Shade(pageColour, ArtistPage.ButtonShade), fill);
+        Assert.True(ArtistPage.Lightness(fill) > ArtistPage.Lightness(pageColour));
         Assert.Equal(Colors.White, ((ISolidColorBrush)name.Foreground!).Color);
         Assert.Equal(Colors.White, ((ISolidColorBrush)buttons[1].Foreground!).Color);
 
         rig.Shell.NavigateBackCommand.Execute(null);
-        window.UpdateLayout();
+        MobileFixtures.Land(window);   // the page slides away, then lets go of its host
         Assert.True(host.ClipToBounds);
         window.Close();
     }

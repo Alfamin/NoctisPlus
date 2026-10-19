@@ -140,6 +140,13 @@ public interface IAudioPlayer : IDisposable
     /// </summary>
     void SetUpmixMode(string mode);
 
+    /// <summary>
+    /// True when this player was started with Headphone surround on: 5.1/7.1 sources render
+    /// binaurally to stereo. Fixed for the player's lifetime (a LibVLC instance option), so
+    /// Settings compares it with the saved choice to say a restart is needed.
+    /// </summary>
+    bool HeadphoneSurroundActive => false;
+
     /// <summary>Prepares a next media item for an AutoMix transition without making it active.</summary>
     void PrepareNext(string filePath, long startPositionMs = -1);
 

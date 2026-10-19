@@ -1,0 +1,68 @@
+{
+ "resultCount": 7,
+ "results": [
+  {
+   "wrapperType": "collection",
+   "collectionType": "Album",
+   "collectionId": 1564530719,
+   "artistName": "Billie Eilish",
+   "collectionName": "Happier Than Ever",
+   "collectionViewUrl": "https://music.apple.com/us/album/happier-than-ever/1564530719?uo=4",
+   "artworkUrl100": "https://is1-ssl.mzstatic.com/image/thumb/Music115/v4/2d/f3/c9/2df3c9fd-e0eb-257c-c035-b04f05a66580/21UMGIM36691.rgb.jpg/100x100bb.jpg"
+  },
+  {
+   "wrapperType": "collection",
+   "collectionType": "Album",
+   "collectionId": 1584261635,
+   "artistName": "Billie Eilish",
+   "collectionName": "Happier Than Ever (Edit) - Single",
+   "collectionViewUrl": "https://music.apple.com/us/album/happier-than-ever-edit-single/1584261635?uo=4",
+   "artworkUrl100": "https://is1-ssl.mzstatic.com/image/thumb/Music115/v4/98/ae/d1/98aed10c-b8dc-8e27-7e88-935cf0ff5acb/21UMGIM36691.rgb.jpg/100x100bb.jpg"
+  },
+  {
+   "wrapperType": "collection",
+   "collectionType": "Album",
+   "collectionId": 1584262454,
+   "artistName": "Billie Eilish",
+   "collectionName": "Happier Than Ever (Edit) - Single",
+   "collectionViewUrl": "https://music.apple.com/us/album/happier-than-ever-edit-single/1584262454?uo=4",
+   "artworkUrl100": "https://is1-ssl.mzstatic.com/image/thumb/Music125/v4/d5/0c/53/d50c5343-58d1-9dfa-22ea-b6ea25b6327b/21UMGIM36684.rgb.jpg/100x100bb.jpg"
+  },
+  {
+   "wrapperType": "collection",
+   "collectionType": "Album",
+   "collectionId": 1564530526,
+   "artistName": "Billie Eilish",
+   "collectionName": "Happier Than Ever",
+   "collectionViewUrl": "https://music.apple.com/us/album/happier-than-ever/1564530526?uo=4",
+   "artworkUrl100": "https://is1-ssl.mzstatic.com/image/thumb/Music125/v4/02/b7/6d/02b76dd3-4006-bc65-9f33-33b70a95222a/21UMGIM36684.rgb.jpg/100x100bb.jpg"
+  },
+  {
+   "wrapperType": "collection",
+   "collectionType": "Album",
+   "collectionId": 1647457597,
+   "artistName": "Billie Eilish",
+   "collectionName": "Apple Music Live: Billie Eilish",
+   "collectionViewUrl": "https://music.apple.com/us/album/apple-music-live-billie-eilish/1647457597?uo=4",
+   "artworkUrl100": "https://is1-ssl.mzstatic.com/image/thumb/Music122/v4/2a/e7/fd/2ae7fd10-e2a2-95a4-36ef-a05be33887e8/22UM1IM11004.rgb.jpg/100x100bb.jpg"
+  },
+  {
+   "wrapperType": "collection",
+   "collectionType": "Album",
+   "collectionId": 1734344008,
+   "artistName": "ASTN",
+   "collectionName": "Happier Than Ever - Single",
+   "collectionViewUrl": "https://music.apple.com/us/album/happier-than-ever-single/1734344008?uo=4",
+   "artworkUrl100": "https://is1-ssl.mzstatic.com/image/thumb/Music112/v4/a8/bd/a3/a8bda3f1-6199-79fb-77a2-900461a1b614/7316470257503.jpg/100x100bb.jpg"
+  },
+  {
+   "wrapperType": "collection",
+   "collectionType": "Album",
+   "collectionId": 1487502456,
+   "artistName": "Billie Eilish",
+   "collectionName": "everything i wanted - Single",
+   "collectionViewUrl": "https://music.apple.com/us/album/everything-i-wanted-single/1487502456?uo=4",
+   "artworkUrl100": "https://is1-ssl.mzstatic.com/image/thumb/Music115/v4/c5/6c/b1/c56cb16a-52c3-33b5-5189-6c65028001fb/19UM1IM00404.rgb.jpg/100x100bb.jpg"
+  }
+ ]
+}

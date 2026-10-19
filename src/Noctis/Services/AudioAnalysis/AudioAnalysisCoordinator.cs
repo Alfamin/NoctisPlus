@@ -245,7 +245,7 @@ public sealed class AudioAnalysisCoordinator
                     }
                     // Only tempo/key change: no new ID3v1 trailer on an MP3 that had none.
                     AdvancedTagIO.RemoveAddedForeignTags(file);
-                });
+                }, releaseOpenFile: false); // a background pass must not put a gap in the playing track
                 return true;
             }
             catch (System.IO.IOException) { System.Threading.Thread.Sleep(TagWriteRetryDelayMs); }

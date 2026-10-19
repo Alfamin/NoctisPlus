@@ -132,6 +132,46 @@ public partial class PlayerViewModel : ViewModelBase
         if (HasMusicVideo) OnPropertyChanged(nameof(MusicVideoSyncPosition));
     }
 
+    // ── Chapters (.m4b audiobooks, Discord Luwi): the current file's chapter marks, listed
+    // under the bar's "…" → Chapters. Read off the UI thread per track; MP4 files only.
+
+    /// <summary>The current file's chapters sorted by start; empty when it has none.</summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(HasChapters))]
+    private IReadOnlyList<TrackChapter> _chapters = Array.Empty<TrackChapter>();
+
+    /// <summary>Two or more chapters: something to jump between (a lone chapter is the whole file).</summary>
+    public bool HasChapters => Chapters.Count > 1;
+
+    private int _chaptersGeneration;
+
+    /// <summary>The current track's chapter read (tests await it).</summary>
+    internal Task ChaptersLoaded { get; private set; } = Task.CompletedTask;
+
+    private void ResolveChapters()
+    {
+        var generation = ++_chaptersGeneration;
+        Chapters = Array.Empty<TrackChapter>();
+        var track = CurrentTrack;
+        ChaptersLoaded = track != null && !track.IsRemoteStream && Mp4ChapterReader.IsMp4Family(track.FilePath)
+            ? LoadChaptersAsync(generation, track.FilePath)
+            : Task.CompletedTask;
+    }
+
+    // A later track change drops this read's result.
+    private async Task LoadChaptersAsync(int generation, string path)
+    {
+        var chapters = await Task.Run(() => Mp4ChapterReader.Read(path));
+        if (generation == _chaptersGeneration)
+            Chapters = chapters;
+    }
+
+    [RelayCommand]
+    private void SeekToChapter(TrackChapter? chapter)
+    {
+        if (chapter != null) SeekTo(chapter.Start);
+    }
+
     // ── Music video audio (Discord, aaron): with the setting on, a song whose clip was found
     // plays the clip's own audio, the song file being the engine's fallback for a clip that
     // won't open or has no audio. Decided at song start only (PlayTrack): toggling, the
@@ -463,6 +503,9 @@ public partial class PlayerViewModel : ViewModelBase
     /// <summary>Whether TTML words split across several timed spans render unbroken
     /// (issue #32). Driven by Settings; the lyrics VM re-parses when it flips.</summary>
     [ObservableProperty] private bool _lyricsJoinSplitWords;
+    /// <summary>Whether sung words float up and held notes swell and glow (Apple Music word
+    /// motion). Driven by Settings; display-only, applied to the running lyrics at once.</summary>
+    [ObservableProperty] private bool _lyricsGlowAndLift = true;
     /// <summary>Whether the lyrics show TTML translations / romanization / background vocals
     /// under each line (issue #78). Driven by Settings; display-only, no re-parse.</summary>
     [ObservableProperty] private bool _lyricsShowTranslations = true;
@@ -666,6 +709,8 @@ public partial class PlayerViewModel : ViewModelBase
         {
             if (e.PropertyName is nameof(HasContent) or nameof(RepeatMode) or nameof(CurrentTrack))
                 NextCommand.NotifyCanExecuteChanged();
+            if (e.PropertyName is nameof(HasContent) or nameof(IsShuffleEnabled))
+                ReshuffleCommand.NotifyCanExecuteChanged();
         };
 
         // Sync volume to audio player
@@ -1078,6 +1123,63 @@ public partial class PlayerViewModel : ViewModelBase
             }
         }
         return restored;
+    }
+
+    /// <summary>Reshuffle needs Shuffle on and two songs up next to trade places.</summary>
+    private bool CanReshuffle() => IsShuffleEnabled && UpNext.Count > 1;
+
+    /// <summary>
+    /// Queue ▸ Reshuffle (Discord, vari): deals Up Next out again in a new random order while
+    /// Shuffle is on. Only Up Next moves — the playing song, the played songs (History) and
+    /// the Shuffle-off order stay as they are, so Shuffle off still continues after the playing
+    /// song (<see cref="BuildUnshuffledQueue"/> reads Up Next as a set). The order is drawn the
+    /// way <see cref="ToggleShuffle"/> draws it (WeightedShuffle: not-liked and recently played
+    /// songs tend to land later), and like it every queued song takes part, "Play Next" ones
+    /// included. A song the shuffle holds out (Skip When Shuffling, snoozed) that was queued
+    /// while shuffled keeps its slot instead of being dropped.
+    /// </summary>
+    [RelayCommand(CanExecute = nameof(CanReshuffle))]
+    private void Reshuffle()
+    {
+        if (!CanReshuffle()) return;
+
+        var slots = new List<int>(UpNext.Count);
+        var dealt = new List<Track>(UpNext.Count);
+        for (var i = 0; i < UpNext.Count; i++)
+        {
+            if (UpNext[i] is { SkipWhenShuffling: false, IsSnoozed: false } t)
+            {
+                slots.Add(i);
+                dealt.Add(t);
+            }
+        }
+        if (dealt.Count < 2) return;
+
+        // A two-song queue comes back unchanged half the time; a press should always move something.
+        List<Track> shuffled = dealt;
+        for (var attempt = 0; attempt < 8; attempt++)
+        {
+            shuffled = Helpers.ShuffleHelper.WeightedShuffle(dealt, recentlyPlayed: _recentlyPlayed);
+            if (shuffled.Count != dealt.Count) return; // a snooze lapsed mid-call: leave the queue be
+            if (!shuffled.SequenceEqual(dealt)) break;
+        }
+        if (shuffled.SequenceEqual(dealt))
+            shuffled = dealt.Skip(1).Append(dealt[0]).ToList();
+
+        var order = UpNext.ToList();
+        for (var k = 0; k < slots.Count; k++)
+            order[slots[k]] = shuffled[k];
+
+        DebugLogger.Info(DebugLogger.Category.Queue, "Reshuffle", $"queueLen={UpNext.Count}, dealt={dealt.Count}");
+        CancelAutoMixTransition("queue reshuffled");
+        MarkQueueChanged();
+        _suppressHasContentNotify = true;
+        try { UpNext.ReplaceAll(order); }
+        finally
+        {
+            _suppressHasContentNotify = false;
+            OnPropertyChanged(nameof(HasContent));
+        }
     }
 
     [RelayCommand]
@@ -2280,6 +2382,7 @@ public partial class PlayerViewModel : ViewModelBase
         ViewCurrentTrackAlbumCommand.NotifyCanExecuteChanged();
         ResolveLyricsBackground();
         ResolveMusicVideo();
+        ResolveChapters();
         // Re-apply ReplayGain so the new track's RG tags take effect. The
         // player already reads tags at Play() time, but settings or playback
         // path changes can leave us here without a Play() call.
@@ -4132,7 +4235,7 @@ public partial class PlayerViewModel : ViewModelBase
         SaveQueueStateInBackground();
     }
 
-    private static string FormatTime(TimeSpan ts)
+    internal static string FormatTime(TimeSpan ts)
     {
         return ts.TotalHours >= 1
             ? ts.ToString(@"h\:mm\:ss")

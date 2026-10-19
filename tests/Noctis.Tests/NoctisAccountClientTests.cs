@@ -280,9 +280,31 @@ public class NoctisAccountClientTests
         using (var client = Client(new ScriptedHandler(_ => new HttpResponseMessage(HttpStatusCode.BadGateway) { Content = new StringContent("") })))
             Assert.Equal(NoctisErrorKind.Server, (await Assert.ThrowsAsync<NoctisServerException>(() => client.GetSongCountAsync(ct))).Kind);
 
-        // No sign-in without a sign-in answer (an old desktop that lacks noctisSignIn).
+        // No sign-in without a sign-in answer: an old desktop that lacks noctisSignIn, which the
+        // Account page words as "too old" instead of "try again in a moment".
         using (var client = Client(new ScriptedHandler(_ => Json("")), key: null))
-            Assert.Equal(NoctisErrorKind.Server, (await Assert.ThrowsAsync<NoctisServerException>(() => client.SignInAsync("a", "b", "phone-0001", "P", ct))).Kind);
+            Assert.Equal(NoctisErrorKind.Outdated, (await Assert.ThrowsAsync<NoctisServerException>(() => client.SignInAsync("a", "b", "phone-0001", "P", ct))).Kind);
+    }
+
+    /// <summary>First contact tells apart why it failed, for the Account page to say what to
+    /// check: a page that is not Noctis or a port that does not speak https (the address and
+    /// port), a name that does not resolve, else no answer at all. All of them read
+    /// "Can't reach your computer" before.</summary>
+    [Fact]
+    public async Task TheProbe_TellsWhyItFailed()
+    {
+        var ct = TestContext.Current.CancellationToken;
+        async Task<NoctisErrorKind> Probe(Func<HttpRequestMessage, HttpResponseMessage> respond) =>
+            (await Assert.ThrowsAsync<NoctisServerException>(() =>
+                NoctisServerClient.ProbeFingerprintAsync(_ => new ScriptedHandler(respond), Url, ct))).Kind;
+
+        Assert.Equal(NoctisErrorKind.NotNoctis, await Probe(_ => new HttpResponseMessage(HttpStatusCode.OK) { Content = new StringContent("<html>router login</html>") }));
+        Assert.Equal(NoctisErrorKind.NotNoctis, await Probe(_ => new HttpResponseMessage(HttpStatusCode.NotFound) { Content = new StringContent("") }));
+        Assert.Equal(NoctisErrorKind.NotNoctis, await Probe(_ => throw new HttpRequestException(HttpRequestError.SecureConnectionError, "tls")));
+        Assert.Equal(NoctisErrorKind.NotNoctis, await Probe(_ => throw new HttpRequestException("tls", new System.Security.Authentication.AuthenticationException("handshake"))));
+        Assert.Equal(NoctisErrorKind.UnknownHost, await Probe(_ => throw new HttpRequestException(HttpRequestError.NameResolutionError, "dns")));
+        Assert.Equal(NoctisErrorKind.UnknownHost, await Probe(_ => throw new HttpRequestException("dns", new System.Net.Sockets.SocketException((int)System.Net.Sockets.SocketError.HostNotFound))));
+        Assert.Equal(NoctisErrorKind.Unreachable, await Probe(_ => throw new HttpRequestException(HttpRequestError.ConnectionError, "refused")));
     }
 
     [Fact]

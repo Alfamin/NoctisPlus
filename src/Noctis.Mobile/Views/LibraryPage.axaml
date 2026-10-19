@@ -146,7 +146,7 @@
             <Setter Property="Height" Value="30" />
             <Setter Property="Margin" Value="-3" />
             <Setter Property="VerticalAlignment" Value="Center" />
-            <Setter Property="Foreground" Value="{DynamicResource AccentTextBrush}" />
+            <Setter Property="Foreground" Value="{DynamicResource AccentTextExactBrush}" />
         </Style>
         <!-- One glyph per row kind (the Tag is the row's key). -->
         <Style Selector="PathIcon.row-icon[Tag=Playlists]">
@@ -167,8 +167,10 @@
         <Style Selector="PathIcon.row-icon[Tag=Downloaded]">
             <Setter Property="Data" Value="{DynamicResource PhDownload}" />
         </Style>
+        <!-- Apple's 17 pt regular list label (the phone's TextBlocks carry real weights:
+             MobileStyles' TextBlock font). -->
         <Style Selector="TextBlock.row-label">
-            <Setter Property="FontSize" Value="20" />
+            <Setter Property="FontSize" Value="18" />
             <Setter Property="FontWeight" Value="Normal" />
             <Setter Property="Margin" Value="15,0,8,0" />
             <Setter Property="VerticalAlignment" Value="Center" />
@@ -182,8 +184,7 @@
             <Setter Property="Margin" Value="0,0,-7,0" />
             <Setter Property="HorizontalAlignment" Value="Right" />
             <Setter Property="VerticalAlignment" Value="Center" />
-            <Setter Property="Foreground" Value="{DynamicResource SecondaryTextBrush}" />
-            <Setter Property="Opacity" Value="0.7" />
+            <Setter Property="Foreground" Value="{DynamicResource PhoneChevronBrush}" />
             <Setter Property="Transitions">
                 <Transitions>
                     <DoubleTransition Property="Opacity" Duration="0:0:0.2" />
@@ -210,7 +211,7 @@
         <Style Selector="Border.row-handle PathIcon">
             <Setter Property="Width" Value="26" />
             <Setter Property="Height" Value="26" />
-            <Setter Property="Foreground" Value="{DynamicResource SecondaryTextBrush}" />
+            <Setter Property="Foreground" Value="{DynamicResource PhoneSecondaryTextBrush}" />
             <Setter Property="Opacity" Value="0.6" />
         </Style>
         <Style Selector="Panel.lib-row.editing Border.row-handle">
@@ -221,14 +222,14 @@
             <Setter Property="Height" Value="0.5" />
             <Setter Property="Margin" Value="15,0,0,0" />
             <Setter Property="VerticalAlignment" Value="Bottom" />
-            <Setter Property="Background" Value="#38808080" />
+            <Setter Property="Background" Value="{DynamicResource PhoneSeparatorBrush}" />
         </Style>
 
         <!-- Under Edit the sections below step back behind a veil of the page colour: the rows
              are what is being edited. A veil, not Opacity on the sections: Opacity is applied
              per element, and each cover's placeholder glyph showed through its faded image. -->
         <Style Selector="Border#SectionsVeil">
-            <Setter Property="Background" Value="{DynamicResource AppWindowBackgroundBrush}" />
+            <Setter Property="Background" Value="{DynamicResource PhoneBackgroundBrush}" />
             <Setter Property="Opacity" Value="0" />
             <Setter Property="IsHitTestVisible" Value="False" />
             <Setter Property="Transitions">
@@ -246,7 +247,7 @@
     </UserControl.Styles>
 
     <Grid RowDefinitions="Auto,*">
-        <Grid Grid.Row="0" Name="LibraryHeader" ColumnDefinitions="*,Auto" Margin="20,10,16,8"
+        <Grid Grid.Row="0" Name="LibraryHeader" ColumnDefinitions="*,Auto" Classes="tab-header"
               Classes.editing="{Binding LibraryRows.IsEditing}">
             <TextBlock Classes="title" Text="{loc:T Tab.Library}" VerticalAlignment="Center" />
             <!-- Liquid Glass, as on Apple's Library: a pill with Edit and the … menu, then the
@@ -258,31 +259,16 @@
                                 IsVisible="{Binding Library.HasFolders}">
                             <PathIcon Data="{DynamicResource PhList}" />
                         </Button>
-                        <Button Name="LibraryMoreButton" Classes="glass-round">
+                        <!-- Add Folder…, Rescan Library and Settings on the glass pop menu (PopMenu). -->
+                        <Button Name="LibraryMoreButton" Classes="glass-round" Command="{Binding OpenLibraryMenuCommand}"
+                                AutomationProperties.Name="More">
                             <PathIcon Data="{DynamicResource LibMoreIcon}" />
-                            <Button.Flyout>
-                                <MenuFlyout Placement="BottomEdgeAlignedRight">
-                                    <!-- The Windows app's own glyphs for the same three actions. -->
-                                    <MenuItem Header="Add Folder…" Command="{Binding Library.AddFolderCommand}">
-                                        <MenuItem.Icon><PathIcon Data="{DynamicResource FolderIcon}" Width="18" Height="18" /></MenuItem.Icon>
-                                    </MenuItem>
-                                    <MenuItem Header="Rescan Library" Command="{Binding Library.RescanCommand}">
-                                        <MenuItem.Icon><PathIcon Data="{DynamicResource SyncIcon}" Width="18" Height="18" /></MenuItem.Icon>
-                                    </MenuItem>
-                                    <MenuItem Header="Settings" Command="{Binding OpenSettingsCommand}">
-                                        <MenuItem.Icon><PathIcon Data="{DynamicResource SettingsIcon}" Width="18" Height="18" /></MenuItem.Icon>
-                                    </MenuItem>
-                                </MenuFlyout>
-                            </Button.Flyout>
                         </Button>
                     </StackPanel>
                 </controls:GlassPanel>
-                <!-- The one profile button in the app: the desktop account's picture once signed in. -->
-                <controls:GlassPanel Name="LibraryProfileGlass" Classes="header-glass">
-                    <views:ProfileButton Name="LibraryProfile" AvatarPath="{Binding ProfileAvatarPath}"
-                                         Command="{Binding OpenSettingsCommand}"
-                                         HorizontalAlignment="Center" VerticalAlignment="Center" />
-                </controls:GlassPanel>
+                <!-- The profile (Settings): the desktop account's picture once signed in. -->
+                <views:ProfileButton Name="LibraryProfile" AvatarPath="{Binding ProfileAvatarPath}"
+                                     Command="{Binding OpenSettingsCommand}" VerticalAlignment="Center" />
             </StackPanel>
             <Button Grid.Column="1" Name="LibraryEditDoneButton" Classes="edit-done" Command="{Binding LibraryRows.DoneCommand}">
                 <PathIcon Data="{DynamicResource PhCheck}" />
@@ -292,28 +278,7 @@
         <ScrollViewer Grid.Row="1" Classes="page-scroll" Name="LibraryScroll" HorizontalScrollBarVisibility="Disabled">
             <!-- No side margin here: rails scroll edge to edge; headers and cards inset themselves. -->
             <StackPanel Name="LibraryContent" Margin="0,0,0,24" Spacing="22">
-                <StackPanel Name="NoticeCards" Margin="20,0" Spacing="14" IsVisible="{Binding Library.HasNotice}">
-                    <Border Name="ConnectCard" Classes="card" Padding="16" IsVisible="{Binding Library.ShowConnectCard}">
-                        <StackPanel Spacing="10">
-                            <TextBlock Classes="section" Text="Add your music" />
-                            <TextBlock Classes="subtle" TextWrapping="Wrap"
-                                       Text="Pick the folder your music lives in. Noctis reads it in place and never uploads anything." />
-                            <Button Classes="pill-accent" Content="Choose folder" Command="{Binding Library.AddFolderCommand}" />
-                        </StackPanel>
-                    </Border>
-
-                    <Border Name="ReconnectCard" Classes="card" Padding="16" IsVisible="{Binding Library.NeedsReconnect}">
-                        <StackPanel Spacing="10">
-                            <TextBlock Text="{Binding Library.StatusText}" TextWrapping="Wrap" />
-                            <Button Classes="pill" Content="Reconnect folder" Command="{Binding Library.AddFolderCommand}" />
-                        </StackPanel>
-                    </Border>
-
-                    <StackPanel Spacing="4" IsVisible="{Binding Library.IsScanning}">
-                        <ProgressBar IsIndeterminate="True" />
-                        <TextBlock Classes="subtle" Text="{Binding Library.ScanProgress, StringFormat='Scanning… {0} files'}" />
-                    </StackPanel>
-                </StackPanel>
+                <views:LibraryNotices IsVisible="{Binding Library.HasNotice}" />
 
                 <!-- The lists, as rows that push their page (Apple's Library). Which rows show,
                      and in what order, is the user's: Edit. -->
@@ -348,25 +313,6 @@
 
                 <Panel>
                     <StackPanel Name="LibrarySections" Spacing="22" Classes.editing="{Binding LibraryRows.IsEditing}">
-                        <!-- Pinned: always shown once there is music, so the pin system is discoverable. -->
-                        <StackPanel Name="PinnedSection" Spacing="10" IsVisible="{Binding Library.HasFolders}">
-                            <Button Name="PinnedHeader" Classes="row section-header" Command="{Binding OpenPinnedCommand}">
-                                <StackPanel Orientation="Horizontal">
-                                    <PathIcon Data="{DynamicResource LibPinIcon}" />
-                                    <TextBlock Classes="section" Text="Pinned" />
-                                    <PathIcon Classes="chevron" Data="{DynamicResource LibChevronIcon}" />
-                                </StackPanel>
-                            </Button>
-                            <ScrollViewer HorizontalScrollBarVisibility="Hidden" VerticalScrollBarVisibility="Disabled" IsVisible="{Binding Library.HasPinned}">
-                                <ItemsControl Name="PinnedRail" Margin="20,0" ItemsSource="{Binding Library.PinnedRail}"
-                                              ItemTemplate="{StaticResource RailTileTemplate}" ItemsPanel="{StaticResource RailPanel}" />
-                            </ScrollViewer>
-                            <Border Name="PinnedHint" Classes="card" Margin="20,0" Padding="16,14" IsVisible="{Binding !Library.HasPinned}">
-                                <TextBlock Classes="subtle" TextWrapping="Wrap"
-                                           Text="Long-press an album, artist, playlist or song and choose Pin to keep it here." />
-                            </Border>
-                        </StackPanel>
-
                         <StackPanel Name="RecentlyAddedSection" Spacing="10" IsVisible="{Binding Library.HasRecentlyAdded}">
                             <Button Name="RecentlyAddedHeader" Classes="row section-header" Command="{Binding OpenRecentlyAddedCommand}">
                                 <StackPanel Orientation="Horizontal">
@@ -377,34 +323,6 @@
                             </Button>
                             <ScrollViewer HorizontalScrollBarVisibility="Hidden" VerticalScrollBarVisibility="Disabled">
                                 <ItemsControl Name="RecentlyAddedRail" Margin="20,0" ItemsSource="{Binding Library.RecentlyAddedRail}"
-                                              ItemTemplate="{StaticResource RailTileTemplate}" ItemsPanel="{StaticResource RailPanel}" />
-                            </ScrollViewer>
-                        </StackPanel>
-
-                        <StackPanel Name="OnRepeatSection" Spacing="10" IsVisible="{Binding Library.HasOnRepeat}">
-                            <Button Name="OnRepeatHeader" Classes="row section-header" Command="{Binding OpenOnRepeatCommand}">
-                                <StackPanel Orientation="Horizontal">
-                                    <PathIcon Data="{DynamicResource LibOnRepeatIcon}" />
-                                    <TextBlock Classes="section" Text="On Repeat" />
-                                    <PathIcon Classes="chevron" Data="{DynamicResource LibChevronIcon}" />
-                                </StackPanel>
-                            </Button>
-                            <ScrollViewer HorizontalScrollBarVisibility="Hidden" VerticalScrollBarVisibility="Disabled">
-                                <ItemsControl Name="OnRepeatRail" Margin="20,0" ItemsSource="{Binding Library.OnRepeatRail}"
-                                              ItemTemplate="{StaticResource RailTileTemplate}" ItemsPanel="{StaticResource RailPanel}" />
-                            </ScrollViewer>
-                        </StackPanel>
-
-                        <StackPanel Name="RecentlyPlayedSection" Spacing="10" IsVisible="{Binding Library.HasShelf}">
-                            <Button Name="RecentlyPlayedHeader" Classes="row section-header" Command="{Binding OpenRecentlyPlayedCommand}">
-                                <StackPanel Orientation="Horizontal">
-                                    <PathIcon Data="{DynamicResource LibRecentlyPlayedIcon}" />
-                                    <TextBlock Classes="section" Text="Recently Played" />
-                                    <PathIcon Classes="chevron" Data="{DynamicResource LibChevronIcon}" />
-                                </StackPanel>
-                            </Button>
-                            <ScrollViewer HorizontalScrollBarVisibility="Hidden" VerticalScrollBarVisibility="Disabled">
-                                <ItemsControl Name="RecentlyPlayedRail" Margin="20,0" ItemsSource="{Binding Library.RecentlyPlayedRail}"
                                               ItemTemplate="{StaticResource RailTileTemplate}" ItemsPanel="{StaticResource RailPanel}" />
                             </ScrollViewer>
                         </StackPanel>

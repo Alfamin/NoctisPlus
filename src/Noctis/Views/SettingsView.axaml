@@ -84,13 +84,17 @@
                                         </StackPanel>
                                         <Panel Grid.Column="1" VerticalAlignment="Center">
                                             <controls:LottieToggle IsVisible="{Binding IsBool}"
+                                                                  AutomationProperties.Name="{Binding Label}"
                                                                   IsChecked="{Binding BoolValue, Mode=TwoWay}"/>
                                             <TextBox IsVisible="{Binding IsString}" Text="{Binding TextValue, Mode=TwoWay}" Watermark="{Binding Placeholder}"
+                                                     AutomationProperties.Name="{Binding Label}"
                                                      Width="220" CornerRadius="999" Padding="14,6" BorderThickness="1.5" MinHeight="0"/>
                                             <NumericUpDown IsVisible="{Binding IsNumber}" Value="{Binding NumberValue, Mode=TwoWay}"
+                                                           AutomationProperties.Name="{Binding Label}"
                                                            Minimum="{Binding Minimum}" Maximum="{Binding Maximum}"
                                                            Width="150" CornerRadius="999" FormatString="0.###"/>
                                             <ComboBox IsVisible="{Binding IsChoice}" Classes="pill-list"
+                                                      AutomationProperties.Name="{Binding Label}"
                                                       ItemsSource="{Binding Choices}" SelectedItem="{Binding SelectedChoice, Mode=TwoWay}"
                                                       MinWidth="160" CornerRadius="999" Padding="14,6"/>
                                         </Panel>
@@ -111,11 +115,13 @@
                         </controls:CollapsibleContent>
                         <StackPanel Orientation="Horizontal" Spacing="8">
                             <Button Classes="pill-action" Padding="12,6" CornerRadius="999" Cursor="Hand"
+                                    AutomationProperties.Name="{loc:T Plugins.OpenPluginFolder}"
                                     Command="{Binding $parent[UserControl].((vm:SettingsViewModel)DataContext).OpenPluginDirectoryCommand}"
                                     CommandParameter="{Binding}">
                                 <TextBlock Text="{loc:T Plugins.OpenPluginFolder}" FontSize="12"/>
                             </Button>
                             <Button Classes="pill-action danger-ghost-pill" Padding="12,6" CornerRadius="999" Cursor="Hand"
+                                    AutomationProperties.Name="{loc:T Plugins.Remove}"
                                     Command="{Binding $parent[UserControl].((vm:SettingsViewModel)DataContext).RemovePluginCommand}"
                                     CommandParameter="{Binding}">
                                 <TextBlock Text="{loc:T Plugins.Remove}" FontSize="12"/>
@@ -939,12 +945,16 @@
              under it from both sides; on a dimmed slider (parent off) the see-through thumb showed
              those overlapping ends, so the slider looked broken apart. Exactly edge-to-edge left a
              notch at each join instead (an 8px bar's corners sit 0.94px outside the 18px circle),
-             so 1px: the corners land on the circle, and the sliver under it is too thin to show. -->
+             so 1px: the corners land on the circle, and the sliver under it is too thin to show.
+             The bar's outer ends start half a thumb in (10-12): at the minimum the fill still
+             peeked out left of the thumb as a little red square, and at the maximum the track
+             right of it. Starting at the thumb's centre at either end, the bar is always
+             under the thumb there, at any display scaling. -->
         <Style Selector="Slider.accent-slider /template/ RepeatButton#PART_DecreaseButton">
-            <Setter Property="Margin" Value="0,0,-1,0"/>
+            <Setter Property="Margin" Value="9,0,-1,0"/>
         </Style>
         <Style Selector="Slider.accent-slider /template/ RepeatButton#PART_IncreaseButton">
-            <Setter Property="Margin" Value="-1,0,0,0"/>
+            <Setter Property="Margin" Value="-1,0,9,0"/>
         </Style>
         <Style Selector="Slider.accent-slider /template/ RepeatButton /template/ Border">
             <Setter Property="Background" Value="{DynamicResource SystemControlHighlightAccentBrush}"/>
@@ -1549,6 +1559,7 @@
         <DockPanel Margin="12,14,12,12">
             <!-- Search across every section (Ctrl+F while Settings is open). -->
             <TextBox DockPanel.Dock="Top"
+                     AutomationProperties.Name="{loc:T Settings.SearchSettings}"
                      x:Name="SettingsSearchBox"
                      Classes="settings-search"
                      Watermark="{loc:T Settings.SearchSettings}"
@@ -1571,6 +1582,7 @@
                                 <ItemsControl.ItemTemplate>
                                     <DataTemplate x:DataType="vm:SettingsSection">
                                         <Button Classes="rail-item"
+                                                AutomationProperties.Name="{Binding Label}"
                                                 Classes.active="{Binding IsSelected}"
                                                 Command="{Binding $parent[UserControl].((vm:SettingsViewModel)DataContext).SelectSettingsTabCommand}"
                                                 CommandParameter="{Binding Key}">
@@ -1659,6 +1671,7 @@
                                        FontSize="12" Opacity="0.5" TextWrapping="Wrap"/>
                         </StackPanel>
                         <ComboBox Grid.Column="1"
+                                  AutomationProperties.Name="{loc:T Settings.Language.Title}"
                                   Classes="pill-list"
                                   ItemsSource="{Binding LanguageOptions}"
                                   SelectedItem="{Binding LanguageChoice}"
@@ -1684,6 +1697,7 @@
                     <Grid ColumnDefinitions="*,Auto">
                         <TextBlock Grid.Column="0" Text="{loc:T Settings.OpenNoctisWhenComputer}" FontSize="13" VerticalAlignment="Center"/>
                         <controls:LottieToggle Grid.Column="1"
+                                              AutomationProperties.Name="{loc:T Settings.OpenNoctisWhenComputer}"
                                               IsChecked="{Binding LaunchAtStartup}"
                                               VerticalAlignment="Center"/>
                     </Grid>
@@ -1698,18 +1712,21 @@
                     <Grid ColumnDefinitions="*,Auto" Classes="dependent-setting" IsEnabled="{Binding LaunchAtStartup}">
                         <TextBlock Grid.Column="0" Text="{loc:T Settings.StartMinimizedTray}" FontSize="13" VerticalAlignment="Center"/>
                         <controls:LottieToggle Grid.Column="1"
+                                              AutomationProperties.Name="{loc:T Settings.StartMinimizedTray}"
                                               IsChecked="{Binding StartMinimizedToTray}"
                                               VerticalAlignment="Center"/>
                     </Grid>
                     <Grid ColumnDefinitions="*,Auto">
                         <TextBlock Grid.Column="0" Text="{loc:T Settings.MinimizeTray}" FontSize="13" VerticalAlignment="Center"/>
                         <controls:LottieToggle Grid.Column="1"
+                                              AutomationProperties.Name="{loc:T Settings.MinimizeTray}"
                                               IsChecked="{Binding MinimizeToTray}"
                                               VerticalAlignment="Center"/>
                     </Grid>
                     <Grid ColumnDefinitions="*,Auto">
                         <TextBlock Grid.Column="0" Text="{loc:T Settings.CloseTray}" FontSize="13" VerticalAlignment="Center"/>
                         <controls:LottieToggle Grid.Column="1"
+                                              AutomationProperties.Name="{loc:T Settings.CloseTray}"
                                               IsChecked="{Binding CloseToTray}"
                                               VerticalAlignment="Center"/>
                     </Grid>
@@ -1720,6 +1737,7 @@
                                        FontSize="12" Opacity="0.5" TextWrapping="Wrap"/>
                         </StackPanel>
                         <controls:LottieToggle Grid.Column="1"
+                                              AutomationProperties.Name="{loc:T Settings.RestoreLastPlayedTrack}"
                                               IsChecked="{Binding RestoreLastTrackOnStartup}"
                                               VerticalAlignment="Center"/>
                     </Grid>
@@ -1740,6 +1758,7 @@
                                        FontSize="12" Opacity="0.5" TextWrapping="Wrap"/>
                         </StackPanel>
                         <controls:LottieToggle Grid.Column="1"
+                                              AutomationProperties.Name="{loc:T Settings.KeepSidebarExpanded}"
                                               IsChecked="{Binding SidebarAlwaysExpanded}"
                                               VerticalAlignment="Center"/>
                     </Grid>
@@ -1751,6 +1770,7 @@
                                        FontSize="12" Opacity="0.5" TextWrapping="Wrap"/>
                         </StackPanel>
                         <controls:LottieToggle Grid.Column="1"
+                                              AutomationProperties.Name="{loc:T Settings.HoverExpandSidebar}"
                                               IsChecked="{Binding SidebarHoverExpand}"
                                               VerticalAlignment="Center"/>
                     </Grid>
@@ -1771,8 +1791,18 @@
                                        FontSize="12" Opacity="0.5" TextWrapping="Wrap"/>
                         </StackPanel>
                         <Button Grid.Column="1" Classes="pill" FontSize="12" Padding="14,6"
+                                Classes.registered="{Binding IsRegisteredForAudioFiles}"
                                 VerticalAlignment="Center" Margin="12,0,0,0"
                                 Command="{Binding RegisterFileTypesCommand}">
+                            <!-- Reads the label it shows (its Panel read "Avalonia.Controls.Panel"). -->
+                            <Button.Styles>
+                                <Style Selector="Button.pill">
+                                    <Setter Property="AutomationProperties.Name" Value="{loc:T Settings.Register}"/>
+                                </Style>
+                                <Style Selector="Button.pill.registered">
+                                    <Setter Property="AutomationProperties.Name" Value="{loc:T Settings.Unregister}"/>
+                                </Style>
+                            </Button.Styles>
                             <Panel>
                                 <TextBlock Text="{loc:T Settings.Register}" IsVisible="{Binding !IsRegisteredForAudioFiles}"/>
                                 <TextBlock Text="{loc:T Settings.Unregister}" IsVisible="{Binding IsRegisteredForAudioFiles}"/>
@@ -1793,6 +1823,7 @@
                     </StackPanel>
                     <Grid ColumnDefinitions="*,Auto">
                         <TextBox Grid.Column="0"
+                                 AutomationProperties.Name="{loc:T Settings.OpenFile}"
                                  Text="{Binding ExternalOpenAppPath}"
                                  Watermark="{loc:T Settings.NotSet}"
                                  CornerRadius="999"
@@ -1830,6 +1861,7 @@
                         </WrapPanel.Styles>
                         <!-- Dark (pure black, silver accents) -->
                         <Button Classes="theme-btn"
+                                AutomationProperties.Name="{loc:T Settings.Dark}"
                                 Classes.active="{Binding IsDarkTheme}"
                                 Command="{Binding SetDarkThemeCommand}">
                             <StackPanel Spacing="8" HorizontalAlignment="Center">
@@ -1852,6 +1884,7 @@
 
                         <!-- Gray (default) -->
                         <Button Classes="theme-btn"
+                                AutomationProperties.Name="{loc:T Settings.Gray}"
                                 Classes.active="{Binding IsGrayTheme}"
                                 Command="{Binding SetGrayThemeCommand}">
                             <StackPanel Spacing="8" HorizontalAlignment="Center">
@@ -1874,6 +1907,7 @@
 
                         <!-- Midnight (deep blue-black) -->
                         <Button Classes="theme-btn"
+                                AutomationProperties.Name="{loc:T Settings.Midnight}"
                                 Classes.active="{Binding IsMidnightTheme}"
                                 Command="{Binding SetMidnightThemeCommand}">
                             <StackPanel Spacing="8" HorizontalAlignment="Center">
@@ -1896,6 +1930,7 @@
 
                         <!-- Light -->
                         <Button Classes="theme-btn"
+                                AutomationProperties.Name="{loc:T Settings.Light}"
                                 Classes.active="{Binding IsLightTheme}"
                                 Command="{Binding SetLightThemeCommand}">
                             <StackPanel Spacing="8" HorizontalAlignment="Center">
@@ -1918,6 +1953,7 @@
 
                         <!-- Ink -->
                         <Button Classes="theme-btn"
+                                AutomationProperties.Name="{loc:T Settings.Ink}"
                                 Classes.active="{Binding IsInkTheme}"
                                 Command="{Binding SetInkThemeCommand}">
                             <StackPanel Spacing="8" HorizontalAlignment="Center">
@@ -1940,6 +1976,7 @@
 
                         <!-- Smoke -->
                         <Button Classes="theme-btn"
+                                AutomationProperties.Name="{loc:T Settings.Smoke}"
                                 Classes.active="{Binding IsSmokeTheme}"
                                 Command="{Binding SetSmokeThemeCommand}">
                             <StackPanel Spacing="8" HorizontalAlignment="Center">
@@ -1970,6 +2007,7 @@
                             <ItemsControl.ItemTemplate>
                                 <DataTemplate x:DataType="vm:CustomThemeTile">
                                     <Button Classes="theme-btn"
+                                            AutomationProperties.Name="{Binding Name}"
                                             Classes.active="{Binding IsActive}"
                                             Command="{Binding $parent[UserControl].((vm:SettingsViewModel)DataContext).ApplyCustomThemeCommand}"
                                             CommandParameter="{Binding Id}"
@@ -2026,6 +2064,7 @@
                             <ItemsControl.ItemTemplate>
                                 <DataTemplate x:DataType="vm:PackThemeTile">
                                     <Button Classes="theme-btn"
+                                            AutomationProperties.Name="{Binding Name}"
                                             Classes.active="{Binding IsActive}"
                                             Command="{Binding $parent[UserControl].((vm:SettingsViewModel)DataContext).ApplyPackThemeCommand}"
                                             CommandParameter="{Binding Key}"
@@ -2062,6 +2101,7 @@
 
                         <!-- "+ Custom" add tile -->
                         <Button Classes="theme-btn"
+                                AutomationProperties.Name="{loc:T Settings.Custom}"
                                 Command="{Binding OpenThemeEditorCommand}"
                                 CommandParameter="{x:Null}"
                                 Margin="0,0,10,10"
@@ -2137,6 +2177,7 @@
                                                             HorizontalAlignment="Center"
                                                             VerticalAlignment="Center"
                                                             ToolTip.Tip="{loc:T Settings.CustomColorTip}"
+                                                            AutomationProperties.Name="{loc:T Settings.CustomColorTip}"
                                                             Cursor="Hand">
                                     <controls:ColorPickerFlyout.SwatchContent>
                                         <Panel Width="44" Height="44">
@@ -2182,6 +2223,7 @@
                                        FontSize="12" Opacity="0.5" TextWrapping="Wrap"/>
                         </StackPanel>
                         <controls:LottieToggle Grid.Column="1"
+                                              AutomationProperties.Name="{loc:T Settings.AccentFollowsArtwork}"
                                               IsChecked="{Binding AccentFollowsArtwork}"
                                               VerticalAlignment="Center"/>
                     </Grid>
@@ -2194,6 +2236,7 @@
                                        FontSize="12" Opacity="0.5" TextWrapping="Wrap"/>
                         </StackPanel>
                         <controls:LottieToggle Grid.Column="1"
+                                              AutomationProperties.Name="{loc:T Settings.AccentTrackLinks}"
                                               IsChecked="{Binding AccentTrackLinks}"
                                               VerticalAlignment="Center"/>
                     </Grid>
@@ -2210,6 +2253,7 @@
                                    FontSize="12" Opacity="0.5" TextWrapping="Wrap"/>
                     </StackPanel>
                     <controls:LottieToggle Grid.Column="1"
+                                          AutomationProperties.Name="{loc:T Settings.LiquidGlass}"
                                           IsChecked="{Binding LiquidGlassEnabled}"
                                           VerticalAlignment="Center"/>
                 </Grid>
@@ -2223,6 +2267,7 @@
                     </StackPanel>
                     <Grid ColumnDefinitions="*,Auto">
                         <Slider Grid.Column="0"
+                                AutomationProperties.Name="{loc:T Settings.PlayerBarOpacity}"
                                 Classes="accent-slider"
                                 Minimum="0" Maximum="1"
                                 x:Name="PlayerBarOpacitySlider"
@@ -2248,6 +2293,7 @@
                     </StackPanel>
                     <Grid ColumnDefinitions="*,Auto">
                         <Slider Grid.Column="0"
+                                AutomationProperties.Name="{loc:T Settings.BackgroundBlur}"
                                 Classes="accent-slider"
                                 Minimum="0" Maximum="1"
                                 x:Name="BackgroundBlurSlider"
@@ -2270,6 +2316,7 @@
                     </StackPanel>
                     <Grid ColumnDefinitions="*,Auto">
                         <Slider Grid.Column="0"
+                                AutomationProperties.Name="{loc:T Settings.TrackBoxOpacity}"
                                 Classes="accent-slider"
                                 Minimum="0" Maximum="1"
                                 x:Name="TrackBoxOpacitySlider"
@@ -2301,12 +2348,14 @@
                     <Grid ColumnDefinitions="*,Auto">
                         <TextBlock Grid.Column="0" Text="{loc:T Settings.AnimateLongTrackTitles}" FontSize="13" VerticalAlignment="Center"/>
                         <controls:LottieToggle Grid.Column="1"
+                                              AutomationProperties.Name="{loc:T Settings.AnimateLongTrackTitles}"
                                               IsChecked="{Binding TrackTitleMarqueeEnabled}"
                                               VerticalAlignment="Center"/>
                     </Grid>
                     <Grid ColumnDefinitions="*,Auto">
                         <TextBlock Grid.Column="0" Text="{loc:T Settings.AnimateLongArtistNames}" FontSize="13" VerticalAlignment="Center"/>
                         <controls:LottieToggle Grid.Column="1"
+                                              AutomationProperties.Name="{loc:T Settings.AnimateLongArtistNames}"
                                               IsChecked="{Binding ArtistMarqueeEnabled}"
                                               VerticalAlignment="Center"/>
                     </Grid>
@@ -2316,18 +2365,21 @@
                     <Grid ColumnDefinitions="*,Auto">
                         <TextBlock Grid.Column="0" Text="{loc:T Settings.AnimateLongTrackTitles}" FontSize="13" VerticalAlignment="Center"/>
                         <controls:LottieToggle Grid.Column="1"
+                                              AutomationProperties.Name="{loc:T Settings.AnimateLongTrackTitles}"
                                               IsChecked="{Binding CoverFlowMarqueeEnabled}"
                                               VerticalAlignment="Center"/>
                     </Grid>
                     <Grid ColumnDefinitions="*,Auto">
                         <TextBlock Grid.Column="0" Text="{loc:T Settings.AnimateLongArtistNames}" FontSize="13" VerticalAlignment="Center"/>
                         <controls:LottieToggle Grid.Column="1"
+                                              AutomationProperties.Name="{loc:T Settings.AnimateLongArtistNames}"
                                               IsChecked="{Binding CoverFlowArtistMarqueeEnabled}"
                                               VerticalAlignment="Center"/>
                     </Grid>
                     <Grid ColumnDefinitions="*,Auto">
                         <TextBlock Grid.Column="0" Text="{loc:T Settings.AnimateLongAlbumTitles}" FontSize="13" VerticalAlignment="Center"/>
                         <controls:LottieToggle Grid.Column="1"
+                                              AutomationProperties.Name="{loc:T Settings.AnimateLongAlbumTitles}"
                                               IsChecked="{Binding CoverFlowAlbumMarqueeEnabled}"
                                               VerticalAlignment="Center"/>
                     </Grid>
@@ -2337,12 +2389,14 @@
                     <Grid ColumnDefinitions="*,Auto">
                         <TextBlock Grid.Column="0" Text="{loc:T Settings.AnimateLongTrackTitles}" FontSize="13" VerticalAlignment="Center"/>
                         <controls:LottieToggle Grid.Column="1"
+                                              AutomationProperties.Name="{loc:T Settings.AnimateLongTrackTitles}"
                                               IsChecked="{Binding LyricsTitleMarqueeEnabled}"
                                               VerticalAlignment="Center"/>
                     </Grid>
                     <Grid ColumnDefinitions="*,Auto">
                         <TextBlock Grid.Column="0" Text="{loc:T Settings.AnimateLongArtistAlbum}" FontSize="13" VerticalAlignment="Center"/>
                         <controls:LottieToggle Grid.Column="1"
+                                              AutomationProperties.Name="{loc:T Settings.AnimateLongArtistAlbum}"
                                               IsChecked="{Binding LyricsArtistMarqueeEnabled}"
                                               VerticalAlignment="Center"/>
                     </Grid>
@@ -2352,12 +2406,14 @@
                     <Grid ColumnDefinitions="*,Auto">
                         <TextBlock Grid.Column="0" Text="{loc:T Settings.AnimateLongTrackTitles}" FontSize="13" VerticalAlignment="Center"/>
                         <controls:LottieToggle Grid.Column="1"
+                                              AutomationProperties.Name="{loc:T Settings.AnimateLongTrackTitles}"
                                               IsChecked="{Binding MiniPlayerTitleMarqueeEnabled}"
                                               VerticalAlignment="Center"/>
                     </Grid>
                     <Grid ColumnDefinitions="*,Auto">
                         <TextBlock Grid.Column="0" Text="{loc:T Settings.AnimateLongAlbumTitles}" FontSize="13" VerticalAlignment="Center"/>
                         <controls:LottieToggle Grid.Column="1"
+                                              AutomationProperties.Name="{loc:T Settings.AnimateLongAlbumTitles}"
                                               IsChecked="{Binding MiniPlayerAlbumMarqueeEnabled}"
                                               VerticalAlignment="Center"/>
                     </Grid>
@@ -2378,6 +2434,7 @@
                                    FontSize="12" Opacity="0.5" TextWrapping="Wrap"/>
                     </StackPanel>
                     <controls:LottieToggle Grid.Column="1"
+                                          AutomationProperties.Name="{loc:T Settings.HomeHeavyRotation}"
                                           IsChecked="{Binding HomeShowHeavyRotation}"
                                           VerticalAlignment="Center"/>
                 </Grid>
@@ -2396,6 +2453,7 @@
                                    FontSize="12" Opacity="0.5" TextWrapping="Wrap"/>
                     </StackPanel>
                     <controls:LottieToggle Grid.Column="1"
+                                          AutomationProperties.Name="{loc:T Settings.AnimatedArtwork}"
                                           IsChecked="{Binding EnableAnimatedCovers}"
                                           VerticalAlignment="Center"/>
                 </Grid>
@@ -2411,6 +2469,7 @@
                                    FontSize="12" Opacity="0.5" TextWrapping="Wrap"/>
                     </StackPanel>
                     <controls:LottieToggle Grid.Column="1"
+                                          AutomationProperties.Name="{loc:T Settings.AlbumPageColour}"
                                           IsChecked="{Binding AlbumPageTintEnabled}"
                                           VerticalAlignment="Center"/>
                 </Grid>
@@ -2424,9 +2483,10 @@
                                    FontSize="12" Opacity="0.5" TextWrapping="Wrap"/>
                     </StackPanel>
                     <Grid ColumnDefinitions="*,Auto">
-                        <Slider x:Name="AlbumPageTintStrengthSlider" Grid.Column="0" Classes="accent-slider"
-                                Minimum="0" Maximum="100" TickFrequency="1" IsSnapToTickEnabled="True"
-                                Value="{Binding AlbumPageTintStrength, Mode=TwoWay}" VerticalAlignment="Center"
+                        <controls:SmoothSlider x:Name="AlbumPageTintStrengthSlider" Grid.Column="0" Classes="accent-slider" Step="1"
+                                AutomationProperties.Name="{loc:T Settings.AlbumPageTintStrength}"
+                                Minimum="0" Maximum="100"
+                                SteppedValue="{Binding AlbumPageTintStrength, Mode=TwoWay}" VerticalAlignment="Center"
                                 DoubleTapped="OnAlbumPageTintStrengthSliderDoubleTapped"/>
                         <TextBlock Grid.Column="1" Text="{Binding AlbumPageTintStrength, StringFormat='{}{0}%'}" FontSize="12" Opacity="0.7"
                                    VerticalAlignment="Center" Margin="12,0,0,0" MinWidth="36" TextAlignment="Right"/>
@@ -2439,6 +2499,7 @@
                                        FontSize="12" Opacity="0.5" TextWrapping="Wrap"/>
                         </StackPanel>
                         <controls:LottieToggle Grid.Column="1"
+                                              AutomationProperties.Name="{loc:T Settings.AlbumPageTintWholePage}"
                                               IsChecked="{Binding AlbumPageTintWholePage}"
                                               VerticalAlignment="Center"/>
                     </Grid>
@@ -2450,6 +2511,7 @@
                                        FontSize="12" Opacity="0.5" TextWrapping="Wrap"/>
                         </StackPanel>
                         <controls:LottieToggle Grid.Column="1"
+                                              AutomationProperties.Name="{loc:T Settings.AlbumPageTintWholeWindow}"
                                               IsChecked="{Binding AlbumPageTintWholeWindow}"
                                               VerticalAlignment="Center"/>
                     </Grid>
@@ -2469,6 +2531,7 @@
                                        FontSize="12" Opacity="0.5" TextWrapping="Wrap"/>
                         </StackPanel>
                         <controls:LottieToggle Grid.Column="1"
+                                              AutomationProperties.Name="{loc:T Settings.AutomaticAlbumCoverSize}"
                                               IsChecked="{Binding AlbumTileSizeAuto}"
                                               VerticalAlignment="Center"/>
                     </Grid>
@@ -2478,6 +2541,7 @@
                                    FontSize="12" Opacity="0.7"
                                    VerticalAlignment="Center" Margin="0,0,12,0"/>
                         <Slider Grid.Column="1"
+                                AutomationProperties.Name="{loc:T Settings.AlbumCoverSize}"
                                 Classes="accent-slider"
                                 Minimum="140" Maximum="320"
                                 Value="{Binding AlbumTileTargetSize, Mode=TwoWay}"
@@ -2508,7 +2572,21 @@
                                    FontSize="12" Opacity="0.5" TextWrapping="Wrap"/>
                     </StackPanel>
                     <controls:LottieToggle Grid.Column="1"
+                                          AutomationProperties.Name="{loc:T Settings.SongProgressTaskbar}"
                                           IsChecked="{Binding TaskbarProgressEnabled}"
+                                          VerticalAlignment="Center"/>
+                </Grid>
+            </Border>
+            <Border Classes="setting-row" IsVisible="{Binding IsTaskbarProgressSupported}">
+                <Grid ColumnDefinitions="*,Auto">
+                    <StackPanel Grid.Column="0" Spacing="2">
+                        <TextBlock Text="{loc:T Settings.MediaControlsTaskbar}" FontSize="15" FontWeight="SemiBold"/>
+                        <TextBlock Text="{loc:T Settings.MediaControlsTaskbarDesc}"
+                                   FontSize="12" Opacity="0.5" TextWrapping="Wrap"/>
+                    </StackPanel>
+                    <controls:LottieToggle Grid.Column="1"
+                                          AutomationProperties.Name="{loc:T Settings.MediaControlsTaskbar}"
+                                          IsChecked="{Binding TaskbarMediaControlsEnabled}"
                                           VerticalAlignment="Center"/>
                 </Grid>
             </Border>
@@ -2535,6 +2613,7 @@
                             <TextBlock Text="{loc:T Settings.RepeatButtonNextToForward}" FontSize="12" Opacity="0.5" TextWrapping="Wrap"/>
                         </StackPanel>
                         <controls:LottieToggle Grid.Column="1"
+                                              AutomationProperties.Name="{loc:T Settings.RepeatButton}"
                                               IsChecked="{Binding PlaybackBarShowRepeat}"
                                               VerticalAlignment="Center"/>
                     </Grid>
@@ -2544,6 +2623,7 @@
                             <TextBlock Text="{loc:T Settings.FavoriteButtonHeart}" FontSize="12" Opacity="0.5" TextWrapping="Wrap"/>
                         </StackPanel>
                         <controls:LottieToggle Grid.Column="1"
+                                              AutomationProperties.Name="{loc:T Settings.FavoriteButton}"
                                               IsChecked="{Binding PlaybackBarShowFavorite}"
                                               VerticalAlignment="Center"/>
                     </Grid>
@@ -2553,6 +2633,7 @@
                             <TextBlock Text="{loc:T Settings.MiniPlayerButtonHint}" FontSize="12" Opacity="0.5" TextWrapping="Wrap"/>
                         </StackPanel>
                         <controls:LottieToggle Grid.Column="1"
+                                              AutomationProperties.Name="{loc:T Settings.MiniPlayerButton}"
                                               IsChecked="{Binding PlaybackBarShowMiniPlayer}"
                                               VerticalAlignment="Center"/>
                     </Grid>
@@ -2562,6 +2643,7 @@
                             <TextBlock Text="{loc:T Settings.IdleQueuePillHint}" FontSize="12" Opacity="0.5" TextWrapping="Wrap"/>
                         </StackPanel>
                         <controls:LottieToggle Grid.Column="1"
+                                              AutomationProperties.Name="{loc:T Settings.IdleQueuePill}"
                                               IsChecked="{Binding PlaybackBarShowIdlePill}"
                                               VerticalAlignment="Center"/>
                     </Grid>
@@ -2572,22 +2654,26 @@
                             <TextBlock Text="{loc:T Settings.JumpFewSecondsEither}" FontSize="12" Opacity="0.5" TextWrapping="Wrap"/>
                         </StackPanel>
                         <controls:LottieToggle Grid.Column="1"
+                                              AutomationProperties.Name="{loc:T Settings.SkipBackForward}"
                                               IsChecked="{Binding PlaybackBarShowSkipButtons}"
                                               VerticalAlignment="Center"/>
                     </Grid>
                     <controls:CollapsibleContent IsOpen="{Binding PlaybackBarShowSkipButtons}" Lift="10" Motion="Glide">
                     <Grid ColumnDefinitions="*,*,*" ColumnSpacing="8" Margin="0,12,0,0">
                         <RadioButton Grid.Column="0" Classes="transition-card medium-card"
+                                     AutomationProperties.Name="{loc:T Settings.10Seconds}"
                                      GroupName="IslandSkipSeconds"
                                      IsChecked="{Binding IsSkipSeconds10, Mode=TwoWay}">
                             <TextBlock Text="{loc:T Settings.10Seconds}" FontSize="13" FontWeight="SemiBold" HorizontalAlignment="Center"/>
                         </RadioButton>
                         <RadioButton Grid.Column="1" Classes="transition-card medium-card"
+                                     AutomationProperties.Name="{loc:T Settings.15Seconds}"
                                      GroupName="IslandSkipSeconds"
                                      IsChecked="{Binding IsSkipSeconds15, Mode=TwoWay}">
                             <TextBlock Text="{loc:T Settings.15Seconds}" FontSize="13" FontWeight="SemiBold" HorizontalAlignment="Center"/>
                         </RadioButton>
                         <RadioButton Grid.Column="2" Classes="transition-card medium-card"
+                                     AutomationProperties.Name="{loc:T Settings.30Seconds}"
                                      GroupName="IslandSkipSeconds"
                                      IsChecked="{Binding IsSkipSeconds30, Mode=TwoWay}">
                             <TextBlock Text="{loc:T Settings.30Seconds}" FontSize="13" FontWeight="SemiBold" HorizontalAlignment="Center"/>
@@ -2601,6 +2687,7 @@
                             <TextBlock Text="{loc:T Settings.1ButtonOpensSpeed}" FontSize="12" Opacity="0.5" TextWrapping="Wrap"/>
                         </StackPanel>
                         <controls:LottieToggle Grid.Column="1"
+                                              AutomationProperties.Name="{loc:T Settings.PlaybackSpeed}"
                                               IsChecked="{Binding PlaybackBarShowPlaybackSpeed}"
                                               VerticalAlignment="Center"/>
                     </Grid>
@@ -2610,6 +2697,7 @@
                             <TextBlock Text="{loc:T Settings.SleepTimerOneClick}" FontSize="12" Opacity="0.5" TextWrapping="Wrap"/>
                         </StackPanel>
                         <controls:LottieToggle Grid.Column="1"
+                                              AutomationProperties.Name="{loc:T Settings.SleepTimer}"
                                               IsChecked="{Binding PlaybackBarShowSleepTimer}"
                                               VerticalAlignment="Center"/>
                     </Grid>
@@ -2619,6 +2707,7 @@
                             <TextBlock Text="{loc:T Settings.ShuffleButtonAfterRepeat}" FontSize="12" Opacity="0.5" TextWrapping="Wrap"/>
                         </StackPanel>
                         <controls:LottieToggle Grid.Column="1"
+                                              AutomationProperties.Name="{loc:T Settings.Shuffle}"
                                               IsChecked="{Binding PlaybackBarShowShuffle}"
                                               VerticalAlignment="Center"/>
                     </Grid>
@@ -2628,6 +2717,7 @@
                             <TextBlock Text="{loc:T Settings.EqualizerButtonHint}" FontSize="12" Opacity="0.5" TextWrapping="Wrap"/>
                         </StackPanel>
                         <controls:LottieToggle Grid.Column="1"
+                                              AutomationProperties.Name="{loc:T Settings.EqualizerButton}"
                                               IsChecked="{Binding PlaybackBarShowEqualizer}"
                                               VerticalAlignment="Center"/>
                     </Grid>
@@ -2637,6 +2727,7 @@
                             <TextBlock Text="{loc:T Settings.PlaybackTimeInTrackBox}" FontSize="12" Opacity="0.5" TextWrapping="Wrap"/>
                         </StackPanel>
                         <controls:LottieToggle Grid.Column="1"
+                                              AutomationProperties.Name="{loc:T Settings.PlaybackTime}"
                                               IsChecked="{Binding PlaybackBarShowTime}"
                                               VerticalAlignment="Center"/>
                     </Grid>
@@ -2651,6 +2742,7 @@
                                    FontSize="12" Opacity="0.5" TextWrapping="Wrap"/>
                     </StackPanel>
                     <controls:LottieToggle Grid.Column="1"
+                                          AutomationProperties.Name="{loc:T Settings.WaveformSeekBar}"
                                           IsChecked="{Binding WaveformSeekBarEnabled}"
                                           VerticalAlignment="Center"/>
                 </Grid>
@@ -2667,6 +2759,7 @@
                                    FontSize="12" Opacity="0.7"
                                    VerticalAlignment="Center" Margin="0,0,12,0"/>
                         <Slider Grid.Column="1"
+                                AutomationProperties.Name="{loc:T Settings.PlayerIslandWidth}"
                                 Classes="accent-slider"
                                 Minimum="340" Maximum="1400"
                                 x:Name="IslandWidthSlider"
@@ -2698,6 +2791,7 @@
                     </StackPanel>
                     <Grid ColumnDefinitions="*,*,*" ColumnSpacing="8">
                         <RadioButton Grid.Column="0" Classes="transition-card medium-card"
+                                     AutomationProperties.Name="{loc:T Settings.Classic}"
                                      GroupName="MiniPlayerStyle"
                                      IsChecked="{Binding IsMiniStyleClassic, Mode=TwoWay}"
                                      ToolTip.Tip="{loc:T Settings.ResizableGlassCardIconTip}">
@@ -2712,6 +2806,7 @@
                             </StackPanel>
                         </RadioButton>
                         <RadioButton Grid.Column="1" Classes="transition-card medium-card"
+                                     AutomationProperties.Name="{loc:T Settings.Pill}"
                                      GroupName="MiniPlayerStyle"
                                      IsChecked="{Binding IsMiniStylePill, Mode=TwoWay}"
                                      ToolTip.Tip="{loc:T Settings.RoundCoverOverlappingLightTip}">
@@ -2726,6 +2821,7 @@
                             </StackPanel>
                         </RadioButton>
                         <RadioButton Grid.Column="2" Classes="transition-card medium-card"
+                                     AutomationProperties.Name="{loc:T Settings.Sleeve}"
                                      GroupName="MiniPlayerStyle"
                                      IsChecked="{Binding IsMiniStyleSleeve, Mode=TwoWay}"
                                      ToolTip.Tip="{loc:T Settings.SpinningDiscPeekingOutTip}">
@@ -2751,6 +2847,7 @@
                     </StackPanel>
                     <Grid ColumnDefinitions="*,Auto">
                         <Slider Grid.Column="0"
+                                AutomationProperties.Name="{loc:T Settings.MiniPlayerOpacity}"
                                 Classes="accent-slider"
                                 Minimum="0" Maximum="1"
                                 x:Name="MiniPlayerOpacitySlider"
@@ -2772,6 +2869,7 @@
                                    FontSize="12" Opacity="0.5" TextWrapping="Wrap"/>
                     </StackPanel>
                     <controls:LottieToggle Grid.Column="1"
+                                          AutomationProperties.Name="{loc:T Settings.MiniPlayerFrostedBackground}"
                                           IsChecked="{Binding MiniPlayerFrostedBackground}"
                                           VerticalAlignment="Center"/>
                 </Grid>
@@ -2790,6 +2888,7 @@
                     </StackPanel>
                     <Grid ColumnDefinitions="*,*,*,*" ColumnSpacing="8">
                         <RadioButton Grid.Column="0" Classes="transition-card medium-card"
+                                     AutomationProperties.Name="{loc:T Settings.Cover}"
                                      GroupName="NowPlayingArtwork"
                                      IsChecked="{Binding IsArtworkStyleCover, Mode=TwoWay}"
                                      ToolTip.Tip="{loc:T Settings.AlbumCoverAsTip}">
@@ -2804,6 +2903,7 @@
                         <RadioButton Grid.Column="1" Classes="transition-card medium-card"
                                      GroupName="NowPlayingArtwork"
                                      IsChecked="{Binding IsArtworkStyleCompactDisc, Mode=TwoWay}"
+                                     AutomationProperties.Name="CD"
                                      ToolTip.Tip="{loc:T Settings.SpinningCompactDiscTip}">
                             <StackPanel Spacing="8">
                                 <Canvas Classes="medium-glyph">
@@ -2814,6 +2914,7 @@
                             </StackPanel>
                         </RadioButton>
                         <RadioButton Grid.Column="2" Classes="transition-card medium-card"
+                                     AutomationProperties.Name="{loc:T Settings.Vinyl}"
                                      GroupName="NowPlayingArtwork"
                                      IsChecked="{Binding IsArtworkStyleVinyl, Mode=TwoWay}"
                                      ToolTip.Tip="{loc:T Settings.SleeveRecordPeekingOutTip}">
@@ -2828,6 +2929,7 @@
                             </StackPanel>
                         </RadioButton>
                         <RadioButton Grid.Column="3" Classes="transition-card medium-card"
+                                     AutomationProperties.Name="{loc:T Settings.Cassette}"
                                      GroupName="NowPlayingArtwork"
                                      IsChecked="{Binding IsArtworkStyleCassette, Mode=TwoWay}"
                                      ToolTip.Tip="{loc:T Settings.CassetteCoverItsLabelTip}">
@@ -2860,6 +2962,7 @@
                     </StackPanel>
                     <Grid ColumnDefinitions="*,*,*" ColumnSpacing="8">
                         <RadioButton Grid.Column="0" Classes="transition-card medium-card"
+                                     AutomationProperties.Name="{loc:T Settings.Carousel}"
                                      GroupName="CoverFlowLayout"
                                      IsChecked="{Binding IsCoverFlowCarousel, Mode=TwoWay}"
                                      ToolTip.Tip="{loc:T Settings.ClassicRowPlayingCoverTip}">
@@ -2876,6 +2979,7 @@
                             </StackPanel>
                         </RadioButton>
                         <RadioButton Grid.Column="1" Classes="transition-card medium-card"
+                                     AutomationProperties.Name="{loc:T Settings.Cascade}"
                                      GroupName="CoverFlowLayout"
                                      IsChecked="{Binding IsCoverFlowCascade, Mode=TwoWay}"
                                      ToolTip.Tip="{loc:T Settings.TiltedCoversDiagonalPathTip}">
@@ -2894,6 +2998,7 @@
                             </StackPanel>
                         </RadioButton>
                         <RadioButton Grid.Column="2" Classes="transition-card medium-card"
+                                     AutomationProperties.Name="{loc:T Settings.Collage}"
                                      GroupName="CoverFlowLayout"
                                      IsChecked="{Binding IsCoverFlowCollage, Mode=TwoWay}"
                                      ToolTip.Tip="{loc:T Settings.MosaicQueueSCoversTip}">
@@ -2941,6 +3046,7 @@
                                         <TextBlock Text="{Binding ByLabel}" FontSize="11" Opacity="0.5"/>
                                     </StackPanel>
                                     <Button Grid.Column="1" Classes="pill-action" Padding="12,6" CornerRadius="999" Cursor="Hand"
+                                            AutomationProperties.Name="{loc:T Settings.LyricsPresets.Apply}"
                                             VerticalAlignment="Center"
                                             Command="{Binding $parent[UserControl].((vm:SettingsViewModel)DataContext).ApplyLyricsPresetCommand}"
                                             CommandParameter="{Binding Key}">
@@ -2967,6 +3073,7 @@
                                        FontSize="12" Opacity="0.5" TextWrapping="Wrap"/>
                         </StackPanel>
                         <ComboBox Grid.Column="1" MinWidth="200" VerticalAlignment="Center"
+                                  AutomationProperties.Name="{loc:T Settings.FlowingLyricsBackground}"
                                   ItemsSource="{Binding FlowingOptions}"
                                   SelectedItem="{Binding SelectedFlowingOption, Mode=TwoWay}"/>
                     </Grid>
@@ -2976,24 +3083,27 @@
                     <StackPanel Spacing="8" Margin="0,12,0,0">
                         <Grid ColumnDefinitions="110,*,Auto">
                             <TextBlock Grid.Column="0" Text="{loc:T Settings.DriftMovement}" FontSize="12" Opacity="0.7" VerticalAlignment="Center"/>
-                            <Slider Grid.Column="1" Classes="accent-slider" Minimum="0" Maximum="300" TickFrequency="1" IsSnapToTickEnabled="True"
-                                    Value="{Binding LyricsDriftMovement, Mode=TwoWay}" VerticalAlignment="Center"
+                            <controls:SmoothSlider Grid.Column="1" Classes="accent-slider" Step="1" Minimum="0" Maximum="300"
+                                    AutomationProperties.Name="{loc:T Settings.DriftMovement}"
+                                    SteppedValue="{Binding LyricsDriftMovement, Mode=TwoWay}" VerticalAlignment="Center"
                                     DoubleTapped="OnDriftMovementSliderDoubleTapped"/>
                             <TextBlock Grid.Column="2" Text="{Binding LyricsDriftMovement, StringFormat='{}{0}%'}" FontSize="12" Opacity="0.7"
                                        VerticalAlignment="Center" Margin="12,0,0,0" MinWidth="36" TextAlignment="Right"/>
                         </Grid>
                         <Grid ColumnDefinitions="110,*,Auto">
                             <TextBlock Grid.Column="0" Text="{loc:T Settings.DriftSaturation}" FontSize="12" Opacity="0.7" VerticalAlignment="Center"/>
-                            <Slider Grid.Column="1" Classes="accent-slider" Minimum="0" Maximum="200" TickFrequency="1" IsSnapToTickEnabled="True"
-                                    Value="{Binding LyricsDriftSaturation, Mode=TwoWay}" VerticalAlignment="Center"
+                            <controls:SmoothSlider Grid.Column="1" Classes="accent-slider" Step="1" Minimum="0" Maximum="200"
+                                    AutomationProperties.Name="{loc:T Settings.DriftSaturation}"
+                                    SteppedValue="{Binding LyricsDriftSaturation, Mode=TwoWay}" VerticalAlignment="Center"
                                     DoubleTapped="OnDriftSaturationSliderDoubleTapped"/>
                             <TextBlock Grid.Column="2" Text="{Binding LyricsDriftSaturation, StringFormat='{}{0}%'}" FontSize="12" Opacity="0.7"
                                        VerticalAlignment="Center" Margin="12,0,0,0" MinWidth="36" TextAlignment="Right"/>
                         </Grid>
                         <Grid ColumnDefinitions="110,*,Auto">
                             <TextBlock Grid.Column="0" Text="{loc:T Settings.DriftBlur}" FontSize="12" Opacity="0.7" VerticalAlignment="Center"/>
-                            <Slider Grid.Column="1" Classes="accent-slider" Minimum="0" Maximum="200" TickFrequency="1" IsSnapToTickEnabled="True"
-                                    Value="{Binding LyricsDriftBlur, Mode=TwoWay}" VerticalAlignment="Center"
+                            <controls:SmoothSlider Grid.Column="1" Classes="accent-slider" Step="1" Minimum="0" Maximum="200"
+                                    AutomationProperties.Name="{loc:T Settings.DriftBlur}"
+                                    SteppedValue="{Binding LyricsDriftBlur, Mode=TwoWay}" VerticalAlignment="Center"
                                     DoubleTapped="OnDriftBlurSliderDoubleTapped"/>
                             <TextBlock Grid.Column="2" Text="{Binding LyricsDriftBlur, StringFormat='{}{0}%'}" FontSize="12" Opacity="0.7"
                                        VerticalAlignment="Center" Margin="12,0,0,0" MinWidth="36" TextAlignment="Right"/>
@@ -3005,15 +3115,17 @@
                     <StackPanel Spacing="8" Margin="0,12,0,0">
                         <Grid ColumnDefinitions="110,*,Auto">
                             <TextBlock Grid.Column="0" Text="{loc:T Settings.KawarpWarp}" FontSize="12" Opacity="0.7" VerticalAlignment="Center"/>
-                            <Slider Grid.Column="1" Classes="accent-slider" Minimum="0" Maximum="3" TickFrequency="0.1" IsSnapToTickEnabled="True"
-                                    Value="{Binding LyricsKawarpWarp, Mode=TwoWay}" VerticalAlignment="Center"/>
+                            <controls:SmoothSlider Grid.Column="1" Classes="accent-slider" Step="0.1" Minimum="0" Maximum="3"
+                                    AutomationProperties.Name="{loc:T Settings.KawarpWarp}"
+                                    SteppedValue="{Binding LyricsKawarpWarp, Mode=TwoWay}" VerticalAlignment="Center"/>
                             <TextBlock Grid.Column="2" Text="{Binding LyricsKawarpWarp, StringFormat='{}{0:0.0}'}" FontSize="12" Opacity="0.7"
                                        VerticalAlignment="Center" Margin="12,0,0,0" MinWidth="28" TextAlignment="Right"/>
                         </Grid>
                         <Grid ColumnDefinitions="110,*,Auto">
                             <TextBlock Grid.Column="0" Text="{loc:T Settings.KawarpBlur}" FontSize="12" Opacity="0.7" VerticalAlignment="Center"/>
-                            <Slider Grid.Column="1" Classes="accent-slider" Minimum="1" Maximum="16" TickFrequency="1" IsSnapToTickEnabled="True"
-                                    Value="{Binding LyricsKawarpBlur, Mode=TwoWay}" VerticalAlignment="Center"/>
+                            <controls:SmoothSlider Grid.Column="1" Classes="accent-slider" Step="1" Minimum="1" Maximum="16"
+                                    AutomationProperties.Name="{loc:T Settings.KawarpBlur}"
+                                    SteppedValue="{Binding LyricsKawarpBlur, Mode=TwoWay}" VerticalAlignment="Center"/>
                             <TextBlock Grid.Column="2" Text="{Binding LyricsKawarpBlur}" FontSize="12" Opacity="0.7"
                                        VerticalAlignment="Center" Margin="12,0,0,0" MinWidth="28" TextAlignment="Right"/>
                         </Grid>
@@ -3030,6 +3142,7 @@
                                        FontSize="12" Opacity="0.5" TextWrapping="Wrap"/>
                         </StackPanel>
                         <controls:LottieToggle Grid.Column="1"
+                                              AutomationProperties.Name="{loc:T Settings.AudioVisualizer}"
                                               IsChecked="{Binding LyricsVisualizerEnabled}"
                                               VerticalAlignment="Center"/>
                     </Grid>
@@ -3043,12 +3156,14 @@
                                        FontSize="12" Opacity="0.5" TextWrapping="Wrap"/>
                         </StackPanel>
                         <controls:LottieToggle Grid.Column="1"
+                                              AutomationProperties.Name="{loc:T Settings.ArtworkColour}"
                                               IsChecked="{Binding LyricsVisualizerArtworkColor}"
                                               VerticalAlignment="Center"/>
                     </Grid>
                     <controls:CollapsibleContent IsOpen="{Binding LyricsVisualizerEnabled}" Lift="10" Motion="Glide">
                     <Grid ColumnDefinitions="*,*,*" ColumnSpacing="8" Margin="0,12,0,0">
                         <RadioButton Grid.Column="0" Classes="transition-card medium-card"
+                                     AutomationProperties.Name="{loc:T Settings.Bars}"
                                      GroupName="LyricsVisualizerStyle"
                                      IsChecked="{Binding IsVisualizerStyleBars, Mode=TwoWay}"
                                      ToolTip.Tip="{loc:T Settings.FrequencyBarsRisingFromTip}">
@@ -3063,6 +3178,7 @@
                             </StackPanel>
                         </RadioButton>
                         <RadioButton Grid.Column="1" Classes="transition-card medium-card"
+                                     AutomationProperties.Name="{loc:T Settings.Mirror}"
                                      GroupName="LyricsVisualizerStyle"
                                      IsChecked="{Binding IsVisualizerStyleMirror, Mode=TwoWay}"
                                      ToolTip.Tip="{loc:T Settings.BarsMirroredAboutCentreTip}">
@@ -3077,6 +3193,7 @@
                             </StackPanel>
                         </RadioButton>
                         <RadioButton Grid.Column="2" Classes="transition-card medium-card"
+                                     AutomationProperties.Name="{loc:T Settings.Wave}"
                                      GroupName="LyricsVisualizerStyle"
                                      IsChecked="{Binding IsVisualizerStyleWave, Mode=TwoWay}"
                                      ToolTip.Tip="{loc:T Settings.SmoothFilledCurveTip}">
@@ -3101,6 +3218,7 @@
                                    FontSize="12" Opacity="0.5" TextWrapping="Wrap"/>
                     </StackPanel>
                     <controls:LottieToggle Grid.Column="1"
+                                          AutomationProperties.Name="{loc:T Settings.FullscreenLyricsFocus}"
                                           IsChecked="{Binding LyricsFullScreenFocusEnabled}"
                                           VerticalAlignment="Center"/>
                 </Grid>
@@ -3114,8 +3232,9 @@
                         <TextBlock Text="{loc:T Settings.LyricsMinLineOpacityHint}"
                                    FontSize="12" Opacity="0.5" TextWrapping="Wrap"/>
                     </StackPanel>
-                    <Slider x:Name="LyricsMinLineOpacitySlider" Grid.Column="1" Classes="accent-slider" Minimum="0" Maximum="60" TickFrequency="1" IsSnapToTickEnabled="True"
-                            Value="{Binding LyricsMinLineOpacity, Mode=TwoWay}" VerticalAlignment="Center" Margin="16,0,0,0"
+                    <controls:SmoothSlider x:Name="LyricsMinLineOpacitySlider" Grid.Column="1" Classes="accent-slider" Step="1" Minimum="0" Maximum="60"
+                            AutomationProperties.Name="{loc:T Settings.LyricsMinLineOpacity}"
+                            SteppedValue="{Binding LyricsMinLineOpacity, Mode=TwoWay}" VerticalAlignment="Center" Margin="16,0,0,0"
                             DoubleTapped="OnLyricsMinLineOpacitySliderDoubleTapped"/>
                     <TextBlock Grid.Column="2" Text="{Binding LyricsMinLineOpacity, StringFormat='{}{0}%'}" FontSize="12" Opacity="0.7"
                                VerticalAlignment="Center" Margin="12,0,0,0" MinWidth="36" TextAlignment="Right"/>
@@ -3129,7 +3248,22 @@
                                    FontSize="12" Opacity="0.5" TextWrapping="Wrap"/>
                     </StackPanel>
                     <controls:LottieToggle Grid.Column="1"
+                                          AutomationProperties.Name="{loc:T Settings.JoinSplitWords}"
                                           IsChecked="{Binding LyricsJoinSplitWords}"
+                                          VerticalAlignment="Center"/>
+                </Grid>
+            </Border>
+            <!-- Apple Music word motion (sung words float up, held notes glow). -->
+            <Border Classes="setting-row">
+                <Grid ColumnDefinitions="*,Auto">
+                    <StackPanel Grid.Column="0" Spacing="2">
+                        <TextBlock Text="{loc:T Settings.LyricsGlowAndLift}" FontSize="15" FontWeight="SemiBold"/>
+                        <TextBlock Text="{loc:T Settings.LyricsGlowAndLiftHint}"
+                                   FontSize="12" Opacity="0.5" TextWrapping="Wrap"/>
+                    </StackPanel>
+                    <controls:LottieToggle Grid.Column="1"
+                                          AutomationProperties.Name="{loc:T Settings.LyricsGlowAndLift}"
+                                          IsChecked="{Binding LyricsGlowAndLift}"
                                           VerticalAlignment="Center"/>
                 </Grid>
             </Border>
@@ -3142,6 +3276,7 @@
                                    FontSize="12" Opacity="0.5" TextWrapping="Wrap"/>
                     </StackPanel>
                     <controls:LottieToggle Grid.Column="1"
+                                          AutomationProperties.Name="{loc:T Settings.ShowTranslations}"
                                           IsChecked="{Binding LyricsShowTranslations}"
                                           VerticalAlignment="Center"/>
                 </Grid>
@@ -3154,6 +3289,7 @@
                                    FontSize="12" Opacity="0.5" TextWrapping="Wrap"/>
                     </StackPanel>
                     <controls:LottieToggle Grid.Column="1"
+                                          AutomationProperties.Name="{loc:T Settings.ShowRomanization}"
                                           IsChecked="{Binding LyricsShowRomanization}"
                                           VerticalAlignment="Center"/>
                 </Grid>
@@ -3166,6 +3302,7 @@
                                    FontSize="12" Opacity="0.5" TextWrapping="Wrap"/>
                     </StackPanel>
                     <controls:LottieToggle Grid.Column="1"
+                                          AutomationProperties.Name="{loc:T Settings.ShowBackgroundVocals}"
                                           IsChecked="{Binding LyricsShowBackgroundVocals}"
                                           VerticalAlignment="Center"/>
                 </Grid>
@@ -3186,6 +3323,7 @@
                             <TextBlock Text="{loc:T Settings.CommunityLyricsDatabase}" FontSize="11" Opacity="0.5"/>
                         </StackPanel>
                         <controls:LottieToggle Grid.Column="1"
+                                              AutomationProperties.Name="{loc:T Settings.LRCLIB}"
                                               IsChecked="{Binding LrcLibEnabled}"
                                               VerticalAlignment="Center"/>
                     </Grid>
@@ -3195,6 +3333,7 @@
                             <TextBlock Text="{loc:T Settings.LargeSyncedLyricsCatalog}" FontSize="11" Opacity="0.5"/>
                         </StackPanel>
                         <controls:LottieToggle Grid.Column="1"
+                                              AutomationProperties.Name="{loc:T Settings.NetEaseCloudMusic}"
                                               IsChecked="{Binding NetEaseEnabled}"
                                               VerticalAlignment="Center"/>
                     </Grid>
@@ -3204,7 +3343,28 @@
                             <TextBlock Text="{loc:T Settings.MusixmatchHint}" FontSize="11" Opacity="0.5"/>
                         </StackPanel>
                         <controls:LottieToggle Grid.Column="1"
+                                              AutomationProperties.Name="{loc:T Settings.Musixmatch}"
                                               IsChecked="{Binding MusixmatchEnabled}"
+                                              VerticalAlignment="Center"/>
+                    </Grid>
+                    <Grid ColumnDefinitions="*,Auto">
+                        <StackPanel Grid.Column="0" VerticalAlignment="Center">
+                            <TextBlock Text="{loc:T Settings.LrcRed}" FontSize="13" FontWeight="SemiBold"/>
+                            <TextBlock Text="{loc:T Settings.LrcRedHint}" FontSize="11" Opacity="0.5"/>
+                        </StackPanel>
+                        <controls:LottieToggle Grid.Column="1"
+                                              AutomationProperties.Name="{loc:T Settings.LrcRed}"
+                                              IsChecked="{Binding LrcRedEnabled}"
+                                              VerticalAlignment="Center"/>
+                    </Grid>
+                    <Grid ColumnDefinitions="*,Auto">
+                        <StackPanel Grid.Column="0" VerticalAlignment="Center">
+                            <TextBlock Text="{loc:T Settings.Unison}" FontSize="13" FontWeight="SemiBold"/>
+                            <TextBlock Text="{loc:T Settings.UnisonHint}" FontSize="11" Opacity="0.5"/>
+                        </StackPanel>
+                        <controls:LottieToggle Grid.Column="1"
+                                              AutomationProperties.Name="{loc:T Settings.Unison}"
+                                              IsChecked="{Binding UnisonEnabled}"
                                               VerticalAlignment="Center"/>
                     </Grid>
                     <Grid ColumnDefinitions="*,Auto">
@@ -3213,6 +3373,7 @@
                             <TextBlock Text="{loc:T Settings.KugouHint}" FontSize="11" Opacity="0.5"/>
                         </StackPanel>
                         <controls:LottieToggle Grid.Column="1"
+                                              AutomationProperties.Name="{loc:T Settings.Kugou}"
                                               IsChecked="{Binding KugouEnabled}"
                                               VerticalAlignment="Center"/>
                     </Grid>
@@ -3222,6 +3383,7 @@
                             <TextBlock Text="{loc:T Settings.YouTubeMusicLyricsHint}" FontSize="11" Opacity="0.5"/>
                         </StackPanel>
                         <controls:LottieToggle Grid.Column="1"
+                                              AutomationProperties.Name="{loc:T Settings.YouTubeMusicLyrics}"
                                               IsChecked="{Binding YouTubeMusicLyricsEnabled}"
                                               VerticalAlignment="Center"/>
                     </Grid>
@@ -3244,6 +3406,7 @@
                                    FontSize="12" Opacity="0.5" TextWrapping="Wrap"/>
                     </StackPanel>
                     <ComboBox Grid.Column="1"
+                              AutomationProperties.Name="{loc:T Settings.LyricsSaveTarget}"
                               Classes="pill-list"
                               ItemsSource="{Binding LyricsSaveTargetOptions}"
                               SelectedItem="{Binding SelectedLyricsSaveTargetOption}"
@@ -3261,6 +3424,7 @@
                                    FontSize="12" Opacity="0.5" TextWrapping="Wrap"/>
                     </StackPanel>
                     <controls:LottieToggle Grid.Column="1"
+                                          AutomationProperties.Name="{loc:T Settings.LyricsAutoDownload}"
                                           IsChecked="{Binding LyricsAutoDownload}"
                                           VerticalAlignment="Center"/>
                 </Grid>
@@ -3273,6 +3437,7 @@
                                    FontSize="12" Opacity="0.5" TextWrapping="Wrap"/>
                     </StackPanel>
                     <ComboBox Grid.Column="1"
+                              AutomationProperties.Name="{loc:T Settings.LyricsPreferredType}"
                               Classes="pill-list"
                               ItemsSource="{Binding LyricsPreferredTypeOptions}"
                               SelectedItem="{Binding SelectedLyricsPreferredTypeOption}"
@@ -3377,6 +3542,7 @@
                             </controls:CollapsibleContent>
                         </StackPanel>
                         <controls:LottieToggle Grid.Column="1"
+                                              AutomationProperties.Name="{loc:T Settings.SongTransitions}"
                                               IsChecked="{Binding SongTransitionsEnabled}"
                                               VerticalAlignment="Center"/>
                     </Grid>
@@ -3386,6 +3552,7 @@
                         <TextBlock Text="{loc:T Settings.TRANSITIONSTYLE}" FontSize="10" Opacity="0.45" Margin="2,4,0,2"/>
 
                         <RadioButton Classes="transition-card"
+                                     AutomationProperties.Name="{loc:T Settings.AutoMix}"
                                      GroupName="TransitionStyle"
                                      IsChecked="{Binding IsAutoMixStyle, Mode=TwoWay}">
                             <StackPanel Spacing="2">
@@ -3401,6 +3568,7 @@
                              body's margin instead, inside the animated height (same recipe as Home). -->
                         <StackPanel>
                         <RadioButton Classes="transition-card"
+                                     AutomationProperties.Name="{loc:T Settings.Crossfade}"
                                      GroupName="TransitionStyle"
                                      IsChecked="{Binding IsCrossfadeStyle, Mode=TwoWay}">
                             <StackPanel Spacing="2">
@@ -3430,6 +3598,7 @@
                             </Grid>
                             <Grid ColumnDefinitions="*,Auto">
                                 <Slider Grid.Column="0"
+                                        AutomationProperties.Name="{loc:T Settings.CrossfadeDuration}"
                                         Classes="accent-slider"
                                         Minimum="1" Maximum="12"
                                         Value="{Binding CrossfadeDuration, Mode=TwoWay}"
@@ -3455,6 +3624,7 @@
                                    FontSize="12" Opacity="0.5" TextWrapping="Wrap"/>
                     </StackPanel>
                     <controls:LottieToggle Grid.Column="1"
+                                          AutomationProperties.Name="{loc:T Settings.SoundCheck}"
                                           IsChecked="{Binding SoundCheckEnabled}"
                                           VerticalAlignment="Center"/>
                 </Grid>
@@ -3467,6 +3637,7 @@
                                    FontSize="12" Opacity="0.5" TextWrapping="Wrap"/>
                     </StackPanel>
                     <controls:LottieToggle Grid.Column="1"
+                                          AutomationProperties.Name="{loc:T Settings.GaplessPlayback}"
                                           IsChecked="{Binding GaplessPlaybackEnabled}"
                                           VerticalAlignment="Center"/>
                 </Grid>
@@ -3481,6 +3652,7 @@
                                        FontSize="12" Opacity="0.5" TextWrapping="Wrap"/>
                         </StackPanel>
                         <controls:LottieToggle Grid.Column="1"
+                                              AutomationProperties.Name="{loc:T Settings.PlayPauseFade}"
                                               IsChecked="{Binding PlayPauseFadeEnabled}"
                                               VerticalAlignment="Center"/>
                     </Grid>
@@ -3488,11 +3660,11 @@
                         <StackPanel Classes="sub-setting" Spacing="6" Margin="2,10,0,0">
                             <TextBlock Text="{loc:T Settings.FadeDuration}" FontSize="13" FontWeight="SemiBold"/>
                             <Grid ColumnDefinitions="*,Auto">
-                                <Slider Grid.Column="0"
-                                        Classes="accent-slider"
+                                <controls:SmoothSlider Grid.Column="0"
+                                        AutomationProperties.Name="{loc:T Settings.FadeDuration}"
+                                        Classes="accent-slider" Step="50"
                                         Minimum="100" Maximum="2000"
-                                        TickFrequency="50" IsSnapToTickEnabled="True"
-                                        Value="{Binding PlayPauseFadeMs, Mode=TwoWay}"
+                                        SteppedValue="{Binding PlayPauseFadeMs, Mode=TwoWay}"
                                         VerticalAlignment="Center"/>
                                 <TextBlock Grid.Column="1"
                                            Text="{Binding PlayPauseFadeMs, StringFormat='{}{0:0} ms'}"
@@ -3513,6 +3685,7 @@
                                    FontSize="12" Opacity="0.5" TextWrapping="Wrap"/>
                     </StackPanel>
                     <ComboBox Grid.Column="1"
+                              AutomationProperties.Name="{loc:T Settings.PlayCountAfter}"
                               Classes="pill-list"
                               ItemsSource="{Binding PlayCountThresholdOptions}"
                               SelectedItem="{Binding SelectedPlayCountThresholdOption}"
@@ -3530,6 +3703,7 @@
                                    FontSize="12" Opacity="0.5" TextWrapping="Wrap"/>
                     </StackPanel>
                     <controls:LottieToggle Grid.Column="1"
+                                          AutomationProperties.Name="{loc:T Settings.Autoplay}"
                                           IsChecked="{Binding AutoplayEnabled}"
                                           VerticalAlignment="Center"/>
                 </Grid>
@@ -3543,6 +3717,7 @@
                                    FontSize="12" Opacity="0.5" TextWrapping="Wrap"/>
                     </StackPanel>
                     <controls:LottieToggle Grid.Column="1"
+                                          AutomationProperties.Name="{loc:T Settings.KeepPlayedInQueue}"
                                           IsChecked="{Binding KeepPlayedInQueue}"
                                           VerticalAlignment="Center"/>
                 </Grid>
@@ -3555,6 +3730,7 @@
                                    FontSize="12" Opacity="0.5" TextWrapping="Wrap"/>
                     </StackPanel>
                     <controls:LottieToggle Grid.Column="1"
+                                          AutomationProperties.Name="{loc:T Settings.ExplicitContent}"
                                           IsChecked="{Binding AllowExplicitContent}"
                                           VerticalAlignment="Center"/>
                 </Grid>
@@ -3577,6 +3753,7 @@
                         </controls:CollapsibleContent>
                     </StackPanel>
                     <controls:LottieToggle Grid.Column="1"
+                                          AutomationProperties.Name="{loc:T Settings.ExclusiveMode}"
                                           IsChecked="{Binding ExclusiveAudioEnabled}"
                                           VerticalAlignment="Center"/>
                 </Grid>
@@ -3589,6 +3766,7 @@
                     </StackPanel>
                     <Grid ColumnDefinitions="*,*,*" ColumnSpacing="8">
                         <RadioButton Grid.Column="0" Classes="transition-card medium-card" GroupName="UpmixMode"
+                                     AutomationProperties.Name="{loc:T Upmix.Off}"
                                      IsChecked="{Binding IsUpmixOff, Mode=TwoWay}">
                             <StackPanel Spacing="2">
                                 <TextBlock Text="{loc:T Upmix.Off}" FontSize="13" FontWeight="SemiBold" HorizontalAlignment="Center"/>
@@ -3596,6 +3774,7 @@
                             </StackPanel>
                         </RadioButton>
                         <RadioButton Grid.Column="1" Classes="transition-card medium-card" GroupName="UpmixMode"
+                                     AutomationProperties.Name="{loc:T Upmix.Duplicate}"
                                      IsChecked="{Binding IsUpmixDuplicate, Mode=TwoWay}">
                             <StackPanel Spacing="2">
                                 <TextBlock Text="{loc:T Upmix.Duplicate}" FontSize="13" FontWeight="SemiBold" HorizontalAlignment="Center"/>
@@ -3603,6 +3782,7 @@
                             </StackPanel>
                         </RadioButton>
                         <RadioButton Grid.Column="2" Classes="transition-card medium-card" GroupName="UpmixMode"
+                                     AutomationProperties.Name="{loc:T Upmix.Surround}"
                                      IsChecked="{Binding IsUpmixSurround, Mode=TwoWay}">
                             <StackPanel Spacing="2">
                                 <TextBlock Text="{loc:T Upmix.Surround}" FontSize="13" FontWeight="SemiBold" HorizontalAlignment="Center"/>
@@ -3613,6 +3793,23 @@
                     <TextBlock Text="{loc:T Upmix.Note}" FontSize="11" Opacity="0.45" TextWrapping="Wrap"/>
                 </StackPanel>
             </Border>
+            <Border Classes="setting-row" IsVisible="{Binding IsHeadphoneSurroundSupported}">
+                <Grid ColumnDefinitions="*,Auto">
+                    <StackPanel Grid.Column="0" Spacing="2">
+                        <TextBlock Text="{loc:T Settings.HeadphoneSurround}" FontSize="15" FontWeight="SemiBold"/>
+                        <TextBlock Text="{loc:T Settings.HeadphoneSurroundDesc}"
+                                   FontSize="12" Opacity="0.5" TextWrapping="Wrap"/>
+                        <controls:CollapsibleContent IsOpen="{Binding HeadphoneSurroundNeedsRestart}" Lift="6">
+                            <TextBlock Text="{loc:T Settings.HeadphoneSurroundRestart}"
+                                       FontSize="12" Opacity="0.8" TextWrapping="Wrap" Margin="0,4,0,0"/>
+                        </controls:CollapsibleContent>
+                    </StackPanel>
+                    <controls:LottieToggle Grid.Column="1"
+                                          AutomationProperties.Name="{loc:T Settings.HeadphoneSurround}"
+                                          IsChecked="{Binding HeadphoneSurround}"
+                                          VerticalAlignment="Center"/>
+                </Grid>
+            </Border>
             <Border Classes="setting-row">
                 <StackPanel Spacing="10">
                     <Grid ColumnDefinitions="*,Auto">
@@ -3622,12 +3819,14 @@
                                        FontSize="11" Opacity="0.5" TextWrapping="Wrap"/>
                         </StackPanel>
                         <controls:LottieToggle Grid.Column="1"
+                                              AutomationProperties.Name="{loc:T Settings.ReplayGain}"
                                               IsChecked="{Binding ReplayGainEnabled}"
                                               VerticalAlignment="Center"/>
                     </Grid>
                     <Grid Classes="sub-setting" ColumnDefinitions="120,*" IsEnabled="{Binding ReplayGainEnabled}">
                         <TextBlock Grid.Column="0" Text="{loc:T Settings.Mode}" VerticalAlignment="Center"/>
                         <ComboBox Grid.Column="1"
+                                  AutomationProperties.Name="{loc:T Settings.Mode}"
                                   Classes="pill-list"
                                   ItemsSource="{Binding ReplayGainModeOptions}"
                                   SelectedItem="{Binding ReplayGainMode}"
@@ -3663,6 +3862,7 @@
                                         Canvas.Top="3"/>
                             </Canvas>
                             <Slider x:Name="PreampSlider"
+                                    AutomationProperties.Name="{loc:T Settings.PreAmpDB}"
                                     Classes="preamp-horizontal"
                                     Value="{Binding ReplayGainPreampDb, Mode=TwoWay}"
                                     Minimum="-12" Maximum="12"
@@ -3690,6 +3890,7 @@
                                        FontSize="12" Opacity="0.5" TextWrapping="Wrap"/>
                         </StackPanel>
                         <controls:LottieToggle Grid.Column="1"
+                                              AutomationProperties.Name="{loc:T Settings.AnalyzeTempoKey}"
                                               IsChecked="{Binding BpmKeyAnalysisEnabled}"
                                               VerticalAlignment="Center"/>
                     </Grid>
@@ -3700,6 +3901,7 @@
                                        FontSize="12" Opacity="0.5" TextWrapping="Wrap"/>
                         </StackPanel>
                         <controls:LottieToggle Grid.Column="1"
+                                              AutomationProperties.Name="{loc:T Settings.SaveAnalysisFileTags}"
                                               IsChecked="{Binding WriteAnalysisToTags}"
                                               VerticalAlignment="Center"/>
                     </Grid>
@@ -3721,6 +3923,7 @@
                             </StackPanel>
                         </StackPanel>
                         <controls:LottieToggle Grid.Column="1"
+                                              AutomationProperties.Name="{loc:T Settings.Equalizer}"
                                               IsChecked="{Binding EqualizerEnabled}"
                                               ToolTip.Tip="{loc:T Settings.EqualizerOnOffTip}"
                                               VerticalAlignment="Center"/>
@@ -3734,12 +3937,14 @@
                          Wraps rather than overflowing on a narrow Settings pane. -->
                     <WrapPanel Orientation="Horizontal" ItemSpacing="8" LineSpacing="8">
                         <ComboBox x:Name="EqPresetCombo"
+                                  AutomationProperties.Name="{loc:T Settings.EqPreset}"
                                   Classes="pill-combo stable-popup"
                                   Width="164"
                                   ItemsSource="{Binding VisibleEqPresets}"
                                   SelectedItem="{Binding SelectedEqPresetName}"
                                   VerticalAlignment="Center" />
                         <Button x:Name="EqSavePresetButton"
+                                AutomationProperties.Name="{loc:T Settings.SaveEqPreset}"
                                 Classes="pill-action"
                                 CornerRadius="999"
                                 Padding="14,8"
@@ -3757,6 +3962,7 @@
                                     <StackPanel x:Name="EqPresetFlyoutBody" Spacing="6" Width="280">
                                         <Grid ColumnDefinitions="*,Auto" ColumnSpacing="8">
                                             <TextBox Text="{Binding NewEqPresetName}"
+                                                     AutomationProperties.Name="{loc:T Settings.EqPresetName}"
                                                      MaxLength="40"
                                                      CornerRadius="999"
                                                      Padding="14,7"
@@ -3765,6 +3971,7 @@
                                                      AttachedToVisualTree="OnEqPresetNameBoxAttached"
                                                      KeyDown="OnEqPresetNameKeyDown"/>
                                             <Button Grid.Column="1"
+                                                    AutomationProperties.Name="{loc:T Settings.SaveEqPreset}"
                                                     Classes="pill-action"
                                                     CornerRadius="999"
                                                     Padding="16,7"
@@ -3783,6 +3990,7 @@
                             </Button.Flyout>
                         </Button>
                         <Button Classes="pill-action"
+                                AutomationProperties.Name="{loc:T Settings.DeleteEqPreset}"
                                 Command="{Binding DeleteSelectedEqPresetCommand}"
                                 IsEnabled="{Binding CanDeleteSelectedEqPreset}"
                                 CornerRadius="999"
@@ -3797,6 +4005,7 @@
                         </Button>
                         <!-- Only while a built-in has been deleted (hidden). -->
                         <Button Classes="pill-action"
+                                AutomationProperties.Name="{loc:T Settings.RestoreEqPresets}"
                                 Command="{Binding RestoreBuiltInEqPresetsCommand}"
                                 IsVisible="{Binding HasHiddenEqPresets}"
                                 CornerRadius="999"
@@ -3810,6 +4019,7 @@
                                        VerticalAlignment="Center" />
                         </Button>
                         <Button Classes="pill-action"
+                                AutomationProperties.Name="{loc:T Settings.Reset}"
                                 Command="{Binding ResetEqualizerCommand}"
                                 CornerRadius="999"
                                 Padding="14,8"
@@ -3831,6 +4041,7 @@
                                    FontSize="12" FontWeight="SemiBold" Opacity="0.85"
                                    VerticalAlignment="Center"/>
                         <Slider Grid.Column="1"
+                                AutomationProperties.Name="{loc:T Settings.Preamp}"
                                 Classes="accent-slider"
                                 Minimum="-12" Maximum="6"
                                 Value="{Binding EqPreampDb}"
@@ -3855,6 +4066,7 @@
                                 <DataTemplate x:DataType="vm:EqBandViewModel">
                                     <Grid ColumnDefinitions="120,*,64,92,34" Margin="0,3">
                                         <NumericUpDown Grid.Column="0"
+                                                       AutomationProperties.Name="{loc:T Settings.FREQUENCY}"
                                                        Classes="eq-pill-number"
                                                        Value="{Binding FrequencyHz}"
                                                        Minimum="20" Maximum="20000" Increment="10"
@@ -3863,6 +4075,7 @@
                                                        ToolTip.Tip="{loc:T Settings.CenterFrequencyHzTypeTip}"
                                                        VerticalAlignment="Center"/>
                                         <Slider Grid.Column="1"
+                                                AutomationProperties.Name="{loc:T Settings.GAIN}"
                                                 Classes="accent-slider"
                                                 Minimum="-12" Maximum="12"
                                                 Value="{Binding GainDb}"
@@ -3873,6 +4086,7 @@
                                                    FontSize="11" Opacity="0.7"
                                                    VerticalAlignment="Center" TextAlignment="Right"/>
                                         <NumericUpDown Grid.Column="3"
+                                                       AutomationProperties.Name="Q"
                                                        Classes="eq-pill-number"
                                                        Value="{Binding Q}"
                                                        Minimum="0.1" Maximum="10" Increment="0.1"
@@ -3893,6 +4107,7 @@
                             </ItemsControl.ItemTemplate>
                         </ItemsControl>
                         <Button Classes="pill-action"
+                                AutomationProperties.Name="{loc:T Settings.AddBand}"
                                 Command="{Binding AddEqBandCommand}"
                                 IsEnabled="{Binding CanAddEqBand}"
                                 CornerRadius="999"
@@ -3923,7 +4138,9 @@
                             </StackPanel>
                         </StackPanel>
                         <Button Grid.Column="1"
+                                AutomationProperties.Name="{loc:T Settings.AddFolder}"
                                 x:Name="AddFolderButton"
+                                Command="{Binding AddMusicFolderCommand}"
                                 Classes="pill-action"
                                 Padding="14,8"
                                 CornerRadius="999"
@@ -3989,6 +4206,7 @@
                                                    VerticalAlignment="Center"
                                                    TextTrimming="CharacterEllipsis"/>
                                         <Button Grid.Column="1"
+                                                AutomationProperties.Name="{loc:T Settings.ShowHiddenFolder}"
                                                 Classes="pill-action"
                                                 Padding="12,4"
                                                 CornerRadius="999"
@@ -4016,6 +4234,7 @@
                                    FontSize="12" Opacity="0.5" TextWrapping="Wrap"/>
                     </StackPanel>
                     <controls:LottieToggle Grid.Column="1"
+                                          AutomationProperties.Name="{loc:T Settings.ImportDroppedFiles}"
                                           IsChecked="{Binding ImportDroppedMedia}"
                                           VerticalAlignment="Center"/>
                 </Grid>
@@ -4030,6 +4249,7 @@
                                    FontSize="12" Opacity="0.5" TextWrapping="Wrap"/>
                     </StackPanel>
                     <controls:LottieToggle Grid.Column="1"
+                                          AutomationProperties.Name="{loc:T Settings.PlaylistAlbumHeaders}"
                                           IsChecked="{Binding PlaylistShowAlbumHeaders}"
                                           VerticalAlignment="Center"/>
                 </Grid>
@@ -4042,6 +4262,7 @@
                                    FontSize="12" Opacity="0.5" TextWrapping="Wrap"/>
                     </StackPanel>
                     <controls:LottieToggle Grid.Column="1"
+                                          AutomationProperties.Name="{loc:T Settings.PlaylistNewBadge}"
                                           IsChecked="{Binding PlaylistShowNewBadge}"
                                           VerticalAlignment="Center"/>
                 </Grid>
@@ -4054,6 +4275,7 @@
                                    FontSize="12" Opacity="0.5" TextWrapping="Wrap"/>
                     </StackPanel>
                     <controls:LottieToggle Grid.Column="1"
+                                          AutomationProperties.Name="{loc:T Settings.PlaylistAddedColumn}"
                                           IsChecked="{Binding PlaylistShowAddedColumn}"
                                           VerticalAlignment="Center"/>
                 </Grid>
@@ -4066,6 +4288,7 @@
                                    FontSize="12" Opacity="0.5" TextWrapping="Wrap"/>
                     </StackPanel>
                     <controls:LottieToggle Grid.Column="1"
+                                          AutomationProperties.Name="{loc:T Settings.PlaylistFavoriteColumn}"
                                           IsChecked="{Binding PlaylistShowFavoriteColumn}"
                                           VerticalAlignment="Center"/>
                 </Grid>
@@ -4088,6 +4311,7 @@
                                    Opacity="0.6"
                                    VerticalAlignment="Center"/>
                         <Button Classes="pill-action"
+                                AutomationProperties.Name="{loc:T Settings.ScanLibrary}"
                                 Command="{Binding RescanCommand}"
                                 IsEnabled="{Binding !IsScanning}"
                                 Padding="14,8"
@@ -4109,6 +4333,7 @@
                         </StackPanel>
                     </StackPanel>
                     <controls:LottieToggle Grid.Column="1"
+                                          AutomationProperties.Name="{loc:T Settings.ScanStartup}"
                                           IsChecked="{Binding ScanOnStartup}"
                                           VerticalAlignment="Center"/>
                 </Grid>
@@ -4123,7 +4348,23 @@
                         </StackPanel>
                     </StackPanel>
                     <controls:LottieToggle Grid.Column="1"
+                                          AutomationProperties.Name="{loc:T Settings.WatchFolders}"
                                           IsChecked="{Binding WatchFoldersEnabled}"
+                                          VerticalAlignment="Center"/>
+                </Grid>
+            </Border>
+            <!-- Discord request (MusicBee's Inbox): new songs found in the music folders wait
+                 on the sidebar's Inbox page until added to the library or deleted. -->
+            <Border Classes="setting-row">
+                <Grid ColumnDefinitions="*,Auto">
+                    <StackPanel Grid.Column="0" Spacing="2" VerticalAlignment="Center" Margin="0,0,16,0">
+                        <TextBlock Text="{loc:T Settings.Inbox}" FontSize="15" FontWeight="SemiBold"/>
+                        <TextBlock Text="{loc:T Settings.InboxHint}"
+                                   FontSize="12" Opacity="0.5" TextWrapping="Wrap"/>
+                    </StackPanel>
+                    <controls:LottieToggle Grid.Column="1"
+                                          AutomationProperties.Name="{loc:T Settings.Inbox}"
+                                          IsChecked="{Binding InboxEnabled}"
                                           VerticalAlignment="Center"/>
                 </Grid>
             </Border>
@@ -4137,6 +4378,7 @@
                         </StackPanel>
                     </StackPanel>
                     <controls:LottieToggle Grid.Column="1"
+                                          AutomationProperties.Name="{loc:T Settings.UseEmbeddedArtwork}"
                                           IsChecked="{Binding UseEmbeddedArtwork}"
                                           VerticalAlignment="Center"/>
                 </Grid>
@@ -4155,6 +4397,7 @@
                                    FontSize="12" Opacity="0.5" TextWrapping="Wrap"/>
                     </StackPanel>
                     <controls:LottieToggle Grid.Column="1"
+                                          AutomationProperties.Name="{loc:T Settings.CollapseAlbumEditions}"
                                           IsChecked="{Binding CollapseAlbumEditions}"
                                           VerticalAlignment="Center"/>
                 </Grid>
@@ -4167,6 +4410,7 @@
                                    FontSize="12" Opacity="0.5" TextWrapping="Wrap"/>
                     </StackPanel>
                     <controls:LottieToggle Grid.Column="1"
+                                          AutomationProperties.Name="{loc:T Settings.MergeFeaturedArtistsFrom}"
                                           IsChecked="{Binding MergeFeaturedFromTitles}"
                                           VerticalAlignment="Center"/>
                 </Grid>
@@ -4180,6 +4424,7 @@
                     </StackPanel>
                     <Grid ColumnDefinitions="*,*" ColumnSpacing="8">
                         <RadioButton Grid.Column="0" Classes="transition-card medium-card"
+                                     AutomationProperties.Name="{loc:T Settings.Artist}"
                                      GroupName="ArtistGroupMode"
                                      IsChecked="{Binding IsArtistGroupByArtist, Mode=TwoWay}"
                                      ToolTip.Tip="{loc:T Settings.FirstCreditedArtistEachTip}">
@@ -4189,6 +4434,7 @@
                             </StackPanel>
                         </RadioButton>
                         <RadioButton Grid.Column="1" Classes="transition-card medium-card"
+                                     AutomationProperties.Name="{loc:T Settings.AlbumArtist}"
                                      GroupName="ArtistGroupMode"
                                      IsChecked="{Binding IsArtistGroupByAlbumArtist, Mode=TwoWay}"
                                      ToolTip.Tip="{loc:T Settings.AlbumArtistTagSongsTip}">
@@ -4244,6 +4490,7 @@
 
                     <Grid ColumnDefinitions="*,Auto" ColumnSpacing="8">
                         <TextBox Grid.Column="0" Classes="settings-search"
+                                 AutomationProperties.Name="{loc:T Settings.AddSeparatorEG}"
                                  Text="{Binding NewArtistSeparator, Mode=TwoWay}"
                                  Watermark="{loc:T Settings.AddSeparatorEG}"
                                  Padding="14,6"
@@ -4258,6 +4505,65 @@
                 </StackPanel>
             </Border>
             <Border Classes="setting-row">
+                <StackPanel Spacing="12">
+                    <Grid ColumnDefinitions="*,Auto">
+                        <StackPanel Grid.Column="0" Spacing="2">
+                            <TextBlock Text="{loc:T Settings.KeepNamesTogether}" FontSize="15" FontWeight="SemiBold"/>
+                            <TextBlock Text="{loc:T Settings.KeepNamesTogetherHint}"
+                                       FontSize="12" Opacity="0.5" TextWrapping="Wrap"/>
+                        </StackPanel>
+                        <Button Grid.Column="1" Classes="pill" Content="{loc:T Settings.Reset}" FontSize="12" Padding="14,6"
+                                VerticalAlignment="Top" Margin="12,0,0,0"
+                                Command="{Binding ResetArtistProtectedNamesCommand}"/>
+                    </Grid>
+
+                    <ItemsControl ItemsSource="{Binding ArtistProtectedNames}">
+                        <ItemsControl.ItemsPanel>
+                            <ItemsPanelTemplate>
+                                <WrapPanel Orientation="Horizontal"/>
+                            </ItemsPanelTemplate>
+                        </ItemsControl.ItemsPanel>
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate x:DataType="sys:String">
+                                <Border Padding="12,4,6,4" Margin="0,0,6,6" CornerRadius="14"
+                                        Background="{DynamicResource SystemControlBackgroundBaseLowBrush}">
+                                    <StackPanel Orientation="Horizontal" Spacing="4">
+                                        <TextBlock Text="{Binding}" FontSize="13" FontWeight="SemiBold"
+                                                   VerticalAlignment="Center"/>
+                                        <Button Content="{loc:T Settings.Text}"
+                                                Command="{Binding $parent[ItemsControl].((vm:SettingsViewModel)DataContext).RemoveArtistProtectedNameCommand}"
+                                                CommandParameter="{Binding}"
+                                                Background="Transparent"
+                                                BorderThickness="0"
+                                                FontSize="11"
+                                                Opacity="0.5"
+                                                Cursor="Hand"
+                                                Padding="4,2"
+                                                ToolTip.Tip="{loc:T Settings.RemoveNameTip}"
+                                                AutomationProperties.Name="{loc:T Settings.RemoveNameTip}"/>
+                                    </StackPanel>
+                                </Border>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+
+                    <Grid ColumnDefinitions="*,Auto" ColumnSpacing="8">
+                        <TextBox Grid.Column="0" Classes="settings-search"
+                                 AutomationProperties.Name="{loc:T Settings.AddArtistNameEG}"
+                                 Text="{Binding NewArtistProtectedName, Mode=TwoWay}"
+                                 PlaceholderText="{loc:T Settings.AddArtistNameEG}"
+                                 Padding="14,6"
+                                 MaxWidth="320" HorizontalAlignment="Left" MinWidth="220">
+                            <TextBox.KeyBindings>
+                                <KeyBinding Gesture="Enter" Command="{Binding AddArtistProtectedNameCommand}"/>
+                            </TextBox.KeyBindings>
+                        </TextBox>
+                        <Button Grid.Column="1" Classes="pill" Content="{loc:T Settings.Add}" FontSize="13" Padding="16,6"
+                                Command="{Binding AddArtistProtectedNameCommand}"/>
+                    </Grid>
+                </StackPanel>
+            </Border>
+            <Border Classes="setting-row">
                 <!-- GitHub #99. Toggle + its word list share a spacing-free panel so the gap folds
                      with the body (see the Album page colour block). -->
                 <StackPanel>
@@ -4268,6 +4574,7 @@
                                    FontSize="12" Opacity="0.5" TextWrapping="Wrap"/>
                     </StackPanel>
                     <controls:LottieToggle Grid.Column="1"
+                                          AutomationProperties.Name="{loc:T Settings.IgnoreLeadingWordsInArtistSort}"
                                           IsChecked="{Binding IgnoreLeadingWordsInArtistSort}"
                                           VerticalAlignment="Center"/>
                 </Grid>
@@ -4304,6 +4611,7 @@
 
                     <Grid ColumnDefinitions="*,Auto,Auto" ColumnSpacing="8">
                         <TextBox Grid.Column="0" Classes="settings-search"
+                                 AutomationProperties.Name="{loc:T Settings.AddWordEG}"
                                  Text="{Binding NewArtistSortIgnoredWord, Mode=TwoWay}"
                                  PlaceholderText="{loc:T Settings.AddWordEG}"
                                  Padding="14,6"
@@ -4338,6 +4646,7 @@
                             <TextBlock Text="{loc:T Settings.MusicStreamingCatalog}" FontSize="11" Opacity="0.5"/>
                         </StackPanel>
                         <controls:LottieToggle Grid.Column="1"
+                                              AutomationProperties.Name="{loc:T Settings.Deezer}"
                                               IsChecked="{Binding DeezerEnabled}"
                                               VerticalAlignment="Center"/>
                     </Grid>
@@ -4347,6 +4656,7 @@
                             <TextBlock Text="{loc:T Settings.OpenMusicEncyclopedia}" FontSize="11" Opacity="0.5"/>
                         </StackPanel>
                         <controls:LottieToggle Grid.Column="1"
+                                              AutomationProperties.Name="{loc:T Settings.MusicBrainz}"
                                               IsChecked="{Binding MusicBrainzEnabled}"
                                               VerticalAlignment="Center"/>
                     </Grid>
@@ -4367,6 +4677,7 @@
                         <TextBlock Text="{loc:T Settings.RenameMoveFilesInto}" FontSize="12" Opacity="0.5" TextWrapping="Wrap"/>
                     </StackPanel>
                     <Button Grid.Column="2" Classes="pill-action" Command="{Binding OpenOrganizeFilesCommand}"
+                            AutomationProperties.Name="{loc:T Settings.Organize}"
                             Padding="14,8" CornerRadius="999" Cursor="Hand" VerticalAlignment="Center" Margin="12,0,0,0">
                         <TextBlock Text="{loc:T Settings.Organize}" FontSize="13"/>
                     </Button>
@@ -4380,6 +4691,7 @@
                         <TextBlock Text="{loc:T Settings.FindDuplicateTracksRemove}" FontSize="12" Opacity="0.5" TextWrapping="Wrap"/>
                     </StackPanel>
                     <Button Grid.Column="2" Classes="pill-action" Command="{Binding OpenDuplicateFinderCommand}"
+                            AutomationProperties.Name="{loc:T Settings.Find}"
                             Padding="14,8" CornerRadius="999" Cursor="Hand" VerticalAlignment="Center" Margin="12,0,0,0">
                         <TextBlock Text="{loc:T Settings.Find}" FontSize="13"/>
                     </Button>
@@ -4393,6 +4705,7 @@
                         <TextBlock Text="{loc:T Settings.IdentifyPoorlyTaggedTracks}" FontSize="12" Opacity="0.5" TextWrapping="Wrap"/>
                     </StackPanel>
                     <Button Grid.Column="2" Classes="pill-action" Command="{Binding OpenMetadataFinderCommand}"
+                            AutomationProperties.Name="{loc:T Settings.Find}"
                             Padding="14,8" CornerRadius="999" Cursor="Hand" VerticalAlignment="Center" Margin="12,0,0,0">
                         <TextBlock Text="{loc:T Settings.Find}" FontSize="13"/>
                     </Button>
@@ -4406,6 +4719,7 @@
                         <TextBlock Text="{loc:T Settings.ImportM3UExportifyCSV}" FontSize="12" Opacity="0.5" TextWrapping="Wrap"/>
                     </StackPanel>
                     <Button Grid.Column="2" Classes="pill-action" Command="{Binding OpenPlaylistImportCommand}"
+                            AutomationProperties.Name="{loc:T Settings.Import}"
                             Padding="14,8" CornerRadius="999" Cursor="Hand" VerticalAlignment="Center" Margin="12,0,0,0">
                         <TextBlock Text="{loc:T Settings.Import}" FontSize="13"/>
                     </Button>
@@ -4425,6 +4739,7 @@
                         <TextBlock Text="{loc:T YouTubeSettings.Description}" FontSize="12" Opacity="0.5" TextWrapping="Wrap"/>
                     </StackPanel>
                     <Button Grid.Column="2" Classes="pill-action" Command="{Binding OpenYouTubeDownloaderCommand}"
+                            AutomationProperties.Name="{loc:T YouTubeSettings.Open}"
                             Padding="14,8" CornerRadius="999" Cursor="Hand" VerticalAlignment="Center" Margin="12,0,0,0">
                         <TextBlock Text="{loc:T YouTubeSettings.Open}" FontSize="13"/>
                     </Button>
@@ -4435,6 +4750,7 @@
                 <Grid ColumnDefinitions="150,*,Auto">
                     <TextBlock Grid.Column="0" Text="{loc:T YouTubeSettings.Folder}" FontSize="13" FontWeight="SemiBold" VerticalAlignment="Center"/>
                     <TextBox Grid.Column="1" Text="{Binding YouTubeDownloadFolder}" Watermark="{Binding YouTubeDownloadFolderHint}"
+                             AutomationProperties.Name="{loc:T YouTubeSettings.Folder}"
                              CornerRadius="999" Padding="14,8" BorderThickness="1.5" MinHeight="0" VerticalAlignment="Center"/>
                     <Button Grid.Column="2" Content="{loc:T Settings.Browse}" Command="{Binding BrowseYouTubeFolderCommand}"
                             Padding="14,8" CornerRadius="999" Margin="8,0,0,0" Cursor="Hand" VerticalAlignment="Center"/>
@@ -4485,6 +4801,7 @@
                                                    VerticalAlignment="Center"
                                                    Margin="12,0"/>
                                         <Button Grid.Column="2"
+                                                AutomationProperties.Name="{loc:T Settings.UnSnooze}"
                                                 Classes="pill-action"
                                                 Command="{Binding $parent[ItemsControl].((vm:SettingsViewModel)DataContext).UnsnoozeCommand}"
                                                 CommandParameter="{Binding}"
@@ -4534,6 +4851,7 @@
                                                        TextTrimming="CharacterEllipsis"/>
                                         </StackPanel>
                                         <Button Grid.Column="1"
+                                                AutomationProperties.Name="{loc:T Settings.Restore}"
                                                 Classes="pill-action"
                                                 Command="{Binding $parent[ItemsControl].((vm:SettingsViewModel)DataContext).RestoreRemovedTrackCommand}"
                                                 CommandParameter="{Binding}"
@@ -4571,6 +4889,7 @@
                             </StackPanel>
                         </StackPanel>
                         <Button Grid.Column="2"
+                                AutomationProperties.Name="{loc:T Settings.OpenDataFolder}"
                                 Command="{Binding OpenDataFolderCommand}"
                                 Classes="pill-action"
                                 Padding="14,8"
@@ -4653,6 +4972,7 @@
                                 </StackPanel>
                             </StackPanel>
                             <Button Grid.Column="1"
+                                    AutomationProperties.Name="{loc:T Settings.ResetSettings}"
                                     Command="{Binding ShowResetConfirmCommand}"
                                     IsVisible="{Binding !IsResetConfirmVisible}"
                                     Classes="pill-action"
@@ -4704,6 +5024,7 @@
                             </StackPanel>
                         </StackPanel>
                         <Button Grid.Column="1"
+                                AutomationProperties.Name="{loc:T Settings.ClearCache}"
                                 Command="{Binding ClearArtworkCacheCommand}"
                                 Classes="pill-action"
                                 Padding="14,8"
@@ -4734,6 +5055,7 @@
                     </StackPanel>
                     <Grid ColumnDefinitions="*,Auto">
                         <TextBox Grid.Column="0"
+                                 AutomationProperties.Name="{loc:T Settings.Ffmpeg}"
                                  Text="{Binding FfmpegPath}"
                                  Watermark="{loc:T Settings.AutoDetect}"
                                  CornerRadius="999"
@@ -4769,6 +5091,7 @@
                                        FontSize="11" Opacity="0.5" TextWrapping="Wrap"/>
                         </StackPanel>
                         <controls:LottieToggle Grid.Column="1"
+                                              AutomationProperties.Name="{loc:T Settings.IncludePreReleaseUpdates}"
                                               IsChecked="{Binding IncludePrereleaseUpdates}"
                                               VerticalAlignment="Center"/>
                     </Grid>
@@ -4784,6 +5107,7 @@
                                        FontSize="12" Opacity="0.5" TextWrapping="Wrap"/>
                         </StackPanel>
                         <controls:LottieToggle Grid.Column="1"
+                                              AutomationProperties.Name="{loc:T Settings.DeveloperMode}"
                                               IsChecked="{Binding DeveloperMode}"
                                               VerticalAlignment="Center"/>
                     </Grid>
@@ -4863,6 +5187,7 @@
                                                            VerticalAlignment="Center"
                                                            Margin="12,0"/>
                                                 <Button Grid.Column="6"
+                                                        AutomationProperties.Name="{Binding ActionLabel}"
                                                         Classes="pill-action"
                                                         IsVisible="{Binding !IsCurrent}"
                                                         Command="{Binding $parent[UserControl].((vm:SettingsViewModel)DataContext).InstallReleaseCommand}"
@@ -4877,6 +5202,7 @@
 
                         <!-- Expand to the full release history -->
                         <Button IsVisible="{Binding HasHiddenReleases}"
+                                AutomationProperties.Name="{Binding ShowOlderVersionsLabel}"
                                 Command="{Binding ShowOlderReleasesCommand}"
                                 Classes="accent-btn"
                                 Background="{DynamicResource AccentButtonBackground}"
@@ -4892,6 +5218,7 @@
                         </Button>
                         <!-- Collapse back to the newest releases (sits under the expanded list) -->
                         <Button IsVisible="{Binding IsReleaseHistoryExpanded}"
+                                AutomationProperties.Name="{loc:T Settings.ShowRecentReleasesOnly}"
                                 Command="{Binding HideOlderReleasesCommand}"
                                 Classes="accent-btn"
                                 Background="{DynamicResource AccentButtonBackground}"
@@ -4919,6 +5246,7 @@
                                              VerticalAlignment="Center"
                                              MinWidth="200"/>
                                 <Button Classes="pill-action"
+                                        AutomationProperties.Name="{loc:T Settings.Cancel}"
                                         Command="{Binding CancelDevDownloadCommand}">
                                     <TextBlock Text="{loc:T Settings.Cancel}" FontSize="12"/>
                                 </Button>
@@ -4936,13 +5264,14 @@
                                    FontSize="12" Opacity="0.5" TextWrapping="Wrap"
                                    Margin="0,10,0,0"/>
                         <StackPanel Orientation="Horizontal" Spacing="8">
-                            <Button Classes="pill-action" Command="{Binding CopyDevLogsCommand}">
+                            <Button Classes="pill-action" Command="{Binding CopyDevLogsCommand}" AutomationProperties.Name="{loc:T Settings.CopyLogs}">
                                 <TextBlock Text="{loc:T Settings.CopyLogs}" FontSize="12"/>
                             </Button>
-                            <Button Classes="pill-action" Command="{Binding ClearDevLogsCommand}">
+                            <Button Classes="pill-action" Command="{Binding ClearDevLogsCommand}" AutomationProperties.Name="{loc:T Settings.Clear}">
                                 <TextBlock Text="{loc:T Settings.Clear}" FontSize="12"/>
                             </Button>
                             <Button Classes="pill-action" Command="{Binding OpenLogsFolderCommand}"
+                                    AutomationProperties.Name="{loc:T Settings.OpenFolder}"
                                     ToolTip.Tip="{loc:T Settings.OpenAppDataFolderTip}">
                                 <TextBlock Text="{loc:T Settings.OpenFolder}" FontSize="12"/>
                             </Button>
@@ -5015,6 +5344,7 @@
                     <StackPanel Grid.Column="1" Margin="16,0,0,0" VerticalAlignment="Center" Spacing="5">
                         <TextBlock Text="{loc:T Settings.Name}" FontSize="11.5" FontWeight="SemiBold" Opacity="0.55"/>
                         <TextBox Classes="profile-name"
+                                 AutomationProperties.Name="{loc:T Settings.Name}"
                                  Text="{Binding ProfileName, Mode=TwoWay}"
                                  Watermark="{loc:T Settings.Name}"
                                  Width="260" HorizontalAlignment="Left"
@@ -5064,8 +5394,10 @@
                         </Grid>
                         <StackPanel Spacing="10">
                             <TextBox x:Name="CreateEmailBox" Classes="account-field" Text="{Binding NewServerUserName}"
+                                     AutomationProperties.Name="{loc:T AccountSync.EmailWatermark}"
                                      Watermark="{loc:T AccountSync.EmailWatermark}"/>
                             <TextBox x:Name="CreatePasswordBox" Classes="account-field" Text="{Binding NewServerUserPassword}" PasswordChar="•"
+                                     AutomationProperties.Name="{loc:T AccountSync.NewPassword}"
                                      RevealPassword="{Binding IsPasswordRevealed}" Watermark="{loc:T AccountSync.NewPassword}">
                                 <TextBox.KeyBindings>
                                     <KeyBinding Gesture="Enter" Command="{Binding CreatePrimaryAccountCommand}"/>
@@ -5081,6 +5413,7 @@
                             </TextBox>
                         </StackPanel>
                         <Button x:Name="CreateAccountButton" Classes="accent-btn account-action" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center"
+                                AutomationProperties.Name="{loc:T AccountSync.Create}"
                                 Height="40" Command="{Binding CreatePrimaryAccountCommand}"
                                 Background="{DynamicResource AccentButtonBackground}" Foreground="{DynamicResource AccentForegroundBrush}">
                             <TextBlock Text="{loc:T AccountSync.Create}" FontSize="13.5" FontWeight="SemiBold"/>
@@ -5093,7 +5426,7 @@
                     <controls:CollapsibleContent IsOpen="{Binding HasPrimaryAccount}" Lift="10" Motion="Glide">
                     <StackPanel>
                         <WrapPanel x:Name="AccountActions" ItemSpacing="8" LineSpacing="8">
-                            <Button Classes="pill-action account-action" Command="{Binding ToggleChangePasswordCommand}">
+                            <Button Classes="pill-action account-action" Command="{Binding ToggleChangePasswordCommand}" AutomationProperties.Name="{loc:T AccountSync.ChangePassword}">
                                 <StackPanel Orientation="Horizontal" Spacing="7">
                                     <PathIcon Data="{StaticResource AccountLockIcon}"/>
                                     <TextBlock Text="{loc:T AccountSync.ChangePassword}"/>
@@ -5110,6 +5443,7 @@
                         <StackPanel Spacing="8" Margin="0,14,0,0">
                             <Grid ColumnDefinitions="*,Auto,Auto" ColumnSpacing="8" MaxWidth="560" HorizontalAlignment="Left">
                                 <TextBox Grid.Column="0" Text="{Binding ChangePasswordValue}" PasswordChar="•" RevealPassword="{Binding IsPasswordRevealed}"
+                                         AutomationProperties.Name="{loc:T AccountSync.NewPassword}"
                                          Watermark="{loc:T AccountSync.NewPassword}" CornerRadius="999" Padding="14,8,4,8" BorderThickness="1.5" MinHeight="0" MinWidth="260">
                                     <TextBox.KeyBindings>
                                         <KeyBinding Gesture="Enter" Command="{Binding ChangePrimaryPasswordCommand}"/>
@@ -5124,10 +5458,11 @@
                                     </TextBox.InnerRightContent>
                                 </TextBox>
                                 <Button Grid.Column="1" Classes="accent-btn account-action" Command="{Binding ChangePrimaryPasswordCommand}"
+                                        AutomationProperties.Name="{loc:T AccountSync.Save}"
                                         Background="{DynamicResource AccentButtonBackground}" Foreground="{DynamicResource AccentForegroundBrush}">
                                     <TextBlock Text="{loc:T AccountSync.Save}" FontWeight="SemiBold"/>
                                 </Button>
-                                <Button Grid.Column="2" Classes="pill-action account-action" Command="{Binding ToggleChangePasswordCommand}">
+                                <Button Grid.Column="2" Classes="pill-action account-action" Command="{Binding ToggleChangePasswordCommand}" AutomationProperties.Name="{loc:T Settings.Cancel}">
                                     <TextBlock Text="{loc:T Settings.Cancel}"/>
                                 </Button>
                             </Grid>
@@ -5169,7 +5504,7 @@
                             </StackPanel>
                             <TextBlock Text="{loc:T Phone.Description}" FontSize="12" Opacity="0.5" TextWrapping="Wrap"/>
                         </StackPanel>
-                        <controls:LottieToggle x:Name="PhoneServerToggle" Grid.Column="1" IsChecked="{Binding NoctisServerEnabled}" VerticalAlignment="Center"/>
+                        <controls:LottieToggle AutomationProperties.Name="{loc:T Phone.Title}" x:Name="PhoneServerToggle" Grid.Column="1" IsChecked="{Binding NoctisServerEnabled}" VerticalAlignment="Center"/>
                     </Grid>
                     <TextBlock Text="{loc:T Phone.NeedsAccount}" FontSize="12" Opacity="0.6" TextWrapping="Wrap" Margin="0,8,0,0"
                                IsVisible="{Binding !HasPrimaryAccount}"/>
@@ -5182,6 +5517,7 @@
                              phone app types the address (it has no scanner), and a camera app
                              would only open the server's address in a browser. -->
                         <Button Classes="accent-btn account-action" Command="{Binding TogglePairingCommand}" HorizontalAlignment="Left"
+                                AutomationProperties.Name="{loc:T AccountSync.PairDevice}"
                                 Background="{DynamicResource AccentButtonBackground}" Foreground="{DynamicResource AccentForegroundBrush}">
                             <StackPanel Orientation="Horizontal" Spacing="7">
                                 <PathIcon Data="{StaticResource AccountPhoneIcon}" Foreground="{DynamicResource AccentForegroundBrush}"/>
@@ -5196,7 +5532,7 @@
                                     <TextBlock Text="{loc:T Server.AddressLabel}" FontSize="10" Opacity="0.5"/>
                                     <StackPanel Orientation="Horizontal" Spacing="8">
                                         <SelectableTextBlock Text="{Binding NoctisServerUrl}" FontSize="14" FontWeight="SemiBold" VerticalAlignment="Center"/>
-                                        <Button Classes="pill-action" Command="{Binding CopyNoctisServerUrlCommand}">
+                                        <Button Classes="pill-action" Command="{Binding CopyNoctisServerUrlCommand}" AutomationProperties.Name="{loc:T Settings.Copy}">
                                             <TextBlock Text="{loc:T Settings.Copy}" FontSize="11"/>
                                         </Button>
                                         <TextBlock Text="{loc:T Settings.Copied}" FontSize="11" Foreground="{DynamicResource AccentColorBrush}" VerticalAlignment="Center" IsVisible="{Binding NoctisServerUrlCopied}"/>
@@ -5231,6 +5567,7 @@
                                             <TextBlock Grid.Column="1" Text="{Binding Name}" FontSize="12" FontWeight="SemiBold" VerticalAlignment="Center" TextTrimming="CharacterEllipsis"/>
                                             <TextBlock Grid.Column="2" Text="{Binding StatusText}" FontSize="11" Opacity="0.55" VerticalAlignment="Center"/>
                                             <Button Grid.Column="3" Classes="pill-action" Cursor="Hand" IsVisible="{Binding IsSignedIn}"
+                                                    AutomationProperties.Name="{loc:T AccountSync.Remove}"
                                                     ToolTip.Tip="{loc:T Phone.SignOutTip}"
                                                     Command="{Binding $parent[UserControl].((vm:SettingsViewModel)DataContext).RemoveSignedInDeviceCommand}"
                                                     CommandParameter="{Binding}">
@@ -5238,6 +5575,7 @@
                                             </Button>
                                             <!-- Signed out already: only takes it off the list (the ledger keeps what it synced). -->
                                             <Button Grid.Column="3" Classes="pill-action" Cursor="Hand" IsVisible="{Binding !IsSignedIn}"
+                                                    AutomationProperties.Name="{loc:T Server.Remove}"
                                                     ToolTip.Tip="{loc:T Phone.ForgetTip}"
                                                     Command="{Binding $parent[UserControl].((vm:SettingsViewModel)DataContext).RemoveSignedInDeviceCommand}"
                                                     CommandParameter="{Binding}">
@@ -5258,7 +5596,7 @@
                                         <TextBlock Text="{loc:T Sync.Title}" FontSize="13" FontWeight="SemiBold"/>
                                         <TextBlock Text="{loc:T Sync.Description}" FontSize="12" Opacity="0.55" TextWrapping="Wrap"/>
                                     </StackPanel>
-                                    <controls:LottieToggle x:Name="PhoneSyncToggle" Grid.Column="1" IsChecked="{Binding SyncEnabled}" VerticalAlignment="Center"/>
+                                    <controls:LottieToggle AutomationProperties.Name="{loc:T Sync.Title}" x:Name="PhoneSyncToggle" Grid.Column="1" IsChecked="{Binding SyncEnabled}" VerticalAlignment="Center"/>
                                 </Grid>
                                 <StackPanel Orientation="Horizontal" Spacing="6"
                                             IsVisible="{Binding SyncStatusText, Converter={x:Static StringConverters.IsNotNullOrEmpty}}">
@@ -5272,6 +5610,7 @@
                         <Grid Classes="sub-setting" ColumnDefinitions="140,*">
                             <TextBlock Grid.Column="0" Text="{loc:T Sync.DeviceName}" VerticalAlignment="Center"/>
                             <TextBox Grid.Column="1" Text="{Binding SyncDeviceName}" MaxWidth="320" HorizontalAlignment="Left" MinWidth="220"
+                                     AutomationProperties.Name="{loc:T Sync.DeviceName}"
                                      CornerRadius="999" Padding="14,8" BorderThickness="1.5" MinHeight="0"/>
                         </Grid>
 
@@ -5283,6 +5622,7 @@
                                 <TextBlock Text="{loc:T Phone.OtherAppsDesc}" FontSize="12" Opacity="0.55" TextWrapping="Wrap"/>
                             </StackPanel>
                             <Button Grid.Column="1" Classes="pill-action account-action" VerticalAlignment="Center"
+                                    AutomationProperties.Name="{loc:T AccountSync.NewApiKey}"
                                     Command="{Binding RegenerateServerApiKeyCommand}" CommandParameter="{Binding PrimaryAccount}"
                                     ToolTip.Tip="{loc:T Phone.NewApiKeyTip}">
                                 <StackPanel Orientation="Horizontal" Spacing="7">
@@ -5326,7 +5666,7 @@
                                 </Border>
                                 <Grid ColumnDefinitions="*,Auto" ColumnSpacing="12">
                                     <TextBlock Text="{loc:T Server.ApiKeyOnce}" FontSize="11.5" Opacity="0.6" TextWrapping="Wrap" VerticalAlignment="Center"/>
-                                    <Button Grid.Column="1" Classes="pill-action account-action" Command="{Binding HideIssuedApiKeyCommand}">
+                                    <Button Grid.Column="1" Classes="pill-action account-action" Command="{Binding HideIssuedApiKeyCommand}" AutomationProperties.Name="{loc:T Server.Done}">
                                         <TextBlock Text="{loc:T Server.Done}"/>
                                     </Button>
                                 </Grid>
@@ -5355,6 +5695,7 @@
                                        FontSize="12" Opacity="0.5" TextWrapping="Wrap"/>
                         </StackPanel>
                         <controls:LottieToggle Grid.Column="1"
+                                              AutomationProperties.Name="{loc:T Settings.WebRemote}"
                                               IsChecked="{Binding WebRemoteEnabled}"
                                               VerticalAlignment="Center"/>
                     </Grid>
@@ -5394,6 +5735,7 @@
                                         <SelectableTextBlock Text="{Binding WebRemoteDisplayUrl}" FontSize="14" FontWeight="SemiBold"
                                                              VerticalAlignment="Center"/>
                                         <Button Classes="pill-action" Command="{Binding CopyWebRemoteUrlCommand}"
+                                                AutomationProperties.Name="{loc:T Settings.Copy}"
                                                 ToolTip.Tip="{loc:T Settings.CopyFullLinkIncludingTip}">
                                             <TextBlock Text="{loc:T Settings.Copy}" FontSize="11"/>
                                         </Button>
@@ -5443,6 +5785,7 @@
                                        FontSize="12" Opacity="0.5" TextWrapping="Wrap"/>
                         </StackPanel>
                         <controls:LottieToggle Grid.Column="1"
+                                              AutomationProperties.Name="{loc:T Settings.LocalApi}"
                                               IsChecked="{Binding LocalApiEnabled}"
                                               VerticalAlignment="Center"/>
                     </Grid>
@@ -5459,7 +5802,16 @@
                                     <TextBlock Text="{Binding LocalApiTokenDisplay}" FontSize="12"
                                                FontFamily="Consolas,Menlo,monospace"
                                                VerticalAlignment="Center"/>
-                                    <Button Classes="pill-action" Command="{Binding ToggleLocalApiTokenRevealCommand}">
+                                    <Button Classes="pill-action" Command="{Binding ToggleLocalApiTokenRevealCommand}"
+                                            Classes.revealed="{Binding LocalApiTokenRevealed}">
+                                        <Button.Styles>
+                                            <Style Selector="Button.pill-action">
+                                                <Setter Property="AutomationProperties.Name" Value="{loc:T Settings.LocalApiShowToken}"/>
+                                            </Style>
+                                            <Style Selector="Button.pill-action.revealed">
+                                                <Setter Property="AutomationProperties.Name" Value="{loc:T Settings.LocalApiHideToken}"/>
+                                            </Style>
+                                        </Button.Styles>
                                         <Panel>
                                             <TextBlock Text="{loc:T Settings.LocalApiShowToken}" FontSize="11"
                                                        IsVisible="{Binding !LocalApiTokenRevealed}"/>
@@ -5467,10 +5819,11 @@
                                                        IsVisible="{Binding LocalApiTokenRevealed}"/>
                                         </Panel>
                                     </Button>
-                                    <Button Classes="pill-action" Command="{Binding CopyLocalApiTokenCommand}">
+                                    <Button Classes="pill-action" Command="{Binding CopyLocalApiTokenCommand}" AutomationProperties.Name="{loc:T Settings.Copy}">
                                         <TextBlock Text="{loc:T Settings.Copy}" FontSize="11"/>
                                     </Button>
                                     <Button Classes="pill-action" Command="{Binding RegenerateLocalApiTokenCommand}"
+                                            AutomationProperties.Name="{loc:T Settings.LocalApiRegenerate}"
                                             ToolTip.Tip="{loc:T Settings.LocalApiRegenerateTip}">
                                         <TextBlock Text="{loc:T Settings.LocalApiRegenerate}" FontSize="11"/>
                                     </Button>
@@ -5530,12 +5883,14 @@
                                    FontSize="12" Opacity="0.5" TextWrapping="Wrap"/>
                     </StackPanel>
                     <controls:LottieToggle Grid.Column="2"
+                                          AutomationProperties.Name="{loc:T Settings.DiscordRichPresence}"
                                           IsChecked="{Binding DiscordRichPresenceEnabled}"
                                           VerticalAlignment="Center"
                                           Margin="12,0,0,0"/>
                 </Grid>
             </Border>
             <controls:CollapsibleContent IsOpen="{Binding DiscordRichPresenceEnabled}" Lift="10" Motion="Glide">
+            <StackPanel>
             <Border Classes="setting-row divided">
                 <Grid ColumnDefinitions="*,Auto">
                     <StackPanel Grid.Column="0" Spacing="2">
@@ -5544,11 +5899,31 @@
                                    FontSize="12" Opacity="0.5" TextWrapping="Wrap"/>
                     </StackPanel>
                     <controls:LottieToggle Grid.Column="1"
+                                          AutomationProperties.Name="{loc:T Settings.ShowAlbumDiscord}"
                                           IsChecked="{Binding DiscordShowAlbum}"
                                           VerticalAlignment="Center"
                                           Margin="12,0,0,0"/>
                 </Grid>
             </Border>
+            <Border Classes="setting-row divided">
+                <Grid ColumnDefinitions="*,Auto">
+                    <StackPanel Grid.Column="0" Spacing="2" Margin="0,0,12,0">
+                        <TextBlock Text="{loc:T Settings.DiscordStatusDisplay}" FontSize="15" FontWeight="SemiBold"/>
+                        <TextBlock Text="{loc:T Settings.DiscordStatusDisplayHint}"
+                                   FontSize="12" Opacity="0.5" TextWrapping="Wrap"/>
+                    </StackPanel>
+                    <ComboBox Grid.Column="1"
+                              AutomationProperties.Name="{loc:T Settings.DiscordStatusDisplay}"
+                              Classes="pill-list"
+                              ItemsSource="{Binding DiscordStatusDisplayOptions}"
+                              SelectedItem="{Binding SelectedDiscordStatusDisplayOption}"
+                              MinWidth="160"
+                              VerticalAlignment="Center"
+                              CornerRadius="999"
+                              Padding="14,8"/>
+                </Grid>
+            </Border>
+            </StackPanel>
             </controls:CollapsibleContent>
             </StackPanel>
             </Border>
@@ -5617,6 +5992,7 @@
 
                         <!-- Logout button (top-right, when connected) -->
                         <Button Grid.Column="2" Grid.Row="0"
+                                AutomationProperties.Name="{loc:T Settings.Logout}"
                                 IsVisible="{Binding IsLastFmConnected}"
                                 Command="{Binding LogoutLastFmCommand}"
                                 Classes="pill-action"
@@ -5637,6 +6013,7 @@
                                    FontSize="13"
                                    VerticalAlignment="Center"/>
                         <controls:LottieToggle Grid.Column="1"
+                                              AutomationProperties.Name="{loc:T Settings.EnableScrobbling}"
                                               IsChecked="{Binding LastFmScrobblingEnabled}"
                                               VerticalAlignment="Center"/>
                     </Grid>
@@ -5689,6 +6066,7 @@
                                         Margin="0,6,0,0"
                                         Spacing="4">
                                 <TextBox x:Name="ListenBrainzTokenBox"
+                                         AutomationProperties.Name="{loc:T Settings.ListenBrainzUserToken}"
                                          Classes="metadata-info-field"
                                          Text="{Binding ListenBrainzToken}"
                                          PasswordChar="•"
@@ -5697,6 +6075,7 @@
                                          HorizontalAlignment="Left"/>
                                 <!-- GitHub #118: optional ListenBrainz-compatible server (blank = listenbrainz.org). -->
                                 <TextBox x:Name="ListenBrainzApiUrlBox"
+                                         AutomationProperties.Name="{loc:T Settings.ListenBrainzApiUrl}"
                                          Classes="metadata-info-field"
                                          Text="{Binding ListenBrainzApiUrl}"
                                          Watermark="{loc:T Settings.ListenBrainzApiUrl}"
@@ -5742,6 +6121,7 @@
 
                         <!-- Logout button (top-right, when connected) -->
                         <Button Grid.Column="2" Grid.Row="0"
+                                AutomationProperties.Name="{loc:T Settings.Logout}"
                                 IsVisible="{Binding IsListenBrainzConnected}"
                                 Command="{Binding LogoutListenBrainzCommand}"
                                 Classes="pill-action"
@@ -5761,6 +6141,7 @@
                                    FontSize="13"
                                    VerticalAlignment="Center"/>
                         <controls:LottieToggle Grid.Column="1"
+                                              AutomationProperties.Name="{loc:T Settings.EnableScrobbling}"
                                               IsChecked="{Binding ListenBrainzScrobblingEnabled}"
                                               VerticalAlignment="Center"/>
                     </Grid>
@@ -5818,6 +6199,7 @@
                     </Button>
 
                     <Button Grid.Column="2"
+                            AutomationProperties.Name="{loc:T Settings.Disconnect}"
                             IsVisible="{Binding IsTidalConnected}"
                             Command="{Binding DisconnectTidalCommand}"
                             Classes="pill-action"
@@ -5870,6 +6252,7 @@
                                     <TextBlock Classes="server-field-label" Text="{loc:T Settings.SERVERTYPE}"/>
                                     <Border Classes="server-pill-shell">
                                         <ComboBox Classes="pill-list server-pill"
+                                                  AutomationProperties.Name="{loc:T Settings.SERVERTYPE}"
                                                   ItemsSource="{Binding MediaServerTypeOptions}"
                                                   SelectedItem="{Binding MediaServerType}"
                                                   IsEnabled="{Binding !IsMediaServerBusy}"
@@ -5879,6 +6262,7 @@
                                 <StackPanel Grid.Row="0" Grid.Column="2" Spacing="4" Margin="0,0,0,10">
                                     <TextBlock Classes="server-field-label" Text="{loc:T Settings.SERVERADDRESS}"/>
                                     <TextBox Classes="metadata-info-field"
+                                             AutomationProperties.Name="{loc:T Settings.SERVERADDRESS}"
                                              Text="{Binding MediaServerUrl}"
                                              Watermark="{loc:T Settings.HttpsMusicExampleCom}"
                                              IsEnabled="{Binding !IsMediaServerBusy}">
@@ -5890,6 +6274,7 @@
                                 <StackPanel Grid.Row="1" Grid.Column="0" Spacing="4">
                                     <TextBlock Classes="server-field-label" Text="{loc:T Settings.USERNAME}"/>
                                     <TextBox Classes="metadata-info-field"
+                                             AutomationProperties.Name="{loc:T Settings.USERNAME}"
                                              Text="{Binding MediaServerUsername}"
                                              Watermark="{loc:T Settings.UsernameWatermark}"
                                              IsEnabled="{Binding !IsMediaServerBusy}">
@@ -5901,6 +6286,7 @@
                                 <StackPanel Grid.Row="1" Grid.Column="2" Spacing="4">
                                     <TextBlock Classes="server-field-label" Text="{loc:T Settings.PASSWORD}"/>
                                     <TextBox Classes="metadata-info-field"
+                                             AutomationProperties.Name="{loc:T Settings.PASSWORD}"
                                              Text="{Binding MediaServerPassword}"
                                              PasswordChar="•"
                                              Watermark="{loc:T Settings.PasswordWatermark}"
@@ -5933,6 +6319,7 @@
 
                         <!-- Connect (top-right, mirrors the account cards) -->
                         <Button Grid.Column="1"
+                                AutomationProperties.Name="{loc:T Settings.Connect}"
                                 IsVisible="{Binding !IsMediaServerConnected}"
                                 IsEnabled="{Binding !IsMediaServerBusy}"
                                 Classes="pill-action accent-btn"
@@ -5957,6 +6344,7 @@
                         </Button>
 
                         <Button Grid.Column="1"
+                                AutomationProperties.Name="{loc:T Settings.Disconnect}"
                                 IsVisible="{Binding IsMediaServerConnected}"
                                 Command="{Binding DisconnectMediaServerCommand}"
                                 Classes="pill-action"
@@ -5979,6 +6367,7 @@
                         <TextBlock Text="{loc:T Plugins.CommunityLine}" FontSize="12" Opacity="0.5" TextWrapping="Wrap"/>
                     </StackPanel>
                     <controls:LottieToggle Grid.Column="1" x:Name="CommunityPluginsToggle"
+                                          AutomationProperties.Name="{loc:T Plugins.CommunityTitle}"
                                           IsChecked="{Binding CommunityPluginsEnabled, Mode=TwoWay}"
                                           VerticalAlignment="Center"/>
                 </Grid>
@@ -6054,6 +6443,7 @@
                                                 <ContentControl.ContentTemplate>
                                                     <DataTemplate x:DataType="plugins:LoadedPlugin">
                                                         <controls:LottieToggle IsChecked="{Binding IsEnabled, Mode=TwoWay}"
+                                                                              AutomationProperties.Name="{Binding Name}"
                                                                               IsEnabled="{Binding CanToggle}"/>
                                                     </DataTemplate>
                                                 </ContentControl.ContentTemplate>
@@ -6076,6 +6466,7 @@
             <Grid ColumnDefinitions="Auto,*,Auto,Auto,Auto" Margin="2,10,0,8">
                 <TextBlock Grid.Column="0" Classes="section-title" Text="{loc:T Plugins.CustomTitle}" Margin="0" VerticalAlignment="Center"/>
                 <Button Grid.Column="2" x:Name="InstallPluginFromFileButton" Classes="pill-action"
+                        AutomationProperties.Name="{loc:T Plugins.InstallFromFile}"
                         Command="{Binding InstallPluginFromFileCommand}"
                         Height="34" Padding="14,0" VerticalContentAlignment="Center" CornerRadius="999" Cursor="Hand" VerticalAlignment="Center" Margin="0,0,6,0">
                     <TextBlock Text="{loc:T Plugins.InstallFromFile}" FontSize="12" FontWeight="SemiBold"/>
@@ -6134,6 +6525,7 @@
                                             <!-- Two-way: LoadedPlugin.IsEnabled routes the flip back to the host
                                                  (approval dialog on first enable, start/stop + persist). -->
                                             <controls:LottieToggle Grid.Column="1" IsChecked="{Binding IsEnabled, Mode=TwoWay}"
+                                                                  AutomationProperties.Name="{Binding Name}"
                                                                   IsEnabled="{Binding CanToggle}"
                                                                   VerticalAlignment="Top"/>
                                         </Grid>
@@ -6218,7 +6610,7 @@
             <!-- Top played: one card, two columns split by a hairline, the full-page link in the header. -->
             <Grid ColumnDefinitions="*,Auto" Margin="0,16,0,8">
                 <TextBlock Grid.Column="0" Classes="section-title" Text="{loc:T Settings.Section.TopPlayed}" Margin="0" VerticalAlignment="Center"/>
-                <Button Grid.Column="1" Classes="pill-action" Command="{Binding OpenStatisticsPageCommand}" Padding="12,5" CornerRadius="999" Cursor="Hand">
+                <Button Grid.Column="1" Classes="pill-action" Command="{Binding OpenStatisticsPageCommand}" Padding="12,5" CornerRadius="999" Cursor="Hand" AutomationProperties.Name="{loc:T Settings.ViewAllStats}">
                     <StackPanel Orientation="Horizontal" Spacing="6">
                         <TextBlock Text="{loc:T Settings.ViewAllStats}" FontSize="12" FontWeight="SemiBold" VerticalAlignment="Center"/>
                         <PathIcon Data="{StaticResource ChevronRightIcon}" Width="9" Height="9" VerticalAlignment="Center" Opacity="0.7"/>
@@ -6329,6 +6721,7 @@
                                      VerticalAlignment="Center"
                                      IsVisible="{Binding IsUpdateAvailable}"/>
                             <Button Command="{Binding CheckForUpdateCommand}"
+                                    AutomationProperties.Name="{Binding CheckForUpdatesButtonText}"
                                     Classes="pill update-pill"
                                     Classes.up-to-date="{Binding IsUpToDate}"
                                     Classes.checking="{Binding IsCheckingForUpdate}"
@@ -6390,6 +6783,7 @@
                                 </Panel>
                             </Border>
                             <Button Command="{Binding CancelUpdateCommand}"
+                                    AutomationProperties.Name="{loc:T Settings.Cancel}"
                                     Classes="pill update-fade"
                                     Padding="16,6"
                                     VerticalAlignment="Center"
@@ -6400,6 +6794,7 @@
                             <!-- Update Available button (replaces Check when a new release is detected).
                                  In-app installer path: Inno install (incl. winget/Chocolatey). -->
                             <Button Command="{Binding DownloadUpdateCommand}"
+                                    AutomationProperties.Name="{Binding UpdateButtonText}"
                                     Classes="pill red-pill update-fade"
                                     VerticalAlignment="Center"
                                     Padding="16,6"
@@ -6412,6 +6807,7 @@
                             <!-- Scoop / portable copies can't safely run the in-app installer;
                                  open the GitHub release instead and surface the update command. -->
                             <Button Command="{Binding OpenLatestReleaseCommand}"
+                                    AutomationProperties.Name="{Binding UpdateButtonText}"
                                     Classes="pill red-pill update-fade"
                                     VerticalAlignment="Center"
                                     Padding="16,6"
@@ -6424,6 +6820,7 @@
 
                             <!-- Postpone a queued automatic install by 24 h (auto-update only) -->
                             <Button Command="{Binding PostponeAutoInstallCommand}"
+                                    AutomationProperties.Name="{loc:T Settings.Postpone}"
                                     Classes="pill update-fade"
                                     Padding="16,6"
                                     VerticalAlignment="Center"
@@ -6433,6 +6830,7 @@
 
                             <!-- Install & Restart button (replaces Update when ready) -->
                             <Button Command="{Binding InstallUpdateCommand}"
+                                    AutomationProperties.Name="{loc:T Settings.InstallRestart}"
                                     Classes="pill red-pill update-fade"
                                     VerticalAlignment="Center"
                                     Padding="16,6"
@@ -6461,6 +6859,7 @@
                         </StackPanel>
                         <!-- After an automatic update: the release notes on GitHub -->
                         <Button Command="{Binding OpenLatestReleaseCommand}"
+                                AutomationProperties.Name="{loc:T Settings.WhatsNew}"
                                 Classes="pill"
                                 Padding="12,4"
                                 VerticalAlignment="Center"
@@ -6482,6 +6881,7 @@
                                        IsVisible="{Binding AutoUpdateDownloadOnly}"/>
                         </StackPanel>
                         <controls:LottieToggle Grid.Column="1"
+                                              AutomationProperties.Name="{loc:T Settings.AutoInstallUpdates}"
                                               IsChecked="{Binding AutoInstallUpdates}"
                                               VerticalAlignment="Center"/>
                     </Grid>
@@ -6490,7 +6890,7 @@
                          each a solid brand fill (star yellow, Discord blurple, Noctis red)
                          with the glyph and text in a contrasting colour. -->
                     <UniformGrid Columns="3" Margin="0,6,0,2">
-                        <Button Classes="brand-tile" Command="{Binding OpenGitHubCommand}" Margin="0,0,5,0">
+                        <Button Classes="brand-tile" Command="{Binding OpenGitHubCommand}" Margin="0,0,5,0" AutomationProperties.Name="{loc:T Settings.StarGitHub}">
                             <Grid>
                                 <Border CornerRadius="16" Background="#F1C40F"/>
                                 <Border Classes="tile-lift" CornerRadius="16"/>
@@ -6512,7 +6912,7 @@
                                 </StackPanel>
                             </Grid>
                         </Button>
-                        <Button Classes="brand-tile" Command="{Binding OpenDiscordCommand}" Margin="5,0,5,0">
+                        <Button Classes="brand-tile" Command="{Binding OpenDiscordCommand}" Margin="5,0,5,0" AutomationProperties.Name="{loc:T Settings.JoinDiscord}">
                             <Grid>
                                 <Border CornerRadius="16" Background="#5865F2"/>
                                 <Border Classes="tile-lift" CornerRadius="16"/>
@@ -6530,7 +6930,7 @@
                                 </StackPanel>
                             </Grid>
                         </Button>
-                        <Button Classes="brand-tile" Command="{Binding OpenWebsiteCommand}" Margin="5,0,0,0">
+                        <Button Classes="brand-tile" Command="{Binding OpenWebsiteCommand}" Margin="5,0,0,0" AutomationProperties.Name="{loc:T Settings.OfficialWebsite}">
                             <Grid>
                                 <Border CornerRadius="16" Background="#E74856"/>
                                 <Border Classes="tile-lift" CornerRadius="16"/>

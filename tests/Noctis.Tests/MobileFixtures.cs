@@ -22,8 +22,11 @@ internal static class MobileFixtures
     {
         /// <summary>Folders whose access is reported lost.</summary>
         public HashSet<string> Lost { get; } = new();
+        /// <summary>Folders on a card, with the card's name.</summary>
+        public Dictionary<string, string> Storage { get; } = new();
         public Task<string?> PickFolderAsync() => Task.FromResult<string?>(null);
         public bool HasAccess(string folder) => !Lost.Contains(folder);
+        public string? StorageName(string folder) => Storage.GetValueOrDefault(folder);
     }
 
     /// <summary>
@@ -118,8 +121,21 @@ internal static class MobileFixtures
     /// </summary>
     private static void RunBlocking(Func<Task> work) => Task.Run(work).GetAwaiter().GetResult();
 
+    /// <summary>The phone's surface palette (MobileTheme.Apply merges it on the device): the
+    /// floating chrome's glass tint and rim come from it. Merged once per headless app; it adds
+    /// only Phone* keys.</summary>
+    internal static void EnsurePhonePalette()
+    {
+        var merged = Avalonia.Application.Current!.Resources.MergedDictionaries;
+        if (merged.OfType<Avalonia.Controls.ResourceDictionary>().Any(d => d.ThemeDictionaries.Count > 0
+                && d.ThemeDictionaries.Values.OfType<Avalonia.Controls.ResourceDictionary>().Any(t => t.ContainsKey("PhoneChromeBrush"))))
+            return;
+        merged.Add(Noctis.Mobile.Services.MobileTheme.BuildPalette());
+    }
+
     internal static Window Mount(ShellViewModel shell, out ShellView view, double width = 412, double height = 915)
     {
+        EnsurePhonePalette();
         view = new ShellView { DataContext = shell };
         var window = new Window { Width = width, Height = height, Content = view };
         window.Show();
@@ -128,6 +144,18 @@ internal static class MobileFixtures
     }
 
     internal static T Find<T>(Visual root) where T : Visual => root.GetVisualDescendants().OfType<T>().First();
+
+    /// <summary>Lands every page and sheet in motion (Motion: they slide on a clock the headless
+    /// tests do not run), then lays the window out: what a test sees once the motion is over.</summary>
+    internal static void Land(Window window)
+    {
+        Motion.FinishAll();
+        window.UpdateLayout();
+    }
+
+    /// <summary>The view holding the top page (PageHost's, or SheetHost's while a sheet is up).</summary>
+    internal static ContentControl PageView(ShellView view, MobilePage page) =>
+        view.FindControl<PageStack>("SheetHost")!.ViewOf(page) ?? view.FindControl<PageStack>("PageHost")!.ViewOf(page)!;
 
     /// <summary>A named control anywhere below <paramref name="root"/>: pages are UserControls
     /// with their own name scopes, so ShellView.FindControl cannot see into them.</summary>

@@ -26,13 +26,13 @@
             <Setter Property="Width" Value="26" />
             <Setter Property="Height" Value="26" />
             <Setter Property="Margin" Value="-4,0,-3,0" />
-            <Setter Property="Foreground" Value="{DynamicResource AccentTextBrush}" />
+            <Setter Property="Foreground" Value="{DynamicResource AccentTextExactBrush}" />
         </Style>
         <Style Selector="Button.back-link TextBlock">
             <Setter Property="FontSize" Value="17" />
             <Setter Property="Margin" Value="2,0,0,0" />
             <Setter Property="VerticalAlignment" Value="Center" />
-            <Setter Property="Foreground" Value="{DynamicResource AccentTextBrush}" />
+            <Setter Property="Foreground" Value="{DynamicResource AccentTextExactBrush}" />
         </Style>
 
         <!-- "Find in Artists": a rounded grey field with the magnifier; the TextBox inside
@@ -91,7 +91,7 @@
             <Setter Property="Height" Value="14" />
             <Setter Property="LineHeight" Value="14" />
             <Setter Property="TextAlignment" Value="Center" />
-            <Setter Property="Foreground" Value="{DynamicResource AccentTextBrush}" />
+            <Setter Property="Foreground" Value="{DynamicResource AccentTextExactBrush}" />
         </Style>
     </UserControl.Styles>
 

@@ -1,9 +1,11 @@
+using System.Text.Json.Serialization;
+
 namespace Noctis.Models;
 
 /// <summary>
 /// Application settings, persisted to settings.json in %APPDATA%\Noctis\.
 /// </summary>
-public class AppSettings
+public class AppSettings : IJsonOnDeserializing
 {
     /// <summary>Directories to scan for music files.</summary>
     public List<string> MusicFolders { get; set; } = new();
@@ -114,6 +116,18 @@ public class AppSettings
     /// <summary>Phone: the lyrics page's text size on top of the system font scale (0.8-1.6).</summary>
     public double MobileLyricsTextScale { get; set; } = 1.0;
 
+    /// <summary>Phone, Settings › Appearance › Player Bar: the mini player's elapsed part filled in
+    /// the cover's colour. Off (the default) leaves the capsule plain glass, as Apple's.</summary>
+    public bool MobilePlayerBarProgressFill { get; set; }
+
+    /// <summary>Phone, Settings › Appearance › Player Bar: the bright progress line along the mini
+    /// player's bottom edge. Off by default.</summary>
+    public bool MobilePlayerBarProgressLine { get; set; }
+
+    /// <summary>Phone, Settings › Appearance › Album Colours: album and artist pages painted in a
+    /// deep shade of the cover's colour. Off, they keep the theme's plain pages. On by default.</summary>
+    public bool MobileArtworkPageColors { get; set; } = true;
+
     /// <summary>User-defined custom themes selectable from the Themes row.</summary>
     public List<CustomThemeDefinition> CustomThemes { get; set; } = new();
 
@@ -128,6 +142,15 @@ public class AppSettings
     /// near-real-time as files are added/removed/changed (FileSystemWatcher).
     /// </summary>
     public bool WatchFoldersEnabled { get; set; } = true;
+
+    /// <summary>
+    /// Inbox for new music (Discord request, MusicBee's Inbox): songs a scan or the folder
+    /// watcher finds for the first time in a music folder that already holds songs wait in
+    /// the Inbox, out of the library views, until added to the library or deleted. A new
+    /// folder's songs (and a fresh library's first scan) are an import and skip it. Off by
+    /// default; turning it off moves everything waiting into the library.
+    /// </summary>
+    public bool InboxEnabled { get; set; }
 
     /// <summary>
     /// Whether album covers may be read from the artwork embedded in each file's
@@ -187,8 +210,10 @@ public class AppSettings
     public double CrossfadeDuration { get; set; } = 6;
 
     /// <summary>GitHub #73: fade the level out before a pause lands and back in after a
-    /// resume (off = the hard cut), over <see cref="PlayPauseFadeMs"/> milliseconds.</summary>
-    public bool PlayPauseFadeEnabled { get; set; }
+    /// resume (off = the hard cut), over <see cref="PlayPauseFadeMs"/> milliseconds. On for new
+    /// installs (2026-10-18); a settings.json saved before the toggle existed keeps it off
+    /// (<see cref="OnDeserializing"/>).</summary>
+    public bool PlayPauseFadeEnabled { get; set; } = true;
 
     public int PlayPauseFadeMs { get; set; } = 300;
 
@@ -252,9 +277,11 @@ public class AppSettings
     public bool EnableAnimatedCovers { get; set; } = true;
 
     /// <summary>Album pages take their background colour from the cover's edge colour,
-    /// Apple-Music style, with the page text flipping dark on light covers. Ships on;
-    /// the Appearance toggle turns it off for users who want the flat theme page.</summary>
-    public bool AlbumPageTintEnabled { get; set; } = false;
+    /// Apple-Music style, with the page text flipping dark on light covers. Ships on
+    /// (2026-10-18; a settings.json saved before the toggle existed keeps it off, see
+    /// <see cref="OnDeserializing"/>); the Appearance toggle turns it off for users who want
+    /// the flat theme page.</summary>
+    public bool AlbumPageTintEnabled { get; set; } = true;
 
     /// <summary>Fresh-install value of <see cref="AlbumPageTintStrength"/>: the full cover
     /// colour, the look the album page had before the slider existed. Double-tapping the
@@ -332,6 +359,11 @@ public class AppSettings
     /// <summary>"Off" | "Duplicate" | "Surround" — see <see cref="Services.UpmixMode"/>.</summary>
     public string UpmixMode { get; set; } = "Off";
 
+    /// <summary>Settings → Audio: 5.1/7.1 files play binaurally (VLC's headphone mode) instead of
+    /// a plain stereo downmix. Stereo and mono pass untouched. Read at launch (VLC takes it as an
+    /// instance option), so a change applies the next time Noctis starts.</summary>
+    public bool HeadphoneSurround { get; set; }
+
     // ── YouTube downloads ──
 
     /// <summary>Where downloaded tracks land. Empty = "&lt;first music folder&gt;/YouTube".</summary>
@@ -362,6 +394,9 @@ public class AppSettings
 
     /// <summary>Also save the timings as a .ttml sidecar, for players that read TTML but not ELRC (Discord: Light Cone).</summary>
     public bool LyricsStudioSaveTtml { get; set; }
+
+    /// <summary>The Studio's live preview pane beside the review is open (10-14).</summary>
+    public bool LyricsStudioLivePreview { get; set; } = true;
 
     // ── Songs page optional columns ──
     // All six were the original set, chosen from the column-header dropdown.
@@ -402,11 +437,16 @@ public class AppSettings
     /// "albumartist" or "year".</summary>
     public string AlbumSortMode { get; set; } = "default";
 
-    /// <summary>Artists grid sort: "name", "songs" (track count) or "albums" (album count).</summary>
+    /// <summary>Artists grid sort: "name", "songs" (track count), "albums" (album count),
+    /// "time" (total length) or "genre".</summary>
     public string ArtistSortMode { get; set; } = "name";
 
     /// <summary>Artists grid sort direction.</summary>
     public bool ArtistSortAscending { get; set; } = true;
+
+    /// <summary>Artists page layout: "grid" (portrait tiles, the default) or "list" (rows
+    /// with Albums / Songs / Time / Genre columns, like the Songs page).</summary>
+    public string ArtistViewMode { get; set; } = "grid";
 
     /// <summary>Artist page Albums / Singles &amp; EPs tab order (GitHub #100): "newest"
     /// (release date), "oldest" (undated releases last) or "name" (A–Z). One setting for
@@ -623,6 +663,11 @@ public class AppSettings
     /// should opt into.</summary>
     public bool TaskbarProgressEnabled { get; set; } = false;
 
+    /// <summary>Windows only: Previous / Play-Pause / Forward / Favorite buttons under the
+    /// taskbar thumbnail (the preview when you hover the app's taskbar icon). On by default,
+    /// as they always were before the toggle existed.</summary>
+    public bool TaskbarMediaControlsEnabled { get; set; } = true;
+
     /// <summary>When true (default), "feat./ft." credits found in track titles — or file names,
     /// which stand in for the title on untagged files — are merged into the artist credit at
     /// scan time so collaborations show the full credit. Off: artist tags are used exactly as
@@ -638,6 +683,11 @@ public class AppSettings
     /// Applies to both artist and album-artist tags; see ArtistCredit.DefaultSeparators.</summary>
     public List<string> ArtistTagSeparators { get; set; } = ArtistCredit.DefaultSeparators.ToList();
 
+    /// <summary>"Keep these names together": artist names never cut apart by the separators
+    /// ("Tyler, The Creator", "AC/DC"). Settings saved before the list existed load the
+    /// built-ins (ArtistCredit.DefaultProtectedNames); an emptied list stays empty.</summary>
+    public List<string> ArtistProtectedNames { get; set; } = ArtistCredit.DefaultProtectedNames.ToList();
+
     /// <summary>The join (ArtistCredit.JoinText) the indexed artist credits were read with —
     /// multi-value artist tags are joined with it. Every build before GitHub #117 used ", ".
     /// When the active join differs, LibraryService.ApplyArtistCreditJoinAsync re-reads the
@@ -645,8 +695,10 @@ public class AppSettings
     public string ArtistCreditJoin { get; set; } = ", ";
 
     /// <summary>GitHub #99: the Artists grid's name sort skips a leading word from
-    /// <see cref="ArtistSortIgnoredWords"/> ("The Beatles" sorts under B). Off by default.</summary>
-    public bool IgnoreLeadingWordsInArtistSort { get; set; } = false;
+    /// <see cref="ArtistSortIgnoredWords"/> ("The Beatles" sorts under B). On for new installs
+    /// (2026-10-18); a settings.json saved before the toggle existed keeps it off
+    /// (<see cref="OnDeserializing"/>).</summary>
+    public bool IgnoreLeadingWordsInArtistSort { get; set; } = true;
 
     /// <summary>Leading words skipped while <see cref="IgnoreLeadingWordsInArtistSort"/> is on;
     /// see ArtistSortWords.SortKey for the matching rule.</summary>
@@ -707,6 +759,10 @@ public class AppSettings
     /// <summary>Whether the Discord card shows the album name under the artist (the large
     /// image's hover text). Off drops that line for a leaner card (Discord ask, 2026-09-03).</summary>
     public bool DiscordShowAlbum { get; set; } = true;
+
+    /// <summary>What Discord's status line reads after "Listening to": "Artist", "Title" or
+    /// "AppName" (see <see cref="Models.DiscordStatusDisplay"/>). Discord ask, 2026-10-14.</summary>
+    public string DiscordStatusDisplay { get; set; } = nameof(Models.DiscordStatusDisplay.Artist);
 
     /// <summary>Loon server URL for Discord cover art (e.g. "wss://loon.example.com").</summary>
     public string LoonServerUrl { get; set; } = "https://noctis-loon.duckdns.org";
@@ -855,6 +911,11 @@ public class AppSettings
     /// follows each syllable's own timing. Ships off, keeping the authored spacing.</summary>
     public bool LyricsJoinSplitWords { get; set; }
 
+    /// <summary>Apple Music word motion on word-synced lyrics: sung words float up and held
+    /// notes swell and glow letter by letter. Ships on; off keeps the words still (the
+    /// sweep alone marks the vocal).</summary>
+    public bool LyricsGlowAndLift { get; set; } = true;
+
     /// <summary>Show a TTML file's translation under each lyric line (issue #78).</summary>
     public bool LyricsShowTranslations { get; set; } = true;
 
@@ -890,6 +951,17 @@ public class AppSettings
 
     /// <summary>Whether Kugou (word-synced KRC lyrics) is searched automatically.</summary>
     public bool KugouEnabled { get; set; } = true;
+
+    /// <summary>Whether lrc.red (TTML: word-synced with duet voices, else line-synced or plain) is
+    /// searched automatically. Off on fresh installs: its word-synced files carry Apple Music's
+    /// agent ids and fields, and Apple Music lyrics stay plugin-only (#119); opt in here
+    /// (2026-10-17). Always available in the Search Lyrics source picker.</summary>
+    public bool LrcRedEnabled { get; set; }
+
+    /// <summary>Whether Unison (Better Lyrics' community lyrics, mostly word-synced TTML) is searched
+    /// automatically. On: keyless, documented for third-party reads (120 a minute per IP), two
+    /// small requests per lookup.</summary>
+    public bool UnisonEnabled { get; set; } = true;
 
     /// <summary>Whether YouTube Music (line-synced) is searched automatically. Off on fresh
     /// installs: three round trips and ~1 MB of responses per lookup, on pinned client versions.</summary>
@@ -990,6 +1062,21 @@ public class AppSettings
         // old default, so it follows the new one instead of leaving a stretched pill.
         if (PlaybackBarWidth == 626) PlaybackBarWidth = 536;
         PlaybackBarSkipSeconds = PlaybackBarSkipSeconds is 10 or 15 or 30 ? PlaybackBarSkipSeconds : 15;
+    }
+
+    /// <summary>
+    /// Runs when a stored settings file is read, after the initializers and before the file's
+    /// own values go in. Defaults that went from off to on after release (2026-10-18) start
+    /// back at their old value here: a key the file has still wins, and a file without the
+    /// key was saved by a build that predates the setting, so that user never saw it and keeps
+    /// the old behaviour. Only a brand-new install (and Reset, both <c>new AppSettings()</c>)
+    /// gets the new default. Every save writes every key, so this only matters once per file.
+    /// </summary>
+    public void OnDeserializing()
+    {
+        AlbumPageTintEnabled = false;
+        PlayPauseFadeEnabled = false;
+        IgnoreLeadingWordsInArtistSort = false;
     }
 }
 

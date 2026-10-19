@@ -85,7 +85,8 @@
                             Background="Transparent" BorderThickness="0"
                             Width="32" Height="32" Padding="0"
                             HorizontalAlignment="Right" VerticalAlignment="Top"
-                            Cursor="Hand" Click="OnCloseClick">
+                            Cursor="Hand" Click="OnCloseClick"
+                            ToolTip.Tip="{loc:T Common.Close}">
                         <controls:LineIcon Data="{StaticResource MenuLineClose}" Width="24" Height="24" Opacity="0.75"/>
                     </Button>
                 </Grid>

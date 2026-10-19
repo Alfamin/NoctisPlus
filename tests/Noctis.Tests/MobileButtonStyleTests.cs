@@ -81,7 +81,7 @@ public class MobileButtonStyleTests
     {
         var (rig, window, view) = Open();
         using var _rig = rig;
-        rig.Shell.OpenSettingsCommand.Execute(null);
+        // Library's own pills (Settings' were rows of Apple's grouped cards since 10-12).
         window.UpdateLayout();
 
         var pills = view.GetVisualDescendants().OfType<Button>()

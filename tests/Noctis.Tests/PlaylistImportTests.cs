@@ -29,6 +29,20 @@ public class PlaylistImportTests
     }
 
     [Fact]
+    public void Csv_PrimaryArtist_KeepsAProtectedNameWhole()
+    {
+        // Matches the library side: Track.PrimaryArtist keeps "Tyler, The Creator" whole too.
+        const string csv =
+            "Track Name,Artist Name(s),Album Name\n" +
+            "EARFQUAKE,\"Tyler, The Creator,Playboi Carti\",IGOR\n" +
+            "Song,\"Kali Uchis, Tyler, The Creator\",Album\n";
+        var entries = PlaylistImportParser.ParseCsv(csv, "f").Entries;
+        Assert.Equal("Tyler, The Creator", entries[0].Artist);
+        Assert.Equal("Kali Uchis", entries[1].Artist);
+        Assert.Equal("Tyler, The Creator", Track.GetPrimaryArtist("Tyler, The Creator, Playboi Carti"));
+    }
+
+    [Fact]
     public void Csv_EmbeddedCommaInQuotedTitle_IsPreserved()
     {
         const string csv =

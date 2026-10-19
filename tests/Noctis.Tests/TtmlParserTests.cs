@@ -615,4 +615,20 @@ public class TtmlParserTests
         Assert.DoesNotContain(lines ?? new(), l => l.Text.Contains("EXPANDED"));
         Assert.DoesNotContain("EXPANDED", plain ?? string.Empty);
     }
+
+    [Fact]
+    public void Parse_UntimedTextBeforeTheFirstTimedSpan_IsAWordFromTheLineStart()
+    {
+        // Mixed content: the line's own text runs until its first timed span. The word row
+        // replaces the line text on screen, so text missing from it was never shown.
+        var ttml = $"""<tt {Ns}><body><div><p begin="5" end="7">Oh my <span begin="6" end="7">word</span></p></div></body></tt>""";
+
+        var line = Assert.Single(TtmlParser.Parse(ttml).Lines!);
+
+        Assert.Equal("Oh my word", line.Text);
+        Assert.Equal(new[] { "Oh my", "word" }, line.Words!.Select(w => w.Text.Trim()));
+        Assert.Equal(TimeSpan.FromSeconds(5), line.Words![0].Start);
+        Assert.Equal(TimeSpan.FromSeconds(6), line.Words![0].End);
+        Assert.Equal("Oh my word", LrcParser.Parse(TtmlParser.ToLrc(ttml)!)[0].Text);
+    }
 }

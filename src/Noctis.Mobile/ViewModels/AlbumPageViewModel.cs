@@ -51,6 +51,7 @@ public sealed partial class AlbumPageViewModel : MobilePage, ITintedPage
         AlbumId = album.Id;
         Tint = shell.TintFactory();
         Tint.HeroFade = true;
+        Tint.Enabled = shell.ArtworkPageColors;
         Shell.Library.Refreshed += OnRefreshed;
         Shell.Player.PropertyChanged += OnPlayerChanged;
         Shell.PropertyChanged += OnShellChanged;
@@ -140,14 +141,19 @@ public sealed partial class AlbumPageViewModel : MobilePage, ITintedPage
     public string QualityDetail => Album.AudioQualityDetailedInfo;
     public string QualityDescription => Album.AudioQualityDescription;
 
+    /// <summary>The quality badge: what it means, as a note on the glass pop menu out of the badge.</summary>
+    [RelayCommand]
+    private void ShowQualityNote() => Shell.ShowOptions(OptionsMenuViewModel.ForNote(QualityBadge, QualityDetail, QualityDescription));
+
     /// <summary>"Genre · Year", skipping what a file does not carry (the "Unknown" genre
     /// placeholder, year 0) so a sparsely tagged album never shows "· ·". The quality badge
     /// follows it as its own element, as on the desktop.</summary>
     public static string BuildMetaLine(Album album)
     {
         var parts = new List<string>();
-        if (!string.IsNullOrWhiteSpace(album.Genre) && !string.Equals(album.Genre, "Unknown", StringComparison.OrdinalIgnoreCase))
-            parts.Add(album.Genre);
+        // Each genre of a multi-genre album on its own: "Rock · Pop · 2018" (GitHub #136).
+        if (album.GenreDisplay.Length > 0)
+            parts.Add(album.GenreDisplay);
         if (album.Year > 0) parts.Add(album.Year.ToString(CultureInfo.InvariantCulture));
         return string.Join(" · ", parts);
     }
@@ -257,6 +263,8 @@ public sealed partial class AlbumPageViewModel : MobilePage, ITintedPage
         if (e.PropertyName is nameof(ShellViewModel.IsNowPlayingOpen) or nameof(ShellViewModel.IsLyricsOpen)
             or nameof(ShellViewModel.IsQueueOpen))
             SyncNowPlaying();
+        else if (e.PropertyName == nameof(ShellViewModel.ArtworkPageColors))
+            Tint.Enabled = Shell.ArtworkPageColors;   // Settings › Appearance › Album Colours, live
     }
 
     /// <summary>Marks the player's track and runs its bars only while it plays and the page is

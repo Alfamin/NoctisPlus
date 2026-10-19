@@ -35,8 +35,12 @@ public class MobileLibraryPagesTests
 
         Assert.True(MobileFixtures.Named<Border>(view, "ConnectCard").IsVisible);
         Assert.False(MobileFixtures.Named<Border>(view, "ReconnectCard").IsVisible);
-        Assert.False(MobileFixtures.Named<ItemsControl>(view, "LibraryRowList").IsVisible);
         Assert.False(MobileFixtures.Named<StackPanel>(view, "PinnedSection").IsVisible);
+        rig.Shell.SelectTabCommand.Execute(MobileTab.Library);
+        window.UpdateLayout();
+        var library = MobileFixtures.Find<LibraryPage>(view);
+        Assert.True(MobileFixtures.Named<Border>(library, "ConnectCard").IsVisible);
+        Assert.False(MobileFixtures.Named<ItemsControl>(library, "LibraryRowList").IsVisible);
         Assert.False(rig.Shell.IsMiniBarVisible);
         window.Close();
     }
@@ -52,9 +56,12 @@ public class MobileLibraryPagesTests
         using var rig = MobileFixtures.MakeRig(new[] { a, b, c }, new[] { album }, WithFolder(mix));
         var window = MobileFixtures.Mount(rig.Shell, out var view);
 
+        Assert.True(MobileFixtures.Named<Border>(view, "PinnedHint").IsVisible);     // Home: nothing pinned yet
+        rig.Shell.SelectTabCommand.Execute(MobileTab.Library);
+        window.UpdateLayout();
         Assert.True(MobileFixtures.Named<ItemsControl>(view, "LibraryRowList").IsVisible);
-        Assert.False(MobileFixtures.Named<Border>(view, "ConnectCard").IsVisible);
-        Assert.True(MobileFixtures.Named<Border>(view, "PinnedHint").IsVisible);     // nothing pinned yet
+        Assert.False(rig.Shell.Library.HasNotice);                                   // no card: the notices collapse
+        Assert.DoesNotContain(view.GetVisualDescendants().OfType<Border>(), b => b.Name == "ConnectCard" && b.IsEffectivelyVisible);
         Assert.Equal(3, rig.Shell.Library.SongCount);
         Assert.Equal(1, rig.Shell.Library.FavoriteCount);
         Assert.Equal(2, rig.Shell.Library.RecentlyAddedCount);                      // the 30-day window drops Beta
@@ -166,15 +173,17 @@ public class MobileLibraryPagesTests
         // 250 rows: long enough to inherit the offset. Pushed directly: an artist link now opens
         // the artist page, which has no SongScroll.
         rig.Shell.Navigate(new SongListPageViewModel(rig.Shell, "Even", () => MobileLibrary.SongsBy(rig.Library, "Even")));
-        window.UpdateLayout();
+        MobileFixtures.Land(window);
         Dispatcher.UIThread.RunJobs();
-        Assert.Equal(0, MobileFixtures.Named<ScrollViewer>(view, "SongScroll").Offset.Y, 1);   // a new page starts at the top
+        // Scoped to the top page's view: the Songs page stays in the tree, hidden, under it.
+        Assert.Equal(0, MobileFixtures.Named<ScrollViewer>(MobileFixtures.PageView(view, rig.Shell.CurrentPage!), "SongScroll").Offset.Y, 1);   // a new page starts at the top
 
         rig.Shell.NavigateBackCommand.Execute(null);
+        MobileFixtures.Land(window);
         for (var i = 0; i < 3; i++) { window.UpdateLayout(); Dispatcher.UIThread.RunJobs(); }
 
         Assert.Same(page, rig.Shell.CurrentPage);
-        Assert.Equal(3000, MobileFixtures.Named<ScrollViewer>(view, "SongScroll").Offset.Y, 1);
+        Assert.Equal(3000, MobileFixtures.Named<ScrollViewer>(MobileFixtures.PageView(view, page), "SongScroll").Offset.Y, 1);
         window.Close();
     }
 
@@ -185,11 +194,53 @@ public class MobileLibraryPagesTests
         rig.Library.AbortScanWithRoots = new[] { "content://tree/music" };
 
         await rig.Shell.Library.RescanCommand.ExecuteAsync(null);
+        rig.Shell.SelectTabCommand.Execute(MobileTab.Library);
         var window = MobileFixtures.Mount(rig.Shell, out var view);
 
         Assert.True(rig.Shell.Library.NeedsReconnect);
         Assert.True(MobileFixtures.Named<Border>(view, "ReconnectCard").IsVisible);
         Assert.False(MobileFixtures.Named<TextBlock>(view, "StatusLine").IsVisible);   // the card carries the text
+        window.Close();
+    }
+
+    /// <summary>The Playlists tab: "1 song", not "1 songs"; the header pill searches and sorts
+    /// the list, pinned playlists first throughout.</summary>
+    [AvaloniaFact]
+    public void PlaylistsTab_CountsInTheSingular_AndItsToolsSearchAndSort()
+    {
+        var a = MobileFixtures.Song("Alpha");
+        var b = MobileFixtures.Song("Beta");
+        var one = new Playlist { Name = "Solo", TrackIds = { a.Id }, ModifiedAt = DateTime.UtcNow.AddDays(-1) };
+        var two = new Playlist { Name = "Duo", TrackIds = { a.Id, b.Id }, ModifiedAt = DateTime.UtcNow.AddDays(-3) };
+        var pinned = new Playlist { Name = "Zed", IsPinned = true, ModifiedAt = DateTime.UtcNow.AddDays(-9) };
+        using var rig = MobileFixtures.MakeRig(new[] { a, b }, seed: WithFolder(one, two, pinned));
+        var window = MobileFixtures.Mount(rig.Shell, out var view);
+        rig.Shell.SelectTabCommand.Execute(MobileTab.Playlists);
+        window.UpdateLayout();
+
+        var page = rig.Shell.PlaylistsRoot;
+        Assert.Equal(new[] { "Zed", "Duo", "Solo" }, page.Rows.Select(r => r.Name));
+        Assert.Equal(new[] { "0 songs", "2 songs", "1 song" }, page.Rows.Select(r => r.Subtitle));
+        var root = view.FindControl<Grid>("PlaylistsRoot")!;
+        var shown = root.GetVisualDescendants().OfType<TextBlock>().Where(t => t.IsEffectivelyVisible).Select(t => t.Text).ToList();
+        Assert.Contains("1 song", shown);
+        Assert.DoesNotContain("1 songs", shown);
+        // The tab's header carries the tools pill, as Favorites' does.
+        var tools = root.GetVisualDescendants().OfType<PlaylistTools>().Single(t => t.IsEffectivelyVisible);
+        Assert.Same(page, tools.DataContext);
+
+        page.ChooseSort(page.SortChoices.Single(c => c.Label == "Recently Updated"));
+        Assert.True(page.IsSorted);
+        Assert.Equal(new[] { "Zed", "Solo", "Duo" }, page.Playlists.Select(p => p.Name));
+        page.ChooseSort(page.SortChoices.Single(c => c.Label == "Title"));
+
+        page.ToggleSearchCommand.Execute(null);
+        page.FilterText = "so";
+        Assert.Equal(new[] { "Solo" }, page.Playlists.Select(p => p.Name));
+        page.FilterText = "nothing";
+        Assert.True(page.ShowNoMatches);
+        page.ToggleSearchCommand.Execute(null);                  // closing the search clears it
+        Assert.Equal(3, page.Playlists.Count);
         window.Close();
     }
 }

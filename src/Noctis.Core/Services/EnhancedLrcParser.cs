@@ -312,7 +312,7 @@ public static partial class EnhancedLrcParser
             var merged = new List<WordTiming>(target.BackgroundWords!);
             var seam = merged[^1];
             if (!seam.Text.EndsWith(' '))
-                merged[^1] = new WordTiming { Text = seam.Text + " ", Start = seam.Start, End = seam.End };
+                merged[^1] = new WordTiming { Text = seam.Text + " ", Start = seam.Start, End = seam.End, Syllables = seam.Syllables };
             merged.AddRange(words);
             target.BackgroundEndTimestamp = bgEnd ?? target.BackgroundEndTimestamp;
             target.BackgroundWords = merged;

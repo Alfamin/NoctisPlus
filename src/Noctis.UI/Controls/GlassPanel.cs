@@ -15,6 +15,18 @@ using SkiaSharp;
 
 namespace Noctis.Controls;
 
+/// <summary>How a <see cref="GlassPanel"/>'s rim light (<see cref="GlassPanel.Specular"/>) falls.</summary>
+public enum GlassSpecularStyle
+{
+    /// <summary>A line all the way round, lit from the top-left (the default).</summary>
+    Diagonal,
+
+    /// <summary>Apple's iOS 26 menus: a soft catch-light along the top edge that fades out down the
+    /// sides, fainter again along the bottom, added to what lies beneath so it takes its colour.
+    /// With no <see cref="GlassPanel.EdgeBrush"/> the glass then has no outline of its own.</summary>
+    TopCatch,
+}
+
 /// <summary>
 /// A surface that frosts whatever the app has already drawn beneath it when Liquid
 /// Glass is on, and paints a plain rounded <see cref="Background"/> when it is off.
@@ -122,6 +134,37 @@ public class GlassPanel : Decorator
     public static readonly StyledProperty<double> SpecularProperty =
         AvaloniaProperty.Register<GlassPanel, double>(nameof(Specular));
 
+    /// <summary>How the rim light falls round the outline; see <see cref="GlassSpecularStyle"/>.</summary>
+    public static readonly StyledProperty<GlassSpecularStyle> SpecularStyleProperty =
+        AvaloniaProperty.Register<GlassPanel, GlassSpecularStyle>(nameof(SpecularStyle));
+
+    /// <summary>How the backdrop's luminance maps into [<see cref="BackdropMinLuminance"/>,
+    /// <see cref="BackdropMaxLuminance"/>]: 1 (default) a straight line; above 1 it climbs steeply
+    /// from the dark end and eases into the top, so the glass shows most content bright and clear and
+    /// holds only the brightest down. See <see cref="GlassLensFrame.ToneCurve"/>.</summary>
+    public static readonly StyledProperty<double> BackdropToneCurveProperty =
+        AvaloniaProperty.Register<GlassPanel, double>(nameof(BackdropToneCurve), 1.0);
+
+    /// <summary>0..1: how content darker than the glass's floor is lifted. 0 (default) scales its
+    /// colour up; 1 lays a white veil over it, as frosted white glass does, so a dark colour behind
+    /// light glass reads as a soft tint instead of a vivid blotch. See <see cref="GlassLensFrame.ToneLift"/>.</summary>
+    public static readonly StyledProperty<double> BackdropLiftProperty =
+        AvaloniaProperty.Register<GlassPanel, double>(nameof(BackdropLift));
+
+    /// <summary>0..1: how much of the glass is the scattered light of its surroundings (Apple: "its
+    /// color is informed by surrounding content") — the backdrop blurred four times as wide as
+    /// <see cref="BlurRadius"/>, brought to the glass's luminance and mixed in. Dark content behind
+    /// the glass then takes the colour of what lies around it instead of a grey or white veil, and a
+    /// plain backdrop keeps its own hue and saturation; <see cref="BackdropLift"/>'s veil only comes
+    /// in as the lift grows. 0 (default): off. See <see cref="GlassLensFrame.Spill"/>.</summary>
+    public static readonly StyledProperty<double> BackdropSpillProperty =
+        AvaloniaProperty.Register<GlassPanel, double>(nameof(BackdropSpill));
+
+    /// <summary>0..1: the rim's shadow on the face, a soft dark band over the lens band
+    /// (<see cref="Refraction"/>), deepest under the top edge, gone along the bottom. 0 (default): none.</summary>
+    public static readonly StyledProperty<double> BackdropShadeProperty =
+        AvaloniaProperty.Register<GlassPanel, double>(nameof(BackdropShade));
+
     /// <summary>Shadows cast outside the panel, as on a <see cref="Border"/>; none by default.</summary>
     public static readonly StyledProperty<BoxShadows> BoxShadowProperty =
         Border.BoxShadowProperty.AddOwner<GlassPanel>();
@@ -132,7 +175,8 @@ public class GlassPanel : Decorator
             IsGlassActiveProperty, GlassTintProperty, GlassTintOpacityProperty, BlurRadiusProperty,
             EdgeBrushProperty, EdgeThicknessProperty, FadeProperty,
             RefractionProperty, RefractionAmountProperty, DispersionProperty, MagnificationProperty,
-            SaturationProperty, SpecularProperty, BoxShadowProperty, BackdropMinLuminanceProperty, BackdropMaxLuminanceProperty);
+            SaturationProperty, SpecularProperty, BoxShadowProperty, BackdropMinLuminanceProperty, BackdropMaxLuminanceProperty,
+            SpecularStyleProperty, BackdropToneCurveProperty, BackdropLiftProperty, BackdropSpillProperty, BackdropShadeProperty);
         AffectsArrange<GlassPanel>(BlurRadiusProperty);
     }
 
@@ -142,14 +186,19 @@ public class GlassPanel : Decorator
     public double Magnification { get => GetValue(MagnificationProperty); set => SetValue(MagnificationProperty, value); }
     public double Saturation { get => GetValue(SaturationProperty); set => SetValue(SaturationProperty, value); }
     public double Specular { get => GetValue(SpecularProperty); set => SetValue(SpecularProperty, value); }
+    public GlassSpecularStyle SpecularStyle { get => GetValue(SpecularStyleProperty); set => SetValue(SpecularStyleProperty, value); }
+    public double BackdropToneCurve { get => GetValue(BackdropToneCurveProperty); set => SetValue(BackdropToneCurveProperty, value); }
+    public double BackdropLift { get => GetValue(BackdropLiftProperty); set => SetValue(BackdropLiftProperty, value); }
     public double BackdropMinLuminance { get => GetValue(BackdropMinLuminanceProperty); set => SetValue(BackdropMinLuminanceProperty, value); }
     public double BackdropMaxLuminance { get => GetValue(BackdropMaxLuminanceProperty); set => SetValue(BackdropMaxLuminanceProperty, value); }
+    public double BackdropSpill { get => GetValue(BackdropSpillProperty); set => SetValue(BackdropSpillProperty, value); }
+    public double BackdropShade { get => GetValue(BackdropShadeProperty); set => SetValue(BackdropShadeProperty, value); }
     public BoxShadows BoxShadow { get => GetValue(BoxShadowProperty); set => SetValue(BoxShadowProperty, value); }
 
     /// <summary>Any lens setting is on: the backdrop is drawn through <see cref="GlassLens"/>.</summary>
     internal bool HasLens =>
         (Refraction > 0 && RefractionAmount != 0) || Math.Abs(Magnification - 1) > 1e-6 || Math.Abs(Saturation - 1) > 1e-6
-        || BackdropMinLuminance > 0 || BackdropMaxLuminance < 1;
+        || BackdropMinLuminance > 0 || BackdropMaxLuminance < 1 || BackdropSpill > 0 || (BackdropShade > 0 && Refraction > 0);
 
     /// <summary>The panel reads what lies beneath it: a blur, a lens, or both.</summary>
     internal bool NeedsBackdrop => BlurRadius > 0 || HasLens;
@@ -212,7 +261,8 @@ public class GlassPanel : Decorator
         if (change.Property == UseAppGlassProperty || change.Property == IsGlassActiveProperty || change.Property == BlurRadiusProperty
             || change.Property == RefractionProperty || change.Property == RefractionAmountProperty
             || change.Property == MagnificationProperty || change.Property == SaturationProperty
-            || change.Property == BackdropMinLuminanceProperty || change.Property == BackdropMaxLuminanceProperty)
+            || change.Property == BackdropMinLuminanceProperty || change.Property == BackdropMaxLuminanceProperty
+            || change.Property == BackdropSpillProperty || change.Property == BackdropShadeProperty)
         {
             if (!EffectiveGlassActive || !NeedsBackdrop) ReleaseBackdrop();
             _reach?.InvalidateVisual();
@@ -306,7 +356,8 @@ public class GlassPanel : Decorator
     internal GlassLensSettings? LensSettings() => HasLens
         ? new GlassLensSettings(Math.Max(Refraction, 0), RefractionAmount, Math.Clamp(Dispersion, 0, 1),
             Math.Max(Magnification, 0.01), Math.Max(Saturation, 0),
-            Math.Clamp(BackdropMinLuminance, 0, 1), Math.Clamp(BackdropMaxLuminance, 0, 1))
+            Math.Clamp(BackdropMinLuminance, 0, 1), Math.Clamp(BackdropMaxLuminance, 0, 1), Math.Max(BackdropToneCurve, 0.01),
+            Math.Clamp(BackdropLift, 0, 1), Math.Clamp(BackdropSpill, 0, 1), Math.Clamp(BackdropShade, 0, 1))
         : null;
 
     public override void Render(DrawingContext context)
@@ -351,7 +402,7 @@ public class GlassPanel : Decorator
 
         var specular = Math.Clamp(Specular, 0, 1) * fade;
         if (specular > 0)
-            context.Custom(new GlassRimOp(rect, CornerRadius, specular, Math.Clamp(Dispersion, 0, 1)));
+            context.Custom(new GlassRimOp(rect, CornerRadius, specular, Math.Clamp(Dispersion, 0, 1), SpecularStyle));
 
         if (EdgeBrush != null && EdgeThickness > 0)
         {
@@ -867,8 +918,11 @@ internal sealed class GlassBackdropOp : ICustomDrawOperation
         var local = new SKRect((float)Bounds.X, (float)Bounds.Y, (float)Bounds.Right, (float)Bounds.Bottom);
         var radii = new GlassCornerRadii((float)_corners.TopLeft, (float)_corners.TopRight, (float)_corners.BottomRight, (float)_corners.BottomLeft);
         if (!GlassLens.TryMapToDevice(m, local, radii, out var device, out var deviceRadii, out var scale)) return null;
+        // The spill reads the backdrop four times as wide as the frost (at least 16 logical px).
+        var spillSigma = Math.Max(_blurRadius * 4, 16) * scale;
         return new GlassLensFrame(device, deviceRadii, (float)(l.Band * scale), (float)(l.Bend * scale),
-            (float)l.Dispersion, (float)l.Zoom, (float)l.Saturation, (float)l.ToneMin, (float)l.ToneMax);
+            (float)l.Dispersion, (float)l.Zoom, (float)l.Saturation, (float)l.ToneMin, (float)l.ToneMax, (float)l.ToneCurve, (float)l.ToneLift,
+            (float)l.Spill, (float)spillSigma, (float)l.Shade);
     }
 }
 
@@ -901,11 +955,17 @@ internal sealed class GlassRimOp : ICustomDrawOperation
     /// <summary>The crisp rim line, the soft inner glow's reach and its strength (logical px / 0..1).</summary>
     internal const double LineWidth = 0.9, GlowWidth = 7, Glow = 0.22;
 
+    /// <summary><see cref="GlassSpecularStyle.TopCatch"/>'s glow: tighter and stronger relative to its
+    /// line, the way the light fades into Apple's menus over the first few points under the top edge.</summary>
+    internal const double CatchGlowWidth = 3, CatchGlow = 0.3;
+
     private readonly Rect _rect;
     private readonly CornerRadius _corners;
     private readonly double _strength, _iridescence;
+    private readonly GlassSpecularStyle _style;
 
-    public GlassRimOp(Rect rect, CornerRadius corners, double strength, double iridescence)
+    public GlassRimOp(Rect rect, CornerRadius corners, double strength, double iridescence,
+        GlassSpecularStyle style = GlassSpecularStyle.Diagonal)
     {
         _rect = rect;
         // The anti-aliased outline reaches half a device pixel past the rect.
@@ -913,12 +973,14 @@ internal sealed class GlassRimOp : ICustomDrawOperation
         _corners = corners;
         _strength = strength;
         _iridescence = iridescence;
+        _style = style;
     }
 
     public Rect Bounds { get; }
     public bool HitTest(Point p) => false;
     public bool Equals(ICustomDrawOperation? other) =>
-        other is GlassRimOp o && o._rect == _rect && o._corners == _corners && o._strength == _strength && o._iridescence == _iridescence;
+        other is GlassRimOp o && o._rect == _rect && o._corners == _corners && o._strength == _strength && o._iridescence == _iridescence
+        && o._style == _style;
     public void Dispose() { }
 
     public void Render(ImmediateDrawingContext context)
@@ -930,8 +992,12 @@ internal sealed class GlassRimOp : ICustomDrawOperation
         var local = new SKRect((float)_rect.X, (float)_rect.Y, (float)_rect.Right, (float)_rect.Bottom);
         var radii = new GlassCornerRadii((float)_corners.TopLeft, (float)_corners.TopRight, (float)_corners.BottomRight, (float)_corners.BottomLeft);
         if (!GlassLens.TryMapToDevice(canvas.TotalMatrix, local, radii, out var device, out var deviceRadii, out var scale)) return;
-        GlassLens.DrawRim(canvas, device, deviceRadii, (float)_strength, (float)(LineWidth * scale),
-            (float)(GlowWidth * scale), (float)Glow, (float)_iridescence);
+        if (_style == GlassSpecularStyle.TopCatch)
+            GlassLens.DrawRim(canvas, device, deviceRadii, (float)_strength, (float)(LineWidth * scale),
+                (float)(CatchGlowWidth * scale), (float)CatchGlow, (float)_iridescence, GlassRimShape.TopCatch, additive: true);
+        else
+            GlassLens.DrawRim(canvas, device, deviceRadii, (float)_strength, (float)(LineWidth * scale),
+                (float)(GlowWidth * scale), (float)Glow, (float)_iridescence);
     }
 }
 

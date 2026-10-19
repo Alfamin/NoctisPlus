@@ -61,8 +61,11 @@ public class LyricsMinLineOpacitySliderTests
 
             var slider = view.FindControl<Slider>("LyricsMinLineOpacitySlider");
             Assert.NotNull(slider);
-            Assert.Equal(1, slider!.TickFrequency);          // 1% steps (user: "smoother")
-            Assert.True(slider.IsSnapToTickEnabled);          // int binding never sees fractions
+            // 1% steps for the int setting, but the thumb itself glides (10-12: the snapped
+            // thumb jumped notch to notch); SmoothSlider rounds only what the setting sees.
+            var smooth = Assert.IsType<Noctis.Controls.SmoothSlider>(slider);
+            Assert.Equal(1, smooth.Step);
+            Assert.False(slider!.IsSnapToTickEnabled);
 
             // User dragged it somewhere else …
             vm.LyricsMinLineOpacity = 42;

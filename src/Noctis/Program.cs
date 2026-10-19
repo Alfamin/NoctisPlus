@@ -19,6 +19,8 @@ internal class Program
     public static void Main(string[] args)
     {
         Services.StartupTrace.Begin();
+        // Before anything can spawn a host tool: children must not inherit the AppImage's libraries.
+        Helpers.PlatformHelper.ScrubAppImageLoaderPathsForChildren();
         // The core's log header must name this app, not the core assembly.
         Services.DebugLog.DescribeBuild = Services.UpdateService.DescribeBuild;
         try
@@ -99,6 +101,10 @@ internal class Program
             // resolve and delays first paint. DI serializes singleton creation,
             // so the UI-thread resolve either finds it ready or waits exactly as
             // it does today — the instance is never built twice.
+            // Headphone surround is a LibVLC instance option, so it has to be known
+            // before the player exists — ahead of the settings load.
+            VlcAudioPlayer.HeadphoneSurroundAtLaunch = PersistenceService.ReadBoolSettingAtLaunch(
+                AppPaths.DataRoot, nameof(Noctis.Models.AppSettings.HeadphoneSurround));
             _ = Task.Run(() =>
             {
                 try { provider.GetRequiredService<IAudioPlayer>(); }
@@ -352,6 +358,8 @@ internal class Program
         services.AddSingleton<INetEaseService, NetEaseService>();
         services.AddSingleton<IMusixmatchService, MusixmatchService>();
         services.AddSingleton<IKugouLyricsService, KugouLyricsService>();
+        services.AddSingleton<ILrcRedLyricsService, LrcRedLyricsService>();
+        services.AddSingleton<IUnisonLyricsService, UnisonLyricsService>();
         services.AddSingleton<IYouTubeMusicLyricsService, YouTubeMusicLyricsService>();
         services.AddSingleton<IPlayHistoryService, PlayHistoryService>();
         // Singleton so the startup archive pass and the Wrap dialog share one instance

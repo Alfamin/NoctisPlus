@@ -145,11 +145,15 @@ public static class PlaylistImportParser
 
     private static string Get(string[] row, int idx) => idx >= 0 && idx < row.Length ? row[idx] : string.Empty;
 
+    /// <summary>The first listed artist. Settings' "keep together" names stay whole, matching
+    /// the library's own PrimaryArtist: "Tyler, The Creator, Kali Uchis" → "Tyler, The Creator",
+    /// not "Tyler" (which then missed the library track's primary artist).</summary>
     private static string PrimaryArtist(string artists)
     {
         if (string.IsNullOrWhiteSpace(artists)) return string.Empty;
-        var first = artists.Split(',', ';')[0];
-        return first.Trim();
+        return Noctis.Models.ArtistCredit.SplitAroundProtected(artists, gap => gap.Split(',', ';'))
+            .Select(a => a.Trim())
+            .FirstOrDefault(a => a.Length > 0) ?? string.Empty;
     }
 
     /// <summary>RFC-4180 tokenizer: handles quoted fields with embedded commas, quotes, and newlines.</summary>

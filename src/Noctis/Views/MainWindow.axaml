@@ -593,37 +593,60 @@
                         </Button>
                     </StackPanel>
 
-                    <!-- Artists grid: sort popover (Name / Songs / Albums + direction). -->
-                    <Panel VerticalAlignment="Center" IsVisible="{Binding HasArtistSort}">
-                        <Button Classes="corner-icon" AutomationProperties.Name="{loc:T Main.Sort}">
-                            <ToolTip.Tip>
-                                <TextBlock><Run Text="{loc:T Main.Sort}"/><Run Text=" "/><Run Text="{Binding ArtistSortLabel}"/></TextBlock>
-                            </ToolTip.Tip>
-                            <PathIcon Data="{StaticResource SortIcon}"/>
-                            <Button.Flyout>
-                                <MenuFlyout Placement="BottomEdgeAlignedRight"
-                                            helpers:MenuOpenAnimation.EnableFlyoutClose="True">
-                                    <MenuItem Header="{loc:T Main.Name}" Command="{Binding ArtistSortCommand}" CommandParameter="name">
-                                        <MenuItem.Icon><controls:LineIcon Classes="mv2-icon mv2-check" Data="{StaticResource MenuLineCheck}" IsVisible="{Binding ArtistSortMode, Converter={StaticResource StringEquals}, ConverterParameter=name}"/></MenuItem.Icon>
-                                    </MenuItem>
-                                    <MenuItem Header="{loc:T Main.SongCount}" Command="{Binding ArtistSortCommand}" CommandParameter="songs">
-                                        <MenuItem.Icon><controls:LineIcon Classes="mv2-icon mv2-check" Data="{StaticResource MenuLineCheck}" IsVisible="{Binding ArtistSortMode, Converter={StaticResource StringEquals}, ConverterParameter=songs}"/></MenuItem.Icon>
-                                    </MenuItem>
-                                    <MenuItem Header="{loc:T Main.AlbumCount}" Command="{Binding ArtistSortCommand}" CommandParameter="albums">
-                                        <MenuItem.Icon><controls:LineIcon Classes="mv2-icon mv2-check" Data="{StaticResource MenuLineCheck}" IsVisible="{Binding ArtistSortMode, Converter={StaticResource StringEquals}, ConverterParameter=albums}"/></MenuItem.Icon>
-                                    </MenuItem>
-                                    <Separator/>
-                                    <MenuItem Header="{loc:T Main.Ascending}" Command="{Binding ArtistSortCommand}" CommandParameter="Ascending">
-                                        <MenuItem.Icon><controls:LineIcon Classes="mv2-icon mv2-check" Data="{StaticResource MenuLineCheck}" IsVisible="{Binding ArtistSortAscending}"/></MenuItem.Icon>
-                                    </MenuItem>
-                                    <MenuItem Header="{loc:T Main.Descending}" Command="{Binding ArtistSortCommand}" CommandParameter="Descending">
-                                        <MenuItem.Icon><controls:LineIcon Classes="mv2-icon mv2-check" Data="{StaticResource MenuLineCheck}" IsVisible="{Binding ArtistSortDescending}"/></MenuItem.Icon>
-                                    </MenuItem>
-                                </MenuFlyout>
-                            </Button.Flyout>
+                    <!-- Artists page: sort popover (Name / Songs / Albums / Time / Genre + direction)
+                         and the grid ↔ list icon, which like the view-mode icon shows the
+                         layout you would switch TO. Both hide under Cover Flow. -->
+                    <StackPanel Orientation="Horizontal" Spacing="8" VerticalAlignment="Center"
+                                IsVisible="{Binding ArtistSortVisible}">
+                        <Panel VerticalAlignment="Center">
+                            <Button Classes="corner-icon" AutomationProperties.Name="{loc:T Main.Sort}">
+                                <ToolTip.Tip>
+                                    <TextBlock><Run Text="{loc:T Main.Sort}"/><Run Text=" "/><Run Text="{Binding ArtistSortLabel}"/></TextBlock>
+                                </ToolTip.Tip>
+                                <PathIcon Data="{StaticResource SortIcon}"/>
+                                <Button.Flyout>
+                                    <MenuFlyout Placement="BottomEdgeAlignedRight"
+                                                helpers:MenuOpenAnimation.EnableFlyoutClose="True">
+                                        <MenuItem Header="{loc:T Main.Name}" Command="{Binding ArtistSortCommand}" CommandParameter="name">
+                                            <MenuItem.Icon><controls:LineIcon Classes="mv2-icon mv2-check" Data="{StaticResource MenuLineCheck}" IsVisible="{Binding ArtistSortMode, Converter={StaticResource StringEquals}, ConverterParameter=name}"/></MenuItem.Icon>
+                                        </MenuItem>
+                                        <MenuItem Header="{loc:T Main.SongCount}" Command="{Binding ArtistSortCommand}" CommandParameter="songs">
+                                            <MenuItem.Icon><controls:LineIcon Classes="mv2-icon mv2-check" Data="{StaticResource MenuLineCheck}" IsVisible="{Binding ArtistSortMode, Converter={StaticResource StringEquals}, ConverterParameter=songs}"/></MenuItem.Icon>
+                                        </MenuItem>
+                                        <MenuItem Header="{loc:T Main.AlbumCount}" Command="{Binding ArtistSortCommand}" CommandParameter="albums">
+                                            <MenuItem.Icon><controls:LineIcon Classes="mv2-icon mv2-check" Data="{StaticResource MenuLineCheck}" IsVisible="{Binding ArtistSortMode, Converter={StaticResource StringEquals}, ConverterParameter=albums}"/></MenuItem.Icon>
+                                        </MenuItem>
+                                        <MenuItem Header="{loc:T Main.Time}" Command="{Binding ArtistSortCommand}" CommandParameter="time">
+                                            <MenuItem.Icon><controls:LineIcon Classes="mv2-icon mv2-check" Data="{StaticResource MenuLineCheck}" IsVisible="{Binding ArtistSortMode, Converter={StaticResource StringEquals}, ConverterParameter=time}"/></MenuItem.Icon>
+                                        </MenuItem>
+                                        <MenuItem Header="{loc:T Main.Genre}" Command="{Binding ArtistSortCommand}" CommandParameter="genre">
+                                            <MenuItem.Icon><controls:LineIcon Classes="mv2-icon mv2-check" Data="{StaticResource MenuLineCheck}" IsVisible="{Binding ArtistSortMode, Converter={StaticResource StringEquals}, ConverterParameter=genre}"/></MenuItem.Icon>
+                                        </MenuItem>
+                                        <Separator/>
+                                        <MenuItem Header="{loc:T Main.Ascending}" Command="{Binding ArtistSortCommand}" CommandParameter="Ascending">
+                                            <MenuItem.Icon><controls:LineIcon Classes="mv2-icon mv2-check" Data="{StaticResource MenuLineCheck}" IsVisible="{Binding ArtistSortAscending}"/></MenuItem.Icon>
+                                        </MenuItem>
+                                        <MenuItem Header="{loc:T Main.Descending}" Command="{Binding ArtistSortCommand}" CommandParameter="Descending">
+                                            <MenuItem.Icon><controls:LineIcon Classes="mv2-icon mv2-check" Data="{StaticResource MenuLineCheck}" IsVisible="{Binding ArtistSortDescending}"/></MenuItem.Icon>
+                                        </MenuItem>
+                                    </MenuFlyout>
+                                </Button.Flyout>
+                            </Button>
+                            <Border Classes="corner-dot" IsVisible="{Binding IsArtistSortActive}"/>
+                        </Panel>
+                        <Button Classes="corner-icon" IsVisible="{Binding !IsArtistListView}"
+                                Command="{Binding ToggleArtistViewCommand}"
+                                AutomationProperties.Name="{loc:T Main.SwitchToArtistList}"
+                                ToolTip.Tip="{loc:T Main.SwitchToArtistList}">
+                            <PathIcon Data="{StaticResource ListViewIcon}"/>
                         </Button>
-                        <Border Classes="corner-dot" IsVisible="{Binding IsArtistSortActive}"/>
-                    </Panel>
+                        <Button Classes="corner-icon" IsVisible="{Binding IsArtistListView}"
+                                Command="{Binding ToggleArtistViewCommand}"
+                                AutomationProperties.Name="{loc:T Main.SwitchToArtistGrid}"
+                                ToolTip.Tip="{loc:T Main.SwitchToArtistGrid}">
+                            <PathIcon Data="{StaticResource GridViewIcon}"/>
+                        </Button>
+                    </StackPanel>
 
                     <!-- Favorites: shuffle icon + Play (primary). -->
                     <StackPanel Orientation="Horizontal" Spacing="8" VerticalAlignment="Center"
@@ -804,7 +827,7 @@
                     </controls:GlassPanel.Transitions>
                 </controls:GlassPanel>
 
-                <!-- Queue popup panel (right side, rounded, slightly transparent).
+                <!-- Queue popup panel (right side, rounded, opaque fill while glass is off).
                      Visibility and the fade/slide open-close animation are driven from
                      code-behind (IsQueuePopupOpen handler) so the close can play before
                      the panel leaves the tree — same pattern as the Settings modal.
@@ -901,8 +924,28 @@
                         <!-- Compact header: "Queue • N", and with Keep Played Songs on a
                              Clear Played button at the right end (GitHub #134). -->
                         <DockPanel DockPanel.Dock="Top" Margin="20,16,16,6">
+                        <!-- Reshuffle (Discord, vari): the same quiet chip, icon-only so it fits
+                             beside Clear Played in every language; shown while Shuffle is on, as
+                             Clear Played is while Keep Played Songs is, and dimmed with fewer
+                             than two songs up next (the command's CanExecute). -->
+                        <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" Spacing="6"
+                                    VerticalAlignment="Center">
+                        <Button x:Name="QueueReshuffleButton"
+                                Classes="queue-clear-played"
+                                Command="{Binding Player.ReshuffleCommand}"
+                                IsVisible="{Binding Player.IsShuffleEnabled}"
+                                ToolTip.Tip="{loc:T Queue.Reshuffle}"
+                                Width="28" Height="24"
+                                Padding="0"
+                                CornerRadius="999"
+                                HorizontalContentAlignment="Center"
+                                VerticalContentAlignment="Center"
+                                VerticalAlignment="Center"
+                                Cursor="Hand">
+                            <PathIcon Data="{StaticResource ShuffleIcon}" Width="13" Height="13"
+                                      Foreground="{DynamicResource QueueDrawerForeground}"/>
+                        </Button>
                         <Button x:Name="QueueClearPlayedButton"
-                                DockPanel.Dock="Right"
                                 Classes="queue-clear-played"
                                 Content="{loc:T Queue.ClearPlayed}"
                                 Click="OnQueueClearPlayedClick"
@@ -914,6 +957,7 @@
                                 CornerRadius="999"
                                 VerticalAlignment="Center"
                                 Cursor="Hand" />
+                        </StackPanel>
                         <StackPanel Orientation="Horizontal" Spacing="7"
                                     VerticalAlignment="Center">
                             <TextBlock Text="{loc:T Main.Queue}"
@@ -1575,10 +1619,13 @@
     <!-- Owner 10-08 "make the background blur just like the metadata pop up": the scrim
          holds a blurred snapshot of AppContentLayer (taken once per open, freed on close)
          under the dim, the PillDialogHost look. Dim alone until the snapshot lands, or where
-         the backend can't take one. -->
+         the backend can't take one. Owner 10-18: that frozen copy stood still and jumped
+         forward on every retake while the lyrics moved under it, so LiveBlur blurs
+         AppContentLayer itself instead (the snapshot stays the Liquid Glass fallback). -->
     <controls:BlurredBackdrop Name="SettingsScrim"
             IsVisible="False"
             Opacity="0"
+            LiveBlur="True"
             Dim="#A6000000"
             ZIndex="99">
         <controls:BlurredBackdrop.Transitions>

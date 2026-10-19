@@ -33,7 +33,7 @@
                     </StackPanel>
                 </Button>
             </StackPanel>
-            <TextBox Name="ListSearchBox" Margin="16,0,16,8" CornerRadius="12" PlaceholderText="Search in this list"
+            <TextBox Name="ListSearchBox" Classes="search-field" Margin="16,0,16,8" PlaceholderText="Search in this list"
                      Text="{Binding FilterText}" IsVisible="{Binding IsSearchOpen}" />
             <!-- Its own line: the toolbar has no room left for it on a phone. -->
             <TextBlock Name="CountLabel" Classes="subtle" FontSize="13" Margin="22,0,20,4" Text="{Binding CountText}" />

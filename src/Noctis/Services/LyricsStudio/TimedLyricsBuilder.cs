@@ -1,5 +1,6 @@
 using System.Text;
 using System.Text.RegularExpressions;
+using Noctis.Models;
 
 namespace Noctis.Services.LyricsStudio;
 
@@ -22,11 +23,25 @@ public static partial class TimedLyricsBuilder
         var sb = new StringBuilder();
         foreach (var line in Ordered(lines))
         {
-            sb.Append('[').Append(FormatTimestamp(line.Start)).Append(']').Append(line.Text).Append('\n');
+            sb.Append(Stamp(line)).Append(line.Text).Append('\n');
+            AppendBackground(sb, line, timed: false);
             AppendCompanions(sb, line);
         }
         return sb.ToString().TrimEnd('\n');
     }
+
+    /// <summary>
+    /// "[mm:ss.xx]" at the line's start, then its duet voice as the reader's "v2:"/"v3:" marker
+    /// (none for the first singer). Without it a saved duet came back all in one voice, and a
+    /// second singer's romaji / translation no longer matched its line's voice and showed as sung.
+    /// </summary>
+    private static string Stamp(AlignedLine line) =>
+        "[" + FormatTimestamp(line.Start) + "]" + line.Voice switch
+        {
+            LyricVoice.Voice2 => "v2:",
+            LyricVoice.Group => "v3:",
+            _ => string.Empty,
+        };
 
     /// <summary>A line's romaji / translation lines (GitHub #116), at its own timestamp, as plain text.</summary>
     private static void AppendCompanions(StringBuilder sb, AlignedLine line)
@@ -34,7 +49,35 @@ public static partial class TimedLyricsBuilder
         if (line.Companions is not { Count: > 0 } companions) return;
         foreach (var c in companions)
             if (!string.IsNullOrWhiteSpace(c))
-                sb.Append('[').Append(FormatTimestamp(line.Start)).Append(']').Append(c.Trim()).Append('\n');
+                sb.Append(Stamp(line)).Append(c.Trim()).Append('\n');
+    }
+
+    /// <summary>
+    /// A line's background vocal as the "[bg: …]" line the lyrics page reads under it: word tags
+    /// in ELRC, its text alone in line-level LRC (shown from the line's start).
+    /// </summary>
+    private static void AppendBackground(StringBuilder sb, AlignedLine line, bool timed)
+    {
+        if (line.Background is not { Count: > 0 } words) return;
+        sb.Append("[bg: ");
+        if (!timed)
+        {
+            for (var i = 0; i < words.Count; i++)
+            {
+                if (i > 0 && !words[i - 1].JoinsNext) sb.Append(' ');
+                sb.Append(words[i].Text.Trim());
+            }
+        }
+        else
+        {
+            for (var i = 0; i < words.Count; i++)
+            {
+                if (i > 0 && !words[i - 1].JoinsNext) sb.Append(' ');
+                sb.Append('<').Append(FormatTimestamp(words[i].Start)).Append('>').Append(words[i].Text.Trim());
+            }
+            sb.Append('<').Append(FormatTimestamp(words[^1].End)).Append('>');
+        }
+        sb.Append("]\n");
     }
 
     public static string BuildElrc(IEnumerable<AlignedLine> lines)
@@ -42,7 +85,8 @@ public static partial class TimedLyricsBuilder
         var sb = new StringBuilder();
         foreach (var line in Ordered(lines))
         {
-            sb.Append('[').Append(FormatTimestamp(line.Start)).Append(']').Append(BuildElrcBody(line)).Append('\n');
+            sb.Append(Stamp(line)).Append(BuildElrcBody(line)).Append('\n');
+            AppendBackground(sb, line, timed: true);
             AppendCompanions(sb, line);
         }
         return sb.ToString().TrimEnd('\n');
@@ -57,7 +101,7 @@ public static partial class TimedLyricsBuilder
         {
             var w = line.Words[i];
             sb.Append('<').Append(FormatTimestamp(w.Start)).Append('>').Append(w.Text.Trim());
-            if (i + 1 < line.Words.Count) sb.Append(' ');
+            if (i + 1 < line.Words.Count && !w.JoinsNext) sb.Append(' ');
         }
         return sb.Append('<').Append(FormatTimestamp(line.Words[^1].End)).Append('>').ToString();
     }
@@ -142,8 +186,7 @@ public static partial class TimedLyricsBuilder
     /// <summary>
     /// TTML in Apple Music's lyrics layout, for players that read TTML and LRC but not ELRC
     /// (Discord, nutf!xx: Light Cone): one &lt;p&gt; per line, one &lt;span&gt; per timed word with
-    /// a space between spans (the word boundary <see cref="TtmlParser"/> and Apple's own files
-    /// use), clock times hh:mm:ss.fff. A line without word timings is its text; itunes:timing
+    /// the space after the word inside its span (see <see cref="AppendWordSpans"/>), clock times hh:mm:ss.fff. A line without word timings is its text; itunes:timing
     /// is "Word" when any line has words, else "Line". Ad-libs go in Apple's background-vocal
     /// span (ttm:role="x-bg") by the rules the ELRC reader applies to the same text
     /// (<see cref="EnhancedLrcParser.FoldBackgroundLines"/>): a parenthesised run inside a line
@@ -162,6 +205,7 @@ public static partial class TimedLyricsBuilder
                 continue;
             }
             var (main, background) = SplitInlineBackground(line.Words);
+            if (line.Background is { Count: > 0 } kept) background.AddRange(kept);
             paragraphs.Add(new TtmlParagraph(line, main, background));
         }
 
@@ -170,7 +214,12 @@ public static partial class TimedLyricsBuilder
         sb.Append("<tt xmlns=\"http://www.w3.org/ns/ttml\" xmlns:ttm=\"http://www.w3.org/ns/ttml#metadata\"")
           .Append(" xmlns:itunes=\"http://music.apple.com/lyric-ttml-internal\"")
           .Append(" itunes:timing=\"").Append(paragraphs.Any(p => p.Line.Words.Count > 0) ? "Word" : "Line").Append("\">\n");
-        sb.Append("  <head><metadata/></head>\n");
+        // Duet voices as Apple's agents, the ids TtmlParser maps back onto the same layout:
+        // v1 the first singer, v2 the second, v1000 both. Files without voices carry none.
+        var duet = paragraphs.Any(p => p.Line.Voice != LyricVoice.Default);
+        sb.Append(duet
+            ? "  <head><metadata><ttm:agent type=\"person\" xml:id=\"v1\"/><ttm:agent type=\"person\" xml:id=\"v2\"/><ttm:agent type=\"group\" xml:id=\"v1000\"/></metadata></head>\n"
+            : "  <head><metadata/></head>\n");
         if (paragraphs.Count == 0)
             return sb.Append("  <body/>\n</tt>").ToString();
 
@@ -181,15 +230,17 @@ public static partial class TimedLyricsBuilder
         {
             var (line, main, background) = paragraphs[i];
             sb.Append("      <p begin=\"").Append(FormatTtmlTime(line.Start)).Append("\" end=\"").Append(FormatTtmlTime(ends[i]))
-              .Append("\" itunes:key=\"L").Append(i + 1).Append("\">");
+              .Append("\" itunes:key=\"L").Append(i + 1).Append('"');
+            if (duet)
+                sb.Append(" ttm:agent=\"").Append(line.Voice switch { LyricVoice.Voice2 => "v2", LyricVoice.Group => "v1000", _ => "v1" }).Append('"');
+            sb.Append('>');
             if (line.Words.Count == 0)
-                sb.Append(XmlText(line.Text.Trim()));
-            AppendWordSpans(sb, main);
+                sb.Append(XmlText(line.Text.Trim() + (background.Count > 0 ? " " : string.Empty)));
+            AppendWordSpans(sb, main, spaceAfterLast: background.Count > 0);
             if (background.Count > 0)
             {
-                if (main.Count > 0) sb.Append(' ');
                 sb.Append("<span ttm:role=\"x-bg\">");
-                AppendWordSpans(sb, background);
+                AppendWordSpans(sb, background, spaceAfterLast: false);
                 sb.Append("</span>");
             }
             // Romaji / translation lines (GitHub #116) as the inline layer spans TtmlParser reads.
@@ -222,15 +273,23 @@ public static partial class TimedLyricsBuilder
         }
     }
 
-    private static void AppendWordSpans(StringBuilder sb, IReadOnlyList<AlignedWord> words)
+    /// <summary>
+    /// One span per word, the space after a word inside its span ("&lt;span&gt;Yeah &lt;/span&gt;").
+    /// A space written between the spans is a whitespace-only text node, which XML readers drop
+    /// by default (.NET's XDocument and XmlDocument, pull parsers told to skip whitespace): other
+    /// players showed those files as "YeahIdon'tsleep" (Discord, nutf!xx). <see cref="TtmlParser"/>
+    /// reads both layouts as the same words. <paramref name="spaceAfterLast"/>: a background row follows.
+    /// </summary>
+    private static void AppendWordSpans(StringBuilder sb, IReadOnlyList<AlignedWord> words, bool spaceAfterLast)
     {
         for (var k = 0; k < words.Count; k++)
         {
             var w = words[k];
-            if (k > 0) sb.Append(' ');
+            var text = w.Text.Trim();
+            if (k + 1 < words.Count ? !w.JoinsNext : spaceAfterLast) text += " ";
             sb.Append("<span begin=\"").Append(FormatTtmlTime(w.Start)).Append("\" end=\"")
               .Append(FormatTtmlTime(w.End < w.Start ? w.Start : w.End)).Append("\">")
-              .Append(XmlText(w.Text.Trim())).Append("</span>");
+              .Append(XmlText(text)).Append("</span>");
         }
     }
 
