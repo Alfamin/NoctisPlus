@@ -17,6 +17,19 @@ public interface IPersistenceService
     Task SaveSettingsAsync(AppSettings settings);
 
     /// <summary>
+    /// Loads the settings, lets <paramref name="change"/> set the caller's own fields, and saves
+    /// them, with no other save of the file in between (PersistenceService gates the file). For
+    /// writers that own a few fields: a plain load-then-save let a save from elsewhere land in
+    /// the gap, and the stale copy written after it undid that save.
+    /// </summary>
+    async Task UpdateSettingsAsync(Action<AppSettings> change)
+    {
+        var settings = await LoadSettingsAsync();
+        change(settings);
+        await SaveSettingsAsync(settings);
+    }
+
+    /// <summary>
     /// True when settings.json existed but could not be parsed on the last load attempt.
     /// The damaged file was renamed aside and the values came from settings.json.bak, or
     /// from defaults when no usable backup existed. Unlike the library, settings stay

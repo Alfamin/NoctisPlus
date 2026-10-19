@@ -169,7 +169,50 @@ public class PersistenceService : IPersistenceService
 
     private string SettingsBackupPath => SettingsPath + ".bak";
 
+    // settings.json has several writers that each load it, change a field or two of their own
+    // and save the whole file back (the library's schema stamps, artist join and hidden
+    // folders, next to Settings' own saves). A save from elsewhere that landed between such a
+    // load and its save was undone by the stale copy written after it: CI 10-18, the library's
+    // genre pass stamped its schema version over the Inbox switch the user had just turned on.
+    // One gate per file, held across UpdateSettingsAsync's load-change-save and around every
+    // plain save, so no save lands inside another writer's update.
+    private static readonly System.Collections.Concurrent.ConcurrentDictionary<string, SemaphoreSlim> _settingsGates =
+        new(StringComparer.OrdinalIgnoreCase);
+
+    private SemaphoreSlim SettingsGate => _settingsGates.GetOrAdd(Path.GetFullPath(SettingsPath), _ => new SemaphoreSlim(1, 1));
+
     public async Task SaveSettingsAsync(AppSettings settings)
+    {
+        var gate = SettingsGate;
+        await gate.WaitAsync().ConfigureAwait(false);
+        try
+        {
+            await SaveSettingsCoreAsync(settings).ConfigureAwait(false);
+        }
+        finally
+        {
+            gate.Release();
+        }
+    }
+
+    /// <inheritdoc />
+    public async Task UpdateSettingsAsync(Action<AppSettings> change)
+    {
+        var gate = SettingsGate;
+        await gate.WaitAsync().ConfigureAwait(false);
+        try
+        {
+            var settings = await LoadSettingsAsync().ConfigureAwait(false);
+            change(settings);
+            await SaveSettingsCoreAsync(settings).ConfigureAwait(false);
+        }
+        finally
+        {
+            gate.Release();
+        }
+    }
+
+    private async Task SaveSettingsCoreAsync(AppSettings settings)
     {
         // Roll the last known-good file aside before overwriting it. settings.json is
         // small and saves are debounced, so the copy is cheap next to the write itself —

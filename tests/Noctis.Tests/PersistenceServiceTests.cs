@@ -195,6 +195,33 @@ public class PersistenceServiceTests : IDisposable
         Assert.Equal(20, (await svc.LoadSettingsAsync()).Volume);
     }
 
+    /// <summary>CI 10-18 (InboxPageTests): the library's genre pass loaded settings.json to
+    /// stamp its schema version, Settings saved the Inbox switch meanwhile, and the pass then
+    /// wrote its stale copy over it. A save that comes while an update is under way now waits
+    /// for it instead of being undone by it.</summary>
+    [Fact]
+    public async Task UpdateSettings_ASaveFromElsewhereMeanwhile_IsNotUndone()
+    {
+        var svc = Create();
+        await svc.SaveSettingsAsync(new AppSettings());
+        using var loaded = new ManualResetEventSlim();
+        using var resume = new ManualResetEventSlim();
+
+        var update = Task.Run(() => svc.UpdateSettingsAsync(s =>
+        {
+            loaded.Set();   // the update has read the file...
+            resume.Wait(TestContext.Current.CancellationToken);
+            s.MetadataSchemaVersion = 12;
+        }), TestContext.Current.CancellationToken);
+        loaded.Wait(TestContext.Current.CancellationToken);
+        var save = svc.SaveSettingsAsync(new AppSettings { InboxEnabled = true });   // ...when Settings saves
+        await Task.Delay(100, TestContext.Current.CancellationToken);
+        resume.Set();
+        await Task.WhenAll(update, save);
+
+        Assert.True((await svc.LoadSettingsAsync()).InboxEnabled);
+    }
+
     [Fact]
     public async Task OutOfRangeNumbers_AreClampedOnLoad()
     {
