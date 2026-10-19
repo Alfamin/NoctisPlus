@@ -723,6 +723,12 @@ public class MobileSettingsTests
             rig.Shell.OpenSettingsCommand.Execute(null);
             var vm = (SettingsPageViewModel)rig.Shell.CurrentPage!;
             await vm.Loaded;
+            // The top level is laid out before a row on it opens a page, as on the phone (and
+            // as WithMountedSettings does). Without it the page could be built straight onto
+            // Music Folders when the settings read beat the dispatcher's layout pass: the top
+            // level then starts hidden, a hidden control is never templated, and its
+            // FoldersValueLabel was not in the tree for the count check below.
+            window.UpdateLayout();
             vm.OpenPaneCommand.Execute(SettingsPane.Folders);
             Settle(window);
             var page = MobileFixtures.Find<SettingsPage>(view);

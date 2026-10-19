@@ -1492,9 +1492,7 @@ public class LibraryService : ILibraryService
         // re-bases on the file before each save and never writes this key, so it survives.
         try
         {
-            var settings = await _persistence.LoadSettingsAsync();
-            settings.HiddenLibraryFolders = updated.ToList();
-            await _persistence.SaveSettingsAsync(settings);
+            await _persistence.UpdateSettingsAsync(s => s.HiddenLibraryFolders = updated.ToList());
         }
         catch (Exception ex)
         {
@@ -2685,9 +2683,7 @@ public class LibraryService : ILibraryService
                 // Re-load rather than save the snapshot taken before the backfills: they can
                 // run for minutes, and writing that snapshot back reverted every setting saved
                 // meanwhile (a removed track's exclusion — the next scan re-imported it).
-                var fresh = await _persistence.LoadSettingsAsync();
-                fresh.MetadataSchemaVersion = Math.Max(fresh.MetadataSchemaVersion, stamp);
-                await _persistence.SaveSettingsAsync(fresh);
+                await _persistence.UpdateSettingsAsync(s => s.MetadataSchemaVersion = Math.Max(s.MetadataSchemaVersion, stamp));
             }
             catch
             {
@@ -3223,12 +3219,7 @@ public class LibraryService : ILibraryService
             var stamped = false;
             try
             {
-                var fresh = await _persistence.LoadSettingsAsync();
-                if (fresh.MetadataSchemaVersion < pass.SchemaVersion)
-                {
-                    fresh.MetadataSchemaVersion = pass.SchemaVersion;
-                    await _persistence.SaveSettingsAsync(fresh);
-                }
+                await _persistence.UpdateSettingsAsync(s => s.MetadataSchemaVersion = Math.Max(s.MetadataSchemaVersion, pass.SchemaVersion));
                 stamped = true;
                 File.Delete(progressPath);
             }
@@ -3554,9 +3545,7 @@ public class LibraryService : ILibraryService
 
             try
             {
-                var fresh = await _persistence.LoadSettingsAsync();
-                fresh.ArtistCreditJoin = join;
-                await _persistence.SaveSettingsAsync(fresh);
+                await _persistence.UpdateSettingsAsync(s => s.ArtistCreditJoin = join);
             }
             catch
             {
