@@ -153,6 +153,9 @@ public partial class LrcRedLyricsService : ILrcRedLyricsService
         // The URL is built from it: only an ISRC goes in.
         if (string.IsNullOrEmpty(isrc) || !IsrcPattern().IsMatch(isrc))
             throw new ArgumentException("Not an ISRC.", nameof(isrc));
+        // Synced already this session (the page, then Search Lyrics): no second model run.
+        if (_modelSynced.TryGetValue(isrc, out var known))
+            return known;
 
         using var timeout = CancellationTokenSource.CreateLinkedTokenSource(ct);
         timeout.CancelAfter(ModelSyncTimeout);

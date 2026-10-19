@@ -119,6 +119,19 @@ public class LrcRedModelSyncServiceTests
     }
 
     [Fact]
+    public async Task Sync_SecondPressForTheSameRecording_IsAnsweredWithoutASecondModelRun()
+    {
+        var router = AcousticRouter();
+        var svc = new LrcRedLyricsService(new HttpClient(router));
+
+        var first = await svc.SyncWithModelAsync(AcousticIsrc);
+        var second = await svc.SyncWithModelAsync(AcousticIsrc.ToLowerInvariant());
+
+        Assert.Same(first, second);
+        Assert.Equal(1, router.Count(HttpMethod.Post));
+    }
+
+    [Fact]
     public async Task FindMatch_IsTheLookupAlone_AndRemembered()
     {
         var router = AcousticRouter();
