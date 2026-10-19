@@ -58,6 +58,25 @@
             </Panel>
         </DataTemplate>
 
+        <!-- Owner #87: a song that was only played (kept in the stream cache, not in Songs): one clear Add,
+             over the time and action slots so the table's columns stay aligned. -->
+        <DataTemplate x:Key="SearchAddPill" x:DataType="vm:SearchSongItem">
+            <Button Classes="accent-btn" Background="{DynamicResource AccentButtonBackground}" BorderThickness="0"
+                    Padding="12,5" CornerRadius="999" Cursor="Hand"
+                    HorizontalAlignment="Right" VerticalAlignment="Center"
+                    AutomationProperties.Name="Add to songs" ToolTip.Tip="Add to songs"
+                    Command="{Binding $parent[UserControl].((vm:SearchViewModel)DataContext).DownloadSongCommand}"
+                    CommandParameter="{Binding}">
+                <StackPanel Orientation="Horizontal" Spacing="5">
+                    <Path Data="M6 1V11M1 6H11" Width="10" Height="10" Stretch="Uniform"
+                          Stroke="{DynamicResource AccentForegroundBrush}" StrokeThickness="2" StrokeLineCap="Round"
+                          VerticalAlignment="Center" />
+                    <TextBlock Text="Add" FontSize="12" FontWeight="SemiBold"
+                               Foreground="{DynamicResource AccentForegroundBrush}" VerticalAlignment="Center" />
+                </StackPanel>
+            </Button>
+        </DataTemplate>
+
         <!-- One song row. Library: double-click plays, hover Play over the cover, heart.
              Online: the same row, a download badge on the cover, a download button where
              the heart would be (a ring while it downloads). -->
@@ -146,6 +165,7 @@
                     <TextBlock Grid.Column="2"
                                Classes="song-row-dim"
                                Text="{Binding DurationText}"
+                               IsVisible="{Binding !IsStreamed}"
                                FontSize="12"
                                Opacity="0.7"
                                VerticalAlignment="Center"
@@ -153,6 +173,8 @@
 
                     <ContentControl Grid.Column="3" Content="{Binding}" ContentTemplate="{StaticResource SearchSongAction}"
                                     HorizontalAlignment="Center" VerticalAlignment="Center" />
+                    <ContentControl Grid.Column="2" Grid.ColumnSpan="2" Content="{Binding}" ContentTemplate="{StaticResource SearchAddPill}"
+                                    IsVisible="{Binding IsStreamed}" HorizontalAlignment="Right" Margin="0,0,6,0" />
                 </Grid>
             </Button>
         </DataTemplate>
@@ -213,9 +235,12 @@
                     <TextBlock Grid.Column="3" Classes="song-row-dim" Text="{Binding AlbumTitle}" FontSize="12" Opacity="0.55"
                                VerticalAlignment="Center" TextTrimming="CharacterEllipsis" MaxLines="1" Margin="0,0,16,0" />
                     <TextBlock Grid.Column="4" Classes="song-row-dim" Text="{Binding DurationText}" FontSize="12" Opacity="0.55"
+                               IsVisible="{Binding !IsStreamed}"
                                HorizontalAlignment="Center" VerticalAlignment="Center" FontFeatures="+tnum" />
                     <ContentControl Grid.Column="5" Content="{Binding}" ContentTemplate="{StaticResource SearchSongAction}"
                                     HorizontalAlignment="Center" VerticalAlignment="Center" />
+                    <ContentControl Grid.Column="4" Grid.ColumnSpan="2" Content="{Binding}" ContentTemplate="{StaticResource SearchAddPill}"
+                                    IsVisible="{Binding IsStreamed}" HorizontalAlignment="Right" Margin="0,0,6,0" />
                 </Grid>
             </Button>
         </DataTemplate>
@@ -888,6 +913,20 @@
                                               Stroke="{Binding $parent[Button].Foreground}" StrokeThickness="2"
                                               StrokeLineCap="Round" StrokeJoin="Round" VerticalAlignment="Center" />
                                         <TextBlock Text="Download" FontSize="13" FontWeight="SemiBold"
+                                                   Foreground="{Binding $parent[Button].Foreground}" VerticalAlignment="Center" />
+                                    </StackPanel>
+                                </Button>
+                                <!-- Owner #87: played only: one clear Add to songs. -->
+                                <Button Classes="grey-pill" BorderThickness="0"
+                                        Padding="16,8" CornerRadius="999" Cursor="Hand"
+                                        IsVisible="{Binding TopSong.IsStreamed, FallbackValue=False}"
+                                        AutomationProperties.Name="Add to songs"
+                                        Command="{Binding DownloadSongCommand}" CommandParameter="{Binding TopSong}">
+                                    <StackPanel Orientation="Horizontal" Spacing="7">
+                                        <Path Data="M6 1V11M1 6H11" Width="12" Height="12" Stretch="Uniform"
+                                              Stroke="{Binding $parent[Button].Foreground}" StrokeThickness="2"
+                                              StrokeLineCap="Round" VerticalAlignment="Center" />
+                                        <TextBlock Text="Add to songs" FontSize="13" FontWeight="SemiBold"
                                                    Foreground="{Binding $parent[Button].Foreground}" VerticalAlignment="Center" />
                                     </StackPanel>
                                 </Button>

@@ -1379,6 +1379,15 @@ public partial class PlayerViewModel : ViewModelBase
     {
         if (CurrentTrack == null) return;
         var newState = !CurrentTrack.IsFavorite;
+        // Owner #87: a played-only song has no library row, so a heart alone would vanish. Liking it adds it to
+        // Songs; the library copy is marked favorite as soon as it is imported.
+        if (newState && IsStreamedTrack && CurrentTrack.FilePath is { } streamedPath)
+        {
+            _favoriteWhenImported = Path.GetFileName(streamedPath);
+            CurrentTrack.IsFavorite = true;
+            await AddToSongs();
+            return;
+        }
         CurrentTrack.IsFavorite = newState;
         // The queue can hold pre-reload Track instances; write through to the
         // library's instance so the change actually persists (SaveAsync saves
@@ -2354,6 +2363,7 @@ public partial class PlayerViewModel : ViewModelBase
     partial void OnCurrentTrackChanged(Track? value)
     {
         if (value is null) OnlinePlayingSongId = null;
+        UpdateStreamedTrack();
         OnPropertyChanged(nameof(HasContent));
         ViewCurrentTrackAlbumCommand.NotifyCanExecuteChanged();
         ResolveLyricsBackground();
@@ -4114,6 +4124,19 @@ public partial class PlayerViewModel : ViewModelBase
 
             // A progressive song becomes an ordinary library row after the saved-file
             // importer lands. Adopt that object without restarting the decoder/clock.
+            // Owner #87: a played-only song that was hearted: its library copy is the favorite.
+            if (_favoriteWhenImported is { } wanted && _library.Tracks.FirstOrDefault(t => !t.IsExternal &&
+                    string.Equals(Path.GetFileName(t.FilePath), wanted, StringComparison.OrdinalIgnoreCase)) is { } imported)
+            {
+                _favoriteWhenImported = null;
+                if (!imported.IsFavorite)
+                {
+                    imported.IsFavorite = true;
+                    _ = _library.SaveTrackUserStateAsync(new[] { imported });
+                    _library.NotifyFavoritesChanged(new[] { imported });
+                }
+            }
+
             if (OnlinePlayingSongId is not null && CurrentTrack is { IsExternal: true } streamed
                 && _library.Tracks.FirstOrDefault(t => string.Equals(t.FilePath, streamed.FilePath, StringComparison.OrdinalIgnoreCase)) is { } saved)
             {

@@ -793,7 +793,7 @@ public sealed partial class SearchSongItem : ObservableObject, IOnlineArtwork
 
     public bool HasArtwork => !string.IsNullOrEmpty(ArtworkPath);
 
-    [ObservableProperty, NotifyPropertyChangedFor(nameof(CanStartDownload), nameof(IsDownloading), nameof(IsQueued), nameof(IsSaved), nameof(IsFailed))]
+    [ObservableProperty, NotifyPropertyChangedFor(nameof(CanStartDownload), nameof(IsDownloading), nameof(IsQueued), nameof(IsSaved), nameof(IsFailed), nameof(IsStreamed))]
     private OnlineDownloadState _downloadState;
 
     /// <summary>0..1 while downloading.</summary>
@@ -809,6 +809,8 @@ public sealed partial class SearchSongItem : ObservableObject, IOnlineArtwork
     public bool IsQueued => IsOnline && DownloadState == OnlineDownloadState.Queued;
     public bool IsSaved => IsOnline && DownloadState == OnlineDownloadState.Saved;
     public bool IsFailed => IsOnline && DownloadState == OnlineDownloadState.Failed;
+    /// <summary>Owner #87: played only, kept in the stream cache: the row offers Add to songs.</summary>
+    public bool IsStreamed => IsOnline && DownloadState == OnlineDownloadState.Streamed;
 
     [ObservableProperty] private bool _isNowPlaying;
     [ObservableProperty, NotifyPropertyChangedFor(nameof(PlayLabel))] private bool _isPlaying;

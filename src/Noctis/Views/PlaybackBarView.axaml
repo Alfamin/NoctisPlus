@@ -1218,6 +1218,27 @@
                          cluster's OptionsButton — the fallback shown only while this box is
                          hidden — and this button opens that same flyout anchored here. -->
                     <StackPanel Grid.Column="3" Orientation="Horizontal" VerticalAlignment="Center">
+                        <!-- Owner #87: a song that was only played is not in Songs; one clear button adds it. -->
+                        <Button x:Name="AddToSongsButton"
+                                Classes="accent-btn" Background="{DynamicResource AccentButtonBackground}" BorderThickness="0"
+                                Padding="11,4" CornerRadius="999" Cursor="Hand" Margin="0,0,6,0"
+                                VerticalAlignment="Center"
+                                IsVisible="{Binding IsStreamedTrack}"
+                                AutomationProperties.Name="Add to songs"
+                                ToolTip.Tip="{Binding AddToSongsTip}"
+                                Command="{Binding AddToSongsCommand}">
+                            <StackPanel Orientation="Horizontal" Spacing="5">
+                                <Path Data="M6 1V11M1 6H11" Width="10" Height="10" Stretch="Uniform"
+                                      Stroke="{DynamicResource AccentForegroundBrush}" StrokeThickness="2" StrokeLineCap="Round"
+                                      VerticalAlignment="Center" />
+                                <TextBlock Text="Add" FontSize="12" FontWeight="SemiBold"
+                                           Foreground="{DynamicResource AccentForegroundBrush}" VerticalAlignment="Center" />
+                            </StackPanel>
+                        </Button>
+                        <PathIcon Data="{StaticResource CheckmarkIcon}" Width="13" Height="13" Margin="0,0,8,0"
+                                  Foreground="{DynamicResource AccentColorBrush}" VerticalAlignment="Center"
+                                  IsVisible="{Binding JustAddedToSongs}"
+                                  ToolTip.Tip="{Binding AddToSongsMessage}" />
                         <controls:EqVisualizer Width="22" Height="18"
                                                VerticalAlignment="Center"
                                                IsPlaying="{Binding IsPlaying}" />

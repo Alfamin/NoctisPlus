@@ -233,6 +233,9 @@ internal sealed class FinderOnlineSearch : IOnlineMusicSearch
         return d.State switch
         {
             DownloadState.Running => new(OnlineDownloadState.Downloading, Math.Clamp(d.Progress, 0, 1), d.Stage, d.Step), // a 0..1 share
+            // Owner #87: played only (in the stream cache, not added): offered for Songs; gone from the cache: nothing.
+            DownloadState.Saved or DownloadState.AlreadyThere when _actions.Downloads.IsCached(d) && d.KeepIn is null =>
+                d.SavedPath is { } cached && File.Exists(cached) ? new(OnlineDownloadState.Streamed, 1) : OnlineDownloadStatus.None,
             DownloadState.Saved or DownloadState.AlreadyThere => new(OnlineDownloadState.Saved, 1),
             DownloadState.Failed => new(OnlineDownloadState.Failed, 0, d.Error),
             DownloadState.Cancelled => OnlineDownloadStatus.None,
@@ -249,10 +252,45 @@ internal sealed class FinderOnlineSearch : IOnlineMusicSearch
         return now ? "Downloading." : "Added to downloads.";
     }
 
+    public bool IsStreamedFile(string? path)
+    {
+        if (_actions.Downloads.CacheFolder is not { } cache || !StreamCache.Contains(cache, path)) return false;
+        if (StreamedDownload(path!) is { KeepIn: not null }) return false;
+        try { return !File.Exists(Path.Combine(_actions.LibraryFolder, Path.GetFileName(path!))); }
+        catch (Exception ex) when (ex is ArgumentException or IOException or UnauthorizedAccessException) { return true; }
+    }
+
+    /// <summary>Owner #87: "Add to songs" from the player. The copy runs off the UI thread.</summary>
+    public Task<string> AddStreamedAsync(string path, CancellationToken ct) => Task.Run(() =>
+    {
+        if (!IsStreamedFile(path)) return "Already in your songs.";
+        var library = _actions.LibraryFolder;
+        if (StreamedDownload(path) is { } download)
+        {
+            var (_, pending) = _actions.Downloads.Keep(download, library);
+            return pending ? "Added. It joins your songs when it finishes downloading." : "Added to your songs.";
+        }
+        // Its download was cleared from the list: the cached file itself is copied.
+        if (!File.Exists(path)) return "This song is no longer in the stream cache. Play it again, then add it.";
+        var copy = StreamCache.CopyToLibrary(path, library);
+        Noctis.Services.Search.OnlineMusicSearch.PublishSavedFile(copy);
+        return "Added to your songs.";
+    }, ct);
+
+    /// <summary>The played-only download behind a cached file (saved, or still arriving under that name).</summary>
+    private Download? StreamedDownload(string path)
+    {
+        var name = Path.GetFileNameWithoutExtension(path);
+        return _actions.Downloads.History.LastOrDefault(d => _actions.Downloads.IsCached(d) && d.State != DownloadState.Removed &&
+            (d.SavedPath is { } saved ? string.Equals(Path.GetFullPath(saved), Path.GetFullPath(path), StringComparison.OrdinalIgnoreCase)
+                : string.Equals(d.Track.FileName, name, StringComparison.OrdinalIgnoreCase)));
+    }
+
     public async Task<Noctis.Models.Track> PreparePlaybackAsync(OnlineSong song, CancellationToken ct)
     {
         if (!_songs.TryGetValue(song.Id, out var catalogSong)) throw new InvalidOperationException("Search again, then choose the song.");
-        await _actions.QueueAsync([catalogSong], priority: true, ct);
+        // Owner #87: Play only streams; the song is kept in the stream cache, not added to Songs.
+        await _actions.QueueAsync([catalogSong], priority: true, ct, stream: true);
         var match = (await _actions.MatchAsync([catalogSong], ct))[catalogSong.Id];
         if (match.Local is { } local) return Make(local.Path, local.Id, external: false);
         var download = match.Download ?? throw new IOException("The download request could not be found. Open Downloads to retry it.");
@@ -261,7 +299,11 @@ internal sealed class FinderOnlineSearch : IOnlineMusicSearch
         while (true)
         {
             ct.ThrowIfCancellationRequested();
-            if (download.SavedPath is { } saved && File.Exists(saved)) return Make(saved);
+            if (download.SavedPath is { } saved && File.Exists(saved))
+            {
+                if (_actions.Downloads.IsCached(download)) StreamCache.Touch(saved); // played again: its days start over
+                return Make(saved);
+            }
             if (download.Playback?.ReadyPath is { } ready) return Make(ready);
             if (download.State is DownloadState.Waiting or DownloadState.Failed)
                 throw new IOException(download.Error.Length > 0 ? download.Error : "The download is waiting. Open Downloads to retry it.");

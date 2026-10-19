@@ -166,6 +166,7 @@ public class LibraryService : ILibraryService
             .Select(r => TryNormalizePath(r.Path))
             .Where(p => !string.IsNullOrWhiteSpace(p))
             .Select(p => p!)
+            .Concat(LibraryExclusions.Folders) // owner #87: the stream cache is never scanned, even inside a library folder
             .Distinct(PathComparison.Comparer)
             .ToArray();
         var ignoredNames = new HashSet<string>(
@@ -1170,6 +1171,7 @@ public class LibraryService : ILibraryService
             .Select(p => p!)
             .Where(File.Exists)
             .Where(p => MetadataService.SupportedExtensions.Contains(Path.GetExtension(p)))
+            .Where(p => !LibraryExclusions.IsExcluded(p)) // played-only songs (owner #87), whatever the caller
             .Distinct(StringComparer.OrdinalIgnoreCase)
             .ToList();
 

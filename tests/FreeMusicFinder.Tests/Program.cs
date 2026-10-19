@@ -72,6 +72,7 @@ try
     await TransferTests.RunAsync();
     await BotQualityTests.RunAsync();
     await QueueManagementTests.RunAsync();
+    await StreamCacheTests.RunAsync();
     await BotSelectionTests.RunAsync();
     await HunterLinkTests.RunAsync();
     await BotPreferenceTests.RunAsync();

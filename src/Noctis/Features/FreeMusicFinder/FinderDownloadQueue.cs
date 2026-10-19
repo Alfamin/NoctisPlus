@@ -26,10 +26,12 @@ internal sealed class FinderDownloadQueue(Downloads downloads) : IDownloadQueue
         return rows;
     }
 
-    private static DownloadEntry Entry(Download d)
+    private DownloadEntry Entry(Download d)
     {
         var (state, detail) = d.State switch
         {
+            // Owner #87: played only, kept in the stream cache, not in Songs.
+            DownloadState.Saved or DownloadState.AlreadyThere when downloads.IsCached(d) && d.KeepIn is null => (OnlineDownloadState.Saved, "Played · not in your songs"),
             DownloadState.Running => (OnlineDownloadState.Downloading, d.Stage.Length > 0 ? d.Stage : d.Progress > 0 ? $"Downloading · {d.Progress:P0}" : "Asking for the file…"),
             DownloadState.Waiting => (OnlineDownloadState.Queued, (d.Error.Length > 0 ? d.Error : "Waiting for the service") +
                 (d.RetryAt is { } at ? $" · retry at {at.ToLocalTime():HH:mm}" : "")),

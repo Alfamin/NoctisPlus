@@ -10,6 +10,8 @@ internal sealed class DiscoveryActions(IPlaylistLibrary library, Downloads downl
     private readonly SemaphoreSlim _gate = new(1, 1);
     private (long Key, DateTimeOffset At, PlaylistMatcher Matcher)? _matcher;
     public Downloads Downloads => downloads;
+    /// <summary>The download folder: where "Add to songs" puts a played song (owner #87).</summary>
+    public string LibraryFolder => folder();
     internal static readonly TimeSpan RetryPause = TimeSpan.FromSeconds(15);
     internal static bool JustFailed(Download d) => d.FailedAt is { } at && DateTimeOffset.UtcNow - at < RetryPause;
 
@@ -42,7 +44,7 @@ internal sealed class DiscoveryActions(IPlaylistLibrary library, Downloads downl
                     (d.IsActive || d.State == DownloadState.Failed || d.State is DownloadState.Saved or DownloadState.AlreadyThere && Downloader.FindExisting(d.Folder, d.Track.FileName) is not null));
                 return new DiscoveryMatch(local, queued, local is not null ? (local.Visible ? "In your library" : "In your library · hidden folder") : queued is not null ? queued.State switch
                 {
-                    DownloadState.Saved or DownloadState.AlreadyThere => "Saved · waiting for Noctis to scan",
+                    DownloadState.Saved or DownloadState.AlreadyThere => downloads.IsCached(queued) && queued.KeepIn is null ? "Played · not in your library" : "Saved · waiting for Noctis to scan",
                     DownloadState.Running => "Downloading · " + (queued.Progress * 100).ToString("0") + "%", // Progress is a 0..1 share
                     DownloadState.Waiting => queued.Error,
                     DownloadState.Failed => "Needs retry · " + queued.Error,
@@ -51,7 +53,8 @@ internal sealed class DiscoveryActions(IPlaylistLibrary library, Downloads downl
             });
         }, ct);
     }
-    public async Task<DiscoveryQueued> QueueAsync(IEnumerable<CatalogSong> songs, bool priority, CancellationToken ct)
+    /// <param name="stream">Owner #87: Play. The song is saved in the stream cache, not the library.</param>
+    public async Task<DiscoveryQueued> QueueAsync(IEnumerable<CatalogSong> songs, bool priority, CancellationToken ct, bool stream = false)
     {
         if (!loggedIn()) throw new InvalidOperationException("Log in to Telegram in Free Music Finder, then choose the songs again. Browsing does not need a login.");
         await _gate.WaitAsync(ct);
@@ -60,13 +63,15 @@ internal sealed class DiscoveryActions(IPlaylistLibrary library, Downloads downl
             var unique = new List<CatalogSong>();
             foreach (var song in songs) if (!unique.Any(s => SpotifyPlaylists.SameRecording(s.Request, song.Request))) unique.Add(song);
             // Always recheck: a download or library rescan may have finished since this page was drawn.
-            var matches = await MatchAsync(unique, ct); var target = folder(); int added = 0, existing = 0, owned = 0;
+            var matches = await MatchAsync(unique, ct); var target = stream && downloads.CacheFolder is { } cache ? cache : folder(); int added = 0, existing = 0, owned = 0;
             foreach (var song in unique)
             {
                 ct.ThrowIfCancellationRequested(); var match = matches[song.Id];
                 if (match.Local is not null) { owned++; continue; }
                 if (match.Download is {} current)
                 {
+                    // Owner #87: a played-only song joins the library from its cached copy (or once it is saved), not by a new download.
+                    if (!stream && downloads.IsCached(current) && current.KeepIn is null) { downloads.Keep(current, target); added++; continue; }
                     // Owner #29: a burst of clicks on a song that just failed retries it once, not once per click.
                     if (priority && (current.IsActive || current.State == DownloadState.Failed && !JustFailed(current))) downloads.DownloadNext(current);
                     existing++; continue;

@@ -28,6 +28,8 @@ internal sealed class Download(BotTrack track, string folder)
     internal Noctis.Features.ProgressivePlayback.ProgressiveTransfer? Playback { get; set; }
     /// <summary>Held back for the song clicked to play after it (owner #83); it goes back to the queue, not to Failed.</summary>
     internal bool Preempted { get; set; }
+    /// <summary>Owner #87: a streamed song the user added to Songs: its library folder (copied there once saved).</summary>
+    public string? KeepIn { get; internal set; }
     public bool IsActive => State is DownloadState.Queued or DownloadState.Running or DownloadState.Waiting;
 }
 
@@ -85,7 +87,7 @@ internal sealed class Downloads : IDisposable
                     throw new InvalidDataException("QUEUE_UNREADABLE: invalid track or folder.");
                 if (item.State == DownloadState.Removed) continue;
                 var download = new Download(restore(item.Request), item.Folder)
-                    { State = item.State, Error = item.Error, RetryAt = item.RetryAt, Priority = item.Priority, Held = item.Held };
+                    { State = item.State, Error = item.Error, RetryAt = item.RetryAt, Priority = item.Priority, Held = item.Held, KeepIn = item.KeepIn };
                 _known.Add(download);
                 if (item.State is DownloadState.Saved or DownloadState.AlreadyThere)
                 {
@@ -102,7 +104,7 @@ internal sealed class Downloads : IDisposable
         _ = Task.Run(RunAsync);
     }
 
-    private sealed record QueueItem(MusicRequest Request, string Folder, DownloadState State, string Error, DateTimeOffset? RetryAt, bool Priority = false, bool Held = false);
+    private sealed record QueueItem(MusicRequest Request, string Folder, DownloadState State, string Error, DateTimeOffset? RetryAt, bool Priority = false, bool Held = false, string? KeepIn = null);
     private sealed record QueueFile(int Version, bool Paused, QueueItem[] Items);
     private void Save()
     {
@@ -112,7 +114,7 @@ internal sealed class Downloads : IDisposable
         var active = _active.ToHashSet();
         if (_store is not null) AtomicJson.Write(_store, new QueueFile(1, _paused,
             _active.Concat(_known.Where(d => !active.Contains(d))).Where(d => d.Track.Request is not null)
-                .Select(d => new QueueItem(d.Track.Request!, d.Folder, d.State, d.Error, d.RetryAt, d.Priority, d.Held)).ToArray()));
+                .Select(d => new QueueItem(d.Track.Request!, d.Folder, d.State, d.Error, d.RetryAt, d.Priority, d.Held, d.KeepIn)).ToArray()));
     }
     /// <summary>
     /// The worker's own saves. One that fails (the file held open a moment by another program) must not stop the
@@ -207,6 +209,51 @@ internal sealed class Downloads : IDisposable
         }
         Wake(); Raise(item);
     }
+    /// <summary>Owner #87: where played-only songs are saved (outside the library). Null: every song goes where asked.</summary>
+    public string? CacheFolder { get; set; }
+    internal bool IsCached(Download d) => CacheFolder is { } cache && StreamCache.Contains(cache, Path.Combine(d.Folder, "x"));
+
+    /// <summary>
+    /// Owner #87: "Add to songs" for a streamed song. A saved one is copied into <paramref name="libraryFolder"/> now
+    /// (returns its library path); one still downloading is copied as soon as it is saved (returns Pending).
+    /// </summary>
+    public (string? Path, bool Pending) Keep(Download item, string libraryFolder)
+    {
+        libraryFolder = Path.GetFullPath(libraryFolder);
+        string? saved = null;
+        lock (_gate)
+        {
+            if (item.State is DownloadState.Saved or DownloadState.AlreadyThere) saved = item.SavedPath;
+            else if (item.IsActive)
+            {
+                item.KeepIn = libraryFolder;
+                SaveOrLog();
+                return (null, true);
+            }
+        }
+        if (saved is null || !File.Exists(saved)) return (null, false);
+        // A failed copy (disk full, no permission) leaves the song streamed, so Add can be pressed again.
+        var copy = CopyKept(saved, libraryFolder) ?? throw new IOException("The song could not be copied into " + libraryFolder + ". Check free space and the download folder; it is still in the stream cache.");
+        lock (_gate) { item.KeepIn = libraryFolder; SaveOrLog(); }
+        Raise(item);
+        return (copy, false);
+    }
+
+    private string? CopyKept(string saved, string libraryFolder)
+    {
+        try
+        {
+            var copy = StreamCache.CopyToLibrary(saved, libraryFolder);
+            Noctis.Services.Search.OnlineMusicSearch.PublishSavedFile(copy);
+            return copy;
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            _log($"could not add \"{Path.GetFileName(saved)}\" to the library: {ex.Message}");
+            return null;
+        }
+    }
+
     /// <summary>
     /// Owner #83: the song clicked to play last is wanted now. It goes first and starts at once; the other transfers are
     /// held back to the queue until it is done (they resume from the bot's chat, the bot is not asked again), except
@@ -368,7 +415,9 @@ internal sealed class Downloads : IDisposable
                     download.State = outcome == DownloadOutcome.Saved ? DownloadState.Saved : DownloadState.AlreadyThere;
                 }
             }
-            if (outcome == DownloadOutcome.Saved && savedPath is not null)
+            // Owner #87: a streamed song stays in the cache, out of the library, unless the user added it meanwhile.
+            if (savedPath is not null && IsCached(download)) { if (download.KeepIn is { } library && CopyKept(savedPath, library) is null) lock (_gate) download.KeepIn = null; }
+            else if (outcome == DownloadOutcome.Saved && savedPath is not null)
                 Noctis.Services.Search.OnlineMusicSearch.PublishSavedFile(savedPath);
         }
         // Whatever the stopped transfer threw: a held-back song goes back to the queue.

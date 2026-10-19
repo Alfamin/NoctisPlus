@@ -53,6 +53,9 @@ public sealed class FreeMusicPlugin : INoctisPlugin
     private volatile bool _allowMp3 = true;
     private volatile AudioQuality _preferredQuality = AudioQuality.FLAC;
     private volatile string _firstBot = BotSelections.Hunters;
+    private string? _streamCache;
+    private Timer? _purge;
+    private DateTime _lastPurge;
     private readonly Func<string, string, ArtistCatalog> _catalogFactory;
     private ForYouSource? _forYou;
     private FinderOnlineSearch? _online;
@@ -89,6 +92,17 @@ public sealed class FreeMusicPlugin : INoctisPlugin
             Path.Combine(host.DataDirectory,"source-limits.json"),allowMp3:()=>_preferredQuality == AudioQuality.MP3 || _allowMp3,
             preferFlac: () => _preferredQuality == AudioQuality.FLAC, quality: () => _preferredQuality, firstBot: () => _firstBot);
         _downloads = new Downloads(Log,Path.Combine(host.DataDirectory,"download-queue.json"),_bot.Track);
+        // Owner #87: played-only songs live here, never in the library.
+        _streamCache = StreamCache.Folder(host.DataDirectory);
+        _downloads.CacheFolder = _streamCache;
+        Noctis.Services.LibraryExclusions.Register(_streamCache);
+        _purge = new Timer(_ => PurgeStreamCache(), null, TimeSpan.FromMinutes(1), TimeSpan.FromHours(6));
+        // A busy listening day must not wait six hours for the size limit: after a new song lands, at most every 5 minutes.
+        _downloads.Changed += d =>
+        {
+            if (d.State == DownloadState.Saved && _downloads?.IsCached(d) == true && DateTime.UtcNow - _lastPurge > TimeSpan.FromMinutes(5))
+            { _lastPurge = DateTime.UtcNow; Task.Run(PurgeStreamCache); }
+        };
         _transfers = new PlaylistTransfers(_telegram,_bot,_downloads,Path.Combine(host.DataDirectory,"playlist-queue.json"),Owns,
             new PlaylistCatalog(PlaylistCatalog.MetadataHandler(_proxy,Log)));
         _playlists = new SpotifyPlaylists(Path.Combine(host.DataDirectory, "spotify-playlists.json"), new PlaylistLibrary(), _downloads, _bot.Track,
@@ -142,6 +156,8 @@ public sealed class FreeMusicPlugin : INoctisPlugin
         _qualityStop.Cancel();
         if (ReferenceEquals(Current, this)) Current = null;
         if (_host is not null) _host.Settings.Changed -= OnSettingChanged;
+        _purge?.Dispose(); _purge = null;
+        if (_streamCache is not null) Noctis.Services.LibraryExclusions.Unregister(_streamCache);
         if (ReferenceEquals(Noctis.Services.Search.OnlineMusicSearch.Current, _online)) Noctis.Services.Search.OnlineMusicSearch.Current = null;
         _online?.Detach(); _online = null;
         foreach (var r in _registrations) r.Dispose();
@@ -195,11 +211,29 @@ public sealed class FreeMusicPlugin : INoctisPlugin
         else if (key == ShortcutKey) ApplyShortcut();
         else if (key == AllowMp3Key) _allowMp3 = _host?.Settings.GetBool(AllowMp3Key, true) ?? true;
         else if (key == "firstBot") _firstBot = _host?.Settings.GetString(key) == "DeezLoad" ? "DeezLoad" : BotSelections.Hunters;
+        else if (key == StreamCache.SettingKey) Task.Run(PurgeStreamCache);
         else if (key == "preferredQuality")
         {
             _preferredQuality = _host?.Settings.GetString(key) == "MP3" ? AudioQuality.MP3 : AudioQuality.FLAC;
             if (_telegram?.IsLoggedIn == true) _ = SynchronizeQualityAsync();
         }
+    }
+
+    /// <summary>Owner #87: played-only songs not played for the chosen number of days are deleted. Songs still being
+    /// downloaded or being played are kept (a file in use cannot be deleted; its turn comes next time).</summary>
+    private void PurgeStreamCache()
+    {
+        try
+        {
+            if (_streamCache is not { } cache || _downloads is not { } downloads) return;
+            var days = StreamCache.Days(_host?.Settings.GetString(StreamCache.SettingKey));
+            var busy = downloads.Active.Where(d => downloads.IsCached(d)).Select(d => d.Track.FileName).ToHashSet(StringComparer.OrdinalIgnoreCase);
+            _lastPurge = DateTime.UtcNow;
+            var removed = StreamCache.Purge(cache, days, DateTime.UtcNow, file => busy.Contains(Path.GetFileNameWithoutExtension(file)),
+                StreamCache.Cap(days, StreamCache.FreeSpace(cache)));
+            if (removed > 0) Log($"removed {removed} played-only song file{(removed == 1 ? "" : "s")} from the stream cache");
+        }
+        catch (Exception ex) { Log("stream cache clean-up failed: " + ex.Message); }
     }
 
     // Owner #81: Music Hunters is never declared unable before it was sent the song's link. The catalog search (cached),

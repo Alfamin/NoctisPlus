@@ -83,6 +83,46 @@ public partial class PlayerViewModel
         }
     }
 
+    /// <summary>Owner #87: the playing song was only streamed (stream cache, not in Songs): the bar offers Add to songs.</summary>
+    [ObservableProperty, NotifyPropertyChangedFor(nameof(AddToSongsTip))] private bool _isStreamedTrack;
+    /// <summary>File name of a hearted played-only song: its library copy is marked favorite once imported.</summary>
+    private string? _favoriteWhenImported;
+    /// <summary>Shown briefly after Add, in place of the button.</summary>
+    [ObservableProperty] private bool _justAddedToSongs;
+    [ObservableProperty, NotifyPropertyChangedFor(nameof(AddToSongsTip))] private string _addToSongsMessage = "";
+    /// <summary>The button's tooltip: why the last Add failed, else what it does.</summary>
+    public string AddToSongsTip => IsStreamedTrack && AddToSongsMessage.Length > 0 && !JustAddedToSongs ? AddToSongsMessage : "Add to songs";
+
+    private void UpdateStreamedTrack()
+    {
+        try { IsStreamedTrack = CurrentTrack is { IsExternal: true, FilePath: { } path } && OnlineMusicSearch.Current?.IsStreamedFile(path) == true; }
+        catch (Exception) { IsStreamedTrack = false; } // a feature fault must never break track changes
+        if (!IsStreamedTrack) JustAddedToSongs = false;
+        AddToSongsMessage = "";
+    }
+
+    [CommunityToolkit.Mvvm.Input.RelayCommand]
+    private async Task AddToSongs()
+    {
+        if (CurrentTrack?.FilePath is not { } path || OnlineMusicSearch.Current is not { } source) return;
+        var track = CurrentTrack;
+        try
+        {
+            AddToSongsMessage = await source.AddStreamedAsync(path, CancellationToken.None);
+            if (!ReferenceEquals(CurrentTrack, track)) return;
+            IsStreamedTrack = false;
+            JustAddedToSongs = true;
+            await Task.Delay(2500);
+            if (ReferenceEquals(CurrentTrack, track)) JustAddedToSongs = false;
+        }
+        catch (Exception ex)
+        {
+            // The song stays streamed, so Add can be pressed again (disk full, folder unavailable).
+            UpdateStreamedTrack();
+            AddToSongsMessage = ex.Message;
+        }
+    }
+
     private void CancelOnlinePlayback()
     {
         var stop = _onlinePlay; _onlinePlay = null; _onlinePreparingSongId = null;

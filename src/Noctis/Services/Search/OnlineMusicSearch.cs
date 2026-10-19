@@ -35,7 +35,8 @@ public sealed record OnlineSearchResult(string Query, IReadOnlyList<OnlineSong> 
     public IReadOnlyList<OnlinePlaylist> Playlists { get; init; } = [];
 }
 
-public enum OnlineDownloadState { None, Queued, Downloading, Saved, Failed }
+/// <summary>Streamed: played and kept in the stream cache, not in the library (owner #87).</summary>
+public enum OnlineDownloadState { None, Queued, Downloading, Saved, Failed, Streamed }
 
 /// <summary>What a running download is doing right now (owner #54: show it, with icons, not text).</summary>
 public enum OnlineDownloadStep { None, Asking, Switching, Receiving, Saving }
@@ -92,6 +93,13 @@ public interface IOnlineMusicSearch
     /// buffered source. Cancelling this wait never cancels the saved download request.</summary>
     Task<Noctis.Models.Track> PreparePlaybackAsync(OnlineSong song, CancellationToken ct)
         => Task.FromException<Noctis.Models.Track>(new NotSupportedException("This source does not support online playback."));
+
+    /// <summary>Owner #87: a file that was only played (in the stream cache, not added to Songs).</summary>
+    bool IsStreamedFile(string? path) => false;
+
+    /// <summary>Owner #87: "Add to songs" for a played file. Copies it into the library now, or as soon as it is saved;
+    /// returns a short message for the user.</summary>
+    Task<string> AddStreamedAsync(string path, CancellationToken ct) => Task.FromResult("This song cannot be added here.");
 
     /// <summary>The download queue behind the Downloads page.</summary>
     IDownloadQueue Downloads { get; }
