@@ -1364,6 +1364,13 @@ public partial class MiniPlayerWindow : Window
             && i < rows.Count && rows[i] is MiniQueueRow { IsPlayed: false } row
             && ReferenceEquals(row.Track, dragged.Track))
             return i;
+        // Recycled (the edge scroll): the row at its own Up Next index, so the second copy of
+        // a song queued twice is not taken for the first; the song's first row only when a
+        // live edit has moved it since.
+        var own = vm.QueueUpNextStart + dragged.Index;
+        if (own < rows.Count && rows[own] is MiniQueueRow { IsPlayed: false } same
+            && ReferenceEquals(same.Track, dragged.Track))
+            return own;
         for (var k = vm.QueueUpNextStart; k < rows.Count; k++)
             if (rows[k] is MiniQueueRow { IsPlayed: false } r && ReferenceEquals(r.Track, dragged.Track))
                 return k;
