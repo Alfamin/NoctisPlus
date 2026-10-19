@@ -1195,6 +1195,8 @@ Deezer and TIDAL: paste the link.</value></data>
   <data name="LyricsSearch.Plain" xml:space="preserve"><value>Plain</value><comment>Result format in LyricsSearchViewModel (no timing)</comment></data>
   <data name="LyricsSearch.NoMatch" xml:space="preserve"><value>No match</value><comment>Result in LyricsSearchViewModel</comment></data>
   <data name="LyricsSearch.CouldNotConnect" xml:space="preserve"><value>Couldn't connect</value><comment>Result in LyricsSearchViewModel</comment></data>
+  <data name="LyricsSearch.Busy" xml:space="preserve"><value>Busy, try again in a moment</value><comment>Result in LyricsSearchViewModel: the source answered "busy" (503/429), so the connection works</comment></data>
+  <data name="LyricsSearch.BusyStatus" xml:space="preserve"><value>{0} is busy, try again in a moment.</value><comment>Status in LyricsSearchViewModel when every searched source failed and one said it is busy; {0} = source name</comment></data>
   <data name="LyricsSearch.Instrumental" xml:space="preserve"><value>Instrumental</value><comment>Result in LyricsSearchViewModel</comment></data>
   <data name="LyricsSearch.ModelSynced" xml:space="preserve"><value>Word-synced by lrc.red's model. Press Use Lyrics to keep them.</value><comment>Status in LyricsSearchViewModel after lrc.red's row was word-synced by its model</comment></data>
   <data name="Lyrics.WrittenBy" xml:space="preserve"><value>Written By: </value><comment>Text in LyricsView.axaml</comment></data>

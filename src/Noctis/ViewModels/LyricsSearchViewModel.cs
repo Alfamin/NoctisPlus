@@ -137,10 +137,13 @@ public partial class LyricsSearchViewModel : ViewModelBase
                 });
             SelectedResult = Results.FirstOrDefault(r => r.IsBest) ?? Results.FirstOrDefault(r => r.HasLyrics);
 
+            // A source that said it was busy answered: the connection works, so "check your
+            // internet connection" would be wrong (lrc.red's 503, live 10-19).
+            var busy = string.Join(", ", hits.Where(h => h.Busy).Select(h => h.Source));
             StatusText = best != null
                 ? (auto ? Loc.T("LyricsSearch.BestMatch", bestSource) : string.Empty)
                 : hits.Count > 0 && hits.All(h => h.Errored)
-                    ? Loc.T("LyricsSearch.Failed")
+                    ? busy.Length > 0 ? Loc.T("LyricsSearch.BusyStatus", busy) : Loc.T("LyricsSearch.Failed")
                     : Loc.T("LyricsSearch.NotFound");
         }
         catch (OperationCanceledException)
@@ -248,6 +251,7 @@ public sealed partial class LyricsSearchResultRow : ObservableObject
             >= LyricsSearchSelector.WordSyncedRank => Loc.T("LyricsSearch.WordSynced"),
             2 => Loc.T("LyricsSearch.LineSynced"),
             1 => Loc.T("LyricsSearch.Plain"),
+            _ when hit.Errored && hit.Busy => Loc.T("LyricsSearch.Busy"),
             _ when hit.Errored => Loc.T("LyricsSearch.CouldNotConnect"),
             _ when hit.Result is { Instrumental: true } => Loc.T("LyricsSearch.Instrumental"),
             _ => Loc.T("LyricsSearch.NoMatch"),
