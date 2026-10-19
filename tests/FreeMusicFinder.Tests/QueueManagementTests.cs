@@ -119,7 +119,7 @@ internal static class QueueManagementTests
     }
     private static async Task Priority()
     {
-        Check.Section("manual downloads bypass a 25-song batch, keep one transfer and respect pause/limits");
+        Check.Section("manual downloads bypass a 25-song batch in their own lane and respect pause/limits");
         var root = Check.NewFolder("queue-priority"); var order = new List<string>();
         var gate = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
         using var queue = new Downloads(_ => { });
@@ -132,7 +132,11 @@ internal static class QueueManagementTests
         }
         var manual = queue.Start(Track("Manual", _ => { lock (order) order.Add("Manual"); return Task.CompletedTask; }), root, priority: true);
         Check.Equal(27, queue.Active.Count, "manual request retained alongside all batch songs");
-        Check.Equal("Current", string.Join(",", order), "manual request does not interrupt current transfer");
+        // Owner #79: a Play waited a whole other song's transfer before any bot was asked.
+        await Check.UntilAsync(() => { lock (order) return order.Contains("Manual"); }, "manual request starts while the current transfer is still running");
+        await Task.Delay(150);
+        Check.Equal("Current,Manual", string.Join(",", order), "manual request does not interrupt current transfer, and the batch keeps to one lane");
+        Check.Equal(DownloadState.Running, queue.Active.First(d => d.Track.Title == "Current").State, "current transfer keeps running beside the manual one");
         gate.SetResult();
         await Check.UntilAsync(() => queue.Active.Count == 0, "priority and batch complete");
         Check.Equal("Current,Manual", string.Join(",", order.Take(2)), "manual download runs before all 25 queued songs");
@@ -151,6 +155,25 @@ internal static class QueueManagementTests
         queue.DownloadNext(limited); await Task.Delay(100);
         Check.Equal(1, calls, "download next does not bypass cooldown or spam the bot");
         queue.Remove(limited);
+        await TwoLanesAtMost();
+    }
+    private static async Task TwoLanesAtMost()
+    {
+        Check.Section("Play requests share two transfer lanes; a third waits for a free one");
+        var root = Check.NewFolder("queue-lanes"); var started = new List<string>();
+        var release = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        using var queue = new Downloads(_ => { });
+        Download Play(string title) => queue.Start(Track(title, async ct => { lock (started) started.Add(title); await release.Task.WaitAsync(ct); }), root, priority: true);
+        var one = Play("One"); var two = Play("Two"); var three = Play("Three");
+        await Check.UntilAsync(() => { lock (started) return started.Count == 2; }, "two Play requests transfer side by side");
+        await Task.Delay(150);
+        Check.Equal("One,Two", string.Join(",", started), "the third Play waits; Telegram never carries more than two transfers");
+        Check.Equal(DownloadState.Queued, three.State, "the third Play is next in line");
+        var removed = queue.Remove(two);
+        await Check.UntilAsync(() => { lock (started) return started.Contains("Three"); }, "removing a running request frees its lane at once");
+        Check.True(removed && two.State == DownloadState.Removed && one.State == DownloadState.Running, "only the removed transfer was cancelled");
+        release.SetResult();
+        await Check.UntilAsync(() => one.State == DownloadState.Saved && three.State == DownloadState.Saved, "both remaining lanes finish");
     }
     private static async Task RemovalAndRestart()
     {

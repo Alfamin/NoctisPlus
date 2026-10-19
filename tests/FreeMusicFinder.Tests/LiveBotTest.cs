@@ -43,8 +43,11 @@ internal static class LiveBotTest
         var bot = (await client.Contacts_ResolveUsername(hunters ? TelegramBotSource.Bot : DeezLoadSource.Bot)).User;
         if (hunters && Environment.GetEnvironmentVariable("FMF_LIVE_BOT_HISTORY") == "1")
         {
-            foreach (var answer in (await client.Messages_GetHistory(bot, limit: 30)).Messages.OfType<Message>().OrderBy(m => m.id))
-                Console.WriteLine((answer.flags.HasFlag(Message.Flags.out_) ? "  asked: " : "  bot: ") + Describe(answer, request));
+            // FMF_LIVE_BOT_HISTORY_BEFORE (UTC): the 30 messages up to that moment, to find which answer a saved limit came from.
+            var before = DateTime.TryParse(Environment.GetEnvironmentVariable("FMF_LIVE_BOT_HISTORY_BEFORE"), null,
+                System.Globalization.DateTimeStyles.AdjustToUniversal | System.Globalization.DateTimeStyles.AssumeUniversal, out var at) ? at : default;
+            foreach (var answer in (await client.Messages_GetHistory(bot, offset_date: before, limit: 30)).Messages.OfType<Message>().OrderBy(m => m.id))
+                Console.WriteLine($"  {answer.date:HH:mm:ss}Z " + (answer.flags.HasFlag(Message.Flags.out_) ? "asked: " : "bot: ") + Describe(answer, request));
             Console.WriteLine("  RESULT: history inspected; no message sent and no file downloaded.");
             return;
         }

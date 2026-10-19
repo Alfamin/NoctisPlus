@@ -62,7 +62,8 @@ internal static partial class BotLimits
     }
 }
 
-internal sealed record SourceCooldown(string Id, DateTimeOffset Until, string Reason);
+/// <param name="Scope">"global", "search" or "download"; absent in files written before owner #79.</param>
+internal sealed record SourceCooldown(string Id, DateTimeOffset Until, string Reason, string? Scope = null);
 
 /// <summary>Primary first on each track. Failed or limited requests use the backup; Telegram-wide waits stop both.</summary>
 internal sealed class MusicSources
@@ -71,9 +72,10 @@ internal sealed class MusicSources
     private readonly Dictionary<string, SourceCooldown> _cooldowns = new(StringComparer.Ordinal);
     private readonly Dictionary<string, DateTimeOffset> _rechecked = new(StringComparer.Ordinal);
     private static readonly TimeSpan RecheckEvery = TimeSpan.FromMinutes(10);
-    // One download at a time and one search at a time, but a search does not wait for a download:
-    // each bot keeps its own conversations apart (TelegramBotSource, DeezLoadSource).
-    private readonly SemaphoreSlim _gate = new(1, 1), _searchGate = new(1, 1);
+    // Two downloads at a time (owner #79: a Play must not wait for another song's whole transfer) and one search at
+    // a time; a search does not wait for a download. Each bot keeps its own conversations apart (TelegramBotSource, DeezLoadSource).
+    internal const int FetchLanes = 2;
+    private readonly SemaphoreSlim _gate = new(FetchLanes, FetchLanes), _searchGate = new(1, 1), _syncGate = new(1, 1);
     private readonly Func<DateTimeOffset> _now;
     private readonly string? _state;
     private readonly Action<string> _notice;
@@ -97,12 +99,23 @@ internal sealed class MusicSources
                 {
                     // The earlier daily-search fix blocked the whole provider; public track links still work.
                     var key = entry.Id == BotSelections.Hunters && entry.Reason?.Contains("daily search limit", StringComparison.OrdinalIgnoreCase) == true ? entry.Id + " search" : entry.Id;
-                    _cooldowns[key] = entry with { Id = key };
+                    var kept = entry with { Id = key };
+                    // Owner #79: builds before the name-search fix saved Music Hunters' "daily search limit reached"
+                    // answer as a 24-hour download limit, so the chosen first bot was skipped all day. Such an
+                    // unscoped entry without a reset time becomes the 3-hour name-search wait it was; a real
+                    // download limit is learned again from the bot's next answer.
+                    if (LegacySearchLimit(kept)) kept = kept with { Id = entry.Id + " search", Until = kept.Until - LegacyRetry + TelegramBotSource.SearchLimitPause, Scope = "search" };
+                    if (kept.Until > _now()) _cooldowns[kept.Id] = kept;
                 }
         }
         catch (Exception ex) when (ex is IOException or JsonException or UnauthorizedAccessException or InvalidDataException)
         { throw new InvalidDataException("SOURCE_STATE_UNREADABLE: saved bot limits could not be read. Keep the file for diagnosis; repair it before resuming.", ex); }
     }
+    private static readonly TimeSpan LegacyRetry = TimeSpan.FromHours(24);
+    internal static bool LegacySearchLimit(SourceCooldown entry) =>
+        entry.Scope is null && entry.Id == BotSelections.Hunters &&
+        entry.Reason?.Contains("reported a download limit. No reset time was supplied", StringComparison.Ordinal) == true;
+
     public BotTrack Track(MusicRequest request)
     {
         var name = Downloader.FileNames([new BotText.Line("1", request.Artist, request.Title, request.Duration)])[0];
@@ -247,9 +260,12 @@ internal sealed class MusicSources
     /// <summary>The preference was changed in the app: each bot's menu is checked once more.</summary>
     public async Task SynchronizeQualityAsync(CancellationToken ct)
     {
-        await _gate.WaitAsync(ct).ConfigureAwait(false);
+        // No download runs while the menus are changed: every lane is taken.
+        await _syncGate.WaitAsync(ct).ConfigureAwait(false);
+        var taken = 0;
         try
         {
+            for (; taken < FetchLanes; taken++) await _gate.WaitAsync(ct).ConfigureAwait(false);
             CheckGlobal();
             foreach (var source in _sources.OfType<IQualityMusicSource>()) source.ForgetQuality();
             var quality = _quality?.Invoke();
@@ -259,7 +275,7 @@ internal sealed class MusicSources
             if (errors.Count > 0) throw new BotAnswerException(string.Join(" ", errors.Values));
             if (quality is not null) _notice("Both bots confirmed preferred quality: " + quality);
         }
-        finally { _gate.Release(); }
+        finally { if (taken > 0) _gate.Release(taken); _syncGate.Release(); }
     }
 
     private async Task<Dictionary<string, string>> ConfigureQualityAsync(IProgress<double>? progress, CancellationToken ct, AudioQuality? preferred)
@@ -331,7 +347,7 @@ internal sealed class MusicSources
         lock (_cooldowns)
         {
             var key = error.Global ? "Telegram" : error.SearchOnly ? error.Provider + " search" : error.Provider;
-            _cooldowns[key] = new(key, error.Until, error.Message);
+            _cooldowns[key] = new(key, error.Until, error.Message, error.Global ? "global" : error.SearchOnly ? "search" : "download");
             if (_state is not null) AtomicJson.Write(_state, _cooldowns.Values.ToArray());
         }
         _notice(error.Message + (error.Global ? "" : " Switching to the backup."));

@@ -145,6 +145,11 @@ internal static class TransferTests
         Check.False(RecordingMatch.Fits(wanted,"Kanye West","Runaway (Live)",TimeSpan.FromSeconds(548)),"live version rejected even at same duration");
         Check.False(RecordingMatch.Fits(wanted,"Kanye West","Runaway (Clean)",TimeSpan.FromSeconds(548)),"clean version rejected for explicit request");
         Check.False(RecordingMatch.Fits(wanted,"Kanye West","Runaway",TimeSpan.FromSeconds(300)),"large duration mismatch rejected");
+        // Owner #79, TEST log: DeezLoad offered "I'M DAT N****" for Spotify's "I'M DAT N***A" and it was refused.
+        var starred=new MusicRequest("I'M DAT N***A","Future",232);
+        Check.True(RecordingMatch.Fits(starred,"Future","I'M DAT N****",TimeSpan.FromSeconds(232)),"a censored word starred differently is the same title");
+        Check.False(RecordingMatch.Fits(starred,"Future","I'M DAT N**** (Instrumental)",TimeSpan.FromSeconds(232)),"its instrumental is still another recording");
+        Check.False(RecordingMatch.Fits(starred,"Future","I'M DAT BOY",TimeSpan.FromSeconds(232)),"a starred word does not match an uncensored different word");
         Check.False(RecordingMatch.Fits(wanted,"","",null),"unidentified files rejected");
         Check.False(RecordingMatch.Fits(new("Same Song","Drake",180),"Drake Bell","Same Song",TimeSpan.FromSeconds(180)),"artist substring does not accept another performer");
         Check.True(RecordingMatch.Fits(new("Song","Artist feat. Guest",180),"Artist","Song",TimeSpan.FromSeconds(180)),"guest-credit differences retain the primary artist");

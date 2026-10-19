@@ -137,6 +137,8 @@ internal static class RecordingMatch
     public static bool Fits(MusicRequest wanted, string artist, string title, TimeSpan? duration)
     {
         if (string.IsNullOrWhiteSpace(artist) || string.IsNullOrWhiteSpace(title)) return false;
+        // Catalogs star a censored word differently: Spotify "I'M DAT N***A", Deezer "I'M DAT N****" (owner #79).
+        title = Uncensored(title); wanted = wanted with { Title = Uncensored(wanted.Title) };
         if (wanted.Explicit == true && Regex.IsMatch(title, @"\b(clean|censored|radio edit)\b",RegexOptions.IgnoreCase)) return false;
         static string Versions(string name)=>Regex.Replace(name,@"\(with instrumental by[^)]*\)","",RegexOptions.IgnoreCase);
         foreach (var version in new[]{"live","remix","instrumental","acoustic","cover","sped up","slowed"})
@@ -162,6 +164,9 @@ internal static class RecordingMatch
         // lengths say so. Two different additions ("- Pt. 1", "- Pt. 2") are two recordings.
         return lengths && (extras.IsSubsetOf(otherExtras) || otherExtras.IsSubsetOf(extras)) && (close || LabelsOnly(extras,otherExtras));
     }
+
+    /// <summary>A starred word is kept as its first letter and one star, however many letters were hidden.</summary>
+    internal static string Uncensored(string title) => title.Contains('*') ? Regex.Replace(title, @"(?<![\w*])(\w)[\w*]*\*[\w*]*", "$1*") : title;
 
     // Additions that name the release, not another cut of the song ("Album Version", "Remastered 2011", "Explicit").
     private static bool LabelsOnly(HashSet<string> one,HashSet<string> other)
@@ -267,63 +272,69 @@ internal sealed class DeezLoadSource : IMusicSource, IQualityMusicSource
         Noctis.Services.DebugLog.Write("Finder", $"DeezLoad: cache checks finished at {phaseClock.Elapsed.TotalSeconds:0.0}s");
         await _conversation.WaitAsync(ct).ConfigureAwait(false);
         Noctis.Services.DebugLog.Write("Finder", $"DeezLoad: conversation acquired at {phaseClock.Elapsed.TotalSeconds:0.0}s");
-        try
-        {
-            var url=request.Url;
-            if(url is null)
-            {
-                var matches=await InlineAsync(client,bot,BotQuery.For(request),ct).ConfigureAwait(false);
-                foreach(var item in matches.results.OfType<BotInlineMediaResult>())
-                    if(item.document is Document doc && Fits(request,doc) && (request.Quality != AudioQuality.MP3 || TelegramBotSource.Extension(doc) == "mp3")) return await Download(client,doc,output,progress,ct).ConfigureAwait(false);
-                url=MatchingInlineLink(request,matches.results.OfType<BotInlineResult>());
-                if(url is null)
-                    Noctis.Services.DebugLog.Write("Finder",$"DeezLoad: none of {matches.results.Length} results fit \"{request.Artist} - {request.Title}\": "+
-                        string.Join(" | ",matches.results.Take(6).Select(r=>r is BotInlineResult text ? (text.title??"")+" / "+(text.description??"").ReplaceLineEndings(" ")
-                            : r is BotInlineMediaResult{document:Document doc} && Request(doc,null) is {} file ? file.Artist+" - "+file.Title+" ("+file.Duration+")" : "file")));
-            }
-            if(!MusicLink.TryParse(url,out var link) || link!.Kind!="track") throw new TrackUnavailableException("DeezLoad did not return a usable track link.");
-            Noctis.Services.DebugLog.Write("Finder", $"DeezLoad: track link resolved at {phaseClock.Elapsed.TotalSeconds:0.0}s");
-            await _account.StartBotAsync(client,bot,Bot,ct).ConfigureAwait(false);
-            var sent=await client.SendMessageAsync(bot,link.Url).WaitAsync(TimeSpan.FromSeconds(25), ct).ConfigureAwait(false);
-            Noctis.Services.DebugLog.Write("Finder", $"DeezLoad: track link sent at {phaseClock.Elapsed.TotalSeconds:0.0}s");
-            var end=DateTimeOffset.UtcNow.AddMinutes(15); var cursor=sent.id; var lastNotice="";
-            string? other=null; DateTimeOffset? otherSince=null;
-            var asked=DateTimeOffset.UtcNow; var heard=false;
-            while(DateTimeOffset.UtcNow<end)
-            {
-                ct.ThrowIfCancellationRequested();
-                var replies=await ReadNew(client,bot,sent.id,ct).ConfigureAwait(false);
-                heard|=replies.Count>0;
-                // A bot that is working says so ("Downloading", its queue position); one that has said nothing at all
-                // for 20 s is not working on it (owner #53: never sit and wait).
-                if(!heard && DateTimeOffset.UtcNow-asked>=SilentLimit)
-                    throw new TimeoutException("DeezLoad did not answer within 20 seconds.");
-                foreach(var m in replies)
-                {
-                    if(BotLimits.Read(Id,m.message??"",DateTimeOffset.UtcNow) is {} limited) throw limited;
-                    if(m.media is MessageMediaDocument {document:Document doc})
-                    {
-                        if(Fits(request,doc)) return await Download(client,doc,output,progress,ct).ConfigureAwait(false);
-                        if(Request(doc,null) is {} sentTrack){other??=Shorten(sentTrack.Artist+" - "+sentTrack.Title);otherSince??=DateTimeOffset.UtcNow;}
-                    }
-                    if(m.message is {Length:>0} status && status!=lastNotice && (status.Contains("position in the queue") || status.Contains("Downloading")))
-                    {
-                        _notice("DeezLoad: "+(lastNotice=status).ReplaceLineEndings(" "));
-                        if (status.Contains("position in the queue")) throw new SourceLimitException(Id,"DeezLoad has a queue delay; trying the other bot.",DateTimeOffset.UtcNow.AddMinutes(10));
-                    }
-                    if(Regex.IsMatch(m.message??"",@"cannot download|not available|not found",RegexOptions.IgnoreCase)) throw new TrackUnavailableException("DeezLoad could not supply this recording.");
-                }
-                // The bot sent another recording (often the same song in a version of another length). The right one
-                // still gets a minute, in case that file was a late answer to an earlier request; then the backup is
-                // tried, instead of every other song and search waiting out the whole quarter of an hour.
-                if(otherSince is {} since && DateTimeOffset.UtcNow-since>=OtherRecordingGrace)
-                    throw new TrackUnavailableException($"DeezLoad sent another recording ({other}) and not this one.");
-                await Task.Delay(TimeSpan.FromSeconds(4),ct).ConfigureAwait(false);
-            }
-            throw new TimeoutException("DeezLoad did not deliver the track within 15 minutes. The backup will be tried.");
-        }
+        Document found;
+        try { found=await ConverseAsync(client,bot,request,phaseClock,ct).ConfigureAwait(false); }
         catch(RpcException ex) { throw Translate(ex); }
         finally { _conversation.Release(); }
+        // Owner #79: the file is known, so the next song's conversation does not wait for these bytes.
+        try { return await Download(client,found,output,progress,ct).ConfigureAwait(false); }
+        catch(RpcException ex) { throw Translate(ex); }
+    }
+    /// <summary>Asks for the track and waits for the bot's matching file, inside the one conversation.</summary>
+    private async Task<Document> ConverseAsync(Client client,User bot,MusicRequest request,System.Diagnostics.Stopwatch phaseClock,CancellationToken ct)
+    {
+        var url=request.Url;
+        if(url is null)
+        {
+            var matches=await InlineAsync(client,bot,BotQuery.For(request),ct).ConfigureAwait(false);
+            foreach(var item in matches.results.OfType<BotInlineMediaResult>())
+                if(item.document is Document doc && Fits(request,doc) && (request.Quality != AudioQuality.MP3 || TelegramBotSource.Extension(doc) == "mp3")) return doc;
+            url=MatchingInlineLink(request,matches.results.OfType<BotInlineResult>());
+            if(url is null)
+                Noctis.Services.DebugLog.Write("Finder",$"DeezLoad: none of {matches.results.Length} results fit \"{request.Artist} - {request.Title}\": "+
+                    string.Join(" | ",matches.results.Take(6).Select(r=>r is BotInlineResult text ? (text.title??"")+" / "+(text.description??"").ReplaceLineEndings(" ")
+                        : r is BotInlineMediaResult{document:Document doc} && Request(doc,null) is {} file ? file.Artist+" - "+file.Title+" ("+file.Duration+")" : "file")));
+        }
+        if(!MusicLink.TryParse(url,out var link) || link!.Kind!="track") throw new TrackUnavailableException("DeezLoad did not return a usable track link.");
+        Noctis.Services.DebugLog.Write("Finder", $"DeezLoad: track link resolved at {phaseClock.Elapsed.TotalSeconds:0.0}s");
+        await _account.StartBotAsync(client,bot,Bot,ct).ConfigureAwait(false);
+        var sent=await client.SendMessageAsync(bot,link.Url).WaitAsync(TimeSpan.FromSeconds(25), ct).ConfigureAwait(false);
+        Noctis.Services.DebugLog.Write("Finder", $"DeezLoad: track link sent at {phaseClock.Elapsed.TotalSeconds:0.0}s");
+        var end=DateTimeOffset.UtcNow.AddMinutes(15); var cursor=sent.id; var lastNotice="";
+        string? other=null; DateTimeOffset? otherSince=null;
+        var asked=DateTimeOffset.UtcNow; var heard=false;
+        while(DateTimeOffset.UtcNow<end)
+        {
+            ct.ThrowIfCancellationRequested();
+            var replies=await ReadNew(client,bot,sent.id,ct).ConfigureAwait(false);
+            heard|=replies.Count>0;
+            // A bot that is working says so ("Downloading", its queue position); one that has said nothing at all
+            // for 20 s is not working on it (owner #53: never sit and wait).
+            if(!heard && DateTimeOffset.UtcNow-asked>=SilentLimit)
+                throw new TimeoutException("DeezLoad did not answer within 20 seconds.");
+            foreach(var m in replies)
+            {
+                if(BotLimits.Read(Id,m.message??"",DateTimeOffset.UtcNow) is {} limited) throw limited;
+                if(m.media is MessageMediaDocument {document:Document doc})
+                {
+                    if(Fits(request,doc)) return doc;
+                    if(Request(doc,null) is {} sentTrack){other??=Shorten(sentTrack.Artist+" - "+sentTrack.Title);otherSince??=DateTimeOffset.UtcNow;}
+                }
+                if(m.message is {Length:>0} status && status!=lastNotice && (status.Contains("position in the queue") || status.Contains("Downloading")))
+                {
+                    _notice("DeezLoad: "+(lastNotice=status).ReplaceLineEndings(" "));
+                    if (status.Contains("position in the queue")) throw new SourceLimitException(Id,"DeezLoad has a queue delay; trying the other bot.",DateTimeOffset.UtcNow.AddMinutes(10));
+                }
+                if(Regex.IsMatch(m.message??"",@"cannot download|not available|not found",RegexOptions.IgnoreCase)) throw new TrackUnavailableException("DeezLoad could not supply this recording.");
+            }
+            // The bot sent another recording (often the same song in a version of another length). The right one
+            // still gets a minute, in case that file was a late answer to an earlier request; then the backup is
+            // tried, instead of every other song and search waiting out the whole quarter of an hour.
+            if(otherSince is {} since && DateTimeOffset.UtcNow-since>=OtherRecordingGrace)
+                throw new TrackUnavailableException($"DeezLoad sent another recording ({other}) and not this one.");
+            await Task.Delay(TimeSpan.FromSeconds(4),ct).ConfigureAwait(false);
+        }
+        throw new TimeoutException("DeezLoad did not deliver the track within 15 minutes. The backup will be tried.");
     }
     // Telegram answers BOT_RESPONSE_TIMEOUT when the bot is slow to answer an inline search; one more try usually lands.
     private static async Task<Messages_BotResults> InlineAsync(Client client,User bot,string query,CancellationToken ct)

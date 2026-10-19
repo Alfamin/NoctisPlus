@@ -746,7 +746,8 @@ internal sealed class TelegramBotSource : IHunterBotSource
             foreach (var reply in history.Messages.OfType<Message>().Where(m => !m.flags.HasFlag(Message.Flags.out_)))
             {
                 // A name-search quota is not a file/download quota. Let SearchAsync scope it correctly.
-                if (BotText.IsSearchLimit(reply.message) && matches(reply)) return reply;
+                // Owner #79: a download waiting for its file never takes another search's quota answer as its own.
+                if (BotText.IsSearchLimit(reply.message)) { if (matches(reply)) return reply; continue; }
                 if (BotLimits.Read("Music Hunters", reply.message ?? "", DateTimeOffset.UtcNow) is { } limited) throw limited;
             }
             var found = history.Messages.OfType<Message>().Reverse()

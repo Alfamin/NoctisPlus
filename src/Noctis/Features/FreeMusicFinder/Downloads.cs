@@ -29,9 +29,13 @@ internal sealed class Download(BotTrack track, string folder)
     public bool IsActive => State is DownloadState.Queued or DownloadState.Running or DownloadState.Waiting;
 }
 
-/// <summary>One Telegram transfer at a time, with a separate priority lane and editable durable backlog.</summary>
+/// <summary>
+/// One Telegram transfer at a time, plus a second lane for Play / download-now requests (owner #79: SICKO MODE waited
+/// a whole other song's 40 s transfer before any bot was asked), with an editable durable backlog.
+/// </summary>
 internal sealed class Downloads : IDisposable
 {
+    internal const int Lanes = MusicSources.FetchLanes;
     private readonly SemaphoreSlim _wake = new(0, 1);
     private readonly CancellationTokenSource _stop = new();
     private readonly object _gate = new();
@@ -40,8 +44,8 @@ internal sealed class Downloads : IDisposable
     private readonly Action<string> _log;
     private readonly string? _store;
     private bool _paused, _saveFailing;
-    private Download? _current, _last;
-    private CancellationTokenSource? _currentStop;
+    private Download? _last;
+    private readonly Dictionary<Download, CancellationTokenSource> _running = new();
     private int _done, _saved;
     private bool _disposed;
     public bool Paused { get { lock (_gate) return _paused; } }
@@ -167,7 +171,7 @@ internal sealed class Downloads : IDisposable
     }
     private void Insert(Download item)
     {
-        int index = item.Priority ? _active.FindIndex(d => !d.Priority && d != _current) : -1;
+        int index = item.Priority ? _active.FindIndex(d => !d.Priority && !_running.ContainsKey(d)) : -1;
         if (index < 0) _active.Add(item); else _active.Insert(index, item);
     }
     private void PromoteLocked(Download item)
@@ -211,21 +215,22 @@ internal sealed class Downloads : IDisposable
             _known.Remove(item); _active.Remove(item);
             try { Save(); } catch { _known.Insert(known, item); if (active >= 0) _active.Insert(active, item); throw; }
             if (item.IsActive || item.State is DownloadState.Failed or DownloadState.Cancelled) item.State = DownloadState.Removed;
-            cancel = _current == item ? _currentStop : null;
+            cancel = _running.GetValueOrDefault(item);
         }
         Cancel(cancel); Wake(); Raise(item); return true;
     }
     public void Clear()
     {
-        Download[] old; Download[] active; CancellationTokenSource? cancel;
+        Download[] old; Download[] active; CancellationTokenSource[] cancel;
         lock (_gate)
         {
             old = _known.ToArray(); active = _active.ToArray(); _known.Clear(); _active.Clear();
             try { Save(); } catch { _known.AddRange(old); _active.AddRange(active); throw; }
             foreach (var item in old.Where(d => d.IsActive || d.State is DownloadState.Failed or DownloadState.Cancelled)) item.State = DownloadState.Removed;
-            _done = _saved = 0; _last = null; cancel = _currentStop;
+            _done = _saved = 0; _last = null; cancel = _running.Values.ToArray();
         }
-        Cancel(cancel); Wake(); foreach (var item in old) Raise(item);
+        foreach (var source in cancel) Cancel(source);
+        Wake(); foreach (var item in old) Raise(item);
     }
     private static void Cancel(CancellationTokenSource? source) { try { source?.Cancel(); } catch (ObjectDisposedException) { } }
     public void Dispose()
@@ -248,43 +253,29 @@ internal sealed class Downloads : IDisposable
         {
             while (!_stop.IsCancellationRequested)
             {
-                Download? download; CancellationTokenSource? transfer = null;
+                Download? download; CancellationTokenSource? transfer = null; var tidy = false;
                 TimeSpan delay = TimeSpan.FromMinutes(1);
                 lock (_gate)
                 {
                     if (_disposed) break;
-                    var eligible = _active.Where(d => d != _current && Runnable(d)).ToArray();
-                    download = eligible.FirstOrDefault(d => d.RetryAt is null || d.RetryAt <= DateTimeOffset.UtcNow);
+                    var eligible = _active.Where(d => !_running.ContainsKey(d) && Runnable(d)).ToArray();
+                    // The second lane takes only Play / download-now requests; the backlog keeps to one.
+                    download = eligible.FirstOrDefault(d => (d.RetryAt is null || d.RetryAt <= DateTimeOffset.UtcNow) &&
+                        (_running.Count == 0 || _running.Count < Lanes && d.Priority));
                     if (download is not null)
                     {
                         transfer = CancellationTokenSource.CreateLinkedTokenSource(_stop.Token);
-                        _current = download; _currentStop = transfer;
+                        _running[download] = transfer; tidy = _tidied.Add(download.Folder);
                         download.State = DownloadState.Running; download.Error = ""; download.Stage = ""; download.Step = Noctis.Services.Search.OnlineDownloadStep.Asking; download.Progress = 0; download.RetryAt = null; SaveOrLog();
                     }
-                    else if (eligible.Length > 0)
-                        delay = TimeSpan.FromMilliseconds(Math.Clamp((eligible.Min(d => d.RetryAt)!.Value - DateTimeOffset.UtcNow).TotalMilliseconds, 10, 60000));
+                    else if (eligible.Any(d => d.RetryAt > DateTimeOffset.UtcNow))
+                        delay = TimeSpan.FromMilliseconds(Math.Clamp((eligible.Where(d => d.RetryAt is not null).Min(d => d.RetryAt)!.Value - DateTimeOffset.UtcNow).TotalMilliseconds, 10, 60000));
                 }
                 if (download is null) { await _wake.WaitAsync(delay, _stop.Token).ConfigureAwait(false); continue; }
-                try { await RunOneAsync(download, transfer!.Token).ConfigureAwait(false); }
-                finally { lock (_gate) { _current = null; _currentStop = null; } transfer!.Dispose(); }
-                string? summary = null;
-                lock (_gate)
-                {
-                    if (_known.Contains(download))
-                    {
-                        if (download.State != DownloadState.Waiting)
-                        {
-                            _active.Remove(download); _done++;
-                            if (download.State == DownloadState.Saved) _saved++;
-                            if (download.State != DownloadState.Cancelled) _last = download;
-                            // Songs waiting for Start or behind a pause do not keep the finished ones from being reported.
-                            if (!_active.Any(Runnable)) { summary = Summary(); _done = _saved = 0; _last = null; }
-                        }
-                        SaveOrLog();
-                    }
-                }
-                Raise(download);
-                if (summary is not null && !_stop.IsCancellationRequested) RaiseFinished(summary);
+                // Before this folder's first transfer starts, so the other lane's partial file is never taken for a leftover.
+                if (tidy && Downloader.CleanLeftovers(download.Folder) is > 0 and var removed)
+                    _log($"removed {removed} unfinished downloads left in {download.Folder}");
+                _ = RunLaneAsync(download, transfer!);
             }
         }
         catch (OperationCanceledException) when (_stop.IsCancellationRequested) { }
@@ -297,14 +288,39 @@ internal sealed class Downloads : IDisposable
             _active.Clear();
         }
     }
+    private async Task RunLaneAsync(Download download, CancellationTokenSource transfer)
+    {
+        try
+        {
+            try { await RunOneAsync(download, transfer.Token).ConfigureAwait(false); }
+            finally { lock (_gate) _running.Remove(download); transfer.Dispose(); }
+            string? summary = null;
+            lock (_gate)
+            {
+                if (_known.Contains(download))
+                {
+                    if (download.State != DownloadState.Waiting)
+                    {
+                        _active.Remove(download); _done++;
+                        if (download.State == DownloadState.Saved) _saved++;
+                        if (download.State != DownloadState.Cancelled) _last = download;
+                        // Songs waiting for Start or behind a pause do not keep the finished ones from being reported.
+                        if (!_active.Any(Runnable)) { summary = Summary(); _done = _saved = 0; _last = null; }
+                    }
+                    SaveOrLog();
+                }
+            }
+            Raise(download);
+            if (summary is not null && !_stop.IsCancellationRequested) RaiseFinished(summary);
+        }
+        catch (Exception ex) { _log("QUEUE_SAVE_FAILED: " + ex.Message + " Pending requests remain in the last saved queue."); }
+        finally { Wake(); }
+    }
     private async Task RunOneAsync(Download download, CancellationToken ct)
     {
         try
         {
             ct.ThrowIfCancellationRequested();
-            bool tidy; lock (_gate) tidy = _tidied.Add(download.Folder);
-            if (tidy && Downloader.CleanLeftovers(download.Folder) is > 0 and var removed)
-                _log($"removed {removed} unfinished downloads left in {download.Folder}");
             Raise(download);
             download.Playback = new(download.Folder, download.Track.FileName, download.Track.Duration);
             var outcome = await Downloader.DownloadAsync(download.Track, download.Folder, new Report(p =>
