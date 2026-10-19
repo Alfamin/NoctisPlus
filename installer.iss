@@ -5,7 +5,7 @@
 #define MyAppName "Noctis Plus"
 ; Build-NoctisPlus.ps1 passes /DMyAppVersion=<Noctis.csproj Version>, so the Setup name matches what the updater looks for.
 #ifndef MyAppVersion
-  #define MyAppVersion "2.0.0"
+  #define MyAppVersion "2.0.1"
 #endif
 #define MyAppPublisher "Alfamin"
 #define MyAppExeName "Noctis.exe"
