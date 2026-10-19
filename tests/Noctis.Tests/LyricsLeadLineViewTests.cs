@@ -177,6 +177,34 @@ public class LyricsLeadLineViewTests
         finally { win.Close(); }
     }
 
+    /// <summary>
+    /// A seek back out of the lead into the line still active ("door slam" again): the list
+    /// went back to that line, but the focus ramp stayed on "cold hand" — the line being sung
+    /// sat dimmed and blurred, the next one bright, until "cold hand" came up.
+    /// </summary>
+    [AvaloniaFact]
+    public void SeekBackOutOfTheLead_IntoTheActiveLine_PutsTheFocusBackOnIt()
+    {
+        var library = new FakeLibraryService();
+        var player = new PlayerViewModel(new FakeAudioPlayer(), library, new TestPersistenceService(), new FakeAnimatedCoverService());
+        var vm = MakeLyrics(player, library);
+        var incoming = LineStarting(vm, "You feel");
+        var sung = LineStarting(vm, "You hear");
+        PlayTo(vm, 115.0, 123.5);
+        AssertLeadState(vm, incoming);
+
+        At(vm, 120.0);                                // seek back within "door slam"
+        PumpFor(50);
+
+        var index = vm.LyricLines.IndexOf(sung);
+        Assert.Equal(index, vm.ActiveLineIndex);
+        Assert.Equal(index, vm.ScrollLineIndex);
+        Assert.False(incoming.IsLeading);
+        Assert.Equal(1.0, sung.LineOpacity);
+        Assert.Equal(0.0, sung.BlurRadius);
+        Assert.True(incoming.LineOpacity < 1.0, $"'cold hand' still in focus: opacity {incoming.LineOpacity}");
+    }
+
     /// <summary>A line sung earlier keeps its words fully swept after it finishes; a seek
     /// back into its lead must not bring it in fully lit.</summary>
     [AvaloniaFact]

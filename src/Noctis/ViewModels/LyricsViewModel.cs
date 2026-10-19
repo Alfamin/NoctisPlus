@@ -325,11 +325,12 @@ public partial class LyricsViewModel : ViewModelBase, IDisposable
     // Apple Music brightens and un-blurs the incoming line as the list sets off toward
     // it, not when its first word starts — measured: incoming sharpness and brightness
     // follow the glide (half-way ~160 ms in), the outgoing line dims within ~100 ms. So
-    // the focus ramp moves with the early glide; the sweep stays on activation.
-    partial void OnScrollLineIndexChanged(int value)
+    // the focus ramp moves with the early glide; the sweep stays on activation. A lead
+    // dropped with the line unchanged (a seek back within it) brings the focus back.
+    partial void OnScrollLineIndexChanged(int oldValue, int newValue)
     {
-        if (value >= 0 && value == ActiveLineIndex + 1 && ActiveLineIndex >= 0
-            && _hasSyncedLyrics && IsSyncTabSelected)
+        if (ActiveLineIndex >= 0 && _hasSyncedLyrics && IsSyncTabSelected
+            && (newValue == ActiveLineIndex + 1 || oldValue == ActiveLineIndex + 1 && newValue == ActiveLineIndex))
             UpdateLineOpacities(ActiveLineIndex);
     }
 
