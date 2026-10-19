@@ -238,6 +238,7 @@ public sealed partial class DownloadRow : ObservableObject
     [ObservableProperty] private string _artist = "";
     [ObservableProperty] private string _detail = "";
     [ObservableProperty] private double _progress;
+    [ObservableProperty] private OnlineDownloadStep _step;
     [ObservableProperty, NotifyPropertyChangedFor(nameof(IsDownloading), nameof(IsQueued), nameof(IsFailed), nameof(IsSaved), nameof(CanMoveUp))]
     private OnlineDownloadState _state;
     [ObservableProperty, NotifyPropertyChangedFor(nameof(CanMoveUp))] private bool _isNext;
@@ -262,6 +263,7 @@ public sealed partial class DownloadRow : ObservableObject
         Artist = entry.Artist;
         Detail = entry.Detail;
         Progress = entry.Progress;
+        Step = entry.Step;
         State = entry.State;
         IsNext = entry.IsNext;
         IsHeld = entry.IsHeld;

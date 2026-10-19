@@ -158,7 +158,7 @@ public partial class PlaylistViewModel
     {
         if (row?.Song.Online is not { } song || _catalogOnline is not { } online) return;
         if (!online.CanDownload) { online.RequestSignIn(); return; }
-        try { CatalogNotice = "Buffering…"; await _player.PlayOnlineAsync(online, song); CatalogNotice = ""; }
+        try { CatalogNotice = ""; await _player.PlayOnlineAsync(online, song); CatalogNotice = ""; }
         catch (Exception ex) { CatalogNotice = ex.Message; }
     }
 

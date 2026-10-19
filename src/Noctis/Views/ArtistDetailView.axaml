@@ -560,8 +560,7 @@
                             <Path Data="{StaticResource SearchDownloadGlyph}" Width="14" Height="14" Stretch="Uniform"
                                   Stroke="{Binding $parent[Button].Foreground}" StrokeThickness="1.9" StrokeLineCap="Round" StrokeJoin="Round" />
                         </Button>
-                        <ctrl:ProgressRing Width="18" Height="18" Thickness="2" Foreground="{DynamicResource AccentColorBrush}"
-                                           IsVisible="{Binding Song.IsDownloading}" Value="{Binding Song.Progress}" ToolTip.Tip="Downloading" />
+                        <ctrl:DownloadStepBadge Width="18" Height="18" IsVisible="{Binding Song.IsDownloading}" Step="{Binding Song.DownloadStep}" Progress="{Binding Song.Progress}" />
                         <ctrl:ProgressRing Width="18" Height="18" Thickness="2" IsIndeterminate="True"
                                            IsVisible="{Binding Song.IsQueued}" ToolTip.Tip="In downloads" />
                         <PathIcon Data="{StaticResource CheckmarkIcon}" Width="12" Height="12" Foreground="{DynamicResource AccentColorBrush}"

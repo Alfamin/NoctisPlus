@@ -11,6 +11,9 @@ public partial class PlayerViewModel
     [ObservableProperty, NotifyPropertyChangedFor(nameof(IsWaitingForAudio))] private bool _isPreparingOnlinePlayback;
     [ObservableProperty, NotifyPropertyChangedFor(nameof(IsWaitingForAudio))] private bool _isBuffering;
     public bool IsWaitingForAudio => IsPreparingOnlinePlayback || IsBuffering;
+    /// <summary>What the download behind the song being prepared is doing (asking, switching bot, receiving, saving).</summary>
+    [ObservableProperty] private OnlineDownloadStep _onlinePreparingStep;
+    [ObservableProperty] private double _onlinePreparingProgress;
     [ObservableProperty] private bool _canSeekCurrent = true;
     [ObservableProperty] private string? _onlinePlayingSongId;
     private bool _inputWaiting;
@@ -48,6 +51,17 @@ public partial class PlayerViewModel
         var stop = _onlinePlay = new();
         _onlinePreparingSongId = song.Id;
         IsPreparingOnlinePlayback = true;
+        // Owner #54: the Play button shows what the download is doing while the song is prepared.
+        void ShowStep()
+        {
+            if (!ReferenceEquals(_onlinePlay, stop)) return;
+            var status = source.StatusOf(song);
+            OnlinePreparingStep = status.State == OnlineDownloadState.Downloading ? status.Step : OnlineDownloadStep.None;
+            OnlinePreparingProgress = status.Progress;
+        }
+        void StepChanged(object? sender, EventArgs e) => Avalonia.Threading.Dispatcher.UIThread.Post(ShowStep);
+        ShowStep();
+        source.DownloadsChanged += StepChanged;
         try
         {
             var track = await source.PreparePlaybackAsync(song, stop.Token);
@@ -62,6 +76,7 @@ public partial class PlayerViewModel
         catch (OperationCanceledException) when (stop.IsCancellationRequested) { }
         finally
         {
+            source.DownloadsChanged -= StepChanged;
             if (ReferenceEquals(_onlinePlay, stop)) _onlinePlay = null;
             if (_onlinePlay is null) { IsPreparingOnlinePlayback = false; _onlinePreparingSongId = null; }
             stop.Dispose();

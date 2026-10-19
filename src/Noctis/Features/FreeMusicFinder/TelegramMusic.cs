@@ -298,9 +298,9 @@ internal sealed class DeezLoadSource : IMusicSource, IQualityMusicSource
 /// <summary>Download progress in steps of 2 %: every report redraws the queue in the window.</summary>
 internal static class TransferProgress
 {
-    public static void Stage(IProgress<double>? progress, string text)
+    public static void Stage(IProgress<double>? progress, string text, Noctis.Services.Search.OnlineDownloadStep step = Noctis.Services.Search.OnlineDownloadStep.Asking)
     {
-        if (progress is IDownloadProgress detailed) detailed.Stage(text);
+        if (progress is IDownloadProgress detailed) detailed.Stage(text, step);
         else progress?.Report(0);
     }
 

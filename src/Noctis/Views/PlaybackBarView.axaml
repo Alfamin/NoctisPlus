@@ -703,8 +703,14 @@
                         <Panel>
                             <!-- Play icon (shown when not playing) -->
                             <controls:ProgressRing Width="36" Height="36" Thickness="2" IsIndeterminate="True"
-                                                   IsVisible="{Binding IsWaitingForAudio}" Foreground="{DynamicResource IslandIconFill}"
+                                                   IsVisible="{Binding IsBuffering}" Foreground="{DynamicResource IslandIconFill}"
                                                    HorizontalAlignment="Center" VerticalAlignment="Center" ToolTip.Tip="Buffering…" />
+                            <!-- Owner #54: while a song you don't have is prepared, its download's step shows in the button. -->
+                            <controls:DownloadStepBadge Width="36" Height="36" IconSize="13"
+                                                        IsVisible="{Binding IsPreparingOnlinePlayback}"
+                                                        Step="{Binding OnlinePreparingStep}"
+                                                        Progress="{Binding OnlinePreparingProgress}" />
+                            <Panel IsVisible="{Binding !IsPreparingOnlinePlayback}">
                             <Viewbox Width="20" Height="20"
                                      IsVisible="{Binding State, Converter={x:Static ObjectConverters.NotEqual}, ConverterParameter={x:Static m:PlaybackState.Playing}}">
                                 <Canvas Width="24" Height="24">
@@ -720,6 +726,7 @@
                                           Data="{StaticResource PauseIcon}" />
                                 </Canvas>
                             </Viewbox>
+                            </Panel>
                         </Panel>
                     </Button>
 

@@ -200,7 +200,7 @@ public sealed partial class ForYouShelfViewModel : ObservableObject, IDisposable
         var generation = ++_playGeneration;
         try
         {
-            Status = "Buffering…";
+            Status = ""; // the step icon shows the progress (owner #54)
             await play(online, song);
             if (!_disposed && generation == _playGeneration) Status = "";
         }

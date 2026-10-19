@@ -67,8 +67,7 @@
                         <Panel>
                             <PathIcon Data="{StaticResource SongsIcon}" Width="14" Height="14" Opacity="0.35"
                                       HorizontalAlignment="Center" VerticalAlignment="Center" IsVisible="{Binding !IsDownloading}" />
-                            <controls:ProgressRing Width="22" Height="22" Thickness="2.2" Foreground="{DynamicResource AccentColorBrush}"
-                                                   IsVisible="{Binding IsDownloading}" Value="{Binding Progress}" />
+                            <controls:DownloadStepBadge Width="22" Height="22" IsVisible="{Binding IsDownloading}" Step="{Binding Step}" Progress="{Binding Progress}" />
                         </Panel>
                     </Border>
                     <StackPanel Grid.Column="1" Spacing="1" VerticalAlignment="Center" Margin="2,0,16,0">

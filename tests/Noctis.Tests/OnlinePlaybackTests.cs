@@ -27,8 +27,10 @@ public class OnlinePlaybackTests
         public Task<string?> ArtworkAsync(string url, CancellationToken ct) => Task.FromResult<string?>(null);
         public bool CanDownload => true;
         public void RequestSignIn() { }
-        public OnlineDownloadStatus StatusOf(OnlineSong song) => OnlineDownloadStatus.None;
-        public event EventHandler? DownloadsChanged { add { } remove { } }
+        internal OnlineDownloadStatus Status = OnlineDownloadStatus.None;
+        internal EventHandler? Changed;
+        public OnlineDownloadStatus StatusOf(OnlineSong song) => Status;
+        public event EventHandler? DownloadsChanged { add => Changed += value; remove => Changed -= value; }
         public Task<string> DownloadAsync(IReadOnlyList<OnlineSong> songs, bool now, CancellationToken ct) => throw new NotSupportedException();
         public IDownloadQueue Downloads { get; } = new EmptyQueue();
         internal OnlineArtist? Opened;
@@ -148,6 +150,63 @@ public class OnlinePlaybackTests
         // Another song still takes over at once.
         var other = player.PlayOnlineAsync(source, new("other", "Other", "Synthetic")); Assert.Equal(2, source.Asked);
         source.Pending["other"].SetResult(Track("Other")); await other; player.StopAndClear();
+    }
+
+    [AvaloniaFact]
+    public async Task PreparingASong_FollowsItsDownloadStep_ForThePlayButton()
+    {
+        // Owner #54: the Play button shows what the download is doing, not just a spinning ring.
+        using var data = new TestPersistenceService(); var source = new Source();
+        var player = new PlayerViewModel(new FakeAudioPlayer(), new FakeLibraryService(), data, new FakeAnimatedCoverService());
+        var song = new OnlineSong("online", "Online", "Synthetic");
+        source.Status = new(OnlineDownloadState.Downloading, 0, "", OnlineDownloadStep.Asking);
+        var play = player.PlayOnlineAsync(source, song);
+        Assert.Equal(OnlineDownloadStep.Asking, player.OnlinePreparingStep);
+
+        source.Status = new(OnlineDownloadState.Downloading, 0.4, "", OnlineDownloadStep.Receiving);
+        source.Changed?.Invoke(source, EventArgs.Empty);
+        Avalonia.Threading.Dispatcher.UIThread.RunJobs();
+        Assert.Equal(OnlineDownloadStep.Receiving, player.OnlinePreparingStep);
+        Assert.Equal(0.4, player.OnlinePreparingProgress, 3);
+
+        source.Pending["online"].SetResult(Track("Online")); await play;
+        Assert.False(player.IsPreparingOnlinePlayback);
+        Assert.Null(source.Changed); // the player stops listening once the song plays
+        player.StopAndClear();
+    }
+
+    [AvaloniaFact]
+    public void StepBadge_ShowsOneIconPerStep_AndNamesIt()
+    {
+        AddToPlaylistDialogTests.EnsureAppStyles();
+        var badge = new Noctis.Controls.DownloadStepBadge();
+        var window = new Avalonia.Controls.Window { Content = badge, Width = 100, Height = 100 };
+        try
+        {
+            window.Show();
+            foreach (var (step, spinning, arrow) in new[]
+            {
+                (OnlineDownloadStep.Asking, true, false), (OnlineDownloadStep.Switching, true, false),
+                (OnlineDownloadStep.Receiving, false, true), (OnlineDownloadStep.Saving, false, false),
+            })
+            {
+                badge.Step = step; badge.Progress = 0.5;
+                Assert.Equal(spinning, badge.Ring.IsIndeterminate);
+                Assert.Equal(arrow, badge.Arrow.IsVisible);
+                Assert.Equal(!arrow, badge.Glyph.IsVisible);
+                if (!arrow) Assert.NotNull(badge.Glyph.Data);
+                Assert.Equal(Noctis.Controls.DownloadStepBadge.Describe(step), Avalonia.Automation.AutomationProperties.GetName(badge));
+            }
+            Assert.Equal(1, badge.Ring.Value); // saving: the ring is full
+            Assert.Contains("spin", new[] { OnlineDownloadStep.Switching }.Select(s => { badge.Step = s; return string.Join(",", badge.Glyph.Classes); }).Single());
+            // Every song row carries a hidden badge: hidden, its icon must not animate.
+            badge.Step = OnlineDownloadStep.Asking;
+            Assert.Contains("pulse", badge.Glyph.Classes);
+            badge.IsVisible = false;
+            Assert.DoesNotContain("pulse", badge.Glyph.Classes);
+            Assert.DoesNotContain("spin", badge.Glyph.Classes);
+        }
+        finally { window.Close(); }
     }
 
     [AvaloniaTheory]

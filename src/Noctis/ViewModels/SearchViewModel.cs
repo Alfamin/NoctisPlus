@@ -508,7 +508,7 @@ public sealed partial class SearchViewModel : ViewModelBase, ISearchable, IDispo
         if (item?.Online is { } song && _source is { } source)
         {
             if (!source.CanDownload) { source.RequestSignIn(); return; }
-            try { Status = "Buffering…"; await _player.PlayOnlineAsync(source, song); Status = ""; }
+            try { Status = ""; await _player.PlayOnlineAsync(source, song); Status = ""; }
             catch (Exception ex) { Status = ex.Message; }
             return;
         }
@@ -722,6 +722,9 @@ public sealed partial class SearchSongItem : ObservableObject, IOnlineArtwork
 
     [ObservableProperty] private string _downloadMessage = "";
 
+    /// <summary>What a running download is doing (owner #54: shown as an icon on the row).</summary>
+    [ObservableProperty] private OnlineDownloadStep _downloadStep;
+
     public bool CanStartDownload => IsOnline && DownloadState is OnlineDownloadState.None or OnlineDownloadState.Failed;
     public bool IsDownloading => IsOnline && DownloadState == OnlineDownloadState.Downloading;
     public bool IsQueued => IsOnline && DownloadState == OnlineDownloadState.Queued;
@@ -742,6 +745,7 @@ public sealed partial class SearchSongItem : ObservableObject, IOnlineArtwork
         DownloadState = status.State;
         Progress = status.Progress;
         DownloadMessage = status.Message;
+        DownloadStep = status.Step;
     }
 }
 

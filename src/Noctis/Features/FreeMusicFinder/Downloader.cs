@@ -112,7 +112,7 @@ internal static class Downloader
             await using (var output = playback?.Attach(file) ?? file)
             {
                 extension = await track.Fetch(output, progress, ct).ConfigureAwait(false);
-                TransferProgress.Stage(progress, "Checking and saving the audio…");
+                TransferProgress.Stage(progress, "Checking and saving the audio…", Noctis.Services.Search.OnlineDownloadStep.Saving);
                 length = output.Length;
             }
             if (!AudioExtensions.Contains(extension)) throw new InvalidDataException($"The bot sent a \".{extension}\" file, which is not a song.");

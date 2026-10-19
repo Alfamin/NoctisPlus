@@ -29,7 +29,11 @@ public sealed record OnlineSearchResult(string Query, IReadOnlyList<OnlineSong> 
 
 public enum OnlineDownloadState { None, Queued, Downloading, Saved, Failed }
 
-public sealed record OnlineDownloadStatus(OnlineDownloadState State, double Progress = 0, string Message = "")
+/// <summary>What a running download is doing right now (owner #54: show it, with icons, not text).</summary>
+public enum OnlineDownloadStep { None, Asking, Switching, Receiving, Saving }
+
+public sealed record OnlineDownloadStatus(OnlineDownloadState State, double Progress = 0, string Message = "",
+    OnlineDownloadStep Step = OnlineDownloadStep.None)
 {
     public static readonly OnlineDownloadStatus None = new(OnlineDownloadState.None);
 }
@@ -93,7 +97,8 @@ public interface IOnlineMusicSearch
 
 /// <summary>One request on the Downloads page. <paramref name="Handle"/> identifies it to the queue.</summary>
 public sealed record DownloadEntry(object Handle, string Title, string Artist, OnlineDownloadState State, double Progress,
-    string Detail, bool IsNext, bool IsHeld, string? SavedPath = null, double? Seconds = null);
+    string Detail, bool IsNext, bool IsHeld, string? SavedPath = null, double? Seconds = null,
+    OnlineDownloadStep Step = OnlineDownloadStep.None);
 
 /// <summary>The download queue (one transfer at a time, a priority lane, a held batch). Calls come
 /// from the UI thread; <see cref="Changed"/> may fire on any thread, often (progress).</summary>

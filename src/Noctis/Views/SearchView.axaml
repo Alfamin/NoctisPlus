@@ -43,11 +43,9 @@
                           Stroke="{Binding $parent[Button].Foreground}" StrokeThickness="1.9"
                           StrokeLineCap="Round" StrokeJoin="Round" />
                 </Button>
-                <controls:ProgressRing Width="20" Height="20" Thickness="2"
-                                       Foreground="{DynamicResource AccentColorBrush}"
-                                       IsVisible="{Binding IsDownloading}"
-                                       Value="{Binding Progress}"
-                                       ToolTip.Tip="Downloading" />
+                <controls:DownloadStepBadge IsVisible="{Binding IsDownloading}"
+                                            Step="{Binding DownloadStep}"
+                                            Progress="{Binding Progress}" />
                 <controls:ProgressRing Width="20" Height="20" Thickness="2"
                                        Foreground="{DynamicResource SystemControlForegroundBaseMediumBrush}"
                                        IsVisible="{Binding IsQueued}"

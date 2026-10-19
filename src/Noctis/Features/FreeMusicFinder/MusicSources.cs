@@ -171,7 +171,9 @@ internal sealed class MusicSources
                         if (output.CanSeek) { output.SetLength(0); output.Position = 0; }
                         TransferProgress.Stage(progress, haveMp3
                             ? "MP3 ready · checking FLAC with " + source.Id + "…"
-                            : "Asking " + source.Id + " for the file…");
+                            : "Asking " + source.Id + " for the file…",
+                            // Owner #54: the step icon shows when the other bot is being tried.
+                            haveMp3 || errors.Count > 0 ? Noctis.Services.Search.OnlineDownloadStep.Switching : Noctis.Services.Search.OnlineDownloadStep.Asking);
                         // Callbacks and chat message IDs are scoped to one provider. Only recording
                         // metadata and public track URLs may cross to the fallback bot.
                         Trace($"fetch \"{request.Title}\": asking {source.Id} at {clock.Elapsed.TotalSeconds:0.0} s");

@@ -6,7 +6,7 @@ internal enum DownloadState { Queued, Running, Saved, AlreadyThere, Failed, Canc
 /// <summary>A transfer has stages as well as bytes: a completed MP3 may still await a FLAC answer.</summary>
 internal interface IDownloadProgress : IProgress<double>
 {
-    void Stage(string text);
+    void Stage(string text, Noctis.Services.Search.OnlineDownloadStep step);
 }
 
 internal sealed class Download(BotTrack track, string folder)
@@ -16,6 +16,8 @@ internal sealed class Download(BotTrack track, string folder)
     public DownloadState State { get; internal set; }
     public double Progress { get; internal set; }
     public string Stage { get; internal set; } = "";
+    /// <summary>What the running transfer is doing, for the step icons (owner #54).</summary>
+    public Noctis.Services.Search.OnlineDownloadStep Step { get; internal set; }
     public string Error { get; internal set; } = "";
     public DateTimeOffset? RetryAt { get; internal set; }
     public bool Priority { get; internal set; }
@@ -257,7 +259,7 @@ internal sealed class Downloads : IDisposable
                     {
                         transfer = CancellationTokenSource.CreateLinkedTokenSource(_stop.Token);
                         _current = download; _currentStop = transfer;
-                        download.State = DownloadState.Running; download.Error = ""; download.Stage = ""; download.Progress = 0; download.RetryAt = null; SaveOrLog();
+                        download.State = DownloadState.Running; download.Error = ""; download.Stage = ""; download.Step = Noctis.Services.Search.OnlineDownloadStep.Asking; download.Progress = 0; download.RetryAt = null; SaveOrLog();
                     }
                     else if (eligible.Length > 0)
                         delay = TimeSpan.FromMilliseconds(Math.Clamp((eligible.Min(d => d.RetryAt)!.Value - DateTimeOffset.UtcNow).TotalMilliseconds, 10, 60000));
@@ -306,8 +308,8 @@ internal sealed class Downloads : IDisposable
             Raise(download);
             download.Playback = new(download.Folder, download.Track.FileName, download.Track.Duration);
             var outcome = await Downloader.DownloadAsync(download.Track, download.Folder, new Report(p =>
-            { download.Progress = double.IsFinite(p) ? Math.Clamp(p, 0, .99) : 0; download.Stage = ""; Raise(download); },
-                stage => { download.Stage = stage; download.Progress = 0; Raise(download); }), ct, download.Playback).ConfigureAwait(false);
+            { download.Progress = double.IsFinite(p) ? Math.Clamp(p, 0, .99) : 0; download.Stage = ""; if (p > 0) download.Step = Noctis.Services.Search.OnlineDownloadStep.Receiving; Raise(download); },
+                (stage, step) => { download.Stage = stage; download.Step = step; download.Progress = 0; Raise(download); }), ct, download.Playback).ConfigureAwait(false);
             var savedPath = Downloader.FindExisting(download.Folder, download.Track.FileName);
             lock (_gate)
             {
@@ -315,6 +317,7 @@ internal sealed class Downloads : IDisposable
                 {
                     download.SavedPath = savedPath;
                     download.Stage = "";
+                    download.Step = Noctis.Services.Search.OnlineDownloadStep.None;
                     download.Progress = 1;
                     download.State = outcome == DownloadOutcome.Saved ? DownloadState.Saved : DownloadState.AlreadyThere;
                 }
@@ -333,7 +336,7 @@ internal sealed class Downloads : IDisposable
         }
     }
     private void SetOutcome(Download d, DownloadState state, string error, DateTimeOffset? retry = null)
-    { lock (_gate) { if (d.State == DownloadState.Removed) return; d.State = state; d.Error = error; d.RetryAt = retry; d.FailedAt = state == DownloadState.Failed ? DateTimeOffset.UtcNow : null; } }
+    { lock (_gate) { if (d.State == DownloadState.Removed) return; d.State = state; d.Error = error; d.RetryAt = retry; d.Step = Noctis.Services.Search.OnlineDownloadStep.None; d.FailedAt = state == DownloadState.Failed ? DateTimeOffset.UtcNow : null; } }
     private string? Summary()
     {
         if (_last is null) return null;
@@ -346,9 +349,9 @@ internal sealed class Downloads : IDisposable
     }
     private void Raise(Download d) { try { Changed?.Invoke(d); } catch (Exception ex) { _log("download listener failed: " + ex.Message); } }
     private void RaiseFinished(string text) { try { Finished?.Invoke(text); } catch (Exception ex) { _log("download listener failed: " + ex.Message); } }
-    private sealed class Report(Action<double> report, Action<string> stage) : IDownloadProgress
+    private sealed class Report(Action<double> report, Action<string, Noctis.Services.Search.OnlineDownloadStep> stage) : IDownloadProgress
     {
         void IProgress<double>.Report(double value) => report(value);
-        public void Stage(string text) => stage(text);
+        public void Stage(string text, Noctis.Services.Search.OnlineDownloadStep step) => stage(text, step);
     }
 }

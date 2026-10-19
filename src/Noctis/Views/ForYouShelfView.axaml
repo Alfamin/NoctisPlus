@@ -243,6 +243,12 @@
                                                     <Path Data="{StaticResource PlayIcon}" Fill="White" />
                                                 </Viewbox>
                                             </Button>
+                                            <!-- Owner #54: what the download is doing, in the cover's corner. -->
+                                            <Border Background="#99000000" CornerRadius="999" Padding="3" Margin="8"
+                                                    HorizontalAlignment="Right" VerticalAlignment="Top" IsHitTestVisible="False"
+                                                    IsVisible="{Binding Song.IsDownloading}">
+                                                <ctrl:DownloadStepBadge IsVisible="{Binding Song.IsDownloading}" Step="{Binding Song.DownloadStep}" Progress="{Binding Song.Progress}" />
+                                            </Border>
                                             <!-- Bottom-right: the options (the same menu as right-click). -->
                                             <Button Classes="tile-more" Click="OnMoreClick">
                                                 <Viewbox Width="14" Height="14"><Path Data="{StaticResource MoreDotsIcon}" /></Viewbox>
