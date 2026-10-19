@@ -14,29 +14,51 @@ public partial class PageSearchBox : UserControl
         AvaloniaProperty.Register<PageSearchBox, string>(nameof(Placeholder), "Search this list");
 
     public string Placeholder { get => GetValue(PlaceholderProperty); set => SetValue(PlaceholderProperty, value); }
-    private readonly DispatcherTimer _debounce = new() { Interval = TimeSpan.FromMilliseconds(150) };
+    private bool _filterScheduled;
+    private ILocalSearchable? _pendingPage;
+    private string? _pendingText;
 
     public PageSearchBox()
     {
         InitializeComponent();
-        _debounce.Tick += (_, _) => ApplyInput();
         // A pending edit belongs to this page instance, never to the next playlist.
-        DataContextChanged += (_, _) => _debounce.Stop();
-        DetachedFromVisualTree += (_, _) => _debounce.Stop();
+        DataContextChanged += (_, _) => CancelPending();
+        DetachedFromVisualTree += (_, _) => CancelPending();
     }
 
     private void OnInputChanged(object? sender, TextChangedEventArgs e)
     {
         if (this.FindControl<Button>("ClearButton") is { } clear)
             clear.IsVisible = !string.IsNullOrEmpty(Input.Text);
-        _debounce.Stop();
+        CancelPending();
         if (DataContext is ILocalSearchable page && page.SearchText != (Input.Text ?? ""))
-            _debounce.Start();
+        {
+            _pendingPage = page;
+            _pendingText = Input.Text ?? "";
+            if (_filterScheduled) return;
+            _filterScheduled = true;
+            // No typing delay for a local list. Coalesce this dispatch's edits, then
+            // let the page's existing background filter/stale-result guard do the work.
+            Dispatcher.UIThread.Post(ApplyPending, DispatcherPriority.Background);
+        }
+    }
+
+    private void CancelPending() { _pendingPage = null; _pendingText = null; }
+
+    private void ApplyPending()
+    {
+        _filterScheduled = false;
+        var page = _pendingPage;
+        var text = _pendingText;
+        CancelPending();
+        if (page is not null && text is not null && ReferenceEquals(page, DataContext)
+            && text == (Input.Text ?? "") && page.SearchText != text)
+            page.ApplyFilter(text);
     }
 
     private void ApplyInput()
     {
-        _debounce.Stop();
+        CancelPending();
         if (DataContext is ILocalSearchable page && page.SearchText != (Input.Text ?? ""))
             page.ApplyFilter(Input.Text ?? "");
     }

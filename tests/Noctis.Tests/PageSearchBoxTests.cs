@@ -17,6 +17,9 @@ namespace Noctis.Tests;
 
 public class PageSearchBoxTests
 {
+    private readonly ITestOutputHelper _output;
+    public PageSearchBoxTests(ITestOutputHelper output) => _output = output;
+
     private static async Task WaitFor(Func<bool> ready)
     {
         var until = Environment.TickCount64 + 5000;
@@ -41,6 +44,50 @@ public class PageSearchBoxTests
 
     private static void Clear(Control view) => view.GetVisualDescendants().OfType<PageSearchBox>().Single()
         .FindControl<Button>("ClearButton")!.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+
+    [AvaloniaFact]
+    public async Task LibrarySizedSearch_FiltersWithoutWaitingForTheNetwork()
+    {
+        using var data = new TestPersistenceService();
+        var lib = new FakeLibraryService();
+        for (var i = 0; i < 2134; i++)
+            lib.TrackList.Add(new Track { Title = $"Track {i:D4}", Artist = "Synthetic Singer", Album = "Search measurement" });
+        var player = new PlayerViewModel(new FakeAudioPlayer(), lib, data, new FakeAnimatedCoverService());
+        using var vm = new LibrarySongsViewModel(lib, player, new SidebarViewModel(data, lib), data);
+        var view = new LibrarySongsView { DataContext = vm };
+        var window = Show(view);
+        try
+        {
+            vm.IsActive = true;
+            await WaitFor(() => vm.FilteredTracks.Count == 2134);
+            foreach (var query in new[] { "Track 2133", "Track 1000", "Track 0200" })
+            {
+                var clock = System.Diagnostics.Stopwatch.StartNew();
+                Type(view, query);
+                await WaitFor(() => vm.FilteredTracks.Count == 1 && vm.FilteredTracks[0].Title == query);
+                _output.WriteLine($"LOCAL_SEARCH_RESPONSE: 2134 tracks, {clock.Elapsed.TotalMilliseconds:0.0} ms (10 ms observation interval)");
+            }
+        }
+        finally { window.Close(); }
+    }
+
+    [AvaloniaFact]
+    public void LocalEdits_ApplyOnTheNextDispatch_WithoutATypingTimer()
+    {
+        var page = new LocalPage();
+        var box = new PageSearchBox { DataContext = page };
+        var window = Show(box);
+        try
+        {
+            var input = box.FindControl<TextBox>("Input")!;
+            input.SetCurrentValue(TextBox.TextProperty, "s");
+            input.SetCurrentValue(TextBox.TextProperty, "song");
+            // Drain queued input/filter work without waiting for wall-clock time.
+            Dispatcher.UIThread.RunJobs();
+            Assert.Equal(["song"], page.Applied);
+        }
+        finally { window.Close(); }
+    }
 
     [AvaloniaFact]
     public async Task Songs_SearchesOnlyThisLibrary_AndClearRestoresTheList()
