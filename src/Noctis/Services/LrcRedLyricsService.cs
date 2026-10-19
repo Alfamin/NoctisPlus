@@ -49,6 +49,28 @@ public partial class LrcRedLyricsService : ILrcRedLyricsService
     /// seconds"; the shared client's 15 s cap would cut a slow one short, so the sync has its own.</summary>
     internal TimeSpan ModelSyncTimeout { get; set; } = TimeSpan.FromSeconds(60);
 
+    /// <summary>Pause before the one retry of a lookup lrc.red answered "busy"; tests shorten it.</summary>
+    internal TimeSpan BusyRetryDelay { get; set; } = TimeSpan.FromSeconds(1.5);
+
+    // Lookups by URL, shared by everyone asking the same query while it runs and, once answered,
+    // remembered like the other memos. lrc.red's nginx answers an uncached /api/v1 query right
+    // behind another with an HTML 503 (curl 10-19: 200 in 1.38 s, then 503 in 0.16 s), so the
+    // lyrics page, Search Lyrics and the Studio asking about one song at once must cost one
+    // request. A caller that stops waiting (the page's grace, a closed dialog) leaves the request
+    // to finish, bounded by the client's timeout: its answer serves the next ask.
+    private readonly Dictionary<string, SharedLookup> _lookups = new();
+
+    private sealed class SharedLookup
+    {
+        /// <summary>Cancelled when every caller has stopped waiting for a busy lookup: its retry is
+        /// dropped. (A first request on the wire is let finish.)</summary>
+        public readonly CancellationTokenSource Abandoned = new();
+        public Task<string> Body = Task.FromResult(string.Empty);
+        public int Waiters;
+        /// <summary>lrc.red said busy once; the retry is pending.</summary>
+        public bool Retrying;
+    }
+
     public LrcRedLyricsService(HttpClient httpClient) : this(httpClient, null)
     {
     }
@@ -142,10 +164,86 @@ public partial class LrcRedLyricsService : ILrcRedLyricsService
     {
         if (_matches.TryGetValue(key, out var known))
             return known;
-        var lookup = await GetStringAsync(LookupQuery(artist, trackName, durationSeconds), ct);
-        var song = PickSong(lookup!, artist, trackName, durationSeconds);
+        var lookup = await SharedLookupAsync(LookupQuery(artist, trackName, durationSeconds), ct);
+        var song = PickSong(lookup, artist, trackName, durationSeconds);
         Remember(_matches, key, song);
         return song;
+    }
+
+    /// <summary>The lookup's answer for <paramref name="url"/>: the one already asked for (running
+    /// or answered), or a new request. <paramref name="ct"/> only stops this caller waiting.</summary>
+    private async Task<string> SharedLookupAsync(string url, CancellationToken ct)
+    {
+        ct.ThrowIfCancellationRequested();
+        SharedLookup shared;
+        lock (_lookups)
+        {
+            if (!_lookups.TryGetValue(url, out shared!) || shared.Abandoned.IsCancellationRequested)
+            {
+                if (_lookups.Count >= MaxCacheEntries) _lookups.Clear();
+                var started = shared = new SharedLookup();
+                // Off the lock: the request's synchronous start runs no caller code under it.
+                started.Body = Task.Run(() => FetchLookupAsync(url, started), CancellationToken.None);
+                _lookups[url] = started;
+                // A failed or abandoned lookup is forgotten, so a later ask tries again.
+                _ = started.Body.ContinueWith(t =>
+                {
+                    _ = t.Exception;
+                    lock (_lookups)
+                    {
+                        if (_lookups.TryGetValue(url, out var current) && ReferenceEquals(current, started))
+                            _lookups.Remove(url);
+                    }
+                }, CancellationToken.None, TaskContinuationOptions.NotOnRanToCompletion, TaskScheduler.Default);
+            }
+            shared.Waiters++;
+        }
+
+        try
+        {
+            return await shared.Body.WaitAsync(ct);
+        }
+        finally
+        {
+            lock (_lookups)
+            {
+                if (--shared.Waiters == 0 && shared.Retrying && !shared.Body.IsCompleted)
+                    shared.Abandoned.Cancel();
+            }
+        }
+    }
+
+    private static bool IsBusy(HttpStatusCode status) =>
+        status is HttpStatusCode.ServiceUnavailable or HttpStatusCode.TooManyRequests;
+
+    /// <summary>
+    /// GET the lookup, once more after <see cref="BusyRetryDelay"/> when lrc.red answers "busy"
+    /// (503 from its nginx, or 429): the burst that tripped it has passed by then. Still busy, the
+    /// status surfaces (<see cref="LyricsProviderException.IsBusy"/>). The model sync never comes
+    /// through here: it is one request per press.
+    /// </summary>
+    private async Task<string> FetchLookupAsync(string url, SharedLookup shared)
+    {
+        var abandoned = shared.Abandoned.Token;
+        for (var attempt = 0; ; attempt++)
+        {
+            using var request = new HttpRequestMessage(HttpMethod.Get, url);
+            request.Headers.Add("User-Agent", UserAgent);
+            using var response = await _http.SendAsync(request, attempt == 0 ? CancellationToken.None : abandoned);
+            if (attempt == 0 && IsBusy(response.StatusCode))
+            {
+                lock (_lookups)
+                {
+                    shared.Retrying = true;
+                    if (shared.Waiters == 0) shared.Abandoned.Cancel(); // no retry for nobody
+                }
+                DebugLogger.Info(DebugLogger.Category.Lyrics, "LrcRed.Busy", $"{(int)response.StatusCode}, retrying once");
+                await Task.Delay(BusyRetryDelay, abandoned);
+                continue;
+            }
+            response.EnsureSuccessStatusCode();
+            return await HttpSafety.ReadStringBoundedAsync(response.Content, ct: CancellationToken.None);
+        }
     }
 
     public async Task<LrcLibResult> SyncWithModelAsync(string isrc, CancellationToken ct = default)

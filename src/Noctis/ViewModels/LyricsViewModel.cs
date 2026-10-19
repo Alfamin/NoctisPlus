@@ -1725,7 +1725,8 @@ public partial class LyricsViewModel : ViewModelBase, IDisposable
             catch (Exception ex)
             {
                 DebugLogger.Warn(DebugLogger.Category.Lyrics, "SourceSearch:Error", $"{name}: {ex.Message}");
-                return new Services.Lyrics.LyricsSourceHit(name, null, Errored: true);
+                return new Services.Lyrics.LyricsSourceHit(name, null, Errored: true,
+                    Busy: ex is LyricsProviderException { IsBusy: true });
             }
         }
     }
