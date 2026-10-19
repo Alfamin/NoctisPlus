@@ -2590,7 +2590,8 @@ public class LibraryService : ILibraryService
         // static enrichment toggle reflects the persisted setting from the first read.
         MetadataService.MergeFeaturedFromTitles = settings.MergeFeaturedFromTitles;
         MetadataService.UseEmbeddedArtwork = settings.UseEmbeddedArtwork;
-        ArtistCredit.Configure(ArtistGroupModes.Parse(settings.ArtistGroupMode), settings.ArtistTagSeparators);
+        ArtistCredit.Configure(ArtistGroupModes.Parse(settings.ArtistGroupMode), settings.ArtistTagSeparators,
+            settings.ArtistProtectedNames ?? ArtistCredit.DefaultProtectedNames.ToList());
         MetadataService.MusicRootFolders = settings.MusicFolders
             .Where(f => !string.IsNullOrWhiteSpace(f)).ToArray();
 

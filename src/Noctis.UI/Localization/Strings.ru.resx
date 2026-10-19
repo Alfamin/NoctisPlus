@@ -152,6 +152,10 @@ Deezer и TIDAL: вставьте ссылку.</value></data>
   <data name="Settings.Text" xml:space="preserve"><value>✕</value><comment>Content in SettingsView.axaml</comment></data>
   <data name="Settings.RemoveSeparatorTip" xml:space="preserve"><value>Удалить разделитель</value><comment>ToolTip.Tip in SettingsView.axaml</comment></data>
   <data name="Settings.AddSeparatorEG" xml:space="preserve"><value>Добавьте разделитель, например feat. или /</value><comment>Watermark in SettingsView.axaml</comment></data>
+  <data name="Settings.KeepNamesTogether" xml:space="preserve"><value>Не разделять эти имена</value><comment>Text in SettingsView.axaml</comment></data>
+  <data name="Settings.KeepNamesTogetherHint" xml:space="preserve"><value>Имена исполнителей, которые разделители никогда не делят, например «Tyler, The Creator» или «AC/DC». Совместные работы вроде «A, B» по-прежнему делятся.</value><comment>Text in SettingsView.axaml</comment></data>
+  <data name="Settings.RemoveNameTip" xml:space="preserve"><value>Удалить имя</value><comment>ToolTip.Tip in SettingsView.axaml</comment></data>
+  <data name="Settings.AddArtistNameEG" xml:space="preserve"><value>Добавьте исполнителя, например Tyler, The Creator</value><comment>Watermark in SettingsView.axaml</comment></data>
   <data name="Settings.Add" xml:space="preserve"><value>Добавить</value><comment>Content in SettingsView.axaml</comment></data>
   <data name="Settings.IgnoreLeadingWordsInArtistSort" xml:space="preserve"><value>Игнорировать начальные слова при сортировке исполнителей</value><comment>Text in SettingsView.axaml</comment></data>
   <data name="Settings.IgnoreLeadingWordsInArtistSortHint" xml:space="preserve"><value>«The Beatles» сортируется на B. Имена по-прежнему показываются полностью.</value><comment>Text in SettingsView.axaml</comment></data>

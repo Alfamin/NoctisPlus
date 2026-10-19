@@ -184,11 +184,13 @@ public static partial class MatchText
         return Math.Max(raw, norm * 0.97);
     }
 
-    /// <summary>Individual credited names: "A feat. B &amp; C" → [A, B, C] (folded).</summary>
+    /// <summary>Individual credited names: "A feat. B &amp; C" → [A, B, C] (folded). The
+    /// Settings "keep together" names stay whole, so "Earth, Wind &amp; Fire" is not read as
+    /// a band called "Earth" (CandidateMerger compares primary names).</summary>
     public static IReadOnlyList<string> SplitArtists(string? artist)
     {
         if (string.IsNullOrWhiteSpace(artist)) return Array.Empty<string>();
-        return ArtistSeparators().Split(artist)
+        return Noctis.Models.ArtistCredit.SplitAroundProtected(artist, gap => ArtistSeparators().Split(gap))
             .Select(Fold)
             .Where(s => s.Length > 0)
             .Distinct()

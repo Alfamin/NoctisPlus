@@ -2011,6 +2011,14 @@ public partial class SettingsViewModel : ViewModelBase
     /// <summary>Text of the "add separator" box on the Library tab.</summary>
     [ObservableProperty] private string _newArtistSeparator = string.Empty;
 
+    /// <summary>"Keep these names together": names the separators never cut apart
+    /// ("Tyler, The Creator"). Edited as chips. Starts on the built-ins so a regroup that
+    /// runs before settings load (the mode or separators arriving first) keeps them.</summary>
+    public ObservableCollection<string> ArtistProtectedNames { get; } = new(ArtistCredit.DefaultProtectedNames);
+
+    /// <summary>Text of the "add name" box under <see cref="ArtistProtectedNames"/>.</summary>
+    [ObservableProperty] private string _newArtistProtectedName = string.Empty;
+
     // ── Artist sort: ignore leading words (GitHub #99) ──
 
     /// <summary>When on, the Artists grid's name sort skips a leading word from
@@ -2913,6 +2921,7 @@ public partial class SettingsViewModel : ViewModelBase
             MergeFeaturedFromTitles = _settings.MergeFeaturedFromTitles;
             ArtistGroupMode = ArtistGroupModes.Parse(_settings.ArtistGroupMode).ToString();
             ReplaceArtistTagSeparators(_settings.ArtistTagSeparators);
+            ReplaceArtistProtectedNames(_settings.ArtistProtectedNames ?? ArtistCredit.DefaultProtectedNames.ToList());
             IgnoreLeadingWordsInArtistSort = _settings.IgnoreLeadingWordsInArtistSort;
             ReplaceArtistSortIgnoredWords(_settings.ArtistSortIgnoredWords);
 
@@ -3390,6 +3399,7 @@ public partial class SettingsViewModel : ViewModelBase
         _settings.MergeFeaturedFromTitles = MergeFeaturedFromTitles;
         _settings.ArtistGroupMode = ArtistGroupModes.Parse(ArtistGroupMode).ToString();
         _settings.ArtistTagSeparators = ArtistTagSeparators.ToList();
+        _settings.ArtistProtectedNames = ArtistProtectedNames.ToList();
         _settings.IgnoreLeadingWordsInArtistSort = IgnoreLeadingWordsInArtistSort;
         _settings.ArtistSortIgnoredWords = ArtistSortIgnoredWords.ToList();
         _settings.LrcLibEnabled = LrcLibEnabled;
@@ -4569,6 +4579,41 @@ public partial class SettingsViewModel : ViewModelBase
     [RelayCommand]
     private void ResetArtistSeparators() => ReplaceArtistTagSeparators(ArtistCredit.DefaultSeparators);
 
+    /// <summary>Swaps the "keep together" chips with one regroup at the end.</summary>
+    private void ReplaceArtistProtectedNames(IEnumerable<string>? names)
+    {
+        var normalized = ArtistCredit.NormalizeProtectedNames(names);
+        if (normalized.SequenceEqual(ArtistProtectedNames, StringComparer.Ordinal))
+            return;
+        ArtistProtectedNames.Clear();
+        foreach (var n in normalized)
+            ArtistProtectedNames.Add(n);
+        ApplyArtistGrouping();
+    }
+
+    [RelayCommand]
+    private void AddArtistProtectedName()
+    {
+        var value = NewArtistProtectedName?.Trim() ?? string.Empty;
+        NewArtistProtectedName = string.Empty;
+        if (value.Length == 0) return;
+        if (ArtistProtectedNames.Any(n => string.Equals(n, value, StringComparison.OrdinalIgnoreCase)))
+            return;
+        ArtistProtectedNames.Add(value);
+        ApplyArtistGrouping();
+    }
+
+    [RelayCommand]
+    private void RemoveArtistProtectedName(string name)
+    {
+        // Unlike the separators an empty list is fine: nothing is kept together.
+        if (!ArtistProtectedNames.Remove(name)) return;
+        ApplyArtistGrouping();
+    }
+
+    [RelayCommand]
+    private void ResetArtistProtectedNames() => ReplaceArtistProtectedNames(ArtistCredit.DefaultProtectedNames);
+
     partial void OnIgnoreLeadingWordsInArtistSortChanged(bool value) => ApplyArtistSortIgnoredWords();
 
     /// <summary>
@@ -4619,7 +4664,7 @@ public partial class SettingsViewModel : ViewModelBase
     }
 
     /// <summary>
-    /// Pushes the grouping mode and separators into the process-wide tokenizer. Runs during
+    /// Pushes the grouping mode, separators and kept-together names into the process-wide tokenizer. Runs during
     /// settings load too (before LibraryService restores its index cache) so startup sees
     /// the persisted configuration; only a real change after load saves and regroups.
     /// </summary>
@@ -4627,7 +4672,7 @@ public partial class SettingsViewModel : ViewModelBase
     {
         var before = ArtistCredit.Version;
         var joinBefore = ArtistCredit.JoinText;
-        ArtistCredit.Configure(ArtistGroupModes.Parse(ArtistGroupMode), ArtistTagSeparators);
+        ArtistCredit.Configure(ArtistGroupModes.Parse(ArtistGroupMode), ArtistTagSeparators, ArtistProtectedNames);
         if (_suspendSettingPersistence) return;
         _ = SaveAsync();
         if (ArtistCredit.Version == before) return;
@@ -7179,6 +7224,7 @@ public partial class SettingsViewModel : ViewModelBase
             MergeFeaturedFromTitles = defaultSettings.MergeFeaturedFromTitles;
             ArtistGroupMode = defaultSettings.ArtistGroupMode;
             ReplaceArtistTagSeparators(defaultSettings.ArtistTagSeparators);
+            ReplaceArtistProtectedNames(defaultSettings.ArtistProtectedNames);
             IgnoreLeadingWordsInArtistSort = defaultSettings.IgnoreLeadingWordsInArtistSort;
             ReplaceArtistSortIgnoredWords(defaultSettings.ArtistSortIgnoredWords);
             EnableAnimatedCovers = defaultSettings.EnableAnimatedCovers;
