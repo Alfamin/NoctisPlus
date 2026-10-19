@@ -46,6 +46,17 @@ internal static class BotTimingTests
         Check.Equal(TimeSpan.Zero, TelegramBotSource.FileWindow(2, s(10)), "10 s without the file: DeezLoad is next");
         Check.Equal(s(1.5), TelegramBotSource.FileWindow(2, s(4.5)), "a slow press acknowledgement shortens the next window, not the budget");
         Check.True(DeezLoadSource.SilentLimit <= s(20), "a DeezLoad that says nothing at all is given up within 20 s");
+
+        // Owner #57, live: Spotify's "JACKBOYS,<no-break space>Sheck Wes" made Music Hunters find nothing.
+        Check.Section("bot queries: plain spaces, first artist, title without credits");
+        Check.Equal("JACKBOYS GANG GANG", BotQuery.For(new MusicRequest("GANG GANG", "JACKBOYS, Sheck Wes")), "no-break space and extra credits dropped");
+        Check.Equal("JACKBOYS, Sheck Wes GANG GANG", BotQuery.Full(new MusicRequest("GANG GANG", "JACKBOYS, Sheck Wes")), "the second try keeps every credit, with plain spaces");
+        Check.Equal("Tyler, The Creator EARFQUAKE", BotQuery.For(new MusicRequest("EARFQUAKE", "Tyler, The Creator")), "a 'X, The Y' name stays whole");
+        Check.Equal("Metro Boomin Too Many Nights", BotQuery.For(new MusicRequest("Too Many Nights (feat. Don Toliver & with Future)", "Metro Boomin, Future, Don Toliver")), "feat./with credits leave the title");
+        Check.Equal("Drake Girls Want Girls", BotQuery.For(new MusicRequest("Girls Want Girls (with Lil Baby)", "Drake & Lil Baby")), "'&' credits drop too");
+        Check.Equal("Lil Nas X INDUSTRY BABY", BotQuery.For(new MusicRequest("INDUSTRY BABY", "Lil Nas X")), "an artist ending in X is not split");
+        Check.Equal("JACKBOYS, Sheck Wes - GANG GANG", Downloader.FileNames([new BotText.Line("1", "JACKBOYS, Sheck Wes", "GANG GANG", null)])[0], "file names get plain spaces");
+        Check.Equal("Drake Hold On, We're Going Home (Album Version)", BotQuery.For(new MusicRequest("Hold On, We're Going Home (Album Version)", "Drake")), "a version label stays in the title");
     }
 
     private static Message Out(int id, DateTime at, string text) => new() { id = id, date = at, message = text, flags = Message.Flags.out_ };

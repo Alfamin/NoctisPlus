@@ -32,9 +32,20 @@ internal sealed class HunterMusicSource : IMusicSource, IQualityMusicSource
             try {return await _bot.FetchSelectedAsync(request,output,progress,ct).ConfigureAwait(false);}
             catch(StaleSelectionException ex){_log(ex.Message);}
         }
-        var tracks = await _bot.SearchAsync(request.Artist + " " + request.Title, ct).ConfigureAwait(false);
+        var tracks = await _bot.SearchAsync(BotQuery.For(request), ct).ConfigureAwait(false);
+        if (!tracks.Any(t => RecordingMatch.Fits(request,t.Artist,t.Title,t.Duration)) && BotQuery.Full(request) != BotQuery.For(request))
+        {
+            Noctis.Services.DebugLog.Write("Finder", "Music Hunters: nothing fit; searching again with every credited artist");
+            tracks = await _bot.SearchAsync(BotQuery.Full(request), ct).ConfigureAwait(false);
+        }
         var match = tracks.FirstOrDefault(t => RecordingMatch.Fits(request,t.Artist,t.Title,t.Duration));
-        if (match is null) throw new TrackUnavailableException("No matching recording in Music Hunters' results.");
+        if (match is null)
+        {
+            // What it offered instead, so a refused song can be explained from session.log (owner #53).
+            Noctis.Services.DebugLog.Write("Finder", $"Music Hunters: none of {tracks.Count} results fit \"{request.Artist} - {request.Title}\" ({request.Duration:m\\:ss}): " +
+                string.Join(" | ", tracks.Take(6).Select(t => $"{t.Artist} - {t.Title} ({t.Duration:m\\:ss})")));
+            throw new TrackUnavailableException("No matching recording in Music Hunters' results.");
+        }
         // A stale selection is refreshed once; no search loop and no human button press.
         return await match.Fetch(output,progress,ct).ConfigureAwait(false);
     }
@@ -61,6 +72,31 @@ internal sealed class HunterMusicSource : IMusicSource, IQualityMusicSource
         }
         return null;
     }
+}
+
+/// <summary>
+/// What is typed to the bots for a song (owner #57). Spotify wrote "JACKBOYS,&lt;no-break space&gt;Sheck Wes": with that
+/// space and every credit in the query Music Hunters found nothing, while "gang gang jack boys" found the song.
+/// Plain spaces, the first credited artist and the title without its feat./with credit; the full credits are a
+/// second try. The results are still checked against all of the song's artists.
+/// </summary>
+internal static class BotQuery
+{
+    internal static string Spaces(string text) => Regex.Replace(text, @"[\s  -​  　﻿]+", " ").Trim();
+
+    internal static string For(MusicRequest request) => Spaces(FirstArtist(request.Artist) + " " + PlainTitle(request.Title));
+
+    internal static string Full(MusicRequest request) => Spaces(request.Artist + " " + request.Title);
+
+    internal static string FirstArtist(string artist)
+    {
+        var parts = Regex.Split(Spaces(artist), @"\s*(?:,|&|;|/|\bfeat\.?|\bft\.?|\bfeaturing\b|\bx\b)\s+", RegexOptions.IgnoreCase);
+        // "Tyler, The Creator" is one artist.
+        return parts.Length > 1 && parts[1].StartsWith("The ", StringComparison.OrdinalIgnoreCase) ? parts[0] + ", " + parts[1] : parts[0];
+    }
+
+    private static string PlainTitle(string title)
+        => Regex.Replace(Spaces(title), @"\s*[\(\[](?:feat\.?|ft\.?|featuring|with)\s[^\)\]]*[\)\]]", "", RegexOptions.IgnoreCase);
 }
 
 internal static class RecordingMatch
@@ -153,7 +189,7 @@ internal sealed class DeezLoadSource : IMusicSource, IQualityMusicSource
         var bot=await _account.BotAsync(client,Bot).ConfigureAwait(false);
         try
         {
-            var results=await client.Messages_GetInlineBotResults(bot,bot,query,"").WaitAsync(TimeSpan.FromSeconds(25), ct).ConfigureAwait(false);
+            var results=await InlineAsync(client,bot,query,ct).ConfigureAwait(false);
             var found=new List<MusicRequest>();
             foreach(var result in results.results)
             {
@@ -200,10 +236,14 @@ internal sealed class DeezLoadSource : IMusicSource, IQualityMusicSource
             var url=request.Url;
             if(url is null)
             {
-                var matches=await client.Messages_GetInlineBotResults(bot,bot,request.Artist+" "+request.Title,"").WaitAsync(TimeSpan.FromSeconds(25), ct).ConfigureAwait(false);
+                var matches=await InlineAsync(client,bot,BotQuery.For(request),ct).ConfigureAwait(false);
                 foreach(var item in matches.results.OfType<BotInlineMediaResult>())
                     if(item.document is Document doc && Fits(request,doc) && (request.Quality != AudioQuality.MP3 || TelegramBotSource.Extension(doc) == "mp3")) return await Download(client,doc,output,progress,ct).ConfigureAwait(false);
                 url=MatchingInlineLink(request,matches.results.OfType<BotInlineResult>());
+                if(url is null)
+                    Noctis.Services.DebugLog.Write("Finder",$"DeezLoad: none of {matches.results.Length} results fit \"{request.Artist} - {request.Title}\": "+
+                        string.Join(" | ",matches.results.Take(6).Select(r=>r is BotInlineResult text ? (text.title??"")+" / "+(text.description??"").ReplaceLineEndings(" ")
+                            : r is BotInlineMediaResult{document:Document doc} && Request(doc,null) is {} file ? file.Artist+" - "+file.Title+" ("+file.Duration+")" : "file")));
             }
             if(!MusicLink.TryParse(url,out var link) || link!.Kind!="track") throw new TrackUnavailableException("DeezLoad did not return a usable track link.");
             await _account.StartBotAsync(client,bot,Bot,ct).ConfigureAwait(false);
@@ -246,6 +286,17 @@ internal sealed class DeezLoadSource : IMusicSource, IQualityMusicSource
         }
         catch(RpcException ex) { throw Translate(ex); }
         finally { _conversation.Release(); }
+    }
+    // Telegram answers BOT_RESPONSE_TIMEOUT when the bot is slow to answer an inline search; one more try usually lands.
+    private static async Task<Messages_BotResults> InlineAsync(Client client,User bot,string query,CancellationToken ct)
+    {
+        try { return await client.Messages_GetInlineBotResults(bot,bot,query,"").WaitAsync(TimeSpan.FromSeconds(25), ct).ConfigureAwait(false); }
+        catch(RpcException ex) when(ex.Message.Contains("BOT_RESPONSE_TIMEOUT",StringComparison.OrdinalIgnoreCase))
+        {
+            Noctis.Services.DebugLog.Write("Finder","DeezLoad: inline search timed out; asking once more");
+            await Task.Delay(1000,ct).ConfigureAwait(false);
+            return await client.Messages_GetInlineBotResults(bot,bot,query,"").WaitAsync(TimeSpan.FromSeconds(25), ct).ConfigureAwait(false);
+        }
     }
     internal Exception Translate(RpcException ex)
         => BotLimits.Read(Id,ex.Message,DateTimeOffset.UtcNow) ?? (Exception)new BotAnswerException("DeezLoad: "+ex.Message);

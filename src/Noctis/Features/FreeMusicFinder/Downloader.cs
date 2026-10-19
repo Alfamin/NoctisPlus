@@ -185,6 +185,8 @@ internal static class Downloader
 
     private static string Sanitize(string name)
     {
+        // Spotify credits carry no-break spaces ("JACKBOYS,<no-break space>Sheck Wes"): plain spaces in file names (#58).
+        name = BotQuery.Spaces(name);
         var invalid = Path.GetInvalidFileNameChars();
         // The Windows set is used everywhere so a library moved between systems keeps working.
         var cleaned = new string(name.Select(c => invalid.Contains(c) || "<>:\"/\\|?*".Contains(c) || char.IsControl(c) ? '_' : c).ToArray())
