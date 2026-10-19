@@ -251,6 +251,7 @@ internal sealed class DeezLoadSource : IMusicSource, IQualityMusicSource
     }
     public async Task<string> FetchAsync(MusicRequest request,Stream output,IProgress<double>? progress,CancellationToken ct)
     {
+        var phaseClock = System.Diagnostics.Stopwatch.StartNew();
         var client=await _account.ConnectAsync(ct).ConfigureAwait(false);
         var bot=await _account.BotAsync(client,Bot).ConfigureAwait(false);
         if(await TelegramAudioCache.Find(client,bot,request,ct).ConfigureAwait(false) is {} existing)
@@ -263,7 +264,9 @@ internal sealed class DeezLoadSource : IMusicSource, IQualityMusicSource
             if(message?.media is MessageMediaDocument {document:Document cached} && Fits(request,cached) && TelegramAudioCache.AcceptsQuality(request, cached))
                 return await Download(client,cached,output,progress,ct).ConfigureAwait(false);
         }
+        Noctis.Services.DebugLog.Write("Finder", $"DeezLoad: cache checks finished at {phaseClock.Elapsed.TotalSeconds:0.0}s");
         await _conversation.WaitAsync(ct).ConfigureAwait(false);
+        Noctis.Services.DebugLog.Write("Finder", $"DeezLoad: conversation acquired at {phaseClock.Elapsed.TotalSeconds:0.0}s");
         try
         {
             var url=request.Url;
@@ -279,8 +282,10 @@ internal sealed class DeezLoadSource : IMusicSource, IQualityMusicSource
                             : r is BotInlineMediaResult{document:Document doc} && Request(doc,null) is {} file ? file.Artist+" - "+file.Title+" ("+file.Duration+")" : "file")));
             }
             if(!MusicLink.TryParse(url,out var link) || link!.Kind!="track") throw new TrackUnavailableException("DeezLoad did not return a usable track link.");
+            Noctis.Services.DebugLog.Write("Finder", $"DeezLoad: track link resolved at {phaseClock.Elapsed.TotalSeconds:0.0}s");
             await _account.StartBotAsync(client,bot,Bot,ct).ConfigureAwait(false);
             var sent=await client.SendMessageAsync(bot,link.Url).WaitAsync(TimeSpan.FromSeconds(25), ct).ConfigureAwait(false);
+            Noctis.Services.DebugLog.Write("Finder", $"DeezLoad: track link sent at {phaseClock.Elapsed.TotalSeconds:0.0}s");
             var end=DateTimeOffset.UtcNow.AddMinutes(15); var cursor=sent.id; var lastNotice="";
             string? other=null; DateTimeOffset? otherSince=null;
             var asked=DateTimeOffset.UtcNow; var heard=false;

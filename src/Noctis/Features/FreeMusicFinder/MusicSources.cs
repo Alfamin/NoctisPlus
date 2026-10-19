@@ -160,7 +160,7 @@ internal sealed class MusicSources
             // bot has the recording in FLAC and the setting allows it.
             using var mp3 = new MemoryStream(); var haveMp3 = false; var skipped = false;
             foreach (var source in InPreferredOrder().OrderBy(s => qualityErrors.ContainsKey(s.Id) ? 1 : 0)
-                .ThenBy(s => request.CachedFrom == s.Id ? 0 : request.Selection?.Provider == s.Id ? 1 : _firstBot is null && request.PreferredSource == s.Id ? 2 : 3))
+                .ThenBy(s => _firstBot is not null ? 0 : request.CachedFrom == s.Id ? 0 : request.Selection?.Provider == s.Id ? 1 : request.PreferredSource == s.Id ? 2 : 3))
             {
                 // A changed settings keyboard must not disable both download providers.
                 // Confirmed providers go first. A responsive unconfirmed one can still supply

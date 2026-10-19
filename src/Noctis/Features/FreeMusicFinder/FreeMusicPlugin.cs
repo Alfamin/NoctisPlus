@@ -51,7 +51,7 @@ public sealed class FreeMusicPlugin : INoctisPlugin
     internal string MetadataProxy => _proxy;
     private volatile bool _allowMp3 = true;
     private volatile AudioQuality _preferredQuality = AudioQuality.FLAC;
-    private volatile string _firstBot = "DeezLoad";
+    private volatile string _firstBot = BotSelections.Hunters;
     private readonly Func<string, string, ArtistCatalog> _catalogFactory;
     private ForYouSource? _forYou;
     private FinderOnlineSearch? _online;
@@ -80,7 +80,7 @@ public sealed class FreeMusicPlugin : INoctisPlugin
         _proxy = host.Settings.GetString(ProxyKey) ?? "";
         _allowMp3 = host.Settings.GetBool(AllowMp3Key, true);
         _preferredQuality = host.Settings.GetString("preferredQuality") == "MP3" ? AudioQuality.MP3 : AudioQuality.FLAC;
-        _firstBot = host.Settings.GetString("firstBot") == BotSelections.Hunters ? BotSelections.Hunters : "DeezLoad";
+        _firstBot = host.Settings.GetString("firstBot") == "DeezLoad" ? "DeezLoad" : BotSelections.Hunters;
         _lastFmKey = host.Settings.GetString(LastFmKey)?.Trim() ?? "";
         _telegram = new TelegramAccount(Path.Combine(host.DataDirectory, "telegram.dat"), () => _proxy, Log);
         _bot = new MusicSources(new HunterMusicSource(_telegram,Log, ResolveHunterLinkAsync),new DeezLoadSource(_telegram,Announce),Announce,
@@ -192,7 +192,7 @@ public sealed class FreeMusicPlugin : INoctisPlugin
         }
         else if (key == ShortcutKey) ApplyShortcut();
         else if (key == AllowMp3Key) _allowMp3 = _host?.Settings.GetBool(AllowMp3Key, true) ?? true;
-        else if (key == "firstBot") _firstBot = _host?.Settings.GetString(key) == BotSelections.Hunters ? BotSelections.Hunters : "DeezLoad";
+        else if (key == "firstBot") _firstBot = _host?.Settings.GetString(key) == "DeezLoad" ? "DeezLoad" : BotSelections.Hunters;
         else if (key == "preferredQuality")
         {
             _preferredQuality = _host?.Settings.GetString(key) == "MP3" ? AudioQuality.MP3 : AudioQuality.FLAC;

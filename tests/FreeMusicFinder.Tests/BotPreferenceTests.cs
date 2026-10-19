@@ -22,6 +22,13 @@ internal static class BotPreferenceTests
         Check.Equal(1, hunters.Calls, "new choice overrides historical bulk-queue preference");
         await sources.SearchAsync("Song", default);
         Check.Equal(1, hunters.Searches, "setting change affects the next search without restart");
+        var pickedHunters = new TransferTests.Source(BotSelections.Hunters);
+        var pickedDeez = new TransferTests.Source("DeezLoad");
+        var chosenRouter = new MusicSources(pickedHunters, pickedDeez, _ => { }, firstBot: () => BotSelections.Hunters);
+        await chosenRouter.FetchAsync(new("Picked", "Artist", CachedFrom: "DeezLoad", MessageId: 42,
+            Selection: new("DeezLoad", "deezload2bot", 42, "1", "data")), output, null, default);
+        Check.Equal(1, pickedHunters.Calls, "current explicit bot choice overrides stale cached and selected bot provenance");
+        Check.Equal(0, pickedDeez.Calls, "selected reserve is not asked before configured first bot");
         hunters.Fetch = (_, _) => throw new TrackUnavailableException("recording unavailable");
         await sources.FetchAsync(new("Other", "Artist"), output, null, default);
         Check.Equal(2, deez.Calls, "reserve supplies a song missing from the chosen primary");
