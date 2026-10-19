@@ -150,6 +150,14 @@ internal static class TransferTests
         Check.True(RecordingMatch.Fits(starred,"Future","I'M DAT N****",TimeSpan.FromSeconds(232)),"a censored word starred differently is the same title");
         Check.False(RecordingMatch.Fits(starred,"Future","I'M DAT N**** (Instrumental)",TimeSpan.FromSeconds(232)),"its instrumental is still another recording");
         Check.False(RecordingMatch.Fits(starred,"Future","I'M DAT BOY",TimeSpan.FromSeconds(232)),"a starred word does not match an uncensored different word");
+        // Owner #89: Telegram keeps only the start of a long audio title; both bots' right files were refused.
+        var brain=new MusicRequest("I Smoked Away My Brain (I'm God x Demons Mashup) (feat. Imogen Heap & Clams Casino)","A$AP Rocky, Imogen Heap, Clams Casino",190,Explicit:true);
+        Check.True(RecordingMatch.Fits(brain,"A$AP Rocky","I Smoked Away My Brain (I'm God x Demons Mashup) (feat. Imogen H",TimeSpan.FromSeconds(190)),"a title Telegram cut off (a bracket left open) is the same recording");
+        Check.True(RecordingMatch.Fits(brain,"A$AP Rocky","I Smoked Away My Brain (I'm God x Demons Mashup) (feat. Imogen Heap & Clams Ca",TimeSpan.FromSeconds(189)),"cut anywhere, a second apart");
+        Check.False(RecordingMatch.Fits(brain,"A$AP Rocky","I Smoked Away My Brain (I'm God x Demons Mashup) (feat. Imogen H",TimeSpan.FromSeconds(230)),"a cut title of another length is another recording");
+        Check.False(RecordingMatch.Fits(brain,"Someone Else","I Smoked Away My Brain (I'm God x Demons Mashup) (feat. Imogen H",TimeSpan.FromSeconds(190)),"or by another artist");
+        Check.False(RecordingMatch.Fits(new("Song Title That Is Quite Long (Remix)","Artist",200),"Artist","Song Title That Is Quite Long (Rem",TimeSpan.FromSeconds(200)),"a cut title never hides a version word the wanted one has");
+        Check.False(RecordingMatch.Truncated("Love Story (Taylor's Version)","Love Story"),"a short complete title is not taken for a cut one");
         // Owner #81: Apple's "Saturn" is 186.2 s, the bots' Deezer file 181 s; Music Hunters was never sent its link.
         var saturn=new MusicRequest("Saturn","SZA",186.192);
         Check.True(RecordingMatch.Fits(saturn,"SZA","Saturn",TimeSpan.FromSeconds(181)),"the same title by the same artist 2.8 % shorter on Deezer is that song");

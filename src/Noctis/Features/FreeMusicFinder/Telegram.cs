@@ -668,8 +668,23 @@ internal sealed class TelegramBotSource : IHunterBotSource
                 var clock = System.Diagnostics.Stopwatch.StartNew();
                 var sent = await client.SendMessageAsync(bot, link.Url).WaitAsync(TimeSpan.FromSeconds(25), ct).ConfigureAwait(false);
                 Noctis.Services.DebugLog.Write("Finder", "Music Hunters: track link sent");
-                var reply = await WaitForLinkReplyAsync(token => WaitForAsync(client, bot, sent.id, m => IsLinkFile(request, m) || Buttons(m).Any(IsNumber), FileBudget, token), ct).ConfigureAwait(false)
-                    ?? throw new TimeoutException("Music Hunters did not supply the linked recording within 10 seconds; trying the reserve.");
+                string? other = null;
+                bool Answer(Message m)
+                {
+                    if (IsLinkFile(request, m) || Buttons(m).Any(IsNumber)) return true;
+                    // Owner #89: a file that is not this recording is said by name and length, so a refused file is never silent.
+                    if (!m.flags.HasFlag(Message.Flags.out_) && m.media is MessageMediaDocument { document: Document sentFile } && DeezLoadSource.Request(sentFile, null) is { } offered)
+                        other ??= $"{offered.Artist} - {offered.Title}" + (offered.Duration is { } took ? $", {took:m\\:ss}" : "");
+                    return false;
+                }
+                Message? reply;
+                try { reply = await WaitForLinkReplyAsync(token => WaitForAsync(client, bot, sent.id, Answer, FileBudget, token), ct).ConfigureAwait(false); }
+                catch (TimeoutException) when (other is not null) { reply = null; }
+                if (reply is null)
+                {
+                    if (other is not null) Noctis.Services.DebugLog.Write("Finder", $"Music Hunters: sent {other} for the link of \"{request.Artist} - {request.Title}\" ({request.Duration:m\\:ss})");
+                    throw new TimeoutException(other is not null ? $"Music Hunters sent another recording ({other}) for the link; trying the reserve." : "Music Hunters did not supply the linked recording within 10 seconds; trying the reserve.");
+                }
                 if (IsLinkFile(request, reply))
                 {
                     Noctis.Services.DebugLog.Write("Finder", $"Music Hunters: linked file after {clock.Elapsed.TotalSeconds:0.0} s");

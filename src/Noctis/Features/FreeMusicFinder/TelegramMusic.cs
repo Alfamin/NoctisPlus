@@ -179,6 +179,10 @@ internal static class RecordingMatch
         if(a.Length==0 || b.Length==0 || !(a==b || ArtistKeys(wanted.Artist).Intersect(ArtistKeys(artist)).Any())) return false;
         var lengths=wanted.Duration is not null && duration is not null;
         if(Key(wanted.Title)==Key(title)) return true;
+        // Owner #89: Telegram keeps only the start of a long audio title, so both bots' files of A$AP Rocky's "I Smoked Away My
+        // Brain (I'm God x Demons Mashup) (feat. Imogen Heap & Clams Casino)" said "… (feat. Imogen H" and were refused. A cut-off
+        // title that is the start of the wanted one, by the same artist and of the same length, is that recording.
+        if(lengths && close && Truncated(wanted.Title,title)) return true;
         // The same title written another way.
         var (name,extras)=Title(wanted.Title); var (otherName,otherExtras)=Title(title);
         if(lengths && Key(BotText.Plain(wanted.Title))==Key(BotText.Plain(title)) && (close || LabelsOnly(extras,otherExtras))) return true;
@@ -187,6 +191,16 @@ internal static class RecordingMatch
         // One names an addition the other leaves out ("- Remastered 2011", "(Bonus)"): the same recording when the
         // lengths say so. Two different additions ("- Pt. 1", "- Pt. 2") are two recordings.
         return lengths && (extras.IsSubsetOf(otherExtras) || otherExtras.IsSubsetOf(extras)) && (close || LabelsOnly(extras,otherExtras));
+    }
+
+    /// <summary>Is <paramref name="sent"/> the cut-off start of <paramref name="wanted"/>? It must look cut (a bracket left open,
+    /// a trailing "…", or long enough to have hit the limit) and keep enough of the title to mean something.</summary>
+    internal static bool Truncated(string wanted,string sent)
+    {
+        var a=Key(wanted); var b=Key(sent);
+        if(b.Length<16 || b.Length>=a.Length || !a.StartsWith(b,StringComparison.Ordinal)) return false;
+        var open=sent.Count(c=>c=='(')>sent.Count(c=>c==')') || sent.Count(c=>c=='[')>sent.Count(c=>c==']');
+        return open || sent.TrimEnd().EndsWith('…') || sent.TrimEnd().EndsWith("...",StringComparison.Ordinal) || sent.Length>=60;
     }
 
     /// <summary>A starred word is kept as its first letter and one star, however many letters were hidden.</summary>
@@ -397,7 +411,7 @@ internal sealed class DeezLoadSource : IRacingMusicSource, IQualityMusicSource
                 if(m.media is MessageMediaDocument {document:Document doc})
                 {
                     if(Fits(request,doc)) return doc;
-                    if(Request(doc,null) is {} sentTrack){other??=Shorten(sentTrack.Artist+" - "+sentTrack.Title);otherSince??=DateTimeOffset.UtcNow;}
+                    if(Request(doc,null) is {} sentTrack){other??=Shorten(sentTrack.Artist+" - "+sentTrack.Title)+(sentTrack.Duration is {} took?$", {took:m\\:ss}":"");otherSince??=DateTimeOffset.UtcNow;}
                 }
                 if(m.message is {Length:>0} status && status!=lastNotice && (status.Contains("position in the queue") || status.Contains("Downloading")))
                 {

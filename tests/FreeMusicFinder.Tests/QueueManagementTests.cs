@@ -174,6 +174,8 @@ internal static class QueueManagementTests
         Check.True(removed && two.State == DownloadState.Removed && one.State == DownloadState.Running, "only the removed transfer was cancelled");
         release.SetResult();
         await Check.UntilAsync(() => one.State == DownloadState.Saved && three.State == DownloadState.Saved, "both remaining lanes finish");
+        if (one.State != DownloadState.Saved || three.State != DownloadState.Saved)
+            Console.WriteLine($"  LANES one={one.State} \"{one.Error}\" three={three.State} \"{three.Error}\" two={two.State} active={queue.Active.Count} started={string.Join(",", started)}");
         await LatestPlayFirst();
     }
     private static async Task LatestPlayFirst()
