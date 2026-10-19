@@ -120,6 +120,30 @@ public class LyricsStudioRoundTripTests : IDisposable
         Assert.Equal(voices, ttml!.Select(l => l.Voice));
     }
 
+    [AvaloniaFact]
+    public async Task CjkCharacters_ShiftedAndSaved_StayTogether()
+    {
+        // A CJK .elrc timed a character at a time: the review rows joined every word with a
+        // space and handed the writers words without JoinsNext, so a save wrote "偶 尔".
+        const string cjk =
+            "[00:20.51]<00:20.51>偶<00:20.94>尔<00:23.53>\n" +
+            "[00:24.44]<00:24.44>我<00:24.63>会 <00:24.79>怀<00:24.99>疑<00:25.14>";
+        var (vm, song) = StudioOn(cjk);
+        vm.WordTimings = true;
+        vm.SaveTtml = true;
+        vm.Selected = vm.Queue[0];
+
+        vm.NudgeLaterCommand.Execute(null);
+        await vm.SaveCommand.ExecuteAsync(null);
+        Assert.Equal(LyricsStudioViewModel.StudioStatus.Saved, vm.Queue[0].Status);
+
+        var expected = new[] { "偶尔", "我会 怀疑" };
+        foreach (var ext in new[] { ".elrc", ".lrc" })
+            Assert.Equal(expected, LrcParser.Parse(File.ReadAllText(Path.ChangeExtension(song.FilePath!, ext))).Select(l => l.Text));
+        var (ttml, _) = TtmlParser.Parse(File.ReadAllText(Path.ChangeExtension(song.FilePath!, ".ttml")));
+        Assert.Equal(expected, ttml!.Select(l => l.Text));
+    }
+
     [Fact]
     public void LyricsPageTtmlExport_KeepsTheBackgroundVocal()
     {
