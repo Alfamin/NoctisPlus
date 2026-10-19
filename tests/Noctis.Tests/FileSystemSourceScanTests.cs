@@ -64,6 +64,7 @@ public class FileSystemSourceScanTests : IDisposable
     {
         var (library, _) = MakeLibrary(new LocalFileSystemSource());
         await library.ScanAsync(new[] { Path.Combine(_root, "music") });
+        if (library.Tracks.Count != 2) Assert.Fail(ScanMissReport.Describe(library, _music));
         Assert.Equal(new[] { "First", "Second" }, library.Tracks.Select(t => t.Title).OrderBy(t => t));
         Assert.All(library.Tracks, t => Assert.True(File.Exists(t.FilePath)));
     }
