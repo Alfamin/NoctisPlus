@@ -24,7 +24,10 @@ public sealed partial class WordLyricsViewModel : ObservableObject, IDisposable
         if (track is not null) _ = LoadWordsAsync(track.FilePath);
         else _ = CountMissingAsync();
         IsSetUp = service.BackendReady;
+        _tick = new DispatcherTimer(TimeSpan.FromSeconds(30), DispatcherPriority.Background, (_, _) => Refresh());
+        _tick.Start();
     }
+    private readonly DispatcherTimer _tick;
     /// <summary>WordLyrics is installed with its models: the footer button opens its settings instead of setup
     /// (owner, 2026-10-18: it asked to download 1.33 GB that was already there).</summary>
     public bool IsSetUp { get; }
@@ -81,12 +84,22 @@ public sealed partial class WordLyricsViewModel : ObservableObject, IDisposable
         var state = _service.State;
         Message = state.Message; Detail = state.Detail;
         IsError = state.Error; HasReport = state.Report.Length > 0;
-        Counts = state.Total > 0 ? $"{state.Completed} / {state.Total} · {_service.WaitingCount} waiting" : $"{_service.WaitingCount} waiting";
+        var waiting = $"{_service.WaitingCount} waiting" + NextTry(_service.NextTryUtc, DateTime.UtcNow);
+        Counts = state.Total > 0 ? $"{state.Completed} / {state.Total} · {waiting}" : waiting;
         Progress = state.Fraction ?? (state.Total > 0 ? Math.Clamp((double)state.Completed / state.Total, 0, 1) : 0);
         Indeterminate = !state.Finished && !state.Paused && !state.Error && state.Fraction is null;
         Paused = state.Paused; Controllable = state.Controllable && !state.Cancelling;
         OnPropertyChanged(nameof(CanInteract));
         StartCommand.NotifyCanExecuteChanged(); FindLyricsCommand.NotifyCanExecuteChanged(); SetupCommand.NotifyCanExecuteChanged();
+    }
+    /// <summary>Owner #91: "3 waiting" with nothing running looked stuck; songs held for a later try say when it is.</summary>
+    internal static string NextTry(DateTime? atUtc, DateTime nowUtc)
+    {
+        if (atUtc is not { } at || at <= nowUtc) return "";
+        var left = at - nowUtc;
+        var text = left.TotalMinutes < 60 ? $"{Math.Max(1, (int)Math.Ceiling(left.TotalMinutes))} min"
+            : $"{(int)left.TotalHours} h {left.Minutes} min";
+        return $" · next try in {text}";
     }
     private async Task Act(Func<Task> action)
     {
@@ -153,5 +166,5 @@ public sealed partial class WordLyricsViewModel : ObservableObject, IDisposable
         return Act(() => _service.SetupAsync(_confirm));
     }
     [RelayCommand] private void OpenReport() { try { _service.OpenReport(); } catch (Exception ex) { Error = ex.Message; } }
-    public void Dispose() { _disposed = true; _stop.Cancel(); _service.Changed -= Refresh; _stop.Dispose(); }
+    public void Dispose() { _disposed = true; _tick.Stop(); _stop.Cancel(); _service.Changed -= Refresh; _stop.Dispose(); }
 }

@@ -127,6 +127,17 @@ internal sealed class Worker : IDisposable
     public DateTime LastSeenUtc => _lastSeen;
     internal int WaitingCount { get { lock (_gate) return _items.Count; } }
     internal bool IsWaiting(string path) { lock (_gate) return _items.ContainsKey(path); }
+    /// <summary>When every waiting song is held for a later try (a provider error, a wait after failures), the
+    /// soonest of those times; null while something can go now or nothing waits.</summary>
+    internal DateTime? NextTryUtc(DateTime now)
+    {
+        lock (_gate)
+        {
+            if (_run is not null || _items.Count == 0) return null;
+            var soonest = _items.Values.Min(item => item.NotBefore);
+            return soonest > now + TimeSpan.FromMinutes(1) ? soonest : null;
+        }
+    }
     internal SongTimingStatus StatusFor(string path)
     {
         lock (_gate)
