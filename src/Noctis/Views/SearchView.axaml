@@ -838,10 +838,10 @@
                                                    Foreground="{Binding $parent[Button].Foreground}" VerticalAlignment="Center" />
                                     </StackPanel>
                                 </Button>
-                                <controls:ProgressRing Width="26" Height="26" Thickness="2.4"
-                                                       Foreground="{DynamicResource AccentColorBrush}"
-                                                       IsVisible="{Binding TopSong.IsDownloading, FallbackValue=False}"
-                                                       Value="{Binding TopSong.Progress, FallbackValue=0}" />
+                                <controls:DownloadStepBadge Width="26" Height="26" IconSize="10"
+                                                            IsVisible="{Binding TopSong.IsDownloading, FallbackValue=False}"
+                                                            Step="{Binding TopSong.DownloadStep, FallbackValue=None}"
+                                                            Progress="{Binding TopSong.Progress, FallbackValue=0}" />
                             </StackPanel>
                         </Grid>
                     </Button>
