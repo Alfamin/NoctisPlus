@@ -73,6 +73,20 @@
       "description": "Open native progress, pause/resume, stop and the latest result."
     },
     {
+      "key": "restart",
+      "label": "Restart word timing",
+      "type": "action",
+      "default": false,
+      "description": "Stops every WordLyrics run at once and starts the waiting songs again. Nothing is lost."
+    },
+    {
+      "key": "missing",
+      "label": "Time all songs without word timing",
+      "type": "action",
+      "default": false,
+      "description": "Queues every library song that has no word timing yet. Existing word timing is kept."
+    },
+    {
       "key": "library",
       "label": "Time library songs\u2026",
       "type": "action",

@@ -22,6 +22,7 @@ public sealed partial class WordLyricsViewModel : ObservableObject, IDisposable
         if (service.Folders.Length == 1) FolderIndex = 1;
         _service.Changed += Refresh; Refresh();
         if (track is not null) _ = LoadWordsAsync(track.FilePath);
+        else _ = CountMissingAsync();
         IsSetUp = service.BackendReady;
     }
     /// <summary>WordLyrics is installed with its models: the footer button opens its settings instead of setup
@@ -121,6 +122,30 @@ public sealed partial class WordLyricsViewModel : ObservableObject, IDisposable
     });
     [RelayCommand] private async Task TogglePause() { await _service.PauseAsync(!Paused); Refresh(); }
     [RelayCommand] private async Task Stop() { await _service.CancelAsync(); Refresh(); }
+
+    /// <summary>Owner #91: closes every WordLyrics run and starts the waiting songs again (nothing is lost).</summary>
+    [RelayCommand]
+    private Task Restart() => Act(async () => { var result = await _service.RestartAsync(); if (!_disposed) { Refresh(); Detail = result; } });
+
+    /// <summary>Owner #91: how many library songs have no word timing (null while counting).</summary>
+    [ObservableProperty, NotifyPropertyChangedFor(nameof(MissingLabel), nameof(HasMissing))] private int? _missingCount;
+    public bool HasMissing => MissingCount is > 0;
+    public string MissingLabel => MissingCount is { } n ? $"Time {n:N0} song{(n == 1 ? "" : "s")} without word timing" : "Counting songs without word timing…";
+    private async Task CountMissingAsync()
+    {
+        try { var missing = await _service.MissingAsync(_stop.Token); if (!_disposed) MissingCount = missing.Count; }
+        catch (OperationCanceledException) { }
+        catch (Exception ex) { if (!_disposed) { MissingCount = 0; Error = ex.Message; } }
+    }
+
+    [RelayCommand]
+    private Task TimeAllMissing() => Act(async () =>
+    {
+        if (MissingCount is > 200 && !await _confirm($"Queue word timing for {MissingCount:N0} songs? Existing word timing is kept. This can take a long time; you can pause, stop or restart it.")) return;
+        var result = await _service.TimeAllMissingAsync(_stop.Token);
+        if (_disposed) return;
+        Refresh(); Detail = result; MissingCount = 0;
+    });
     [RelayCommand(CanExecute = nameof(CanInteract))]
     private Task Setup()
     {

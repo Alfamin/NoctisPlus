@@ -61,6 +61,17 @@ internal sealed class Worker : IDisposable
     private bool _paused;               // the user paused: no new batch starts until Resume; the waiting list is kept
     private bool _cancelling;           // the user cancelled the run that is going; it is finishing the song it is on
     private bool _controlled;           // the run that is going looks at the control file (so the buttons are shown)
+    private bool _restarting;           // owner #91: the run that is going was ended by Restart (or the watchdog)
+    private string? _restartNotice;     // what the panel says once a restarted run has ended (null: the watchdog says it)
+    private bool? _wasReady;            // whether WordLyrics was set up at the last look (null: not looked yet)
+    // Owner #91 watchdog: a run whose progress file and CPU time both stop moving is stuck (a model call that never returns).
+    internal TimeSpan StuckAfter { get; set; } = TimeSpan.FromMinutes(15);
+    internal TimeSpan IdleCpuAfter { get; set; } = TimeSpan.FromMinutes(5);
+    internal TimeSpan ReadinessEvery { get; set; } = TimeSpan.FromSeconds(5);
+    private const int MaxAutoRestarts = 2;
+    private int _autoRestarts;
+    private DateTime _progressStamp, _progressMoved, _cpuMoved;
+    private TimeSpan _cpuSeen;
     private View _view = new("Starting WordLyrics", "", 0, 0, null, false);
 
     /// <summary>What the last progress update of the program said (before pause and cancel are added to it).</summary>
@@ -115,6 +126,7 @@ internal sealed class Worker : IDisposable
     public bool HasCheckpoint { get; }
     public DateTime LastSeenUtc => _lastSeen;
     internal int WaitingCount { get { lock (_gate) return _items.Count; } }
+    internal bool IsWaiting(string path) { lock (_gate) return _items.ContainsKey(path); }
     internal SongTimingStatus StatusFor(string path)
     {
         lock (_gate)
@@ -200,6 +212,126 @@ internal sealed class Worker : IDisposable
         });
     }
 
+    /// <summary>
+    /// Owner #91: Restart. Whatever WordLyrics is doing stops at once (no grace: it may be stuck); the songs stay on the
+    /// list without a failed try, every retry wait is cleared and the next run starts right away. With
+    /// <paramref name="automatic"/> (the stuck-run watchdog) the songs keep their tries.
+    /// </summary>
+    public string Restart(bool automatic = false)
+    {
+        Process? active; Job? job; int waiting;
+        lock (_gate)
+        {
+            if (_disposed) return "";
+            _paused = false; _cancelling = false;
+            ClearWaits(resetTries: !automatic);
+            active = _run; job = _job;
+            waiting = _items.Count;
+            if (active is not null) { _restarting = true; _restartNotice = waiting == 0 ? "Nothing is waiting." : $"{waiting} song{(waiting == 1 ? "" : "s")} start again."; }
+        }
+        // A Restart by the user closes every WordLyrics run of this installation: one left by the old Noctis plugin or a
+        // command window holds the one-run-at-a-time lock and would keep this one waiting.
+        if (!automatic) Safe(() => { var stopped = StopOtherRuns(new Tool(Options.Folder).Folder, active); if (stopped > 0) _log($"stopped {stopped} other WordLyrics run{(stopped == 1 ? "" : "s")}"); });
+        if (active is not null)
+            Safe(() => { if (job is not null) job.Dispose(); else if (!active.HasExited) active.Kill(entireProcessTree: true); });
+        else
+        {
+            _timer.Change(TimeSpan.Zero, Tick);
+            _progress(new ProgressState("Restarted", waiting == 0 ? "Nothing is waiting." : $"{waiting} song{(waiting == 1 ? "" : "s")} start again.", Finished: waiting == 0));
+        }
+        return waiting == 0 ? "WordLyrics restarted. Nothing is waiting." : $"WordLyrics restarted: {waiting} song{(waiting == 1 ? "" : "s")} start again.";
+    }
+
+    /// <summary>WordLyrics processes of this installation (its own Python) other than <paramref name="ours"/>.</summary>
+    internal static List<Process> OtherRuns(string toolFolder, Process? ours)
+    {
+        var python = Path.GetFullPath(Path.Combine(toolFolder, ".python"));
+        var found = new List<Process>();
+        foreach (var process in Process.GetProcessesByName("python"))
+        {
+            try
+            {
+                if (ours is not null && process.Id == ours.Id) { process.Dispose(); continue; }
+                var exe = process.MainModule?.FileName;
+                if (exe is not null && exe.StartsWith(python + Path.DirectorySeparatorChar, StringComparison.OrdinalIgnoreCase)) { found.Add(process); continue; }
+            }
+            catch (Exception ex) when (ex is System.ComponentModel.Win32Exception or InvalidOperationException or NotSupportedException) { }
+            process.Dispose();
+        }
+        return found;
+    }
+
+    private static int StopOtherRuns(string toolFolder, Process? ours)
+    {
+        var stopped = 0;
+        foreach (var other in OtherRuns(toolFolder, ours))
+            using (other)
+                try { other.Kill(entireProcessTree: true); stopped++; }
+                catch (Exception ex) when (ex is System.ComponentModel.Win32Exception or InvalidOperationException or NotSupportedException) { }
+        return stopped;
+    }
+
+    /// <summary>What else may hold WordLyrics' one-run lock, for the "another run" message.</summary>
+    private string OtherHolder()
+    {
+        try
+        {
+            var others = OtherRuns(new Tool(Options.Folder).Folder, null);
+            foreach (var o in others) o.Dispose();
+            var current = Environment.ProcessPath ?? "";
+            var otherNoctis = Process.GetProcessesByName("Noctis").Any(p => { try { return !string.Equals(p.MainModule?.FileName, current, StringComparison.OrdinalIgnoreCase); } catch (Exception) { return false; } finally { p.Dispose(); } });
+            return otherNoctis ? "Another Noctis app is open and may be timing songs (close it), or press Restart to stop every WordLyrics run."
+                : others.Count > 0 ? "A WordLyrics window or an earlier run is still going. Press Restart to stop it."
+                : "Another window is using the model. This batch will retry in a minute.";
+        }
+        catch (Exception) { return "Another window is using the model. This batch will retry in a minute."; }
+    }
+
+    /// <summary>Every waiting song may start now (a fixed setup, a restart). Called under the lock.</summary>
+    private void ClearWaits(bool resetTries)
+    {
+        var now = DateTime.UtcNow;
+        foreach (var item in _items.Values) { item.NotBefore = now; item.Waits = 0; item.AccessReported = false; if (resetTries) item.Tries = 0; }
+        _saidNotReady = false; _saidBadFolder = false;
+        SaveState();
+    }
+
+    /// <summary>Owner #91: many songs asked for at once ("Time all songs without word timing"): one save, not one per song.
+    /// Returns how many were added; songs that already have word timing or are already waiting are skipped.</summary>
+    internal int AskMany(IEnumerable<string> paths)
+    {
+        var now = DateTime.UtcNow; var added = 0;
+        var fresh = new List<(string Path, string Root)>();
+        foreach (var raw in paths)
+        {
+            try
+            {
+                if (string.IsNullOrWhiteSpace(raw) || !Audio.Contains(Path.GetExtension(raw)) || !File.Exists(raw)) continue;
+                var path = Path.GetFullPath(raw);
+                if (HasWordLyrics(path) || EmbeddedWordLyrics.HasWords(path)) continue;
+                fresh.Add((path, LibraryFolders().FirstOrDefault(f => Inside(path, f)) ?? Path.GetDirectoryName(path)!));
+            }
+            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or ArgumentException or NotSupportedException) { }
+        }
+        lock (_gate)
+        {
+            if (_disposed) return 0;
+            foreach (var (path, root) in fresh)
+            {
+                if (_items.TryGetValue(path, out var existing)) { existing.Asked = true; existing.NotBefore = now; continue; }
+                _items[path] = new Item { Path = path, Root = root, Asked = true, Action = TimingAction.Missing, Seen = now, QuietSince = now, NotBefore = now };
+                added++;
+            }
+            SaveState();
+        }
+        _timer.Change(TimeSpan.Zero, Tick);
+        return added;
+    }
+
+    /// <summary>Raised (worker thread) the first time WordLyrics is found set up after it was not (a finished setup, or the
+    /// first look at a backend that was already installed).</summary>
+    internal event Action? BecameReady;
+
     /// <summary>The Noctis library folders that exist right now.</summary>
     public IReadOnlyList<string> LibraryFolders() => _folders();
 
@@ -284,7 +416,7 @@ internal sealed class Worker : IDisposable
     private void Work()
     {
         var now = DateTime.UtcNow;
-        if (_run is not null) ReadProgress();
+        if (_run is not null) { ReadProgress(); Watch(now); }
 
         List<Item> waiting;
         lock (_gate)
@@ -295,7 +427,12 @@ internal sealed class Worker : IDisposable
                 _lastSeen = now;
                 SaveState();
             }
-            if (_run is not null || _items.Count == 0) return;
+            if (_run is not null) return;
+        }
+        CheckReadiness(now);
+        lock (_gate)
+        {
+            if (_disposed || _run is not null || _items.Count == 0) return;
             if (_paused) return;            // paused by the user: the waiting songs stay on the list until Resume
             waiting = _items.Values.Where(i => i.Asked || _options.Auto).ToList();
         }
@@ -333,6 +470,7 @@ internal sealed class Worker : IDisposable
         }
         _saidBadFolder = false;
         var ready = _readiness(tool);
+
         var repairReady = batch[0].Action == TimingAction.Missing || tool.SupportsRepair;
         if (!ready || !repairReady)
         {
@@ -356,6 +494,30 @@ internal sealed class Worker : IDisposable
         }
     }
 
+    private DateTime _readyChecked;
+    /// <summary>
+    /// Owner #91: is WordLyrics set up now? Looked at every few seconds while no run is going, even when every song is still
+    /// waiting out a retry or nothing is waiting at all. A setup that was just finished (or repaired) clears the retry waits
+    /// songs collected while it was missing or broken (up to 3 hours each), and is announced once (BecameReady).
+    /// </summary>
+    private void CheckReadiness(DateTime now)
+    {
+        if (now - _readyChecked < ReadinessEvery) return;
+        _readyChecked = now;
+        bool ready;
+        try { ready = _readiness(new Tool(Options.Folder)); }
+        catch (Exception ex) when (ex is ArgumentException or NotSupportedException or IOException or UnauthorizedAccessException) { ready = false; }
+        if (!ready) { _wasReady = false; return; }
+        if (_wasReady == true) return;
+        var wasMissing = _wasReady == false;
+        _wasReady = true;
+        if (wasMissing)
+        {
+            lock (_gate) if (!_disposed && _items.Count > 0) ClearWaits(resetTries: false);
+            _log("WordLyrics is set up; songs waiting for it start now");
+        }
+        Safe(() => BecameReady?.Invoke());
+    }
     /// <summary>Has the file been left alone long enough, and does it still need lyrics? Called under the lock.</summary>
     private bool Ripe(Item item, DateTime now)
     {
@@ -456,6 +618,8 @@ internal sealed class Worker : IDisposable
             _activePaths.UnionWith(batch.Select(i => i.Path));
             _controlled = controlled;
             _cancelling = false;
+            _restarting = false;
+            _progressStamp = DateTime.MinValue; _progressMoved = _cpuMoved = DateTime.UtcNow; _cpuSeen = TimeSpan.Zero;
             _view = new View("Starting WordLyrics", $"{batch.Count} songs queued. Preparing backup and lyric search...", 0, batch.Count, null, false);
         }
         _log($"started WordLyrics on {batch.Count} song{(batch.Count == 1 ? "" : "s")} ({speed} speed)");
@@ -466,6 +630,37 @@ internal sealed class Worker : IDisposable
             catch (Exception) { /* killed while we waited */ }
             Safe(() => Finished(run, batch));
         });
+    }
+
+    /// <summary>
+    /// Owner #91: the friend's run sat at "Time the words 0/1" for good. A run whose progress file has not changed for
+    /// <see cref="StuckAfter"/> and that has used no CPU for <see cref="IdleCpuAfter"/> is stuck: it is restarted (the songs
+    /// stay, keeping their tries), twice at most for one batch; then it is stopped and the panel says so, with Restart.
+    /// A paused run and one that is stopping are left alone.
+    /// </summary>
+    private void Watch(DateTime now)
+    {
+        Process? run;
+        lock (_gate) { run = _run; if (run is null || _paused || _cancelling || _restarting) return; }
+        try
+        {
+            var stamp = File.Exists(ProgressFile) ? File.GetLastWriteTimeUtc(ProgressFile) : DateTime.MinValue;
+            if (stamp != _progressStamp) { _progressStamp = stamp; _progressMoved = now; }
+            var cpu = run.TotalProcessorTime;
+            if (cpu - _cpuSeen > TimeSpan.FromSeconds(2)) { _cpuSeen = cpu; _cpuMoved = now; }
+        }
+        catch (Exception ex) when (ex is InvalidOperationException or System.ComponentModel.Win32Exception or IOException or UnauthorizedAccessException or NotSupportedException) { return; }
+        if (now - _progressMoved < StuckAfter || now - _cpuMoved < IdleCpuAfter) return;
+        if (++_autoRestarts <= MaxAutoRestarts)
+        {
+            _log($"WordLyrics made no progress for {StuckAfter.TotalMinutes:0} minutes and used no CPU; restarting it (the songs are kept)");
+            Restart(automatic: true);
+            return;
+        }
+        _log("WordLyrics stopped responding again; it is stopped. Press Restart in the word timing panel to try again");
+        Restart(automatic: true);
+        lock (_gate) { _restartNotice = null; foreach (var item in _items.Values) item.NotBefore = now + TimeSpan.FromMinutes(30); SaveState(); }
+        _progress(new ProgressState("WordLyrics stopped responding", "It made no progress twice. The songs are kept and tried again in 30 minutes; press Restart to try now. If it keeps happening, run Set up WordLyrics again.", Finished: true, Error: true));
     }
 
     private void ReadProgress()
@@ -544,7 +739,7 @@ internal sealed class Worker : IDisposable
 
         var counts = new Dictionary<string, int>();
         var titles = new Dictionary<string, string>();
-        bool asked = batch[0].Asked, stopped, cancelled, held;
+        bool asked = batch[0].Asked, stopped, cancelled, held, restarted; string? restartNotice;
         var firstDelays = 0;
         var dropped = 0;
         lock (_gate)
@@ -553,6 +748,8 @@ internal sealed class Worker : IDisposable
             stopped = _disposed;
             held = _paused;                 // paused too late for this run to notice: the songs still waiting stay held
             cancelled = _cancelling && ReferenceEquals(_run, run);
+            restarted = _restarting && ReferenceEquals(_run, run); restartNotice = _restartNotice; _restarting = false; _restartNotice = null;
+            if (!restarted && code != ExitAlreadyRunning) _autoRestarts = 0; // a run that ended by itself: the watchdog starts counting again
             if (ReferenceEquals(_run, run))
             {
                 _run = null;
@@ -574,6 +771,8 @@ internal sealed class Worker : IDisposable
                     continue;
                 }
                 if (stopped) continue; // Noctis is closing: the song stays on the list
+                // Owner #91: ended by Restart or the watchdog: nothing is the song's fault; what was finished stays finished.
+                if (restarted && status is not ("timed" or "lines_only" or "no_lyrics" or "rejected" or "not_timed" or "skipped")) continue;
                 if (cancelled)
                 {
                     // A stop by the user says nothing about a song: no failed try, no wait. What was finished
@@ -618,6 +817,13 @@ internal sealed class Worker : IDisposable
         var written = batch.Where(i => outcome.TryGetValue(i.Path, out var o) && o.Status is "timed" or "lines_only").Select(i => i.Path).ToArray();
         if (written.Length > 0) _lyricsWritten(written);
 
+        if (restarted)
+        {
+            _log("WordLyrics was restarted; the waiting songs start again");
+            if (restartNotice is not null) _progress(new ProgressState("Restarted", restartNotice));
+            _timer.Change(TimeSpan.FromSeconds(1), Tick);
+            return;
+        }
         if (cancelled)
         {
             var finished = counts.GetValueOrDefault("timed") + counts.GetValueOrDefault("lines_only");
@@ -629,7 +835,7 @@ internal sealed class Worker : IDisposable
         if (code == ExitAlreadyRunning)
         {
             _log("WordLyrics is running in another window; trying again in a minute");
-            _progress(new ProgressState("Waiting for another WordLyrics run", "Another window is using the model. This batch will retry in a minute.", Total: batch.Count, Paused: held));
+            _progress(new ProgressState("Waiting for another WordLyrics run", OtherHolder(), Total: batch.Count, Paused: held));
             return;
         }
         if (code == ExitSetupFailed)
@@ -746,7 +952,11 @@ internal sealed class Worker : IDisposable
     {
         const string how = " Use Set up WordLyrics; queued songs are saved.";
         if (!tool.Installed) return "The WordLyrics program is not installed." + how;
-        return (tool.TooOld ? "The WordLyrics program needs an update." : "WordLyrics is not set up yet.") + how;
+        // Owner #91: say what is missing, and that setup keeps what is there (a model downloaded for the old plugin is reused).
+        var missing = tool.Missing();
+        var what = missing.Count == 0 ? "" : " Missing: " + string.Join(", ", missing) + ".";
+        return (tool.TooOld ? "The WordLyrics program needs an update." : "WordLyrics is not set up yet.") + what +
+            " Setup reuses everything already downloaded." + how;
     }
 
     // ── the list of waiting songs, kept across restarts ──
@@ -839,7 +1049,7 @@ internal sealed class Worker : IDisposable
     private static string Text(JsonElement element, string name)
         => element.TryGetProperty(name, out var value) && value.ValueKind == JsonValueKind.String ? value.GetString() ?? "" : "";
 
-    private static bool HasWordLyrics(string song)
+    internal static bool HasWordLyrics(string song)
     {
         var stem = Path.Combine(Path.GetDirectoryName(song) ?? "", Path.GetFileNameWithoutExtension(song));
         return WordLyrics.Any(extension => File.Exists(stem + extension));

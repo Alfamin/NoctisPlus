@@ -83,6 +83,27 @@ internal sealed class Tool
         }
     }
 
+    /// <summary>Owner #91: what keeps <see cref="Ready"/> false, in the user's words (empty when nothing is known to be missing).</summary>
+    public IReadOnlyList<string> Missing()
+    {
+        var missing = new List<string>();
+        try
+        {
+            if (!Installed) { missing.Add("the program"); return missing; }
+            if (TooOld) missing.Add($"a newer program (version {Needed} or later)");
+            var python = Path.Combine(Folder, ".python");
+            if (!File.Exists(Path.Combine(python, "python.exe")) || !Directory.Exists(python) || !Directory.EnumerateFiles(python, "ready-*.txt").Any()) missing.Add("its Python packages");
+            foreach (var (file, size, name) in new[] { ("mms_fa_300m.onnx", 1262421764L, "the timing model"), ("Kim_Vocal_2.onnx", 66759214L, "the voice model") })
+            {
+                var model = new FileInfo(Path.Combine(Folder, "models", file));
+                if (!model.Exists) missing.Add(name);
+                else if (model.Length != size) missing.Add(name + " (partly downloaded)");
+            }
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException) { }
+        return missing;
+    }
+
     /// <summary>
     /// Times the songs listed in <paramref name="listFile"/>, without a window. What happened to
     /// each song is written to <paramref name="resultFile"/>, the program's own output to <paramref name="logFile"/>.
@@ -152,7 +173,7 @@ internal sealed class Tool
     /// program's own installer, then fetches its models. <paramref name="scriptFolder"/> is where
     /// the few lines that do this are written.
     /// </summary>
-    public void OpenSetup(string scriptFolder)
+    public void OpenSetup(string scriptFolder, Action? closed = null)
     {
         Directory.CreateDirectory(scriptFolder);
         var script = Path.Combine(scriptFolder, "setup.cmd");
@@ -170,7 +191,8 @@ internal sealed class Tool
         var proxy = new BackendProxy(() => FreeMusicFinder.FreeMusicPlugin.Current?.MetadataProxy ?? WordLyricsFeature.Current?.MetadataProxy ?? "");
         proxy.Configure(info);
         var process = new Process { StartInfo = info, EnableRaisingEvents = true };
-        process.Exited += (_, _) => { proxy.Dispose(); process.Dispose(); };
+        // Owner #91: when the setup window closes, waiting songs start at once instead of after their retry waits.
+        process.Exited += (_, _) => { proxy.Dispose(); process.Dispose(); try { closed?.Invoke(); } catch (Exception) { } };
         try { if (!process.Start()) throw new IOException("WordLyrics setup could not start."); }
         catch { proxy.Dispose(); process.Dispose(); throw; }
     }

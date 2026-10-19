@@ -15,7 +15,7 @@ public class WordLyricsBackendTests
         internal readonly TestPersistenceService Data = new();
         internal readonly string App, Music, Song, Work;
         private readonly string? _before = Environment.GetEnvironmentVariable("WORDLYRICS_PYTHON");
-        internal Rig(bool hold = false, string outcome = "timed")
+        internal Rig(bool hold = false, string outcome = "timed", bool stuck = false)
         {
             var python = Environment.GetEnvironmentVariable("NOCTIS_TEST_PYTHON") ?? "python";
             try
@@ -31,7 +31,7 @@ public class WordLyricsBackendTests
             File.WriteAllText(Path.Combine(module, "__init__.py"), "__version__ = \"1.6.4\"\n");
             File.WriteAllText(Path.Combine(App, "WordLyrics.bat"), "fixture only");
             File.WriteAllText(Path.Combine(module, "__main__.py"), "# --confirm-redo is supported by this synthetic backend\n");
-            File.WriteAllText(Path.Combine(App, "fixture.json"), JsonSerializer.Serialize(new { hold, outcome }));
+            File.WriteAllText(Path.Combine(App, "fixture.json"), JsonSerializer.Serialize(new { hold, outcome, stuck }));
             File.WriteAllText(Path.Combine(module, "models.py"), "class ModelError(Exception):pass\ndef missing(folder):return []\ndef download(*a,**k):raise Exception('Original download must never run')\n");
             var run = """
                 import json,sys,time,os
@@ -44,6 +44,7 @@ public class WordLyricsBackendTests
                 def put(path,data):
                     target=Path(path);tmp=target.with_suffix('.tmp');tmp.write_text(json.dumps(data),encoding='utf-8');os.replace(tmp,target)
                 control=Path(value('--control')) if '--control' in args else None
+                if config.get('stuck'): time.sleep(60)  # owner #91: a model call that never returns: no progress, no CPU
                 deadline=time.monotonic()+15
                 while config['hold'] and time.monotonic()<deadline:
                     word=control.read_text() if control and control.exists() else 'run'
@@ -167,5 +168,79 @@ public class WordLyricsBackendTests
         using var child = new Tool(rig.App).StartQuietRun(rig.Music, list, rig.Result, log, "light", "", true);
         await child.WaitForExitAsync().WaitAsync(TimeSpan.FromSeconds(8));
         Assert.Equal(70, child.ExitCode); Assert.Contains("SETUP_CONSENT_REQUIRED", File.ReadAllText(log));
+    }
+    // ── Owner #91: Restart, a stuck-run watchdog, a fixed setup and "time all songs without word timing" ──
+
+    [Fact]
+    public async Task RestartDuringARun_EndsItAtOnce_KeepsTheSong_AndStartsAgain()
+    {
+        using var rig = new Rig(hold: true, outcome: "not_timed"); var states = new ConcurrentQueue<ProgressState>();
+        using var worker = rig.Worker(states.Enqueue);
+        worker.Ask(rig.Song);
+        await Until(() => states.Any(s => s.Controllable));
+        var said = worker.Restart();
+        Assert.Contains("start again", said);
+        await Until(() => states.Any(s => s.Message == "Restarted"));
+        Assert.Equal(1, worker.WaitingCount); // nothing is lost and no try was spent
+        await Until(() => worker.StatusFor(rig.Song) == SongTimingStatus.Processing); // and it runs again at once
+        worker.Cancel(); await Until(() => states.Any(s => s.Message == "Cancelled"));
+        Assert.Equal("synthetic audio remains unchanged", File.ReadAllText(rig.Song));
+    }
+
+    [Fact]
+    public async Task RestartClearsARetryWait_SoTheSongIsTriedAgainNow()
+    {
+        using var rig = new Rig(outcome: "network_error"); var states = new ConcurrentQueue<ProgressState>();
+        using var worker = rig.Worker(states.Enqueue);
+        worker.Ask(rig.Song);
+        await Until(() => worker.StatusFor(rig.Song) == SongTimingStatus.Retry); // waits 10 minutes
+        File.Delete(rig.Result);
+        worker.Restart();
+        await Until(() => File.Exists(rig.Result)); // tried again right away
+    }
+
+    [Fact]
+    public async Task ASetupThatWasMissingAndIsNowReady_ClearsTheWaitsSongsCollected_AndSaysSo()
+    {
+        using var rig = new Rig(outcome: "network_error"); var ready = true; var announced = 0;
+        using var worker = new Worker(rig.Work, () => [rig.Music], new(true, "Light", false, rig.App, ""), _ => { }, _ => { }, _ => { }, readiness: _ => ready)
+            { ReadinessEvery = TimeSpan.Zero };
+        worker.BecameReady += () => Interlocked.Increment(ref announced);
+        worker.Ask(rig.Song);
+        await Until(() => worker.StatusFor(rig.Song) == SongTimingStatus.Retry);
+        Assert.Equal(1, Volatile.Read(ref announced)); // the first look at a backend that is set up
+        ready = false; worker.TickNow();               // setup broken or removed
+        File.Delete(rig.Result);
+        ready = true; worker.TickNow();                // setup finished again
+        await Until(() => File.Exists(rig.Result));    // the retry wait (10 minutes) was cleared
+        Assert.Equal(2, Volatile.Read(ref announced));
+    }
+
+    [Fact]
+    public async Task AStuckRun_IsRestartedByItself_ThenStoppedWithAClearMessage_AndTheSongIsKept()
+    {
+        using var rig = new Rig(stuck: true); var states = new ConcurrentQueue<ProgressState>();
+        using var worker = new Worker(rig.Work, () => [rig.Music], new(true, "Light", false, rig.App, ""), _ => { }, _ => { }, states.Enqueue, readiness: _ => true)
+            { StuckAfter = TimeSpan.FromMilliseconds(400), IdleCpuAfter = TimeSpan.FromMilliseconds(400) };
+        worker.Ask(rig.Song);
+        var clock = Stopwatch.StartNew();
+        while (!states.Any(s => s.Message == "WordLyrics stopped responding") && clock.Elapsed < TimeSpan.FromSeconds(25)) await Task.Delay(50);
+        Assert.Contains(states, s => s.Message == "Restarted");
+        Assert.Contains(states, s => s.Message == "WordLyrics stopped responding" && s.Error);
+        Assert.Equal(1, worker.WaitingCount); // kept, for Restart or the next try
+        Assert.Equal(SongTimingStatus.Retry, worker.StatusFor(rig.Song));
+    }
+
+    [Fact]
+    public void TimeAllWithoutWordTiming_QueuesOnlySongsThatHaveNone_InOneSave()
+    {
+        using var rig = new Rig(); var timed = Path.Combine(rig.Music, "already timed.mp3");
+        File.WriteAllText(timed, "synthetic"); File.WriteAllText(Path.ChangeExtension(timed, ".elrc"), "[00:01.00]<00:01.00>word");
+        using var worker = new Worker(rig.Work, () => [rig.Music], new(false, "Light", false, rig.App, ""), _ => { }, _ => { }, _ => { }, startTimer: false, readiness: _ => false);
+        Assert.Equal(1, worker.AskMany([rig.Song, timed, Path.Combine(rig.Music, "gone.mp3"), rig.Song]));
+        Assert.Equal(1, worker.WaitingCount);
+        Assert.Equal(0, worker.AskMany([rig.Song])); // already waiting
+        using var checkpoint = JsonDocument.Parse(File.ReadAllText(Path.Combine(rig.Work, "state.json")));
+        Assert.Single(checkpoint.RootElement.GetProperty("waiting").EnumerateArray()); // saved, so it survives until setup
     }
 }

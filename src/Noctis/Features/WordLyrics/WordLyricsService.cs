@@ -181,6 +181,70 @@ internal sealed class WordLyricsService(ILibraryService library, Func<AppSetting
     });
     internal Task PauseAsync(bool paused) => Task.Run(() => _worker?.SetPaused(paused));
     internal Task CancelAsync() => Task.Run(() => _worker?.Cancel());
+
+    /// <summary>Owner #91: Restart. Every WordLyrics run is closed and the waiting songs start again at once.</summary>
+    internal Task<string> RestartAsync() => Task.Run(() => _worker?.Restart() ?? "Enable WordLyrics in Settings → Features.");
+
+    /// <summary>Owner #91: the library songs (local files) that have no word timing and are not already waiting. Reads only
+    /// lyric files and tags, off the UI thread.</summary>
+    internal Task<IReadOnlyList<string>> MissingAsync(CancellationToken ct = default)
+    {
+        var worker = _worker;
+        var paths = library.AllTracks.Where(t => !t.IsRemoteStream && !t.IsExternal && !string.IsNullOrWhiteSpace(t.FilePath))
+            .Select(t => t.FilePath).Distinct(StringComparer.OrdinalIgnoreCase).ToArray();
+        return Task.Run<IReadOnlyList<string>>(() =>
+        {
+            var missing = new List<string>();
+            foreach (var path in paths)
+            {
+                ct.ThrowIfCancellationRequested();
+                try
+                {
+                    if (worker?.IsWaiting(Path.GetFullPath(path)) == true || !File.Exists(path)) continue;
+                    if (!Worker.HasWordLyrics(path) && !EmbeddedWordLyrics.HasWords(path)) missing.Add(path);
+                }
+                catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or ArgumentException or NotSupportedException) { }
+            }
+            return missing;
+        }, ct);
+    }
+
+    /// <summary>Owner #91: one click for every library song without word timing. Existing word timing is never redone.</summary>
+    internal async Task<string> TimeAllMissingAsync(CancellationToken ct = default)
+    {
+        if (_worker is not { } worker) return "Enable WordLyrics in Settings → Features.";
+        var missing = await MissingAsync(ct);
+        if (missing.Count == 0) return "Every song already has word timing.";
+        var added = await Task.Run(() => worker.AskMany(missing), ct);
+        return BackendReady ? $"{added:N0} song{(added == 1 ? "" : "s")} queued for word timing."
+            : $"{added:N0} song{(added == 1 ? "" : "s")} saved for word timing; they start once WordLyrics is set up.";
+    }
+
+    /// <summary>
+    /// Owner #91: once WordLyrics is set up (or found set up for the first time, e.g. a model downloaded for the old plugin),
+    /// it offers to time the library songs that have none, once for each installation. Never while nothing is missing.
+    /// </summary>
+    private async Task OfferMissingAsync()
+    {
+        if (_disposed || _worker is not { } worker || _host is null) return;
+        var flag = Path.Combine(DataDirectory, "offered-missing.txt");
+        var key = new Tool(worker.Options.Folder).Folder;
+        try { if (File.Exists(flag) && string.Equals(File.ReadAllText(flag).Trim(), key, StringComparison.OrdinalIgnoreCase)) return; }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException) { return; }
+        IReadOnlyList<string> missing;
+        try { missing = await MissingAsync(); }
+        catch (Exception ex) { Log("WORDLYRICS_MISSING_COUNT_FAILED: " + ex.Message); return; }
+        if (missing.Count == 0 || _disposed) return;
+        try { File.WriteAllText(flag, key); } catch (Exception ex) when (ex is IOException or UnauthorizedAccessException) { }
+        await Dispatcher.UIThread.InvokeAsync(async () =>
+        {
+            if (_disposed || (Application.Current?.ApplicationLifetime as IClassicDesktopStyleApplicationLifetime)?.MainWindow is not { } owner) return;
+            var text = $"WordLyrics is ready.\n{missing.Count:N0} song{(missing.Count == 1 ? " has" : "s have")} no word timing. Time {(missing.Count == 1 ? "it" : "them")} now?";
+            if (!await Views.ConfirmationDialog.ShowAsync(owner, text) || _disposed) return;
+            var result = await TimeAllMissingAsync();
+            Progress(new ProgressState("Queued", result));
+        });
+    }
     internal void OpenReport()
     {
         if (_worker is not { } worker || string.IsNullOrWhiteSpace(State.Report)) return;
@@ -201,7 +265,7 @@ internal sealed class WordLyricsService(ILibraryService library, Func<AppSetting
                 confirm = text => Views.ConfirmationDialog.ShowAsync(owner, text);
             }
             if (!await confirm(SetupConsent) || _disposed) return;
-            await Task.Run(() => new Tool(worker.Options.Folder).OpenSetup(host.DataDirectory));
+            await Task.Run(() => new Tool(worker.Options.Folder).OpenSetup(host.DataDirectory, closed: () => { if (!_disposed) _worker?.Restart(); }));
         }
         catch (Exception ex) { Progress(new("Setup could not open", ex.Message, Error: true, Finished: true)); }
     }

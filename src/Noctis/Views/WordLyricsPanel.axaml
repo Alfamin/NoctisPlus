@@ -29,8 +29,14 @@
           <StackPanel Orientation="Horizontal" Spacing="8">
             <Button Content="{Binding PauseLabel}" Classes="pill-secondary" Command="{Binding TogglePauseCommand}" />
             <Button Content="Stop" Classes="pill-secondary" Command="{Binding StopCommand}" />
+            <!-- Owner #91: one press closes every WordLyrics run and starts the waiting songs again. -->
+            <Button Content="Restart" Classes="pill-secondary" Command="{Binding RestartCommand}" IsEnabled="{Binding CanInteract}"
+                    ToolTip.Tip="Stops WordLyrics and starts the waiting songs again" />
             <Button Content="View report" Classes="pill-secondary" IsVisible="{Binding HasReport}" Command="{Binding OpenReportCommand}" />
           </StackPanel>
+          <!-- Owner #91: every library song without word timing, in one press. -->
+          <Button Content="{Binding MissingLabel}" Classes="pill-primary" Command="{Binding TimeAllMissingCommand}"
+                  IsVisible="{Binding !IsSong}" IsEnabled="{Binding HasMissing}" HorizontalAlignment="Left" />
           <ComboBox ItemsSource="{Binding Folders}" SelectedIndex="{Binding FolderIndex}" IsVisible="{Binding IsLibrary}"
                     IsEnabled="{Binding CanInteract}" Classes="pill-field" HorizontalAlignment="Stretch" />
           <ComboBox ItemsSource="{Binding Actions}" SelectedIndex="{Binding ActionIndex}" IsVisible="{Binding IsSong}"
