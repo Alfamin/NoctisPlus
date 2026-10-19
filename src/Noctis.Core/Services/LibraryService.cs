@@ -1320,6 +1320,14 @@ public class LibraryService : ILibraryService
                 // The audio didn't change, but the watcher also routes a replaced
                 // cover.jpg here via a sibling audio file — check that album's folder art.
                 unchangedKnown.Add(existing);
+                if (!discovered && existing.IsInInbox)
+                {
+                    // The user's own add of a file the folder watcher reached first (a
+                    // conversion or download saved into a music folder): into the library.
+                    existing.IsInInbox = false;
+                    existing.DateAdded = DateTime.UtcNow;
+                    changed = true;
+                }
                 continue;
             }
 
@@ -1328,7 +1336,14 @@ public class LibraryService : ILibraryService
 
             track.Id = trackId;
             if (existing != null)
+            {
                 CopyMutableTrackState(existing, track);
+                if (!discovered && track.IsInInbox)
+                {
+                    track.IsInInbox = false;
+                    track.DateAdded = DateTime.UtcNow;
+                }
+            }
             else
             {
                 track.SourceType = SourceType.Local;
