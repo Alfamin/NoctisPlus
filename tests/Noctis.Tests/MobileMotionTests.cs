@@ -405,7 +405,13 @@ public class MobileMotionTests
         {
             rig.Shell.OpenSongsCommand.Execute(null);
             var clock = System.Diagnostics.Stopwatch.StartNew();
-            while (clock.ElapsedMilliseconds < 140) Pump(window);
+            // Until the page is on its way, as BackMidSheet waits: a loaded runner's slow frames
+            // had not started the slide by 140 ms ("Back came at 411").
+            while (clock.ElapsedMilliseconds < 140 || Probe(0, "songs", Find<SongListPage>(view), window) is not { Opacity: > 0.01, X: < W - 50 })
+            {
+                Pump(window);
+                if (clock.ElapsedMilliseconds > 1500) break;
+            }
             rig.Shell.TryHandleBack();
         }, 800, ("songs", () => Find<SongListPage>(view)), ("library", () => Find<LibraryPage>(view)));
         var songs = s.Where(x => x.Target == "songs" && x.Ms >= 0 && x.Present).Select(x => x.X).ToList();
