@@ -42,6 +42,66 @@ jobs:
             echo "No green main run with files for $GITHUB_SHA; building and testing this tag."
           fi
 
+  # The suite on four runners at once (owner, 2026-10-19: get releases out sooner, same results). Test classes are
+  # listed, sorted and dealt round-robin, so every class runs exactly once; each shard is the old single run's
+  # command limited to its classes.
+  tests:
+    needs: reuse
+    if: ${{ !cancelled() && github.repository != 'heartached/Noctis' && needs.reuse.outputs.run_id == '' }}
+    runs-on: windows-latest
+    timeout-minutes: 40
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [0, 1, 2, 3]
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+      - uses: actions/setup-dotnet@67a3573c9a986a3f9c594539f4ab511d57bb3ce9
+        with:
+          dotnet-version: '10.0.x'
+      - name: Restore existing dependencies
+        run: dotnet restore tests/Noctis.Tests/Noctis.Tests.csproj
+      - name: Build tests
+        run: dotnet build tests/Noctis.Tests/Noctis.Tests.csproj -c Release --no-restore --nologo
+      - name: Test this shard with bounded parallelism
+        shell: pwsh
+        env:
+          SHARD: ${{ matrix.shard }}
+          SHARDS: 4
+        run: |
+          New-Item -ItemType Directory -Path artifacts/plus -Force | Out-Null
+          $dll = 'tests/Noctis.Tests/bin/Release/net10.0-windows10.0.19041.0/Noctis.Tests.dll'
+          $classes = @(dotnet $dll -list classes | Where-Object { $_ -match '^Noctis\.' } | Sort-Object -Unique)
+          if ($classes.Count -lt 50) { Write-Host "::error::Only $($classes.Count) test classes were listed."; exit 1 }
+          $mine = @(for ($i = [int]$env:SHARD; $i -lt $classes.Count; $i += [int]$env:SHARDS) { $classes[$i] })
+          Write-Host "Shard ${env:SHARD} of ${env:SHARDS}: $($mine.Count) of $($classes.Count) test classes"
+          $filter = @(); foreach ($c in $mine) { $filter += @('-class', $c) }
+          dotnet $dll -parallelAlgorithm conservative -maxThreads 4 -longRunning 60 -noColor -xml "artifacts/plus/ci-tests-$env:SHARD.xml" @filter
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - name: List failed tests on the run page
+        # Annotations are readable without signing in, unlike the log and the report artifact.
+        if: failure()
+        shell: pwsh
+        run: |
+          $report = "artifacts/plus/ci-tests-${{ matrix.shard }}.xml"
+          if (!(Test-Path $report)) { Write-Host '::error::No test report was written.'; exit 0 }
+          [xml]$x = Get-Content $report -Raw
+          $clean = { param($s) $c = ([string]$s -replace '%', '%25' -replace '\r?\n', ' '); $c.Substring(0, [Math]::Min(400, $c.Length)) }
+          foreach ($t in $x.SelectNodes("//test[@result='Fail']")) {
+            Write-Host ("::error title=FAIL {0}::{1}" -f $t.name, (& $clean $t.failure.message.InnerText))
+          }
+          foreach ($e in $x.SelectNodes('//errors/error')) {
+            Write-Host ("::error title=ERROR {0} {1}::{2}" -f $e.type, $e.name, (& $clean $e.failure.message.InnerText))
+          }
+      - name: Upload test report
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: NoctisPlus-tests-${{ matrix.shard }}
+          path: artifacts/plus/*.xml
+          if-no-files-found: ignore
+
+  # Package and install-check at the same time as the tests; a release needs both green.
   windows:
     needs: reuse
     if: ${{ !cancelled() && github.repository != 'heartached/Noctis' && needs.reuse.outputs.run_id == '' }}
@@ -54,29 +114,6 @@ jobs:
           dotnet-version: '10.0.x'
       - name: Restore existing dependencies
         run: dotnet restore tests/Noctis.Tests/Noctis.Tests.csproj
-      - name: Build tests
-        run: dotnet build tests/Noctis.Tests/Noctis.Tests.csproj -c Release --no-restore --nologo
-      - name: Test with bounded parallelism
-        shell: pwsh
-        run: |
-          New-Item -ItemType Directory -Path artifacts/plus -Force | Out-Null
-          dotnet tests/Noctis.Tests/bin/Release/net10.0-windows10.0.19041.0/Noctis.Tests.dll -parallelAlgorithm conservative -maxThreads 4 -longRunning 60 -noColor -xml artifacts/plus/ci-tests.xml
-          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-      - name: List failed tests on the run page
-        # Annotations are readable without signing in, unlike the log and the report artifact.
-        if: failure()
-        shell: pwsh
-        run: |
-          $report = 'artifacts/plus/ci-tests.xml'
-          if (!(Test-Path $report)) { Write-Host '::error::No test report was written.'; exit 0 }
-          [xml]$x = Get-Content $report -Raw
-          $clean = { param($s) $c = ([string]$s -replace '%', '%25' -replace '\r?\n', ' '); $c.Substring(0, [Math]::Min(400, $c.Length)) }
-          foreach ($t in $x.SelectNodes("//test[@result='Fail']")) {
-            Write-Host ("::error title=FAIL {0}::{1}" -f $t.name, (& $clean $t.failure.message.InnerText))
-          }
-          foreach ($e in $x.SelectNodes('//errors/error')) {
-            Write-Host ("::error title=ERROR {0} {1}::{2}" -f $e.type, $e.name, (& $clean $e.failure.message.InnerText))
-          }
       - name: Inno Setup (preinstalled, else from Chocolatey)
         shell: powershell
         run: |
@@ -91,13 +128,6 @@ jobs:
         run: |
           $setup = Get-ChildItem -Path release-artifacts -Filter 'NoctisPlus-v*-Setup.exe' | Select-Object -First 1
           .\scripts\ci\Test-NoctisPlusInstall.ps1 -Setup $setup.FullName
-      - name: Upload test report
-        if: always()
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
-        with:
-          name: NoctisPlus-tests
-          path: artifacts/plus/*.xml
-          if-no-files-found: ignore
       - name: Upload portable preview
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
@@ -113,8 +143,8 @@ jobs:
   release:
     # Only for a version tag, and only after this commit was built, tested and install-checked: by main's run
     # (reused) or by the Windows job of this tag.
-    if: ${{ !cancelled() && startsWith(github.ref, 'refs/tags/v') && (needs.windows.result == 'success' || (needs.windows.result == 'skipped' && needs.reuse.outputs.run_id != '')) }}
-    needs: [reuse, windows]
+    if: ${{ !cancelled() && startsWith(github.ref, 'refs/tags/v') && ((needs.windows.result == 'success' && needs.tests.result == 'success') || (needs.windows.result == 'skipped' && needs.tests.result == 'skipped' && needs.reuse.outputs.run_id != '')) }}
+    needs: [reuse, tests, windows]
     runs-on: ubuntu-latest
     timeout-minutes: 15
     permissions:
