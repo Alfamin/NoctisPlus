@@ -13,7 +13,7 @@ namespace Noctis.ViewModels;
 /// <summary>
 /// ViewModel for the Favorites tab — shows favorited tracks and fully-favorited albums.
 /// </summary>
-public partial class FavoritesViewModel : ViewModelBase, ISearchable, IDisposable
+public partial class FavoritesViewModel : ViewModelBase, ILocalSearchable, IDisposable
 {
     private readonly PlayerViewModel _player;
     private readonly ILibraryService _library;

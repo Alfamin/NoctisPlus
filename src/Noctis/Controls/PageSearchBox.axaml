@@ -1,0 +1,49 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:Noctis.ViewModels"
+             xmlns:controls="using:Noctis.Controls"
+             xmlns:loc="using:Noctis.Localization"
+             x:Class="Noctis.Controls.PageSearchBox"
+             x:DataType="vm:ILocalSearchable"
+             Width="280" Height="36" HorizontalAlignment="Right">
+    <UserControl.Styles>
+        <Style Selector="Border.page-search">
+            <Setter Property="Background" Value="{DynamicResource ChipBackground}" />
+            <Setter Property="BorderBrush" Value="{DynamicResource SystemControlForegroundBaseLowBrush}" />
+            <Setter Property="Transitions">
+                <Transitions><BrushTransition Property="BorderBrush" Duration="0:0:0.12" /></Transitions>
+            </Setter>
+        </Style>
+        <Style Selector="Border.page-search:focus-within">
+            <Setter Property="BorderBrush" Value="{DynamicResource AccentColorBrush}" />
+        </Style>
+        <Style Selector="Button.page-search-action">
+            <Setter Property="Background" Value="Transparent" />
+            <Setter Property="BorderThickness" Value="0" />
+            <Setter Property="Padding" Value="0" />
+            <Setter Property="CornerRadius" Value="999" />
+            <Setter Property="Width" Value="30" />
+            <Setter Property="MinHeight" Value="0" />
+            <Setter Property="Cursor" Value="Hand" />
+        </Style>
+    </UserControl.Styles>
+    <Border Classes="page-search" CornerRadius="999" BorderThickness="1" Padding="3,0">
+        <Grid ColumnDefinitions="Auto,*,Auto">
+            <Button Classes="page-search-action" Click="OnFocusClick"
+                    AutomationProperties.Name="{Binding $parent[controls:PageSearchBox].Placeholder}">
+                <PathIcon Data="{StaticResource SearchIcon}" Width="14" Height="14" Opacity="0.7" />
+            </Button>
+            <TextBox x:Name="Input" Grid.Column="1" Classes="search-box"
+                     Text="{Binding SearchText, Mode=OneWay}"
+                     Watermark="{Binding $parent[controls:PageSearchBox].Placeholder}"
+                     AutomationProperties.Name="{Binding $parent[controls:PageSearchBox].Placeholder}"
+                     FontSize="12" Padding="0" VerticalContentAlignment="Center"
+                     TextChanged="OnInputChanged" KeyDown="OnInputKeyDown" />
+            <Button x:Name="ClearButton" Grid.Column="2" Classes="page-search-action"
+                    Click="OnClearClick" IsVisible="False"
+                    AutomationProperties.Name="{loc:T Main.Clear}">
+                <PathIcon Data="{StaticResource DismissIcon}" Width="10" Height="10" Opacity="0.65" />
+            </Button>
+        </Grid>
+    </Border>
+</UserControl>

@@ -12,7 +12,7 @@ namespace Noctis.ViewModels;
 /// <summary>
 /// ViewModel for displaying and managing a single playlist.
 /// </summary>
-public partial class PlaylistViewModel : ViewModelBase, ISearchable, IDisposable
+public partial class PlaylistViewModel : ViewModelBase, ILocalSearchable, IDisposable
 {
     private readonly PlayerViewModel _player;
     private readonly ILibraryService _library;

@@ -23,6 +23,9 @@
              edge (matches the Albums section) instead of being inset ~16px from it. -->
         <DockPanel Grid.Row="0" Margin="16,8,2,16">
 
+        <controls:PageSearchBox DockPanel.Dock="Top" Margin="0,0,12,12"
+                                Placeholder="{loc:T LibrarySongs.Search}" />
+
         <!-- Column headers (sortable). Optional columns live in Auto columns whose cells
              carry fixed widths, so hiding a cell collapses its column to zero in both the
              header and the rows. Artist and Album can't use that trick — they're star

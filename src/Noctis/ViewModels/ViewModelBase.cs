@@ -27,3 +27,9 @@ public interface ISearchable
     /// </summary>
     bool IsSearchCleared => false;
 }
+
+/// <summary>A list page exposes its current filter to its own in-page search field.</summary>
+public interface ILocalSearchable : ISearchable
+{
+    string SearchText { get; }
+}

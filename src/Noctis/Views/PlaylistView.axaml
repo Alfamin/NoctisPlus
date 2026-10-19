@@ -692,12 +692,15 @@
 
                 <!-- Track list column. Right margin trimmed to 2 so the vertical scrollbar
                      sits at the rail's divider (matching the Albums/Songs lists). -->
-                <Grid Grid.Column="0" RowDefinitions="Auto,*" Margin="20,14,2,0">
+                <Grid Grid.Column="0" RowDefinitions="Auto,Auto,*" Margin="20,14,2,0">
+
+                <controls:PageSearchBox Grid.Row="0" Margin="0,0,12,12"
+                                        Placeholder="{loc:T Playlist.Search}" />
 
                 <!-- Column headers. Insets (1px left, 9px right) mirror the track-list
                      row content box (1px ListBoxItem border + 8px right padding) so each
                      header sits exactly over its column's data. -->
-                <Grid Grid.Row="0"
+                <Grid Grid.Row="1"
                       ColumnDefinitions="34,48,2*,1.4*,Auto,Auto,64,40"
                       Margin="1,0,9,6">
                     <TextBlock Grid.Column="0" Text="#"
@@ -726,7 +729,7 @@
                 </Grid>
 
                 <!-- Track list: the only scrolling region (virtualized) -->
-                <Grid Grid.Row="1" x:Name="TrackListWrapper">
+                <Grid Grid.Row="2" x:Name="TrackListWrapper">
                     <ListBox Classes="track-list"
                              ItemsSource="{Binding Rows}"
                              x:Name="TrackList"

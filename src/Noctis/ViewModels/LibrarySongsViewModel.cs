@@ -12,7 +12,7 @@ namespace Noctis.ViewModels;
 /// <summary>
 /// ViewModel for the flat "Songs" view — shows all tracks in a sortable table.
 /// </summary>
-public partial class LibrarySongsViewModel : ViewModelBase, ISearchable, IDisposable
+public partial class LibrarySongsViewModel : ViewModelBase, ILocalSearchable, IDisposable
 {
     private readonly ILibraryService _library;
     private readonly PlayerViewModel _player;
@@ -150,6 +150,8 @@ public partial class LibrarySongsViewModel : ViewModelBase, ISearchable, IDispos
         if (SearchText != query)
             SearchText = query;
 
+        // This edit is already being applied; don't repeat it when the property timer fires.
+        _searchDebounce?.Stop();
         _currentFilter = query;
         OnPropertyChanged(nameof(HasActiveFilter));
         ApplyFilterAndSort();

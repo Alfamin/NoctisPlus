@@ -19,6 +19,9 @@
         <!-- Right margin trimmed to 2 so the vertical scrollbar sits at the window edge. -->
         <DockPanel Grid.Row="0" Margin="12,8,2,8">
 
+        <controls:PageSearchBox DockPanel.Dock="Top" Margin="0,0,12,12"
+                                Placeholder="{loc:T Favorites.Search}" />
+
         <!-- Content area with overlay for empty state -->
         <Grid>
             <!-- Favorite grid: outer ListBox virtualizes rows, inner UniformGrid lays out GridColumns per row -->

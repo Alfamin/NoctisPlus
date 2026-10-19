@@ -2719,4 +2719,7 @@ The lines and their timings are dropped and an empty lyrics box opens for your o
   <data name="Lyrics.TimingSetup" xml:space="preserve"><value>Setup needed</value></data>
   <data name="Home.ReadyTitle" xml:space="preserve"><value>Your music is ready</value></data>
   <data name="Home.ReadyLine" xml:space="preserve"><value>Play a song to get started</value></data>
+  <data name="LibrarySongs.Search" xml:space="preserve"><value>Search your songs</value></data>
+  <data name="Playlist.Search" xml:space="preserve"><value>Search this playlist</value></data>
+  <data name="Favorites.Search" xml:space="preserve"><value>Search your favorites</value></data>
 </root>
