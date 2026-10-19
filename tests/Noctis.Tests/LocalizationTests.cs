@@ -36,8 +36,7 @@ public class LocalizationTests
     [AvaloniaFact]
     public void SwitchingCulture_RaisesIndexerChange_AndFallsBackPerKey()
     {
-        // Other test classes (other collections, other threads) also switch culture; the events are raised on the
-        // switching thread, so only this test's own switches are counted (CI shard, 2026-10-19: 2 instead of 1).
+        // Other test classes (other threads) also switch culture; only this test's own switches are counted.
         var me = Environment.CurrentManagedThreadId;
         var raised = new List<string?>();
         Loc.Instance.PropertyChanged += (_, e) => { if (Environment.CurrentManagedThreadId == me) raised.Add(e.PropertyName); };
@@ -45,6 +44,8 @@ public class LocalizationTests
         Loc.Instance.CultureChanged += (_, _) => { if (Environment.CurrentManagedThreadId == me) cultureEvents++; };
 
         Loc.Instance.SetCulture("en");
+        // The switch to English is only setup: an earlier test may have left another language (CI shard order).
+        raised.Clear(); cultureEvents = 0;
         try
         {
             Loc.Instance.SetCulture("es");
