@@ -615,16 +615,17 @@ internal sealed class TelegramBotSource : IHunterBotSource
 
     public async Task<string> FetchLinkAsync(MusicRequest request, Stream output, IProgress<double>? progress, CancellationToken ct)
     {
-        if (!HunterMusicSource.IsTrackLink(request.Url)) throw new TrackUnavailableException("No supported track link was found for Music Hunters.");
+        if (!MusicLink.TryParse(request.Url, out var link) || link!.Kind != "track") throw new TrackUnavailableException("No supported track link was found for Music Hunters.");
+        Document document;
         await _searching.WaitAsync(ct).ConfigureAwait(false);
         try
         {
-            var document = await RunAsync(async (client, bot) =>
+            document = await RunAsync(async (client, bot) =>
             {
                 var clock = System.Diagnostics.Stopwatch.StartNew();
-                var sent = await client.SendMessageAsync(bot, request.Url!).WaitAsync(TimeSpan.FromSeconds(25), ct).ConfigureAwait(false);
+                var sent = await client.SendMessageAsync(bot, link.Url).WaitAsync(TimeSpan.FromSeconds(25), ct).ConfigureAwait(false);
                 Noctis.Services.DebugLog.Write("Finder", "Music Hunters: track link sent");
-                var reply = await WaitForAsync(client, bot, sent.id, m => IsLinkFile(request, m) || Buttons(m).Any(IsNumber), FileBudget, ct).ConfigureAwait(false)
+                var reply = await WaitForLinkReplyAsync(token => WaitForAsync(client, bot, sent.id, m => IsLinkFile(request, m) || Buttons(m).Any(IsNumber), FileBudget, token), ct).ConfigureAwait(false)
                     ?? throw new TimeoutException("Music Hunters did not supply the linked recording within 10 seconds; trying the reserve.");
                 if (IsLinkFile(request, reply))
                 {
@@ -636,11 +637,21 @@ internal sealed class TelegramBotSource : IHunterBotSource
                 _answered = System.Diagnostics.Stopwatch.GetTimestamp();
                 return await RequestSelectedDocumentAsync(request with { Selection = selected.Selection }, ct).ConfigureAwait(false);
             }, ct).ConfigureAwait(false);
-            var client = await _account.ConnectAsync(ct).ConfigureAwait(false);
-            await AudioFileTransfer.DownloadAsync(_account, client, document, output, progress, ct).ConfigureAwait(false);
-            return Extension(document)!;
         }
         finally { _searching.Release(); }
+        // Once a matched document is known, independent name searches need not wait for its bytes.
+        var transferClient = await _account.ConnectAsync(ct).ConfigureAwait(false);
+        await AudioFileTransfer.DownloadAsync(_account, transferClient, document, output, progress, ct).ConfigureAwait(false);
+        return Extension(document)!;
+    }
+
+    internal static async Task<Message?> WaitForLinkReplyAsync(Func<CancellationToken, Task<Message?>> wait, CancellationToken ct, TimeSpan? budget = null)
+    {
+        using var deadline = CancellationTokenSource.CreateLinkedTokenSource(ct);
+        deadline.CancelAfter(budget ?? FileBudget);
+        try { return await wait(deadline.Token).WaitAsync(deadline.Token).ConfigureAwait(false); }
+        catch (OperationCanceledException) when (!ct.IsCancellationRequested)
+        { throw new TimeoutException("Music Hunters' linked reply timed out; trying the reserve."); }
     }
 
     internal static bool IsLinkFile(MusicRequest request, Message message)

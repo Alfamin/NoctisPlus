@@ -583,6 +583,8 @@
 
         <!-- Covers fade in as they arrive instead of popping. -->
         <Style Selector="controls|CachedImage.search-art">
+            <!-- Same guarded sampling as native album/artist grids. Small thumbnails and upscales retain their configured filter. -->
+            <Setter Property="FastDownscale" Value="True" />
             <Setter Property="Transitions">
                 <Transitions>
                     <DoubleTransition Property="Opacity" Duration="0:0:0.18" />

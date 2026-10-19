@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Linq;
 using System.Threading.Tasks;
 using Avalonia;
@@ -155,6 +156,66 @@ public class GridScrollFrameCostTests : IDisposable
         Assert.NotEmpty(_decoded);
         Assert.All(_decoded, d => Assert.True(d.Width <= bucket, $"{d.Path} decoded at {d.Width} for a {cover.Bounds.Width:0}px tile"));
         window.Close();
+    }
+
+    [AvaloniaFact]
+    public async Task SearchArtwork_UsesNativeTileSampling_WithoutSofteningSmallSongCovers()
+    {
+        EnsureAppStyles();
+        var previous = Noctis.Services.Search.OnlineMusicSearch.Current;
+        Noctis.Services.Search.OnlineMusicSearch.Current = null;
+        using var persistence = new TestPersistenceService();
+        var library = new FakeLibraryService();
+        var player = new PlayerViewModel(new FakeAudioPlayer(), library, persistence, new FakeAnimatedCoverService());
+        using var vm = new SearchViewModel(library, player, _ => { }, _ => { });
+        Window? window = null;
+        try
+        {
+            // Opaque patterned covers also make the optional real-Skia render-cost probe meaningful.
+            ArtworkCache.DecoderOverride = (_, width) =>
+            {
+                var bitmap = new WriteableBitmap(new PixelSize(width, width), new Vector(96, 96), PixelFormat.Bgra8888, AlphaFormat.Premul);
+                using var pixels = bitmap.Lock();
+                var data = Enumerable.Range(0, width * width).Select(i => unchecked((int)(0xff000000u | ((uint)i * 2654435761u & 0xffffff)))).ToArray();
+                System.Runtime.InteropServices.Marshal.Copy(data, 0, pixels.Address, data.Length);
+                return bitmap;
+            };
+            // This is a view/render fixture, not a search request: don't race an asynchronous index publication.
+            vm.QueryText = "fixture";
+            vm.Songs.Add(new SearchSongItem(new Noctis.Services.Search.OnlineSong("song", "Song", "Artist")) { ArtworkPath = Path("search-song") });
+            vm.Artists.Add(new SearchArtistItem(new Artist { Name = "Artist", ImagePath = Path("search-artist") }));
+            vm.Albums.Add(new SearchAlbumItem(new Album { Name = "Album", Artist = "Artist", ArtworkPath = Path("search-album") }));
+            vm.Playlists.Add(new SearchPlaylistItem(new Noctis.Services.Search.OnlinePlaylist("playlist", "Playlist", "Owner", "https://example.invalid/playlist", "", 100, 100)) { ArtworkPath = Path("search-playlist") });
+            vm.ResultVersion++;
+            var view = new SearchView { DataContext = vm };
+            window = new Window { Width = 1400, Height = 1100, Content = view };
+            window.Show();
+            await Flush();
+            var images = view.GetVisualDescendants().OfType<CachedImage>().Where(i => i.Classes.Contains("search-art") && i.Source is Bitmap && i.Bounds.Width > 0).ToList();
+            Console.WriteLine($"Search fixture: query={vm.QueryText}, songs={vm.Songs.Count}, albums={vm.Albums.Count}, playlists={vm.Playlists.Count}, drawn images={images.Count}");
+            Assert.Contains(images, i => i.DataContext is SearchAlbumItem);
+            Assert.Contains(images, i => i.DataContext is SearchPlaylistItem);
+            Assert.All(images, i => Assert.True(i.FastDownscale));
+            Assert.All(images.Where(i => i.DataContext is SearchAlbumItem or SearchPlaylistItem), i => Assert.Equal(BitmapInterpolationMode.LowQuality, RenderOptions.GetBitmapInterpolationMode(i)));
+            Assert.All(images.Where(i => i.DataContext is SearchSongItem), i => Assert.Equal(BitmapInterpolationMode.HighQuality, RenderOptions.GetBitmapInterpolationMode(i)));
+
+            if (HeadlessTestApp.RealRendering)
+            {
+                await Task.Delay(250); await Flush();
+                using var target = new RenderTargetBitmap(new PixelSize(1400, 1100));
+                var costs = new Dictionary<bool, List<double>> { [false] = [], [true] = [] };
+                foreach (var fast in new[] { false, true, true, false })
+                {
+                    foreach (var image in images) image.FastDownscale = fast;
+                    target.Render(view); // warm the changed render options
+                    var timer = Stopwatch.StartNew();
+                    for (var i = 0; i < 20; i++) target.Render(view);
+                    costs[fast].Add(timer.Elapsed.TotalMilliseconds / 20);
+                }
+                Console.WriteLine($"PROBE Search covers, same real view: configured={costs[false].Average():F2}ms/frame, native guarded sampling={costs[true].Average():F2}ms/frame");
+            }
+        }
+        finally { window?.Close(); Noctis.Services.Search.OnlineMusicSearch.Current = previous; }
     }
 
     private sealed class NoOpPlayHistoryStub : IPlayHistoryService

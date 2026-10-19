@@ -32,6 +32,8 @@ namespace Noctis.Helpers;
 /// </summary>
 public static class SmoothScrollBehavior
 {
+    // Explicit developer opt-in: sample the app's animation callbacks, independently of screenshot latency.
+    private static readonly bool TraceFrames = Environment.GetEnvironmentVariable("NOCTIS_PLUS_SCROLL_TRACE") == "1";
     public static readonly AttachedProperty<bool> IsEnabledProperty =
         AvaloniaProperty.RegisterAttached<InputElement, bool>("IsEnabled", typeof(SmoothScrollBehavior));
 
@@ -246,6 +248,7 @@ public static class SmoothScrollBehavior
         private long _lastFrameTimestamp;
         private bool _isRunning;
         private bool _isFrameQueued;
+        private readonly List<double>? _frameGaps = TraceFrames ? [] : null;
 
         public SmoothScrollState(InputElement element)
         {
@@ -275,6 +278,7 @@ public static class SmoothScrollBehavior
             // saved-offset restore, ScrollIntoView) — re-seat on where the content actually is.
             if (!_isRunning || double.IsNaN(_appliedY) || Math.Abs(offsetY - _appliedY) > 1.0)
             {
+                if (!_isRunning) _frameGaps?.Clear();
                 _currentY = offsetY;
                 _targetY = offsetY;
                 // Carrying momentum from a glide that is no longer where the content is would
@@ -296,6 +300,12 @@ public static class SmoothScrollBehavior
 
         public void Stop()
         {
+            if (_isRunning && _frameGaps is { Count: > 0 } gaps)
+            {
+                var sorted = gaps.Order().ToArray();
+                Noctis.Services.DebugLog.Write("Scroll", $"{_scrollViewer?.FindAncestorOfType<ListBox>()?.Name ?? _scrollViewer?.Name}: frames={gaps.Count}, p50={sorted[sorted.Length / 2]:0.0}ms, p95={sorted[(int)((sorted.Length - 1) * .95)]:0.0}ms, max={sorted[^1]:0.0}ms, over30={gaps.Count(g => g > 30)}");
+                gaps.Clear();
+            }
             _isRunning = false;
             _velocityY = 0;
             _appliedY = double.NaN;
@@ -319,6 +329,7 @@ public static class SmoothScrollBehavior
             var targetY = Math.Clamp(_targetY, 0, maxY);
 
             var now = Stopwatch.GetTimestamp();
+            _frameGaps?.Add((now - _lastFrameTimestamp) * 1000.0 / Stopwatch.Frequency);
             // Real elapsed time, clamped so a stalled UI thread can't produce one giant jump.
             var dt = Math.Min((now - _lastFrameTimestamp) / (double)Stopwatch.Frequency, 0.1);
             _lastFrameTimestamp = now;

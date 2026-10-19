@@ -68,6 +68,18 @@ internal static class HunterLinkTests
         Check.False(HunterMusicSource.IsTrackLink("https://open.spotify.com/playlist/0123456789012345678901"), "playlist is not sent for a single recording");
         Check.True(BotText.IsEmptySearch("❌ No results found. Try a link."), "plain no-result reply does not wait for missing buttons");
         Check.False(BotText.IsEmptySearch("1. Artist - Nothing Found (3:20)"), "a song title is not an empty-result signal");
+        Check.False(BotText.IsSearchLimit("1. Artist - Daily Search Limit (3:20)"), "a numbered song title cannot impose a provider quota");
+        Check.True(BotLimits.Read(BotSelections.Hunters, "Daily search limit reached for today. Send a link.", DateTimeOffset.UtcNow)?.SearchOnly == true,
+            "a search quota remains search-only when read outside the name-search path");
+
+        var file = new TL.Document { mime_type = "audio/mpeg", attributes = [new TL.DocumentAttributeFilename { file_name = "Song.mp3" }, new TL.DocumentAttributeAudio { performer = "Artist", title = "Song", duration = 200 }] };
+        var incoming = new TL.Message { media = new TL.MessageMediaDocument { document = file } };
+        Check.True(TelegramBotSource.IsLinkFile(request, incoming), "linked MP3 audio is a valid recording, not FLAC-only");
+        incoming.flags |= TL.Message.Flags.out_;
+        Check.False(TelegramBotSource.IsLinkFile(request, incoming), "outgoing messages cannot satisfy a linked download");
+        incoming.flags = 0;
+        file.attributes.OfType<TL.DocumentAttributeAudio>().Single().performer = "Other Artist";
+        Check.False(TelegramBotSource.IsLinkFile(request, incoming), "another artist's late file cannot satisfy the current link");
         using var canceled = new CancellationTokenSource();
         var cancelBot = new Bot { Empty = true, OnSearch = () => { canceled.Cancel(); return Task.CompletedTask; } };
         await Check.ThrowsAsync<OperationCanceledException>(() => new HunterMusicSource(cancelBot).FetchAsync(request with { Url = "https://www.deezer.com/track/3135556" }, output, null, canceled.Token), "cancellation wins before the link send");
@@ -82,5 +94,12 @@ internal static class HunterLinkTests
         Check.Equal(0, linkProvider.Searches, "persisted search-only cooldown suppresses name queries");
         await router.FetchAsync(request, output, null, default);
         Check.Equal(1, linkProvider.Calls, "same cooldown does not suppress track downloads");
+        var silentReply = new TaskCompletionSource<TL.Message?>(TaskCreationOptions.RunContinuationsAsynchronously);
+        await Check.ThrowsAsync<TimeoutException>(() => TelegramBotSource.WaitForLinkReplyAsync(_ => silentReply.Task, default, TimeSpan.FromMilliseconds(25)),
+            "a Telegram history call ignoring cancellation cannot outlive the linked-reply deadline");
+        using var userStop = new CancellationTokenSource();
+        userStop.Cancel();
+        await Check.ThrowsAsync<OperationCanceledException>(() => TelegramBotSource.WaitForLinkReplyAsync(_ => silentReply.Task, userStop.Token),
+            "owner cancellation is preserved rather than turned into a reserve retry");
     }
 }

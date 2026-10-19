@@ -70,7 +70,7 @@ internal static partial class BotText
     /// <summary>Music Hunters' answer once its name searches are used up for the day ("Daily search limit reached for
     /// today ... send a link", owner #73). Links still work then.</summary>
     public static bool IsSearchLimit(string? text) => text is { Length: > 0 } &&
-        Regex.IsMatch(text, @"\b(daily|day's)\s+search\s+limit|search\s+limit\s+(is\s+)?reached|limit\s+reached\s+for\s+today", RegexOptions.IgnoreCase);
+        Regex.IsMatch(text, @"^\s*[^\p{L}\p{N}]*(?:(?:your\s+)?(?:daily|day's)\s+search\s+limit(?:\s+(?:has\s+been|is))?\s+(?:reached|exceeded)|search\s+limit\s+(?:is\s+)?reached|limit\s+reached\s+for\s+today)", RegexOptions.IgnoreCase);
 
     public static bool IsEmptySearch(string? text) => text is { Length: > 0 } &&
         Regex.IsMatch(text, @"^\s*[^\p{L}\p{N}]*(?:no (?:results|songs|tracks) (?:were )?found\b|nothing found\b|no results[.!]?\s*$)", RegexOptions.IgnoreCase);

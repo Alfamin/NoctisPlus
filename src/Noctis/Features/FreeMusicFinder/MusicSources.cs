@@ -58,7 +58,7 @@ internal static partial class BotLimits
             retry = now.AddSeconds(Math.Clamp(number * (double)factor, 2, 7 * 86400) + 2);
         }
         return new(provider, global ? "Telegram requires a wait before either bot can be used." :
-            provider + " reported a download limit. " + (match.Success ? "Retrying after its requested wait." : "No reset time was supplied; checking again in 24 hours."), retry, global);
+            provider + " reported a " + (BotText.IsSearchLimit(text) ? "name-search" : "download") + " limit. " + (match.Success ? "Retrying after its requested wait." : "No reset time was supplied; checking again in 24 hours."), retry, global, searchOnly: !global && BotText.IsSearchLimit(text));
     }
 }
 
@@ -96,7 +96,7 @@ internal sealed class MusicSources
                 if ((_sources.Any(s => s.Id == entry.Id || s.Id + " search" == entry.Id) || entry.Id == "Telegram") && entry.Until <= _now().AddDays(8))
                 {
                     // The earlier daily-search fix blocked the whole provider; public track links still work.
-                    var key = entry.Id == BotSelections.Hunters && entry.Reason.Contains("daily search limit", StringComparison.OrdinalIgnoreCase) ? entry.Id + " search" : entry.Id;
+                    var key = entry.Id == BotSelections.Hunters && entry.Reason?.Contains("daily search limit", StringComparison.OrdinalIgnoreCase) == true ? entry.Id + " search" : entry.Id;
                     _cooldowns[key] = entry with { Id = key };
                 }
         }
