@@ -67,6 +67,11 @@ internal static partial class BotText
         return key.ToString();
     }
 
+    /// <summary>Music Hunters' answer once its name searches are used up for the day ("Daily search limit reached for
+    /// today ... send a link", owner #73). Links still work then.</summary>
+    public static bool IsSearchLimit(string? text) => text is { Length: > 0 } &&
+        Regex.IsMatch(text, @"\b(daily|day's)\s+search\s+limit|search\s+limit\s+(is\s+)?reached|limit\s+reached\s+for\s+today", RegexOptions.IgnoreCase);
+
     /// <summary>The title without its bracketed additions: "Song (Live) [2011]" → "Song".</summary>
     public static string Plain(string title)
     {

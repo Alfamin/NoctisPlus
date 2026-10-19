@@ -9,6 +9,12 @@ internal static class BotTimingTests
 {
     internal static void Run()
     {
+        Check.Section("Music Hunters daily search limit (owner #73)");
+        Check.True(BotText.IsSearchLimit("Daily search limit reached for today.\nPlease search in your music app (e.g. Spotify, Deezer, Amazon Music) and send me the link."), "the limit answer is recognised");
+        Check.True(BotText.IsSearchLimit("Search limit reached. Send a music link instead."), "in its shorter wording too");
+        Check.True(!BotText.IsSearchLimit("1. Juice WRLD - Flaws and Sins (3:21)\n2. Juice WRLD - Flaws And Sins (Live) (3:30)"), "a result list is not a limit");
+        Check.True(!BotText.IsSearchLimit("Limitless - Search Party (2:59)") && !BotText.IsSearchLimit(null), "nor a song that happens to say limit or search");
+        Check.True(TelegramBotSource.SearchLimitPause >= TimeSpan.FromHours(1), "Music Hunters is left out for a while, not asked again at once");
         Check.Section("bot timings: waits follow the bot's usual answer time");
         var folder = Check.NewFolder("bot-timings");
         var path = Path.Combine(folder, "bot-timings.json");

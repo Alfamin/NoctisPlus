@@ -438,6 +438,8 @@ internal sealed class TelegramBotSource : IHunterBotSource
     // from a search answer by being a file.
     private readonly SemaphoreSlim _searching = new(1, 1);
     private long _answered = long.MinValue;
+    /// <summary>How long Music Hunters is left out after "daily search limit reached" (owner #73); then it is asked again.</summary>
+    internal static readonly TimeSpan SearchLimitPause = TimeSpan.FromHours(3);
 
     public TelegramBotSource(TelegramAccount account, Action<string> log)
     {
@@ -465,11 +467,19 @@ internal sealed class TelegramBotSource : IHunterBotSource
                 var clock = System.Diagnostics.Stopwatch.StartNew();
                 var sent = await client.SendMessageAsync(bot, "/search " + query).WaitAsync(TimeSpan.FromSeconds(25), ct).ConfigureAwait(false);
                 // The answer always carries buttons; without results it has no numbered ones.
-                var results = await WaitForAsync(client, bot, sent.id, m => m.media is not MessageMediaDocument && Buttons(m).Any(), wait, ct).ConfigureAwait(false)
+                // Owner #73: the daily-limit answer has no result buttons; it is taken at once instead of waited out.
+                var results = await WaitForAsync(client, bot, sent.id, m => m.media is not MessageMediaDocument && (Buttons(m).Any() || BotText.IsSearchLimit(m.message)), wait, ct).ConfigureAwait(false)
                     ?? throw new TimeoutException($"The bot did not answer within {wait.TotalSeconds:0} seconds (it usually answers in about {Usual(SearchTiming)}).");
                 _timings.Record(SearchTiming, clock.Elapsed);
                 _answered = System.Diagnostics.Stopwatch.GetTimestamp();
                 Noctis.Services.DebugLog.Write("Finder", $"Music Hunters: results in {clock.Elapsed.TotalSeconds:0.0} s");
+                if (BotText.IsSearchLimit(results.message))
+                {
+                    // Name searches are refused for the day (links still work, owner #73): DeezLoad takes the song now,
+                    // and Music Hunters is not asked by name again until the limit can have reset.
+                    Noctis.Services.DebugLog.Write("Finder", "Music Hunters: daily search limit reached; handing over to DeezLoad");
+                    throw new SourceLimitException(BotSelections.Hunters, "Music Hunters reached its daily search limit; DeezLoad answers until it resets.", DateTimeOffset.UtcNow.Add(SearchLimitPause));
+                }
 
                 return ParseResults(results,FetchSelectedAsync);
             }, ct).ConfigureAwait(false);
