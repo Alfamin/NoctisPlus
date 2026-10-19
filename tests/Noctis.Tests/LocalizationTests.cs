@@ -36,10 +36,13 @@ public class LocalizationTests
     [AvaloniaFact]
     public void SwitchingCulture_RaisesIndexerChange_AndFallsBackPerKey()
     {
+        // Other test classes (other collections, other threads) also switch culture; the events are raised on the
+        // switching thread, so only this test's own switches are counted (CI shard, 2026-10-19: 2 instead of 1).
+        var me = Environment.CurrentManagedThreadId;
         var raised = new List<string?>();
-        Loc.Instance.PropertyChanged += (_, e) => raised.Add(e.PropertyName);
+        Loc.Instance.PropertyChanged += (_, e) => { if (Environment.CurrentManagedThreadId == me) raised.Add(e.PropertyName); };
         var cultureEvents = 0;
-        Loc.Instance.CultureChanged += (_, _) => cultureEvents++;
+        Loc.Instance.CultureChanged += (_, _) => { if (Environment.CurrentManagedThreadId == me) cultureEvents++; };
 
         Loc.Instance.SetCulture("en");
         try
