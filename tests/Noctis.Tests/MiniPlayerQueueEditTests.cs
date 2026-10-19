@@ -361,6 +361,54 @@ public class MiniPlayerQueueEditTests
         finally { rig.Win.Close(); }
     }
 
+    [AvaloniaFact]
+    public async Task EdgeScrollDrag_OfASongQueuedTwice_MovesTheCopyThatWasDragged()
+    {
+        // Up Next: A, B, A, … — the drag lifts the SECOND A. The edge scroll recycles its row's
+        // container, and the source was then looked up by song, which found the first A.
+        var a = T("A"); var b = T("B");
+        var queue = new List<Track> { T("Now"), a, b, a };
+        queue.AddRange(Tracks(27));
+        var rig = Open(queue, ended: 0, keepPlayed: false);
+        try
+        {
+            await OpenQueue(rig);
+            var scroller = rig.Win.FindControl<ScrollViewer>("QueueScroller")!;
+            Assert.Equal(0, scroller.Offset.Y);
+            var lastOnScreen = rig.List.GetRealizedContainers().Max(c => rig.List.IndexFromContainer(c));
+            var row = RowOf(rig, 2); // the second A
+            Assert.Same(a, ((MiniQueueRow)row.DataContext!).Track);
+            Assert.Equal(2, ((MiniQueueRow)row.DataContext!).Index);
+            var win = rig.Win;
+            var pointer = new Pointer(Pointer.GetNextFreeId(), PointerType.Mouse, true);
+            var at = row.TranslatePoint(new Point(row.Bounds.Width / 2, row.Bounds.Height / 2), win)!.Value;
+            var edgeY = scroller.TranslatePoint(new Point(0, scroller.Bounds.Height - 6), win)!.Value.Y;
+            var held = new PointerPointProperties(RawInputModifiers.LeftMouseButton, PointerUpdateKind.Other);
+            row.RaiseEvent(new PointerPressedEventArgs(row, pointer, win, at, 0,
+                new PointerPointProperties(RawInputModifiers.LeftMouseButton, PointerUpdateKind.LeftButtonPressed), KeyModifiers.None));
+            for (var step = 1; step <= 6; step++)
+            {
+                scroller.RaiseEvent(new PointerEventArgs(InputElement.PointerMovedEvent, scroller, pointer, win,
+                    new Point(at.X, at.Y + (edgeY - at.Y) * step / 6.0), 0, held, KeyModifiers.None));
+                await PumpFor(16);
+            }
+            await PumpFor(700);
+            Assert.True(scroller.Offset.Y > 40, $"offset {scroller.Offset.Y}: the list did not scroll");
+            scroller.RaiseEvent(new PointerReleasedEventArgs(scroller, pointer, win, new Point(at.X, edgeY), 0,
+                new PointerPointProperties(RawInputModifiers.None, PointerUpdateKind.LeftButtonReleased), KeyModifiers.None, MouseButton.Left));
+            await PumpFor(500);
+
+            var upNext = rig.Player.UpNext.ToList();
+            _out.WriteLine(string.Join(", ", upNext.Take(8).Select(t => t.Title)) + $" … lastA={upNext.LastIndexOf(a)}");
+            Assert.Equal(30, upNext.Count);
+            // The first A and B stayed where they were; the dragged A went down past the first screen.
+            Assert.Same(a, upNext[0]);
+            Assert.Same(b, upNext[1]);
+            Assert.True(upNext.LastIndexOf(a) > lastOnScreen, $"the dragged A landed at {upNext.LastIndexOf(a)}");
+        }
+        finally { rig.Win.Close(); }
+    }
+
     // ── Reshuffle ──
 
     [AvaloniaTheory]
