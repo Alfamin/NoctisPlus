@@ -169,6 +169,29 @@ public class TtmlWordSpacesTests
         Assert.Equal(new[] { "偶尔", "再怎么 深呼吸" }, TtmlParser.Parse(TimedLyricsBuilder.BuildTtml(ExistingLyricsLoader.ParseTimed(lrc))).Lines!.Select(l => l.Text));
     }
 
+    /// <summary>
+    /// A TTML whose spans carry the space BEFORE the word ("&lt;span&gt; world&lt;/span&gt;"), as
+    /// the lyrics page shows it ("Hello world"), imported or fetched online (TtmlParser.ToLrc,
+    /// OnlineTtml.Convert): the LRC it became ran the words together ("Helloworld").
+    /// </summary>
+    [Fact]
+    public void ImportedTtml_WithTheSpaceBeforeEachWord_KeepsItsSpaces()
+    {
+        const string ttml = """
+            <tt xmlns="http://www.w3.org/ns/ttml"><body><div>
+            <p begin="1.000" end="3.000"><span begin="1.000" end="1.500">Hello</span><span begin="1.500" end="2.000"> world</span><span begin="2.000" end="3.000"> again</span></p>
+            </div></body></tt>
+            """;
+        Assert.Equal("Hello world again", Assert.Single(TtmlParser.Parse(ttml).Lines!).Text);
+
+        var lrc = TtmlParser.ToLrc(ttml)!;
+        var online = OnlineTtml.Convert(ttml)!.Value.Synced!;
+
+        Assert.Equal(new[] { "Hello world again" }, LyricsViewModel.ParseLrcContent(lrc).Select(l => l.Text));
+        Assert.Equal(new[] { "Hello world again" }, LyricsViewModel.ParseLrcContent(online).Select(l => l.Text));
+        Assert.Equal(new[] { "Hello world again" }, ExistingLyricsLoader.ParseTimed(lrc).Select(l => l.Text));
+    }
+
     /// <summary>Duet agents are unchanged and each singer's line keeps its spaces.</summary>
     [Fact]
     public void SavedTtml_Duet_KeepsAgentsAndSpaces()
