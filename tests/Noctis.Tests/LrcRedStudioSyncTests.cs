@@ -253,6 +253,55 @@ public class LrcRedStudioSyncTests : IDisposable
         finally { win.Close(); }
     }
 
+    /// <summary>Lullaby that times the lines it is given, a second apart, and records what it was given.</summary>
+    private sealed class EchoEngine : ILyricsStudioEngine
+    {
+        public readonly List<LyricsStudioOptions> Options = new();
+        public EchoEngine(string root) => Models = StudioTestModel.Installed(root);
+        public bool HasFfmpeg => true;
+        public WhisperModelManager Models { get; }
+        public IDisposable OpenSession(WhisperModelSize model) => new Handle();
+        public Task<LyricsStudioResult> ProcessAsync(Track track, LyricsStudioOptions options, IProgress<LyricsStudioProgress>? progress, CancellationToken ct)
+        {
+            Options.Add(options);
+            var lines = (options.SourceLines ?? Array.Empty<string>()).Select((text, i) =>
+                new AlignedLine(text, TimeSpan.FromSeconds(i + 1), TimeSpan.FromSeconds(i + 1.9),
+                    new[] { new AlignedWord(text, TimeSpan.FromSeconds(i + 1), TimeSpan.FromSeconds(i + 1.9)) }, 0.9, false)).ToList();
+            return Task.FromResult(new LyricsStudioResult(track, lines, LyricsStudioSource.ExistingLyrics, 0.9, "ja", lines.Count));
+        }
+        private sealed class Handle : IDisposable { public void Dispose() { } }
+    }
+
+    [AvaloniaFact]
+    public async Task ResyncAfterLrcRedsModel_RetimesTheLyricsOnScreen_NotTheSongsOldLrc()
+    {
+        var engine = new EchoEngine(_tmp);
+        var settings = new AppSettings { LrcRedEnabled = true };
+        var lrcRed = new FakeLrcRed();
+        var vm = new LyricsStudioViewModel(new[] { Song("blessing", "[00:00.56]an old line of my own\n[00:03.29]another old line") }, engine,
+            new LyricsWriter(null!, null), new FakeLibraryService(), null, () => settings, _ => { })
+        {
+            AutoTick = false,
+            Confirm = _ => Task.FromResult(true),
+            LrcRed = lrcRed,
+        };
+        await SelectAsync(vm, 0);
+        await vm.SyncWithLrcRedCommand.ExecuteAsync(null);
+        Assert.Equal("遥か遠くに浮かぶ星を", vm.ReviewLines[0].ToAlignedLine().Text);
+        Assert.Equal("Re-sync", vm.StartLabel);
+
+        await vm.StartCommand.ExecuteAsync(null); // Re-sync: "a fresh run of Lullaby" on what is shown
+
+        var given = Assert.Single(engine.Options).SourceLines!;
+        Assert.Equal(new[] { "遥か遠くに浮かぶ星を", "想い眠りにつく君の", "選ぶ未来が望む道が" }, given);
+        Assert.Equal(Status.Ready, vm.Queue[0].Status);
+        Assert.Equal(3, vm.ReviewLines.Count);
+        // lrc.red's romaji and translation stay with their lines.
+        var saved = LrcParser.Parse(vm.BuildReviewText()).Where(l => l.IsSynced && !l.IsIntroPlaceholder).ToList();
+        Assert.Equal("You think of the stars floating", saved[0].Translation);
+        Assert.Equal("haruka tooku ni ukabu hoshi o", saved[0].Transliteration);
+    }
+
     [AvaloniaFact]
     public async Task WhileItRuns_LullabyWaits_AndClosingTheStudioCancelsIt()
     {

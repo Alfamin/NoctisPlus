@@ -863,8 +863,9 @@ public partial class LyricsStudioViewModel : ViewModelBase
             Requeue(current);
             // The user's own lyrics (pasted, typed, a corrected transcript) are re-timed as the
             // review shows them now, edits included: Re-sync used to time the lyrics box, or the
-            // song's .lrc the user had replaced (Discord, Mistery 2026-10-10).
-            if (current.BeforeRerun?.Result is { Source: LyricsStudioSource.PastedLyrics } shown)
+            // song's .lrc the user had replaced (Discord, Mistery 2026-10-10). So are lrc.red's,
+            // which replaced the song's own on screen.
+            if (current.BeforeRerun?.Result is { Source: LyricsStudioSource.PastedLyrics or LyricsStudioSource.LrcRed } shown)
                 current.SourceOverride = shown.Lines.Select(l => l.Text).ToList();
             items.Add(current);
         }
@@ -1190,7 +1191,13 @@ public partial class LyricsStudioViewModel : ViewModelBase
                         done++;
                         continue;
                     }
-                    if (pasted is not null && !prefilledBox) result = result with { Source = LyricsStudioSource.PastedLyrics };
+                    if (pasted is not null && !prefilledBox)
+                    {
+                        result = result with { Source = LyricsStudioSource.PastedLyrics };
+                        // lrc.red's lyrics re-timed: their romaji / translation lines ride along.
+                        if (item.BeforeRerun?.Result is { Source: LyricsStudioSource.LrcRed } fromLrcRed)
+                            result = result with { Lines = ExistingLyricsLoader.CarryCompanions(fromLrcRed.Lines, result.Lines) };
+                    }
                     // Timed from the song's own lyrics: their romaji / translation lines ride along.
                     else if (item.Existing is { } source)
                         result = result with { Lines = ExistingLyricsLoader.CarryCompanions(source.Lines, result.Lines) };
