@@ -15,8 +15,36 @@ permissions:
   contents: read
 
 jobs:
+  # A version tag on a commit that main already built, tested and install-checked publishes that run's files
+  # instead of doing it all again (owner, 2026-10-19: a release took 20 minutes). No such run, or its files
+  # expired: the full Windows job below runs as before.
+  reuse:
+    if: github.repository != 'heartached/Noctis' && startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      actions: read
+    outputs:
+      run_id: ${{ steps.find.outputs.run_id }}
+    steps:
+      - name: Find the green main run of this commit
+        id: find
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          run=$(gh api "repos/$GITHUB_REPOSITORY/actions/workflows/noctis-plus.yml/runs?branch=main&event=push&status=success&head_sha=$GITHUB_SHA" --jq '.workflow_runs[0].id // empty')
+          if [ -n "$run" ] && gh api "repos/$GITHUB_REPOSITORY/actions/runs/$run/artifacts" \
+               --jq '.artifacts[] | select(.name == "NoctisPlus-windows-x64" and .expired == false) | .id' | grep -q .; then
+            echo "Reusing main run $run for $GITHUB_SHA"
+            echo "run_id=$run" >> "$GITHUB_OUTPUT"
+          else
+            echo "No green main run with files for $GITHUB_SHA; building and testing this tag."
+          fi
+
   windows:
-    if: github.repository != 'heartached/Noctis'
+    needs: reuse
+    if: ${{ !cancelled() && github.repository != 'heartached/Noctis' && needs.reuse.outputs.run_id == '' }}
     runs-on: windows-latest
     timeout-minutes: 50
     steps:
@@ -83,9 +111,10 @@ jobs:
           retention-days: 14
 
   release:
-    # Only for a version tag, and only after the Windows job built, tested and install-checked it.
-    if: startsWith(github.ref, 'refs/tags/v')
-    needs: windows
+    # Only for a version tag, and only after this commit was built, tested and install-checked: by main's run
+    # (reused) or by the Windows job of this tag.
+    if: ${{ !cancelled() && startsWith(github.ref, 'refs/tags/v') && (needs.windows.result == 'success' || (needs.windows.result == 'skipped' && needs.reuse.outputs.run_id != '')) }}
+    needs: [reuse, windows]
     runs-on: ubuntu-latest
     timeout-minutes: 15
     permissions:
@@ -97,10 +126,11 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
           TAG: ${{ github.ref_name }}
+          REUSED_RUN: ${{ needs.reuse.outputs.run_id }}
         run: |
           set -euo pipefail
           version="${TAG#v}"
-          gh run download "$GITHUB_RUN_ID" --repo "$GITHUB_REPOSITORY" --name NoctisPlus-windows-x64 --dir dist
+          gh run download "${REUSED_RUN:-$GITHUB_RUN_ID}" --repo "$GITHUB_REPOSITORY" --name NoctisPlus-windows-x64 --dir dist
           setup="dist/release-artifacts/NoctisPlus-v${version}-Setup.exe"
           # The tag must match the version the app was built with, or the updater would offer it forever.
           test -f "$setup" || { echo "No $setup: bump <Version> in src/Noctis/Noctis.csproj to $version before tagging."; ls -R dist; exit 1; }
