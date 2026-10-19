@@ -25,7 +25,7 @@ public partial class PlaylistViewModel
     public bool HasCatalogMissing => CatalogRows.Count > 0;
     // Owner #48: header Play/Shuffle/queue act on owned songs only. With none owned they would do nothing, so they
     // hide, as on an online album; each missing row keeps its own Play.
-    public bool ShowPlayActions => Tracks.Count > 0 || !HasCatalogMissing;
+    public bool ShowPlayActions => (Tracks.Count > 0 || !HasCatalogMissing) && !IsPreviewLoading;
     partial void OnTrackCountChanged(int value) => OnPropertyChanged(nameof(ShowPlayActions));
     private int CatalogMissingCount => CatalogRows.Count;
     private IReadOnlyList<ImportedPlaylistEntry>? _importedEntries;
@@ -41,7 +41,7 @@ public partial class PlaylistViewModel
 
     private void RefreshCatalogRows()
     {
-        ShowImportedEntries(_streamingImports?.EntriesFor(PlaylistId));
+        ShowImportedEntries(IsPreview ? _previewEntries : _streamingImports?.EntriesFor(PlaylistId));
     }
 
     internal void ShowImportedEntries(IReadOnlyList<ImportedPlaylistEntry>? entries)

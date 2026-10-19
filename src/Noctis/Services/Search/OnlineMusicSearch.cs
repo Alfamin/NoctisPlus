@@ -15,6 +15,11 @@ public sealed record OnlineAlbum(string Id, string Title, string ArtistName, str
 public sealed record OnlineSong(string Id, string Title, string ArtistDisplay, string Album = "",
     double? Seconds = null, bool? Explicit = null, string ArtworkUrl = "", Guid? LocalTrackId = null, string AlbumId = "", double Score = 0);
 
+/// <summary>A public playlist found by name (owner #69: "hype drake", "gym"). <paramref name="Saves"/> is how many
+/// people saved it, when the service says; <paramref name="SavedAs"/> is the Noctis playlist it was already saved as.</summary>
+public sealed record OnlinePlaylist(string Id, string Name, string Owner, string Url, string ArtworkUrl = "",
+    int TrackCount = 0, long? Saves = null, Guid? SavedAs = null, double Score = 0);
+
 /// <summary>
 /// One state of an online search. A search yields several, each more complete than the last
 /// (songs first, then artists and albums, then library matches); the last has
@@ -25,6 +30,9 @@ public sealed record OnlineSearchResult(string Query, IReadOnlyList<OnlineSong> 
 {
     /// <summary>The top result's kind ("artist", "song", "album") and id, when the source has an opinion.</summary>
     public (string Kind, string Id)? Top { get; init; }
+
+    /// <summary>Public playlists by name, most relevant and most saved first.</summary>
+    public IReadOnlyList<OnlinePlaylist> Playlists { get; init; } = [];
 }
 
 public enum OnlineDownloadState { None, Queued, Downloading, Saved, Failed }

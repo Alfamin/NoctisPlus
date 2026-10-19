@@ -1717,6 +1717,8 @@ Saving replaces them with the lyrics on screen. A lyrics file Noctis didn't writ
   <data name="Playlist.AddDescription" xml:space="preserve"><value>Add a description…</value><comment>Text in PlaylistView.axaml</comment></data>
   <data name="Playlist.PlayTip" xml:space="preserve"><value>Play</value><comment>ToolTip.Tip in PlaylistView.axaml</comment></data>
   <data name="Playlist.ShuffleTip" xml:space="preserve"><value>Shuffle</value><comment>ToolTip.Tip in PlaylistView.axaml</comment></data>
+  <data name="Playlist.SaveFound" xml:space="preserve"><value>Save</value><comment>Save button on a found playlist (PlaylistView.axaml)</comment></data>
+  <data name="Playlist.SaveFoundTip" xml:space="preserve"><value>Add to your playlists</value><comment>ToolTip.Tip in PlaylistView.axaml</comment></data>
   <data name="Playlist.OptionsTip" xml:space="preserve"><value>Options</value><comment>ToolTip.Tip in PlaylistView.axaml</comment></data>
   <data name="Playlist.PlayNext" xml:space="preserve"><value>Play Next</value><comment>Header in PlaylistView.axaml</comment></data>
   <data name="Playlist.AddQueue" xml:space="preserve"><value>Add to Queue</value><comment>Header in PlaylistView.axaml</comment></data>

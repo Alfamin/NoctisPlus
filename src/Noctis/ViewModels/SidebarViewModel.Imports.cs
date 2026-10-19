@@ -49,4 +49,21 @@ public partial class SidebarViewModel
         RefreshPlaylistCounts();
         PlaylistTracksChanged?.Invoke(this, id);
     }
+
+    /// <summary>
+    /// Owner #69: a found playlist saved from Search keeps its own cover, copied into the app's playlist covers like
+    /// one picked in Edit Playlist. A cover the user already chose is never replaced.
+    /// </summary>
+    internal async Task KeepFoundCoverAsync(Guid id, string image)
+    {
+        if (Playlists.FirstOrDefault(p => p.Id == id) is not { } playlist || !string.IsNullOrEmpty(playlist.CoverArtPath) || !File.Exists(image)) return;
+        var covers = Path.Combine(Helpers.AppPaths.DataRoot, "playlist_covers");
+        Directory.CreateDirectory(covers);
+        var path = Path.Combine(covers, $"{id}.jpg");
+        File.Copy(image, path, overwrite: true);
+        playlist.CoverArtPath = path;
+        if (PlaylistItems.FirstOrDefault(n => n.PlaylistId == id) is { } nav) nav.CoverArtPath = path;
+        await _persistence.SavePlaylistsAsync(Playlists.ToList());
+        PlaylistEdited?.Invoke(this, id);
+    }
 }

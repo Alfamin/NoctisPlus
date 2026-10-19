@@ -522,6 +522,7 @@ public partial class MainWindowViewModel : ViewModelBase
         _downloadsVm = new DownloadsViewModel(library, Player, _songsVm,
             track => OnViewAlbumFromTrack(this, track), ViewArtistByName);
         _searchVm.DownloadsRequested += (_, _) => Navigate("downloads");
+        _searchVm.PlaylistOpened += (_, playlist) => OpenFoundPlaylist(playlist);
         // Noctis Plus: online artists and albums open on the app's own pages (typed calls from
         // the built-in catalog; no window scanning).
         FreeMusicFinder.CatalogPages.ArtistRequested += artist => Dispatcher.UIThread.Post(() =>
@@ -2632,9 +2633,39 @@ public partial class MainWindowViewModel : ViewModelBase
     }
 
 
-    private void OnPlaylistOpened(object? sender, Playlist playlist)
+    private void OnPlaylistOpened(object? sender, Playlist playlist) => ShowPlaylistDetail(playlist, pushHistory: true);
+
+    /// <summary>
+    /// Owner #69: a playlist found in Search opens on the playlist page. One already saved opens as itself; any
+    /// other opens unsaved (read-only, with Save), and once saved the new playlist takes that page's place, so Back
+    /// still leads to Search.
+    /// </summary>
+    private void OpenFoundPlaylist(Services.Search.OnlinePlaylist found)
     {
+        var saved = FreeMusicFinder.FreeMusicPlugin.Current?.PlaylistImports?.SavedAs(found.Url) ?? found.SavedAs;
+        if (saved is { } id && Sidebar.GetPlaylist(id) is { } own) { ShowPlaylistDetail(own, pushHistory: true); return; }
+
         PushCurrentViewToHistory();
+        ClearAllTopBarActions();
+        _searchBoxBinding.SetPageText(string.Empty);
+        TopBar.CurrentTabName = "Playlist";
+        var preview = PlaylistViewModel.ForPreview(found, Player, _library, _persistence, Sidebar, _artistImageService);
+        preview.BackRequested += (_, _) => { if (ReferenceEquals(CurrentView, preview)) GoBackInHistory(); };
+        preview.ViewAlbumRequested += OnViewAlbumFromTrack;
+        preview.SetSearchLyricsAction(SearchLyricsForTrack);
+        preview.SetViewArtistAction(ViewArtistByName);
+        preview.SetOpenFeaturedArtistsAction(OpenPlaylistFeaturedArtistsPage);
+        preview.PreviewSaved += (_, playlistId) =>
+        {
+            if (ReferenceEquals(CurrentView, preview) && Sidebar.GetPlaylist(playlistId) is { } playlist)
+                ShowPlaylistDetail(playlist, pushHistory: false);
+        };
+        CurrentView = preview;
+    }
+
+    private void ShowPlaylistDetail(Playlist playlist, bool pushHistory)
+    {
+        if (pushHistory) PushCurrentViewToHistory();
         ClearAllTopBarActions();
 
         // Re-scope the top-bar search to the detail view (the history entry above

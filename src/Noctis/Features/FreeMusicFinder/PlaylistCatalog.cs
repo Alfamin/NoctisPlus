@@ -24,7 +24,7 @@ internal sealed class PlaylistManifest
 }
 
 /// <summary>Metadata only. A full ordered list is obtained before any bot is asked for audio.</summary>
-internal sealed class PlaylistCatalog : IDisposable
+internal sealed partial class PlaylistCatalog : IDisposable
 {
     private readonly HttpClient _http;
     private readonly MetadataRoute? _route;
@@ -43,6 +43,9 @@ internal sealed class PlaylistCatalog : IDisposable
         Dictionary<string,MusicRequest> known=new();
         Dictionary<string,(string Artwork,string Album)> details=new();
         string? token=null;
+        // #69: a Spotify playlist in a few pages with every song's details; the embed reading below is the fallback.
+        if(!manifest.CompleteIds && link.Kind=="playlist" && await FullPlaylistAsync(link,ct).ConfigureAwait(false) is {} paged)
+        {manifest.Name=paged.Name;manifest.Total=paged.Total;manifest.Entries=paged.Entries;manifest.CompleteIds=true;checkpoint(manifest);progress($"Full metadata list saved: {manifest.Total} entries");}
         if(!manifest.CompleteIds)
         {
             var html=await Get("https://open.spotify.com/embed/"+link.Kind+"/"+link.Id,null,ct).ConfigureAwait(false);
@@ -199,10 +202,11 @@ internal sealed class PlaylistCatalog : IDisposable
     private async Task<string> Get(string url,string? token,CancellationToken ct)
     {
         var uri=new Uri(url);
-        if(uri.Scheme!="https" || uri.Host is not ("open.spotify.com" or "spclient.wg.spotify.com" or "api.deezer.com")) throw new InvalidDataException("Unapproved metadata host.");
-        using var request=new HttpRequestMessage(HttpMethod.Get,uri);
+        if(uri.Scheme!="https" || uri.Host is not ("open.spotify.com" or "spclient.wg.spotify.com" or "api-partner.spotify.com" or "api.deezer.com")) throw new InvalidDataException("Unapproved metadata host.");
+        // HTTP/2 where offered: a playlist search's save and song counts share one connection instead of opening sixteen.
+        using var request=new HttpRequestMessage(HttpMethod.Get,uri){Version=HttpVersion.Version20,VersionPolicy=HttpVersionPolicy.RequestVersionOrLower};
         if(token is not null)
-        {if(uri.Host!="spclient.wg.spotify.com")throw new InvalidDataException("Unapproved token destination.");request.Headers.Authorization=new AuthenticationHeaderValue("Bearer",token);request.Headers.Accept.ParseAdd("application/json");}
+        {if(uri.Host is not ("spclient.wg.spotify.com" or "api-partner.spotify.com"))throw new InvalidDataException("Unapproved token destination.");request.Headers.Authorization=new AuthenticationHeaderValue("Bearer",token);request.Headers.Accept.ParseAdd("application/json");}
         HttpResponseMessage response;
         try { response=await _http.SendAsync(request,HttpCompletionOption.ResponseHeadersRead,ct).ConfigureAwait(false); }
         catch(OperationCanceledException) when(!ct.IsCancellationRequested) {throw new TimeoutException("METADATA_TIMEOUT: "+(_route?.Unanswered(uri)??"the metadata service did not respond in 25 seconds."));}

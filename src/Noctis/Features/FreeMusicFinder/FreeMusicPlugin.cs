@@ -101,7 +101,7 @@ public sealed class FreeMusicPlugin : INoctisPlugin
         // Native For you loads when its shelf is visible. A startup background build
         // must not compete with the user's first Search for metadata connections.
         // The app's own Search page reads the catalog and starts downloads through this.
-        _online = new FinderOnlineSearch(() => _catalog, _discoveryActions, _artistPages, () => _telegram?.IsLoggedIn == true, ShowSignIn);
+        _online = new FinderOnlineSearch(() => _catalog, _discoveryActions, _artistPages, () => _telegram?.IsLoggedIn == true, ShowSignIn, () => _playlists);
         Current = this;
         Noctis.Services.Search.OnlineMusicSearch.Current = _online;
         _transfers.Changed += Announce;

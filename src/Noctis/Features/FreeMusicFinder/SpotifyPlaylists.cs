@@ -125,6 +125,52 @@ internal sealed class SpotifyPlaylists : IDisposable
     private void Save() { lock (_gate) AtomicJson.Write(_file, _jobs); }
     private void Publish(string? status = null) { if (status is not null) Status = status; try { Changed?.Invoke(); } catch { } }
 
+    /// <summary>Owner #69: public playlists by name, each marked with the Noctis playlist it was already saved as.</summary>
+    internal async Task<(IReadOnlyList<(FoundPlaylist Found, Guid? SavedAs)> Playlists, string Source)> SearchAsync(string query, int limit, CancellationToken ct)
+    {
+        var (found, source) = await _catalog.SearchPlaylistsAsync(query, limit, ct).ConfigureAwait(false);
+        var saved = Jobs.Where(j => j.Created && !j.FillingStopped).ToDictionary(j => j.Url, j => j.LibraryId);
+        return (found.Select(f => (f, saved.TryGetValue(f.Url, out var id) ? id : (Guid?)null)).ToList(), source);
+    }
+
+    internal void WarmUpSearch() => _ = _catalog.WarmUpSearchAsync();
+
+    // Read previews, so Save after a look does not read the playlist again (owner: snappy).
+    private readonly Dictionary<string, PlaylistManifest> _previews = new();
+
+    /// <summary>
+    /// A found playlist read in full and matched against the library, without creating anything: every entry in
+    /// order, with the library song that stands for it. Save turns the same reading into a normal playlist.
+    /// </summary>
+    internal async Task<(PlaylistManifest Manifest, IReadOnlyList<ImportedPlaylistEntry> Entries)> PreviewAsync(string url, CancellationToken ct)
+    {
+        if (!PlaylistLink(url, out var link)) throw new FormatException("Not a Spotify or Deezer playlist.");
+        PlaylistManifest? manifest;
+        lock (_gate) _previews.TryGetValue(link!.Url, out manifest);
+        if (manifest is null)
+        {
+            manifest = await _catalog.ReadAsync(link, null, _ => { }, _ => { }, ct).ConfigureAwait(false);
+            if (!Valid(manifest)) throw new InvalidDataException("METADATA_INCOMPLETE: Spotify returned only part of this playlist. Try again.");
+            lock (_gate) { if (_previews.Count >= 20) _previews.Clear(); _previews[link.Url] = manifest; }
+        }
+        var matcher = new PlaylistMatcher(await _library.SnapshotAsync().ConfigureAwait(false));
+        return (manifest, manifest.Entries.OrderBy(e => e.Position).Select(e => new ImportedPlaylistEntry(
+            e.Position, e.Request is null ? null : Song(e), e.Request is { } r ? matcher.Find(r)?.Id : null, e.Issue,
+            ArtistCatalog.ArtworkUrl(e.Artwork) ? e.Artwork : "", e.Album ?? "")).ToArray());
+    }
+
+    /// <summary>The Noctis playlist a link was saved as, when it was.</summary>
+    internal Guid? SavedAs(string url) => PlaylistLink(url, out var link) && Jobs.FirstOrDefault(j => j.Url == link!.Url && j.Created && !j.FillingStopped) is { } job ? job.LibraryId : null;
+
+    /// <summary>Save (owner #69): the previewed playlist becomes a normal Noctis playlist, as a pasted link would.</summary>
+    internal async Task<Guid> SaveAsync(string url, CancellationToken ct)
+    {
+        if (!PlaylistLink(url, out var link)) throw new FormatException("Not a Spotify or Deezer playlist.");
+        await ImportAsync(link!.Url, ct).ConfigureAwait(false);
+        var job = Jobs.FirstOrDefault(j => j.Url == link.Url);
+        return job is { Created: true } ? job.LibraryId : throw new InvalidOperationException(job?.Status is { Length: > 0 } status ? status : "The playlist could not be saved.");
+    }
+
     public async Task ImportAsync(string text, CancellationToken ct)
     {
         var links = Links(text); // Validate the whole paste before making any changes.
@@ -164,6 +210,9 @@ internal sealed class SpotifyPlaylists : IDisposable
                         }
                         PlaylistLink(url, out var link);
                         job.Status = "Reading full metadata…"; Publish();
+                        PlaylistManifest? previewed;
+                        lock (_gate) _previews.TryGetValue(url, out previewed);
+                        if (previewed is not null && job.Manifest is not { CompleteIds: true }) { job.Manifest = previewed; Save(); }
                         job.Manifest = await _catalog.ReadAsync(link!, job.Manifest,
                             m => { job.Manifest = m; Save(); }, p => { job.Status = p; Publish(); }, ct).ConfigureAwait(false);
                         if (!Valid(job.Manifest)) throw new InvalidDataException("METADATA_INCOMPLETE: No playlist was created from a partial preview.");

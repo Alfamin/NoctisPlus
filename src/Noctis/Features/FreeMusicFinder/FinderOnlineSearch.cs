@@ -19,13 +19,18 @@ internal sealed class FinderOnlineSearch : IOnlineMusicSearch
     private readonly CatalogPages _pages;
     private readonly Func<bool> _signedIn;
     private readonly Action _signIn;
+    private readonly Func<SpotifyPlaylists?> _playlists;
     private readonly ConcurrentDictionary<string, CatalogSong> _songs = new();
     private readonly ConcurrentDictionary<string, CatalogArtist> _artists = new();
     private readonly ConcurrentDictionary<string, CatalogRelease> _albums = new();
 
-    public FinderOnlineSearch(Func<ArtistCatalog?> catalog, DiscoveryActions actions, CatalogPages pages, Func<bool> signedIn, Action signIn)
+    /// <summary>How many playlists a search asks for (owner #69); the All view shows one row of them.</summary>
+    internal const int PlaylistLimit = 24;
+
+    public FinderOnlineSearch(Func<ArtistCatalog?> catalog, DiscoveryActions actions, CatalogPages pages, Func<bool> signedIn, Action signIn,
+        Func<SpotifyPlaylists?>? playlists = null)
     {
-        _catalog = catalog; _actions = actions; _pages = pages; _signedIn = signedIn; _signIn = signIn;
+        _catalog = catalog; _actions = actions; _pages = pages; _signedIn = signedIn; _signIn = signIn; _playlists = playlists ?? (() => null);
         _actions.Downloads.Changed += OnDownloadChanged;
     }
 
@@ -35,7 +40,11 @@ internal sealed class FinderOnlineSearch : IOnlineMusicSearch
 
     public event EventHandler? DownloadsChanged;
 
-    public void WarmUp() => _catalog()?.WarmUp();
+    public void WarmUp()
+    {
+        _catalog()?.WarmUp();
+        _playlists()?.WarmUpSearch();
+    }
 
     public void Retry() => _catalog()?.ForgetGuessedWaits();
 
@@ -52,6 +61,12 @@ internal sealed class FinderOnlineSearch : IOnlineMusicSearch
         List<CatalogArtist> artists = []; List<CatalogSearchSong> songs = []; List<CatalogRelease> albums = [];
         var warnings = new ConcurrentQueue<string>();
         Dictionary<string, DiscoveryMatch>? matches = null;
+        // Playlists (#69) come from another service and never hold up songs: shown whenever they land.
+        var playlists = _playlists() is { } imports && text.Length >= 2 ? FindPlaylistsAsync(imports, text, warnings, ct) : null;
+        OnlineSearchResult Result(bool complete) => Build(catalog, query, artists, songs, albums, matches, complete, warnings) with
+        {
+            Playlists = playlists is { IsCompletedSuccessfully: true } ? playlists.Result : [],
+        };
 
         async Task Read<T>(string section, Func<Task<CatalogResult<List<T>>>> read, Action<List<T>> publish)
         {
@@ -76,11 +91,11 @@ internal sealed class FinderOnlineSearch : IOnlineMusicSearch
             var done = await Task.WhenAny(pending).ConfigureAwait(false);
             pending.Remove(done);
             ct.ThrowIfCancellationRequested();
-            yield return Build(catalog, query, artists, songs, albums, matches, complete: false, warnings);
+            yield return Result(false);
         }
 
         songs = await catalog.RefineTitleAsync(query, songs, ct).ConfigureAwait(false);
-        yield return Build(catalog, query, artists, songs, albums, matches, complete: false, warnings);
+        yield return Result(false);
 
         // An artist search ("drake"): that artist's own top songs lead the song list.
         var hits = SearchRanking.Build(query, artists, songs, albums, fansOf: catalog.FansOf);
@@ -94,7 +109,7 @@ internal sealed class FinderOnlineSearch : IOnlineMusicSearch
                 added = true;
             }
             catch (Exception ex) when (ex is not OperationCanceledException) { warnings.Enqueue("Artist songs: " + ArtistCatalog.Explain(ex)); }
-            if (added) yield return Build(catalog, query, artists, songs, albums, matches, complete: false, warnings);
+            if (added) yield return Result(false);
         }
 
         // Which of these the library already has (same recording: title, artist, length).
@@ -103,7 +118,12 @@ internal sealed class FinderOnlineSearch : IOnlineMusicSearch
             try { matches = await _actions.MatchAsync(songs.Select(s => s.Song), ct, reuse: true).ConfigureAwait(false); }
             catch (Exception ex) when (ex is not OperationCanceledException) { warnings.Enqueue("Library check: " + ex.Message); }
         }
-        yield return Build(catalog, query, artists, songs, albums, matches, complete: true, warnings);
+        if (playlists is { IsCompleted: false })
+        {
+            yield return Result(false);
+            await playlists.ConfigureAwait(false);
+        }
+        yield return Result(true);
     }
 
     private OnlineSearchResult Build(ArtistCatalog catalog, FinderQuery query, List<CatalogArtist> artists, List<CatalogSearchSong> songs, List<CatalogRelease> albums,
@@ -152,6 +172,20 @@ internal sealed class FinderOnlineSearch : IOnlineMusicSearch
         // their order among themselves but never outrank an equally strong library match.
         var s = Math.Max(0, finder * 0.92);
         return s <= 90 ? s : 90 + 7 * (1 - Math.Exp(-(s - 90) / 10));
+    }
+
+    private static async Task<IReadOnlyList<OnlinePlaylist>> FindPlaylistsAsync(SpotifyPlaylists imports, string text, ConcurrentQueue<string> warnings, CancellationToken ct)
+    {
+        try
+        {
+            var clock = System.Diagnostics.Stopwatch.StartNew();
+            var (found, source) = await imports.SearchAsync(text, PlaylistLimit, ct).ConfigureAwait(false);
+            Noctis.Services.DebugLog.Write("Search", $"\"{text}\": {found.Count} playlists from {source} in {clock.ElapsedMilliseconds} ms ({PlaylistCatalog.LastCounts})");
+            // Best first; the score only keeps that order through the page's merge.
+            return found.Select((p, i) => new OnlinePlaylist(p.Found.Url, p.Found.Name, p.Found.Owner, p.Found.Url, p.Found.Artwork,
+                p.Found.Tracks, p.Found.Saves, p.SavedAs, found.Count - i)).ToList();
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException) { warnings.Enqueue("Playlists: " + ArtistCatalog.Explain(ex)); return []; }
     }
 
     public string? CachedArtwork(string url) => url.Length == 0 ? null : _catalog()?.SavedArtwork(url);

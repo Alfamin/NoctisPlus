@@ -310,6 +310,50 @@
                 </StackPanel>
             </Button>
         </DataTemplate>
+
+        <!-- A found playlist (owner #69): the album card, with how many saved it on the cover (a heart and a
+             number) and a check once it is one of yours. Opens the playlist page; nothing is saved until Save. -->
+        <DataTemplate x:Key="SearchPlaylistTile" x:DataType="vm:SearchPlaylistItem">
+            <Button Classes="album-tile search-album-tile"
+                    AutomationProperties.Name="{Binding Title}"
+                    Margin="2,2,12,12" Padding="2" VerticalAlignment="Top"
+                    Command="{Binding $parent[UserControl].((vm:SearchViewModel)DataContext).OpenPlaylistCommand}"
+                    CommandParameter="{Binding}">
+                <StackPanel Spacing="0" Width="168">
+                    <Panel Width="168" Height="168">
+                        <Border Width="168" Height="168" CornerRadius="6" ClipToBounds="True"
+                                Background="{DynamicResource SystemControlBackgroundBaseLowBrush}">
+                            <Panel>
+                                <PathIcon Data="{StaticResource PlaylistsIcon}" Width="40" Height="40" Opacity="0.2"
+                                          HorizontalAlignment="Center" VerticalAlignment="Center"
+                                          IsVisible="{Binding !HasArtwork}" />
+                                <controls:CachedImage Classes="search-art" SourcePath="{Binding ArtworkPath}" DecodeWidth="384"
+                                                      Stretch="UniformToFill" RenderOptions.BitmapInterpolationMode="HighQuality"
+                                                      IsVisible="{Binding HasArtwork}" />
+                                <Border Classes="tile-dim" />
+                            </Panel>
+                        </Border>
+                        <Border IsVisible="{Binding HasSaves}" CornerRadius="999" Padding="7,3" Background="#99000000"
+                                HorizontalAlignment="Left" VerticalAlignment="Bottom" Margin="7,0,0,7"
+                                ToolTip.Tip="{Binding SavesText, StringFormat='Saved by {0}'}">
+                            <StackPanel Orientation="Horizontal" Spacing="4">
+                                <PathIcon Data="{StaticResource HeartFillIcon}" Width="9" Height="9" Foreground="White" VerticalAlignment="Center" />
+                                <TextBlock Text="{Binding SavesText}" FontSize="11" FontWeight="SemiBold" Foreground="White" VerticalAlignment="Center" />
+                            </StackPanel>
+                        </Border>
+                        <Border Classes="online-badge large" IsVisible="{Binding IsSaved}" Background="{DynamicResource AccentColorBrush}"
+                                HorizontalAlignment="Right" VerticalAlignment="Bottom" Margin="0,0,7,7"
+                                ToolTip.Tip="In your playlists">
+                            <PathIcon Data="{StaticResource CheckmarkIcon}" Width="10" Height="10" Foreground="{DynamicResource AccentForegroundBrush}" />
+                        </Border>
+                    </Panel>
+                    <TextBlock Text="{Binding Title}" FontSize="13" FontWeight="SemiBold" Margin="0,5,0,0"
+                               TextWrapping="Wrap" TextTrimming="CharacterEllipsis" MaxLines="2" />
+                    <TextBlock Text="{Binding Subtitle}" FontSize="12" FontWeight="Bold" Opacity="0.55" Margin="0,1,0,0"
+                               TextTrimming="CharacterEllipsis" MaxLines="1" />
+                </StackPanel>
+            </Button>
+        </DataTemplate>
     </UserControl.Resources>
 
     <UserControl.Styles>
@@ -653,6 +697,13 @@
                         <Border Classes="tab-underline" Height="2" Margin="0,9,0,0" CornerRadius="1" Background="{DynamicResource AccentColorBrush}" />
                     </StackPanel>
                 </Button>
+                <Button Classes="page-tab" Classes.selected="{Binding IsPlaylistsFilter}" IsVisible="{Binding HasOnline}"
+                        Command="{Binding SelectFilterCommand}" CommandParameter="Playlists" AutomationProperties.Name="Playlists">
+                    <StackPanel>
+                        <TextBlock Text="Playlists" />
+                        <Border Classes="tab-underline" Height="2" Margin="0,9,0,0" CornerRadius="1" Background="{DynamicResource AccentColorBrush}" />
+                    </StackPanel>
+                </Button>
             </StackPanel>
         </Grid>
         <!-- The top bar's hairline, once results have scrolled under the toolbar. -->
@@ -889,6 +940,24 @@
                     </ItemsControl.ItemsPanel>
                 </ItemsControl>
             </StackPanel>
+
+            <!-- Playlists (owner #69): public playlists by name, most relevant and most saved first. -->
+            <StackPanel Classes="search-block" IsVisible="{Binding ShowPlaylists}" x:Name="PlaylistsBlock">
+                <TextBlock Classes="search-section" Text="Playlists" IsVisible="{Binding IsAllFilter}" />
+                <ItemsControl ItemsSource="{Binding Playlists}" ItemTemplate="{StaticResource SearchPlaylistTile}">
+                    <ItemsControl.ItemsPanel>
+                        <ItemsPanelTemplate><WrapPanel Orientation="Horizontal" /></ItemsPanelTemplate>
+                    </ItemsControl.ItemsPanel>
+                </ItemsControl>
+            </StackPanel>
+            <StackPanel IsVisible="{Binding ShowPlaylistSkeletons}" Orientation="Horizontal" Spacing="14">
+                <Border Classes="skeleton" Width="168" Height="168" CornerRadius="6" />
+                <Border Classes="skeleton" Width="168" Height="168" CornerRadius="6" />
+                <Border Classes="skeleton" Width="168" Height="168" CornerRadius="6" />
+                <Border Classes="skeleton" Width="168" Height="168" CornerRadius="6" />
+            </StackPanel>
+            <TextBlock IsVisible="{Binding ShowNoPlaylists}" Text="{Binding QueryText, StringFormat='No playlists for “{0}”'}"
+                       FontSize="15" FontWeight="SemiBold" Opacity="0.6" HorizontalAlignment="Center" Margin="0,40,0,0" />
 
             <!-- Card skeletons while the online artists and albums load. -->
             <StackPanel IsVisible="{Binding ShowCardSkeletons}" Orientation="Horizontal" Spacing="14">

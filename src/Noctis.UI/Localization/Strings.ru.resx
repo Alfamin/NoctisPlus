@@ -1717,6 +1717,8 @@
   <data name="Playlist.AddDescription" xml:space="preserve"><value>Добавить описание…</value><comment>Text in PlaylistView.axaml</comment></data>
   <data name="Playlist.PlayTip" xml:space="preserve"><value>Слушать</value><comment>ToolTip.Tip in PlaylistView.axaml</comment></data>
   <data name="Playlist.ShuffleTip" xml:space="preserve"><value>Перемешать</value><comment>ToolTip.Tip in PlaylistView.axaml</comment></data>
+  <data name="Playlist.SaveFound" xml:space="preserve"><value>Сохранить</value><comment>Save button on a found playlist (PlaylistView.axaml)</comment></data>
+  <data name="Playlist.SaveFoundTip" xml:space="preserve"><value>Добавить в ваши плейлисты</value><comment>ToolTip.Tip in PlaylistView.axaml</comment></data>
   <data name="Playlist.OptionsTip" xml:space="preserve"><value>Параметры</value><comment>ToolTip.Tip in PlaylistView.axaml</comment></data>
   <data name="Playlist.PlayNext" xml:space="preserve"><value>Играть следующим</value><comment>Header in PlaylistView.axaml</comment></data>
   <data name="Playlist.AddQueue" xml:space="preserve"><value>В очередь</value><comment>Header in PlaylistView.axaml</comment></data>

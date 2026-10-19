@@ -75,7 +75,7 @@ public partial class PlaylistViewModel : ViewModelBase, ILocalSearchable, IDispo
 
     /// <summary>True when drag-reorder is possible: manual playlist, manual sort, no active filter.
     /// Drives the row grip-handle affordance in the # column.</summary>
-    public bool CanReorder => IsManualPlaylist && IsManualSort && string.IsNullOrWhiteSpace(SearchText) && !HasUnownedImportEntries;
+    public bool CanReorder => IsManualPlaylist && IsManualSort && string.IsNullOrWhiteSpace(SearchText) && !HasUnownedImportEntries && !IsPreview;
 
     partial void OnSearchTextChanged(string value)
     {
@@ -199,7 +199,7 @@ public partial class PlaylistViewModel : ViewModelBase, ILocalSearchable, IDispo
 
     /// <summary>Library-only suggestions (same artists as the playlist) shown in the left rail.</summary>
     public ObservableCollection<Track> SuggestedTracks { get; } = new();
-    public bool HasSuggestions => IsManualPlaylist && SuggestedTracks.Count > 0;
+    public bool HasSuggestions => IsManualPlaylist && !IsPreview && SuggestedTracks.Count > 0;
 
     /// <summary>Number of Ctrl-selected rows; drives the floating selection action bar.</summary>
     [ObservableProperty] private int _selectedCount;
@@ -290,7 +290,7 @@ public partial class PlaylistViewModel : ViewModelBase, ILocalSearchable, IDispo
     private void RefreshMissingDownloads()
     {
         var job = _streamingImports?.Jobs.FirstOrDefault(j => j.LibraryId == PlaylistId && j.Created && !j.FillingStopped);
-        var missing = job is null ? 0 : job.Total - job.Found;
+        var missing = IsPreview ? PreviewMissingCount : job is null ? 0 : job.Total - job.Found;
         HasMissingDownloads = missing > 0;
         MissingDownloadsLabel = $"Download missing · {missing}";
         RefreshCatalogRows();
@@ -300,6 +300,7 @@ public partial class PlaylistViewModel : ViewModelBase, ILocalSearchable, IDispo
     [RelayCommand]
     private async Task DownloadMissing()
     {
+        if (IsPreview) { await DownloadPreviewMissingAsync(); return; }
         await Views.StreamingPlaylistImportDialog.TryShowAsync(PlaylistId);
     }
 
@@ -514,7 +515,7 @@ public partial class PlaylistViewModel : ViewModelBase, ILocalSearchable, IDispo
 
     private void RebuildSuggestions(bool force = false)
     {
-        if (IsSmartPlaylist) return;
+        if (IsSmartPlaylist || IsPreview) return;
 
         var key = string.Join(",", _playlist.TrackIds);
         if (!force && key == _lastSuggestionKey) return;
@@ -573,7 +574,7 @@ public partial class PlaylistViewModel : ViewModelBase, ILocalSearchable, IDispo
     [RelayCommand]
     private async Task AddSuggested(Track track)
     {
-        if (track == null || IsSmartPlaylist) return;
+        if (track == null || IsSmartPlaylist || IsPreview) return;
         // Raises PlaylistTracksChanged, which reloads this view (and the suggestions).
         await _sidebar.AddTracksToPlaylist(_playlist.Id, new[] { track });
     }
@@ -583,6 +584,7 @@ public partial class PlaylistViewModel : ViewModelBase, ILocalSearchable, IDispo
     [RelayCommand]
     private void StartRename()
     {
+        if (IsPreview) return;
         NameEditorText = Name;
         IsRenamingName = true;
     }
@@ -607,7 +609,7 @@ public partial class PlaylistViewModel : ViewModelBase, ILocalSearchable, IDispo
         var filterActive = !string.IsNullOrWhiteSpace(_currentFilter);
         var count = Rows.Count;
         ShowNoResults = count == 0 && filterActive && (_importedEntries?.Count ?? unfilteredCount) > 0;
-        ShowEmptyManual = count == 0 && !ShowNoResults && !IsSmartPlaylist;
+        ShowEmptyManual = count == 0 && !ShowNoResults && !IsSmartPlaylist && !IsPreview;
         ShowEmptySmart = count == 0 && !ShowNoResults && IsSmartPlaylist;
     }
 
@@ -763,7 +765,7 @@ public partial class PlaylistViewModel : ViewModelBase, ILocalSearchable, IDispo
     {
         // Smart playlist contents come from its rules, not TrackIds: the row would just
         // come back on the next reload.
-        if (IsSmartPlaylist) return;
+        if (IsSmartPlaylist || IsPreview) return;
         var tracks = SelectionOr(track);
         foreach (var t in tracks)
         {
@@ -787,7 +789,7 @@ public partial class PlaylistViewModel : ViewModelBase, ILocalSearchable, IDispo
 
     public async Task MoveTrack(int fromIndex, int toIndex)
     {
-        if (IsSmartPlaylist) return;
+        if (IsSmartPlaylist || IsPreview) return;
         // Tracks is the filtered view while a search is active; rebuilding
         // TrackIds from it would silently delete every non-matching track.
         if (!string.IsNullOrWhiteSpace(_currentFilter)) return;
@@ -814,7 +816,7 @@ public partial class PlaylistViewModel : ViewModelBase, ILocalSearchable, IDispo
     /// </summary>
     public async Task MoveTracks(IReadOnlyList<Track> moved, int insertIndex)
     {
-        if (IsSmartPlaylist) return;
+        if (IsSmartPlaylist || IsPreview) return;
         if (!string.IsNullOrWhiteSpace(_currentFilter)) return;
         if (SortMode != PlaylistSortMode.Manual) return;
         if (moved.Count == 0) return;
@@ -1057,6 +1059,7 @@ public partial class PlaylistViewModel : ViewModelBase, ILocalSearchable, IDispo
     [RelayCommand]
     private async Task AddDescription()
     {
+        if (IsPreview) return;
         DescriptionEditorText = string.Empty;
         IsDescriptionEditing = true;
         await Views.PlaylistDescriptionDialog.ShowAsync(this);
@@ -1123,13 +1126,14 @@ public partial class PlaylistViewModel : ViewModelBase, ILocalSearchable, IDispo
     [RelayCommand]
     private async Task AddSongs()
     {
-        if (IsSmartPlaylist) return;
+        if (IsSmartPlaylist || IsPreview) return;
         await _sidebar.OpenAddSongsAsync(_playlist);
     }
 
     [RelayCommand]
     private async Task EditPlaylist()
     {
+        if (IsPreview) return;
         // The header refreshes from the sidebar's PlaylistEdited (OnPlaylistEdited).
         await _sidebar.EditPlaylistAsync(_playlist);
     }
@@ -1137,6 +1141,7 @@ public partial class PlaylistViewModel : ViewModelBase, ILocalSearchable, IDispo
     [RelayCommand]
     private async Task DeletePlaylist()
     {
+        if (IsPreview) return;
         var confirmed = await Views.ConfirmationDialog.ShowAsync($"Are you sure you want to delete \"{_playlist.Name}\"? This cannot be undone.");
         if (!confirmed) return;
         await _sidebar.DeletePlaylistAsync(_playlist.Id);
@@ -1154,6 +1159,7 @@ public partial class PlaylistViewModel : ViewModelBase, ILocalSearchable, IDispo
         if (_streamingDisposed) return;
         _streamingDisposed = true;
         DisposeCatalogRows();
+        StopPreview();
         Services.Search.OnlineMusicSearch.CurrentChanged -= OnStreamingFeatureChanged;
         if (_streamingImports is not null) _streamingImports.Changed -= OnStreamingImportsChanged;
         _player.PropertyChanged -= _playerPropertyChangedHandler;

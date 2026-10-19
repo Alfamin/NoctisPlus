@@ -484,7 +484,7 @@
                         </TextBlock.Text>
                     </TextBlock>
                     <TextBlock Text=" · " FontSize="12" FontWeight="SemiBold" Opacity="0.8" />
-                    <TextBlock FontSize="12" FontWeight="SemiBold" Opacity="0.8">
+                    <TextBlock FontSize="12" FontWeight="SemiBold" Opacity="0.8" IsVisible="{Binding IsEditable}">
                         <TextBlock.Text>
                             <MultiBinding StringFormat="{}{0} · {1}">
                                 <Binding Path="CreatedDateDisplay" />
@@ -492,6 +492,8 @@
                             </MultiBinding>
                         </TextBlock.Text>
                     </TextBlock>
+                    <!-- A found playlist (#69): who made it and how many saved it, in place of the dates. -->
+                    <TextBlock Text="{Binding PreviewByline}" FontSize="12" FontWeight="SemiBold" Opacity="0.8" IsVisible="{Binding IsPreview}" />
                     </StackPanel>
 
                     <!-- Description (clickable, opens dialog) -->
@@ -524,8 +526,13 @@
                             HorizontalAlignment="Left"
                             Cursor="Hand"
                             Margin="-2,4,0,0"
-                            Command="{Binding AddDescriptionCommand}"
-                            IsVisible="{Binding !HasDescription}">
+                            Command="{Binding AddDescriptionCommand}">
+                        <Button.IsVisible>
+                            <MultiBinding Converter="{x:Static BoolConverters.And}">
+                                <Binding Path="!HasDescription" />
+                                <Binding Path="IsEditable" />
+                            </MultiBinding>
+                        </Button.IsVisible>
                         <TextBlock Text="{loc:T Playlist.AddDescription}"
                                    FontSize="12.5"
                                    FontStyle="Italic"
@@ -579,6 +586,18 @@
                                 <TextBlock Text="{loc:T Playlist.ShuffleTip}" VerticalAlignment="Center" FontSize="14" FontWeight="Bold" />
                             </StackPanel>
                         </Button>
+                        <!-- A found playlist (#69): Save makes it one of yours (then rename, add, remove). -->
+                        <Button Classes="glass-pill" Command="{Binding SavePreviewCommand}" IsVisible="{Binding IsPreview}"
+                                Padding="16,8" VerticalAlignment="Center" Cursor="Hand"
+                                ToolTip.Tip="{loc:T Playlist.SaveFoundTip}" AutomationProperties.Name="{loc:T Playlist.SaveFound}">
+                            <StackPanel Orientation="Horizontal" Spacing="7">
+                                <PathIcon Data="{StaticResource AddIcon}" Width="11" Height="11" VerticalAlignment="Center"
+                                          IsVisible="{Binding !IsSaving}" />
+                                <controls:ProgressRing Width="12" Height="12" Thickness="1.6" IsIndeterminate="True"
+                                                       IsVisible="{Binding IsSaving}" VerticalAlignment="Center" />
+                                <TextBlock Text="{loc:T Playlist.SaveFound}" FontSize="14" FontWeight="SemiBold" VerticalAlignment="Center" />
+                            </StackPanel>
+                        </Button>
                         <Button Classes="glass-pill" Content="{Binding MissingDownloadsLabel}"
                                 Command="{Binding DownloadMissingCommand}" IsVisible="{Binding HasMissingDownloads}"
                                 Padding="16,8" VerticalAlignment="Center" />
@@ -614,30 +633,40 @@
                                             <Viewbox Width="16" Height="16"><Canvas Width="24" Height="24"><Path Classes="mv2-icon" Data="{StaticResource MenuLineQueue}" StrokeThickness="2.25" StrokeLineCap="Round" StrokeJoin="Round" /></Canvas></Viewbox>
                                         </MenuItem.Icon>
                                     </MenuItem>
-                                    <Separator IsVisible="{Binding ShowPlayActions}" />
+                                    <Separator>
+                                        <Separator.IsVisible>
+                                            <MultiBinding Converter="{x:Static BoolConverters.And}">
+                                                <Binding Path="ShowPlayActions" />
+                                                <Binding Path="IsEditable" />
+                                            </MultiBinding>
+                                        </Separator.IsVisible>
+                                    </Separator>
                                     <MenuItem Header="{loc:T Playlist.AddSongs}"
                                               Command="{Binding AddSongsCommand}"
-                                              IsVisible="{Binding IsManualPlaylist}">
+                                              IsVisible="{Binding CanAddSongs}">
                                         <MenuItem.Icon>
                                             <Viewbox Width="16" Height="16"><Canvas Width="24" Height="24"><Path Classes="mv2-icon" Data="{StaticResource MenuLinePlaylistAdd}" StrokeThickness="2.25" StrokeLineCap="Round" StrokeJoin="Round" /></Canvas></Viewbox>
                                         </MenuItem.Icon>
                                     </MenuItem>
                                     <MenuItem Header="{loc:T Playlist.EditPlaylist}"
-                                              Command="{Binding EditPlaylistCommand}">
+                                              Command="{Binding EditPlaylistCommand}"
+                                              IsVisible="{Binding IsEditable}">
                                         <MenuItem.Icon>
                                             <Viewbox Width="16" Height="16"><Canvas Width="24" Height="24"><Path Classes="mv2-icon" Data="{StaticResource MenuLineEdit}" StrokeThickness="2.25" StrokeLineCap="Round" StrokeJoin="Round" /></Canvas></Viewbox>
                                         </MenuItem.Icon>
                                     </MenuItem>
                                     <!-- GitHub #121: SendPlaylistToFolderCommand existed since 2a616afb but no menu bound it. -->
                                     <MenuItem Header="{loc:T SendTo.Title}"
-                                              Command="{Binding SendPlaylistToFolderCommand}">
+                                              Command="{Binding SendPlaylistToFolderCommand}"
+                                              IsVisible="{Binding IsEditable}">
                                         <MenuItem.Icon>
                                             <Viewbox Width="16" Height="16"><Canvas Width="24" Height="24"><Path Classes="mv2-icon" Data="{StaticResource MenuLineSendToFolder}" StrokeThickness="2.25" StrokeLineCap="Round" StrokeJoin="Round" /></Canvas></Viewbox>
                                         </MenuItem.Icon>
                                     </MenuItem>
-                                    <Separator />
+                                    <Separator IsVisible="{Binding IsEditable}" />
                                     <MenuItem Header="{loc:T Playlist.DeletePlaylist}" Classes="danger"
-                                              Command="{Binding DeletePlaylistCommand}">
+                                              Command="{Binding DeletePlaylistCommand}"
+                                              IsVisible="{Binding IsEditable}">
                                         <MenuItem.Icon>
                                             <Viewbox Width="16" Height="16"><Canvas Width="24" Height="24"><Path Classes="mv2-icon" Data="{StaticResource MenuLineTrash}" StrokeThickness="2.25" StrokeLineCap="Round" StrokeJoin="Round" /></Canvas></Viewbox>
                                         </MenuItem.Icon>
@@ -1150,6 +1179,11 @@
                             </StackPanel>
                         </Grid>
                     </Border>
+
+                    <!-- A found playlist (#69) being read: one quiet spinner where its songs will be. -->
+                    <controls:ProgressRing Width="28" Height="28" Thickness="2.5" IsIndeterminate="True"
+                                           IsVisible="{Binding IsPreviewLoading}" Foreground="{DynamicResource AccentColorBrush}"
+                                           HorizontalAlignment="Center" VerticalAlignment="Center" />
 
                     <!-- Empty state: manual playlists -->
                     <StackPanel HorizontalAlignment="Center"

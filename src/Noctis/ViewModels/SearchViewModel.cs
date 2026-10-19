@@ -53,16 +53,19 @@ public sealed partial class SearchViewModel : ViewModelBase, ISearchable, IDispo
     public ObservableCollection<SearchSongItem> Songs { get; } = new();
     public ObservableCollection<SearchArtistItem> Artists { get; } = new();
     public ObservableCollection<SearchAlbumItem> Albums { get; } = new();
+    public ObservableCollection<SearchPlaylistItem> Playlists { get; } = new();
 
-    /// <summary>All, Songs, Artists or Albums.</summary>
+    /// <summary>All, Songs, Artists, Albums or Playlists.</summary>
     [ObservableProperty, NotifyPropertyChangedFor(nameof(IsAllFilter), nameof(IsSongsFilter), nameof(IsArtistsFilter), nameof(IsAlbumsFilter),
-        nameof(ShowArtists), nameof(ShowAlbums), nameof(ShowCardSkeletons))]
+        nameof(IsPlaylistsFilter), nameof(ShowArtists), nameof(ShowAlbums), nameof(ShowPlaylists), nameof(ShowCardSkeletons),
+        nameof(ShowPlaylistSkeletons), nameof(ShowNoPlaylists))]
     private string _filter = "All";
 
     public bool IsAllFilter => Filter == "All";
     public bool IsSongsFilter => Filter == "Songs";
     public bool IsArtistsFilter => Filter == "Artists";
     public bool IsAlbumsFilter => Filter == "Albums";
+    public bool IsPlaylistsFilter => Filter == "Playlists";
 
     /// <summary>The single best match (an artist, song or album), shown large on the All view.</summary>
     [ObservableProperty, NotifyPropertyChangedFor(nameof(HasTopResult), nameof(TopSong), nameof(TopArtist), nameof(TopAlbum))]
@@ -86,7 +89,7 @@ public sealed partial class SearchViewModel : ViewModelBase, ISearchable, IDispo
     private bool _isOnlinePending;
 
     /// <summary>Online results are still arriving (the first may already be on screen).</summary>
-    [ObservableProperty] private bool _isOnlineLoading;
+    [ObservableProperty, NotifyPropertyChangedFor(nameof(ShowPlaylistSkeletons), nameof(ShowNoPlaylists))] private bool _isOnlineLoading;
 
     [ObservableProperty, NotifyPropertyChangedFor(nameof(HasStatus))]
     private string _status = "";
@@ -96,7 +99,8 @@ public sealed partial class SearchViewModel : ViewModelBase, ISearchable, IDispo
     public bool HasStatus => Status.Length > 0 && !IsOnlineUnreachable;
 
     [ObservableProperty, NotifyPropertyChangedFor(nameof(ShowNoResults), nameof(HasSongs), nameof(HasArtists), nameof(HasAlbums), nameof(ShowSongSkeletons), nameof(ShowCardSkeletons),
-        nameof(ShowArtists), nameof(ShowAlbums), nameof(ShowSongsSection))]
+        nameof(ShowArtists), nameof(ShowAlbums), nameof(ShowSongsSection), nameof(HasPlaylists), nameof(ShowPlaylists),
+        nameof(ShowPlaylistSkeletons), nameof(ShowNoPlaylists))]
     private int _resultVersion;
 
     /// <summary>The online catalog could not be reached for this query (no connection, VPN off,
@@ -114,15 +118,20 @@ public sealed partial class SearchViewModel : ViewModelBase, ISearchable, IDispo
     public bool HasSongs => Songs.Count > 0;
     public bool HasArtists => Artists.Count > 0;
     public bool HasAlbums => Albums.Count > 0;
+    public bool HasPlaylists => Playlists.Count > 0;
     public bool ShowSongSkeletons => IsOnlinePending && Songs.Count < SongCap;
     /// <summary>The All view's Songs column: only with songs (or their placeholders) to show.</summary>
     public bool ShowSongsSection => HasSongs || ShowSongSkeletons;
-    public bool ShowCardSkeletons => IsOnlinePending && Albums.Count == 0 && !IsSongsFilter;
-    public bool ShowNoResults => HasQuery && !IsOnlinePending && !IsOnlineLoading && !IsOnlineUnreachable && Songs.Count == 0 && Artists.Count == 0 && Albums.Count == 0;
+    public bool ShowCardSkeletons => IsOnlinePending && Albums.Count == 0 && !IsSongsFilter && !IsPlaylistsFilter;
+    /// <summary>Playlists come from another service and may land after the songs: their tab waits with placeholders.</summary>
+    public bool ShowPlaylistSkeletons => IsPlaylistsFilter && IsOnlineLoading && Playlists.Count == 0;
+    public bool ShowNoResults => HasQuery && !IsOnlinePending && !IsOnlineLoading && !IsOnlineUnreachable && Songs.Count == 0 && Artists.Count == 0 && Albums.Count == 0 && Playlists.Count == 0;
+    public bool ShowNoPlaylists => IsPlaylistsFilter && HasQuery && HasOnline && !IsOnlineLoading && !IsOnlineUnreachable && Playlists.Count == 0 && !ShowNoResults;
 
     /// <summary>Each chip shows its own kind only; All shows everything.</summary>
     public bool ShowArtists => HasArtists && (IsAllFilter || IsArtistsFilter);
     public bool ShowAlbums => HasAlbums && (IsAllFilter || IsAlbumsFilter);
+    public bool ShowPlaylists => HasPlaylists && (IsAllFilter || IsPlaylistsFilter);
 
     /// <summary>True while an online catalog is available (Free Music Finder switched on).</summary>
     public bool HasOnline => _source is not null;
@@ -130,6 +139,7 @@ public sealed partial class SearchViewModel : ViewModelBase, ISearchable, IDispo
     private int SongCap => Filter == "All" ? 5 : 50;
     private int ArtistCap => Filter == "All" ? _artistsPerRow : 40;
     private int AlbumCap => Filter == "All" ? _albumsPerRow : 40;
+    private int PlaylistCap => Filter == "All" ? _albumsPerRow : 40;
     private int _artistsPerRow = 7, _albumsPerRow = 7;
 
     /// <summary>The All view shows one full row of artists and of albums; the view says how many fit.</summary>
@@ -264,7 +274,7 @@ public sealed partial class SearchViewModel : ViewModelBase, ISearchable, IDispo
             await foreach (var result in source.SearchAsync(query, cts.Token).WithCancellation(cts.Token))
             {
                 if (cts.IsCancellationRequested || !ReferenceEquals(cts, _onlineCts)) return;
-                var empty = result.Songs.Count == 0 && result.Artists.Count == 0 && result.Albums.Count == 0;
+                var empty = result.Songs.Count == 0 && result.Artists.Count == 0 && result.Albums.Count == 0 && result.Playlists.Count == 0;
                 // Nothing at all came back and something went wrong: the catalog is out of reach
                 // (said once, above the results, not as a line of error text at the bottom).
                 if (result.Complete && empty && result.Warning.Length > 0)
@@ -301,7 +311,7 @@ public sealed partial class SearchViewModel : ViewModelBase, ISearchable, IDispo
     [RelayCommand]
     private void SelectFilter(string? filter)
     {
-        if (filter is not ("All" or "Songs" or "Artists" or "Albums") || filter == Filter) return;
+        if (filter is not ("All" or "Songs" or "Artists" or "Albums" or "Playlists") || filter == Filter) return;
         Filter = filter;
         Publish();
     }
@@ -318,6 +328,7 @@ public sealed partial class SearchViewModel : ViewModelBase, ISearchable, IDispo
         for (var i = 0; i < Songs.Count; i++) Songs[i].Number = i + 1;
         Sync(Artists, artists.Take(ArtistCap).ToList());
         Sync(Albums, albums.Take(AlbumCap).ToList());
+        Sync(Playlists, MergePlaylists().Take(PlaylistCap).ToList());
         RefreshDownloadStates();
         RefreshPlaybackStates();
         LoadArtwork();
@@ -399,6 +410,13 @@ public sealed partial class SearchViewModel : ViewModelBase, ISearchable, IDispo
         }
         return rows.OrderByDescending(r => r.Score).Select(r => r.Item).ToList();
     }
+
+    private readonly Dictionary<string, SearchPlaylistItem> _playlistItems = new();
+
+    // Online only, in the source's order (relevance lifted by saves, owner #69). A card is kept while its playlist
+    // is unchanged, so its loaded cover stays.
+    private List<SearchPlaylistItem> MergePlaylists() => (_online?.Playlists ?? []).OrderByDescending(p => p.Score)
+        .Select(p => _playlistItems.TryGetValue(p.Id, out var item) && item.Online == p ? item : _playlistItems[p.Id] = new SearchPlaylistItem(p)).ToList();
 
     private object? PickTop(List<SearchSongItem> songs, List<SearchArtistItem> artists, List<SearchAlbumItem> albums)
         => ChooseTop(_query, songs, artists, albums, _online);
@@ -486,6 +504,7 @@ public sealed partial class SearchViewModel : ViewModelBase, ISearchable, IDispo
         wanted.AddRange(Songs.OfType<IOnlineArtwork>());
         wanted.AddRange(Artists);
         wanted.AddRange(Albums);
+        wanted.AddRange(Playlists);
         foreach (var item in wanted)
         {
             if (item.ArtworkPath is { Length: > 0 } || item.ArtworkUrl.Length == 0) continue;
@@ -585,6 +604,15 @@ public sealed partial class SearchViewModel : ViewModelBase, ISearchable, IDispo
         try { await source.OpenAlbumAsync(online, CancellationToken.None); }
         catch (OperationCanceledException) { }
         catch (Exception ex) { Status = ex.Message; }
+    }
+
+    /// <summary>A found playlist was clicked: the shell opens it (its saved copy, or an unsaved look).</summary>
+    public event EventHandler<OnlinePlaylist>? PlaylistOpened;
+
+    [RelayCommand]
+    private void OpenPlaylist(SearchPlaylistItem? item)
+    {
+        if (item?.Online is { } playlist) PlaylistOpened?.Invoke(this, playlist);
     }
 
     // ── Downloads and library changes ──
@@ -823,4 +851,40 @@ public sealed partial class SearchAlbumItem : ObservableObject, IOnlineArtwork
     private string? _artworkPath;
 
     public bool HasArtwork => !string.IsNullOrEmpty(ArtworkPath);
+}
+
+/// <summary>A playlist card (owner #69): a public playlist found by name, with how many saved it.</summary>
+public sealed partial class SearchPlaylistItem : ObservableObject, IOnlineArtwork
+{
+    public SearchPlaylistItem(OnlinePlaylist playlist)
+    {
+        Online = playlist;
+        Title = playlist.Name;
+        Subtitle = string.Join(" · ", new[] { playlist.Owner, playlist.TrackCount > 0 ? (playlist.TrackCount == 1 ? "1 song" : $"{playlist.TrackCount} songs") : "" }.Where(p => p.Length > 0));
+        SavesText = playlist.Saves is > 0 and var saves ? Compact(saves) : "";
+        ArtworkUrl = playlist.ArtworkUrl;
+    }
+
+    public OnlinePlaylist Online { get; }
+    public string Title { get; }
+    public string Subtitle { get; }
+    /// <summary>"18K": shown beside a heart, so no word is needed.</summary>
+    public string SavesText { get; }
+    public bool HasSaves => SavesText.Length > 0;
+    public bool IsSaved => Online.SavedAs is not null;
+    public string ArtworkUrl { get; }
+
+    [ObservableProperty, NotifyPropertyChangedFor(nameof(HasArtwork))]
+    private string? _artworkPath;
+
+    public bool HasArtwork => !string.IsNullOrEmpty(ArtworkPath);
+
+    internal static string Compact(long n) => n switch
+    {
+        < 1_000 => n.ToString(System.Globalization.CultureInfo.CurrentCulture),
+        < 10_000 => (n / 1_000d).ToString("0.#", System.Globalization.CultureInfo.CurrentCulture) + "K",
+        < 1_000_000 => (n / 1_000).ToString(System.Globalization.CultureInfo.CurrentCulture) + "K",
+        < 10_000_000 => (n / 1_000_000d).ToString("0.#", System.Globalization.CultureInfo.CurrentCulture) + "M",
+        _ => (n / 1_000_000).ToString(System.Globalization.CultureInfo.CurrentCulture) + "M",
+    };
 }
