@@ -18,12 +18,12 @@
     <Company>Alfamin; based on Noctis by heartached</Company>
     <!-- Noctis Plus has its own release numbers (1.6.3.1, 1.6.3.2, then 2.0.0).
          Plugins still see the base version (1.6.3) for minAppVersion checks. -->
-    <Version>2.0.1</Version>
+    <Version>2.0.2</Version>
     <!-- Pre-release marker: numeric Version stays 1.1.16 (update checks + the
          displayed number are unchanged); the "-prerelease" SemVer suffix on the
          informational version is what lights the "Pre-release" badge in Settings.
          Remove this line (or drop the suffix) when cutting a stable release. -->
-    <InformationalVersion>2.0.1</InformationalVersion>
+    <InformationalVersion>2.0.2</InformationalVersion>
     <ApplicationManifest Condition="$([MSBuild]::IsOSPlatform('Windows'))">app.manifest</ApplicationManifest>
 
     <!-- Avalonia requires this for XAML compilation -->

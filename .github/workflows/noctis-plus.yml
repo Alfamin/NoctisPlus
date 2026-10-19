@@ -3,7 +3,7 @@ name: Noctis Plus Windows preview
 on:
   push:
     branches: [main]
-    # A version tag (v1.6.3.1) runs the same build and checks, then publishes the release below.
+    # Version tags reuse the identical green main package, or build/check it before publishing.
     tags: ['v*']
     paths-ignore: ['website/**']
   pull_request:
@@ -59,6 +59,14 @@ jobs:
       - uses: actions/setup-dotnet@67a3573c9a986a3f9c594539f4ab511d57bb3ce9
         with:
           dotnet-version: '10.0.x'
+      # Shards restore only; the packaging job saves the shared package cache once.
+      # This avoids five runners compressing/uploading the same cold cache together.
+      - name: Restore NuGet package cache
+        uses: actions/cache/restore@0057852bfaa89a56745cba8c7296529d2fc39830
+        with:
+          path: ~/.nuget/packages
+          key: ${{ runner.os }}-dotnet10-nuget-v1-${{ hashFiles('**/*.csproj', '**/*.props', '**/*.targets', '**/NuGet.Config', 'global.json') }}
+          restore-keys: ${{ runner.os }}-dotnet10-nuget-v1-
       - name: Restore existing dependencies
         run: dotnet restore tests/Noctis.Tests/Noctis.Tests.csproj
       - name: Build tests
@@ -112,6 +120,12 @@ jobs:
       - uses: actions/setup-dotnet@67a3573c9a986a3f9c594539f4ab511d57bb3ce9
         with:
           dotnet-version: '10.0.x'
+      - name: Restore and save NuGet package cache
+        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830
+        with:
+          path: ~/.nuget/packages
+          key: ${{ runner.os }}-dotnet10-nuget-v1-${{ hashFiles('**/*.csproj', '**/*.props', '**/*.targets', '**/NuGet.Config', 'global.json') }}
+          restore-keys: ${{ runner.os }}-dotnet10-nuget-v1-
       - name: Restore existing dependencies
         run: dotnet restore tests/Noctis.Tests/Noctis.Tests.csproj
       - name: Inno Setup (preinstalled, else from Chocolatey)
