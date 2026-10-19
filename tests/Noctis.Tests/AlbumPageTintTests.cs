@@ -282,6 +282,6 @@ public class AlbumPageTintTests
     }
 
     [Fact]
-    public void Setting_DefaultsOff()
-        => Assert.False(new AppSettings().AlbumPageTintEnabled);
+    public void Setting_DefaultsOn()
+        => Assert.True(new AppSettings().AlbumPageTintEnabled);
 }

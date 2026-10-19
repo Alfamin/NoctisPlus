@@ -88,7 +88,9 @@ public class SettingsResetTests : IDisposable
             LyricsStudioSkipAlreadyTimed = false,
             LyricsStudioEmbedTags = true,
             LyricsStudioOnlineLyrics = false,
-            IgnoreLeadingWordsInArtistSort = true,
+            IgnoreLeadingWordsInArtistSort = false,
+            AlbumPageTintEnabled = false,
+            PlayPauseFadeEnabled = false,
             ArtistSortIgnoredWords = new List<string> { "The", "Los" },
             PlayCountThresholdPercent = 75,
         });
@@ -117,6 +119,10 @@ public class SettingsResetTests : IDisposable
         // Any toggle, or the unconditional save when the window closes.
         await vm.SaveAsync();
         var afterReset = await persistence.LoadSettingsAsync();
+        // The defaults that went on for new installs (2026-10-18) come back on.
+        Assert.True(afterReset.AlbumPageTintEnabled);
+        Assert.True(afterReset.PlayPauseFadeEnabled);
+        Assert.True(afterReset.IgnoreLeadingWordsInArtistSort);
 
         // Except the sync id: made once per install, at random (a fresh install has its own), and
         // kept through a reset so phones still see the same computer in the sync ledger.

@@ -131,11 +131,11 @@ public class SettingsViewModelPersistenceTests : IDisposable
         var vm = CreateViewModel();
         await vm.LoadAsync();
         Assert.True(vm.ImportDroppedMedia);
-        Assert.False(vm.PlayPauseFadeEnabled);
+        Assert.True(vm.PlayPauseFadeEnabled);
         Assert.Equal(300, vm.PlayPauseFadeMs);
 
         vm.ImportDroppedMedia = false;
-        vm.PlayPauseFadeEnabled = true;
+        vm.PlayPauseFadeEnabled = false;
         vm.PlayPauseFadeMs = 750;
         await vm.SaveAsync();
 
@@ -143,7 +143,7 @@ public class SettingsViewModelPersistenceTests : IDisposable
         await reloaded.LoadAsync();
 
         Assert.False(reloaded.ImportDroppedMedia);
-        Assert.True(reloaded.PlayPauseFadeEnabled);
+        Assert.False(reloaded.PlayPauseFadeEnabled);
         Assert.Equal(750, reloaded.PlayPauseFadeMs);
     }
 

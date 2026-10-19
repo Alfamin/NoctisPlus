@@ -148,6 +148,26 @@ public class FreshInstallDefaultsTests
     }
 
     [Fact]
+    public void AlbumColourPlayPauseFadeAndArtistSort_ShipOn()
+    {
+        // Turned on for new installs 2026-10-18. Settings files that predate a toggle keep it
+        // off (AppSettings.OnDeserializing, ChangedDefaultsUpgradeTests).
+        Assert.True(Fresh.AlbumPageTintEnabled);
+        Assert.True(Fresh.PlayPauseFadeEnabled);
+        Assert.Equal(300, Fresh.PlayPauseFadeMs);
+        Assert.True(Fresh.IgnoreLeadingWordsInArtistSort);
+        Assert.Equal(new[] { "The" }, Fresh.ArtistSortIgnoredWords);
+    }
+
+    [Fact]
+    public void LyricsAutoDownload_IsOptIn()
+    {
+        // Its online pick goes through the Search Lyrics path, which writes .lrc/.elrc files
+        // beside the song (or into its tags, per Save lyrics to) with no click of the user's.
+        Assert.False(Fresh.LyricsAutoDownload);
+    }
+
+    [Fact]
     public void Unison_SearchesAutomatically_LrcRed_IsOptIn()
     {
         // Unison: keyless, documented for third-party reads (2026-10-17). lrc.red's word-synced

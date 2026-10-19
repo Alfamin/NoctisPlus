@@ -186,10 +186,10 @@ public class ArtistSortIgnoredWordsTests : IDisposable
         new PersistenceService(_root), new FakeLibraryService(), new NoOpPlayHistoryService());
 
     [Fact]
-    public void FreshInstall_IsOffWithJustThe()
+    public void FreshInstall_IsOnWithJustThe()
     {
         var fresh = new AppSettings();
-        Assert.False(fresh.IgnoreLeadingWordsInArtistSort);
+        Assert.True(fresh.IgnoreLeadingWordsInArtistSort);
         Assert.Equal(The, fresh.ArtistSortIgnoredWords);
     }
 
@@ -199,6 +199,9 @@ public class ArtistSortIgnoredWordsTests : IDisposable
         var vm = CreateSettings();
         await vm.LoadAsync();
         Assert.Equal(The, vm.ArtistSortIgnoredWords);
+        // Ships on (2026-10-18): the active list is the words until the toggle goes off.
+        Assert.Equal(The, vm.ActiveArtistSortIgnoredWords);
+        vm.IgnoreLeadingWordsInArtistSort = false;
         Assert.Empty(vm.ActiveArtistSortIgnoredWords);
 
         var raised = 0;
