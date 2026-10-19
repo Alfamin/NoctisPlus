@@ -138,6 +138,7 @@ internal sealed class DeezLoadSource : IMusicSource, IQualityMusicSource
 {
     public const string Bot = "deezload2bot";
     private static readonly TimeSpan OtherRecordingGrace = TimeSpan.FromMinutes(1);
+    internal static readonly TimeSpan SilentLimit = TimeSpan.FromSeconds(20);
     public string Id => "DeezLoad";
     public Task<bool> SetQualityAsync(AudioQuality quality, CancellationToken ct) => _account.SetQualityAsync(Bot, Id, quality, ct);
     public bool QualityConfirmed(AudioQuality quality) => _account.QualityConfirmed(Bot, quality);
@@ -209,10 +210,16 @@ internal sealed class DeezLoadSource : IMusicSource, IQualityMusicSource
             var sent=await client.SendMessageAsync(bot,link.Url).WaitAsync(TimeSpan.FromSeconds(25), ct).ConfigureAwait(false);
             var end=DateTimeOffset.UtcNow.AddMinutes(15); var cursor=sent.id; var lastNotice="";
             string? other=null; DateTimeOffset? otherSince=null;
+            var asked=DateTimeOffset.UtcNow; var heard=false;
             while(DateTimeOffset.UtcNow<end)
             {
                 ct.ThrowIfCancellationRequested();
                 var replies=await ReadNew(client,bot,sent.id,ct).ConfigureAwait(false);
+                heard|=replies.Count>0;
+                // A bot that is working says so ("Downloading", its queue position); one that has said nothing at all
+                // for 20 s is not working on it (owner #53: never sit and wait).
+                if(!heard && DateTimeOffset.UtcNow-asked>=SilentLimit)
+                    throw new TimeoutException("DeezLoad did not answer within 20 seconds.");
                 foreach(var m in replies)
                 {
                     if(BotLimits.Read(Id,m.message??"",DateTimeOffset.UtcNow) is {} limited) throw limited;

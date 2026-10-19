@@ -416,10 +416,16 @@ internal sealed class TelegramBotSource : IHunterBotSource
     public const string Bot = "MusicsHuntersbot";
     // The longest waits, used until the bot's usual answer times are known (BotTimings).
     private static readonly TimeSpan SearchWait = TimeSpan.FromSeconds(20);
-    private static readonly TimeSpan FileWait = TimeSpan.FromMinutes(3);
     // The shortest: a normal answer is never cut off (owner: 8 to 10 s for a ~2 s bot).
     private static readonly TimeSpan MinSearchWait = TimeSpan.FromSeconds(8);
-    private static readonly TimeSpan MinFileWait = TimeSpan.FromSeconds(60);
+    // Its files come within seconds of a press that lands (0.2-2.3 s measured). A dropped press once left a song
+    // waiting minutes with DeezLoad never asked. Owner #53: press 0.5 s after the list, press again when nothing
+    // comes, and after 10 s without the file ask DeezLoad.
+    internal static readonly TimeSpan PressAfterAnswer = TimeSpan.FromMilliseconds(500);
+    internal static readonly TimeSpan RepressEvery = TimeSpan.FromSeconds(3);
+    internal static readonly TimeSpan FileBudget = TimeSpan.FromSeconds(10);
+    internal const int MaxPresses = 3;
+    private static readonly TimeSpan PressAnswerWait = TimeSpan.FromSeconds(3);
     internal const string SearchTiming = "hunters-search", FileTiming = "hunters-file";
     private readonly BotTimings _timings;
     private bool _seeded;
@@ -431,6 +437,7 @@ internal sealed class TelegramBotSource : IHunterBotSource
     // the other's answer, since the bot answers both in the same chat; a download's file is told apart
     // from a search answer by being a file.
     private readonly SemaphoreSlim _searching = new(1, 1);
+    private long _answered = long.MinValue;
 
     public TelegramBotSource(TelegramAccount account, Action<string> log)
     {
@@ -461,6 +468,8 @@ internal sealed class TelegramBotSource : IHunterBotSource
                 var results = await WaitForAsync(client, bot, sent.id, m => m.media is not MessageMediaDocument && Buttons(m).Any(), wait, ct).ConfigureAwait(false)
                     ?? throw new TimeoutException($"The bot did not answer within {wait.TotalSeconds:0} seconds (it usually answers in about {Usual(SearchTiming)}).");
                 _timings.Record(SearchTiming, clock.Elapsed);
+                _answered = System.Diagnostics.Stopwatch.GetTimestamp();
+                Noctis.Services.DebugLog.Write("Finder", $"Music Hunters: results in {clock.Elapsed.TotalSeconds:0.0} s");
 
                 return ParseResults(results,FetchSelectedAsync);
             }, ct).ConfigureAwait(false);
@@ -518,24 +527,37 @@ internal sealed class TelegramBotSource : IHunterBotSource
             var button=ValidateSelection(request,old.Messages.OfType<Message>().FirstOrDefault(m=>m.id==selection.MessageId));
             var resultsId=selection.MessageId;
             var newest = (await client.Messages_GetHistory(bot, limit: 1).WaitAsync(TimeSpan.FromSeconds(25), ct).ConfigureAwait(false)).Messages.FirstOrDefault()?.ID ?? resultsId;
-            string? notice = null;
-            try { notice = (await client.Messages_GetBotCallbackAnswer(bot, resultsId, button).WaitAsync(TimeSpan.FromSeconds(25), ct).ConfigureAwait(false))?.message; }
-            // The bot may acknowledge the press later than Telegram waits; the file still arrives.
-            catch (RpcException ex) when (ex.Message.Contains("TIMEOUT", StringComparison.OrdinalIgnoreCase)) { }
-            catch(RpcException ex) when(IsStaleCallback(ex.Message))
-            {throw new StaleSelectionException("Music Hunters' selection expired; finding a fresh matching result.");}
-            if (BotLimits.Read("Music Hunters", notice ?? "", DateTimeOffset.UtcNow) is { } limited) throw limited;
-
-            string? other = null;
-            var fileWait = _timings.Wait(FileTiming, FileWait, MinFileWait, FileWait);
+            string? notice = null, other = null;
+            Message? file = null;
+            // Owner #53: press half a second after the list arrives, again if no file comes, and after 10 s DeezLoad.
+            var sinceAnswer = _answered == long.MinValue ? TimeSpan.MaxValue : System.Diagnostics.Stopwatch.GetElapsedTime(_answered);
+            if (sinceAnswer < PressAfterAnswer) await Task.Delay(PressAfterAnswer - sinceAnswer, ct).ConfigureAwait(false);
             var fileClock = System.Diagnostics.Stopwatch.StartNew();
-            var file = await WaitForAsync(client, bot, newest, m =>
+            for (var press = 1; file is null; press++)
             {
-                if (m.media is not MessageMediaDocument { document: Document sent }) return false;
-                if (Extension(sent) is not null && DeezLoadSource.Fits(request, sent)) return true;
-                other = Describe(sent);
-                return false;
-            }, fileWait, ct).ConfigureAwait(false);
+                // Telegram can hold a press until the bot acknowledges it; never longer than a moment here.
+                try { notice = (await client.Messages_GetBotCallbackAnswer(bot, resultsId, button).WaitAsync(PressAnswerWait, ct).ConfigureAwait(false))?.message; }
+                catch (RpcException ex) when (ex.Message.Contains("TIMEOUT", StringComparison.OrdinalIgnoreCase)) { }
+                catch (TimeoutException) { }
+                catch(RpcException ex) when(IsStaleCallback(ex.Message))
+                {throw new StaleSelectionException("Music Hunters' selection expired; finding a fresh matching result.");}
+                if (BotLimits.Read("Music Hunters", notice ?? "", DateTimeOffset.UtcNow) is { } limited) throw limited;
+                Noctis.Services.DebugLog.Write("Finder", $"Music Hunters: pressed {selection.Number}" + (press > 1 ? $" again at {fileClock.Elapsed.TotalSeconds:0.0} s" : ""));
+
+                var window = FileWindow(press, fileClock.Elapsed);
+                if (window <= TimeSpan.Zero) break;
+                file = await WaitForAsync(client, bot, newest, m =>
+                {
+                    if (m.media is not MessageMediaDocument { document: Document sent }) return false;
+                    if (Extension(sent) is not null && DeezLoadSource.Fits(request, sent)) return true;
+                    other = Describe(sent);
+                    return false;
+                }, window, ct).ConfigureAwait(false);
+                if (file is null && FileWindow(press + 1, fileClock.Elapsed) <= TimeSpan.Zero) break;
+            }
+            Noctis.Services.DebugLog.Write("Finder", file is not null
+                ? $"Music Hunters: file after {fileClock.Elapsed.TotalSeconds:0.0} s"
+                : $"Music Hunters: no file after {fileClock.Elapsed.TotalSeconds:0.0} s; trying DeezLoad");
             if (file is not null) _timings.Record(FileTiming, fileClock.Elapsed);
             if (file is null)
             {
@@ -546,6 +568,17 @@ internal sealed class TelegramBotSource : IHunterBotSource
             }
             return (Document)((MessageMediaDocument)file.media).document;
         }, ct);
+    }
+
+    /// <summary>How long to wait for the file after press number <paramref name="press"/> (1-based), counted from
+    /// the first press: presses at 0, 3 and 6 s, the last one waits until <see cref="FileBudget"/>; zero = give up.</summary>
+    internal static TimeSpan FileWindow(int press, TimeSpan elapsed)
+    {
+        if (press > MaxPresses || elapsed >= FileBudget) return TimeSpan.Zero;
+        var until = press < MaxPresses ? RepressEvery * press : FileBudget;
+        if (until > FileBudget) until = FileBudget;
+        var window = until - elapsed;
+        return window > TimeSpan.Zero ? window : TimeSpan.Zero;
     }
 
     public async Task<string> FetchSelectedAsync(MusicRequest request,Stream output,IProgress<double>? progress,CancellationToken ct)
@@ -654,7 +687,7 @@ internal sealed class TelegramBotSource : IHunterBotSource
     }
 
     private static TimeSpan PollInterval(TimeSpan waited)
-        => TimeSpan.FromSeconds(waited < TimeSpan.FromSeconds(15) ? 1.5 : waited < TimeSpan.FromMinutes(1) ? 3 : 5);
+        => TimeSpan.FromSeconds(waited < TimeSpan.FromSeconds(15) ? 1 : waited < TimeSpan.FromMinutes(1) ? 3 : 5);
 
     /// <summary>The buttons under a message that send data back to the bot when pressed.</summary>
     private static IEnumerable<(string Text, byte[] Data)> Buttons(Message message)

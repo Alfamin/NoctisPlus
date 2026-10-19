@@ -34,6 +34,18 @@ internal static class BotTimingTests
         Check.Equal(2, times.Count, "history pairs each search with the bot's next result message only");
         Check.Equal(TimeSpan.FromSeconds(2), times[0], "answer time is the gap between the two messages");
         Check.Equal(TimeSpan.FromSeconds(0.5), times[1], "a same-second answer counts as half a second");
+
+        // Owner #53: a dropped press left a song waiting minutes while DeezLoad was never asked.
+        Check.Section("Music Hunters: press soon, press again, DeezLoad after 10 s");
+        static TimeSpan s(double seconds) => TimeSpan.FromSeconds(seconds);
+        Check.Equal(TimeSpan.FromMilliseconds(500), TelegramBotSource.PressAfterAnswer, "the first press comes half a second after the list");
+        Check.Equal(s(3), TelegramBotSource.FileWindow(1, TimeSpan.Zero), "the first press waits 3 s for the file");
+        Check.Equal(s(3), TelegramBotSource.FileWindow(2, s(3)), "a second press at 3 s waits until 6 s");
+        Check.Equal(s(4), TelegramBotSource.FileWindow(3, s(6)), "the last press at 6 s waits until 10 s");
+        Check.Equal(TimeSpan.Zero, TelegramBotSource.FileWindow(4, s(10)), "no fourth press");
+        Check.Equal(TimeSpan.Zero, TelegramBotSource.FileWindow(2, s(10)), "10 s without the file: DeezLoad is next");
+        Check.Equal(s(1.5), TelegramBotSource.FileWindow(2, s(4.5)), "a slow press acknowledgement shortens the next window, not the budget");
+        Check.True(DeezLoadSource.SilentLimit <= s(20), "a DeezLoad that says nothing at all is given up within 20 s");
     }
 
     private static Message Out(int id, DateTime at, string text) => new() { id = id, date = at, message = text, flags = Message.Flags.out_ };
