@@ -77,7 +77,8 @@ public class TestLauncherTests
         using var process = Process.Start(start)!;
         var stdout = process.StandardOutput.ReadToEndAsync();
         var stderr = process.StandardError.ReadToEndAsync();
-        try { await process.WaitForExitAsync().WaitAsync(TimeSpan.FromSeconds(25)); }
+        // A busy CI runner took over 25 s to start PowerShell and the launcher (2026-10-19).
+        try { await process.WaitForExitAsync().WaitAsync(TimeSpan.FromSeconds(60)); }
         catch { process.Kill(entireProcessTree: true); await process.WaitForExitAsync(); throw; }
         return (process.ExitCode, await stdout + await stderr);
     }

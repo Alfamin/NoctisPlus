@@ -534,7 +534,7 @@ public sealed class SendToFolderService : ISendToFolderService
         ct.ThrowIfCancellationRequested();
         if (sameVolume ?? SameVolume(source, target))
         {
-            File.Move(source, target, overwrite: false);
+            await WhileInUseAsync(() => File.Move(source, target, overwrite: false), ct);
             return;
         }
         await CopyFileAsync(source, target, ct, afterChunk);
@@ -544,12 +544,26 @@ public sealed class SendToFolderService : ISendToFolderService
             var expected = new FileInfo(source).Length;
             if (written != expected)
                 throw new IOException($"Copy is {written} bytes, the song {expected}.");
-            File.Delete(source);
+            await WhileInUseAsync(() => File.Delete(source), ct);
         }
         catch
         {
             try { File.Delete(target); } catch { /* the drive may be gone */ }
             throw;
+        }
+    }
+
+    /// <summary>A song just read (tags, artwork, the library index) can be held open for a moment: a move retries a
+    /// few times on "in use" (sharing/lock violation) before it counts as failed. Seen on a busy CI runner.</summary>
+    private static async Task WhileInUseAsync(Action action, CancellationToken ct)
+    {
+        for (var attempt = 1; ; attempt++)
+        {
+            try { action(); return; }
+            catch (IOException ex) when (attempt < 4 && (ex.HResult & 0xFFFF) is 32 or 33)
+            {
+                await Task.Delay(250 * attempt, ct);
+            }
         }
     }
 
