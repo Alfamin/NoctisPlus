@@ -9,10 +9,12 @@ internal sealed class HunterMusicSource : IMusicSource, IQualityMusicSource
     private readonly TelegramAccount? _account;
     private readonly IHunterBotSource _bot;
     private readonly Action<string> _log;
-    public HunterMusicSource(TelegramAccount account,Action<string> log)
-    {_account=account;_bot=new TelegramBotSource(account,log);_log=log;}
-    internal HunterMusicSource(IHunterBotSource bot,Action<string>? log=null)
-    {_bot=bot;_log=log??(_=>{});}
+    private readonly Func<MusicRequest, CancellationToken, Task<string?>>? _resolveLink;
+    public HunterMusicSource(TelegramAccount account,Action<string> log, Func<MusicRequest, CancellationToken, Task<string?>>? resolveLink = null)
+    {_account=account;_bot=new TelegramBotSource(account,log);_log=log;_resolveLink=resolveLink;}
+    internal HunterMusicSource(IHunterBotSource bot,Action<string>? log=null, Func<MusicRequest, CancellationToken, Task<string?>>? resolveLink = null)
+    {_bot=bot;_log=log??(_=>{});_resolveLink=resolveLink;}
+    internal static bool IsTrackLink(string? url) => MusicLink.TryParse(url, out var link) && link!.Kind == "track";
     public string Id => BotSelections.Hunters;
     public Task<bool> SetQualityAsync(AudioQuality quality, CancellationToken ct)
         => _account?.SetQualityAsync(TelegramBotSource.Bot, Id, quality, ct) ?? Task.FromResult(false);
@@ -32,22 +34,53 @@ internal sealed class HunterMusicSource : IMusicSource, IQualityMusicSource
             try {return await _bot.FetchSelectedAsync(request,output,progress,ct).ConfigureAwait(false);}
             catch(StaleSelectionException ex){_log(ex.Message);}
         }
-        var tracks = await _bot.SearchAsync(BotQuery.For(request), ct).ConfigureAwait(false);
-        if (!tracks.Any(t => RecordingMatch.Fits(request,t.Artist,t.Title,t.Duration)) && BotQuery.Full(request) != BotQuery.For(request))
+        using var resolving = CancellationTokenSource.CreateLinkedTokenSource(ct);
+        resolving.CancelAfter(TimeSpan.FromSeconds(3));
+        // Start metadata lookup before asking by name. Catalog requests already carry a usable link.
+        var linkTask = ResolveLinkAsync(request, resolving.Token);
+        try
         {
-            Noctis.Services.DebugLog.Write("Finder", "Music Hunters: nothing fit; searching again with every credited artist");
-            tracks = await _bot.SearchAsync(BotQuery.Full(request), ct).ConfigureAwait(false);
-        }
-        var match = tracks.FirstOrDefault(t => RecordingMatch.Fits(request,t.Artist,t.Title,t.Duration));
-        if (match is null)
-        {
+            IReadOnlyList<BotTrack> tracks;
+            try { tracks = await _bot.SearchAsync(BotQuery.For(request), ct).ConfigureAwait(false); }
+            catch (SourceLimitException ex) when (ex.SearchOnly && !ex.Global)
+            {
+                ct.ThrowIfCancellationRequested();
+                var url = await linkTask.ConfigureAwait(false);
+                ct.ThrowIfCancellationRequested();
+                if (url is null) throw new TrackUnavailableException("Music Hunters' name search is limited and no matching track link was found; trying the reserve.");
+                return await _bot.FetchLinkAsync(request with { Url = url }, output, progress, ct).ConfigureAwait(false);
+            }
+            var match = tracks.FirstOrDefault(t => RecordingMatch.Fits(request,t.Artist,t.Title,t.Duration));
+            if (match is null)
+            {
+                var url = await linkTask.ConfigureAwait(false);
+                ct.ThrowIfCancellationRequested();
+                if (url is not null) return await _bot.FetchLinkAsync(request with { Url = url }, output, progress, ct).ConfigureAwait(false);
+                if (BotQuery.Full(request) != BotQuery.For(request))
+                {
+                    tracks = await _bot.SearchAsync(BotQuery.Full(request), ct).ConfigureAwait(false);
+                    match = tracks.FirstOrDefault(t => RecordingMatch.Fits(request,t.Artist,t.Title,t.Duration));
+                }
+            }
+            if (match is not null) return await match.Fetch(output,progress,ct).ConfigureAwait(false);
             // What it offered instead, so a refused song can be explained from session.log (owner #53).
             Noctis.Services.DebugLog.Write("Finder", $"Music Hunters: none of {tracks.Count} results fit \"{request.Artist} - {request.Title}\" ({request.Duration:m\\:ss}): " +
                 string.Join(" | ", tracks.Take(6).Select(t => $"{t.Artist} - {t.Title} ({t.Duration:m\\:ss})")));
             throw new TrackUnavailableException("No matching recording in Music Hunters' results.");
         }
-        // A stale selection is refreshed once; no search loop and no human button press.
-        return await match.Fetch(output,progress,ct).ConfigureAwait(false);
+        finally { resolving.Cancel(); }
+    }
+    private async Task<string?> ResolveLinkAsync(MusicRequest request, CancellationToken ct)
+    {
+        if (IsTrackLink(request.Url)) return request.Url;
+        if (_resolveLink is null) return null;
+        try
+        {
+            var url = await _resolveLink(request, ct).WaitAsync(ct).ConfigureAwait(false);
+            return IsTrackLink(url) ? url : null;
+        }
+        catch (Exception ex) when (ex is OperationCanceledException or TimeoutException or HttpRequestException or IOException or InvalidOperationException or ArgumentException or System.Text.Json.JsonException)
+        { return null; } // Optional metadata must not delay or break a successful name search.
     }
     private async Task<string?> TryCachedAsync(MusicRequest request,Stream output,IProgress<double>? progress,CancellationToken ct)
     {

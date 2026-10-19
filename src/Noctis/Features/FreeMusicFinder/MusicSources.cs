@@ -18,12 +18,13 @@ internal interface IMusicSource
     Task<string> FetchAsync(MusicRequest request, Stream output, IProgress<double>? progress, CancellationToken ct);
 }
 
-internal sealed class SourceLimitException(string provider, string message, DateTimeOffset until, bool global = false)
+internal sealed class SourceLimitException(string provider, string message, DateTimeOffset until, bool global = false, bool searchOnly = false)
     : Exception(message)
 {
     public string Provider { get; } = provider;
     public DateTimeOffset Until { get; } = until;
     public bool Global { get; } = global;
+    public bool SearchOnly { get; } = searchOnly;
 }
 internal sealed class SourcesWaitingException(string message, DateTimeOffset until) : Exception(message)
 {
@@ -79,18 +80,25 @@ internal sealed class MusicSources
     private readonly Func<bool> _allowMp3;
     private readonly Func<bool> _preferFlac;
     private readonly Func<AudioQuality>? _quality;
+    private readonly Func<string>? _firstBot;
     /// <param name="allowMp3">Whether an MP3 is taken when no bot has the recording in FLAC (a leak, say). Asked per song.</param>
-    public MusicSources(IMusicSource primary, IMusicSource backup, Action<string> notice, string? state = null, Func<DateTimeOffset>? now = null, Func<bool>? allowMp3 = null, Func<bool>? preferFlac = null, Func<AudioQuality>? quality = null)
+    public MusicSources(IMusicSource primary, IMusicSource backup, Action<string> notice, string? state = null, Func<DateTimeOffset>? now = null, Func<bool>? allowMp3 = null, Func<bool>? preferFlac = null, Func<AudioQuality>? quality = null, Func<string>? firstBot = null)
     {
         _sources = [primary, backup]; _notice = notice; _state = state; _now = now ?? (() => DateTimeOffset.UtcNow); _allowMp3 = allowMp3 ?? (() => false);
         _preferFlac = preferFlac ?? (() => true);
         _quality = quality;
+        _firstBot = firstBot;
         if (state is null || !File.Exists(state)) return;
         try
         {
             if (new FileInfo(state).Length > 64 * 1024) throw new InvalidDataException();
             foreach (var entry in JsonSerializer.Deserialize<SourceCooldown[]>(File.ReadAllText(state)) ?? [])
-                if ((_sources.Any(s => s.Id == entry.Id) || entry.Id == "Telegram") && entry.Until <= _now().AddDays(8)) _cooldowns[entry.Id] = entry;
+                if ((_sources.Any(s => s.Id == entry.Id || s.Id + " search" == entry.Id) || entry.Id == "Telegram") && entry.Until <= _now().AddDays(8))
+                {
+                    // The earlier daily-search fix blocked the whole provider; public track links still work.
+                    var key = entry.Id == BotSelections.Hunters && entry.Reason.Contains("daily search limit", StringComparison.OrdinalIgnoreCase) ? entry.Id + " search" : entry.Id;
+                    _cooldowns[key] = entry with { Id = key };
+                }
         }
         catch (Exception ex) when (ex is IOException or JsonException or UnauthorizedAccessException or InvalidDataException)
         { throw new InvalidDataException("SOURCE_STATE_UNREADABLE: saved bot limits could not be read. Keep the file for diagnosis; repair it before resuming.", ex); }
@@ -108,9 +116,9 @@ internal sealed class MusicSources
         try
         {
             CheckGlobal(); var errors = new List<string>();
-            foreach (var source in _sources)
+            foreach (var source in InPreferredOrder())
             {
-                if (Cooling(source.Id)) continue;
+                if (Cooling(source.Id) || Cooling(source.Id + " search")) continue;
                 try
                 {
                     var items = await source.SearchAsync(query, ct).ConfigureAwait(false);
@@ -124,7 +132,7 @@ internal sealed class MusicSources
                 {Block(new(source.Id,"TELEGRAM_CONNECTION_FAILED: "+ex.Message+" Check the VPN/proxy; queued work is preserved.",_now().AddMinutes(10),true));throw Waiting();}
                 catch (Exception ex) when (ex is TimeoutException or BotAnswerException or TrackUnavailableException) { errors.Add(source.Id + ": " + ex.Message); }
             }
-            if (_sources.Any(s => Cooling(s.Id))) throw Waiting();
+            if (_sources.Any(s => Cooling(s.Id) || Cooling(s.Id + " search"))) throw Waiting();
             if (errors.Count > 0) throw new BotAnswerException(string.Join(" ", errors));
             return [];
         }
@@ -151,8 +159,8 @@ internal sealed class MusicSources
             // An MP3 a bot sent is kept aside while the other bot is asked for FLAC. It is used only when no
             // bot has the recording in FLAC and the setting allows it.
             using var mp3 = new MemoryStream(); var haveMp3 = false; var skipped = false;
-            foreach (var source in _sources.OrderBy(s => qualityErrors.ContainsKey(s.Id) ? 1 : 0)
-                .ThenBy(s => request.CachedFrom == s.Id ? 0 : request.Selection?.Provider == s.Id ? 1 : request.PreferredSource == s.Id ? 2 : 3))
+            foreach (var source in InPreferredOrder().OrderBy(s => qualityErrors.ContainsKey(s.Id) ? 1 : 0)
+                .ThenBy(s => request.CachedFrom == s.Id ? 0 : request.Selection?.Provider == s.Id ? 1 : _firstBot is null && request.PreferredSource == s.Id ? 2 : 3))
             {
                 // A changed settings keyboard must not disable both download providers.
                 // Confirmed providers go first. A responsive unconfirmed one can still supply
@@ -229,6 +237,12 @@ internal sealed class MusicSources
         finally { _gate.Release(); }
     }
     private static void Trace(string line) => Noctis.Services.DebugLog.Write("Finder", line);
+
+    private IEnumerable<IMusicSource> InPreferredOrder()
+    {
+        var first = _firstBot?.Invoke();
+        return _sources.OrderBy(s => s.Id == first ? 0 : 1);
+    }
 
     /// <summary>The preference was changed in the app: each bot's menu is checked once more.</summary>
     public async Task SynchronizeQualityAsync(CancellationToken ct)
@@ -316,7 +330,8 @@ internal sealed class MusicSources
     {
         lock (_cooldowns)
         {
-            _cooldowns[error.Global ? "Telegram" : error.Provider] = new(error.Global ? "Telegram" : error.Provider, error.Until, error.Message);
+            var key = error.Global ? "Telegram" : error.SearchOnly ? error.Provider + " search" : error.Provider;
+            _cooldowns[key] = new(key, error.Until, error.Message);
             if (_state is not null) AtomicJson.Write(_state, _cooldowns.Values.ToArray());
         }
         _notice(error.Message + (error.Global ? "" : " Switching to the backup."));

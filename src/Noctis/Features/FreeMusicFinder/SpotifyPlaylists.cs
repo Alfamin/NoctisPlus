@@ -331,7 +331,7 @@ internal sealed class SpotifyPlaylists : IDisposable
                     scope.Token.ThrowIfCancellationRequested();
                     if (entry.Request is not {} request) continue;
                     if (known.Any(k => SameRecording(request, k))) continue;
-                    _downloads.Start(_track(request with { PreferredSource = "DeezLoad" }), folder, held: true);
+                    _downloads.Start(_track(request), folder, held: true);
                     known.Add(request); queued++;
                 }
             var name = only?.Manifest is {} named ? DisplayName(named.Name) : "";

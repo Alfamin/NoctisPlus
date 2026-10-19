@@ -32,4 +32,6 @@ internal interface IHunterBotSource
 {
     Task<IReadOnlyList<BotTrack>> SearchAsync(string query,CancellationToken ct);
     Task<string> FetchSelectedAsync(MusicRequest request,Stream output,IProgress<double>? progress,CancellationToken ct);
+    Task<string> FetchLinkAsync(MusicRequest request,Stream output,IProgress<double>? progress,CancellationToken ct)
+        => Task.FromException<string>(new TrackUnavailableException("Music Hunters' link path is unavailable."));
 }

@@ -440,12 +440,23 @@ internal sealed class TelegramBotSource : IHunterBotSource
     private long _answered = long.MinValue;
     /// <summary>How long Music Hunters is left out after "daily search limit reached" (owner #73); then it is asked again.</summary>
     internal static readonly TimeSpan SearchLimitPause = TimeSpan.FromHours(3);
+    private DateTimeOffset _nameSearchUntil;
+    private string SearchLimitPath => Path.Combine(_account.DataFolder, "hunters-search-until.json");
 
     public TelegramBotSource(TelegramAccount account, Action<string> log)
     {
         _account = account;
         _log = log;
         _timings = new BotTimings(Path.Combine(account.DataFolder, "bot-timings.json"));
+        try
+        {
+            if (File.Exists(SearchLimitPath) && new FileInfo(SearchLimitPath).Length < 1024)
+            {
+                var until = System.Text.Json.JsonSerializer.Deserialize<DateTimeOffset>(File.ReadAllText(SearchLimitPath));
+                if (until <= DateTimeOffset.UtcNow.Add(SearchLimitPause)) _nameSearchUntil = until;
+            }
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or System.Text.Json.JsonException) { _log("Music Hunters' saved search wait could not be read; track links remain available."); }
     }
 
     /// <summary>
@@ -459,6 +470,8 @@ internal sealed class TelegramBotSource : IHunterBotSource
         await _searching.WaitAsync(ct).ConfigureAwait(false);
         try
         {
+            if (_nameSearchUntil > DateTimeOffset.UtcNow)
+                throw new SourceLimitException(BotSelections.Hunters, "Music Hunters' name search is waiting; track links remain available.", _nameSearchUntil, searchOnly: true);
             return await RunAsync<IReadOnlyList<BotTrack>>(async (client, bot) =>
             {
                 await LearnFromHistoryAsync(client, bot, ct).ConfigureAwait(false);
@@ -468,17 +481,18 @@ internal sealed class TelegramBotSource : IHunterBotSource
                 var sent = await client.SendMessageAsync(bot, "/search " + query).WaitAsync(TimeSpan.FromSeconds(25), ct).ConfigureAwait(false);
                 // The answer always carries buttons; without results it has no numbered ones.
                 // Owner #73: the daily-limit answer has no result buttons; it is taken at once instead of waited out.
-                var results = await WaitForAsync(client, bot, sent.id, m => m.media is not MessageMediaDocument && (Buttons(m).Any() || BotText.IsSearchLimit(m.message)), wait, ct).ConfigureAwait(false)
+                var results = await WaitForAsync(client, bot, sent.id, m => m.media is not MessageMediaDocument && (Buttons(m).Any() || BotText.IsSearchLimit(m.message) || BotText.IsEmptySearch(m.message)), wait, ct).ConfigureAwait(false)
                     ?? throw new TimeoutException($"The bot did not answer within {wait.TotalSeconds:0} seconds (it usually answers in about {Usual(SearchTiming)}).");
                 _timings.Record(SearchTiming, clock.Elapsed);
                 _answered = System.Diagnostics.Stopwatch.GetTimestamp();
                 Noctis.Services.DebugLog.Write("Finder", $"Music Hunters: results in {clock.Elapsed.TotalSeconds:0.0} s");
                 if (BotText.IsSearchLimit(results.message))
                 {
-                    // Name searches are refused for the day (links still work, owner #73): DeezLoad takes the song now,
-                    // and Music Hunters is not asked by name again until the limit can have reset.
-                    Noctis.Services.DebugLog.Write("Finder", "Music Hunters: daily search limit reached; handing over to DeezLoad");
-                    throw new SourceLimitException(BotSelections.Hunters, "Music Hunters reached its daily search limit; DeezLoad answers until it resets.", DateTimeOffset.UtcNow.Add(SearchLimitPause));
+                    _nameSearchUntil = DateTimeOffset.UtcNow.Add(SearchLimitPause);
+                    try { AtomicJson.Write(SearchLimitPath, _nameSearchUntil); }
+                    catch (Exception ex) when (ex is IOException or UnauthorizedAccessException) { _log("Music Hunters' search wait could not be saved; using it for this session."); }
+                    Noctis.Services.DebugLog.Write("Finder", "Music Hunters: daily name-search limit; using the track link");
+                    throw new SourceLimitException(BotSelections.Hunters, "Music Hunters reached its daily search limit; track links remain available.", _nameSearchUntil, searchOnly: true);
                 }
 
                 return ParseResults(results,FetchSelectedAsync);
@@ -598,6 +612,40 @@ internal sealed class TelegramBotSource : IHunterBotSource
             await AudioFileTransfer.DownloadAsync(_account, client, document, output, progress, ct).ConfigureAwait(false);
             return Extension(document)!;
     }
+
+    public async Task<string> FetchLinkAsync(MusicRequest request, Stream output, IProgress<double>? progress, CancellationToken ct)
+    {
+        if (!HunterMusicSource.IsTrackLink(request.Url)) throw new TrackUnavailableException("No supported track link was found for Music Hunters.");
+        await _searching.WaitAsync(ct).ConfigureAwait(false);
+        try
+        {
+            var document = await RunAsync(async (client, bot) =>
+            {
+                var clock = System.Diagnostics.Stopwatch.StartNew();
+                var sent = await client.SendMessageAsync(bot, request.Url!).WaitAsync(TimeSpan.FromSeconds(25), ct).ConfigureAwait(false);
+                Noctis.Services.DebugLog.Write("Finder", "Music Hunters: track link sent");
+                var reply = await WaitForAsync(client, bot, sent.id, m => IsLinkFile(request, m) || Buttons(m).Any(IsNumber), FileBudget, ct).ConfigureAwait(false)
+                    ?? throw new TimeoutException("Music Hunters did not supply the linked recording within 10 seconds; trying the reserve.");
+                if (IsLinkFile(request, reply))
+                {
+                    Noctis.Services.DebugLog.Write("Finder", $"Music Hunters: linked file after {clock.Elapsed.TotalSeconds:0.0} s");
+                    return (Document)((MessageMediaDocument)reply.media).document;
+                }
+                var selected = ParseResults(reply, FetchSelectedAsync).FirstOrDefault(t => RecordingMatch.Fits(request, t.Artist, t.Title, t.Duration))?.Request
+                    ?? throw new TrackUnavailableException("Music Hunters' link results did not match this recording.");
+                _answered = System.Diagnostics.Stopwatch.GetTimestamp();
+                return await RequestSelectedDocumentAsync(request with { Selection = selected.Selection }, ct).ConfigureAwait(false);
+            }, ct).ConfigureAwait(false);
+            var client = await _account.ConnectAsync(ct).ConfigureAwait(false);
+            await AudioFileTransfer.DownloadAsync(_account, client, document, output, progress, ct).ConfigureAwait(false);
+            return Extension(document)!;
+        }
+        finally { _searching.Release(); }
+    }
+
+    internal static bool IsLinkFile(MusicRequest request, Message message)
+        => !message.flags.HasFlag(Message.Flags.out_) && message.media is MessageMediaDocument { document: Document file }
+            && Extension(file) is not null && DeezLoadSource.Fits(request, file);
     private string Usual(string kind) => _timings.Usual(kind) is { } usual ? $"{usual.TotalSeconds:0.#} seconds" : "an unknown time";
 
     /// <summary>
@@ -685,7 +733,11 @@ internal sealed class TelegramBotSource : IHunterBotSource
             ct.ThrowIfCancellationRequested();
             var history = await client.Messages_GetHistory(bot, min_id: afterId, limit: 30).WaitAsync(TimeSpan.FromSeconds(25), ct).ConfigureAwait(false);
             foreach (var reply in history.Messages.OfType<Message>().Where(m => !m.flags.HasFlag(Message.Flags.out_)))
+            {
+                // A name-search quota is not a file/download quota. Let SearchAsync scope it correctly.
+                if (BotText.IsSearchLimit(reply.message) && matches(reply)) return reply;
                 if (BotLimits.Read("Music Hunters", reply.message ?? "", DateTimeOffset.UtcNow) is { } limited) throw limited;
+            }
             var found = history.Messages.OfType<Message>().Reverse()
                 .FirstOrDefault(m => !m.flags.HasFlag(Message.Flags.out_) && matches(m));
             if (found is not null) return found;

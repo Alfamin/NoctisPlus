@@ -51,6 +51,7 @@ public sealed class FreeMusicPlugin : INoctisPlugin
     internal string MetadataProxy => _proxy;
     private volatile bool _allowMp3 = true;
     private volatile AudioQuality _preferredQuality = AudioQuality.FLAC;
+    private volatile string _firstBot = "DeezLoad";
     private readonly Func<string, string, ArtistCatalog> _catalogFactory;
     private ForYouSource? _forYou;
     private FinderOnlineSearch? _online;
@@ -79,11 +80,12 @@ public sealed class FreeMusicPlugin : INoctisPlugin
         _proxy = host.Settings.GetString(ProxyKey) ?? "";
         _allowMp3 = host.Settings.GetBool(AllowMp3Key, true);
         _preferredQuality = host.Settings.GetString("preferredQuality") == "MP3" ? AudioQuality.MP3 : AudioQuality.FLAC;
+        _firstBot = host.Settings.GetString("firstBot") == BotSelections.Hunters ? BotSelections.Hunters : "DeezLoad";
         _lastFmKey = host.Settings.GetString(LastFmKey)?.Trim() ?? "";
         _telegram = new TelegramAccount(Path.Combine(host.DataDirectory, "telegram.dat"), () => _proxy, Log);
-        _bot = new MusicSources(new HunterMusicSource(_telegram,Log),new DeezLoadSource(_telegram,Announce),Announce,
+        _bot = new MusicSources(new HunterMusicSource(_telegram,Log, ResolveHunterLinkAsync),new DeezLoadSource(_telegram,Announce),Announce,
             Path.Combine(host.DataDirectory,"source-limits.json"),allowMp3:()=>_preferredQuality == AudioQuality.MP3 || _allowMp3,
-            preferFlac: () => _preferredQuality == AudioQuality.FLAC, quality: () => _preferredQuality);
+            preferFlac: () => _preferredQuality == AudioQuality.FLAC, quality: () => _preferredQuality, firstBot: () => _firstBot);
         _downloads = new Downloads(Log,Path.Combine(host.DataDirectory,"download-queue.json"),_bot.Track);
         _transfers = new PlaylistTransfers(_telegram,_bot,_downloads,Path.Combine(host.DataDirectory,"playlist-queue.json"),Owns,
             new PlaylistCatalog(PlaylistCatalog.MetadataHandler(_proxy,Log)));
@@ -190,11 +192,21 @@ public sealed class FreeMusicPlugin : INoctisPlugin
         }
         else if (key == ShortcutKey) ApplyShortcut();
         else if (key == AllowMp3Key) _allowMp3 = _host?.Settings.GetBool(AllowMp3Key, true) ?? true;
+        else if (key == "firstBot") _firstBot = _host?.Settings.GetString(key) == BotSelections.Hunters ? BotSelections.Hunters : "DeezLoad";
         else if (key == "preferredQuality")
         {
             _preferredQuality = _host?.Settings.GetString(key) == "MP3" ? AudioQuality.MP3 : AudioQuality.FLAC;
             if (_telegram?.IsLoggedIn == true) _ = SynchronizeQualityAsync();
         }
+    }
+
+    private async Task<string?> ResolveHunterLinkAsync(MusicRequest request, CancellationToken ct)
+    {
+        var catalog = _catalog;
+        if (catalog is null) return null;
+        var matches = await catalog.SearchSongsAsync(BotQuery.For(request), ct).ConfigureAwait(false);
+        return matches.Value.Select(s => s.Song.Request)
+            .FirstOrDefault(s => HunterMusicSource.IsTrackLink(s.Url) && RecordingMatch.Fits(request, s.Artist, s.Title, s.Duration))?.Url;
     }
 
     private async Task SynchronizeQualityAsync()

@@ -15,8 +15,12 @@ internal static class LiveBotTest
 {
     public static async Task RunAsync(string trackLink, string? store, string? proxy)
     {
-        Check.Section("live: asking DeezLoad for one track with the real account");
+        var hunters = Environment.GetEnvironmentVariable("FMF_LIVE_BOT_SOURCE") == BotSelections.Hunters;
+        var provider = hunters ? BotSelections.Hunters : "DeezLoad";
+        Check.Section("live: asking " + provider + " for one track with the TEST account");
         if (string.IsNullOrWhiteSpace(store) || !File.Exists(store)) throw new ArgumentException("FMF_TELEGRAM_STORE (the plugin's login file) is required with FMF_LIVE_BOT.");
+        if (hunters && !Path.GetFullPath(store).Equals(@"C:\Users\Alfamine\NoctisPlus-Test\profile\plugin-data\dev.moshi.freemusicfinder\telegram.dat", StringComparison.OrdinalIgnoreCase))
+            throw new ArgumentException("The Music Hunters live probe only accepts the signed-in TEST profile, in place.");
         if (!MusicLink.TryParse(trackLink, out var link) || link!.Kind != "track") throw new ArgumentException("FMF_LIVE_BOT needs a Spotify or Deezer track link.");
         using var account = new TelegramAccount(store, () => proxy ?? "", way => Console.WriteLine("  " + way));
         if (!account.IsLoggedIn) { Console.WriteLine("  this login file holds no login; nothing was sent"); return; }
@@ -36,7 +40,14 @@ internal static class LiveBotTest
             Console.WriteLine($"  chat with @{name}: {(newest.Messages.Length == 0 ? "empty, so the next message is a first contact as far as Telegram shows" : newest.Messages.Length + " of its newest 5 messages are there")}");
         }
 
-        var bot = (await client.Contacts_ResolveUsername(DeezLoadSource.Bot)).User;
+        var bot = (await client.Contacts_ResolveUsername(hunters ? TelegramBotSource.Bot : DeezLoadSource.Bot)).User;
+        if (hunters && Environment.GetEnvironmentVariable("FMF_LIVE_BOT_HISTORY") == "1")
+        {
+            foreach (var answer in (await client.Messages_GetHistory(bot, limit: 30)).Messages.OfType<Message>().OrderBy(m => m.id))
+                Console.WriteLine((answer.flags.HasFlag(Message.Flags.out_) ? "  asked: " : "  bot: ") + Describe(answer, request));
+            Console.WriteLine("  RESULT: history inspected; no message sent and no file downloaded.");
+            return;
+        }
         Message sent;
         try { sent = await client.SendMessageAsync(bot, link.Url); } // what DeezLoadSource.FetchAsync sends, with no /start before it
         catch (RpcException ex) { Console.WriteLine($"  Telegram did not take the message: {ex.Message}"); return; }
@@ -52,6 +63,11 @@ internal static class LiveBotTest
                 if (said.GetValueOrDefault(answer.id) == text) continue; // the bot rewrites its progress message
                 said[answer.id] = text;
                 Console.WriteLine($"  [{(DateTime.UtcNow - (end - TimeSpan.FromMinutes(3))).TotalSeconds,3:0} s] bot: {text}");
+                if (hunters && answer.reply_markup is ReplyInlineMarkup && answer.media is not MessageMediaDocument)
+                {
+                    Console.WriteLine("  RESULT: Music Hunters answered the link with buttons; none were pressed.");
+                    return;
+                }
                 if (answer.media is MessageMediaDocument { document: Document file } && DeezLoadSource.Fits(request, file))
                 {
                     Console.WriteLine("  RESULT: the bot sent the track that was asked for. It was not downloaded.");

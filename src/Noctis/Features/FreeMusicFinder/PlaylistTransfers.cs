@@ -118,7 +118,6 @@ internal sealed class PlaylistTransfers : IDisposable
                 ct.ThrowIfCancellationRequested();
                 if(_downloads.Paused) {Notice(job,"Metadata saved. Import paused; resume the queue to continue.");return;}
                 if(entry.Request is not {} request || job.Enqueued.Contains(request.Identity))continue;
-                request=request with {PreferredSource=link!.Kind=="playlist"?"DeezLoad":"Music Hunters"};
                 var track=_sources.Track(request);
                 var owned=_owned(track) || Downloader.FindExisting(job.Folder,track.FileName) is not null;
                 lock(_gate)
