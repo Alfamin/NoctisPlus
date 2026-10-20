@@ -60,7 +60,10 @@ internal static class BackupCleaner
         var summary = Path.Combine(runFolder, "summary.txt");
         if (!File.Exists(summary)) return new(0, 0, 0);
         var backup = File.ReadLines(summary).Select(l => Regex.Match(l, @"^\s*Backup copy:\s*(.+?)\s*$")).FirstOrDefault(m => m.Success)?.Groups[1].Value;
-        if (backup is null || !Path.IsPathFullyQualified(backup) || !Directory.Exists(backup) || Redirected(backup)) return new(0, 0, 0);
+        if (backup is null || !Path.IsPathFullyQualified(backup)) return new(0, 0, 0);
+        // WordLyrics keeps a small note beside each backup folder ("….wordlyrics.json"); with the folder gone it describes nothing.
+        if (!Directory.Exists(backup)) { DropNote(backup); return new(0, 0, 0); }
+        if (Redirected(backup)) return new(0, 0, 0);
         var (source, songs) = Request(Path.Combine(runFolder, "request.json"));
         if (source is null) return new(0, 0, 0);
         var root = Path.GetFullPath(backup).TrimEnd('\\', '/');
@@ -85,7 +88,15 @@ internal static class BackupCleaner
         foreach (var dir in Directory.EnumerateDirectories(root, "*", SearchOption.AllDirectories).OrderByDescending(d => d.Length).Append(root))
             try { if (!Directory.EnumerateFileSystemEntries(dir).Any() && !Redirected(dir)) Directory.Delete(dir); }
             catch (Exception ex) when (ex is IOException or UnauthorizedAccessException) { }
+        if (!Directory.Exists(root)) DropNote(root);
         return new(removed, kept, bytes);
+    }
+
+    private static void DropNote(string backupFolder)
+    {
+        var note = Path.GetFullPath(backupFolder).TrimEnd('\\', '/') + ".wordlyrics.json";
+        try { if (File.Exists(note) && !Redirected(note)) File.Delete(note); }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or ArgumentException) { }
     }
 
     private static (string? Source, List<string> Songs) Request(string file)

@@ -228,7 +228,9 @@ public partial class PlayerViewModel
             asked++;
             if (status.State is OnlineDownloadState.Downloading or OnlineDownloadState.Queued) continue;
             if (!pending.Source.CanDownload || !_askedAhead.TryAdd(pending.Song.Id, pending)) continue;
-            var now = asked == 1;
+            // Part of playing, like Play itself: the fast lanes (two at once), also while bulk downloads are paused (live:
+            // a paused queue held the 2nd and 3rd song back).
+            const bool now = true;
             _ = Task.Run(async () =>
             {
                 try { await pending.Source.DownloadAsync([pending.Song], now, CancellationToken.None); }

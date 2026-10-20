@@ -165,7 +165,7 @@ public class QueueStreamingTests
         var end = DateTime.UtcNow.AddSeconds(3);
         while (source.Downloads_.Count < PlayerViewModel.StreamAheadSongs && DateTime.UtcNow < end) { Thread.Sleep(10); Settle(); }
         lock (source.Downloads_)
-            Assert.Equal(new[] { ("s0", true), ("s1", false), ("s2", false) }, source.Downloads_.OrderBy(d => d.Id));
+            Assert.Equal(new[] { ("s0", true), ("s1", true), ("s2", true) }, source.Downloads_.OrderBy(d => d.Id));
     }
 
     [Fact]

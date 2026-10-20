@@ -50,10 +50,12 @@ public class WordLyricsBackupCleanupTests : IDisposable
         Directory.CreateDirectory(Path.Combine(backup, "Album"));
         File.WriteAllBytes(Path.Combine(music, "Album", "a.flac"), [7, 7]);
         File.WriteAllBytes(Path.Combine(backup, "Album", "a.flac"), [7, 7]);
+        File.WriteAllText(backup + ".wordlyrics.json", "{}");
         var run = Run(music, backup, []);
 
         Assert.Equal(1, BackupCleaner.CleanRun(run).Removed);
         Assert.False(Directory.Exists(backup));
+        Assert.False(File.Exists(backup + ".wordlyrics.json")); // its note goes with it
     }
 
     [Fact]
