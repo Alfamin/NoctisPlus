@@ -32,16 +32,20 @@ internal static class AudioFileTransfer
 
     internal static async Task CopyAsync(Stream output, long size,
         Func<long, int, CancellationToken, Task<byte[]>> read, IProgress<double>? progress, CancellationToken ct,
-        TimeSpan? idleTimeout = null)
+        TimeSpan? idleTimeout = null, long start = 0, PartialAudio.Slot? kept = null)
     {
         if (size <= 0 || size > 4L * 1024 * 1024 * 1024) throw new InvalidDataException("INVALID_AUDIO_SIZE: the provider supplied an empty or oversized file.");
         if (!output.CanSeek || !output.CanWrite) throw new ArgumentException("Audio transfers need a seekable writable output.", nameof(output));
+        if (start < 0 || start > size || start % ChunkSize != 0 && start != size) throw new ArgumentOutOfRangeException(nameof(start));
         using var stop = CancellationTokenSource.CreateLinkedTokenSource(ct);
         var timeout = idleTimeout ?? IdleTimeout;
         stop.CancelAfter(timeout);
         var token = stop.Token;
         var pending = new List<Task<(long Offset, byte[] Bytes)>>(Parallelism);
-        long next = 0, received = 0, origin = output.Position;
+        // Owner #100: a transfer stopped part way resumes from the bytes kept (start); the unbroken prefix written so far is
+        // what can be kept if this one is stopped too (chunks arrive out of order).
+        long next = start, received = start, origin = output.Position - start, prefix = start;
+        var done = new HashSet<long>();
         double lastShare = 0;
         async Task<(long, byte[])> Part(long offset)
         {
@@ -68,6 +72,9 @@ internal static class AudioFileTransfer
                 output.Position = checked(origin + offset);
                 await output.WriteAsync(bytes, token).ConfigureAwait(false);
                 received += bytes.Length; stop.CancelAfter(timeout);
+                done.Add(offset);
+                while (done.Remove(prefix)) prefix = Math.Min(size, prefix + ChunkSize);
+                if (kept is not null) kept.Prefix = prefix;
                 var share = (double)received / size;
                 if (share - lastShare >= .02 || received == size) progress?.Report(lastShare = share);
             }
@@ -109,7 +116,17 @@ internal static class AudioFileTransfer
             }
             return file is Upload_File bytes ? bytes.bytes : throw new TrackUnavailableException("Telegram returned unsupported audio storage. Retry the recording from the other bot.");
         }
-        try { await CopyAsync(output, document.size, Read, progress, ct).ConfigureAwait(false); }
+        // Owner #100: the bytes of this very file kept from a transfer stopped earlier go back in first.
+        var kept = PartialAudio.Current.Value;
+        long start = 0;
+        if (kept is not null)
+        {
+            kept.DocumentId = document.id; kept.Size = document.size; kept.Prefix = 0;
+            start = await PartialAudio.RestoreAsync(document.id, document.size, output, ct).ConfigureAwait(false);
+            kept.Prefix = start;
+            if (start > 0) Noctis.Services.DebugLog.Write("Finder", $"resuming a stopped transfer at {start * 100 / document.size}%");
+        }
+        try { await CopyAsync(output, document.size, Read, progress, ct, start: start, kept: kept).ConfigureAwait(false); }
         catch (AudioTransferStalledException)
         { await account.RetireConnectionAsync(client).ConfigureAwait(false); throw; }
         // A cancelled transfer (removed, or held back for a newer Play, owner #83/#84) keeps the connection: the other

@@ -101,6 +101,8 @@ internal static class Downloader
         if (FindExisting(folder, track.FileName) is { } existing) { playback?.End(existing); return DownloadOutcome.AlreadyThere; }
 
         var partial = Path.Combine(folder, track.FileName + PartSuffix);
+        // Owner #100: what the transfer had when stopped is kept (see PartialAudio) and the next download goes on from there.
+        var kept = PartialAudio.Current.Value = new PartialAudio.Slot();
         try
         {
             string extension;
@@ -147,6 +149,7 @@ internal static class Downloader
         catch (Exception ex)
         {
             playback?.End(null, ex);
+            if (ct.IsCancellationRequested) PartialAudio.Keep(partial, kept);
             try { File.Delete(partial); } catch (IOException) { } catch (UnauthorizedAccessException) { }
             throw;
         }

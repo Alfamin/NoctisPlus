@@ -95,6 +95,9 @@ public sealed class FreeMusicPlugin : INoctisPlugin
         // Owner #87: played-only songs live here, never in the library.
         _streamCache = StreamCache.Folder(host.DataDirectory);
         _downloads.CacheFolder = _streamCache;
+        // Owner #100: parts of stopped downloads, kept to go on later (removed after three days).
+        PartialAudio.Folder = Path.Combine(host.DataDirectory, "stream-partial");
+        _ = Task.Run(PartialAudio.Clean);
         Noctis.Services.LibraryExclusions.Register(_streamCache);
         _purge = new Timer(_ => PurgeStreamCache(), null, TimeSpan.FromMinutes(1), TimeSpan.FromHours(6));
         // A busy listening day must not wait six hours for the size limit: after a new song lands, at most every 5 minutes.
