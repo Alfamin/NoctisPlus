@@ -266,7 +266,7 @@ public partial class PlayerViewModel
     /// the fast lane; saved ones are swapped for the real song so crossfade and gapless treat them like any other.</summary>
     // ── Owner #102: the next songs you don't have show their cover in the queue (small, a few KB each) ──
     internal const int QueueCoverSongs = 30;
-    private const int QueueCoverLoads = 6;
+    private const int QueueCoverLoads = QueueCoverSongs; // owner #104: all at once (small, one HTTP/2 connection)
     private readonly HashSet<Track> _coverLoading = new(ReferenceEqualityComparer.Instance);
     private readonly HashSet<Track> _noCover = new(ReferenceEqualityComparer.Instance);
 
@@ -294,7 +294,7 @@ public partial class PlayerViewModel
                     if (path is not null) t.ShowArtwork(path);
                     else _noCover.Add(t); // none: not asked again this session
                     _coverLoading.Remove(t);
-                    if (path is not null || waiting.Count > QueueCoverLoads) PostStreamAhead(); // the next ones
+                    if (waiting.Count > QueueCoverLoads) PostStreamAhead(); // the next ones
                 }, Avalonia.Threading.DispatcherPriority.Background);
             });
         }

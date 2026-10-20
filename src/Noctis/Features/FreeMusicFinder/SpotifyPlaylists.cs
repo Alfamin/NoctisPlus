@@ -60,10 +60,88 @@ internal sealed class SpotifyPlaylists : IDisposable
         var job = Jobs.FirstOrDefault(j => j.LibraryId == playlistId);
         if (job?.Manifest is not { CompleteIds: true } manifest || job.FillingStopped) return null;
         var matches = job.Matches;
+        _ = FillCoversAsync(job);
         return manifest.Entries.OrderBy(e => e.Position).Select(e => new ImportedPlaylistEntry(
             e.Position, e.Request is null ? null : Song(e),
             matches.TryGetValue(e.Position, out var id) ? id : null, e.Issue,
             ArtistCatalog.ArtworkUrl(e.Artwork) ? e.Artwork : "", e.Album ?? "")).ToArray();
+    }
+
+    // ── Owner #104: imports saved before covers were kept have none (the owner's three: 6 of 418 songs). Spotify's paged
+    // list gives every cover in about a second per 100 songs, so they are filled in once, saved, and the page shows them. ──
+    private readonly Dictionary<string, Task> _coverFills = new();
+    private readonly Dictionary<string, DateTimeOffset> _coverFillTried = new();
+    private static bool LacksCovers(SpotifyPlaylist job) => job.Manifest is { CompleteIds: true } manifest &&
+        manifest.Entries.Any(e => e.Request is not null && e.Uri.StartsWith("spotify:track:", StringComparison.Ordinal) && !ArtistCatalog.ArtworkUrl(e.Artwork));
+
+    internal Task FillCoversAsync(SpotifyPlaylist job)
+    {
+        lock (_gate)
+        {
+            if (_coverFills.TryGetValue(job.Url, out var running)) return running;
+            if (!LacksCovers(job) || !PlaylistLink(job.Url, out var link) || link!.Service != "spotify" ||
+                _coverFillTried.TryGetValue(job.Url, out var tried) && DateTimeOffset.UtcNow - tried < TimeSpan.FromMinutes(2)) return Task.CompletedTask;
+            var fill = Task.Run(() => FillCoversCore(job, link, _stop.Token));
+            _coverFills[job.Url] = fill;
+            return fill;
+        }
+    }
+
+    private async Task FillCoversCore(SpotifyPlaylist job, MusicLink link, CancellationToken ct)
+    {
+        var clock = System.Diagnostics.Stopwatch.StartNew();
+        var filled = 0; var read = false;
+        try
+        {
+            if (await _catalog.FullPlaylistAsync(link, ct).ConfigureAwait(false) is not { } paged) return;
+            read = true; // once a session: songs Spotify has no cover for are not asked again on every refresh
+            var covers = paged.Entries.Where(e => ArtistCatalog.ArtworkUrl(e.Artwork)).GroupBy(e => e.Uri).ToDictionary(g => g.Key, g => g.First());
+            lock (_gate)
+            {
+                foreach (var entry in job.Manifest?.Entries ?? [])
+                    if (!ArtistCatalog.ArtworkUrl(entry.Artwork) && covers.TryGetValue(entry.Uri, out var found))
+                    {
+                        entry.Artwork = found.Artwork;
+                        if (string.IsNullOrEmpty(entry.Album)) entry.Album = found.Album;
+                        filled++;
+                    }
+            }
+            if (filled == 0) return;
+            try { Save(); } catch (Exception ex) when (ex is IOException or UnauthorizedAccessException) { } // kept for this session
+            Noctis.Services.DebugLog.Write("Playlist", $"covers filled in for {filled} songs of \"{DisplayName(job.Manifest?.Name ?? "")}\" in {clock.ElapsedMilliseconds} ms");
+            Publish();
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException) { Noctis.Services.DebugLog.Write("Playlist", "covers not filled in: " + ex.Message); }
+        finally
+        {
+            lock (_gate)
+            {
+                _coverFills.Remove(job.Url);
+                _coverFillTried[job.Url] = read ? DateTimeOffset.MaxValue : DateTimeOffset.UtcNow;
+            }
+        }
+    }
+
+    /// <summary>Owner #104: the cover of an imported song ("spotify:ID"), as saved; null when it has none yet.</summary>
+    internal string? ArtworkFor(string songId)
+    {
+        if (!songId.StartsWith("spotify:", StringComparison.Ordinal)) return null;
+        var uri = "spotify:track:" + songId["spotify:".Length..];
+        foreach (var job in Jobs)
+            if (job.Manifest?.Entries.FirstOrDefault(e => e.Uri == uri && ArtistCatalog.ArtworkUrl(e.Artwork)) is { } entry) return entry.Artwork;
+        return null;
+    }
+
+    /// <summary>Owner #104: as <see cref="ArtworkFor"/>, first filling in the covers of the imports that list the song.</summary>
+    internal async Task<string?> ArtworkForAsync(string songId, CancellationToken ct)
+    {
+        if (ArtworkFor(songId) is { } saved) return saved;
+        if (!songId.StartsWith("spotify:", StringComparison.Ordinal)) return null;
+        var uri = "spotify:track:" + songId["spotify:".Length..];
+        var fills = Jobs.Where(j => j.Manifest?.Entries.Any(e => e.Uri == uri) == true).Select(FillCoversAsync).ToArray();
+        if (fills.Length == 0) return null;
+        await Task.WhenAll(fills).WaitAsync(ct).ConfigureAwait(false);
+        return ArtworkFor(songId);
     }
 
     // "spotify:track:ID" -> "spotify:ID": the catalog id shape (its Request maps it back to the track URI).

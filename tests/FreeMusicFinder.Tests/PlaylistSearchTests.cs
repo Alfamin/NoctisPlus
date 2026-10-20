@@ -158,6 +158,34 @@ internal static class PlaylistSearchTests
             var manifest = await catalog.ReadAsync(link!, null, _ => { }, _ => { }, default);
             Check.Equal(3, manifest.Entries.Count, "Spotify refusing the paged query: the embed reading answers");
         }
+        await CoversFilledIn();
+    }
+
+    // Owner #104: imports saved without covers (the embed reading, or before covers were kept) get them once.
+    private static async Task CoversFilledIn()
+    {
+        var folder = Check.NewFolder("playlist-covers"); var store = Path.Combine(folder, "imports.json");
+        var sources = new MusicSources(new TransferTests.Source("DeezLoad"), new TransferTests.Source("Music Hunters"), _ => { });
+        using var downloads = new Downloads(_ => { }, Path.Combine(folder, "queue.json"), sources.Track);
+        var http = new Http { PagedTotal = 0 };
+        var library = new SpotifyPlaylistTests.Library();
+        using (var imports = new SpotifyPlaylists(store, library, downloads, sources.Track, new PlaylistCatalog(http)))
+        {
+            await imports.ImportAsync(SpotifyPlaylistTests.Url(2), default); // songs 2, 1, 3, read from the embed pages: no covers
+            var job = imports.Jobs[0];
+            Check.True(job.Manifest!.Entries.All(e => e.Artwork.Length == 0), "an import read without covers has none");
+            http.PagedTotal = 3; var pages = http.PageCalls; // Spotify's paged list lists songs 0, 1, 2 with covers
+            Check.Equal("https://i.scdn.co/image/a1", await imports.ArtworkForAsync("spotify:" + SpotifyPlaylistTests.Id(1), default), "a queued song's cover is filled in from the paged list");
+            Check.Equal("https://i.scdn.co/image/a2", imports.ArtworkFor("spotify:" + SpotifyPlaylistTests.Id(2)), "with the rest of the playlist's");
+            Check.True(imports.EntriesFor(job.LibraryId)!.First(e => e.Position == 1).Artwork == "https://i.scdn.co/image/a2", "the playlist page shows them");
+            Check.Equal("Album 1", job.Manifest.Entries.First(e => e.Uri.EndsWith(SpotifyPlaylistTests.Id(1))).Album, "albums too");
+            Check.Equal((string?)null, await imports.ArtworkForAsync("spotify:" + SpotifyPlaylistTests.Id(3), default), "a song Spotify gave no cover for has none");
+            await imports.FillCoversAsync(job);
+            Check.Equal(pages + 1, http.PageCalls, "the list is read once, not on every refresh");
+            Check.Equal((string?)null, imports.ArtworkFor("spotify:" + SpotifyPlaylistTests.Id(9)), "a song in no import has none");
+        }
+        using (var again = new SpotifyPlaylists(store, library, downloads, sources.Track, new PlaylistCatalog(new Http { PagedTotal = 0 })))
+            Check.Equal("https://i.scdn.co/image/a1", again.ArtworkFor("spotify:" + SpotifyPlaylistTests.Id(1)), "they are saved: the next start has them at once");
     }
 
     private static void Ranking()

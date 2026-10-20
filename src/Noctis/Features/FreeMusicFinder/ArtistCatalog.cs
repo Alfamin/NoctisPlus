@@ -39,7 +39,11 @@ internal sealed partial class ArtistCatalog : IDisposable
     private readonly HashSet<string> _askedBy = new();
     // Six covers at a time: Search shows a screenful at once and covers are small (~20 KB).
     private readonly SemaphoreSlim _artGate = new(6, 6);
-    private readonly SemaphoreSlim[] _artLocks = Enumerable.Range(0, 16).Select(_ => new SemaphoreSlim(1, 1)).ToArray();
+    // Owner #104: the queue's covers have a lane of their own, so a page fetching hundreds of row covers does not hold
+    // them up; one HTTP/2 connection carries them all.
+    private readonly SemaphoreSlim _quickArtGate = new(16, 16);
+    // One lock per image (striped): 256 stripes, so two different covers rarely wait on each other.
+    private readonly SemaphoreSlim[] _artLocks = Enumerable.Range(0, 256).Select(_ => new SemaphoreSlim(1, 1)).ToArray();
     private readonly Dictionary<string, object> _memory = new();
     private readonly Dictionary<string, (CatalogProfile Raw, CatalogProfile View)> _profileViews = new();
     private sealed record Cache<T>(int Version, DateTimeOffset SavedAt, T Value, string Warning = "");
@@ -463,17 +467,18 @@ internal sealed partial class ArtistCatalog : IDisposable
         try { var path = SafeFile("art-" + Key(url!)[..64] + ".img")!; return File.Exists(path) && new FileInfo(path).Length is > 0 and var bytes && bytes <= (highQuality ? 4 * 1024 * 1024 : 512 * 1024) ? path : null; }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or InvalidDataException) { return null; }
     }
-    public async Task<string?> ArtworkAsync(string url, CancellationToken ct, bool highQuality = false)
+    public async Task<string?> ArtworkAsync(string url, CancellationToken ct, bool highQuality = false, bool quick = false)
     {
         if (!ArtworkUrl(url)) return null;
         var sameImage = _artLocks[(int)((uint)StringComparer.Ordinal.GetHashCode(url) % (uint)_artLocks.Length)];
         await sameImage.WaitAsync(ct).ConfigureAwait(false);
-        try { return await FetchArtwork(url, ct, highQuality).ConfigureAwait(false); }
+        try { return await FetchArtwork(url, ct, highQuality, quick ? _quickArtGate : _artGate).ConfigureAwait(false); }
         finally { sameImage.Release(); }
     }
-    private async Task<string?> FetchArtwork(string url, CancellationToken ct, bool highQuality)
+    private async Task<string?> FetchArtwork(string url, CancellationToken ct, bool highQuality, SemaphoreSlim gate)
     {
-        await _artGate.WaitAsync(ct).ConfigureAwait(false);
+        if (SavedArtwork(url, highQuality) is {} ready) return ready;
+        await gate.WaitAsync(ct).ConfigureAwait(false);
         try
         {
             if (SavedArtwork(url, highQuality) is {} saved) return saved;
@@ -492,7 +497,7 @@ internal sealed partial class ArtistCatalog : IDisposable
             finally { if (File.Exists(temp)) File.Delete(temp); }
             return SavedArtwork(url, highQuality);
         }
-        finally { _artGate.Release(); }
+        finally { gate.Release(); }
     }
     public void Dispose() => _http.Dispose();
 }

@@ -207,19 +207,29 @@ internal sealed class FinderOnlineSearch : IOnlineMusicSearch
     }
 
     // Owner #102: a queue row's cover. One the page already showed (any size) is used at once; else the small one.
+    // Owner #104: a song of an imported playlist saved without covers takes the one filled in since.
     public string? CachedQueueCover(OnlineSong song)
-        => song.ArtworkUrl.Length == 0 ? null
-            : CachedArtwork(song.ArtworkUrl) ?? (CatalogArtwork.ThumbUrl(song.ArtworkUrl) is { } thumb ? CachedArtwork(thumb) : null);
+        => CoverUrl(song) is not { Length: > 0 } url ? null
+            : CachedArtwork(url) ?? (CatalogArtwork.ThumbUrl(url) is { } thumb ? CachedArtwork(thumb) : null);
+    private string? CoverUrl(OnlineSong song) => song.ArtworkUrl.Length > 0 ? song.ArtworkUrl : _playlists()?.ArtworkFor(song.Id);
 
     public async Task<string?> QueueCoverAsync(OnlineSong song, CancellationToken ct)
     {
-        if (song.ArtworkUrl.Length == 0) return null;
         var clock = System.Diagnostics.Stopwatch.StartNew();
-        var path = CatalogArtwork.ThumbUrl(song.ArtworkUrl) is { } thumb && thumb != song.ArtworkUrl
-            ? await ArtworkAsync(thumb, ct).ConfigureAwait(false) : null;
-        path ??= await ArtworkAsync(song.ArtworkUrl, ct).ConfigureAwait(false); // the small one was refused: the cover as it is
+        var url = CoverUrl(song);
+        if (url is null && _playlists() is { } imports) url = await imports.ArtworkForAsync(song.Id, ct).ConfigureAwait(false);
+        if (url is not { Length: > 0 } || _catalog() is not { } catalog) return null;
+        string? path = null;
+        try
+        {
+            // The quick lane: a page loading hundreds of row covers does not hold the queue's thirty up.
+            path = CatalogArtwork.ThumbUrl(url) is { } thumb && thumb != url ? await catalog.ArtworkAsync(thumb, ct, quick: true).ConfigureAwait(false) : null;
+            path ??= await catalog.ArtworkAsync(url, ct, quick: true).ConfigureAwait(false); // the small one was refused: the cover as it is
+        }
+        catch (Exception ex) when (ex is HttpRequestException or IOException or TimeoutException or InvalidDataException) { }
         if (path is not null)
             Noctis.Services.DebugLog.Write("Queue", $"cover of \"{song.Title}\" in {clock.ElapsedMilliseconds} ms ({new FileInfo(path).Length / 1024} KB)");
+        else Noctis.Services.DebugLog.Write("Queue", $"no cover for \"{song.Title}\" ({(url is { Length: > 0 } ? "not loaded" : "none listed")})");
         return path;
     }
 
