@@ -94,6 +94,7 @@ public class QueueStreamingTests
         var list = new List<Track> { Local("A") };
         for (int i = 0; i < 6; i++) list.Add(StandIn(source, "s" + i));
         player.ReplaceQueueAndPlay(list, 0); Settle();
+        Assert.True(player.QueueIsSettling); // shared with timing-ahead: current song is never held, next songs are
         await Task.Delay(200); Settle();
         Assert.Empty(source.Downloads_);
         lock (source.AskedAhead) Assert.Empty(source.AskedAhead);
@@ -102,6 +103,7 @@ public class QueueStreamingTests
         Assert.Empty(source.Downloads_);
         await Until(() => source.Downloads_.Count >= PlayerViewModel.StreamAheadSongs);
         Assert.Equal(PlayerViewModel.StreamAheadSongs, source.Downloads_.Count); // settled: the next two download
+        Assert.False(player.QueueIsSettling);
 
         var (other, _) = NewPlayer(); other.QueueSettle = TimeSpan.FromSeconds(30);
         var second = new Source(); var songs = new List<Track> { Local("B"), Local("C") };

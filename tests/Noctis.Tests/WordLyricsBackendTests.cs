@@ -65,11 +65,11 @@ public class WordLyricsBackendTests
         internal string Result => Path.Combine(Work, "result.json");
         public void Dispose() { Environment.SetEnvironmentVariable("WORDLYRICS_PYTHON", _before); Data.Dispose(); }
     }
-    private static async Task Until(Func<bool> condition)
+    private static async Task Until(Func<bool> condition, Func<string>? diagnostic = null)
     {
         var timer = Stopwatch.StartNew();
         while (!condition() && timer.Elapsed < TimeSpan.FromSeconds(8)) await Task.Delay(20);
-        Assert.True(condition(), "Synthetic backend did not reach the expected state.");
+        Assert.True(condition(), "Synthetic backend did not reach the expected state. " + diagnostic?.Invoke());
     }
     [Fact]
     public async Task NativeRunnerPreservesPathsGuidesAndPreferredProxy_WithoutShellExpansion()
@@ -288,8 +288,10 @@ public class WordLyricsBackendTests
     public async Task ManualPlayingRequest_PromotesAnExistingJobAheadOfOlderRequests_WithoutReplacingItsDraft()
     {
         using var rig = new Rig(hold: true);
+        var states = new ConcurrentQueue<ProgressState>();
+        var logs = new ConcurrentQueue<string>();
         using var worker = new Worker(rig.Work, () => [rig.Music], new(true, "Light", false, rig.App, ""),
-            _ => { }, _ => { }, readiness: _ => true, startTimer: false);
+            logs.Enqueue, _ => { }, states.Enqueue, readiness: _ => true, startTimer: false);
         worker.SetPaused(true);
         worker.Ask(rig.Song);
         var current = Path.Combine(rig.Music, "playing.mp3"); File.WriteAllText(current, "synthetic");
@@ -297,9 +299,15 @@ public class WordLyricsBackendTests
         worker.Ask(current, TimingAction.Custom, draft);
         worker.Prioritize(current);
         worker.SetPaused(false);
-        await Until(() => worker.StatusFor(current) == SongTimingStatus.Processing);
+        await Until(() => worker.StatusFor(current) == SongTimingStatus.Processing,
+            () => $"Status={worker.StatusFor(current)}; logs={string.Join(" | ", logs)}; states={string.Join(" | ", states)}");
         Assert.Equal([current], File.ReadAllLines(Path.Combine(rig.Work, "songs.txt")));
         Assert.True(worker.IsWaiting(rig.Song));
+        worker.Cancel();
+        await Until(() => File.Exists(rig.Result));
+        using var result = JsonDocument.Parse(File.ReadAllText(rig.Result));
+        var args = result.RootElement.GetProperty("args").EnumerateArray().Select(v => v.GetString()).ToArray();
+        Assert.Equal(draft, args[Array.IndexOf(args, "--lyrics-file") + 1]);
     }
 
     [Fact]

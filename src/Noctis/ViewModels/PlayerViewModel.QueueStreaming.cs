@@ -370,6 +370,7 @@ public partial class PlayerViewModel
     /// <summary>How long a new queue must stay unchanged before the songs ahead are asked for or downloaded.</summary>
     internal TimeSpan QueueSettle { get; set; } = TimeSpan.FromSeconds(10);
     private DateTime _settleUntil;
+    internal bool QueueIsSettling => DateTime.UtcNow < _settleUntil;
     private int _settleGeneration;
 
     /// <summary>A new queue (played, shuffled, unshuffled, reshuffled): the songs ahead wait <see cref="QueueSettle"/>; each

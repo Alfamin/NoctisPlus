@@ -40,7 +40,7 @@
     {
       "key": "lightWhileGaming",
       "label": "Use Light for fullscreen apps",
-      "description": "Games and other detected fullscreen apps use Light on the next timing run; your normal speed returns afterward. Windowed games may not be detected.",
+      "description": "New runs use Light for detected fullscreen apps, then restore your speed.",
       "type": "bool",
       "default": true
     },
