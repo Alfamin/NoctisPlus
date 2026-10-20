@@ -112,6 +112,18 @@ public class NativeWordLyricsTests
         Assert.False(shown);
     }
     [AvaloniaFact]
+    public void AddingThePlayingCopy_RespectsAutomaticTimingOff()
+    {
+        using var rig = new Rig(off: true);
+        var saved = rig.Song("Playing song");
+        var cache = new Track { FilePath = Path.Combine(rig.Data.DataDirectory, "stream-cache", Path.GetFileName(saved.FilePath)) };
+        rig.Service.PlayerMoved(cache, TimeSpan.Zero, true);
+        OnlineMusicSearch.PublishSavedFile(saved.FilePath);
+        Thread.Sleep(100); Dispatcher.UIThread.RunJobs();
+        Assert.Equal(0, rig.Service.WaitingCount);
+    }
+
+    [AvaloniaFact]
     public void ExistingLibraryIsNotBackfilled_AndNewDownloadsAreQueuedOnce()
     {
         using var rig = new Rig();

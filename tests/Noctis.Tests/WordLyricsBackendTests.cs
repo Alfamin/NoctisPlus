@@ -15,7 +15,7 @@ public class WordLyricsBackendTests
         internal readonly TestPersistenceService Data = new();
         internal readonly string App, Music, Song, Work;
         private readonly string? _before = Environment.GetEnvironmentVariable("WORDLYRICS_PYTHON");
-        internal Rig(bool hold = false, string outcome = "timed", bool stuck = false, double done = 1)
+        internal Rig(bool hold = false, string outcome = "timed", bool stuck = false, double done = 1, bool earlyWords = false)
         {
             var python = Environment.GetEnvironmentVariable("NOCTIS_TEST_PYTHON") ?? "python";
             try
@@ -31,7 +31,7 @@ public class WordLyricsBackendTests
             File.WriteAllText(Path.Combine(module, "__init__.py"), "__version__ = \"1.6.4\"\n");
             File.WriteAllText(Path.Combine(App, "WordLyrics.bat"), "fixture only");
             File.WriteAllText(Path.Combine(module, "__main__.py"), "# --confirm-redo is supported by this synthetic backend\n");
-            File.WriteAllText(Path.Combine(App, "fixture.json"), JsonSerializer.Serialize(new { hold, outcome, stuck, done }));
+            File.WriteAllText(Path.Combine(App, "fixture.json"), JsonSerializer.Serialize(new { hold, outcome, stuck, done, earlyWords }));
             File.WriteAllText(Path.Combine(module, "models.py"), "class ModelError(Exception):pass\ndef missing(folder):return []\ndef download(*a,**k):raise Exception('Original download must never run')\n");
             var run = """
                 import json,sys,time,os
@@ -48,7 +48,8 @@ public class WordLyricsBackendTests
                 deadline=time.monotonic()+15
                 while config['hold'] and time.monotonic()<deadline:
                     word=control.read_text() if control and control.exists() else 'run'
-                    put(value('--progress'),{'completed':0,'total':len(songs),'paused':word=='pause','stages':[{'name':'Align words','state':'running','done':config.get('done',1),'total':4,'current':'Synthetic song'}]})
+                    if config.get('earlyWords'): Path(songs[0]).with_suffix('.elrc').write_text('[00:01.00]<00:01.00>synthetic words',encoding='utf-8')
+                    put(value('--progress'),{'completed':1 if config.get('earlyWords') else 0,'total':len(songs),'paused':word=='pause','stages':[{'name':'Align words','state':'running','done':config.get('done',1),'total':4,'current':'Synthetic song'}]})
                     if word=='stop':break
                     time.sleep(.05)
                 proxy=urlsplit(os.environ.get('https_proxy',''))
@@ -263,6 +264,24 @@ public class WordLyricsBackendTests
         await Until(() => worker.StatusFor(played) == SongTimingStatus.Processing);
         Assert.False(worker.IsWaiting(rig.Song)); // it finished (timed), then the played song started
         Assert.Equal([played], File.ReadAllLines(Path.Combine(rig.Work, "songs.txt")));
+    }
+
+    [Fact]
+    public async Task PlayingCacheCopy_ReportsItsTimedLibraryCopyBeforeRunEnds_AndDoesNotInterruptIt()
+    {
+        using var rig = new Rig(hold: true, earlyWords: true);
+        var written = new ConcurrentQueue<string>();
+        using var worker = new Worker(rig.Work, () => [rig.Music], new(true, "Light", false, rig.App, ""),
+            _ => { }, _ => { }, readiness: _ => true, lyricsWritten: paths => { foreach (var path in paths) written.Enqueue(path); });
+        var cache = Path.Combine(rig.Data.DataDirectory, "stream-cache", Path.GetFileName(rig.Song));
+        worker.Watched = () => cache;
+        worker.AskPlayed(rig.Song, out var accepted); Assert.True(accepted);
+        await Until(() => worker.StatusFor(rig.Song) == SongTimingStatus.Processing);
+        worker.MakeRoom(cache);
+        await Until(() => written.Contains(rig.Song));
+        Assert.False(File.Exists(rig.Result)); // notified while the backend is still running
+        Assert.Equal([rig.Song], File.ReadAllLines(Path.Combine(rig.Work, "songs.txt")));
+        Assert.NotEqual("stop", File.Exists(Path.Combine(rig.Work, "control.txt")) ? File.ReadAllText(Path.Combine(rig.Work, "control.txt")) : "");
     }
 
     [Fact]
