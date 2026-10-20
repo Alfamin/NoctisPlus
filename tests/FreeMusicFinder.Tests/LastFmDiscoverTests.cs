@@ -197,7 +197,7 @@ internal static class LastFmDiscoverTests
         var catalog = new DelayedCatalog();
         await Discover.BuildAsync(Enumerable.Range(0, 9).Select(i => new TasteSeed("Seed" + i, 1, 1)).ToList(), catalog,
             (_, _) => Task.FromResult(new HashSet<string>()), new DiscoverHidden(Path.Combine(Check.NewFolder("discover-parallel"), "hidden.json")), null, CancellationToken.None);
-        Check.True(catalog.Max == 3 && catalog.Done == 9, "seed relations run three at a time with bounded fanout");
+        Check.True(catalog.Max == Discover.ArtistLookups && catalog.Done == 9, $"seed relations run {Discover.ArtistLookups} at a time with bounded fanout");
         Check.Equal(0, catalog.PrematureIdentity, "phase one does not identify artists before requesting relations");
     }
 

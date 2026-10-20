@@ -9,6 +9,18 @@ namespace FreeMusicFinder.Tests;
 /// </summary>
 internal static class LiveForYouTest
 {
+    /// <summary>FMF_TRACE_HTTP=1: every catalog request with its start, length and answer, to see where the time goes.</summary>
+    private sealed class Trace(HttpMessageHandler inner, System.Diagnostics.Stopwatch clock) : DelegatingHandler(inner)
+    {
+        protected override async Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken ct)
+        {
+            var at = clock.Elapsed.TotalSeconds;
+            var response = await base.SendAsync(request, ct);
+            Console.WriteLine($"    http {at,6:0.0}+{clock.Elapsed.TotalSeconds - at:0.00} s {(int)response.StatusCode} {request.RequestUri!.Host} {request.RequestUri.PathAndQuery[..Math.Min(110, request.RequestUri.PathAndQuery.Length)]}");
+            return response;
+        }
+    }
+
     public static async Task RunAsync(string noctisData)
     {
         var folder = Environment.GetEnvironmentVariable("FMF_DISCOVERY_CACHE") ?? throw new ArgumentException("Set an isolated FMF_DISCOVERY_CACHE directory.");
@@ -28,7 +40,8 @@ internal static class LiveForYouTest
         var seeds = Taste.Seeds(plays, library, DateTime.UtcNow);
         Console.WriteLine($"  library {library.Count} songs, {plays.Count} plays; seeds: " + string.Join(", ", seeds.Select(s => $"{s.Name} ({s.Weight:0.0})")));
         var route = PlaylistCatalog.MetadataHandler("", way => Console.WriteLine("  " + way));
-        using var catalog = new ArtistCatalog(folder, route);
+        var started = System.Diagnostics.Stopwatch.StartNew();
+        using var catalog = new ArtistCatalog(folder, Environment.GetEnvironmentVariable("FMF_TRACE_HTTP") == "1" ? new Trace(route, started) : route);
         using var similar = new SimilarArtists(folder, PlaylistCatalog.MetadataHandler("", _ => { }));
         string lastKey = "";
         if (Environment.GetEnvironmentVariable("FMF_LASTFM_KEY_FILE") is { Length: > 0 } keyFile)
@@ -51,7 +64,7 @@ internal static class LiveForYouTest
         var provider = new CatalogForDiscover(() => catalog, name => albums.GetValueOrDefault(BotText.Key(name)) ?? [], () => similar, () => lastFm);
         Task<DiscoverResult> Build() => Discover.BuildAsync(seeds, provider,
             (songs, _) => Task.FromResult(songs.Where(s => matcher.Find(s.Request) is not null).Select(s => s.Id).ToHashSet(StringComparer.Ordinal)),
-            new DiscoverHidden(Path.Combine(folder, "hidden.json")), new Progress<string>(text => Console.WriteLine("    … " + text)), stop.Token);
+            new DiscoverHidden(Path.Combine(folder, "hidden.json")), new Progress<string>(text => Console.WriteLine($"    {clock.Elapsed.TotalSeconds,6:0.0} s … {text}")), stop.Token);
         var result = await Build();
         Console.WriteLine($"  {result.Songs.Count} songs in {clock.Elapsed.TotalSeconds:0.0} s. {result.Notice}");
         foreach (var s in result.Songs.Take(30))
@@ -59,10 +72,10 @@ internal static class LiveForYouTest
         Console.WriteLine("  artists for you: " + string.Join(", ", result.Artists.Select(a => a.Artist.Name)));
         Check.True(result.Songs.Count > 0, "live For you: suggestions from the real listening history");
         Check.False(result.Songs.Any(s => matcher.Find(s.Track.Song.Request) is not null), "live For you: nothing suggested is already in the library");
+        clock.Restart(); var warm = await Build();
+        Console.WriteLine($"  warm: {warm.Songs.Count} songs in {clock.Elapsed.TotalSeconds:0.000} s. {warm.Notice}");
         if (lastFm.Enabled)
         {
-            clock.Restart(); var warm = await Build();
-            Console.WriteLine($"  warm: {warm.Songs.Count} songs in {clock.Elapsed.TotalSeconds:0.000} s. {warm.Notice}");
             Check.True(warm.Songs.Select(s => s.Track.Song.Id).SequenceEqual(result.Songs.Select(s => s.Track.Song.Id)), "cached live build preserves ranking");
             var page = new ForYouCache(Path.Combine(folder, "for-you-last.json"));
             var now = DateTimeOffset.UtcNow; var until = lastFm.DataExpires < now.AddDays(7) ? lastFm.DataExpires : now.AddDays(7);

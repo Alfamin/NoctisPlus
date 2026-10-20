@@ -21,6 +21,42 @@ internal static class ForYouDiscoverTests
         Hidden();
         await RelatedFromDeezer();
         await ListenBrainz();
+        await FastArtistSongs();
+    }
+
+    /// <summary>Owner #94: For you took ~80 s because Deezer's artist:"…" track search went empty and every related artist
+    /// fell to Apple's 3.1 s pace. Now: Deezer's artist search plus that artist's top songs; a busy Deezer is waited for.</summary>
+    private static async Task FastArtistSongs()
+    {
+        Check.Equal("Big Sean", Taste.MainArtist("Big Sean, Drake"), "a comma-joined credit is its first artist");
+        Check.Equal("Drake", Taste.MainArtist("Drake/ WizKid/ Kyla"), "a slash-joined credit is its first artist");
+        Check.Equal("Tyler, The Creator", Taste.MainArtist("Tyler, The Creator"), "\"Tyler, The Creator\" stays one artist");
+        Check.Equal("AC/DC", Taste.MainArtist("AC/DC"), "a slash inside a name stays");
+
+        var http = new DiscoveryTests.Http();
+        using (var catalog = DiscoveryTests.Catalog(Check.NewFolder("discover-deezer-top"), http))
+        {
+            var found = (await catalog.SongsByArtistNameAsync("North Star", default)).Value;
+            Check.True(found.Artist?.Id == "deezer:42" && found.Songs.Count == 3, "a related artist's songs come from Deezer's artist search and top songs");
+            Check.False(http.Calls.Any(u => u.Host == "itunes.apple.com" || u.AbsolutePath == "/search/track"), "never Apple's slow lane nor Deezer's empty artist:\"…\" search");
+            var calls = http.Calls.Count; await catalog.SongsByArtistNameAsync("North Star", default);
+            Check.Equal(calls, http.Calls.Count, "asked again: answered from the cache");
+        }
+
+        var pause = ArtistCatalog.QuotaPause; ArtistCatalog.QuotaPause = TimeSpan.FromMilliseconds(5);
+        try
+        {
+            int busy = 2;
+            using var inner = new HttpMessageInvoker(new DiscoveryTests.Http());
+            var quota = new DiscoveryTests.Http { Override = (r, ct) => r.RequestUri!.AbsolutePath == "/search/artist" && busy-- > 0
+                ? Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK) { Content = new StringContent("{\"error\":{\"type\":\"Exception\",\"message\":\"Quota limit exceeded\",\"code\":4}}") })
+                : inner.SendAsync(r, ct) };
+            using var catalog = DiscoveryTests.Catalog(Check.NewFolder("discover-deezer-quota"), quota);
+            var found = (await catalog.SongsByArtistNameAsync("North Star", default)).Value;
+            Check.True(found.Artist?.Id == "deezer:42", "Deezer's \"quota exceeded\" is waited out, not taken for a missing artist");
+            Check.False(quota.Calls.Any(u => u.Host == "itunes.apple.com"), "a busy Deezer does not send the song to Apple's slow lane");
+        }
+        finally { ArtistCatalog.QuotaPause = pause; }
     }
 
     private static void TasteFromListening()

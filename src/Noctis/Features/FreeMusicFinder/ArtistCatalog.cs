@@ -343,7 +343,19 @@ internal sealed partial class ArtistCatalog : IDisposable
         }
         throw Invalid("The catalog exceeded its page limit; no truncated list was saved.");
     }
+    /// <summary>Deezer allows about 50 requests in 5 s and says so with error code 4, not an HTTP status. That is a
+    /// moment's wait, not a missing artist: try again shortly instead of falling through to Apple's slow lane.</summary>
+    internal static TimeSpan QuotaPause = TimeSpan.FromSeconds(1.5);
     private async Task<JsonDocument> Get(string provider, string path, CancellationToken ct)
+    {
+        for (var attempt = 0; ; attempt++)
+        {
+            try { return await GetOnce(provider, path, ct).ConfigureAwait(false); }
+            catch (DeezerQuotaException) when (attempt < 3) { await Task.Delay(QuotaPause * (attempt + 1), ct).ConfigureAwait(false); }
+        }
+    }
+    private sealed class DeezerQuotaException() : IOException("CATALOG_INCOMPLETE: deezer is busy (too many requests); try again shortly.");
+    private async Task<JsonDocument> GetOnce(string provider, string path, CancellationToken ct)
     {
         var host = provider == "apple" ? "itunes.apple.com" : "api.deezer.com";
         void CheckCooldown()
@@ -396,6 +408,9 @@ internal sealed partial class ArtistCatalog : IDisposable
             using var buffer = new MemoryStream(); var bytes = new byte[16384];
             while (true) { var n = await input.ReadAsync(bytes, timeout.Token).ConfigureAwait(false); if (n == 0) break; if (buffer.Length + n > 4 * 1024 * 1024) throw Invalid("Catalog response exceeded 4 MB."); buffer.Write(bytes, 0, n); }
             var data = JsonDocument.Parse(buffer.ToArray(), new JsonDocumentOptions { MaxDepth = 64 });
+            if (data.RootElement.ValueKind == JsonValueKind.Object && data.RootElement.TryGetProperty("error", out var error)
+                && error.ValueKind == JsonValueKind.Object && error.TryGetProperty("code", out var code) && code.ValueKind == JsonValueKind.Number && code.TryGetInt32(out var number) && number == 4)
+            { data.Dispose(); throw new DeezerQuotaException(); }
             if (data.RootElement.ValueKind != JsonValueKind.Object || data.RootElement.TryGetProperty("error", out _)) { data.Dispose(); throw Invalid(provider + " returned a catalog error. The artist or release may be unavailable."); }
             return data;
         }

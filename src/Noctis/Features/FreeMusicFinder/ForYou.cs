@@ -32,6 +32,10 @@ internal static class Taste
             int i = a.IndexOf(cut, StringComparison.OrdinalIgnoreCase);
             if (i > 0) a = a[..i];
         }
+        // Owner #94: "Big Sean, Drake" and "Drake/ WizKid/ Kyla" were taste seeds of their own: no catalog knows them,
+        // and every lookup fell through to the slow Apple lane. "Tyler, The Creator" and "AC/DC" stay one artist.
+        var parts = System.Text.RegularExpressions.Regex.Split(a, @"\s*(?:,|/)\s+");
+        if (parts.Length > 1) a = parts[1].StartsWith("The ", StringComparison.OrdinalIgnoreCase) ? parts[0] + ", " + parts[1] : parts[0];
         return a.Trim();
     }
 
@@ -244,7 +248,7 @@ internal sealed class CatalogForDiscover(Func<ArtistCatalog> catalog, Func<strin
 /// </summary>
 internal static class Discover
 {
-    public const int SeedArtistsUsed = 15, CandidateArtists = 30, SongsPerArtist = 8;
+    public const int SeedArtistsUsed = 15, CandidateArtists = 30, SongsPerArtist = 8, ArtistLookups = 6;
 
     public static async Task<DiscoverResult> BuildAsync(IReadOnlyList<TasteSeed> seeds, IDiscoverCatalog catalog,
         Func<IReadOnlyList<CatalogSong>, CancellationToken, Task<HashSet<string>>> unavailable, DiscoverHidden hidden,
@@ -271,7 +275,7 @@ internal static class Discover
         foreach (var seed in used) own.Add(BotText.Key(seed.Name));
         var lists = new List<(TasteSeed Seed, List<SimilarArtist> Similar)>();
         int complete = 0;
-        using var concurrent = new SemaphoreSlim(3, 3);
+        using var concurrent = new SemaphoreSlim(ArtistLookups, ArtistLookups);
         var relations = await Task.WhenAll(used.Select(async seed =>
         {
             await concurrent.WaitAsync(ct);
@@ -305,32 +309,35 @@ internal static class Discover
         }
         var ranked = score.OrderByDescending(s => s.Value).Take(CandidateArtists).ToList();
         var songs = new List<(CatalogSearchSong Track, double Score, string Key)>();
-        for (int k = 0; k < ranked.Count; k++)
+        // Owner #94: every artist's songs at once (the catalog itself keeps to its few connections), merged in rank
+        // order afterwards so network timing never changes the picks.
+        int picked = 0;
+        using var lookups = new SemaphoreSlim(ArtistLookups, ArtistLookups);
+        var rows = await Task.WhenAll(ranked.Select(async row =>
         {
-            ct.ThrowIfCancellationRequested();
-            var (key, value) = ranked[k];
-            progress?.Report($"Picking songs you don't have… {k + 1} of {ranked.Count}");
+            await lookups.WaitAsync(ct);
             try
             {
-                CatalogArtist? artist;
-                List<CatalogSearchSong> candidates;
-                if (own.Contains(key))
+                if (own.Contains(row.Key))
                 {
-                    artist = await catalog.FindAsync(used.First(s => BotText.Key(s.Name) == key), ct);
-                    if (artist is null) continue;
-                    candidates = await catalog.TopSongsAsync(artist, ct);
+                    var artist = await catalog.FindAsync(used.First(s => BotText.Key(s.Name) == row.Key), ct);
+                    return (Artist: artist, Songs: artist is null ? [] : await catalog.TopSongsAsync(artist, ct), Error: "");
                 }
-                else
-                {
-                    var relatedSongs = await catalog.SongsByNameAsync(display[key], ct);
-                    artist = relatedSongs.Artist; candidates = relatedSongs.Songs;
-                    if (artist is null) continue;
-                }
-                resolved[key] = artist; found++;
-                var top = candidates.Where(s => !hidden.HidesSong(s.Song)).Take(SongsPerArtist).ToList();
-                for (int n = 0; n < top.Count; n++) songs.Add((top[n], value * (1 - 0.07 * n), key));
+                var relatedSongs = await catalog.SongsByNameAsync(display[row.Key], ct);
+                return (relatedSongs.Artist, relatedSongs.Songs, Error: "");
             }
-            catch (Exception ex) when (ex is not OperationCanceledException) { failed++; lastError = ArtistCatalog.Explain(ex); }
+            catch (Exception ex) when (ex is not OperationCanceledException) { return (Artist: (CatalogArtist?)null, Songs: new List<CatalogSearchSong>(), Error: ArtistCatalog.Explain(ex)); }
+            finally { progress?.Report($"Picking songs you don't have… {Interlocked.Increment(ref picked)} of {ranked.Count}"); lookups.Release(); }
+        }));
+        for (int k = 0; k < ranked.Count; k++)
+        {
+            var (key, value) = ranked[k];
+            var (artist, candidates, error) = rows[k];
+            if (error.Length > 0) { failed++; lastError = error; continue; }
+            if (artist is null) continue;
+            resolved[key] = artist; found++;
+            var top = candidates.Where(s => !hidden.HidesSong(s.Song)).Take(SongsPerArtist).ToList();
+            for (int n = 0; n < top.Count; n++) songs.Add((top[n], value * (1 - 0.07 * n), key));
         }
         // One recording once, explicit preferred; then leave out what is owned or already queued.
         var distinct = SearchRanking.DeduplicateSongs(songs.Select(s => s.Track)).Select(t => t.Song.Id).ToHashSet(StringComparer.Ordinal);
