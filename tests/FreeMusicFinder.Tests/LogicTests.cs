@@ -625,12 +625,12 @@ internal static class LogicTests
             Check.Equal("Saved,Saved,Failed", $"{a.State},{b.State},{c.State}", "two saved, one failed");
             Check.Equal("The bot did not send the file.", c.Error, "the failure says why");
             await Check.UntilAsync(() => finished.Count == 1, "one message at the end");
-            Check.Equal($"Saved 2 of 3 tracks to {folder}", finished[0], "the message counts them");
+            Check.Equal("Saved 2 of 3 songs", finished[0], "partial completion keeps its count without a folder path");
 
             var retry = downloads.Start(Track("C"), folder);
             Check.True(!ReferenceEquals(retry, c), "a failed one can be asked for again");
             await Check.UntilAsync(() => finished.Count == 2, "the retry finishes");
-            Check.Equal($"Saved \"C\" to {folder}", finished[1], "a single track is named");
+            Check.Equal("Saved to library", finished[1], "single success is a short line without song or folder");
 
             var gate = new TaskCompletionSource();
             var stuck = downloads.Start(Track("Stuck", bytes: 500_000, before: () => gate.Task), folder);

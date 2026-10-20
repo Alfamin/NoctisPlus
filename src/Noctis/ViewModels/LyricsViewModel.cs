@@ -11,6 +11,7 @@ using CommunityToolkit.Mvvm.Input;
 using Noctis.Helpers;
 using Noctis.Models;
 using Noctis.Services;
+using Noctis.Services.Search;
 using Noctis.Features.WordLyrics;
 
 namespace Noctis.ViewModels;
@@ -2468,6 +2469,7 @@ public partial class LyricsViewModel : ViewModelBase, IDisposable
         // without requiring a separate "Save to File" click. An explicit source
         // switch may replace an app-written sidecar so the choice sticks.
         PersistOnlineLyricsToSidecar(result, allowReplaceAppSidecar: userSwitchedSource);
+        KeepPlainStreamLyricsInBackground();
 
         // Start sync timer if synced lyrics and playing
         if (_hasSyncedLyrics && IsSyncTabSelected && _player.State == Models.PlaybackState.Playing)
@@ -2906,6 +2908,7 @@ public partial class LyricsViewModel : ViewModelBase, IDisposable
                         // In place: the old lines leave in this same frame, so the timeline lets go of them only now.
                         if (inPlace) _timeline.Reset();
                         ApplyLocalLyricsResult(track, probe);
+                        KeepPlainStreamLyricsInBackground();
                         LyricsSwapped?.Invoke(this, EventArgs.Empty);
                     }
                     if (swapClock != null)
@@ -3367,6 +3370,19 @@ public partial class LyricsViewModel : ViewModelBase, IDisposable
     /// whose length is off the song's: its timings would drift, so Plain is the default then
     /// (Synced stays one click away).</summary>
     private bool OpensOnSyncedTab => _hasSyncedLyrics && !_player.MusicVideoAudioLengthDiffers;
+
+    // Plain lyrics fetched for a stream are preparation for timing, not a manual-scroll page.
+    // Keep the cached/provider text intact; line/word timings and Studio previews still show normally.
+    private void KeepPlainStreamLyricsInBackground()
+    {
+        if (_hasSyncedLyrics || IsPreviewActive || _currentTrack is not { } track ||
+            OnlineMusicSearch.Current?.IsCachedFile(track.FilePath) != true) return;
+        LyricLines.Clear();
+        UnsyncedLines.Clear();
+        IsSyncTabSelected = true;
+        IsUnsyncTabSelected = false;
+        ShowSearchButton = true;
+    }
 
     private void AutoSelectTab()
     {

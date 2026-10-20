@@ -61,8 +61,8 @@ public static class WhatsNewGate
     internal static string Short(string text) => Version.TryParse(text, out var v) ? Short(v) : text.Trim();
 }
 
-/// <summary>The pop-up's content and its one action.</summary>
-public sealed partial class WhatsNewViewModel(WhatsNewNotes notes, Action close) : ObservableObject
+/// <summary>The update sheet, its dismissal and the optional word timing settings shortcut.</summary>
+public sealed partial class WhatsNewViewModel(WhatsNewNotes notes, Action close, Action? openWordTimingSettings = null) : ObservableObject
 {
     public string Heading => "What's new";
     public string VersionLabel => "Version " + WhatsNewGate.Short(notes.Version);
@@ -70,5 +70,7 @@ public sealed partial class WhatsNewViewModel(WhatsNewNotes notes, Action close)
     public IReadOnlyList<string> Fixed => notes.Fixed;
     public bool HasAdded => notes.Added.Count > 0;
     public bool HasFixed => notes.Fixed.Count > 0;
+    public bool HasWordTimingSettings => openWordTimingSettings is not null;
+    [RelayCommand] private void WordTimingSettings() { close(); openWordTimingSettings?.Invoke(); }
     [RelayCommand] private void Close() => close();
 }

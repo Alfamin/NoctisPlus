@@ -696,6 +696,8 @@ public class PluginHostApiTests : IDisposable
         script.Host.Notify("   ");
         var n = Assert.Single(notices);
         Assert.Equal(("Test Plugin", "first"), (n.PluginName, n.Message));
+        Assert.Equal("Test Plugin: first", n.DisplayText); // community notices retain attribution
+        Assert.Equal("Saved to library", new PluginNotice("Free Music Finder", "Saved to library") { IncludeSource = false }.DisplayText);
     }
 
     [AvaloniaFact]

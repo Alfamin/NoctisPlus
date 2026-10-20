@@ -19,6 +19,10 @@ public class QueueStreamingTests
         internal readonly List<(string Id, bool Keep)> Asked = [];
         internal readonly List<(string Id, bool Now)> Downloads_ = [];
         internal bool SignedIn = true;
+        internal Func<string?, bool>? CacheTest;
+        public bool IsCachedFile(string? path) => CacheTest?.Invoke(path) == true;
+        internal readonly Dictionary<string, string> CompleteFiles = [];
+        public string? CompletedPlaybackPath(OnlineSong song) => CompleteFiles.GetValueOrDefault(song.Id);
         public Task<Track> PreparePlaybackAsync(OnlineSong song, CancellationToken ct) => PreparePlaybackAsync(song, false, ct);
         public Task<Track> PreparePlaybackAsync(OnlineSong song, bool keep, CancellationToken ct)
         { Asked.Add((song.Id, keep)); Tokens[song.Id] = ct; return (Pending[song.Id] = new(TaskCreationOptions.RunContinuationsAsynchronously)).Task; }
@@ -63,6 +67,23 @@ public class QueueStreamingTests
         var audio = new FakeAudioPlayer();
         // The other tests look at the songs ahead right away; owner #111's wait after a new queue has its own test.
         return (new PlayerViewModel(audio, new FakeLibraryService(), new TestPersistenceService(), new FakeAnimatedCoverService()) { QueueSettle = TimeSpan.Zero }, audio);
+    }
+
+    [AvaloniaFact]
+    public void AheadWindowsCountOwnedQueuePositions_InsteadOfReachingForFourMissingSongs()
+    {
+        var source = new Source { FinishDownloads = true }; var (player, _) = NewPlayer();
+        player.ReplaceQueueAndPlay([Local("Now"), Local("One"), Local("Two"), Local("Three"), Local("Four"),
+            StandIn(source, "outside")], 0); Settle();
+        Assert.Empty(source.Downloads_);
+        Assert.Empty(source.AskedAhead);
+        player.ReplaceQueueAndPlay([Local("Now"), Local("One"), StandIn(source, "two"),
+            Local("Three"), StandIn(source, "four"), StandIn(source, "five")], 0);
+        var end = DateTime.UtcNow.AddSeconds(3);
+        while (source.AskedAhead.Count == 0 && DateTime.UtcNow < end) { Thread.Sleep(10); Settle(); }
+        Assert.Equal(new[] { "two" }, source.Downloads_.Select(d => d.Id));
+        Assert.Equal(new[] { "four" }, source.AskedAhead);
+        player.ClearQueue(); Settle();
     }
 
     [AvaloniaFact]

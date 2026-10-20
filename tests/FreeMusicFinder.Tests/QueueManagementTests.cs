@@ -114,7 +114,7 @@ internal static class QueueManagementTests
         queue.Start(Track("Held one"), root, held: true); queue.Start(Track("Held two"), root, held: true);
         queue.Start(Track("Wanted now"), root, priority: true);
         await Check.UntilAsync(() => { lock (finished) return finished.Count == 1; }, "Download now is reported although staged songs still wait");
-        lock (finished) Check.True(finished[0].Contains("Wanted now"), "the notice names the song that was saved");
+        lock (finished) Check.Equal("Saved to library", finished[0], "a completed priority download uses the compact save notice");
         Check.Equal(2, queue.Active.Count(d => d.Held), "the staged songs still wait for Start");
     }
     private static async Task Priority()

@@ -277,6 +277,13 @@ internal sealed class FinderOnlineSearch : IOnlineMusicSearch
         return d is { State: DownloadState.Saved or DownloadState.AlreadyThere, SavedPath: { } path } && !_actions.Downloads.IsCached(d) ? path : null;
     }
 
+    public string? CompletedPlaybackPath(OnlineSong song)
+    {
+        if (!_songs.TryGetValue(song.Id, out var catalogSong)) return null;
+        var d = _actions.Downloads.History.LastOrDefault(x => x.Track.Request is { } r && SpotifyPlaylists.SameRecording(catalogSong.Request, r) && x.State != DownloadState.Removed);
+        return d is { State: DownloadState.Saved or DownloadState.AlreadyThere, SavedPath: { } path } ? path : null;
+    }
+
     public bool CancelQueued(OnlineSong song)
     {
         if (!_songs.TryGetValue(song.Id, out var catalogSong)) return false;
@@ -325,22 +332,22 @@ internal sealed class FinderOnlineSearch : IOnlineMusicSearch
     /// <summary>Owner #87: "Add to songs" from the player (and #88: a playlist add). The copy runs off the UI thread.</summary>
     public Task<StreamedAdd> AddStreamedAsync(string path, CancellationToken ct) => Task.Run(() =>
     {
-        if (!IsCachedFile(path)) return new StreamedAdd("Already in your songs.", null);
+        if (!IsCachedFile(path)) return new StreamedAdd("Already in library", null);
         // Where the library copy is: the download folder it went to, else the one it goes to now.
         var download = StreamedDownload(path);
         var library = download?.KeepIn ?? _actions.LibraryFolder;
         var target = Path.Combine(library, Path.GetFileName(path));
-        if (!IsStreamedFile(path)) return new StreamedAdd("Already in your songs.", target);
+        if (!IsStreamedFile(path)) return new StreamedAdd("Already in library", target);
         if (download is not null)
         {
             var (copy, pending) = _actions.Downloads.Keep(download, library);
-            return new StreamedAdd(pending ? "Added. It joins your songs when it finishes downloading." : "Added to your songs.", copy ?? target);
+            return new StreamedAdd(pending ? "Saving to library…" : "Saved to library", copy ?? target);
         }
         // Its download was cleared from the list: the cached file itself is copied.
         if (!File.Exists(path)) throw new IOException("This song is no longer in the stream cache. Play it again, then add it.");
         var copied = StreamCache.CopyToLibrary(path, library);
         Noctis.Services.Search.OnlineMusicSearch.PublishSavedFile(copied);
-        return new StreamedAdd("Added to your songs.", copied);
+        return new StreamedAdd("Saved to library", copied);
     }, ct);
 
     /// <summary>The played-only download behind a cached file (saved, or still arriving under that name).</summary>

@@ -285,6 +285,55 @@ public class WordLyricsBackendTests
     }
 
     [Fact]
+    public async Task ManualPlayingRequest_PromotesAnExistingJobAheadOfOlderRequests_WithoutReplacingItsDraft()
+    {
+        using var rig = new Rig(hold: true);
+        using var worker = new Worker(rig.Work, () => [rig.Music], new(true, "Light", false, rig.App, ""),
+            _ => { }, _ => { }, readiness: _ => true, startTimer: false);
+        worker.SetPaused(true);
+        worker.Ask(rig.Song);
+        var current = Path.Combine(rig.Music, "playing.mp3"); File.WriteAllText(current, "synthetic");
+        var draft = Path.Combine(rig.Work, "custom.txt"); File.WriteAllText(draft, "custom words");
+        worker.Ask(current, TimingAction.Custom, draft);
+        worker.Prioritize(current);
+        worker.SetPaused(false);
+        await Until(() => worker.StatusFor(current) == SongTimingStatus.Processing);
+        Assert.Equal([current], File.ReadAllLines(Path.Combine(rig.Work, "songs.txt")));
+        Assert.True(worker.IsWaiting(rig.Song));
+    }
+
+    [Fact]
+    public void AheadOnlyJobsAreTransient_AndChangingTheWindowKeepsExplicitRequests()
+    {
+        using var rig = new Rig();
+        using var worker = new Worker(rig.Work, () => [rig.Music], new(true, "Full", false, rig.App, ""),
+            _ => { }, _ => { }, readiness: _ => false, startTimer: false);
+        worker.SetPaused(true);
+        worker.Ask(rig.Song);
+        var next = Path.Combine(rig.Music, "ahead.mp3"); File.WriteAllText(next, "synthetic");
+        worker.SetAhead([rig.Song, next], rig.Song);
+        Assert.Equal(2, worker.WaitingCount);
+        using (var json = JsonDocument.Parse(File.ReadAllText(Path.Combine(rig.Work, "state.json"))))
+            Assert.Single(json.RootElement.GetProperty("waiting").EnumerateArray());
+        worker.SetAhead([], rig.Song);
+        Assert.Equal(1, worker.WaitingCount);
+        Assert.True(worker.IsWaiting(rig.Song));
+        Assert.False(worker.IsWaiting(next));
+    }
+
+    [Theory]
+    [InlineData(2, true)]
+    [InlineData(3, true)]
+    [InlineData(5, false)]
+    [InlineData(6, false)]
+    public void FullscreenBudgetUsesLight_ThenRestoresTheChosenSpeed(int state, bool protect)
+    {
+        Assert.Equal(protect, GamingBudget.ProtectsFullscreen(state));
+        Assert.Equal(protect ? "Light" : "Half", GamingBudget.Speed("Half", GamingBudget.ProtectsFullscreen(state)));
+        Assert.Equal("Full", GamingBudget.Speed("Full", false));
+    }
+
+    [Fact]
     public void TimeAllWithoutWordTiming_QueuesOnlySongsThatHaveNone_InOneSave()
     {
         using var rig = new Rig(); var timed = Path.Combine(rig.Music, "already timed.mp3");

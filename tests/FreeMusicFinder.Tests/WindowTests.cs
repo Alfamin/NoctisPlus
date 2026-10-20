@@ -231,7 +231,7 @@ internal static class WindowTests
 
         gate.SetResult();
         Check.Until(() => third.State==DownloadState.Saved && QueueRows(window).Count==0, "completed running request leaves queue tab");
-        Check.Until(() => Status(window) == $"Saved \"Third\" to {Path.GetFullPath(folder)}", "the status says what was saved");
+        Check.Until(() => Status(window) == "Saved to library", "the save status stays compact");
         window.Close();
     }
 
@@ -339,7 +339,7 @@ internal static class WindowTests
             var downloads = (Downloads)typeof(FreeMusicPlugin).GetField("_downloads", BindingFlags.NonPublic | BindingFlags.Instance)!.GetValue(plugin)!;
             downloads.Start(LogicTests.Track("Announced"), folder);
             Check.Until(() => host.Notices.Count == 1, "finished download is announced independently of pages");
-            Check.Equal($"Saved \"Announced\" to {Path.GetFullPath(folder)}", host.Notices.FirstOrDefault(), "notice identifies the saved song and folder");
+            Check.Equal("Saved to library", host.Notices.FirstOrDefault(), "success notice has no app name, title or folder path");
             noctis.Show();
             var before = requests.Count;
             Check.False(Press(noctis, Key.F, KeyModifiers.Control), "Ctrl+F remains Noctis's own command");

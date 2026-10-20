@@ -5,7 +5,7 @@ using System.Text.Json;
 namespace Noctis.Features.WordLyrics;
 
 /// <summary>What the user chose in Settings → Features. Read on the UI thread, used everywhere.</summary>
-internal sealed record Options(bool Auto, string Speed, bool Notify, string Folder, string Backup);
+internal sealed record Options(bool Auto, string Speed, bool Notify, string Folder, string Backup, bool LightWhileGaming = true);
 
 /// <summary>
 /// Processes typed library/download requests, one background run at a time. Retains the
@@ -68,6 +68,9 @@ internal sealed class Worker : IDisposable
     private double _runProgress;        // how far the run is (0..1), from its stages
     private int _lastCompleted;         // songs the run has finished, at the last look
     private readonly HashSet<string> _reported = new(StringComparer.OrdinalIgnoreCase);
+    internal Func<bool> FullscreenWorkload { get; set; } = GamingBudget.IsActive;
+    private DateTime _budgetChecked;
+    private bool _lightBudget;
     /// <summary>Owner #110: the song playing now; its word timing is reported the moment it is written, not when the run ends.</summary>
     internal Func<string?>? Watched { get; set; }
     // Owner #91 watchdog: a run whose progress file and CPU time both stop moving is stuck (a model call that never returns).
@@ -91,6 +94,8 @@ internal sealed class Worker : IDisposable
         public string? Draft;
         public bool Asked;              // the user asked for this song by hand
         public DateTime Urgent;         // owner #108: the song playing now (newest first, alone in its run; not saved)
+        public bool Ahead, AheadOnly;
+        public int AheadOrder;
         public int Tries;               // runs that failed because of the song
         public int Waits;               // runs that could not do anything (no internet, broken setup): see Backoff
         public DateTime Seen;
@@ -265,10 +270,50 @@ internal sealed class Worker : IDisposable
     {
         var message = Ask(path, TimingAction.Missing, null, out accepted);
         if (!accepted) return message;
+        Prioritize(path);
+        return message;
+    }
+
+    /// <summary>Promote an existing request without replacing its repair action or custom draft.</summary>
+    internal void Prioritize(string path)
+    {
         lock (_gate)
             if (_items.TryGetValue(Path.GetFullPath(path), out var item)) { item.Urgent = DateTime.UtcNow; item.NotBefore = DateTime.UtcNow; }
         _timer.Change(TimeSpan.Zero, Tick);
-        return message;
+    }
+
+    /// <summary>Transient priorities for complete files in the next two queue positions.</summary>
+    internal void SetAhead(IReadOnlyList<string> paths, string? current)
+    {
+        var wanted = paths.Take(2).Where(p => File.Exists(p) && !ProgressivePlayback.ProgressiveTransfer.IsDownloading(p)
+            && !HasWordLyrics(p) && !EmbeddedWordLyrics.HasWords(p)).Select(Path.GetFullPath).Distinct(StringComparer.OrdinalIgnoreCase).ToArray();
+        bool displaced = false;
+        lock (_gate)
+        {
+            if (_disposed) return;
+            foreach (var item in _items.Values.ToArray())
+            {
+                if (!WordLyricsService.SameSong(item.Path, current)) item.Urgent = default;
+                if (!item.Ahead || wanted.Contains(item.Path, StringComparer.OrdinalIgnoreCase)) continue;
+                item.Ahead = false;
+                if (item.AheadOnly) { displaced |= _activePaths.Contains(item.Path); _items.Remove(item.Path); }
+            }
+            for (var i = 0; i < wanted.Length; i++)
+            {
+                var path = wanted[i];
+                if (!_items.TryGetValue(path, out var item))
+                {
+                    var now = DateTime.UtcNow;
+                    _items[path] = item = new Item { Path = path, Root = Path.GetDirectoryName(path)!, Asked = true,
+                        AheadOnly = true, Seen = now, QuietSince = now, NotBefore = now };
+                }
+                item.Ahead = true; item.AheadOrder = i;
+            }
+            SaveState();
+        }
+        if (displaced) MakeRoom(current ?? "");
+        StatusChanged?.Invoke();
+        _timer.Change(TimeSpan.Zero, Tick);
     }
 
     /// <summary>
@@ -397,6 +442,8 @@ internal sealed class Worker : IDisposable
     internal string? Ask(string path, TimingAction action, string? draft, out bool accepted)
     {
         accepted = false;
+        if (!string.IsNullOrWhiteSpace(path) && ProgressivePlayback.ProgressiveTransfer.IsDownloading(path))
+            return "Wait for the song to finish downloading.";
         if (string.IsNullOrWhiteSpace(path) || !File.Exists(path)) return "The song's file is not there.";
         if (!Audio.Contains(Path.GetExtension(path))) return "WordLyrics cannot read this kind of file.";
         if (action == TimingAction.Missing && (HasWordLyrics(path) || EmbeddedWordLyrics.HasWords(path))) return "Word-timed lyrics already exist. To fix wrong words or timing, right-click this song and choose Wrong lyrics / redo with fresh lyrics (WordLyrics), or Edit / paste custom lyrics.";
@@ -413,6 +460,7 @@ internal sealed class Worker : IDisposable
             if (action == TimingAction.Missing && _items.TryGetValue(path, out var existing))
             {
                 existing.Asked = true;
+                existing.AheadOnly = false;
                 SaveState();
                 accepted = true;
                 return "Already queued for word timing.";
@@ -471,6 +519,16 @@ internal sealed class Worker : IDisposable
     private void Work()
     {
         var now = DateTime.UtcNow;
+        if (now - _budgetChecked >= TimeSpan.FromSeconds(5))
+        {
+            _budgetChecked = now;
+            var protect = Options.LightWhileGaming && FullscreenWorkload();
+            if (protect != _lightBudget)
+            {
+                _lightBudget = protect;
+                _log(protect ? "WordLyrics: fullscreen workload detected; new timing runs use Light." : "WordLyrics: normal timing speed restored for new runs.");
+            }
+        }
         if (_run is not null) { ReadProgress(); Watch(now); }
 
         List<Item> waiting;
@@ -495,7 +553,8 @@ internal sealed class Worker : IDisposable
         // Looking at the files happens outside the lock: a slow drive must never make Noctis
         // wait (it calls into the plugin from its own thread). Only this timer changes these
         // entries while no run is going.
-        var ripe = waiting.Where(i => Ripe(i, now)).OrderByDescending(i => i.Urgent).ThenByDescending(i => i.Asked).ThenBy(i => i.Seen).ToList();
+        var ripe = waiting.Where(i => Ripe(i, now)).OrderByDescending(i => i.Urgent).ThenByDescending(i => i.Ahead)
+            .ThenBy(i => i.Ahead ? i.AheadOrder : 0).ThenByDescending(i => i.Asked).ThenBy(i => i.Seen).ToList();
         var gone = waiting.Where(i => i.Length == -2).ToList();
         if (gone.Count > 0)
         {
@@ -507,8 +566,8 @@ internal sealed class Worker : IDisposable
         }
         if (ripe.Count == 0) return;
         // Owner #108: the song playing now runs alone, so it is done (and the next one played can go first) at once.
-        var batch = ripe[0].Urgent != default ? [ripe[0]]
-            : ripe.Where(i => i.Urgent == default && i.Asked == ripe[0].Asked && i.Action == ripe[0].Action && i.Draft == ripe[0].Draft && SamePath(i.Root, ripe[0].Root)).Take(MaxSongsPerRun).ToList();
+        var batch = ripe[0].Urgent != default || ripe[0].Ahead ? [ripe[0]]
+            : ripe.Where(i => i.Urgent == default && !i.Ahead && i.Asked == ripe[0].Asked && i.Action == ripe[0].Action && i.Draft == ripe[0].Draft && SamePath(i.Root, ripe[0].Root)).Take(MaxSongsPerRun).ToList();
 
         var options = Options;
         Tool tool;
@@ -660,7 +719,8 @@ internal sealed class Worker : IDisposable
         File.WriteAllLines(ListFile, batch.Select(i => i.Path), new UTF8Encoding(false));
         File.Delete(ResultFile);
         File.Delete(ProgressFile);
-        var speed = options.Speed.ToLowerInvariant() is "full" or "half" or "light" ? options.Speed.ToLowerInvariant() : "half";
+        var selectedSpeed = GamingBudget.Speed(options.Speed, _lightBudget);
+        var speed = selectedSpeed.ToLowerInvariant() is "full" or "half" or "light" ? selectedSpeed.ToLowerInvariant() : "half";
         // Pause and Cancel need a program that looks at a control file (1.6.4 on); an older one runs without the buttons.
         var controlled = tool.SupportsControl;
         Process run;
@@ -1102,7 +1162,7 @@ internal sealed class Worker : IDisposable
                 json.WriteStartObject();
                 json.WriteString("lastSeenUtc", _lastSeen);
                 json.WriteStartArray("waiting");
-                foreach (var item in _items.Values.Where(i => i.Length != -2))
+                foreach (var item in _items.Values.Where(i => i.Length != -2 && !i.AheadOnly))
                 {
                     json.WriteStartObject();
                     json.WriteString("path", item.Path);

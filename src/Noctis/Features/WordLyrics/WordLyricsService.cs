@@ -5,6 +5,7 @@ using Noctis.Models;
 using Noctis.Plugins;
 using Noctis.Services;
 using Noctis.Services.Search;
+using Noctis.ViewModels;
 
 namespace Noctis.Features.WordLyrics;
 
@@ -40,7 +41,8 @@ internal sealed class WordLyricsService(ILibraryService library, Func<AppSetting
     internal DateTime? NextTryUtc => _worker?.NextTryUtc(DateTime.UtcNow);
     internal SongTimingStatus StatusFor(string path)
     {
-        var state = _worker?.StatusFor(path) ?? SongTimingStatus.None;
+        var timingPath = Volatile.Read(ref _playingTimingPath);
+        var state = _worker?.StatusFor(timingPath is not null && SameSong(path, Volatile.Read(ref _playingPath)) ? timingPath : path) ?? SongTimingStatus.None;
         return state is SongTimingStatus.Queued or SongTimingStatus.Retry && !BackendReady ? SongTimingStatus.SetupNeeded : state;
     }
     private void SongStatusChanged() => Dispatcher.UIThread.Post(() => { if (!_disposed) Changed?.Invoke(); });
@@ -51,10 +53,11 @@ internal sealed class WordLyricsService(ILibraryService library, Func<AppSetting
     internal void Start(IPluginHost host)
     {
         _host = host; _disposed = false; _known.Clear(); _baseline = false; _startedUtc = DateTime.UtcNow;
+        _playingAsked = false; _aheadPaths = []; _aheadCurrent = null;
         UpdateProxy(); if (_preferences is not null) _preferences.NativePreferenceChanged += PreferenceChanged;
         _folders = settings().MusicFolders.ToArray();
         _worker = new Worker(host.DataDirectory, () => _folders, ReadOptions(), Log, Notify, Progress,
-            lyricsWritten: paths => { var shown = WithPlayingCopy(paths); Dispatcher.UIThread.Post(() => { if (!_disposed) LyricsWritten?.Invoke(shown); }); });
+            lyricsWritten: PublishWrittenLyrics);
         _worker.StatusChanged += SongStatusChanged;
         _worker.Watched = () => Volatile.Read(ref _playingPath);
         // Owner #96: song copies earlier runs left that are exact duplicates of their song go (in the background, after
@@ -73,7 +76,7 @@ internal sealed class WordLyricsService(ILibraryService library, Func<AppSetting
         var mode = Enum.TryParse<WordTimingMode>(config.GetString(WordTimingSettings.ModeKey), out var value) && Enum.IsDefined(value) ? value : WordTimingMode.Medium;
         var oldValues = settings().PluginSettingValues?.FirstOrDefault(p => p.Key.Equals("dev.moshi.wordlyrics", StringComparison.OrdinalIgnoreCase)).Value;
         var oldSpeed = oldValues?.GetValueOrDefault("speed") ?? "Half";
-        return new(mode != WordTimingMode.Off, WordTimingSettings.BackendSpeed(mode) ?? oldSpeed, config.GetBool("notify", true), config.GetString("folder") ?? "", config.GetString("backup") ?? "");
+        return new(mode != WordTimingMode.Off, WordTimingSettings.BackendSpeed(mode) ?? oldSpeed, config.GetBool("notify", true), config.GetString("folder") ?? "", config.GetString("backup") ?? "", config.GetBool("lightWhileGaming", true));
     }
     internal void SettingChanged(string key)
     {
@@ -112,7 +115,28 @@ internal sealed class WordLyricsService(ILibraryService library, Func<AppSetting
         // its lyrics switch on the copy being heard (see WithPlayingCopy).
         if (worker.Options.Auto && SameSong(path, Volatile.Read(ref _playingPath)))
         {
-            _ = Task.Run(() => { worker.AskPlayed(path, out var accepted); if (accepted) worker.MakeRoom(path); });
+            Volatile.Write(ref _playingLibraryPath, path);
+            Volatile.Write(ref _playingTimingPath, path);
+            QueueTimingWork(() =>
+            {
+                if (Worker.HasWordLyrics(path))
+                {
+                    PublishWrittenLyrics([path]);
+                    worker.TickNow(); // an earlier cache-only request can now see the shared timing and leave the queue
+                    return;
+                }
+                var playing = Volatile.Read(ref _playingPath);
+                if (playing is not null && (worker.IsWaiting(playing) || Worker.HasWordLyrics(playing)))
+                {
+                    Volatile.Write(ref _playingTimingPath, playing);
+                    if (worker.IsWaiting(playing)) { worker.Prioritize(playing); worker.MakeRoom(playing); }
+                    else PublishWrittenLyrics([playing]);
+                    return;
+                }
+                worker.AskPlayed(path, out var accepted);
+                if (accepted) worker.MakeRoom(path);
+                else if (Worker.HasWordLyrics(path)) PublishWrittenLyrics([path]);
+            });
             return;
         }
         EnqueueBackground([path], worker, null, true);
@@ -136,29 +160,36 @@ internal sealed class WordLyricsService(ILibraryService library, Func<AppSetting
     internal const string PlayedKey = "timePlayed";
     internal static readonly TimeSpan PlayedAfter = TimeSpan.FromSeconds(5);
     private string? _playingPath;
+    private string? _playingTimingPath;
+    private string? _playingLibraryPath;
     private Track? _playing;
     private bool _playingAsked;
-    /// <summary>On: a song you stream (not in Songs) is timed after 5 s of play, before anything waiting. Off (the default):
+    /// <summary>On (the default): a song you stream is timed after 5 s of play, before anything waiting. Off:
     /// only the songs in your library (a download is queued the moment it arrives).</summary>
-    internal bool TimePlayed => _host?.Settings.GetBool(PlayedKey, false) == true;
+    internal bool TimePlayed => _host?.Settings.GetBool(PlayedKey, true) == true;
 
     /// <summary>Called by the player (UI thread) as the song, its position or its state changes.</summary>
     internal void PlayerMoved(Track? track, TimeSpan position, bool playing)
     {
         if (!ReferenceEquals(track, _playing))
         {
+            if (!SameSong(track?.FilePath, _playingPath))
+            {
+                Volatile.Write(ref _playingTimingPath, null);
+                Volatile.Write(ref _playingLibraryPath, null);
+            }
             _playing = track; _playingAsked = false;
             Volatile.Write(ref _playingPath, track is { IsRemoteStream: false, FilePath.Length: > 0 } ? track.FilePath : null);
         }
-        if (_playingAsked || !playing || position < PlayedAfter || _disposed || _worker is not { } worker || !TimePlayed) return;
+        if (_playingAsked || !playing || _disposed || _worker is not { } worker || !TimePlayed) return;
         if (track is null || track.IsRemoteStream || string.IsNullOrWhiteSpace(track.FilePath)) return;
-        // Owner 10-20: only a song you stream (the stream cache); a downloaded one is in Songs and already queued on arrival.
-        if (OnlineMusicSearch.Current?.IsCachedFile(track.FilePath) != true) return;
+        // Owned songs start now; streamed songs retain the five-second listening rule.
+        if (OnlineMusicSearch.Current?.IsCachedFile(track.FilePath) == true && position < PlayedAfter) return;
         // A song still arriving is asked once its file is whole (the next position change after that).
         if (ProgressivePlayback.ProgressiveTransfer.IsDownloading(track.FilePath) || !File.Exists(track.FilePath)) return;
         _playingAsked = true;
         var path = track.FilePath;
-        _ = Task.Run(() =>
+        QueueTimingWork(() =>
         {
             var message = worker.AskPlayed(path, out var accepted);
             if (!accepted) return;
@@ -167,26 +198,68 @@ internal sealed class WordLyricsService(ILibraryService library, Func<AppSetting
         });
     }
 
+    private readonly object _timingWorkGate = new();
+    private Task _timingWork = Task.CompletedTask;
+    private void QueueTimingWork(Action work)
+    {
+        lock (_timingWorkGate)
+            _timingWork = _timingWork.ContinueWith(_ =>
+            {
+                if (_disposed) return;
+                try { work(); } catch (Exception ex) { Log("WORDLYRICS_QUEUE: " + ex.Message); }
+            }, CancellationToken.None, TaskContinuationOptions.None, TaskScheduler.Default);
+    }
+
+    private string[] _aheadPaths = [];
+    private string? _aheadCurrent;
+    private long _aheadGeneration;
+    internal void UpdateAhead(IEnumerable<Track> queue, bool playing)
+    {
+        if (_disposed || _worker is not { } worker) return;
+        var current = Volatile.Read(ref _playingPath);
+        var paths = TimePlayed && playing && _playingAsked
+            ? queue.Take(2).Select(t => t.PendingStream is PendingStream p ? p.Source.CompletedPlaybackPath(p.Song)
+                : !t.IsRemoteStream ? t.FilePath : null).Where(p => !string.IsNullOrWhiteSpace(p)).Cast<string>().ToArray()
+            : [];
+        if (string.Equals(current, _aheadCurrent, StringComparison.OrdinalIgnoreCase) && paths.SequenceEqual(_aheadPaths, StringComparer.OrdinalIgnoreCase)) return;
+        _aheadCurrent = current; _aheadPaths = paths;
+        var generation = Interlocked.Increment(ref _aheadGeneration);
+        QueueTimingWork(() => { if (generation == Interlocked.Read(ref _aheadGeneration)) worker.SetAhead(paths, current); });
+    }
+
     /// <summary>The same song file in another folder (a streamed song's library copy keeps its file name).</summary>
     internal static bool SameSong(string? one, string? other)
         => one is { Length: > 0 } && other is { Length: > 0 } && string.Equals(Path.GetFileName(one), Path.GetFileName(other), StringComparison.OrdinalIgnoreCase);
+
+    private void PublishWrittenLyrics(IReadOnlyList<string> paths)
+    {
+        var shown = WithPlayingCopy(paths);
+        Dispatcher.UIThread.Post(() => { if (!_disposed) LyricsWritten?.Invoke(shown); });
+    }
 
     // Owner 10-20: a song heard from the stream cache whose library copy was just timed: the timing files go next to the
     // copy being heard too, so the lyrics on screen switch now (the cache copy leaves with the cache).
     private IReadOnlyList<string> WithPlayingCopy(IReadOnlyList<string> paths)
     {
         var playing = Volatile.Read(ref _playingPath);
-        var timed = paths.FirstOrDefault(p => SameSong(p, playing) && !string.Equals(Path.GetFullPath(p), Path.GetFullPath(playing!), StringComparison.OrdinalIgnoreCase));
+        var timed = paths.FirstOrDefault(p => SameSong(p, playing));
         if (timed is null) return paths;
-        try
+        var shown = paths.ToList();
+        foreach (var target in new[] { playing, Volatile.Read(ref _playingLibraryPath) }.Where(p => !string.IsNullOrWhiteSpace(p)).Distinct(StringComparer.OrdinalIgnoreCase))
         {
-            var from = Path.Combine(Path.GetDirectoryName(timed)!, Path.GetFileNameWithoutExtension(timed));
-            var to = Path.Combine(Path.GetDirectoryName(playing!)!, Path.GetFileNameWithoutExtension(playing!));
-            foreach (var extension in new[] { ".elrc", ".ttml", ".lyricsfile", ".lrc" })
-                if (File.Exists(from + extension)) File.Copy(from + extension, to + extension, overwrite: true);
+            if (string.Equals(Path.GetFullPath(timed), Path.GetFullPath(target!), StringComparison.OrdinalIgnoreCase)) continue;
+            try
+            {
+                var from = Path.Combine(Path.GetDirectoryName(timed)!, Path.GetFileNameWithoutExtension(timed));
+                var to = Path.Combine(Path.GetDirectoryName(target!)!, Path.GetFileNameWithoutExtension(target!));
+                foreach (var extension in new[] { ".elrc", ".ttml", ".lyricsfile", ".lrc" })
+                    if (File.Exists(from + extension)) File.Copy(from + extension, to + extension, overwrite: true);
+                shown.Add(target!);
+            }
+            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or ArgumentException)
+            { Log("Could not share the playing song's timing: " + ex.Message); }
         }
-        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or ArgumentException) { return paths; }
-        return [.. paths, playing!];
+        return shown;
     }
 
     internal static bool Inside(string path, string folder) => Path.GetFullPath(path).StartsWith(Path.GetFullPath(folder).TrimEnd('\\', '/') + Path.DirectorySeparatorChar, StringComparison.OrdinalIgnoreCase);
@@ -204,7 +277,12 @@ internal sealed class WordLyricsService(ILibraryService library, Func<AppSetting
             foreach (var path in selected)
             {
                 var before = worker.WaitingCount;
-                last = worker.Ask(path, action, draft);
+                last = worker.Ask(path, action, draft, out var accepted);
+                if (accepted && SameSong(path, Volatile.Read(ref _playingPath)))
+                {
+                    worker.Prioritize(path);
+                    worker.MakeRoom(path);
+                }
                 if (worker.WaitingCount > before) queued++;
             }
             return selected.Length == 1 ? last ?? "Queued." : $"{queued} songs queued. Existing word timing is kept when timing missing words.";
@@ -227,7 +305,16 @@ internal sealed class WordLyricsService(ILibraryService library, Func<AppSetting
             if (_worker is not { } worker) return;
             var result = await Task.Run(() =>
             {
-                var message = worker.Ask(track.FilePath, TimingAction.Missing, null, out var accepted);
+                var playing = SameSong(track.FilePath, Volatile.Read(ref _playingPath));
+                var saved = Volatile.Read(ref _playingTimingPath);
+                var path = playing && saved is not null && File.Exists(saved) ? saved : track.FilePath;
+                var message = worker.Ask(path, TimingAction.Missing, null, out var accepted);
+                if (accepted && playing)
+                {
+                    worker.Prioritize(path);
+                    worker.MakeRoom(path);
+                }
+                else if (playing && Worker.HasWordLyrics(path)) PublishWrittenLyrics([path]);
                 return (Message: message, Accepted: accepted);
             });
             if (_disposed || !ReferenceEquals(worker, _worker)) return;

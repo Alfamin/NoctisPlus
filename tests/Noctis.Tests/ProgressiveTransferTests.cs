@@ -5,6 +5,20 @@ namespace Noctis.Tests;
 
 public class ProgressiveTransferTests
 {
+    [Fact]
+    public async Task WordTimingRejectsAPlayableButIncompleteTransfer_WithoutQueuingPartialAudio()
+    {
+        using var rig = new Rig(TimeSpan.FromMinutes(3)).Open();
+        rig.Writer.Write(Audio());
+        await Task.Delay(550); // the buffer deliberately waits before estimating sustained throughput
+        Assert.Equal(rig.Target, rig.Transfer.ReadyPath);
+        using var worker = new Noctis.Features.WordLyrics.Worker(Path.Combine(rig.Data.DataDirectory, "words"),
+            () => [rig.Data.DataDirectory], new(true, "Light", false, "", ""), _ => { }, _ => { }, startTimer: false);
+        Assert.Equal("Wait for the song to finish downloading.", worker.Ask(rig.Target, Noctis.Features.WordLyrics.TimingAction.Missing, null, out var accepted));
+        Assert.False(accepted);
+        Assert.Equal(0, worker.WaitingCount);
+    }
+
     private sealed class Rig(TimeSpan? duration = null) : IDisposable
     {
         internal readonly TestPersistenceService Data = new();

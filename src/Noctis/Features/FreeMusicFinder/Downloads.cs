@@ -378,9 +378,14 @@ internal sealed class Downloads : IDisposable
                 {
                     if (download.State is not (DownloadState.Waiting or DownloadState.Queued))
                     {
-                        _active.Remove(download); _done++;
-                        if (download.State == DownloadState.Saved) _saved++;
-                        if (download.State != DownloadState.Cancelled) _last = download;
+                        _active.Remove(download);
+                        // Playing fills the cache, not Songs: it is not a library-save notice.
+                        if (!IsCached(download) || download.KeepIn is not null)
+                        {
+                            _done++;
+                            if (download.State == DownloadState.Saved) _saved++;
+                            if (download.State != DownloadState.Cancelled) _last = download;
+                        }
                         // Songs waiting for Start or behind a pause do not keep the finished ones from being reported.
                         if (!_active.Any(Runnable)) { summary = Summary(); _done = _saved = 0; _last = null; }
                     }
@@ -450,10 +455,10 @@ internal sealed class Downloads : IDisposable
     private string? Summary()
     {
         if (_last is null) return null;
-        if (_done > 1) return $"Saved {_saved} of {_done} tracks to {_last.Folder}";
+        if (_done > 1) return _saved == _done ? "Saved to library" : $"Saved {_saved} of {_done} songs";
         return _last.State switch
         {
-            DownloadState.Saved => $"Saved \"{_last.Track.Title}\" to {_last.Folder}",
+            DownloadState.Saved => "Saved to library",
             DownloadState.Failed => $"Could not download \"{_last.Track.Title}\": {_last.Error}", _ => null,
         };
     }

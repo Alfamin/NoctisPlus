@@ -6,6 +6,7 @@
     { "icon": "RailSparkleIcon", "title": "For you in seconds", "line": "Recommendations fill in about 7 s instead of over a minute" },
     { "icon": "SearchIcon", "title": "Hard names found", "line": "Tricky titles get a second search; close matches wait in Check these" },
     { "icon": "LyricsIcon", "title": "Word timing, under control", "line": "Restart it, time every song without it, see when it tries again" },
+    { "icon": "LyricsIcon", "title": "Word timing as you listen", "line": "On by default once set up; turn it off in WordLyrics settings" },
     { "icon": "SaveDiskIcon", "title": "Space back", "line": "Word timing's song copies are removed once they are duplicates" },
     { "icon": "MiniPlayerIcon", "title": "The player fits", "line": "Its buttons step aside in a narrow window and come back" }
   ],

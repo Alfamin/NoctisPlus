@@ -89,6 +89,8 @@ public interface IOnlineMusicSearch
     OnlineDownloadStatus StatusOf(OnlineSong song);
     /// <summary>Owner #95: where the song was saved in Songs (not the stream cache), once it is; else null.</summary>
     string? SavedPathOf(OnlineSong song) => null;
+    /// <summary>A completed file for queue timing, including the stream cache. Never starts a transfer.</summary>
+    string? CompletedPlaybackPath(OnlineSong song) => SavedPathOf(song);
     /// <summary>Owner #95/#100: a download asked for ahead that the queue no longer needs is dropped, also one already
     /// transferring (unless it is being heard). True when one was dropped.</summary>
     bool CancelQueued(OnlineSong song) => false;

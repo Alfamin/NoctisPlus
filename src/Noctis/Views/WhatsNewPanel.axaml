@@ -77,8 +77,13 @@
         </StackPanel>
       </ScrollViewer>
       <Border Grid.Row="2" Padding="30,14,30,24">
-        <Button Content="Got it" Classes="pill-primary" Command="{Binding CloseCommand}" HorizontalAlignment="Stretch"
-                HorizontalContentAlignment="Center" AutomationProperties.Name="Got it" />
+        <StackPanel Spacing="10">
+          <Button Content="Word timing settings" Classes="pill-secondary" Command="{Binding WordTimingSettingsCommand}"
+                  IsVisible="{Binding HasWordTimingSettings}" HorizontalAlignment="Stretch"
+                  HorizontalContentAlignment="Center" AutomationProperties.Name="Word timing settings" />
+          <Button Content="Got it" Classes="pill-primary" Command="{Binding CloseCommand}" HorizontalAlignment="Stretch"
+                  HorizontalContentAlignment="Center" AutomationProperties.Name="Got it" />
+        </StackPanel>
       </Border>
     </Grid>
   </controls:PillDialogHost>

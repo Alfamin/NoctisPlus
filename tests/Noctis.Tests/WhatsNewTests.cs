@@ -51,17 +51,34 @@ public class WhatsNewTests : IDisposable
     }
 
     [AvaloniaFact]
+    public void WordTimingSettingsShortcutClosesTheSheet_ThenOpensSettings()
+    {
+        var calls = new List<string>();
+        var vm = new WhatsNewViewModel(Notes("2.2.0"), () => calls.Add("close"), () => calls.Add("settings"));
+        Assert.True(vm.HasWordTimingSettings);
+        vm.WordTimingSettingsCommand.Execute(null);
+        Assert.Equal(new[] { "close", "settings" }, calls);
+    }
+
+    [AvaloniaFact]
     public void ThePanel_ShowsEveryFeature_AndGotItCloses()
     {
         AddToPlaylistDialogTests.EnsureAppStyles();
-        var closed = false;
+        var closed = false; var settings = false;
         var notes = WhatsNewNotes.Load()!;
-        var panel = new Views.WhatsNewPanel { DataContext = new WhatsNewViewModel(notes, () => closed = true) };
+        var panel = new Views.WhatsNewPanel { DataContext = new WhatsNewViewModel(notes, () => closed = true, () => settings = true) };
         var window = new Window { Width = 900, Height = 900, Content = panel };
         window.Show();
         for (int i = 0; i < 3; i++) { Dispatcher.UIThread.RunJobs(); window.UpdateLayout(); }
         var rows = panel.GetVisualDescendants().OfType<StackPanel>().Count(p => p.Classes.Contains("feature-row"));
         Assert.Equal(notes.Added.Count, rows);
+        var shortcut = panel.GetVisualDescendants().OfType<Button>().Single(b => b.Content as string == "Word timing settings");
+        Assert.True(shortcut.IsVisible);
+        Assert.Contains("pill-secondary", shortcut.Classes);
+        shortcut.Command!.Execute(null);
+        Assert.True(settings);
+        Assert.True(closed);
+        closed = false;
         var gotIt = panel.GetVisualDescendants().OfType<Button>().Single(b => b.Content as string == "Got it");
         gotIt.Command!.Execute(null);
         Assert.True(closed);

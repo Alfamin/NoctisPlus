@@ -19,6 +19,7 @@ namespace Noctis.Tests;
 /// play call so the "lyrics take a while after the track starts" report can be
 /// judged against numbers instead of a feeling.
 /// </summary>
+[Collection("MetadataServiceStatics")]
 public class LyricsTrackChangeTimingTests : IDisposable
 {
     private readonly ITestOutputHelper _output;
@@ -102,6 +103,29 @@ public class LyricsTrackChangeTimingTests : IDisposable
 
     /// <summary>Owner #70: word timing finishing for the song on screen swapped its lyrics like a track change (fade
     /// to black, every line dark for a moment): a flash. Now the same lines are replaced in place, in one frame.</summary>
+    [AvaloniaFact]
+    public async Task StreamPlainLyricsStayInBackground_ThenTimedSidecarAppearsOnCompletion()
+    {
+        using var persistence = new TestPersistenceService();
+        var player = new PlayerViewModel(new FakeAudioPlayer(), new FakeLibraryService(), persistence, new FakeAnimatedCoverService());
+        using var vm = new LyricsViewModel(player, new StubLrcLib(), new StubNetEase(), new StubMetadata(), persistence, new FakeLibraryService());
+        var song = MakeTrack("stream", "plain text without timestamps");
+        var before = Services.Search.OnlineMusicSearch.Current;
+        Services.Search.OnlineMusicSearch.Current = new QueueStreamingTests.Source { CacheTest = p => p == song.FilePath };
+        try
+        {
+            player.ReplaceQueueAndPlay([song], 0); await Pump(300);
+            Assert.Empty(vm.LyricLines);
+            Assert.Empty(vm.UnsyncedLines);
+            Assert.True(vm.ShowSearchButton);
+            File.WriteAllText(Path.ChangeExtension(song.FilePath, ".elrc"), Elrc("timed"));
+            vm.ReloadWrittenLyrics([song.FilePath]); await Pump(300);
+            Assert.Contains(vm.LyricLines, l => l.Words is not null);
+            Assert.False(vm.ShowSearchButton);
+        }
+        finally { Services.Search.OnlineMusicSearch.Current = before; }
+    }
+
     [AvaloniaFact]
     public async Task CompletedWordTimingOfThePlayingSong_SwapsInPlace_WithoutFadeOrLosingTheLine()
     {

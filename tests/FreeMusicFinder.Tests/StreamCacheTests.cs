@@ -126,11 +126,15 @@ internal static class StreamCacheTests
         try
         {
             using var queue = new Downloads(_ => { }) { CacheFolder = cache };
+            var notices = new List<string>();
+            queue.Finished += text => { lock (notices) notices.Add(text); };
             var played = queue.Start(Track("Played"), cache, priority: true);
             await Check.UntilAsync(() => played.State == DownloadState.Saved, "the played song is saved");
             Check.True(played.SavedPath is { } p && p.StartsWith(cache, StringComparison.OrdinalIgnoreCase), "into the stream cache");
             Check.True(queue.IsCached(played) && played.KeepIn is null, "as played only");
             lock (announced) Check.Equal(0, announced.Count, "the library is not told about it");
+            await Task.Delay(50);
+            lock (notices) Check.Equal(0, notices.Count, "stream-only completion never says it was saved to the library");
             var (path, pending) = queue.Keep(played, library);
             Check.True(!pending && path is not null && File.Exists(path) && path.StartsWith(library, StringComparison.OrdinalIgnoreCase), "Add copies it into the library folder");
             lock (announced) Check.True(announced.Count == 1 && announced[0] == path, "and announces exactly that copy to the library");
@@ -165,6 +169,8 @@ internal static class StreamCacheTests
             await Check.UntilAsync(() => song.State == DownloadState.Running, "the song is downloading");
             var (path, pending) = queue.Keep(song, library);
             Check.True(pending && path is null, "Add is accepted while it downloads");
+            lock (announced) Check.Equal(0, announced.Count, "no saved-file/WordLyrics event before the transfer is complete");
+            Check.False(Directory.Exists(library), "Add intent does not create a partial library copy");
             release.SetResult();
             await Check.UntilAsync(() => File.Exists(Path.Combine(library, song.Track.FileName + ".flac")), "the finished song is copied into the library");
             lock (announced) Check.Equal(1, announced.Count, "and announced once");

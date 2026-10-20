@@ -112,6 +112,63 @@ public class NativeWordLyricsTests
         Assert.False(shown);
     }
     [AvaloniaFact]
+    public void TimingAheadUsesOnlyTheNextTwoPositions_CompletedFilesOnly_AndClearsOldPriorities()
+    {
+        using var rig = new Rig();
+        var now = rig.Song("Playing local");
+        var second = rig.Song("Second ready");
+        var third = rig.Song("Third outside");
+        var source = new QueueStreamingTests.Source();
+        var pending = PlayerViewModel.StandIn(source, new OnlineSong("missing", "Still arriving", "Synthetic"), false);
+        rig.Service.PlayerMoved(now, TimeSpan.Zero, true); // local songs now get timing too
+        rig.Service.UpdateAhead([pending, second, third], true);
+        Until(() => rig.Service.WaitingCount == 2); // current + ready position2; no backfill for missing position1
+        Assert.Equal(SongTimingStatus.None, rig.Service.StatusFor(third.FilePath));
+        Assert.Empty(source.Asked); // timing never starts an audio download
+        rig.Service.UpdateAhead([], true);
+        Until(() => rig.Service.WaitingCount == 1); // obsolete ahead-only work removed, current retained
+    }
+
+    [AvaloniaFact]
+    public void AddingAnAlreadyTimedPlayingSong_PublishesItsSidecarsToTheCacheWithoutAnotherModelRun()
+    {
+        using var rig = new Rig();
+        var saved = rig.Song("Already timed copy");
+        var cache = Path.Combine(rig.Data.DataDirectory, "cache", Path.GetFileName(saved.FilePath));
+        Directory.CreateDirectory(Path.GetDirectoryName(cache)!);
+        File.WriteAllText(cache, "synthetic cache audio");
+        var words = "[00:01.00]<00:01.00>timed <00:02.00>words";
+        File.WriteAllText(Path.ChangeExtension(saved.FilePath, ".elrc"), words);
+        IReadOnlyList<string>? written = null;
+        rig.Service.LyricsWritten += paths => written = paths;
+        rig.Service.PlayerMoved(new Track { FilePath = cache }, TimeSpan.Zero, true);
+        OnlineMusicSearch.PublishSavedFile(saved.FilePath);
+        Until(() => written?.Contains(cache) == true);
+        Assert.Equal(words, File.ReadAllText(Path.ChangeExtension(cache, ".elrc")));
+        Until(() => rig.Service.WaitingCount == 0);
+    }
+
+    [AvaloniaFact]
+    public void PlayingSavedCopyShowsTimingStatus_AndNewPlayedDefaultKeepsAnExplicitOffChoice()
+    {
+        using var rig = new Rig();
+        Assert.True(rig.Service.TimePlayed);
+        rig.Host.FindById("dev.moshi.wordlyrics")!.SettingItems.Single(s => s.Key == "timePlayed").BoolValue = false;
+        Assert.False(rig.Service.TimePlayed);
+        var saved = rig.Song("Copy status");
+        var cache = Path.Combine(rig.Data.DataDirectory, "cache", Path.GetFileName(saved.FilePath));
+        rig.Service.PlayerMoved(new Track { FilePath = cache }, TimeSpan.Zero, true);
+        OnlineMusicSearch.PublishSavedFile(saved.FilePath);
+        Until(() => rig.Service.StatusFor(cache) == SongTimingStatus.SetupNeeded);
+        Assert.Equal(rig.Service.StatusFor(saved.FilePath), rig.Service.StatusFor(cache));
+        Directory.CreateDirectory(Path.GetDirectoryName(cache)!);
+        File.WriteAllText(cache, "synthetic cache copy");
+        var manual = rig.Service.TimeSongAsync(new Track { FilePath = cache });
+        Until(() => manual.IsCompleted); manual.GetAwaiter().GetResult();
+        Assert.Equal(1, rig.Service.WaitingCount); // manual action promotes the saved copy, never queues its cache twin too
+    }
+
+    [AvaloniaFact]
     public void AddingThePlayingCopy_RespectsAutomaticTimingOff()
     {
         using var rig = new Rig(off: true);

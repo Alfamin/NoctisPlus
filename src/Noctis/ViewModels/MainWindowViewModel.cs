@@ -488,7 +488,7 @@ public partial class MainWindowViewModel : ViewModelBase
         // "Open" buttons in Settings → Features: the action's window or page shows in front, not behind Settings.
         Plugins.SettingActionInvoked += (_, _) => IsSettingsModalOpen = false;
         Plugins.NotificationRequested += (_, notice) =>
-            TransientStatus.Show(nameof(PluginNotice), v => PluginNotice = v, $"{notice.PluginName}: {notice.Message}", TimeSpan.FromSeconds(4));
+            TransientStatus.Show(nameof(PluginNotice), v => PluginNotice = v, notice.DisplayText, TimeSpan.FromSeconds(4));
         // LoadAll walks the plugins folder, loads assemblies and reflects over their
         // types on the UI thread. Settings finish loading right after the window
         // shows, so running it inline there held the first frame hostage to however
@@ -701,8 +701,12 @@ public partial class MainWindowViewModel : ViewModelBase
         Player.PropertyChanged += (_, e) =>
         {
             if (e.PropertyName is nameof(PlayerViewModel.Position) or nameof(PlayerViewModel.CurrentTrack) or nameof(PlayerViewModel.State))
+            {
                 wordService.PlayerMoved(Player.CurrentTrack, Player.Position, Player.State == PlaybackState.Playing);
+                wordService.UpdateAhead(Player.UpNext, Player.State == PlaybackState.Playing);
+            }
         };
+        Player.UpNext.CollectionChanged += (_, _) => wordService.UpdateAhead(Player.UpNext, Player.State == PlaybackState.Playing);
         _downloadImporter = new(library, text => Dispatcher.UIThread.Post(() =>
             TransientStatus.Show(nameof(PluginNotice), v => PluginNotice = v, text, TimeSpan.FromSeconds(12))));
         _lyricsVm.PluginLyricsSources = () => Plugins.LyricsProviders;
@@ -1168,6 +1172,10 @@ public partial class MainWindowViewModel : ViewModelBase
                 {
                     WhatsNewSheet = null;
                     Features.WhatsNew.WhatsNewGate.MarkSeen(_persistence.DataDirectory, current);
+                }, () =>
+                {
+                    Settings.SelectedSettingsTab = SettingsViewModel.TabFeatures;
+                    OpenSettingsCommand.Execute(null);
                 });
             }, TimeSpan.FromSeconds(1.5));
         }

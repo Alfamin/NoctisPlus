@@ -397,7 +397,11 @@ public sealed class PluginTrackCommand
 }
 
 /// <summary>A message a plugin asked to show.</summary>
-public sealed record PluginNotice(string PluginName, string Message);
+public sealed record PluginNotice(string PluginName, string Message)
+{
+    public bool IncludeSource { get; init; } = true;
+    public string DisplayText => IncludeSource ? $"{PluginName}: {Message}" : Message;
+}
 
 /// <summary>Result of an install from a .zip.</summary>
 public enum PluginInstallOutcome { Installed, Updated, AlreadyInstalled, NotNewer, Failed }
@@ -1087,7 +1091,10 @@ public sealed class PluginHost
         if (now - plugin.LastNotice < TimeSpan.FromSeconds(1)) return;
         plugin.LastNotice = now;
         var text = message.Length > 200 ? message[..200] + "…" : message;
-        var notice = new PluginNotice(plugin.Name, text);
+        var notice = new PluginNotice(plugin.Name, text)
+        {
+            IncludeSource = !(plugin.IsBundled && SameId(plugin.Id, "dev.moshi.freemusicfinder"))
+        };
         void Raise() => NotificationRequested?.Invoke(this, notice);
         if (Dispatcher.UIThread.CheckAccess()) Raise();
         else Dispatcher.UIThread.Post(Raise);
