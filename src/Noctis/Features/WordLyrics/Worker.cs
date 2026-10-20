@@ -64,6 +64,12 @@ internal sealed class Worker : IDisposable
     private bool _restarting;           // owner #91: the run that is going was ended by Restart (or the watchdog)
     private string? _restartNotice;     // what the panel says once a restarted run has ended (null: the watchdog says it)
     private bool? _wasReady;            // whether WordLyrics was set up at the last look (null: not looked yet)
+    private bool _yielding;             // owner #108: the run finishes the song it is on and stops for the song playing now
+    private double _runProgress;        // how far the run is (0..1), from its stages
+    private int _lastCompleted;         // songs the run has finished, at the last look
+    private readonly HashSet<string> _reported = new(StringComparer.OrdinalIgnoreCase);
+    /// <summary>Owner #110: the song playing now; its word timing is reported the moment it is written, not when the run ends.</summary>
+    internal Func<string?>? Watched { get; set; }
     // Owner #91 watchdog: a run whose progress file and CPU time both stop moving is stuck (a model call that never returns).
     internal TimeSpan StuckAfter { get; set; } = TimeSpan.FromMinutes(15);
     internal TimeSpan IdleCpuAfter { get; set; } = TimeSpan.FromMinutes(5);
@@ -84,6 +90,7 @@ internal sealed class Worker : IDisposable
         public TimingAction Action;
         public string? Draft;
         public bool Asked;              // the user asked for this song by hand
+        public DateTime Urgent;         // owner #108: the song playing now (newest first, alone in its run; not saved)
         public int Tries;               // runs that failed because of the song
         public int Waits;               // runs that could not do anything (no internet, broken setup): see Backoff
         public DateTime Seen;
@@ -251,6 +258,42 @@ internal sealed class Worker : IDisposable
             _progress(new ProgressState("Restarted", waiting == 0 ? "Nothing is waiting." : $"{waiting} song{(waiting == 1 ? "" : "s")} start again.", Finished: waiting == 0));
         }
         return waiting == 0 ? "WordLyrics restarted. Nothing is waiting." : $"WordLyrics restarted: {waiting} song{(waiting == 1 ? "" : "s")} start again.";
+    }
+
+    /// <summary>Owner #108: the song playing now is timed next, before everything else waiting.</summary>
+    internal string? AskPlayed(string path, out bool accepted)
+    {
+        var message = Ask(path, TimingAction.Missing, null, out accepted);
+        if (!accepted) return message;
+        lock (_gate)
+            if (_items.TryGetValue(Path.GetFullPath(path), out var item)) { item.Urgent = DateTime.UtcNow; item.NotBefore = DateTime.UtcNow; }
+        _timer.Change(TimeSpan.Zero, Tick);
+        return message;
+    }
+
+    /// <summary>
+    /// Owner #108: another song plays. A run on other songs that is at least 75% through finishes the song it is on and
+    /// stops; one less far is stopped now. Either way its songs stay on the list (no failed try) and the song playing now
+    /// goes first.
+    /// </summary>
+    internal void MakeRoom(string path)
+    {
+        Process active; Job? job;
+        lock (_gate)
+        {
+            if (_disposed || _run is not { } run || _cancelling || _restarting || _activePaths.Contains(Path.GetFullPath(path))) return;
+            if (_runProgress >= 0.75)
+            {
+                if (!_controlled) return; // an old program without the stop file simply finishes
+                _yielding = true; _cancelling = true;
+                WriteControl("stop");
+                Emit();
+                return;
+            }
+            active = run; job = _job;
+            _restarting = true; _restartNotice = null;
+        }
+        Safe(() => { if (job is not null) job.Dispose(); else if (!active.HasExited) active.Kill(entireProcessTree: true); });
     }
 
     /// <summary>WordLyrics processes of this installation (its own Python) other than <paramref name="ours"/>.</summary>
@@ -451,7 +494,7 @@ internal sealed class Worker : IDisposable
         // Looking at the files happens outside the lock: a slow drive must never make Noctis
         // wait (it calls into the plugin from its own thread). Only this timer changes these
         // entries while no run is going.
-        var ripe = waiting.Where(i => Ripe(i, now)).OrderByDescending(i => i.Asked).ThenBy(i => i.Seen).ToList();
+        var ripe = waiting.Where(i => Ripe(i, now)).OrderByDescending(i => i.Urgent).ThenByDescending(i => i.Asked).ThenBy(i => i.Seen).ToList();
         var gone = waiting.Where(i => i.Length == -2).ToList();
         if (gone.Count > 0)
         {
@@ -462,7 +505,9 @@ internal sealed class Worker : IDisposable
             }
         }
         if (ripe.Count == 0) return;
-        var batch = ripe.Where(i => i.Asked == ripe[0].Asked && i.Action == ripe[0].Action && i.Draft == ripe[0].Draft && SamePath(i.Root, ripe[0].Root)).Take(MaxSongsPerRun).ToList();
+        // Owner #108: the song playing now runs alone, so it is done (and the next one played can go first) at once.
+        var batch = ripe[0].Urgent != default ? [ripe[0]]
+            : ripe.Where(i => i.Urgent == default && i.Asked == ripe[0].Asked && i.Action == ripe[0].Action && i.Draft == ripe[0].Draft && SamePath(i.Root, ripe[0].Root)).Take(MaxSongsPerRun).ToList();
 
         var options = Options;
         Tool tool;
@@ -627,6 +672,7 @@ internal sealed class Worker : IDisposable
             _job = Job.Around(run);
             _activePaths.Clear();
             _activePaths.UnionWith(batch.Select(i => i.Path));
+            _reported.Clear(); _lastCompleted = 0; _runProgress = 0; _yielding = false;
             _controlled = controlled;
             _cancelling = false;
             _restarting = false;
@@ -690,8 +736,12 @@ internal sealed class Worker : IDisposable
             var detail = Text(root, "notice");
             string message = "Preparing WordLyrics";
             double? fraction = null;
+            int stageCount = 0, stagesDone = 0;
             if (root.TryGetProperty("stages", out var stages))
                 foreach (var stage in stages.EnumerateArray())
+                {
+                    stageCount++;
+                    if (Text(stage, "state") == "done") stagesDone++;
                     if (Text(stage, "state") == "running")
                     {
                         message = Text(stage, "name");
@@ -700,13 +750,29 @@ internal sealed class Worker : IDisposable
                         var count = stage.GetProperty("total").GetDouble();
                         fraction = count > 0 ? Math.Clamp(stage.GetProperty("done").GetDouble() / count, 0, 1) : null;
                     }
+                }
             var enginePaused = root.TryGetProperty("paused", out var rests) && rests.ValueKind == JsonValueKind.True;
             lock (_gate)
                 if (ReferenceEquals(_run, active))
                 {
                     _view = new View(message, detail, completed, total, fraction, enginePaused);
+                    _runProgress = stageCount > 0 ? Math.Clamp((stagesDone + (fraction ?? 0)) / stageCount, 0, 1) : 0;
                     Emit();
                 }
+            // Owner #110: the song playing now, timed in this run: its lyrics are shown as soon as they are written.
+            if (completed > _lastCompleted)
+            {
+                _lastCompleted = completed;
+                string? playing = null;
+                lock (_gate)
+                    if (Watched?.Invoke() is { Length: > 0 } current && _activePaths.Contains(Path.GetFullPath(current)) && !_reported.Contains(Path.GetFullPath(current)))
+                        playing = Path.GetFullPath(current);
+                if (playing is not null && (HasWordLyrics(playing) || EmbeddedWordLyrics.HasWords(playing)))
+                {
+                    lock (_gate) _reported.Add(playing);
+                    _lyricsWritten([playing]);
+                }
+            }
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or JsonException or InvalidOperationException or KeyNotFoundException or FormatException) { }
     }
@@ -762,6 +828,9 @@ internal sealed class Worker : IDisposable
             held = _paused;                 // paused too late for this run to notice: the songs still waiting stay held
             cancelled = _cancelling && ReferenceEquals(_run, run);
             restarted = _restarting && ReferenceEquals(_run, run); restartNotice = _restartNotice; _restarting = false; _restartNotice = null;
+            // Owner #108: stopped for the song playing now: like a restart, nothing is lost and nothing is the song's fault.
+            if (_yielding && ReferenceEquals(_run, run)) { cancelled = false; restarted = true; }
+            _yielding = false;
             if (!restarted && code != ExitAlreadyRunning) _autoRestarts = 0; // a run that ended by itself: the watchdog starts counting again
             if (ReferenceEquals(_run, run))
             {
@@ -832,7 +901,7 @@ internal sealed class Worker : IDisposable
 
         if (restarted)
         {
-            _log("WordLyrics was restarted; the waiting songs start again");
+            _log(restartNotice is null ? "WordLyrics made room for the song playing now; the others wait" : "WordLyrics was restarted; the waiting songs start again");
             if (restartNotice is not null) _progress(new ProgressState("Restarted", restartNotice));
             _timer.Change(TimeSpan.FromSeconds(1), Tick);
             return;

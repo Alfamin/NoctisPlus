@@ -56,6 +56,7 @@ internal sealed class WordLyricsService(ILibraryService library, Func<AppSetting
         _worker = new Worker(host.DataDirectory, () => _folders, ReadOptions(), Log, Notify, Progress,
             lyricsWritten: paths => Dispatcher.UIThread.Post(() => { if (!_disposed) LyricsWritten?.Invoke(paths); }));
         _worker.StatusChanged += SongStatusChanged;
+        _worker.Watched = () => Volatile.Read(ref _playingPath);
         // Owner #96: song copies earlier runs left that are exact duplicates of their song go (in the background, after
         // startup has settled, at low priority).
         try { BackupCleaner.CleanEarlierLater(new Tool(_worker.Options.Folder).Folder, Log, TimeSpan.FromMinutes(2)); }
@@ -104,6 +105,9 @@ internal sealed class WordLyricsService(ILibraryService library, Func<AppSetting
     private void DownloadSaved(object? sender, string path)
     {
         if (_disposed || _worker is not { } worker) return;
+        // Owner #108: a song only played (the stream cache, also the songs fetched ahead) is not one of your songs: it is
+        // timed only when it plays and "Time every song you play" is on. Added to Songs, its library copy comes here.
+        if (OnlineMusicSearch.Current?.IsCachedFile(path) == true) return;
         EnqueueBackground([path], worker, null, true);
     }
     private void EnqueueBackground(string[] paths, Worker worker, DateTime? since, bool complete)
@@ -121,6 +125,41 @@ internal sealed class WordLyricsService(ILibraryService library, Func<AppSetting
                 catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or ArgumentException) { Log("WORDLYRICS_ENQUEUE_FAILED: " + ex.Message); }
             }
         });
+    // ── Owner #108: songs you play ──
+    internal const string PlayedKey = "timePlayed";
+    internal static readonly TimeSpan PlayedAfter = TimeSpan.FromSeconds(5);
+    private string? _playingPath;
+    private Track? _playing;
+    private bool _playingAsked;
+    /// <summary>On: a song you stream (not in Songs) is timed after 5 s of play, before anything waiting. Off (the default):
+    /// only the songs in your library (a download is queued the moment it arrives).</summary>
+    internal bool TimePlayed => _host?.Settings.GetBool(PlayedKey, false) == true;
+
+    /// <summary>Called by the player (UI thread) as the song, its position or its state changes.</summary>
+    internal void PlayerMoved(Track? track, TimeSpan position, bool playing)
+    {
+        if (!ReferenceEquals(track, _playing))
+        {
+            _playing = track; _playingAsked = false;
+            Volatile.Write(ref _playingPath, track is { IsRemoteStream: false, FilePath.Length: > 0 } ? track.FilePath : null);
+        }
+        if (_playingAsked || !playing || position < PlayedAfter || _disposed || _worker is not { } worker || !TimePlayed) return;
+        if (track is null || track.IsRemoteStream || string.IsNullOrWhiteSpace(track.FilePath)) return;
+        // Owner 10-20: only a song you stream (the stream cache); a downloaded one is in Songs and already queued on arrival.
+        if (OnlineMusicSearch.Current?.IsCachedFile(track.FilePath) != true) return;
+        // A song still arriving is asked once its file is whole (the next position change after that).
+        if (ProgressivePlayback.ProgressiveTransfer.IsDownloading(track.FilePath) || !File.Exists(track.FilePath)) return;
+        _playingAsked = true;
+        var path = track.FilePath;
+        _ = Task.Run(() =>
+        {
+            var message = worker.AskPlayed(path, out var accepted);
+            if (!accepted) return;
+            worker.MakeRoom(path);
+            if (message is { Length: > 0 } && !message.StartsWith("Already", StringComparison.Ordinal)) Log("played song: " + message);
+        });
+    }
+
     internal static bool Inside(string path, string folder) => Path.GetFullPath(path).StartsWith(Path.GetFullPath(folder).TrimEnd('\\', '/') + Path.DirectorySeparatorChar, StringComparison.OrdinalIgnoreCase);
 
     internal async Task<string> QueueAsync(IEnumerable<string> paths, TimingAction action = TimingAction.Missing, string? words = null)

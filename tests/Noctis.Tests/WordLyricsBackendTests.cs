@@ -15,7 +15,7 @@ public class WordLyricsBackendTests
         internal readonly TestPersistenceService Data = new();
         internal readonly string App, Music, Song, Work;
         private readonly string? _before = Environment.GetEnvironmentVariable("WORDLYRICS_PYTHON");
-        internal Rig(bool hold = false, string outcome = "timed", bool stuck = false)
+        internal Rig(bool hold = false, string outcome = "timed", bool stuck = false, double done = 1)
         {
             var python = Environment.GetEnvironmentVariable("NOCTIS_TEST_PYTHON") ?? "python";
             try
@@ -31,7 +31,7 @@ public class WordLyricsBackendTests
             File.WriteAllText(Path.Combine(module, "__init__.py"), "__version__ = \"1.6.4\"\n");
             File.WriteAllText(Path.Combine(App, "WordLyrics.bat"), "fixture only");
             File.WriteAllText(Path.Combine(module, "__main__.py"), "# --confirm-redo is supported by this synthetic backend\n");
-            File.WriteAllText(Path.Combine(App, "fixture.json"), JsonSerializer.Serialize(new { hold, outcome, stuck }));
+            File.WriteAllText(Path.Combine(App, "fixture.json"), JsonSerializer.Serialize(new { hold, outcome, stuck, done }));
             File.WriteAllText(Path.Combine(module, "models.py"), "class ModelError(Exception):pass\ndef missing(folder):return []\ndef download(*a,**k):raise Exception('Original download must never run')\n");
             var run = """
                 import json,sys,time,os
@@ -48,7 +48,7 @@ public class WordLyricsBackendTests
                 deadline=time.monotonic()+15
                 while config['hold'] and time.monotonic()<deadline:
                     word=control.read_text() if control and control.exists() else 'run'
-                    put(value('--progress'),{'completed':0,'total':len(songs),'paused':word=='pause','stages':[{'name':'Align words','state':'running','done':1,'total':4,'current':'Synthetic song'}]})
+                    put(value('--progress'),{'completed':0,'total':len(songs),'paused':word=='pause','stages':[{'name':'Align words','state':'running','done':config.get('done',1),'total':4,'current':'Synthetic song'}]})
                     if word=='stop':break
                     time.sleep(.05)
                 proxy=urlsplit(os.environ.get('https_proxy',''))
@@ -229,6 +229,40 @@ public class WordLyricsBackendTests
         Assert.Contains(states, s => s.Message == "WordLyrics stopped responding" && s.Error);
         Assert.Equal(1, worker.WaitingCount); // kept, for Restart or the next try
         Assert.Equal(SongTimingStatus.Retry, worker.StatusFor(rig.Song));
+    }
+
+    // Owner #108: the song playing now is timed first and alone; a run on other songs less than 75% through steps
+    // aside at once, one further on finishes its song first; the other songs are never lost.
+    [Fact]
+    public async Task APlayedSong_StopsARunNotFarThrough_AndIsTimedFirst_TheOtherSongKept()
+    {
+        using var rig = new Rig(hold: true, done: 1); // 25% through
+        using var worker = rig.Worker(_ => { });
+        worker.Ask(rig.Song);
+        await Until(() => worker.StatusFor(rig.Song) == SongTimingStatus.Processing);
+        await Task.Delay(1500); // its progress has been read
+        var played = Path.Combine(rig.Music, "played now.mp3"); File.WriteAllText(played, "synthetic");
+        worker.AskPlayed(played, out var accepted); Assert.True(accepted);
+        worker.MakeRoom(played);
+        await Until(() => worker.StatusFor(played) == SongTimingStatus.Processing);
+        Assert.Equal([played], File.ReadAllLines(Path.Combine(rig.Work, "songs.txt"))); // alone in its run
+        Assert.True(worker.IsWaiting(rig.Song)); // kept, no failed try
+    }
+
+    [Fact]
+    public async Task APlayedSong_LetsARunFarThroughFinishItsSong_ThenGoesNext()
+    {
+        using var rig = new Rig(hold: true, done: 3.5); // 88% through
+        using var worker = rig.Worker(_ => { });
+        worker.Ask(rig.Song);
+        await Until(() => worker.StatusFor(rig.Song) == SongTimingStatus.Processing);
+        await Task.Delay(1500);
+        var played = Path.Combine(rig.Music, "played now.mp3"); File.WriteAllText(played, "synthetic");
+        worker.AskPlayed(played, out _);
+        worker.MakeRoom(played);
+        await Until(() => worker.StatusFor(played) == SongTimingStatus.Processing);
+        Assert.False(worker.IsWaiting(rig.Song)); // it finished (timed), then the played song started
+        Assert.Equal([played], File.ReadAllLines(Path.Combine(rig.Work, "songs.txt")));
     }
 
     [Fact]

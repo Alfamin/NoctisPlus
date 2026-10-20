@@ -31,6 +31,13 @@
       "description": "Applied to every new download and newly added local song. Off skips automatic timing; manual repair remains available. Medium keeps the previous Half setting. Changes affect the next batch."
     },
     {
+      "key": "timePlayed",
+      "label": "Time every song you play",
+      "description": "Off: only the songs in your library. On: songs you stream too, after 5 seconds of play, before anything waiting.",
+      "type": "bool",
+      "default": false
+    },
+    {
       "key": "notify",
       "label": "Say when a song is done",
       "description": "A short notification each time a song's word timing is finished.",

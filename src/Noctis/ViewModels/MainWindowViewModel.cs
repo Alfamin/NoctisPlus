@@ -696,6 +696,13 @@ public partial class MainWindowViewModel : ViewModelBase
         _lyricsVm.WordTimingStartRequested = wordService.TimeSongAsync;
         _lyricsVm.AttachWordTiming(wordService);
         wordService.LyricsWritten += _lyricsVm.ReloadWrittenLyrics;
+        // Owner #108/#110: the song playing now (timed first when "Time every song you play" is on; its lyrics switch
+        // to word timing the moment they are written).
+        Player.PropertyChanged += (_, e) =>
+        {
+            if (e.PropertyName is nameof(PlayerViewModel.Position) or nameof(PlayerViewModel.CurrentTrack) or nameof(PlayerViewModel.State))
+                wordService.PlayerMoved(Player.CurrentTrack, Player.Position, Player.State == PlaybackState.Playing);
+        };
         _downloadImporter = new(library, text => Dispatcher.UIThread.Post(() =>
             TransientStatus.Show(nameof(PluginNotice), v => PluginNotice = v, text, TimeSpan.FromSeconds(12))));
         _lyricsVm.PluginLyricsSources = () => Plugins.LyricsProviders;
