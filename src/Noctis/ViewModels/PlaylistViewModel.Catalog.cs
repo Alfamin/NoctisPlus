@@ -75,7 +75,6 @@ public partial class PlaylistViewModel
         RefreshCatalogDownloads();
         OnPropertyChanged(nameof(HasCatalogMissing));
         OnPropertyChanged(nameof(ShowPlayActions));
-        OnPropertyChanged(nameof(ShowStreamToggle));
         OnPropertyChanged(nameof(CanReorder));
         OnPropertyChanged(nameof(TrackCountText));
         UpdateEmptyStateFlags(entries?.Count ?? Tracks.Count);
@@ -156,14 +155,13 @@ public partial class PlaylistViewModel
 
     // ── Owner #95: the playlist plays its songs you don't have too ──
 
-    /// <summary>The header toggle: songs you don't have play too (fetched as the queue reaches them). Off: only yours.</summary>
+    /// <summary>Songs you don't have play too (fetched as the queue reaches them). Off: only yours. Switched in Settings →
+    /// Playback (a header button read as "download everything", owner 2026-10-20).</summary>
     public bool StreamMissing
     {
         get => _player.StreamMissingSongs;
-        set { if (_player.StreamMissingSongs == value) return; _player.StreamMissingSongs = value; OnPropertyChanged(); OnPropertyChanged(nameof(ShowPlayActions)); }
+        set => _player.StreamMissingSongs = value;
     }
-    public bool ShowStreamToggle => HasCatalogMissing && !IsPreview;
-    [RelayCommand] private void ToggleStreamMissing() => StreamMissing = !StreamMissing;
 
     private bool Streams => _player.StreamMissingSongs && HasCatalogMissing && !IsPreview && _catalogOnline is not null;
     private readonly System.Runtime.CompilerServices.ConditionalWeakTable<ArtistCatalogSong, Track> _standIns = new();
@@ -172,7 +170,7 @@ public partial class PlaylistViewModel
 
     /// <summary>What Play, Shuffle and the queue actions take: the playlist's rows in their order (missing songs as
     /// stand-ins) when streaming is on, else only the songs you have, as before.</summary>
-    private List<Track> PlaybackList()
+    internal List<Track> PlaybackList()
     {
         if (!Streams) return Tracks.ToList();
         var list = new List<Track>(Rows.Count);

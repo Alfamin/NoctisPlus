@@ -249,4 +249,55 @@ public class NativeTrueShuffleTests
         Assert.Equal(PlayerShuffleMode.ForYou, rig.Player.ShuffleMode);
         Assert.InRange(rig.Player.UpNext.Count, 1, 25);
     }
+
+    // Owner 2026-10-20 (#95): No repeats or Discovery on a playlist that plays its missing songs kept only the songs you have.
+    private static List<Track> StandIns(int count)
+    {
+        var source = new QueueStreamingTests.Source();
+        return Enumerable.Range(1, count).Select(i => PlayerViewModel.StandIn(source,
+            new Noctis.Services.Search.OnlineSong("s" + i, "Online " + i, "Synthetic", Seconds: 180), keep: true)).ToList();
+    }
+
+    [AvaloniaTheory]
+    [InlineData(PlayerShuffleMode.NoRepeats)]
+    [InlineData(PlayerShuffleMode.Discovery)]
+    [InlineData(PlayerShuffleMode.EqualChance)]
+    public void ShufflingAQueueWithSongsYouDontHave_KeepsThem(PlayerShuffleMode mode)
+    {
+        using var rig = new Rig(6); rig.Service.WindowSize = 50;
+        var missing = StandIns(6);
+        rig.Player.ReplaceQueueAndPlay(rig.Tracks.Concat(missing).ToList(), 0); rig.Settle();
+        rig.Choose(mode, ShuffleScope.CurrentQueue);
+        Assert.Equal(mode, rig.Player.ShuffleMode);
+        Assert.Empty(rig.Player.ShuffleStatus);
+        Assert.All(missing, t => Assert.Contains(t, rig.Player.UpNext));
+        Assert.Equal(11, rig.Player.UpNext.Count);
+    }
+
+    [AvaloniaFact]
+    public void ShufflingSongsYouDontHave_FromNothingPlaying_StartsOnOneYouHave()
+    {
+        using var rig = new Rig(1); rig.Service.WindowSize = 50;
+        rig.Player.AddRangeToQueue(StandIns(8).Prepend(rig.Tracks[0]).ToList(), announce: false); rig.Settle();
+        Assert.Null(rig.Player.CurrentTrack);
+        rig.Choose(PlayerShuffleMode.NoRepeats, ShuffleScope.CurrentQueue);
+        Assert.Same(rig.Tracks[0], rig.Player.CurrentTrack);
+        Assert.Equal(8, rig.Player.UpNext.Count(t => t.IsPendingStream));
+    }
+
+    [AvaloniaFact]
+    public void WithPlaySongsYouDontHaveOff_AShuffleLeavesThemOut()
+    {
+        using var rig = new Rig(6); rig.Service.WindowSize = 3; rig.Service.RefillAt = 1;
+        var missing = StandIns(6);
+        rig.Player.ReplaceQueueAndPlay(rig.Tracks.Concat(missing).ToList(), 0); rig.Settle();
+        rig.Choose(PlayerShuffleMode.EqualChance, ShuffleScope.CurrentQueue);
+        rig.Player.StreamMissingSongs = false; rig.Settle();
+        for (var i = 0; i < 8 && rig.Player.UpNext.Count > 0; i++)
+        {
+            Assert.DoesNotContain(rig.Player.UpNext, t => t.IsPendingStream);
+            rig.Next();
+        }
+        Assert.False(rig.Player.CurrentTrack?.IsPendingStream);
+    }
 }

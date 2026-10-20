@@ -31,31 +31,36 @@ internal sealed class ShuffleQueue
     public bool ExplicitAllowed => _explicitAllowed();
     public Guid? OpenPlaylistId => _openPlaylist()?.PlaylistId;
 
+    /// <summary>Plays without a file here: a server stream, or (owner #95) a playlist song you don't have yet, fetched as
+    /// the queue reaches it. Shuffles keep these instead of dropping them as missing files.</summary>
+    public static bool NoFile(Track track) => track.IsRemoteStream || track.IsPendingStream;
+
     /// <summary>The domain view of a track. <paramref name="identities"/> remembers keys already worked out, so a
     /// track met twice opens its file once (the identity read is cheap: ~30 ms for 2,134 files, measured).</summary>
     public static Song SongOf(Track track, Dictionary<string, string>? identities = null)
     {
         var id = track.Id.ToString();
-        var cacheKey = (track.IsRemoteStream ? "r|" : "l|") + id + "|" + track.FilePath;
+        var cacheKey = (NoFile(track) ? "r|" : "l|") + id + "|" + track.FilePath;
         if (identities == null || !identities.TryGetValue(cacheKey, out var key))
         {
-            key = Song.StableKey(id, track.FilePath, track.IsRemoteStream);
+            key = Song.StableKey(id, track.FilePath, NoFile(track));
             if (identities != null) identities[cacheKey] = key;
         }
         return new Song(id, track.FilePath, track.Title, track.Artist, track.PlayCount, track.SkipWhenShuffling,
-            track.IsExplicit, track.IsDisliked, track.SnoozedUntil, track.IsRemoteStream, key);
+            track.IsExplicit, track.IsDisliked, track.SnoozedUntil, NoFile(track), key);
     }
 
     /// <summary>The path-based key, worked out without opening the file.</summary>
     public static string LegacyKeyOf(Track track) => new Song(track.Id.ToString(), track.FilePath, track.Title, track.Artist,
-        track.PlayCount, track.SkipWhenShuffling, track.IsExplicit, track.IsDisliked, track.SnoozedUntil, track.IsRemoteStream).LegacyKey;
+        track.PlayCount, track.SkipWhenShuffling, track.IsExplicit, track.IsDisliked, track.SnoozedUntil, NoFile(track)).LegacyKey;
 
     /// <summary>The songs of a source, in their order; no file is opened.</summary>
     public List<Track> Snapshot(ShuffleScope scope) => scope switch
     {
         ShuffleScope.CurrentQueue => (_player.CurrentTrack is { } current ? new[] { current } : []).Concat(_player.UpNext).ToList(),
         ShuffleScope.WholeLibrary => _library.Tracks.ToList(),
-        ShuffleScope.OpenPlaylist => _openPlaylist()?.Tracks.ToList()
+        // Owner #95: with "Play songs you don't have" on, the playlist's missing songs too, as Play and Shuffle take them.
+        ShuffleScope.OpenPlaylist => _openPlaylist()?.PlaybackList()
             ?? throw new InvalidOperationException("Open a playlist in Noctis first, or choose Current queue / Whole library."),
         _ => throw new ArgumentOutOfRangeException(nameof(scope)),
     };

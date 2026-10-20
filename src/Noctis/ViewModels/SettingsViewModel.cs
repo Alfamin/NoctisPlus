@@ -2588,7 +2588,7 @@ public partial class SettingsViewModel : ViewModelBase
     {
         _player = player;
         ApplyPlayerSettings();
-        // Owner #95: the playlist header flips it on the player; keep it saved.
+        // Owner #95: kept in sync both ways (the playlist view model can set it on the player); keep it saved.
         player.PropertyChanged += (_, e) =>
         {
             if (e.PropertyName == nameof(PlayerViewModel.StreamMissingSongs) && StreamMissingSongs != player.StreamMissingSongs)

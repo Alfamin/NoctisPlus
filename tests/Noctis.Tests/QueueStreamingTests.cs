@@ -12,7 +12,7 @@ namespace Noctis.Tests;
 /// about the queue (History, Previous, Pause, the song before ending) may go wrong because of them.</summary>
 public class QueueStreamingTests
 {
-    private sealed class Source : IOnlineMusicSearch
+    internal sealed class Source : IOnlineMusicSearch
     {
         internal readonly Dictionary<string, TaskCompletionSource<Track>> Pending = [];
         internal readonly Dictionary<string, CancellationToken> Tokens = [];

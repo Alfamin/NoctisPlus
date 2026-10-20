@@ -257,6 +257,9 @@ public partial class PlaylistViewModel : ViewModelBase, ILocalSearchable, IDispo
                 IsPlayerPlaying = _player.State == PlaybackState.Playing;
             if (e.PropertyName is nameof(PlayerViewModel.CurrentTrack) or nameof(PlayerViewModel.State) or nameof(PlayerViewModel.OnlinePlayingSongId))
                 RefreshCatalogDownloads();
+            // Owner #95: switched in Settings → Playback.
+            if (e.PropertyName == nameof(PlayerViewModel.StreamMissingSongs))
+                OnPropertyChanged(nameof(ShowPlayActions));
         };
         _player.PropertyChanged += _playerPropertyChangedHandler;
 

@@ -201,7 +201,11 @@ internal sealed class TrueShuffleService : IDisposable
                     EndSession();
                     _preferences = (Player.RepeatMode, Player.AutoplayEnabled);
                     Player.RepeatMode = RepeatMode.Off; Player.AutoplayEnabled = false;
-                    _queue.Apply(manual.Concat(first).ToList(), keepCurrent: playing is not null);
+                    var order = manual.Concat(first).ToList();
+                    // Owner #95: nothing playing yet starts on a song you have (no wait), as the playlist's Shuffle does.
+                    if (playing is null && order.Count > 0 && order[0].IsPendingStream && order.FindIndex(t => !t.IsPendingStream) is > 0 and var owned)
+                        (order[0], order[owned]) = (order[owned], order[0]);
+                    _queue.Apply(order, keepCurrent: playing is not null);
                     _queue.BeginSession(Player.UpNext.Where(t => !manualIds.Contains(t.Id)));
                     _roll = new(mode, effectiveScope, skipDisliked, effectiveScope == ShuffleScope.WholeLibrary ? null : source,
                         ordered, first.Count, prepared.Identities) { Playlist = continuing?.Playlist ?? (effectiveScope == ShuffleScope.OpenPlaylist ? _queue.OpenPlaylistId : null) };
@@ -248,12 +252,16 @@ internal sealed class TrueShuffleService : IDisposable
     private List<Track> Manual() => Player.ShuffleGenerated is { } generated
         ? Player.UpNext.Where(t => !generated.Contains(t)).ToList() : [];
     private static PlayerShuffleMode ToPlayer(ShuffleMode mode) => (PlayerShuffleMode)((int)mode + 2);
-    private static List<Track> ResolveMembers(RollingQueue roll, List<Track> library)
+    private List<Track> ResolveMembers(RollingQueue roll, List<Track> library)
     {
         if (roll.Members is null) return library;
         var byId = library.DistinctBy(t => t.Id).ToDictionary(t => t.Id);
-        return roll.Members.Select(t => byId.TryGetValue(t.Id, out var fresh) ? fresh : t.IsRemoteStream ? t : null).OfType<Track>().ToList();
+        return roll.Members.Select(t => byId.TryGetValue(t.Id, out var fresh) ? fresh : Keeps(t) ? t : null).OfType<Track>().ToList();
     }
+
+    /// <summary>A song not in the library that still belongs in the shuffle: a server stream, or (owner #95) a playlist song
+    /// you don't have, while "Play songs you don't have" is on (the queue fetches it as it comes up).</summary>
+    private bool Keeps(Track t) => t.IsRemoteStream || t.IsPendingStream && Player.StreamMissingSongs;
 
     internal void ScheduleRefill()
     {
@@ -278,8 +286,8 @@ internal sealed class TrueShuffleService : IDisposable
                 while (batch.Count < size && roll.Remaining > 0)
                 {
                     var entry = roll.Plan[roll.Next++];
-                    var t = library.GetValueOrDefault(entry.Track.Id) ?? (entry.Track.IsRemoteStream ? entry.Track : null);
-                    if (t is null || !queued.Add(t.Id) || !t.IsRemoteStream && !File.Exists(t.FilePath)) continue;
+                    var t = library.GetValueOrDefault(entry.Track.Id) ?? (Keeps(entry.Track) ? entry.Track : null);
+                    if (t is null || !queued.Add(t.Id) || !ShuffleQueue.NoFile(t) && !File.Exists(t.FilePath)) continue;
                     if (!ShuffleEngine.StillWanted(ShuffleQueue.SongOf(t, roll.Identities), roll.Mode, _seen, _queue.ExplicitAllowed, roll.SkipDisliked, DateTime.UtcNow)) continue;
                     batch.Add(t);
                 }

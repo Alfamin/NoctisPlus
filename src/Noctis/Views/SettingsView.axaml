@@ -3538,6 +3538,20 @@
                                           VerticalAlignment="Center"/>
                 </Grid>
             </Border>
+            <!-- Owner #95: a playlist's songs you don't have play too (moved here from the playlist header, owner 2026-10-20). -->
+            <Border Classes="setting-row">
+                <Grid ColumnDefinitions="*,Auto">
+                    <StackPanel Grid.Column="0" Spacing="2">
+                        <TextBlock Text="Play songs you don't have" FontSize="15" FontWeight="SemiBold"/>
+                        <TextBlock Text="A playlist's missing songs download as the queue reaches them."
+                                   FontSize="12" Opacity="0.5" TextWrapping="Wrap"/>
+                    </StackPanel>
+                    <controls:LottieToggle Grid.Column="1"
+                                          IsChecked="{Binding StreamMissingSongs}"
+                                          AutomationProperties.Name="Play songs you don't have"
+                                          VerticalAlignment="Center"/>
+                </Grid>
+            </Border>
             <!-- GitHub #124: list played songs in the queue and keep the last one loaded. -->
             <Border Classes="setting-row">
                 <Grid ColumnDefinitions="*,Auto">

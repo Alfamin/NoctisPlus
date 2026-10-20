@@ -18,7 +18,7 @@ public partial class PlayerViewModel
     /// <summary>Downloaded ahead: the next stand-ins within this many queue places.</summary>
     internal const int StreamAheadPlaces = 6, StreamAheadSongs = 3;
 
-    /// <summary>The playlist header's toggle (persisted in Settings). Off: only the songs you have are queued.</summary>
+    /// <summary>Settings → Playback, "Play songs you don't have". Off: only the songs you have are queued.</summary>
     [ObservableProperty] private bool _streamMissingSongs = true;
 
     /// <summary>The stand-in being fetched to play (its song left the queue; the song before it was already put in History).</summary>

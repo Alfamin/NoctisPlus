@@ -1,7 +1,7 @@
 {
   "version": "2.2.0",
   "added": [
-    { "icon": "PlaylistsIcon", "title": "Every song in your playlists plays", "line": "Songs you don't have yet are fetched as the queue reaches them" },
+    { "icon": "PlaylistsIcon", "title": "Every song in your playlists plays", "line": "Songs you don't have yet play too, shuffled or not" },
     { "icon": "SongsIcon", "title": "Play just streams", "line": "Played songs wait in a cache; Add to songs keeps them" },
     { "icon": "RailSparkleIcon", "title": "For you in seconds", "line": "Recommendations fill in about 7 s instead of over a minute" },
     { "icon": "SearchIcon", "title": "Hard names found", "line": "Tricky titles get a second search; close matches wait in Check these" },
