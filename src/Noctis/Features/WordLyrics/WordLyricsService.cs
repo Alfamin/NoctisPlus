@@ -54,7 +54,7 @@ internal sealed class WordLyricsService(ILibraryService library, Func<AppSetting
         UpdateProxy(); if (_preferences is not null) _preferences.NativePreferenceChanged += PreferenceChanged;
         _folders = settings().MusicFolders.ToArray();
         _worker = new Worker(host.DataDirectory, () => _folders, ReadOptions(), Log, Notify, Progress,
-            lyricsWritten: paths => Dispatcher.UIThread.Post(() => { if (!_disposed) LyricsWritten?.Invoke(paths); }));
+            lyricsWritten: paths => { var shown = WithPlayingCopy(paths); Dispatcher.UIThread.Post(() => { if (!_disposed) LyricsWritten?.Invoke(shown); }); });
         _worker.StatusChanged += SongStatusChanged;
         _worker.Watched = () => Volatile.Read(ref _playingPath);
         // Owner #96: song copies earlier runs left that are exact duplicates of their song go (in the background, after
@@ -108,6 +108,13 @@ internal sealed class WordLyricsService(ILibraryService library, Func<AppSetting
         // Owner #108: a song only played (the stream cache, also the songs fetched ahead) is not one of your songs: it is
         // timed only when it plays and "Time every song you play" is on. Added to Songs, its library copy comes here.
         if (OnlineMusicSearch.Current?.IsCachedFile(path) == true) return;
+        // Owner 10-20: the song playing now, just added to Songs (or downloaded): timed first, like a played song, and
+        // its lyrics switch on the copy being heard (see WithPlayingCopy).
+        if (worker.Options.Auto && SameSong(path, Volatile.Read(ref _playingPath)))
+        {
+            _ = Task.Run(() => { worker.AskPlayed(path, out var accepted); if (accepted) worker.MakeRoom(path); });
+            return;
+        }
         EnqueueBackground([path], worker, null, true);
     }
     private void EnqueueBackground(string[] paths, Worker worker, DateTime? since, bool complete)
@@ -158,6 +165,28 @@ internal sealed class WordLyricsService(ILibraryService library, Func<AppSetting
             worker.MakeRoom(path);
             if (message is { Length: > 0 } && !message.StartsWith("Already", StringComparison.Ordinal)) Log("played song: " + message);
         });
+    }
+
+    /// <summary>The same song file in another folder (a streamed song's library copy keeps its file name).</summary>
+    internal static bool SameSong(string? one, string? other)
+        => one is { Length: > 0 } && other is { Length: > 0 } && string.Equals(Path.GetFileName(one), Path.GetFileName(other), StringComparison.OrdinalIgnoreCase);
+
+    // Owner 10-20: a song heard from the stream cache whose library copy was just timed: the timing files go next to the
+    // copy being heard too, so the lyrics on screen switch now (the cache copy leaves with the cache).
+    private IReadOnlyList<string> WithPlayingCopy(IReadOnlyList<string> paths)
+    {
+        var playing = Volatile.Read(ref _playingPath);
+        var timed = paths.FirstOrDefault(p => SameSong(p, playing) && !string.Equals(Path.GetFullPath(p), Path.GetFullPath(playing!), StringComparison.OrdinalIgnoreCase));
+        if (timed is null) return paths;
+        try
+        {
+            var from = Path.Combine(Path.GetDirectoryName(timed)!, Path.GetFileNameWithoutExtension(timed));
+            var to = Path.Combine(Path.GetDirectoryName(playing!)!, Path.GetFileNameWithoutExtension(playing!));
+            foreach (var extension in new[] { ".elrc", ".ttml", ".lyricsfile", ".lrc" })
+                if (File.Exists(from + extension)) File.Copy(from + extension, to + extension, overwrite: true);
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or ArgumentException) { return paths; }
+        return [.. paths, playing!];
     }
 
     internal static bool Inside(string path, string folder) => Path.GetFullPath(path).StartsWith(Path.GetFullPath(folder).TrimEnd('\\', '/') + Path.DirectorySeparatorChar, StringComparison.OrdinalIgnoreCase);

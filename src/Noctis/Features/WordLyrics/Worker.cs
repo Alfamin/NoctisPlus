@@ -281,7 +281,8 @@ internal sealed class Worker : IDisposable
         Process active; Job? job;
         lock (_gate)
         {
-            if (_disposed || _run is not { } run || _cancelling || _restarting || _activePaths.Contains(Path.GetFullPath(path))) return;
+            if (_disposed || _run is not { } run || _cancelling || _restarting ||
+                _activePaths.Any(p => string.Equals(Path.GetFileName(p), Path.GetFileName(path), StringComparison.OrdinalIgnoreCase))) return;
             if (_runProgress >= 0.75)
             {
                 if (!_controlled) return; // an old program without the stop file simply finishes
@@ -765,8 +766,9 @@ internal sealed class Worker : IDisposable
                 _lastCompleted = completed;
                 string? playing = null;
                 lock (_gate)
-                    if (Watched?.Invoke() is { Length: > 0 } current && _activePaths.Contains(Path.GetFullPath(current)) && !_reported.Contains(Path.GetFullPath(current)))
-                        playing = Path.GetFullPath(current);
+                    if (Watched?.Invoke() is { Length: > 0 } current)
+                        // The song heard may be another copy of the one timed (a streamed song added to Songs): same file name.
+                        playing = _activePaths.FirstOrDefault(p => string.Equals(Path.GetFileName(p), Path.GetFileName(current), StringComparison.OrdinalIgnoreCase) && !_reported.Contains(p));
                 if (playing is not null && (HasWordLyrics(playing) || EmbeddedWordLyrics.HasWords(playing)))
                 {
                     lock (_gate) _reported.Add(playing);
