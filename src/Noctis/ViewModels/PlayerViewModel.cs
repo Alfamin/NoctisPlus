@@ -678,6 +678,8 @@ public partial class PlayerViewModel : ViewModelBase
     [RelayCommand]
     private void PlayPause()
     {
+        // Owner #95: Pause while the next song is still being fetched: stop fetching, keep it next in the queue.
+        if (PutBackStandIn()) { if (State == PlaybackState.Playing) { _audioPlayer.Pause(); State = PlaybackState.Paused; } return; }
         CancelOnlinePlayback();
         DebugLogger.Info(DebugLogger.Category.Playback, "PlayPause", $"state={State}, track={CurrentTrack?.Title}");
         switch (State)
@@ -771,6 +773,8 @@ public partial class PlayerViewModel : ViewModelBase
     [RelayCommand]
     private void Previous()
     {
+        // Owner #95: Previous while the next song is still being fetched: back to the song that was playing, from its start.
+        if (PutBackStandIn()) { if (CurrentTrack is { } current) PlayTrack(current); return; }
         CancelOnlinePlayback();
         DebugLogger.Info(DebugLogger.Category.Playback, "Previous", $"pos={Position.TotalSeconds:F1}s, historyLen={History.Count}");
         if (Position.TotalSeconds > 3)
@@ -2027,7 +2031,8 @@ public partial class PlayerViewModel : ViewModelBase
         if (_sidebar == null) return;
         var tracks = new List<Track>();
         if (CurrentTrack != null) tracks.Add(CurrentTrack);
-        tracks.AddRange(UpNext);
+        // Owner #95: songs still to be fetched are not songs of the library yet; a playlist cannot hold them.
+        tracks.AddRange(UpNext.Where(t => !t.IsPendingStream));
         if (tracks.Count == 0) return;
         await _sidebar.OpenAddToPlaylistAsync(tracks);
     }
@@ -2737,6 +2742,11 @@ public partial class PlayerViewModel : ViewModelBase
 
     private void PlayTrack(Track track)
     {
+        WireQueueStreaming();
+        // Owner #95: a playlist song not on this computer yet: fetched first, then played (the song before keeps going
+        // meanwhile when it was a skip).
+        if (track.PendingStream is PendingStream pending) { PlayStandIn(track, pending); return; }
+        _preparingStandIn = null;
         CancelOnlinePlayback();
         var playTrackStart = Stopwatch.GetTimestamp();
         IsBuffering = false;
@@ -3050,6 +3060,10 @@ public partial class PlayerViewModel : ViewModelBase
 
     private void AdvanceQueueCore(QueueAdvanceReason reason)
     {
+        // Owner #95: the next song is being fetched: the song before it ending (or its fallback timer) must not move the
+        // queue on a second time, nor repeat it; the fetched song starts when it is ready.
+        if (_preparingStandIn != null && reason is QueueAdvanceReason.Natural or QueueAdvanceReason.AutoMix) return;
+
         if (reason is QueueAdvanceReason.UserSkip or QueueAdvanceReason.Previous or QueueAdvanceReason.Error)
             CancelAutoMixTransition(reason == QueueAdvanceReason.Error ? "playback error" : "user skipped");
 
@@ -3084,7 +3098,8 @@ public partial class PlayerViewModel : ViewModelBase
             return;
         }
 
-        if (CurrentTrack != null)
+        // Owner #95: already put in History when the queue moved on to a song still being fetched; once is enough.
+        if (CurrentTrack != null && !(_preparingStandIn != null && History.Count > 0 && ReferenceEquals(History[0], CurrentTrack)))
         {
             if (CurrentTrack.RememberPlaybackPosition == true)
             {
@@ -3665,6 +3680,9 @@ public partial class PlayerViewModel : ViewModelBase
             return false;
 
         var nextTrack = UpNext[0];
+        // Owner #95: nothing is pre-rolled into a song still to be fetched, nor while one is.
+        if (nextTrack.IsPendingStream || _preparingStandIn != null)
+            return false;
         var nextPlayPath = ResolveNextPlayPath(nextTrack);
         // Its music video is still being looked for (off the UI thread): plan on a later tick.
         if (nextPlayPath == null)
@@ -3848,6 +3866,9 @@ public partial class PlayerViewModel : ViewModelBase
             return false;
 
         var nextTrack = UpNext[0];
+        // Owner #95: nothing is pre-rolled into a song still to be fetched, nor while one is.
+        if (nextTrack.IsPendingStream || _preparingStandIn != null)
+            return false;
         var remaining = duration - position;
 
         if (remaining > TimeSpan.FromSeconds(GaplessHandoffLeadSeconds))
@@ -4258,9 +4279,18 @@ public partial class PlayerViewModel : ViewModelBase
             return;
         }
 
+        // Owner #95: a song still to be fetched cannot wait loaded and stopped; the first song on this computer does.
+        var at = 0;
+        while (at < UpNext.Count && UpNext[at].IsPendingStream) at++;
+        if (at == UpNext.Count)
+        {
+            StopAndClear("currentTrackRemoved");
+            return;
+        }
+
         MarkQueueChanged();
-        var next = UpNext[0];
-        UpNext.RemoveAt(0);
+        var next = UpNext[at];
+        UpNext.RemoveAt(at);
         _resumePositionMs = -1;
         State = PlaybackState.Stopped;
         CurrentTrack = next;

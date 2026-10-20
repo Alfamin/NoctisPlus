@@ -238,6 +238,9 @@ public class AppSettings
     /// Now Playing and the last song stays loaded when the queue ends. Off by default.</summary>
     public bool KeepPlayedInQueue { get; set; }
 
+    /// <summary>Owner #95: a playlist's songs you don't have play too, fetched as the queue reaches them. On by default.</summary>
+    public bool StreamMissingSongs { get; set; } = true;
+
     /// <summary>Whether long playback-bar track titles should scroll while playing.</summary>
     public bool TrackTitleMarqueeEnabled { get; set; } = true;
 

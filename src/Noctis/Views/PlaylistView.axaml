@@ -586,6 +586,22 @@
                                 <TextBlock Text="{loc:T Playlist.ShuffleTip}" VerticalAlignment="Center" FontSize="14" FontWeight="Bold" />
                             </StackPanel>
                         </Button>
+                        <!-- Owner #95: songs you don't have play too (fetched as the queue reaches them). Quiet round icon:
+                             lit = on; dim = only the songs on this computer play. -->
+                        <Button Classes="glass-pill" Width="36" Height="36" Padding="0" CornerRadius="999" Cursor="Hand"
+                                VerticalAlignment="Center" HorizontalContentAlignment="Center" VerticalContentAlignment="Center"
+                                IsVisible="{Binding ShowStreamToggle}" Command="{Binding ToggleStreamMissingCommand}"
+                                ToolTip.Tip="Play songs you don't have · downloads them as they come up"
+                                AutomationProperties.Name="Play songs you don't have">
+                            <Panel>
+                                <Path Data="{StaticResource SearchDownloadGlyph}" Width="16" Height="16" Stretch="Uniform"
+                                      Stroke="{DynamicResource AccentColorBrush}" StrokeThickness="1.8" StrokeLineCap="Round" StrokeJoin="Round"
+                                      IsVisible="{Binding StreamMissing}" />
+                                <Path Data="{StaticResource SearchDownloadGlyph}" Width="16" Height="16" Stretch="Uniform" Opacity="0.4"
+                                      Stroke="{DynamicResource SystemControlForegroundBaseHighBrush}" StrokeThickness="1.8" StrokeLineCap="Round" StrokeJoin="Round"
+                                      IsVisible="{Binding !StreamMissing}" />
+                            </Panel>
+                        </Button>
                         <!-- A found playlist (#69): Save makes it one of yours (then rename, add, remove). -->
                         <Button Classes="glass-pill" Command="{Binding SavePreviewCommand}" IsVisible="{Binding IsPreview}"
                                 Padding="16,8" VerticalAlignment="Center" Cursor="Hand"

@@ -1171,6 +1171,7 @@
                                                     </MenuItem>
                                                     <!-- GitHub #105: ReplayGain for queued tracks, library or not. -->
                                                     <MenuItem Header="{loc:T Main.ScanReplayGain}"
+                                                              Classes="queue-menu-replaygain"
                                                               Click="OnQueueScanReplayGainClick">
                                                         <MenuItem.Icon>
                                                             <controls:LineIcon Classes="mv2-icon" Data="{StaticResource MenuLineReplayGain}"/>

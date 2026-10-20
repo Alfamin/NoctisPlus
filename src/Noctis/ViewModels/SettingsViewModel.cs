@@ -1,4 +1,4 @@
-﻿using System.Collections.ObjectModel;
+using System.Collections.ObjectModel;
 using System.Diagnostics;
 using System.Linq;
 using System.Net.Sockets;
@@ -2037,6 +2037,9 @@ public partial class SettingsViewModel : ViewModelBase
     /// <summary>Keep played songs in the queue (GitHub #124). Off by default.</summary>
     [ObservableProperty] private bool _keepPlayedInQueue;
 
+    /// <summary>Owner #95: a playlist's songs you don't have play too, fetched as the queue reaches them. On by default.</summary>
+    [ObservableProperty] private bool _streamMissingSongs = true;
+
     // ── Audio analysis (background BPM/key detection) ──
 
     [ObservableProperty] private bool _bpmKeyAnalysisEnabled = true;
@@ -2585,6 +2588,12 @@ public partial class SettingsViewModel : ViewModelBase
     {
         _player = player;
         ApplyPlayerSettings();
+        // Owner #95: the playlist header flips it on the player; keep it saved.
+        player.PropertyChanged += (_, e) =>
+        {
+            if (e.PropertyName == nameof(PlayerViewModel.StreamMissingSongs) && StreamMissingSongs != player.StreamMissingSongs)
+                StreamMissingSongs = player.StreamMissingSongs;
+        };
     }
 
     /// <summary>Sets the Discord presence service reference.</summary>
@@ -2907,6 +2916,7 @@ public partial class SettingsViewModel : ViewModelBase
             GaplessPlaybackEnabled = _settings.GaplessPlaybackEnabled;
             AutoplayEnabled = _settings.AutoplayEnabled;
             KeepPlayedInQueue = _settings.KeepPlayedInQueue;
+            StreamMissingSongs = _settings.StreamMissingSongs;
             AllowExplicitContent = _settings.AllowExplicitContent;
             BpmKeyAnalysisEnabled = _settings.BpmKeyAnalysisEnabled;
             WriteAnalysisToTags = _settings.WriteAnalysisToTags;
@@ -3375,6 +3385,7 @@ public partial class SettingsViewModel : ViewModelBase
         _settings.GaplessPlaybackEnabled = GaplessPlaybackEnabled;
         _settings.AutoplayEnabled = AutoplayEnabled;
         _settings.KeepPlayedInQueue = KeepPlayedInQueue;
+        _settings.StreamMissingSongs = StreamMissingSongs;
         _settings.AllowExplicitContent = AllowExplicitContent;
         SaveFeatureSettings();
         _settings.BpmKeyAnalysisEnabled = BpmKeyAnalysisEnabled;
@@ -3573,6 +3584,7 @@ public partial class SettingsViewModel : ViewModelBase
         _player.GaplessEnabled = GaplessPlaybackEnabled;
         _player.AutoplayEnabled = AutoplayEnabled;
         _player.KeepPlayedInQueue = KeepPlayedInQueue;
+        _player.StreamMissingSongs = StreamMissingSongs;
         _player.AllowExplicitContent = AllowExplicitContent;
         _player.TrackTitleMarqueeEnabled = TrackTitleMarqueeEnabled;
         _player.ArtistMarqueeEnabled = ArtistMarqueeEnabled;
@@ -5210,6 +5222,13 @@ public partial class SettingsViewModel : ViewModelBase
     {
         _audioPlayer?.SetGapless(value);
         if (_player != null) _player.GaplessEnabled = value;
+        _ = SaveAsync();
+    }
+
+    partial void OnStreamMissingSongsChanged(bool value)
+    {
+        if (_player != null && _player.StreamMissingSongs != value) _player.StreamMissingSongs = value;
+        if (_suspendSettingPersistence) return;
         _ = SaveAsync();
     }
 
@@ -7098,6 +7117,7 @@ public partial class SettingsViewModel : ViewModelBase
             // moment a default changed, so "Reset to Defaults" stopped matching a fresh install.
             AutoplayEnabled = defaultSettings.AutoplayEnabled;
             KeepPlayedInQueue = defaultSettings.KeepPlayedInQueue;
+            StreamMissingSongs = defaultSettings.StreamMissingSongs;
             AllowExplicitContent = defaultSettings.AllowExplicitContent;
             BpmKeyAnalysisEnabled = defaultSettings.BpmKeyAnalysisEnabled;
             WriteAnalysisToTags = defaultSettings.WriteAnalysisToTags;

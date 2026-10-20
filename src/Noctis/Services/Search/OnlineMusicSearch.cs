@@ -82,6 +82,11 @@ public interface IOnlineMusicSearch
     void RequestSignIn();
 
     OnlineDownloadStatus StatusOf(OnlineSong song);
+    /// <summary>Owner #95: where the song was saved in Songs (not the stream cache), once it is; else null.</summary>
+    string? SavedPathOf(OnlineSong song) => null;
+    /// <summary>Owner #95: a download asked for ahead that the queue no longer needs: dropped if it has not started yet
+    /// (one already transferring finishes). True when one was dropped.</summary>
+    bool CancelQueued(OnlineSong song) => false;
 
     /// <summary>Raised (any thread) when a download's state or progress changes.</summary>
     event EventHandler? DownloadsChanged;

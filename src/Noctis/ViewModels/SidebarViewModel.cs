@@ -1031,7 +1031,8 @@ public partial class SidebarViewModel : ViewModelBase
     /// </summary>
     internal static async Task<IList<Track>> InLibraryAsync(IEnumerable<Track> tracks, Noctis.Services.Search.IOnlineMusicSearch? source = null)
     {
-        var list = tracks.ToList();
+        // Owner #95: a queued song still to be fetched is not a song of the library yet; a playlist cannot hold it.
+        var list = tracks.Where(t => !t.IsPendingStream).ToList();
         source ??= Noctis.Services.Search.OnlineMusicSearch.Current;
         if (source is null) return list;
         for (var i = 0; i < list.Count; i++)

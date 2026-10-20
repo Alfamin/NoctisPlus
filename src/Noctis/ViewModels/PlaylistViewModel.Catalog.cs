@@ -25,7 +25,7 @@ public partial class PlaylistViewModel
     public bool HasCatalogMissing => CatalogRows.Count > 0;
     // Owner #48: header Play/Shuffle/queue act on owned songs only. With none owned they would do nothing, so they
     // hide, as on an online album; each missing row keeps its own Play.
-    public bool ShowPlayActions => (Tracks.Count > 0 || !HasCatalogMissing) && !IsPreviewLoading;
+    public bool ShowPlayActions => (Tracks.Count > 0 || !HasCatalogMissing || _player.StreamMissingSongs && !IsPreview) && !IsPreviewLoading;
     partial void OnTrackCountChanged(int value) => OnPropertyChanged(nameof(ShowPlayActions));
     private int CatalogMissingCount => CatalogRows.Count;
     private IReadOnlyList<ImportedPlaylistEntry>? _importedEntries;
@@ -75,6 +75,7 @@ public partial class PlaylistViewModel
         RefreshCatalogDownloads();
         OnPropertyChanged(nameof(HasCatalogMissing));
         OnPropertyChanged(nameof(ShowPlayActions));
+        OnPropertyChanged(nameof(ShowStreamToggle));
         OnPropertyChanged(nameof(CanReorder));
         OnPropertyChanged(nameof(TrackCountText));
         UpdateEmptyStateFlags(entries?.Count ?? Tracks.Count);
@@ -153,11 +154,46 @@ public partial class PlaylistViewModel
         }
     }
 
+    // ── Owner #95: the playlist plays its songs you don't have too ──
+
+    /// <summary>The header toggle: songs you don't have play too (fetched as the queue reaches them). Off: only yours.</summary>
+    public bool StreamMissing
+    {
+        get => _player.StreamMissingSongs;
+        set { if (_player.StreamMissingSongs == value) return; _player.StreamMissingSongs = value; OnPropertyChanged(); OnPropertyChanged(nameof(ShowPlayActions)); }
+    }
+    public bool ShowStreamToggle => HasCatalogMissing && !IsPreview;
+    [RelayCommand] private void ToggleStreamMissing() => StreamMissing = !StreamMissing;
+
+    private bool Streams => _player.StreamMissingSongs && HasCatalogMissing && !IsPreview && _catalogOnline is not null;
+    private readonly System.Runtime.CompilerServices.ConditionalWeakTable<ArtistCatalogSong, Track> _standIns = new();
+    private Track StandInFor(ArtistCatalogSong row, OnlineSong song)
+        => _standIns.GetValue(row, _ => PlayerViewModel.StandIn(_catalogOnline!, song, keep: !IsPreview));
+
+    /// <summary>What Play, Shuffle and the queue actions take: the playlist's rows in their order (missing songs as
+    /// stand-ins) when streaming is on, else only the songs you have, as before.</summary>
+    private List<Track> PlaybackList()
+    {
+        if (!Streams) return Tracks.ToList();
+        var list = new List<Track>(Rows.Count);
+        foreach (var row in Rows)
+            if (row is Track track) list.Add(track);
+            else if (row is ArtistCatalogSong { Song.Online: { } song } missing) list.Add(StandInFor(missing, song));
+        return list;
+    }
+
     [RelayCommand(AllowConcurrentExecutions = true)]
     private async Task PlayCatalogSong(ArtistCatalogSong? row)
     {
         if (row?.Song.Online is not { } song || _catalogOnline is not { } online) return;
         if (!online.CanDownload) { online.RequestSignIn(); return; }
+        if (Streams)
+        {
+            // The whole playlist from this song on (or shuffled around it), like any other row.
+            var list = PlaybackList();
+            var at = list.IndexOf(StandInFor(row, song));
+            if (at >= 0) { CatalogNotice = ""; _player.PlayFromRow(list, at); return; }
+        }
         // Owner #88: a song of one of your playlists is one of your songs: Play keeps it; a preview only streams.
         try { CatalogNotice = ""; await _player.PlayOnlineAsync(online, song, keep: !IsPreview); CatalogNotice = ""; }
         catch (Exception ex) { CatalogNotice = ex.Message; }

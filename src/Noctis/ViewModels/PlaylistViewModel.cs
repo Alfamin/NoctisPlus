@@ -679,7 +679,7 @@ public partial class PlaylistViewModel : ViewModelBase, ILocalSearchable, IDispo
     [RelayCommand]
     private void PlayAll()
     {
-        var tracks = Tracks.ToList();
+        var tracks = PlaybackList();
         if (tracks.Count == 0) return;
         _player.ReplaceQueueAndPlay(tracks, 0);
     }
@@ -687,7 +687,7 @@ public partial class PlaylistViewModel : ViewModelBase, ILocalSearchable, IDispo
     [RelayCommand]
     private void PlayFrom(Track track)
     {
-        var tracks = Tracks.ToList();
+        var tracks = PlaybackList();
         var idx = tracks.IndexOf(track);
         if (idx < 0) idx = 0;
         _player.ReplaceQueueAndPlay(tracks, idx);
@@ -904,8 +904,10 @@ public partial class PlaylistViewModel : ViewModelBase, ILocalSearchable, IDispo
     [RelayCommand]
     private void ShuffleAll()
     {
-        var tracks = Tracks.ToList();
+        var tracks = PlaybackList();
         if (tracks.Count == 0) return;
+        // Owner #95: start on a song you have, so music starts at once while the others are fetched ahead.
+        if (tracks.Count != Tracks.Count && Tracks.Count > 0) { _player.PlayShuffled(tracks, first: Tracks[Random.Shared.Next(Tracks.Count)]); return; }
         _player.PlayShuffled(tracks);
     }
 
@@ -1113,13 +1115,13 @@ public partial class PlaylistViewModel : ViewModelBase, ILocalSearchable, IDispo
     [RelayCommand]
     private void PlayNextAll()
     {
-        _player.AddNextRange(Tracks.ToList(), _playlist.Name);
+        _player.AddNextRange(PlaybackList(), _playlist.Name);
     }
 
     [RelayCommand]
     private void AddAllToQueue()
     {
-        _player.AddRangeToQueue(Tracks.ToList(), _playlist.Name);
+        _player.AddRangeToQueue(PlaybackList(), _playlist.Name);
     }
 
     /// <summary>Opens the search-driven library picker to add songs to this (manual) playlist.</summary>

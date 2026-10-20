@@ -2180,10 +2180,13 @@ public partial class MainWindow : Window, IPageKeyOverlayHost
         if (sender is Control { ContextMenu: { } menu } && DataContext is MainWindowViewModel vm)
         {
             var kind = _queueContextRow >= 0 ? vm.Player.GetQueueRowKind(_queueContextRow) : QueueRowKind.Upcoming;
+            // Owner #95: a song still to be fetched has no file to measure yet.
+            var standIn = (sender as Control)?.DataContext is Track { IsPendingStream: true };
             foreach (var item in menu.Items.OfType<MenuItem>())
             {
                 if (item.Classes.Contains("queue-menu-remove")) item.IsVisible = kind != QueueRowKind.Current;
                 else if (item.Classes.Contains("queue-menu-clear-played")) item.IsVisible = kind == QueueRowKind.Played;
+                else if (item.Classes.Contains("queue-menu-replaygain")) item.IsVisible = !standIn;
             }
         }
     }

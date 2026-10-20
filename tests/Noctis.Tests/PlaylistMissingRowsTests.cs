@@ -98,6 +98,7 @@ public class PlaylistMissingRowsTests
         var lib = new FakeLibraryService();
         using var persistence = new TestPersistenceService();
         var player = new PlayerViewModel(new FakeAudioPlayer(), lib, persistence, new FakeAnimatedCoverService());
+        player.StreamMissingSongs = false; // owner #95: with it on, a playlist plays its missing songs too (checked below)
         var sidebar = new SidebarViewModel(persistence, lib);
         var vm = new PlaylistViewModel(new Playlist { Name = "All missing" }, player, lib, persistence, sidebar);
         var view = new PlaylistView { DataContext = vm };
@@ -114,6 +115,7 @@ public class PlaylistMissingRowsTests
             var play = view.GetVisualDescendants().OfType<Button>().Single(b => ReferenceEquals(b.Command, vm.PlayAllCommand));
             var shuffle = view.GetVisualDescendants().OfType<Button>().Single(b => ReferenceEquals(b.Command, vm.ShuffleAllCommand));
             Assert.False(play.IsVisible); Assert.False(shuffle.IsVisible);
+            vm.StreamMissing = true; Assert.True(vm.ShowPlayActions); vm.StreamMissing = false;
             Assert.Equal("", vm.TotalSizeSuffix); // nothing on disk: no "0 KB" in the header line
 
             var landed = new Track { Id = Guid.NewGuid(), Title = "One", Artist = "Singer", Duration = TimeSpan.FromSeconds(180) };

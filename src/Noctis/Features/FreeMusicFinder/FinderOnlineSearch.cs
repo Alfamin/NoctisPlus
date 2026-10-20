@@ -243,6 +243,22 @@ internal sealed class FinderOnlineSearch : IOnlineMusicSearch
         };
     }
 
+    public string? SavedPathOf(OnlineSong song)
+    {
+        if (!_songs.TryGetValue(song.Id, out var catalogSong)) return null;
+        var d = _actions.Downloads.History.LastOrDefault(x => x.Track.Request is { } r && SpotifyPlaylists.SameRecording(catalogSong.Request, r) && x.State != DownloadState.Removed);
+        return d is { State: DownloadState.Saved or DownloadState.AlreadyThere, SavedPath: { } path } && !_actions.Downloads.IsCached(d) ? path : null;
+    }
+
+    public bool CancelQueued(OnlineSong song)
+    {
+        if (!_songs.TryGetValue(song.Id, out var catalogSong)) return false;
+        var d = _actions.Downloads.Active.LastOrDefault(x => x.Track.Request is { } r && SpotifyPlaylists.SameRecording(catalogSong.Request, r));
+        if (d is not { State: DownloadState.Queued }) return false;
+        try { return _actions.Downloads.Remove(d); }
+        catch (Exception) { return false; } // the queue file could not be saved: it simply downloads
+    }
+
     public async Task<string> DownloadAsync(IReadOnlyList<OnlineSong> songs, bool now, CancellationToken ct)
     {
         var wanted = songs.Select(s => _songs.TryGetValue(s.Id, out var c) ? c : null).Where(c => c is not null).Cast<CatalogSong>().ToList();

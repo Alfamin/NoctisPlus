@@ -221,6 +221,11 @@ public partial class Track : ObservableObject
     /// checks it on the Downloads page. Not persisted here (Free Music Finder keeps the list).</summary>
     [ObservableProperty] private bool _needsCheck;
 
+    /// <summary>Owner #95: a playlist song not on this computer yet, standing in the queue (never the playing song, never
+    /// saved). The player fetches it when the queue reaches it; the app knows what the object is.</summary>
+    [JsonIgnore] public object? PendingStream { get; init; }
+    [JsonIgnore] public bool IsPendingStream => PendingStream is not null;
+
     /// <summary>Transient 1-based position within the list view currently displaying this track
     /// (set by the Folders pane). Drives the leading row-number column. Not persisted.</summary>
     [ObservableProperty]
