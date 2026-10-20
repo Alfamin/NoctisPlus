@@ -2751,6 +2751,12 @@ public partial class MainWindow : Window, IPageKeyOverlayHost
         e.Handled = true;
     }
 
+    private void OnWhatsNewBackdropPressed(object? sender, Avalonia.Input.PointerPressedEventArgs e)
+    {
+        if (DataContext is ViewModels.MainWindowViewModel { WhatsNewSheet: { } sheet }) sheet.CloseCommand.Execute(null);
+        e.Handled = true;
+    }
+
     private void OnWordTimingBackdropPressed(object? sender, Avalonia.Input.PointerPressedEventArgs e)
     {
         if (DataContext is ViewModels.MainWindowViewModel vm) vm.CloseWordTimingSheetCommand.Execute(null);

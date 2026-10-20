@@ -1,0 +1,18 @@
+{
+  "version": "2.2.0",
+  "added": [
+    { "icon": "PlaylistsIcon", "title": "Every song in your playlists plays", "line": "Songs you don't have yet are fetched as the queue reaches them" },
+    { "icon": "SongsIcon", "title": "Play just streams", "line": "Played songs wait in a cache; Add to songs keeps them" },
+    { "icon": "RailSparkleIcon", "title": "For you in seconds", "line": "Recommendations fill in about 7 s instead of over a minute" },
+    { "icon": "SearchIcon", "title": "Hard names found", "line": "Tricky titles get a second search; close matches wait in Check these" },
+    { "icon": "LyricsIcon", "title": "Word timing, under control", "line": "Restart it, time every song without it, see when it tries again" },
+    { "icon": "SaveDiskIcon", "title": "Space back", "line": "Word timing's song copies are removed once they are duplicates" },
+    { "icon": "MiniPlayerIcon", "title": "The player fits", "line": "Its buttons step aside in a narrow window and come back" }
+  ],
+  "fixed": [
+    "Songs whose long titles Telegram cuts short download again",
+    "A playlist's song that was only played joins Songs when added",
+    "For you knows songs credited to several artists (\"Big Sean, Drake\")",
+    "A stuck word timing run restarts by itself"
+  ]
+}

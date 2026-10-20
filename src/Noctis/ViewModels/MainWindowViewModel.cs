@@ -1136,6 +1136,35 @@ public partial class MainWindowViewModel : ViewModelBase
             App.PendingOpenFiles = Array.Empty<string>();
             Dispatcher.UIThread.Post(() => OpenExternalFiles(pending), DispatcherPriority.Background);
         }
+
+        // Owner #97: the first start after an update says what is new, once (after startup has settled).
+        ScheduleWhatsNew();
+    }
+
+    /// <summary>Owner #97: what this update added and fixed (null: closed). Inside the window, like Word timing's panel.</summary>
+    [ObservableProperty] private Features.WhatsNew.WhatsNewViewModel? _whatsNewSheet;
+
+    private void ScheduleWhatsNew()
+    {
+        try
+        {
+            var notes = Features.WhatsNew.WhatsNewNotes.Load();
+            var current = Services.UpdateService.CurrentVersion;
+            // NOCTIS_PLUS_WHATSNEW=1 shows it in any build (to check how it looks).
+            var forced = Environment.GetEnvironmentVariable("NOCTIS_PLUS_WHATSNEW") == "1" && notes is not null;
+            var existing = Settings.GetSettings().MusicFolders.Count > 0 || _library.Tracks.Count > 0;
+            var show = forced ? notes : Features.WhatsNew.WhatsNewGate.ToShow(_persistence.DataDirectory, current, existing, notes);
+            if (show is null) return;
+            DispatcherTimer.RunOnce(() =>
+            {
+                WhatsNewSheet = new Features.WhatsNew.WhatsNewViewModel(show, () =>
+                {
+                    WhatsNewSheet = null;
+                    Features.WhatsNew.WhatsNewGate.MarkSeen(_persistence.DataDirectory, current);
+                });
+            }, TimeSpan.FromSeconds(1.5));
+        }
+        catch (Exception ex) { DebugLog.Write("WhatsNew", "skipped: " + ex.Message); } // never in the way of startup
     }
 
     /// <summary>

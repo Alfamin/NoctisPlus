@@ -7,6 +7,7 @@
         xmlns:controls="using:Noctis.Controls"
         xmlns:conv="using:Noctis.Converters"
         xmlns:helpers="using:Noctis.Helpers"
+        xmlns:wn="using:Noctis.Features.WhatsNew"
         x:Class="Noctis.Views.MainWindow"
         x:DataType="vm:MainWindowViewModel"
         Title="{x:Static helpers:ProductIdentity.Name}"
@@ -1507,6 +1508,18 @@
             </StackPanel>
         </Button>
     </StackPanel>
+
+    <!-- Owner #97: What's new, once after an update; the backdrop or Got it closes it. -->
+    <Panel IsVisible="{Binding WhatsNewSheet, Converter={x:Static ObjectConverters.IsNotNull}}" ZIndex="96">
+        <Border Background="#73000000" PointerPressed="OnWhatsNewBackdropPressed" />
+        <ContentControl Content="{Binding WhatsNewSheet}" HorizontalAlignment="Center" VerticalAlignment="Center" Margin="24">
+            <ContentControl.ContentTemplate>
+                <DataTemplate x:DataType="wn:WhatsNewViewModel">
+                    <views:WhatsNewPanel />
+                </DataTemplate>
+            </ContentControl.ContentTemplate>
+        </ContentControl>
+    </Panel>
 
     <!-- Word timing panel inside the window (owner, 2026-10-18: not a separate window that pops up and takes focus).
          Opened from the status pill, a song's "Word timing…" or the WordLyrics settings; the backdrop or Done closes it. -->

@@ -1,0 +1,85 @@
+<UserControl xmlns="https://github.com/avaloniaui" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:wn="using:Noctis.Features.WhatsNew" xmlns:controls="using:Noctis.Controls"
+             xmlns:helpers="using:Noctis.Helpers"
+             x:Class="Noctis.Views.WhatsNewPanel" x:DataType="wn:WhatsNewViewModel">
+  <!-- Owner #97: the first start after an update shows what is new, once. Native sheet (same host as Word timing):
+       an accent tile per feature, a title and one short line; the fixes as a quiet checked list. -->
+  <UserControl.Styles>
+    <Style Selector="Border.feature-tile">
+      <Setter Property="Width" Value="38" />
+      <Setter Property="Height" Value="38" />
+      <Setter Property="CornerRadius" Value="11" />
+      <Setter Property="Background" Value="{DynamicResource AccentButtonBackground}" />
+    </Style>
+    <Style Selector="StackPanel.feature-row">
+      <Setter Property="Opacity" Value="0" />
+      <Setter Property="RenderTransform" Value="translateY(6px)" />
+      <Setter Property="Transitions">
+        <Transitions>
+          <DoubleTransition Property="Opacity" Duration="0:0:0.28" Easing="CubicEaseOut" />
+          <TransformOperationsTransition Property="RenderTransform" Duration="0:0:0.32" Easing="CubicEaseOut" />
+        </Transitions>
+      </Setter>
+    </Style>
+    <Style Selector="StackPanel.feature-row.shown">
+      <Setter Property="Opacity" Value="1" />
+      <Setter Property="RenderTransform" Value="translateY(0px)" />
+    </Style>
+  </UserControl.Styles>
+  <controls:PillDialogHost>
+    <Grid Width="560" MaxHeight="720" RowDefinitions="Auto,*,Auto">
+      <StackPanel Margin="30,26,30,6" Spacing="8">
+        <PathIcon Data="{StaticResource RailSparkleIcon}" Width="22" Height="22" HorizontalAlignment="Left"
+                  Foreground="{DynamicResource AccentColorBrush}" />
+        <TextBlock Text="{Binding Heading}" FontSize="24" FontWeight="Bold" />
+        <Border HorizontalAlignment="Left" CornerRadius="999" Padding="10,3" Background="{DynamicResource ChipBackground}">
+          <TextBlock Text="{Binding VersionLabel}" FontSize="11.5" FontWeight="SemiBold" Opacity="0.75" />
+        </Border>
+      </StackPanel>
+      <ScrollViewer Grid.Row="1" HorizontalScrollBarVisibility="Disabled">
+        <StackPanel Margin="30,14,30,10" Spacing="18">
+          <ItemsControl x:Name="AddedList" ItemsSource="{Binding Added}" IsVisible="{Binding HasAdded}">
+            <ItemsControl.ItemsPanel>
+              <ItemsPanelTemplate><StackPanel Spacing="14" /></ItemsPanelTemplate>
+            </ItemsControl.ItemsPanel>
+            <ItemsControl.ItemTemplate>
+              <DataTemplate x:DataType="wn:WhatsNewItem">
+                <StackPanel Classes="feature-row" Orientation="Horizontal" Spacing="14">
+                  <Border Classes="feature-tile" VerticalAlignment="Top">
+                    <PathIcon Data="{Binding Icon, Converter={x:Static helpers:IconKeyConverter.Instance}}" Width="17" Height="17"
+                              Foreground="{DynamicResource AccentForegroundBrush}" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                  </Border>
+                  <StackPanel Spacing="2" VerticalAlignment="Center" MaxWidth="440">
+                    <TextBlock Text="{Binding Title}" FontSize="14.5" FontWeight="SemiBold" TextWrapping="Wrap" />
+                    <TextBlock Text="{Binding Line}" FontSize="12.5" Opacity="0.6" TextWrapping="Wrap" />
+                  </StackPanel>
+                </StackPanel>
+              </DataTemplate>
+            </ItemsControl.ItemTemplate>
+          </ItemsControl>
+          <StackPanel IsVisible="{Binding HasFixed}" Spacing="9">
+            <TextBlock Text="FIXED" FontSize="11" FontWeight="Bold" Opacity="0.45" LetterSpacing="1.2" Margin="0,4,0,2" />
+            <ItemsControl ItemsSource="{Binding Fixed}">
+              <ItemsControl.ItemsPanel>
+                <ItemsPanelTemplate><StackPanel Spacing="8" /></ItemsPanelTemplate>
+              </ItemsControl.ItemsPanel>
+              <ItemsControl.ItemTemplate>
+                <DataTemplate x:DataType="x:String">
+                  <Grid ColumnDefinitions="22,*">
+                    <PathIcon Data="{StaticResource CheckmarkIcon}" Width="11" Height="11" VerticalAlignment="Top" Margin="0,4,0,0"
+                              Foreground="{DynamicResource AccentColorBrush}" HorizontalAlignment="Left" />
+                    <TextBlock Grid.Column="1" Text="{Binding}" FontSize="12.5" Opacity="0.8" TextWrapping="Wrap" />
+                  </Grid>
+                </DataTemplate>
+              </ItemsControl.ItemTemplate>
+            </ItemsControl>
+          </StackPanel>
+        </StackPanel>
+      </ScrollViewer>
+      <Border Grid.Row="2" Padding="30,14,30,24">
+        <Button Content="Got it" Classes="pill-primary" Command="{Binding CloseCommand}" HorizontalAlignment="Stretch"
+                HorizontalContentAlignment="Center" AutomationProperties.Name="Got it" />
+      </Border>
+    </Grid>
+  </controls:PillDialogHost>
+</UserControl>
