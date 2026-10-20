@@ -1653,6 +1653,18 @@
 
             <StackPanel x:Name="GeneralTabPanel" Classes="tab-page" IsVisible="{Binding IsGeneralTabVisible}" Spacing="4">
             <Border Classes="setting-card group-card">
+                <Border Classes="setting-row">
+                <Grid ColumnDefinitions="*,Auto">
+                    <StackPanel Spacing="2">
+                        <TextBlock Text="Offline mode" FontSize="15" FontWeight="SemiBold"/>
+                        <TextBlock Text="Play local music. Online work waits until you turn this off."
+                                   FontSize="12" Opacity="0.5" TextWrapping="Wrap"/>
+                    </StackPanel>
+                    <ToggleSwitch Grid.Column="1" IsChecked="{Binding OfflineMode}" VerticalAlignment="Center"/>
+                </Grid>
+                </Border>
+            </Border>
+            <Border Classes="setting-card group-card">
             <StackPanel>
             <Border Classes="setting-row">
                 <StackPanel Spacing="10">

@@ -72,6 +72,18 @@ public class WordLyricsBackendTests
         Assert.True(condition(), "Synthetic backend did not reach the expected state. " + diagnostic?.Invoke());
     }
     [Fact]
+    public void FinishedWordsSuppressStaleAutomaticQueuedPill_ButExplicitRepairRemainsVisible()
+    {
+        using var rig = new Rig();
+        using var worker = new Worker(rig.Work, () => [rig.Music], new(false, "Light", false, rig.App, ""), _ => { }, _ => { }, _ => { }, startTimer: false, readiness: _ => false);
+        worker.Ask(rig.Song);
+        Assert.Equal(SongTimingStatus.Queued, worker.StatusFor(rig.Song));
+        File.WriteAllText(Path.ChangeExtension(rig.Song, ".elrc"), "[00:01.00]<00:01.00>word");
+        Assert.Equal(SongTimingStatus.None, worker.StatusFor(rig.Song));
+        worker.Ask(rig.Song, TimingAction.Current);
+        Assert.Equal(SongTimingStatus.Queued, worker.StatusFor(rig.Song));
+    }
+    [Fact]
     public async Task NativeRunnerPreservesPathsGuidesAndPreferredProxy_WithoutShellExpansion()
     {
         using var rig = new Rig(); var tool = new Tool(rig.App);
@@ -135,7 +147,8 @@ public class WordLyricsBackendTests
         using var checkpoint = JsonDocument.Parse(File.ReadAllText(Path.Combine(rig.Work, "state.json")));
         var row = Assert.Single(checkpoint.RootElement.GetProperty("waiting").EnumerateArray());
         Assert.Equal(1, row.GetProperty("waits").GetInt32());
-        Assert.True(row.GetProperty("notBeforeUtc").GetDateTime() > DateTime.UtcNow.AddMinutes(8));
+        Assert.InRange(row.GetProperty("notBeforeUtc").GetDateTime(), DateTime.UtcNow.AddSeconds(15), DateTime.UtcNow.AddSeconds(35));
+        Assert.True(row.GetProperty("networkWait").GetBoolean());
         File.Delete(rig.Result);
         using var resumed = rig.Worker(_ => { }); resumed.TickNow();
         await Task.Delay(150); Assert.Equal(1, resumed.WaitingCount); Assert.False(File.Exists(rig.Result));
@@ -194,7 +207,7 @@ public class WordLyricsBackendTests
         using var rig = new Rig(outcome: "network_error"); var states = new ConcurrentQueue<ProgressState>();
         using var worker = rig.Worker(states.Enqueue);
         worker.Ask(rig.Song);
-        await Until(() => worker.StatusFor(rig.Song) == SongTimingStatus.Retry); // waits 10 minutes
+        await Until(() => worker.StatusFor(rig.Song) == SongTimingStatus.Retry); // short network retry, not setup's long backoff
         File.Delete(rig.Result);
         worker.Restart();
         await Until(() => File.Exists(rig.Result)); // tried again right away

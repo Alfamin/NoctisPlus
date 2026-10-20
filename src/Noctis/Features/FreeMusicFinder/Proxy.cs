@@ -358,12 +358,19 @@ internal sealed class MetadataRoute : HttpMessageHandler
 
     protected override async Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken ct)
     {
+        Noctis.Services.OnlineAccess.Shared.ThrowIfOffline();
+        using var attempt = CancellationTokenSource.CreateLinkedTokenSource(ct, Noctis.Services.OnlineAccess.Shared.RequestToken);
         try
         {
-            return await Connections(request.RequestUri!).SendAsync(request, ct).ConfigureAwait(false);
+            var response = await Connections(request.RequestUri!).SendAsync(request, attempt.Token).ConfigureAwait(false);
+            if (response.IsSuccessStatusCode) Noctis.Services.OnlineAccess.Shared.Succeeded();
+            return response;
         }
+        catch (OperationCanceledException) when (!ct.IsCancellationRequested && Noctis.Services.OnlineAccess.Shared.IsOffline)
+        { throw new Noctis.Services.OfflineModeException(); }
         catch (HttpRequestException ex)
         {
+            Noctis.Services.OnlineAccess.Shared.Failed();
             // The first thing that went wrong says the most: the proxy's own words, or the system's.
             var first = ex.GetBaseException();
             if (first is FormatException) throw new HttpRequestException("METADATA_PROXY_SETTING: " + first.Message, ex);

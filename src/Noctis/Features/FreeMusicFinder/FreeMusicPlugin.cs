@@ -95,13 +95,12 @@ public sealed class FreeMusicPlugin : INoctisPlugin
         BotLibrary.Current = new BotLibrary(Path.Combine(host.DataDirectory, "bot-songs.json"), new TelegramBotChats(_telegram));
         _bot.Chats = BotLibrary.Current;
         _ = Task.Run(async () => { await Task.Delay(TimeSpan.FromSeconds(8)).ConfigureAwait(false); await (BotLibrary.Current?.SyncAsync() ?? Task.CompletedTask).ConfigureAwait(false); });
-        _downloads = new Downloads(Log,Path.Combine(host.DataDirectory,"download-queue.json"),_bot.Track);
         // Owner #87: played-only songs live here, never in the library.
         _streamCache = StreamCache.Folder(host.DataDirectory);
-        _downloads.CacheFolder = _streamCache;
-        // Owner #100: parts of stopped downloads, kept to go on later (removed after three days).
+        _downloads = new Downloads(Log,Path.Combine(host.DataDirectory,"download-queue.json"),_bot.Track, _streamCache);
+        // Partial and completed stream files share the owner's cache retention choice.
         PartialAudio.Folder = Path.Combine(host.DataDirectory, "stream-partial");
-        _ = Task.Run(PartialAudio.Clean);
+        _ = Task.Run(PurgeStreamCache);
         Noctis.Services.LibraryExclusions.Register(_streamCache);
         _purge = new Timer(_ => PurgeStreamCache(), null, TimeSpan.FromMinutes(1), TimeSpan.FromHours(6));
         // A busy listening day must not wait six hours for the size limit: after a new song lands, at most every 5 minutes.
@@ -235,11 +234,15 @@ public sealed class FreeMusicPlugin : INoctisPlugin
         {
             if (_streamCache is not { } cache || _downloads is not { } downloads) return;
             var days = StreamCache.Days(_host?.Settings.GetString(StreamCache.SettingKey));
+            var cap = StreamCache.Cap(days, StreamCache.FreeSpace(cache));
+            PartialAudio.Clean(days, cap);
+            long partialBytes = PartialAudio.Folder is { } partial && Directory.Exists(partial)
+                ? Directory.EnumerateFiles(partial).Sum(f => new FileInfo(f).Length) : 0;
             var busy = downloads.Active.Where(d => downloads.IsCached(d)).Select(d => d.Track.FileName).ToHashSet(StringComparer.OrdinalIgnoreCase);
             _lastPurge = DateTime.UtcNow;
             var held = Noctis.Services.Search.OnlineMusicSearch.FilesInPlayer.ToHashSet(StringComparer.OrdinalIgnoreCase);
             var removed = StreamCache.Purge(cache, days, DateTime.UtcNow, file => busy.Contains(Path.GetFileNameWithoutExtension(file)) || held.Contains(file),
-                StreamCache.Cap(days, StreamCache.FreeSpace(cache)));
+                cap is { } maximum ? Math.Max(0, maximum - partialBytes) : null);
             if (removed > 0) Log($"removed {removed} played-only song file{(removed == 1 ? "" : "s")} from the stream cache");
         }
         catch (Exception ex) { Log("stream cache clean-up failed: " + ex.Message); }

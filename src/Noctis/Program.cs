@@ -355,7 +355,7 @@ internal class Program
         // External integrations
         services.AddSingleton<HttpClient>(_ =>
         {
-            var http = new HttpClient
+            var http = new HttpClient(new OnlineAccessHandler(new HttpClientHandler()))
             {
                 Timeout = TimeSpan.FromSeconds(15)
             };

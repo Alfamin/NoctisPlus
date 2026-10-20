@@ -21,6 +21,7 @@ internal sealed class FinderOnlineSearch : IOnlineMusicSearch
     private readonly Action _signIn;
     private readonly Func<SpotifyPlaylists?> _playlists;
     private readonly ConcurrentDictionary<string, CatalogSong> _songs = new();
+    private readonly ConcurrentDictionary<string, Download> _restored = new();
     private readonly ConcurrentDictionary<string, CatalogArtist> _artists = new();
     private readonly ConcurrentDictionary<string, CatalogRelease> _albums = new();
 
@@ -289,9 +290,30 @@ internal sealed class FinderOnlineSearch : IOnlineMusicSearch
         if (!_songs.TryGetValue(song.Id, out var catalogSong)) return false;
         var d = _actions.Downloads.Active.LastOrDefault(x => x.Track.Request is { } r && SpotifyPlaylists.SameRecording(catalogSong.Request, r));
         // Owner #100: skipped past: stopped even mid-transfer, unless it is the song being heard.
-        if (d is null || d.State is not (DownloadState.Queued or DownloadState.Running) || d.Playback?.HasReaders == true) return false;
+        if (d is null || !d.IsActive || !_actions.Downloads.IsCached(d) || d.KeepIn is not null || d.Playback?.HasReaders == true || d.State == DownloadState.Running && d.Progress >= .85) return false;
         try { return _actions.Downloads.Remove(d); }
         catch (Exception) { return false; } // the queue file could not be saved: it simply downloads
+    }
+
+    public void SetPlaybackWindow(string? currentPath, IReadOnlyList<OnlineSong> songs)
+    {
+        var names = songs.Select(s => _songs.TryGetValue(s.Id, out var c) ? _actions.TrackFor(c.Request).FileName : _restored.GetValueOrDefault(s.Id)?.Track.FileName).OfType<string>().ToList();
+        if (currentPath is not null) names.Add(Path.GetFileName(currentPath));
+        _actions.Downloads.SetPlaybackWindow(names);
+    }
+
+    public Noctis.Models.Track? RestorePlaybackTrack(string path, Guid id)
+    {
+        if (!IsCachedFile(path) || File.Exists(path)) return null;
+        var d = _actions.Downloads.History.LastOrDefault(d => d.Track.Request is not null &&
+            string.Equals(Path.Combine(d.Folder, d.Track.FileName + Path.GetExtension(path)), path, StringComparison.OrdinalIgnoreCase));
+        if (d is null) return null;
+        var key = "restored:" + id;
+        _restored[key] = d;
+        var song = new OnlineSong(key, d.Track.Title, d.Track.Artist, Seconds: d.Track.Duration?.TotalSeconds);
+        var track = Noctis.ViewModels.PlayerViewModel.StandIn(this, song, keep: false);
+        track.Id = id; track.FilePath = path; track.IsExternal = true;
+        return track;
     }
 
     public async Task PrefetchAsync(OnlineSong song, bool keep, CancellationToken ct)
@@ -363,12 +385,19 @@ internal sealed class FinderOnlineSearch : IOnlineMusicSearch
 
     public async Task<Noctis.Models.Track> PreparePlaybackAsync(OnlineSong song, bool keep, CancellationToken ct)
     {
+        Download download;
+        bool restored = _restored.TryGetValue(song.Id, out var parked);
+        if (restored)
+            download = _actions.Downloads.Start(parked!.Track, parked.Folder, priority: true);
+        else
+        {
         if (!_songs.TryGetValue(song.Id, out var catalogSong)) throw new InvalidOperationException("Search again, then choose the song.");
         // Owner #87: Play only streams; the song is kept in the stream cache, not added to Songs.
         await _actions.QueueAsync([catalogSong], priority: true, ct, stream: !keep);
         var match = (await _actions.MatchAsync([catalogSong], ct))[catalogSong.Id];
         if (match.Local is { } local) return Make(local.Path, local.Id, external: false);
-        var download = match.Download ?? throw new IOException("The download request could not be found. Open Downloads to retry it.");
+        download = match.Download ?? throw new IOException("The download request could not be found. Open Downloads to retry it.");
+        }
         // Owner #83: the song clicked to play last is fetched now, ahead of every song clicked before it.
         _actions.Downloads.PlayNow(download);
         while (true)
@@ -379,8 +408,10 @@ internal sealed class FinderOnlineSearch : IOnlineMusicSearch
                 if (_actions.Downloads.IsCached(download)) StreamCache.Touch(saved); // played again: its days start over
                 return Make(saved);
             }
-            if (download.Playback?.ReadyPath is { } ready) return Make(ready);
-            if (download.State is DownloadState.Waiting or DownloadState.Failed)
+            if (!restored && download.Playback?.ReadyPath is { } ready) return Make(ready);
+            // A temporary outage/rate-limit wait must not be mistaken for a missing recording.
+            // Stay on the same request; user skip/pause still cancels this wait immediately.
+            if (download.State == DownloadState.Failed)
                 throw new IOException(download.Error.Length > 0 ? download.Error : "The download is waiting. Open Downloads to retry it.");
             if (download.State is DownloadState.Cancelled or DownloadState.Removed)
                 throw new IOException("The download was removed or interrupted.");

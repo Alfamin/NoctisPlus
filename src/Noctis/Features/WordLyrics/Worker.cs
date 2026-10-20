@@ -105,6 +105,7 @@ internal sealed class Worker : IDisposable
         public long Length = -1;
         public DateTime Stamp;
         public bool AccessReported;
+        public bool NetworkWait;
     }
 
     /// <param name="dataDirectory">The plugin's own folder (list of waiting songs, last result, last output).</param>
@@ -155,6 +156,7 @@ internal sealed class Worker : IDisposable
         lock (_gate)
         {
             if (_disposed || !_items.TryGetValue(path, out var item)) return SongTimingStatus.None;
+            if (item.Action == TimingAction.Missing && !_activePaths.Contains(path) && HasWordLyrics(path)) return SongTimingStatus.None;
             if (!_activePaths.Contains(path) && !item.Asked && !_options.Auto) return SongTimingStatus.None;
             if (_paused) return SongTimingStatus.Paused;
             if (_activePaths.Contains(path)) return SongTimingStatus.Processing;
@@ -164,6 +166,18 @@ internal sealed class Worker : IDisposable
     public bool EnqueueAutomatic(string path, string root, bool complete = false)
         => Consider(Path.GetFullPath(path), Path.GetFullPath(root), complete ? QuietAfterRename : QuietAfterCreate);
     internal void TickNow() => OnTick();
+
+    internal void RetryNetworkWaits()
+    {
+        lock (_gate)
+        {
+            if (_disposed) return;
+            foreach (var item in _items.Values.Where(i => i.NetworkWait))
+            { item.NetworkWait = false; item.NotBefore = DateTime.UtcNow; }
+            SaveState();
+        }
+        _timer.Change(TimeSpan.Zero, Tick);
+    }
 
     /// <summary>How long the program gets to stop after Cancel before it is stopped by force.</summary>
     internal TimeSpan CancelGrace { get; set; } = TimeSpan.FromMinutes(3);
@@ -553,7 +567,7 @@ internal sealed class Worker : IDisposable
         // Looking at the files happens outside the lock: a slow drive must never make Noctis
         // wait (it calls into the plugin from its own thread). Only this timer changes these
         // entries while no run is going.
-        var ripe = waiting.Where(i => Ripe(i, now)).OrderByDescending(i => i.Urgent).ThenByDescending(i => i.Ahead)
+        var ripe = waiting.Where(i => (!Services.OnlineAccess.Shared.IsOffline || i.Action == TimingAction.Custom && i.Draft is not null || i.Action is TimingAction.Missing or TimingAction.Current && File.Exists(Path.ChangeExtension(i.Path, ".lrc"))) && Ripe(i, now)).OrderByDescending(i => i.Urgent).ThenByDescending(i => i.Ahead)
             .ThenBy(i => i.Ahead ? i.AheadOrder : 0).ThenByDescending(i => i.Asked).ThenBy(i => i.Seen).ToList();
         var gone = waiting.Where(i => i.Length == -2).ToList();
         if (gone.Count > 0)
@@ -927,10 +941,13 @@ internal sealed class Worker : IDisposable
                 {
                     if (status == "network_error" || (code == ExitSetupFailed && status is "" or "not_reached"))
                     {
+                        item.NetworkWait = status == "network_error";
+                        if (item.NetworkWait) Services.OnlineAccess.Shared.Failed();
                         // Not the song's fault, and it can last for hours (no internet, a broken setup):
                         // it keeps its tries and waits longer each time instead of being given up.
                         if (item.Waits == 0) firstDelays++;
-                        item.NotBefore = now + Backoff(item.Waits++);
+                        item.NotBefore = now + (item.NetworkWait ? TimeSpan.FromSeconds(30) : Backoff(item.Waits));
+                        item.Waits++;
                         continue;
                     }
                     if (status is "" or "failed" or "not_reached")
@@ -1130,6 +1147,7 @@ internal sealed class Worker : IDisposable
                     Draft = Text(entry, "draft") is { Length: > 0 } draft ? draft : null,
                     Tries = entry.TryGetProperty("tries", out var tries) && tries.TryGetInt32(out var tr) ? Math.Clamp(tr, 0, MaxTries) : 0,
                     Waits = entry.TryGetProperty("waits", out var waits) && waits.TryGetInt32(out var wa) ? Math.Clamp(wa, 0, 100) : 0,
+                    NetworkWait = entry.TryGetProperty("networkWait", out var nw) && nw.ValueKind == JsonValueKind.True,
                 };
                 if (entry.TryGetProperty("notBeforeUtc", out var retry) && retry.TryGetDateTime(out var until))
                     _items[path].NotBefore = until.ToUniversalTime() > now.AddDays(8) ? now : until.ToUniversalTime();
@@ -1171,6 +1189,7 @@ internal sealed class Worker : IDisposable
                     json.WriteString("action", item.Action.ToString());
                     if (item.Draft is not null) json.WriteString("draft", item.Draft);
                     json.WriteNumber("tries", item.Tries); json.WriteNumber("waits", item.Waits);
+                    json.WriteBoolean("networkWait", item.NetworkWait);
                     json.WriteString("notBeforeUtc", item.NotBefore);
                     json.WriteEndObject();
                 }

@@ -15,6 +15,19 @@ public class PartialAudioTests : IDisposable
 
     private static byte[] Song(int size) { var bytes = new byte[size]; new Random(7).NextBytes(bytes); return bytes; }
 
+    [Theory]
+    [InlineData(7, false)]
+    [InlineData(30, true)]
+    [InlineData(null, true)]
+    public void PartialCacheHonorsTheSameRetentionChoiceAsCompleteStreams(int? days, bool retained)
+    {
+        Directory.CreateDirectory(PartialAudio.Folder!);
+        var part = Path.Combine(PartialAudio.Folder!, "42-999.part"); File.WriteAllText(part, "partial");
+        File.SetLastWriteTimeUtc(part, DateTime.UtcNow.AddDays(-10)); File.SetLastAccessTimeUtc(part, DateTime.UtcNow.AddDays(-10));
+        PartialAudio.Clean(days);
+        Assert.Equal(retained, File.Exists(part));
+    }
+
     [Fact]
     public async Task AStoppedTransfer_IsKept_AndTheNextOneGoesOnFromThere_WithTheSameBytes()
     {

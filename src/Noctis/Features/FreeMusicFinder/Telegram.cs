@@ -47,6 +47,7 @@ internal sealed class TelegramAccount : ITelegramSignIn, IDisposable
     /// <summary>The connected client of the signed-in account.</summary>
     public async Task<Client> ConnectAsync(CancellationToken ct)
     {
+        await Noctis.Services.OnlineAccess.Shared.WaitAsync(ct).ConfigureAwait(false);
         await _gate.WaitAsync(ct).ConfigureAwait(false);
         try
         {

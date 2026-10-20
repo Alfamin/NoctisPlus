@@ -17,8 +17,7 @@ internal static class PartialAudio
     }
 
     internal static readonly AsyncLocal<Slot?> Current = new();
-    private static readonly TimeSpan KeepFor = TimeSpan.FromDays(3);
-    private const long MinimumKept = AudioFileTransfer.ChunkSize * 4L; // less is not worth a file
+    private const long MinimumKept = AudioFileTransfer.ChunkSize; // every fully validated chunk is reusable
 
     /// <summary>Null: nothing is kept (no stream cache).</summary>
     public static string? Folder { get; set; }
@@ -89,14 +88,13 @@ internal static class PartialAudio
         finally { if (temp is not null) Delete(temp); }
     }
 
-    /// <summary>Kept parts older than three days are removed.</summary>
-    public static void Clean()
+    /// <summary>Partial files obey the same age and space limits as completed stream files.</summary>
+    public static void Clean(int? days = 30, long? maxBytes = null)
     {
         try
         {
             if (Folder is not { } folder || !Directory.Exists(folder)) return;
-            foreach (var file in Directory.EnumerateFiles(folder, "*.part*"))
-                if (DateTime.UtcNow - File.GetLastWriteTimeUtc(file) > KeepFor) Delete(file);
+            StreamCache.Purge(folder, days, DateTime.UtcNow, maxBytes: maxBytes);
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException) { }
     }

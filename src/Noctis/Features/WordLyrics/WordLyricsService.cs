@@ -46,6 +46,8 @@ internal sealed class WordLyricsService(ILibraryService library, Func<AppSetting
         return state is SongTimingStatus.Queued or SongTimingStatus.Retry && !BackendReady ? SongTimingStatus.SetupNeeded : state;
     }
     private void SongStatusChanged() => Dispatcher.UIThread.Post(() => { if (!_disposed) Changed?.Invoke(); });
+    private void NetworkRecovered() { if (!OnlineAccess.Shared.IsOffline) _worker?.RetryNetworkWaits(); }
+    private void NetworkModeChanged(bool offline) { if (!offline) _worker?.RetryNetworkWaits(); }
     internal void SetPreviewState(ProgressState state) => Progress(state);
     internal string[] Folders => _folders;
     internal IReadOnlyList<Track> Tracks => library.AllTracks;
@@ -59,6 +61,9 @@ internal sealed class WordLyricsService(ILibraryService library, Func<AppSetting
         _worker = new Worker(host.DataDirectory, () => _folders, ReadOptions(), Log, Notify, Progress,
             lyricsWritten: PublishWrittenLyrics);
         _worker.StatusChanged += SongStatusChanged;
+        OnlineAccess.Shared.Recovered += NetworkRecovered;
+        OnlineAccess.Shared.RetryHint += NetworkRecovered;
+        OnlineAccess.Shared.Changed += NetworkModeChanged;
         _worker.Watched = () => Volatile.Read(ref _playingPath);
         // Owner #96: song copies earlier runs left that are exact duplicates of their song go (in the background, after
         // startup has settled, at low priority).
@@ -466,6 +471,9 @@ internal sealed class WordLyricsService(ILibraryService library, Func<AppSetting
         _disposed = true; library.LibraryUpdated -= LibraryChanged; library.MusicFoldersChanged -= FoldersChanged;
         if (_preferences is not null) _preferences.NativePreferenceChanged -= PreferenceChanged;
         OnlineMusicSearch.FileSaved -= DownloadSaved;
+        OnlineAccess.Shared.Recovered -= NetworkRecovered;
+        OnlineAccess.Shared.RetryHint -= NetworkRecovered;
+        OnlineAccess.Shared.Changed -= NetworkModeChanged;
         _worker?.Dispose(); _worker = null; _host = null; _known.Clear(); Changed?.Invoke();
     }
 }

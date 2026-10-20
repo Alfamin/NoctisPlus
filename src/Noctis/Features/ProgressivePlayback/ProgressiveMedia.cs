@@ -31,7 +31,7 @@ internal sealed class ProgressiveMedia : Media
     internal bool Complete => _lease.Buffer.Complete;
     internal TimeSpan? Duration => _lease.Duration;
     internal bool Cancelled => _input.Cancelled;
-    internal Exception? Error => _input.Error;
+    internal Exception? Error => _input.Error ?? _lease.Error;
     internal void CancelRead() => _input.CancelRead();
     internal event Action<bool>? Buffering { add => _input.Buffering += value; remove => _input.Buffering -= value; }
     internal event Action? Finished;

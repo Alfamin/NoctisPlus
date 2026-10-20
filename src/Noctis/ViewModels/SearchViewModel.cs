@@ -47,6 +47,9 @@ public sealed partial class SearchViewModel : ViewModelBase, ISearchable, IDispo
         _index.Rebuilt += OnIndexRebuilt;
         _player.PropertyChanged += OnPlayerChanged;
         OnlineMusicSearch.CurrentChanged += OnSourceChanged;
+        OnlineAccess.Shared.Changed += OnOfflineChanged;
+        OnlineAccess.Shared.Recovered += OnNetworkRecovered;
+        OnlineAccess.Shared.RetryHint += OnNetworkRecovered;
         AttachSource(OnlineMusicSearch.Current);
     }
 
@@ -134,7 +137,7 @@ public sealed partial class SearchViewModel : ViewModelBase, ISearchable, IDispo
     public bool ShowPlaylists => HasPlaylists && (IsAllFilter || IsPlaylistsFilter);
 
     /// <summary>True while an online catalog is available (Free Music Finder switched on).</summary>
-    public bool HasOnline => _source is not null;
+    public bool HasOnline => _source is not null && !OnlineAccess.Shared.IsOffline;
 
     private int SongCap => Filter == "All" ? 5 : 50;
     private int ArtistCap => Filter == "All" ? _artistsPerRow : 40;
@@ -189,10 +192,10 @@ public sealed partial class SearchViewModel : ViewModelBase, ISearchable, IDispo
         _local = _index.Search(query);
         if (!force)
             Trace($"\"{query}\": {_local.Songs.Count} songs, {_local.Artists.Count} artists, {_local.Albums.Count} albums in {localClock.Elapsed.TotalMilliseconds:0.0} ms");
-        IsOnlinePending = !force && _source is not null;
-        IsOnlineLoading = _source is not null;
+        IsOnlinePending = !force && HasOnline;
+        IsOnlineLoading = HasOnline;
         Publish();
-        if (_source is { } source)
+        if (HasOnline && _source is { } source)
         {
             var cts = _onlineCts = new CancellationTokenSource();
             _ = RunOnlineAsync(source, query, cts, force ? TimeSpan.Zero : OnlineDelay);
@@ -213,7 +216,7 @@ public sealed partial class SearchViewModel : ViewModelBase, ISearchable, IDispo
     /// <summary>The page was opened: warm the online connection so the first query is quick.</summary>
     public void OnShown()
     {
-        _source?.WarmUp();
+        if (HasOnline) _source?.WarmUp();
         RefreshDownloadStates();
         // Back on the page after the catalog failed: maybe the connection is back.
         if (IsOnlineUnreachable && _query.Length > 0) RetryOnline();
@@ -224,7 +227,7 @@ public sealed partial class SearchViewModel : ViewModelBase, ISearchable, IDispo
     [RelayCommand]
     private void RetryOnline()
     {
-        if (_source is not { } source || _query.Length == 0) return;
+        if (!HasOnline || _source is not { } source || _query.Length == 0) return;
         source.Retry();
         Run(_query, force: false, again: true);
     }
@@ -246,6 +249,7 @@ public sealed partial class SearchViewModel : ViewModelBase, ISearchable, IDispo
 
     private void CheckReconnect()
     {
+        if (OnlineAccess.Shared.IsOffline) return;
         if (!IsOnlineUnreachable || _source is not { } source || _query.Length == 0) { _reconnect?.Stop(); return; }
         if (IsOnlineLoading) return;
         if (source.Route != _failedRoute || DateTime.UtcNow - _failedAt > TimeSpan.FromSeconds(30))
@@ -254,6 +258,17 @@ public sealed partial class SearchViewModel : ViewModelBase, ISearchable, IDispo
             Run(_query, force: false, again: true);
         }
     }
+
+    private void OnOfflineChanged(bool offline) => Dispatcher.UIThread.Post(() =>
+    {
+        if (_disposed) return;
+        OnPropertyChanged(nameof(HasOnline)); OnPropertyChanged(nameof(ShowForYou)); OnPropertyChanged(nameof(ShowOnlineProblem));
+        if (_query.Length > 0) Run(_query, force: false, again: true);
+    });
+    private void OnNetworkRecovered() => Dispatcher.UIThread.Post(() =>
+    {
+        if (!_disposed && IsOnlineUnreachable && !IsOnlineLoading) RetryOnline();
+    });
 
     /// <summary>How long the first online answer may take before the page says it cannot reach
     /// the catalog (the search goes on; results replace the notice if they come).</summary>
@@ -736,6 +751,9 @@ public sealed partial class SearchViewModel : ViewModelBase, ISearchable, IDispo
         _player.PropertyChanged -= OnPlayerChanged;
         _index.Dispose();
         OnlineMusicSearch.CurrentChanged -= OnSourceChanged;
+        OnlineAccess.Shared.Changed -= OnOfflineChanged;
+        OnlineAccess.Shared.Recovered -= OnNetworkRecovered;
+        OnlineAccess.Shared.RetryHint -= OnNetworkRecovered;
         AttachSource(null);
     }
 }

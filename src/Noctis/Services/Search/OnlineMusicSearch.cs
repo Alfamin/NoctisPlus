@@ -94,6 +94,10 @@ public interface IOnlineMusicSearch
     /// <summary>Owner #95/#100: a download asked for ahead that the queue no longer needs is dropped, also one already
     /// transferring (unless it is being heard). True when one was dropped.</summary>
     bool CancelQueued(OnlineSong song) => false;
+    /// <summary>Replace transient audio work with this exact playback window. Explicit saves are independent.</summary>
+    void SetPlaybackWindow(string? currentPath, IReadOnlyList<OnlineSong> songs) { }
+    /// <summary>Restore an interrupted cached recording as a paused, fetchable track, without starting network work.</summary>
+    Noctis.Models.Track? RestorePlaybackTrack(string path, Guid id) => null;
     /// <summary>Owner #100: the bot is asked for the song so it is ready in the chat; nothing is downloaded. A later download
     /// starts from there without asking again.</summary>
     Task AskAheadAsync(OnlineSong song, CancellationToken ct) => Task.CompletedTask;

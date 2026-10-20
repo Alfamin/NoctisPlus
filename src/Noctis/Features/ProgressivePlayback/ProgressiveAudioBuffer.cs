@@ -106,10 +106,10 @@ internal sealed class ProgressiveAudioBuffer : IDisposable
             {
                 ct.ThrowIfCancellationRequested(); ThrowIfDisposed();
                 if (generation != _generation) throw new IOException("A backup transfer replaced this audio. Wait for the complete download.");
-                if (_error is not null) throw new IOException("The audio transfer was interrupted.", _error);
                 var available = PrefixLocked - position;
                 if (available > 0)
                     return RandomAccess.Read(_file.SafeFileHandle, target[..(int)Math.Min(available, target.Length)], position);
+                if (_error is not null) throw new IOException("The audio transfer was interrupted.", _error);
                 if (_complete) return 0;
                 Monitor.Wait(_gate);
             }

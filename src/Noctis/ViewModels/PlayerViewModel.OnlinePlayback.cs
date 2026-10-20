@@ -7,6 +7,7 @@ public partial class PlayerViewModel
 {
     private CancellationTokenSource? _onlinePlay;
     private string? _onlinePreparingSongId;
+    private PendingStream? _onlinePreparingRequest;
     private Task? _onlinePlayTask;
     [ObservableProperty, NotifyPropertyChangedFor(nameof(IsWaitingForAudio))] private bool _isPreparingOnlinePlayback;
     [ObservableProperty, NotifyPropertyChangedFor(nameof(IsWaitingForAudio))] private bool _isBuffering;
@@ -50,6 +51,10 @@ public partial class PlayerViewModel
         if (OnlinePlayingSongId == song.Id && CurrentTrack is not null) { PlayPauseCommand.Execute(null); return; }
         var stop = _onlinePlay = new();
         _onlinePreparingSongId = song.Id;
+        _onlinePreparingRequest = new(source, song, keep);
+        source.SetPlaybackWindow(null, [song]);
+        Watch(source);
+        WireQueueStreaming();
         IsPreparingOnlinePlayback = true;
         // Owner #54: the Play button shows what the download is doing while the song is prepared.
         void ShowStep()
@@ -72,14 +77,16 @@ public partial class PlayerViewModel
             if (CurrentTrack is { } outgoing) { History.Insert(0, outgoing); TrimHistory(); }
             PlayTrack(_library.Tracks.FirstOrDefault(t => t.Id == track.Id) ?? track);
             OnlinePlayingSongId = song.Id;
+            PostStreamAhead();
         }
         catch (OperationCanceledException) when (stop.IsCancellationRequested) { }
         finally
         {
             source.DownloadsChanged -= StepChanged;
             if (ReferenceEquals(_onlinePlay, stop)) _onlinePlay = null;
-            if (_onlinePlay is null) { IsPreparingOnlinePlayback = false; _onlinePreparingSongId = null; }
+            if (_onlinePlay is null) { IsPreparingOnlinePlayback = false; _onlinePreparingSongId = null; _onlinePreparingRequest = null; }
             stop.Dispose();
+            PostStreamAhead();
         }
     }
 
@@ -132,7 +139,7 @@ public partial class PlayerViewModel
 
     private void CancelOnlinePlayback()
     {
-        var stop = _onlinePlay; _onlinePlay = null; _onlinePreparingSongId = null;
+        var stop = _onlinePlay; _onlinePlay = null; _onlinePreparingSongId = null; _onlinePreparingRequest = null;
         stop?.Cancel();
         IsPreparingOnlinePlayback = false;
     }

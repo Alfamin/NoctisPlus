@@ -2753,6 +2753,8 @@ public partial class SettingsViewModel : ViewModelBase
             IncludePrereleaseUpdates = _settings.IncludePrereleaseUpdates;
             AutoInstallUpdates = _settings.AutoInstallUpdates;
             DeveloperMode = _settings.DeveloperMode;
+            OfflineMode = _settings.OfflineMode;
+            OnlineAccess.Shared.SetOffline(OfflineMode);
 
             // Playback
             MigrateTransitionSettings(_settings);
@@ -3235,6 +3237,7 @@ public partial class SettingsViewModel : ViewModelBase
         _settings.IncludePrereleaseUpdates = IncludePrereleaseUpdates;
         _settings.AutoInstallUpdates = AutoInstallUpdates;
         _settings.DeveloperMode = DeveloperMode;
+        _settings.OfflineMode = OfflineMode;
         // Same trap (Discord, Mistery 2026-09-21: "language changes to system default after
         // restart"): the picker wrote _settings.Language once, the merge put the on-disk ""
         // back, and the file was saved with the old value.
@@ -7007,6 +7010,7 @@ public partial class SettingsViewModel : ViewModelBase
             IncludePrereleaseUpdates = false;
             AutoInstallUpdates = false;
             DeveloperMode = false;
+            OfflineMode = false;
 
             // Everything below was previously left at its pre-reset value, and because
             // SyncToSettings then wrote the stale VM state back over the freshly-defaulted

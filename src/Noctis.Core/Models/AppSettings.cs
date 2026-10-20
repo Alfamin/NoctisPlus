@@ -159,6 +159,9 @@ public class AppSettings
     /// <summary>Shows the Developer section (version manager + debug logs) in Settings → About.</summary>
     public bool DeveloperMode { get; set; } = false;
 
+    /// <summary>Explicit local-only mode. Connectivity returning never changes this choice.</summary>
+    public bool OfflineMode { get; set; }
+
     /// <summary>Default page index (0=Home, 1=Songs, 2=Albums, 3=Artists, 4=Genres, 5=Playlists, 6=Favorites).</summary>
     public int DefaultPageIndex { get; set; } = 0;
 

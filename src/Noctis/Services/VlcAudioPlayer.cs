@@ -856,6 +856,9 @@ public class VlcAudioPlayer : IAudioPlayer
         get
         {
             if (_disposed) return TimeSpan.Zero;
+            if (_gaplessEngine && _currentMedia is ProgressiveMedia)
+                return TimeSpan.FromMilliseconds(EngineTickTimeMs(_gaplessSink?.Provider.ActiveSegment, EngineSlotOf(_player), true,
+                    0, Volatile.Read(ref _engineSegments[EngineSlotOf(_player)])) ?? 0);
             var time = _player.Time;
             if (time <= 0) return TimeSpan.Zero;
             return TimeSpan.FromMilliseconds(time);
@@ -3179,7 +3182,7 @@ public class VlcAudioPlayer : IAudioPlayer
                 ProgressiveMedia.Configure(streamed, filePath);
                 // The download can still make playback wait. The view model shows the buffering ring only when the
                 // audible position actually stops (the engine's refill hold, below), not while bytes trickle in.
-                streamed.Finished += () => { if (ReferenceEquals(_currentMedia, streamed)) BufferingChanged?.Invoke(this, false); };
+                streamed.Finished += () => { if (ReferenceEquals(_currentMedia, streamed)) BufferingChanged?.Invoke(this, !streamed.Complete); };
                 BufferingChanged?.Invoke(this, !streamed.Complete);
             }
             if (!isPathless)
@@ -4482,10 +4485,14 @@ public class VlcAudioPlayer : IAudioPlayer
     /// for it runs seconds behind the audio actually played (real app: 21.98 s at the end of a
     /// 24 s MP3), and that one tick snapped the shown position back before the end grace took over.
     /// </summary>
-    internal static long? EngineTickTimeMs(GaplessTrackSegment? active, int playerSlot, bool progressiveInput, long vlcTimeMs)
+    internal static long? EngineTickTimeMs(GaplessTrackSegment? active, int playerSlot, bool progressiveInput, long vlcTimeMs, GaplessTrackSegment? own = null)
     {
         if (active != null)
             return active.Source is int slot && slot == playerSlot ? active.PositionMs : 0;
+        // The sink removes a drained segment. Keep publishing its consumed-frame
+        // position during an interrupted download so buffering can settle there;
+        // VLC's independent clock must never run the timeline through silence.
+        if (progressiveInput && own is { Abandoned: false, Source: int ownSlot } && ownSlot == playerSlot) return own.PositionMs;
         return progressiveInput ? null : vlcTimeMs;
     }
 
@@ -5095,7 +5102,20 @@ public class VlcAudioPlayer : IAudioPlayer
         if (_disposed) return;
         if (_currentMedia is ProgressiveMedia growing)
         {
-            if (!growing.Complete || _currentMediaPath is null || !File.Exists(_currentMediaPath)) return;
+            if (_currentMediaPath is null) return;
+            if (!growing.Complete)
+            {
+                // Previous/restart is valid within the buffered prefix, even during
+                // an outage. Never map an arbitrary time into unknown future bytes.
+                if (position > TimeSpan.Zero) return;
+                _downloadRestartSession = CurrentSessionId;
+                if (!ProgressiveTransfer.IsDownloading(_currentMediaPath)) return;
+                Interlocked.Exchange(ref _pendingSeekMs, 0);
+                _restartPausedRequest = _isPaused;
+                Play(_currentMediaPath);
+                return;
+            }
+            if (!File.Exists(_currentMediaPath)) return;
             Interlocked.Exchange(ref _pendingSeekMs, Math.Max(0, (long)position.TotalMilliseconds));
             _restartPausedRequest = _isPaused;
             Play(_currentMediaPath); // reopen the validated full file with normal seeking
@@ -5243,10 +5263,49 @@ public class VlcAudioPlayer : IAudioPlayer
         }
     }
 
+    // A failed/unfinished download is not the end of its recording. Keep the current
+    // session and queue while its transfer retries; never arm repeat/natural-end grace.
+    private bool HoldInterruptedDownload()
+    {
+        if (_currentMedia is not ProgressiveMedia { Complete: false, Cancelled: false }) return false;
+        ResetEndReachedPending();
+        if (_gaplessEngine) Volatile.Read(ref _engineSegments[EngineSlotOf(_player)])?.MarkEndOfStream();
+        BufferingChanged?.Invoke(this, true);
+        if (!_isPaused) _positionTimer.Start();
+        DebugLog.Write("Playback", "download input interrupted; keeping the current song and waiting for its saved file");
+        return true;
+    }
+
+    private long _downloadRecoverySession = -1;
+    private long _downloadRestartSession = -1;
+    private bool TryRecoverInterruptedDownload()
+    {
+        if (_currentMedia is not ProgressiveMedia { Complete: false, Cancelled: false } input ||
+            _currentMediaPath is not { } path || !File.Exists(path) || ProgressiveTransfer.IsDownloading(path) ||
+            input.Error is null && _player.State is not (VLCState.Ended or VLCState.Error)) return false;
+        var session = CurrentSessionId;
+        if (Interlocked.Exchange(ref _downloadRecoverySession, session) == session) return true;
+        var version = Interlocked.Read(ref _playRequestVersion);
+        // Serialize with the user's transport actions. A queued recovery of A must
+        // never replace B, or undo Pause/Next arriving while the file was finishing.
+        Avalonia.Threading.Dispatcher.UIThread.Post(() =>
+        {
+            if (_disposed || CurrentSessionId != session || version != Interlocked.Read(ref _playRequestVersion) || !ReferenceEquals(_currentMedia, input)) return;
+            var segment = _gaplessEngine ? Volatile.Read(ref _engineSegments[EngineSlotOf(_player)]) : null;
+            var heard = _downloadRestartSession == session ? 0 : segment?.PositionMs ?? Math.Max(0, _player.Time);
+            Interlocked.Exchange(ref _pendingSeekMs, heard);
+            _restartPausedRequest = _isPaused;
+            DebugLog.Write("Playback", $"download recovered; continuing the same song at {heard} ms");
+            Play(path);
+        });
+        return true;
+    }
+
     private void OnEndReachedCore(object? sender)
     {
         if (_disposed) return;
         if (ReferenceEquals(sender, _player) && _currentMedia is ProgressiveMedia { Cancelled: true }) return;
+        if (ReferenceEquals(sender, _player) && HoldInterruptedDownload()) return;
 
         // Owner 10-18 ("Which One", paused, resumed, then the timeline jumped to 0:36 of 0:47 on a 2:49 song): a
         // download-backed input can end long before the recording does. Its download is complete and saved, so the
@@ -5386,6 +5445,7 @@ public class VlcAudioPlayer : IAudioPlayer
             }
 
             if (_currentMedia is ProgressiveMedia { Cancelled: true }) return;
+            if (HoldInterruptedDownload()) return;
 
             DebugLogger.Error(DebugLogger.Category.Playback, "VLC.Error", "VLC encountered a playback error");
             ResetEndReachedPending();
@@ -5453,6 +5513,7 @@ public class VlcAudioPlayer : IAudioPlayer
         try
         {
             var sessionId = CurrentSessionId;
+            if (TryRecoverInterruptedDownload()) return;
             var endDeadlineTicks = Interlocked.Read(ref _endReachedDeadlineTicksUtc);
             if (endDeadlineTicks != 0)
             {
@@ -5504,7 +5565,7 @@ public class VlcAudioPlayer : IAudioPlayer
             // playback wedged at end-of-track with no end bookkeeping pending).
             // If VLC says the current input Ended and the audible tail has
             // drained, arm the end grace ourselves so the track can never wedge.
-            if (_gaplessEngine && !_isPaused && _currentMedia != null &&
+            if (_gaplessEngine && !_isPaused && _currentMedia != null && _currentMedia is not ProgressiveMedia { Complete: false } &&
                 Interlocked.Read(ref _endReachedDeadlineTicksUtc) == 0)
             {
                 try
@@ -5535,7 +5596,7 @@ public class VlcAudioPlayer : IAudioPlayer
             if (_gaplessEngine)
             {
                 if (EngineTickTimeMs(_gaplessSink?.Provider.ActiveSegment, EngineSlotOf(_player),
-                        _currentMedia is ProgressiveMedia, _player.Time) is not { } engineTime)
+                        _currentMedia is ProgressiveMedia, _player.Time, Volatile.Read(ref _engineSegments[EngineSlotOf(_player)])) is not { } engineTime)
                     return;
                 time = engineTime;
             }

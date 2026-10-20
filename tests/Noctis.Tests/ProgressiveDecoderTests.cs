@@ -10,6 +10,42 @@ namespace Noctis.Tests;
 public class ProgressiveDecoderTests(ITestOutputHelper output)
 {
     [Theory]
+    [InlineData("flac")]
+    [InlineData("mp3")]
+    public async Task InterruptedNativeInputWaits_InsteadOfReplayingItsAvailablePrefix(string extension)
+    {
+        if (!OperatingSystem.IsWindows()) Assert.Skip("Requires bundled Windows LibVLC.");
+        Core.Initialize(); using var data = new TestPersistenceService();
+        var audio = await AudioAsync(extension, data.DataDirectory, wave: TimeCoded(12));
+        using var buffer = new ProgressiveAudioBuffer(new FileStream(Path.Combine(data.DataDirectory, "interrupted.part"), FileMode.Create, FileAccess.ReadWrite, FileShare.ReadWrite | FileShare.Delete, 1));
+        buffer.Begin(audio.Length); buffer.Writer.Write(audio.AsSpan(0, audio.Length / 3));
+        buffer.Finish(new IOException("Synthetic VPN failure"));
+        using var input = new ProgressiveMediaInput(buffer);
+        using var vlc = new LibVLC("--intf=dummy", "--no-video", "--no-stats", "--quiet", "--input-repeat=0");
+        using var media = new Media(vlc, input); ProgressiveMedia.Configure(media, "interrupted." + extension);
+        using var player = new MediaPlayer(vlc);
+        var ended = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        player.EndReached += (_, _) => ended.TrySetResult();
+        player.EncounteredError += (_, _) => ended.TrySetResult();
+        long samples = 0;
+        MediaPlayer.LibVLCAudioPlayCb play = (_, _, frames, _) => Interlocked.Add(ref samples, frames);
+        player.SetAudioCallbacks(play, null, null, null, null); player.SetAudioFormat("S16N", 48000, 1);
+        try
+        {
+            Assert.True(player.Play(media));
+            for (int i = 0; i < 300 && input.Error is null; i++) await Task.Delay(10);
+            Assert.NotNull(input.Error); Assert.False(input.Seek(0));
+            await Task.Delay(6000); // the ~4 seconds available have drained
+            var before = Interlocked.Read(ref samples);
+            await Task.Delay(1500);
+            Assert.Equal(before, Interlocked.Read(ref samples));
+            Assert.False(ended.Task.IsCompleted);
+            Assert.InRange(Interlocked.Read(ref samples), 1, 48000 * 8);
+            output.WriteLine($"{extension}: waiting after {samples / 48000.0:0.00} s of available audio; no prefix replay");
+        }
+        finally { input.CancelRead(); await Task.Run(player.Stop).WaitAsync(TimeSpan.FromSeconds(5)); GC.KeepAlive(play); }
+    }
+    [Theory]
     [InlineData("wav")]
     [InlineData("mp3")]
     [InlineData("flac")]

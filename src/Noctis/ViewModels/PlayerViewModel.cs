@@ -2294,6 +2294,11 @@ public partial class PlayerViewModel : ViewModelBase
                     list.Add(new(id, libraryTrack));
                     continue;
                 }
+                if (Services.Search.OnlineMusicSearch.Current?.RestorePlaybackTrack(path, id) is { } interrupted)
+                {
+                    list.Add(new(id, interrupted));
+                    continue;
+                }
                 if (metadata == null) continue;
                 try
                 {
@@ -2373,6 +2378,7 @@ public partial class PlayerViewModel : ViewModelBase
 
     partial void OnCurrentTrackChanged(Track? value)
     {
+        if (_streamingWired) PostStreamAhead();
         if (value is null) OnlinePlayingSongId = null;
         UpdateStreamedTrack();
         OnPropertyChanged(nameof(HasContent));

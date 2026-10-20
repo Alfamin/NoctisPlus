@@ -110,6 +110,7 @@ internal sealed class ProgressiveTransfer(string folder, string fileName, TimeSp
         private int _disposed;
         internal ProgressiveAudioBuffer Buffer => buffer;
         internal TimeSpan? Duration => owner.Duration;
+        internal Exception? Error => owner.Error;
         internal ProgressiveMediaInput CreateInput() => new(buffer);
         internal event Action? Ended { add => owner.Ended += value; remove => owner.Ended -= value; }
         internal Lease Retain()

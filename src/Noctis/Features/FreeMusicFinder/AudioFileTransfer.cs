@@ -6,6 +6,8 @@ namespace FreeMusicFinder;
 internal sealed class AudioTransferStalledException(long received, long total) : TimeoutException(
     $"AUDIO_TRANSFER_STALLED: no audio bytes arrived for three minutes ({received:N0} / {total:N0} bytes). Check your VPN or system proxy. The request is kept for retry.");
 
+internal sealed class AudioNetworkInterruptedException(Exception cause) : IOException("Audio connection interrupted.", cause);
+
 /// <summary>Owner #100: the output of a fetch that only asks the bot (the next songs of the queue are made ready in the chat,
 /// only the next two are downloaded). Nothing may be written to it.</summary>
 internal sealed class AskOnlyStream : Stream
@@ -31,6 +33,31 @@ internal static class AudioFileTransfer
     // took ~16 s over the VPN (live, 2026-10-20: ~2 MB/s, bound by round trips); four times the bytes per trip.
     internal const int ChunkSize = 512 * 1024, Parallelism = 4;
     internal static readonly TimeSpan IdleTimeout = TimeSpan.FromMinutes(3);
+
+    internal static async Task CopyRecoveringAsync(Stream output, long size,
+        Func<long, int, CancellationToken, Task<byte[]>> read, IProgress<double>? progress, CancellationToken ct,
+        PartialAudio.Slot kept, Func<Task> reconnect, Noctis.Services.OnlineAccess access, TimeSpan? retryDelay = null)
+    {
+        var origin = output.Position - kept.Prefix;
+        while (true)
+        {
+            await access.WaitAsync(ct).ConfigureAwait(false);
+            output.Position = origin + kept.Prefix;
+            try
+            {
+                await CopyAsync(output, size, read, progress, ct, start: kept.Prefix, kept: kept).ConfigureAwait(false);
+                access.Succeeded();
+                return;
+            }
+            catch (Exception ex) when (!ct.IsCancellationRequested && ex is AudioNetworkInterruptedException or AudioTransferStalledException)
+            {
+                access.Failed();
+                TransferProgress.Stage(progress, "Waiting for connection…", Noctis.Services.Search.OnlineDownloadStep.Receiving);
+                await reconnect().ConfigureAwait(false);
+                await access.RetryAsync(ct, retryDelay).ConfigureAwait(false);
+            }
+        }
+    }
 
     internal static async Task CopyAsync(Stream output, long size,
         Func<long, int, CancellationToken, Task<byte[]>> read, IProgress<double>? progress, CancellationToken ct,
@@ -101,25 +128,47 @@ internal static class AudioFileTransfer
         if (output is Noctis.Features.ProgressivePlayback.IProgressiveAudioWriter publisher)
             publisher.BeginAudio(document.size, TelegramBotSource.Extension(document) ?? "");
         Client? media = null;
-        var initialMedia = new Lazy<Task<Client>>(() => document.dc_id == 0
-            ? Task.FromResult(client) : client.GetClientForDC(-document.dc_id, true));
+        var connection = client;
+        Lazy<Task<Client>> MediaConnection() => new(async () =>
+        {
+            connection = await account.ConnectAsync(ct).ConfigureAwait(false);
+            return document.dc_id == 0 ? connection : await connection.GetClientForDC(-document.dc_id, true).ConfigureAwait(false);
+        });
+        var initialMedia = MediaConnection();
         var location = document.ToFileLocation((PhotoSizeBase?)null);
         async Task<byte[]> Read(long offset, int count, CancellationToken token)
         {
+            await Noctis.Services.OnlineAccess.Shared.WaitAsync(token).ConfigureAwait(false);
+            using var attempt = CancellationTokenSource.CreateLinkedTokenSource(token, Noctis.Services.OnlineAccess.Shared.RequestToken);
+            try
+            {
             var dc = media ?? await initialMedia.Value.WaitAsync(token).ConfigureAwait(false);
             Interlocked.CompareExchange(ref media, dc, null);
             Upload_FileBase file;
-            try { file = await dc.Upload_GetFile(location, offset, count).WaitAsync(token).ConfigureAwait(false); }
+            async Task<Upload_FileBase> Fetch(Client from)
+            {
+                var rpc = from.Upload_GetFile(location, offset, count);
+                _ = rpc.ContinueWith(t => { _ = t.Exception; }, CancellationToken.None,
+                    TaskContinuationOptions.OnlyOnFaulted | TaskContinuationOptions.ExecuteSynchronously, TaskScheduler.Default);
+                return await rpc.WaitAsync(TimeSpan.FromSeconds(12), attempt.Token).ConfigureAwait(false);
+            }
+            try { file = await Fetch(dc).ConfigureAwait(false); }
             catch (RpcException ex) when (ex.Code == 303 && ex.Message == "FILE_MIGRATE_X")
             {
-                dc = await client.GetClientForDC(-ex.X, true).WaitAsync(token).ConfigureAwait(false);
+                dc = await connection.GetClientForDC(-ex.X, true).WaitAsync(token).ConfigureAwait(false);
                 Interlocked.Exchange(ref media, dc);
-                file = await dc.Upload_GetFile(location, offset, count).WaitAsync(token).ConfigureAwait(false);
+                file = await Fetch(dc).ConfigureAwait(false);
             }
+            Noctis.Services.OnlineAccess.Shared.Succeeded();
             return file is Upload_File bytes ? bytes.bytes : throw new TrackUnavailableException("Telegram returned unsupported audio storage. Retry the recording from the other bot.");
+            }
+            catch (OperationCanceledException ex) when (!token.IsCancellationRequested && Noctis.Services.OnlineAccess.Shared.IsOffline)
+            { throw new AudioNetworkInterruptedException(ex); }
+            catch (Exception ex) when (ex is TimeoutException or System.Net.Sockets.SocketException or IOException)
+            { throw new AudioNetworkInterruptedException(ex); }
         }
         // Owner #100: the bytes of this very file kept from a transfer stopped earlier go back in first.
-        var kept = PartialAudio.Current.Value;
+        var kept = PartialAudio.Current.Value ?? new PartialAudio.Slot();
         long start = 0;
         if (kept is not null)
         {
@@ -128,9 +177,14 @@ internal static class AudioFileTransfer
             kept.Prefix = start;
             if (start > 0) Noctis.Services.DebugLog.Write("Finder", $"resuming a stopped transfer at {start * 100 / document.size}%");
         }
-        try { await CopyAsync(output, document.size, Read, progress, ct, start: start, kept: kept).ConfigureAwait(false); }
-        catch (AudioTransferStalledException)
-        { await account.RetireConnectionAsync(client).ConfigureAwait(false); throw; }
+        try
+        {
+            await CopyRecoveringAsync(output, document.size, Read, progress, ct, kept, async () =>
+                {
+                    await account.RetireConnectionAsync(connection).ConfigureAwait(false);
+                    media = null; initialMedia = MediaConnection();
+                }, Noctis.Services.OnlineAccess.Shared).ConfigureAwait(false);
+        }
         // A cancelled transfer (removed, or held back for a newer Play, owner #83/#84) keeps the connection: the other
         // transfers and bot conversations share it, and its late chunk answers are simply dropped. Retiring it here
         // disposed the client under them (ObjectDisposedException, a linked reply missed in the TEST log).

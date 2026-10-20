@@ -6,6 +6,17 @@ namespace Noctis.Tests;
 public class ProgressivePlaybackClockTests
 {
     [Fact]
+    public void InterruptedStreamKeepsReportingItsLastAudiblePosition_AfterTheSinkRemovesTheDrainedSegment()
+    {
+        var own = new GaplessTrackSegment(8000, 1, 0, basePositionMs: 162_000);
+        own.MarkEndOfStream();
+        Assert.Equal(162_000, VlcAudioPlayer.EngineTickTimeMs(null, 0, true, 251_000, own));
+        Assert.Equal(162_000, VlcAudioPlayer.EngineTickTimeMs(null, 0, true, 350_000, own));
+        Assert.Null(VlcAudioPlayer.EngineTickTimeMs(null, 1, true, 350_000, own));
+        own.Abandon();
+        Assert.Null(VlcAudioPlayer.EngineTickTimeMs(null, 0, true, 350_000, own));
+    }
+    [Fact]
     public void DecoderResyncDuringDownloadPreservesUnplayedPcm_AndTheAudibleClockContinues()
     {
         var segment = new GaplessTrackSegment(8000, 1, null);

@@ -165,7 +165,7 @@ internal sealed class MusicSources
                 catch (TL.RpcException ex) when (BotLimits.Read(source.Id,ex.Message,_now()) is not null)
                 {var limit=BotLimits.Read(source.Id,ex.Message,_now())!;Block(limit);if(limit.Global)throw Waiting();errors.Add(limit.Message);}
                 catch(System.Net.Sockets.SocketException ex)
-                {Block(new(source.Id,"TELEGRAM_CONNECTION_FAILED: "+ex.Message+" Check the VPN/proxy; queued work is preserved.",_now().AddMinutes(10),true));throw Waiting();}
+                {throw;}
                 catch (Exception ex) when (ex is TimeoutException or BotAnswerException or TrackUnavailableException) { errors.Add(source.Id + ": " + ex.Message); }
             }
             if (_sources.Any(s => Cooling(s.Id) || Cooling(s.Id + " search"))) throw Waiting();
@@ -300,7 +300,7 @@ internal sealed class MusicSources
                 catch (TL.RpcException ex) when (BotLimits.Read(source.Id,ex.Message,_now()) is not null)
                 {var limit=BotLimits.Read(source.Id,ex.Message,_now())!;Block(limit);if(limit.Global)throw Waiting();errors.Add(limit.Message);skipped=true;}
                 catch(System.Net.Sockets.SocketException ex)
-                {Block(new(source.Id,"TELEGRAM_CONNECTION_FAILED: "+ex.Message+" Check the VPN/proxy; queued work is preserved.",_now().AddMinutes(10),true));throw Waiting();}
+                {throw;}
                 catch (Exception ex) when (ex is TimeoutException or BotAnswerException or TrackUnavailableException or StaleSelectionException)
                 { errors.Add(source.Id + ": " + ex.Message); Trace($"fetch \"{request.Title}\": {source.Id} failed at {clock.Elapsed.TotalSeconds:0.0} s: {ex.Message}"); _notice(source.Id + " could not supply “" + request.Title + "”; trying the backup."); }
             }
@@ -413,7 +413,7 @@ internal sealed class MusicSources
                 catch (TL.RpcException ex)
                 { errors[source.Id] = "BOT_QUALITY_FAILED: " + source.Id + " rejected the quality request: " + ex.Message; _notice(errors[source.Id]); }
                 catch (System.Net.Sockets.SocketException ex)
-                { Block(new(source.Id, "TELEGRAM_CONNECTION_FAILED: " + ex.Message + " Check the VPN/proxy; queued work is preserved.", _now().AddMinutes(10), true)); throw Waiting(); }
+                { throw; }
                 catch (Exception ex) when (ex is BotAnswerException or TimeoutException)
                 { errors[source.Id] = ex.Message; _notice(ex.Message); }
             }

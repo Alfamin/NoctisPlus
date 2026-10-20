@@ -1450,6 +1450,11 @@
     <!-- Top status stack: the plugin notice and, under it, word timing's compact pill (icon + a few words; owner
          2026-10-18: no long sentences popping up). The pill opens the progress window with the details. -->
     <StackPanel HorizontalAlignment="Center" VerticalAlignment="Top" Margin="0,72,0,0" Spacing="8" ZIndex="40">
+        <Button Classes="word-timing-pill" HorizontalAlignment="Center"
+                IsVisible="{Binding Settings.OfflineMode}" Command="{Binding Settings.GoOnlineCommand}"
+                Content="Offline" ToolTip.Tip="Go online" AutomationProperties.Name="Offline mode · go online"
+                Background="{DynamicResource IslandBackground}" Foreground="{DynamicResource IslandForeground}"
+                BorderBrush="#22FFFFFF" BorderThickness="1" CornerRadius="999" Padding="12,7"/>
         <Border IsVisible="{Binding PluginNotice, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"
                 IsHitTestVisible="False"
                 HorizontalAlignment="Center"

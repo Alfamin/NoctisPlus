@@ -76,6 +76,9 @@ public partial class PlayerViewModel
         CancelOnlinePlayback();
         var stop = _onlinePlay = new();
         _onlinePreparingSongId = pending.Song.Id;
+        _onlinePreparingRequest = pending;
+        pending.Source.SetPlaybackWindow(null, [pending.Song]);
+        Watch(pending.Source);
         _preparingStandIn = standIn;
         IsPreparingOnlinePlayback = true;
         void ShowStep()
@@ -89,7 +92,6 @@ public partial class PlayerViewModel
         ShowStep();
         pending.Source.DownloadsChanged += StepChanged;
         using var wait = CancellationTokenSource.CreateLinkedTokenSource(stop.Token);
-        wait.CancelAfter(StandInWait); // the download itself goes on and lands in Songs
         try
         {
             if (!pending.Source.CanDownload) throw new InvalidOperationException("not signed in to the download service");
@@ -98,6 +100,7 @@ public partial class PlayerViewModel
             _onlinePlay = null;
             _streamFailures = 0;
             var real = _library.Tracks.FirstOrDefault(t => t.Id == track.Id) ?? track;
+            if (_resumeTrackId == standIn.Id) _resumeTrackId = real.Id;
             SwapStandIn(standIn, real);
             PlayTrack(real);
             OnlinePlayingSongId = pending.Song.Id;
@@ -139,7 +142,7 @@ public partial class PlayerViewModel
         {
             pending.Source.DownloadsChanged -= StepChanged;
             if (ReferenceEquals(_onlinePlay, stop)) _onlinePlay = null;
-            if (_onlinePlay is null) { IsPreparingOnlinePlayback = false; _onlinePreparingSongId = null; }
+            if (_onlinePlay is null) { IsPreparingOnlinePlayback = false; _onlinePreparingSongId = null; _onlinePreparingRequest = null; }
             // Whatever ended this fetch (played, failed at the queue's end, or another Play took over), it no longer holds
             // the queue; a newer stand-in being fetched is left alone.
             if (ReferenceEquals(_preparingStandIn, standIn)) _preparingStandIn = null;
@@ -327,6 +330,14 @@ public partial class PlayerViewModel
         // nothing ahead is asked for or downloaded until the queue has stayed as it is for a while: a playlist played
         // and shuffled seconds later fetched two queues. The song that plays is fetched at once all the same.
         if (DateTime.UtcNow < _settleUntil) { fetch.Clear(); ask.Clear(); }
+        // The download layer owns the authoritative window, including requests left
+        // by earlier clicks (which may never have entered _askedAhead).
+        if (_streamingSource is { } source)
+        {
+            var songs = fetch.Where(p => ReferenceEquals(p.Song.Source, source)).Select(p => p.Song.Song).ToList();
+            if (_onlinePreparingRequest is { } preparing && ReferenceEquals(preparing.Source, source)) songs.Add(preparing.Song);
+            source.SetPlaybackWindow(_onlinePreparingRequest is null ? CurrentTrack?.FilePath : null, songs);
+        }
         // Owner #95/#100: the queue was skipped past, cleared, reshuffled, edited or replaced: a download ahead that is no
         // longer among the next two is stopped, even mid-transfer (not the song being heard or fetched to play).
         if (_askedAhead.Count > 0)
@@ -348,7 +359,8 @@ public partial class PlayerViewModel
         foreach (var (_, pending) in fetch)
         {
             var status = pending.Source.StatusOf(pending.Song);
-            if (status.State is OnlineDownloadState.Downloading or OnlineDownloadState.Queued) continue;
+            if (status.State is OnlineDownloadState.Downloading or OnlineDownloadState.Queued)
+            { _askedAhead.TryAdd(pending.Song.Id, pending); continue; }
             if (!pending.Source.CanDownload || !_askedAhead.TryAdd(pending.Song.Id, pending)) continue;
             // Part of playing, like Play itself: the fast lanes (two at once), also while bulk downloads are paused (live:
             // a paused queue held the 2nd and 3rd song back).

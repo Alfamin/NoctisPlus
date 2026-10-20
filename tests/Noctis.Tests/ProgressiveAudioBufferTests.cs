@@ -5,6 +5,39 @@ namespace Noctis.Tests;
 
 public class ProgressiveAudioBufferTests
 {
+    [Fact]
+    public async Task NativeInputCannotRewindOrReopenAfterAnInterruptedRead()
+    {
+        using var rig = new Rig(); rig.Buffer.Begin(8);
+        rig.Buffer.Writer.Write("abcd"u8); rig.Buffer.Finish(new IOException("VPN unavailable"));
+        using var input = new ProgressiveMediaInput(rig.Buffer);
+        Assert.True(input.Open(out _));
+        var memory = System.Runtime.InteropServices.Marshal.AllocHGlobal(8);
+        try
+        {
+            Assert.Equal(4, input.Read(memory, 8));
+            var tail = Task.Run(() => input.Read(memory, 8));
+            for (int i = 0; i < 100 && input.Error is null; i++) await Task.Delay(10);
+            Assert.NotNull(input.Error);
+            Assert.False(input.Seek(0)); Assert.False(input.Open(out _));
+            Assert.False(tail.IsCompleted);
+            input.CancelRead();
+            Assert.Equal(-1, await tail.WaitAsync(TimeSpan.FromSeconds(2)));
+            Assert.Equal(-1, input.Read(memory, 8));
+        }
+        finally { System.Runtime.InteropServices.Marshal.FreeHGlobal(memory); }
+    }
+    [Fact]
+    public void BufferedAudioDrainsBeforeAnInterruptedProducerIsReported()
+    {
+        using var rig = new Rig(); var b = rig.Buffer; b.Begin(8);
+        b.Writer.Write("abcd"u8); b.Finish(new IOException("VPN unavailable"));
+        using var reader = b.OpenReader(); var data = new byte[8];
+        Assert.Equal(4, reader.Read(data));
+        Assert.Equal("abcd", System.Text.Encoding.ASCII.GetString(data, 0, 4));
+        Assert.Throws<IOException>(() => reader.Read(data));
+        Assert.False(b.Complete);
+    }
     private sealed class Rig : IDisposable
     {
         internal readonly TestPersistenceService Data = new();

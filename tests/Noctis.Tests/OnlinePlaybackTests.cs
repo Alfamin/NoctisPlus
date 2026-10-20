@@ -171,7 +171,9 @@ public class OnlinePlaybackTests
 
         source.Pending["online"].SetResult(Track("Online")); await play;
         Assert.False(player.IsPreparingOnlinePlayback);
-        Assert.Null(source.Changed); // the player stops listening once the song plays
+        // Preparation's handler is gone; one playback-window listener remains so
+        // reconnect/download completion can update the active window without a new click.
+        Assert.Single(source.Changed!.GetInvocationList());
         player.StopAndClear();
     }
 

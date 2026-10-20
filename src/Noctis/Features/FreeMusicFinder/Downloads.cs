@@ -28,6 +28,7 @@ internal sealed class Download(BotTrack track, string folder)
     internal Noctis.Features.ProgressivePlayback.ProgressiveTransfer? Playback { get; set; }
     /// <summary>Held back for the song clicked to play after it (owner #83); it goes back to the queue, not to Failed.</summary>
     internal bool Preempted { get; set; }
+    internal bool FinishIntoCache { get; set; }
     /// <summary>Owner #87: a streamed song the user added to Songs: its library folder (copied there once saved).</summary>
     public string? KeepIn { get; internal set; }
     public bool IsActive => State is DownloadState.Queued or DownloadState.Running or DownloadState.Waiting;
@@ -58,9 +59,9 @@ internal sealed class Downloads : IDisposable
     public event Action<Download>? Changed;
     public event Action<string>? Finished;
 
-    public Downloads(Action<string> log, string? store = null, Func<MusicRequest, BotTrack>? restore = null)
+    public Downloads(Action<string> log, string? store = null, Func<MusicRequest, BotTrack>? restore = null, string? cacheFolder = null)
     {
-        _log = log; _store = store;
+        _log = log; _store = store; CacheFolder = cacheFolder;
         if (store is not null && File.Exists(store))
         {
             if (new FileInfo(store).Length > 16 * 1024 * 1024 || (File.GetAttributes(store) & FileAttributes.ReparsePoint) != 0)
@@ -86,9 +87,14 @@ internal sealed class Downloads : IDisposable
                     !Enum.IsDefined(item.State) || item.RetryAt > DateTimeOffset.UtcNow.AddDays(8))
                     throw new InvalidDataException("QUEUE_UNREADABLE: invalid track or folder.");
                 if (item.State == DownloadState.Removed) continue;
+                // Resume explicit saves after restart, not the previous session's
+                // speculative audio window. Its partial cache remains reusable.
+                bool parked = cacheFolder is not null && item.KeepIn is null && StreamCache.Contains(cacheFolder, Path.Combine(item.Folder, "x")) &&
+                    item.State is not (DownloadState.Saved or DownloadState.AlreadyThere or DownloadState.Failed);
                 var download = new Download(restore(item.Request), item.Folder)
                     { State = item.State, Error = item.Error, RetryAt = item.RetryAt, Priority = item.Priority, Held = item.Held, KeepIn = item.KeepIn };
                 _known.Add(download);
+                if (parked) { download.State = DownloadState.Cancelled; download.Priority = false; continue; }
                 if (item.State is DownloadState.Saved or DownloadState.AlreadyThere)
                 {
                     download.SavedPath = Downloader.FindExisting(download.Folder, download.Track.FileName);
@@ -101,6 +107,9 @@ internal sealed class Downloads : IDisposable
             var ordered=_active.OrderByDescending(d=>d.Priority).ToArray();
             _active.Clear();_active.AddRange(ordered);
         }
+        Noctis.Services.OnlineAccess.Shared.Changed += NetworkModeChanged;
+        Noctis.Services.OnlineAccess.Shared.Recovered += NetworkRecovered;
+        Noctis.Services.OnlineAccess.Shared.RetryHint += NetworkRecovered;
         _ = Task.Run(RunAsync);
     }
 
@@ -130,7 +139,33 @@ internal sealed class Downloads : IDisposable
         }
     }
     // Whether a request would be started now: songs staged from Playlists wait for Start, and a pause holds the batch.
-    private bool Runnable(Download d) => !d.Held && (!_paused || d.Priority);
+    private bool Runnable(Download d) => !Noctis.Services.OnlineAccess.Shared.IsOffline && !d.Held && (!_paused || d.Priority);
+    private void NetworkModeChanged(bool offline)
+    {
+        CancellationTokenSource[] cancel = [];
+        lock (_gate)
+            if (offline)
+            {
+                foreach (var d in _running.Keys) d.Preempted = true;
+                cancel = _running.Values.ToArray();
+            }
+        foreach (var source in cancel) Cancel(source);
+        if (!offline) NetworkRecovered();
+        Wake();
+    }
+    private void NetworkRecovered()
+    {
+        lock (_gate)
+        {
+            if (_disposed) return;
+            if (Noctis.Services.OnlineAccess.Shared.IsOffline) return;
+            foreach (var d in _active.Where(d => d.State == DownloadState.Waiting &&
+                (d.Error.StartsWith("TELEGRAM_CONNECTION_FAILED", StringComparison.Ordinal) || d.Error.StartsWith("Connection interrupted", StringComparison.Ordinal))))
+            { d.RetryAt = null; d.State = DownloadState.Queued; }
+            SaveOrLog();
+        }
+        Wake();
+    }
     private void Wake() { try { _wake.Release(); } catch (SemaphoreFullException) { } }
     public void SetPaused(bool paused)
     {
@@ -157,6 +192,8 @@ internal sealed class Downloads : IDisposable
         Download download;
         lock (_gate)
         {
+            if (CacheFolder is { } cache && StreamCache.Contains(cache, Path.Combine(folder, "x")) && !Wanted(track.FileName))
+                return new Download(track, folder) { State = DownloadState.Removed };
             download = _active.FirstOrDefault(d => Same(d, track.FileName, folder))!;
             if (download is not null)
             {
@@ -213,6 +250,37 @@ internal sealed class Downloads : IDisposable
     public string? CacheFolder { get; set; }
     internal bool IsCached(Download d) => CacheFolder is { } cache && StreamCache.Contains(cache, Path.Combine(d.Folder, "x"));
 
+    private HashSet<string>? _playbackWindow;
+    private static string AudioName(string path) => Path.GetExtension(path).ToLowerInvariant() is ".mp3" or ".flac"
+        ? Path.GetFileNameWithoutExtension(path) : Path.GetFileName(path);
+    private bool Wanted(string fileName) => _playbackWindow is null || _playbackWindow.Contains(AudioName(fileName));
+
+    // A playback request is disposable; an explicit Download/Add is not. This runs under
+    // the same lock as Start so late prefetch completions cannot resurrect an old window.
+    internal void SetPlaybackWindow(IEnumerable<string> names)
+    {
+        Download[] gone;
+        var cancel = new List<CancellationTokenSource>();
+        lock (_gate)
+        {
+            var window = names.Select(AudioName).ToHashSet(StringComparer.OrdinalIgnoreCase);
+            if (_playbackWindow?.SetEquals(window) == true) return;
+            _playbackWindow = window;
+            foreach (var d in _active.Where(d => Wanted(d.Track.FileName))) d.FinishIntoCache = false;
+            gone = _active.Where(d => IsCached(d) && d.KeepIn is null && !Wanted(d.Track.FileName)).ToArray();
+            foreach (var d in gone)
+            {
+                if (d.State == DownloadState.Running && d.Progress >= .85)
+                { d.FinishIntoCache = true; continue; }
+                _active.Remove(d); d.State = DownloadState.Cancelled; d.Preempted = false;
+                if (_running.TryGetValue(d, out var running)) cancel.Add(running);
+            }
+            SaveOrLog();
+        }
+        foreach (var running in cancel) Cancel(running);
+        Wake(); foreach (var d in gone) Raise(d);
+    }
+
     /// <summary>
     /// Owner #87: "Add to songs" for a streamed song. A saved one is copied into <paramref name="libraryFolder"/> now
     /// (returns its library path); one still downloading is copied as soon as it is saved (returns Pending).
@@ -267,7 +335,7 @@ internal sealed class Downloads : IDisposable
             if (!_active.Contains(item)) return;
             item.Priority = true; item.Held = false;
             _active.Remove(item); _active.Insert(0, item); _now = item;
-            var others = _running.Where(r => r.Key != item && r.Key.Playback?.HasReaders != true).ToArray();
+            var others = _running.Where(r => r.Key != item && !r.Key.FinishIntoCache && r.Key.Playback?.HasReaders != true).ToArray();
             foreach (var (other, _) in others) other.Preempted = true;
             hold = others.Select(r => r.Value).ToArray();
             SaveOrLog();
@@ -312,6 +380,9 @@ internal sealed class Downloads : IDisposable
             _disposed = true;
         }
         _stop.Cancel();
+        Noctis.Services.OnlineAccess.Shared.Changed -= NetworkModeChanged;
+        Noctis.Services.OnlineAccess.Shared.Recovered -= NetworkRecovered;
+        Noctis.Services.OnlineAccess.Shared.RetryHint -= NetworkRecovered;
         Wake();
     }
     private static bool Same(Download d, string name, string folder) =>
@@ -376,6 +447,10 @@ internal sealed class Downloads : IDisposable
                 if (_now == download && download.State != DownloadState.Queued) _now = null;
                 if (_known.Contains(download))
                 {
+                    if (download.FinishIntoCache && download.State is DownloadState.Waiting or DownloadState.Queued)
+                    {
+                        _known.Remove(download); _active.Remove(download); download.State = DownloadState.Removed;
+                    }
                     if (download.State is not (DownloadState.Waiting or DownloadState.Queued))
                     {
                         _active.Remove(download);
@@ -442,7 +517,7 @@ internal sealed class Downloads : IDisposable
         { SetOutcome(download, DownloadState.Queued, ""); lock (_gate) { download.Preempted = false; download.Progress = 0; } }
         catch (SourcesWaitingException ex) { SetOutcome(download, DownloadState.Waiting, ex.Message, ex.Until); }
         catch (IOException ex) { SetOutcome(download, DownloadState.Waiting, "Connection or storage interrupted: " + ex.Message, DateTimeOffset.UtcNow.AddMinutes(10)); }
-        catch (System.Net.Sockets.SocketException ex) { SetOutcome(download, DownloadState.Waiting, "TELEGRAM_CONNECTION_FAILED: " + ex.Message, DateTimeOffset.UtcNow.AddMinutes(10)); }
+        catch (System.Net.Sockets.SocketException ex) { Noctis.Services.OnlineAccess.Shared.Failed(); SetOutcome(download, DownloadState.Waiting, "TELEGRAM_CONNECTION_FAILED: " + ex.Message, DateTimeOffset.UtcNow.AddSeconds(5)); }
         catch (OperationCanceledException) when (ct.IsCancellationRequested) { SetOutcome(download, DownloadState.Cancelled, ""); }
         catch (Exception ex)
         {
@@ -451,7 +526,7 @@ internal sealed class Downloads : IDisposable
         }
     }
     private void SetOutcome(Download d, DownloadState state, string error, DateTimeOffset? retry = null)
-    { lock (_gate) { if (d.State == DownloadState.Removed) return; d.State = state; d.Error = error; d.RetryAt = retry; d.Step = Noctis.Services.Search.OnlineDownloadStep.None; d.FailedAt = state == DownloadState.Failed ? DateTimeOffset.UtcNow : null; } }
+    { lock (_gate) { if (d.State == DownloadState.Removed || d.State == DownloadState.Cancelled && !_active.Contains(d)) return; d.State = state; d.Error = error; d.RetryAt = retry; d.Step = Noctis.Services.Search.OnlineDownloadStep.None; d.FailedAt = state == DownloadState.Failed ? DateTimeOffset.UtcNow : null; } }
     private string? Summary()
     {
         if (_last is null) return null;

@@ -149,7 +149,7 @@ internal static class Downloader
         catch (Exception ex)
         {
             playback?.End(null, ex);
-            if (ct.IsCancellationRequested) PartialAudio.Keep(partial, kept);
+            PartialAudio.Keep(partial, kept); // transport failures retain the same validated prefix as a skip/pause
             try { File.Delete(partial); } catch (IOException) { } catch (UnauthorizedAccessException) { }
             throw;
         }

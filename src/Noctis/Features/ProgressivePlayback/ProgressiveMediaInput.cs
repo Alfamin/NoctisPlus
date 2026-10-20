@@ -22,7 +22,12 @@ internal sealed class ProgressiveMediaInput : MediaInput
     public override bool Open(out ulong size)
     {
         size = ulong.MaxValue;
-        try { _cancel.ThrowIfCancellationRequested(); _reader?.Dispose(); _reader = _buffer.OpenReader(_cancel); return true; }
+        try
+        {
+            _cancel.ThrowIfCancellationRequested();
+            if (Error is not null) return false;
+            _reader?.Dispose(); _reader = _buffer.OpenReader(_cancel); return true;
+        }
         catch (Exception ex) { Error = ex; return false; }
     }
     public override int Read(IntPtr target, uint length)
@@ -30,6 +35,7 @@ internal sealed class ProgressiveMediaInput : MediaInput
         var waiting = false;
         try
         {
+            if (Error is not null) return -1;
             waiting = _reader is { } reader && !_buffer.Complete && _buffer.Prefix <= reader.Position;
             if (waiting) NotifyBuffering(true);
             var read = _reader?.Read(_scratch.AsSpan(0, (int)Math.Min(length, (uint)_scratch.Length))) ?? -1;
@@ -41,12 +47,24 @@ internal sealed class ProgressiveMediaInput : MediaInput
             // Once per input, always in session.log: an early end of a download-backed song names its cause.
             if (Error is null && !_cancel.IsCancellationRequested)
                 try { Noctis.Services.DebugLog.Write("Playback", $"download input read failed: {ex.GetType().Name}: {ex.Message}"); } catch { }
-            Error = ex; return -1; // never unwind a native callback
+            Error = ex;
+            if (ex is IOException && !_cancel.IsCancellationRequested)
+            {
+                // Returning -1 lets VLC replay its internal prefetch buffer, without
+                // invoking Seek/Open or EndReached. Park this input instead. A resumed
+                // transfer or Stop/Next cancels this read before disposing native media.
+                NotifyBuffering(true);
+                try { _cancel.WaitHandle.WaitOne(); } catch (ObjectDisposedException) { }
+            }
+            return -1; // never unwind a native callback
         }
         finally { if (waiting) NotifyBuffering(false); }
     }
     private void NotifyBuffering(bool waiting) { try { Buffering?.Invoke(waiting); } catch { /* native callbacks must not unwind observers */ } }
-    public override bool Seek(ulong offset) => offset <= long.MaxValue && _reader?.Seek((long)offset) == true;
+    // VLC's FLAC demuxer tries Seek(0) after a read failure. Accepting it replays
+    // the same prefix forever without an EndReached event. Pause still has its
+    // seek callback; only this terminally failed input is sealed against rewind.
+    public override bool Seek(ulong offset) => Error is null && offset <= long.MaxValue && _reader?.Seek((long)offset) == true;
     internal void CancelRead() { try { if (Volatile.Read(ref _disposed) == 0) _stop.Cancel(); } catch (ObjectDisposedException) { } }
     public override void Close() { _reader?.Dispose(); _reader = null; }
     protected override void Dispose(bool disposing)
