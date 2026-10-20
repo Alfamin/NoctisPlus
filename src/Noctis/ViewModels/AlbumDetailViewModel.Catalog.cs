@@ -35,8 +35,43 @@ public partial class AlbumDetailViewModel
     /// <summary>"Not in your library" heads the missing rows only when owned rows sit above them.</summary>
     public bool ShowCatalogMissingHeader => HasCatalogMissing && Tracks.Count > 0;
 
-    /// <summary>Play, Shuffle and Add to Queue need local songs: an online album with none hides them.</summary>
-    public bool ShowPlayActions => !IsOnlineAlbum && !IsCatalogLoading || Tracks.Count > 0;
+    /// <summary>Play, Shuffle and Add to Queue need local songs, or (owner #100) this page's toggle on: an online album
+    /// with none hides them otherwise.</summary>
+    public bool ShowPlayActions => !IsOnlineAlbum && !IsCatalogLoading || Tracks.Count > 0 || Streams;
+
+    // ── Owner #100: the header toggle: this album's songs you don't have play too ──
+    private string StreamPage => "album:" + (_catalog?.Album.Release.Id ?? Album.Name);
+    public bool StreamMissing
+    {
+        get => _player.StreamsPage(StreamPage);
+        set { _player.SetStreamPage(StreamPage, value); NotifyStreamToggle(); }
+    }
+    public bool ShowStreamToggle => HasCatalogMissing && _catalogOnline is not null;
+    public string StreamToggleTip => StreamToggle.Tip(StreamMissing);
+    [RelayCommand] private void ToggleStreamMissing() => StreamMissing = !StreamMissing;
+    private void NotifyStreamToggle()
+    {
+        OnPropertyChanged(nameof(StreamMissing)); OnPropertyChanged(nameof(StreamToggleTip));
+        OnPropertyChanged(nameof(ShowStreamToggle)); OnPropertyChanged(nameof(ShowPlayActions));
+    }
+    private bool Streams => _catalog is not null && HasCatalogMissing && _catalogOnline is not null && StreamMissing;
+    private readonly System.Runtime.CompilerServices.ConditionalWeakTable<ArtistCatalogSong, Track> _standIns = new();
+
+    /// <summary>What Play, Shuffle and Play from take: the album's songs in album order, the ones you don't have as
+    /// stand-ins when this page's toggle is on (an online album's only play, like Search; a library album's are kept).</summary>
+    private List<Track> PlaybackList(IEnumerable<Track> owned)
+    {
+        var list = InAlbumOrder(owned);
+        if (!Streams) return list;
+        foreach (var row in CatalogMissing.OrderBy(r => r.Rank))
+        {
+            if (row.Song.Online is not { } song) continue;
+            var standIn = _standIns.GetValue(row, _ => PlayerViewModel.StandIn(_catalogOnline!, song, keep: _catalogEnriches, StreamPage));
+            var at = list.FindIndex(t => t.IsPendingStream ? false : t.TrackNumber > row.Rank);
+            if (at < 0) list.Add(standIn); else list.Insert(at, standIn);
+        }
+        return list;
+    }
 
     // Owner #34: an online album's page opens at once; skeleton rows stand in until its songs are read.
     private CatalogRelease? _catalogLoading;
@@ -168,6 +203,7 @@ public partial class AlbumDetailViewModel
         RefreshCatalogDownloads();
         OnPropertyChanged(nameof(HasCatalogMissing));
         OnPropertyChanged(nameof(ShowCatalogMissingHeader));
+        OnPropertyChanged(nameof(ShowStreamToggle));
         OnPropertyChanged(nameof(ShowPlayActions));
         OnPropertyChanged(nameof(ShowAddAlbumDescription));
         DownloadMissingCommand.NotifyCanExecuteChanged();
@@ -203,6 +239,13 @@ public partial class AlbumDetailViewModel
     {
         if (row?.Song.Online is not { } song || _catalogOnline is not { } online) return;
         if (!online.CanDownload) { online.RequestSignIn(); return; }
+        if (Streams)
+        {
+            // Owner #100: the album from this song on, like any other row.
+            var list = PlaybackList(Tracks);
+            var at = _standIns.TryGetValue(row, out var standIn) ? list.IndexOf(standIn) : -1;
+            if (at >= 0) { CatalogNotice = ""; _player.PlayFromRow(list, at); return; }
+        }
         try { CatalogNotice = ""; await _player.PlayOnlineAsync(online, song); CatalogNotice = ""; }
         catch (Exception ex) { CatalogNotice = ex.Message; }
     }

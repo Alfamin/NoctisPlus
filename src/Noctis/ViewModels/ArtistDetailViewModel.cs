@@ -1040,7 +1040,8 @@ public partial class ArtistDetailViewModel : ViewModelBase, ISearchable, IDispos
     [RelayCommand]
     private void PlayAll()
     {
-        var tracks = GetAllTracks();
+        // Owner #100: with the header toggle on, the artist's songs you don't have play too.
+        var tracks = StreamingList(GetAllTracks()) ?? GetAllTracks();
         if (tracks.Count == 0) return;
         _player.ReplaceQueueAndPlay(tracks, 0);
     }
@@ -1048,9 +1049,11 @@ public partial class ArtistDetailViewModel : ViewModelBase, ISearchable, IDispos
     [RelayCommand]
     private void ShuffleAll()
     {
-        var tracks = GetAllTracks();
+        var tracks = StreamingList(GetAllTracks()) ?? GetAllTracks();
         if (tracks.Count == 0) return;
-        _player.PlayShuffled(tracks);
+        // A song you have starts (no wait).
+        var owned = tracks.Where(t => !t.IsPendingStream).ToList();
+        _player.PlayShuffled(tracks, first: owned.Count > 0 && owned.Count < tracks.Count ? owned[Random.Shared.Next(owned.Count)] : null);
     }
 
     [RelayCommand]

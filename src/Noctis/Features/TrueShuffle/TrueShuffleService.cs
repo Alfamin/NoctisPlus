@@ -261,7 +261,7 @@ internal sealed class TrueShuffleService : IDisposable
 
     /// <summary>A song not in the library that still belongs in the shuffle: a server stream, or (owner #95) a playlist song
     /// you don't have, while "Play songs you don't have" is on (the queue fetches it as it comes up).</summary>
-    private bool Keeps(Track t) => t.IsRemoteStream || t.IsPendingStream && Player.StreamMissingSongs;
+    private bool Keeps(Track t) => t.IsRemoteStream || Player.Streams(t);
 
     internal void ScheduleRefill()
     {

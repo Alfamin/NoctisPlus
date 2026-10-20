@@ -586,6 +586,21 @@
                                 <TextBlock Text="{loc:T Playlist.ShuffleTip}" VerticalAlignment="Center" FontSize="14" FontWeight="Bold" />
                             </StackPanel>
                         </Button>
+                        <!-- Owner #100: this playlist's songs you don't have play too (per playlist); lit = on. -->
+                        <Button Classes="glass-pill" Width="36" Height="36" Padding="0" CornerRadius="999" Cursor="Hand"
+                                VerticalAlignment="Center" HorizontalContentAlignment="Center" VerticalContentAlignment="Center"
+                                IsVisible="{Binding ShowStreamToggle}" Command="{Binding ToggleStreamMissingCommand}"
+                                ToolTip.ShowDelay="0" ToolTip.Tip="{Binding StreamToggleTip}"
+                                AutomationProperties.Name="Play songs you don't have">
+                            <Panel>
+                                <Path Data="{StaticResource StreamMissingGlyph}" Width="18" Height="18" Stretch="Uniform"
+                                      Stroke="{DynamicResource AccentColorBrush}" StrokeThickness="1.8" StrokeLineCap="Round" StrokeJoin="Round"
+                                      IsVisible="{Binding StreamMissing}" />
+                                <Path Data="{StaticResource StreamMissingGlyph}" Width="18" Height="18" Stretch="Uniform" Opacity="0.4"
+                                      Stroke="{DynamicResource SystemControlForegroundBaseHighBrush}" StrokeThickness="1.8" StrokeLineCap="Round" StrokeJoin="Round"
+                                      IsVisible="{Binding !StreamMissing}" />
+                            </Panel>
+                        </Button>
                         <!-- A found playlist (#69): Save makes it one of yours (then rename, add, remove). -->
                         <Button Classes="glass-pill" Command="{Binding SavePreviewCommand}" IsVisible="{Binding IsPreview}"
                                 Padding="16,8" VerticalAlignment="Center" Cursor="Hand"

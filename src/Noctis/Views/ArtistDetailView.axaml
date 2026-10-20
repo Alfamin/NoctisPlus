@@ -880,6 +880,21 @@
                                     <TextBlock Text="{loc:T ArtistDetail.Shuffle}" FontSize="14" FontWeight="Bold" VerticalAlignment="Center" />
                                 </StackPanel>
                             </Button>
+                            <!-- Owner #100: this artist's songs you don't have play too (per artist); lit = on. -->
+                            <Button Classes="glass-pill" Width="36" Height="36" Padding="0" CornerRadius="999" Cursor="Hand"
+                                    VerticalAlignment="Center" HorizontalContentAlignment="Center" VerticalContentAlignment="Center"
+                                    IsVisible="{Binding ShowStreamToggle}" Command="{Binding ToggleStreamMissingCommand}"
+                                    ToolTip.ShowDelay="0" ToolTip.Tip="{Binding StreamToggleTip}"
+                                    AutomationProperties.Name="Play songs you don't have">
+                                <Panel>
+                                    <Path Data="{StaticResource StreamMissingGlyph}" Width="18" Height="18" Stretch="Uniform"
+                                          Stroke="{DynamicResource AccentColorBrush}" StrokeThickness="1.8" StrokeLineCap="Round" StrokeJoin="Round"
+                                          IsVisible="{Binding StreamMissing}" />
+                                    <Path Data="{StaticResource StreamMissingGlyph}" Width="18" Height="18" Stretch="Uniform" Opacity="0.4"
+                                          Stroke="{DynamicResource SystemControlForegroundBaseHighBrush}" StrokeThickness="1.8" StrokeLineCap="Round" StrokeJoin="Round"
+                                          IsVisible="{Binding !StreamMissing}" />
+                                </Panel>
+                            </Button>
 
                             <!-- Favourite artist (GitHub #41 star) -->
                             <Button Classes="header-icon-btn"

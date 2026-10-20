@@ -79,6 +79,7 @@ public partial class ArtistDetailViewModel
         OnPropertyChanged(nameof(DisplaySongCount));
         OnPropertyChanged(nameof(ShowNoPopular));
         OnPropertyChanged(nameof(ShowNoAllSongs));
+        NotifyStreamToggle(); // owner #100
         FilterCatalogSongs();
     }
     private void FilterCatalogSongs()
@@ -88,6 +89,7 @@ public partial class ArtistDetailViewModel
         SearchViewModel.Sync(CatalogPopular, rows.Take(MaxPopular).ToList());
         OnPropertyChanged(nameof(ShowNoPopular));
         OnPropertyChanged(nameof(ShowNoAllSongs));
+        NotifyStreamToggle(); // owner #100
     }
 
     private async Task LoadCatalogSongArt(SearchSongItem row, FinderOnlineSearch online, CancellationToken ct)
@@ -127,8 +129,46 @@ public partial class ArtistDetailViewModel
         }).ToList();
         if (changed) SetCatalogRows(rows);
     }
+    // ── Owner #100: the header toggle: this artist's songs you don't have play too ──
+    private string StreamPage => "artist:" + ArtistName.ToLowerInvariant();
+    public bool StreamMissing
+    {
+        get => _player.StreamsPage(StreamPage);
+        set { _player.SetStreamPage(StreamPage, value); NotifyStreamToggle(); }
+    }
+    public bool ShowStreamToggle => _catalogOnline is not null && _catalogRows.Any(r => r.Song.Local is null && r.Song.Online is not null);
+    public string StreamToggleTip => StreamToggle.Tip(StreamMissing);
+    [RelayCommand] private void ToggleStreamMissing() => StreamMissing = !StreamMissing;
+    internal void NotifyStreamToggle()
+    {
+        OnPropertyChanged(nameof(StreamMissing)); OnPropertyChanged(nameof(StreamToggleTip)); OnPropertyChanged(nameof(ShowStreamToggle));
+    }
+    private bool Streams => StreamMissing && ShowStreamToggle;
+    private readonly System.Runtime.CompilerServices.ConditionalWeakTable<ArtistCatalogSong, Track> _standIns = new();
+    private Track? CatalogTrack(ArtistCatalogSong row)
+        => row.Song.Local is { } local ? (File.Exists(local.FilePath) ? local : null)
+            : row.Song.Online is { } song && _catalogOnline is { } online
+                ? _standIns.GetValue(row, _ => PlayerViewModel.StandIn(online, song, keep: false, StreamPage)) : null;
+    /// <summary>The artist's songs in the catalog's order (the ones you don't have as stand-ins), then library songs the
+    /// catalog does not list. Null when the toggle is off or nothing is missing.</summary>
+    private List<Track>? StreamingList(IEnumerable<Track> library)
+    {
+        if (!Streams) return null;
+        var list = _catalogRows.Select(CatalogTrack).OfType<Track>().DistinctBy(t => t.Id).ToList();
+        var ids = list.Select(t => t.Id).ToHashSet();
+        list.AddRange(library.Where(t => ids.Add(t.Id)));
+        return list;
+    }
+
     [RelayCommand] private async Task PlayCatalogSong(ArtistCatalogSong? row)
     {
+        if (row is not null && Streams && CatalogTrack(row) is { } picked)
+        {
+            // Owner #100: the artist's songs from this one on, the ones you don't have fetched as they come up.
+            var list = StreamingList([])!;
+            var at = list.IndexOf(picked);
+            if (at >= 0) { _player.PlayFromRow(list, at); return; }
+        }
         if (row?.Song.Local is { } track && File.Exists(track.FilePath))
         {
             var tracks = _catalogRows.Select(r => r.Song.Local).OfType<Track>().Where(t => File.Exists(t.FilePath)).DistinctBy(t => t.Id).ToList();

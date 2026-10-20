@@ -98,9 +98,9 @@ public class PlaylistMissingRowsTests
         var lib = new FakeLibraryService();
         using var persistence = new TestPersistenceService();
         var player = new PlayerViewModel(new FakeAudioPlayer(), lib, persistence, new FakeAnimatedCoverService());
-        player.StreamMissingSongs = false; // owner #95: with it on, a playlist plays its missing songs too (checked below)
         var sidebar = new SidebarViewModel(persistence, lib);
         var vm = new PlaylistViewModel(new Playlist { Name = "All missing" }, player, lib, persistence, sidebar);
+        vm.StreamMissing = false; // owner #100: this playlist's header toggle; with it on, its missing songs play too (checked below)
         var view = new PlaylistView { DataContext = vm };
         var window = new Window { Width = 1280, Height = 900, Content = view };
         try

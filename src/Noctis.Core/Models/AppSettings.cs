@@ -241,6 +241,10 @@ public class AppSettings
     /// <summary>Owner #95: a playlist's songs you don't have play too, fetched as the queue reaches them. On by default.</summary>
     public bool StreamMissingSongs { get; set; } = true;
 
+    /// <summary>Owner #100: pages ("playlist:…", "album:…", "artist:…") whose header toggle is off: their songs you don't
+    /// have are left out of the queue.</summary>
+    public List<string> StreamOffPages { get; set; } = [];
+
     /// <summary>Whether long playback-bar track titles should scroll while playing.</summary>
     public bool TrackTitleMarqueeEnabled { get; set; } = true;
 

@@ -5,7 +5,9 @@ using Noctis.Services.Search;
 namespace Noctis.ViewModels;
 
 /// <summary>What a stand-in in the queue is (owner #95): a playlist song not on this computer yet.</summary>
-public sealed record PendingStream(IOnlineMusicSearch Source, OnlineSong Song, bool Keep);
+/// <param name="Page">Owner #100: the page it was played from ("playlist:…", "album:…", "artist:…"); its header toggle
+/// decides whether that page's songs you don't have play.</param>
+public sealed record PendingStream(IOnlineMusicSearch Source, OnlineSong Song, bool Keep, string? Page = null);
 
 /// <summary>
 /// Owner #95: playing a playlist plays the songs you don't have too, like a streaming app. Each one stands in the queue as a
@@ -29,7 +31,31 @@ public partial class PlayerViewModel
     private IOnlineMusicSearch? _streamingSource;
 
     /// <summary>A stand-in for a song not on this computer; the same song gives the same id.</summary>
-    public static Track StandIn(IOnlineMusicSearch source, OnlineSong song, bool keep) => new()
+    // ── Owner #100: the header toggle, per page (playlist, album, artist), remembered in the profile ──
+    private readonly HashSet<string> _streamOffPages = new(StringComparer.Ordinal);
+    /// <summary>The pages whose songs you don't have are left out (their toggle is off).</summary>
+    public IReadOnlyCollection<string> StreamOffPages => _streamOffPages;
+    public bool StreamsPage(string? page) => StreamMissingSongs && (page is null || !_streamOffPages.Contains(page));
+    /// <summary>A stand-in that may stay in the queue now (its page's toggle is on).</summary>
+    internal bool Streams(Track track) => track.PendingStream is PendingStream p && StreamsPage(p.Page);
+    internal void LoadStreamOffPages(IEnumerable<string>? pages)
+    {
+        _streamOffPages.Clear();
+        if (pages is not null) _streamOffPages.UnionWith(pages.Where(p => !string.IsNullOrWhiteSpace(p)));
+        OnPropertyChanged(nameof(StreamOffPages));
+    }
+    public void SetStreamPage(string page, bool on)
+    {
+        if (on ? !_streamOffPages.Remove(page) : !_streamOffPages.Add(page)) return;
+        OnPropertyChanged(nameof(StreamOffPages));
+        if (on) { PostStreamAhead(); return; }
+        // Off: that page's songs you don't have leave the queue; one being fetched gives way to the next song.
+        var fetching = _preparingStandIn?.PendingStream is PendingStream p && p.Page == page;
+        DropStandIns(page);
+        if (fetching) { CancelOnlinePlayback(); IsPreparingOnlinePlayback = false; AdvanceQueue(QueueAdvanceReason.Error); }
+    }
+
+    public static Track StandIn(IOnlineMusicSearch source, OnlineSong song, bool keep, string? page = null) => new()
     {
         Id = new Guid(System.Security.Cryptography.MD5.HashData(System.Text.Encoding.UTF8.GetBytes("stream:" + song.Id))),
         Title = song.Title,
@@ -37,7 +63,7 @@ public partial class PlayerViewModel
         Album = song.Album,
         Duration = TimeSpan.FromSeconds(song.Seconds is > 0 and <= 86400 ? song.Seconds.Value : 0),
         IsExplicit = song.Explicit == true,
-        PendingStream = new PendingStream(source, song, keep),
+        PendingStream = new PendingStream(source, song, keep, page),
     };
 
     private void PlayStandIn(Track standIn, PendingStream pending)
@@ -155,11 +181,12 @@ public partial class PlayerViewModel
     }
 
     /// <summary>Every song still to be fetched leaves the queue (the toggle went off, or fetching cannot work now).</summary>
-    private void DropStandIns()
+    private void DropStandIns(string? page = null)
     {
+        bool Drop(Track t) => t.PendingStream is PendingStream p && (page is null || p.Page == page);
         for (int i = UpNext.Count - 1; i >= 0; i--)
-            if (UpNext[i].IsPendingStream) UpNext.RemoveAt(i);
-        _repeatCycleTracks.RemoveAll(t => t.IsPendingStream);
+            if (Drop(UpNext[i])) UpNext.RemoveAt(i);
+        _repeatCycleTracks.RemoveAll(Drop);
     }
 
     partial void OnStreamMissingSongsChanged(bool value)
@@ -246,7 +273,9 @@ public partial class PlayerViewModel
         {
             if (head[i].PendingStream is not PendingStream pending) continue;
             Watch(pending.Source);
-            if (pending.Source.StatusOf(pending.Song).State == OnlineDownloadState.Saved)
+            var state = pending.Source.StatusOf(pending.Song).State;
+            if (state == OnlineDownloadState.Streamed) continue; // in the stream cache: it plays at once when reached
+            if (state == OnlineDownloadState.Saved)
             {
                 // Saved: once the library has imported it, the stand-in becomes the real song.
                 if (pending.Source.SavedPathOf(pending.Song) is { } path &&
@@ -255,7 +284,7 @@ public partial class PlayerViewModel
                 continue;
             }
             if (fetch.Count + ask.Count >= AskAheadSongs) break;
-            if (pending.Keep && fetch.Count < StreamAheadSongs) fetch.Add((i, pending));
+            if (fetch.Count < StreamAheadSongs) fetch.Add((i, pending));
             else ask.Add(pending);
         }
         // Owner #95/#100: the queue was skipped past, cleared, reshuffled, edited or replaced: a download ahead that is no
@@ -278,10 +307,9 @@ public partial class PlayerViewModel
             if (!pending.Source.CanDownload || !_askedAhead.TryAdd(pending.Song.Id, pending)) continue;
             // Part of playing, like Play itself: the fast lanes (two at once), also while bulk downloads are paused (live:
             // a paused queue held the 2nd and 3rd song back).
-            const bool now = true;
             _ = Task.Run(async () =>
             {
-                try { await pending.Source.DownloadAsync([pending.Song], now, CancellationToken.None); }
+                try { await pending.Source.PrefetchAsync(pending.Song, pending.Keep, CancellationToken.None); }
                 catch (Exception ex)
                 {
                     // Live: refused while the library was still scanning. Not asked after all: asked again shortly.
@@ -302,4 +330,12 @@ public partial class PlayerViewModel
     }
 
     private void OnStreamDownloadsChanged(object? sender, EventArgs e) => PostStreamAhead();
+}
+
+/// <summary>Owner #100: the page header toggle's words (its tooltip shows at once on hover).</summary>
+public static class StreamToggle
+{
+    public static string Tip(bool on) => on
+        ? "Songs you don't have play too · fetched as the queue reaches them. Click: only yours"
+        : "Only your songs play. Click: play the songs you don't have too";
 }

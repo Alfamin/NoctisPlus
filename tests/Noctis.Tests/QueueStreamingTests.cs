@@ -198,6 +198,25 @@ public class QueueStreamingTests
         lock (source.Cancelled) Assert.Equal(new[] { "s0", "s1", "s2" }, source.Cancelled.OrderBy(x => x));
     }
     [AvaloniaFact]
+    public void APagesToggle_LeavesOnlyThatPagesSongsOut_AndIsRemembered()
+    {
+        // Owner #100: per page (one playlist on, another off), in the page header, not in Settings.
+        var source = new Source(); var (player, _) = NewPlayer();
+        Track a = Local("A");
+        Track one = PlayerViewModel.StandIn(source, new OnlineSong("p1", "P1", "Synthetic", Seconds: 180), keep: true, "playlist:1");
+        Track two = PlayerViewModel.StandIn(source, new OnlineSong("p2", "P2", "Synthetic", Seconds: 180), keep: false, "album:2");
+        player.ReplaceQueueAndPlay([a, one, two], 0); Settle();
+        player.SetStreamPage("playlist:1", false); Settle();
+        Assert.Equal(new[] { two }, player.UpNext);
+        Assert.False(player.StreamsPage("playlist:1")); Assert.True(player.StreamsPage("album:2"));
+        Assert.Equal(new[] { "playlist:1" }, player.StreamOffPages);
+        player.SetStreamPage("playlist:1", true);
+        Assert.Empty(player.StreamOffPages);
+        player.LoadStreamOffPages(["artist:x"]);
+        Assert.False(player.StreamsPage("artist:x"));
+    }
+
+    [AvaloniaFact]
     public void JumpingPastTheSongsAskedAhead_StopsAskingForThem_AndAsksForTheNewNextOnes()
     {
         // Owner #100: clicking far down the queue (or clearing it) stops what is being asked for at once.

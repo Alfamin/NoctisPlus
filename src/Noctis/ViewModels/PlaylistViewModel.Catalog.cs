@@ -25,7 +25,7 @@ public partial class PlaylistViewModel
     public bool HasCatalogMissing => CatalogRows.Count > 0;
     // Owner #48: header Play/Shuffle/queue act on owned songs only. With none owned they would do nothing, so they
     // hide, as on an online album; each missing row keeps its own Play.
-    public bool ShowPlayActions => (Tracks.Count > 0 || !HasCatalogMissing || _player.StreamMissingSongs && !IsPreview) && !IsPreviewLoading;
+    public bool ShowPlayActions => (Tracks.Count > 0 || !HasCatalogMissing || StreamMissing && !IsPreview) && !IsPreviewLoading;
     partial void OnTrackCountChanged(int value) => OnPropertyChanged(nameof(ShowPlayActions));
     private int CatalogMissingCount => CatalogRows.Count;
     private IReadOnlyList<ImportedPlaylistEntry>? _importedEntries;
@@ -74,6 +74,7 @@ public partial class PlaylistViewModel
         else _rows?.Refresh();
         RefreshCatalogDownloads();
         OnPropertyChanged(nameof(HasCatalogMissing));
+        OnPropertyChanged(nameof(ShowStreamToggle));
         OnPropertyChanged(nameof(ShowPlayActions));
         OnPropertyChanged(nameof(CanReorder));
         OnPropertyChanged(nameof(TrackCountText));
@@ -155,18 +156,22 @@ public partial class PlaylistViewModel
 
     // ── Owner #95: the playlist plays its songs you don't have too ──
 
-    /// <summary>Songs you don't have play too (fetched as the queue reaches them). Off: only yours. Switched in Settings →
-    /// Playback (a header button read as "download everything", owner 2026-10-20).</summary>
+    /// <summary>Owner #100: this playlist's header toggle: its songs you don't have play too (fetched as the queue reaches
+    /// them). Off: only yours. Per playlist, remembered.</summary>
     public bool StreamMissing
     {
-        get => _player.StreamMissingSongs;
-        set => _player.StreamMissingSongs = value;
+        get => _player.StreamsPage(StreamPage);
+        set { _player.SetStreamPage(StreamPage, value); OnPropertyChanged(); OnPropertyChanged(nameof(StreamToggleTip)); OnPropertyChanged(nameof(ShowPlayActions)); }
     }
+    public bool ShowStreamToggle => HasCatalogMissing && !IsPreview && _catalogOnline is not null;
+    public string StreamToggleTip => StreamToggle.Tip(StreamMissing);
+    [RelayCommand] private void ToggleStreamMissing() => StreamMissing = !StreamMissing;
+    private string StreamPage => "playlist:" + PlaylistId;
 
-    private bool Streams => _player.StreamMissingSongs && HasCatalogMissing && !IsPreview && _catalogOnline is not null;
+    private bool Streams => StreamMissing && HasCatalogMissing && !IsPreview && _catalogOnline is not null;
     private readonly System.Runtime.CompilerServices.ConditionalWeakTable<ArtistCatalogSong, Track> _standIns = new();
     private Track StandInFor(ArtistCatalogSong row, OnlineSong song)
-        => _standIns.GetValue(row, _ => PlayerViewModel.StandIn(_catalogOnline!, song, keep: !IsPreview));
+        => _standIns.GetValue(row, _ => PlayerViewModel.StandIn(_catalogOnline!, song, keep: !IsPreview, StreamPage));
 
     /// <summary>What Play, Shuffle and the queue actions take: the playlist's rows in their order (missing songs as
     /// stand-ins) when streaming is on, else only the songs you have, as before.</summary>

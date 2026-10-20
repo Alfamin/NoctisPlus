@@ -261,6 +261,8 @@ public partial class AlbumDetailViewModel : ViewModelBase, IDisposable
                 IsPlayerPlaying = _player.State == Models.PlaybackState.Playing;
             if (e.PropertyName == nameof(PlayerViewModel.CurrentAnimatedCoverPath))
                 OnPropertyChanged(nameof(IsCurrentAlbumPlaying));
+            if (e.PropertyName is nameof(PlayerViewModel.StreamOffPages) or nameof(PlayerViewModel.StreamMissingSongs))
+                NotifyStreamToggle(); // owner #100
         };
         _player.PropertyChanged += _playerPropertyChangedHandler;
 
@@ -755,8 +757,9 @@ public partial class AlbumDetailViewModel : ViewModelBase, IDisposable
     [RelayCommand]
     private void PlayAll()
     {
-        if (Tracks.Count == 0) return;
-        var tracks = InAlbumOrder(Tracks);
+        // Owner #100: with the header toggle on, the album's songs you don't have play too (fetched as they come up).
+        var tracks = PlaybackList(Tracks);
+        if (tracks.Count == 0) return;
         DebugLogger.Info(DebugLogger.Category.Queue, "Album.Play", $"tracks={tracks.Count}, startIdx=0");
         _player.ReplaceQueueAndPlay(tracks, 0);
     }
@@ -764,14 +767,17 @@ public partial class AlbumDetailViewModel : ViewModelBase, IDisposable
     [RelayCommand]
     private void ShufflePlay()
     {
-        if (Tracks.Count == 0) return;
-        _player.PlayShuffled(InAlbumOrder(Tracks));
+        var tracks = PlaybackList(Tracks);
+        if (tracks.Count == 0) return;
+        // A song you have starts (no wait); the ones you don't have follow in the shuffled order.
+        var owned = tracks.Where(t => !t.IsPendingStream).ToList();
+        _player.PlayShuffled(tracks, first: owned.Count > 0 && owned.Count < tracks.Count ? owned[Random.Shared.Next(owned.Count)] : null);
     }
 
     [RelayCommand]
     private void PlayFrom(Track track)
     {
-        var tracks = InAlbumOrder(Tracks);
+        var tracks = PlaybackList(Tracks);
         var idx = tracks.FindIndex(t => t.Id == track.Id);
         if (idx < 0) idx = 0;
         DebugLogger.Info(DebugLogger.Category.Queue, "Album.PlayFrom", $"tracks={tracks.Count}, startIdx={idx}, track={track.Title}");
@@ -963,8 +969,9 @@ public partial class AlbumDetailViewModel : ViewModelBase, IDisposable
     [RelayCommand]
     private async Task AddAlbumToQueue()
     {
-        if (Tracks.Count == 0) return;
-        _player.AddRangeToQueue(InAlbumOrder(Tracks), Album.Name);
+        var adding = PlaybackList(Tracks); // owner #100: with the toggle on, the songs you don't have too
+        if (adding.Count == 0) return;
+        _player.AddRangeToQueue(adding, Album.Name);
 
         var generation = ++_albumAddedGeneration;
         AlbumAddedToQueue = true;

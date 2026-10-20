@@ -90,6 +90,9 @@ public interface IOnlineMusicSearch
     /// <summary>Owner #100: the bot is asked for the song so it is ready in the chat; nothing is downloaded. A later download
     /// starts from there without asking again.</summary>
     Task AskAheadAsync(OnlineSong song, CancellationToken ct) => Task.CompletedTask;
+    /// <summary>Owner #100: downloaded ahead in the fast lane; <paramref name="keep"/> false saves it in the stream cache
+    /// (a song only played), not in Songs.</summary>
+    Task PrefetchAsync(OnlineSong song, bool keep, CancellationToken ct) => DownloadAsync([song], true, ct);
 
     /// <summary>Raised (any thread) when a download's state or progress changes.</summary>
     event EventHandler? DownloadsChanged;

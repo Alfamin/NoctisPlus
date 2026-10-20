@@ -260,6 +260,12 @@ internal sealed class FinderOnlineSearch : IOnlineMusicSearch
         catch (Exception) { return false; } // the queue file could not be saved: it simply downloads
     }
 
+    public async Task PrefetchAsync(OnlineSong song, bool keep, CancellationToken ct)
+    {
+        if (!_songs.TryGetValue(song.Id, out var catalogSong)) return;
+        await _actions.QueueAsync([catalogSong], priority: true, ct, stream: !keep).ConfigureAwait(false);
+    }
+
     public async Task AskAheadAsync(OnlineSong song, CancellationToken ct)
     {
         if (!_songs.TryGetValue(song.Id, out var catalogSong) || !CanDownload) return;

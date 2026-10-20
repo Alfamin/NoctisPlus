@@ -2593,6 +2593,10 @@ public partial class SettingsViewModel : ViewModelBase
         {
             if (e.PropertyName == nameof(PlayerViewModel.StreamMissingSongs) && StreamMissingSongs != player.StreamMissingSongs)
                 StreamMissingSongs = player.StreamMissingSongs;
+            // Owner #100: a page header's toggle was switched; remembered in the profile.
+            if (e.PropertyName == nameof(PlayerViewModel.StreamOffPages) && !_suspendSettingPersistence
+                && !(_settings.StreamOffPages ?? []).ToHashSet().SetEquals(player.StreamOffPages))
+                _ = SaveAsync();
         };
     }
 
@@ -3386,6 +3390,7 @@ public partial class SettingsViewModel : ViewModelBase
         _settings.AutoplayEnabled = AutoplayEnabled;
         _settings.KeepPlayedInQueue = KeepPlayedInQueue;
         _settings.StreamMissingSongs = StreamMissingSongs;
+        if (_player != null) _settings.StreamOffPages = _player.StreamOffPages.ToList();
         _settings.AllowExplicitContent = AllowExplicitContent;
         SaveFeatureSettings();
         _settings.BpmKeyAnalysisEnabled = BpmKeyAnalysisEnabled;
@@ -3585,6 +3590,7 @@ public partial class SettingsViewModel : ViewModelBase
         _player.AutoplayEnabled = AutoplayEnabled;
         _player.KeepPlayedInQueue = KeepPlayedInQueue;
         _player.StreamMissingSongs = StreamMissingSongs;
+        _player.LoadStreamOffPages(_settings.StreamOffPages);
         _player.AllowExplicitContent = AllowExplicitContent;
         _player.TrackTitleMarqueeEnabled = TrackTitleMarqueeEnabled;
         _player.ArtistMarqueeEnabled = ArtistMarqueeEnabled;
