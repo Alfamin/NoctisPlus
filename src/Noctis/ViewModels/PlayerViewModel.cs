@@ -773,6 +773,7 @@ public partial class PlayerViewModel : ViewModelBase
     [RelayCommand]
     private void Previous()
     {
+        QueueMoved(); // owner #111
         // Owner #95: Previous while the next song is still being fetched: back to the song that was playing, from its start.
         if (PutBackStandIn()) { if (CurrentTrack is { } current) PlayTrack(current); return; }
         CancelOnlinePlayback();
@@ -999,6 +1000,7 @@ public partial class PlayerViewModel : ViewModelBase
     private void ToggleShuffle()
     {
         CancelAutoMixTransition("shuffle changed");
+        QueueReplaced(); // owner #111
         IsShuffleEnabled = !IsShuffleEnabled;
         MarkQueueChanged();
         DebugLogger.Info(DebugLogger.Category.Queue, "ToggleShuffle", $"enabled={IsShuffleEnabled}, queueLen={UpNext.Count}");
@@ -1577,6 +1579,7 @@ public partial class PlayerViewModel : ViewModelBase
         if (startIndex < 0 || startIndex >= tracks.Count) startIndex = 0;
         var nativeSource = tracks as IReadOnlyList<Track> ?? tracks.ToList();
         if (notifyShuffle) ShuffleListStarting?.Invoke(nativeSource);
+        QueueReplaced(); // owner #111
         // Any non-radio queue replacement (album/playlist/shuffle/etc.) ends radio so
         // it stops refilling. StartRadio re-enables IsRadioActive after calling this.
         IsRadioActive = false;
@@ -1940,6 +1943,7 @@ public partial class PlayerViewModel : ViewModelBase
     public void PlayFromUpNextAt(int index)
     {
         if (index < 0 || index >= UpNext.Count) return;
+        QueueMoved(); // owner #111
         DebugLogger.Info(DebugLogger.Category.Playback, "PlayFromUpNextAt", $"index={index}, queueLen={UpNext.Count}");
         CancelAutoMixTransition("user skipped");
         MarkQueueChanged();
@@ -2895,6 +2899,7 @@ public partial class PlayerViewModel : ViewModelBase
 
     private void AdvanceQueue(QueueAdvanceReason reason = QueueAdvanceReason.Natural)
     {
+        QueueMoved(); // owner #111
         // Re-entrancy guard — if TrackEnded fires twice (VLC race), ignore the second.
         if (_isAdvancingQueue)
         {

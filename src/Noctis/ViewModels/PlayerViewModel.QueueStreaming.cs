@@ -331,6 +331,10 @@ public partial class PlayerViewModel
             if (ready + fetch.Count < StreamAheadSongs) fetch.Add((i, pending));
             else ask.Add(pending);
         }
+        // Owner #111: right after a big queue change (a list played, shuffle on or off, a reshuffle, a True Shuffle mode)
+        // nothing ahead is asked for or downloaded until the queue has stayed as it is for a while: a playlist played
+        // and shuffled seconds later fetched two queues. The song that plays is fetched at once all the same.
+        if (DateTime.UtcNow < _settleUntil) { fetch.Clear(); ask.Clear(); }
         // Owner #95/#100: the queue was skipped past, cleared, reshuffled, edited or replaced: a download ahead that is no
         // longer among the next two is stopped, even mid-transfer (not the song being heard or fetched to play).
         if (_askedAhead.Count > 0)
@@ -368,6 +372,36 @@ public partial class PlayerViewModel
                 }
             });
         }
+    }
+
+    // ── Owner #111: a new queue settles before anything ahead is fetched ──
+    /// <summary>How long a new queue must stay unchanged before the songs ahead are asked for or downloaded.</summary>
+    internal TimeSpan QueueSettle { get; set; } = TimeSpan.FromSeconds(10);
+    private DateTime _settleUntil;
+    private int _settleGeneration;
+
+    /// <summary>A new queue (played, shuffled, unshuffled, reshuffled): the songs ahead wait <see cref="QueueSettle"/>; each
+    /// further big change starts the wait again.</summary>
+    private void QueueReplaced()
+    {
+        if (QueueSettle <= TimeSpan.Zero) return;
+        _settleUntil = DateTime.UtcNow + QueueSettle;
+        var generation = ++_settleGeneration;
+        _ = Task.Delay(QueueSettle).ContinueWith(_ => Avalonia.Threading.Dispatcher.UIThread.Post(() =>
+        {
+            if (generation != _settleGeneration) return;
+            _settleUntil = default;
+            PostStreamAhead();
+        }));
+    }
+
+    /// <summary>Next, a song ending, Previous or a jump in the queue: the songs ahead move at once (owner #100), also
+    /// during a wait.</summary>
+    private void QueueMoved()
+    {
+        if (_settleUntil == default) return;
+        _settleUntil = default; _settleGeneration++;
+        PostStreamAhead();
     }
 
     private void Watch(IOnlineMusicSearch source)

@@ -61,7 +61,35 @@ public class QueueStreamingTests
     private static (PlayerViewModel Player, FakeAudioPlayer Audio) NewPlayer()
     {
         var audio = new FakeAudioPlayer();
-        return (new PlayerViewModel(audio, new FakeLibraryService(), new TestPersistenceService(), new FakeAnimatedCoverService()), audio);
+        // The other tests look at the songs ahead right away; owner #111's wait after a new queue has its own test.
+        return (new PlayerViewModel(audio, new FakeLibraryService(), new TestPersistenceService(), new FakeAnimatedCoverService()) { QueueSettle = TimeSpan.Zero }, audio);
+    }
+
+    [AvaloniaFact]
+    public async Task ANewQueue_FetchesNothingAhead_UntilItHasSettled_ButNextMovesAtOnce()
+    {
+        // Owner #111: a playlist played and shuffled seconds later fetched two queues. The song that plays is not delayed.
+        var source = new Source(); var (player, _) = NewPlayer(); player.QueueSettle = TimeSpan.FromMilliseconds(600);
+        var list = new List<Track> { Local("A") };
+        for (int i = 0; i < 6; i++) list.Add(StandIn(source, "s" + i));
+        player.ReplaceQueueAndPlay(list, 0); Settle();
+        await Task.Delay(200); Settle();
+        Assert.Empty(source.Downloads_);
+        lock (source.AskedAhead) Assert.Empty(source.AskedAhead);
+        player.ReplaceQueueAndPlay(list, 0); Settle(); // another big change starts the wait again
+        await Task.Delay(400); Settle();
+        Assert.Empty(source.Downloads_);
+        await Until(() => source.Downloads_.Count >= PlayerViewModel.StreamAheadSongs);
+        Assert.Equal(PlayerViewModel.StreamAheadSongs, source.Downloads_.Count); // settled: the next two download
+
+        var (other, _) = NewPlayer(); other.QueueSettle = TimeSpan.FromSeconds(30);
+        var second = new Source(); var songs = new List<Track> { Local("B"), Local("C") };
+        for (int i = 0; i < 4; i++) songs.Add(StandIn(second, "t" + i));
+        other.ReplaceQueueAndPlay(songs, 0); Settle();
+        Assert.Empty(second.Downloads_);
+        other.NextCommand.Execute(null); Settle(); // a skip moves the songs ahead at once, wait or not
+        await Until(() => second.Downloads_.Count > 0);
+        Assert.NotEmpty(second.Downloads_);
     }
 
     [AvaloniaFact]
@@ -253,7 +281,7 @@ public class QueueStreamingTests
         // Live 2026-10-20: the first song downloaded ahead was imported, the library reconcile dropped every stand-in.
         var source = new Source(); var audio = new FakeAudioPlayer(); var library = new FakeLibraryService();
         var a = Local("A"); library.TrackList.Add(a);
-        var player = new PlayerViewModel(audio, library, new TestPersistenceService(), new FakeAnimatedCoverService());
+        var player = new PlayerViewModel(audio, library, new TestPersistenceService(), new FakeAnimatedCoverService()) { QueueSettle = TimeSpan.Zero };
         Track b = StandIn(source, "b"), c = StandIn(source, "c");
         player.ReplaceQueueAndPlay([a, b, c], 0); Settle();
         library.TrackList.Add(Local("Imported")); library.RaiseLibraryUpdated();

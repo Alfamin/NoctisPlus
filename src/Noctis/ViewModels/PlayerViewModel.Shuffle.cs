@@ -49,6 +49,6 @@ public partial class PlayerViewModel
     internal event Action<IReadOnlyList<Track>>? ShuffleListStarted;
     internal event Action? ShuffleQueueCleared;
 
-    internal void ClearShuffleUpcoming() => ClearQueueCore(notifyShuffle: false);
+    internal void ClearShuffleUpcoming() { QueueReplaced(); ClearQueueCore(notifyShuffle: false); } // owner #111: a mode switch
     internal void PlayShuffleOrder(IList<Track> tracks) => ReplaceQueueAndPlay(tracks, 0, null, notifyShuffle: false);
 }
