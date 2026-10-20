@@ -546,7 +546,7 @@
                     <!-- The album page's missing-song control: download icon (right-click: now / add to downloads),
                          progress ring, waiting ring, checkmark once saved. -->
                     <Panel Grid.Column="4" Width="32" Height="32" VerticalAlignment="Center">
-                        <Button Classes="catalog-download" IsVisible="{Binding Song.CanStartDownload}" ToolTip.Tip="Download"
+                        <Button Classes="catalog-download" IsVisible="{Binding Song.ShowDownload}" ToolTip.Tip="Download"
                                 AutomationProperties.Name="Download"
                                 Command="{Binding $parent[UserControl].((vm:ArtistDetailViewModel)DataContext).DownloadCatalogSongNowCommand}" CommandParameter="{Binding}">
                             <Button.ContextMenu>

@@ -58,7 +58,8 @@ public partial class AlbumDetailViewModel
     private readonly System.Runtime.CompilerServices.ConditionalWeakTable<ArtistCatalogSong, Track> _standIns = new();
 
     /// <summary>What Play, Shuffle and Play from take: the album's songs in album order, the ones you don't have as
-    /// stand-ins when this page's toggle is on (an online album's only play, like Search; a library album's are kept).</summary>
+    /// stand-ins when this page's toggle is on. Owner 10-20: they only play (stream cache, "Add to songs"), like Search, also
+    /// on an album you have some songs of; only a playlist's songs join Songs.</summary>
     private List<Track> PlaybackList(IEnumerable<Track> owned)
     {
         var list = InAlbumOrder(owned);
@@ -66,7 +67,7 @@ public partial class AlbumDetailViewModel
         foreach (var row in CatalogMissing.OrderBy(r => r.Rank))
         {
             if (row.Song.Online is not { } song) continue;
-            var standIn = _standIns.GetValue(row, _ => PlayerViewModel.StandIn(_catalogOnline!, song, keep: _catalogEnriches, StreamPage));
+            var standIn = _standIns.GetValue(row, _ => PlayerViewModel.StandIn(_catalogOnline!, song, keep: false, StreamPage));
             var at = list.FindIndex(t => t.IsPendingStream ? false : t.TrackNumber > row.Rank);
             if (at < 0) list.Add(standIn); else list.Insert(at, standIn);
         }
@@ -253,8 +254,8 @@ public partial class AlbumDetailViewModel
 
     /// <summary>Every song of the album the library lacks, into the download queue (in album order).</summary>
     [RelayCommand(CanExecute = nameof(CanDownloadMissing))]
-    private Task DownloadMissing() => DownloadCatalogAsync(CatalogMissing.Where(r => r.Song.CanStartDownload).ToList(), now: false);
-    private bool CanDownloadMissing() => CatalogMissing.Any(r => r.Song.CanStartDownload);
+    private Task DownloadMissing() => DownloadCatalogAsync(CatalogMissing.Where(r => r.Song.CanStartDownload || r.Song.IsStreamed).ToList(), now: false);
+    private bool CanDownloadMissing() => CatalogMissing.Any(r => r.Song.CanStartDownload || r.Song.IsStreamed);
 
     private async Task DownloadCatalogAsync(IReadOnlyList<ArtistCatalogSong> rows, bool now)
     {

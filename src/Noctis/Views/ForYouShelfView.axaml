@@ -210,7 +210,7 @@
                                     CommandParameter="{Binding}">
                                 <Button.ContextMenu>
                                     <ContextMenu>
-                                        <MenuItem Header="Download now" IsVisible="{Binding Song.CanStartDownload}"
+                                        <MenuItem Header="Download now" IsVisible="{Binding Song.ShowDownload}"
                                                   Command="{Binding $parent[UserControl].((vm:ForYouShelfViewModel)DataContext).DownloadCommand}" CommandParameter="{Binding}" />
                                         <MenuItem Header="Add to downloads" IsVisible="{Binding Song.CanStartDownload}"
                                                   Command="{Binding $parent[UserControl].((vm:ForYouShelfViewModel)DataContext).QueueDownloadCommand}" CommandParameter="{Binding}" />

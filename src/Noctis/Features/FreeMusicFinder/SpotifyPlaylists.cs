@@ -403,11 +403,16 @@ internal sealed class SpotifyPlaylists : IDisposable
             var known = _downloads.History.Where(d => d.Track.Request is not null &&
                 (d.IsActive || d.State == DownloadState.Failed || (d.State is DownloadState.Saved or DownloadState.AlreadyThere &&
                 Downloader.FindExisting(d.Folder, d.Track.FileName) is not null))).Select(d => d.Track.Request!).ToList();
+            // Owner 10-20: a song that was only played (stream cache) joins Songs from its cached copy, without a new download.
+            var played = _downloads.History.Where(d => d.Track.Request is not null && d.KeepIn is null && _downloads.IsCached(d) &&
+                d.State is DownloadState.Saved or DownloadState.AlreadyThere && Downloader.FindExisting(d.Folder, d.Track.FileName) is not null).ToList();
             foreach (var job in Jobs.Where(j => j.Created && !j.FillingStopped && (only is null || ReferenceEquals(j, only))))
                 foreach (var entry in job.Manifest!.Entries.Where(e => !job.Matches.ContainsKey(e.Position)))
                 {
                     scope.Token.ThrowIfCancellationRequested();
                     if (entry.Request is not {} request) continue;
+                    if (played.FirstOrDefault(d => SameRecording(request, d.Track.Request!)) is { } cached)
+                    { _downloads.Keep(cached, folder); played.Remove(cached); known.Add(request); queued++; continue; }
                     if (known.Any(k => SameRecording(request, k))) continue;
                     _downloads.Start(_track(request), folder, held: true);
                     known.Add(request); queued++;

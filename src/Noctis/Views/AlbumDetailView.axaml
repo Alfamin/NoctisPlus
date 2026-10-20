@@ -1102,7 +1102,7 @@
                                     <TextBlock Grid.Column="2" Text="{Binding Song.DurationText}" FontSize="14" Opacity="0.5" FontFeatures="+tnum"
                                                HorizontalAlignment="Right" VerticalAlignment="Center" />
                                     <Panel Grid.Column="3" Width="32" Height="32" HorizontalAlignment="Center" VerticalAlignment="Center">
-                                        <Button Classes="catalog-download" IsVisible="{Binding Song.CanStartDownload}" ToolTip.Tip="Download"
+                                        <Button Classes="catalog-download" IsVisible="{Binding Song.ShowDownload}" ToolTip.Tip="Download"
                                                 Command="{Binding $parent[UserControl].((vm:AlbumDetailViewModel)DataContext).DownloadCatalogSongCommand}"
                                                 CommandParameter="{Binding}">
                                             <Button.ContextMenu>

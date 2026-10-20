@@ -171,7 +171,7 @@ public partial class PlaylistViewModel
     private bool Streams => StreamMissing && HasCatalogMissing && !IsPreview && _catalogOnline is not null;
     private readonly System.Runtime.CompilerServices.ConditionalWeakTable<ArtistCatalogSong, Track> _standIns = new();
     private Track StandInFor(ArtistCatalogSong row, OnlineSong song)
-        => _standIns.GetValue(row, _ => PlayerViewModel.StandIn(_catalogOnline!, song, keep: !IsPreview, StreamPage));
+        => _standIns.GetValue(row, _ => PlayerViewModel.StandIn(_catalogOnline!, song, keep: false, StreamPage));
 
     /// <summary>What Play, Shuffle and the queue actions take: the playlist's rows in their order (missing songs as
     /// stand-ins) when streaming is on, else only the songs you have, as before.</summary>
@@ -197,8 +197,8 @@ public partial class PlaylistViewModel
             var at = list.IndexOf(StandInFor(row, song));
             if (at >= 0) { CatalogNotice = ""; _player.PlayFromRow(list, at); return; }
         }
-        // Owner #88: a song of one of your playlists is one of your songs: Play keeps it; a preview only streams.
-        try { CatalogNotice = ""; await _player.PlayOnlineAsync(online, song, keep: !IsPreview); CatalogNotice = ""; }
+        // Owner 10-20 (was #88): playing only streams, a playlist's songs too; its Download button keeps it in Songs.
+        try { CatalogNotice = ""; await _player.PlayOnlineAsync(online, song); CatalogNotice = ""; }
         catch (Exception ex) { CatalogNotice = ex.Message; }
     }
 
