@@ -27,7 +27,9 @@ internal sealed class AskOnlyStream : Stream
 /// it never retains the output stream. Cancellation drains every writer before returning.</summary>
 internal static class AudioFileTransfer
 {
-    internal const int ChunkSize = 128 * 1024, Parallelism = 4;
+    // Owner #100: 512 KB pieces (the largest Telegram serves at aligned offsets; 1 MB is a multiple). With 128 KB a FLAC
+    // took ~16 s over the VPN (live, 2026-10-20: ~2 MB/s, bound by round trips); four times the bytes per trip.
+    internal const int ChunkSize = 512 * 1024, Parallelism = 4;
     internal static readonly TimeSpan IdleTimeout = TimeSpan.FromMinutes(3);
 
     internal static async Task CopyAsync(Stream output, long size,

@@ -19,7 +19,7 @@ public partial class PlayerViewModel
 {
     /// <summary>Owner #100: the next <see cref="AskAheadSongs"/> stand-ins (within <see cref="StreamAheadPlaces"/> queue places)
     /// are made ready in the bot's chat; only the first <see cref="StreamAheadSongs"/> of them are downloaded.</summary>
-    internal const int StreamAheadPlaces = 10, StreamAheadSongs = 2, AskAheadSongs = 7;
+    internal const int StreamAheadPlaces = 10, StreamAheadSongs = 2, AskAheadSongs = 4;
 
     /// <summary>Settings → Playback, "Play songs you don't have". Off: only the songs you have are queued.</summary>
     [ObservableProperty] private bool _streamMissingSongs = true;
@@ -225,6 +225,8 @@ public partial class PlayerViewModel
     // Owner #100: asks ahead, one at a time (the bots answer one song at a time), nearest first.
     private readonly HashSet<string> _askedSongs = new(StringComparer.Ordinal);
     private (PendingStream Song, CancellationTokenSource Stop)? _asking;
+    /// <summary>Songs downloaded ahead that have become the real song (they still count as the two downloaded).</summary>
+    private readonly HashSet<Track> _fetchedAhead = new(ReferenceEqualityComparer.Instance);
 
     /// <summary>The next stand-ins after the downloaded ones are asked for, so the bot has sent them into the chat by the
     /// time they are downloaded. One no longer among them stops being asked (the bot may still answer; that is kept).</summary>
@@ -265,26 +267,30 @@ public partial class PlayerViewModel
     private void StreamAhead()
     {
         var head = UpNext.Take(StreamAheadPlaces).ToList();
-        // Owner #100: the next two stand-ins still to be saved are downloaded; the next ones after them, up to seven in all,
-        // are only asked for (ready in the bot's chat).
+        // Owner #100: of the next songs you don't have, two are downloaded (one already downloaded counts, also once it has
+        // become the real song) and the next ones, four in all, only asked for (ready in the bot's chat).
+        _fetchedAhead.RemoveWhere(t => !head.Contains(t));
         var fetch = new List<(int At, PendingStream Song)>();
         var ask = new List<PendingStream>();
+        var ready = 0;
         for (int i = 0; i < head.Count; i++)
         {
-            if (head[i].PendingStream is not PendingStream pending) continue;
+            if (head[i].PendingStream is not PendingStream pending) { if (_fetchedAhead.Contains(head[i])) ready++; continue; }
             Watch(pending.Source);
             var state = pending.Source.StatusOf(pending.Song).State;
-            if (state == OnlineDownloadState.Streamed) continue; // in the stream cache: it plays at once when reached
             if (state == OnlineDownloadState.Saved)
             {
                 // Saved: once the library has imported it, the stand-in becomes the real song.
                 if (pending.Source.SavedPathOf(pending.Song) is { } path &&
                     _library.Tracks.FirstOrDefault(t => string.Equals(t.FilePath, path, StringComparison.OrdinalIgnoreCase)) is { } local)
-                    SwapStandIn(head[i], local);
+                { SwapStandIn(head[i], local); _fetchedAhead.Add(local); }
+                ready++;
                 continue;
             }
-            if (fetch.Count + ask.Count >= AskAheadSongs) break;
-            if (fetch.Count < StreamAheadSongs) fetch.Add((i, pending));
+            // In the stream cache (plays at once), or neither bot had it (skipped when reached): nothing more to do.
+            if (state is OnlineDownloadState.Streamed or OnlineDownloadState.Failed) { ready++; continue; }
+            if (ready + fetch.Count + ask.Count >= AskAheadSongs) break;
+            if (ready + fetch.Count < StreamAheadSongs) fetch.Add((i, pending));
             else ask.Add(pending);
         }
         // Owner #95/#100: the queue was skipped past, cleared, reshuffled, edited or replaced: a download ahead that is no
@@ -299,7 +305,9 @@ public partial class PlayerViewModel
                 gone.Source.CancelQueued(gone.Song);
             }
         }
-        AskAhead(ask);
+        // Live: asking shares the two bot lanes with downloading; a download waited 8 s behind asks, a song neither bot had
+        // held a lane for a minute. So asking runs only while the next two need nothing (an ask in flight gives way).
+        AskAhead(fetch.Count > 0 ? [] : ask);
         foreach (var (_, pending) in fetch)
         {
             var status = pending.Source.StatusOf(pending.Song);

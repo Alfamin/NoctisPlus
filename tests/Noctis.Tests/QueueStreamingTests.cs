@@ -31,10 +31,17 @@ public class QueueStreamingTests
         public bool CanDownload => SignedIn;
         internal int SignInAsked;
         public void RequestSignIn() => SignInAsked++;
-        public OnlineDownloadStatus StatusOf(OnlineSong song) => OnlineDownloadStatus.None;
-        public event EventHandler? DownloadsChanged { add { } remove { } }
+        /// <summary>Downloads finish at once (into the stream cache), as when the next songs are ready.</summary>
+        internal bool FinishDownloads;
+        public OnlineDownloadStatus StatusOf(OnlineSong song)
+        { lock (Downloads_) return FinishDownloads && Downloads_.Any(d => d.Id == song.Id) ? new(OnlineDownloadState.Streamed, 1) : OnlineDownloadStatus.None; }
+        public event EventHandler? DownloadsChanged;
         public Task<string> DownloadAsync(IReadOnlyList<OnlineSong> songs, bool now, CancellationToken ct)
-        { lock (Downloads_) Downloads_.AddRange(songs.Select(s => (s.Id, now))); return Task.FromResult("Downloading."); }
+        {
+            lock (Downloads_) Downloads_.AddRange(songs.Select(s => (s.Id, now)));
+            if (FinishDownloads) DownloadsChanged?.Invoke(this, EventArgs.Empty);
+            return Task.FromResult("Downloading.");
+        }
         public IDownloadQueue Downloads => throw new NotSupportedException();
         internal readonly List<string> Cancelled = [];
         public bool CancelQueued(OnlineSong song) { lock (Cancelled) Cancelled.Add(song.Id); return true; }
@@ -162,7 +169,7 @@ public class QueueStreamingTests
     [AvaloniaFact]
     public void TheNextSongsToFetch_AreDownloadedAhead_InQueueOrder()
     {
-        var source = new Source(); var (player, _) = NewPlayer();
+        var source = new Source { FinishDownloads = true }; var (player, _) = NewPlayer();
         var list = new List<Track> { Local("A") };
         for (int i = 0; i < 6; i++) list.Add(StandIn(source, "s" + i));
         player.ReplaceQueueAndPlay(list, 0); Settle();
@@ -170,10 +177,11 @@ public class QueueStreamingTests
         while (source.Downloads_.Count < PlayerViewModel.StreamAheadSongs && DateTime.UtcNow < end) { Thread.Sleep(10); Settle(); }
         lock (source.Downloads_)
             Assert.Equal(new[] { ("s0", true), ("s1", true) }, source.Downloads_.OrderBy(d => d.Id));
-        // Owner #100: the next ones, up to seven in all, are only asked for (ready in the bot chat), one at a time, in order.
+        // Owner #100: once those two are ready, the next ones are only asked for (ready in the bot chat), one at a time, in order.
         end = DateTime.UtcNow.AddSeconds(3);
-        while (source.AskedAhead.Count < 4 && DateTime.UtcNow < end) { Thread.Sleep(10); Settle(); }
-        lock (source.AskedAhead) Assert.Equal(new[] { "s2", "s3", "s4", "s5" }, source.AskedAhead);
+        while (source.AskedAhead.Count < 2 && DateTime.UtcNow < end) { Thread.Sleep(10); Settle(); }
+        Thread.Sleep(50); Settle();
+        lock (source.AskedAhead) Assert.Equal(new[] { "s2", "s3" }, source.AskedAhead); // four ready in all (owner, 2026-10-20)
     }
 
     [Fact]
@@ -194,6 +202,7 @@ public class QueueStreamingTests
         // s0 moves to the end of the queue: it is no longer among the next two, s2 is.
         var s0 = player.UpNext[0]; player.UpNext.RemoveAt(0); player.UpNext.Add(s0); Settle();
         lock (source.Cancelled) Assert.Equal(new[] { "s0" }, source.Cancelled);
+        Assert.Empty(source.AskedAhead); // live: asking waits while the next two are still downloading (it shares the bot lanes)
         player.ClearQueue(); Settle();
         lock (source.Cancelled) Assert.Equal(new[] { "s0", "s1", "s2" }, source.Cancelled.OrderBy(x => x));
     }
@@ -220,7 +229,7 @@ public class QueueStreamingTests
     public void JumpingPastTheSongsAskedAhead_StopsAskingForThem_AndAsksForTheNewNextOnes()
     {
         // Owner #100: clicking far down the queue (or clearing it) stops what is being asked for at once.
-        var source = new Source { HoldAsks = new() }; var (player, _) = NewPlayer();
+        var source = new Source { HoldAsks = new(), FinishDownloads = true }; var (player, _) = NewPlayer();
         var list = new List<Track> { Local("A") };
         for (int i = 0; i < 20; i++) list.Add(StandIn(source, "s" + i));
         player.ReplaceQueueAndPlay(list, 0); Settle();
