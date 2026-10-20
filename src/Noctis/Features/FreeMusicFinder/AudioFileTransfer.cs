@@ -6,6 +6,23 @@ namespace FreeMusicFinder;
 internal sealed class AudioTransferStalledException(long received, long total) : TimeoutException(
     $"AUDIO_TRANSFER_STALLED: no audio bytes arrived for three minutes ({received:N0} / {total:N0} bytes). Check your VPN or system proxy. The request is kept for retry.");
 
+/// <summary>Owner #100: the output of a fetch that only asks the bot (the next songs of the queue are made ready in the chat,
+/// only the next two are downloaded). Nothing may be written to it.</summary>
+internal sealed class AskOnlyStream : Stream
+{
+    public Document? Found { get; internal set; }
+    public override bool CanRead => false;
+    public override bool CanSeek => false;
+    public override bool CanWrite => false;
+    public override long Length => 0;
+    public override long Position { get => 0; set => throw new NotSupportedException(); }
+    public override void Flush() { }
+    public override int Read(byte[] buffer, int offset, int count) => throw new NotSupportedException();
+    public override long Seek(long offset, SeekOrigin origin) => throw new NotSupportedException();
+    public override void SetLength(long value) => throw new NotSupportedException();
+    public override void Write(byte[] buffer, int offset, int count) => throw new NotSupportedException("Only asked; nothing is transferred.");
+}
+
 /// <summary>Bounded chunk requests, one writer. An abandoned RPC can only return bytes;
 /// it never retains the output stream. Cancellation drains every writer before returning.</summary>
 internal static class AudioFileTransfer
@@ -69,6 +86,9 @@ internal static class AudioFileTransfer
     internal static async Task DownloadAsync(TelegramAccount account, Client client, Document document,
         Stream output, IProgress<double>? progress, CancellationToken ct)
     {
+        // Owner #100: asked ahead. The bot has sent the file into the chat; nothing is transferred. A later download finds
+        // it there and starts at once, without asking the bot again.
+        if (output is AskOnlyStream asked) { asked.Found = document; return; }
         if (output is Noctis.Features.ProgressivePlayback.IProgressiveAudioWriter publisher)
             publisher.BeginAudio(document.size, TelegramBotSource.Extension(document) ?? "");
         Client? media = null;

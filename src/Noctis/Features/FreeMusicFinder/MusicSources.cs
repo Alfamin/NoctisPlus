@@ -255,7 +255,9 @@ internal sealed class MusicSources
                     if (ext != "flac")
                     {
                         if (ext == "mp3" && allowMp3 && !preferFlac) return ext;
-                        if (ext == "mp3" && !haveMp3 && output.CanSeek && output.Length > 0 && allowMp3)
+                        // Owner #100: only asked; the MP3 stays in the chat as the fallback.
+                        if (ext == "mp3" && allowMp3 && output is AskOnlyStream) haveMp3 = true;
+                        else if (ext == "mp3" && !haveMp3 && output.CanSeek && output.Length > 0 && allowMp3)
                         {
                             output.Position = 0; await output.CopyToAsync(mp3, ct).ConfigureAwait(false); haveMp3 = true;
                         }
@@ -288,6 +290,7 @@ internal sealed class MusicSources
                 { errors.Add(source.Id + ": " + ex.Message); Trace($"fetch \"{request.Title}\": {source.Id} failed at {clock.Elapsed.TotalSeconds:0.0} s: {ex.Message}"); _notice(source.Id + " could not supply “" + request.Title + "”; trying the backup."); }
             }
             // A bot that is waiting out a limit (not asked, or it just said so) may still have FLAC: the song waits for it.
+            if (haveMp3 && !skipped && output is AskOnlyStream) return "mp3";
             if (haveMp3 && !skipped)
             {
                 output.SetLength(0); output.Position = 0; mp3.Position = 0;

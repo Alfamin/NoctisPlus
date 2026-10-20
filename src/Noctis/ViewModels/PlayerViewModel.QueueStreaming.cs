@@ -15,8 +15,9 @@ public sealed record PendingStream(IOnlineMusicSearch Source, OnlineSong Song, b
 /// </summary>
 public partial class PlayerViewModel
 {
-    /// <summary>Downloaded ahead: the next stand-ins within this many queue places.</summary>
-    internal const int StreamAheadPlaces = 6, StreamAheadSongs = 3;
+    /// <summary>Owner #100: the next <see cref="AskAheadSongs"/> stand-ins (within <see cref="StreamAheadPlaces"/> queue places)
+    /// are made ready in the bot's chat; only the first <see cref="StreamAheadSongs"/> of them are downloaded.</summary>
+    internal const int StreamAheadPlaces = 10, StreamAheadSongs = 2, AskAheadSongs = 7;
 
     /// <summary>Settings → Playback, "Play songs you don't have". Off: only the songs you have are queued.</summary>
     [ObservableProperty] private bool _streamMissingSongs = true;
@@ -118,6 +119,7 @@ public partial class PlayerViewModel
             // the queue; a newer stand-in being fetched is left alone.
             if (ReferenceEquals(_preparingStandIn, standIn)) _preparingStandIn = null;
             stop.Dispose();
+            PostStreamAhead(); // owner #100: asking ahead waited for this song; it goes on now
         }
     }
 
@@ -183,13 +185,52 @@ public partial class PlayerViewModel
     {
         if (_aheadPosted) return;
         _aheadPosted = true;
+        // Owner #100: right after the change that caused it (a whole queue replace is one pass), not when the app is idle.
         Avalonia.Threading.Dispatcher.UIThread.Post(() =>
         {
             _aheadPosted = false;
             // Downloading ahead is a nicety: whatever goes wrong in it never touches playback.
             try { StreamAhead(); }
             catch (Exception ex) { Services.DebugLog.Write("Queue", "download ahead skipped: " + ex.Message); }
-        }, Avalonia.Threading.DispatcherPriority.Background);
+        }, Avalonia.Threading.DispatcherPriority.Normal);
+    }
+
+    // Owner #100: asks ahead, one at a time (the bots answer one song at a time), nearest first.
+    private readonly HashSet<string> _askedSongs = new(StringComparer.Ordinal);
+    private (PendingStream Song, CancellationTokenSource Stop)? _asking;
+
+    /// <summary>The next stand-ins after the downloaded ones are asked for, so the bot has sent them into the chat by the
+    /// time they are downloaded. One no longer among them stops being asked (the bot may still answer; that is kept).</summary>
+    private void AskAhead(List<PendingStream> wanted)
+    {
+        if (_asking is { } current && (!wanted.Any(p => p.Song.Id == current.Song.Song.Id) || _preparingStandIn is not null))
+        {
+            current.Stop.Cancel(); // the song to play now goes first (it needs the bots too)
+            _asking = null;
+        }
+        if (_asking is not null || _preparingStandIn is not null) return;
+        if (wanted.FirstOrDefault(p => !_askedSongs.Contains(p.Song.Id) && p.Source.CanDownload
+                && p.Source.StatusOf(p.Song).State == OnlineDownloadState.None) is not { } next) return;
+        var stop = new CancellationTokenSource();
+        _asking = (next, stop);
+        _ = Task.Run(async () =>
+        {
+            var retry = false;
+            try { await next.Source.AskAheadAsync(next.Song, stop.Token); }
+            catch (OperationCanceledException) when (stop.IsCancellationRequested) { retry = true; }
+            catch (Exception ex)
+            {
+                // Neither bot has it, or a limit: it is downloaded (and skipped if it fails) as the queue reaches it.
+                Services.DebugLog.Write("Queue", $"asking ahead for \"{next.Song.Title}\" failed: {ex.Message}");
+            }
+            Avalonia.Threading.Dispatcher.UIThread.Post(() =>
+            {
+                if (!retry) _askedSongs.Add(next.Song.Id);
+                if (_asking is { } now && ReferenceEquals(now.Stop, stop)) _asking = null;
+                stop.Dispose();
+                PostStreamAhead();
+            });
+        });
     }
 
     /// <summary>The next stand-ins (within <see cref="StreamAheadPlaces"/>) are downloaded in queue order, the first one in
@@ -197,26 +238,15 @@ public partial class PlayerViewModel
     private void StreamAhead()
     {
         var head = UpNext.Take(StreamAheadPlaces).ToList();
-        // Owner #95: the queue was cleared, reshuffled, edited or replaced: what was asked for ahead and is no longer among
-        // the next places is dropped if it has not started (one already transferring finishes, into Songs).
-        if (_askedAhead.Count > 0)
-        {
-            var near = head.Select(t => t.PendingStream).OfType<PendingStream>().Select(p => p.Song.Id).ToHashSet(StringComparer.Ordinal);
-            if (_preparingStandIn?.PendingStream is PendingStream fetching) near.Add(fetching.Song.Id);
-            foreach (var (id, gone) in _askedAhead.Where(a => !near.Contains(a.Key)).ToList())
-            {
-                _askedAhead.Remove(id);
-                gone.Source.CancelQueued(gone.Song);
-            }
-        }
-        if (!head.Any(t => t.IsPendingStream)) return;
-        var asked = 0;
+        // Owner #100: the next two stand-ins still to be saved are downloaded; the next ones after them, up to seven in all,
+        // are only asked for (ready in the bot's chat).
+        var fetch = new List<(int At, PendingStream Song)>();
+        var ask = new List<PendingStream>();
         for (int i = 0; i < head.Count; i++)
         {
             if (head[i].PendingStream is not PendingStream pending) continue;
             Watch(pending.Source);
-            var status = pending.Source.StatusOf(pending.Song);
-            if (status.State == OnlineDownloadState.Saved)
+            if (pending.Source.StatusOf(pending.Song).State == OnlineDownloadState.Saved)
             {
                 // Saved: once the library has imported it, the stand-in becomes the real song.
                 if (pending.Source.SavedPathOf(pending.Song) is { } path &&
@@ -224,8 +254,26 @@ public partial class PlayerViewModel
                     SwapStandIn(head[i], local);
                 continue;
             }
-            if (!pending.Keep || asked >= StreamAheadSongs) continue;
-            asked++;
+            if (fetch.Count + ask.Count >= AskAheadSongs) break;
+            if (pending.Keep && fetch.Count < StreamAheadSongs) fetch.Add((i, pending));
+            else ask.Add(pending);
+        }
+        // Owner #95/#100: the queue was skipped past, cleared, reshuffled, edited or replaced: a download ahead that is no
+        // longer among the next two is stopped, even mid-transfer (not the song being heard or fetched to play).
+        if (_askedAhead.Count > 0)
+        {
+            var near = fetch.Select(f => f.Song.Song.Id).ToHashSet(StringComparer.Ordinal);
+            if (_preparingStandIn?.PendingStream is PendingStream fetching) near.Add(fetching.Song.Id);
+            foreach (var (id, gone) in _askedAhead.Where(a => !near.Contains(a.Key)).ToList())
+            {
+                _askedAhead.Remove(id);
+                gone.Source.CancelQueued(gone.Song);
+            }
+        }
+        AskAhead(ask);
+        foreach (var (_, pending) in fetch)
+        {
+            var status = pending.Source.StatusOf(pending.Song);
             if (status.State is OnlineDownloadState.Downloading or OnlineDownloadState.Queued) continue;
             if (!pending.Source.CanDownload || !_askedAhead.TryAdd(pending.Song.Id, pending)) continue;
             // Part of playing, like Play itself: the fast lanes (two at once), also while bulk downloads are paused (live:

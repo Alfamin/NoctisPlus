@@ -254,9 +254,20 @@ internal sealed class FinderOnlineSearch : IOnlineMusicSearch
     {
         if (!_songs.TryGetValue(song.Id, out var catalogSong)) return false;
         var d = _actions.Downloads.Active.LastOrDefault(x => x.Track.Request is { } r && SpotifyPlaylists.SameRecording(catalogSong.Request, r));
-        if (d is not { State: DownloadState.Queued }) return false;
+        // Owner #100: skipped past: stopped even mid-transfer, unless it is the song being heard.
+        if (d is null || d.State is not (DownloadState.Queued or DownloadState.Running) || d.Playback?.HasReaders == true) return false;
         try { return _actions.Downloads.Remove(d); }
         catch (Exception) { return false; } // the queue file could not be saved: it simply downloads
+    }
+
+    public async Task AskAheadAsync(OnlineSong song, CancellationToken ct)
+    {
+        if (!_songs.TryGetValue(song.Id, out var catalogSong) || !CanDownload) return;
+        if (StatusOf(song).State != OnlineDownloadState.None) return; // already downloading or saved
+        var clock = System.Diagnostics.Stopwatch.StartNew();
+        var asked = new AskOnlyStream();
+        await _actions.TrackFor(catalogSong.Request).Fetch(asked, null, ct).ConfigureAwait(false);
+        Noctis.Services.DebugLog.Write("Finder", $"asked ahead \"{song.Title}\": ready in the chat in {clock.Elapsed.TotalSeconds:0.0} s");
     }
 
     public async Task<string> DownloadAsync(IReadOnlyList<OnlineSong> songs, bool now, CancellationToken ct)

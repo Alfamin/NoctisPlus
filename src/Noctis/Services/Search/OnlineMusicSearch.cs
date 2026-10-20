@@ -84,9 +84,12 @@ public interface IOnlineMusicSearch
     OnlineDownloadStatus StatusOf(OnlineSong song);
     /// <summary>Owner #95: where the song was saved in Songs (not the stream cache), once it is; else null.</summary>
     string? SavedPathOf(OnlineSong song) => null;
-    /// <summary>Owner #95: a download asked for ahead that the queue no longer needs: dropped if it has not started yet
-    /// (one already transferring finishes). True when one was dropped.</summary>
+    /// <summary>Owner #95/#100: a download asked for ahead that the queue no longer needs is dropped, also one already
+    /// transferring (unless it is being heard). True when one was dropped.</summary>
     bool CancelQueued(OnlineSong song) => false;
+    /// <summary>Owner #100: the bot is asked for the song so it is ready in the chat; nothing is downloaded. A later download
+    /// starts from there without asking again.</summary>
+    Task AskAheadAsync(OnlineSong song, CancellationToken ct) => Task.CompletedTask;
 
     /// <summary>Raised (any thread) when a download's state or progress changes.</summary>
     event EventHandler? DownloadsChanged;

@@ -10,6 +10,8 @@ internal sealed class DiscoveryActions(IPlaylistLibrary library, Downloads downl
     private readonly SemaphoreSlim _gate = new(1, 1);
     private (long Key, DateTimeOffset At, PlaylistMatcher Matcher)? _matcher;
     public Downloads Downloads => downloads;
+    /// <summary>The bot request for a song (owner #100: asked ahead, without a download).</summary>
+    public BotTrack TrackFor(MusicRequest request) => track(request);
     /// <summary>The download folder: where "Add to songs" puts a played song (owner #87).</summary>
     public string LibraryFolder => folder();
     internal static readonly TimeSpan RetryPause = TimeSpan.FromSeconds(15);

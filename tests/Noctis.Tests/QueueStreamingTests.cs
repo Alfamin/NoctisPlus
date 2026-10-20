@@ -38,6 +38,10 @@ public class QueueStreamingTests
         public IDownloadQueue Downloads => throw new NotSupportedException();
         internal readonly List<string> Cancelled = [];
         public bool CancelQueued(OnlineSong song) { lock (Cancelled) Cancelled.Add(song.Id); return true; }
+        internal readonly List<string> AskedAhead = [];
+        internal TaskCompletionSource? HoldAsks; internal CancellationToken AskToken;
+        public Task AskAheadAsync(OnlineSong song, CancellationToken ct)
+        { lock (AskedAhead) AskedAhead.Add(song.Id); AskToken = ct; return HoldAsks?.Task.WaitAsync(ct) ?? Task.CompletedTask; }
         public void OpenArtist(OnlineArtist artist) { }
         public Task OpenAlbumAsync(OnlineAlbum album, CancellationToken ct) => Task.CompletedTask;
     }
@@ -165,7 +169,11 @@ public class QueueStreamingTests
         var end = DateTime.UtcNow.AddSeconds(3);
         while (source.Downloads_.Count < PlayerViewModel.StreamAheadSongs && DateTime.UtcNow < end) { Thread.Sleep(10); Settle(); }
         lock (source.Downloads_)
-            Assert.Equal(new[] { ("s0", true), ("s1", true), ("s2", true) }, source.Downloads_.OrderBy(d => d.Id));
+            Assert.Equal(new[] { ("s0", true), ("s1", true) }, source.Downloads_.OrderBy(d => d.Id));
+        // Owner #100: the next ones, up to seven in all, are only asked for (ready in the bot chat), one at a time, in order.
+        end = DateTime.UtcNow.AddSeconds(3);
+        while (source.AskedAhead.Count < 4 && DateTime.UtcNow < end) { Thread.Sleep(10); Settle(); }
+        lock (source.AskedAhead) Assert.Equal(new[] { "s2", "s3", "s4", "s5" }, source.AskedAhead);
     }
 
     [Fact]
@@ -183,12 +191,34 @@ public class QueueStreamingTests
         player.ReplaceQueueAndPlay(list, 0); Settle();
         var end = DateTime.UtcNow.AddSeconds(3);
         while (source.Downloads_.Count < PlayerViewModel.StreamAheadSongs && DateTime.UtcNow < end) { Thread.Sleep(10); Settle(); }
-        // s0 moves to the end of the queue: it is no longer among the next places, s3 is.
+        // s0 moves to the end of the queue: it is no longer among the next two, s2 is.
         var s0 = player.UpNext[0]; player.UpNext.RemoveAt(0); player.UpNext.Add(s0); Settle();
         lock (source.Cancelled) Assert.Equal(new[] { "s0" }, source.Cancelled);
         player.ClearQueue(); Settle();
-        lock (source.Cancelled) Assert.Equal(new[] { "s0", "s1", "s2", "s3" }, source.Cancelled.OrderBy(x => x));
+        lock (source.Cancelled) Assert.Equal(new[] { "s0", "s1", "s2" }, source.Cancelled.OrderBy(x => x));
     }
+    [AvaloniaFact]
+    public void JumpingPastTheSongsAskedAhead_StopsAskingForThem_AndAsksForTheNewNextOnes()
+    {
+        // Owner #100: clicking far down the queue (or clearing it) stops what is being asked for at once.
+        var source = new Source { HoldAsks = new() }; var (player, _) = NewPlayer();
+        var list = new List<Track> { Local("A") };
+        for (int i = 0; i < 20; i++) list.Add(StandIn(source, "s" + i));
+        player.ReplaceQueueAndPlay(list, 0); Settle();
+        var end = DateTime.UtcNow.AddSeconds(3);
+        while (source.AskedAhead.Count < 1 && DateTime.UtcNow < end) { Thread.Sleep(10); Settle(); }
+        var first = source.AskToken;
+        lock (source.AskedAhead) Assert.Equal(new[] { "s2" }, source.AskedAhead); // one at a time
+        for (int i = 0; i < 12; i++) player.UpNext.RemoveAt(0); // the next songs are now s12, s13, …
+        Settle();
+        end = DateTime.UtcNow.AddSeconds(3);
+        while (source.AskedAhead.Count < 2 && DateTime.UtcNow < end) { Thread.Sleep(10); Settle(); }
+        Assert.True(first.IsCancellationRequested);
+        lock (source.AskedAhead) Assert.Equal("s14", source.AskedAhead[^1]);
+        player.ClearQueue(); Settle();
+        Assert.True(source.AskToken.IsCancellationRequested);
+    }
+
     [AvaloniaFact]
     public async Task ASongSavedToTheLibrary_DoesNotTakeTheOtherSongsToFetchOutOfTheQueue()
     {
