@@ -320,6 +320,20 @@
             <Setter Property="Background" Value="#22808080" />
             <Setter Property="Foreground" Value="{DynamicResource AccentColorBrush}" />
         </Style>
+        <!-- Owner #107: a song you have shows a play button in place of its number while hovered (like the songs
+             you don't have); one click plays from it. -->
+        <Style Selector="TextBlock.row-number">
+            <Setter Property="Opacity" Value="0.5" />
+        </Style>
+        <Style Selector="Border.row-body:pointerover TextBlock.row-number">
+            <Setter Property="Opacity" Value="0" />
+        </Style>
+        <Style Selector="Button.row-play">
+            <Setter Property="IsVisible" Value="False" />
+        </Style>
+        <Style Selector="Border.row-body:pointerover Button.row-play">
+            <Setter Property="IsVisible" Value="True" />
+        </Style>
     </UserControl.Styles>
 
     <Grid>
@@ -922,12 +936,20 @@
                                     </MultiBinding>
                                 </controls:EqVisualizer.IsVisible>
                             </controls:EqVisualizer>
-                            <TextBlock Text="{Binding TrackNumber}"
-                                       Opacity="0.5"
-                                       FontSize="14"
-                                       HorizontalAlignment="Right"
-                                       VerticalAlignment="Center"
-                                       IsVisible="{Binding !#RowEq.IsVisible}" />
+                            <Panel IsVisible="{Binding !#RowEq.IsVisible}">
+                                <TextBlock Classes="row-number"
+                                           Text="{Binding TrackNumber}"
+                                           FontSize="14"
+                                           HorizontalAlignment="Right"
+                                           VerticalAlignment="Center" />
+                                <Button Classes="catalog-download row-play" Margin="0,0,-8,0"
+                                        HorizontalAlignment="Right" VerticalAlignment="Center"
+                                        ToolTip.Tip="Play" AutomationProperties.Name="Play"
+                                        Command="{Binding $parent[UserControl].((vm:AlbumDetailViewModel)DataContext).PlayFromCommand}"
+                                        CommandParameter="{Binding}">
+                                    <PathIcon Data="{StaticResource PlayIcon}" Width="12" Height="12" />
+                                </Button>
+                            </Panel>
                         </Panel>
 
                         <!-- Title + artist + explicit badge -->
