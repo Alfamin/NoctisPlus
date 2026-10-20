@@ -76,7 +76,9 @@ public class ProgressiveAudioBufferTests
     public async Task DisposalWakesBlockedReaders_AndVlcCallbacksNeverUnwindExceptions()
     {
         using var rig = new Rig(); using var input = new ProgressiveMediaInput(rig.Buffer);
-        Assert.False(input.CanSeek); Assert.True(input.Open(out var size)); Assert.Equal(ulong.MaxValue, size);
+        Assert.True(input.CanSeek); Assert.True(input.Open(out var size)); Assert.Equal(ulong.MaxValue, size);
+        Assert.True(input.Seek(0)); // VLC needs the callback for native pause support.
+        Assert.False(input.Seek(ulong.MaxValue)); // unknown tail is never read or waited for.
         var memory = System.Runtime.InteropServices.Marshal.AllocHGlobal(1024);
         try
         {

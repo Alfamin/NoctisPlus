@@ -104,6 +104,78 @@ public class ProgressiveDecoderTests(ITestOutputHelper output)
         Assert.True(heard.Length >= rate * (seconds - 0.5), $"only {heard.Length / (double)rate:0.00} s of {seconds} s delivered");
     }
 
+    [Fact]
+    public async Task LongPauseOfCallbackInput_KeepsEveryDecodedSecond()
+    {
+        if (!OperatingSystem.IsWindows()) Assert.Skip("Requires bundled Windows LibVLC.");
+        Core.Initialize();
+        using var data = new TestPersistenceService();
+        const int rate = 48000, seconds = 8;
+        var audio = await AudioAsync("flac", data.DataDirectory, wave: TimeCoded(seconds));
+        using var buffer = new ProgressiveAudioBuffer(new FileStream(Path.Combine(data.DataDirectory, "paused.part"), FileMode.Create, FileAccess.ReadWrite, FileShare.ReadWrite | FileShare.Delete, 1));
+        buffer.Begin(audio.Length); buffer.Writer.Write(audio); buffer.Finish();
+        using var input = new ProgressiveMediaInput(buffer);
+        using var vlc = new LibVLC("--intf=dummy", "--no-video", "--no-stats", "--quiet");
+        using var media = new Media(vlc, input); ProgressiveMedia.Configure(media, "paused.flac");
+        using var player = new MediaPlayer(vlc);
+        var segment = new GaplessTrackSegment(rate, 1, 0, capacitySeconds: 2);
+        var drops = 0;
+        var first = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        MediaPlayer.LibVLCAudioPlayCb play = (_, ptr, count, _) =>
+        {
+            var block = new short[count]; System.Runtime.InteropServices.Marshal.Copy(ptr, block, 0, (int)count);
+            if (!segment.Write(block, timeoutMs: 200)) Interlocked.Increment(ref drops);
+            first.TrySetResult();
+        };
+        MediaPlayer.LibVLCAudioDrainCb drain = _ => segment.MarkEndOfStream();
+        player.SetAudioCallbacks(play, null, null, null, drain); player.SetAudioFormat("S16N", rate, 1);
+        var pcm = new List<float>();
+        var parked = 0;
+        using var stop = new CancellationTokenSource();
+        var render = Task.Run(async () =>
+        {
+            var block = new float[rate / 100];
+            while (!stop.IsCancellationRequested)
+            {
+                if (Volatile.Read(ref parked) == 0)
+                {
+                    var read = segment.Read(block, 0, block.Length);
+                    pcm.AddRange(block.AsSpan(0, read).ToArray());
+                }
+                await Task.Delay(10);
+            }
+        });
+        try
+        {
+            Assert.True(player.Play(media));
+            await first.Task.WaitAsync(TimeSpan.FromSeconds(10));
+            player.SetPause(true); // same order as VlcAudioPlayer: pause decoder, then park output.
+            Volatile.Write(ref parked, 1);
+            await Task.Delay(2700);
+            Assert.Equal(0, Volatile.Read(ref drops));
+            Volatile.Write(ref parked, 0); player.SetPause(false);
+            var clock = Stopwatch.StartNew();
+            while (!segment.IsFinished && clock.Elapsed < TimeSpan.FromSeconds(15))
+                await Task.Delay(20);
+            Assert.True(segment.IsFinished);
+            stop.Cancel(); await render;
+            Assert.Equal(0, drops);
+            Assert.InRange(pcm.Count, rate * (seconds - .1), rate * (seconds + .1));
+            var heard = pcm.Select(v => (short)(v * 32768)).ToArray();
+            var played = new HashSet<int>();
+            for (var offset = 0; offset + rate / 10 <= heard.Length; offset += rate / 10)
+                if (ToneSecond(heard.AsSpan(offset, rate / 10), rate) is { } second) played.Add(second);
+            Assert.Empty(Enumerable.Range(0, seconds).Except(played));
+        }
+        finally
+        {
+            segment.Abandon(); input.CancelRead();
+            stop.Cancel(); await render;
+            await Task.Run(player.Stop).WaitAsync(TimeSpan.FromSeconds(5));
+            GC.KeepAlive(play); GC.KeepAlive(drain);
+        }
+    }
+
     /// <summary>Mono 48 kHz WAV whose second t is a 300 + 50*t Hz tone, with a little noise so FLAC stays realistic in size.</summary>
     private static byte[] TimeCoded(int seconds)
     {

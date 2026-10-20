@@ -148,7 +148,7 @@ internal sealed class ProgressiveAudioBuffer : IDisposable
         {
             lock (_owner._gate)
             {
-                if (_token.IsCancellationRequested || _generation != _owner._generation || position < 0 || position > _owner.PrefixLocked) return false;
+                if (_owner._disposed || _token.IsCancellationRequested || _generation != _owner._generation || position < 0 || position > _owner.PrefixLocked) return false;
                 _position = position; return true;
             }
         }
