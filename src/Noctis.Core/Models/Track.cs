@@ -217,6 +217,10 @@ public partial class Track : ObservableObject
     /// tiles show Pause on it and Play otherwise; PlayerViewModel keeps it in sync.</summary>
     [ObservableProperty] private bool _isCurrentlyPlaying;
 
+    /// <summary>Owner #93: only a close match supplied this download; the Songs row shows a small mark until the user
+    /// checks it on the Downloads page. Not persisted here (Free Music Finder keeps the list).</summary>
+    [ObservableProperty] private bool _needsCheck;
+
     /// <summary>Transient 1-based position within the list view currently displaying this track
     /// (set by the Folders pane). Drives the leading row-number column. Not persisted.</summary>
     [ObservableProperty]

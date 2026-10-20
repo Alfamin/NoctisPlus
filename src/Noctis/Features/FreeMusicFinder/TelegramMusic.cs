@@ -138,9 +138,19 @@ internal static class BotQuery
 {
     internal static string Spaces(string text) => Regex.Replace(text, @"[\s  -​  　﻿]+", " ").Trim();
 
-    internal static string For(MusicRequest request) => Spaces(FirstArtist(request.Artist) + " " + PlainTitle(request.Title));
+    internal static string For(MusicRequest request) => request.Loose
+        ? Spaces(FirstArtist(request.Artist) + " " + Regex.Split(BotText.Plain(PlainTitle(request.Title)), @"\s+[-–—]\s+")[0])
+        : Spaces(FirstArtist(request.Artist) + " " + PlainTitle(request.Title));
 
-    internal static string Full(MusicRequest request) => Spaces(request.Artist + " " + request.Title);
+    /// <summary>The second try. In the loose pass (owner #93): the song's next credited artist with the plain title, since
+    /// a bot may list it under them ("I'm God x Demons Mashup" under Clams Casino).</summary>
+    internal static string Full(MusicRequest request)
+    {
+        if (!request.Loose) return Spaces(request.Artist + " " + request.Title);
+        var others = Regex.Split(Spaces(request.Artist), @"\s*(?:,|&|;|/|\bfeat\.?|\bft\.?|\bfeaturing\b|\bx\b)\s+", RegexOptions.IgnoreCase);
+        var second = others.Skip(1).FirstOrDefault(a => a.Length > 0 && !a.StartsWith("The ", StringComparison.OrdinalIgnoreCase));
+        return second is null ? For(request) : Spaces(second + " " + Regex.Split(BotText.Plain(PlainTitle(request.Title)), @"\s+[-–—]\s+")[0]);
+    }
 
     internal static string FirstArtist(string artist)
     {
@@ -156,6 +166,30 @@ internal static class BotQuery
 internal static class RecordingMatch
 {
     public static bool Fits(MusicRequest wanted, string artist, string title, TimeSpan? duration)
+        => Strict(wanted, artist, title, duration) || wanted.Loose && Close(wanted, artist, title, duration);
+
+    /// <summary>
+    /// Owner #93, the second-chance pass only: the same artist, the same kind of version (never a remix for the original,
+    /// never clean for explicit), a title that starts the same way or names the same song, and a length within 10 s
+    /// (or 5 %). Such a song is saved and marked for the user to check.
+    /// </summary>
+    internal static bool Close(MusicRequest wanted, string artist, string title, TimeSpan? duration)
+    {
+        if (string.IsNullOrWhiteSpace(artist) || string.IsNullOrWhiteSpace(title)) return false;
+        title = Uncensored(title); wanted = wanted with { Title = Uncensored(wanted.Title) };
+        if (wanted.Explicit == true && Regex.IsMatch(title, @"\b(clean|censored|radio edit)\b", RegexOptions.IgnoreCase)) return false;
+        foreach (var version in new[] { "live", "remix", "instrumental", "acoustic", "cover", "sped up", "slowed", "karaoke", "nightcore", "8d" })
+            if (Regex.IsMatch(wanted.Title, @"\b" + version + @"\b", RegexOptions.IgnoreCase) != Regex.IsMatch(title, @"\b" + version + @"\b", RegexOptions.IgnoreCase)) return false;
+        if (wanted.Duration is { } length && duration is { } other && Math.Abs((length - other).TotalSeconds) > Math.Max(10, length.TotalSeconds * 0.05)) return false;
+        static IEnumerable<string> ArtistKeys(string value) => Regex.Split(value, @"\s*(?:,|&|;|/|\bfeat\.?|\bft\.?|\bfeaturing\b|\bx\b)\s*", RegexOptions.IgnoreCase).Select(Key).Where(k => k.Length > 0);
+        if (!ArtistKeys(wanted.Artist).Intersect(ArtistKeys(artist)).Any()) return false;
+        string a = Title(wanted.Title).Name, b = Title(title).Name;
+        if (a == b) return true;
+        string shorter = a.Length <= b.Length ? a : b, longer = a.Length <= b.Length ? b : a;
+        return shorter.Length >= 5 && longer.StartsWith(shorter, StringComparison.Ordinal);
+    }
+
+    private static bool Strict(MusicRequest wanted, string artist, string title, TimeSpan? duration)
     {
         if (string.IsNullOrWhiteSpace(artist) || string.IsNullOrWhiteSpace(title)) return false;
         // Catalogs star a censored word differently: Spotify "I'M DAT N***A", Deezer "I'M DAT N****" (owner #79).

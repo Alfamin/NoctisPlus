@@ -276,7 +276,7 @@ public partial class LibrarySongsView : UserControl, ITrackSelectionSource
     /// <summary>Child lookups for <see cref="OnTitleCellLayoutUpdated"/>, resolved once
     /// per cell and stashed in Tag: LayoutUpdated fires after EVERY window layout pass,
     /// and a template cell's children never change (recycling reuses the same Grid).</summary>
-    private sealed record TitleCellChildren(TextBlock Title, Border? ExplicitBadge, Border? ArtThumb);
+    private sealed record TitleCellChildren(TextBlock Title, Border? ExplicitBadge, Border? ArtThumb, Border? CheckMark = null);
 
     private static void OnTitleCellLayoutUpdated(object? sender, EventArgs e)
     {
@@ -295,7 +295,8 @@ public partial class LibrarySongsView : UserControl, ITrackSelectionSource
                 .FirstOrDefault(b => b.Classes.Contains("explicit-badge"));
             var artThumb = titleCell.Children.OfType<Border>()
                 .FirstOrDefault(b => b.Classes.Contains("row-art"));
-            children = new TitleCellChildren(title, explicitBadge, artThumb);
+            children = new TitleCellChildren(title, explicitBadge, artThumb,
+                titleCell.Children.OfType<Border>().FirstOrDefault(b => b.Classes.Contains("check-mark")));
             titleCell.Tag = children;
         }
 
@@ -305,6 +306,8 @@ public partial class LibrarySongsView : UserControl, ITrackSelectionSource
             reservedWidth += ReservedWidth(children.ExplicitBadge);
         if (children.ArtThumb?.IsVisible == true)
             reservedWidth += ReservedWidth(children.ArtThumb);
+        if (children.CheckMark?.IsVisible == true)
+            reservedWidth += ReservedWidth(children.CheckMark);
 
         var maxTitleWidth = Math.Max(0, titleCell.Bounds.Width - reservedWidth);
         if (Math.Abs(children.Title.MaxWidth - maxTitleWidth) > 0.5)

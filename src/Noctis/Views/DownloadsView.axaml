@@ -180,6 +180,40 @@
             <TextBlock Text="{Binding Status}" IsVisible="{Binding Status, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"
                        FontSize="12" Foreground="#FF6B6B" TextWrapping="Wrap" />
 
+            <!-- Owner #93: songs only a close match supplied. They are in Songs already; listen, then ✓ or Not it. -->
+            <StackPanel IsVisible="{Binding HasToCheck}">
+                <TextBlock Classes="section" Text="Check these" />
+                <ItemsControl ItemsSource="{Binding ToCheck}">
+                    <ItemsControl.ItemTemplate>
+                        <DataTemplate x:DataType="vm:CheckRow">
+                            <Border Classes="download-row" Height="52" Margin="0,3" CornerRadius="6" Background="{DynamicResource HomeCardBackground}">
+                                <Grid ColumnDefinitions="52,*,Auto">
+                                    <Button Classes="row-icon" Width="36" Height="36" CornerRadius="5" HorizontalAlignment="Center" ToolTip.Tip="Listen"
+                                            AutomationProperties.Name="Listen" IsEnabled="{Binding Local, Converter={x:Static ObjectConverters.IsNotNull}}"
+                                            Command="{Binding $parent[UserControl].((vm:DownloadsViewModel)DataContext).TogglePlayTrackCommand}" CommandParameter="{Binding Local}">
+                                        <Viewbox Width="12" Height="12" Margin="1,0,0,0"><Path Data="{StaticResource PlayIcon}" Fill="{Binding $parent[Button].Foreground}" /></Viewbox>
+                                    </Button>
+                                    <StackPanel Grid.Column="1" Spacing="1" VerticalAlignment="Center" Margin="2,0,16,0">
+                                        <TextBlock FontSize="13" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" MaxLines="1">
+                                            <Run Text="{Binding Title, Mode=OneWay}" /><Run Text="{Binding Artist, Mode=OneWay, StringFormat=' · {0}'}" FontWeight="Normal" />
+                                        </TextBlock>
+                                        <TextBlock Text="Closest match · is it right?" FontSize="11" Opacity="0.55" />
+                                    </StackPanel>
+                                    <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="6" Margin="0,0,10,0" VerticalAlignment="Center">
+                                        <Button Classes="row-icon" ToolTip.Tip="It's right" AutomationProperties.Name="It's right"
+                                                Command="{Binding $parent[UserControl].((vm:DownloadsViewModel)DataContext).KeepCheckedCommand}" CommandParameter="{Binding}">
+                                            <PathIcon Data="{StaticResource CheckmarkIcon}" Width="13" Height="13" Foreground="{DynamicResource AccentColorBrush}" />
+                                        </Button>
+                                        <Button Classes="grey-pill" Content="Not it" ToolTip.Tip="Remove it and search for the right one"
+                                                Command="{Binding $parent[UserControl].((vm:DownloadsViewModel)DataContext).NotItCommand}" CommandParameter="{Binding}" />
+                                    </StackPanel>
+                                </Grid>
+                            </Border>
+                        </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                </ItemsControl>
+            </StackPanel>
+
             <StackPanel IsVisible="{Binding HasPending}">
                 <TextBlock Classes="section" Text="Queue" />
                 <ItemsControl ItemsSource="{Binding Pending}" ItemTemplate="{StaticResource DownloadRowTemplate}" />

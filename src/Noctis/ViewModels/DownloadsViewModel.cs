@@ -5,6 +5,7 @@ using CommunityToolkit.Mvvm.Input;
 using Noctis.Services.Search;
 using Noctis.Services;
 using Noctis.Models;
+using Noctis.Helpers;
 
 namespace Noctis.ViewModels;
 
@@ -38,7 +39,40 @@ public sealed partial class DownloadsViewModel : ViewModelBase, IDisposable
         if (_library is not null) _library.LibraryUpdated += OnLibraryUpdated;
         RebuildLibrary();
         OnlineMusicSearch.CurrentChanged += OnSourceChanged;
+        FreeMusicFinder.CheckThese.Changed += OnCheckChanged;
         Attach(OnlineMusicSearch.Current?.Downloads);
+    }
+
+    /// <summary>Owner #93: songs only a close match supplied, kept in Songs; listen, then ✓ or "Not it".</summary>
+    public ObservableCollection<CheckRow> ToCheck { get; } = new();
+    [ObservableProperty, NotifyPropertyChangedFor(nameof(IsEmpty))] private bool _hasToCheck;
+    private void OnCheckChanged() => Dispatcher.UIThread.Post(() => { if (!_disposed) RefreshToCheck(); });
+    private void RefreshToCheck()
+    {
+        var rows = FreeMusicFinder.CheckThese.Entries.Select(e => new CheckRow(e.Path, e.Title, e.Artist,
+            PathKey(e.Path) is { } key && _tracksByPath.TryGetValue(key, out var track) ? track : null)).ToList();
+        if (!rows.Select(r => (r.Path, r.Local)).SequenceEqual(ToCheck.Select(r => (r.Path, r.Local))))
+        {
+            ToCheck.Clear();
+            foreach (var row in rows) ToCheck.Add(row);
+        }
+        HasToCheck = ToCheck.Count > 0;
+        // The Songs row mark: a few tracks at most, found by path.
+        var marked = new HashSet<Track>(rows.Select(r => r.Local).OfType<Track>(), ReferenceEqualityComparer.Instance);
+        foreach (var track in _marked) if (!marked.Contains(track)) track.NeedsCheck = false;
+        foreach (var track in marked) track.NeedsCheck = true;
+        _marked = marked;
+    }
+    private HashSet<Track> _marked = new(ReferenceEqualityComparer.Instance);
+    [RelayCommand] private void KeepChecked(CheckRow? row) { if (row is not null) FreeMusicFinder.CheckThese.Remove(row.Path); }
+    /// <summary>The wrong song: the app's own Remove from library (keep or recycle the file), then Search for the right one.</summary>
+    [RelayCommand]
+    private async Task NotIt(CheckRow? row)
+    {
+        if (row is null) return;
+        if (row.Local is { } track && _library is not null && !await LibraryRemovalHelper.RemoveWithPromptAsync(_library, [track])) return;
+        FreeMusicFinder.CheckThese.Remove(row.Path);
+        OnlineMusicSearch.RequestOpen(row.Artist + " " + row.Title);
     }
 
     /// <summary>Running, next, queued and failed requests.</summary>
@@ -55,7 +89,7 @@ public sealed partial class DownloadsViewModel : ViewModelBase, IDisposable
     [ObservableProperty, NotifyPropertyChangedFor(nameof(IsEmpty))] private bool _hasFinished;
     [ObservableProperty] private string _status = "";
 
-    public bool IsEmpty => !HasPending && !HasFinished;
+    public bool IsEmpty => !HasPending && !HasFinished && !HasToCheck;
     public bool IsAvailable => _queue is not null;
 
     private void OnSourceChanged(object? sender, EventArgs e) => Dispatcher.UIThread.Post(() =>
@@ -66,6 +100,7 @@ public sealed partial class DownloadsViewModel : ViewModelBase, IDisposable
         if (_disposed) return;
         RebuildLibrary();
         foreach (var row in Finished) Resolve(row);
+        RefreshToCheck();
     });
 
     private void RebuildLibrary()
@@ -115,6 +150,7 @@ public sealed partial class DownloadsViewModel : ViewModelBase, IDisposable
         if (_queue is not null) _queue.Changed += OnQueueChanged;
         OnPropertyChanged(nameof(IsAvailable));
         Refresh();
+        RefreshToCheck();
     }
 
     /// <summary>Progress fires many times a second: coalesce into one refresh per frame-ish.</summary>
@@ -129,7 +165,7 @@ public sealed partial class DownloadsViewModel : ViewModelBase, IDisposable
     {
         // Startup cache loading does not always announce an update. Navigation still catches it.
         var libraryRebuilt = _library is not null && _tracks.Count != _library.Tracks.Count;
-        if (libraryRebuilt) RebuildLibrary();
+        if (libraryRebuilt) { RebuildLibrary(); RefreshToCheck(); }
         var entries = _queue?.Snapshot() ?? [];
         var pending = new List<DownloadRow>();
         var finished = new List<DownloadRow>();
@@ -225,9 +261,13 @@ public sealed partial class DownloadsViewModel : ViewModelBase, IDisposable
         _disposed = true;
         if (_library is not null) _library.LibraryUpdated -= OnLibraryUpdated;
         OnlineMusicSearch.CurrentChanged -= OnSourceChanged;
+        FreeMusicFinder.CheckThese.Changed -= OnCheckChanged;
         Attach(null);
     }
 }
+
+/// <summary>Owner #93: one song to check on the Downloads page.</summary>
+public sealed record CheckRow(string Path, string Title, string Artist, Track? Local);
 
 /// <summary>One request on the Downloads page.</summary>
 public sealed partial class DownloadRow : ObservableObject

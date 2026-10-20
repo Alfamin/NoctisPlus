@@ -7,6 +7,9 @@ internal sealed record MusicRequest(string Title, string Artist, double? Seconds
     bool? Explicit = null, string? Playlist = null, int Position = 0, int? MessageId = null, string? CachedFrom = null, string? PreferredSource = null, string? OriginUri = null,
     BotSelection? Selection = null, AudioQuality? Quality = null)
 {
+    /// <summary>Owner #93: the second-chance pass after both bots found nothing: plainer names are asked and a close match
+    /// is taken (the song is then marked for the user to check). Never saved with a queued request.</summary>
+    [System.Text.Json.Serialization.JsonIgnore] public bool Loose { get; init; }
     public TimeSpan? Duration => Seconds is > 0 and <= 86400 ? TimeSpan.FromSeconds(Seconds.Value) : null;
     public string Identity => OriginUri is {Length:>0} ? OriginUri : Url is { Length: > 0 } ? Url : BotText.Key(Artist) + "|" + BotText.Key(Title) + "|" + Seconds;
 }
@@ -170,6 +173,26 @@ internal sealed class MusicSources
         finally { _searchGate.Release(); }
     }
     public async Task<string> FetchAsync(MusicRequest request, Stream output, IProgress<double>? progress, CancellationToken ct)
+    {
+        CheckThese.TakeFetched(request);
+        try { return await FetchOnceAsync(request, output, progress, ct).ConfigureAwait(false); }
+        // Owner #93: one more pass with plainer names and close matches, only after both bots found nothing; most songs never
+        // get here. What it finds is saved and marked "check this".
+        catch (TrackUnavailableException first) when (!request.Loose && !ct.IsCancellationRequested)
+        {
+            Trace($"fetch \"{request.Title}\": nothing exact; trying plainer names and close matches");
+            try
+            {
+                var ext = await FetchOnceAsync(request with { Loose = true }, output, progress, ct).ConfigureAwait(false);
+                CheckThese.Fetched(request);
+                Trace($"fetch \"{request.Title}\": a close match was taken; marked to check");
+                return ext;
+            }
+            catch (TrackUnavailableException) { throw first; }
+        }
+    }
+
+    private async Task<string> FetchOnceAsync(MusicRequest request, Stream output, IProgress<double>? progress, CancellationToken ct)
     {
         // Owner 10-18: a click took about a minute before any bot saw a message; these lines (always in
         // session.log) say where the time went: this gate, the quality check, or a bot.

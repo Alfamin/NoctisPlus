@@ -416,9 +416,21 @@ internal sealed class Downloads : IDisposable
                 }
             }
             // Owner #87: a streamed song stays in the cache, out of the library, unless the user added it meanwhile.
-            if (savedPath is not null && IsCached(download)) { if (download.KeepIn is { } library && CopyKept(savedPath, library) is null) lock (_gate) download.KeepIn = null; }
+            // Owner #93: only a close match supplied it: the song is kept and marked for the user to check.
+            var unsure = download.Track.Request is { } wanted && CheckThese.TakeFetched(wanted);
+            if (savedPath is not null && IsCached(download))
+            {
+                if (download.KeepIn is { } library)
+                {
+                    if (CopyKept(savedPath, library) is not { } kept) lock (_gate) download.KeepIn = null;
+                    else if (unsure) CheckThese.Add(kept, download.Track.Request!);
+                }
+            }
             else if (outcome == DownloadOutcome.Saved && savedPath is not null)
+            {
+                if (unsure) CheckThese.Add(savedPath, download.Track.Request!);
                 Noctis.Services.Search.OnlineMusicSearch.PublishSavedFile(savedPath);
+            }
         }
         // Whatever the stopped transfer threw: a held-back song goes back to the queue.
         catch (Exception) when (ct.IsCancellationRequested && download.Preempted && !_stop.IsCancellationRequested)

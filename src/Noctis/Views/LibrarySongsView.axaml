@@ -313,7 +313,7 @@
 
                         <!-- Artwork + Title + Explicit badge -->
                         <Grid Grid.Column="0"
-                              ColumnDefinitions="Auto,Auto,Auto"
+                              ColumnDefinitions="Auto,Auto,Auto,Auto"
                               ClipToBounds="True"
                               VerticalAlignment="Center"
                               LayoutUpdated="OnTitleCellLayoutUpdated">
@@ -385,6 +385,13 @@
                                            Classes="explicit-badge-text compact"
                                            FontSize="8"
                                            Opacity="0.9" />
+                            </Border>
+                            <!-- Owner #93: only a close match supplied this download; check it in Downloads. -->
+                            <Border Grid.Column="3" Classes="check-mark" Width="14" Height="14" CornerRadius="7" Margin="4,0,4,0"
+                                    VerticalAlignment="Center" Background="{DynamicResource AccentColorBrush}"
+                                    IsVisible="{Binding NeedsCheck}" ToolTip.Tip="Closest match · check it in Downloads">
+                                <TextBlock Text="?" FontSize="9" FontWeight="Bold" Foreground="{DynamicResource AccentForegroundBrush}"
+                                           HorizontalAlignment="Center" VerticalAlignment="Center" />
                             </Border>
                         </Grid>
 

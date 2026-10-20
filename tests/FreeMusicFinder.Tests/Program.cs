@@ -76,6 +76,7 @@ try
     await BotSelectionTests.RunAsync();
     await HunterLinkTests.RunAsync();
     await BotPreferenceTests.RunAsync();
+    await CheckTheseTests.RunAsync();
     await SpotifyPlaylistTests.RunAsync();
     await PlaylistSearchTests.RunAsync();
     await DiscoveryTests.RunAsync();
