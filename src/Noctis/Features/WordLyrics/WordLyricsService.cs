@@ -56,6 +56,10 @@ internal sealed class WordLyricsService(ILibraryService library, Func<AppSetting
         _worker = new Worker(host.DataDirectory, () => _folders, ReadOptions(), Log, Notify, Progress,
             lyricsWritten: paths => Dispatcher.UIThread.Post(() => { if (!_disposed) LyricsWritten?.Invoke(paths); }));
         _worker.StatusChanged += SongStatusChanged;
+        // Owner #96: song copies earlier runs left that are exact duplicates of their song go (in the background, after
+        // startup has settled, at low priority).
+        try { BackupCleaner.CleanEarlierLater(new Tool(_worker.Options.Folder).Folder, Log, TimeSpan.FromMinutes(2)); }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or ArgumentException) { }
         library.LibraryUpdated += LibraryChanged;
         library.MusicFoldersChanged += FoldersChanged;
         OnlineMusicSearch.FileSaved += DownloadSaved;

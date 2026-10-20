@@ -732,6 +732,8 @@ internal sealed class Worker : IDisposable
                 var root = document.RootElement;
                 error = Text(root, "error");
                 report = Path.Combine(Text(root, "run_folder"), "report.html");
+                // Owner #96: the run is over; its song copies that match their song exactly are duplicates now.
+                if (Text(root, "run_folder") is { Length: > 0 } runFolder) BackupCleaner.CleanLater(runFolder, _log);
                 if (root.TryGetProperty("songs", out var songs) && songs.ValueKind == JsonValueKind.Array)
                     foreach (var song in songs.EnumerateArray())
                     {
