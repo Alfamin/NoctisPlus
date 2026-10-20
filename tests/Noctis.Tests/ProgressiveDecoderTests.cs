@@ -104,19 +104,21 @@ public class ProgressiveDecoderTests(ITestOutputHelper output)
         Assert.True(heard.Length >= rate * (seconds - 0.5), $"only {heard.Length / (double)rate:0.00} s of {seconds} s delivered");
     }
 
-    [Fact]
-    public async Task LongPauseOfCallbackInput_KeepsEveryDecodedSecond()
+    [Theory]
+    [InlineData("flac")]
+    [InlineData("mp3")]
+    public async Task LongPauseOfCallbackInput_KeepsEveryDecodedSecond(string format)
     {
         if (!OperatingSystem.IsWindows()) Assert.Skip("Requires bundled Windows LibVLC.");
         Core.Initialize();
         using var data = new TestPersistenceService();
         const int rate = 48000, seconds = 8;
-        var audio = await AudioAsync("flac", data.DataDirectory, wave: TimeCoded(seconds));
+        var audio = await AudioAsync(format, data.DataDirectory, wave: TimeCoded(seconds));
         using var buffer = new ProgressiveAudioBuffer(new FileStream(Path.Combine(data.DataDirectory, "paused.part"), FileMode.Create, FileAccess.ReadWrite, FileShare.ReadWrite | FileShare.Delete, 1));
         buffer.Begin(audio.Length); buffer.Writer.Write(audio); buffer.Finish();
         using var input = new ProgressiveMediaInput(buffer);
         using var vlc = new LibVLC("--intf=dummy", "--no-video", "--no-stats", "--quiet");
-        using var media = new Media(vlc, input); ProgressiveMedia.Configure(media, "paused.flac");
+        using var media = new Media(vlc, input); ProgressiveMedia.Configure(media, "paused." + format);
         using var player = new MediaPlayer(vlc);
         var segment = new GaplessTrackSegment(rate, 1, 0, capacitySeconds: 2);
         var drops = 0;
