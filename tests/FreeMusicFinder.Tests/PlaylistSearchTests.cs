@@ -16,6 +16,8 @@ internal static class PlaylistSearchTests
         /// <summary>Serve Spotify's paged playlist query: this many entries (0: answer it like an unknown page).</summary>
         public int PagedTotal;
         public bool ShortPage;
+        /// <summary>This entry comes without an id (a song removed from Spotify).</summary>
+        public int NoIdAt = -1;
         public int PageCalls;
         public string LastSearch = "", LastDeezer = "";
         public int Unauthorized;
@@ -41,6 +43,7 @@ internal static class PlaylistSearchTests
                 var count = Math.Min(100, PagedTotal - offset) - (ShortPage && offset > 0 ? 1 : 0);
                 var items = Enumerable.Range(offset, Math.Max(0, count)).Select(i => (object)(i switch
                 {
+                    _ when i == NoIdAt => new { itemV2 = new { data = new { __typename = "NotFound" } } },
                     4 => new { itemV2 = new { data = new { __typename = "LocalTrack", uri = "spotify:local:Local+Artist::Local+Song:200" } } },
                     7 => new { itemV2 = new { data = new { __typename = "Episode", uri = "spotify:episode:" + SpotifyPlaylistTests.Id(7) } } },
                     _ => new { itemV2 = new { data = new
@@ -174,7 +177,8 @@ internal static class PlaylistSearchTests
             await imports.ImportAsync(SpotifyPlaylistTests.Url(2), default); // songs 2, 1, 3, read from the embed pages: no covers
             var job = imports.Jobs[0];
             Check.True(job.Manifest!.Entries.All(e => e.Artwork.Length == 0), "an import read without covers has none");
-            http.PagedTotal = 3; var pages = http.PageCalls; // Spotify's paged list lists songs 0, 1, 2 with covers
+            // Spotify's paged list lists songs 0, 1, 2 with covers, and one it removed (no id), which once refused the list.
+            http.PagedTotal = 4; http.NoIdAt = 3; var pages = http.PageCalls;
             Check.Equal("https://i.scdn.co/image/a1", await imports.ArtworkForAsync("spotify:" + SpotifyPlaylistTests.Id(1), default), "a queued song's cover is filled in from the paged list");
             Check.Equal("https://i.scdn.co/image/a2", imports.ArtworkFor("spotify:" + SpotifyPlaylistTests.Id(2)), "with the rest of the playlist's");
             Check.True(imports.EntriesFor(job.LibraryId)!.First(e => e.Position == 1).Artwork == "https://i.scdn.co/image/a2", "the playlist page shows them");

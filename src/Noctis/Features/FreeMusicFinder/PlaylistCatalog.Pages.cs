@@ -15,19 +15,21 @@ internal sealed partial class PlaylistCatalog
     internal const int PageSize = 100;
 
     /// <summary>The whole list with metadata, or null when Spotify's answer is not the expected one.</summary>
-    internal async Task<PlaylistManifest?> FullPlaylistAsync(MusicLink link, CancellationToken ct)
+    /// <param name="lenient">Owner #104: for covers only: an entry Spotify gives without an id (a song removed from the
+    /// service) is kept as an empty entry instead of refusing the whole list.</param>
+    internal async Task<PlaylistManifest?> FullPlaylistAsync(MusicLink link, CancellationToken ct, bool lenient = false)
     {
         try
         {
             var token = await TokenAsync(ct).ConfigureAwait(false);
-            var first = await PageAsync(link.Id, 0, token, ct).ConfigureAwait(false);
+            var first = await PageAsync(link.Id, 0, token, ct, lenient).ConfigureAwait(false);
             if (first.Total is < 0 or > 10000) return null;
             var pages = new List<CatalogEntry>[(first.Total + PageSize - 1) / PageSize];
             if (pages.Length > 0) pages[0] = first.Entries;
             var offsets = Enumerable.Range(1, Math.Max(0, pages.Length - 1)).ToArray();
             await Parallel.ForEachAsync(offsets, new ParallelOptions { MaxDegreeOfParallelism = 4, CancellationToken = ct }, async (page, cancel) =>
             {
-                var next = await PageAsync(link.Id, page * PageSize, token, cancel).ConfigureAwait(false);
+                var next = await PageAsync(link.Id, page * PageSize, token, cancel, lenient).ConfigureAwait(false);
                 if (next.Total != first.Total) throw new InvalidDataException("PLAYLIST_CHANGED: its size changed while reading.");
                 pages[page] = next.Entries;
             }).ConfigureAwait(false);
@@ -43,18 +45,18 @@ internal sealed partial class PlaylistCatalog
         }
     }
 
-    private async Task<(string Name, int Total, List<CatalogEntry> Entries)> PageAsync(string id, int offset, string token, CancellationToken ct)
+    private async Task<(string Name, int Total, List<CatalogEntry> Entries)> PageAsync(string id, int offset, string token, CancellationToken ct, bool lenient = false)
     {
         var variables = JsonSerializer.Serialize(new { uri = "spotify:playlist:" + id, offset, limit = PageSize, enableWatchFeedEntrypoint = false });
         var url = "https://api-partner.spotify.com/pathfinder/v1/query?operationName=fetchPlaylist&variables=" + Uri.EscapeDataString(variables) +
             "&extensions=" + Uri.EscapeDataString("{\"persistedQuery\":{\"version\":1,\"sha256Hash\":\"" + PlaylistHash + "\"}}");
-        var page = ParsePlaylistPage(await Get(url, token, ct).ConfigureAwait(false));
+        var page = ParsePlaylistPage(await Get(url, token, ct).ConfigureAwait(false), lenient);
         var expected = Math.Min(PageSize, page.Total - offset);
         if (page.Entries.Count != expected) throw new InvalidDataException($"METADATA_INCOMPLETE: Spotify returned {page.Entries.Count} of {expected} entries at {offset}.");
         return page;
     }
 
-    internal static (string Name, int Total, List<CatalogEntry> Entries) ParsePlaylistPage(string raw)
+    internal static (string Name, int Total, List<CatalogEntry> Entries) ParsePlaylistPage(string raw, bool lenient = false)
     {
         using var doc = JsonDocument.Parse(raw, new JsonDocumentOptions { MaxDepth = 96 });
         if (Path(doc.RootElement, ["data", "playlistV2"]) is not { ValueKind: JsonValueKind.Object } playlist ||
@@ -64,8 +66,13 @@ internal sealed partial class PlaylistCatalog
         var entries = new List<CatalogEntry>();
         foreach (var item in items.EnumerateArray())
         {
-            if (Path(item, ["itemV2", "data"]) is not { ValueKind: JsonValueKind.Object } data) throw new InvalidDataException("METADATA_INCOMPLETE: an entry has no data.");
+            if (Path(item, ["itemV2", "data"]) is not { ValueKind: JsonValueKind.Object } data)
+            {
+                if (lenient) { entries.Add(new CatalogEntry()); continue; }
+                throw new InvalidDataException("METADATA_INCOMPLETE: an entry has no data.");
+            }
             var uri = String(data, "uri", "");
+            if (lenient && uri.Length == 0) { entries.Add(new CatalogEntry()); continue; }
             if (uri.Length is 0 or > 1000) throw new InvalidDataException("METADATA_INCOMPLETE: a playlist entry has no identifier.");
             var entry = new CatalogEntry { Uri = uri };
             if (String(data, "__typename", "") == "Track" && Regex.IsMatch(uri, @"^spotify:track:[A-Za-z0-9]{22}$"))

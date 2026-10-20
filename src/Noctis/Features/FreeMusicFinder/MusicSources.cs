@@ -104,6 +104,8 @@ internal sealed class MusicSources
     private readonly Func<bool> _preferFlac;
     private readonly Func<AudioQuality>? _quality;
     private readonly Func<string>? _firstBot;
+    /// <summary>Owner #105: the files the bots already sent, looked at before either bot is asked.</summary>
+    internal IChatFiles? Chats { get; set; }
     /// <param name="allowMp3">Whether an MP3 is taken when no bot has the recording in FLAC (a leak, say). Asked per song.</param>
     public MusicSources(IMusicSource primary, IMusicSource backup, Action<string> notice, string? state = null, Func<DateTimeOffset>? now = null, Func<bool>? allowMp3 = null, Func<bool>? preferFlac = null, Func<AudioQuality>? quality = null, Func<string>? firstBot = null)
     {
@@ -197,16 +199,29 @@ internal sealed class MusicSources
         // Owner 10-18: a click took about a minute before any bot saw a message; these lines (always in
         // session.log) say where the time went: this gate, the quality check, or a bot.
         var clock = System.Diagnostics.Stopwatch.StartNew();
+        var preferred = _quality?.Invoke();
+        var allowMp3 = preferred == AudioQuality.MP3 || _allowMp3();
+        var preferFlac = preferred is { } format ? format == AudioQuality.FLAC : _preferFlac();
+        if (output is Noctis.Features.ProgressivePlayback.IProgressiveAudioWriter publisher)
+            publisher.SetFormatPolicy(ext => ext == "flac" ? preferred != AudioQuality.MP3 : ext == "mp3" && allowMp3 && !preferFlac);
+        // Owner #105: a file either bot already sent is taken from its chat, before any bot is asked and without waiting for a
+        // bot lane. A song missing from the chats goes on below as before.
+        if (Chats is { } chats)
+        {
+            try
+            {
+                var wanted = preferred is null ? request : request with { Quality = preferred };
+                if (await chats.FetchAsync(wanted, ext => ext == "flac" ? preferred != AudioQuality.MP3 : ext == "mp3" && (preferred == AudioQuality.MP3 || allowMp3 && !preferFlac),
+                    output, progress, ct).ConfigureAwait(false) is { } found) return found;
+            }
+            catch (Exception ex) when (!ct.IsCancellationRequested && ex is not OperationCanceledException)
+            { Trace($"fetch \"{request.Title}\": the chats' copy failed ({ex.Message}); asking the bots"); }
+        }
         await _gate.WaitAsync(ct).ConfigureAwait(false);
         Trace($"fetch \"{request.Title}\": gate {clock.Elapsed.TotalSeconds:0.0} s");
         try
         {
             CheckGlobal(); var errors = new List<string>();
-            var preferred = _quality?.Invoke();
-            var allowMp3 = preferred == AudioQuality.MP3 || _allowMp3();
-            var preferFlac = preferred is { } format ? format == AudioQuality.FLAC : _preferFlac();
-            if (output is Noctis.Features.ProgressivePlayback.IProgressiveAudioWriter publisher)
-                publisher.SetFormatPolicy(ext => ext == "flac" ? preferred != AudioQuality.MP3 : ext == "mp3" && allowMp3 && !preferFlac);
             var qualityErrors = await ConfigureQualityAsync(progress, ct, preferred).ConfigureAwait(false);
             Trace($"fetch \"{request.Title}\": quality checked at {clock.Elapsed.TotalSeconds:0.0} s ({qualityErrors.Count} unconfirmed)");
             if (preferred is not null) request = request with { Quality = preferred };

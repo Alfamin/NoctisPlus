@@ -28,7 +28,9 @@ internal sealed class HunterMusicSource : IRacingMusicSource, IQualityMusicSourc
     {
         request=BotSelections.ForSource(request,Id);
         var clock=System.Diagnostics.Stopwatch.StartNew();
-        if(_account is not null && await TryCachedAsync(request,output,progress,ct).ConfigureAwait(false) is {} cached)return cached;
+        // Owner #105: with the song index read up to now, the chat was already looked at (MusicSources.Chats); only the
+        // file a request names by its message is checked here.
+        if(_account is not null && await TryCachedAsync(request,output,progress,ct,BotLibrary.Current?.UpToDate(TelegramBotSource.Bot)==true).ConfigureAwait(false) is {} cached)return cached;
         Noctis.Services.DebugLog.Write("Finder",$"Music Hunters: chat history checked in {clock.Elapsed.TotalSeconds:0.0} s");
         if(request.Selection is not null)
         {
@@ -103,12 +105,12 @@ internal sealed class HunterMusicSource : IRacingMusicSource, IQualityMusicSourc
         catch (Exception ex) when (ex is OperationCanceledException or TimeoutException or HttpRequestException or IOException or InvalidOperationException or ArgumentException or System.Text.Json.JsonException)
         { return null; } // Optional metadata must not delay or break a successful name search.
     }
-    private async Task<string?> TryCachedAsync(MusicRequest request,Stream output,IProgress<double>? progress,CancellationToken ct)
+    private async Task<string?> TryCachedAsync(MusicRequest request,Stream output,IProgress<double>? progress,CancellationToken ct,bool indexed=false)
     {
         var account=_account!;
         var cachedClient=await account.ConnectAsync(ct).ConfigureAwait(false);
         var cachedPeer=await account.BotAsync(cachedClient,TelegramBotSource.Bot).ConfigureAwait(false);
-        if(await TelegramAudioCache.Find(cachedClient,cachedPeer,request,ct).ConfigureAwait(false) is {} existing)
+        if(!indexed && await TelegramAudioCache.Find(cachedClient,cachedPeer,request,ct).ConfigureAwait(false) is {} existing)
         {
             await AudioFileTransfer.DownloadAsync(account,cachedClient,existing,output,progress,ct).ConfigureAwait(false);
             return TelegramBotSource.Extension(existing)!;

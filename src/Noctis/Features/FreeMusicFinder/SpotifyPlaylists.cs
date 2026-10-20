@@ -93,9 +93,9 @@ internal sealed class SpotifyPlaylists : IDisposable
         var filled = 0; var read = false;
         try
         {
-            if (await _catalog.FullPlaylistAsync(link, ct).ConfigureAwait(false) is not { } paged) return;
+            if (await _catalog.FullPlaylistAsync(link, ct, lenient: true).ConfigureAwait(false) is not { } paged) return;
             read = true; // once a session: songs Spotify has no cover for are not asked again on every refresh
-            var covers = paged.Entries.Where(e => ArtistCatalog.ArtworkUrl(e.Artwork)).GroupBy(e => e.Uri).ToDictionary(g => g.Key, g => g.First());
+            var covers = paged.Entries.Where(e => e.Uri.Length > 0 && ArtistCatalog.ArtworkUrl(e.Artwork)).GroupBy(e => e.Uri).ToDictionary(g => g.Key, g => g.First());
             lock (_gate)
             {
                 foreach (var entry in job.Manifest?.Entries ?? [])

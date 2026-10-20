@@ -79,6 +79,7 @@ try
     await CheckTheseTests.RunAsync();
     await SpotifyPlaylistTests.RunAsync();
     await PlaylistSearchTests.RunAsync();
+    await BotLibraryTests.RunAsync();
     await DiscoveryTests.RunAsync();
     await UnifiedSearchTests.RunAsync();
     await CatalogPerformanceTests.RunAsync();

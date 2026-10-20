@@ -91,6 +91,10 @@ public sealed class FreeMusicPlugin : INoctisPlugin
         _bot = new MusicSources(new HunterMusicSource(_telegram,Log, ResolveHunterLinkAsync),_deezLoad,Announce,
             Path.Combine(host.DataDirectory,"source-limits.json"),allowMp3:()=>_preferredQuality == AudioQuality.MP3 || _allowMp3,
             preferFlac: () => _preferredQuality == AudioQuality.FLAC, quality: () => _preferredQuality, firstBot: () => _firstBot);
+        // Owner #105: every song the bots already sent, so none is asked for twice; read in the background after start.
+        BotLibrary.Current = new BotLibrary(Path.Combine(host.DataDirectory, "bot-songs.json"), new TelegramBotChats(_telegram));
+        _bot.Chats = BotLibrary.Current;
+        _ = Task.Run(async () => { await Task.Delay(TimeSpan.FromSeconds(8)).ConfigureAwait(false); await (BotLibrary.Current?.SyncAsync() ?? Task.CompletedTask).ConfigureAwait(false); });
         _downloads = new Downloads(Log,Path.Combine(host.DataDirectory,"download-queue.json"),_bot.Track);
         // Owner #87: played-only songs live here, never in the library.
         _streamCache = StreamCache.Folder(host.DataDirectory);

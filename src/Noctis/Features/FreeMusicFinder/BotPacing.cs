@@ -14,7 +14,12 @@ internal static class BotPacing
     private static readonly ConcurrentDictionary<string, long> Sent = new(StringComparer.Ordinal);
 
     /// <summary>The bot just sent a file.</summary>
-    public static void Answered(string bot) => Sent[bot] = Stopwatch.GetTimestamp();
+    public static void Answered(string bot)
+    {
+        Sent[bot] = Stopwatch.GetTimestamp();
+        // Owner #105: the new file goes into the song index at once, so it is never asked for again.
+        BotLibrary.Current?.Touch(bot == "deezload" ? DeezLoadSource.Bot : TelegramBotSource.Bot);
+    }
 
     /// <summary>Waits, if needed, so this message reaches the bot at least <see cref="Gap"/> after its last file.</summary>
     public static async Task TurnAsync(string bot, CancellationToken ct)
