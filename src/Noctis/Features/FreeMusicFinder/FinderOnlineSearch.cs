@@ -206,6 +206,23 @@ internal sealed class FinderOnlineSearch : IOnlineMusicSearch
         catch (Exception ex) when (ex is HttpRequestException or IOException or TimeoutException or InvalidDataException) { return null; }
     }
 
+    // Owner #102: a queue row's cover. One the page already showed (any size) is used at once; else the small one.
+    public string? CachedQueueCover(OnlineSong song)
+        => song.ArtworkUrl.Length == 0 ? null
+            : CachedArtwork(song.ArtworkUrl) ?? (CatalogArtwork.ThumbUrl(song.ArtworkUrl) is { } thumb ? CachedArtwork(thumb) : null);
+
+    public async Task<string?> QueueCoverAsync(OnlineSong song, CancellationToken ct)
+    {
+        if (song.ArtworkUrl.Length == 0) return null;
+        var clock = System.Diagnostics.Stopwatch.StartNew();
+        var path = CatalogArtwork.ThumbUrl(song.ArtworkUrl) is { } thumb && thumb != song.ArtworkUrl
+            ? await ArtworkAsync(thumb, ct).ConfigureAwait(false) : null;
+        path ??= await ArtworkAsync(song.ArtworkUrl, ct).ConfigureAwait(false); // the small one was refused: the cover as it is
+        if (path is not null)
+            Noctis.Services.DebugLog.Write("Queue", $"cover of \"{song.Title}\" in {clock.ElapsedMilliseconds} ms ({new FileInfo(path).Length / 1024} KB)");
+        return path;
+    }
+
     public bool CanDownload => _signedIn();
 
     public void RequestSignIn() => _signIn();

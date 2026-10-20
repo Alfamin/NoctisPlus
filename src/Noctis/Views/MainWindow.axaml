@@ -902,23 +902,6 @@
                         <!-- Compact header: "Queue • N", and with Keep Played Songs on a
                              Clear Played button at the right end (GitHub #134). -->
                         <DockPanel DockPanel.Dock="Top" Margin="20,16,16,6">
-                        <Button x:Name="QueueForYouButton" DockPanel.Dock="Right"
-                                Classes="queue-clear-played" Padding="11,4" FontSize="12" FontWeight="SemiBold" CornerRadius="999" Margin="6,0,0,0"
-                                VerticalAlignment="Center" IsVisible="{Binding Player.TrueShuffleAvailable}"
-                                Command="{Binding Player.SelectShuffleModeCommand}"
-                                CommandParameter="{x:Static vm:PlayerShuffleMode.ForYou}"
-                                ToolTip.Tip="{loc:T Queue.ForYouTip}" AutomationProperties.Name="{loc:T Queue.ForYou}">
-                            <Button.Flyout><controls:ShuffleMenu Player="{Binding #QueueForYouButton.((vm:MainWindowViewModel)DataContext).Player}" /></Button.Flyout>
-                            <StackPanel Orientation="Horizontal" Spacing="5">
-                                <Panel Width="14" Height="14">
-                                    <PathIcon Data="{DynamicResource RailSparkleIcon}" Width="14" Height="14"
-                                              IsVisible="{Binding !Player.IsForYouShuffle}"/>
-                                    <PathIcon Data="{DynamicResource RailSparkleIcon}" Width="14" Height="14"
-                                              Foreground="{DynamicResource AccentColorBrush}" IsVisible="{Binding Player.IsForYouShuffle}"/>
-                                </Panel>
-                                <TextBlock Text="{loc:T Queue.ForYou}" VerticalAlignment="Center"/>
-                            </StackPanel>
-                        </Button>
                         <Button x:Name="QueueClearPlayedButton"
                                 DockPanel.Dock="Right"
                                 Classes="queue-clear-played"

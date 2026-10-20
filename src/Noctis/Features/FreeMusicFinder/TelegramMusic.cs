@@ -422,6 +422,7 @@ internal sealed class DeezLoadSource : IRacingMusicSource, IQualityMusicSource
         if(!MusicLink.TryParse(url,out var link) || link!.Kind!="track") throw new TrackUnavailableException("DeezLoad did not return a usable track link.");
         Noctis.Services.DebugLog.Write("Finder", $"DeezLoad: track link resolved at {phaseClock.Elapsed.TotalSeconds:0.0}s");
         await _account.StartBotAsync(client,bot,Bot,ct).ConfigureAwait(false);
+        await BotPacing.TurnAsync("deezload", ct).ConfigureAwait(false);
         var sent=await client.SendMessageAsync(bot,link.Url).WaitAsync(TimeSpan.FromSeconds(25), ct).ConfigureAwait(false);
         Noctis.Services.DebugLog.Write("Finder", $"DeezLoad: track link sent at {phaseClock.Elapsed.TotalSeconds:0.0}s");
         var end=DateTimeOffset.UtcNow.AddMinutes(15); var cursor=sent.id; var lastNotice="";
@@ -444,7 +445,7 @@ internal sealed class DeezLoadSource : IRacingMusicSource, IQualityMusicSource
                 if(BotLimits.Read(Id,m.message??"",DateTimeOffset.UtcNow) is {} limited) throw limited;
                 if(m.media is MessageMediaDocument {document:Document doc})
                 {
-                    if(Fits(request,doc)) return doc;
+                    if(Fits(request,doc)) { BotPacing.Answered("deezload"); return doc; }
                     if(Request(doc,null) is {} sentTrack){other??=Shorten(sentTrack.Artist+" - "+sentTrack.Title)+(sentTrack.Duration is {} took?$", {took:m\\:ss}":"");otherSince??=DateTimeOffset.UtcNow;}
                 }
                 if(m.message is {Length:>0} status && status!=lastNotice && (status.Contains("position in the queue") || status.Contains("Downloading")))

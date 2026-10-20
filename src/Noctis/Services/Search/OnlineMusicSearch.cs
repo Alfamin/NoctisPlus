@@ -74,6 +74,11 @@ public interface IOnlineMusicSearch
 
     /// <summary>Fetches artwork into the local cache; the file path, or null when it cannot be had.</summary>
     Task<string?> ArtworkAsync(string url, CancellationToken ct);
+    /// <summary>Owner #102: a small cover (~120 px) for a queue row: one already on disk, else null.</summary>
+    string? CachedQueueCover(OnlineSong song) => song.ArtworkUrl.Length == 0 ? null : CachedArtwork(song.ArtworkUrl);
+    /// <summary>Owner #102: fetches that small cover (a few KB); null when there is none.</summary>
+    Task<string?> QueueCoverAsync(OnlineSong song, CancellationToken ct)
+        => song.ArtworkUrl.Length == 0 ? Task.FromResult<string?>(null) : ArtworkAsync(song.ArtworkUrl, ct);
 
     /// <summary>True when downloads can start right away (signed in to the download service).</summary>
     bool CanDownload { get; }

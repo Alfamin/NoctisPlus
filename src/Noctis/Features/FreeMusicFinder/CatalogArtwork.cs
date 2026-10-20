@@ -19,6 +19,21 @@ internal static class CatalogArtwork
         return url.GetLeftPart(UriPartial.Authority) + url.AbsolutePath[..match.Index] + $"/{size}x{size}{mode}.jpg" + url.Query;
     }
 
+    /// <summary>Owner #102: the same picture made small (a queue row's cover: ~120 px is sharp there, a few KB). Deezer and
+    /// Apple resize to any size; a Spotify album cover is taken in its 300 px variant (it has only 64, 300 and 640).</summary>
+    internal static string? ThumbUrl(string? value, int size = 120)
+    {
+        if (!ArtistCatalog.ArtworkUrl(value)) return null;
+        var url = new Uri(value!);
+        if (url.Host == "i.scdn.co")
+            return url.AbsolutePath.StartsWith("/image/ab67616d0000b273", StringComparison.Ordinal)
+                ? value!.Replace("ab67616d0000b273", "ab67616d00001e02", StringComparison.Ordinal) : value;
+        var match = Regex.Match(url.AbsolutePath, @"/(?<w>[1-9][0-9]{0,3})x(?<h>[1-9][0-9]{0,3})(?<mode>bb|cw|cc|-[a-zA-Z0-9-]+)?\.(jpg|jpeg|png|webp)$", RegexOptions.IgnoreCase, TimeSpan.FromSeconds(1));
+        if (!match.Success || int.Parse(match.Groups["w"].Value) <= size) return value;
+        var mode = url.Host == "cdn-images.dzcdn.net" ? match.Groups["mode"].Value : "bb";
+        return url.GetLeftPart(UriPartial.Authority) + url.AbsolutePath[..match.Index] + $"/{size}x{size}{mode}.jpg" + url.Query;
+    }
+
     internal static string? LargeUrl(string? value, int size = 1200)
     {
         if (!ArtistCatalog.ArtworkUrl(value)) return null;

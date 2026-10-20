@@ -531,6 +531,14 @@ public partial class Track : ObservableObject
     [System.Text.Json.Serialization.JsonIgnore]
     public bool HasAlbumArt => !string.IsNullOrEmpty(AlbumArtworkPath);
 
+    /// <summary>Owner #102: a cover that arrived after the row was shown (a song you don't have, in the queue).</summary>
+    public void ShowArtwork(string path)
+    {
+        AlbumArtworkPath = path;
+        OnPropertyChanged(nameof(AlbumArtworkPath));
+        OnPropertyChanged(nameof(HasAlbumArt));
+    }
+
     /// <summary>User comment or notes about the track.</summary>
     public string Comment { get; set; } = string.Empty;
 

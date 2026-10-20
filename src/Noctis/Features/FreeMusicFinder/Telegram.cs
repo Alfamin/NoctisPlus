@@ -503,6 +503,7 @@ internal sealed class TelegramBotSource : IHunterBotSource
                 Noctis.Services.DebugLog.Write("Finder", $"Music Hunters: /search sent {waited.Elapsed.TotalSeconds:0.0} s after it was asked");
                 var wait = _timings.Wait(SearchTiming, SearchWait, MinSearchWait, SearchWait);
                 var clock = System.Diagnostics.Stopwatch.StartNew();
+                await BotPacing.TurnAsync("hunters", ct).ConfigureAwait(false);
                 var sent = await client.SendMessageAsync(bot, "/search " + query).WaitAsync(TimeSpan.FromSeconds(25), ct).ConfigureAwait(false);
                 // The answer always carries buttons; without results it has no numbered ones.
                 // Owner #73: the daily-limit answer has no result buttons; it is taken at once instead of waited out.
@@ -608,7 +609,7 @@ internal sealed class TelegramBotSource : IHunterBotSource
             Noctis.Services.DebugLog.Write("Finder", file is not null
                 ? $"Music Hunters: file after {fileClock.Elapsed.TotalSeconds:0.0} s"
                 : $"Music Hunters: no file after {fileClock.Elapsed.TotalSeconds:0.0} s; trying DeezLoad");
-            if (file is not null) _timings.Record(FileTiming, fileClock.Elapsed);
+            if (file is not null) { _timings.Record(FileTiming, fileClock.Elapsed); BotPacing.Answered("hunters"); }
             if (file is null)
             {
                 throw new TimeoutException(
@@ -666,6 +667,7 @@ internal sealed class TelegramBotSource : IHunterBotSource
             document = await RunAsync(async (client, bot) =>
             {
                 var clock = System.Diagnostics.Stopwatch.StartNew();
+                await BotPacing.TurnAsync("hunters", ct).ConfigureAwait(false);
                 var sent = await client.SendMessageAsync(bot, link.Url).WaitAsync(TimeSpan.FromSeconds(25), ct).ConfigureAwait(false);
                 Noctis.Services.DebugLog.Write("Finder", "Music Hunters: track link sent");
                 string? other = null;
@@ -688,6 +690,7 @@ internal sealed class TelegramBotSource : IHunterBotSource
                 if (IsLinkFile(request, reply))
                 {
                     Noctis.Services.DebugLog.Write("Finder", $"Music Hunters: linked file after {clock.Elapsed.TotalSeconds:0.0} s");
+                    BotPacing.Answered("hunters");
                     return (Document)((MessageMediaDocument)reply.media).document;
                 }
                 var selected = ParseResults(reply, FetchSelectedAsync).FirstOrDefault(t => RecordingMatch.Fits(request, t.Artist, t.Title, t.Duration))?.Request

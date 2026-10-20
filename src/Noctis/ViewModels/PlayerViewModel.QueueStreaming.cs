@@ -264,8 +264,46 @@ public partial class PlayerViewModel
 
     /// <summary>The next stand-ins (within <see cref="StreamAheadPlaces"/>) are downloaded in queue order, the first one in
     /// the fast lane; saved ones are swapped for the real song so crossfade and gapless treat them like any other.</summary>
+    // ── Owner #102: the next songs you don't have show their cover in the queue (small, a few KB each) ──
+    internal const int QueueCoverSongs = 30;
+    private const int QueueCoverLoads = 6;
+    private readonly HashSet<Track> _coverLoading = new(ReferenceEqualityComparer.Instance);
+    private readonly HashSet<Track> _noCover = new(ReferenceEqualityComparer.Instance);
+
+    private void LoadQueueCovers()
+    {
+        var waiting = new List<Track>();
+        foreach (var t in UpNext.Take(QueueCoverSongs))
+        {
+            if (t.PendingStream is not PendingStream p || t.HasAlbumArt || _coverLoading.Contains(t) || _noCover.Contains(t)) continue;
+            // One already on disk (the playlist page showed it) at once; the rest are fetched.
+            if (p.Source.CachedQueueCover(p.Song) is { } cached) t.ShowArtwork(cached);
+            else waiting.Add(t);
+        }
+        foreach (var t in waiting.Take(Math.Max(0, QueueCoverLoads - _coverLoading.Count)))
+        {
+            var p = (PendingStream)t.PendingStream!;
+            _coverLoading.Add(t);
+            _ = Task.Run(async () =>
+            {
+                string? path = null;
+                try { path = await p.Source.QueueCoverAsync(p.Song, CancellationToken.None); }
+                catch (Exception ex) { Services.DebugLog.Write("Queue", $"cover of \"{p.Song.Title}\" not loaded: {ex.Message}"); }
+                Avalonia.Threading.Dispatcher.UIThread.Post(() =>
+                {
+                    if (path is not null) t.ShowArtwork(path);
+                    else _noCover.Add(t); // none: not asked again this session
+                    _coverLoading.Remove(t);
+                    if (path is not null || waiting.Count > QueueCoverLoads) PostStreamAhead(); // the next ones
+                }, Avalonia.Threading.DispatcherPriority.Background);
+            });
+        }
+    }
+
     private void StreamAhead()
     {
+        try { LoadQueueCovers(); }
+        catch (Exception ex) { Services.DebugLog.Write("Queue", "queue covers skipped: " + ex.Message); }
         var head = UpNext.Take(StreamAheadPlaces).ToList();
         // Owner #100: of the next songs you don't have, two are downloaded (one already downloaded counts, also once it has
         // become the real song) and the next ones, four in all, only asked for (ready in the bot's chat).
@@ -308,6 +346,9 @@ public partial class PlayerViewModel
         // Live: asking shares the two bot lanes with downloading; a download waited 8 s behind asks, a song neither bot had
         // held a lane for a minute. So asking runs only while the next two need nothing (an ask in flight gives way).
         AskAhead(fetch.Count > 0 ? [] : ask);
+        // Owner 2026-10-20: the song clicked to play is asked for first and alone (the bots answer one song at a time; an
+        // ahead download sent alongside it was asked first: "Photograph" clicked, "The Cut Off" requested). They follow once it plays.
+        if (_preparingStandIn is not null) return;
         foreach (var (_, pending) in fetch)
         {
             var status = pending.Source.StatusOf(pending.Song);
