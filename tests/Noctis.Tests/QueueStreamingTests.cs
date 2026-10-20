@@ -189,4 +189,17 @@ public class QueueStreamingTests
         player.ClearQueue(); Settle();
         lock (source.Cancelled) Assert.Equal(new[] { "s0", "s1", "s2", "s3" }, source.Cancelled.OrderBy(x => x));
     }
+    [AvaloniaFact]
+    public async Task ASongSavedToTheLibrary_DoesNotTakeTheOtherSongsToFetchOutOfTheQueue()
+    {
+        // Live 2026-10-20: the first song downloaded ahead was imported, the library reconcile dropped every stand-in.
+        var source = new Source(); var audio = new FakeAudioPlayer(); var library = new FakeLibraryService();
+        var a = Local("A"); library.TrackList.Add(a);
+        var player = new PlayerViewModel(audio, library, new TestPersistenceService(), new FakeAnimatedCoverService());
+        Track b = StandIn(source, "b"), c = StandIn(source, "c");
+        player.ReplaceQueueAndPlay([a, b, c], 0); Settle();
+        library.TrackList.Add(Local("Imported")); library.RaiseLibraryUpdated();
+        await Until(() => false); // let the reconcile run
+        Assert.Equal(new[] { b, c }, player.UpNext);
+    }
 }

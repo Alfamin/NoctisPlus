@@ -4198,7 +4198,9 @@ public partial class PlayerViewModel : ViewModelBase
             // One pass and one Reset per list: a Remove per deleted track was a linear search
             // plus a queue-panel renumber each, thousands of them when a removed folder was
             // under a whole-library shuffle.
-            var keptUpNext = UpNext.Where(t => t.IsExternal || _library.GetTrackById(t.Id) != null).ToList();
+            // Owner #95: a song still to be fetched is not in the library yet, and was never in it: not deleted either
+            // (live: every saved download reconciled the playlist's other missing songs out of the queue).
+            var keptUpNext = UpNext.Where(t => t.IsExternal || t.IsPendingStream || _library.GetTrackById(t.Id) != null).ToList();
             if (keptUpNext.Count != UpNext.Count)
             {
                 CancelAutoMixTransition("queue changed");

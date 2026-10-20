@@ -232,7 +232,13 @@ public partial class PlayerViewModel
             _ = Task.Run(async () =>
             {
                 try { await pending.Source.DownloadAsync([pending.Song], now, CancellationToken.None); }
-                catch (Exception ex) { Services.DebugLog.Write("Queue", $"download ahead of \"{pending.Song.Title}\" failed: {ex.Message}"); }
+                catch (Exception ex)
+                {
+                    // Live: refused while the library was still scanning. Not asked after all: asked again shortly.
+                    Services.DebugLog.Write("Queue", $"download ahead of \"{pending.Song.Title}\" failed, trying again shortly: {ex.Message}");
+                    await Task.Delay(TimeSpan.FromSeconds(10));
+                    Avalonia.Threading.Dispatcher.UIThread.Post(() => { _askedAhead.Remove(pending.Song.Id); PostStreamAhead(); });
+                }
             });
         }
     }
