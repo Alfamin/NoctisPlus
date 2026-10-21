@@ -27,6 +27,12 @@ internal sealed class ForYouCache(string path)
         try { if (Safe() && JsonSerializer.SerializeToUtf8Bytes(page).Length <= 2 * 1024 * 1024) AtomicJson.Write(path, page); }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException) { }
     }
+    public void Delete()
+    {
+        try { if (Safe() && File.Exists(path)) File.Delete(path); }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException) { }
+    }
+
     private bool Safe()
     {
         for (var dir = new DirectoryInfo(Path.GetDirectoryName(Path.GetFullPath(path))!); dir is not null; dir = dir.Parent)

@@ -15,7 +15,7 @@ internal static class NativeForYouTests
         var songs = new[] { "Already owned", "New first song", "New second song" }.Select((title, i) =>
             new DiscoverSong(new(DiscoveryTests.Song("deezer:" + (100 + i), title), DiscoveryTests.Orbit), 1, "Because you play North Star")).ToList();
         var now = DateTimeOffset.UtcNow;
-        new ForYouCache(Path.Combine(folder, "for-you-last.json")).Write(new(1, now, now.AddDays(1), new(songs, [], "")));
+        new ForYouCache(Path.Combine(folder, "for-you-last.json")).Write(new(1, now, now.AddDays(1), new(songs, [], "", Batch: "page-1")));
         var http = new DiscoveryTests.Http { Offline = true };
         using var catalog = DiscoveryTests.Catalog(Path.Combine(folder, "catalog"), http);
         using var downloads = new Downloads(_ => { });
@@ -30,6 +30,8 @@ internal static class NativeForYouTests
         Check.Until(() => !vm.IsLoading && vm.Picks.Count == 2, "native shelf loads cached picks and excludes already-owned recordings");
         Check.Equal(0, http.Calls.Count, "showing saved picks does not perform catalog searches");
         Check.Equal(0, downloads.History.Count, "opening For you never queues or downloads audio");
+        Check.True(source.Feedback.Batches is [{ Id: "page-1", Shown.Count: 2 }] && source.Feedback.Batches[0].Shown[0].Position == 0,
+            "the page on screen is recorded as shown once, with each card's place");
         var first = vm.Picks[0];
         var signIn = vm.DownloadCommand.ExecuteAsync(first);
         Check.Until(() => signIn.IsCompleted, "download click completes the sign-in offer");
@@ -53,17 +55,23 @@ internal static class NativeForYouTests
         play.GetAwaiter().GetResult();
         Check.True(played.SequenceEqual(new[] { first.Song.Online!.Id }), "Play forwards exactly the chosen song to the existing progressive player");
         Check.Equal(0, downloads.History.Count, "the shelf does not also issue a duplicate direct-download request");
+        var again = vm.PlayCommand.ExecuteAsync(first);
+        Check.Until(() => again.IsCompleted, "a second Play click completes");
+        Check.Equal(1, source.Feedback.Interactions.Count(i => i.Action == DiscoverAction.Play), "clicking Play twice counts as one play of that card");
         vm.NotForMeCommand.Execute(first);
         Check.True(vm.HasUndo && vm.Picks.Count == 1 && source.Hidden.HidesSong(first.Pick.Track.Song), "Not for me hides just the chosen song immediately");
         Check.False(source.Hidden.HidesSong(vm.Picks[0].Pick.Track.Song), "another song by the same artist stays recommended");
         vm.UndoCommand.Execute(null);
         Check.True(!vm.HasUndo && vm.Picks[0] == first && !source.Hidden.HidesSong(first.Pick.Track.Song), "Undo restores the same card and removes the persistent preference");
+        Check.False(source.Feedback.Interactions.Any(i => i.Action == DiscoverAction.Dismiss), "Undo also takes back what the dismissal taught");
         vm.NotForMeCommand.Execute(first);
         Check.Until(() => !vm.HasUndo, "Undo expires after its short window");
         Check.True(source.Hidden.HidesSong(first.Pick.Track.Song), "expiry leaves only that song dismissed");
         vm.SetActive(false);
         vm.SetActive(true);
         Check.Equal(1, vm.Picks.Count, "leaving and returning preserves the page instead of moving cards");
+        Check.Equal(1, source.Feedback.Batches.Count, "returning to the same page does not count it as shown again");
+        Check.Equal(1, source.Feedback.Interactions.Count(i => i.Action == DiscoverAction.Dismiss), "the expired dismissal stays recorded once");
         Check.Equal(0, http.Calls.Count, "returning to the shelf does not rebuild recommendations or delay Search");
         http.Override = async (_, ct) => { await Task.Delay(Timeout.Infinite, ct); throw new Exception("unreachable"); };
         var refresh = vm.RefreshCommand.ExecuteAsync(null);

@@ -28,6 +28,13 @@ if (Environment.GetEnvironmentVariable("FMF_FORYOU_LIVE") is { Length: > 0 } for
     return Check.Failed;
 }
 
+// Explicit opt-in, offline: chronological replay of For you's taste step on a copy of the listener's own data.
+if (Environment.GetEnvironmentVariable("FMF_DISCOVER_REPLAY") is { Length: > 0 } replayData)
+{
+    DiscoverReplayTest.Run(replayData);
+    return 0;
+}
+
 // Explicit public catalog metadata probe. No Telegram connection, audio download or live library write.
 if (Environment.GetEnvironmentVariable("FMF_DISCOVERY_LIVE") is { Length: > 0 } artists)
 {
