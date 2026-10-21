@@ -26,7 +26,7 @@
       <Setter Property="RenderTransform" Value="translateY(0px)" />
     </Style>
   </UserControl.Styles>
-  <controls:PillDialogHost>
+  <controls:PillDialogHost ShowBackdrop="False">
     <Grid Width="560" MaxHeight="720" RowDefinitions="Auto,*,Auto">
       <StackPanel Margin="30,26,30,6" Spacing="8">
         <PathIcon Data="{StaticResource RailSparkleIcon}" Width="22" Height="22" HorizontalAlignment="Left"
@@ -50,7 +50,12 @@
                               Foreground="{DynamicResource AccentForegroundBrush}" HorizontalAlignment="Center" VerticalAlignment="Center" />
                   </Border>
                   <StackPanel Spacing="2" VerticalAlignment="Center" MaxWidth="440">
-                    <TextBlock Text="{Binding Title}" FontSize="14.5" FontWeight="SemiBold" TextWrapping="Wrap" />
+                    <TextBlock Text="{Binding Title}" FontSize="14.5" FontWeight="SemiBold" TextWrapping="Wrap" IsVisible="{Binding !HasSetting}" />
+                    <Button IsVisible="{Binding HasSetting}" Background="Transparent" BorderThickness="0" Padding="0"
+                            HorizontalAlignment="Left" Cursor="Hand" Foreground="{DynamicResource AccentColorBrush}"
+                            Command="{Binding $parent[UserControl].((wn:WhatsNewViewModel)DataContext).OpenSettingCommand}" CommandParameter="{Binding Setting}">
+                      <TextBlock Text="{Binding Title}" FontSize="14.5" FontWeight="SemiBold" TextWrapping="Wrap" />
+                    </Button>
                     <TextBlock Text="{Binding Line}" FontSize="12.5" Opacity="0.6" TextWrapping="Wrap" />
                   </StackPanel>
                 </StackPanel>
@@ -78,9 +83,6 @@
       </ScrollViewer>
       <Border Grid.Row="2" Padding="30,14,30,24">
         <StackPanel Spacing="10">
-          <Button Content="Word timing settings" Classes="pill-secondary" Command="{Binding WordTimingSettingsCommand}"
-                  IsVisible="{Binding HasWordTimingSettings}" HorizontalAlignment="Stretch"
-                  HorizontalContentAlignment="Center" AutomationProperties.Name="Word timing settings" />
           <Button Content="Got it" Classes="pill-primary" Command="{Binding CloseCommand}" HorizontalAlignment="Stretch"
                   HorizontalContentAlignment="Center" AutomationProperties.Name="Got it" />
         </StackPanel>

@@ -45,6 +45,55 @@ public class OnlineAlbumOpeningTests
     }
 
     [AvaloniaFact]
+    public async Task LibraryAlbum_ShowsLoadingImmediately_AndKeepsOwnedRows()
+    {
+        var artist = new CatalogArtist("deezer:17", "Synthetic Singer");
+        var vm = Page(new("deezer:170", "Local album", artist, "2020", "album", 8));
+        vm.Album.CatalogReleaseId = null;
+        var owned = new Track { Title = "Already owned", Artist = artist.Name };
+        vm.Tracks.Add(owned);
+        var response = new TaskCompletionSource<CatalogAlbumOpen?>(TaskCreationOptions.RunContinuationsAsynchronously);
+        var loading = vm.EnrichCatalogAsync(_ => response.Task);
+        try
+        {
+            Assert.True(vm.IsCatalogLoading); Assert.Equal("Loading more songs", vm.CatalogLoadingText);
+            Assert.True(vm.ShowPlayActions); Assert.Same(owned, Assert.Single(vm.Tracks));
+            var view = new AlbumDetailView { DataContext = vm };
+            var window = new Window { Content = view, Width = 1280, Height = 900 };
+            try
+            {
+                window.Show(); Dispatcher.UIThread.RunJobs();
+                Assert.True(view.FindControl<StackPanel>("CatalogLoadingRows")!.IsVisible);
+                response.SetResult(null); await loading;
+                Dispatcher.UIThread.RunJobs();
+                Assert.False(vm.IsCatalogLoading);
+                Assert.False(view.FindControl<StackPanel>("CatalogLoadingRows")!.IsVisible);
+                Assert.Same(owned, Assert.Single(vm.Tracks));
+            }
+            finally { window.Close(); }
+        }
+        finally { response.TrySetResult(null); vm.Dispose(); }
+    }
+
+    [AvaloniaFact]
+    public async Task Enrichment_LateCancelledResponseCannotClearNewLoading_OrFillClosedPage()
+    {
+        var artist = new CatalogArtist("deezer:18", "Synthetic Singer");
+        var release = new CatalogRelease("deezer:180", "Local album", artist, "2020", "album", 8);
+        var vm = Page(release);
+        var oldResponse = new TaskCompletionSource<CatalogAlbumOpen?>(TaskCreationOptions.RunContinuationsAsynchronously);
+        var newResponse = new TaskCompletionSource<CatalogAlbumOpen?>(TaskCreationOptions.RunContinuationsAsynchronously);
+        var first = vm.EnrichCatalogAsync(_ => oldResponse.Task);
+        var second = vm.EnrichCatalogAsync(_ => newResponse.Task);
+        oldResponse.SetResult(null); await first;
+        Assert.True(vm.IsCatalogLoading);
+        vm.Dispose(); Assert.False(vm.IsCatalogLoading);
+        newResponse.SetResult(new(new(release, [new("deezer:181", "Late", [artist], 200, false)]), new Dictionary<string, DiscoveryMatch>()));
+        await second;
+        Assert.Empty(vm.CatalogMissing); Assert.False(vm.IsCatalogLoading);
+    }
+
+    [AvaloniaFact]
     public void OnlineAlbum_OpensAtOnceWithSkeletons_ThenFillsInPlace()
     {
         var artist = new CatalogArtist("deezer:7", "Synthetic Singer");

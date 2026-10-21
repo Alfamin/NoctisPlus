@@ -1653,7 +1653,7 @@
 
             <StackPanel x:Name="GeneralTabPanel" Classes="tab-page" IsVisible="{Binding IsGeneralTabVisible}" Spacing="4">
             <Border Classes="setting-card group-card">
-                <Border Classes="setting-row">
+                <Border x:Name="OfflineModeRow" Classes="setting-row" BorderThickness="0">
                 <Grid ColumnDefinitions="*,Auto">
                     <StackPanel Spacing="2">
                         <TextBlock Text="Offline mode" FontSize="15" FontWeight="SemiBold"/>
@@ -6016,7 +6016,7 @@
                                         </ItemsControl.ItemsPanel>
                                         <ItemsControl.ItemTemplate>
                                             <DataTemplate x:DataType="plugins:PluginSettingItem">
-                                                <Grid ColumnDefinitions="*,Auto">
+                                                <Grid ColumnDefinitions="*,Auto" AttachedToVisualTree="OnFeatureSettingAttached" DetachedFromVisualTree="OnFeatureSettingDetached">
                                                     <StackPanel Grid.Column="0" Spacing="1" VerticalAlignment="Center" Margin="0,0,12,0">
                                                         <TextBlock Text="{Binding Label}" FontSize="13" TextWrapping="Wrap"/>
                                                         <TextBlock Text="{Binding Description}" FontSize="11" Opacity="0.5" TextWrapping="Wrap"
@@ -6401,6 +6401,8 @@
 
                         <!-- Action buttons (top-right) -->
                         <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
+                            <Button x:Name="WhatsNewButton" Command="{Binding OpenWhatsNewCommand}" Content="What's new"
+                                    Classes="pill" Padding="16,6" VerticalAlignment="Center" AutomationProperties.Name="What's new in this version" />
                             <!-- Update-available dot next to the update pill, mirroring the
                                  sidebar settings-icon badge -->
                             <Ellipse Width="8" Height="8"

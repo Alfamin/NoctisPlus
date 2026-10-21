@@ -72,6 +72,23 @@ public class NativeWordLyricsTests
         Assert.False(Directory.Exists(Path.Combine(rig.Data.DataDirectory, "absent backend")));
     }
     [AvaloniaFact]
+    public void SongOptOutIsReversibleInNativePanel_AndUsesOnlyTheOuterScrim()
+    {
+        using var rig = new Rig(); var track = rig.Library.TrackList[0];
+        using var vm = new WordLyricsViewModel(rig.Service, false, track, _ => Task.FromResult(true));
+        Assert.True(vm.CanStart); Assert.Contains("Ignore", vm.IgnoreLabel);
+        vm.ToggleIgnoreCommand.Execute(null);
+        Assert.True(vm.IsIgnored); Assert.False(vm.CanStart); Assert.False(vm.StartCommand.CanExecute(null));
+        Assert.Contains("Enable", vm.IgnoreLabel);
+        vm.ToggleIgnoreCommand.Execute(null);
+        Assert.False(vm.IsIgnored); Assert.True(vm.CanStart);
+        var panel = new WordLyricsPanel { DataContext = vm };
+        Assert.False(panel.FindControl<Noctis.Controls.PillDialogHost>("TimingHost")!.ShowBackdrop);
+        panel.UseWindowBackdrop();
+        Assert.True(panel.FindControl<Noctis.Controls.PillDialogHost>("TimingHost")!.ShowBackdrop);
+    }
+
+    [AvaloniaFact]
     public void NativeMigrationRunsBeforeDefaults_AndNewChoiceKeepsRollbackKeys()
     {
         using var rig = new Rig(off: true);

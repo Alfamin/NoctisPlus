@@ -1,19 +1,107 @@
 {
   "version": "2.2.0",
   "added": [
-    { "icon": "PlaylistsIcon", "title": "Every song in your playlists plays", "line": "Songs you don't have yet play too, shuffled or not" },
-    { "icon": "SongsIcon", "title": "Play just streams", "line": "Played songs wait in a cache; Add to songs keeps them" },
-    { "icon": "RailSparkleIcon", "title": "For you in seconds", "line": "Recommendations fill in about 7 s instead of over a minute" },
-    { "icon": "SearchIcon", "title": "Hard names found", "line": "Tricky titles get a second search; close matches wait in Check these" },
-    { "icon": "LyricsIcon", "title": "Word timing, under control", "line": "Restart it, time every song without it, see when it tries again" },
-    { "icon": "LyricsIcon", "title": "Word timing as you listen", "line": "On by default once set up; turn it off in WordLyrics settings" },
-    { "icon": "SaveDiskIcon", "title": "Space back", "line": "Word timing's song copies are removed once they are duplicates" },
-    { "icon": "MiniPlayerIcon", "title": "The player fits", "line": "Its buttons step aside in a narrow window and come back" }
+    {
+      "icon": "PlaylistsIcon",
+      "title": "Every song in your playlists plays",
+      "line": "Songs you don't have yet play too, shuffled or not"
+    },
+    {
+      "icon": "SongsIcon",
+      "title": "Play just streams",
+      "line": "Played songs wait in a cache; Add to songs keeps them"
+    },
+    {
+      "icon": "RailSparkleIcon",
+      "title": "For you in seconds",
+      "line": "Recommendations fill in about 7 s instead of over a minute"
+    },
+    {
+      "icon": "SearchIcon",
+      "title": "Hard names found",
+      "line": "Tricky titles get a second search; close matches wait in Check these"
+    },
+    {
+      "icon": "LyricsIcon",
+      "title": "Word timing, under control",
+      "line": "Restart it, time every song without it, see when it tries again"
+    },
+    {
+      "icon": "LyricsIcon",
+      "title": "Word timing as you listen",
+      "line": "On by default once set up; turn it off in WordLyrics settings",
+      "setting": "wordTiming"
+    },
+    {
+      "icon": "SaveDiskIcon",
+      "title": "Space back",
+      "line": "Word timing's song copies are removed once they are duplicates"
+    },
+    {
+      "icon": "MiniPlayerIcon",
+      "title": "The player fits",
+      "line": "Its buttons step aside in a narrow window and come back"
+    },
+    {
+      "icon": "SongsIcon",
+      "title": "Offline mode",
+      "line": "Keep listening locally; online work waits",
+      "setting": "offline"
+    },
+    {
+      "icon": "SaveDiskIcon",
+      "title": "Keep played songs",
+      "line": "Partial downloads follow your cache retention choice",
+      "setting": "cache"
+    },
+    {
+      "icon": "LyricsIcon",
+      "title": "Lighter timing while gaming",
+      "line": "New timing runs use Light during fullscreen games",
+      "setting": "gaming"
+    },
+    {
+      "icon": "SongsIcon",
+      "title": "Choose your first bot",
+      "line": "Music Hunters leads by default; the other is the reserve",
+      "setting": "firstBot"
+    },
+    {
+      "icon": "LyricsIcon",
+      "title": "Skip word timing for a song",
+      "line": "Lyrics menu → Ignore WordLyrics; enable it again anytime"
+    },
+    {
+      "icon": "LyricsIcon",
+      "title": "Fewer lyric retries",
+      "line": "Missing or untimeable lyrics wait 10 days; manual retry stays available"
+    },
+    {
+      "icon": "RailSparkleIcon",
+      "title": "What's new, anytime",
+      "line": "Reopen these notes in Settings → About",
+      "setting": "about"
+    }
   ],
   "fixed": [
     "Songs whose long titles Telegram cuts short download again",
     "A playlist's song that was only played joins Songs when added",
     "For you knows songs credited to several artists (\"Big Sean, Drake\")",
-    "A stuck word timing run restarts by itself"
+    "A stuck word timing run restarts by itself",
+    "Interrupted streams wait instead of replaying the downloaded part",
+    "Reconnecting keeps the playback position and your Pause choice",
+    "Interrupted audio transfers resume from saved partial data",
+    "Only the current song and next two positions stay active for streaming",
+    "Explicit downloads stay queued when you change what is playing",
+    "The next four bot lookups count songs already owned or cached",
+    "The playing song gets word timing first, after its download completes",
+    "The next two complete songs can receive word timing ahead of playback",
+    "Word lyrics appear immediately when timing finishes",
+    "Completed word lyrics no longer show an obsolete automatic queued state",
+    "Repeating playback cannot reset a missing-lyrics cooldown",
+    "Album pages show loading feedback while additional songs arrive",
+    "WordLyrics uses one rounded backdrop inside the player",
+    "The Offline setting has no extra divider",
+    "A late queue cleanup no longer removes a newer manual lyric repair"
   ]
 }

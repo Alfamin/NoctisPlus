@@ -49,6 +49,20 @@ internal sealed class WordLyricsService(ILibraryService library, Func<AppSetting
     private void NetworkRecovered() { if (!OnlineAccess.Shared.IsOffline) _worker?.RetryNetworkWaits(); }
     private void NetworkModeChanged(bool offline) { if (!offline) _worker?.RetryNetworkWaits(); }
     internal void SetPreviewState(ProgressState state) => Progress(state);
+    internal bool IsIgnored(string path) => _worker?.IsIgnored(path) == true;
+    internal void SetIgnored(string path, bool ignored)
+    {
+        if (_worker is { } worker)
+        {
+            var playing = Volatile.Read(ref _playingPath);
+            var saved = Volatile.Read(ref _playingLibraryPath);
+            if (SameSong(path, playing) && playing is not null) worker.ShareRules(path, playing);
+            if (SameSong(path, saved) && saved is not null) worker.ShareRules(path, saved);
+            worker.SetIgnored(path, ignored);
+        }
+        _playingAsked = false;
+        Changed?.Invoke();
+    }
     internal string[] Folders => _folders;
     internal IReadOnlyList<Track> Tracks => library.AllTracks;
 
@@ -118,7 +132,9 @@ internal sealed class WordLyricsService(ILibraryService library, Func<AppSetting
         if (OnlineMusicSearch.Current?.IsCachedFile(path) == true) return;
         // Owner 10-20: the song playing now, just added to Songs (or downloaded): timed first, like a played song, and
         // its lyrics switch on the copy being heard (see WithPlayingCopy).
-        if (worker.Options.Auto && SameSong(path, Volatile.Read(ref _playingPath)))
+        var playingCopy = Volatile.Read(ref _playingPath);
+        if (SameSong(path, playingCopy) && playingCopy is not null) worker.ShareRules(playingCopy, path);
+        if (worker.Options.Auto && SameSong(path, playingCopy))
         {
             Volatile.Write(ref _playingLibraryPath, path);
             Volatile.Write(ref _playingTimingPath, path);
@@ -365,7 +381,7 @@ internal sealed class WordLyricsService(ILibraryService library, Func<AppSetting
                 ct.ThrowIfCancellationRequested();
                 try
                 {
-                    if (worker?.IsWaiting(Path.GetFullPath(path)) == true || !File.Exists(path)) continue;
+                    if (worker?.IsWaiting(Path.GetFullPath(path)) == true || worker?.AutomaticBlocked(path) == true || !File.Exists(path)) continue;
                     if (!Worker.HasWordLyrics(path) && !EmbeddedWordLyrics.HasWords(path)) missing.Add(path);
                 }
                 catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or ArgumentException or NotSupportedException) { }

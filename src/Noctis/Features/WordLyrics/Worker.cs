@@ -38,6 +38,7 @@ internal sealed class Worker : IDisposable
     private const int ExitSetupFailed = 70;
 
     private readonly string _data;
+    private readonly SongRules _rules;
     private readonly Func<IReadOnlyList<string>> _folders;
     private readonly Action<string> _log;
     private readonly Action<string> _notify;
@@ -106,6 +107,7 @@ internal sealed class Worker : IDisposable
         public DateTime Stamp;
         public bool AccessReported;
         public bool NetworkWait;
+        public bool Deferred;
     }
 
     /// <param name="dataDirectory">The plugin's own folder (list of waiting songs, last result, last output).</param>
@@ -124,6 +126,8 @@ internal sealed class Worker : IDisposable
         _lyricsWritten = lyricsWritten ?? (_ => { });
         Directory.CreateDirectory(_data);
 
+        _rules = new SongRules(_data, _log);
+        _rules.Load();
         HasCheckpoint = File.Exists(StateFile);
         LoadState();
 
@@ -138,8 +142,8 @@ internal sealed class Worker : IDisposable
 
     public bool HasCheckpoint { get; }
     public DateTime LastSeenUtc => _lastSeen;
-    internal int WaitingCount { get { lock (_gate) return _items.Count; } }
-    internal bool IsWaiting(string path) { lock (_gate) return _items.ContainsKey(path); }
+    internal int WaitingCount { get { lock (_gate) return _items.Values.Count(i => !i.Deferred); } }
+    internal bool IsWaiting(string path) { lock (_gate) return _items.TryGetValue(path, out var item) && !item.Deferred; }
     /// <summary>When every waiting song is held for a later try (a provider error, a wait after failures), the
     /// soonest of those times; null while something can go now or nothing waits.</summary>
     internal DateTime? NextTryUtc(DateTime now)
@@ -155,7 +159,7 @@ internal sealed class Worker : IDisposable
     {
         lock (_gate)
         {
-            if (_disposed || !_items.TryGetValue(path, out var item)) return SongTimingStatus.None;
+            if (_disposed || IsIgnored(path) || !_items.TryGetValue(path, out var item) || item.Deferred) return SongTimingStatus.None;
             if (item.Action == TimingAction.Missing && !_activePaths.Contains(path) && HasWordLyrics(path)) return SongTimingStatus.None;
             if (!_activePaths.Contains(path) && !item.Asked && !_options.Auto) return SongTimingStatus.None;
             if (_paused) return SongTimingStatus.Paused;
@@ -282,7 +286,9 @@ internal sealed class Worker : IDisposable
     /// <summary>Owner #108: the song playing now is timed next, before everything else waiting.</summary>
     internal string? AskPlayed(string path, out bool accepted)
     {
-        var message = Ask(path, TimingAction.Missing, null, out accepted);
+        accepted = false;
+        if (AutomaticBlocked(path)) return null;
+        var message = Ask(path, TimingAction.Missing, null, out accepted, automatic: true);
         if (!accepted) return message;
         Prioritize(path);
         return message;
@@ -292,14 +298,14 @@ internal sealed class Worker : IDisposable
     internal void Prioritize(string path)
     {
         lock (_gate)
-            if (_items.TryGetValue(Path.GetFullPath(path), out var item)) { item.Urgent = DateTime.UtcNow; item.NotBefore = DateTime.UtcNow; }
+            if (_items.TryGetValue(Path.GetFullPath(path), out var item) && !item.Deferred && !IsIgnored(path)) { item.Urgent = DateTime.UtcNow; item.NotBefore = DateTime.UtcNow; }
         _timer.Change(TimeSpan.Zero, Tick);
     }
 
     /// <summary>Transient priorities for complete files in the next two queue positions.</summary>
     internal void SetAhead(IReadOnlyList<string> paths, string? current)
     {
-        var wanted = paths.Take(2).Where(p => File.Exists(p) && !ProgressivePlayback.ProgressiveTransfer.IsDownloading(p)
+        var wanted = paths.Take(2).Where(p => !AutomaticBlocked(p) && File.Exists(p) && !ProgressivePlayback.ProgressiveTransfer.IsDownloading(p)
             && !HasWordLyrics(p) && !EmbeddedWordLyrics.HasWords(p)).Select(Path.GetFullPath).Distinct(StringComparer.OrdinalIgnoreCase).ToArray();
         bool displaced = false;
         lock (_gate)
@@ -319,7 +325,7 @@ internal sealed class Worker : IDisposable
                 {
                     var now = DateTime.UtcNow;
                     _items[path] = item = new Item { Path = path, Root = Path.GetDirectoryName(path)!, Asked = true,
-                        AheadOnly = true, Seen = now, QuietSince = now, NotBefore = now };
+                        AheadOnly = true, Action = _rules.Get(path).RetryUtc != default ? TimingAction.Fresh : TimingAction.Missing, Seen = now, QuietSince = now, NotBefore = now };
                 }
                 item.Ahead = true; item.AheadOrder = i;
             }
@@ -405,7 +411,7 @@ internal sealed class Worker : IDisposable
     private void ClearWaits(bool resetTries)
     {
         var now = DateTime.UtcNow;
-        foreach (var item in _items.Values) { item.NotBefore = now; item.Waits = 0; item.AccessReported = false; if (resetTries) item.Tries = 0; }
+        foreach (var item in _items.Values.Where(i => !i.Deferred)) { item.NotBefore = now; item.Waits = 0; item.AccessReported = false; if (resetTries) item.Tries = 0; }
         _saidNotReady = false; _saidBadFolder = false;
         SaveState();
     }
@@ -432,8 +438,9 @@ internal sealed class Worker : IDisposable
             if (_disposed) return 0;
             foreach (var (path, root) in fresh)
             {
+                if (AutomaticBlocked(path)) continue;
                 if (_items.TryGetValue(path, out var existing)) { existing.Asked = true; existing.NotBefore = now; continue; }
-                _items[path] = new Item { Path = path, Root = root, Asked = true, Action = TimingAction.Missing, Seen = now, QuietSince = now, NotBefore = now };
+                _items[path] = new Item { Path = path, Root = root, Asked = true, Action = _rules.Get(path).RetryUtc != default ? TimingAction.Fresh : TimingAction.Missing, Seen = now, QuietSince = now, NotBefore = now };
                 added++;
             }
             SaveState();
@@ -453,7 +460,7 @@ internal sealed class Worker : IDisposable
     public string? Ask(string path, TimingAction action = TimingAction.Missing, string? draft = null)
         => Ask(path, action, draft, out _);
 
-    internal string? Ask(string path, TimingAction action, string? draft, out bool accepted)
+    internal string? Ask(string path, TimingAction action, string? draft, out bool accepted, bool automatic = false)
     {
         accepted = false;
         if (!string.IsNullOrWhiteSpace(path) && ProgressivePlayback.ProgressiveTransfer.IsDownloading(path))
@@ -469,6 +476,17 @@ internal sealed class Worker : IDisposable
         lock (_gate)
         {
             if (_disposed) return null;
+            if (IsIgnored(path)) return "WordLyrics is off for this song.";
+            if (automatic && AutomaticBlocked(path)) return null;
+            var rule = _rules.Get(path);
+            if (rule.RetryUtc != default)
+            {
+                // A manual retry bypasses the cooldown and fetches a new source. An expired
+                // automatic retry also ignores the lyrics that could not be aligned last time.
+                if (action == TimingAction.Missing) action = TimingAction.Fresh;
+                _rules.Set(path, rule with { RetryUtc = default });
+                if (_items.TryGetValue(path, out var deferred) && deferred.Deferred) _items.Remove(path);
+            }
             // The empty-lyrics action is idempotent, including a download racing
             // its automatic request. Do not replace a live item's identity.
             if (action == TimingAction.Missing && _items.TryGetValue(path, out var existing))
@@ -574,7 +592,8 @@ internal sealed class Worker : IDisposable
         {
             lock (_gate)
             {
-                foreach (var item in gone) _items.Remove(item.Path);
+                foreach (var item in gone)
+                    if (_items.TryGetValue(item.Path, out var current) && ReferenceEquals(current, item)) _items.Remove(item.Path);
                 SaveState();
             }
         }
@@ -652,6 +671,15 @@ internal sealed class Worker : IDisposable
     private bool Ripe(Item item, DateTime now)
     {
         if (now < item.NotBefore) return false;
+        if (IsIgnored(item.Path)) { item.Length = -2; return false; }
+        var rule = _rules.Get(item.Path);
+        if (rule.RetryUtc > now)
+        {
+            item.Deferred = true; item.NotBefore = rule.RetryUtc;
+            item.Action = TimingAction.Fresh; item.Draft = null; item.AheadOnly = false;
+        }
+        if (now < item.NotBefore) return false;
+        item.Deferred = false;
         try
         {
             var file = new FileInfo(item.Path);
@@ -712,8 +740,8 @@ internal sealed class Worker : IDisposable
         var now = DateTime.UtcNow;
         lock (_gate)
         {
-            if (_disposed || !_options.Auto || _items.ContainsKey(path)) return false;
-            _items[path] = new Item { Path = path, Root = root, Seen = now, QuietSince = now, Quiet = quiet, NotBefore = now, Length = length, Stamp = stamp };
+            if (_disposed || !_options.Auto || AutomaticBlocked(path) || _items.ContainsKey(path)) return false;
+            _items[path] = new Item { Path = path, Root = root, Action = _rules.Get(path).RetryUtc != default ? TimingAction.Fresh : TimingAction.Missing, Seen = now, QuietSince = now, Quiet = quiet, NotBefore = now, Length = length, Stamp = stamp };
             if (save) SaveState();
             return true;
         }
@@ -741,6 +769,10 @@ internal sealed class Worker : IDisposable
         lock (_gate)
         {
             if (_disposed || _run is not null) return;
+            // A user can ignore a song after Ripe inspected the batch, before process launch.
+            batch = batch.Where(i => !IsIgnored(i.Path) && _items.TryGetValue(i.Path, out var current) && ReferenceEquals(current, i)).ToList();
+            if (batch.Count == 0) return;
+            File.WriteAllLines(ListFile, batch.Select(i => i.Path), new UTF8Encoding(false));
             if (controlled) WriteControl(_paused ? "pause" : "run");
             run = _run = tool.StartQuietRun(batch[0].Root, ListFile, ResultFile, OutputFile, speed, options.Backup, retry: batch[0].Asked, ProgressFile,
                 controlled ? ControlFile : null, batch[0].Action, batch[0].Draft);
@@ -791,7 +823,7 @@ internal sealed class Worker : IDisposable
         }
         _log("WordLyrics stopped responding again; it is stopped. Press Restart in the word timing panel to try again");
         Restart(automatic: true);
-        lock (_gate) { _restartNotice = null; foreach (var item in _items.Values) item.NotBefore = now + TimeSpan.FromMinutes(30); SaveState(); }
+        lock (_gate) { _restartNotice = null; foreach (var item in _items.Values.Where(i => !i.Deferred)) item.NotBefore = now + TimeSpan.FromMinutes(30); SaveState(); }
         _progress(new ProgressState("WordLyrics stopped responding", "It made no progress twice. The songs are kept and tried again in 30 minutes; press Restart to try now. If it keeps happening, run Set up WordLyrics again.", Finished: true, Error: true));
     }
 
@@ -961,7 +993,19 @@ internal sealed class Worker : IDisposable
                         status = status.Length == 0 ? "failed" : status;
                     }
                 }
-                _items.Remove(item.Path);
+                if (IsIgnored(item.Path)) { _items.Remove(item.Path); continue; }
+                if (!cancelled && status is "no_lyrics" or "rejected" or "not_timed" or "lines_only" or "failed")
+                {
+                    _rules.Set(item.Path, new(RetryUtc: now + SongRules.RetryAfter));
+                    item.Deferred = true; item.NotBefore = now + SongRules.RetryAfter;
+                    item.Action = TimingAction.Fresh; item.Draft = null; item.Urgent = default;
+                    item.Ahead = false; item.AheadOnly = false; item.Tries = 0; item.NetworkWait = false;
+                }
+                else
+                {
+                    _items.Remove(item.Path);
+                    if (status == "timed") _rules.Set(item.Path, new());
+                }
                 counts[status] = counts.GetValueOrDefault(status) + 1;
                 titles[status] = title;
             }
@@ -1011,6 +1055,7 @@ internal sealed class Worker : IDisposable
         var timed = counts.GetValueOrDefault("timed");
         var failed = counts.Where(c => c.Key is not "timed" and not "skipped").Sum(c => c.Value);
         var detail = string.Join("\n", new[] { error, reason, $"Details: {ResultFile}", $"Startup log: {OutputFile}" }.Where(s => s.Length > 0));
+        if (counts.Keys.Any(s => s is "no_lyrics" or "rejected" or "not_timed" or "lines_only" or "failed")) detail = "Next automatic try in 10 days.\n" + detail;
         var retrying = counts.Count == 0 && outcome.Count != 0 || (counts.Count == 0 && code != 0);
         _progress(new ProgressState(retrying ? "Retry scheduled" : timed > 0 ? $"{timed} songs received word timestamps" : "No new word timestamps were written",
             detail + (failed > 0 ? $"\n{failed} songs need attention." : "") + (held ? "\nPaused: the songs still waiting start when you press Resume." : ""),
@@ -1148,9 +1193,10 @@ internal sealed class Worker : IDisposable
                     Tries = entry.TryGetProperty("tries", out var tries) && tries.TryGetInt32(out var tr) ? Math.Clamp(tr, 0, MaxTries) : 0,
                     Waits = entry.TryGetProperty("waits", out var waits) && waits.TryGetInt32(out var wa) ? Math.Clamp(wa, 0, 100) : 0,
                     NetworkWait = entry.TryGetProperty("networkWait", out var nw) && nw.ValueKind == JsonValueKind.True,
+                    Deferred = entry.TryGetProperty("deferred", out var de) && de.ValueKind == JsonValueKind.True,
                 };
                 if (entry.TryGetProperty("notBeforeUtc", out var retry) && retry.TryGetDateTime(out var until))
-                    _items[path].NotBefore = until.ToUniversalTime() > now.AddDays(8) ? now : until.ToUniversalTime();
+                    _items[path].NotBefore = until.ToUniversalTime() > now.AddDays(31) ? now.Add(SongRules.RetryAfter) : until.ToUniversalTime();
             }
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
@@ -1190,6 +1236,7 @@ internal sealed class Worker : IDisposable
                     if (item.Draft is not null) json.WriteString("draft", item.Draft);
                     json.WriteNumber("tries", item.Tries); json.WriteNumber("waits", item.Waits);
                     json.WriteBoolean("networkWait", item.NetworkWait);
+                    json.WriteBoolean("deferred", item.Deferred);
                     json.WriteString("notBeforeUtc", item.NotBefore);
                     json.WriteEndObject();
                 }
@@ -1204,6 +1251,33 @@ internal sealed class Worker : IDisposable
         {
             _log("the list of waiting songs could not be saved: " + ex.Message);
         }
+        StatusChanged?.Invoke();
+    }
+
+    internal void ShareRules(string source, string target)
+    {
+        try { _rules.Share(source, target); }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or ArgumentException or NotSupportedException)
+        { _log("WordLyrics copy preferences could not be shared: " + ex.Message); }
+    }
+    internal bool IsIgnored(string path) => _rules.Get(path).Ignored;
+    internal bool AutomaticBlocked(string path)
+    {
+        var rule = _rules.Get(path);
+        return rule.Ignored || rule.RetryUtc > DateTime.UtcNow;
+    }
+    internal void SetIgnored(string path, bool ignored)
+    {
+        bool stopRun;
+        lock (_gate)
+        {
+            _rules.Set(path, new(Ignored: ignored));
+            stopRun = ignored && _activePaths.Any(IsIgnored);
+            foreach (var item in _items.Values.Where(i => _rules.Get(i.Path).Ignored).ToArray()) _items.Remove(item.Path);
+            SaveState();
+        }
+        // Stop any run containing this song safely; other songs keep their checkpoint.
+        if (stopRun) MakeRoom("");
         StatusChanged?.Invoke();
     }
 

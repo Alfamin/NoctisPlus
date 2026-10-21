@@ -83,6 +83,100 @@ public class WordLyricsBackendTests
         worker.Ask(rig.Song, TimingAction.Current);
         Assert.Equal(SongTimingStatus.Queued, worker.StatusFor(rig.Song));
     }
+    [Theory]
+    [InlineData("no_lyrics")]
+    [InlineData("not_timed")]
+    [InlineData("rejected")]
+    [InlineData("lines_only")]
+    public async Task UnavailableLyricsWaitTenDays_AcrossPlaybackAheadNetworkAndRestart(string outcome)
+    {
+        using var rig = new Rig(outcome: outcome); var states = new ConcurrentQueue<ProgressState>();
+        using (var worker = rig.Worker(states.Enqueue))
+        {
+            worker.Ask(rig.Song);
+            await Until(() => states.Any(s => s.Finished));
+            Assert.Equal(0, worker.WaitingCount); // dormant retries are not processing/queued songs
+            Assert.Equal(SongTimingStatus.None, worker.StatusFor(rig.Song));
+            Assert.InRange(worker.NextTryUtc(DateTime.UtcNow)!.Value, DateTime.UtcNow.AddDays(9.99), DateTime.UtcNow.AddDays(10.01));
+            worker.AskPlayed(rig.Song, out var accepted); Assert.False(accepted);
+            worker.Prioritize(rig.Song); worker.SetAhead([rig.Song], null); worker.RetryNetworkWaits(); worker.Restart();
+            Assert.False(worker.EnqueueAutomatic(rig.Song, rig.Music, true));
+            Assert.Equal(0, worker.AskMany([rig.Song]));
+            Assert.True(worker.AutomaticBlocked(rig.Song));
+        }
+        File.Delete(rig.Result);
+        using var resumed = rig.Worker(_ => { }); resumed.TickNow();
+        await Task.Delay(150);
+        Assert.False(File.Exists(rig.Result)); Assert.True(resumed.AutomaticBlocked(rig.Song));
+        Assert.Equal(0, resumed.WaitingCount);
+        // The same recording in a stream/library folder shares the cooldown.
+        var copy = Path.Combine(Directory.CreateDirectory(Path.Combine(rig.Music, "cache")).FullName, Path.GetFileName(rig.Song));
+        File.Copy(rig.Song, copy);
+        resumed.AskPlayed(copy, out var copyAccepted); Assert.False(copyAccepted);
+    }
+
+    [Fact]
+    public async Task ManualRetryBypassesCooldown_AndFetchesFreshLyrics()
+    {
+        using var rig = new Rig(outcome: "no_lyrics"); var states = new ConcurrentQueue<ProgressState>();
+        using var worker = rig.Worker(states.Enqueue); worker.Ask(rig.Song);
+        await Until(() => states.Any(s => s.Finished));
+        File.Delete(rig.Result); File.WriteAllText(Path.Combine(rig.App, "fixture.json"), "{\"hold\":false,\"outcome\":\"timed\"}");
+        worker.Ask(rig.Song);
+        await Until(() => File.Exists(rig.Result) && !worker.IsWaiting(rig.Song));
+        using var result = JsonDocument.Parse(File.ReadAllText(rig.Result));
+        var args = result.RootElement.GetProperty("args").EnumerateArray().Select(v => v.GetString()).ToArray();
+        Assert.Contains("--repair-lyrics", args); Assert.Contains("--ignore-lyric-source", args);
+        Assert.False(worker.AutomaticBlocked(rig.Song));
+    }
+
+    [Fact]
+    public async Task ExpiredCooldownAutomaticallyRefetches_WithoutReplayingOldDraft()
+    {
+        using var rig = new Rig(outcome: "not_timed"); var states = new ConcurrentQueue<ProgressState>();
+        using (var worker = rig.Worker(states.Enqueue))
+        {
+            worker.Ask(rig.Song); await Until(() => states.Any(s => s.Finished));
+        }
+        var stateFile = Path.Combine(rig.Work, "state.json");
+        var state = System.Text.Json.Nodes.JsonNode.Parse(File.ReadAllText(stateFile))!;
+        state["waiting"]![0]!["notBeforeUtc"] = DateTime.UtcNow.AddSeconds(-1);
+        File.WriteAllText(stateFile, state.ToJsonString());
+        var rulesFile = Path.Combine(rig.Work, "song-rules.json");
+        var rules = System.Text.Json.Nodes.JsonNode.Parse(File.ReadAllText(rulesFile))!;
+        foreach (var (_, rule) in rules["Rules"]!.AsObject()) rule!["RetryUtc"] = DateTime.UtcNow.AddSeconds(-1);
+        File.WriteAllText(rulesFile, rules.ToJsonString());
+        File.Delete(rig.Result); File.WriteAllText(Path.Combine(rig.App, "fixture.json"), "{\"hold\":false,\"outcome\":\"timed\"}");
+        using var resumed = rig.Worker(_ => { }); resumed.TickNow();
+        await Until(() => File.Exists(rig.Result) && !resumed.IsWaiting(rig.Song));
+        using var result = JsonDocument.Parse(File.ReadAllText(rig.Result));
+        Assert.Contains("--repair-lyrics", result.RootElement.GetProperty("args").EnumerateArray().Select(v => v.GetString()));
+    }
+
+    [Fact]
+    public void IgnoringASongIsDurableReversible_AndPreservesLyricsAndOtherRecordings()
+    {
+        using var rig = new Rig();
+        var copy = Path.Combine(Directory.CreateDirectory(Path.Combine(rig.Music, "cache")).FullName, Path.GetFileName(rig.Song));
+        File.Copy(rig.Song, copy);
+        var unrelated = Path.Combine(Directory.CreateDirectory(Path.Combine(rig.Music, "unrelated")).FullName, Path.GetFileName(rig.Song));
+        File.WriteAllText(unrelated, "different recording");
+        File.WriteAllText(Path.ChangeExtension(rig.Song, ".lrc"), "[00:01.00]Keep my lyrics");
+        using (var worker = new Worker(rig.Work, () => [rig.Music], new(true, "Light", false, rig.App, ""), _ => { }, _ => { }, startTimer: false))
+        {
+            worker.Ask(rig.Song); worker.SetIgnored(rig.Song, true);
+            Assert.Equal(0, worker.WaitingCount); Assert.True(worker.IsIgnored(copy)); Assert.False(worker.IsIgnored(unrelated));
+            worker.AskPlayed(rig.Song, out var accepted); Assert.False(accepted);
+            worker.SetAhead([copy], null); Assert.Equal(0, worker.WaitingCount);
+            Assert.False(worker.EnqueueAutomatic(rig.Song, rig.Music)); Assert.Equal(0, worker.AskMany([rig.Song]));
+            Assert.Contains("off", worker.Ask(rig.Song, TimingAction.Fresh));
+        }
+        using var restored = new Worker(rig.Work, () => [rig.Music], new(true, "Light", false, rig.App, ""), _ => { }, _ => { }, startTimer: false);
+        Assert.True(restored.IsIgnored(copy)); restored.SetIgnored(copy, false);
+        Assert.False(restored.IsIgnored(rig.Song)); Assert.True(restored.EnqueueAutomatic(rig.Song, rig.Music));
+        Assert.Equal("[00:01.00]Keep my lyrics", File.ReadAllText(Path.ChangeExtension(rig.Song, ".lrc")));
+    }
+
     [Fact]
     public async Task NativeRunnerPreservesPathsGuidesAndPreferredProxy_WithoutShellExpansion()
     {
@@ -251,10 +345,10 @@ public class WordLyricsBackendTests
     public async Task APlayedSong_StopsARunNotFarThrough_AndIsTimedFirst_TheOtherSongKept()
     {
         using var rig = new Rig(hold: true, done: 1); // 25% through
-        using var worker = rig.Worker(_ => { });
+        var states = new ConcurrentQueue<ProgressState>();
+        using var worker = rig.Worker(states.Enqueue);
         worker.Ask(rig.Song);
-        await Until(() => worker.StatusFor(rig.Song) == SongTimingStatus.Processing);
-        await Task.Delay(1500); // its progress has been read
+        await Until(() => states.Any(s => s.Fraction is > 0 and < 0.75));
         var played = Path.Combine(rig.Music, "played now.mp3"); File.WriteAllText(played, "synthetic");
         worker.AskPlayed(played, out var accepted); Assert.True(accepted);
         worker.MakeRoom(played);
@@ -267,10 +361,10 @@ public class WordLyricsBackendTests
     public async Task APlayedSong_LetsARunFarThroughFinishItsSong_ThenGoesNext()
     {
         using var rig = new Rig(hold: true, done: 3.5); // 88% through
-        using var worker = rig.Worker(_ => { });
+        var states = new ConcurrentQueue<ProgressState>();
+        using var worker = rig.Worker(states.Enqueue);
         worker.Ask(rig.Song);
-        await Until(() => worker.StatusFor(rig.Song) == SongTimingStatus.Processing);
-        await Task.Delay(1500);
+        await Until(() => states.Any(s => s.Fraction >= 0.75));
         var played = Path.Combine(rig.Music, "played now.mp3"); File.WriteAllText(played, "synthetic");
         worker.AskPlayed(played, out _);
         worker.MakeRoom(played);

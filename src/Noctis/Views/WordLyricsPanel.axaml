@@ -6,7 +6,7 @@
   <UserControl.Styles>
     <Style Selector="TextBlock.problem"><Setter Property="Foreground" Value="{DynamicResource SystemControlErrorTextForegroundBrush}" /></Style>
   </UserControl.Styles>
-  <controls:PillDialogHost>
+  <controls:PillDialogHost x:Name="TimingHost" ShowBackdrop="False">
     <Grid Width="700" MaxHeight="740" RowDefinitions="Auto,*,Auto">
       <Border Padding="28,22,28,16" BorderThickness="0,0,0,1" BorderBrush="{DynamicResource SystemControlForegroundBaseLowBrush}">
         <StackPanel Spacing="4">
@@ -41,6 +41,7 @@
                     IsEnabled="{Binding CanInteract}" Classes="pill-field" HorizontalAlignment="Stretch" />
           <ComboBox ItemsSource="{Binding Actions}" SelectedIndex="{Binding ActionIndex}" IsVisible="{Binding IsSong}"
                     IsEnabled="{Binding CanInteract}" Classes="pill-field" HorizontalAlignment="Stretch" />
+          <Button Content="{Binding IgnoreLabel}" Classes="pill-secondary" Command="{Binding ToggleIgnoreCommand}" IsVisible="{Binding IsSong}" HorizontalAlignment="Left" />
           <StackPanel IsVisible="{Binding IsCustom}" Spacing="10">
             <Grid ColumnDefinitions="*,Auto" ColumnSpacing="10">
               <TextBox Text="{Binding GeniusPage}" IsEnabled="{Binding CanInteract}" Classes="pill-field" PlaceholderText="Genius page URL, or leave empty for LRCLIB" />

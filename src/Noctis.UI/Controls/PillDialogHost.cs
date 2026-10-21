@@ -76,6 +76,12 @@ public class PillDialogHost : ContentControl
     internal static readonly Easing OpenEase = new CubicBezierEase(0.16, 1.0, 0.3, 1.0);
     internal static readonly Easing CloseEase = new CubicBezierEase(0.4, 0.0, 1.0, 1.0);
 
+    /// <summary>Embedded sheets already have a full-window scrim; do not paint a
+    /// second rectangular one over the rounded card's bounds.</summary>
+    public static readonly StyledProperty<bool> ShowBackdropProperty =
+        AvaloniaProperty.Register<PillDialogHost, bool>(nameof(ShowBackdrop), true);
+    public bool ShowBackdrop { get => GetValue(ShowBackdropProperty); set => SetValue(ShowBackdropProperty, value); }
+
     public static readonly StyledProperty<bool> BlurBackdropProperty =
         AvaloniaProperty.Register<PillDialogHost, bool>(nameof(BlurBackdrop), true);
 
@@ -146,7 +152,7 @@ public class PillDialogHost : ContentControl
     /// </summary>
     public Task RefreshBackdropAsync()
     {
-        if (_closed || _closeAnimating || !BlurBackdrop || _window is not { } window) return Task.CompletedTask;
+        if (_closed || _closeAnimating || !ShowBackdrop || !BlurBackdrop || _window is not { } window) return Task.CompletedTask;
         BackdropRefreshes++;
         return CaptureBackdropAsync(window);
     }
@@ -346,7 +352,7 @@ public class PillDialogHost : ContentControl
     /// </summary>
     private async Task CaptureBackdropAsync(Window window)
     {
-        if (!BlurBackdrop || window.Owner is not TopLevel owner) return;
+        if (!ShowBackdrop || !BlurBackdrop || window.Owner is not TopLevel owner) return;
         var generation = ++_backdropGeneration;
         var bitmap = await BackdropSnapshot.CaptureBlurredAsync(owner, owner, "PillDialog.Backdrop");
         if (bitmap is null) return;

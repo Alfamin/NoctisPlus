@@ -5,7 +5,25 @@ using CommunityToolkit.Mvvm.Input;
 namespace Noctis.Features.WhatsNew;
 
 /// <summary>One new feature: an icon (an app geometry key), a title and one short line (owner: minimal text).</summary>
-public sealed record WhatsNewItem(string Icon, string Title, string Line);
+public sealed record WhatsNewItem(string Icon, string Title, string Line, string? Setting = null)
+{
+    public bool HasSetting => SettingShortcut.Resolve(Setting) is not null;
+}
+
+/// <summary>Allowlisted, native destinations for release-note links; no external URLs or commands.</summary>
+public sealed record SettingShortcut(string Tab, string? Control = null, string? Feature = null, string? Key = null)
+{
+    public static SettingShortcut? Resolve(string? id) => id switch
+    {
+        "offline" => new("General", Control: "OfflineModeRow"),
+        "wordTiming" => new("Features", Feature: "dev.moshi.wordlyrics", Key: "timePlayed"),
+        "gaming" => new("Features", Feature: "dev.moshi.wordlyrics", Key: "lightWhileGaming"),
+        "cache" => new("Features", Feature: "dev.moshi.freemusicfinder", Key: "streamCacheDays"),
+        "firstBot" => new("Features", Feature: "dev.moshi.freemusicfinder", Key: "firstBot"),
+        "about" => new("About", Control: "WhatsNewButton"),
+        _ => null,
+    };
+}
 
 /// <summary>The notes shipped with this build (Features/WhatsNew/whats-new.json; edit it for each release).</summary>
 public sealed record WhatsNewNotes(string Version, IReadOnlyList<WhatsNewItem> Added, IReadOnlyList<string> Fixed)
@@ -62,7 +80,7 @@ public static class WhatsNewGate
 }
 
 /// <summary>The update sheet, its dismissal and the optional word timing settings shortcut.</summary>
-public sealed partial class WhatsNewViewModel(WhatsNewNotes notes, Action close, Action? openWordTimingSettings = null) : ObservableObject
+public sealed partial class WhatsNewViewModel(WhatsNewNotes notes, Action close, Action? openWordTimingSettings = null, Action<string>? openSetting = null) : ObservableObject
 {
     public string Heading => "What's new";
     public string VersionLabel => "Version " + WhatsNewGate.Short(notes.Version);
@@ -72,5 +90,10 @@ public sealed partial class WhatsNewViewModel(WhatsNewNotes notes, Action close,
     public bool HasFixed => notes.Fixed.Count > 0;
     public bool HasWordTimingSettings => openWordTimingSettings is not null;
     [RelayCommand] private void WordTimingSettings() { close(); openWordTimingSettings?.Invoke(); }
+    [RelayCommand] private void OpenSetting(string? id)
+    {
+        if (SettingShortcut.Resolve(id) is null || openSetting is null) return;
+        close(); openSetting(id!);
+    }
     [RelayCommand] private void Close() => close();
 }

@@ -47,7 +47,7 @@
             <ControlTemplate>
                 <Panel>
                     <!-- Faded as one layer; PillDialogHost fills the image with the owner snapshot. -->
-                    <Panel x:Name="PART_BackdropLayer" IsHitTestVisible="False">
+                    <Panel x:Name="PART_BackdropLayer" IsHitTestVisible="False" IsVisible="{TemplateBinding ShowBackdrop}">
                         <Image x:Name="PART_Backdrop"
                                Stretch="Fill"
                                HorizontalAlignment="Left"

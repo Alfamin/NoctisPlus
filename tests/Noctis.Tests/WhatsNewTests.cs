@@ -60,22 +60,96 @@ public class WhatsNewTests : IDisposable
         Assert.Equal(new[] { "close", "settings" }, calls);
     }
 
+    private sealed class NoOpHistory : Noctis.Services.IPlayHistoryService
+    {
+        public IReadOnlyList<Noctis.Models.PlayHistoryEvent> Events => [];
+        public Task PreloadAsync() => Task.CompletedTask;
+        public void RecordPlay(Noctis.Models.Track track) { }
+        public void RecordSkip(Noctis.Models.Track track) { }
+        public Task FlushAsync() => Task.CompletedTask;
+    }
+    [Fact]
+    public void SettingLinksAreAllowlisted_AndCloseBeforeNavigation()
+    {
+        var notes = WhatsNewNotes.Load()!;
+        var calls = new List<string>();
+        var vm = new WhatsNewViewModel(notes, () => calls.Add("close"), openSetting: id => calls.Add(id));
+        foreach (var feature in notes.Added.Where(i => i.HasSetting))
+        {
+            calls.Clear(); vm.OpenSettingCommand.Execute(feature.Setting);
+            Assert.Equal(new[] { "close", feature.Setting! }, calls);
+        }
+        calls.Clear(); vm.OpenSettingCommand.Execute("https://example.invalid"); Assert.Empty(calls);
+        Assert.Contains(notes.Added, i => i.Setting == "offline");
+        Assert.Contains(notes.Added, i => i.Setting == "about");
+        Assert.Equal("OfflineModeRow", SettingShortcut.Resolve("offline")!.Control);
+        Assert.Equal("timePlayed", SettingShortcut.Resolve("wordTiming")!.Key);
+        Assert.Equal("firstBot", SettingShortcut.Resolve("firstBot")!.Key);
+    }
+
+    [AvaloniaFact]
+    public void AboutCanReopenNotes_AfterTheAutomaticGateWasDismissed()
+    {
+        using var data = new TestPersistenceService();
+        var settings = new Noctis.ViewModels.SettingsViewModel(data, new FakeLibraryService(), new NoOpHistory());
+        WhatsNewGate.MarkSeen(data.DataDirectory, new Version(2, 2, 0));
+        var calls = 0; settings.OpenWhatsNewRequested += (_, _) => calls++;
+        settings.OpenWhatsNewCommand.Execute(null); settings.OpenWhatsNewCommand.Execute(null);
+        Assert.Equal(2, calls);
+        settings.NavigateToSetting("offline");
+        Assert.Equal(Noctis.ViewModels.SettingsViewModel.TabGeneral, settings.SelectedSettingsTab);
+        Assert.Equal("OfflineModeRow", settings.PendingSettingShortcut!.Control);
+        settings.NavigateToSetting("wordTiming");
+        Assert.Equal(Noctis.ViewModels.SettingsViewModel.TabFeatures, settings.SelectedSettingsTab);
+        Assert.Equal("dev.moshi.wordlyrics", settings.PendingSettingShortcut!.Feature);
+    }
+
+    [AvaloniaFact]
+    public void NativeSettingsLinksReachTheExactControl_AndOfflineHasNoDivider()
+    {
+        AddToPlaylistDialogTests.EnsureAppStyles();
+        using var data = new TestPersistenceService();
+        var settings = new Noctis.ViewModels.SettingsViewModel(data, new FakeLibraryService(), new NoOpHistory());
+        settings.NavigateToSetting("offline");
+        var view = new Views.SettingsView { DataContext = settings };
+        var window = new Window { Width = 1100, Height = 820, Content = view };
+        window.Show();
+        try
+        {
+            Dispatcher.UIThread.RunJobs(); window.UpdateLayout(); Dispatcher.UIThread.RunJobs();
+            Assert.Null(settings.PendingSettingShortcut);
+            Assert.Equal(new Avalonia.Thickness(0), view.FindControl<Border>("OfflineModeRow")!.BorderThickness);
+            settings.NavigateToSetting("wordTiming");
+            var feature = new Noctis.Services.Plugins.LoadedPlugin("dev.moshi.wordlyrics", null) { IsBundled = true };
+            feature.SettingItems.Add(new(new("timePlayed", "Time every song you play", Noctis.Services.Plugins.PluginSettingType.Bool, "true", [], null, null, null), "true", _ => { }));
+            settings.BuiltInFeatures.Add(feature);
+            for (int i = 0; i < 4; i++) { Dispatcher.UIThread.RunJobs(); window.UpdateLayout(); }
+            Assert.Null(settings.PendingSettingShortcut);
+            Assert.Equal(Noctis.ViewModels.SettingsViewModel.TabFeatures, settings.SelectedSettingsTab);
+            settings.NavigateToSetting("about");
+            Dispatcher.UIThread.RunJobs(); window.UpdateLayout(); Dispatcher.UIThread.RunJobs();
+            Assert.Null(settings.PendingSettingShortcut);
+            Assert.True(view.FindControl<Button>("WhatsNewButton")!.IsEffectivelyVisible);
+        }
+        finally { window.Close(); }
+    }
+
     [AvaloniaFact]
     public void ThePanel_ShowsEveryFeature_AndGotItCloses()
     {
         AddToPlaylistDialogTests.EnsureAppStyles();
         var closed = false; var settings = false;
         var notes = WhatsNewNotes.Load()!;
-        var panel = new Views.WhatsNewPanel { DataContext = new WhatsNewViewModel(notes, () => closed = true, () => settings = true) };
+        var panel = new Views.WhatsNewPanel { DataContext = new WhatsNewViewModel(notes, () => closed = true, openSetting: _ => settings = true) };
         var window = new Window { Width = 900, Height = 900, Content = panel };
         window.Show();
         for (int i = 0; i < 3; i++) { Dispatcher.UIThread.RunJobs(); window.UpdateLayout(); }
         var rows = panel.GetVisualDescendants().OfType<StackPanel>().Count(p => p.Classes.Contains("feature-row"));
         Assert.Equal(notes.Added.Count, rows);
-        var shortcut = panel.GetVisualDescendants().OfType<Button>().Single(b => b.Content as string == "Word timing settings");
+        var shortcut = panel.GetVisualDescendants().OfType<Button>().Single(b => b.CommandParameter as string == "offline");
         Assert.True(shortcut.IsVisible);
-        Assert.Contains("pill-secondary", shortcut.Classes);
-        shortcut.Command!.Execute(null);
+        Assert.True(shortcut.IsEnabled);
+        shortcut.Command!.Execute(shortcut.CommandParameter);
         Assert.True(settings);
         Assert.True(closed);
         closed = false;

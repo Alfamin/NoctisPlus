@@ -56,7 +56,16 @@ public sealed partial class WordLyricsViewModel : ObservableObject, IDisposable
     [ObservableProperty] private string _error = "";
     [ObservableProperty, NotifyPropertyChangedFor(nameof(CanInteract)), NotifyCanExecuteChangedFor(nameof(StartCommand), nameof(FindLyricsCommand), nameof(SetupCommand))] private bool _busy;
     public bool CanInteract => !Busy && !_disposed && _service.Enabled;
-    public bool CanStart => CanInteract && CanQueue;
+    public bool IsIgnored => _track is not null && _service.IsIgnored(_track.FilePath);
+    public string IgnoreLabel => IsIgnored ? "Enable WordLyrics for this song" : "Ignore WordLyrics for this song";
+    public bool CanStart => CanInteract && CanQueue && !IsIgnored;
+    [RelayCommand]
+    private void ToggleIgnore()
+    {
+        if (_track is null) return;
+        _service.SetIgnored(_track.FilePath, !IsIgnored);
+        Refresh();
+    }
     public string PauseLabel => Paused ? "Resume" : "Pause";
     public ObservableCollection<string> SourceLabels { get; } = [];
     public bool HasSources => SourceLabels.Count > 0;
@@ -90,6 +99,7 @@ public sealed partial class WordLyricsViewModel : ObservableObject, IDisposable
         Indeterminate = !state.Finished && !state.Paused && !state.Error && state.Fraction is null;
         Paused = state.Paused; Controllable = state.Controllable && !state.Cancelling;
         OnPropertyChanged(nameof(CanInteract));
+        OnPropertyChanged(nameof(IsIgnored)); OnPropertyChanged(nameof(IgnoreLabel)); OnPropertyChanged(nameof(CanStart));
         StartCommand.NotifyCanExecuteChanged(); FindLyricsCommand.NotifyCanExecuteChanged(); SetupCommand.NotifyCanExecuteChanged();
     }
     /// <summary>Owner #91: "3 waiting" with nothing running looked stuck; songs held for a later try say when it is.</summary>
@@ -97,7 +107,7 @@ public sealed partial class WordLyricsViewModel : ObservableObject, IDisposable
     {
         if (atUtc is not { } at || at <= nowUtc) return "";
         var left = at - nowUtc;
-        var text = left.TotalMinutes < 60 ? $"{Math.Max(1, (int)Math.Ceiling(left.TotalMinutes))} min"
+        var text = left.TotalDays >= 1 ? $"{(int)Math.Ceiling(left.TotalDays)} days" : left.TotalMinutes < 60 ? $"{Math.Max(1, (int)Math.Ceiling(left.TotalMinutes))} min"
             : $"{(int)left.TotalHours} h {left.Minutes} min";
         return $" · next try in {text}";
     }

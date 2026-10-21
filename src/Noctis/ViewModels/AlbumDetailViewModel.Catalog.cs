@@ -76,7 +76,9 @@ public partial class AlbumDetailViewModel
 
     // Owner #34: an online album's page opens at once; skeleton rows stand in until its songs are read.
     private CatalogRelease? _catalogLoading;
-    public bool IsCatalogLoading => _catalogLoading is not null;
+    private bool _enrichLoading;
+    public bool IsCatalogLoading => _catalogLoading is not null || _enrichLoading;
+    public string CatalogLoadingText => Tracks.Count > 0 ? "Loading more songs" : "Loading songs";
     internal bool IsCatalogLoadingFor(string releaseId) => _catalogLoading?.Id == releaseId;
     /// <summary>Title-bar widths of the skeleton rows (varied, like real titles).</summary>
     public IReadOnlyList<double> CatalogSkeletonRows { get; } = [210, 160, 240, 180, 220, 150];
@@ -109,36 +111,59 @@ public partial class AlbumDetailViewModel
     internal void EnrichFromCatalog()
     {
         if (_catalog is not null || Album.CatalogReleaseId is not null || Album.Tracks.Count == 0) return;
-        if (FreeMusicPlugin.Current?.CatalogPages is not { Enabled: true } pages) return;
+        if (Services.OnlineAccess.Shared.IsOffline || FreeMusicPlugin.Current?.CatalogPages is not { Enabled: true } pages) return;
         var artist = Album.Artist;
         if (string.IsNullOrWhiteSpace(artist) || artist.Equals("Various Artists", StringComparison.OrdinalIgnoreCase)) return;
-        _enrichStop?.Cancel();
-        var stop = _enrichStop = new CancellationTokenSource();
         var name = Album.Name;
         var titles = Album.Tracks.Select(t => t.Title).ToArray();
-        _ = Task.Run(async () =>
+        _ = EnrichCatalogAsync(async ct =>
         {
-            try
-            {
-                var (identity, _) = await pages.IdentifyAsync(artist, pages.LocalAlbums(artist), titles, stop.Token);
-                if (identity is null) return;
-                var profile = await pages.Catalog.SavedArtistAsync(identity, stop.Token)
-                              ?? await pages.Catalog.ArtistAsync(identity, false, stop.Token);
-                var release = profile.Value.Releases.FirstOrDefault(r => CatalogEditions.Matches(r, name, artist));
-                if (release is null) return;
-                var album = await pages.Catalog.AlbumAsync(release, false, stop.Token);
-                var matches = await pages.Actions.MatchAsync(album.Value.Songs, stop.Token, reuse: true);
-                if (stop.IsCancellationRequested) return;
-                await Dispatcher.UIThread.InvokeAsync(() =>
-                {
-                    if (stop.IsCancellationRequested || _catalog is not null) return;
-                    _catalogEnriches = true;
-                    ShowCatalog(new CatalogAlbumOpen(album.Value, matches));
-                });
-            }
-            catch (Exception ex) when (ex is OperationCanceledException or HttpRequestException or IOException or TimeoutException
-                                           or InvalidDataException or InvalidOperationException or SourcesWaitingException or ArgumentException) { }
+            var (identity, _) = await pages.IdentifyAsync(artist, pages.LocalAlbums(artist), titles, ct);
+            if (identity is null) return null;
+            var profile = await pages.Catalog.SavedArtistAsync(identity, ct)
+                          ?? await pages.Catalog.ArtistAsync(identity, false, ct);
+            var release = profile.Value.Releases.FirstOrDefault(r => CatalogEditions.Matches(r, name, artist));
+            if (release is null) return null;
+            var album = await pages.Catalog.AlbumAsync(release, false, ct);
+            var matches = await pages.Actions.MatchAsync(album.Value.Songs, ct, reuse: true);
+            return new CatalogAlbumOpen(album.Value, matches);
         });
+    }
+
+    /// <summary>Paint feedback before any catalog IO; keep the owned rows and guard late answers.</summary>
+    internal async Task EnrichCatalogAsync(Func<CancellationToken, Task<CatalogAlbumOpen?>> load)
+    {
+        _enrichStop?.Cancel();
+        var stop = _enrichStop = new CancellationTokenSource();
+        _enrichLoading = true;
+        OnPropertyChanged(nameof(IsCatalogLoading));
+        OnPropertyChanged(nameof(CatalogLoadingText));
+        OnPropertyChanged(nameof(ShowPlayActions));
+        try
+        {
+            var open = await Task.Run(() => load(stop.Token));
+            if (open is null || stop.IsCancellationRequested) return;
+            await Dispatcher.UIThread.InvokeAsync(() =>
+            {
+                if (stop.IsCancellationRequested || !ReferenceEquals(_enrichStop, stop) || _catalog is not null) return;
+                _catalogEnriches = true;
+                ShowCatalog(open);
+            });
+        }
+        catch (Exception ex) when (ex is OperationCanceledException or HttpRequestException or IOException or TimeoutException
+                                       or InvalidDataException or InvalidOperationException or SourcesWaitingException or ArgumentException) { }
+        finally
+        {
+            await Dispatcher.UIThread.InvokeAsync(() =>
+            {
+                if (!ReferenceEquals(_enrichStop, stop)) return;
+                _enrichStop = null;
+                _enrichLoading = false;
+                OnPropertyChanged(nameof(IsCatalogLoading));
+                OnPropertyChanged(nameof(ShowPlayActions));
+            });
+            stop.Dispose();
+        }
     }
 
     internal void ShowCatalog(CatalogAlbumOpen open)
@@ -270,6 +295,7 @@ public partial class AlbumDetailViewModel
     private void DisposeCatalog()
     {
         _catalogLoading = null; // a closed page is never filled later
+        _enrichLoading = false;
         _enrichStop?.Cancel();
         if (_catalogOnline is not null) _catalogOnline.DownloadsChanged -= CatalogDownloadsChanged;
         _catalogOnline = null;

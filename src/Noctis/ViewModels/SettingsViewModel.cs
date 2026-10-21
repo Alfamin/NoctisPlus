@@ -75,6 +75,18 @@ public partial class SettingsViewModel : ViewModelBase
     private Task _scanInFlight = Task.CompletedTask;
 
     [ObservableProperty] private int _mediaFoldersScrollRequest;
+    [ObservableProperty] private int _settingShortcutRequest;
+    internal Features.WhatsNew.SettingShortcut? PendingSettingShortcut { get; private set; }
+    internal void NavigateToSetting(string id)
+    {
+        if (Features.WhatsNew.SettingShortcut.Resolve(id) is not { } target) return;
+        PendingSettingShortcut = target;
+        SelectedSettingsTab = target.Tab;
+        SettingShortcutRequest++;
+    }
+    internal void CompleteSettingShortcut() => PendingSettingShortcut = null;
+    public event EventHandler? OpenWhatsNewRequested;
+    [RelayCommand] private void OpenWhatsNew() => OpenWhatsNewRequested?.Invoke(this, EventArgs.Empty);
 
     // ── Tabs ──
     // The Settings modal is split into named tabs; exactly one tab panel is visible at a time.

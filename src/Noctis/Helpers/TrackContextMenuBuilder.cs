@@ -630,12 +630,24 @@ public sealed class TrackContextMenuBuilder
             _wordTiming = new MenuItem { Header = "Word timing / repair…" };
             _wordTiming.Command = new RelayCommand<Track>(t => { if (t is not null) Features.WordLyrics.WordLyricsFeature.Current?.Show(track: t); });
             Lyrics.Items.Add(_wordTiming);
+            _ignoreWordLyrics = new MenuItem();
+            _ignoreWordLyrics.Command = new RelayCommand<Track>(t =>
+            {
+                if (t is null || Features.WordLyrics.WordLyricsFeature.Current is not { } service) return;
+                service.SetIgnored(t.FilePath, !service.IsIgnored(t.FilePath));
+            });
+            Lyrics.Items.Add(_ignoreWordLyrics);
         }
         _wordTiming.IsVisible = Features.WordLyrics.WordLyricsFeature.Current?.Enabled == true;
         _wordTiming.IsEnabled = !track.IsRemoteStream;
         _wordTiming.CommandParameter = track;
+        _ignoreWordLyrics!.Header = Features.WordLyrics.WordLyricsFeature.Current?.IsIgnored(track.FilePath) == true
+            ? "Enable WordLyrics for this song" : "Ignore WordLyrics for this song";
+        _ignoreWordLyrics.IsVisible = _wordTiming.IsVisible;
+        _ignoreWordLyrics.IsEnabled = !track.IsRemoteStream && !string.IsNullOrWhiteSpace(track.FilePath);
+        _ignoreWordLyrics.CommandParameter = track;
     }
-    private MenuItem? _wordTiming;
+    private MenuItem? _wordTiming, _ignoreWordLyrics;
 
     /// <summary>Rebuilds the plugin entries for this open. A plugin that throws here is contained by the host.</summary>
     private void BindPluginCommands(Track track)

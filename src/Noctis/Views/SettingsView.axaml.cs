@@ -359,7 +359,10 @@ public partial class SettingsView : UserControl
         _trackedViewModel = DataContext as SettingsViewModel;
 
         if (_trackedViewModel != null)
+        {
             _trackedViewModel.PropertyChanged += OnSettingsViewModelPropertyChanged;
+            Dispatcher.UIThread.Post(ApplySettingShortcut, DispatcherPriority.Loaded);
+        }
     }
 
     private void OnSettingsViewModelPropertyChanged(object? sender, PropertyChangedEventArgs e)
@@ -368,6 +371,9 @@ public partial class SettingsView : UserControl
         {
             // The media-folders card is the first card on the Library tab (the view model
             // already switched tabs), so landing there is just a scroll to the top.
+            case nameof(SettingsViewModel.SettingShortcutRequest):
+                Dispatcher.UIThread.Post(ApplySettingShortcut, DispatcherPriority.Loaded);
+                break;
             case nameof(SettingsViewModel.MediaFoldersScrollRequest):
             case nameof(SettingsViewModel.SelectedSettingsTab):
                 ScrollToTop();
@@ -395,6 +401,32 @@ public partial class SettingsView : UserControl
                         DispatcherPriority.Loaded);
                 break;
         }
+    }
+
+    private readonly Dictionary<Services.Plugins.PluginSettingItem, Control> _featureSettingRows = new();
+    private void OnFeatureSettingAttached(object? sender, VisualTreeAttachmentEventArgs e)
+    {
+        if (sender is Control { DataContext: Services.Plugins.PluginSettingItem setting } row)
+            _featureSettingRows[setting] = row;
+        Dispatcher.UIThread.Post(ApplySettingShortcut, DispatcherPriority.Loaded);
+    }
+    private void OnFeatureSettingDetached(object? sender, VisualTreeAttachmentEventArgs e)
+    {
+        if (sender is Control { DataContext: Services.Plugins.PluginSettingItem setting }) _featureSettingRows.Remove(setting);
+    }
+    private void ApplySettingShortcut()
+    {
+        if (_trackedViewModel?.PendingSettingShortcut is not { } target) return;
+        SettingsSearchBox.Text = ""; // a previous filter must not hide the linked setting
+        Control? row = target.Control is { } name ? this.FindControl<Control>(name) : null;
+        if (target.Feature is { } id && target.Key is { } key)
+        {
+            var setting = _trackedViewModel.BuiltInFeatures.FirstOrDefault(f => f.Id == id)?.SettingItems.FirstOrDefault(s => s.Key == key);
+            if (setting is not null) _featureSettingRows.TryGetValue(setting, out row);
+        }
+        if (row is null || !row.IsEffectivelyVisible) return; // templates attach after the sheet opens
+        row.BringIntoView();
+        _trackedViewModel.CompleteSettingShortcut();
     }
 
     private EventHandler? _followReveal;

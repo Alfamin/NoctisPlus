@@ -7,6 +7,7 @@ namespace Noctis.Views;
 public partial class WordLyricsPanel : UserControl
 {
     public WordLyricsPanel() => InitializeComponent();
+    internal void UseWindowBackdrop() => TimingHost.ShowBackdrop = true;
 
     /// <summary>Done was pressed: the host closes the panel. Bubbles, so a host can listen from above a template.</summary>
     public static readonly RoutedEvent<RoutedEventArgs> CloseRequestedEvent =

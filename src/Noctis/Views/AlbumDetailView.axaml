@@ -665,7 +665,10 @@
                                   IsVisible="{Binding !StreamMissing}" />
                         </Panel>
                     </Button>
-                    <!-- Noctis Plus, online album: the songs the library lacks, into Downloads. -->
+                    <TextBlock Text="{Binding CatalogNotice}" FontSize="12" Opacity="0.55" TextWrapping="Wrap" Margin="0,6,0,6"
+                   Foreground="{Binding PageForegroundBrush}" IsVisible="{Binding HasCatalogNotice}" />
+
+        <!-- Noctis Plus, online album: the songs the library lacks, into Downloads. -->
                     <Button Command="{Binding DownloadMissingCommand}"
                             IsVisible="{Binding HasCatalogMissing}"
                             Classes="accent-btn album-header-action"
@@ -1060,7 +1063,8 @@
         </ItemsControl>
 
         <!-- Owner #34: an online album opens at once; these rows breathe until its songs arrive. -->
-        <StackPanel IsVisible="{Binding IsCatalogLoading}" Spacing="0" Margin="0,4,0,0">
+        <StackPanel x:Name="CatalogLoadingRows" IsVisible="{Binding IsCatalogLoading}" Spacing="0" Margin="0,12,0,0">
+            <controls:ShimmerText Text="{Binding CatalogLoadingText}" IsShimmering="{Binding IsCatalogLoading}" FontSize="13" Opacity="0.85" Margin="0,0,0,12" Foreground="{Binding PageForegroundBrush}" />
             <StackPanel.Styles>
                 <Style Selector="Border.row-skeleton">
                     <Setter Property="Background" Value="{DynamicResource SystemControlForegroundBaseHighBrush}" />
@@ -1094,8 +1098,6 @@
         <StackPanel IsVisible="{Binding HasCatalogMissing}" Margin="0,0,0,0">
             <TextBlock Text="Not in your library" FontSize="17" FontWeight="Bold" Margin="0,18,0,6"
                        Foreground="{Binding PageForegroundBrush}" IsVisible="{Binding ShowCatalogMissingHeader}" />
-            <TextBlock Text="{Binding CatalogNotice}" FontSize="12" Opacity="0.55" TextWrapping="Wrap" Margin="0,0,0,6"
-                       Foreground="{Binding PageForegroundBrush}" IsVisible="{Binding HasCatalogNotice}" />
             <ItemsControl ItemsSource="{Binding CatalogMissing}" Foreground="{Binding PageForegroundBrush}">
                 <ItemsControl.ItemTemplate>
                     <DataTemplate x:DataType="vm:ArtistCatalogSong">

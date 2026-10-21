@@ -1,4 +1,4 @@
-﻿using System.ComponentModel;
+using System.ComponentModel;
 using System.Diagnostics;
 using System.IO;
 using System.Windows.Input;
@@ -752,6 +752,12 @@ public partial class MainWindowViewModel : ViewModelBase
             SkipNextSettingsOpenAnimation = true;
             OpenSettings();
         };
+        Settings.OpenWhatsNewRequested += (_, _) =>
+        {
+            if (Features.WhatsNew.WhatsNewNotes.Load() is not { } notes) return;
+            CloseSettings();
+            PresentWhatsNew(notes);
+        };
         Settings.OpenStatisticsRequested += (_, _) =>
         {
             // Swap the content to Statistics while the modal still covers it, then
@@ -1177,20 +1183,23 @@ public partial class MainWindowViewModel : ViewModelBase
             var existing = Settings.GetSettings().MusicFolders.Count > 0 || _library.Tracks.Count > 0;
             var show = forced ? notes : Features.WhatsNew.WhatsNewGate.ToShow(_persistence.DataDirectory, current, existing, notes);
             if (show is null) return;
-            DispatcherTimer.RunOnce(() =>
-            {
-                WhatsNewSheet = new Features.WhatsNew.WhatsNewViewModel(show, () =>
-                {
-                    WhatsNewSheet = null;
-                    Features.WhatsNew.WhatsNewGate.MarkSeen(_persistence.DataDirectory, current);
-                }, () =>
-                {
-                    Settings.SelectedSettingsTab = SettingsViewModel.TabFeatures;
-                    OpenSettingsCommand.Execute(null);
-                });
-            }, TimeSpan.FromSeconds(1.5));
+            DispatcherTimer.RunOnce(() => PresentWhatsNew(show), TimeSpan.FromSeconds(1.5));
         }
         catch (Exception ex) { DebugLog.Write("WhatsNew", "skipped: " + ex.Message); } // never in the way of startup
+    }
+
+    private void PresentWhatsNew(Features.WhatsNew.WhatsNewNotes notes)
+    {
+        WhatsNewSheet = new Features.WhatsNew.WhatsNewViewModel(notes, () =>
+        {
+            WhatsNewSheet = null;
+            Features.WhatsNew.WhatsNewGate.MarkSeen(_persistence.DataDirectory, Services.UpdateService.CurrentVersion);
+        }, () => OpenWhatsNewSetting("wordTiming"), OpenWhatsNewSetting);
+    }
+    private void OpenWhatsNewSetting(string id)
+    {
+        Settings.NavigateToSetting(id);
+        OpenSettingsCommand.Execute(null);
     }
 
     /// <summary>

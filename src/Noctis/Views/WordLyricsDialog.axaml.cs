@@ -13,6 +13,7 @@ public partial class WordLyricsDialog : Window
     public WordLyricsDialog()
     {
         InitializeComponent();
+        WordPanel.UseWindowBackdrop();
         WordPanel.CloseRequested += (_, _) => Close();
     }
     internal WordLyricsDialog(WordLyricsService service, bool library, Track? track) : this()
