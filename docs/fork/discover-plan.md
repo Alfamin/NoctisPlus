@@ -1,12 +1,21 @@
 # Discover / For you: plan and continuation notes
 
-Branch `discover-a`, started from `native` at v2.2.0 (`11995e63`). Milestone A is the only milestone done so far.
-Don't start B until the owner says so.
+Branch `discover-a`, started from `native` at v2.2.0 (`11995e63`), draft PR Alfamin/NoctisPlus#12 into `main`.
+**Done:** Milestones A and B. **Next:** C, only when the owner says so. Never merge, push to `main`/`native`, or tag.
 
-> **The brief was cut off.** The copy this work started from stops in section 5 ("…should not be ad"). The definitions
-> of Milestones A–D and the section 10 docs never arrived. Milestone A below was scoped from sections 1–4 and the
-> parts of 5 that did arrive. The B–D plans further down are proposals, not the owner's definitions. Check them against
-> the full brief before starting B.
+The milestones are the owner's (brief section 9):
+- **A. Working Discovery improvement:** ranking and identity audit; filtering, personalisation, novelty, diversity, song-level
+  dismissal. The shelf must stay usable with no telemetry or provider data.
+- **B. Learning data:** only the missing high-value exposure and feedback telemetry, reuse playback tracking, update derived
+  preference statistics safely, focused persistence and Undo tests.
+- **C. Evaluation and reliability:** compare baseline and improved behaviour, failure cases, offline and cache behaviour,
+  performance. Fix correctness problems before adding complexity.
+- **D. Future-model readiness:** a concrete model adoption gate and the architectural boundaries it needs. No model download or
+  execution, no whole-library processing, no vector database, no speculative ML without separate authorisation.
+
+> The first copy of the brief stopped in section 5, so the B–D in the first version of this file were my guesses (B was
+> "track-level candidates"). They have been replaced by the owner's definitions above. Track-level retrieval is not in any
+> milestone; it is listed under "Later, only with evidence" in section 5.
 
 ## 1. What was already there (audit)
 
@@ -94,7 +103,7 @@ old pages without a `Batch` are just not recorded as exposures.
 
 ## 3. Evaluation
 
-**CI (Windows, `tests/Noctis.Tests/DiscoverLearningTests.cs`, synthetic only).** Covers:
+**CI (Windows, `tests/Noctis.Tests/DiscoverLearningTests.cs`, synthetic only; B adds `DiscoverTelemetryTests.cs`, see section 4).** Covers:
 - identity merges and keeps
 - heard, namesake and compilation exclusion
 - cross-provider dedupe
@@ -141,59 +150,144 @@ Caveats:
 - Library marks and playlists are today's, so they are applied at every cutoff (a mild look-ahead).
 - Catalog retrieval isn't replayed (no network), so this measures seeds, not songs.
 
-## 4. Known gaps (deliberately not in A)
-- **Plays are recorded only while True Shuffle is enabled.** `PlayTracker` lives in `TrueShuffleService`. Moving it out would
-  change True Shuffle's lifecycle; left for B or C with the owner's agreement.
-- **Exposure is shelf-level, not viewport-level.** Only the first 10 positions count toward resting; cards further right may
-  never have been scrolled into view.
-- **No track-level retrieval yet.** Candidates are still "top songs of related artists".
-- **Not checked in the real app:** the Reset menu item, and the expanded/collapsed exposure rule. Both are covered only by
-  view-model logic; no UI test was run.
+## 4. Milestone B: what changed
 
-## 5. Proposed B–D (to check against the full brief)
+Every derived statistic is recomputed from raw records at each build (`DiscoverFeedback.Learn`). Nothing derived is stored, so
+Undo, Reset and pruning cannot leave stale statistics behind.
 
-**B. Track-level candidates**
-- Last.fm `track.getSimilar` and ListenBrainz/LB-Labs similar recordings, seeded from recently loved recordings rather than
-  artists, mixed with the artist path under a per-source quota.
-- Recorded fixtures for every provider response, with no live calls in tests.
-- Read the provider docs (section 10) only for the exact endpoints, parameters and rate limits.
-- Extend the replay to a song-level offline metric using cached catalog pages.
+### Exposure that was actually on screen
+- The shelf is a wrapping grid inside the page's vertical scroll, so "first 10 positions" was a guess.
+- `ForYouShelfView` now reports, after each scroll or layout pass (coalesced, background priority), the cards that are at least
+  half inside the scroll viewport (`ForYouShelfView.InView`).
+- The view model passes their page positions to `DiscoverFeedback.Seen`. A write happens only when a new place comes into
+  view, and nothing is recorded while the shelf is inactive or collapsed.
+- `DiscoverBatch.Seen` holds the positions in view. Resting uses only those. Pages recorded before this (`Seen` = null) keep
+  the old "first 10" rule.
+- Not done: dwell time. A card scrolled past quickly still counts as seen once.
 
-**C. Feedback quality and UI**
-- Viewport-accurate exposure (the cards actually scrolled into view).
-- Show "why" more concretely.
-- Settings entry for reset and retention.
-- Move `PlayTracker` so listening is recorded without True Shuffle, if approved.
-- Headless UI tests for the menu and exposure rules.
+### Outcomes from real listening (reusing `PlayTracker` records)
+- **Outcome per played or saved card,** joined by recording key to the listener's own records from the moment they first acted
+  on it (2 minutes of clock slack). From best to worst:
+  - **Kept:** saved, then favourited, rated 4+, or put in one of their own playlists (not an import); or two good plays on
+    separate days
+  - **Saved:** downloaded or queued
+  - **Enjoyed:** a finish or qualified play
+  - **Sampled:** a partial listen
+  - **Skipped:** an audible early skip and nothing better
+  - **None:** a quick skip, a failed start or no play. A shown card with no action has no outcome, which is never a negative.
+- **Per-artist effect (`ArtistFactor`):** dismissals plus early skips, minus good outcomes, minus one. Each unit over zero
+  lowers the artist's other songs (never below ×0.4). Good outcomes alone lift the artist by up to ×1.25, so a new artist the
+  listener took to gets more songs. One dismissal or one early skip still changes nothing beyond that song (it is now heard,
+  so excluded anyway).
+- Plays from before the card was acted on never count as its outcome.
 
-**D. Neural-network readiness, no model shipped**
-- A `IRecordingFeatures` seam (an embedding per recording key, a version, a source), stored separately from behaviour data.
-- An offline evaluation harness that can compare "taste + embedding similarity" against the current ranker on replayed data.
-- A short design note on candidate local models and their licence, size and CPU cost.
+### Playback evidence that is not taste (`TasteSources.ShuffleListens` / `Load`)
+- **Under 3 audible seconds is neutral**, whatever the end reason (a slip, a failed stream start or buffering). It was −0.3
+  for a quick Next; it is no longer a dislike and no longer marks the song as heard.
+- **"Finished" needs at least half the song or 30 seconds heard.** Otherwise it was a failed stream or an unknown length,
+  not a finish (it used to count +1.5).
+- **Duplicate play events** (the same recording starting within the same 2 seconds) count once (`TasteSources.Distinct`).
+- `listens.jsonl`, True Shuffle and play counts are unchanged; only For you's reading of them changed.
+
+### Persistence and Undo (tests)
+- Truncated or unknown-version feedback files are ignored, and the next write replaces them.
+- Reset between queued writes leaves only post-Reset data.
+- Seen positions and retractions survive a reload.
+- Pages cached by 2.2.0 (no `Batch`, `Seed` or `Own`) still load and are never counted as shown.
+- Undo retracts the dismissal's learning (Finder suite, view-model level).
+
+### What leaves the computer (unchanged by A and B; listed for section 7)
+- **Last.fm `artist.getSimilar`** (only with the user's own API key): a seed artist name.
+- **MusicBrainz:** a seed artist name and up to 3 of the listener's song titles for that artist, to identify the right artist
+  (namesake safety).
+- **ListenBrainz Labs similar artists:** an artist MBID.
+- **Deezer, else Apple:** artist names and IDs, for search, related artists and top songs.
+
+Not sent: listening history, play counts, the feedback file, library paths, audio, Telegram sessions, credentials. Requests
+go through Finder's existing HTTP clients (its configured proxy, pacing and caches). Offline-mode handling is checked in C.
+
+## 5. Plan for C and D, and the gates after them
+
+**C. Evaluation and reliability (next, when approved)**
+- **Promotion and stopping criteria, written before measuring.** Proposed: the new engine is kept if, on synthetic personas
+  and on the owner's local replay, it is no worse on recall and skip share and better on returning favourites. It is
+  reverted if duplicate or familiar recommendations appear in synthetic checks. Any regression is fixed before new features.
+- **Song-level offline comparison** of the 2.2.0 ranker against the current one on synthetic catalog fixtures:
+  - duplicate rate, familiar/owned leakage, artist and seed concentration, repeated exposure
+  - the outcome counts from `Summary` where feedback exists
+- **Reliability:**
+  - provider failures and partial failures
+  - explicit Offline mode (verify that Discover respects it; fix it if not)
+  - cached-page fallback and cancellation
+  - stable visible batches while new picks arrive
+- **Performance:** build latency and allocations on a 50k-song synthetic library, and the cost of `InView` on layout.
+- **Kept explicit:** offline evaluation of biased historical logs cannot show causal satisfaction gains.
+
+**D. Future-model readiness (documentation and boundaries only)**
+- **The adoption gate (all must hold, each with evidence):**
+  - a named model and exact pinned artifacts
+  - compatible licences for code, weights and training data
+  - a supported, auditable native Windows inference path (a real, built and validated ONNX export)
+  - measured CPU, RAM, disk and optional GPU cost
+  - a way to get audio or compatible embeddings for *remote* candidates, without downloading full songs to fill the shelf
+  - enough candidate coverage
+  - a separate evaluation showing a meaningful improvement over this deterministic baseline
+- **Boundaries:**
+  - any feature cache keyed by `DiscoverIdentity.Key` plus model and preprocessing version
+  - optional and rebuildable; its removal or failure leaves Discover as it is
+- No interface or storage is added until the gate is met.
+
+**Later, only with evidence:** track-level retrieval (Last.fm `track.getSimilar` or ListenBrainz recording similarity). It
+would need a docs check, recorded fixtures and a song-level offline comparison first.
 
 ### Rough cost (Claude cloud credits, very uncertain)
 
 | Milestone | Estimate | Main uncertainty |
 |---|---|---|
-| A (this) | ~$12–18 used | Included a cold .NET install and two full local test runs. |
-| B | $15–25 | Provider fixtures and the docs check; quota mixing and the replay extension. |
-| C | $8–15 | Headless Avalonia UI tests are slow to iterate. |
-| D | $12–25 | Scope of the evaluation harness; no model training or inference included. |
+| A | ~$12–18 used | A cold .NET install and two full local test runs. |
+| B | ~$8–12 used | Two full local test runs again. |
+| C | $10–18 | Song-level comparison fixtures and the Offline-mode audit; a fix if Offline mode is not respected. |
+| D | $3–6 | A written gate and a short boundary note; no code unless the gate demands it. |
 
-Total B–D is about $35–65, which may not fit what's left of the $70. B is the one most likely to improve picks.
+## 6. Acceptance criteria: verified vs pending
 
-## 6. Continuation notes
+| # | Criterion | Verified here | Pending (owner, Windows app, isolated test profile) |
+|---|---|---|---|
+| 1 | Discovery improved without a model or paid inference | Synthetic tests; replay on a synthetic persona | Real listening over some weeks |
+| 2 | Ownership, identity and playback safeguards intact | Unit tests; Windows CI green on A | Real library with remasters and compilations |
+| 3 | Learns from trustworthy evidence, not exposure, failures or imports | Unit tests (B) | Real playback failures and streams |
+| 4 | Song-level dismissal and Undo | Unit and view-model tests | Clicking it in the app |
+| 5 | Offline, cancellation, cache, queue semantics preserved | Existing suites pass; cached-page tests | Explicit Offline mode audit (C); app check |
+| 6 | Automated checks for ranking, telemetry, identity, feedback | `DiscoverLearningTests`, `DiscoverTelemetryTests`, Finder suite | — |
+| 7 | Baseline comparison and limits documented, no invented results | Replay tool and this file | The owner's own replay numbers |
+| 8 | Evidence-based model gate | Draft in section 5 | Finalised in D |
+| 9 | Verified vs pending kept apart | This table | — |
+
+**UI checks pending in the Windows app:**
+- the "Reset For you…" header menu
+- exposure counts only while expanded
+- the in-view report while scrolling
+- that LayoutUpdated reporting causes no visible cost
+
+## 7. Continuation notes
 - Entry points:
-  - `ForYou.cs`: `Taste.Seeds`, `TasteSources`, `Discover.BuildAsync`, `DiscoverHidden`, `ForYouSource.ResetLearning`
-  - `DiscoverIdentity.cs`, `DiscoverFeedback.cs`, `DiscoverReplay.cs`
-  - `ForYouShelfViewModel.cs`: `RecordShown`, `Record`, `ResetLearning`
+  - `ForYou.cs`: `Taste.Seeds`, `TasteSources` (`Load`, `Distinct`, `Familiar`, `Playlists`), `Discover.BuildAsync`,
+    `DiscoverHidden`, `ForYouSource.ResetLearning`
+  - `DiscoverIdentity.cs`, `DiscoverFeedback.cs` (`Shown`, `Seen`, `Record`, `Retract`, `Learn`, `Outcome`, `Summary`),
+    `DiscoverReplay.cs`
+  - `ForYouShelfViewModel.cs`: `RecordShown`, `InView`, `Record`, `ResetLearning`
+  - `ForYouShelfView.axaml.cs`: `InView`
 - Tuning constants:
   - `Taste.DurableSeeds`
   - `Discover.Shelf`, `PerSeed`, `OwnArtists`
   - `DiscoverLearning.Rest` and `ArtistFactor`
-  - `DiscoverFeedback.Keep`, `MaxBatches`, `MaxInteractions`, `FrontOfShelf`
+  - `DiscoverFeedback.Keep`, `MaxBatches`, `MaxInteractions`, `FrontOfShelf`, `Slack`
+- Known gap kept: plays are recorded only while True Shuffle is enabled (`PlayTracker` lives in `TrueShuffleService`). Moving it
+  would change True Shuffle's lifecycle, so it needs the owner's approval.
 - Local runs on Linux:
   - Build: `dotnet build tests/Noctis.Tests/Noctis.Tests.csproj -c Release`
-  - New tests: `dotnet tests/Noctis.Tests/bin/Release/net10.0/Noctis.Tests.dll -class Noctis.Tests.DiscoverLearningTests`
+  - Discover tests: `dotnet tests/Noctis.Tests/bin/Release/net10.0/Noctis.Tests.dll -class Noctis.Tests.DiscoverLearningTests -class Noctis.Tests.DiscoverTelemetryTests`
   - Finder suite: `dotnet run --project tests/FreeMusicFinder.Tests -c Release`. On Linux, 7 checks fail on `native` too
     (Windows file locking and `C:\` paths).
+  - Full `Noctis.Tests` on Linux: 49 tests fail on `native` too (Windows paths, the updater, the Windows player, a socket
+    broken-pipe); CI on Windows is the reference.

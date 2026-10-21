@@ -159,7 +159,7 @@ public sealed partial class ForYouShelfViewModel : ObservableObject, IDisposable
         Picks.Clear();
         foreach (var pick in page.Songs.Where(s => !source.Hidden.HidesSong(s.Track.Song)).Take(20))
         {
-            var row = new ForYouPick(pick, new SearchSongItem(_online!.Remember(pick.Track)), page.Batch ?? "");
+            var row = new ForYouPick(pick, new SearchSongItem(_online!.Remember(pick.Track)), page.Batch ?? "", Picks.Count);
             Picks.Add(row);
             _ = LoadArt(row, _load!.Token);
         }
@@ -175,8 +175,16 @@ public sealed partial class ForYouShelfViewModel : ObservableObject, IDisposable
     private void RecordShown()
     {
         if (_disposed || !_active || !IsExpanded || _source is not { } source || _page is not { Batch.Length: > 0 } page || Picks.Count == 0) return;
-        source.Feedback.Shown(page.Batch, Picks.Select((p, i) => new DiscoverShown(DiscoverIdentity.Key(p.Pick.Track.Song), p.Pick.Track.Song.Id,
-            DiscoverIdentity.Artist(p.Pick.Track.Song.Artists.FirstOrDefault()?.Name), p.Pick.Seed ?? "", p.Pick.Own, i)).ToList());
+        source.Feedback.Shown(page.Batch, Picks.Select(p => new DiscoverShown(DiscoverIdentity.Key(p.Pick.Track.Song), p.Pick.Track.Song.Id,
+            DiscoverIdentity.Artist(p.Pick.Track.Song.Artists.FirstOrDefault()?.Name), p.Pick.Seed ?? "", p.Pick.Own, p.Position)).ToList());
+    }
+
+    /// <summary>The view's report of the cards at least half on screen. Only those count as seen when a passed-over song is
+    /// rested; cards below the fold were retrieved, not shown. Ignored while the shelf is inactive or collapsed.</summary>
+    internal void InView(IEnumerable<ForYouPick> visible)
+    {
+        if (_disposed || !_active || !IsExpanded || _source is not { } source || _page is not { Batch.Length: > 0 } page) return;
+        source.Feedback.Seen(page.Batch, visible.Where(p => p.Batch == page.Batch).Select(p => p.Position).ToList());
     }
 
     private void Record(ForYouPick pick, DiscoverAction action)
@@ -336,7 +344,9 @@ public sealed class ForYouPick
     internal DiscoverSong Pick { get; }
     /// <summary>The page this card was shown on.</summary>
     internal string Batch { get; }
-    internal ForYouPick(DiscoverSong pick, SearchSongItem song, string batch = "") { Pick = pick; Song = song; Batch = batch; }
+    /// <summary>Where it was placed when the page was shown (Undo puts it back without changing it).</summary>
+    internal int Position { get; }
+    internal ForYouPick(DiscoverSong pick, SearchSongItem song, string batch = "", int position = 0) { Pick = pick; Song = song; Batch = batch; Position = position; }
     public SearchSongItem Song { get; }
     public string Because => Pick.Because;
 }

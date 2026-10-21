@@ -160,7 +160,14 @@ internal static class TasteSources
         if (noctisData is null) return [];
         var listens = ShuffleListens(Path.Combine(noctisData, "plugin-data", "dev.moshi.trueshuffle", "listens.jsonl"));
         var since = listens.Count > 0 ? listens.Min(p => p.At) : DateTime.MaxValue;
-        return NoctisHistory(Path.Combine(noctisData, "play_history.json"), since).Concat(listens).ToList();
+        return Distinct(NoctisHistory(Path.Combine(noctisData, "play_history.json"), since).Concat(listens));
+    }
+
+    /// <summary>One play once: the same recording starting within the same two seconds is one event written twice.</summary>
+    public static List<TastePlay> Distinct(IEnumerable<TastePlay> plays)
+    {
+        var seen = new HashSet<(string, long)>();
+        return plays.Where(p => seen.Add((DiscoverIdentity.Key(p.Title, p.Artist) is { Length: > 0 } k ? k : BotText.Key(p.Artist), p.At.Ticks / (2 * TimeSpan.TicksPerSecond)))).ToList();
     }
 
     /// <summary>Recordings the listener has heard (by <see cref="DiscoverIdentity.Key(string?, string?)"/>): not owning one does not make it new to them.</summary>
@@ -243,12 +250,16 @@ internal static class TasteSources
                     var artist = Str(e, "artist"); var at = Time(e, "startUtc");
                     if (artist.Length == 0 || at is not { } when) continue;
                     var end = Str(e, "end"); double coverage = Num(e, "coverage"), heard = Num(e, "listenedMs");
-                    double w = end == "Finished" ? 1.5
+                    // "Finished" with little heard is a stream that failed or a length that was unknown, not a finish.
+                    bool finished = end == "Finished" && (coverage >= 0.5 || heard >= 30_000);
+                    // Under three audible seconds says nothing either way: a slip, a failed start or buffering, never a dislike.
+                    double w = finished ? 1.5
                         : coverage >= 0.5 || heard >= 240_000 ? 1.0
-                        : end == "Skipped" ? (heard < 3_000 ? -0.3 : coverage < 0.25 ? -1.5 : 0.3)
+                        : heard < 3_000 ? 0
+                        : end == "Skipped" ? (coverage < 0.25 ? -1.5 : 0.3)
                         : heard >= 30_000 ? 0.3 : 0;
-                    // Three audible seconds or more, or the end: this recording is known, whatever the verdict.
-                    bool audible = end == "Finished" || heard >= 3_000;
+                    // Three audible seconds or more, or a real finish: this recording is known, whatever the verdict.
+                    bool audible = finished || heard >= 3_000;
                     if (w != 0 || audible) result.Add(new(artist, when, w, Str(e, "title"), audible));
                 }
                 catch (JsonException) { } // a line cut by a crash
@@ -643,7 +654,7 @@ internal sealed class ForYouSource(Func<ArtistCatalog> catalog, DiscoveryActions
             progress?.Report("Learning your taste…");
             var songs = await library.SnapshotAsync();
             var (plays, playlists) = await Task.Run(() => (TasteSources.Load(noctisData), TasteSources.Playlists(noctisData)), ct);
-            var learning = Feedback.Learn();
+            var learning = Feedback.Learn(plays, songs, playlists);
             var seeds = Taste.Seeds(plays.Concat(learning.Saves), songs, _now().UtcDateTime, playlists: playlists);
             var result = await Discover.BuildAsync(seeds, new CatalogForDiscover(catalog, localAlbums, similar ?? (() => null), lastFm), Unavailable, Hidden, progress, ct,
                 context: new(TasteSources.Familiar(plays), learning, _now()));

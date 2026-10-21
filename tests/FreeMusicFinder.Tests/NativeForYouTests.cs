@@ -32,6 +32,8 @@ internal static class NativeForYouTests
         Check.Equal(0, downloads.History.Count, "opening For you never queues or downloads audio");
         Check.True(source.Feedback.Batches is [{ Id: "page-1", Shown.Count: 2 }] && source.Feedback.Batches[0].Shown[0].Position == 0,
             "the page on screen is recorded as shown once, with each card's place");
+        vm.InView([vm.Picks[1]]);
+        Check.True(source.Feedback.Batches[0].Seen is [1], "only the cards the view reports in sight count as seen, by their place on the page");
         var first = vm.Picks[0];
         var signIn = vm.DownloadCommand.ExecuteAsync(first);
         Check.Until(() => signIn.IsCompleted, "download click completes the sign-in offer");
