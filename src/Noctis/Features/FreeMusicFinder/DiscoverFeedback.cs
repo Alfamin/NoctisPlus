@@ -83,7 +83,9 @@ internal sealed class DiscoverFeedback
             if (File.Exists(path) && (File.GetAttributes(path) & FileAttributes.ReparsePoint) == 0 && new FileInfo(path).Length < 8 * 1024 * 1024
                 && JsonSerializer.Deserialize<Saved>(File.ReadAllText(path)) is { Version: 1 } saved)
             {
-                _batches.AddRange((saved.Batches ?? []).Where(b => b is { Id.Length: > 0, Shown: not null }));
+                // Entries that are not whole (a hand edit, another version) are skipped one by one, never the whole file.
+                _batches.AddRange((saved.Batches ?? []).Where(b => b is { Id.Length: > 0, Shown: not null })
+                    .Select(b => b with { Shown = b.Shown.Where(c => c is { Key.Length: > 0, Artist: not null }).ToList(), Seen = b.Seen?.ToList() }));
                 _interactions.AddRange((saved.Interactions ?? []).Where(i => i is { Batch: not null, Key.Length: > 0, Artist: not null, Title: not null }));
                 Prune();
             }

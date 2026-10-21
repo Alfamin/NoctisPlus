@@ -20,8 +20,9 @@ internal sealed record TasteSeed(string Name, double Weight, int Owned, IReadOnl
 /// <paramref name="Seed"/> is the listener's artist it came through; <paramref name="Own"/>: it is one of their own artists' songs.
 internal sealed record DiscoverSong(CatalogSearchSong Track, double Score, string Because, string Seed = "", bool Own = false);
 internal sealed record DiscoverArtist(CatalogArtist Artist, string Because);
-/// <paramref name="Batch"/> names this page, so showing it again is not counted as showing it twice.
-internal sealed record DiscoverResult(List<DiscoverSong> Songs, List<DiscoverArtist> Artists, string Notice, bool LastFm = false, string Batch = "");
+/// <paramref name="Batch"/> names this page, so showing it again is not counted as showing it twice. <paramref name="Unreachable"/>:
+/// no catalog answered, so this empty page is an outage, not an answer; the shelf keeps the picks it has.
+internal sealed record DiscoverResult(List<DiscoverSong> Songs, List<DiscoverArtist> Artists, string Notice, bool LastFm = false, string Batch = "", bool Unreachable = false);
 
 /// <summary>What Discover leaves out or rests besides owned and dismissed songs: recordings already heard, and what earlier pages taught.</summary>
 internal sealed record DiscoverContext(IReadOnlySet<string> Familiar, DiscoverLearning Learning, DateTimeOffset Now);
@@ -374,6 +375,17 @@ internal static class Discover
     /// other songs are left. With nothing else left the shelf is still filled.</summary>
     public const int Shelf = 20, PerSeed = 6, OwnArtists = 8;
 
+    /// <summary>The page for a listener: what earlier pages taught, their taste, and the songs. <see cref="ForYouSource"/>'s build,
+    /// and the evaluation's, so both run the same steps.</summary>
+    public static Task<DiscoverResult> ForListenerAsync(IReadOnlyList<TastePlay> plays, IReadOnlyList<LocalSong> library, IReadOnlyList<TastePlaylist> playlists,
+        DiscoverFeedback feedback, DiscoverHidden hidden, IDiscoverCatalog catalog, Func<IReadOnlyList<CatalogSong>, CancellationToken, Task<HashSet<string>>> unavailable,
+        IProgress<string>? progress, DateTimeOffset now, CancellationToken ct)
+    {
+        var learning = feedback.Learn(plays, library, playlists);
+        var seeds = Taste.Seeds(plays.Concat(learning.Saves), library, now.UtcDateTime, playlists: playlists);
+        return BuildAsync(seeds, catalog, unavailable, hidden, progress, ct, context: new(TasteSources.Familiar(plays), learning, now));
+    }
+
     public static async Task<DiscoverResult> BuildAsync(IReadOnlyList<TasteSeed> seeds, IDiscoverCatalog catalog,
         Func<IReadOnlyList<CatalogSong>, CancellationToken, Task<HashSet<string>>> unavailable, DiscoverHidden hidden,
         IProgress<string>? progress, CancellationToken ct, int songCount = 40, DiscoverContext? context = null)
@@ -410,7 +422,7 @@ internal static class Discover
             {
                 return (Seed: seed, Similar: LastFmSimilar.Filter(await catalog.SimilarAsync(seed, null, ct), seed.Name, used.Select(s => s.Name)).Take(40).ToList(), Error: "");
             }
-            catch (Exception ex) when (ex is not OperationCanceledException) { return (Seed: seed, Similar: new List<SimilarArtist>(), Error: ArtistCatalog.Explain(ex)); }
+            catch (Exception ex) when (Failed(ex, ct)) { return (Seed: seed, Similar: new List<SimilarArtist>(), Error: ArtistCatalog.Explain(ex)); }
             finally { progress?.Report($"Finding artists like the ones you play… {Interlocked.Increment(ref complete)} of {used.Count}"); concurrent.Release(); }
         }));
         // Merge in seed order, not completion order: network timing must not change ranking or reasons.
@@ -454,7 +466,7 @@ internal static class Discover
                 var relatedSongs = await catalog.SongsByNameAsync(display[row.Key], ct);
                 return (relatedSongs.Artist, relatedSongs.Songs, Error: "");
             }
-            catch (Exception ex) when (ex is not OperationCanceledException) { return (Artist: (CatalogArtist?)null, Songs: new List<CatalogSearchSong>(), Error: ArtistCatalog.Explain(ex)); }
+            catch (Exception ex) when (Failed(ex, ct)) { return (Artist: (CatalogArtist?)null, Songs: new List<CatalogSearchSong>(), Error: ArtistCatalog.Explain(ex)); }
             finally { progress?.Report($"Picking songs you don't have… {Interlocked.Increment(ref picked)} of {ranked.Count}"); lookups.Release(); }
         }));
         for (int k = 0; k < ranked.Count; k++)
@@ -514,8 +526,13 @@ internal static class Discover
                 : "Everything For you found is already in your library or download queue. Refresh after listening some more."
             : failed > 0 ? $"Some artists could not be loaded ({lastError}); these are from the rest." : "";
         if (catalog.Notice.Length > 0) notice = (notice + " " + catalog.Notice).Trim();
-        return new(result, newArtists, notice, catalog.HasLastFm, Guid.NewGuid().ToString("N"));
+        return new(result, newArtists, notice, catalog.HasLastFm, Guid.NewGuid().ToString("N"), Unreachable: found == 0 && failed > 0);
     }
+
+    /// <summary>One artist's lookup failed, and the others go on: an error, or a provider's own timeout (an HTTP client's timeout is
+    /// a cancellation nobody asked for). A real cancellation, and Offline mode, stop the whole build.</summary>
+    private static bool Failed(Exception ex, CancellationToken ct) =>
+        ex is not OperationCanceledException || ex is not Noctis.Services.OfflineModeException && !ct.IsCancellationRequested;
 
     /// <summary>The song credits the artist it was found for. A namesake's or a compilation's song is left out rather than guessed.</summary>
     private static bool Credits(CatalogSong song, CatalogArtist artist, string key) =>
@@ -564,6 +581,8 @@ internal sealed class DiscoverHidden
             return key.Length > 0 && _identities.Values.Any(i => i.Key == key && DiscoverIdentity.Same(song, new CatalogSong("", song.Title, song.Artists, i.Seconds, null)));
         }
     }
+    /// <summary>2.2.0's rule (the song id, or the same edition key and artist), for <see cref="DiscoverBaseline"/> only.</summary>
+    internal bool HidesEdition(CatalogSong song) { lock (_lock) return _songs.Contains(song.Id) || _recordings.ContainsValue(Recording(song)); }
     public int Count { get { lock (_lock) return _songs.Count; } }
     private static string Recording(CatalogSong song) => CatalogEditions.Key(song.Title) + "|" + BotText.Key(song.Artists.FirstOrDefault()?.Name ?? "");
 
@@ -594,7 +613,8 @@ internal sealed class DiscoverHidden
 /// <summary>For you as the plugin offers it: the listener's taste, the catalog, the library check and the dismissed songs.</summary>
 internal sealed class ForYouSource(Func<ArtistCatalog> catalog, DiscoveryActions? actions, Func<string, IReadOnlyList<string>> localAlbums,
     IPlaylistLibrary library, string? noctisData, string hiddenPath, Func<SimilarArtists?>? similar = null,
-    Func<LastFmSimilar?>? lastFm = null, Func<DateTimeOffset>? now = null) : IDisposable
+    Func<LastFmSimilar?>? lastFm = null, Func<DateTimeOffset>? now = null, Func<IDiscoverCatalog>? discover = null,
+    Func<IReadOnlyList<CatalogSong>, CancellationToken, Task<HashSet<string>>>? unavailable = null) : IDisposable
 {
     private readonly Func<DateTimeOffset> _now = now ?? (() => DateTimeOffset.UtcNow);
     private readonly ForYouCache _cache = new(Path.Combine(Path.GetDirectoryName(Path.GetFullPath(hiddenPath))!, "for-you-last.json"));
@@ -653,23 +673,20 @@ internal sealed class ForYouSource(Func<ArtistCatalog> catalog, DiscoveryActions
             }
             progress?.Report("Learning your taste…");
             var songs = await library.SnapshotAsync();
-            var (plays, playlists) = await Task.Run(() => (TasteSources.Load(noctisData), TasteSources.Playlists(noctisData)), ct);
-            var learning = Feedback.Learn(plays, songs, playlists);
-            var seeds = Taste.Seeds(plays.Concat(learning.Saves), songs, _now().UtcDateTime, playlists: playlists);
-            var result = await Discover.BuildAsync(seeds, new CatalogForDiscover(catalog, localAlbums, similar ?? (() => null), lastFm), Unavailable, Hidden, progress, ct,
-                context: new(TasteSources.Familiar(plays), learning, _now()));
+            // Reading the history, learning, taste and ranking are seconds of work on a large profile: none of it on the UI
+            // thread (awaiting there would bring every step after the first lookup back to it).
+            var result = await Task.Run(() => Discover.ForListenerAsync(TasteSources.Load(noctisData), songs, TasteSources.Playlists(noctisData), Feedback, Hidden,
+                discover?.Invoke() ?? new CatalogForDiscover(catalog, localAlbums, similar ?? (() => null), lastFm), unavailable ?? Unavailable, progress, _now(), ct), ct);
             ct.ThrowIfCancellationRequested();
             lock (_sync)
             {
                 if (_disposed || invalidation != _invalidation) return Filter(result);
-                // A transient outage never replaces a useful offline page with an empty failure.
-                if (result.Songs.Count > 0)
-                {
-                    var until = _now().AddDays(7);
-                    if (lastFm?.Invoke() is { } last && last.DataExpires < until) until = last.DataExpires;
-                    _last = new(1, _now(), until, result); _revision++;
-                    if (until > _now()) _cache.Write(_last);
-                }
+                // A transient outage never replaces a useful offline page with an empty failure, and is no news for the shelf.
+                if (result.Songs.Count == 0) return Filter(result);
+                var until = _now().AddDays(7);
+                if (lastFm?.Invoke() is { } last && last.DataExpires < until) until = last.DataExpires;
+                _last = new(1, _now(), until, result); _revision++;
+                if (until > _now()) _cache.Write(_last);
             }
             PicksReady?.Invoke(result);
             return Filter(result);

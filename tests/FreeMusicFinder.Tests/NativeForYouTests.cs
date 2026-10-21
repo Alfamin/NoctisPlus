@@ -75,9 +75,15 @@ internal static class NativeForYouTests
         Check.Equal(1, source.Feedback.Batches.Count, "returning to the same page does not count it as shown again");
         Check.Equal(1, source.Feedback.Interactions.Count(i => i.Action == DiscoverAction.Dismiss), "the expired dismissal stays recorded once");
         Check.Equal(0, http.Calls.Count, "returning to the shelf does not rebuild recommendations or delay Search");
+        var outage = vm.RefreshCommand.ExecuteAsync(null);
+        Check.Until(() => outage.IsCompleted && !vm.IsLoading, "Refresh with no catalog reachable finishes");
+        Check.True(vm.Picks.Count == 1 && vm.Status.StartsWith("Couldn't refresh right now", StringComparison.Ordinal),
+            "a catalog outage on Refresh keeps the picks on screen instead of blanking the shelf, and says so");
+        Check.False(vm.HasNewPicks, "an outage is not announced as new picks");
+        int calls = http.Calls.Count;
         http.Override = async (_, ct) => { await Task.Delay(Timeout.Infinite, ct); throw new Exception("unreachable"); };
         var refresh = vm.RefreshCommand.ExecuteAsync(null);
-        Check.Until(() => http.Calls.Count > 0, "explicit Refresh starts metadata work");
+        Check.Until(() => http.Calls.Count > calls, "explicit Refresh starts metadata work");
         vm.SetActive(false);
         Check.Until(() => refresh.IsCompleted, "typing or leaving Search cancels recommendation requests promptly");
         refresh.GetAwaiter().GetResult();

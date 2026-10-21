@@ -184,4 +184,41 @@ public class DiscoverTelemetryTests : IDisposable
         Assert.Equal(new[] { 4, 5, 6, 7 }, ForYouShelfView.InView(list, scroller));
         window.Close();
     }
+
+    /// <summary>
+    /// P9: while music plays, the playback bar and lyrics lay the window out many times a second. None of that may make the
+    /// shelf work out which cards are on screen; only scrolling, resizing and a new page do, at most once per dispatcher pass.
+    /// </summary>
+    [AvaloniaFact]
+    public void InViewReport_RunsOnScrollResizeAndNewPage_NotOnUnrelatedLayout()
+    {
+        var vm = new Noctis.ViewModels.ForYouShelfViewModel();
+        var shelf = new ForYouShelfView { DataContext = vm };
+        var clock = new TextBlock { Text = "0:00" };
+        var scroller = new ScrollViewer { Content = new StackPanel { Children = { shelf, new Border { Height = 2000 } } } };
+        var window = new Window { Content = new DockPanel { Children = { clock, scroller } }, Width = 900, Height = 500 };
+        DockPanel.SetDock(clock, Dock.Bottom);
+        window.Show();
+        Dispatcher.UIThread.RunJobs(); window.UpdateLayout(); Dispatcher.UIThread.RunJobs();
+        int start = shelf.Reports;
+        for (int i = 1; i <= 60; i++) { clock.Text = $"0:{i:00}"; clock.Width = 40 + i % 2; window.UpdateLayout(); Dispatcher.UIThread.RunJobs(); }
+        int idle = shelf.Reports - start;
+        scroller.Offset = new Vector(0, 300); window.UpdateLayout(); Dispatcher.UIThread.RunJobs();
+        int scrolled = shelf.Reports - start - idle;
+        window.Width = 700; window.UpdateLayout(); Dispatcher.UIThread.RunJobs();
+        int resized = shelf.Reports - start - idle - scrolled;
+        // A new page: twenty cards arrive one by one, and are worked out once they are laid out.
+        int before = shelf.Reports;
+        for (int i = 0; i < 20; i++)
+        {
+            var song = new DiscoverSong(new(new CatalogSong("deezer:" + i, "Song " + i, [new("deezer:a" + i, "Act " + i)], 180, true), null), 1, "Because you play X");
+            vm.Picks.Add(new Noctis.ViewModels.ForYouPick(song, new Noctis.ViewModels.SearchSongItem(new Noctis.Services.Search.OnlineSong("deezer:" + i, "Song " + i, "Act " + i)), "p", i));
+        }
+        window.UpdateLayout(); Dispatcher.UIThread.RunJobs();
+        int paged = shelf.Reports - before;
+        window.Close();
+        vm.Dispose();
+        Assert.True(idle == 0, $"60 unrelated layout passes worked out the cards on screen {idle} times");
+        Assert.True(scrolled is >= 1 and <= 2 && resized is >= 1 and <= 2 && paged is >= 1 and <= 2, $"scroll {scrolled}, resize {resized}, new page {paged}");
+    }
 }

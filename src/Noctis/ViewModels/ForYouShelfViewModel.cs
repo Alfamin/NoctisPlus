@@ -126,10 +126,18 @@ public sealed partial class ForYouShelfViewModel : ObservableObject, IDisposable
         Status = Picks.Count > 0 ? "Refreshing…" : "Finding music for you…";
         try
         {
-            var progress = new Progress<string>(text => { if (Current()) ShowProgress(text); });
+            // A report posted late from the build must not overwrite the final status (the notice or "Couldn't refresh").
+            var progress = new Progress<string>(text => { if (Current() && IsLoading) ShowProgress(text); });
             var page = !refresh ? await source.SavedAsync(stop.Token) : null;
             page ??= await source.BuildAsync(refresh, progress, stop.Token);
             if (!Current()) return;
+            // No catalog answered: an outage, not an empty answer. Keep the picks on screen, or bring back the last saved page.
+            if (page is { Songs.Count: 0, Unreachable: true } && (Picks.Count > 0 || source.LastSaved() is { Songs.Count: > 0 }))
+            {
+                if (Picks.Count == 0 && source.LastSaved() is { } saved) Show(saved, source);
+                Status = "Couldn't refresh right now. Showing your last picks.";
+                return;
+            }
             // A cached page can predate a download or library scan. Filter those recordings
             // before displaying it; download actions still check the disk afresh.
             if (_actions is { } actions && page.Songs.Count > 0)

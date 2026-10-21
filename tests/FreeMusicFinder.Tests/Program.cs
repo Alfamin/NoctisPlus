@@ -31,7 +31,7 @@ if (Environment.GetEnvironmentVariable("FMF_FORYOU_LIVE") is { Length: > 0 } for
 // Explicit opt-in, offline: chronological replay of For you's taste step on a copy of the listener's own data.
 if (Environment.GetEnvironmentVariable("FMF_DISCOVER_REPLAY") is { Length: > 0 } replayData)
 {
-    DiscoverReplayTest.Run(replayData);
+    await DiscoverReplayTest.RunAsync(replayData);
     return 0;
 }
 
@@ -106,6 +106,7 @@ try
     TelegramSignInTests.Run();
     StreamingPlaylistImportTests.Run();
     NativeForYouTests.Run();
+    DiscoverReplayChecks.Run();
     WindowTests.Run(string.IsNullOrEmpty(pictures) ? null : pictures);
     PlaylistWindowTests.Run(pictures);
     NativePlaylistTests.Run();
