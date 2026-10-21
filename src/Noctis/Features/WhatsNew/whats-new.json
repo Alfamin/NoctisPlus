@@ -100,6 +100,7 @@
     "Completed word lyrics no longer show an obsolete automatic queued state",
     "Repeating playback cannot reset a missing-lyrics cooldown",
     "Album pages show loading feedback while additional songs arrive",
+    "Album songs remain visible during library scans, with Retry for failed loads",
     "WordLyrics uses one rounded backdrop inside the player",
     "The Offline setting has no extra divider",
     "A late queue cleanup no longer removes a newer manual lyric repair",

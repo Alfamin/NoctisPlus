@@ -667,6 +667,8 @@
                     </Button>
                     <TextBlock Text="{Binding CatalogNotice}" FontSize="12" Opacity="0.55" TextWrapping="Wrap" Margin="0,6,0,6"
                    Foreground="{Binding PageForegroundBrush}" IsVisible="{Binding HasCatalogNotice}" />
+                    <Button Content="Retry" Command="{Binding RetryCatalogCommand}" IsVisible="{Binding CanRetryCatalog}"
+                            HorizontalAlignment="Left" Margin="0,0,0,6" />
 
         <!-- Noctis Plus, online album: the songs the library lacks, into Downloads. -->
                     <Button Command="{Binding DownloadMissingCommand}"

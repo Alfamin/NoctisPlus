@@ -1,3 +1,4 @@
+using Avalonia;
 using Avalonia.Headless.XUnit;
 using Avalonia.Controls;
 using Avalonia.VisualTree;
@@ -128,12 +129,94 @@ public class OnlineAlbumOpeningTests
         failed.ShowCatalogFailed("The catalog did not answer.");
         Assert.False(failed.IsCatalogLoading);
         Assert.Equal("The catalog did not answer.", failed.CatalogNotice);
+        Assert.True(failed.IsOnlineAlbum); // a failed online page is never mistaken for a deleted library album
+        Assert.False(failed.ShowPlayActions);
+        Assert.True(failed.CanRetryCatalog);
         failed.Dispose();
 
         var closed = Page(release);
         closed.ShowCatalogLoading(release);
         closed.Dispose();
         Assert.False(closed.IsCatalogLoadingFor(release.Id)); // a late answer never fills a closed page
+    }
+
+    [AvaloniaFact]
+    public async Task FailedAlbumLoading_ShowsRetry_ThenFillsTheSameView()
+    {
+        AddToPlaylistDialogTests.EnsureAppStyles();
+        var artist = new CatalogArtist("deezer:19", "Synthetic Band");
+        var release = new CatalogRelease("deezer:190", "Retry album", artist, "2020", "album", 2);
+        using var vm = Page(release);
+        var view = new AlbumDetailView { DataContext = vm };
+        var window = new Window { Content = view, Width = 1280, Height = 900 };
+        var attempts = 0;
+        Task<CatalogAlbumOpen?> Load(CancellationToken ct)
+        {
+            if (Interlocked.Increment(ref attempts) == 1) throw new IOException("Synthetic catalog failure");
+            return Task.FromResult<CatalogAlbumOpen?>(new(new(release, [new("deezer:191", "Loaded after retry", [artist], 180, false)]), new Dictionary<string, DiscoveryMatch>()));
+        }
+        try
+        {
+            window.Show();
+            await vm.EnrichCatalogAsync(Load, enriches: false);
+            Dispatcher.UIThread.RunJobs(); window.UpdateLayout();
+            Assert.False(vm.IsCatalogLoading);
+            Assert.True(vm.HasCatalogNotice);
+            var retry = Assert.Single(view.GetVisualDescendants().OfType<Button>().Where(b => b.Content as string == "Retry"));
+            Assert.True(retry.IsEffectivelyVisible); Assert.True(retry.Command!.CanExecute(null));
+            await vm.RetryCatalogCommand.ExecuteAsync(null);
+            Dispatcher.UIThread.RunJobs(); window.UpdateLayout();
+            Assert.Equal(2, attempts); Assert.False(vm.HasCatalogNotice); Assert.False(vm.CanRetryCatalog);
+            vm.CatalogNotice = "Queued one download";
+            Assert.False(vm.CanRetryCatalog); // download notices do not offer an unrelated album retry
+            Assert.True(vm.IsOnlineAlbum);
+            Assert.Equal("Loaded after retry", Assert.Single(vm.CatalogMissing).Song.Title);
+            Assert.Single(view.GetVisualDescendants().OfType<Border>().Where(b => b.Classes.Contains("catalog-missing")));
+        }
+        finally { window.Close(); }
+    }
+
+    [AvaloniaFact]
+    public async Task EmptyAlbum_IsNotSilent_AndCanBeRetried()
+    {
+        var artist = new CatalogArtist("deezer:20", "Synthetic Band");
+        var release = new CatalogRelease("deezer:200", "Empty album", artist, "2020", "album", 2);
+        using var vm = Page(release);
+        var calls = 0;
+        await vm.EnrichCatalogAsync(_ => Task.FromResult<CatalogAlbumOpen?>(new(new(release, ++calls == 1 ? [] : [new("deezer:201", "Returned", [artist], 180, false)]), new Dictionary<string, DiscoveryMatch>())), enriches: false);
+        Assert.True(vm.HasCatalogNotice); Assert.True(vm.CanRetryCatalog);
+        await vm.RetryCatalogCommand.ExecuteAsync(null);
+        Assert.Single(vm.CatalogMissing); Assert.False(vm.HasCatalogNotice);
+    }
+
+    [AvaloniaFact]
+    public void LoadedSongs_AreRenderedAfterSkeletons_InTheExistingPage()
+    {
+        AddToPlaylistDialogTests.EnsureAppStyles();
+        var artist = new CatalogArtist("deezer:9", "Synthetic Band");
+        var release = new CatalogRelease("deezer:90", "Loading songs", artist, "2020", "album", 2);
+        using var vm = Page(release);
+        vm.ShowCatalogLoading(release);
+        var view = new AlbumDetailView { DataContext = vm };
+        var window = new Window { Content = view, Width = 1280, Height = 900 };
+        try
+        {
+            window.Show(); Dispatcher.UIThread.RunJobs(); window.UpdateLayout();
+            vm.ShowCatalog(new(new(release, [new("deezer:91", "First song", [artist], 200, false), new("deezer:92", "Second song", [artist], 180, false)]), new Dictionary<string, DiscoveryMatch>()));
+            Dispatcher.UIThread.RunJobs(); window.UpdateLayout();
+            var rows = view.GetVisualDescendants().OfType<Border>().Where(b => b.Classes.Contains("catalog-missing")).ToList();
+            Assert.Equal(2, rows.Count);
+            Assert.All(rows, row =>
+            {
+                Assert.True(row.IsEffectivelyVisible);
+                Assert.True(row.Bounds.Height > 0);
+                Assert.True(row.Bounds.Width > 0);
+                var point = row.TranslatePoint(default, view);
+                Assert.NotNull(point);
+                Assert.InRange(point!.Value.Y, 0, window.Height - 56);
+            });
+        }
+        finally { window.Close(); }
     }
 
     [AvaloniaFact]

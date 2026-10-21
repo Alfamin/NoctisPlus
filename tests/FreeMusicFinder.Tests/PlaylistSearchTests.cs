@@ -36,7 +36,7 @@ internal static class PlaylistSearchTests
             var uri = request.RequestUri!;
             if (uri.Host == "api-partner.spotify.com" && uri.Query.Contains("operationName=fetchPlaylist"))
             {
-                PageCalls++;
+                Interlocked.Increment(ref PageCalls); // pages are requested concurrently
                 if (PagedTotal == 0) return new(HttpStatusCode.BadRequest);
                 using var vars = JsonDocument.Parse(Uri.UnescapeDataString(System.Text.RegularExpressions.Regex.Match(uri.Query, "variables=([^&]+)").Groups[1].Value));
                 var offset = vars.RootElement.GetProperty("offset").GetInt32();

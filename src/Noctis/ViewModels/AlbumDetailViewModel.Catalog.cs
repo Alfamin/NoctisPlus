@@ -21,12 +21,17 @@ public partial class AlbumDetailViewModel
     // as opposed to an online album the library has nothing of.
     private bool _catalogEnriches;
     private CancellationTokenSource? _enrichStop;
+    private Func<CancellationToken, Task<CatalogAlbumOpen?>>? _retryCatalog;
+    private bool _retryEnriches;
+    private bool _catalogDisposed;
+    private bool _catalogRetryAvailable;
+    public bool CanRetryCatalog => !_catalogDisposed && _catalogRetryAvailable && !IsCatalogLoading && HasCatalogNotice && _retryCatalog is not null;
 
     /// <summary>The page shows catalog songs (an online album, or a library album completed by the catalog).</summary>
     public bool IsCatalogAlbum => _catalog is not null;
 
     /// <summary>An online album opened from Search, For you or an artist page: not in the library.</summary>
-    public bool IsOnlineAlbum => _catalog is not null && !_catalogEnriches;
+    public bool IsOnlineAlbum => !_catalogEnriches && (_catalog is not null || Album.CatalogReleaseId is not null);
 
     /// <summary>The album's songs the library does not have yet, in album order.</summary>
     public ObservableCollection<ArtistCatalogSong> CatalogMissing { get; } = [];
@@ -85,9 +90,14 @@ public partial class AlbumDetailViewModel
 
     internal void ShowCatalogLoading(CatalogRelease release)
     {
+        _retryEnriches = false;
+        _retryCatalog = async ct => await (FreeMusicPlugin.Current?.CatalogPages
+            ?? throw new InvalidOperationException("Online catalog is unavailable.")).ReadAlbumAsync(release, ct, refresh: true);
         _catalogLoading = release;
         OnPropertyChanged(nameof(IsCatalogLoading));
         OnPropertyChanged(nameof(ShowPlayActions));
+        OnPropertyChanged(nameof(CanRetryCatalog));
+        RetryCatalogCommand.NotifyCanExecuteChanged();
         _ = LoadCatalogCoverAsync(release);
     }
 
@@ -95,12 +105,22 @@ public partial class AlbumDetailViewModel
     {
         _catalogLoading = null;
         OnPropertyChanged(nameof(IsCatalogLoading));
+        _catalogRetryAvailable = message.Length > 0;
         CatalogNotice = message;
+        OnPropertyChanged(nameof(CanRetryCatalog));
     }
 
     /// <summary>A quiet line (partial catalog answer, a download message).</summary>
     [ObservableProperty, NotifyPropertyChangedFor(nameof(HasCatalogNotice))] private string _catalogNotice = "";
     public bool HasCatalogNotice => CatalogNotice.Length > 0;
+    partial void OnCatalogNoticeChanged(string value)
+    {
+        OnPropertyChanged(nameof(CanRetryCatalog));
+        RetryCatalogCommand.NotifyCanExecuteChanged();
+    }
+
+    [RelayCommand(CanExecute = nameof(CanRetryCatalog))]
+    private Task RetryCatalog() => _retryCatalog is { } load ? EnrichCatalogAsync(load, _retryEnriches) : Task.CompletedTask;
 
     /// <summary>
     /// A library album: find the same release in the catalog (in the background, metadata only)
@@ -116,42 +136,58 @@ public partial class AlbumDetailViewModel
         if (string.IsNullOrWhiteSpace(artist) || artist.Equals("Various Artists", StringComparison.OrdinalIgnoreCase)) return;
         var name = Album.Name;
         var titles = Album.Tracks.Select(t => t.Title).ToArray();
+        var localAlbums = pages.LocalAlbums(artist); // take the observable library snapshot on the UI thread
         _ = EnrichCatalogAsync(async ct =>
         {
-            var (identity, _) = await pages.IdentifyAsync(artist, pages.LocalAlbums(artist), titles, ct);
-            if (identity is null) return null;
-            var profile = await pages.Catalog.SavedArtistAsync(identity, ct)
-                          ?? await pages.Catalog.ArtistAsync(identity, false, ct);
-            var release = profile.Value.Releases.FirstOrDefault(r => CatalogEditions.Matches(r, name, artist));
-            if (release is null) return null;
-            var album = await pages.Catalog.AlbumAsync(release, false, ct);
-            var matches = await pages.Actions.MatchAsync(album.Value.Songs, ct, reuse: true);
-            return new CatalogAlbumOpen(album.Value, matches);
+            var (identity, _) = await pages.IdentifyAsync(artist, localAlbums, titles, ct);
+            if (identity is null) throw new InvalidOperationException("Couldn't identify this album's artist.");
+            var release = await pages.FindLibraryReleaseAsync(identity, name, ct);
+            if (release is null) throw new InvalidOperationException("This album wasn't found in the online catalog.");
+            return await pages.ReadAlbumAsync(release, ct);
         });
     }
 
     /// <summary>Paint feedback before any catalog IO; keep the owned rows and guard late answers.</summary>
-    internal async Task EnrichCatalogAsync(Func<CancellationToken, Task<CatalogAlbumOpen?>> load)
+    internal async Task EnrichCatalogAsync(Func<CancellationToken, Task<CatalogAlbumOpen?>> load, bool enriches = true)
     {
+        if (_catalogDisposed) return;
+        _retryCatalog = load;
+        _retryEnriches = enriches;
         _enrichStop?.Cancel();
         var stop = _enrichStop = new CancellationTokenSource();
+        var previousCatalog = _catalog;
+        _catalogRetryAvailable = false;
+        CatalogNotice = "";
         _enrichLoading = true;
         OnPropertyChanged(nameof(IsCatalogLoading));
         OnPropertyChanged(nameof(CatalogLoadingText));
         OnPropertyChanged(nameof(ShowPlayActions));
+        OnPropertyChanged(nameof(CanRetryCatalog));
+        RetryCatalogCommand.NotifyCanExecuteChanged();
         try
         {
             var open = await Task.Run(() => load(stop.Token));
-            if (open is null || stop.IsCancellationRequested) return;
+            if (stop.IsCancellationRequested) return;
+            if (open is null) throw new InvalidOperationException("No matching album was returned.");
             await Dispatcher.UIThread.InvokeAsync(() =>
             {
-                if (stop.IsCancellationRequested || !ReferenceEquals(_enrichStop, stop) || _catalog is not null) return;
-                _catalogEnriches = true;
+                if (stop.IsCancellationRequested || !ReferenceEquals(_enrichStop, stop) || !ReferenceEquals(_catalog, previousCatalog)) return;
+                _catalogEnriches = enriches;
                 ShowCatalog(open);
             });
         }
+        catch (OperationCanceledException) when (stop.IsCancellationRequested) { }
         catch (Exception ex) when (ex is OperationCanceledException or HttpRequestException or IOException or TimeoutException
-                                       or InvalidDataException or InvalidOperationException or SourcesWaitingException or ArgumentException) { }
+                                       or InvalidDataException or InvalidOperationException or SourcesWaitingException or ArgumentException or UnauthorizedAccessException)
+        {
+            await Dispatcher.UIThread.InvokeAsync(() =>
+            {
+                if (_catalogDisposed || stop.IsCancellationRequested || !ReferenceEquals(_enrichStop, stop)) return;
+                _catalogRetryAvailable = true;
+                CatalogNotice = "Couldn't load album songs. Try again.";
+                Services.DebugLog.Write("Catalog", "Album loading failed: " + ArtistCatalog.Explain(ex));
+            });
+        }
         finally
         {
             await Dispatcher.UIThread.InvokeAsync(() =>
@@ -161,6 +197,8 @@ public partial class AlbumDetailViewModel
                 _enrichLoading = false;
                 OnPropertyChanged(nameof(IsCatalogLoading));
                 OnPropertyChanged(nameof(ShowPlayActions));
+                OnPropertyChanged(nameof(CanRetryCatalog));
+                RetryCatalogCommand.NotifyCanExecuteChanged();
             });
             stop.Dispose();
         }
@@ -172,7 +210,8 @@ public partial class AlbumDetailViewModel
         var wasLoading = _catalogLoading?.Id == open.Album.Release.Id;
         _catalogLoading = null;
         OnPropertyChanged(nameof(IsCatalogLoading));
-        if (wasLoading)
+        OnPropertyChanged(nameof(CanRetryCatalog));
+        if (!_catalogEnriches)
         {
             Album.TrackCount = Math.Max(open.Album.Release.Count, open.Album.Songs.Count);
             Album.TotalDuration = open.Album.Songs.Count >= Album.TrackCount && open.Album.Songs.All(s => s.Seconds is > 0)
@@ -186,7 +225,14 @@ public partial class AlbumDetailViewModel
             online.DownloadsChanged += CatalogDownloadsChanged;
         }
         // The catalog's own wording mentions a "Download all" this page does not have.
-        CatalogNotice = open.Album.Notice.Length > 0 ? "Some of this album's songs are not in the online catalog." : "";
+        _catalogRetryAvailable = open.Album.Songs.Count == 0 || open.Album.Notice.Length > 0;
+        CatalogNotice = open.Album.Songs.Count == 0 ? "No album songs returned. Try again."
+            : open.Album.Notice.Length > 0 ? "Some of this album's songs are not in the online catalog." : "";
+        if (HasCatalogNotice && FreeMusicPlugin.Current?.CatalogPages is { } pages)
+        {
+            _retryEnriches = _catalogEnriches;
+            _retryCatalog = async ct => await pages.ReadAlbumAsync(open.Album.Release, ct, refresh: true);
+        }
         RefreshCatalogOwnership();
         OnPropertyChanged(nameof(IsCatalogAlbum));
         OnPropertyChanged(nameof(IsOnlineAlbum));
@@ -294,6 +340,7 @@ public partial class AlbumDetailViewModel
 
     private void DisposeCatalog()
     {
+        _catalogDisposed = true;
         _catalogLoading = null; // a closed page is never filled later
         _enrichLoading = false;
         _enrichStop?.Cancel();

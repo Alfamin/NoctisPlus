@@ -125,16 +125,43 @@ internal sealed class CatalogPages : IDisposable
         AlbumOpening?.Invoke(release);
         try
         {
-            var album = await _catalog().AlbumAsync(release, false, ct);
-            var matches = await Actions.MatchAsync(album.Value.Songs, ct);
+            var album = await ReadAlbumAsync(release, ct);
             ct.ThrowIfCancellationRequested();
-            AlbumRequested?.Invoke(new(album.Value, matches));
+            AlbumRequested?.Invoke(album);
         }
         catch (Exception ex)
         {
             AlbumOpenFailed?.Invoke(release, ex is OperationCanceledException ? "" : ex.Message);
             throw;
         }
+    }
+
+    /// <summary>Browsing must not lose a fetched tracklist because a scan or library check is busy.
+    /// Download actions still do their own strict ownership check before writing anything.</summary>
+    internal async Task<CatalogAlbumOpen> ReadAlbumAsync(CatalogRelease release, CancellationToken ct, bool refresh = false)
+    {
+        var album = await _catalog().AlbumAsync(release, refresh, ct);
+        IReadOnlyDictionary<string, DiscoveryMatch> matches;
+        try { matches = await Actions.MatchAsync(album.Value.Songs, ct, reuse: true); }
+        catch (Exception ex) when (ex is IOException or InvalidOperationException or UnauthorizedAccessException)
+        {
+            ct.ThrowIfCancellationRequested();
+            _log("CATALOG_LIBRARY_CHECK_FAILED: " + ex.Message);
+            matches = new Dictionary<string, DiscoveryMatch>();
+        }
+        return new(album.Value, matches);
+    }
+
+    internal async Task<CatalogRelease?> FindLibraryReleaseAsync(CatalogArtist artist, string title, CancellationToken ct)
+    {
+        var catalog = _catalog();
+        var profile = await catalog.SavedArtistAsync(artist, ct) ?? await catalog.ArtistAsync(artist, false, ct);
+        bool Matches(CatalogRelease release) => release.Artist.Id == artist.Id && CatalogEditions.Matches(release, title, artist.Name);
+        if (profile.Value.Releases.FirstOrDefault(Matches) is { } saved) return saved;
+        // A saved profile may predate this release or be capped by the provider. Search the
+        // album directly, keeping BOTH the edition and stable artist identity checks.
+        var found = await catalog.SearchAlbumsAsync(artist.Name + " " + title, ct);
+        return found.Value.FirstOrDefault(Matches);
     }
 
     /// <summary>The library album a catalog release stands for (same title edition, same artist), if any.</summary>

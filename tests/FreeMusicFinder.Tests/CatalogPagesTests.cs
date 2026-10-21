@@ -6,6 +6,13 @@ namespace FreeMusicFinder.Tests;
 /// plugin-era window-scanning bridge, 2026-10-17). Ported from the bridge's identity checks.</summary>
 internal static class CatalogPagesTests
 {
+    private sealed class ScanningLibrary : IPlaylistLibrary
+    {
+        public Task<IReadOnlyList<LocalSong>> SnapshotAsync() => throw new IOException("LIBRARY_SCANNING: synthetic scan in progress");
+        public Task ApplyAsync(Guid id, string name, string url, IReadOnlyList<Guid> tracks, bool create, IReadOnlyList<Guid> expected, IReadOnlyList<Guid>? remappedExpected = null)
+            => throw new InvalidOperationException("Browsing must not write playlists");
+    }
+
     internal static async Task RunAsync()
     {
         Check.Section("catalog pages: artist identity, remembered choices, namesake visits, album opening");
@@ -50,6 +57,32 @@ internal static class CatalogPagesTests
         finally { CatalogPages.AlbumRequested -= OnAlbum; }
         Check.True(album is { Album.Songs.Count: > 0 } && album.Matches.Count == album.Album.Songs.Count, "opening an online album hands the page its songs and which ones the library has");
         Check.Equal(0, downloads.History.Count, "opening an album never downloads audio");
+        var logs = new List<string>();
+        var scanningActions = new DiscoveryActions(new ScanningLibrary(), downloads, _ => throw new Exception("No audio"), () => folder, () => false);
+        using (var scanningPages = new CatalogPages(() => catalog, scanningActions, logs.Add, () => true, library: () => null))
+        {
+            album = null;
+            CatalogPages.AlbumRequested += OnAlbum;
+            try { await scanningPages.OpenAlbumAsync(DiscoveryTests.Orbit, default); }
+            finally { CatalogPages.AlbumRequested -= OnAlbum; }
+            Check.True(album is { Album.Songs.Count: 3, Matches.Count: 0 }, "a busy library scan cannot hide an already fetched album tracklist");
+            Check.True(logs.Any(l => l.Contains("CATALOG_LIBRARY_CHECK_FAILED")), "ownership-check failure is logged instead of silently dropping the album");
+        }
+        // A cached/capped discography can omit the album while direct album search still has it.
+        var searchHttp = new DiscoveryTests.Http { Override = (request, ct) => Task.FromResult(new System.Net.Http.HttpResponseMessage(System.Net.HttpStatusCode.OK)
+        { Content = new System.Net.Http.StringContent(System.Text.Json.JsonSerializer.Serialize(new { data = new[] { DiscoveryTests.Http.Album(), DiscoveryTests.Http.Album(999, "Unrelated") } })) }) };
+        var incompleteFolder = Check.NewFolder("catalog-incomplete-profile");
+        ArtistIdentityTests.Seed(incompleteFolder, "artist:" + DiscoveryTests.Star.Id, new CatalogProfile(DiscoveryTests.Star, [], []));
+        ArtistIdentityTests.Seed(incompleteFolder, "artist:deezer:404", new CatalogProfile(wrongArtist, [], []));
+        using (var incompleteCatalog = DiscoveryTests.Catalog(incompleteFolder, searchHttp))
+        using (var incompletePages = new CatalogPages(() => incompleteCatalog, actions, _ => { }, () => true, library: () => null))
+        {
+            Check.Equal(DiscoveryTests.Orbit.Id, (await incompletePages.FindLibraryReleaseAsync(DiscoveryTests.Star, "Orbit", default))?.Id,
+                "an incomplete saved artist profile is repaired by exact album lookup");
+            Check.Equal(1, searchHttp.Calls.Count, "the missing release needs one direct album search, not a full discography refresh");
+            Check.True(await incompletePages.FindLibraryReleaseAsync(new("deezer:404", "North Star"), "Orbit", default) is null,
+                "a same-name foreign artist's album is not accepted by the fallback");
+        }
         await PopularityAsync();
     }
 
