@@ -1,7 +1,7 @@
 # Discover / For you: plan and continuation notes
 
 Branch `discover-a`, started from `native` at v2.2.0 (`11995e63`), draft PR Alfamin/NoctisPlus#12 into `main`.
-**Done:** Milestones A and B. **Next:** C, only when the owner says so. Never merge, push to `main`/`native`, or tag.
+**Done:** Milestones A and B. **In progress:** C (criteria in section 5, written before measuring). Never merge, push to `main`/`native`, or tag.
 
 The milestones are the owner's (brief section 9):
 - **A. Working Discovery improvement:** ranking and identity audit; filtering, personalisation, novelty, diversity, song-level
@@ -206,7 +206,57 @@ Undo, Reset and pruning cannot leave stale statistics behind.
 Not sent: listening history, play counts, the feedback file, library paths, audio, Telegram sessions, credentials. Requests
 go through Finder's existing HTTP clients (its configured proxy, pacing and caches). Offline-mode handling is checked in C.
 
-## 5. Plan for C and D, and the gates after them
+## 5. Milestone C: metrics and criteria (written before any results)
+
+Written and committed before the comparison was run, so the results can't move the goalposts. Constants from A and B are not
+tuned in C; only correctness bugs are fixed, each with a regression test.
+
+### Metrics (per page = the 20 cards the shelf shows)
+| # | Metric | Definition |
+|---|---|---|
+| M1 | Duplicate rate | Cards whose recording (`DiscoverIdentity.Key`) already appeared earlier on the same page, ÷ cards. |
+| M2 | Owned leakage | Cards matching a library song by recording identity, ÷ cards. |
+| M3 | Heard leakage | Cards matching a recording heard (3 s or more, or the old history) before the build, ÷ cards. |
+| M4 | Repeat exposure | Cards that were in view on the previous page and not used, ÷ cards. Also: cards in view on each of the last 3 pages. |
+| M5 | Artist spread | Distinct artists on the page; most cards from one artist. |
+| M6 | Seed spread | Distinct seeds (the listener's artist a card came through); most cards through one seed. |
+| M7 | Popularity concentration | **Top-3 share:** cards that are among the first 3 songs of their artist's catalog top list, ÷ cards. Also the mean place in that list (1 = the artist's most popular song) and the median Deezer `rank` where known. |
+| M8 | Dismissal effect | Dismissed recordings (any edition or provider) on the next page; cards of an artist with 2+ dismissals, this page vs next. |
+| M9 | Outcome effect | Cards of an artist on the next page after an enjoyed pick of theirs, and after 3 early skips, compared with no outcome. |
+| M10 | Cost | Build time and bytes allocated with an in-memory catalog (network excluded) on a 50,000-song library with 100,000 plays; how often the in-view report runs. |
+
+Baseline: the 2.2.0 engine (seed step, `listens.jsonl` reading and ranker) kept runnable as `DiscoverBaseline`, fed the same
+catalog. It had no exposure memory or outcomes, and it hides dismissed songs the 2.2.0 way.
+
+### Promotion criteria (the new engine stays the default only if all hold, on every synthetic persona)
+- **P1:** M1, M2 and M3 are 0 for the new engine.
+- **P2:** no dismissed recording returns on the next page (M8), in any edition.
+- **P3:** repeat exposure on the second page (M4) is at most half the baseline's, or at most 25 %.
+- **P4:** at most 3 cards per artist and 6 per seed when the pool allows it, and at least as many distinct artists as the baseline.
+- **P5:** top-3 share (M7) no higher than the baseline's. Retrieval is unchanged, so this is measured, not something C has to improve.
+- **P6:** in the chronological seed replay, recall at least the baseline's minus 2 points, seeds skipped next at most the
+  baseline's plus 2 points, returning favourites at least the baseline's.
+- **P7:** the local part of a build (everything but the network) takes under 2 s on the 50,000-song library, and ranking alone
+  under 250 ms. The tests assert a looser bound so a slow CI runner doesn't make them flaky.
+- **P8:** in every failure case (provider unavailable or slow, Offline mode, cancellation, corrupt files, empty or tiny library,
+  huge imported playlist) no exception escapes, the shelf keeps or brings back its cached picks, Offline mode sends no request,
+  and cancellation ends the build within 1 s.
+- **P9:** layout passes elsewhere in the window (the playback bar, lyrics) trigger no in-view computation; scrolling, resizing
+  and a new page trigger at most one per dispatcher pass.
+
+### Stopping criteria
+- **S1:** if a hard criterion (P1, P2, P8) fails and the cause isn't a local correctness bug, stop and report, recommending the
+  baseline behaviour for that part, instead of adding complexity.
+- **S2:** if more than half of the new engine's cards are an artist's top-3 songs (M7) on the synthetic personas or on the
+  owner's replay, re-ranking inside artist top lists can't fix the famous-songs lean. That is the evidence threshold for
+  considering track-level retrieval later; C doesn't add it.
+- **S3:** no tuning to my own synthetic personas. They are written by me and can favour the new engine; a criterion that only
+  passes after tuning counts as failed.
+- **S4:** if the owner's replay shows the new engine worse than the baseline on P1–P4, stop and report before D.
+
+Offline evaluation of logged data can't show causal satisfaction gains; only real listening over time can.
+
+## 6. Plan for C and D, and the gates after them
 
 **C. Evaluation and reliability (next, when approved)**
 - **Promotion and stopping criteria, written before measuring.** Proposed: the new engine is kept if, on synthetic personas
@@ -249,7 +299,7 @@ would need a docs check, recorded fixtures and a song-level offline comparison f
 | C | $10–18 | Song-level comparison fixtures and the Offline-mode audit; a fix if Offline mode is not respected. |
 | D | $3–6 | A written gate and a short boundary note; no code unless the gate demands it. |
 
-## 6. Acceptance criteria: verified vs pending
+## 7. Acceptance criteria: verified vs pending
 
 | # | Criterion | Verified here | Pending (owner, Windows app, isolated test profile) |
 |---|---|---|---|
@@ -269,7 +319,7 @@ would need a docs check, recorded fixtures and a song-level offline comparison f
 - the in-view report while scrolling
 - that LayoutUpdated reporting causes no visible cost
 
-## 7. Continuation notes
+## 8. Continuation notes
 - Entry points:
   - `ForYou.cs`: `Taste.Seeds`, `TasteSources` (`Load`, `Distinct`, `Familiar`, `Playlists`), `Discover.BuildAsync`,
     `DiscoverHidden`, `ForYouSource.ResetLearning`
