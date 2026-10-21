@@ -240,8 +240,7 @@ public class AccountDevicesPageTests : IDisposable
             vm.NoctisServerEnabled = true;
             vm.NoctisServerEnabled = false;
             await ServerSettled(vm, expectRunning: false);
-            await Task.Delay(500); // a start that escaped the stop would be listening by now
-            Assert.False(Listening(port));
+            Assert.True(await StaysClosed(port), "a start queued before the stop must not stay listening");
 
             vm.NoctisServerEnabled = true;
             vm.NoctisServerEnabled = false;
@@ -263,6 +262,21 @@ public class AccountDevicesPageTests : IDisposable
             await Task.Delay(50);
         }
         throw new Xunit.Sdk.XunitException("server never settled");
+    }
+
+    /// <summary>The start queued by the first flip may still be making its certificate (seconds on a loaded runner); the
+    /// stop queued behind it must win. A start that escaped the stop would stay open, so this waits for the port to close
+    /// and stay closed for a second, within ten.</summary>
+    private static async Task<bool> StaysClosed(int port)
+    {
+        var deadline = DateTime.UtcNow.AddSeconds(10); DateTime? closedSince = null;
+        while (DateTime.UtcNow < deadline)
+        {
+            if (Listening(port)) closedSince = null;
+            else if ((closedSince ??= DateTime.UtcNow) < DateTime.UtcNow.AddSeconds(-1)) return true;
+            await Task.Delay(100);
+        }
+        return false;
     }
 
     private static bool Listening(int port)
