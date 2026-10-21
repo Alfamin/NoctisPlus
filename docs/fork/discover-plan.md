@@ -1,7 +1,8 @@
 # Discover / For you: plan and continuation notes
 
 Branch `discover-a`, started from `native` at v2.2.0 (`11995e63`), draft PR Alfamin/NoctisPlus#12 into `main`.
-**Done:** Milestones A and B. **In progress:** C (criteria in section 5, written before measuring). Never merge, push to `main`/`native`, or tag.
+**Done:** Milestones A, B and C (criteria in section 5, written before measuring; results in section 6). **Next:** D, only when
+the owner says so. Never merge, push to `main`/`native`, or tag.
 
 The milestones are the owner's (brief section 9):
 - **A. Working Discovery improvement:** ranking and identity audit; filtering, personalisation, novelty, diversity, song-level
@@ -121,10 +122,12 @@ old pages without a `Batch` are just not recorded as exposures.
 - Undo retracts the dismissal's learning
 - returning to the page doesn't re-count it
 
-### Chronological replay on your own data (local, offline, read-only)
+### Replay on your own data (local, offline, read-only)
 
-Run it on a **copy** of your Noctis data folder, with Noctis closed. Nothing is sent anywhere and nothing is written; it
-prints only counts and percentages.
+Run it on a **copy** of your Noctis data folder, with Noctis closed. Nothing is sent anywhere: every HTTP request goes to a
+handler that refuses it before it leaves. Nothing in the copy is written (a Finder-suite check hashes every file before and
+after); the shelf's state is copied again to a temporary folder before the engines use it. It prints only counts and
+percentages, never titles or names.
 
 ```powershell
 # PowerShell, from the repository root
@@ -135,20 +138,35 @@ $data = "$env:APPDATA\Noctis Plus"   # or your NOCTIS_PLUS_DATA_DIR
 Copy-Item "$data\play_history.json","$data\library.json","$data\playlists.json" $copy -ErrorAction SilentlyContinue
 New-Item -ItemType Directory "$copy\plugin-data\dev.moshi.trueshuffle" -Force | Out-Null
 Copy-Item "$data\plugin-data\dev.moshi.trueshuffle\listens.jsonl" "$copy\plugin-data\dev.moshi.trueshuffle\" -ErrorAction SilentlyContinue
+# Milestone C: the shelf's own files and the saved catalog (metadata only: names, IDs, top songs; it can be a few hundred MB)
+$finder = "$data\plugin-data\dev.moshi.freemusicfinder"
+New-Item -ItemType Directory "$copy\plugin-data\dev.moshi.freemusicfinder" -Force | Out-Null
+Copy-Item "$finder\for-you-feedback.json","$finder\for-you-hidden.json","$finder\for-you-last.json" "$copy\plugin-data\dev.moshi.freemusicfinder\" -ErrorAction SilentlyContinue
+Copy-Item "$finder\artist-catalog" "$copy\plugin-data\dev.moshi.freemusicfinder\artist-catalog" -Recurse -ErrorAction SilentlyContinue
 $env:FMF_DISCOVER_REPLAY = $copy
 dotnet run --project tests/FreeMusicFinder.Tests -c Release
 Remove-Item Env:FMF_DISCOVER_REPLAY
+Remove-Item $copy -Recurse -Force
 ```
 
-The output has one line for `before` (the 2.2.0 seed step) and one for `now`, with these metrics:
-- **recall:** share of artists you enjoyed in the next 14 days (2 or more good plays) that were seeds
-- **returning favourites:** the same, but only for artists you loved months earlier and came back to
-- **seeds skipped next:** seeds you only skipped in the following 14 days
+The output has four parts:
+1. **Seed replay** (chronological): one line for `before` (the 2.2.0 seed step) and one for `now`:
+   - **recall:** share of artists you enjoyed in the next 14 days (2 or more good plays) that were seeds
+   - **returning favourites:** the same, but only for artists you loved months earlier and came back to
+   - **seeds skipped next:** seeds you only skipped in the following 14 days
+2. **Shelf** (from `for-you-feedback.json`): pages, cards, actions and outcomes, then the M1–M6 metrics averaged over the
+   pages the shelf actually recorded, and how many dismissed songs were shown again later.
+3. **Saved page** (`for-you-last.json`): its metrics, including the median Deezer rank of its songs.
+4. **Both engines on your saved catalog**, as of the saved page's date: the M1–M10 metrics for `before` and `now` over three
+   pages (each with its first 12 cards in view; on page 1 the first card and the next by its artist are dismissed and one
+   other card is finished), and how many lookups the saved catalog could not answer. Those artists count as unavailable for
+   both engines; a high count means the comparison covers only part of what the app would see.
 
 Caveats:
 - Without `library.json` the replay runs on plays alone (no favourites, ratings or ownership).
 - Library marks and playlists are today's, so they are applied at every cutoff (a mild look-ahead).
-- Catalog retrieval isn't replayed (no network), so this measures seeds, not songs.
+- Owned leakage uses today's library by title and artist; the app also checks the files and the download queue.
+- The saved catalog is whatever For you and Search fetched lately; the baseline's seeds may need artists it never fetched.
 
 ## 4. Milestone B: what changed
 
@@ -256,24 +274,104 @@ catalog. It had no exposure memory or outcomes, and it hides dismissed songs the
 
 Offline evaluation of logged data can't show causal satisfaction gains; only real listening over time can.
 
-## 6. Plan for C and D, and the gates after them
+## 6. Milestone C: what changed and what the numbers say
 
-**C. Evaluation and reliability (next, when approved)**
-- **Promotion and stopping criteria, written before measuring.** Proposed: the new engine is kept if, on synthetic personas
-  and on the owner's local replay, it is no worse on recall and skip share and better on returning favourites. It is
-  reverted if duplicate or familiar recommendations appear in synthetic checks. Any regression is fixed before new features.
-- **Song-level offline comparison** of the 2.2.0 ranker against the current one on synthetic catalog fixtures:
-  - duplicate rate, familiar/owned leakage, artist and seed concentration, repeated exposure
-  - the outcome counts from `Summary` where feedback exists
-- **Reliability:**
-  - provider failures and partial failures
-  - explicit Offline mode (verify that Discover respects it; fix it if not)
-  - cached-page fallback and cancellation
-  - stable visible batches while new picks arrive
-- **Performance:** build latency and allocations on a 50k-song synthetic library, and the cost of `InView` on layout.
-- **Kept explicit:** offline evaluation of biased historical logs cannot show causal satisfaction gains.
+### Baseline kept runnable
+- `DiscoverBaseline.cs`: 2.2.0's `listens.jsonl` reading, seed step and ranker, frozen. Its dismissals use 2.2.0's rule
+  (`DiscoverHidden.HidesEdition`). Only the evaluation and the replay call it.
+- `Discover.ForListenerAsync` is now the one build path; `ForYouSource` and the evaluation both call it.
+- `DiscoverEvaluation.cs`: the metrics (`DiscoverPageMetrics`), a catalog wrapper that records each song's place in its
+  artist's list (`PlaceRecorder`), and the three-page script both engines run (`DiscoverEvaluation.RunAsync`).
 
-**D. Future-model readiness (documentation and boundaries only)**
+### Synthetic comparison (`DiscoverEvaluationTests`, CI)
+The world: 4 genres of 12 artists, plus 3 megastars on every similar-artist list. Each artist's list is popularity ordered and
+carries real-list traps: song 1 again as a remaster on another provider (placed 2nd: at 4th the 3-per-artist cap hid it from
+both engines, so the trap never fired; moved before any criterion was evaluated against it), a compilation song that does not
+credit the artist, and a live recording. Personas: **steady** (two bands for a year, a three-week phase, hits of related bands
+streamed but not owned), **streamer** (no library, duplicate events, failed starts, empty "Finished" streams), **collector**
+(owns whole catalogs, a 90-song Spotify import, ratings), **tiny** (one song). The world and personas are mine (S3): they can
+favour the new engine.
+
+Mean of the three pages, baseline → now:
+
+| Persona | Duplicates | Heard | 2nd-page repeat | Artists (max each) | Seeds (max each) | Top-3 share | Uncredited |
+|---|---|---|---|---|---|---|---|
+| steady | 30 % → 0 | 87 % → 0 | 55 % → 15 % | 8 (3) → 12 (3) | 6 (5) → 7 (6) | 97 % → 48 % | 0 → 0 |
+| streamer | 32 % → 0 | 90 % → 0 | 50 % → 20 % | 8 (3) → 13 (3) | 6 (5) → 6 (6) | 97 % → 52 % | 0 → 0 |
+| collector | 15 % → 0 | 7 % → 0 | 55 % → 30 % | 10 (6) → 14 (3) | 7 (13) → 6 (6) | 55 % → 57 % | 23 % → 0 |
+| tiny | 32 % → 0 | 7 % → 0 | 55 % → 25 % | 8 (3) → 9 (3) | 2 (20) → 2 (20) | 90 % → 62 % | 0 → 0 |
+
+Owned leakage was 0 for both engines everywhere (both get the same library check). Dismissed songs came back 0 times for
+both. A twice-dismissed artist went from 3 cards to 0 on the next page with the new engine (two songs hidden, the third
+lowered ×0.77 and rested ×0.8) and 3 → 2 with the baseline. Cards in view on each of the last 3 pages: 40–55 % → 0–15 %.
+"Uncredited" (cards whose credits don't name the artist whose list they came from) is a diagnostic I added after the
+criteria were set, to explain the collector's P5 result.
+
+**Verdicts against section 5:**
+- **P1 PASS** (0 duplicates, owned or heard cards) and **P2 PASS** on every persona.
+- **P3:** PASS for steady, streamer and tiny; **FAIL for collector** (30 % against a limit of 27.5 %, half the baseline’s 55 %). One page of passing over
+  only rests a song ×0.8, by design; repeats fade over three pages. Not tuned (S3).
+- **P4 PASS** (tiny has too few seeds for the per-seed cap; the shelf is filled anyway, as designed).
+- **P5:** PASS for steady, streamer and tiny; **FAIL for collector** (57 % against 55 %). The baseline's lower share comes
+  from deep-list cards that shouldn't be there: 23 % of its cards were compilation songs not crediting the artist.
+- **P6:** equal on steady (recall 86.1 %, returning favourites 100 %, skipped 0 %); streamer and collector have too little
+  history for a chronological cutoff.
+- **S2 triggered:** the new engine's top-3 share is 48–62 %, over 50 % on three of four personas. Re-ranking inside artist
+  top lists halves the famous-songs lean but can't remove it. That is the evidence threshold for considering track-level
+  retrieval later. The owner's replay (M7 on the saved catalog) is the real check.
+
+### Reliability fixes, each with a regression test (`DiscoverReliabilityTests`, CI, unless noted)
+1. **A catalog outage blanked the shelf.** With no catalog reachable, Refresh got an empty page and showed it. Results now
+   carry `Unreachable`; the shelf keeps its picks, or brings back the last saved page, with the existing "Couldn't refresh
+   right now. Showing your last picks." (view-model check in the Finder suite).
+2. **An empty failure lit the "new picks" dot.** `PicksReady` now fires only for a page that was adopted.
+3. **One provider timeout aborted the whole build.** ListenBrainz's HTTP client timeout is a `TaskCanceledException` nobody
+   asked for; it escaped the per-artist catch. It now fails that artist only. A real cancellation and Offline mode still stop
+   the build.
+4. **A malformed card in for-you-feedback.json broke every later build** (Learn threw on a null card or key until Reset).
+   Malformed entries are now skipped one by one.
+5. **The build ran on the UI thread.** After its first await, reading the history, learning, taste and ranking all resumed on
+   the UI thread (about a second on a large profile). The whole build now runs on the thread pool (test: 72 of 72 lookups ran
+   on the UI thread before, 0 now).
+6. **A late progress report overwrote the final status** (the shelf could end on "Picking songs… 1 of 1"). Progress is ignored
+   once loading ended (found by the Finder-suite outage check).
+
+Also tested, no change needed: Last.fm and ListenBrainz down (own artists still fill the shelf), slow lookups, cancellation
+mid-build (ends in well under 1 s, cache unchanged, next build works), truncated `for-you-last.json`, `for-you-hidden.json`
+and `listens.jsonl`, an empty library, no data folder, one song, a 50,000-song import.
+
+**Offline mode:** no request leaves (checked through `OnlineAccessHandler`); the saved page stays. Found, not changed: the
+catalog turns Offline mode's refusal into `CATALOG_TIMEOUT … did not finish its response in 25 seconds`. It is catalog-wide
+(Search too), and that conversion is also what lets the catalog serve stale saved data offline, so changing it is out of
+scope. With fix 1 the shelf never shows that text over existing picks; on a first-ever load in Offline mode it would.
+
+### Performance
+- **In-view reporting:** `ForYouShelfView` no longer subscribes to `LayoutUpdated`, which fires for every layout pass in the
+  window. It reacts to the page's `ScrollChanged` (offset, extent, viewport), the list's `EffectiveViewportChanged`, a new page
+  and opening the shelf, coalesced to one report per dispatcher pass. Headless test: 60 unrelated layout passes (a ticking
+  clock) caused **60 reports before, 0 now**; one scroll, one resize and one new page cause 1 each.
+- **Build cost** at the bounds (50,000 songs, 100,000 listens rows, a 50,000-song import, 120 pages, 3,000 actions, 5,000
+  dismissed songs), in-memory catalog, three cold processes on this Linux container:
+
+  | Step | Time |
+  |---|---|
+  | Reading `listens.jsonl` and `playlists.json` (74,721 plays kept of 100,000 rows) | 1.0–1.3 s |
+  | Learning from 120 pages | 0.14–0.34 s |
+  | Taste (seeds) | 0.48–0.72 s |
+  | Heard set | 0.10–0.17 s |
+  | Ranking alone | 18–53 ms |
+  | **Whole local build** | **2.7–3.1 s**, about 300 MB allocated (short-lived) |
+
+  An earlier warm run (same process as other tests) took 1.4 s for the whole build.
+- **P7 verdict:** ranking alone **PASS** (18–53 ms, under 250 ms). The whole local part: **FAIL** against 2 s on a cold process
+  (2.7–3.1 s; reading the 100,000-row log and the title normalisation dominate), about 1.4 s warm. It now runs off the UI thread (fix 5), so it delays the page,
+  not the window. Not optimised further in C.
+- A "Not for me" click with 5,000 songs already dismissed costs about 5 ms on the UI thread; each dismissal lookup about
+  0.1 ms (linear in dismissed songs, capped at 5,000).
+
+## 7. Plan for D, and the gates after it
+
+**D. Future-model readiness (next, when approved; documentation and boundaries only)**
 - **The adoption gate (all must hold, each with evidence):**
   - a named model and exact pinned artifacts
   - compatible licences for code, weights and training data
@@ -288,7 +386,8 @@ Offline evaluation of logged data can't show causal satisfaction gains; only rea
 - No interface or storage is added until the gate is met.
 
 **Later, only with evidence:** track-level retrieval (Last.fm `track.getSimilar` or ListenBrainz recording similarity). It
-would need a docs check, recorded fixtures and a song-level offline comparison first.
+would need a docs check, recorded fixtures and a song-level offline comparison first. C's synthetic comparison crossed the S2
+threshold (top-3 share 48–62 %); the owner's replay on the saved catalog decides whether real data does too.
 
 ### Rough cost (Claude cloud credits, very uncertain)
 
@@ -296,37 +395,44 @@ would need a docs check, recorded fixtures and a song-level offline comparison f
 |---|---|---|
 | A | ~$12–18 used | A cold .NET install and two full local test runs. |
 | B | ~$8–12 used | Two full local test runs again. |
-| C | $10–18 | Song-level comparison fixtures and the Offline-mode audit; a fix if Offline mode is not respected. |
+| C | ~$15–22 used | Six reliability fixes instead of the expected one, and four full local Finder-suite runs. |
 | D | $3–6 | A written gate and a short boundary note; no code unless the gate demands it. |
 
-## 7. Acceptance criteria: verified vs pending
+## 8. Acceptance criteria: verified vs pending
 
 | # | Criterion | Verified here | Pending (owner, Windows app, isolated test profile) |
 |---|---|---|---|
-| 1 | Discovery improved without a model or paid inference | Synthetic tests; replay on a synthetic persona | Real listening over some weeks |
-| 2 | Ownership, identity and playback safeguards intact | Unit tests; Windows CI green on A | Real library with remasters and compilations |
-| 3 | Learns from trustworthy evidence, not exposure, failures or imports | Unit tests (B) | Real playback failures and streams |
-| 4 | Song-level dismissal and Undo | Unit and view-model tests | Clicking it in the app |
-| 5 | Offline, cancellation, cache, queue semantics preserved | Existing suites pass; cached-page tests | Explicit Offline mode audit (C); app check |
-| 6 | Automated checks for ranking, telemetry, identity, feedback | `DiscoverLearningTests`, `DiscoverTelemetryTests`, Finder suite | — |
-| 7 | Baseline comparison and limits documented, no invented results | Replay tool and this file | The owner's own replay numbers |
-| 8 | Evidence-based model gate | Draft in section 5 | Finalised in D |
+| 1 | Discovery improved without a model or paid inference | Synthetic comparison against the runnable 2.2.0 engine (section 6) | The owner's replay on the saved catalog; real listening over some weeks |
+| 2 | Ownership, identity and playback safeguards intact | Unit tests; synthetic comparison: 0 duplicate, owned or heard cards | Real library with remasters and compilations |
+| 3 | Learns from trustworthy evidence, not exposure, failures or imports | Unit tests (B); streamer persona | Real playback failures and streams |
+| 4 | Song-level dismissal and Undo | Unit and view-model tests; 0 dismissed songs back in the comparison | — (owner checked the app's Play path; Not for me/Undo covered by the Finder suite) |
+| 5 | Offline, cancellation, cache, queue semantics preserved | `DiscoverReliabilityTests` (C); Finder-suite outage check | Offline mode in the app; the catalog's misleading "CATALOG_TIMEOUT" wording in Offline mode (pre-existing, catalog-wide) |
+| 6 | Automated checks for ranking, telemetry, identity, feedback | `DiscoverLearningTests`, `DiscoverTelemetryTests`, `DiscoverEvaluationTests`, `DiscoverReliabilityTests`, Finder suite | — |
+| 7 | Baseline comparison and limits documented, no invented results | Criteria committed before results (`79396c1`); section 6 | The owner's replay numbers |
+| 8 | Evidence-based model gate | Draft in section 7 | Finalised in D |
 | 9 | Verified vs pending kept apart | This table | — |
 
-**UI checks pending in the Windows app:**
-- the "Reset For you…" header menu
-- exposure counts only while expanded
-- the in-view report while scrolling
-- that LayoutUpdated reporting causes no visible cost
+**Checked by the owner on Windows (61d10fe, isolated test profile):** shelf opens and Refresh builds in 20 s; the first 20
+picks had 0 owned, 0 heard, 0 duplicate recordings and at most 3 per artist; one page with 12 cards in view and one Play
+recorded once; the played pick only streamed; Finder suite 1557 ok, 0 wrong.
 
-## 8. Continuation notes
+**UI checks pending in the Windows app (C changes):**
+- the shelf keeps its picks on Refresh with the network off
+- the in-view report while scrolling and resizing, with the new event wiring
+- no hitch on Refresh with a large profile (the build now runs off the UI thread)
+- the "Reset For you…" header menu (from A)
+
+## 9. Continuation notes
 - Entry points:
-  - `ForYou.cs`: `Taste.Seeds`, `TasteSources` (`Load`, `Distinct`, `Familiar`, `Playlists`), `Discover.BuildAsync`,
-    `DiscoverHidden`, `ForYouSource.ResetLearning`
+  - `ForYou.cs`: `Taste.Seeds`, `TasteSources` (`Load`, `Distinct`, `Familiar`, `Playlists`), `Discover.ForListenerAsync`,
+    `Discover.BuildAsync`, `DiscoverHidden`, `ForYouSource.ResetLearning`
+  - `DiscoverBaseline.cs` (2.2.0, frozen), `DiscoverEvaluation.cs` (`DiscoverPageMetrics`, `PlaceRecorder`, `RunAsync`),
+    `DiscoverReplay.ReportAsync` (the owner's local report)
   - `DiscoverIdentity.cs`, `DiscoverFeedback.cs` (`Shown`, `Seen`, `Record`, `Retract`, `Learn`, `Outcome`, `Summary`),
     `DiscoverReplay.cs`
   - `ForYouShelfViewModel.cs`: `RecordShown`, `InView`, `Record`, `ResetLearning`
-  - `ForYouShelfView.axaml.cs`: `InView`
+  - `ForYouShelfView.axaml.cs`: `InView`, `Reports` (what triggers a report: `ScrollChanged`, `EffectiveViewportChanged`,
+    the list's items, `IsExpanded`, visibility)
 - Tuning constants:
   - `Taste.DurableSeeds`
   - `Discover.Shelf`, `PerSeed`, `OwnArtists`
@@ -336,8 +442,10 @@ would need a docs check, recorded fixtures and a song-level offline comparison f
   would change True Shuffle's lifecycle, so it needs the owner's approval.
 - Local runs on Linux:
   - Build: `dotnet build tests/Noctis.Tests/Noctis.Tests.csproj -c Release`
-  - Discover tests: `dotnet tests/Noctis.Tests/bin/Release/net10.0/Noctis.Tests.dll -class Noctis.Tests.DiscoverLearningTests -class Noctis.Tests.DiscoverTelemetryTests`
+  - Discover tests: `dotnet tests/Noctis.Tests/bin/Release/net10.0/Noctis.Tests.dll -class Noctis.Tests.DiscoverLearningTests -class Noctis.Tests.DiscoverTelemetryTests -class Noctis.Tests.DiscoverEvaluationTests -class Noctis.Tests.DiscoverReliabilityTests`
+  - The comparison table: set `DISCOVER_EVAL_REPORT` to a file path and run `-class Noctis.Tests.DiscoverEvaluationTests`.
   - Finder suite: `dotnet run --project tests/FreeMusicFinder.Tests -c Release`. On Linux, 7 checks fail on `native` too
-    (Windows file locking and `C:\` paths).
+    (Windows file locking and `C:\` paths). "after the restart the song finishes and is copied" failed once in four runs
+    (a download-restart timing check, unrelated to Discover).
   - Full `Noctis.Tests` on Linux: 49 tests fail on `native` too (Windows paths, the updater, the Windows player, a socket
     broken-pipe); CI on Windows is the reference.
