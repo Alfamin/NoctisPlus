@@ -89,6 +89,64 @@ public class NativeWordLyricsTests
     }
 
     [AvaloniaFact]
+    public void ExplicitTimeWordsReenablesAnIgnoredSong_AndQueuesOnlyOneRequestWithoutDownloadingModels()
+    {
+        using var rig = new Rig(off: true);
+        var song = rig.Library.TrackList[0];
+        rig.Service.Presenter = (_, _) => { };
+        rig.Service.SetIgnored(song.FilePath, true);
+        rig.Service.PlayerMoved(song, TimeSpan.FromSeconds(12), true);
+        Thread.Sleep(100); Dispatcher.UIThread.RunJobs();
+        Assert.Equal(0, rig.Service.WaitingCount); Assert.True(rig.Service.IsIgnored(song.FilePath));
+        var request = rig.Service.TimeSongAsync(song); Until(() => request.IsCompleted); request.GetAwaiter().GetResult();
+        Assert.False(rig.Service.IsIgnored(song.FilePath));
+        Assert.Equal(1, rig.Service.WaitingCount);
+        var again = rig.Service.TimeSongAsync(song); Until(() => again.IsCompleted); again.GetAwaiter().GetResult();
+        Assert.Equal(1, rig.Service.WaitingCount);
+        Assert.False(Directory.Exists(Path.Combine(rig.Data.DataDirectory, "absent backend")));
+        using var state = JsonDocument.Parse(File.ReadAllText(Path.Combine(rig.Service.DataDirectory, "song-rules.json")));
+        Assert.Empty(state.RootElement.GetProperty("Rules").EnumerateObject());
+    }
+
+    [AvaloniaTheory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void PlayerLyricsMenuIncludesTheSameActions_AndRebindsIgnoreToTheNewSong(bool lyricsPage)
+    {
+        using var rig = new Rig(off: true);
+        var first = rig.Library.TrackList[0]; var second = rig.Song("Second menu target");
+        var player = new PlayerViewModel(new FakeAudioPlayer(), rig.Library, rig.Data, new FakeAnimatedCoverService())
+            { CurrentTrack = first, IsLyricsPageActive = lyricsPage };
+        var bar = new PlaybackBarView { DataContext = player };
+        var window = new Window { Content = bar, Width = 1000, Height = 700 };
+        window.Show(); Dispatcher.UIThread.RunJobs();
+        var menu = Assert.IsType<MenuFlyout>(bar.FindControl<Button>("OptionsButton")!.Flyout);
+        Track? repaired = null; rig.Service.Presenter = (_, song) => repaired = song;
+        try
+        {
+            menu.ShowAt(bar); Dispatcher.UIThread.RunJobs();
+            var timing = bar.FindControl<MenuItem>("CurrentWordTimingMenuItem")!;
+            var ignore = bar.FindControl<MenuItem>("CurrentIgnoreWordLyricsMenuItem")!;
+            Assert.True(timing.IsVisible); Assert.True(ignore.IsVisible);
+            Assert.Same(first, timing.CommandParameter); Assert.Same(first, ignore.CommandParameter);
+            Assert.Same(player.FetchCurrentTrackLyricsCommand, bar.FindControl<MenuItem>("FetchCurrentLyricsMenuItem")!.Command);
+            Assert.True(bar.FindControl<MenuItem>("RemoveCurrentLyricsMenuItem")!.IsVisible);
+            Assert.Same(player.OpenCurrentTrackLyricsStudioCommand, bar.FindControl<MenuItem>("CurrentLyricsStudioMenuItem")!.Command);
+            timing.Command!.Execute(timing.CommandParameter); Assert.Same(first, repaired);
+            ignore.Command!.Execute(ignore.CommandParameter); Assert.True(rig.Service.IsIgnored(first.FilePath));
+            menu.Hide(); player.CurrentTrack = second;
+            menu.ShowAt(bar); Dispatcher.UIThread.RunJobs();
+            Assert.Equal("Ignore WordLyrics for this song", ignore.Header);
+            Assert.Same(second, ignore.CommandParameter);
+            ignore.Command!.Execute(ignore.CommandParameter);
+            Assert.True(rig.Service.IsIgnored(second.FilePath)); Assert.True(rig.Service.IsIgnored(first.FilePath));
+            menu.Hide(); menu.ShowAt(bar); Dispatcher.UIThread.RunJobs();
+            Assert.Equal("Enable WordLyrics for this song", ignore.Header);
+        }
+        finally { menu.Hide(); window.Close(); }
+    }
+
+    [AvaloniaFact]
     public void NativeMigrationRunsBeforeDefaults_AndNewChoiceKeepsRollbackKeys()
     {
         using var rig = new Rig(off: true);

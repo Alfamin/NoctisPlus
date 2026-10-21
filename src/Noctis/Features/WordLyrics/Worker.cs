@@ -460,7 +460,7 @@ internal sealed class Worker : IDisposable
     public string? Ask(string path, TimingAction action = TimingAction.Missing, string? draft = null)
         => Ask(path, action, draft, out _);
 
-    internal string? Ask(string path, TimingAction action, string? draft, out bool accepted, bool automatic = false)
+    internal string? Ask(string path, TimingAction action, string? draft, out bool accepted, bool automatic = false, bool enableIgnored = false)
     {
         accepted = false;
         if (!string.IsNullOrWhiteSpace(path) && ProgressivePlayback.ProgressiveTransfer.IsDownloading(path))
@@ -476,7 +476,13 @@ internal sealed class Worker : IDisposable
         lock (_gate)
         {
             if (_disposed) return null;
-            if (IsIgnored(path)) return "WordLyrics is off for this song.";
+            if (IsIgnored(path))
+            {
+                if (!enableIgnored) return "WordLyrics is off for this song.";
+                // An explicit lyrics-view Time words click is a new user choice, not
+                // automatic playback. Known copies share this persisted preference.
+                _rules.Set(path, _rules.Get(path) with { Ignored = false });
+            }
             if (automatic && AutomaticBlocked(path)) return null;
             var rule = _rules.Get(path);
             if (rule.RetryUtc != default)

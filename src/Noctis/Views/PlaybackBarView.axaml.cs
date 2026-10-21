@@ -1758,6 +1758,11 @@ public partial class PlaybackBarView : UserControl
         _quickQueueTile!.Command = vm.AddCurrentTrackToQueueCommand;
 
         var track = vm.CurrentTrack;
+        WordLyricsMenu.Bind(CurrentWordTimingMenuItem, CurrentIgnoreWordLyricsMenuItem, track);
+        var completeLocal = track is { IsRemoteStream: false, FilePath.Length: > 0 }
+            && !Features.ProgressivePlayback.ProgressiveTransfer.IsDownloading(track.FilePath);
+        FetchCurrentLyricsMenuItem.IsEnabled = CurrentLyricsStudioMenuItem.IsEnabled = completeLocal;
+        RemoveCurrentLyricsMenuItem.IsEnabled = completeLocal;
         BindViewArtist(vm, track);
 
         LyricsBackgroundClearMenuItem.IsVisible = track != null &&

@@ -102,6 +102,8 @@
     "Album pages show loading feedback while additional songs arrive",
     "WordLyrics uses one rounded backdrop inside the player",
     "The Offline setting has no extra divider",
-    "A late queue cleanup no longer removes a newer manual lyric repair"
+    "A late queue cleanup no longer removes a newer manual lyric repair",
+    "The player and lyrics-page menus include all song lyric actions",
+    "Time words re-enables word timing when you explicitly ask"
   ]
 }

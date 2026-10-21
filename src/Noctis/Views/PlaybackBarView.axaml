@@ -1437,6 +1437,12 @@
                                     <MenuItem.Icon>
                                         <controls:LineIcon Classes="mv2-icon" Data="{StaticResource MenuLineLyrics}"/>
                                     </MenuItem.Icon>
+                                    <MenuItem x:Name="FetchCurrentLyricsMenuItem" Header="{loc:T Menu.FetchLyrics}"
+                                              Command="{Binding FetchCurrentTrackLyricsCommand}" />
+                                    <MenuItem x:Name="CurrentLyricsStudioMenuItem" Header="{loc:T Menu.LyricsStudio}"
+                                              Command="{Binding OpenCurrentTrackLyricsStudioCommand}" />
+                                    <MenuItem x:Name="CurrentWordTimingMenuItem" />
+                                    <MenuItem x:Name="CurrentIgnoreWordLyricsMenuItem" />
                                     <MenuItem Header="{loc:T PlaybackBar.SearchLyrics}"
                                               Command="{Binding SearchCurrentTrackLyricsCommand}">
                                         <MenuItem.Icon>
@@ -1481,9 +1487,8 @@
                                             <controls:LineIcon Classes="mv2-icon" Data="{StaticResource MenuLineLyricsPanel}"/>
                                         </MenuItem.Icon>
                                     </MenuItem>
-                                    <MenuItem Header="{loc:T PlaybackBar.RemoveLyrics}" Classes="danger"
-                                              Command="{Binding RemoveCurrentTrackLyricsCommand}"
-                                              IsVisible="{Binding IsLyricsPageActive}">
+                                    <MenuItem x:Name="RemoveCurrentLyricsMenuItem" Header="{loc:T PlaybackBar.RemoveLyrics}" Classes="danger"
+                                              Command="{Binding RemoveCurrentTrackLyricsCommand}">
                                         <MenuItem.Icon>
                                             <controls:LineIcon Classes="mv2-icon" Data="{StaticResource MenuLineTrash}"/>
                                         </MenuItem.Icon>

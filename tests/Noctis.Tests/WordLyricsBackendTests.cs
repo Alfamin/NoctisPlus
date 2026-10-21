@@ -42,7 +42,14 @@ public class WordLyricsBackendTests
                 config=json.loads(Path('fixture.json').read_text())
                 songs=Path(value('--songs-from')).read_text(encoding='utf-8').splitlines()
                 def put(path,data):
-                    target=Path(path);tmp=target.with_suffix('.tmp');tmp.write_text(json.dumps(data),encoding='utf-8');os.replace(tmp,target)
+                    target=Path(path);tmp=target.with_suffix('.tmp');tmp.write_text(json.dumps(data),encoding='utf-8')
+                    # A Windows reader can briefly hold this file during its next progress poll.
+                    # The fixture tests model preemption, not atomic-replace sharing violations.
+                    for attempt in range(30):
+                        try:os.replace(tmp,target);return
+                        except PermissionError:
+                            if attempt==29:raise
+                            time.sleep(.01)
                 control=Path(value('--control')) if '--control' in args else None
                 if config.get('stuck'): time.sleep(60)  # owner #91: a model call that never returns: no progress, no CPU
                 deadline=time.monotonic()+15
@@ -362,14 +369,20 @@ public class WordLyricsBackendTests
     {
         using var rig = new Rig(hold: true, done: 3.5); // 88% through
         var states = new ConcurrentQueue<ProgressState>();
-        using var worker = rig.Worker(states.Enqueue);
+        var reports = new ConcurrentQueue<string>();
+        using var worker = rig.Worker(state =>
+        {
+            states.Enqueue(state);
+            if (state.Finished && File.Exists(Path.Combine(rig.Work, "last run.log")))
+                reports.Enqueue(File.ReadAllText(Path.Combine(rig.Work, "last run.log")));
+        });
         worker.Ask(rig.Song);
         await Until(() => states.Any(s => s.Fraction >= 0.75));
         var played = Path.Combine(rig.Music, "played now.mp3"); File.WriteAllText(played, "synthetic");
         worker.AskPlayed(played, out _);
         worker.MakeRoom(played);
         await Until(() => worker.StatusFor(played) == SongTimingStatus.Processing);
-        Assert.False(worker.IsWaiting(rig.Song)); // it finished (timed), then the played song started
+        Assert.False(worker.IsWaiting(rig.Song), string.Join("\n", reports)); // it finished (timed), then the played song started
         Assert.Equal([played], File.ReadAllLines(Path.Combine(rig.Work, "songs.txt")));
     }
 

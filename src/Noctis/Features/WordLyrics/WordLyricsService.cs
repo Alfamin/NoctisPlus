@@ -329,7 +329,8 @@ internal sealed class WordLyricsService(ILibraryService library, Func<AppSetting
                 var playing = SameSong(track.FilePath, Volatile.Read(ref _playingPath));
                 var saved = Volatile.Read(ref _playingTimingPath);
                 var path = playing && saved is not null && File.Exists(saved) ? saved : track.FilePath;
-                var message = worker.Ask(path, TimingAction.Missing, null, out var accepted);
+                if (playing) worker.ShareRules(track.FilePath, path);
+                var message = worker.Ask(path, TimingAction.Missing, null, out var accepted, enableIgnored: true);
                 if (accepted && playing)
                 {
                     worker.Prioritize(path);

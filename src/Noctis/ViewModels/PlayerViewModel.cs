@@ -1212,7 +1212,26 @@ public partial class PlayerViewModel : ViewModelBase
     private void OpenLyricsBackgroundColor() => _openLyricsBackgroundColor?.Invoke();
 
     [RelayCommand]
-    private void RemoveCurrentTrackLyrics() => _removeLyrics?.Invoke();
+    private async Task RemoveCurrentTrackLyrics()
+    {
+        if (_removeLyrics is { } remove) { remove(); return; }
+        if (CurrentTrack is { IsRemoteStream: false } track && !Features.ProgressivePlayback.ProgressiveTransfer.IsDownloading(track.FilePath))
+            await MetadataHelper.OpenBulkLyricsDialog([track], remove: true);
+    }
+
+    [RelayCommand]
+    private async Task FetchCurrentTrackLyrics()
+    {
+        if (CurrentTrack is { IsRemoteStream: false } track && !Features.ProgressivePlayback.ProgressiveTransfer.IsDownloading(track.FilePath))
+            await MetadataHelper.OpenBulkLyricsDialog([track], remove: false);
+    }
+
+    [RelayCommand]
+    private async Task OpenCurrentTrackLyricsStudio()
+    {
+        if (CurrentTrack is { IsRemoteStream: false } track && !Features.ProgressivePlayback.ProgressiveTransfer.IsDownloading(track.FilePath))
+            await MetadataHelper.OpenLyricsStudio([track]);
+    }
 
     [RelayCommand]
     private void ShareCurrentTrackLyrics() => _shareLyrics?.Invoke();
