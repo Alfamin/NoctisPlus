@@ -1,8 +1,9 @@
 # Discover / For you: plan and continuation notes
 
 Branch `discover-a`, started from `native` at v2.2.0 (`11995e63`), draft PR Alfamin/NoctisPlus#12 into `main`.
-**Done:** Milestones A, B and C (criteria in section 5, written before measuring; results in section 6). **Next:** D, only when
-the owner says so. Never merge, push to `main`/`native`, or tag.
+**Done:** Milestones A, B, C (criteria in section 5, written before measuring; results in section 6) and D (the model gate:
+no-go, section 7 and `discover-model-gate.md`). **Next:** only what the owner approves; track-level retrieval is outlined in the
+gate's section 6. Never merge, push to `main`/`native`, or tag.
 
 The milestones are the owner's (brief section 9):
 - **A. Working Discovery improvement:** ranking and identity audit; filtering, personalisation, novelty, diversity, song-level
@@ -16,7 +17,7 @@ The milestones are the owner's (brief section 9):
 
 > The first copy of the brief stopped in section 5, so the B–D in the first version of this file were my guesses (B was
 > "track-level candidates"). They have been replaced by the owner's definitions above. Track-level retrieval is not in any
-> milestone; it is listed under "Later, only with evidence" in section 5.
+> milestone; D outlines it (`discover-model-gate.md`, section 6) without building it.
 
 ## 1. What was already there (audit)
 
@@ -214,7 +215,7 @@ Undo, Reset and pruning cannot leave stale statistics behind.
 - Pages cached by 2.2.0 (no `Batch`, `Seed` or `Own`) still load and are never counted as shown.
 - Undo retracts the dismissal's learning (Finder suite, view-model level).
 
-### What leaves the computer (unchanged by A and B; listed for section 7)
+### What leaves the computer (unchanged by A and B; the privacy baseline for later sources)
 - **Last.fm `artist.getSimilar`** (only with the user's own API key): a seed artist name.
 - **MusicBrainz:** a seed artist name and up to 3 of the listener's song titles for that artist, to identify the right artist
   (namesake safety).
@@ -369,25 +370,34 @@ scope. With fix 1 the shelf never shows that text over existing picks; on a firs
 - A "Not for me" click with 5,000 songs already dismissed costs about 5 ms on the UI thread; each dismissal lookup about
   0.1 ms (linear in dismissed songs, capped at 5,000).
 
-## 7. Plan for D, and the gates after it
+## 7. Milestone D: the model gate (done; documentation only)
 
-**D. Future-model readiness (next, when approved; documentation and boundaries only)**
-- **The adoption gate (all must hold, each with evidence):**
-  - a named model and exact pinned artifacts
-  - compatible licences for code, weights and training data
-  - a supported, auditable native Windows inference path (a real, built and validated ONNX export)
-  - measured CPU, RAM, disk and optional GPU cost
-  - a way to get audio or compatible embeddings for *remote* candidates, without downloading full songs to fill the shelf
-  - enough candidate coverage
-  - a separate evaluation showing a meaningful improvement over this deterministic baseline
-- **Boundaries:**
-  - any feature cache keyed by `DiscoverIdentity.Key` plus model and preprocessing version
-  - optional and rebuildable; its removal or failure leaves Discover as it is
-- No interface or storage is added until the gate is met.
-
-**Later, only with evidence:** track-level retrieval (Last.fm `track.getSimilar` or ListenBrainz recording similarity). It
-would need a docs check, recorded fixtures and a song-level offline comparison first. C's synthetic comparison crossed the S2
-threshold (top-3 share 48–62 %); the owner's replay on the saved catalog decides whether real data does too.
+The full gate is in [`discover-model-gate.md`](discover-model-gate.md). In short:
+- **Verdict: no-go.** For you's candidates are songs the listener doesn't own and hasn't heard, and Noctis has no audio or
+  compatible embedding for them:
+  - the stream cache holds only played (heard) songs
+  - the catalog takes no preview URLs by design
+  - Apple's previews are for promotion only
+  - full downloads are ruled out
+- **Licences:** Essentia's Discogs-EffNet, the only candidate with a first-party ONNX export, has CC BY-NC-SA 4.0 weights
+  and unreleased training data. The LAION-CLAP and MERT weight licences couldn't be confirmed from primary sources, and
+  neither model has a supported ONNX export.
+- **Gate G1–G7:**
+  - G1 coverage ≥ 80 % of candidates
+  - G2 licences
+  - G3 pinned first-party ONNX with matching C# preprocessing
+  - G4 Windows resource limits, paused while gaming or WordLyrics runs
+  - G5 top-3 share −10 points with P1/P2 holding, on the replay and the personas
+  - G6 two weeks of real outcomes no lower
+  - G7 the shelf unchanged with the model missing or failing
+- **If a model fails,** nothing ships, the gate isn't loosened, and it's re-run only when the failing condition changes.
+- **Boundary:** one bounded multiplier on the per-song score in `Discover.BuildAsync`, after the safety filters and before
+  `Distinct` and the caps. Features would be keyed by `DiscoverIdentity.Key` plus model hash and preprocessing version,
+  and a missing feature means a factor of 1.0.
+- **No code added in D.** An interface would be unused while G1 fails, and the existing tests already pin the no-model
+  shelf.
+- **Next lever: track-level retrieval** (gate section 6). Smallest option: Last.fm `track.getSimilar` for about 10
+  best-liked recordings. It sends those song titles with the user's key. About $8–14 to build. Not started.
 
 ### Rough cost (Claude cloud credits, very uncertain)
 
@@ -396,7 +406,8 @@ threshold (top-3 share 48–62 %); the owner's replay on the saved catalog decid
 | A | ~$12–18 used | A cold .NET install and two full local test runs. |
 | B | ~$8–12 used | Two full local test runs again. |
 | C | ~$15–22 used | Six reliability fixes instead of the expected one, and four full local Finder-suite runs. |
-| D | $3–6 | A written gate and a short boundary note; no code unless the gate demands it. |
+| D | ~$3–5 used | Primary-source reading through a restricted network; no code. |
+| Track-level retrieval (not started) | $8–14 | A new client, song candidates merged under the same filters, fixtures, tests; more if ListenBrainz. |
 
 ## 8. Acceptance criteria: verified vs pending
 
@@ -409,7 +420,7 @@ threshold (top-3 share 48–62 %); the owner's replay on the saved catalog decid
 | 5 | Offline, cancellation, cache, queue semantics preserved | `DiscoverReliabilityTests` (C); Finder-suite outage check | Offline mode in the app; the catalog's misleading "CATALOG_TIMEOUT" wording in Offline mode (pre-existing, catalog-wide) |
 | 6 | Automated checks for ranking, telemetry, identity, feedback | `DiscoverLearningTests`, `DiscoverTelemetryTests`, `DiscoverEvaluationTests`, `DiscoverReliabilityTests`, Finder suite | — |
 | 7 | Baseline comparison and limits documented, no invented results | Criteria committed before results (`79396c1`); section 6 | The owner's replay numbers |
-| 8 | Evidence-based model gate | Draft in section 7 | Finalised in D |
+| 8 | Evidence-based model gate | `discover-model-gate.md`: no-go, with sources | Weight licences unverified here (Hugging Face blocked): LAION-CLAP, MERT |
 | 9 | Verified vs pending kept apart | This table | — |
 
 **Checked by the owner on Windows (61d10fe, isolated test profile):** shelf opens and Refresh builds in 20 s; the first 20
@@ -438,6 +449,8 @@ recorded once; the played pick only streamed; Finder suite 1557 ok, 0 wrong.
   - `Discover.Shelf`, `PerSeed`, `OwnArtists`
   - `DiscoverLearning.Rest` and `ArtistFactor`
   - `DiscoverFeedback.Keep`, `MaxBatches`, `MaxInteractions`, `FrontOfShelf`, `Slack`
+- Model gate (D): `discover-model-gate.md`. The plug-in point for a future model is the per-song score in `Discover.BuildAsync`.
+  Nothing is wired; re-open only if gate condition G1 (audio or embeddings for remote candidates) changes.
 - Known gap kept: plays are recorded only while True Shuffle is enabled (`PlayTracker` lives in `TrueShuffleService`). Moving it
   would change True Shuffle's lifecycle, so it needs the owner's approval.
 - Local runs on Linux:
