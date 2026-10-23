@@ -75,20 +75,20 @@ public sealed record WhatsNewNotes(string Version, IReadOnlyList<WhatsNewItem> A
 }
 
 /// <summary>
-/// Owner #97: the first start after an update shows what was added and fixed, once. A new install records the version
-/// without showing it (there is nothing it updated from). The notes show only for the version they were written for.
+/// Owner #97: the first start after an update shows what was added and fixed, once. Owner #150: a new install shows every
+/// update once too. The notes show only for the version they were written for.
 /// </summary>
 public static class WhatsNewGate
 {
     private const string SeenFile = "whats-new-seen.txt";
 
-    /// <summary>Notes to show now, or null. <paramref name="existingProfile"/>: the profile was used before this start.</summary>
-    public static WhatsNewNotes? ToShow(string dataDirectory, Version current, bool existingProfile, WhatsNewNotes? notes)
-        => ToShow(dataDirectory, current, existingProfile, notes is null ? [] : [notes]);
+    /// <summary>Notes to show now, or null.</summary>
+    public static WhatsNewNotes? ToShow(string dataDirectory, Version current, WhatsNewNotes? notes)
+        => ToShow(dataDirectory, current, notes is null ? [] : [notes]);
 
-    /// <summary>Owner #149: every release since the one last seen, up to this one, as one sheet. A profile from before the
-    /// sheet existed (none seen) gets them all.</summary>
-    public static WhatsNewNotes? ToShow(string dataDirectory, Version current, bool existingProfile, IReadOnlyList<WhatsNewNotes> releases)
+    /// <summary>Owner #149: every release since the one last seen, up to this one, as one sheet. None seen (a new install,
+    /// or a profile from before the sheet existed): all of them.</summary>
+    public static WhatsNewNotes? ToShow(string dataDirectory, Version current, IReadOnlyList<WhatsNewNotes> releases)
     {
         var running = Short(current);
         var path = Path.Combine(dataDirectory, SeenFile);
@@ -96,7 +96,6 @@ public static class WhatsNewGate
         try { seen = File.Exists(path) ? File.ReadAllText(path).Trim() : ""; }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException) { return null; }
         if (seen == running) return null;
-        if (seen.Length == 0 && !existingProfile) { MarkSeen(dataDirectory, current); return null; }
         // Notes are shown only by the build they were written for (this release is among them).
         if (releases.All(r => Short(r.Version) != running)) { MarkSeen(dataDirectory, current); return null; }
         var now = Parse(running);

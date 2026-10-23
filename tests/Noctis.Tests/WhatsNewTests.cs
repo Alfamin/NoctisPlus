@@ -19,21 +19,23 @@ public class WhatsNewTests : IDisposable
     public void AnUpdate_ShowsTheNotesOnce()
     {
         WhatsNewGate.MarkSeen(_data, new Version(2, 1, 0));
-        Assert.NotNull(WhatsNewGate.ToShow(_data, new Version(2, 2, 0, 0), existingProfile: true, Notes("2.2.0")));
+        Assert.NotNull(WhatsNewGate.ToShow(_data, new Version(2, 2, 0, 0), Notes("2.2.0")));
         WhatsNewGate.MarkSeen(_data, new Version(2, 2, 0, 0));
-        Assert.Null(WhatsNewGate.ToShow(_data, new Version(2, 2, 0, 0), existingProfile: true, Notes("2.2.0")));
+        Assert.Null(WhatsNewGate.ToShow(_data, new Version(2, 2, 0, 0), Notes("2.2.0")));
     }
 
     [Fact]
-    public void AFreshInstall_ShowsNothing_ButTheNextUpdateDoes()
+    public void AFreshInstall_GetsEveryUpdateOnce_ThenOnlyTheNextOnes()
     {
-        Assert.Null(WhatsNewGate.ToShow(_data, new Version(2, 2, 0), existingProfile: false, Notes("2.2.0")));
-        Assert.NotNull(WhatsNewGate.ToShow(_data, new Version(2, 3, 0), existingProfile: true, Notes("2.3.0")));
+        // Owner #150: a new user sees everything once.
+        Assert.Equal(4, WhatsNewGate.ToShow(_data, new Version(2, 3, 1), History)!.Updates);
+        WhatsNewGate.MarkSeen(_data, new Version(2, 3, 1));
+        Assert.Null(WhatsNewGate.ToShow(_data, new Version(2, 3, 1), History));
     }
 
     [Fact]
     public void AnExistingProfileFromBeforeThePopUp_SeesIt()
-        => Assert.NotNull(WhatsNewGate.ToShow(_data, new Version(2, 2, 0), existingProfile: true, Notes("2.2.0")));
+        => Assert.NotNull(WhatsNewGate.ToShow(_data, new Version(2, 2, 0), Notes("2.2.0")));
 
     private static WhatsNewNotes Release(string version, params (string Title, bool Top)[] added)
         => new(version, [.. added.Select(a => new WhatsNewItem("SongsIcon", a.Title, "line", Top: a.Top))], ["fix " + version]);
@@ -50,12 +52,12 @@ public class WhatsNewTests : IDisposable
     public void SkippedUpdates_ShowEverythingMissed_HeadlinesFirst()
     {
         WhatsNewGate.MarkSeen(_data, new Version(2, 1, 0));
-        var notes = WhatsNewGate.ToShow(_data, new Version(2, 3, 1, 0), existingProfile: true, History)!;
+        var notes = WhatsNewGate.ToShow(_data, new Version(2, 3, 1, 0), History)!;
         Assert.Equal(new[] { "big 2.3.1", "big 2.3.0", "big 2.2.0", "small 2.3.1", "small 2.3.0" }, notes.Added.Select(i => i.Title));
         Assert.Equal(new[] { "fix 2.3.1", "fix 2.3.0", "fix 2.2.0" }, notes.Fixed);
         Assert.Equal("Version 2.3.1 · 3 updates", new WhatsNewViewModel(notes, () => { }).VersionLabel);
         WhatsNewGate.MarkSeen(_data, new Version(2, 3, 0));
-        var one = WhatsNewGate.ToShow(_data, new Version(2, 3, 1), existingProfile: true, History)!;
+        var one = WhatsNewGate.ToShow(_data, new Version(2, 3, 1), History)!;
         Assert.Equal(new[] { "big 2.3.1", "small 2.3.1" }, one.Added.Select(i => i.Title));
         Assert.Equal("Version 2.3.1", new WhatsNewViewModel(one, () => { }).VersionLabel);
     }
@@ -63,7 +65,7 @@ public class WhatsNewTests : IDisposable
     [Fact]
     public void AProfileFromBeforeThePopUp_GetsEveryUpdate_UpToThisOne()
     {
-        var notes = WhatsNewGate.ToShow(_data, new Version(2, 3, 0), existingProfile: true, History)!;
+        var notes = WhatsNewGate.ToShow(_data, new Version(2, 3, 0), History)!;
         Assert.Equal(3, notes.Updates);
         Assert.DoesNotContain(notes.Added, i => i.Title.EndsWith("2.3.1"));
     }
@@ -82,7 +84,7 @@ public class WhatsNewTests : IDisposable
 
     [Fact]
     public void NotesForAnotherVersion_AreNeverShown()
-        => Assert.Null(WhatsNewGate.ToShow(_data, new Version(2, 2, 1), existingProfile: true, Notes("2.2.0")));
+        => Assert.Null(WhatsNewGate.ToShow(_data, new Version(2, 2, 1), Notes("2.2.0")));
 
     [AvaloniaFact]
     public void TheShippedNotes_Load_AndEveryIconExists()

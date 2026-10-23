@@ -1180,8 +1180,7 @@ public partial class MainWindowViewModel : ViewModelBase
             var current = Services.UpdateService.CurrentVersion;
             // NOCTIS_PLUS_WHATSNEW=1 shows it in any build (to check how it looks): the newest release's notes.
             var forced = Environment.GetEnvironmentVariable("NOCTIS_PLUS_WHATSNEW") == "1" && releases.Count > 0;
-            var existing = Settings.GetSettings().MusicFolders.Count > 0 || _library.Tracks.Count > 0;
-            var show = forced ? releases[0] : Features.WhatsNew.WhatsNewGate.ToShow(_persistence.DataDirectory, current, existing, releases);
+            var show = forced ? releases[0] : Features.WhatsNew.WhatsNewGate.ToShow(_persistence.DataDirectory, current, releases);
             if (show is null) return;
             DispatcherTimer.RunOnce(() => PresentWhatsNew(show), TimeSpan.FromSeconds(1.5));
         }

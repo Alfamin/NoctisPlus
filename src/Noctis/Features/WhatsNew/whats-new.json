@@ -1,6 +1,13 @@
 {
   "releases": [
     {
+      "version": "2.3.2",
+      "added": [
+        { "icon": "RailInfoIcon", "title": "Every update you missed", "line": "Biggest changes first; all of them in Settings → About", "setting": "about", "top": true }
+      ],
+      "fixed": []
+    },
+    {
       "version": "2.3.1",
       "added": [
         { "icon": "RailSparkleIcon", "title": "For you plays its page", "line": "A song you play queues the rest of that page", "top": true },
@@ -36,8 +43,7 @@
         { "icon": "RailSparkleIcon", "title": "For you in seconds", "line": "Recommendations fill in about 7 s instead of over a minute" },
         { "icon": "SearchIcon", "title": "Hard names found", "line": "Tricky titles get a second search; close matches wait in Check these" },
         { "icon": "SaveDiskIcon", "title": "Keep played songs", "line": "Choose how long songs you only played are kept", "setting": "cache" },
-        { "icon": "LyricsIcon", "title": "Skip word timing for a song", "line": "Lyrics menu → Ignore WordLyrics; enable it again anytime" },
-        { "icon": "RailInfoIcon", "title": "What's new, anytime", "line": "Every update's notes in Settings → About", "setting": "about" }
+        { "icon": "LyricsIcon", "title": "Skip word timing for a song", "line": "Lyrics menu → Ignore WordLyrics; enable it again anytime" }
       ],
       "fixed": [
         "Songs whose long titles Telegram cuts short download again",
