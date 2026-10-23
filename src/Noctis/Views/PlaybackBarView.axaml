@@ -1695,7 +1695,7 @@
                     <!-- Queue button -->
                     <Button Classes="secondary-btn"
                             Command="{Binding ShowQueueCommand}"
-                            Tag="QueueToggle"
+                            Tag="QueueToggle" AutomationProperties.Name="{loc:T PlaybackBar.QueueTip}"
                             ToolTip.Tip="{loc:T PlaybackBar.QueueTip}"
                             Width="34" Height="34">
                         <Panel Width="34" Height="34">

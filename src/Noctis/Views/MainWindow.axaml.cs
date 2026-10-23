@@ -2252,6 +2252,13 @@ public partial class MainWindow : Window, IPageKeyOverlayHost
     private Control? _queueDragRow;
     private double _queueDragRowOffsetY;
     private LiquidReorder? _queueLiquid;
+    // Owner #151: a row held near the list's top or bottom edge scrolls the list, as the band does (GitHub #88).
+    private double _queueDragPointerY;   // in the list
+    private double _queueDragCardTop;    // in the wrapper
+    private double _queueDragRowHeight;
+    private bool _queueDragFrameQueued;
+    private bool _queueDragScrolling;
+    private long _queueDragLastFrameTicks;
 
     /// <summary>The dragged row's current queue index, read from its container (which
     /// follows a queue that shifted mid-drag); IndexOf only if the container moved on.</summary>
@@ -2351,6 +2358,51 @@ public partial class MainWindow : Window, IPageKeyOverlayHost
         liquid.MoveCardTo(cardTop);
         var target = LiquidReorder.NearestSlot(listBox, wrapper, cardTop + rowControl.Bounds.Height / 2);
         if (target >= 0) liquid.TargetIndex = target;
+
+        _queueDragPointerY = e.GetPosition(listBox).Y;
+        _queueDragCardTop = cardTop;
+        _queueDragRowHeight = rowControl.Bounds.Height;
+        QueueDragFrameRequest();
+    }
+
+    private void QueueDragFrameRequest()
+    {
+        if (!_queueDragActive || _queueDragFrameQueued) return;
+        if (!_queueDragScrolling) _queueDragLastFrameTicks = System.Diagnostics.Stopwatch.GetTimestamp();
+        _queueDragFrameQueued = true;
+        RequestAnimationFrame(QueueDragFrame);
+    }
+
+    /// <summary>Owner #151: past the edge zone the list scrolls toward the pointer, faster the deeper it is, while the card
+    /// stays under the pointer and the gap follows; held still at the edge it keeps going until the list ends.</summary>
+    private void QueueDragFrame(TimeSpan _)
+    {
+        _queueDragFrameQueued = false;
+        _queueDragScrolling = false;
+        var now = System.Diagnostics.Stopwatch.GetTimestamp();
+        // Real elapsed time, clamped so a stalled UI thread can't produce one giant jump.
+        var dt = Math.Min((now - _queueDragLastFrameTicks) / (double)System.Diagnostics.Stopwatch.Frequency, 0.1);
+        _queueDragLastFrameTicks = now;
+        if (!_queueDragActive || QueueLiquid is not { IsDragging: true } liquid
+            || this.FindControl<ListBox>("QueuePopupListBox") is not { } listBox
+            || this.FindControl<Grid>("QueueListWrapper") is not { } wrapper
+            || listBox.FindDescendantOfType<ScrollViewer>() is not { } scroller)
+            return;
+
+        var delta = QueueBandAutoScroll.Step(_queueDragPointerY, listBox.Bounds.Height, QueueBandEdge, dt);
+        var max = Math.Max(0, scroller.Extent.Height - scroller.Viewport.Height);
+        var next = Math.Clamp(scroller.Offset.Y + delta, 0, max);
+        // Inside the list, or at its end: the next pointer move asks again.
+        if (delta == 0 || Math.Abs(next - scroller.Offset.Y) <= 0.01) return;
+
+        scroller.Offset = scroller.Offset.WithY(next);
+        // Realize/arrange the rows at the new offset before measuring off them.
+        listBox.UpdateLayout();
+        if (DataContext is MainWindowViewModel vm) liquid.SourceIndex = QueueDragSourceIndex(vm.Player, listBox);
+        var target = LiquidReorder.NearestSlot(listBox, wrapper, _queueDragCardTop + _queueDragRowHeight / 2);
+        if (target >= 0) liquid.TargetIndex = target;
+        _queueDragScrolling = true;
+        QueueDragFrameRequest();
     }
 
     private void OnQueueItemPointerReleased(object? sender, PointerReleasedEventArgs e)
@@ -2391,6 +2443,8 @@ public partial class MainWindow : Window, IPageKeyOverlayHost
         // Capture the pointer so we keep receiving move/release events even if the cursor
         // leaves the row's hit area.
         e.Pointer.Capture(rowControl);
+        // Owner #151: the list may scroll the row out of view; a focused row stays realized (and keeps the capture).
+        rowControl.FindAncestorOfType<ListBoxItem>()?.Focus();
 
         var wrapper = this.FindControl<Grid>("QueueListWrapper");
         var listBox = this.FindControl<ListBox>("QueuePopupListBox");
