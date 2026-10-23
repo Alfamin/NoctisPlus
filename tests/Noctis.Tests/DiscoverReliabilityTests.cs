@@ -94,6 +94,31 @@ public class DiscoverReliabilityTests : IDisposable
     }
 
     [Fact]
+    public async Task ANewPage_LeavesTheSongsOnKeptPagesToThem()
+    {
+        // Owner #139: "Dum, Dumb, and Dumber" in the same place on all five pages after quick refreshes (nothing on screen
+        // had been reported yet, so nothing rested). Songs on a kept page are left to it, however fast the refresh.
+        var (source, _, _) = Source();
+        using var _ = source;
+        var first = (await source.BuildAsync(true, null, CancellationToken.None)).Songs.Take(Discover.Shelf).Select(s => DiscoverIdentity.Key(s.Track.Song)).ToHashSet();
+        var second = (await source.BuildAsync(true, null, CancellationToken.None)).Songs.Take(Discover.Shelf).Select(s => DiscoverIdentity.Key(s.Track.Song)).ToList();
+        Assert.Equal(Discover.Shelf, second.Count);
+        Assert.True(second.Count(first.Contains) <= 2, $"{second.Count(first.Contains)} of the new page's songs were already on the page before");
+    }
+
+    [Theory]
+    [InlineData(5, 1, "1 2 3 4 5")]
+    [InlineData(10, 1, "1 2 3 4 5 … 10")]
+    [InlineData(10, 5, "1 … 4 5 6 … 10")]
+    [InlineData(10, 9, "1 … 6 7 8 9 10")]
+    public void ThePager_StaysCompact(int count, int current, string expected)
+    {
+        var numbers = Noctis.ViewModels.ForYouShelfViewModel.PagerNumbers(count, current);
+        Assert.Equal(expected, string.Join(" ", numbers.Select(n => n == 0 ? "…" : n.ToString())));
+        Assert.True(numbers.Count <= Noctis.ViewModels.ForYouShelfViewModel.PagerSlots);
+    }
+
+    [Fact]
     public async Task SimilarArtistsDown_OwnArtistsStillFillTheShelf()
     {
         var (source, catalog, _) = Source();

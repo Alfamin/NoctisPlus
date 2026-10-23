@@ -158,27 +158,44 @@ public sealed partial class ForYouShelfViewModel : ObservableObject, IDisposable
         finally { if (Current()) IsLoading = false; }
     }
 
-    // A saved page can predate a download or library scan. Filter those recordings before
-    // displaying it; download actions still check the disk afresh.
+    // A saved page can predate a download, a library scan or a listen. Filter those recordings before
+    // displaying it (owner #139: a song listened to leaves its page); download actions still check the disk afresh.
     private async Task<DiscoverResult> WithoutOwned(DiscoverResult page, CancellationToken ct)
     {
+        if (page.Songs.Count == 0) return page;
+        if (_source is { } source)
+        {
+            var known = await source.FamiliarAsync(ct);
+            page = page with { Songs = page.Songs.Where(s => !known.Contains(DiscoverIdentity.Key(s.Track.Song))).ToList() };
+        }
         if (_actions is not { } actions || page.Songs.Count == 0) return page;
         var matches = await actions.MatchAsync(page.Songs.Select(s => s.Track.Song), ct, reuse: true);
         return page with { Songs = page.Songs.Where(s => !matches.TryGetValue(s.Track.Song.Id, out var m) || m.Local is null && m.Download is null).ToList() };
     }
 
-    /// <summary>Goes back to an earlier page (or forward to a newer one). Its songs keep their page, so nothing counts twice.</summary>
-    [RelayCommand]
-    private async Task ShowPage(ForYouPageTab? tab)
+    // ── Owner #139: the pages the shelf keeps, as a compact pager under it (‹ 1 2 3 … 10 ›, 1 the newest) ──
+    private IReadOnlyList<DiscoverResult> _pages = [];
+    private int _pageIndex;
+    /// <summary>Numbers shown at most, gaps included: the first, the last, and the ones around the page on screen.</summary>
+    internal const int PagerSlots = 7;
+    public bool CanPreviousPage => HasPageTabs && _pageIndex > 0;
+    public bool CanNextPage => HasPageTabs && _pageIndex < _pages.Count - 1;
+
+    [RelayCommand] private Task ShowPage(ForYouPageTab? tab) => tab is { IsGap: false } ? GoToPage(tab.Number - 1) : Task.CompletedTask;
+    [RelayCommand] private Task PreviousPage() => GoToPage(_pageIndex - 1);
+    [RelayCommand] private Task NextPage() => GoToPage(_pageIndex + 1);
+
+    /// <summary>Goes to a kept page. Its songs keep their page, so nothing counts twice.</summary>
+    private async Task GoToPage(int index)
     {
-        if (_disposed || tab is null || tab.IsCurrent || _source is not { } source || _online is null) return;
+        if (_disposed || index < 0 || index >= _pages.Count || index == _pageIndex && _page is not null || _source is not { } source || _online is null) return;
         _load?.Cancel(); _load?.Dispose();
         var stop = _load = new();
         var generation = ++_generation;
         IsLoading = false;
         try
         {
-            var page = await WithoutOwned(tab.Page, stop.Token);
+            var page = await WithoutOwned(_pages[index], stop.Token);
             if (!_disposed && generation == _generation && !stop.IsCancellationRequested && ReferenceEquals(source, _source)) Show(page, source);
         }
         catch (OperationCanceledException) when (stop.IsCancellationRequested) { }
@@ -186,12 +203,30 @@ public sealed partial class ForYouShelfViewModel : ObservableObject, IDisposable
 
     private void UpdatePageTabs(ForYouSource source)
     {
+        _pages = source.Pages();
+        var shown = _page?.Batch ?? "";
+        _pageIndex = Math.Max(0, _pages.ToList().FindIndex(p => p.Batch.Length > 0 && p.Batch == shown));
         PageTabs.Clear();
-        var pages = source.Pages();
-        if (pages.Count > 1)
-            for (int i = 0; i < pages.Count; i++)
-                PageTabs.Add(new(i + 1, pages[i]) { IsCurrent = _page is { Batch.Length: > 0 } shown && pages[i].Batch == shown.Batch });
-        OnPropertyChanged(nameof(HasPageTabs));
+        if (_pages.Count > 1)
+            foreach (var number in PagerNumbers(_pages.Count, _pageIndex + 1))
+                PageTabs.Add(new(number) { IsCurrent = number == _pageIndex + 1 });
+        OnPropertyChanged(nameof(HasPageTabs)); OnPropertyChanged(nameof(CanPreviousPage)); OnPropertyChanged(nameof(CanNextPage));
+    }
+
+    /// <summary>The page numbers to show for <paramref name="count"/> pages with <paramref name="current"/> on screen; 0 is a gap (…).
+    /// All of them when they fit, else the first, the last and a window round the current one, never wider than <see cref="PagerSlots"/>.</summary>
+    internal static List<int> PagerNumbers(int count, int current)
+    {
+        if (count <= PagerSlots) return [.. Enumerable.Range(1, count)];
+        int from = Math.Max(2, current - 1), to = Math.Min(count - 1, current + 1);
+        if (current <= 3) { from = 2; to = 5; }
+        else if (current >= count - 2) { from = count - 4; to = count - 1; }
+        var numbers = new List<int> { 1 };
+        if (from > 2) numbers.Add(0);
+        for (int n = from; n <= to; n++) numbers.Add(n);
+        if (to < count - 1) numbers.Add(0);
+        numbers.Add(count);
+        return numbers;
     }
 
     private void Show(DiscoverResult page, ForYouSource source)
@@ -366,7 +401,8 @@ public sealed partial class ForYouShelfViewModel : ObservableObject, IDisposable
         if (_disposed || _source is not { } source) return Task.CompletedTask;
         _undo?.Cancel(); HasUndo = false; _dismissed = null;
         source.ResetLearning();
-        _page = null; Picks.Clear(); PageTabs.Clear(); OnPropertyChanged(nameof(HasPageTabs));
+        _page = null; Picks.Clear(); _pages = []; PageTabs.Clear();
+        OnPropertyChanged(nameof(HasPageTabs)); OnPropertyChanged(nameof(CanPreviousPage)); OnPropertyChanged(nameof(CanNextPage));
         return LoadAsync(true);
     }
 
@@ -384,9 +420,11 @@ public sealed partial class ForYouShelfViewModel : ObservableObject, IDisposable
 /// <summary>One of the shelf's page numbers (owner #139).</summary>
 public sealed partial class ForYouPageTab : ObservableObject
 {
-    internal ForYouPageTab(int number, DiscoverResult page) { Number = number; Page = page; }
+    internal ForYouPageTab(int number) => Number = number;
+    /// <summary>The page's number; 0 for a gap between numbers.</summary>
     public int Number { get; }
-    internal DiscoverResult Page { get; }
+    public bool IsGap => Number == 0;
+    public string Label => IsGap ? "…" : Number.ToString();
     [ObservableProperty] private bool _isCurrent;
 }
 

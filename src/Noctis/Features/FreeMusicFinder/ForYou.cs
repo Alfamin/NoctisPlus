@@ -33,7 +33,10 @@ internal sealed record DiscoverResult(List<DiscoverSong> Songs, List<DiscoverArt
 /// <summary>What Discover leaves out or rests besides owned and dismissed songs: recordings already heard, and what earlier pages taught.
 /// <paramref name="Liked"/>: the listener's best-liked recordings, for songs like them; null builds the artist-only page of Milestone C
 /// (kept runnable for the comparison).</summary>
-internal sealed record DiscoverContext(IReadOnlySet<string> Familiar, DiscoverLearning Learning, DateTimeOffset Now, IReadOnlyList<TasteRecording>? Liked = null);
+/// <summary><paramref name="OnPages"/>: recordings on the pages the shelf keeps (owner #139). A new page leaves them to those pages and
+/// only falls back on them when nothing fresh is left.</summary>
+internal sealed record DiscoverContext(IReadOnlySet<string> Familiar, DiscoverLearning Learning, DateTimeOffset Now, IReadOnlyList<TasteRecording>? Liked = null,
+    IReadOnlySet<string>? OnPages = null);
 
 /// <summary>The listener's taste in artists, from what they play and what they own. Nothing leaves the computer.</summary>
 internal static class Taste
@@ -454,17 +457,19 @@ internal static class Discover
     public const int Shelf = 20, PerSeed = 6, OwnArtists = 8;
     /// <summary>Songs kept per liked recording (after every filter), so one loved song cannot fill the shelf.</summary>
     public const int PerLiked = 3;
+    /// <summary>What a song already on a kept page keeps of its score on a new page: it comes back only when nothing fresh is left.</summary>
+    public const double KeptPageShare = 0.05;
 
     /// <summary>The page for a listener: what earlier pages taught, their taste, and the songs. <see cref="ForYouSource"/>'s build,
     /// and the evaluation's, so both run the same steps. <paramref name="songs"/>: false builds Milestone C's artist-only page.</summary>
     public static Task<DiscoverResult> ForListenerAsync(IReadOnlyList<TastePlay> plays, IReadOnlyList<LocalSong> library, IReadOnlyList<TastePlaylist> playlists,
         DiscoverFeedback feedback, DiscoverHidden hidden, IDiscoverCatalog catalog, Func<IReadOnlyList<CatalogSong>, CancellationToken, Task<HashSet<string>>> unavailable,
-        IProgress<string>? progress, DateTimeOffset now, CancellationToken ct, bool songs = true)
+        IProgress<string>? progress, DateTimeOffset now, CancellationToken ct, bool songs = true, IReadOnlySet<string>? onPages = null)
     {
         var learning = feedback.Learn(plays, library, playlists);
         var liked = new List<TasteRecording>();
         var seeds = Taste.Seeds(plays.Concat(learning.Saves), library, now.UtcDateTime, playlists: playlists, liked: liked);
-        return BuildAsync(seeds, catalog, unavailable, hidden, progress, ct, context: new(TasteSources.Familiar(plays, now.UtcDateTime), learning, now, songs ? liked : null));
+        return BuildAsync(seeds, catalog, unavailable, hidden, progress, ct, context: new(TasteSources.Familiar(plays, now.UtcDateTime), learning, now, songs ? liked : null, onPages));
     }
 
     public static async Task<DiscoverResult> BuildAsync(IReadOnlyList<TasteSeed> seeds, IDiscoverCatalog catalog,
@@ -475,6 +480,9 @@ internal static class Discover
         var learning = context?.Learning ?? DiscoverLearning.None;
         var now = context?.Now ?? DateTimeOffset.UtcNow;
         var liked = context?.Liked;
+        var onPages = context?.OnPages;
+        // Owner #139: the same songs in the same places on every page. A song on a kept page is still there to go back to.
+        double Rest(string identity) => learning.Rest(identity, now) * (onPages?.Contains(identity) == true ? KeptPageShare : 1);
         if (seeds.Count == 0) return new([], [], "Play some music first: For you learns from what you listen to and what you own.");
         // Candidate artists by name: the listener's own (their missing songs) and the ones their listeners also play.
         var score = new Dictionary<string, double>(StringComparer.Ordinal);
@@ -572,15 +580,17 @@ internal static class Discover
             resolved[key] = artist; found++;
             // Scored by the catalog's own order, so leaving one song out never lifts or lowers the others.
             var top = new List<(CatalogSearchSong Song, double Kept)>();
-            for (int n = 0; n < candidates.Count && top.Count < SongsPerArtist; n++)
+            int fresh = 0; // songs on a kept page do not take an artist's places: the next ones in its list get them
+            for (int n = 0; n < candidates.Count && fresh < SongsPerArtist; n++)
             {
                 var s = candidates[n];
                 if (hidden.HidesSong(s.Song) || !Credits(s.Song, artist, key)) continue;
                 var identity = DiscoverIdentity.Key(s.Song);
                 if (familiar.Contains(identity)) { heard++; continue; }
-                var rest = learning.Rest(identity, now);
+                var rest = Rest(identity);
                 if (rest <= 0) { rested++; continue; }
                 top.Add((s, rest * (1 - 0.07 * Math.Min(n, 12))));
+                if (onPages?.Contains(identity) != true) fresh++;
             }
             foreach (var (song, kept) in top)
                 songs.Add((song, value * kept * learning.ArtistFactor(DiscoverIdentity.Artist(song.Song.Artists[0].Name)), key, SeedOf(key), null));
@@ -605,7 +615,7 @@ internal static class Discover
                 if (key.Length == 0 || hidden.HidesSong(s.Song) || !Credits(s.Song, s.Song.Artists[0], key)) continue;
                 var identity = DiscoverIdentity.Key(s.Song);
                 if (identity == itself || familiar.Contains(identity)) { heard++; continue; }
-                var rest = learning.Rest(identity, now);
+                var rest = Rest(identity);
                 if (rest <= 0) { rested++; continue; }
                 list.Add((s, value * rest * (1 - 0.05 * Math.Min(n, 12)) * learning.ArtistFactor(key), key, own.Contains(key) ? key : seed, like));
             }
@@ -782,7 +792,7 @@ internal sealed class ForYouSource(Func<ArtistCatalog> catalog, DiscoveryActions
     private readonly ForYouCache _earlierFile = new(Path.Combine(Path.GetDirectoryName(Path.GetFullPath(hiddenPath))!, "for-you-pages.json"));
     private List<ForYouCache.Page>? _earlier;
     /// <summary>How many pages the shelf can go back through, the current one included.</summary>
-    public const int PagesKept = 5;
+    public const int PagesKept = 10;
     private readonly SemaphoreSlim _build = new(1, 1);
     private readonly object _sync = new();
     private readonly CancellationTokenSource _lifetime = new();
@@ -830,6 +840,10 @@ internal sealed class ForYouSource(Func<ArtistCatalog> catalog, DiscoveryActions
         }
     }
 
+    /// <summary>Recordings the listener now knows (listened to since a page was made): a page shown again leaves them out (owner #139).</summary>
+    public Task<HashSet<string>> FamiliarAsync(CancellationToken ct) =>
+        Task.Run(() => TasteSources.Familiar(TasteSources.Load(noctisData), _now().UtcDateTime), ct);
+
     private DiscoverResult Filter(DiscoverResult result) => result with
     {
         Songs = result.Songs.Where(s => !Hidden.HidesSong(s.Track.Song)).ToList(),
@@ -851,11 +865,18 @@ internal sealed class ForYouSource(Func<ArtistCatalog> catalog, DiscoveryActions
                 invalidation = _invalidation;
             }
             progress?.Report("Learning your taste…");
+            HashSet<string> onPages;
+            lock (_sync)
+            {
+                _earlier ??= _earlierFile.ReadEarlier(_now(), PagesKept - 1);
+                var kept = _last is { } current ? _earlier.Prepend(current) : _earlier;
+                onPages = kept.SelectMany(p => p.Result.Songs.Take(Discover.Shelf)).Select(s => DiscoverIdentity.Key(s.Track.Song)).ToHashSet(StringComparer.Ordinal);
+            }
             var songs = await library.SnapshotAsync();
             // Reading the history, learning, taste and ranking are seconds of work on a large profile: none of it on the UI
             // thread (awaiting there would bring every step after the first lookup back to it).
             var result = await Task.Run(() => Discover.ForListenerAsync(TasteSources.Load(noctisData), songs, TasteSources.Playlists(noctisData), Feedback, Hidden,
-                discover?.Invoke() ?? new CatalogForDiscover(catalog, localAlbums, similar ?? (() => null), lastFm), unavailable ?? Unavailable, progress, _now(), ct), ct);
+                discover?.Invoke() ?? new CatalogForDiscover(catalog, localAlbums, similar ?? (() => null), lastFm), unavailable ?? Unavailable, progress, _now(), ct, onPages: onPages), ct);
             ct.ThrowIfCancellationRequested();
             lock (_sync)
             {

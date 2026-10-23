@@ -132,6 +132,9 @@
             <Setter Property="Background" Value="{DynamicResource AccentColorBrush}" />
             <Setter Property="Foreground" Value="White" />
         </Style>
+        <Style Selector="Button.page-number:disabled">
+            <Setter Property="Opacity" Value="0.35" />
+        </Style>
 
         <!-- Home's album tiles: bare cover + two text lines, no plate, no press zoom. -->
         <Style Selector="Button.foryou-tile">
@@ -296,20 +299,36 @@
                     </ItemsControl.ItemTemplate>
                 </ItemsControl>
 
-                <!-- Owner #139: back to earlier pages, so a Refresh never loses songs not listened to yet. 1 is the newest. -->
-                <ItemsControl ItemsSource="{Binding PageTabs}" IsVisible="{Binding HasPageTabs}" Margin="2,0,0,4">
-                    <ItemsControl.ItemsPanel>
-                        <ItemsPanelTemplate><StackPanel Orientation="Horizontal" Spacing="6" /></ItemsPanelTemplate>
-                    </ItemsControl.ItemsPanel>
-                    <ItemsControl.ItemTemplate>
-                        <DataTemplate x:DataType="vm:ForYouPageTab">
-                            <Button Classes="page-number" Classes.current="{Binding IsCurrent}" Content="{Binding Number}"
-                                    AutomationProperties.Name="{Binding Number, StringFormat='Page {0}'}"
-                                    Command="{Binding $parent[UserControl].((vm:ForYouShelfViewModel)DataContext).ShowPageCommand}"
-                                    CommandParameter="{Binding}" />
-                        </DataTemplate>
-                    </ItemsControl.ItemTemplate>
-                </ItemsControl>
+                <!-- Owner #139: back to earlier pages, so a Refresh never loses songs not listened to yet. 1 is the newest.
+                     A compact centered pager, as on most sites: ‹ 1 2 3 … 10 ›, never wider than seven numbers. -->
+                <StackPanel Orientation="Horizontal" Spacing="4" HorizontalAlignment="Center" Margin="0,2,0,6" IsVisible="{Binding HasPageTabs}">
+                    <Button Classes="page-number" IsEnabled="{Binding CanPreviousPage}" Command="{Binding PreviousPageCommand}"
+                            ToolTip.Tip="Newer" AutomationProperties.Name="Newer page">
+                        <Path Data="M 5,0 L 0,5 L 5,10" Stroke="{Binding $parent[Button].Foreground}" StrokeThickness="1.6"
+                              StrokeLineCap="Round" StrokeJoin="Round" Width="6" Height="10" Stretch="None" />
+                    </Button>
+                    <ItemsControl ItemsSource="{Binding PageTabs}">
+                        <ItemsControl.ItemsPanel>
+                            <ItemsPanelTemplate><StackPanel Orientation="Horizontal" Spacing="4" /></ItemsPanelTemplate>
+                        </ItemsControl.ItemsPanel>
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate x:DataType="vm:ForYouPageTab">
+                                <Panel>
+                                    <TextBlock Text="…" IsVisible="{Binding IsGap}" Width="20" TextAlignment="Center" VerticalAlignment="Center" Opacity="0.5" />
+                                    <Button Classes="page-number" Classes.current="{Binding IsCurrent}" Content="{Binding Label}" IsVisible="{Binding !IsGap}"
+                                            AutomationProperties.Name="{Binding Number, StringFormat='Page {0}'}"
+                                            Command="{Binding $parent[UserControl].((vm:ForYouShelfViewModel)DataContext).ShowPageCommand}"
+                                            CommandParameter="{Binding}" />
+                                </Panel>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                    <Button Classes="page-number" IsEnabled="{Binding CanNextPage}" Command="{Binding NextPageCommand}"
+                            ToolTip.Tip="Older" AutomationProperties.Name="Older page">
+                        <Path Data="M 0,0 L 5,5 L 0,10" Stroke="{Binding $parent[Button].Foreground}" StrokeThickness="1.6"
+                              StrokeLineCap="Round" StrokeJoin="Round" Width="6" Height="10" Stretch="None" />
+                    </Button>
+                </StackPanel>
 
                 <!-- A quiet line at the end (owner: not important enough for the top): why the
                      shelf is empty, that an old page is shown, or which artists could not load. -->
