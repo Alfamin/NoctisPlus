@@ -1,6 +1,13 @@
 {
   "releases": [
     {
+      "version": "2.3.3",
+      "added": [
+        { "icon": "PlaylistsIcon", "title": "The queue scrolls as you drag", "line": "Hold a song near the top or bottom edge to move it further" }
+      ],
+      "fixed": []
+    },
+    {
       "version": "2.3.2",
       "added": [
         { "icon": "RailInfoIcon", "title": "Every update you missed", "line": "Biggest changes first; all of them in Settings → About", "setting": "about", "top": true }
