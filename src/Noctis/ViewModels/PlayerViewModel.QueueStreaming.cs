@@ -5,7 +5,7 @@ using Noctis.Services.Search;
 namespace Noctis.ViewModels;
 
 /// <summary>What a stand-in in the queue is (owner #95): a playlist song not on this computer yet.</summary>
-/// <param name="Page">Owner #100: the page it was played from ("playlist:…", "album:…", "artist:…"); its header toggle
+/// <param name="Page">Owner #100: the page it was played from ("playlist:…", "album:…", "artist:…", "foryou"); its header toggle
 /// decides whether that page's songs you don't have play.</param>
 public sealed record PendingStream(IOnlineMusicSearch Source, OnlineSong Song, bool Keep, string? Page = null);
 
@@ -198,6 +198,38 @@ public partial class PlayerViewModel
         var fetching = _preparingStandIn != null;
         DropStandIns();
         if (fetching) { CancelOnlinePlayback(); IsPreparingOnlinePlayback = false; AdvanceQueue(QueueAdvanceReason.Error); }
+    }
+
+    /// <summary>Stand-ins from the For you shelf (owner #143); no header toggle, so only Play songs you don't have decides.</summary>
+    internal const string ForYouPage = "foryou";
+
+    /// <summary>
+    /// Owner #143: a For you song plays with the rest of the page shown (only that page) as the queue, from this song on, or
+    /// shuffled around it, like a playlist row. False when the song should play alone instead: Play songs you don't have is
+    /// off, or it is the song already playing (that click pauses or resumes it).
+    /// </summary>
+    internal bool PlayOnlinePage(IOnlineMusicSearch source, IReadOnlyList<OnlineSong> songs, int at)
+    {
+        if (at < 0 || at >= songs.Count || !StreamsPage(ForYouPage) || OnlinePlayingSongId == songs[at].Id) return false;
+        PlayFromRow(songs.Select(s => StandIn(source, s, keep: false, ForYouPage)).ToList(), at);
+        return true;
+    }
+
+    /// <summary>
+    /// Owner #144: Not for me on the song playing, or being fetched to play, goes on to the next song (or pauses at the end of
+    /// the queue); the song also leaves the songs to come.
+    /// </summary>
+    internal void SkipDismissed(OnlineSong song)
+    {
+        bool Same(Track t) => t.PendingStream is PendingStream p && p.Song.Id == song.Id;
+        for (int i = UpNext.Count - 1; i >= 0; i--)
+            if (Same(UpNext[i])) UpNext.RemoveAt(i);
+        _repeatCycleTracks.RemoveAll(Same);
+        var fetching = _onlinePreparingSongId == song.Id;
+        if (OnlinePlayingSongId != song.Id && !fetching) return;
+        if (CanGoNext()) { NextCommand.Execute(null); return; }
+        if (fetching) { CancelOnlinePlayback(); IsPreparingOnlinePlayback = false; return; }
+        if (State == PlaybackState.Playing) { _audioPlayer.Pause(); State = PlaybackState.Paused; }
     }
 
     private void WireQueueStreaming()

@@ -41,6 +41,8 @@ public sealed partial class SearchViewModel : ViewModelBase, ISearchable, IDispo
         _library = library;
         _player = player;
         ForYou.PlayRequested = (source, song) => player.PlayOnlineAsync(source, song);
+        ForYou.PlayPageRequested = player.PlayOnlinePage;
+        ForYou.DismissRequested = player.SkipDismissed;
         _openArtist = openArtist;
         _openAlbum = openAlbum;
         _index = new LibrarySearchIndex(library);

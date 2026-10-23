@@ -106,6 +106,7 @@ try
     TelegramSignInTests.Run();
     StreamingPlaylistImportTests.Run();
     NativeForYouTests.Run();
+    NativeForYouTests.RunPager();
     DiscoverReplayChecks.Run();
     WindowTests.Run(string.IsNullOrEmpty(pictures) ? null : pictures);
     PlaylistWindowTests.Run(pictures);

@@ -311,4 +311,37 @@ public class QueueStreamingTests
         await Until(() => false); // let the reconcile run
         Assert.Equal(new[] { b, c }, player.UpNext);
     }
+
+    private static OnlineSong Song(string id) => new(id, "Online " + id, "Synthetic", Seconds: 180);
+    private static string[] Ahead(PlayerViewModel player) => player.UpNext.Select(t => t.PendingStream is PendingStream p ? p.Song.Id : t.Title).ToArray();
+
+    /// <summary>Owner #143: a For you song plays with the rest of the page shown as the queue, not the old queue.</summary>
+    [AvaloniaFact]
+    public void AForYouSong_QueuesThePageShown_FromThatSong()
+    {
+        var source = new Source(); var (player, _) = NewPlayer();
+        player.ReplaceQueueAndPlay([Local("Old"), Local("Library")], 0); Settle();
+        Assert.True(player.PlayOnlinePage(source, [Song("a"), Song("b"), Song("c"), Song("d")], 1)); Settle();
+        Assert.Equal([("b", false)], source.Asked);                   // only streamed, like any For you play
+        Assert.Equal(new[] { "c", "d" }, Ahead(player));
+        player.StreamMissingSongs = false;
+        Assert.False(player.PlayOnlinePage(source, [Song("a"), Song("b")], 0)); // plays alone instead
+    }
+
+    /// <summary>Owner #144: Not for me on the song playing goes on to the next one; a dismissed song to come leaves the queue.</summary>
+    [AvaloniaFact]
+    public async Task NotForMe_OnThePlayingSong_SkipsToTheNext_AndLeavesTheQueue()
+    {
+        var source = new Source(); var (player, _) = NewPlayer();
+        Assert.True(player.PlayOnlinePage(source, [Song("a"), Song("b"), Song("c"), Song("d")], 0)); Settle();
+        var real = Local("A");
+        source.Pending["a"].SetResult(real);
+        await Until(() => ReferenceEquals(player.CurrentTrack, real));
+        player.SkipDismissed(Song("c")); Settle();                     // not playing: only leaves the queue
+        Assert.Same(real, player.CurrentTrack);
+        Assert.Equal(new[] { "b", "d" }, Ahead(player));
+        player.SkipDismissed(Song("a")); Settle();
+        Assert.Contains(("b", false), source.Asked);                  // the next song is on its way
+        Assert.Equal(new[] { "d" }, Ahead(player));
+    }
 }

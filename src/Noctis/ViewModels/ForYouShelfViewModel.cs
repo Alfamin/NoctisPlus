@@ -21,6 +21,10 @@ public sealed partial class ForYouShelfViewModel : ObservableObject, IDisposable
     private long _generation;
     private bool _active, _disposed;
     internal Func<IOnlineMusicSearch, OnlineSong, Task>? PlayRequested { get; set; }
+    /// <summary>Plays the page from a song as the queue; false: play the song alone (<see cref="PlayRequested"/>).</summary>
+    internal Func<IOnlineMusicSearch, IReadOnlyList<OnlineSong>, int, bool>? PlayPageRequested { get; set; }
+    /// <summary>Not for me: the player skips the song if it is playing and drops it from the queue (owner #144).</summary>
+    internal Action<OnlineSong>? DismissRequested { get; set; }
     private long _playGeneration;
 
     public ForYouShelfViewModel()
@@ -196,16 +200,19 @@ public sealed partial class ForYouShelfViewModel : ObservableObject, IDisposable
         try
         {
             var page = await WithoutOwned(_pages[index], stop.Token);
-            if (!_disposed && generation == _generation && !stop.IsCancellationRequested && ReferenceEquals(source, _source)) Show(page, source);
+            if (!_disposed && generation == _generation && !stop.IsCancellationRequested && ReferenceEquals(source, _source)) Show(page, source, index);
         }
         catch (OperationCanceledException) when (stop.IsCancellationRequested) { }
     }
 
-    private void UpdatePageTabs(ForYouSource source)
+    /// <param name="opened">The kept page just opened. Owner #145: a page saved by 2.2.0 has no name (Batch), so it is found by
+    /// where it was opened from; matching names alone put every such page at 1 and the pager stuck.</param>
+    private void UpdatePageTabs(ForYouSource source, int? opened = null)
     {
         _pages = source.Pages();
         var shown = _page?.Batch ?? "";
-        _pageIndex = Math.Max(0, _pages.ToList().FindIndex(p => p.Batch.Length > 0 && p.Batch == shown));
+        var at = shown.Length > 0 ? _pages.ToList().FindIndex(p => p.Batch == shown) : -1;
+        _pageIndex = at >= 0 ? at : opened is int i && i < _pages.Count ? i : 0;
         PageTabs.Clear();
         if (_pages.Count > 1)
             foreach (var number in PagerNumbers(_pages.Count, _pageIndex + 1))
@@ -229,7 +236,7 @@ public sealed partial class ForYouShelfViewModel : ObservableObject, IDisposable
         return numbers;
     }
 
-    private void Show(DiscoverResult page, ForYouSource source)
+    private void Show(DiscoverResult page, ForYouSource source, int? opened = null)
     {
         _page = page;
         Picks.Clear();
@@ -244,7 +251,7 @@ public sealed partial class ForYouShelfViewModel : ObservableObject, IDisposable
         if (Picks.Count == 0 && Status.Length == 0) Status = "No new picks right now. Listen to more music, then refresh.";
         RefreshDownloadStates();
         RecordShown();
-        UpdatePageTabs(source);
+        UpdatePageTabs(source, opened);
     }
 
     /// <summary>The page counts as shown once it is on screen: the shelf active and open. Recorded once per page, so
@@ -303,6 +310,9 @@ public sealed partial class ForYouShelfViewModel : ObservableObject, IDisposable
         if (!online.CanDownload) { online.RequestSignIn(); return; }
         Record(pick, DiscoverAction.Play);
         var generation = ++_playGeneration;
+        // Owner #143: the page shown becomes the queue (only this page, not the kept ones), from this song on.
+        var page = Picks.Select(p => p.Song.Online).OfType<OnlineSong>().ToList();
+        if (PlayPageRequested?.Invoke(online, page, page.IndexOf(song)) == true) { Status = ""; return; }
         try
         {
             Status = ""; // the step icon shows the progress (owner #54)
@@ -360,6 +370,7 @@ public sealed partial class ForYouShelfViewModel : ObservableObject, IDisposable
         var stop = _undo = new();
         _dismissed = (pick, Picks.IndexOf(pick), _page, source);
         Picks.Remove(pick);
+        if (pick.Song.Online is { } song) DismissRequested?.Invoke(song);
         UndoLabel = "Hidden · " + pick.Song.Title;
         HasUndo = true;
         _ = ExpireUndo(stop);

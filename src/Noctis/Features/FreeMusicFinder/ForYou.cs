@@ -888,7 +888,7 @@ internal sealed class ForYouSource(Func<ArtistCatalog> catalog, DiscoveryActions
                 if (_last is { Result.Songs.Count: > 0 } previous && previous.Result.Batch != result.Batch)
                 {
                     _earlier ??= _earlierFile.ReadEarlier(_now(), PagesKept - 1);
-                    _earlier = [previous, .. _earlier.Where(p => p.Result.Batch != previous.Result.Batch).Take(PagesKept - 2)];
+                    _earlier = [previous, .. _earlier.Where(p => string.IsNullOrEmpty(p.Result.Batch) || p.Result.Batch != previous.Result.Batch).Take(PagesKept - 2)];
                     _earlierFile.WriteEarlier(_earlier);
                 }
                 _last = new(1, _now(), until, result); _revision++;

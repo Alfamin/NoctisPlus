@@ -733,7 +733,7 @@
                     <!-- Forward button -->
                     <Button Classes="pill-btn transport-btn"
                             Command="{Binding NextCommand}"
-                            ToolTip.Tip="{loc:T PlaybackBar.ForwardTip}"
+                            ToolTip.Tip="{loc:T PlaybackBar.ForwardTip}" AutomationProperties.Name="{loc:T PlaybackBar.ForwardTip}"
                             Width="34" Height="34">
                         <Viewbox Width="18" Height="18">
                             <Canvas Width="24" Height="24">

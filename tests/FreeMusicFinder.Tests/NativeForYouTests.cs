@@ -91,4 +91,43 @@ internal static class NativeForYouTests
         online.Detach();
         Dispatcher.UIThread.RunJobs();
     }
+
+    /// <summary>Owner #145: a page saved by 2.2.0 has no name (Batch). As the oldest kept page it could not be opened: the
+    /// pager took it for page 1, so its number and the arrow showed the same page again and again.</summary>
+    internal static void RunPager()
+    {
+        Check.Section("native For you shelf: every kept page opens, a 2.2.0 page too");
+        var folder = Check.NewFolder("native-for-you-pager");
+        var library = new SpotifyPlaylistTests.Library();
+        var now = DateTimeOffset.UtcNow;
+        ForYouCache.Page Page(string batch, int first, int ageHours) => new(1, now.AddHours(-ageHours), now.AddDays(1),
+            new(Enumerable.Range(first, 3).Select(i => new DiscoverSong(new(DiscoveryTests.Song("deezer:" + i, "Song " + i), DiscoveryTests.Orbit), 1, "Because you play North Star")).ToList(), [], "", Batch: batch));
+        new ForYouCache(Path.Combine(folder, "for-you-last.json")).Write(Page("page-new", 300, 0));
+        new ForYouCache(Path.Combine(folder, "for-you-pages.json")).WriteEarlier([Page("page-mid", 200, 1), Page("", 100, 2)]);
+        var http = new DiscoveryTests.Http { Offline = true };
+        using var catalog = DiscoveryTests.Catalog(Path.Combine(folder, "catalog"), http);
+        using var downloads = new Downloads(_ => { });
+        var actions = new DiscoveryActions(library, downloads, _ => throw new Exception("No transfer is allowed in this fixture"), () => folder, () => false);
+        using var pages = new CatalogPages(() => catalog, actions, _ => { }, () => true, library: () => null);
+        var online = new FinderOnlineSearch(() => catalog, actions, pages, () => true, () => { });
+        using var source = new ForYouSource(() => catalog, actions, _ => [], library, null, Path.Combine(folder, "hidden.json"));
+        using var vm = new ForYouShelfViewModel(source, online, actions);
+        vm.SetActive(true);
+        Check.Until(() => !vm.IsLoading && vm.Picks.Count == 3 && vm.PageTabs.Count == 3, "three kept pages give three page numbers");
+        string Shown() => vm.Picks[0].Song.Online!.Id;
+        string Current() => string.Join(",", vm.PageTabs.Where(t => t.IsCurrent).Select(t => t.Number));
+        vm.ShowPageCommand.Execute(vm.PageTabs[2]);
+        Check.Until(() => Shown() == "deezer:100", "page 3 (saved by 2.2.0, no name) opens");
+        Check.Equal("3", Current(), "the pager marks page 3 as the one on screen");
+        Check.False(vm.CanNextPage, "there is no page after the oldest");
+        vm.PreviousPageCommand.Execute(null);
+        Check.Until(() => Shown() == "deezer:200", "the arrow goes from page 3 to page 2");
+        Check.Equal("2", Current(), "the pager follows to page 2");
+        vm.NextPageCommand.Execute(null);
+        Check.Until(() => Shown() == "deezer:100", "and back to page 3");
+        vm.ShowPageCommand.Execute(vm.PageTabs[0]);
+        Check.Until(() => Shown() == "deezer:300", "page 1 opens again");
+        online.Detach();
+        Dispatcher.UIThread.RunJobs();
+    }
 }
