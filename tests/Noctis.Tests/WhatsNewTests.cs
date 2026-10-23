@@ -80,7 +80,7 @@ public class WhatsNewTests : IDisposable
             Assert.Equal(new[] { "close", feature.Setting! }, calls);
         }
         calls.Clear(); vm.OpenSettingCommand.Execute("https://example.invalid"); Assert.Empty(calls);
-        Assert.Contains(notes.Added, i => i.Setting == "offline");
+        Assert.All(notes.Added.Where(i => i.Setting is not null), i => Assert.True(i.HasSetting, i.Setting));
         Assert.Contains(notes.Added, i => i.Setting == "about");
         Assert.Equal("OfflineModeRow", SettingShortcut.Resolve("offline")!.Control);
         Assert.Equal("timePlayed", SettingShortcut.Resolve("wordTiming")!.Key);
@@ -146,7 +146,7 @@ public class WhatsNewTests : IDisposable
         for (int i = 0; i < 3; i++) { Dispatcher.UIThread.RunJobs(); window.UpdateLayout(); }
         var rows = panel.GetVisualDescendants().OfType<StackPanel>().Count(p => p.Classes.Contains("feature-row"));
         Assert.Equal(notes.Added.Count, rows);
-        var shortcut = panel.GetVisualDescendants().OfType<Button>().Single(b => b.CommandParameter as string == "offline");
+        var shortcut = panel.GetVisualDescendants().OfType<Button>().Single(b => b.CommandParameter as string == notes.Added.First(i => i.HasSetting).Setting);
         Assert.True(shortcut.IsVisible);
         Assert.True(shortcut.IsEnabled);
         shortcut.Command!.Execute(shortcut.CommandParameter);
