@@ -35,6 +35,7 @@ public class DiscoverReliabilityTests : IDisposable
         public async Task<CatalogArtist?> FindByNameAsync(string name, CancellationToken ct) { await Go("find:" + name, ct); return await world.FindByNameAsync(name, ct); }
         public async Task<List<SimilarArtist>> SimilarAsync(TasteSeed seed, CatalogArtist? artist, CancellationToken ct) { await Go("similar:" + seed.Name, ct); return await world.SimilarAsync(seed, artist, ct); }
         public async Task<List<CatalogSearchSong>> TopSongsAsync(CatalogArtist artist, CancellationToken ct) { await Go("top:" + artist.Name, ct); return await world.TopSongsAsync(artist, ct); }
+        public async Task<List<CatalogSearchSong>> SongsLikeAsync(TasteRecording liked, CancellationToken ct) { await Go("like:" + liked.Artist, ct); return await world.SongsLikeAsync(liked, ct); }
     }
 
     private (ForYouSource Source, Switchable Catalog, DiscoverEvaluationTests.Persona Persona) Source(string persona = "steady", Func<ArtistCatalog>? real = null)
@@ -73,7 +74,9 @@ public class DiscoverReliabilityTests : IDisposable
     {
         var (source, catalog, _) = Source();
         using var _ = source;
-        catalog.Before = (what, _) => what.StartsWith("similar:", StringComparison.Ordinal) ? throw new HttpRequestException("Last.fm and ListenBrainz down") : Task.CompletedTask;
+        // Similar artists and Deezer's radio both down: only the listener's own artists are left.
+        catalog.Before = (what, _) => what.StartsWith("similar:", StringComparison.Ordinal) || what.StartsWith("like:", StringComparison.Ordinal)
+            ? throw new HttpRequestException("Last.fm, ListenBrainz and Deezer radio down") : Task.CompletedTask;
         var page = await source.BuildAsync(true, null, CancellationToken.None);
         Assert.NotEmpty(page.Songs);
         Assert.False(page.Unreachable);

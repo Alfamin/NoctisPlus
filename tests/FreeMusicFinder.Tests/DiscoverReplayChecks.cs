@@ -4,7 +4,7 @@ using System.Text.Json;
 namespace FreeMusicFinder.Tests;
 
 /// <summary>The owner's local replay (Milestone C) on a synthetic data folder whose catalog was saved by a real build:
-/// it compares both engines from the saved catalog, sends nothing, writes nothing and prints no titles or names.</summary>
+/// it compares the engines from the saved catalog, sends nothing, writes nothing and prints no titles or names.</summary>
 internal static class DiscoverReplayChecks
 {
     internal static void Run()
@@ -42,7 +42,7 @@ internal static class DiscoverReplayChecks
         if (Environment.GetEnvironmentVariable("FMF_SHOW_REPLAY") is { Length: > 0 }) Console.WriteLine(report);
         Check.Equal(calls, http.Calls.Count, "the replay sends no request, not even to the test's own handler");
         Check.Equal(before, Hashes(), "the replay changes no file in the copy");
-        Check.True(report.Contains("Both engines on your saved catalog") && report.Contains("before ") && report.Contains("now "), "both engines run from the saved catalog");
+        Check.True(report.Contains("The engines on your saved catalog") && report.Contains("before ") && report.Contains("artists ") && report.Contains("now "), "the three engines run from the saved catalog");
         Check.True(System.Text.RegularExpressions.Regex.IsMatch(report, @"now\s+cards\s+[1-9]"), "the current engine finds songs in the saved catalog");
         Check.False(report.Contains("North Star") || report.Contains("Missing") || report.Contains("Night") || report.Contains("Orbit"), "the report prints counts only, no artist or song names");
     }

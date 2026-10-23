@@ -161,7 +161,11 @@ a G7 test, before any model code. There's no feature storage, vector database or
 
 C's synthetic comparison crossed stopping rule S2: the top-3 share is still 48–62 % on three of four personas. Re-ranking
 within an artist's top songs can't fix that, because the candidates *are* each artist's top songs. The lever is a
-**new candidate source** that names songs rather than artists. Not built.
+**new candidate source** that names songs rather than artists.
+
+> **Update: built after D, key-free first** (`discover-plan.md`, section 10). The owner chose Deezer's artist radio as the
+> primary source, because most users have no Last.fm key. Last.fm `track.getSimilar` runs only when a key is entered. The outline
+> below is the pre-build plan, kept for the record.
 
 **Smallest option: Last.fm `track.getSimilar`.**
 - **Parameters:** `artist` and `track` (or `mbid`), `limit`, `autocorrect`, `api_key`; no user authentication. Source:

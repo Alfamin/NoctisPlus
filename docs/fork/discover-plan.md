@@ -2,8 +2,8 @@
 
 Branch `discover-a`, started from `native` at v2.2.0 (`11995e63`), draft PR Alfamin/NoctisPlus#12 into `main`.
 **Done:** Milestones A, B, C (criteria in section 5, written before measuring; results in section 6) and D (the model gate:
-no-go, section 7 and `discover-model-gate.md`). **Next:** only what the owner approves; track-level retrieval is outlined in the
-gate's section 6. Never merge, push to `main`/`native`, or tag.
+no-go, section 7 and `discover-model-gate.md`), then song-to-song candidates (section 10: Deezer artist radio, plus Last.fm
+`track.getSimilar` with the user's own key). **Next:** only what the owner approves. Never merge, push to `main`/`native`, or tag.
 
 The milestones are the owner's (brief section 9):
 - **A. Working Discovery improvement:** ranking and identity audit; filtering, personalisation, novelty, diversity, song-level
@@ -215,8 +215,11 @@ Undo, Reset and pruning cannot leave stale statistics behind.
 - Pages cached by 2.2.0 (no `Batch`, `Seed` or `Own`) still load and are never counted as shown.
 - Undo retracts the dismissal's learning (Finder suite, view-model level).
 
-### What leaves the computer (unchanged by A and B; the privacy baseline for later sources)
+### What leaves the computer (A and B; section 10 adds two items, marked)
 - **Last.fm `artist.getSimilar`** (only with the user's own API key): a seed artist name.
+- **Last.fm `track.getSimilar`** (section 10; only with the user's own API key): the title and artist of each of up to 10
+  best-liked recordings.
+- **Deezer artist radio** (section 10): a Deezer artist ID only.
 - **MusicBrainz:** a seed artist name and up to 3 of the listener's song titles for that artist, to identify the right artist
   (namesake safety).
 - **ListenBrainz Labs similar artists:** an artist MBID.
@@ -407,7 +410,7 @@ The full gate is in [`discover-model-gate.md`](discover-model-gate.md). In short
 | B | ~$8–12 used | Two full local test runs again. |
 | C | ~$15–22 used | Six reliability fixes instead of the expected one, and four full local Finder-suite runs. |
 | D | ~$3–5 used | Primary-source reading through a restricted network; no code. |
-| Track-level retrieval (not started) | $8–14 | A new client, song candidates merged under the same filters, fixtures, tests; more if ListenBrainz. |
+| Song-to-song candidates (section 10) | ~$11–14 used | A third engine in the comparison, a place lookup for the top-3 metric, and full local runs. |
 
 ## 8. Acceptance criteria: verified vs pending
 
@@ -426,6 +429,12 @@ The full gate is in [`discover-model-gate.md`](discover-model-gate.md). In short
 **Checked by the owner on Windows (61d10fe, isolated test profile):** shelf opens and Refresh builds in 20 s; the first 20
 picks had 0 owned, 0 heard, 0 duplicate recordings and at most 3 per artist; one page with 12 cards in view and one Play
 recorded once; the played pick only streamed; Finder suite 1557 ok, 0 wrong.
+
+**Pending in the Windows app (section 10):**
+- a live For you build with and without a Last.fm key: Deezer's radio answers as the fixtures assume (`/artist/{id}/radio`,
+  a `data` list of track objects), and the shelf fills
+- then the replay (section 3) on a copy made after that build, for the real top-3 share of `artists` → `now`
+- the owner's approval of the changed Last.fm setting sentence
 
 **UI checks pending in the Windows app (C changes):**
 - the shelf keeps its picks on Refresh with the network off
@@ -449,16 +458,110 @@ recorded once; the played pick only streamed; Finder suite 1557 ok, 0 wrong.
   - `Discover.Shelf`, `PerSeed`, `OwnArtists`
   - `DiscoverLearning.Rest` and `ArtistFactor`
   - `DiscoverFeedback.Keep`, `MaxBatches`, `MaxInteractions`, `FrontOfShelf`, `Slack`
+- Song-to-song candidates (section 10): `Taste.Seeds(..., liked:)`, `IDiscoverCatalog.SongsLikeAsync`,
+  `CatalogForDiscover.SongsLikeAsync`, `ArtistCatalog.RadioAsync` (`CatalogRecommend.cs`), `LastFmSimilar.SimilarTracksAsync`; in
+  `Discover.BuildAsync` the song lists, the per-liked claim (`PerLiked`) and the turn-taking `Next`. `ForListenerAsync(songs: false)`
+  and `DiscoverContext.Liked == null` build Milestone C's page (the comparison's "artists" engine). Constants: `Taste.LikedRecordings`,
+  `Discover.PerLiked`, `CatalogForDiscover.LastFmSongLookups`. Tests: `DiscoverSongSourceTests`.
 - Model gate (D): `discover-model-gate.md`. The plug-in point for a future model is the per-song score in `Discover.BuildAsync`.
   Nothing is wired; re-open only if gate condition G1 (audio or embeddings for remote candidates) changes.
 - Known gap kept: plays are recorded only while True Shuffle is enabled (`PlayTracker` lives in `TrueShuffleService`). Moving it
   would change True Shuffle's lifecycle, so it needs the owner's approval.
 - Local runs on Linux:
   - Build: `dotnet build tests/Noctis.Tests/Noctis.Tests.csproj -c Release`
-  - Discover tests: `dotnet tests/Noctis.Tests/bin/Release/net10.0/Noctis.Tests.dll -class Noctis.Tests.DiscoverLearningTests -class Noctis.Tests.DiscoverTelemetryTests -class Noctis.Tests.DiscoverEvaluationTests -class Noctis.Tests.DiscoverReliabilityTests`
+  - Discover tests: `dotnet tests/Noctis.Tests/bin/Release/net10.0/Noctis.Tests.dll -class Noctis.Tests.DiscoverLearningTests -class Noctis.Tests.DiscoverTelemetryTests -class Noctis.Tests.DiscoverEvaluationTests -class Noctis.Tests.DiscoverReliabilityTests -class Noctis.Tests.DiscoverSongSourceTests`
   - The comparison table: set `DISCOVER_EVAL_REPORT` to a file path and run `-class Noctis.Tests.DiscoverEvaluationTests`.
   - Finder suite: `dotnet run --project tests/FreeMusicFinder.Tests -c Release`. On Linux, 7 checks fail on `native` too
     (Windows file locking and `C:\` paths). "after the restart the song finishes and is copied" failed once in four runs
     (a download-restart timing check, unrelated to Discover).
   - Full `Noctis.Tests` on Linux: 49 tests fail on `native` too (Windows paths, the updater, the Windows player, a socket
     broken-pipe); CI on Windows is the reference.
+
+## 10. Song-to-song candidates (after D)
+
+The owner's next step after D, key-free first: most users have no Last.fm key.
+
+### Source chosen: Deezer artist radio (`GET /artist/{id}/radio`)
+- **Why not ListenBrainz Labs `similar-recordings`?**
+  - The official ListenBrainz API reference (`docs/users/api/index.rst` in metabrainz/listenbrainz-server) doesn't list
+    Labs at all, so it has no documented contract.
+  - The query reads a table named `recording_dev`, and its algorithm names are discovered at run time.
+  - It needs a recording MBID per seed, which Noctis doesn't store: one more MusicBrainz lookup each, at 1 per second.
+- **Why Deezer radio?**
+  - It's on the host the catalog already uses, with no key and no account.
+  - It sends only a Deezer artist ID. The ID comes from the identity lookup the build already does for the listener's
+    artists.
+  - It answers for any Deezer artist, so coverage is the catalog's own.
+  - The cost is that it's seeded by a liked recording's **artist**, not the recording itself. Deezer's public API has no
+    song-seeded similarity.
+  - Deezer's documentation pages couldn't be read from this environment (developers.deezer.com is blocked). The response
+    is taken to be the same track list as `/artist/{id}/top`. That is an assumption, to be checked live on Windows.
+- **With the user's own Last.fm key, also `track.getSimilar`** for the same recordings.
+  - Its songs are found among their artists' catalog songs (the existing, cached `SongsByArtistNameAsync`), so Deezer still
+    gets only artist names.
+  - A song not in that list is left out, not guessed. That also limits it to each artist's top 25.
+  - At most 6 artist lookups per liked recording (`LastFmSongLookups`).
+- **The setting sentence** "Only artist names are sent to Last.fm" now reads "Only artist names and the titles of up to 10
+  songs you like are sent to Last.fm". Flagged in the PR for the owner's approval. No other text or UI changed: song cards
+  reuse "Because you play …" and "More from …".
+
+### What changed
+- **Seeds:** `Taste.Seeds(..., liked:)` returns the 10 recordings with the most of the same evidence Taste already weighs:
+  recent and lasting plays, favorites, ratings and the listener's own playlists. Never imports or merely owning a file.
+- **Same filters as every card:** dismissed, credited, heard (the liked recording itself included), rested, owned or
+  queued, one recording once.
+  - Each liked recording keeps at most `PerLiked` = 3 songs that no other liked recording took. Two liked songs by one
+    artist share a radio, so they get different songs from it.
+  - Then the existing per-artist (3), per-seed (6) and own-artist (8) caps.
+- **Spread on the page:**
+  - The two sources take turns.
+  - A seed never comes twice in a row while another is available.
+  - A seed's turn comes round in proportion to the square root of its weight, so a weak old interest can't fill the top.
+    This was the owner's live test: the first 6 cards from 5 Pink Floyd plays on a mostly hip-hop profile.
+- **Networking:**
+  - Radio goes through the catalog's existing client: proxy, Offline mode, 3 concurrent requests, Deezer quota retries,
+    the 25 s timeout and the cache. It's kept for 3 days and served stale when Deezer can't be reached.
+  - Last.fm uses the existing client's pacing (350 ms), key handling, error codes and persisted cache (14 days).
+  - Each liked recording's lookup is one more slot in the build's six-at-a-time lookups.
+  - A failing source fails alone (the existing "Some artists could not be loaded" notice). Cancellation and Offline mode
+    stop the build as before.
+- **Requests per cold build:**
+  - Deezer: up to 10 radio requests, one per liked artist. Identity lookups are usually already cached by the artist path.
+  - With a key: up to 10 Last.fm requests, plus up to 60 artist lookups (two Deezer requests each, cached 7 days and 1 day).
+  - Warm builds send almost nothing.
+
+### Metric note
+- Top-3 share (M7) is now taken over the cards whose place in their artist's list is known (`Placed`). Song-source cards
+  come from no artist's list, so the evaluation looks their place up; one not in the list counts as below it.
+- For the 2.2.0 and C engines every card is placed, so their numbers are unchanged.
+
+### Synthetic results (`DiscoverEvaluationTests`; criterion T1: top-3 share at least 10 points below the artist-only engine)
+The radio is **modelled, not recorded**: 25 songs, a third by the artist and the rest by its first ten similar artists,
+drawn with weight 1/n^0.7 over each artist's whole list. A second run uses a hits-only radio (each artist's first four songs)
+to show how much the result depends on that.
+
+| Persona | Top-3 share, artist-only (C) → now | T1 | Hits-only radio: now | P1–P4 |
+|---|---|---|---|---|
+| steady | 48 % → 28 % | PASS (−20) | 58 % (FAIL) | pass |
+| streamer | 52 % → 33 % | PASS (−19) | 55 % (FAIL) | pass |
+| collector | 57 % → 50 % | FAIL (−7) | 65 % (FAIL) | pass |
+| tiny | 62 % → 60 % | FAIL (−2) | 65 % (FAIL) | pass (too few seeds for the caps) |
+
+What it means:
+- With a radio that reaches past the hits, the famous-songs lean falls by 20 or more points for listeners with history.
+- The collector has few plays, and their liked songs are mostly owned artists. Tiny has one liked recording, so at most 3
+  song cards.
+- If Deezer's radio is mostly hits, songs from it make the lean slightly **worse**. The synthetic numbers can't settle
+  this; one live build and then the replay on real data can.
+- P1–P4 held on every persona and both radio models: 0 duplicate, owned, heard or dismissed cards; at most 3 per artist
+  and 6 per seed.
+- Distinct artists went up: steady 12 → 16, streamer 13 → 16, collector 14 → 16, tiny 9 → 10.
+- Second-page repeats, artist-only → now:
+  - steady 15 → 20 %
+  - streamer 20 → 10 %
+  - collector 30 → 40 % (P3 fails: limit 28 %)
+  - tiny 25 → 10 %
+- The collector's song cards come from few seeds whose other songs are owned. With the seeds taking turns, a seed with few
+  songs left shows a passed-over one again. That's reported, not tuned (S3).
+- One real fix came out of this run: each liked recording first claimed its songs in the source's order, so a song passed
+  over before was claimed again unchanged. Claims now go by score, which carries that rest, as everywhere else.

@@ -8,16 +8,18 @@ namespace FreeMusicFinder;
 /// <paramref name="Top3"/>: cards among the first three songs of their artist's catalog list; <paramref name="MeanPlace"/>: their
 /// mean place in it (1 = the artist's most popular song); <paramref name="MedianRank"/>: median Deezer rank of the cards that have one.
 /// <paramref name="Uncredited"/> (a diagnostic added after the criteria were set): cards whose credits do not name the artist whose
-/// list they came from, such as a compilation's song.
+/// list they came from, such as a compilation's song. <paramref name="Placed"/>: cards whose place in their artist's list is known;
+/// <paramref name="Top3"/> and <paramref name="MeanPlace"/> are of those (songs like a liked recording come from no artist's list, so
+/// their place is looked up; one not found there counts as below the list, one whose list cannot be read is left out).
 /// </summary>
 internal sealed record DiscoverPageMetrics(int Cards, double Duplicates, double Owned, double Heard, double Repeat, int Artists, int MaxPerArtist,
-    int Seeds, int MaxPerSeed, double OwnArtists, double Top3, double MeanPlace, double MedianRank, double Uncredited = 0)
+    int Seeds, int MaxPerSeed, double OwnArtists, double Top3, double MeanPlace, double MedianRank, double Uncredited = 0, double Placed = 0)
 {
     public static DiscoverPageMetrics Empty { get; } = new(0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0);
 
     public override string ToString() =>
         $"cards {Cards,2} · dup {Duplicates:P0} · owned {Owned:P0} · heard {Heard:P0} · repeat {Repeat:P0} · artists {Artists,2} (max {MaxPerArtist}) · "
-        + $"seeds {Seeds,2} (max {MaxPerSeed}) · own-artist {OwnArtists:P0} · top-3 {Top3:P0} · mean place {MeanPlace:0.0} · median rank {MedianRank:0} · uncredited {Uncredited:P0}";
+        + $"seeds {Seeds,2} (max {MaxPerSeed}) · own-artist {OwnArtists:P0} · top-3 {Top3:P0} of {Placed:P0} placed · mean place {MeanPlace:0.0} · median rank {MedianRank:0} · uncredited {Uncredited:P0}";
 
     /// <summary>The cards' seed: the listener's artist they came through (from the reason for pages that did not store it).</summary>
     public static string SeedOf(DiscoverSong song) => BotText.Key(song.Seed is { Length: > 0 } seed ? seed
@@ -40,9 +42,10 @@ internal sealed record DiscoverPageMetrics(int Cards, double Duplicates, double 
         double n = page.Count;
         return new(page.Count, duplicates / n, keys.Count(owned.Contains) / n, keys.Count(heard.Contains) / n,
             previous is null ? 0 : keys.Count(previous.Contains) / n, artists.Count, artists.Max(g => g.Count()), seeds.Count, seeds.Max(g => g.Count()),
-            page.Count(s => s.Own) / n, places.Count == 0 ? 0 : places.Count(p => p <= 3) / n, places.Count == 0 ? 0 : places.Average(),
+            page.Count(s => s.Own) / n, places.Count == 0 ? 0 : places.Count(p => p <= 3) / (double)places.Count, places.Count == 0 ? 0 : places.Average(),
             ranks.Count == 0 ? 0 : ranks.Count % 2 == 1 ? ranks[ranks.Count / 2] : (ranks[ranks.Count / 2 - 1] + ranks[ranks.Count / 2]) / 2.0,
-            listedUnder is null ? 0 : page.Count(s => listedUnder.TryGetValue(s.Track.Song.Id, out var a) && !s.Track.Song.Artists.Any(c => BotText.Key(c.Name) == a)) / n);
+            listedUnder is null ? 0 : page.Count(s => listedUnder.TryGetValue(s.Track.Song.Id, out var a) && !s.Track.Song.Artists.Any(c => BotText.Key(c.Name) == a)) / n,
+            places.Count / n);
     }
 
     /// <summary>A page the shelf recorded (for-you-feedback.json): what M1–M6 can tell from the cards' keys, artists and seeds.</summary>
@@ -64,7 +67,7 @@ internal sealed record DiscoverPageMetrics(int Cards, double Duplicates, double 
         if (p.Count == 0) return Empty;
         return new((int)Math.Round(p.Average(m => m.Cards)), p.Average(m => m.Duplicates), p.Average(m => m.Owned), p.Average(m => m.Heard), p.Average(m => m.Repeat),
             (int)Math.Round(p.Average(m => m.Artists)), p.Max(m => m.MaxPerArtist), (int)Math.Round(p.Average(m => m.Seeds)), p.Max(m => m.MaxPerSeed),
-            p.Average(m => m.OwnArtists), p.Average(m => m.Top3), p.Average(m => m.MeanPlace), p.Average(m => m.MedianRank), p.Average(m => m.Uncredited));
+            p.Average(m => m.OwnArtists), p.Average(m => m.Top3), p.Average(m => m.MeanPlace), p.Average(m => m.MedianRank), p.Average(m => m.Uncredited), p.Average(m => m.Placed));
     }
 }
 
@@ -85,6 +88,25 @@ internal sealed class PlaceRecorder(IDiscoverCatalog inner) : IDiscoverCatalog
         Remember(songs.Songs, name);
         return songs;
     }
+    /// <summary>Passed through; a source's order is no artist's list, so nothing is placed here (see <see cref="PlaceAsync"/>).</summary>
+    public Task<List<CatalogSearchSong>> SongsLikeAsync(TasteRecording liked, CancellationToken ct) => inner.SongsLikeAsync(liked, ct);
+
+    /// <summary>Places the page's cards that came from no artist's list: in their artist's list, by recording, or below it when not
+    /// there. A card whose artist's list cannot be read stays unplaced.</summary>
+    public async Task PlaceAsync(IEnumerable<DiscoverSong> page, CancellationToken ct)
+    {
+        foreach (var card in page.Where(c => !Places.ContainsKey(c.Track.Song.Id) && c.Track.Song.Artists.Count > 0).ToList())
+        {
+            List<CatalogSearchSong> list;
+            try { list = (await SongsByNameAsync(Taste.MainArtist(card.Track.Song.Artists[0].Name), ct)).Songs; }
+            catch (Exception ex) when (ex is not OperationCanceledException || !ct.IsCancellationRequested) { continue; }
+            if (list.Count == 0 || Places.ContainsKey(card.Track.Song.Id)) continue;
+            var key = DiscoverIdentity.Key(card.Track.Song);
+            var at = list.FindIndex(s => DiscoverIdentity.Key(s.Song) == key);
+            Places[card.Track.Song.Id] = at >= 0 ? at + 1 : list.Count + 1;
+        }
+    }
+
     private List<CatalogSearchSong> Remember(List<CatalogSearchSong> songs, string artist)
     {
         for (int i = 0; i < songs.Count; i++)
@@ -107,7 +129,8 @@ internal sealed record DiscoverRun(string Name, List<DiscoverPageMetrics> Pages,
 }
 
 /// <summary>
-/// The baseline-versus-current comparison (Milestone C). Both engines get the same listener, catalog and clock and the same
+/// The baseline-versus-current comparison (Milestone C), with Milestone C's artist-only engine ("artists") beside the current one
+/// ("now", which adds songs like the listener's best-liked recordings). All engines get the same listener, catalog and clock and the same
 /// script: each page is shown with its first <see cref="InView"/> cards in view; on the first page the listener dismisses
 /// the first card and the next one by the same artist, and finishes one other card; nothing else is used. The current
 /// engine records what the shelf records (shown, seen, actions); the baseline has only its dismissals, as in 2.2.0.
@@ -126,9 +149,9 @@ internal static class DiscoverEvaluation
         Task<HashSet<string>> Unavailable(IReadOnlyList<CatalogSong> songs, CancellationToken _) =>
             Task.FromResult(songs.Where(s => owned.Contains(DiscoverIdentity.Key(s))).Select(s => s.Id).ToHashSet(StringComparer.Ordinal));
         var runs = new List<DiscoverRun>();
-        foreach (var name in new[] { "before", "now" })
+        foreach (var name in new[] { "before", "artists", "now" })
         {
-            bool current = name == "now";
+            bool current = name != "before";
             var clock = start;
             string Copy(string? from, string file)
             {
@@ -157,13 +180,14 @@ internal static class DiscoverEvaluation
                 long before = GC.GetTotalAllocatedBytes(true);
                 var watch = Stopwatch.StartNew();
                 var result = current
-                    ? await Discover.ForListenerAsync(history, library, playlists, feedback, hidden, recorder, Unavailable, null, clock, ct)
+                    ? await Discover.ForListenerAsync(history, library, playlists, feedback, hidden, recorder, Unavailable, null, clock, ct, songs: name == "now")
                     : await DiscoverBaseline.ForListenerAsync(history, library, hidden, recorder, Unavailable, clock, ct);
                 times.Add(watch.Elapsed);
                 allocated += GC.GetTotalAllocatedBytes(true) - before;
                 if (p == 0) notice = result.Notice;
                 var page = result.Songs.Where(s => !hidden.HidesSong(s.Track.Song)).Take(Discover.Shelf).ToList();
                 var keys = page.Select(s => DiscoverIdentity.Key(s.Track.Song)).ToList();
+                await recorder.PlaceAsync(page, ct);
                 string ArtistOf(DiscoverSong s) => DiscoverIdentity.Artist(s.Track.Song.Artists.FirstOrDefault()?.Name);
                 pages.Add(DiscoverPageMetrics.Of(page, owned, TasteSources.Familiar(plays.Concat(listened).Where(x => x.At < clock.UtcDateTime)),
                     seenPages.Count > 0 ? seenPages[^1] : null, recorder.Places, recorder.ListedUnder));

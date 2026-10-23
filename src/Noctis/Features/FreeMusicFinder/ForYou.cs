@@ -16,6 +16,10 @@ internal sealed record TasteSeed(string Name, double Weight, int Owned, IReadOnl
     public IReadOnlyList<string> SongTitles => Titles ?? [];
 }
 
+/// <summary>One of the listener's best-liked recordings (finished, kept on, favorite, rated or put in their own playlist), a seed
+/// for songs like it.</summary>
+internal sealed record TasteRecording(string Artist, string Title, double Weight);
+
 /// <summary>A song the listener does not have yet, and why it was picked.</summary>
 /// <paramref name="Seed"/> is the listener's artist it came through; <paramref name="Own"/>: it is one of their own artists' songs.
 internal sealed record DiscoverSong(CatalogSearchSong Track, double Score, string Because, string Seed = "", bool Own = false);
@@ -24,8 +28,10 @@ internal sealed record DiscoverArtist(CatalogArtist Artist, string Because);
 /// no catalog answered, so this empty page is an outage, not an answer; the shelf keeps the picks it has.
 internal sealed record DiscoverResult(List<DiscoverSong> Songs, List<DiscoverArtist> Artists, string Notice, bool LastFm = false, string Batch = "", bool Unreachable = false);
 
-/// <summary>What Discover leaves out or rests besides owned and dismissed songs: recordings already heard, and what earlier pages taught.</summary>
-internal sealed record DiscoverContext(IReadOnlySet<string> Familiar, DiscoverLearning Learning, DateTimeOffset Now);
+/// <summary>What Discover leaves out or rests besides owned and dismissed songs: recordings already heard, and what earlier pages taught.
+/// <paramref name="Liked"/>: the listener's best-liked recordings, for songs like them; null builds the artist-only page of Milestone C
+/// (kept runnable for the comparison).</summary>
+internal sealed record DiscoverContext(IReadOnlySet<string> Familiar, DiscoverLearning Learning, DateTimeOffset Now, IReadOnlyList<TasteRecording>? Liked = null);
 
 /// <summary>The listener's taste in artists, from what they play and what they own. Nothing leaves the computer.</summary>
 internal static class Taste
@@ -33,6 +39,8 @@ internal static class Taste
     private static readonly TimeSpan HalfLife = TimeSpan.FromDays(30), LongHalfLife = TimeSpan.FromDays(365);
     /// <summary>Seed places kept for lasting interests (years of one artist) that a recent phase would push out.</summary>
     public const int DurableSeeds = 5;
+    /// <summary>How many best-liked recordings seed songs like them.</summary>
+    public const int LikedRecordings = 10;
 
     /// <summary>The first credited artist: "Juice WRLD feat. Halsey" and "Juice WRLD; Halsey" are Juice WRLD.</summary>
     public static string MainArtist(string? artist)
@@ -59,9 +67,11 @@ internal static class Taste
     /// over the year (365 days, only for artists played on three or more days). Favorites, ratings and songs put in their own
     /// playlists are deliberate and count fully; imported playlists and owning files count a little. The last
     /// <see cref="DurableSeeds"/> places go to lasting interests that a recent phase pushed down, so one is not averaged away.
+    /// <paramref name="liked"/>, when given, receives the <see cref="LikedRecordings"/> recordings with the most of the same evidence
+    /// (plays, favorites, ratings, the listener's own playlists; never imports or merely owning a file).
     /// </summary>
     public static List<TasteSeed> Seeds(IEnumerable<TastePlay> plays, IReadOnlyList<LocalSong> library, DateTime nowUtc, int count = 15,
-        IReadOnlyList<TastePlaylist>? playlists = null)
+        IReadOnlyList<TastePlaylist>? playlists = null, List<TasteRecording>? liked = null)
     {
         var names = new Dictionary<string, Dictionary<string, int>>(StringComparer.Ordinal);
         var titles = new Dictionary<string, Dictionary<string, double>>(StringComparer.Ordinal);
@@ -70,6 +80,7 @@ internal static class Taste
         var deliberate = new Dictionary<(string Artist, string Track), double>();
         var imported = new Dictionary<(int List, string Artist), double>();
         var days = new Dictionary<string, HashSet<DateOnly>>(StringComparer.Ordinal);
+        var spelled = new Dictionary<(string Artist, string Track), string>();
         void Title(string key, string title, double w)
         {
             if (title.Trim().Length == 0) return;
@@ -99,7 +110,7 @@ internal static class Taste
                 d.Add(DateOnly.FromDateTime(play.At));
             }
             Name(main);
-            if (play.Weight > 0) Title(key, play.Title, play.Weight);
+            if (play.Weight > 0) { Title(key, play.Title, play.Weight); if (play.Title.Trim().Length > 0) spelled.TryAdd(track, play.Title.Trim()); }
         }
         var owned = new Dictionary<string, int>(StringComparer.Ordinal);
         var byId = new Dictionary<Guid, (string Artist, string Track)>();
@@ -113,6 +124,7 @@ internal static class Taste
             Title(key, song.Title, 0.01);
             var track = (key, DiscoverIdentity.Title(song.Title));
             byId.TryAdd(song.Id, track);
+            if (song.Title.Trim().Length > 0) spelled.TryAdd(track, song.Title.Trim());
             // Said outright, so it does not fade: a favorite, a rating, a "dislike" of that one song.
             double said = (song.Favorite ? 2 : 0) + song.Rating switch { >= 5 => 1.5, 4 => 1, > 0 and <= 2 => -1, _ => 0 } + (song.Disliked ? -1.5 : 0);
             if (said != 0) deliberate[track] = deliberate.GetValueOrDefault(track) + said;
@@ -140,6 +152,18 @@ internal static class Taste
         foreach (var (key, n) in owned) lasting[key] = lasting.GetValueOrDefault(key) + 0.4 * Math.Log(1 + n);
         foreach (var (key, v) in lasting) weight[key] = weight.GetValueOrDefault(key) + v;
 
+        if (liked is not null)
+        {
+            // A recording's own evidence, weighed as its artist's is: recent plays, lasting plays (artists of three or more days) and what was said outright.
+            var mine = new Dictionary<(string Artist, string Track), double>();
+            foreach (var (track, v) in recent) if (v > 0) mine[track] = Compress(v);
+            foreach (var (track, v) in durable)
+                if (v > 0 && days.GetValueOrDefault(track.Artist)?.Count >= 3) mine[track] = mine.GetValueOrDefault(track) + 0.5 * Compress(v);
+            foreach (var (track, v) in deliberate) mine[track] = mine.GetValueOrDefault(track) + 0.6 * Compress(v);
+            liked.AddRange(mine.Where(m => m.Value > 0.5 && m.Key.Track.Length > 0 && names.ContainsKey(m.Key.Artist) && spelled.ContainsKey(m.Key))
+                .OrderByDescending(m => m.Value).ThenBy(m => m.Key.Artist, StringComparer.Ordinal).ThenBy(m => m.Key.Track, StringComparer.Ordinal).Take(LikedRecordings)
+                .Select(m => new TasteRecording(names[m.Key.Artist].OrderByDescending(n => n.Value).First().Key, spelled[m.Key], Math.Round(m.Value, 3))));
+        }
         var eligible = weight.Where(w => w.Value > 0.2 && names.ContainsKey(w.Key)).ToList();
         var chosen = eligible.OrderByDescending(w => w.Value).ThenBy(w => w.Key, StringComparer.Ordinal).Take(Math.Max(0, count - DurableSeeds)).Select(w => w.Key).ToList();
         chosen.AddRange(eligible.Where(w => !chosen.Contains(w.Key) && lasting.GetValueOrDefault(w.Key) > 0.5)
@@ -301,6 +325,8 @@ internal interface IDiscoverCatalog
         var artist = await FindByNameAsync(name, ct);
         return new(artist, artist is null ? [] : await TopSongsAsync(artist, ct));
     }
+    /// <summary>Songs like one of the listener's best-liked recordings, most alike first (none when the catalog has no such source).</summary>
+    Task<List<CatalogSearchSong>> SongsLikeAsync(TasteRecording liked, CancellationToken ct) => Task.FromResult(new List<CatalogSearchSong>());
 }
 
 /// <summary>
@@ -357,6 +383,45 @@ internal sealed class CatalogForDiscover(Func<ArtistCatalog> catalog, Func<strin
     }
     public async Task<List<CatalogSearchSong>> TopSongsAsync(CatalogArtist artist, CancellationToken ct) => (await catalog().ArtistSongsAsync(artist, ct)).Value;
     public async Task<CatalogArtistSongs> SongsByNameAsync(string name, CancellationToken ct) => (await catalog().SongsByArtistNameAsync(name, ct)).Value;
+
+    /// <summary>How many of Last.fm's similar songs are looked up in the catalog (by their artist's songs) per liked recording.</summary>
+    public const int LastFmSongLookups = 6;
+
+    /// <summary>
+    /// Songs like a liked recording. With the listener's own Last.fm key, Last.fm's similar songs first (this sends that one
+    /// recording's title and artist), found among their artists' catalog songs; then always Deezer's radio for the recording's
+    /// artist, which sends only a Deezer artist ID. One source failing leaves the other.
+    /// </summary>
+    public async Task<List<CatalogSearchSong>> SongsLikeAsync(TasteRecording liked, CancellationToken ct)
+    {
+        var result = new List<CatalogSearchSong>();
+        Exception? failure = null;
+        if (lastFm?.Invoke() is { Enabled: true } last)
+        {
+            try
+            {
+                int asked = 0;
+                foreach (var similar in await last.SimilarTracksAsync(liked.Artist, liked.Title, ct))
+                {
+                    if (asked >= LastFmSongLookups) break;
+                    if (BotText.Key(Taste.MainArtist(similar.Artist)) == BotText.Key(Taste.MainArtist(liked.Artist))) continue;
+                    asked++;
+                    var title = DiscoverIdentity.Title(similar.Title);
+                    var songs = await SongsByNameAsync(similar.Artist, ct);
+                    if (songs.Songs.FirstOrDefault(s => DiscoverIdentity.Title(s.Song.Title) == title) is { } found) result.Add(found);
+                }
+            }
+            catch (Exception ex) when (ex is not OperationCanceledException || !ct.IsCancellationRequested) { failure = ex; }
+        }
+        try
+        {
+            if (await FindAsync(new TasteSeed(liked.Artist, liked.Weight, 0, [liked.Title]), ct) is { } artist)
+                result.AddRange((await catalog().RadioAsync(artist, ct)).Value);
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException || !ct.IsCancellationRequested) { failure ??= ex; }
+        if (result.Count == 0 && failure is not null) throw failure;
+        return result;
+    }
 }
 
 /// <summary>
@@ -374,16 +439,19 @@ internal static class Discover
     /// (its own songs and its neighbours' together) and at most <see cref="OwnArtists"/> are their own artists' songs, while
     /// other songs are left. With nothing else left the shelf is still filled.</summary>
     public const int Shelf = 20, PerSeed = 6, OwnArtists = 8;
+    /// <summary>Songs kept per liked recording (after every filter), so one loved song cannot fill the shelf.</summary>
+    public const int PerLiked = 3;
 
     /// <summary>The page for a listener: what earlier pages taught, their taste, and the songs. <see cref="ForYouSource"/>'s build,
-    /// and the evaluation's, so both run the same steps.</summary>
+    /// and the evaluation's, so both run the same steps. <paramref name="songs"/>: false builds Milestone C's artist-only page.</summary>
     public static Task<DiscoverResult> ForListenerAsync(IReadOnlyList<TastePlay> plays, IReadOnlyList<LocalSong> library, IReadOnlyList<TastePlaylist> playlists,
         DiscoverFeedback feedback, DiscoverHidden hidden, IDiscoverCatalog catalog, Func<IReadOnlyList<CatalogSong>, CancellationToken, Task<HashSet<string>>> unavailable,
-        IProgress<string>? progress, DateTimeOffset now, CancellationToken ct)
+        IProgress<string>? progress, DateTimeOffset now, CancellationToken ct, bool songs = true)
     {
         var learning = feedback.Learn(plays, library, playlists);
-        var seeds = Taste.Seeds(plays.Concat(learning.Saves), library, now.UtcDateTime, playlists: playlists);
-        return BuildAsync(seeds, catalog, unavailable, hidden, progress, ct, context: new(TasteSources.Familiar(plays), learning, now));
+        var liked = new List<TasteRecording>();
+        var seeds = Taste.Seeds(plays.Concat(learning.Saves), library, now.UtcDateTime, playlists: playlists, liked: liked);
+        return BuildAsync(seeds, catalog, unavailable, hidden, progress, ct, context: new(TasteSources.Familiar(plays), learning, now, songs ? liked : null));
     }
 
     public static async Task<DiscoverResult> BuildAsync(IReadOnlyList<TasteSeed> seeds, IDiscoverCatalog catalog,
@@ -393,6 +461,7 @@ internal static class Discover
         var familiar = context?.Familiar ?? new HashSet<string>();
         var learning = context?.Learning ?? DiscoverLearning.None;
         var now = context?.Now ?? DateTimeOffset.UtcNow;
+        var liked = context?.Liked;
         if (seeds.Count == 0) return new([], [], "Play some music first: For you learns from what you listen to and what you own.");
         // Candidate artists by name: the listener's own (their missing songs) and the ones their listeners also play.
         var score = new Dictionary<string, double>(StringComparer.Ordinal);
@@ -447,13 +516,15 @@ internal static class Discover
             }
         }
         var ranked = score.OrderByDescending(s => s.Value).Take(CandidateArtists).ToList();
-        var songs = new List<(CatalogSearchSong Track, double Score, string Key)>();
+        // Seed: the listener's artist a song comes through. Like: the liked recording it is like, for songs from that source.
+        var songs = new List<(CatalogSearchSong Track, double Score, string Key, string Seed, TasteRecording? Like)>();
         int heard = 0, rested = 0;
+        string SeedOf(string key) => own.Contains(key) ? key : BotText.Key(because[key].Seed);
         // Owner #94: every artist's songs at once (the catalog itself keeps to its few connections), merged in rank
         // order afterwards so network timing never changes the picks.
-        int picked = 0;
+        int picked = 0, lookupCount = ranked.Count + (liked?.Count ?? 0);
         using var lookups = new SemaphoreSlim(ArtistLookups, ArtistLookups);
-        var rows = await Task.WhenAll(ranked.Select(async row =>
+        var rowsTask = Task.WhenAll(ranked.Select(async row =>
         {
             await lookups.WaitAsync(ct);
             try
@@ -467,8 +538,18 @@ internal static class Discover
                 return (relatedSongs.Artist, relatedSongs.Songs, Error: "");
             }
             catch (Exception ex) when (Failed(ex, ct)) { return (Artist: (CatalogArtist?)null, Songs: new List<CatalogSearchSong>(), Error: ArtistCatalog.Explain(ex)); }
-            finally { progress?.Report($"Picking songs you don't have… {Interlocked.Increment(ref picked)} of {ranked.Count}"); lookups.Release(); }
+            finally { progress?.Report($"Picking songs you don't have… {Interlocked.Increment(ref picked)} of {lookupCount}"); lookups.Release(); }
         }));
+        // Songs like the listener's best-liked recordings, looked up beside the artists'; one failing fails alone.
+        var likeTask = Task.WhenAll((liked ?? []).Select(async like =>
+        {
+            await lookups.WaitAsync(ct);
+            try { return (Songs: await catalog.SongsLikeAsync(like, ct), Error: ""); }
+            catch (Exception ex) when (Failed(ex, ct)) { return (Songs: new List<CatalogSearchSong>(), Error: ArtistCatalog.Explain(ex)); }
+            finally { progress?.Report($"Picking songs you don't have… {Interlocked.Increment(ref picked)} of {lookupCount}"); lookups.Release(); }
+        }));
+        await Task.WhenAll(rowsTask, likeTask);
+        var (rows, likeRows) = (rowsTask.Result, likeTask.Result);
         for (int k = 0; k < ranked.Count; k++)
         {
             var (key, value) = ranked[k];
@@ -489,34 +570,100 @@ internal static class Discover
                 top.Add((s, rest * (1 - 0.07 * Math.Min(n, 12))));
             }
             foreach (var (song, kept) in top)
-                songs.Add((song, value * kept * learning.ArtistFactor(DiscoverIdentity.Artist(song.Song.Artists[0].Name)), key));
+                songs.Add((song, value * kept * learning.ArtistFactor(DiscoverIdentity.Artist(song.Song.Artists[0].Name)), key, SeedOf(key), null));
         }
-        // One recording once (its best place, explicit preferred), across albums and providers; then leave out what is owned or queued.
-        songs = DiscoverIdentity.Distinct(songs.OrderByDescending(s => s.Score), s => s.Track.Song);
-        var gone = songs.Count == 0 ? [] : await unavailable(songs.Select(s => s.Track.Song).ToList(), ct);
+        // The same filters as above (dismissed, credited, heard, rested; owned, queued and one recording once below), in the source's order.
+        var likeLists = new List<List<(CatalogSearchSong Track, double Score, string Key, string Seed, TasteRecording? Like)>>();
+        for (int k = 0; k < (liked?.Count ?? 0); k++)
+        {
+            var like = liked![k];
+            var (candidates, error) = likeRows[k];
+            var list = new List<(CatalogSearchSong Track, double Score, string Key, string Seed, TasteRecording? Like)>();
+            likeLists.Add(list);
+            if (error.Length > 0) { failed++; lastError = error; continue; }
+            if (candidates.Count > 0) found++;
+            var seed = DiscoverIdentity.Artist(like.Artist);
+            var itself = DiscoverIdentity.Key(like.Title, like.Artist);
+            double value = Math.Sqrt(Math.Max(0, like.Weight));
+            for (int n = 0; n < candidates.Count; n++)
+            {
+                var s = candidates[n];
+                var key = DiscoverIdentity.Artist(s.Song.Artists.FirstOrDefault()?.Name);
+                if (key.Length == 0 || hidden.HidesSong(s.Song) || !Credits(s.Song, s.Song.Artists[0], key)) continue;
+                var identity = DiscoverIdentity.Key(s.Song);
+                if (identity == itself || familiar.Contains(identity)) { heard++; continue; }
+                var rest = learning.Rest(identity, now);
+                if (rest <= 0) { rested++; continue; }
+                list.Add((s, value * rest * (1 - 0.05 * Math.Min(n, 12)) * learning.ArtistFactor(key), key, own.Contains(key) ? key : seed, like));
+            }
+        }
+        HashSet<string> gone;
+        if (liked is null)
+        {
+            // One recording once (its best place, explicit preferred), across albums and providers; then leave out what is owned or queued.
+            songs = DiscoverIdentity.Distinct(songs.OrderByDescending(s => s.Score), s => s.Track.Song);
+            gone = songs.Count == 0 ? [] : await unavailable(songs.Select(s => s.Track.Song).ToList(), ct);
+        }
+        else
+        {
+            // Owned and queued first, every candidate; then each liked recording, best-liked first, keeps its first PerLiked songs that
+            // no other one took (two liked songs by one artist share a radio, and get different songs from it); then one recording once.
+            var every = songs.Concat(likeLists.SelectMany(l => l)).Select(s => s.Track.Song).DistinctBy(s => s.Id).ToList();
+            gone = every.Count == 0 ? [] : await unavailable(every, ct);
+            var claimed = new HashSet<string>(StringComparer.Ordinal);
+            foreach (var list in likeLists)
+                songs.AddRange(list.OrderByDescending(s => s.Score) // the score carries the rest of songs passed over before
+                    .Where(s => !gone.Contains(s.Track.Song.Id) && claimed.Add(DiscoverIdentity.Key(s.Track.Song))).Take(PerLiked));
+            songs = DiscoverIdentity.Distinct(songs.OrderByDescending(s => s.Score), s => s.Track.Song);
+        }
         var pool = songs.Where(s => !gone.Contains(s.Track.Song.Id)).OrderByDescending(s => s.Score).ToList();
 
         var result = new List<DiscoverSong>();
         var count = new Dictionary<string, int>(StringComparer.Ordinal);
         var perSeed = new Dictionary<string, int>(StringComparer.Ordinal);
         int ownCount = 0;
-        string? previous = null;
-        string SeedOf(string key) => own.Contains(key) ? key : BotText.Key(because[key].Seed);
-        bool Varied(string key) => result.Count >= Shelf || perSeed.GetValueOrDefault(SeedOf(key)) < PerSeed && (!own.Contains(key) || ownCount < OwnArtists);
+        string? previous = null, previousSeed = null;
+        bool? previousLike = null;
+        // A seed's turn comes round in proportion to how much the listener likes it: one old interest cannot fill the top.
+        var share = new Dictionary<string, double>(StringComparer.Ordinal);
+        foreach (var like in liked ?? []) share[DiscoverIdentity.Artist(like.Artist)] = like.Weight;
+        foreach (var seed in used) share[BotText.Key(seed.Name)] = seed.Weight;
+        double Share(string seed) => Math.Sqrt(Math.Max(0.05, share.GetValueOrDefault(seed)));
+        bool Varied((CatalogSearchSong Track, double Score, string Key, string Seed, TasteRecording? Like) s) =>
+            result.Count >= Shelf || perSeed.GetValueOrDefault(s.Seed) < PerSeed && (!own.Contains(s.Key) || ownCount < OwnArtists);
+        // Milestone C's page: best score first. With songs like liked recordings: the sources take turns, and so do the seeds.
+        int Next(Func<(CatalogSearchSong Track, double Score, string Key, string Seed, TasteRecording? Like), bool> ok)
+        {
+            if (liked is null) return pool.FindIndex(s => ok(s));
+            bool otherSource = previousLike is { } last && pool.Any(s => (s.Like is not null) != last && ok(s));
+            bool otherSeed = pool.Any(s => s.Seed != previousSeed && ok(s));
+            int best = -1; var bestTurn = (0, 0, 0.0, 0.0);
+            var heads = new HashSet<(bool, string)>();
+            for (int i = 0; i < pool.Count; i++)
+            {
+                var s = pool[i];
+                if (!ok(s) || !heads.Add((s.Like is not null, s.Seed))) continue; // the pool is best first: each group's best
+                var turn = (otherSource && (s.Like is not null) == previousLike ? 1 : 0, otherSeed && s.Seed == previousSeed ? 1 : 0,
+                    (perSeed.GetValueOrDefault(s.Seed) + 1) / Share(s.Seed), -s.Score);
+                if (best < 0 || turn.CompareTo(bestTurn) < 0) (best, bestTurn) = (i, turn);
+            }
+            return best;
+        }
         while (result.Count < songCount && pool.Count > 0)
         {
-            int pick = pool.FindIndex(s => s.Key != previous && count.GetValueOrDefault(s.Key) < 3 && Varied(s.Key));
-            if (pick < 0) pick = pool.FindIndex(s => s.Key != previous && count.GetValueOrDefault(s.Key) < 3);
-            if (pick < 0) pick = pool.FindIndex(s => s.Key != previous);
+            int pick = Next(s => s.Key != previous && count.GetValueOrDefault(s.Key) < 3 && Varied(s));
+            if (pick < 0) pick = Next(s => s.Key != previous && count.GetValueOrDefault(s.Key) < 3);
+            if (pick < 0) pick = Next(s => s.Key != previous);
             if (pick < 0) break; // only songs of the artist just placed are left
             var chosen = pool[pick]; pool.RemoveAt(pick);
             bool mine = own.Contains(chosen.Key);
-            var reason = mine ? "More from " + resolved[chosen.Key].Name : "Because you play " + because[chosen.Key].Seed;
-            result.Add(new(chosen.Track, Math.Round(chosen.Score, 4), reason, mine ? resolved[chosen.Key].Name : because[chosen.Key].Seed, mine));
+            var name = chosen.Like is null ? mine ? resolved[chosen.Key].Name : because[chosen.Key].Seed
+                : mine ? Taste.MainArtist(chosen.Track.Song.Artists[0].Name) : chosen.Like.Artist;
+            result.Add(new(chosen.Track, Math.Round(chosen.Score, 4), (mine ? "More from " : "Because you play ") + name, name, mine));
             count[chosen.Key] = count.GetValueOrDefault(chosen.Key) + 1;
-            perSeed[SeedOf(chosen.Key)] = perSeed.GetValueOrDefault(SeedOf(chosen.Key)) + 1;
+            perSeed[chosen.Seed] = perSeed.GetValueOrDefault(chosen.Seed) + 1;
             if (mine) ownCount++;
-            previous = chosen.Key;
+            (previous, previousSeed, previousLike) = (chosen.Key, chosen.Seed, chosen.Like is not null);
         }
         var newArtists = ranked.Where(r => !own.Contains(r.Key) && resolved.ContainsKey(r.Key)).Take(12)
             .Select(r => new DiscoverArtist(resolved[r.Key], "Similar to " + because[r.Key].Seed)).ToList();

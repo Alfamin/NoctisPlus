@@ -28,6 +28,8 @@ public class DiscoverEvaluationTests(ITestOutputHelper output) : IDisposable
         private readonly Dictionary<string, List<CatalogSearchSong>> _songs = new(StringComparer.Ordinal);
         private readonly Dictionary<string, List<SimilarArtist>> _similar = new(StringComparer.Ordinal);
         public Func<string, CancellationToken, Task>? Delay { get; init; }
+        /// <summary>How deep into an artist's catalog list the modelled radio reaches (15: the whole list; 4: hits only).</summary>
+        public int RadioDepth { get; init; } = 15;
         public int Calls;
 
         public World()
@@ -68,6 +70,32 @@ public class DiscoverEvaluationTests(ITestOutputHelper output) : IDisposable
         public async Task<CatalogArtist?> FindByNameAsync(string name, CancellationToken ct) { await Wait("find:" + name, ct); return _artists.GetValueOrDefault(name); }
         public async Task<List<SimilarArtist>> SimilarAsync(TasteSeed seed, CatalogArtist? artist, CancellationToken ct) { await Wait("similar:" + seed.Name, ct); return [.. _similar.GetValueOrDefault(seed.Name) ?? []]; }
         public async Task<List<CatalogSearchSong>> TopSongsAsync(CatalogArtist artist, CancellationToken ct) { await Wait("top:" + artist.Name, ct); return [.. _songs.GetValueOrDefault(artist.Name) ?? []]; }
+
+        /// <summary>
+        /// Deezer's artist radio as modelled here, an assumption rather than a recording: 25 songs, about a third by the liked
+        /// recording's artist and the rest by the first ten artists on its similar list (megastars included), each drawn from that
+        /// artist's first <see cref="RadioDepth"/> songs with the popular ones likelier (weight 1/n^0.7). Deterministic per artist.
+        /// </summary>
+        public async Task<List<CatalogSearchSong>> SongsLikeAsync(TasteRecording liked, CancellationToken ct)
+        {
+            await Wait("like:" + liked.Artist, ct);
+            var name = Taste.MainArtist(liked.Artist);
+            if (!_artists.ContainsKey(name)) return [];
+            var random = new Random(name.Aggregate(17, (h, c) => h * 31 + c));
+            var others = (_similar.GetValueOrDefault(name) ?? []).Take(10).Select(a => a.Name).ToList();
+            var weights = Enumerable.Range(1, RadioDepth).Select(n => Math.Pow(n, -0.7)).ToList();
+            var radio = new List<CatalogSearchSong>();
+            for (int i = 0; radio.Count < 25 && i < 500; i++)
+            {
+                var artist = others.Count == 0 || random.NextDouble() < 0.33 ? name : others[random.Next(others.Count)];
+                double r = random.NextDouble() * weights.Sum();
+                int n = 0;
+                while (n < weights.Count - 1 && (r -= weights[n]) > 0) n++;
+                var song = _songs[artist].First(s => s.Song.Id == $"deezer:{artist}:{n + 1}");
+                if (!radio.Contains(song)) radio.Add(song);
+            }
+            return radio;
+        }
     }
 
     internal sealed record Persona(string Name, string Folder, List<LocalSong> Library);
@@ -124,6 +152,7 @@ public class DiscoverEvaluationTests(ITestOutputHelper output) : IDisposable
         return new(name, folder, library);
     }
 
+    /// <summary>Runs before (2.2.0), artists (Milestone C) and now (with songs like liked recordings).</summary>
     internal static Task<List<DiscoverRun>> Compare(Persona persona, string work, Func<IDiscoverCatalog>? catalog = null)
     {
         var world = catalog ?? (() => new World());
@@ -145,7 +174,7 @@ public class DiscoverEvaluationTests(ITestOutputHelper output) : IDisposable
         {
             var persona = Make(_folder, name);
             var runs = await Compare(persona, Path.Combine(_folder, name + "-work"));
-            var (before, now) = (runs[0], runs[1]);
+            var (before, artists, now) = (runs[0], runs[1], runs[2]);
             report.Add($"[{name}]"); report.AddRange(runs.Select(r => "  " + r.ToString().Replace("\n", "\n  ")));
             void Verdict(string id, bool pass, string detail) => report.Add($"  {id} {(pass ? "PASS" : "FAIL")}: {detail}");
             bool clean = now.Pages.All(p => p.Duplicates == 0 && p.Owned == 0 && p.Heard == 0);
@@ -164,8 +193,16 @@ public class DiscoverEvaluationTests(ITestOutputHelper output) : IDisposable
             var (b, n) = (DiscoverPageMetrics.Mean(before.Pages), DiscoverPageMetrics.Mean(now.Pages));
             Verdict("P5", n.Top3 <= b.Top3 + 1e-9, $"top-3 share {n.Top3:P0} vs {b.Top3:P0} (uncredited cards {n.Uncredited:P0} vs {b.Uncredited:P0}); "
                 + $"S2 threshold 50 %: {(n.Top3 > 0.5 ? "over" : "under")}");
-            // P5 is measured, not guarded: retrieval is unchanged in C. Uncredited cards are a regression guard of their own.
+            // P5 is measured, not guarded. Uncredited cards are a regression guard of their own.
             if (n.Uncredited > 0) broken.Add($"{name}: uncredited cards");
+            var a = DiscoverPageMetrics.Mean(artists.Pages);
+            Verdict("T1", n.Top3 <= a.Top3 - 0.10, $"songs like liked recordings: top-3 share {n.Top3:P0} vs {a.Top3:P0} artist-only (target: 10 points lower)");
+            // The same with a radio of hits only (its songs from the first four of each list): how much T1 rests on the radio's depth.
+            var hits = await Compare(persona, Path.Combine(_folder, name + "-hits"), () => new World { RadioDepth = 4 });
+            var (ha, hn) = (DiscoverPageMetrics.Mean(hits[1].Pages), DiscoverPageMetrics.Mean(hits[2].Pages));
+            report.Add("  hits-only radio: now " + DiscoverPageMetrics.Mean(hits[2].Pages));
+            Verdict("T1-hits", hn.Top3 <= ha.Top3 - 0.10, $"top-3 share {hn.Top3:P0} vs {ha.Top3:P0} artist-only");
+            if (hits[2].Pages.Any(p => p.Duplicates > 0 || p.Owned > 0 || p.Heard > 0) || hits[2].DismissedReturned > 0) broken.Add($"{name}: P1/P2 with a hits-only radio");
         }
         output.WriteLine(string.Join("\n", report));
         if (Environment.GetEnvironmentVariable("DISCOVER_EVAL_REPORT") is { Length: > 0 } path) File.WriteAllLines(path, report);

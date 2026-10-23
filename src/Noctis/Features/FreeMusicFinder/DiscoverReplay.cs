@@ -128,20 +128,51 @@ internal static class DiscoverReplay
         using var catalog = new ArtistCatalog(catalogFolder, refuse, () => asOf, TimeSpan.Zero);
         using var similar = new SimilarArtists(catalogFolder, refuse, () => asOf, TimeSpan.Zero);
         using var lastFm = File.Exists(Path.Combine(catalogFolder, "lastfm.json")) ? new LastFmSimilar(catalogFolder, refuse, () => new string('0', 32), () => asOf, TimeSpan.Zero) : null;
-        var discover = new CatalogForDiscover(() => catalog, name => albums.GetValueOrDefault(BotText.Key(Taste.MainArtist(name))) ?? [], () => similar, () => lastFm);
+        var counted = new Counted(new CatalogForDiscover(() => catalog, name => albums.GetValueOrDefault(BotText.Key(Taste.MainArtist(name))) ?? [], () => similar, () => lastFm));
+        IDiscoverCatalog discover = counted;
         var work = Path.Combine(Path.GetTempPath(), "noctis-discover-replay-" + Guid.NewGuid().ToString("N"));
         try
         {
             var before = plays.Where(p => p.At < asOf.UtcDateTime).ToList();
             var runs = await DiscoverEvaluation.RunAsync(before, DiscoverBaseline.Plays(noctisData).Where(p => p.At < asOf.UtcDateTime).ToList(), library, playlists,
                 () => discover, work, asOf, Optional("for-you-feedback.json"), Optional("for-you-hidden.json"), ct);
-            output.WriteLine($"Both engines on your saved catalog, as of {asOf:yyyy-MM-dd} ({DiscoverEvaluation.Pages} pages; each shows its first {DiscoverEvaluation.InView} cards; "
-                + "on page 1 the first card and the next by its artist are dismissed and one other is finished):");
+            output.WriteLine($"The engines on your saved catalog, as of {asOf:yyyy-MM-dd} ({DiscoverEvaluation.Pages} pages; each shows its first {DiscoverEvaluation.InView} cards; "
+                + "on page 1 the first card and the next by its artist are dismissed and one other is finished). before = 2.2.0, artists = Milestone C, "
+                + "now = with songs like your best-liked recordings:");
             foreach (var run in runs) output.WriteLine("  " + run.ToString().Replace("\n", "\n  "));
+            if (runs.Count == 3)
+            {
+                var (artists, now) = (DiscoverPageMetrics.Mean(runs[1].Pages), DiscoverPageMetrics.Mean(runs[2].Pages));
+                output.WriteLine($"  Top-3 share, artists → now: {artists.Top3:P0} → {now.Top3:P0} (target: 10 points lower; {(now.Top3 <= artists.Top3 - 0.10 ? "met" : "not met")}).");
+            }
+            output.WriteLine($"  Songs like your liked recordings: {counted.Answered} of {counted.Asked} lookups had saved songs. They come from Deezer radio (and Last.fm) "
+                + "pages saved by a For you build with this version; until one has run, \"now\" has none and matches \"artists\".");
             output.WriteLine($"  {refuse.Refused} lookups were not in the saved catalog and were refused locally (nothing was sent); those artists count as unavailable.");
             output.WriteLine("  Owned leakage uses today's library by title and artist; the app also checks the files and the download queue.");
         }
         finally { try { Directory.Delete(work, true); } catch (IOException) { } }
+    }
+
+    /// <summary>Passes every call through, counting how often songs like a liked recording were asked for and found.</summary>
+    private sealed class Counted(IDiscoverCatalog inner) : IDiscoverCatalog
+    {
+        private int _asked, _answered;
+        public int Asked => _asked;
+        public int Answered => _answered;
+        public string Notice => inner.Notice;
+        public bool HasLastFm => inner.HasLastFm;
+        public Task<CatalogArtist?> FindAsync(TasteSeed seed, CancellationToken ct) => inner.FindAsync(seed, ct);
+        public Task<CatalogArtist?> FindByNameAsync(string name, CancellationToken ct) => inner.FindByNameAsync(name, ct);
+        public Task<List<SimilarArtist>> SimilarAsync(TasteSeed seed, CatalogArtist? artist, CancellationToken ct) => inner.SimilarAsync(seed, artist, ct);
+        public Task<List<CatalogSearchSong>> TopSongsAsync(CatalogArtist artist, CancellationToken ct) => inner.TopSongsAsync(artist, ct);
+        public Task<CatalogArtistSongs> SongsByNameAsync(string name, CancellationToken ct) => inner.SongsByNameAsync(name, ct);
+        public async Task<List<CatalogSearchSong>> SongsLikeAsync(TasteRecording liked, CancellationToken ct)
+        {
+            Interlocked.Increment(ref _asked);
+            var songs = await inner.SongsLikeAsync(liked, ct);
+            if (songs.Count > 0) Interlocked.Increment(ref _answered);
+            return songs;
+        }
     }
 
     /// <summary>Every request fails before it leaves: the replay never uses the network.</summary>
