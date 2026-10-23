@@ -81,7 +81,7 @@ public class WhatsNewTests : IDisposable
         }
         calls.Clear(); vm.OpenSettingCommand.Execute("https://example.invalid"); Assert.Empty(calls);
         Assert.All(notes.Added.Where(i => i.Setting is not null), i => Assert.True(i.HasSetting, i.Setting));
-        Assert.Contains(notes.Added, i => i.Setting == "about");
+        Assert.NotNull(SettingShortcut.Resolve("about"));
         Assert.Equal("OfflineModeRow", SettingShortcut.Resolve("offline")!.Control);
         Assert.Equal("timePlayed", SettingShortcut.Resolve("wordTiming")!.Key);
         Assert.Equal("firstBot", SettingShortcut.Resolve("firstBot")!.Key);

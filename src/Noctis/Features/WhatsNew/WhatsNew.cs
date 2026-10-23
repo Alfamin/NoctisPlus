@@ -20,6 +20,7 @@ public sealed record SettingShortcut(string Tab, string? Control = null, string?
         "gaming" => new("Features", Feature: "dev.moshi.wordlyrics", Key: "lightWhileGaming"),
         "cache" => new("Features", Feature: "dev.moshi.freemusicfinder", Key: "streamCacheDays"),
         "firstBot" => new("Features", Feature: "dev.moshi.freemusicfinder", Key: "firstBot"),
+        "downloadAhead" => new("Features", Feature: "dev.moshi.freemusicfinder", Key: "downloadAhead"),
         "about" => new("About", Control: "WhatsNewButton"),
         _ => null,
     };

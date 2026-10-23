@@ -1,48 +1,20 @@
 {
-  "version": "2.3.0",
+  "version": "2.3.1",
   "added": [
     {
       "icon": "RailSparkleIcon",
-      "title": "For you learns as you listen",
-      "line": "What you play, keep, skip or scroll past shapes the next page"
+      "title": "For you plays its page",
+      "line": "A song you play queues the rest of that page"
     },
     {
-      "icon": "HeartOutlineIcon",
-      "title": "Songs like your favourites",
-      "line": "Picks follow the songs you like most, not only their artists"
-    },
-    {
-      "icon": "GridViewIcon",
-      "title": "Earlier pages kept",
-      "line": "Your last 10 pages stay; pick one under the shelf"
-    },
-    {
-      "icon": "ShuffleIcon",
-      "title": "Fewer repeats",
-      "line": "New pages bring new songs; ones you've heard leave old pages"
-    },
-    {
-      "icon": "ArtistsIcon",
-      "title": "Artists open straight away",
-      "line": "No more \"which one?\"; the best-known artist with that name loads"
-    },
-    {
-      "icon": "NextIcon",
-      "title": "A quick skip isn't a no",
-      "line": "Songs played under 30 s can come back later; Not for me hides them"
-    },
-    {
-      "icon": "RailInfoIcon",
-      "title": "What's new, anytime",
-      "line": "Reopen these notes in Settings → About",
-      "setting": "about"
+      "icon": "SaveDiskIcon",
+      "title": "Download ahead",
+      "line": "Choose how many next songs download: Off to 4",
+      "setting": "downloadAhead"
     }
   ],
   "fixed": [
-    "For you leaves out songs you've already heard, even ones you don't own",
-    "One song shows once, across remasters, clean editions and services",
-    "A catalog outage keeps your picks instead of emptying the shelf",
-    "A slow service fails only its own artist, not the whole page",
-    "Refreshing For you no longer slows down the rest of the app"
+    "Not for me on the playing song skips to the next one",
+    "Every earlier For you page opens, older ones too"
   ]
 }
