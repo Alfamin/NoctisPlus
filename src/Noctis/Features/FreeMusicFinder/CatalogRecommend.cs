@@ -23,7 +23,7 @@ internal sealed partial class ArtistCatalog
                 await RememberArtistFansAsync(Data(data.RootElement), ct).ConfigureAwait(false);
                 return Data(data.RootElement).Select(DeezerArtist).OfType<CatalogArtist>().Where(a => BotText.Key(a.Name) == BotText.Key(name)).DistinctBy(a => a.Id).ToList();
             }, ct).ConfigureAwait(false)).Value;
-            var artist = exact.Count == 1 ? exact[0] : exact.Count > 1 ? await PopularNamesakeAsync(name, exact, ct).ConfigureAwait(false) : null;
+            var artist = exact.Count == 1 ? exact[0] : exact.Count > 1 ? await PopularNamesakeAsync(name, exact, ct, decisive: true).ConfigureAwait(false) : null;
             if (artist is not null)
             {
                 var top = await ArtistSongsAsync(artist, ct).ConfigureAwait(false);

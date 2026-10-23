@@ -130,17 +130,30 @@ internal static class CatalogPagesTests
         pages.Choose("North Star", artists[0]);
         Check.Equal("deezer:43", (await pages.IdentifyAsync("North Star", [], [], default)).Artist?.Id, "an explicit choice is never overruled by popularity");
 
-        foreach (var counts in new[] { "1000,1500", "1000,null", "999,0", "1000,\"wrong type\"" })
+        // Owner #140: Post Malone asked "which one?" because its tiny namesakes had no saved counts. The page never asks:
+        // the most followed opens, unknown or malformed counts rank last, and with nothing known the catalog's order decides.
+        foreach (var (counts, expected) in new[] { ("1000,1500", "deezer:42"), ("1000,null", "deezer:43"), ("999,0", "deezer:43"), ("1000,\"wrong type\"", "deezer:43"), ("null,null", "deezer:43") })
         {
             var values = counts.Split(',');
             var input = "{\"data\":[{\"id\":43,\"name\":\"North Star\",\"nb_fan\":" + values[0] + "},{\"id\":42,\"name\":\"North Star\",\"nb_fan\":" + values[1] + "}]}";
             var otherHttp = new DiscoveryTests.Http { Override = (_, _) => Task.FromResult(new System.Net.Http.HttpResponseMessage(System.Net.HttpStatusCode.OK) { Content = new System.Net.Http.StringContent(input) }) };
-            using var other = DiscoveryTests.Catalog(Check.NewFolder("comparable-fans"), otherHttp);
+            using var other = DiscoveryTests.Catalog(Check.NewFolder("comparable-fans-" + new string(counts.Where(char.IsLetterOrDigit).ToArray())), otherHttp); // counts saved by one case must not leak into the next
             var matches = (await other.SearchAsync("North Star", false, default)).Value;
-            Check.True(await other.PopularNamesakeAsync("North Star", matches, default) is null, "comparable, missing or malformed popularity does not invent an identity: " + counts);
+            Check.Equal(expected, (await other.PopularNamesakeAsync("North Star", matches, default))?.Id, "namesakes never prompt; the most likely opens: " + counts);
             var requests = otherHttp.Calls.Count;
             await other.PopularNamesakeAsync("North Star", matches, default);
             Check.Equal(requests, otherHttp.Calls.Count, "missing counts are refreshed at most once, not on every artist visit");
+        }
+
+        // A famous artist opens at once: its namesakes' unknown counts are not fetched first.
+        var famousHttp = new DiscoveryTests.Http { Override = http.Override };
+        using (var famous = DiscoveryTests.Catalog(Check.NewFolder("famous-namesake"), famousHttp))
+        {
+            await famous.SearchAsync("North Star", false, default);
+            var withUnknown = new List<CatalogArtist> { new("deezer:44", "North Star"), new("deezer:42", "North Star") };
+            var before = famousHttp.Calls.Count;
+            Check.Equal("deezer:42", (await famous.PopularNamesakeAsync("North Star", withUnknown, default))?.Id, "a widely followed namesake wins over an unknown one");
+            Check.Equal(before, famousHttp.Calls.Count, "no count refresh delays a famous artist's page");
         }
 
         var legacyFolder = Check.NewFolder("legacy-artist-fans");

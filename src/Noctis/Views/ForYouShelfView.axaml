@@ -109,6 +109,30 @@
             <Setter Property="Foreground" Value="{DynamicResource AccentTextExactBrush}" />
         </Style>
 
+        <!-- Owner #139: the page numbers under the shelf, small round chips like the corner icon; the page on screen in accent. -->
+        <Style Selector="Button.page-number">
+            <Setter Property="Width" Value="28" />
+            <Setter Property="Height" Value="28" />
+            <Setter Property="MinHeight" Value="0" />
+            <Setter Property="CornerRadius" Value="14" />
+            <Setter Property="Padding" Value="0" />
+            <Setter Property="BorderThickness" Value="0" />
+            <Setter Property="FontSize" Value="12" />
+            <Setter Property="FontWeight" Value="SemiBold" />
+            <Setter Property="Background" Value="{DynamicResource ChipBackground}" />
+            <Setter Property="Foreground" Value="{DynamicResource SystemControlForegroundBaseHighBrush}" />
+            <Setter Property="HorizontalContentAlignment" Value="Center" />
+            <Setter Property="VerticalContentAlignment" Value="Center" />
+            <Setter Property="Cursor" Value="Hand" />
+        </Style>
+        <Style Selector="Button.page-number:pointerover /template/ ContentPresenter, Button.page-number:pressed /template/ ContentPresenter">
+            <Setter Property="Background" Value="{DynamicResource ChipHoverBackground}" />
+        </Style>
+        <Style Selector="Button.page-number.current /template/ ContentPresenter">
+            <Setter Property="Background" Value="{DynamicResource AccentColorBrush}" />
+            <Setter Property="Foreground" Value="White" />
+        </Style>
+
         <!-- Home's album tiles: bare cover + two text lines, no plate, no press zoom. -->
         <Style Selector="Button.foryou-tile">
             <Setter Property="Background" Value="Transparent" />
@@ -268,6 +292,21 @@
                                                TextTrimming="CharacterEllipsis" MaxLines="1" ToolTip.Tip="{Binding Because}" />
                                 </StackPanel>
                             </Button>
+                        </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                </ItemsControl>
+
+                <!-- Owner #139: back to earlier pages, so a Refresh never loses songs not listened to yet. 1 is the newest. -->
+                <ItemsControl ItemsSource="{Binding PageTabs}" IsVisible="{Binding HasPageTabs}" Margin="2,0,0,4">
+                    <ItemsControl.ItemsPanel>
+                        <ItemsPanelTemplate><StackPanel Orientation="Horizontal" Spacing="6" /></ItemsPanelTemplate>
+                    </ItemsControl.ItemsPanel>
+                    <ItemsControl.ItemTemplate>
+                        <DataTemplate x:DataType="vm:ForYouPageTab">
+                            <Button Classes="page-number" Classes.current="{Binding IsCurrent}" Content="{Binding Number}"
+                                    AutomationProperties.Name="{Binding Number, StringFormat='Page {0}'}"
+                                    Command="{Binding $parent[UserControl].((vm:ForYouShelfViewModel)DataContext).ShowPageCommand}"
+                                    CommandParameter="{Binding}" />
                         </DataTemplate>
                     </ItemsControl.ItemTemplate>
                 </ItemsControl>

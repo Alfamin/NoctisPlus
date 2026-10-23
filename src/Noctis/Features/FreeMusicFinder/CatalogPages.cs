@@ -68,8 +68,8 @@ internal sealed class CatalogPages : IDisposable
             .OrderByDescending(a => a.Tracks.Count).Select(a => a.Name).ToArray();
     }
 
-    /// <summary>Which catalog artist a page's name means. Null with candidates when several share
-    /// the name and the evidence cannot tell them apart: the page lets the user choose once.</summary>
+    /// <summary>Which catalog artist a page's name means. Among several namesakes the evidence (albums, a manual choice)
+    /// decides, else the most likely one opens. Null with candidates only when no catalog artist has this exact name.</summary>
     internal async Task<(CatalogArtist? Artist, IReadOnlyList<CatalogArtist> Candidates)> IdentifyAsync(
         string name, IReadOnlyList<string> albums, IReadOnlyList<string> titles, CancellationToken ct)
     {
@@ -93,6 +93,13 @@ internal sealed class CatalogPages : IDisposable
             var separated = await catalog.SeparateNamesakesAsync(popular, albums, titles, ct).ConfigureAwait(false);
             Save(name, separated);
             return (separated, []);
+        }
+        // Owner #140: an exact namesake from another catalog opens too (its first result); only a name with no exact
+        // match at all still offers the spellings found.
+        if (result.Candidates.FirstOrDefault(a => BotText.Key(a.Name) == BotText.Key(name)) is { } first)
+        {
+            Save(name, first);
+            return (first, []);
         }
         return (null, result.Candidates);
     }

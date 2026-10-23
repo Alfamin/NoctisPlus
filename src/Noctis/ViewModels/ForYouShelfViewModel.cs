@@ -40,6 +40,9 @@ public sealed partial class ForYouShelfViewModel : ObservableObject, IDisposable
     }
 
     public ObservableCollection<ForYouPick> Picks { get; } = [];
+    /// <summary>Owner #139: the pages the shelf can go back to, 1 the newest. Shown only when there is more than one.</summary>
+    public ObservableCollection<ForYouPageTab> PageTabs { get; } = [];
+    public bool HasPageTabs => PageTabs.Count > 1;
     [ObservableProperty, NotifyPropertyChangedFor(nameof(ShowSkeletons), nameof(RefreshTip))] private bool _isLoading;
     [ObservableProperty, NotifyPropertyChangedFor(nameof(RefreshTip))] private string _status = "";
     [ObservableProperty] private bool _hasUndo;
@@ -138,13 +141,7 @@ public sealed partial class ForYouShelfViewModel : ObservableObject, IDisposable
                 Status = "Couldn't refresh right now. Showing your last picks.";
                 return;
             }
-            // A cached page can predate a download or library scan. Filter those recordings
-            // before displaying it; download actions still check the disk afresh.
-            if (_actions is { } actions && page.Songs.Count > 0)
-            {
-                var matches = await actions.MatchAsync(page.Songs.Select(s => s.Track.Song), stop.Token, reuse: true);
-                page = page with { Songs = page.Songs.Where(s => !matches.TryGetValue(s.Track.Song.Id, out var m) || m.Local is null && m.Download is null).ToList() };
-            }
+            page = await WithoutOwned(page, stop.Token);
             if (Current()) Show(page, source);
         }
         catch (OperationCanceledException) when (stop.IsCancellationRequested) { }
@@ -159,6 +156,42 @@ public sealed partial class ForYouShelfViewModel : ObservableObject, IDisposable
                 : "For you could not load: " + ArtistCatalog.Explain(ex);
         }
         finally { if (Current()) IsLoading = false; }
+    }
+
+    // A saved page can predate a download or library scan. Filter those recordings before
+    // displaying it; download actions still check the disk afresh.
+    private async Task<DiscoverResult> WithoutOwned(DiscoverResult page, CancellationToken ct)
+    {
+        if (_actions is not { } actions || page.Songs.Count == 0) return page;
+        var matches = await actions.MatchAsync(page.Songs.Select(s => s.Track.Song), ct, reuse: true);
+        return page with { Songs = page.Songs.Where(s => !matches.TryGetValue(s.Track.Song.Id, out var m) || m.Local is null && m.Download is null).ToList() };
+    }
+
+    /// <summary>Goes back to an earlier page (or forward to a newer one). Its songs keep their page, so nothing counts twice.</summary>
+    [RelayCommand]
+    private async Task ShowPage(ForYouPageTab? tab)
+    {
+        if (_disposed || tab is null || tab.IsCurrent || _source is not { } source || _online is null) return;
+        _load?.Cancel(); _load?.Dispose();
+        var stop = _load = new();
+        var generation = ++_generation;
+        IsLoading = false;
+        try
+        {
+            var page = await WithoutOwned(tab.Page, stop.Token);
+            if (!_disposed && generation == _generation && !stop.IsCancellationRequested && ReferenceEquals(source, _source)) Show(page, source);
+        }
+        catch (OperationCanceledException) when (stop.IsCancellationRequested) { }
+    }
+
+    private void UpdatePageTabs(ForYouSource source)
+    {
+        PageTabs.Clear();
+        var pages = source.Pages();
+        if (pages.Count > 1)
+            for (int i = 0; i < pages.Count; i++)
+                PageTabs.Add(new(i + 1, pages[i]) { IsCurrent = _page is { Batch.Length: > 0 } shown && pages[i].Batch == shown.Batch });
+        OnPropertyChanged(nameof(HasPageTabs));
     }
 
     private void Show(DiscoverResult page, ForYouSource source)
@@ -176,6 +209,7 @@ public sealed partial class ForYouShelfViewModel : ObservableObject, IDisposable
         if (Picks.Count == 0 && Status.Length == 0) Status = "No new picks right now. Listen to more music, then refresh.";
         RefreshDownloadStates();
         RecordShown();
+        UpdatePageTabs(source);
     }
 
     /// <summary>The page counts as shown once it is on screen: the shelf active and open. Recorded once per page, so
@@ -332,7 +366,7 @@ public sealed partial class ForYouShelfViewModel : ObservableObject, IDisposable
         if (_disposed || _source is not { } source) return Task.CompletedTask;
         _undo?.Cancel(); HasUndo = false; _dismissed = null;
         source.ResetLearning();
-        _page = null; Picks.Clear();
+        _page = null; Picks.Clear(); PageTabs.Clear(); OnPropertyChanged(nameof(HasPageTabs));
         return LoadAsync(true);
     }
 
@@ -345,6 +379,15 @@ public sealed partial class ForYouShelfViewModel : ObservableObject, IDisposable
         if (_source is not null) _source.PicksReady -= NewPicks;
         if (_online is not null) _online.DownloadsChanged -= DownloadsChanged;
     }
+}
+
+/// <summary>One of the shelf's page numbers (owner #139).</summary>
+public sealed partial class ForYouPageTab : ObservableObject
+{
+    internal ForYouPageTab(int number, DiscoverResult page) { Number = number; Page = page; }
+    public int Number { get; }
+    internal DiscoverResult Page { get; }
+    [ObservableProperty] private bool _isCurrent;
 }
 
 public sealed class ForYouPick

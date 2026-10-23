@@ -189,7 +189,7 @@ internal static class DiscoverEvaluation
                 var keys = page.Select(s => DiscoverIdentity.Key(s.Track.Song)).ToList();
                 await recorder.PlaceAsync(page, ct);
                 string ArtistOf(DiscoverSong s) => DiscoverIdentity.Artist(s.Track.Song.Artists.FirstOrDefault()?.Name);
-                pages.Add(DiscoverPageMetrics.Of(page, owned, TasteSources.Familiar(plays.Concat(listened).Where(x => x.At < clock.UtcDateTime)),
+                pages.Add(DiscoverPageMetrics.Of(page, owned, TasteSources.Familiar(plays.Concat(listened).Where(x => x.At < clock.UtcDateTime), clock.UtcDateTime),
                     seenPages.Count > 0 ? seenPages[^1] : null, recorder.Places, recorder.ListedUnder));
                 if (p == 1)
                 {

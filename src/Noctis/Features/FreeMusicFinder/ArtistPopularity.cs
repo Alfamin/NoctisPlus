@@ -47,19 +47,24 @@ internal sealed partial class ArtistCatalog
         }
     }
 
-    /// <summary>Album evidence and manual choices have already had first say. Only a decisive popularity gap
-    /// separates exact namesakes automatically; missing/comparable counts retain the existing chooser.</summary>
-    internal async Task<CatalogArtist?> PopularNamesakeAsync(string name, IReadOnlyList<CatalogArtist> candidates, CancellationToken ct)
+    /// <summary>Album evidence and manual choices have already had first say. Owner #140: after that the page never
+    /// asks which namesake is meant; it opens the most likely one at once: the most followed, or, with no counts at all,
+    /// the catalog's own first result. <paramref name="decisive"/> (For you's songs, where a wrong guess shows another
+    /// artist's songs): only a clear popularity gap picks one, else null.</summary>
+    internal async Task<CatalogArtist?> PopularNamesakeAsync(string name, IReadOnlyList<CatalogArtist> candidates, CancellationToken ct, bool decisive = false)
     {
         await LoadArtistFansAsync(ct).ConfigureAwait(false);
         var exact = candidates.Where(a => a.Id.StartsWith("deezer:", StringComparison.Ordinal) && BotText.Key(a.Name) == BotText.Key(name)).ToArray();
-        if (exact.Length < 2 || exact.Length != candidates.Count) return null;
-        if (exact.Any(a => FansOf(a) is null) && _fanRefreshes.TryAdd(BotText.Key(name), 0))
+        if (decisive ? exact.Length < 2 || exact.Length != candidates.Count : exact.Length == 0) return null;
+        if (exact.Length == 1) return exact[0];
+        // A widely followed artist (Post Malone: 4.2 million) needs no wait for its unknown namesakes' counts.
+        bool famous = !decisive && exact.Any(a => FansOf(a) >= 100_000);
+        if (!famous && exact.Any(a => FansOf(a) is null) && _fanRefreshes.TryAdd(BotText.Key(name), 0))
         {
             // Old artist caches omitted fan counts. One bounded artist-search refresh hydrates all candidates;
-            // ordinary Search never waits for this repair and an offline page keeps the chooser.
+            // ordinary Search never waits for this repair, and offline the best known guess opens.
             using var deadline = CancellationTokenSource.CreateLinkedTokenSource(ct);
-            deadline.CancelAfter(TimeSpan.FromSeconds(6));
+            deadline.CancelAfter(TimeSpan.FromSeconds(4));
             try { await SearchAsync(name, true, deadline.Token).ConfigureAwait(false); }
             catch (OperationCanceledException) when (ct.IsCancellationRequested)
             { _fanRefreshes.TryRemove(BotText.Key(name), out _); throw; }
@@ -67,9 +72,14 @@ internal sealed partial class ArtistCatalog
             catch (Exception ex) when (Recoverable(ex)) { }
         }
         ct.ThrowIfCancellationRequested();
-        if (exact.Any(a => FansOf(a) is null)) return null;
-        var ranked = exact.OrderByDescending(a => FansOf(a)!.Value).ToArray();
-        var top = FansOf(ranked[0])!.Value;
-        return top >= 1000 && top >= 10d * Math.Max(1, FansOf(ranked[1])!.Value) ? ranked[0] : null;
+        if (decisive)
+        {
+            if (exact.Any(a => FansOf(a) is null)) return null;
+            var ranked = exact.OrderByDescending(a => FansOf(a)!.Value).ToArray();
+            var top = FansOf(ranked[0])!.Value;
+            return top >= 1000 && top >= 10d * Math.Max(1, FansOf(ranked[1])!.Value) ? ranked[0] : null;
+        }
+        // Unknown counts rank below every known one; ties keep the catalog's own order.
+        return exact.Select((artist, place) => (artist, place)).OrderByDescending(c => FansOf(c.artist) ?? -1).ThenBy(c => c.place).First().artist;
     }
 }

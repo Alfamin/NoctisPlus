@@ -4,7 +4,9 @@ namespace FreeMusicFinder;
 
 /// <summary>One play of something by an artist, and what it says: finished or kept on is positive, an early skip negative.
 /// <paramref name="Heard"/>: the listener audibly heard this recording, so it is no discovery any more.</summary>
-internal sealed record TastePlay(string Artist, DateTime At, double Weight, string Title = "", bool Heard = false);
+/// <summary><paramref name="Heard"/>: listened to properly, never new again. <paramref name="Sampled"/>: only a taste of it (owner
+/// #141), new again after <see cref="TasteSources.SampleRest"/>.</summary>
+internal sealed record TastePlay(string Artist, DateTime At, double Weight, string Title = "", bool Heard = false, bool Sampled = false);
 
 /// <summary>A playlist of the listener's: made by them (each song a deliberate choice) or imported from a streaming service.</summary>
 internal sealed record TastePlaylist(bool Imported, IReadOnlyList<Guid> Tracks, IReadOnlyDictionary<Guid, DateTime>? Added = null);
@@ -195,9 +197,18 @@ internal static class TasteSources
         return plays.Where(p => seen.Add((DiscoverIdentity.Key(p.Title, p.Artist) is { Length: > 0 } k ? k : BotText.Key(p.Artist), p.At.Ticks / (2 * TimeSpan.TicksPerSecond)))).ToList();
     }
 
-    /// <summary>Recordings the listener has heard (by <see cref="DiscoverIdentity.Key(string?, string?)"/>): not owning one does not make it new to them.</summary>
-    public static HashSet<string> Familiar(IEnumerable<TastePlay> plays) =>
-        plays.Where(p => p.Heard).Select(p => DiscoverIdentity.Key(p.Title, p.Artist)).Where(k => k.Length > 0).ToHashSet(StringComparer.Ordinal);
+    /// <summary>Owner #141: a song only tasted (a few seconds of a new album, then skipped) is new again after this long.</summary>
+    public static readonly TimeSpan SampleRest = TimeSpan.FromDays(90);
+    /// <summary>Heard properly: 30 audible seconds, a fifth of the song, or a real finish. Less is only a taste.</summary>
+    public const double HeardMs = 30_000, HeardCoverage = 0.2;
+
+    /// <summary>Recordings the listener knows (by <see cref="DiscoverIdentity.Key(string?, string?)"/>): not owning one does not make it new
+    /// to them. One heard properly stays known; one only tasted is known for <see cref="SampleRest"/> after <paramref name="now"/>'s last taste.</summary>
+    public static HashSet<string> Familiar(IEnumerable<TastePlay> plays, DateTime? now = null)
+    {
+        var since = (now ?? DateTime.UtcNow) - SampleRest;
+        return plays.Where(p => p.Heard || p.Sampled && p.At >= since).Select(p => DiscoverIdentity.Key(p.Title, p.Artist)).Where(k => k.Length > 0).ToHashSet(StringComparer.Ordinal);
+    }
 
     /// <summary>Noctis's playlists.json: the listener's own playlists and the imported ones ("Imported from …"). Smart playlists are
     /// rules, not choices, and are left out. Read only.</summary>
@@ -283,9 +294,11 @@ internal static class TasteSources
                         : heard < 3_000 ? 0
                         : end == "Skipped" ? (coverage < 0.25 ? -1.5 : 0.3)
                         : heard >= 30_000 ? 0.3 : 0;
-                    // Three audible seconds or more, or a real finish: this recording is known, whatever the verdict.
-                    bool audible = finished || heard >= 3_000;
-                    if (w != 0 || audible) result.Add(new(artist, when, w, Str(e, "title"), audible));
+                    // Owner #141: 30 audible seconds, a fifth of the song or a real finish make it known for good, whatever the
+                    // verdict. Three seconds up to that is a taste: not new for a while, then it may come back.
+                    bool known = finished || heard >= HeardMs || coverage >= HeardCoverage;
+                    bool tasted = !known && heard >= 3_000;
+                    if (w != 0 || known || tasted) result.Add(new(artist, when, w, Str(e, "title"), known, tasted));
                 }
                 catch (JsonException) { } // a line cut by a crash
             }
@@ -451,7 +464,7 @@ internal static class Discover
         var learning = feedback.Learn(plays, library, playlists);
         var liked = new List<TasteRecording>();
         var seeds = Taste.Seeds(plays.Concat(learning.Saves), library, now.UtcDateTime, playlists: playlists, liked: liked);
-        return BuildAsync(seeds, catalog, unavailable, hidden, progress, ct, context: new(TasteSources.Familiar(plays), learning, now, songs ? liked : null));
+        return BuildAsync(seeds, catalog, unavailable, hidden, progress, ct, context: new(TasteSources.Familiar(plays, now.UtcDateTime), learning, now, songs ? liked : null));
     }
 
     public static async Task<DiscoverResult> BuildAsync(IReadOnlyList<TasteSeed> seeds, IDiscoverCatalog catalog,
@@ -765,6 +778,11 @@ internal sealed class ForYouSource(Func<ArtistCatalog> catalog, DiscoveryActions
 {
     private readonly Func<DateTimeOffset> _now = now ?? (() => DateTimeOffset.UtcNow);
     private readonly ForYouCache _cache = new(Path.Combine(Path.GetDirectoryName(Path.GetFullPath(hiddenPath))!, "for-you-last.json"));
+    // Owner #139: an accidental Refresh, or songs not listened to yet, must not be lost with the page they were on.
+    private readonly ForYouCache _earlierFile = new(Path.Combine(Path.GetDirectoryName(Path.GetFullPath(hiddenPath))!, "for-you-pages.json"));
+    private List<ForYouCache.Page>? _earlier;
+    /// <summary>How many pages the shelf can go back through, the current one included.</summary>
+    public const int PagesKept = 5;
     private readonly SemaphoreSlim _build = new(1, 1);
     private readonly object _sync = new();
     private readonly CancellationTokenSource _lifetime = new();
@@ -795,6 +813,20 @@ internal sealed class ForYouSource(Func<ArtistCatalog> catalog, DiscoveryActions
         {
             var page = _last ?? _cache.Read(_now(), expired: true);
             return page is null ? null : Filter(page.Result);
+        }
+    }
+
+    /// <summary>The current page, then the earlier ones, newest first (owner #139): what the shelf's page numbers show.</summary>
+    public IReadOnlyList<DiscoverResult> Pages()
+    {
+        lock (_sync)
+        {
+            if (!_loaded) { _last = _cache.Read(_now()); _loaded = true; }
+            _earlier ??= _earlierFile.ReadEarlier(_now(), PagesKept - 1);
+            var all = new List<ForYouCache.Page>();
+            if (_last is { } last) all.Add(last);
+            all.AddRange(_earlier);
+            return all.Select(p => p.Result).Where(r => r.Songs.Count > 0).DistinctBy(r => r.Batch is { Length: > 0 } b ? b : Guid.NewGuid().ToString()).Take(PagesKept).Select(Filter).ToList();
         }
     }
 
@@ -832,6 +864,12 @@ internal sealed class ForYouSource(Func<ArtistCatalog> catalog, DiscoveryActions
                 if (result.Songs.Count == 0) return Filter(result);
                 var until = _now().AddDays(7);
                 if (lastFm?.Invoke() is { } last && last.DataExpires < until) until = last.DataExpires;
+                if (_last is { Result.Songs.Count: > 0 } previous && previous.Result.Batch != result.Batch)
+                {
+                    _earlier ??= _earlierFile.ReadEarlier(_now(), PagesKept - 1);
+                    _earlier = [previous, .. _earlier.Where(p => p.Result.Batch != previous.Result.Batch).Take(PagesKept - 2)];
+                    _earlierFile.WriteEarlier(_earlier);
+                }
                 _last = new(1, _now(), until, result); _revision++;
                 if (until > _now()) _cache.Write(_last);
             }
@@ -843,12 +881,12 @@ internal sealed class ForYouSource(Func<ArtistCatalog> catalog, DiscoveryActions
 
     public void Forget() { lock (_sync) { _last = null; _invalidation++; } }
 
-    /// <summary>Forgets what For you learned here: dismissed songs, shown pages and their actions, and the saved page.
+    /// <summary>Forgets what For you learned here: dismissed songs, shown pages and their actions, and the saved pages.
     /// Listening history, favorites and playlists belong to the library and are not touched.</summary>
     public void ResetLearning()
     {
         Hidden.Clear(); Feedback.Reset();
-        lock (_sync) { _last = null; _loaded = true; _invalidation++; _cache.Delete(); }
+        lock (_sync) { _last = null; _loaded = true; _invalidation++; _cache.Delete(); _earlier = []; _earlierFile.Delete(); }
     }
 
     /// <summary>Metadata only; delayed so startup and the library scan keep priority. One build per source.

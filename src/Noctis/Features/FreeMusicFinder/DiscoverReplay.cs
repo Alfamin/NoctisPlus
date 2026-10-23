@@ -94,7 +94,7 @@ internal static class DiscoverReplay
             HashSet<string>? previous = null;
             foreach (var batch in shelf.Batches.OrderBy(b => b.At))
             {
-                var heard = TasteSources.Familiar(plays.Where(p => p.At < batch.At.UtcDateTime));
+                var heard = TasteSources.Familiar(plays.Where(p => p.At < batch.At.UtcDateTime), batch.At.UtcDateTime);
                 var cards = batch.Shown.OrderBy(c => c.Position).Take(Discover.Shelf).ToList();
                 back += cards.Count(c => dismissed.Contains(c.Key));
                 pages.Add(DiscoverPageMetrics.Of(cards, owned, heard, previous));
@@ -111,7 +111,7 @@ internal static class DiscoverReplay
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or JsonException) { }
         if (saved?.Result.Songs is { Count: > 0 } songs)
         {
-            var heard = TasteSources.Familiar(plays.Where(p => p.At < saved.At.UtcDateTime));
+            var heard = TasteSources.Familiar(plays.Where(p => p.At < saved.At.UtcDateTime), saved.At.UtcDateTime);
             output.WriteLine();
             output.WriteLine($"Saved page ({saved.At:yyyy-MM-dd}): {DiscoverPageMetrics.Of(songs.Take(Discover.Shelf).ToList(), owned, heard)}");
         }

@@ -240,6 +240,27 @@ public class DiscoverLearningTests : IDisposable
     }
 
     [Fact]
+    public void ATaste_ComesBackAfterARest_ButASongHeardProperlyNever()
+    {
+        // Owner #141: ten seconds of a new album song, skipped, may interest them months later.
+        var shuffle = Path.Combine(_folder, "plugin-data", "dev.moshi.trueshuffle"); Directory.CreateDirectory(shuffle);
+        File.WriteAllLines(Path.Combine(shuffle, "listens.jsonl"), [
+            "{\"trackId\":\"1\",\"title\":\"Tasted\",\"artist\":\"A\",\"startUtc\":\"2026-10-15T10:00:00Z\",\"end\":\"Skipped\",\"coverage\":0.05,\"listenedMs\":10000}",
+            "{\"trackId\":\"2\",\"title\":\"Half Minute\",\"artist\":\"A\",\"startUtc\":\"2026-10-15T10:01:00Z\",\"end\":\"Skipped\",\"coverage\":0.15,\"listenedMs\":31000}",
+            "{\"trackId\":\"3\",\"title\":\"Short Song\",\"artist\":\"A\",\"startUtc\":\"2026-10-15T10:02:00Z\",\"end\":\"Skipped\",\"coverage\":0.25,\"listenedMs\":25000}",
+            "{\"trackId\":\"4\",\"title\":\"Done\",\"artist\":\"A\",\"startUtc\":\"2026-10-15T10:05:00Z\",\"end\":\"Finished\",\"coverage\":1,\"listenedMs\":180000}",
+        ]);
+        var plays = TasteSources.Load(_folder);
+        var soon = TasteSources.Familiar(plays, new DateTime(2026, 11, 1, 0, 0, 0, DateTimeKind.Utc));
+        Assert.Contains(DiscoverIdentity.Key("Tasted", "A"), soon); // just skipped: not offered again straight away
+        var later = TasteSources.Familiar(plays, new DateTime(2026, 10, 15, 0, 0, 0, DateTimeKind.Utc) + TasteSources.SampleRest + TimeSpan.FromDays(2));
+        Assert.DoesNotContain(DiscoverIdentity.Key("Tasted", "A"), later);
+        Assert.Contains(DiscoverIdentity.Key("Half Minute", "A"), later); // 30 audible seconds
+        Assert.Contains(DiscoverIdentity.Key("Short Song", "A"), later); // a fifth of the song
+        Assert.Contains(DiscoverIdentity.Key("Done", "A"), later);
+    }
+
+    [Fact]
     public void Replay_ScoresBothMethodsChronologically()
     {
         var plays = new List<TastePlay>();

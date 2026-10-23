@@ -70,6 +70,30 @@ public class DiscoverReliabilityTests : IDisposable
     }
 
     [Fact]
+    public async Task Refresh_KeepsTheEarlierPages_NewestFirst_AcrossARestart_UntilReset()
+    {
+        // Owner #139: an accidental Refresh must not lose the songs on the page before it.
+        var (source, _, p) = Source();
+        var batches = new List<string>();
+        using (source)
+        {
+            for (int i = 0; i < ForYouSource.PagesKept + 1; i++) batches.Add((await source.BuildAsync(true, null, CancellationToken.None)).Batch);
+            Assert.Equal(batches.Distinct().Count(), batches.Count);
+            var pages = source.Pages();
+            Assert.Equal(ForYouSource.PagesKept, pages.Count);
+            Assert.Equal(Enumerable.Reverse(batches).Take(ForYouSource.PagesKept), pages.Select(r => r.Batch)); // 1 is the newest
+        }
+        using (var restarted = new ForYouSource(() => throw new InvalidOperationException("no real catalog here"), null, _ => [], new Library(p.Library), p.Folder,
+            PluginFile(p, "for-you-hidden.json"), now: () => Now, discover: () => new Switchable(new DiscoverEvaluationTests.World()), unavailable: (songs, _) => Task.FromResult(new HashSet<string>())))
+        {
+            Assert.Equal(Enumerable.Reverse(batches).Take(ForYouSource.PagesKept), restarted.Pages().Select(r => r.Batch));
+            restarted.ResetLearning();
+            Assert.Empty(restarted.Pages());
+            Assert.False(File.Exists(PluginFile(p, "for-you-pages.json")));
+        }
+    }
+
+    [Fact]
     public async Task SimilarArtistsDown_OwnArtistsStillFillTheShelf()
     {
         var (source, catalog, _) = Source();
