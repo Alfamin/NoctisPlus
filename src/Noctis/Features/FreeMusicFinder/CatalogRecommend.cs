@@ -69,6 +69,26 @@ internal sealed partial class ArtistCatalog
     /// The artists Deezer's listeners pair with this one, in Deezer's order. Only Deezer artists have such a list; an
     /// Apple artist gives none. Public metadata, cached for a week like other slow-changing pages.
     /// </summary>
+    /// <summary>
+    /// Deezer's radio for an artist: songs by it and by the artists Deezer's listeners pair with it, in Deezer's order. Only the
+    /// Deezer artist ID is sent. An Apple artist has none. Kept for three days, served from the cache offline like other pages.
+    /// </summary>
+    public Task<CatalogResult<List<CatalogSearchSong>>> RadioAsync(CatalogArtist artist, CancellationToken ct)
+    {
+        var (provider, id) = Split(artist.Id);
+        if (provider != "deezer") return Task.FromResult(new CatalogResult<List<CatalogSearchSong>>([], _now(), false));
+        return Cached("artist-radio:" + artist.Id, TimeSpan.FromDays(3), false, async () =>
+        {
+            using var data = await Get("deezer", "/artist/" + id + "/radio", ct);
+            return Data(data.RootElement).Select(t =>
+            {
+                if (DeezerSong(t) is not { } song) return null;
+                var album = t.TryGetProperty("album", out var a) ? DeezerRelease(a, song.Artists[0]) : null;
+                return new CatalogSearchSong(song, album, album?.Artwork ?? "");
+            }).OfType<CatalogSearchSong>().DistinctBy(s => s.Song.Id).Take(100).ToList();
+        }, ct);
+    }
+
     public Task<CatalogResult<List<CatalogArtist>>> RelatedAsync(CatalogArtist artist, CancellationToken ct)
     {
         var (provider, id) = Split(artist.Id);

@@ -6,7 +6,9 @@ using Noctis.ViewModels;
 
 namespace FreeMusicFinder;
 
-internal sealed record LocalSong(Guid Id, string Artist, string Title, string Path, TimeSpan Duration, bool Explicit = false, bool Visible = true, string AlbumArtist = "");
+/// <summary>A library song. <paramref name="Favorite"/>, <paramref name="Rating"/> and <paramref name="Disliked"/> are the listener's own marks.</summary>
+internal sealed record LocalSong(Guid Id, string Artist, string Title, string Path, TimeSpan Duration, bool Explicit = false, bool Visible = true, string AlbumArtist = "",
+    bool Favorite = false, int Rating = 0, bool Disliked = false);
 internal interface IPlaylistLibrary
 {
     Task<IReadOnlyList<LocalSong>> SnapshotAsync();
@@ -34,7 +36,7 @@ internal sealed class PlaylistLibrary : IPlaylistLibrary
             throw new IOException("LIBRARY_SCANNING: Noctis is still scanning. Wait for it to finish, then check the library again; no missing downloads were guessed.");
         var visible = library.Tracks.Select(t => t.Id).ToHashSet();
         return (IReadOnlyList<LocalSong>)library.AllTracks.Where(t => !t.IsRemoteStream && Path.IsPathFullyQualified(t.FilePath))
-            .Select(t => new LocalSong(t.Id, t.Artist, t.Title, t.FilePath, t.Duration, t.IsExplicit, visible.Contains(t.Id), t.AlbumArtist)).ToArray();
+            .Select(t => new LocalSong(t.Id, t.Artist, t.Title, t.FilePath, t.Duration, t.IsExplicit, visible.Contains(t.Id), t.AlbumArtist, t.IsFavorite, t.Rating, t.IsDisliked)).ToArray();
     });
 
     public async Task ApplyAsync(Guid id, string name, string url, IReadOnlyList<Guid> tracks, bool create, IReadOnlyList<Guid> expected, IReadOnlyList<Guid>? remappedExpected = null)

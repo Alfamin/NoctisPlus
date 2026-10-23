@@ -77,6 +77,8 @@ public sealed partial class ForYouShelfViewModel : ObservableObject, IDisposable
         if (!value) { LoadFraction = 0; LoadCount = ""; }
     }
 
+    partial void OnIsExpandedChanged(bool value) { if (value) RecordShown(); }
+
     private void FeatureChanged(object? sender, EventArgs e) => Dispatcher.UIThread.Post(() =>
     {
         if (!_disposed) Attach(FreeMusicPlugin.Current?.ForYou, FreeMusicPlugin.Current?.OnlineSearch, FreeMusicPlugin.Current?.Discovery);
@@ -103,6 +105,7 @@ public sealed partial class ForYouShelfViewModel : ObservableObject, IDisposable
         if (_page is null) _ = LoadAsync(false);
         else
         {
+            RecordShown();
             _load?.Dispose(); _load = new();
             foreach (var row in Picks.Where(r => !r.Song.HasArtwork)) _ = LoadArt(row, _load.Token);
             RefreshDownloadStates();
@@ -123,10 +126,18 @@ public sealed partial class ForYouShelfViewModel : ObservableObject, IDisposable
         Status = Picks.Count > 0 ? "Refreshing…" : "Finding music for you…";
         try
         {
-            var progress = new Progress<string>(text => { if (Current()) ShowProgress(text); });
+            // A report posted late from the build must not overwrite the final status (the notice or "Couldn't refresh").
+            var progress = new Progress<string>(text => { if (Current() && IsLoading) ShowProgress(text); });
             var page = !refresh ? await source.SavedAsync(stop.Token) : null;
             page ??= await source.BuildAsync(refresh, progress, stop.Token);
             if (!Current()) return;
+            // No catalog answered: an outage, not an empty answer. Keep the picks on screen, or bring back the last saved page.
+            if (page is { Songs.Count: 0, Unreachable: true } && (Picks.Count > 0 || source.LastSaved() is { Songs.Count: > 0 }))
+            {
+                if (Picks.Count == 0 && source.LastSaved() is { } saved) Show(saved, source);
+                Status = "Couldn't refresh right now. Showing your last picks.";
+                return;
+            }
             // A cached page can predate a download or library scan. Filter those recordings
             // before displaying it; download actions still check the disk afresh.
             if (_actions is { } actions && page.Songs.Count > 0)
@@ -156,7 +167,7 @@ public sealed partial class ForYouShelfViewModel : ObservableObject, IDisposable
         Picks.Clear();
         foreach (var pick in page.Songs.Where(s => !source.Hidden.HidesSong(s.Track.Song)).Take(20))
         {
-            var row = new ForYouPick(pick, new SearchSongItem(_online!.Remember(pick.Track)));
+            var row = new ForYouPick(pick, new SearchSongItem(_online!.Remember(pick.Track)), page.Batch ?? "", Picks.Count);
             Picks.Add(row);
             _ = LoadArt(row, _load!.Token);
         }
@@ -164,6 +175,30 @@ public sealed partial class ForYouShelfViewModel : ObservableObject, IDisposable
         Status = page.Notice;
         if (Picks.Count == 0 && Status.Length == 0) Status = "No new picks right now. Listen to more music, then refresh.";
         RefreshDownloadStates();
+        RecordShown();
+    }
+
+    /// <summary>The page counts as shown once it is on screen: the shelf active and open. Recorded once per page, so
+    /// coming back to it, Undo or a re-render never count it again. Retrieved-but-unshown picks are never recorded.</summary>
+    private void RecordShown()
+    {
+        if (_disposed || !_active || !IsExpanded || _source is not { } source || _page is not { Batch.Length: > 0 } page || Picks.Count == 0) return;
+        source.Feedback.Shown(page.Batch, Picks.Select(p => new DiscoverShown(DiscoverIdentity.Key(p.Pick.Track.Song), p.Pick.Track.Song.Id,
+            DiscoverIdentity.Artist(p.Pick.Track.Song.Artists.FirstOrDefault()?.Name), p.Pick.Seed ?? "", p.Pick.Own, p.Position)).ToList());
+    }
+
+    /// <summary>The view's report of the cards at least half on screen. Only those count as seen when a passed-over song is
+    /// rested; cards below the fold were retrieved, not shown. Ignored while the shelf is inactive or collapsed.</summary>
+    internal void InView(IEnumerable<ForYouPick> visible)
+    {
+        if (_disposed || !_active || !IsExpanded || _source is not { } source || _page is not { Batch.Length: > 0 } page) return;
+        source.Feedback.Seen(page.Batch, visible.Where(p => p.Batch == page.Batch).Select(p => p.Position).ToList());
+    }
+
+    private void Record(ForYouPick pick, DiscoverAction action)
+    {
+        var song = pick.Pick.Track.Song;
+        _source?.Feedback.Record(pick.Batch, DiscoverIdentity.Key(song), DiscoverIdentity.Artist(song.Artists.FirstOrDefault()?.Name), song.Title, action);
     }
 
     private async Task LoadArt(ForYouPick row, CancellationToken ct)
@@ -197,6 +232,7 @@ public sealed partial class ForYouShelfViewModel : ObservableObject, IDisposable
     {
         if (_disposed || pick?.Song.Online is not { } song || _online is not { } online || PlayRequested is not { } play) return;
         if (!online.CanDownload) { online.RequestSignIn(); return; }
+        Record(pick, DiscoverAction.Play);
         var generation = ++_playGeneration;
         try
         {
@@ -213,6 +249,7 @@ public sealed partial class ForYouShelfViewModel : ObservableObject, IDisposable
     [RelayCommand(AllowConcurrentExecutions = true)] private async Task OpenPick(ForYouPick? pick)
     {
         if (pick is null || _online is not { } online) return;
+        Record(pick, DiscoverAction.Open);
         if (pick.Pick.Track.Album is { } album)
         {
             if (_openStop is not null && _openingAlbum == album.Id) return; // already opening: its page is up
@@ -229,12 +266,16 @@ public sealed partial class ForYouShelfViewModel : ObservableObject, IDisposable
     [RelayCommand] private void OpenPickArtist(ForYouPick? pick)
     {
         if (pick?.Pick.Track.Song.Artists.FirstOrDefault() is { } artist)
+        {
+            Record(pick, DiscoverAction.Open);
             _online?.OpenArtist(new(artist.Id, artist.Name, Genre: artist.Genre));
+        }
     }
     private async Task DownloadAsync(ForYouPick? pick, bool now)
     {
         if (_disposed || pick?.Song.Online is not { } song || _online is not { } online) return;
         if (!online.CanDownload) { online.RequestSignIn(); return; }
+        Record(pick, now ? DiscoverAction.Download : DiscoverAction.Queue);
         try { Status = await online.DownloadAsync([song], now, CancellationToken.None); }
         catch (Exception ex) { Status = ex.Message; }
         RefreshDownloadStates();
@@ -245,6 +286,7 @@ public sealed partial class ForYouShelfViewModel : ObservableObject, IDisposable
     {
         if (pick is null || _source is not { } source || !Picks.Contains(pick)) return;
         if (!source.Hidden.Hide(pick.Pick.Track.Song)) return;
+        Record(pick, DiscoverAction.Dismiss);
         _undo?.Cancel(); _undo?.Dispose();
         var stop = _undo = new();
         _dismissed = (pick, Picks.IndexOf(pick), _page, source);
@@ -270,6 +312,7 @@ public sealed partial class ForYouShelfViewModel : ObservableObject, IDisposable
         if (!HasUndo || _dismissed is not { } old) return;
         _undo?.Cancel();
         old.Source.Hidden.Undo(old.Pick.Pick.Track.Song);
+        old.Source.Feedback.Retract(old.Pick.Batch, DiscoverIdentity.Key(old.Pick.Pick.Track.Song), DiscoverAction.Dismiss);
         // Undo may finish after Refresh or a feature switch. Remove the preference in all
         // cases, but never put a card from an older page into the newly displayed page.
         if (ReferenceEquals(old.Page, _page) && ReferenceEquals(old.Source, _source))
@@ -279,6 +322,18 @@ public sealed partial class ForYouShelfViewModel : ObservableObject, IDisposable
                 Picks.Insert(Math.Min(old.Index, Picks.Count), old.Pick);
         }
         HasUndo = false; _dismissed = null;
+    }
+
+    /// <summary>Forgets For you's dismissals, shown pages and saved page, then finds new picks. The library and its
+    /// listening history are not touched.</summary>
+    [RelayCommand]
+    private Task ResetLearning()
+    {
+        if (_disposed || _source is not { } source) return Task.CompletedTask;
+        _undo?.Cancel(); HasUndo = false; _dismissed = null;
+        source.ResetLearning();
+        _page = null; Picks.Clear();
+        return LoadAsync(true);
     }
 
     public void Dispose()
@@ -295,7 +350,11 @@ public sealed partial class ForYouShelfViewModel : ObservableObject, IDisposable
 public sealed class ForYouPick
 {
     internal DiscoverSong Pick { get; }
-    internal ForYouPick(DiscoverSong pick, SearchSongItem song) { Pick = pick; Song = song; }
+    /// <summary>The page this card was shown on.</summary>
+    internal string Batch { get; }
+    /// <summary>Where it was placed when the page was shown (Undo puts it back without changing it).</summary>
+    internal int Position { get; }
+    internal ForYouPick(DiscoverSong pick, SearchSongItem song, string batch = "", int position = 0) { Pick = pick; Song = song; Batch = batch; Position = position; }
     public SearchSongItem Song { get; }
     public string Because => Pick.Because;
 }

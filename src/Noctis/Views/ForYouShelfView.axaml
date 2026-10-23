@@ -150,6 +150,11 @@
         <Grid ColumnDefinitions="*,Auto">
             <Button Classes="section-toggle" Classes.expanded="{Binding IsExpanded}" Command="{Binding ToggleExpandedCommand}"
                     ToolTip.Tip="Hide or show this section">
+                <Button.ContextMenu>
+                    <ContextMenu>
+                        <MenuItem Header="Reset For you (forget hidden songs and shown picks)" Command="{Binding ResetLearningCommand}" />
+                    </ContextMenu>
+                </Button.ContextMenu>
                 <StackPanel Orientation="Horizontal" Spacing="8">
                     <TextBlock Text="For you" FontSize="22" FontWeight="Bold" />
                     <Border Classes="section-chevron-box">
@@ -198,7 +203,7 @@
                     <Border Classes="skeleton" Width="168" Height="168" CornerRadius="6" />
                 </StackPanel>
 
-                <ItemsControl ItemsSource="{Binding Picks}">
+                <ItemsControl x:Name="PickList" ItemsSource="{Binding Picks}">
                     <ItemsControl.ItemsPanel>
                         <ItemsPanelTemplate><WrapPanel Orientation="Horizontal" /></ItemsPanelTemplate>
                     </ItemsControl.ItemsPanel>

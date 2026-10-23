@@ -5,11 +5,15 @@ using System.Text.RegularExpressions;
 
 namespace FreeMusicFinder;
 
-/// <summary>Public artist relations only. No user session, scrobbles, local paths or listening events are sent.
+/// <summary>A song Last.fm's listeners pair with another, most similar first.</summary>
+internal sealed record SimilarTrack(string Artist, string Title, double Score);
+
+/// <summary>Public artist and song relations only. Sent: an artist name, or for songs like a liked recording its title and artist.
+/// No user session, scrobbles, local paths or listening events are sent.
 /// The injected route/key keep this usable by the future native app as well as the plugin.</summary>
 internal sealed class LastFmSimilar : IDisposable
 {
-    private sealed record Entry(DateTimeOffset Until, List<SimilarArtist> Artists);
+    private sealed record Entry(DateTimeOffset Until, List<SimilarArtist> Artists, List<SimilarTrack>? Tracks = null);
     private readonly HttpClient _http;
     private readonly Func<string> _key;
     private readonly Func<DateTimeOffset> _now;
@@ -38,7 +42,7 @@ internal sealed class LastFmSimilar : IDisposable
             if (Safe() && File.Exists(_path) && new FileInfo(_path).Length < 4 * 1024 * 1024 &&
                 JsonSerializer.Deserialize<Dictionary<string, Entry>>(File.ReadAllText(_path)) is { } saved)
                 _cache = saved.Where(p => p.Value is { Artists: not null } && p.Value.Until > _now() && p.Value.Until <= _now().AddDays(15))
-                    .Take(256).ToDictionary(p => p.Key, p => p.Value with { Artists = Clean(p.Value.Artists) }, StringComparer.Ordinal);
+                    .Take(256).ToDictionary(p => p.Key, p => p.Value with { Artists = Clean(p.Value.Artists), Tracks = p.Value.Tracks is { } t ? Clean(t) : null }, StringComparer.Ordinal);
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or JsonException or ArgumentException) { }
     }
@@ -46,12 +50,74 @@ internal sealed class LastFmSimilar : IDisposable
     public async Task<List<SimilarArtist>> SimilarAsync(string artist, CancellationToken ct)
     {
         ct.ThrowIfCancellationRequested();
-        var apiKey = _key().Trim();
-        if (!ValidKey(apiKey)) return [];
-        if (string.IsNullOrWhiteSpace(artist) || artist.Length > 200 || artist.Any(char.IsControl)) return [];
+        if (!Sendable(artist)) return [];
         var name = BotText.Key(artist);
+        var entry = await AskAsync(name, "artist.getsimilar&artist=" + Uri.EscapeDataString(artist) + "&limit=50", root => Artists(root, name), ct).ConfigureAwait(false);
+        return [.. entry?.Artists ?? []];
+    }
+
+    /// <summary>Last.fm's songs like this one (<c>track.getSimilar</c>): sends the title and artist, cached like similar artists.</summary>
+    public async Task<List<SimilarTrack>> SimilarTracksAsync(string artist, string title, CancellationToken ct)
+    {
+        ct.ThrowIfCancellationRequested();
+        if (!Sendable(artist) || !Sendable(title) || DiscoverIdentity.Key(title, artist) is not { Length: > 0 } key) return [];
+        var entry = await AskAsync("track:" + key, "track.getsimilar&artist=" + Uri.EscapeDataString(artist) + "&track=" + Uri.EscapeDataString(title) + "&limit=30",
+            root => new Entry(default, [], Tracks(root, key)), ct).ConfigureAwait(false);
+        return [.. entry?.Tracks ?? []];
+    }
+
+    private static bool Sendable(string value) => !string.IsNullOrWhiteSpace(value) && value.Length <= 200 && !value.Any(char.IsControl);
+
+    private static Entry Artists(JsonElement root, string name)
+    {
+        if (!root.TryGetProperty("similarartists", out var similar) || similar.ValueKind != JsonValueKind.Object || !similar.TryGetProperty("artist", out var rows) ||
+            rows.ValueKind is not (JsonValueKind.Array or JsonValueKind.Object)) throw new JsonException();
+        var result = new List<SimilarArtist>();
+        foreach (var row in rows.ValueKind == JsonValueKind.Array ? rows.EnumerateArray().ToArray() : new[] { rows })
+        {
+            if (row.ValueKind != JsonValueKind.Object || !row.TryGetProperty("name", out var n) || n.ValueKind != JsonValueKind.String) continue;
+            var display = n.GetString()?.Trim() ?? "";
+            var score = Match(row);
+            if (double.IsFinite(score) && BotText.Key(display) != name) result.Add(new(display, Math.Clamp(score, 0, 1)));
+        }
+        return new(default, Clean(result).OrderByDescending(a => a.Score).ToList());
+    }
+
+    private static List<SimilarTrack> Tracks(JsonElement root, string key)
+    {
+        if (!root.TryGetProperty("similartracks", out var similar) || similar.ValueKind != JsonValueKind.Object || !similar.TryGetProperty("track", out var rows) ||
+            rows.ValueKind is not (JsonValueKind.Array or JsonValueKind.Object)) throw new JsonException();
+        var result = new List<SimilarTrack>();
+        foreach (var row in rows.ValueKind == JsonValueKind.Array ? rows.EnumerateArray().ToArray() : new[] { rows })
+        {
+            if (row.ValueKind != JsonValueKind.Object || !row.TryGetProperty("name", out var n) || n.ValueKind != JsonValueKind.String) continue;
+            if (!row.TryGetProperty("artist", out var by) || by.ValueKind != JsonValueKind.Object || !by.TryGetProperty("name", out var a) || a.ValueKind != JsonValueKind.String) continue;
+            var (title, artist) = (n.GetString()?.Trim() ?? "", a.GetString()?.Trim() ?? "");
+            var score = Match(row);
+            if (double.IsFinite(score) && DiscoverIdentity.Key(title, artist) != key) result.Add(new(artist, title, Math.Clamp(score, 0, 1)));
+        }
+        return Clean(result).OrderByDescending(t => t.Score).ToList();
+    }
+
+    private static double Match(JsonElement row)
+    {
+        double score = 0;
+        if (row.TryGetProperty("match", out var m))
+        {
+            if (m.ValueKind == JsonValueKind.Number) m.TryGetDouble(out score);
+            else if (m.ValueKind == JsonValueKind.String) double.TryParse(m.GetString(), NumberStyles.Float, CultureInfo.InvariantCulture, out score);
+        }
+        return score;
+    }
+
+    /// <summary>One Last.fm method call, cached under <paramref name="name"/>, paced, and with the key's and the service's errors kept as
+    /// the notice. Null: the key is missing or invalid, nothing was asked.</summary>
+    private async Task<Entry?> AskAsync(string name, string method, Func<JsonElement, Entry> parse, CancellationToken ct)
+    {
+        var apiKey = _key().Trim();
+        if (!ValidKey(apiKey)) return null;
         lock (_sync)
-            if (_cache.TryGetValue(name, out var cached) && cached.Until > _now()) { if (cached.Until < _dataExpires) _dataExpires = cached.Until; return [.. cached.Artists]; }
+            if (_cache.TryGetValue(name, out var cached) && cached.Until > _now()) { if (cached.Until < _dataExpires) _dataExpires = cached.Until; return cached; }
         await _slots.WaitAsync(ct).ConfigureAwait(false);
         try
         {
@@ -74,8 +140,8 @@ internal sealed class LastFmSimilar : IDisposable
             finally { _start.Release(); }
 
             // Never log this URI, provider error text, or underlying network exception messages: they may echo the key.
-            using var response = await _http.GetAsync("https://ws.audioscrobbler.com/2.0/?method=artist.getsimilar&artist=" +
-                Uri.EscapeDataString(artist) + "&limit=50&autocorrect=1&api_key=" + apiKey + "&format=json", HttpCompletionOption.ResponseHeadersRead, ct).ConfigureAwait(false);
+            using var response = await _http.GetAsync("https://ws.audioscrobbler.com/2.0/?method=" + method + "&autocorrect=1&api_key=" + apiKey + "&format=json",
+                HttpCompletionOption.ResponseHeadersRead, ct).ConfigureAwait(false);
             if (response.StatusCode == HttpStatusCode.TooManyRequests) throw Wait(response);
             if (!response.IsSuccessStatusCode) throw new HttpRequestException("Last.fm HTTP failure.", null, response.StatusCode);
             if (response.Content.Headers.ContentLength > 1024 * 1024) throw new InvalidDataException("Last.fm returned too much data. Using the other catalogs.");
@@ -90,7 +156,7 @@ internal sealed class LastFmSimilar : IDisposable
             }
             using var doc = JsonDocument.Parse(buffer.ToArray()); var root = doc.RootElement;
             if (root.ValueKind != JsonValueKind.Object) throw new JsonException();
-            var result = new List<SimilarArtist>();
+            var result = new Entry(default, [], []);
             if (root.TryGetProperty("error", out var error))
             {
                 int code = error.ValueKind == JsonValueKind.Number && error.TryGetInt32(out var i) ? i : 0;
@@ -107,44 +173,27 @@ internal sealed class LastFmSimilar : IDisposable
                 }
                 if (code != 6) throw new InvalidDataException("Last.fm could not provide similar artists. Using the other catalogs.");
             }
-            else
-            {
-                if (!root.TryGetProperty("similarartists", out var similar) || similar.ValueKind != JsonValueKind.Object || !similar.TryGetProperty("artist", out var rows) ||
-                    rows.ValueKind is not (JsonValueKind.Array or JsonValueKind.Object)) throw new JsonException();
-                foreach (var row in rows.ValueKind == JsonValueKind.Array ? rows.EnumerateArray().ToArray() : new[] { rows })
-                {
-                    if (row.ValueKind != JsonValueKind.Object || !row.TryGetProperty("name", out var n) || n.ValueKind != JsonValueKind.String) continue;
-                    var display = n.GetString()?.Trim() ?? "";
-                    double score = 0;
-                    if (row.TryGetProperty("match", out var m))
-                    {
-                        if (m.ValueKind == JsonValueKind.Number) m.TryGetDouble(out score);
-                        else if (m.ValueKind == JsonValueKind.String) double.TryParse(m.GetString(), NumberStyles.Float, CultureInfo.InvariantCulture, out score);
-                    }
-                    if (double.IsFinite(score) && BotText.Key(display) != name) result.Add(new(display, Math.Clamp(score, 0, 1)));
-                }
-                result = Clean(result).OrderByDescending(a => a.Score).ToList();
-            }
+            else result = parse(root);
             lock (_sync)
             {
                 if (_rejectedKey != apiKey && _retry <= _now()) { _rejectedKey = ""; _notice = ""; }
                 // Respect a shorter server lifetime; no-store/no-cache data never enters the persistent cache.
                 var headers = response.Headers.CacheControl;
-                var ttl = result.Count == 0 ? TimeSpan.FromDays(7) : TimeSpan.FromDays(14);
+                var ttl = result.Artists.Count == 0 && result.Tracks is not { Count: > 0 } ? TimeSpan.FromDays(7) : TimeSpan.FromDays(14);
                 if (headers?.MaxAge is { } max) ttl = max - (response.Headers.Age ?? TimeSpan.Zero) < ttl ? max - (response.Headers.Age ?? TimeSpan.Zero) : ttl;
                 if (response.Content.Headers.Expires is { } expires && expires - _now() < ttl) ttl = expires - _now();
                 var dataUntil = headers?.NoStore == true || headers?.NoCache == true ? _now() : _now() + ttl;
                 if (dataUntil < _dataExpires) _dataExpires = dataUntil;
                 if (headers?.NoStore != true && headers?.NoCache != true && ttl > TimeSpan.Zero)
                 {
-                    _cache[name] = new(_now() + ttl, result);
+                    _cache[name] = result with { Until = _now() + ttl };
                     _cache = _cache.Where(p => p.Value.Until > _now()).OrderByDescending(p => p.Value.Until).Take(256).ToDictionary(p => p.Key, p => p.Value, StringComparer.Ordinal);
                     while (_cache.Count > 1 && JsonSerializer.SerializeToUtf8Bytes(_cache).Length > 4 * 1024 * 1024) _cache.Remove(_cache.Keys.Last());
                     try { if (Safe()) AtomicJson.Write(_path, _cache); }
                     catch (Exception ex) when (ex is IOException or UnauthorizedAccessException) { }
                 }
             }
-            return [.. result];
+            return result;
         }
         catch (OperationCanceledException) when (!ct.IsCancellationRequested) { throw Failure("Last.fm timed out. Check your VPN/proxy; using the other catalogs."); }
         catch (HttpRequestException ex) { throw Failure(ex.StatusCode is { } status ? $"Last.fm answered HTTP {(int)status}. Using the other catalogs."
@@ -180,6 +229,9 @@ internal sealed class LastFmSimilar : IDisposable
         }).ToList();
     }
 
+    private static List<SimilarTrack> Clean(IEnumerable<SimilarTrack> tracks) => tracks.Where(t => t is not null && t.Artist is { Length: > 0 and <= 200 } &&
+        t.Title is { Length: > 0 and <= 200 } && !t.Artist.Any(char.IsControl) && !t.Title.Any(char.IsControl) && double.IsFinite(t.Score))
+        .DistinctBy(t => DiscoverIdentity.Key(t.Title, t.Artist)).Take(50).Select(t => t with { Score = Math.Clamp(t.Score, 0, 1) }).ToList();
     private static List<SimilarArtist> Clean(IEnumerable<SimilarArtist> artists) => artists.Where(a => a is not null && a.Name is { Length: > 0 and <= 200 } &&
         !a.Name.Any(char.IsControl) && double.IsFinite(a.Score)).DistinctBy(a => BotText.Key(a.Name)).Take(50).Select(a => a with { Score = Math.Clamp(a.Score, 0, 1) }).ToList();
     private bool Safe()
