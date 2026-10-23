@@ -1,20 +1,99 @@
 {
-  "version": "2.3.1",
-  "added": [
+  "releases": [
     {
-      "icon": "RailSparkleIcon",
-      "title": "For you plays its page",
-      "line": "A song you play queues the rest of that page"
+      "version": "2.3.1",
+      "added": [
+        { "icon": "RailSparkleIcon", "title": "For you plays its page", "line": "A song you play queues the rest of that page", "top": true },
+        { "icon": "SaveDiskIcon", "title": "Download ahead", "line": "Choose how many next songs download: Off to 4", "setting": "downloadAhead" }
+      ],
+      "fixed": [
+        "Not for me on the playing song skips to the next one",
+        "Every earlier For you page opens, older ones too"
+      ]
     },
     {
-      "icon": "SaveDiskIcon",
-      "title": "Download ahead",
-      "line": "Choose how many next songs download: Off to 4",
-      "setting": "downloadAhead"
+      "version": "2.3.0",
+      "added": [
+        { "icon": "RailSparkleIcon", "title": "For you learns as you listen", "line": "What you play, keep, skip or scroll past shapes the next page", "top": true },
+        { "icon": "HeartOutlineIcon", "title": "Songs like your favourites", "line": "Picks follow the songs you like most, not only their artists", "top": true },
+        { "icon": "GridViewIcon", "title": "Earlier pages kept", "line": "Your last 10 pages stay; pick one under the shelf" },
+        { "icon": "ShuffleIcon", "title": "Fewer repeats", "line": "New pages bring new songs; ones you've heard leave old pages" },
+        { "icon": "ArtistsIcon", "title": "Artists open straight away", "line": "No more \"which one?\"; the best-known artist with that name loads" },
+        { "icon": "NextIcon", "title": "A quick skip isn't a no", "line": "Songs played under 30 s can come back later; Not for me hides them" }
+      ],
+      "fixed": [
+        "For you leaves out songs you've already heard, even ones you don't own",
+        "A catalog outage keeps your picks instead of emptying the shelf"
+      ]
+    },
+    {
+      "version": "2.2.0",
+      "added": [
+        { "icon": "PlaylistsIcon", "title": "Every song in your playlists plays", "line": "Songs you don't have yet play too, shuffled or not", "top": true },
+        { "icon": "SongsIcon", "title": "Play just streams", "line": "Played songs wait in a cache; Add to songs keeps them", "top": true },
+        { "icon": "GlobeIcon", "title": "Offline mode", "line": "Keep listening locally; online work waits", "setting": "offline", "top": true },
+        { "icon": "LyricsIcon", "title": "Word timing as you listen", "line": "On by default once set up; turn it off in WordLyrics settings", "setting": "wordTiming" },
+        { "icon": "RailSparkleIcon", "title": "For you in seconds", "line": "Recommendations fill in about 7 s instead of over a minute" },
+        { "icon": "SearchIcon", "title": "Hard names found", "line": "Tricky titles get a second search; close matches wait in Check these" },
+        { "icon": "SaveDiskIcon", "title": "Keep played songs", "line": "Choose how long songs you only played are kept", "setting": "cache" },
+        { "icon": "LyricsIcon", "title": "Skip word timing for a song", "line": "Lyrics menu → Ignore WordLyrics; enable it again anytime" },
+        { "icon": "RailInfoIcon", "title": "What's new, anytime", "line": "Every update's notes in Settings → About", "setting": "about" }
+      ],
+      "fixed": [
+        "Songs whose long titles Telegram cuts short download again",
+        "Interrupted streams and transfers continue instead of starting over",
+        "Album songs stay visible during library scans, with Retry for failed loads"
+      ]
+    },
+    {
+      "version": "2.1.0",
+      "added": [
+        { "icon": "PlaylistsIcon", "title": "Playlists in Search", "line": "Find public playlists, play them, save them as your own", "top": true },
+        { "icon": "PlayIcon", "title": "Your last click plays first", "line": "The song you press Play on starts before earlier downloads" },
+        { "icon": "SyncIcon", "title": "Faster bots", "line": "A busy or silent bot gives way to the other one" },
+        { "icon": "SongsIcon", "title": "Choose your first bot", "line": "Music Hunters leads by default; the other is the reserve", "setting": "firstBot" }
+      ],
+      "fixed": [
+        "Fewer missed songs: small length differences and censored titles match",
+        "Lyrics no longer flash or freeze when word timing finishes"
+      ]
+    },
+    {
+      "version": "2.0.2",
+      "added": [
+        { "icon": "SearchIcon", "title": "Search inside your lists", "line": "Songs, playlists and Favorites each have their own search bar" }
+      ],
+      "fixed": []
+    },
+    {
+      "version": "2.0.1",
+      "added": [
+        { "icon": "SyncIcon", "title": "See what a download is doing", "line": "A small icon: asking the bot, trying the other, receiving, saving" }
+      ],
+      "fixed": [
+        "Downloads no longer get stuck waiting for a bot",
+        "Playlist songs with several artists download",
+        "Accents don't matter in Search"
+      ]
+    },
+    {
+      "version": "2.0.0",
+      "added": [
+        { "icon": "SearchIcon", "title": "One Search page", "line": "Your library and online music together", "top": true },
+        { "icon": "PlayIcon", "title": "Play while it downloads", "line": "Songs you don't have start once enough has arrived", "top": true },
+        { "icon": "AlbumsIcon", "title": "Pages show what you don't own", "line": "Artist, album and playlist pages list every song" },
+        { "icon": "LyricsIcon", "title": "WordLyrics built in", "line": "Word-by-word lyric timing, set up when you choose" },
+        { "icon": "ShuffleIcon", "title": "Shuffle modes", "line": "Equal chance, No repeats, Discovery, Never played, For you" },
+        { "icon": "SaveDiskIcon", "title": "Download quality", "line": "FLAC or MP3, with an MP3 fallback if you allow it" }
+      ],
+      "fixed": []
+    },
+    {
+      "version": "1.6.3.1",
+      "added": [
+        { "icon": "StarIcon", "title": "Noctis Plus", "line": "Free Music Finder, True Shuffle, WordLyrics and Lyric Motion built in", "top": true }
+      ],
+      "fixed": []
     }
-  ],
-  "fixed": [
-    "Not for me on the playing song skips to the next one",
-    "Every earlier For you page opens, older ones too"
   ]
 }
