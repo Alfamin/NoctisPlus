@@ -96,6 +96,9 @@ public interface IOnlineMusicSearch
     bool CancelQueued(OnlineSong song) => false;
     /// <summary>Replace transient audio work with this exact playback window. Explicit saves are independent.</summary>
     void SetPlaybackWindow(string? currentPath, IReadOnlyList<OnlineSong> songs) { }
+    /// <summary>Owner #147: how many of the next songs you don't have are downloaded ahead, 0 (none: each is fetched when
+    /// the queue reaches it) to 4. Changing it raises <see cref="DownloadsChanged"/>.</summary>
+    int DownloadAheadSongs => 2;
     /// <summary>Restore an interrupted cached recording as a paused, fetchable track, without starting network work.</summary>
     Noctis.Models.Track? RestorePlaybackTrack(string path, Guid id) => null;
     /// <summary>Owner #100: the bot is asked for the song so it is ready in the chat; nothing is downloaded. A later download

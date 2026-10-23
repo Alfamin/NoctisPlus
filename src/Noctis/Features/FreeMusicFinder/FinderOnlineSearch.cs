@@ -37,6 +37,11 @@ internal sealed class FinderOnlineSearch : IOnlineMusicSearch
 
     public void Detach() => _actions.Downloads.Changed -= OnDownloadChanged;
 
+    /// <summary>Owner #147: the "Download ahead" choice (0-4 songs).</summary>
+    internal Func<int> DownloadAhead { get; init; } = () => StreamCache.DefaultAhead;
+    public int DownloadAheadSongs => Math.Clamp(DownloadAhead(), 0, StreamCache.MaxAhead);
+    internal void AheadChanged() => DownloadsChanged?.Invoke(this, EventArgs.Empty);
+
     private void OnDownloadChanged(Download _) => DownloadsChanged?.Invoke(this, EventArgs.Empty);
 
     public event EventHandler? DownloadsChanged;

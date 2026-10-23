@@ -17,7 +17,8 @@ public sealed record PendingStream(IOnlineMusicSearch Source, OnlineSong Song, b
 /// </summary>
 public partial class PlayerViewModel
 {
-    /// <summary>Owner #116: the next four queue positions count, including owned songs; only the next two positions download.</summary>
+    /// <summary>Owner #116: the next four queue positions count, including owned songs; only the next two positions download
+    /// (owner #147: the source's Download ahead choice, 0 to 4; two by default).</summary>
     internal const int StreamAheadPlaces = 4, StreamAheadSongs = 2, AskAheadSongs = 4;
 
     /// <summary>Settings → Playback, "Play songs you don't have". Off: only the songs you have are queued.</summary>
@@ -355,7 +356,7 @@ public partial class PlayerViewModel
             }
             // In the stream cache (plays at once), or neither bot had it (skipped when reached): nothing more to do.
             if (state is OnlineDownloadState.Streamed or OnlineDownloadState.Failed) continue;
-            if (i < StreamAheadSongs) fetch.Add((i, pending));
+            if (i < pending.Source.DownloadAheadSongs) fetch.Add((i, pending));
             else ask.Add(pending);
         }
         // Owner #111: right after a big queue change (a list played, shuffle on or off, a reshuffle, a True Shuffle mode)

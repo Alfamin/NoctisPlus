@@ -19,6 +19,8 @@ public class QueueStreamingTests
         internal readonly List<(string Id, bool Keep)> Asked = [];
         internal readonly List<(string Id, bool Now)> Downloads_ = [];
         internal bool SignedIn = true;
+        internal int Ahead = PlayerViewModel.StreamAheadSongs;
+        public int DownloadAheadSongs => Ahead;
         internal Func<string?, bool>? CacheTest;
         public bool IsCachedFile(string? path) => CacheTest?.Invoke(path) == true;
         internal readonly Dictionary<string, string> CompleteFiles = [];
@@ -343,5 +345,22 @@ public class QueueStreamingTests
         player.SkipDismissed(Song("a")); Settle();
         Assert.Contains(("b", false), source.Asked);                  // the next song is on its way
         Assert.Equal(new[] { "d" }, Ahead(player));
+    }
+
+    /// <summary>Owner #147: the Download ahead choice, from Off (each song downloads when the queue reaches it) to 4.</summary>
+    [AvaloniaTheory]
+    [InlineData(0)]
+    [InlineData(1)]
+    [InlineData(4)]
+    public async Task DownloadAhead_TakesTheChosenNumberOfNextSongs(int ahead)
+    {
+        var source = new Source { Ahead = ahead, FinishDownloads = true }; var (player, _) = NewPlayer(); // asks wait for the downloads
+        var list = new List<Track> { Local("A") };
+        for (int i = 0; i < 6; i++) list.Add(StandIn(source, "s" + i));
+        player.ReplaceQueueAndPlay(list, 0); Settle();
+        await Until(() => source.Downloads_.Count >= ahead && source.AskedAhead.Count >= 4 - ahead);
+        await Task.Delay(100); Settle();
+        lock (source.Downloads_) Assert.Equal(Enumerable.Range(0, ahead).Select(i => "s" + i), source.Downloads_.Select(d => d.Id).Order()); // started side by side
+        lock (source.AskedAhead) Assert.Equal(Enumerable.Range(ahead, 4 - ahead).Select(i => "s" + i), source.AskedAhead); // the rest only asked for
     }
 }

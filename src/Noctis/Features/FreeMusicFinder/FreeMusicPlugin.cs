@@ -126,7 +126,8 @@ public sealed class FreeMusicPlugin : INoctisPlugin
         // Native For you loads when its shelf is visible. A startup background build
         // must not compete with the user's first Search for metadata connections.
         // The app's own Search page reads the catalog and starts downloads through this.
-        _online = new FinderOnlineSearch(() => _catalog, _discoveryActions, _artistPages, () => _telegram?.IsLoggedIn == true, ShowSignIn, () => _playlists);
+        _online = new FinderOnlineSearch(() => _catalog, _discoveryActions, _artistPages, () => _telegram?.IsLoggedIn == true, ShowSignIn, () => _playlists)
+        { DownloadAhead = () => StreamCache.AheadSongs(_host?.Settings.GetString(StreamCache.AheadKey)) };
         Current = this;
         Noctis.Services.Search.OnlineMusicSearch.Current = _online;
         _transfers.Changed += Announce;
@@ -219,6 +220,7 @@ public sealed class FreeMusicPlugin : INoctisPlugin
         else if (key == AllowMp3Key) _allowMp3 = _host?.Settings.GetBool(AllowMp3Key, true) ?? true;
         else if (key == "firstBot") _firstBot = _host?.Settings.GetString(key) == "DeezLoad" ? "DeezLoad" : BotSelections.Hunters;
         else if (key == StreamCache.SettingKey) Task.Run(PurgeStreamCache);
+        else if (key == StreamCache.AheadKey) _online?.AheadChanged();
         else if (key == "preferredQuality")
         {
             _preferredQuality = _host?.Settings.GetString(key) == "MP3" ? AudioQuality.MP3 : AudioQuality.FLAC;

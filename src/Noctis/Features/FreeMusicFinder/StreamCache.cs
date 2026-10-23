@@ -52,6 +52,12 @@ internal static class StreamCache
     public static bool Fits(string folder, string fileName) => Path.Combine(folder, fileName).Length + ".flac.part".Length <= MaxPath;
 
     /// <summary>Days a streamed song is kept after it was last played; null = forever.</summary>
+    /// <summary>Owner #147: how many of the next songs in the queue download ahead (only the ones you don't have).</summary>
+    internal const string AheadKey = "downloadAhead", DefaultAheadChoice = "2 songs";
+    internal const int DefaultAhead = 2, MaxAhead = 4;
+    internal static readonly string[] AheadChoices = ["Off", "1 song", "2 songs", "3 songs", "4 songs"];
+    public static int AheadSongs(string? choice) => Array.IndexOf(AheadChoices, choice?.Trim()) is var i and >= 0 ? i : DefaultAhead;
+
     public static int? Days(string? choice) => choice?.Trim() switch
     {
         "7 days" => 7,
