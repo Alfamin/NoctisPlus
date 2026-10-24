@@ -394,7 +394,7 @@ internal static class QueueManagementTests
         var releaseFirst = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
         var holdAsk = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
         var blockAskFor = "";
-        BotTrack Song(string title) => new(title, "Artist", null, "Artist - " + title, async (output, _, ct) =>
+        BotTrack Song(string title) => new(title, "Artist", null, "Artist - " + title, async (output, progress, ct) =>
         {
             if (output is AskOnlyStream)
             {
@@ -403,7 +403,14 @@ internal static class QueueManagementTests
                 return "flac";
             }
             lock (log) log.Add("get " + title);
-            if (title == "A") await releaseFirst.Task.WaitAsync(ct);
+            if (title == "A")
+            {
+                await Task.Delay(200, ct);
+                Check.False(Log().Any(l => l.StartsWith("ask ", StringComparison.Ordinal)), "nothing is asked ahead while the current song is still with the bot");
+                progress?.Report(0.1); // its file is arriving: the bot is done with it
+                await releaseFirst.Task.WaitAsync(ct);
+            }
+            progress?.Report(0.5); await Task.Delay(100, ct); // a transfer takes a moment
             await output.WriteAsync(Encoding.ASCII.GetBytes("fLaC " + title), ct); return "flac";
         }) { Request = new(title, "Artist") };
         string[] Log() { lock (log) return log.ToArray(); }
@@ -420,13 +427,27 @@ internal static class QueueManagementTests
             Check.False(Log().Contains("ask A"), "the song already downloading is not asked for again");
         }
         log.Clear();
+        blockAskFor = "H";
+        using (var queue = new Downloads(_ => { }) { AskAhead = (d, ct) => d.Track.Fetch(new AskOnlyStream(), null, ct) })
+        {
+            var g = queue.Start(Song("G"), root); var h = queue.Start(Song("H"), root);
+            await Check.UntilAsync(() => g.State == DownloadState.Saved && Log().Contains("ask H"), "the first song finishes while the next is still being asked for");
+            await Task.Delay(200);
+            Check.False(Log().Contains("get H"), "the next song's own turn waits for its ask instead of asking a bot again");
+            holdAsk.SetResult();
+            await Check.UntilAsync(() => h.State == DownloadState.Saved, "then it is collected");
+            Check.Equal(1, Log().Count(l => l == "ask H"), "the bots were asked for it once");
+        }
+        holdAsk = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        log.Clear();
         blockAskFor = "F";
         using (var queue = new Downloads(_ => { }) { AskAhead = (d, ct) => d.Track.Fetch(new AskOnlyStream(), null, ct) })
         {
             var slowFirst = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
-            var first = queue.Start(new BotTrack("E", "Artist", null, "Artist - E", async (output, _, ct) =>
+            var first = queue.Start(new BotTrack("E", "Artist", null, "Artist - E", async (output, progress, ct) =>
             {
                 if (output is AskOnlyStream) return "flac";
+                progress?.Report(0.1);
                 await slowFirst.Task.WaitAsync(ct); await output.WriteAsync(Encoding.ASCII.GetBytes("fLaC E"), ct); return "flac";
             }) { Request = new("E", "Artist") }, root);
             queue.Start(Song("F"), root);

@@ -675,7 +675,7 @@
                             IsVisible="{Binding HasCatalogMissing}"
                             Classes="accent-btn album-header-action"
                             Padding="22,8" CornerRadius="999" BorderThickness="1" FontWeight="Bold" Cursor="Hand"
-                            ToolTip.Tip="Download the songs you don't have">
+                            ToolTip.Tip="Download the songs you don't have" AutomationProperties.Name="Download missing">
                         <StackPanel Orientation="Horizontal" Spacing="6">
                             <Path Data="{StaticResource SearchDownloadGlyph}" Width="13" Height="13" Stretch="Uniform" VerticalAlignment="Center"
                                   Stroke="{Binding $parent[Button].Foreground}" StrokeThickness="2.2" StrokeLineCap="Round" StrokeJoin="Round" />

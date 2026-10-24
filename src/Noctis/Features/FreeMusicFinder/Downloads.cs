@@ -35,6 +35,8 @@ internal sealed class Download(BotTrack track, string folder)
     internal int Stalls { get; set; }
     /// <summary>Cancelled by the watchdog alone: only then is a transfer that ignores its cancel left behind.</summary>
     internal CancellationTokenSource? StallStop { get; set; }
+    /// <summary>Owner #160: this run already set off asking for the songs after it.</summary>
+    internal bool AskedOnward { get; set; }
     internal bool FinishIntoCache { get; set; }
     /// <summary>Owner #87: a streamed song the user added to Songs: its library folder (copied there once saved).</summary>
     public string? KeepIn { get; internal set; }
@@ -75,14 +77,19 @@ internal sealed class Downloads : IDisposable
     /// <summary>Drops the Telegram connection (the login is kept), so a request that hangs on it ends and frees its lane.</summary>
     internal Func<Task>? ResetConnection { get; set; }
     /// <summary>Owner #160: while the backlog downloads one song, the bots are asked for the next ones (as for streaming): their
-    /// files wait in the chat, so each later song only has to be collected. One ask at a time; a Play or download-now request
-    /// stops the ask in flight, and songs fetched for playback are left to the player's own asking ahead.</summary>
+    /// files wait in the chat, so each later song only has to be collected. Asked once the current song's file is arriving
+    /// (the bot is done with it: live, an ask sent beside the current song's search left Music Hunters silent to it). One ask
+    /// at a time; a Play or download-now request stops the ask in flight; songs fetched for playback are left to the player.</summary>
     internal const int AheadSongs = 2;
     /// <summary>Asks the bots for a song without transferring it (<see cref="AskOnlyStream"/>).</summary>
     internal Func<Download, CancellationToken, Task>? AskAhead { get; set; }
     private readonly HashSet<Download> _askedAhead = new();
     private Task _askingAhead = Task.CompletedTask;
     private CancellationTokenSource? _askStop;
+    // The song being asked for and its ask: when its own turn comes meanwhile, it waits for that ask and then takes the file
+    // from the chat, instead of asking a bot a second time (live: two requests for one song left Music Hunters "busy").
+    private Download? _askingFor;
+    private Task? _askFor;
 
     public Downloads(Action<string> log, string? store = null, Func<MusicRequest, BotTrack>? restore = null, string? cacheFolder = null)
     {
@@ -439,15 +446,16 @@ internal sealed class Downloads : IDisposable
                         transfer = CancellationTokenSource.CreateLinkedTokenSource(_stop.Token);
                         _running[download] = transfer; tidy = _tidied.Add(download.Folder);
                         download.State = DownloadState.Running; download.Error = ""; download.Stage = ""; download.Step = Noctis.Services.Search.OnlineDownloadStep.Asking; download.Progress = 0; download.RetryAt = null;
-                        download.LastActivity = DateTimeOffset.UtcNow; download.Stalled = false; download.StallStop = new(); SaveOrLog();
+                        download.LastActivity = DateTimeOffset.UtcNow; download.Stalled = false; download.StallStop = new(); download.AskedOnward = false; SaveOrLog();
                     }
                     else if (eligible.Any(d => d.RetryAt > DateTimeOffset.UtcNow))
                         delay = TimeSpan.FromMilliseconds(Math.Clamp((eligible.Where(d => d.RetryAt is not null).Min(d => d.RetryAt)!.Value - DateTimeOffset.UtcNow).TotalMilliseconds, 10, 60000));
                     if (_running.Count > 0) { StopStalled(); delay = TimeSpan.FromMilliseconds(Math.Min(delay.TotalMilliseconds, Math.Clamp(StallLimit.TotalMilliseconds / 4, 50, 30_000))); }
                 }
                 if (download is null) { await _wake.WaitAsync(delay, _stop.Token).ConfigureAwait(false); continue; }
-                // A Play or download-now request takes the bots first; otherwise the next songs are asked for meanwhile.
-                if (download.Priority) Cancel(_askStop); else PostAskAhead();
+                // A Play or download-now request takes the bots first (the next songs are asked for once a backlog song's
+                // file is arriving: see RunOneAsync).
+                if (download.Priority) Cancel(_askStop);
                 // Before this folder's first transfer starts, so the other lane's partial file is never taken for a leftover.
                 if (tidy && Downloader.CleanLeftovers(download.Folder) is > 0 and var removed)
                     _log($"removed {removed} unfinished downloads left in {download.Folder}");
@@ -492,14 +500,20 @@ internal sealed class Downloads : IDisposable
                 stop = _askStop = CancellationTokenSource.CreateLinkedTokenSource(_stop.Token);
                 stop.CancelAfter(TimeSpan.FromSeconds(45));
             }
-            try { await ask(next, stop.Token).ConfigureAwait(false); }
+            var asking = ask(next, stop.Token);
+            lock (_gate) { _askingFor = next; _askFor = asking; }
+            try { await asking.ConfigureAwait(false); }
             catch (Exception ex) when (!_stop.IsCancellationRequested)
             {
                 // Nothing lost: the song is asked for again when its turn comes.
                 _log($"asking ahead for \"{next.Track.Title}\" stopped: {(ex is OperationCanceledException ? "a played song went first" : ex.Message)}");
                 if (ex is OperationCanceledException) return;
             }
-            finally { lock (_gate) { if (ReferenceEquals(_askStop, stop)) _askStop = null; } stop.Dispose(); }
+            finally
+            {
+                lock (_gate) { if (ReferenceEquals(_askStop, stop)) _askStop = null; if (ReferenceEquals(_askingFor, next)) { _askingFor = null; _askFor = null; } }
+                stop.Dispose();
+            }
         }
     }
 
@@ -563,11 +577,23 @@ internal sealed class Downloads : IDisposable
         {
             ct.ThrowIfCancellationRequested();
             Raise(download);
+            Task? asked; lock (_gate) asked = ReferenceEquals(_askingFor, download) ? _askFor : null;
+            if (asked is not null)
+            {
+                // Owner #160: already being asked for: its file is about to be in the chat.
+                try { await asked.WaitAsync(TimeSpan.FromSeconds(45), ct).ConfigureAwait(false); }
+                catch (Exception) when (!ct.IsCancellationRequested) { } // the download asks again itself
+            }
             download.Playback = new(download.Folder, download.Track.FileName, download.Track.Duration);
             // Only a stall lets go of a transfer that ignores its cancel (a request hanging on a dead connection), so the lane is
             // freed; other cancels (a song held back for Play) still wait for the transfer to stop, as before.
             var outcome = await Downloader.DownloadAsync(download.Track, download.Folder, new Report(p =>
-            { download.LastActivity = DateTimeOffset.UtcNow; download.Progress = double.IsFinite(p) ? Math.Clamp(p, 0, .99) : 0; download.Stage = ""; if (p > 0) download.Step = Noctis.Services.Search.OnlineDownloadStep.Receiving; Raise(download); },
+            {
+                download.LastActivity = DateTimeOffset.UtcNow; download.Progress = double.IsFinite(p) ? Math.Clamp(p, 0, .99) : 0; download.Stage = "";
+                if (p > 0) download.Step = Noctis.Services.Search.OnlineDownloadStep.Receiving;
+                if (p > 0 && !download.Priority && !download.AskedOnward) { download.AskedOnward = true; PostAskAhead(); }
+                Raise(download);
+            },
                 (stage, step) => { download.LastActivity = DateTimeOffset.UtcNow; download.Stage = stage; download.Step = step; download.Progress = 0; Raise(download); }), ct, download.Playback)
                 .WaitAsync(download.StallStop?.Token ?? CancellationToken.None).ConfigureAwait(false);
             var savedPath = Downloader.FindExisting(download.Folder, download.Track.FileName);
