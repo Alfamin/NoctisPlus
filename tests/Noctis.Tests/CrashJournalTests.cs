@@ -180,4 +180,42 @@ public class CrashJournalTests
         Assert.Contains("line 1000", block);
         Assert.Contains("full file is in the data folder", block);
     }
+
+    // ── Owner #153: a stack overflow's frames (stderr) reach the preserved crash log ──
+
+    [Fact]
+    public void NativeErrors_AreAddedToThePreservedCrashLog_ThenRemoved()
+    {
+        var dir = Directory.CreateTempSubdirectory("noctis-journal-").FullName;
+        try
+        {
+            var crash = Path.Combine(dir, "crashlog-20261024-115212.log");
+            File.WriteAllText(crash, "[11:52:10] [Queue] last line\n");
+            File.WriteAllText(Path.Combine(dir, "native-errors.log"), "Stack overflow.\nRepeat 1000 times:\n   at Noctis.Views.Foo()\n");
+            CrashJournal.PreserveNativeErrors(dir, crash);
+            var text = File.ReadAllText(crash);
+            Assert.Contains("last line", text);
+            Assert.Contains(CrashJournal.NativeErrorsBanner, text);
+            Assert.Contains("at Noctis.Views.Foo()", text);
+            Assert.False(File.Exists(Path.Combine(dir, "native-errors.log")));
+        }
+        finally { Directory.Delete(dir, true); }
+    }
+
+    [Fact]
+    public void NativeErrors_WithoutAJournal_GetACrashLogOfTheirOwn_AndEmptyOnesNone()
+    {
+        var dir = Directory.CreateTempSubdirectory("noctis-journal-").FullName;
+        try
+        {
+            File.WriteAllText(Path.Combine(dir, "native-errors.log"), "");
+            CrashJournal.PreserveNativeErrors(dir, null);
+            Assert.Empty(Directory.GetFiles(dir, "crashlog-*.log"));
+            File.WriteAllText(Path.Combine(dir, "native-errors.log"), "Stack overflow.\n");
+            CrashJournal.PreserveNativeErrors(dir, null);
+            var kept = Assert.Single(Directory.GetFiles(dir, "crashlog-*.log"));
+            Assert.Contains("Stack overflow.", File.ReadAllText(kept));
+        }
+        finally { Directory.Delete(dir, true); }
+    }
 }

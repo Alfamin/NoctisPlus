@@ -75,6 +75,7 @@ public static class CrashJournal
             if (_writer != null) return;
             _dataRoot = dataRoot;
             var sessionPath = Path.Combine(dataRoot, SessionFileName);
+            string? preserved = null;
 
             try
             {
@@ -96,6 +97,7 @@ public static class CrashJournal
                         var target = Path.Combine(dataRoot, PreservedPrefix + stamp + ".log");
                         // A same-second crash loop lands on an existing name.
                         File.Move(sessionPath, target, overwrite: true);
+                        preserved = target;
 
                         foreach (var name in SelectPruneVictims(
                             Directory.GetFiles(dataRoot, PreservedPrefix + "*.log")
@@ -107,14 +109,23 @@ public static class CrashJournal
                     }
                 }
 
+                PreserveNativeErrors(dataRoot, preserved);
+
                 // FileShare.Read: users can peek via Open Folder, but a second
                 // Noctis instance cannot open this for write — its Initialize
                 // fails right here (or on the Move above) and it runs
                 // memory-only instead of destroying the live journal.
-                _writer = new StreamWriter(
-                    new FileStream(sessionPath, FileMode.Create, FileAccess.Write, FileShare.Read),
-                    Encoding.UTF8)
-                { AutoFlush = true };
+                // Owner #153: right after an update the old instance can still hold
+                // the file for a moment; that run went memory-only and its crash
+                // left nothing. Wait up to ~3 s for it.
+                FileStream? stream = null;
+                for (var attempt = 0; stream == null; attempt++)
+                {
+                    try { stream = new FileStream(sessionPath, FileMode.Create, FileAccess.Write, FileShare.Read); }
+                    catch (IOException) when (attempt < 20) { Thread.Sleep(150); }
+                }
+                _writer = new StreamWriter(stream, Encoding.UTF8) { AutoFlush = true };
+                CaptureNativeErrors(dataRoot);
             }
             catch
             {
@@ -124,6 +135,57 @@ public static class CrashJournal
         }
 
         DebugLog.AttachSink(AppendLine, ResetSessionFile);
+    }
+
+    // ── Owner #153: a stack overflow ends the process with no handler, no fatal marker and
+    // no crash.log entry; the runtime writes its repeating frames to stderr only, which a
+    // windowed app does not have. Windows: the C runtime's stderr (which the runtime prints
+    // through; SetStdHandle alone is not seen) goes to native-errors.log, and the next launch
+    // adds what it holds to the preserved crash log. Checked with a windowed probe that
+    // overflows: "Stack overflow. Repeated 32149 times: at P.Deep(Int32)".
+
+    private const string NativeErrorsFileName = "native-errors.log";
+    internal const string NativeErrorsBanner = "=== native error output ===";
+    private static IntPtr _nativeErrors;
+
+    [System.Runtime.InteropServices.DllImport("kernel32.dll")]
+    private static extern IntPtr GetStdHandle(int nStdHandle);
+    private const int StdErrorHandle = -12;
+    [System.Runtime.InteropServices.DllImport("ucrtbase.dll", CallingConvention = System.Runtime.InteropServices.CallingConvention.Cdecl)]
+    private static extern IntPtr __acrt_iob_func(uint index);
+    [System.Runtime.InteropServices.DllImport("ucrtbase.dll", CallingConvention = System.Runtime.InteropServices.CallingConvention.Cdecl,
+        CharSet = System.Runtime.InteropServices.CharSet.Unicode)]
+    private static extern int _wfreopen_s(out IntPtr stream, string path, string mode, IntPtr oldStream);
+
+    /// <summary>What the last run wrote to stderr goes to the end of its preserved crash log (or a crash log of its
+    /// own when the run kept no journal). Nothing written: nothing kept.</summary>
+    internal static void PreserveNativeErrors(string dataRoot, string? preservedTarget)
+    {
+        var path = Path.Combine(dataRoot, NativeErrorsFileName);
+        try
+        {
+            if (!File.Exists(path) || new FileInfo(path).Length == 0) return;
+            var text = File.ReadAllText(path);
+            var target = preservedTarget ?? Path.Combine(dataRoot, PreservedPrefix
+                + File.GetLastWriteTime(path).ToString(PreservedStampFormat, CultureInfo.InvariantCulture) + ".log");
+            File.AppendAllText(target, Environment.NewLine + NativeErrorsBanner + Environment.NewLine + text);
+            File.Delete(path);
+        }
+        catch { /* best effort, like the rest of the journal */ }
+    }
+
+    private static void CaptureNativeErrors(string dataRoot)
+    {
+        if (!OperatingSystem.IsWindows()) return;
+        try
+        {
+            // Started from a console (or with stderr redirected): it already goes somewhere.
+            var current = GetStdHandle(StdErrorHandle);
+            if (current != IntPtr.Zero && current != new IntPtr(-1)) return;
+            if (_wfreopen_s(out var stream, Path.Combine(dataRoot, NativeErrorsFileName), "w", __acrt_iob_func(2)) == 0)
+                _nativeErrors = stream;
+        }
+        catch { _nativeErrors = IntPtr.Zero; }
     }
 
     /// <summary>
@@ -149,6 +211,17 @@ public static class CrashJournal
     {
         lock (Lock)
         {
+            // A clean exit's stderr (a library's chatter) is no crash to keep.
+            try
+            {
+                if (_nativeErrors != IntPtr.Zero && _dataRoot != null)
+                {
+                    _wfreopen_s(out _, "NUL", "w", _nativeErrors);
+                    File.Delete(Path.Combine(_dataRoot, NativeErrorsFileName));
+                }
+            }
+            catch { /* kept: shown with the next crash at worst */ }
+            _nativeErrors = IntPtr.Zero;
             if (_writer == null) return;
             try
             {
