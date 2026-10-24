@@ -109,4 +109,29 @@ internal static class HunterLinkTests
         await Check.ThrowsAsync<OperationCanceledException>(() => TelegramBotSource.WaitForLinkReplyAsync(_ => silentReply.Task, userStop.Token),
             "owner cancellation is preserved rather than turned into a reserve retry");
     }
+
+    /// <summary>Owner #159: Music Hunters deletes its earlier results when another search reaches it. The lock is kept from a
+    /// search's results until their press, so another song's search waits; a hold nobody presses passes on its own.</summary>
+    internal static async Task ResultsLockAsync()
+    {
+        Check.Section("Music Hunters: another song's search waits until the results just found are pressed");
+        var gate = new ResultsLock { Hold = TimeSpan.FromMilliseconds(400) };
+        await gate.WaitAsync(default); gate.KeepFor(101);              // "Stuck In A Dream": results 101 found
+        var other = gate.WaitAsync(default);                            // "Umbrella"'s search
+        await Task.Delay(100);
+        Check.False(other.IsCompleted, "another search waits while the results are not yet pressed");
+        Check.False(gate.TryTake(999), "a press for other results does not take the kept lock");
+        Check.True(gate.TryTake(101), "the press for the kept results takes the lock over");
+        await Task.Delay(500);
+        Check.False(other.IsCompleted, "the hold's timer does not release a lock a press has taken");
+        gate.Release();                                                 // pressed: the file is waited for without the lock
+        await other.WaitAsync(TimeSpan.FromSeconds(1));
+        Check.True(other.IsCompletedSuccessfully, "after the press the other search goes ahead");
+        gate.KeepFor(102);                                              // results nobody takes (no fitting song)
+        var later = gate.WaitAsync(default);
+        await later.WaitAsync(TimeSpan.FromSeconds(2));
+        Check.True(later.IsCompletedSuccessfully, "results nobody presses stop holding the bot after the hold");
+        Check.False(gate.TryTake(102), "a late press after the hold must take the lock the normal way");
+        gate.Release();
+    }
 }

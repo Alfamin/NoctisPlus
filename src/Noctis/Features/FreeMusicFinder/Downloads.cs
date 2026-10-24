@@ -74,6 +74,15 @@ internal sealed class Downloads : IDisposable
     internal static TimeSpan StallRetry = TimeSpan.FromSeconds(10);
     /// <summary>Drops the Telegram connection (the login is kept), so a request that hangs on it ends and frees its lane.</summary>
     internal Func<Task>? ResetConnection { get; set; }
+    /// <summary>Owner #160: while the backlog downloads one song, the bots are asked for the next ones (as for streaming): their
+    /// files wait in the chat, so each later song only has to be collected. One ask at a time; a Play or download-now request
+    /// stops the ask in flight, and songs fetched for playback are left to the player's own asking ahead.</summary>
+    internal const int AheadSongs = 2;
+    /// <summary>Asks the bots for a song without transferring it (<see cref="AskOnlyStream"/>).</summary>
+    internal Func<Download, CancellationToken, Task>? AskAhead { get; set; }
+    private readonly HashSet<Download> _askedAhead = new();
+    private Task _askingAhead = Task.CompletedTask;
+    private CancellationTokenSource? _askStop;
 
     public Downloads(Action<string> log, string? store = null, Func<MusicRequest, BotTrack>? restore = null, string? cacheFolder = null)
     {
@@ -437,6 +446,8 @@ internal sealed class Downloads : IDisposable
                     if (_running.Count > 0) { StopStalled(); delay = TimeSpan.FromMilliseconds(Math.Min(delay.TotalMilliseconds, Math.Clamp(StallLimit.TotalMilliseconds / 4, 50, 30_000))); }
                 }
                 if (download is null) { await _wake.WaitAsync(delay, _stop.Token).ConfigureAwait(false); continue; }
+                // A Play or download-now request takes the bots first; otherwise the next songs are asked for meanwhile.
+                if (download.Priority) Cancel(_askStop); else PostAskAhead();
                 // Before this folder's first transfer starts, so the other lane's partial file is never taken for a leftover.
                 if (tidy && Downloader.CleanLeftovers(download.Folder) is > 0 and var removed)
                     _log($"removed {removed} unfinished downloads left in {download.Folder}");
@@ -453,6 +464,45 @@ internal sealed class Downloads : IDisposable
             _active.Clear();
         }
     }
+    private void PostAskAhead()
+    {
+        if (AskAhead is not { } ask) return;
+        lock (_gate)
+        {
+            if (!_askingAhead.IsCompleted || _disposed) return;
+            _askingAhead = Task.Run(() => AskAheadAsync(ask));
+        }
+    }
+
+    /// <summary>Owner #160: the next <see cref="AheadSongs"/> backlog songs not yet asked for, in queue order, one at a time.</summary>
+    private async Task AskAheadAsync(Func<Download, CancellationToken, Task> ask)
+    {
+        for (var turn = 0; turn < AheadSongs && !_stop.IsCancellationRequested; turn++)
+        {
+            Download? next; CancellationTokenSource stop;
+            lock (_gate)
+            {
+                if (_disposed || _active.Any(d => d.Priority && (d.State == DownloadState.Running || Runnable(d)))) return;
+                _askedAhead.RemoveWhere(d => !_active.Contains(d));
+                next = _active.Where(d => !_running.ContainsKey(d) && Runnable(d) && !d.Priority && !IsCached(d)
+                        && (d.RetryAt is null || d.RetryAt <= DateTimeOffset.UtcNow))
+                    .Take(AheadSongs).FirstOrDefault(d => !_askedAhead.Contains(d));
+                if (next is null) return;
+                _askedAhead.Add(next);
+                stop = _askStop = CancellationTokenSource.CreateLinkedTokenSource(_stop.Token);
+                stop.CancelAfter(TimeSpan.FromSeconds(45));
+            }
+            try { await ask(next, stop.Token).ConfigureAwait(false); }
+            catch (Exception ex) when (!_stop.IsCancellationRequested)
+            {
+                // Nothing lost: the song is asked for again when its turn comes.
+                _log($"asking ahead for \"{next.Track.Title}\" stopped: {(ex is OperationCanceledException ? "a played song went first" : ex.Message)}");
+                if (ex is OperationCanceledException) return;
+            }
+            finally { lock (_gate) { if (ReferenceEquals(_askStop, stop)) _askStop = null; } stop.Dispose(); }
+        }
+    }
+
     /// <summary>Owner #156: under the queue lock. Each stalled transfer is cancelled (it requeues itself) and the connection is
     /// reset once, so a request hanging on it ends.</summary>
     private void StopStalled()

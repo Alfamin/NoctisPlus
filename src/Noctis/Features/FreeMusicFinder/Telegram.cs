@@ -465,7 +465,8 @@ internal sealed class TelegramBotSource : IHunterBotSource
     // Searches may now run while a download waits for its file. Two searches at once would each take
     // the other's answer, since the bot answers both in the same chat; a download's file is told apart
     // from a search answer by being a file.
-    private readonly SemaphoreSlim _searching = new(1, 1);
+    // Owner #159: also kept from a search's results until their button is pressed (ResultsLock).
+    private readonly ResultsLock _searching = new();
     private long _answered = long.MinValue;
     /// <summary>How long Music Hunters is left out after "daily search limit reached" (owner #73); then it is asked again.</summary>
     internal static readonly TimeSpan SearchLimitPause = TimeSpan.FromHours(3);
@@ -497,11 +498,13 @@ internal sealed class TelegramBotSource : IHunterBotSource
     {
         var waited = System.Diagnostics.Stopwatch.StartNew();
         await _searching.WaitAsync(ct).ConfigureAwait(false);
+        var held = false;
         try
         {
             if (_nameSearchUntil > DateTimeOffset.UtcNow)
                 throw new SourceLimitException(BotSelections.Hunters, "Music Hunters' name search is waiting; track links remain available.", _nameSearchUntil, searchOnly: true);
-            return await RunAsync<IReadOnlyList<BotTrack>>(async (client, bot) =>
+            var resultsId = 0;
+            var tracks = await RunAsync<IReadOnlyList<BotTrack>>(async (client, bot) =>
             {
                 await LearnFromHistoryAsync(client, bot, ct).ConfigureAwait(false);
                 Noctis.Services.DebugLog.Write("Finder", $"Music Hunters: /search sent {waited.Elapsed.TotalSeconds:0.0} s after it was asked");
@@ -525,11 +528,15 @@ internal sealed class TelegramBotSource : IHunterBotSource
                     throw new SourceLimitException(BotSelections.Hunters, "Music Hunters reached its daily search limit; track links remain available.", _nameSearchUntil, searchOnly: true);
                 }
 
+                resultsId = results.id;
                 return ParseResults(results,FetchSelectedAsync);
             }, ct).ConfigureAwait(false);
+            if (tracks.Count > 0 && resultsId != 0) { _searching.KeepFor(resultsId); held = true; }
+            return tracks;
         }
-        finally { _searching.Release(); }
+        finally { if (!held) _searching.Release(); }
     }
+
 
     internal static IReadOnlyList<BotTrack> ParseResults(Message results,
         Func<MusicRequest,Stream,IProgress<double>?,CancellationToken,Task<string>> fetch)
@@ -571,11 +578,17 @@ internal sealed class TelegramBotSource : IHunterBotSource
     /// other file the bot sends meanwhile (the late answer to an earlier request, or something
     /// that is not a song) is left alone.
     /// </summary>
-    internal Task<Document> RequestSelectedDocumentAsync(MusicRequest request,CancellationToken ct)
+    /// <param name="searchingHeld">The caller holds the search lock (the link path) until the file is in.</param>
+    internal async Task<Document> RequestSelectedDocumentAsync(MusicRequest request,CancellationToken ct,bool searchingHeld=false)
     {
         var selection=request.Selection??throw new StaleSelectionException("Music Hunters' selection was not saved.");
         _=BotSelections.DecodeHunter(selection);
-        return RunAsync(async (client, bot) =>
+        // Owner #159: no other search may reach the bot between these results and their press. Kept from the search
+        // that found them, or taken now (an older selection, from a saved queue); let go once the button is pressed.
+        if (!searchingHeld && !_searching.TryTake(selection.MessageId)) await _searching.WaitAsync(ct).ConfigureAwait(false);
+        var holding = !searchingHeld;
+        void Pressed() { if (!holding) return; holding = false; _searching.Release(); }
+        try { return await RunAsync(async (client, bot) =>
         {
             var old=await client.Messages_GetHistory(bot,offset_id:selection.MessageId+1,limit:1).WaitAsync(TimeSpan.FromSeconds(25), ct).ConfigureAwait(false);
             var button=ValidateSelection(request,old.Messages.OfType<Message>().FirstOrDefault(m=>m.id==selection.MessageId));
@@ -598,6 +611,7 @@ internal sealed class TelegramBotSource : IHunterBotSource
                 if (BotText.IsBusy(notice)) throw new BotBusyException(BotSelections.Hunters, "Music Hunters is finishing another download.", newest);
                 if (BotLimits.Read("Music Hunters", notice ?? "", DateTimeOffset.UtcNow) is { } limited) throw limited;
                 Noctis.Services.DebugLog.Write("Finder", $"Music Hunters: pressed {selection.Number}" + (press > 1 ? $" again at {fileClock.Elapsed.TotalSeconds:0.0} s" : ""));
+                Pressed(); // the file is waited for without holding other searches back
 
                 var window = FileWindow(press, fileClock.Elapsed);
                 if (window <= TimeSpan.Zero) break;
@@ -622,7 +636,8 @@ internal sealed class TelegramBotSource : IHunterBotSource
                     : "The bot answered: " + notice);
             }
             return (Document)((MessageMediaDocument)file.media).document;
-        }, ct);
+        }, ct).ConfigureAwait(false); }
+        finally { Pressed(); }
     }
 
     /// <summary>How long to wait for the file after press number <paramref name="press"/> (1-based), counted from
@@ -700,7 +715,7 @@ internal sealed class TelegramBotSource : IHunterBotSource
                 var selected = ParseResults(reply, FetchSelectedAsync).FirstOrDefault(t => RecordingMatch.Fits(request, t.Artist, t.Title, t.Duration))?.Request
                     ?? throw new TrackUnavailableException("Music Hunters' link results did not match this recording.");
                 _answered = System.Diagnostics.Stopwatch.GetTimestamp();
-                return await RequestSelectedDocumentAsync(request with { Selection = selected.Selection }, ct).ConfigureAwait(false);
+                return await RequestSelectedDocumentAsync(request with { Selection = selected.Selection }, ct, searchingHeld: true).ConfigureAwait(false);
             }, ct).ConfigureAwait(false);
         }
         finally { _searching.Release(); }

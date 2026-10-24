@@ -21,6 +21,7 @@ internal static class QueueManagementTests
         await WorkerSurvivesSaveFailure(); await ReportWhileHeld();
         await SavedHistoryPaths();
         await StallWatchdog();
+        await AskAheadForTheBacklog();
     }
     private static async Task SavedHistoryPaths()
     {
@@ -381,5 +382,60 @@ internal static class QueueManagementTests
             Check.Equal(8, slow, "it ran once, start to finish");
         }
         finally { (Downloads.StallLimit, Downloads.StallRetry) = (limit, retry); }
+    }
+
+    /// <summary>Owner #160: while the backlog downloads one song the bots are asked for the next two (their files wait in the
+    /// chat), one at a time, never further ahead; a Play request stops the ask in flight.</summary>
+    private static async Task AskAheadForTheBacklog()
+    {
+        Check.Section("a download queue asks the bots for its next two songs while one downloads");
+        var root = Check.NewFolder("queue-ask-ahead");
+        var log = new List<string>();
+        var releaseFirst = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var holdAsk = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var blockAskFor = "";
+        BotTrack Song(string title) => new(title, "Artist", null, "Artist - " + title, async (output, _, ct) =>
+        {
+            if (output is AskOnlyStream)
+            {
+                lock (log) log.Add("ask " + title);
+                if (title == blockAskFor) { try { await holdAsk.Task.WaitAsync(ct); } catch (OperationCanceledException) { lock (log) log.Add("ask stopped " + title); throw; } }
+                return "flac";
+            }
+            lock (log) log.Add("get " + title);
+            if (title == "A") await releaseFirst.Task.WaitAsync(ct);
+            await output.WriteAsync(Encoding.ASCII.GetBytes("fLaC " + title), ct); return "flac";
+        }) { Request = new(title, "Artist") };
+        string[] Log() { lock (log) return log.ToArray(); }
+        using (var queue = new Downloads(_ => { }) { AskAhead = (d, ct) => d.Track.Fetch(new AskOnlyStream(), null, ct) })
+        {
+            var songs = new[] { "A", "B", "C", "D" }.Select(t => queue.Start(Song(t), root)).ToArray();
+            await Check.UntilAsync(() => Log().Contains("ask B") && Log().Contains("ask C"), "while the first song downloads, the next two are asked for");
+            await Task.Delay(150);
+            Check.False(Log().Contains("ask D"), "never more than two songs ahead");
+            Check.True(Log().Count(l => l == "ask B") == 1 && Log().Count(l => l == "ask C") == 1, "each song is asked for once");
+            releaseFirst.SetResult();
+            await Check.UntilAsync(() => songs.All(s => s.State == DownloadState.Saved), "the whole queue downloads, one song after another");
+            Check.True(Log().Contains("ask D"), "the window moves on: the fourth song is asked for once the second downloads");
+            Check.False(Log().Contains("ask A"), "the song already downloading is not asked for again");
+        }
+        log.Clear();
+        blockAskFor = "F";
+        using (var queue = new Downloads(_ => { }) { AskAhead = (d, ct) => d.Track.Fetch(new AskOnlyStream(), null, ct) })
+        {
+            var slowFirst = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+            var first = queue.Start(new BotTrack("E", "Artist", null, "Artist - E", async (output, _, ct) =>
+            {
+                if (output is AskOnlyStream) return "flac";
+                await slowFirst.Task.WaitAsync(ct); await output.WriteAsync(Encoding.ASCII.GetBytes("fLaC E"), ct); return "flac";
+            }) { Request = new("E", "Artist") }, root);
+            queue.Start(Song("F"), root);
+            await Check.UntilAsync(() => Log().Contains("ask F"), "the next song is being asked for");
+            var played = queue.Start(Song("Played"), root, priority: true);
+            await Check.UntilAsync(() => Log().Contains("ask stopped F"), "a Play request stops the ask in flight");
+            await Check.UntilAsync(() => played.State == DownloadState.Saved, "the played song downloads");
+            slowFirst.SetResult();
+            await Check.UntilAsync(() => first.State == DownloadState.Saved, "the queue goes on afterwards");
+        }
     }
 }
