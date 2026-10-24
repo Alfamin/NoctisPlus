@@ -20,6 +20,7 @@ internal static class QueueManagementTests
         await Priority(); await RemovalAndRestart(); await CancelRunning(); await ClearAndStorageFailure(); await ClearImports();
         await WorkerSurvivesSaveFailure(); await ReportWhileHeld();
         await SavedHistoryPaths();
+        await StallWatchdog();
     }
     private static async Task SavedHistoryPaths()
     {
@@ -340,5 +341,45 @@ internal static class QueueManagementTests
         var again = imports.Start(job.Url, root);
         Check.False(ReferenceEquals(job, again), "deliberately reimporting creates a fresh job");
         imports.Clear();
+    }
+
+    /// <summary>Owner #156: a transfer that hangs and ignores its cancel (a request on a dead connection) is stopped, the
+    /// Telegram connection reset and the song queued again; the songs behind it keep downloading; after MaxStalls it fails.</summary>
+    private static async Task StallWatchdog()
+    {
+        Check.Section("a stuck download is restarted, the queue goes on, and a song that keeps sticking is failed");
+        var root = Check.NewFolder("queue-stall");
+        var (limit, retry) = (Downloads.StallLimit, Downloads.StallRetry);
+        Downloads.StallLimit = TimeSpan.FromMilliseconds(400); Downloads.StallRetry = TimeSpan.FromMilliseconds(50);
+        try
+        {
+            var attempts = 0; var resets = 0; var log = new List<string>();
+            var hung = new BotTrack("Hung", "Artist", null, "Artist - Hung", async (_, _, _) =>
+            {
+                Interlocked.Increment(ref attempts);
+                await Task.Delay(Timeout.Infinite); // ignores its cancel, like a request on a dead connection
+                return "flac";
+            }) { Request = new("Hung", "Artist") };
+            using var queue = new Downloads(l => { lock (log) log.Add(l); }) { ResetConnection = () => { Interlocked.Increment(ref resets); return Task.CompletedTask; } };
+            var stuck = queue.Start(hung, root);
+            var next = queue.Start(Track("Behind it"), root);
+            await Check.UntilAsync(() => next.State == DownloadState.Saved, "the song behind a stuck one downloads: the queue is not held");
+            await Check.UntilAsync(() => stuck.State == DownloadState.Failed, "a song that sticks every time is failed after three tries");
+            Check.Equal(Downloads.MaxStalls, attempts, "it was tried three times");
+            Check.True(resets >= 1, "the Telegram connection was reset for a stuck transfer");
+            Check.True(stuck.Error.Contains("No progress", StringComparison.Ordinal), "the failure says why");
+            lock (log) Check.True(log.Any(l => l.Contains("showed no progress", StringComparison.Ordinal)), "the log says a stuck song was restarted");
+
+            var slow = 0;
+            var alive = new BotTrack("Slow but alive", "Artist", null, "Artist - Slow but alive", async (output, progress, ct) =>
+            {
+                for (var i = 0; i < 8; i++) { progress?.Report(i / 10.0); await Task.Delay(150, ct); Interlocked.Increment(ref slow); }
+                await output.WriteAsync(Encoding.ASCII.GetBytes("fLaC slow"), ct); return "flac";
+            }) { Request = new("Slow but alive", "Artist") };
+            var steady = queue.Start(alive, root);
+            await Check.UntilAsync(() => steady.State == DownloadState.Saved, "a slow transfer that keeps reporting progress is never stopped");
+            Check.Equal(8, slow, "it ran once, start to finish");
+        }
+        finally { (Downloads.StallLimit, Downloads.StallRetry) = (limit, retry); }
     }
 }

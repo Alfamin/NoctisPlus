@@ -71,6 +71,13 @@ internal static class HunterLinkTests
         Check.False(BotText.IsSearchLimit("1. Artist - Daily Search Limit (3:20)"), "a numbered song title cannot impose a provider quota");
         Check.True(BotLimits.Read(BotSelections.Hunters, "Daily search limit reached for today. Send a link.", DateTimeOffset.UtcNow)?.SearchOnly == true,
             "a search quota remains search-only when read outside the name-search path");
+        // Owner #156: Telegram's own limit comes as "FLOOD_WAIT_X" with the seconds apart; read as text alone it had no
+        // number and stopped both bots for 24 hours.
+        var floodAt = DateTimeOffset.UtcNow;
+        var flood = BotLimits.Read(BotSelections.Hunters, new TL.RpcException(420, "FLOOD_WAIT_X", 35), floodAt);
+        Check.True(flood is { Global: true } && flood.Until > floodAt.AddSeconds(35) && flood.Until < floodAt.AddSeconds(40),
+            "Telegram's flood wait stops both bots for the seconds it asked (35 s), not a day");
+        Check.True(BotLimits.Read(BotSelections.Hunters, new TL.RpcException(400, "MESSAGE_ID_INVALID"), floodAt) is null, "another Telegram error is no limit");
 
         var file = new TL.Document { mime_type = "audio/mpeg", attributes = [new TL.DocumentAttributeFilename { file_name = "Song.mp3" }, new TL.DocumentAttributeAudio { performer = "Artist", title = "Song", duration = 200 }] };
         var incoming = new TL.Message { media = new TL.MessageMediaDocument { document = file } };

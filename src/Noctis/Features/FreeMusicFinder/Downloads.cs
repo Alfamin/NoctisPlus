@@ -28,6 +28,13 @@ internal sealed class Download(BotTrack track, string folder)
     internal Noctis.Features.ProgressivePlayback.ProgressiveTransfer? Playback { get; set; }
     /// <summary>Held back for the song clicked to play after it (owner #83); it goes back to the queue, not to Failed.</summary>
     internal bool Preempted { get; set; }
+    /// <summary>Owner #156: when the running transfer last showed a sign of life (a stage or bytes).</summary>
+    internal DateTimeOffset LastActivity { get; set; }
+    /// <summary>Stopped by the stall watchdog; it goes back to the queue. <see cref="Stalls"/> counts this session's stops.</summary>
+    internal bool Stalled { get; set; }
+    internal int Stalls { get; set; }
+    /// <summary>Cancelled by the watchdog alone: only then is a transfer that ignores its cancel left behind.</summary>
+    internal CancellationTokenSource? StallStop { get; set; }
     internal bool FinishIntoCache { get; set; }
     /// <summary>Owner #87: a streamed song the user added to Songs: its library folder (copied there once saved).</summary>
     public string? KeepIn { get; internal set; }
@@ -58,6 +65,15 @@ internal sealed class Downloads : IDisposable
     public IReadOnlyList<Download> Active { get { lock (_gate) return _active.ToArray(); } }
     public event Action<Download>? Changed;
     public event Action<string>? Finished;
+    /// <summary>Owner #156: a transfer with no sign of life this long (no stage, no bytes) is stopped and queued again, so one
+    /// stuck song cannot hold the queue; the bots' own waits (a busy bot, a short flood wait) stay well inside it.</summary>
+    internal static TimeSpan StallLimit = TimeSpan.FromMinutes(5);
+    /// <summary>A song that stalls this often in a session is marked failed instead of being queued again.</summary>
+    internal const int MaxStalls = 3;
+    /// <summary>How soon a stalled song is tried again.</summary>
+    internal static TimeSpan StallRetry = TimeSpan.FromSeconds(10);
+    /// <summary>Drops the Telegram connection (the login is kept), so a request that hangs on it ends and frees its lane.</summary>
+    internal Func<Task>? ResetConnection { get; set; }
 
     public Downloads(Action<string> log, string? store = null, Func<MusicRequest, BotTrack>? restore = null, string? cacheFolder = null)
     {
@@ -413,10 +429,12 @@ internal sealed class Downloads : IDisposable
                     {
                         transfer = CancellationTokenSource.CreateLinkedTokenSource(_stop.Token);
                         _running[download] = transfer; tidy = _tidied.Add(download.Folder);
-                        download.State = DownloadState.Running; download.Error = ""; download.Stage = ""; download.Step = Noctis.Services.Search.OnlineDownloadStep.Asking; download.Progress = 0; download.RetryAt = null; SaveOrLog();
+                        download.State = DownloadState.Running; download.Error = ""; download.Stage = ""; download.Step = Noctis.Services.Search.OnlineDownloadStep.Asking; download.Progress = 0; download.RetryAt = null;
+                        download.LastActivity = DateTimeOffset.UtcNow; download.Stalled = false; download.StallStop = new(); SaveOrLog();
                     }
                     else if (eligible.Any(d => d.RetryAt > DateTimeOffset.UtcNow))
                         delay = TimeSpan.FromMilliseconds(Math.Clamp((eligible.Where(d => d.RetryAt is not null).Min(d => d.RetryAt)!.Value - DateTimeOffset.UtcNow).TotalMilliseconds, 10, 60000));
+                    if (_running.Count > 0) { StopStalled(); delay = TimeSpan.FromMilliseconds(Math.Min(delay.TotalMilliseconds, Math.Clamp(StallLimit.TotalMilliseconds / 4, 50, 30_000))); }
                 }
                 if (download is null) { await _wake.WaitAsync(delay, _stop.Token).ConfigureAwait(false); continue; }
                 // Before this folder's first transfer starts, so the other lane's partial file is never taken for a leftover.
@@ -435,12 +453,28 @@ internal sealed class Downloads : IDisposable
             _active.Clear();
         }
     }
+    /// <summary>Owner #156: under the queue lock. Each stalled transfer is cancelled (it requeues itself) and the connection is
+    /// reset once, so a request hanging on it ends.</summary>
+    private void StopStalled()
+    {
+        var reset = false;
+        foreach (var (download, transfer) in _running)
+        {
+            if (download.Stalled || DateTimeOffset.UtcNow - download.LastActivity < StallLimit) continue;
+            download.Stalled = true; reset = true;
+            _log($"\"{download.Track.Title}\" showed no progress for {StallLimit.TotalMinutes:0} minutes; restarting it and the Telegram connection.");
+            Cancel(transfer); Cancel(download.StallStop);
+        }
+        if (reset && ResetConnection is { } resetConnection)
+            _ = Task.Run(async () => { try { await resetConnection().ConfigureAwait(false); } catch (Exception ex) { _log("Telegram connection reset failed: " + ex.Message); } });
+    }
+
     private async Task RunLaneAsync(Download download, CancellationTokenSource transfer)
     {
         try
         {
             try { await RunOneAsync(download, transfer.Token).ConfigureAwait(false); }
-            finally { lock (_gate) _running.Remove(download); transfer.Dispose(); }
+            finally { lock (_gate) { _running.Remove(download); download.StallStop?.Dispose(); download.StallStop = null; } transfer.Dispose(); }
             string? summary = null;
             lock (_gate)
             {
@@ -480,9 +514,12 @@ internal sealed class Downloads : IDisposable
             ct.ThrowIfCancellationRequested();
             Raise(download);
             download.Playback = new(download.Folder, download.Track.FileName, download.Track.Duration);
+            // Only a stall lets go of a transfer that ignores its cancel (a request hanging on a dead connection), so the lane is
+            // freed; other cancels (a song held back for Play) still wait for the transfer to stop, as before.
             var outcome = await Downloader.DownloadAsync(download.Track, download.Folder, new Report(p =>
-            { download.Progress = double.IsFinite(p) ? Math.Clamp(p, 0, .99) : 0; download.Stage = ""; if (p > 0) download.Step = Noctis.Services.Search.OnlineDownloadStep.Receiving; Raise(download); },
-                (stage, step) => { download.Stage = stage; download.Step = step; download.Progress = 0; Raise(download); }), ct, download.Playback).ConfigureAwait(false);
+            { download.LastActivity = DateTimeOffset.UtcNow; download.Progress = double.IsFinite(p) ? Math.Clamp(p, 0, .99) : 0; download.Stage = ""; if (p > 0) download.Step = Noctis.Services.Search.OnlineDownloadStep.Receiving; Raise(download); },
+                (stage, step) => { download.LastActivity = DateTimeOffset.UtcNow; download.Stage = stage; download.Step = step; download.Progress = 0; Raise(download); }), ct, download.Playback)
+                .WaitAsync(download.StallStop?.Token ?? CancellationToken.None).ConfigureAwait(false);
             var savedPath = Downloader.FindExisting(download.Folder, download.Track.FileName);
             lock (_gate)
             {
@@ -515,6 +552,13 @@ internal sealed class Downloads : IDisposable
         // Whatever the stopped transfer threw: a held-back song goes back to the queue.
         catch (Exception) when (ct.IsCancellationRequested && download.Preempted && !_stop.IsCancellationRequested)
         { SetOutcome(download, DownloadState.Queued, ""); lock (_gate) { download.Preempted = false; download.Progress = 0; } }
+        // Owner #156: stopped by the stall watchdog: queued again in a moment, or failed after MaxStalls.
+        catch (Exception) when (ct.IsCancellationRequested && download.Stalled && !_stop.IsCancellationRequested)
+        {
+            int stalls; lock (_gate) { stalls = ++download.Stalls; download.Stalled = false; download.Progress = 0; }
+            if (stalls >= MaxStalls) SetOutcome(download, DownloadState.Failed, $"No progress for {StallLimit.TotalMinutes:0} minutes, {stalls} times. Try it again later.");
+            else SetOutcome(download, DownloadState.Queued, "", DateTimeOffset.UtcNow + StallRetry);
+        }
         catch (SourcesWaitingException ex) { SetOutcome(download, DownloadState.Waiting, ex.Message, ex.Until); }
         catch (IOException ex) { SetOutcome(download, DownloadState.Waiting, "Connection or storage interrupted: " + ex.Message, DateTimeOffset.UtcNow.AddMinutes(10)); }
         catch (System.Net.Sockets.SocketException ex) { Noctis.Services.OnlineAccess.Shared.Failed(); SetOutcome(download, DownloadState.Waiting, "TELEGRAM_CONNECTION_FAILED: " + ex.Message, DateTimeOffset.UtcNow.AddSeconds(5)); }

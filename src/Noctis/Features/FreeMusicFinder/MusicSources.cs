@@ -58,6 +58,11 @@ internal static partial class BotLimits
 {
     [GeneratedRegex(@"(?:FLOOD_(?:PREMIUM_)?WAIT[_ :]*|(?:wait|retry|try again|in|after)\s+)(\d+)\s*(seconds?|secs?|s\b|minutes?|mins?|hours?|hrs?|days?)?", RegexOptions.IgnoreCase)]
     private static partial Regex Wait();
+    /// <summary>Owner #156: Telegram's own limit arrives as "FLOOD_WAIT_X" with the seconds in <see cref="TL.RpcException.X"/>;
+    /// read as text alone it had no number, so a 30-second wait stopped both bots for 24 hours (kept across restarts).</summary>
+    public static SourceLimitException? Read(string provider, TL.RpcException ex, DateTimeOffset now) => Read(provider, Text(ex), now);
+    internal static string Text(TL.RpcException ex) => ex.X > 0 && ex.Message.EndsWith("_X", StringComparison.Ordinal) ? ex.Message[..^1] + ex.X : ex.Message;
+
     public static SourceLimitException? Read(string provider, string text, DateTimeOffset now)
     {
         if (string.IsNullOrWhiteSpace(text)) return null;
@@ -162,8 +167,8 @@ internal sealed class MusicSources
                     if (items.Count > 0) return items.Select(r=>Track(r with {PreferredSource=source.Id})).ToArray();
                 }
                 catch (SourceLimitException ex) { Block(ex); if (ex.Global) throw Waiting(); errors.Add(ex.Message); }
-                catch (TL.RpcException ex) when (BotLimits.Read(source.Id,ex.Message,_now()) is not null)
-                {var limit=BotLimits.Read(source.Id,ex.Message,_now())!;Block(limit);if(limit.Global)throw Waiting();errors.Add(limit.Message);}
+                catch (TL.RpcException ex) when (BotLimits.Read(source.Id, ex, _now()) is not null)
+                {var limit=BotLimits.Read(source.Id, ex, _now())!;Block(limit);if(limit.Global)throw Waiting();errors.Add(limit.Message);}
                 catch(System.Net.Sockets.SocketException ex)
                 {throw;}
                 catch (Exception ex) when (ex is TimeoutException or BotAnswerException or TrackUnavailableException) { errors.Add(source.Id + ": " + ex.Message); }
@@ -297,8 +302,8 @@ internal sealed class MusicSources
                     errors.Add(ex.Message); skipped = true;
                 }
                 catch (SourceLimitException ex) { Block(ex); if (ex.Global) throw Waiting(); errors.Add(ex.Message); skipped = true; }
-                catch (TL.RpcException ex) when (BotLimits.Read(source.Id,ex.Message,_now()) is not null)
-                {var limit=BotLimits.Read(source.Id,ex.Message,_now())!;Block(limit);if(limit.Global)throw Waiting();errors.Add(limit.Message);skipped=true;}
+                catch (TL.RpcException ex) when (BotLimits.Read(source.Id, ex, _now()) is not null)
+                {var limit=BotLimits.Read(source.Id, ex, _now())!;Block(limit);if(limit.Global)throw Waiting();errors.Add(limit.Message);skipped=true;}
                 catch(System.Net.Sockets.SocketException ex)
                 {throw;}
                 catch (Exception ex) when (ex is TimeoutException or BotAnswerException or TrackUnavailableException or StaleSelectionException)
@@ -408,8 +413,8 @@ internal sealed class MusicSources
                 TransferProgress.Stage(progress, "Setting " + source.Id + " quality to " + quality + "…");
                 try { await configurable.SetQualityAsync(quality, ct).ConfigureAwait(false); }
                 catch (SourceLimitException ex) { Block(ex); if (ex.Global) throw Waiting(); errors[source.Id] = ex.Message; }
-                catch (TL.RpcException ex) when (BotLimits.Read(source.Id, ex.Message, _now()) is { })
-                { var limit = BotLimits.Read(source.Id, ex.Message, _now())!; Block(limit); if (limit.Global) throw Waiting(); errors[source.Id] = limit.Message; }
+                catch (TL.RpcException ex) when (BotLimits.Read(source.Id, ex, _now()) is { })
+                { var limit = BotLimits.Read(source.Id, ex, _now())!; Block(limit); if (limit.Global) throw Waiting(); errors[source.Id] = limit.Message; }
                 catch (TL.RpcException ex)
                 { errors[source.Id] = "BOT_QUALITY_FAILED: " + source.Id + " rejected the quality request: " + ex.Message; _notice(errors[source.Id]); }
                 catch (System.Net.Sockets.SocketException ex)

@@ -330,6 +330,9 @@ internal sealed class TelegramAccount : ITelegramSignIn, IDisposable
     }
     private volatile bool _disposed;
 
+    /// <summary>Owner #156: the current connection retired (the queue's stall watchdog), the login kept.</summary>
+    internal Task RetireCurrentConnectionAsync() => _client is { } current ? RetireConnectionAsync(current) : Task.CompletedTask;
+
     /// <summary>Abort stalled transport/RPCs, keeping the saved login for the next connection.</summary>
     internal async Task RetireConnectionAsync(Client expected)
     {
@@ -788,9 +791,9 @@ internal sealed class TelegramBotSource : IHunterBotSource
             _account.SessionEnded();
             throw new InvalidOperationException("Telegram ended the session. Log in again.", ex);
         }
-        catch (RpcException ex) when (BotLimits.Read("Music Hunters", ex.Message, DateTimeOffset.UtcNow) is not null)
+        catch (RpcException ex) when (BotLimits.Read("Music Hunters", ex, DateTimeOffset.UtcNow) is not null)
         {
-            throw BotLimits.Read("Music Hunters", ex.Message, DateTimeOffset.UtcNow)!;
+            throw BotLimits.Read("Music Hunters", ex, DateTimeOffset.UtcNow)!;
         }
         catch(RpcException ex){throw new BotAnswerException("Music Hunters: "+ex.Message);}
     }

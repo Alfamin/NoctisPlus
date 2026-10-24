@@ -98,6 +98,7 @@ public sealed class FreeMusicPlugin : INoctisPlugin
         // Owner #87: played-only songs live here, never in the library.
         _streamCache = StreamCache.Folder(host.DataDirectory);
         _downloads = new Downloads(Log,Path.Combine(host.DataDirectory,"download-queue.json"),_bot.Track, _streamCache);
+        _downloads.ResetConnection = () => _telegram?.RetireCurrentConnectionAsync() ?? Task.CompletedTask;
         // Partial and completed stream files share the owner's cache retention choice.
         PartialAudio.Folder = Path.Combine(host.DataDirectory, "stream-partial");
         _ = Task.Run(PurgeStreamCache);

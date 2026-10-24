@@ -479,7 +479,7 @@ internal sealed class DeezLoadSource : IRacingMusicSource, IQualityMusicSource
         }
     }
     internal Exception Translate(RpcException ex)
-        => BotLimits.Read(Id,ex.Message,DateTimeOffset.UtcNow) ?? (Exception)new BotAnswerException("DeezLoad: "+ex.Message);
+        => BotLimits.Read(Id,ex,DateTimeOffset.UtcNow) ?? (Exception)new BotAnswerException("DeezLoad: "+ex.Message);
     internal static string? MatchingInlineLink(MusicRequest wanted,IEnumerable<BotInlineResult> results)
         => results.Where(r=>r.send_message is BotInlineMessageText)
             .Select(r=>InlineTrack(r.title??"",r.description??"",((BotInlineMessageText)r.send_message).message))
