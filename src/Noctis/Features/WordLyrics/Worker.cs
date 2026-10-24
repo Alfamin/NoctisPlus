@@ -80,6 +80,10 @@ internal sealed class Worker : IDisposable
     internal TimeSpan ReadinessEvery { get; set; } = TimeSpan.FromSeconds(5);
     private const int MaxAutoRestarts = 2;
     private int _autoRestarts;
+    // Owner #161: a run that broke off (a crash) without saying which song did it: the songs left go one per run until a run
+    // ends normally, so the one that breaks it is found and charged, and the others are timed (a 200-song batch was
+    // otherwise charged a try per song, and two crashes put all of them off for ten days).
+    private bool _oneAtATime;
     private DateTime _progressStamp, _progressMoved, _cpuMoved;
     private TimeSpan _cpuSeen;
     private View _view = new("Starting WordLyrics", "", 0, 0, null, false);
@@ -176,7 +180,7 @@ internal sealed class Worker : IDisposable
         lock (_gate)
         {
             if (_disposed) return;
-            foreach (var item in _items.Values.Where(i => i.NetworkWait))
+            foreach (var item in _items.Values.Where(i => i.NetworkWait && i.Waits < RecoveryRetryWaits))
             { item.NetworkWait = false; item.NotBefore = DateTime.UtcNow; }
             SaveState();
         }
@@ -606,7 +610,7 @@ internal sealed class Worker : IDisposable
         if (ripe.Count == 0) return;
         // Owner #108: the song playing now runs alone, so it is done (and the next one played can go first) at once.
         var batch = ripe[0].Urgent != default || ripe[0].Ahead ? [ripe[0]]
-            : ripe.Where(i => i.Urgent == default && !i.Ahead && i.Asked == ripe[0].Asked && i.Action == ripe[0].Action && i.Draft == ripe[0].Draft && SamePath(i.Root, ripe[0].Root)).Take(MaxSongsPerRun).ToList();
+            : ripe.Where(i => i.Urgent == default && !i.Ahead && i.Asked == ripe[0].Asked && i.Action == ripe[0].Action && i.Draft == ripe[0].Draft && SamePath(i.Root, ripe[0].Root)).Take(_oneAtATime ? 1 : MaxSongsPerRun).ToList();
 
         var options = Options;
         Tool tool;
@@ -930,6 +934,8 @@ internal sealed class Worker : IDisposable
             }
         }
 
+        // Owner #161: broke off with nothing said about any song (not a stop, a restart, another window or a setup failure).
+        var crashed = code is not 0 and not ExitAlreadyRunning and not ExitSetupFailed && outcome.Count == 0;
         var counts = new Dictionary<string, int>();
         var titles = new Dictionary<string, string>();
         bool asked = batch[0].Asked, stopped, cancelled, held, restarted; string? restartNotice;
@@ -984,9 +990,16 @@ internal sealed class Worker : IDisposable
                         // Not the song's fault, and it can last for hours (no internet, a broken setup):
                         // it keeps its tries and waits longer each time instead of being given up.
                         if (item.Waits == 0) firstDelays++;
-                        item.NotBefore = now + (item.NetworkWait ? TimeSpan.FromSeconds(30) : Backoff(item.Waits));
+                        item.NotBefore = now + (item.NetworkWait ? NetworkBackoff(item.Waits) : Backoff(item.Waits));
                         item.Waits++;
                         continue;
+                    }
+                    if (crashed && batch.Count > 1 && status.Length == 0)
+                    {
+                        // Owner #161: nobody knows which song broke the run: none is charged. One finished before it broke
+                        // off (its lyrics are written) counts as timed; the others go again, one per run.
+                        if (HasWordLyrics(item.Path) || EmbeddedWordLyrics.HasWords(item.Path)) status = "timed";
+                        else { item.NotBefore = now + TimeSpan.FromSeconds(2); continue; }
                     }
                     if (status is "" or "failed" or "not_reached")
                     {
@@ -1014,6 +1027,11 @@ internal sealed class Worker : IDisposable
                 }
                 counts[status] = counts.GetValueOrDefault(status) + 1;
                 titles[status] = title;
+            }
+            if (!cancelled && !restarted && code != ExitAlreadyRunning)
+            {
+                if (crashed && batch.Count > 1) _oneAtATime = true;
+                else if (!crashed && outcome.Count > 0) _oneAtATime = false; // a run that ended normally: batches again
             }
             if (cancelled && !stopped)
             {
@@ -1121,6 +1139,23 @@ internal sealed class Worker : IDisposable
     }
 
     /// <summary>How long a song waits after a run that could not do anything: 10 minutes, 30 minutes, an hour, then every 3 hours.</summary>
+    /// <summary>Owner #162: network-error waits grow (30 s, 1, 2, 5, 15, 30 min, then hourly, never longer, never given up)
+    /// instead of 30 s every time: a lyric source that keeps refusing (Genius answers 403 to some VPNs; the program calls
+    /// that a network error) was retried around the clock (99 tries seen on the TEST profile).</summary>
+    internal static TimeSpan NetworkBackoff(int waits) => waits switch
+    {
+        <= 0 => TimeSpan.FromSeconds(30),
+        1 => TimeSpan.FromMinutes(1),
+        2 => TimeSpan.FromMinutes(2),
+        3 => TimeSpan.FromMinutes(5),
+        4 => TimeSpan.FromMinutes(15),
+        5 => TimeSpan.FromMinutes(30),
+        _ => TimeSpan.FromHours(1),
+    };
+    /// <summary>Owner #162: "back online" retries at once only songs that began failing lately (an outage costs a try or
+    /// two). Any working request elsewhere counts as back online, so a song that keeps failing keeps its growing wait.</summary>
+    internal const int RecoveryRetryWaits = 3;
+
     internal static TimeSpan Backoff(int waits) => waits switch
     {
         <= 0 => TimeSpan.FromMinutes(10),

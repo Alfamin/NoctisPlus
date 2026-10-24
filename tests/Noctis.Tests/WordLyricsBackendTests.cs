@@ -15,7 +15,7 @@ public class WordLyricsBackendTests
         internal readonly TestPersistenceService Data = new();
         internal readonly string App, Music, Song, Work;
         private readonly string? _before = Environment.GetEnvironmentVariable("WORDLYRICS_PYTHON");
-        internal Rig(bool hold = false, string outcome = "timed", bool stuck = false, double done = 1, bool earlyWords = false)
+        internal Rig(bool hold = false, string outcome = "timed", bool stuck = false, double done = 1, bool earlyWords = false, string? crashOn = null)
         {
             var python = Environment.GetEnvironmentVariable("NOCTIS_TEST_PYTHON") ?? "python";
             try
@@ -31,7 +31,7 @@ public class WordLyricsBackendTests
             File.WriteAllText(Path.Combine(module, "__init__.py"), "__version__ = \"1.6.4\"\n");
             File.WriteAllText(Path.Combine(App, "WordLyrics.bat"), "fixture only");
             File.WriteAllText(Path.Combine(module, "__main__.py"), "# --confirm-redo is supported by this synthetic backend\n");
-            File.WriteAllText(Path.Combine(App, "fixture.json"), JsonSerializer.Serialize(new { hold, outcome, stuck, done, earlyWords }));
+            File.WriteAllText(Path.Combine(App, "fixture.json"), JsonSerializer.Serialize(new { hold, outcome, stuck, done, earlyWords, crashOn }));
             File.WriteAllText(Path.Combine(module, "models.py"), "class ModelError(Exception):pass\ndef missing(folder):return []\ndef download(*a,**k):raise Exception('Original download must never run')\n");
             var run = """
                 import json,sys,time,os
@@ -59,6 +59,8 @@ public class WordLyricsBackendTests
                     put(value('--progress'),{'completed':1 if config.get('earlyWords') else 0,'total':len(songs),'paused':word=='pause','stages':[{'name':'Align words','state':'running','done':config.get('done',1),'total':4,'current':'Synthetic song'}]})
                     if word=='stop':break
                     time.sleep(.05)
+                # Owner #161: a song that brings the whole program down: no result file at all.
+                if config.get('crashOn') and any(config['crashOn'] in Path(p).name for p in songs): os._exit(9)
                 proxy=urlsplit(os.environ.get('https_proxy',''))
                 put(value('--result'),{'run_folder':'','songs':[{'path':p,'title':Path(p).stem,'status':config['outcome']} for p in songs],
                     'args':args,'authenticated_loopback_proxy':proxy.hostname=='127.0.0.1' and bool(proxy.password)})
@@ -254,6 +256,55 @@ public class WordLyricsBackendTests
         using var resumed = rig.Worker(_ => { }); resumed.TickNow();
         await Task.Delay(150); Assert.Equal(1, resumed.WaitingCount); Assert.False(File.Exists(rig.Result));
     }
+    /// <summary>Owner #161: a song that crashes the whole WordLyrics run takes only itself down; the songs beside it are timed
+    /// (a crash used to charge every song of the batch a try, and two crashes put all of them off for ten days).</summary>
+    [Fact]
+    public async Task ASongThatCrashesTheRun_IsFoundAlone_AndTheOthersAreTimed()
+    {
+        using var rig = new Rig(crashOn: "poison");
+        string Song(string name) { var path = Path.Combine(rig.Music, name + ".mp3"); File.WriteAllText(path, "synthetic audio"); return path; }
+        var first = Song("a first"); var poison = Song("b poison"); var last = Song("c last");
+        var log = new ConcurrentQueue<string>();
+        using var worker = new Worker(rig.Work, () => [rig.Music], new(true, "Light", false, rig.App, ""), l => log.Enqueue($"{DateTime.Now:ss.fff} LOG {l}"), _ => { }, s => log.Enqueue($"{DateTime.Now:ss.fff} {s.Message} / {s.Detail}"), readiness: _ => true);
+        Assert.Equal(3, worker.AskMany([first, poison, last]));
+        var clock = Stopwatch.StartNew(); // each run starts Python; the first crash waits 2 s before the songs go one by one
+        while (!(worker.StatusFor(first) == SongTimingStatus.None && worker.StatusFor(last) == SongTimingStatus.None) && clock.Elapsed < TimeSpan.FromSeconds(40))
+            await Task.Delay(50);
+        Assert.True(worker.StatusFor(first) == SongTimingStatus.None && worker.StatusFor(last) == SongTimingStatus.None,
+            $"first={worker.StatusFor(first)} poison={worker.StatusFor(poison)} last={worker.StatusFor(last)} after {clock.Elapsed.TotalSeconds:0.0} s; " + string.Join(" | ", log));
+        Assert.Equal(SongTimingStatus.Retry, worker.StatusFor(poison)); // charged one try, tried again later
+        Assert.False(worker.AutomaticBlocked(first)); Assert.False(worker.AutomaticBlocked(last));
+        Assert.Equal(1, worker.WaitingCount);
+    }
+
+    /// <summary>Owner #162: a song whose lyric source keeps refusing (reported as a network error) is not retried around the
+    /// clock: every working request elsewhere counted as "back online" and retried it at once (99 tries seen on the TEST
+    /// profile). Its wait grows to an hour at most and it is never given up (owner: no ten-day wait for network errors).</summary>
+    [Fact]
+    public async Task ANetworkErrorThatNeverClears_BacksOffToAnHour_AndIsNeverGivenUp()
+    {
+        using var rig = new Rig(outcome: "network_error");
+        using var worker = rig.Worker(_ => { });
+        worker.Ask(rig.Song);
+        for (var run = 1; run < Worker.RecoveryRetryWaits; run++)
+        {
+            await Until(() => worker.StatusFor(rig.Song) == SongTimingStatus.Retry && File.Exists(rig.Result));
+            File.Delete(rig.Result);
+            worker.RetryNetworkWaits(); // "back online": a song that only began failing is tried again at once
+        }
+        await Until(() => worker.StatusFor(rig.Song) == SongTimingStatus.Retry && File.Exists(rig.Result));
+        File.Delete(rig.Result);
+        worker.RetryNetworkWaits(); await Task.Delay(400);
+        Assert.False(File.Exists(rig.Result)); // kept failing: "back online" no longer retries it at once
+        Assert.False(worker.AutomaticBlocked(rig.Song)); // never put off for ten days
+        Assert.Equal(SongTimingStatus.Retry, worker.StatusFor(rig.Song));
+        Assert.InRange(worker.NextTryUtc(DateTime.UtcNow)!.Value, DateTime.UtcNow, DateTime.UtcNow.AddHours(1).AddMinutes(1));
+        Assert.Equal(TimeSpan.FromSeconds(30), Worker.NetworkBackoff(0));
+        Assert.True(Worker.NetworkBackoff(3) > Worker.NetworkBackoff(1) && Worker.NetworkBackoff(50) == TimeSpan.FromHours(1));
+        worker.Restart(); // owner: Restart retries everything that waits
+        await Until(() => File.Exists(rig.Result));
+    }
+
     [Fact]
     public async Task StoppingAnOldWorkerCannotOverwriteItsReplacementsCheckpoint()
     {
