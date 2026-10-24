@@ -170,16 +170,29 @@ public class ProgressiveDecoderTests(ITestOutputHelper output)
         var pcm = new List<float>();
         var parked = 0;
         using var stop = new CancellationTokenSource();
+        // A sound card pulls at the audio clock. The output here pulls what the elapsed real time asks for: a fixed block per
+        // 10 ms delay pulled 64 % of real time wherever the system timer ticks every 15.6 ms (no app had raised it), LibVLC
+        // then dropped late audio and the test failed by chance, as it did on 2026-10-24 (Sleep(10) measured 15.7 ms).
         var render = Task.Run(async () =>
         {
-            var block = new float[rate / 100];
+            var block = new float[rate / 10];
+            var clock = Stopwatch.StartNew(); var last = TimeSpan.Zero; var wanted = 0.0;
             while (!stop.IsCancellationRequested)
             {
+                var now = clock.Elapsed; var step = (now - last).TotalSeconds; last = now;
                 if (Volatile.Read(ref parked) == 0)
                 {
-                    var read = segment.Read(block, 0, block.Length);
-                    pcm.AddRange(block.AsSpan(0, read).ToArray());
+                    // Owed samples are capped at a tenth of a second: nothing is owed for the time before the decoder starts.
+                    wanted = Math.Min(wanted + step * rate, rate / 10.0);
+                    while (wanted >= 1)
+                    {
+                        var read = segment.Read(block, 0, (int)Math.Min(wanted, block.Length));
+                        if (read == 0) break;
+                        pcm.AddRange(block.AsSpan(0, read).ToArray());
+                        wanted -= read;
+                    }
                 }
+                else wanted = 0;
                 await Task.Delay(10);
             }
         });
