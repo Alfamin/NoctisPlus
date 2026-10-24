@@ -33,6 +33,9 @@ public sealed record OnlineSearchResult(string Query, IReadOnlyList<OnlineSong> 
 
     /// <summary>Public playlists by name, most relevant and most saved first.</summary>
     public IReadOnlyList<OnlinePlaylist> Playlists { get; init; } = [];
+
+    /// <summary>Owner #155: the song (one of <see cref="Songs"/>, the top result) whose lyrics the query quotes.</summary>
+    public string? LyricsMatch { get; init; }
 }
 
 /// <summary>Streamed: played and kept in the stream cache, not in the library (owner #87).</summary>

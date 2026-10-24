@@ -69,7 +69,11 @@ internal sealed class FinderOnlineSearch : IOnlineMusicSearch
         Dictionary<string, DiscoveryMatch>? matches = null;
         // Playlists (#69) come from another service and never hold up songs: shown whenever they land.
         var playlists = _playlists() is { } imports && text.Length >= 2 ? FindPlaylistsAsync(imports, text, warnings, ct) : null;
-        OnlineSearchResult Result(bool complete) => Build(catalog, query, artists, songs, albums, matches, complete, warnings) with
+        // Owner #155: four words or more may be a line of lyrics. Spotify's song search runs beside the catalog's and holds
+        // none of it up; shorter searches never ask it, so they stay exactly as they were.
+        var lyric = _playlists() is { } spotify && LyricSearch.LooksLikeLyric(text) ? FindLyricAsync(spotify, catalog, text, ct) : null;
+        CatalogSearchSong? lyricSong = null;
+        OnlineSearchResult Result(bool complete) => Build(catalog, query, artists, songs, albums, matches, complete, warnings, lyricSong) with
         {
             Playlists = playlists is { IsCompletedSuccessfully: true } ? playlists.Result : [],
         };
@@ -92,16 +96,40 @@ internal sealed class FinderOnlineSearch : IOnlineMusicSearch
             Read("Artists", () => catalog.SearchAsync(query.Artist.Length > 0 ? query.Artist : query.Text, false, ct), v => artists = v),
             Read("Albums", () => catalog.SearchAlbumsAsync(query.Term, ct), v => albums = v),
         };
+        // Owner #155: the lyric answer is shown the moment it lands, whichever step the catalog is on.
+        var lyricPending = lyric;
+        bool TookLyric(Task done)
+        {
+            if (lyricPending is null || !ReferenceEquals(done, lyricPending)) return false;
+            lyricSong = lyricPending.Result; // FindLyricAsync answers null rather than throwing
+            lyricPending = null;
+            return true;
+        }
+        bool LyricLeads() => lyricSong is not null && Leads(query, SearchRanking.Build(query, artists, songs, albums, fansOf: catalog.FansOf), lyricSong);
         while (pending.Count > 0)
         {
-            var done = await Task.WhenAny(pending).ConfigureAwait(false);
-            pending.Remove(done);
+            var done = await Task.WhenAny(lyricPending is null ? pending : pending.Append(lyricPending)).ConfigureAwait(false);
+            if (!TookLyric(done)) pending.Remove(done);
             ct.ThrowIfCancellationRequested();
             yield return Result(false);
         }
 
-        songs = await catalog.RefineTitleAsync(query, songs, ct).ConfigureAwait(false);
-        yield return Result(false);
+        // The second search for tricky titles; pointless once a line of lyrics has led to its song, so then it is dropped.
+        using (var refining = CancellationTokenSource.CreateLinkedTokenSource(ct))
+        {
+            var refine = LyricLeads() ? null : catalog.RefineTitleAsync(query, songs, refining.Token);
+            while (refine is not null && lyricPending is not null && !refine.IsCompleted)
+            {
+                if (!TookLyric(await Task.WhenAny(refine, lyricPending).ConfigureAwait(false))) continue;
+                if (LyricLeads()) refining.Cancel();
+                yield return Result(false);
+            }
+            if (refine is not null)
+            {
+                var refined = await Refined(refine, refining, ct).ConfigureAwait(false);
+                if (refined is not null) { songs = refined; yield return Result(false); }
+            }
+        }
 
         // An artist search ("drake"): that artist's own top songs lead the song list.
         var hits = SearchRanking.Build(query, artists, songs, albums, fansOf: catalog.FansOf);
@@ -118,10 +146,17 @@ internal sealed class FinderOnlineSearch : IOnlineMusicSearch
             if (added) yield return Result(false);
         }
 
-        // Which of these the library already has (same recording: title, artist, length).
-        if (songs.Count > 0)
+        if (lyricPending is not null)
         {
-            try { matches = await _actions.MatchAsync(songs.Select(s => s.Song), ct, reuse: true).ConfigureAwait(false); }
+            lyricSong = await lyricPending.ConfigureAwait(false);
+            if (lyricSong is not null) yield return Result(false);
+        }
+
+        // Which of these the library already has (same recording: title, artist, length).
+        if (songs.Count > 0 || lyricSong is not null)
+        {
+            var checking = lyricSong is null ? songs.Select(s => s.Song) : songs.Select(s => s.Song).Append(lyricSong.Song).DistinctBy(s => s.Id);
+            try { matches = await _actions.MatchAsync(checking, ct, reuse: true).ConfigureAwait(false); }
             catch (Exception ex) when (ex is not OperationCanceledException) { warnings.Enqueue("Library check: " + ex.Message); }
         }
         if (playlists is { IsCompleted: false })
@@ -132,10 +167,61 @@ internal sealed class FinderOnlineSearch : IOnlineMusicSearch
         yield return Result(true);
     }
 
+    /// <summary>The refined songs, or null when the refinement was dropped for a lyric answer.</summary>
+    private static async Task<List<CatalogSearchSong>?> Refined(Task<List<CatalogSearchSong>> refine, CancellationTokenSource refining, CancellationToken ct)
+    {
+        try { return await refine.ConfigureAwait(false); }
+        catch (OperationCanceledException) when (refining.IsCancellationRequested && !ct.IsCancellationRequested) { return null; }
+    }
+
+    /// <summary>Owner #155: Spotify's answer leads the songs unless the words name the catalog's own first song (a title
+    /// search), or do but that song is a copy (karaoke, tribute) played far less than Spotify's: the famous one leads.</summary>
+    internal static bool Leads(FinderQuery query, IReadOnlyList<FinderHit> hits, CatalogSearchSong lyric)
+    {
+        if (hits.FirstOrDefault(h => h.Track is not null) is not { Track: { } first } || first.Song.Id == lyric.Song.Id) return true;
+        if (!LyricSearch.NamesSong(query.Text, first.Song.Title, first.Song.Artists.Select(a => a.Name))) return true;
+        return first.Song.Popularity > 0 && lyric.Song.Popularity >= 10L * first.Song.Popularity;
+    }
+
+    /// <summary>Owner #155: the leading song is shown as found from the lyrics only when the words are not its own name.</summary>
+    internal static bool FromLyrics(FinderQuery query, CatalogSearchSong lyric)
+        => !LyricSearch.NamesSong(query.Text, lyric.Song.Title, lyric.Song.Artists.Select(a => a.Name));
+
+    /// <summary>Owner #155: Spotify's best song for these words, as the catalog's copy; null when there is none, Spotify is
+    /// out of reach or slower than <see cref="LyricSearch.Budget"/> (the search then stays as it was). Only Spotify's first
+    /// song is taken: a less popular one below it is a cover or a namesake more often than the answer.</summary>
+    private static async Task<CatalogSearchSong?> FindLyricAsync(SpotifyPlaylists spotify, ArtistCatalog catalog, string text, CancellationToken ct)
+    {
+        using var budget = CancellationTokenSource.CreateLinkedTokenSource(ct);
+        budget.CancelAfter(LyricSearch.Budget);
+        try
+        {
+            var hits = await spotify.SearchTracksAsync(text, LyricSearch.Candidates, budget.Token).ConfigureAwait(false);
+            if (hits.FirstOrDefault() is not { } best) return null;
+            var found = await catalog.SearchSongsAsync(best.Artists[0] + " " + CatalogEditions.Title(best.Title), budget.Token).ConfigureAwait(false);
+            var match = LyricSearch.Match(best, found.Value);
+            Noctis.Services.DebugLog.Write("Search", $"lyrics: Spotify \"{best.Title}\" by {best.Artists[0]}{(best.Lyrics ? " (lyrics)" : "")}"
+                + (match is null ? ", not in the catalog" : ""));
+            return match;
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException || !ct.IsCancellationRequested)
+        {
+            Noctis.Services.DebugLog.Write("Search", "lyrics: " + (ex is OperationCanceledException ? "no answer in time" : ArtistCatalog.Explain(ex)));
+            return null;
+        }
+    }
+
     private OnlineSearchResult Build(ArtistCatalog catalog, FinderQuery query, List<CatalogArtist> artists, List<CatalogSearchSong> songs, List<CatalogRelease> albums,
-        Dictionary<string, DiscoveryMatch>? matches, bool complete, ConcurrentQueue<string> warnings)
+        Dictionary<string, DiscoveryMatch>? matches, bool complete, ConcurrentQueue<string> warnings, CatalogSearchSong? lyric = null)
     {
         var hits = SearchRanking.Build(query, artists, songs, albums, fansOf: catalog.FansOf);
+        if (lyric is not null && !Leads(query, hits, lyric)) lyric = null;
+        if (lyric is not null)
+        {
+            hits.RemoveAll(h => h.Track?.Song.Id == lyric.Song.Id);
+            hits.Insert(0, new FinderHit("Songs", lyric.Song.Id, lyric.Song.Title, string.Join(", ", lyric.Song.Artists.Select(a => a.Name)),
+                LyricLeads, Track: lyric));
+        }
         // Searching an artist: their own songs lead, songs they only feature on follow.
         var leading = hits.FirstOrDefault() is { Artist: { } a } && BotText.Key(a.Name) == BotText.Key(query.Text) ? a.Id : null;
         var songRows = new List<OnlineSong>();
@@ -166,8 +252,12 @@ internal sealed class FinderOnlineSearch : IOnlineMusicSearch
         return new OnlineSearchResult(query.Text, songRows, artistRows, albumRows, complete, string.Join(" ", warnings.Distinct()))
         {
             Top = top is null ? null : (top.Kind switch { "Artists" => "artist", "Songs" => "song", _ => "album" }, top.Id),
+            LyricsMatch = lyric is not null && FromLyrics(query, lyric) ? lyric.Song.Id : null,
         };
     }
+
+    /// <summary>The lyric answer's place: above any name match (110 at most), so it is the first song and the top result.</summary>
+    internal const double LyricLeads = 120;
 
     /// <summary>Finder's ranking (exact name ≈ 96-110, every word ≈ 76-90, spread ≈ 50-70) onto the
     /// library index's 0-100 scale, so an exact online match and an exact library match tie and the

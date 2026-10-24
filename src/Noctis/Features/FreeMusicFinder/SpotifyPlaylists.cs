@@ -212,6 +212,8 @@ internal sealed class SpotifyPlaylists : IDisposable
     }
 
     internal void WarmUpSearch() => _ = _catalog.WarmUpSearchAsync();
+    /// <summary>Owner #155: Spotify's song search (names and lyrics), best first.</summary>
+    internal Task<IReadOnlyList<SpotifyTrackHit>> SearchTracksAsync(string term, int limit, CancellationToken ct) => _catalog.SearchTracksAsync(term, limit, ct);
 
     // Read previews, so Save after a look does not read the playlist again (owner: snappy).
     private readonly Dictionary<string, PlaylistManifest> _previews = new();

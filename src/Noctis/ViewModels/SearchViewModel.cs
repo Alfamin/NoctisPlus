@@ -77,6 +77,8 @@ public sealed partial class SearchViewModel : ViewModelBase, ISearchable, IDispo
     private object? _topResult;
 
     public bool HasTopResult => TopResult is not null;
+    /// <summary>Owner #155: the top song was found from the lyrics typed (an owned copy too).</summary>
+    [ObservableProperty] private bool _topFromLyrics;
     public SearchSongItem? TopSong => TopResult as SearchSongItem;
     public SearchArtistItem? TopArtist => TopResult as SearchArtistItem;
     public SearchAlbumItem? TopAlbum => TopResult as SearchAlbumItem;
@@ -341,6 +343,8 @@ public sealed partial class SearchViewModel : ViewModelBase, ISearchable, IDispo
         var artists = MergeArtists();
         var albums = MergeAlbums();
         TopResult = PickTop(songs, artists, albums);
+        TopFromLyrics = _online?.LyricsMatch is { } lyric && TopResult is SearchSongItem top
+            && (top.Online?.Id == lyric || top.Local is { } owned && _online.Songs.Any(o => o.Id == lyric && o.LocalTrackId == owned.Id));
         Sync(Songs, songs.Take(SongCap).ToList());
         for (var i = 0; i < Songs.Count; i++) Songs[i].Number = i + 1;
         Sync(Artists, artists.Take(ArtistCap).ToList());

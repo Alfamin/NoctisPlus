@@ -8,6 +8,12 @@ if (Environment.GetEnvironmentVariable("FMF_UNIFIED_LIVE") is { Length: > 0 } se
     await LiveUnifiedSearchTest.RunAsync(searchQueries);
     return 0;
 }
+if (Environment.GetEnvironmentVariable("FMF_LYRICS_LIVE") is { Length: > 0 } lyricQueries)
+{
+    try { await LiveLyricSearchTest.RunAsync(lyricQueries, Environment.GetEnvironmentVariable("FMF_LIVE_PROXY")); }
+    finally { Console.WriteLine($"{Check.Passed} ok, {Check.Failed} wrong"); Check.RemoveFolders(); }
+    return Check.Failed;
+}
 if (Environment.GetEnvironmentVariable("FMF_PLAYLIST_SEARCH_LIVE") is { Length: > 0 } playlistQueries)
 {
     try { await LivePlaylistSearchTest.RunAsync(playlistQueries, Environment.GetEnvironmentVariable("FMF_LIVE_PROXY")); }
@@ -86,6 +92,7 @@ try
     await CheckTheseTests.RunAsync();
     await SpotifyPlaylistTests.RunAsync();
     await PlaylistSearchTests.RunAsync();
+    await LyricSearchTests.RunAsync();
     await BotLibraryTests.RunAsync();
     await DiscoveryTests.RunAsync();
     await UnifiedSearchTests.RunAsync();

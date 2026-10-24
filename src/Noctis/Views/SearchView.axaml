@@ -882,6 +882,13 @@
                                         <Border Classes="kind-pill">
                                             <TextBlock Text="Song" FontSize="12" FontWeight="SemiBold" />
                                         </Border>
+                                        <!-- Owner #155: found from the lyrics typed. -->
+                                        <Border Classes="kind-pill" IsVisible="{Binding TopFromLyrics}" ToolTip.Tip="Found from the lyrics you typed">
+                                            <StackPanel Orientation="Horizontal" Spacing="5">
+                                                <PathIcon Data="{StaticResource LyricsIcon}" Width="11" Height="11" VerticalAlignment="Center" />
+                                                <TextBlock Text="Lyrics" FontSize="12" FontWeight="SemiBold" />
+                                            </StackPanel>
+                                        </Border>
                                         <TextBlock Text="{Binding TopSong.ArtistDisplay, FallbackValue=''}" FontSize="13" Opacity="0.65"
                                                    VerticalAlignment="Center" TextTrimming="CharacterEllipsis" MaxLines="1" />
                                     </StackPanel>
