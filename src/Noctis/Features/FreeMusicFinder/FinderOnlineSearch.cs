@@ -198,6 +198,11 @@ internal sealed class FinderOnlineSearch : IOnlineMusicSearch
         {
             var hits = await spotify.SearchTracksAsync(text, LyricSearch.Candidates, budget.Token).ConfigureAwait(false);
             if (hits.FirstOrDefault() is not { } best) return null;
+            if (LyricSearch.NamesAlbum(text, best))
+            {
+                Noctis.Services.DebugLog.Write("Search", $"lyrics: none, the words name the album \"{best.Album}\"");
+                return null;
+            }
             var found = await catalog.SearchSongsAsync(best.Artists[0] + " " + CatalogEditions.Title(best.Title), budget.Token).ConfigureAwait(false);
             var match = LyricSearch.Match(best, found.Value);
             Noctis.Services.DebugLog.Write("Search", $"lyrics: Spotify \"{best.Title}\" by {best.Artists[0]}{(best.Lyrics ? " (lyrics)" : "")}"

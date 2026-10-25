@@ -38,6 +38,11 @@ internal static class LyricSearch
         return covered >= Math.Ceiling(words.Count * 0.8);
     }
 
+    /// <summary>The query names the album Spotify's song is on ("without warning 21 savage" gave "Ghostface Killers"): an
+    /// album search, not lyrics.</summary>
+    internal static bool NamesAlbum(string query, SpotifyTrackHit hit)
+        => hit.Album.Length > 0 && NamesSong(query, hit.Album, hit.Artists);
+
     /// <summary>Words people add around a song's name ("hotline bling by drake", "... song lyrics") that are neither.</summary>
     private static readonly HashSet<string> Filler = new(StringComparer.Ordinal) { "by", "song", "lyrics", "lyric", "feat", "ft", "featuring" };
 

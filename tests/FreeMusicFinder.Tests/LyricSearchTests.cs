@@ -81,6 +81,9 @@ internal static class LyricSearchTests
 
         Song Catalog(string id, string title, string artist, double seconds, int popularity) => new(id, title, artist, seconds, popularity);
         var hit = new SpotifyTrackHit("sp", "Hotline Bling", ["Drake"], "Views", 267, true, "", true);
+        Check.True(LyricSearch.NamesAlbum("without warning 21 savage", new SpotifyTrackHit("gk", "Ghostface Killers (feat. Travis Scott)",
+            ["21 Savage", "Offset", "Metro Boomin"], "Without Warning", 269, true, "", true)), "an album and its artist name the album, not lyrics");
+        Check.False(LyricSearch.NamesAlbum("you used to call me on my cell phone", hit), "a line of lyrics does not name the album");
         var copies = new[]
         {
             Catalog("cover", "Hotline Bling", "William Singe", 200, 600),
