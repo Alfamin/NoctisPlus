@@ -256,6 +256,27 @@ public class WordLyricsBackendTests
         using var resumed = rig.Worker(_ => { }); resumed.TickNow();
         await Task.Delay(150); Assert.Equal(1, resumed.WaitingCount); Assert.False(File.Exists(rig.Result));
     }
+    /// <summary>Owner #162: a song put off for days (no lyrics found once the network worked) starts its network waits afresh;
+    /// on the TEST profile one kept 100 and would have gone straight to hourly tries.</summary>
+    [Fact]
+    public async Task ASongPutOffForDays_StartsItsNetworkWaitsAfresh()
+    {
+        using var rig = new Rig(outcome: "network_error");
+        using (var worker = rig.Worker(_ => { }))
+        {
+            worker.Ask(rig.Song);
+            await Until(() => worker.StatusFor(rig.Song) == SongTimingStatus.Retry && File.Exists(rig.Result));
+            File.Delete(rig.Result);
+            File.WriteAllText(Path.Combine(rig.App, "fixture.json"), "{\"hold\":false,\"outcome\":\"no_lyrics\"}");
+            worker.RetryNetworkWaits();
+            await Until(() => worker.AutomaticBlocked(rig.Song), () => $"status={worker.StatusFor(rig.Song)}");
+        }
+        using var checkpoint = JsonDocument.Parse(File.ReadAllText(Path.Combine(rig.Work, "state.json")));
+        var row = Assert.Single(checkpoint.RootElement.GetProperty("waiting").EnumerateArray());
+        Assert.True(row.GetProperty("deferred").GetBoolean());
+        Assert.Equal(0, row.GetProperty("waits").GetInt32());
+        Assert.False(row.GetProperty("networkWait").GetBoolean());
+    }
     /// <summary>Owner #161: a song that crashes the whole WordLyrics run takes only itself down; the songs beside it are timed
     /// (a crash used to charge every song of the batch a try, and two crashes put all of them off for ten days).</summary>
     [Fact]

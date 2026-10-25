@@ -685,7 +685,8 @@ internal sealed class Worker : IDisposable
         var rule = _rules.Get(item.Path);
         if (rule.RetryUtc > now)
         {
-            item.Deferred = true; item.NotBefore = rule.RetryUtc;
+            // Owner #162: a song put off for days starts its network waits afresh (one kept 100 and would go hourly at once).
+            item.Deferred = true; item.NotBefore = rule.RetryUtc; item.Waits = 0; item.NetworkWait = false;
             item.Action = TimingAction.Fresh; item.Draft = null; item.AheadOnly = false;
         }
         if (now < item.NotBefore) return false;
@@ -1018,7 +1019,7 @@ internal sealed class Worker : IDisposable
                     _rules.Set(item.Path, new(RetryUtc: now + SongRules.RetryAfter));
                     item.Deferred = true; item.NotBefore = now + SongRules.RetryAfter;
                     item.Action = TimingAction.Fresh; item.Draft = null; item.Urgent = default;
-                    item.Ahead = false; item.AheadOnly = false; item.Tries = 0; item.NetworkWait = false;
+                    item.Ahead = false; item.AheadOnly = false; item.Tries = 0; item.Waits = 0; item.NetworkWait = false;
                 }
                 else
                 {
