@@ -84,6 +84,8 @@ internal sealed class Worker : IDisposable
     // ends normally, so the one that breaks it is found and charged, and the others are timed (a 200-song batch was
     // otherwise charged a try per song, and two crashes put all of them off for ten days).
     private bool _oneAtATime;
+    // Owner #168: a run is on the pill ("Starting WordLyrics", "Timing words") until a result or an idle state replaces it.
+    private bool _pillOpen;
     private DateTime _progressStamp, _progressMoved, _cpuMoved;
     private TimeSpan _cpuSeen;
     private View _view = new("Starting WordLyrics", "", 0, 0, null, false);
@@ -554,8 +556,16 @@ internal sealed class Worker : IDisposable
             if (_disposed || _ticking) return;
             _ticking = true;
         }
-        try { Safe(Work); }
+        try { Safe(Work); Safe(CloseIdlePill); }
         finally { lock (_gate) _ticking = false; }
+    }
+
+    /// <summary>Owner #168: a run stopped to make room for the song playing now (or by Restart) says nothing itself, and when
+    /// no run follows, the pill stayed on "Starting WordLyrics" for good. With nothing running, it goes back to idle.</summary>
+    private void CloseIdlePill()
+    {
+        lock (_gate) { if (_disposed || _run is not null || _paused || !_pillOpen) return; _pillOpen = false; }
+        _progress(new ProgressState("Ready", "New downloads use the timing mode in Settings → Features.", Finished: true));
     }
 
     private void Work()
@@ -796,6 +806,7 @@ internal sealed class Worker : IDisposable
             _restarting = false;
             _progressStamp = DateTime.MinValue; _progressMoved = _cpuMoved = DateTime.UtcNow; _cpuSeen = TimeSpan.Zero;
             _view = new View("Starting WordLyrics", $"{batch.Count} songs queued. Preparing backup and lyric search...", 0, batch.Count, null, false);
+            _pillOpen = true;
         }
         _log($"started WordLyrics on {batch.Count} song{(batch.Count == 1 ? "" : "s")} ({speed} speed)");
         lock (_gate) Emit();
@@ -952,6 +963,7 @@ internal sealed class Worker : IDisposable
             // Owner #108: stopped for the song playing now: like a restart, nothing is lost and nothing is the song's fault.
             if (_yielding && ReferenceEquals(_run, run)) { cancelled = false; restarted = true; }
             _yielding = false;
+            if (!restarted) _pillOpen = false; // every other ending puts its own result on the pill
             if (!restarted && code != ExitAlreadyRunning) _autoRestarts = 0; // a run that ended by itself: the watchdog starts counting again
             if (ReferenceEquals(_run, run))
             {

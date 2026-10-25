@@ -81,6 +81,8 @@ internal sealed class WordLyricsService(ILibraryService library, Func<AppSetting
         _worker.Watched = () => Volatile.Read(ref _playingPath);
         // Owner #96: song copies earlier runs left that are exact duplicates of their song go (in the background, after
         // startup has settled, at low priority).
+        BackupCleaner.Temporary = source => FreeMusicFinder.FreeMusicPlugin.Current?.StreamCacheFolder is { Length: > 0 } cache
+            && string.Equals(Path.GetFullPath(cache).TrimEnd('\\', '/'), Path.GetFullPath(source).TrimEnd('\\', '/'), StringComparison.OrdinalIgnoreCase);
         try { BackupCleaner.CleanEarlierLater(new Tool(_worker.Options.Folder).Folder, Log, TimeSpan.FromMinutes(2)); }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or ArgumentException) { }
         library.LibraryUpdated += LibraryChanged;

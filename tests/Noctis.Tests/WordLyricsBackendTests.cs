@@ -436,6 +436,22 @@ public class WordLyricsBackendTests
         Assert.True(worker.IsWaiting(rig.Song)); // kept, no failed try
     }
 
+    /// <summary>Owner #168: the run was stopped to make room, and nothing followed (the streamed song it was on left the
+    /// cache when it was skipped): the pill sat on "Starting WordLyrics" for good. It goes back to idle.</summary>
+    [Fact]
+    public async Task ARunStoppedToMakeRoom_WithNothingAfterIt_LeavesThePillIdle()
+    {
+        using var rig = new Rig(hold: true, done: 1);
+        var states = new ConcurrentQueue<ProgressState>();
+        using var worker = rig.Worker(states.Enqueue);
+        worker.Ask(rig.Song);
+        await Until(() => states.Any(s => s.Fraction is > 0 and < 0.75));
+        File.Delete(rig.Song); // a skipped stream leaves the cache
+        worker.MakeRoom(Path.Combine(rig.Music, "played now.mp3"));
+        await Until(() => states.LastOrDefault() is { Message: "Ready", Finished: true }, () => string.Join(" | ", states.Select(s => s.Message)));
+        Assert.Null(TimingPill.From(states.Last()));
+    }
+
     [Fact]
     public async Task APlayedSong_LetsARunFarThroughFinishItsSong_ThenGoesNext()
     {

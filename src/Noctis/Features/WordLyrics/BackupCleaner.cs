@@ -14,6 +14,13 @@ internal static class BackupCleaner
 {
     private static readonly SemaphoreSlim _one = new(1, 1);
 
+    /// <summary>
+    /// Owner #168: a folder whose songs are temporary copies (the stream cache of played songs). Each streamed song got its own
+    /// run and its own backup copy; the cache lets the song go later, so the copy no longer matched anything and was kept for
+    /// good (about 900 MB in a day here). A backup of such a song is never needed: the song itself can be fetched again.
+    /// </summary>
+    internal static Func<string, bool> Temporary = _ => false;
+
     /// <summary>After a run: its copies, in the background, at low priority.</summary>
     internal static void CleanLater(string runFolder, Action<string> log) => _ = Task.Run(async () =>
     {
@@ -35,9 +42,17 @@ internal static class BackupCleaner
             var runs = Path.Combine(toolFolder, "runs");
             if (!Directory.Exists(runs)) return;
             var total = new Result(0, 0, 0);
+            var places = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
             foreach (var summary in Directory.EnumerateFiles(runs, "summary.txt", SearchOption.AllDirectories))
             {
                 var r = CleanRun(Path.GetDirectoryName(summary)!);
+                total = new(total.Removed + r.Removed, total.Kept + r.Kept, total.Bytes + r.Bytes);
+                if (BackupOf(summary) is { } backup && Path.GetDirectoryName(Path.GetFullPath(backup).TrimEnd('\\', '/')) is { } place) places.Add(place);
+            }
+            // A run stopped before its summary (a song skipped while it was timed) left its copy with only WordLyrics' note.
+            foreach (var place in places)
+            {
+                var r = CleanTemporaryNotes(place);
                 total = new(total.Removed + r.Removed, total.Kept + r.Kept, total.Bytes + r.Bytes);
             }
             Report(total, log);
@@ -59,13 +74,55 @@ internal static class BackupCleaner
     {
         var summary = Path.Combine(runFolder, "summary.txt");
         if (!File.Exists(summary)) return new(0, 0, 0);
-        var backup = File.ReadLines(summary).Select(l => Regex.Match(l, @"^\s*Backup copy:\s*(.+?)\s*$")).FirstOrDefault(m => m.Success)?.Groups[1].Value;
-        if (backup is null || !Path.IsPathFullyQualified(backup)) return new(0, 0, 0);
+        var backup = BackupOf(summary);
+        if (backup is null) return new(0, 0, 0);
         // WordLyrics keeps a small note beside each backup folder ("….wordlyrics.json"); with the folder gone it describes nothing.
         if (!Directory.Exists(backup)) { DropNote(backup); return new(0, 0, 0); }
         if (Redirected(backup)) return new(0, 0, 0);
         var (source, songs) = Request(Path.Combine(runFolder, "request.json"));
         if (source is null) return new(0, 0, 0);
+        return Clean(backup, source, songs);
+    }
+
+    private static string? BackupOf(string summary)
+    {
+        var backup = File.ReadLines(summary).Select(l => Regex.Match(l, @"^\s*Backup copy:\s*(.+?)\s*$")).FirstOrDefault(m => m.Success)?.Groups[1].Value;
+        return backup is not null && Path.IsPathFullyQualified(backup) ? backup : null;
+    }
+
+    /// <summary>Owner #168: the copies of temporary songs in <paramref name="place"/> that only WordLyrics' note describes.</summary>
+    internal static Result CleanTemporaryNotes(string place)
+    {
+        int removed = 0, kept = 0; long bytes = 0;
+        if (!Directory.Exists(place) || Redirected(place)) return new(0, 0, 0);
+        foreach (var note in Directory.EnumerateFiles(place, "*.wordlyrics.json"))
+        {
+            var folder = note[..^".wordlyrics.json".Length];
+            var source = NoteSource(note);
+            if (source is null || !Temporary(source) || !Directory.Exists(folder)) continue;
+            var r = Clean(folder, source, []);
+            removed += r.Removed; kept += r.Kept; bytes += r.Bytes;
+        }
+        return new(removed, kept, bytes);
+    }
+
+    private static string? NoteSource(string note)
+    {
+        try
+        {
+            if (new FileInfo(note).Length > 1024 * 1024) return null;
+            using var doc = JsonDocument.Parse(File.ReadAllText(note));
+            return doc.RootElement.TryGetProperty("source", out var s) && s.ValueKind == JsonValueKind.String && Path.IsPathFullyQualified(s.GetString()!)
+                ? Path.GetFullPath(s.GetString()!).TrimEnd('\\', '/') : null;
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or JsonException or ArgumentException) { return null; }
+    }
+
+    private static Result Clean(string backup, string source, List<string> songs)
+    {
+        if (!Directory.Exists(backup)) { DropNote(backup); return new(0, 0, 0); }
+        if (Redirected(backup)) return new(0, 0, 0);
+        var temporary = Temporary(source);
         var root = Path.GetFullPath(backup).TrimEnd('\\', '/');
         // Never inside the music itself, and never a drive root.
         if (Path.GetPathRoot(root)?.TrimEnd('\\', '/') == root || Inside(root, source) || Inside(source, root)) return new(0, 0, 0);
@@ -78,7 +135,7 @@ internal static class BackupCleaner
             var candidates = new List<string> { Path.Combine(source, rel) };
             if (byName.TryGetValue(Path.GetFileName(copy), out var named)) candidates.AddRange(named);
             var size = new FileInfo(copy).Length;
-            if (candidates.Any(original => Same(original, copy, size)))
+            if (temporary || candidates.Any(original => Same(original, copy, size)))
             {
                 try { File.SetAttributes(copy, FileAttributes.Normal); File.Delete(copy); removed++; bytes += size; }
                 catch (Exception ex) when (ex is IOException or UnauthorizedAccessException) { kept++; }

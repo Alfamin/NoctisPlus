@@ -70,4 +70,35 @@ public class WordLyricsBackupCleanupTests : IDisposable
         Assert.Equal(0, BackupCleaner.CleanRun(run).Removed);
         Assert.True(File.Exists(Path.Combine(backup, "s.flac")));
     }
+
+    /// <summary>Owner #168: a played song's copy goes once its run is over, even after the stream cache let the song go; the
+    /// copy a stopped run left with only its note goes too. Songs of a real music folder keep the old rule.</summary>
+    [Fact]
+    public void CopiesOfStreamedSongs_Go_EvenWhenTheCacheLetTheSongGo()
+    {
+        var cache = Directory.CreateDirectory(Path.Combine(_root, "stream-cache")).FullName;
+        var music = Directory.CreateDirectory(Path.Combine(_root, "music4")).FullName;
+        var places = Path.Combine(_root, "WordLyrics Backups");
+        var played = Directory.CreateDirectory(Path.Combine(places, "stream-cache 2026-10-25 (single songs)")).FullName;
+        File.WriteAllBytes(Path.Combine(played, "played.flac"), [1, 2]); // the cache has let it go
+        var stopped = Directory.CreateDirectory(Path.Combine(places, "stream-cache 2026-10-25 b (single songs)")).FullName;
+        File.WriteAllBytes(Path.Combine(stopped, "skipped.flac"), [3, 4]);
+        File.WriteAllText(stopped + ".wordlyrics.json", JsonSerializer.Serialize(new { source = cache, folder = Path.GetFileName(stopped) }));
+        var mine = Directory.CreateDirectory(Path.Combine(places, "music4 2026-10-25 (single songs)")).FullName;
+        File.WriteAllBytes(Path.Combine(mine, "gone.flac"), [5]);
+        File.WriteAllText(mine + ".wordlyrics.json", JsonSerializer.Serialize(new { source = music, folder = Path.GetFileName(mine) }));
+        var run = Run(cache, played, [Path.Combine(cache, "played.flac")]);
+        var before = BackupCleaner.Temporary;
+        BackupCleaner.Temporary = source => string.Equals(Path.GetFullPath(source).TrimEnd('\\'), cache.TrimEnd('\\'), StringComparison.OrdinalIgnoreCase);
+        try
+        {
+            Assert.Equal(1, BackupCleaner.CleanRun(run).Removed);
+            Assert.False(Directory.Exists(played));
+            Assert.Equal(1, BackupCleaner.CleanTemporaryNotes(places).Removed);
+            Assert.False(Directory.Exists(stopped));
+            Assert.False(File.Exists(stopped + ".wordlyrics.json"));
+            Assert.True(File.Exists(Path.Combine(mine, "gone.flac"))); // a music folder's copy whose song is gone stays
+        }
+        finally { BackupCleaner.Temporary = before; }
+    }
 }

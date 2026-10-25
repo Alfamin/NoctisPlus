@@ -39,6 +39,8 @@ public sealed class FreeMusicPlugin : INoctisPlugin
     private PlaylistTransfers? _transfers;
     private SpotifyPlaylists? _playlists;
     private Downloads? _downloads;
+    /// <summary>Owner #168: where played songs are kept for a while (null before the plugin starts).</summary>
+    internal string? StreamCacheFolder => _downloads?.CacheFolder;
     private Noctis.Views.TelegramSignInDialog? _signInDialog;
     private ArtistCatalog? _catalog;
     private DiscoveryActions? _discoveryActions;
