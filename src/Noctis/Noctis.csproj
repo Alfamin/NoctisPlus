@@ -133,6 +133,8 @@
   <!-- Metadata reading -->
   <ItemGroup>
     <PackageReference Include="TagLibSharp" Version="2.3.0" />
+    <!-- Optional For you sound embeddings. CPU only; no driver/GPU requirement and no Python dependency. -->
+    <PackageReference Include="Microsoft.ML.OnnxRuntime" Version="1.23.2" />
   </ItemGroup>
 
   <!-- Image color extraction (transitive dep of Avalonia.Skia, explicit for compile-time access) -->
@@ -187,6 +189,8 @@
     <Content Include="Features\LyricMotion\LICENSE" Link="features\dev.moshi.lyricmotion\LICENSE"
              CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
     <Content Include="Features\FreeMusicFinder\LICENSE" Link="features\dev.moshi.freemusicfinder\LICENSE"
+             CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
+    <Content Include="Features\FreeMusicFinder\Sonic-OnnxRuntime-*.txt" Link="features\dev.moshi.freemusicfinder\Sonic\%(Filename)%(Extension)"
              CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
   </ItemGroup>
   <ItemGroup>

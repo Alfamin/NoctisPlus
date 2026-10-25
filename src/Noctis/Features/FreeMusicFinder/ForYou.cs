@@ -36,7 +36,8 @@ internal sealed record DiscoverResult(List<DiscoverSong> Songs, List<DiscoverArt
 /// <summary><paramref name="OnPages"/>: recordings on the pages the shelf keeps (owner #139). A new page leaves them to those pages and
 /// only falls back on them when nothing fresh is left.</summary>
 internal sealed record DiscoverContext(IReadOnlySet<string> Familiar, DiscoverLearning Learning, DateTimeOffset Now, IReadOnlyList<TasteRecording>? Liked = null,
-    IReadOnlySet<string>? OnPages = null);
+    IReadOnlySet<string>? OnPages = null,
+    Func<IReadOnlyList<CatalogSong>, CancellationToken, Task<IReadOnlyDictionary<string, double>>>? Sonic = null);
 
 /// <summary>The listener's taste in artists, from what they play and what they own. Nothing leaves the computer.</summary>
 internal static class Taste
@@ -464,12 +465,20 @@ internal static class Discover
     /// and the evaluation's, so both run the same steps. <paramref name="songs"/>: false builds Milestone C's artist-only page.</summary>
     public static Task<DiscoverResult> ForListenerAsync(IReadOnlyList<TastePlay> plays, IReadOnlyList<LocalSong> library, IReadOnlyList<TastePlaylist> playlists,
         DiscoverFeedback feedback, DiscoverHidden hidden, IDiscoverCatalog catalog, Func<IReadOnlyList<CatalogSong>, CancellationToken, Task<HashSet<string>>> unavailable,
-        IProgress<string>? progress, DateTimeOffset now, CancellationToken ct, bool songs = true, IReadOnlySet<string>? onPages = null)
+        IProgress<string>? progress, DateTimeOffset now, CancellationToken ct, bool songs = true, IReadOnlySet<string>? onPages = null, IDiscoverSonic? sonic = null)
     {
         var learning = feedback.Learn(plays, library, playlists);
         var liked = new List<TasteRecording>();
         var seeds = Taste.Seeds(plays.Concat(learning.Saves), library, now.UtcDateTime, playlists: playlists, liked: liked);
-        return BuildAsync(seeds, catalog, unavailable, hidden, progress, ct, context: new(TasteSources.Familiar(plays, now.UtcDateTime), learning, now, songs ? liked : null, onPages));
+        // Explicit song feedback is local to the sonic lane, never an artist-wide ban. Retract/Undo removes the
+        // interaction, so no stale negative survives the next page. Historical replay passes empty current marks.
+        var sonicPlays = sonic is null ? plays : plays
+            .Concat(feedback.Interactions.Where(i => i.Action == DiscoverAction.Dismiss && i.At <= now)
+                .Select(i => new TastePlay(i.Artist, i.At.UtcDateTime, -1, i.Title)))
+            .Concat(library.Where(s => s.Disliked || s.Rating is > 0 and <= 2)
+                .Select(s => new TastePlay(s.Artist, now.UtcDateTime, -1, s.Title))).ToList();
+        return BuildAsync(seeds, catalog, unavailable, hidden, progress, ct, context: new(TasteSources.Familiar(plays, now.UtcDateTime), learning, now, songs ? liked : null, onPages,
+            sonic is null ? null : (candidates, token) => sonic.RankAsync(candidates, liked, sonicPlays, token)));
     }
 
     public static async Task<DiscoverResult> BuildAsync(IReadOnlyList<TasteSeed> seeds, IDiscoverCatalog catalog,
@@ -640,6 +649,25 @@ internal static class Discover
             songs = DiscoverIdentity.Distinct(songs.OrderByDescending(s => s.Score), s => s.Track.Song);
         }
         var pool = songs.Where(s => !gone.Contains(s.Track.Song.Id)).OrderByDescending(s => s.Score).ToList();
+        // Optional, isolated For you V2 stage. Filters run first; the existing diversity rules still run last.
+        // A model, timeout or proxy failure never prevents the metadata page from being returned.
+        var baseline = pool.Select((s, i) => (s.Track.Song.Id, i)).GroupBy(x => x.Id).ToDictionary(g => g.Key, g => g.First().i);
+        bool sonicApplied = false;
+        if (context?.Sonic is { } sonic && pool.Count > 0)
+        {
+            using var budget = CancellationTokenSource.CreateLinkedTokenSource(ct);
+            budget.CancelAfter(TimeSpan.FromSeconds(2));
+            try
+            {
+                var pending = sonic(pool.Select(s => s.Track.Song).ToList(), budget.Token);
+                _ = pending.ContinueWith(t => _ = t.Exception, CancellationToken.None, TaskContinuationOptions.OnlyOnFaulted, TaskScheduler.Default);
+                var factors = await pending.WaitAsync(budget.Token).ConfigureAwait(false);
+                pool = pool.Select(s => factors.TryGetValue(DiscoverIdentity.Key(s.Track.Song), out var factor) && double.IsFinite(factor) && factor is >= 0.6 and <= 1.65
+                    ? (s.Track, s.Score * factor, s.Key, s.Seed, s.Like) : s).OrderByDescending(s => s.Item2).ToList();
+                sonicApplied = factors.Values.Any(f => double.IsFinite(f) && f is >= 0.6 and <= 1.65 && Math.Abs(f - 1) > 1e-6);
+            }
+            catch (Exception) when (!ct.IsCancellationRequested) { /* The unchanged baseline is useful on its own. */ }
+        }
 
         var result = new List<DiscoverSong>();
         var count = new Dictionary<string, int>(StringComparer.Ordinal);
@@ -657,6 +685,9 @@ internal static class Discover
         // Milestone C's page: best score first. With songs like liked recordings: the sources take turns, and so do the seeds.
         int Next(Func<(CatalogSearchSong Track, double Score, string Key, string Seed, TasteRecording? Like), bool> ok)
         {
+            // Every fifth position keeps a metadata-led choice: acoustically unfamiliar discoveries still get a turn.
+            if (sonicApplied && result.Count % 5 == 4)
+                return pool.Select((s, i) => (Song: s, Index: i)).Where(x => ok(x.Song)).OrderBy(x => baseline[x.Song.Track.Song.Id]).Select(x => x.Index).DefaultIfEmpty(-1).First();
             if (liked is null) return pool.FindIndex(s => ok(s));
             bool otherSource = previousLike is { } last && pool.Any(s => (s.Like is not null) != last && ok(s));
             bool otherSeed = pool.Any(s => s.Seed != previousSeed && ok(s));
@@ -784,7 +815,7 @@ internal sealed class DiscoverHidden
 internal sealed class ForYouSource(Func<ArtistCatalog> catalog, DiscoveryActions? actions, Func<string, IReadOnlyList<string>> localAlbums,
     IPlaylistLibrary library, string? noctisData, string hiddenPath, Func<SimilarArtists?>? similar = null,
     Func<LastFmSimilar?>? lastFm = null, Func<DateTimeOffset>? now = null, Func<IDiscoverCatalog>? discover = null,
-    Func<IReadOnlyList<CatalogSong>, CancellationToken, Task<HashSet<string>>>? unavailable = null) : IDisposable
+    Func<IReadOnlyList<CatalogSong>, CancellationToken, Task<HashSet<string>>>? unavailable = null, IDiscoverSonic? sonic = null) : IDisposable
 {
     private readonly Func<DateTimeOffset> _now = now ?? (() => DateTimeOffset.UtcNow);
     private readonly ForYouCache _cache = new(Path.Combine(Path.GetDirectoryName(Path.GetFullPath(hiddenPath))!, "for-you-last.json"));
@@ -803,6 +834,8 @@ internal sealed class ForYouSource(Func<ArtistCatalog> catalog, DiscoveryActions
     /// <summary>Which pages were shown and what was done with them; the next page learns from it.</summary>
     public DiscoverFeedback Feedback { get; } = new(Path.Combine(Path.GetDirectoryName(Path.GetFullPath(hiddenPath))!, "for-you-feedback.json"), now);
     public bool UsesLastFm => lastFm?.Invoke()?.Enabled == true;
+    // Kept separate from ordinary ranking so missing/disabled models preserve the current feature exactly.
+    internal IDiscoverSonic? Sonic { get; set; } = sonic;
     public event Action<DiscoverResult>? PicksReady;
 
     public Task<DiscoverResult?> SavedAsync(CancellationToken ct) => Task.Run(() =>
@@ -876,7 +909,7 @@ internal sealed class ForYouSource(Func<ArtistCatalog> catalog, DiscoveryActions
             // Reading the history, learning, taste and ranking are seconds of work on a large profile: none of it on the UI
             // thread (awaiting there would bring every step after the first lookup back to it).
             var result = await Task.Run(() => Discover.ForListenerAsync(TasteSources.Load(noctisData), songs, TasteSources.Playlists(noctisData), Feedback, Hidden,
-                discover?.Invoke() ?? new CatalogForDiscover(catalog, localAlbums, similar ?? (() => null), lastFm), unavailable ?? Unavailable, progress, _now(), ct, onPages: onPages), ct);
+                discover?.Invoke() ?? new CatalogForDiscover(catalog, localAlbums, similar ?? (() => null), lastFm), unavailable ?? Unavailable, progress, _now(), ct, onPages: onPages, sonic: Sonic), ct);
             ct.ThrowIfCancellationRequested();
             lock (_sync)
             {

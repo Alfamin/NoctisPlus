@@ -3,6 +3,18 @@ using Avalonia.Headless;
 using Avalonia.Themes.Fluent;
 using FreeMusicFinder.Tests;
 
+if (Environment.GetEnvironmentVariable("FMF_SONIC_ENCODER") is { Length: > 0 } sonicEncoder)
+{
+    await SonicNativeCheck.RunAsync(sonicEncoder);
+    return Check.Failed;
+}
+
+if (Environment.GetEnvironmentVariable("FMF_SONIC_REPLAY") is { Length: > 0 } sonicWork)
+{
+    await SonicReplayTest.RunAsync(sonicWork);
+    return 0;
+}
+
 if (Environment.GetEnvironmentVariable("FMF_UNIFIED_LIVE") is { Length: > 0 } searchQueries)
 {
     await LiveUnifiedSearchTest.RunAsync(searchQueries);

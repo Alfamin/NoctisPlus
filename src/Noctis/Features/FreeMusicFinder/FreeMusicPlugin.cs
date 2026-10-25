@@ -60,6 +60,8 @@ public sealed class FreeMusicPlugin : INoctisPlugin
     private DateTime _lastPurge;
     private readonly Func<string, string, ArtistCatalog> _catalogFactory;
     private ForYouSource? _forYou;
+    private SonicFeature? _sonic;
+    private volatile bool _sonicEnabled;
     private FinderOnlineSearch? _online;
     private SimilarArtists? _similar;
     private LastFmSimilar? _lastFm;
@@ -127,6 +129,9 @@ public sealed class FreeMusicPlugin : INoctisPlugin
         CheckThese.Load(Path.Combine(host.DataDirectory, "check-these.json"));
         _forYou = new ForYouSource(() => _catalog ?? throw new InvalidOperationException("Free Music Finder has stopped."), _discoveryActions,
             DiscoverAlbums, new PlaylistLibrary(), NoctisDataOf(host.DataDirectory), Path.Combine(host.DataDirectory, "for-you-hidden.json"), () => _similar, () => _lastFm);
+        _sonicEnabled = host.Settings.GetBool(SonicFeature.SettingKey, false);
+        _sonic = new SonicFeature(host.DataDirectory, () => _sonicEnabled, _proxy, Log);
+        _forYou.Sonic = _sonic;
         // Native For you loads when its shelf is visible. A startup background build
         // must not compete with the user's first Search for metadata connections.
         // The app's own Search page reads the catalog and starts downloads through this.
@@ -178,6 +183,7 @@ public sealed class FreeMusicPlugin : INoctisPlugin
         _signInDialog?.Close();
         _signInDialog = null;
         _forYou?.Dispose(); _forYou = null;
+        _sonic?.Dispose(); _sonic = null;
         _artistPages?.Dispose(); _artistPages = null;
         _catalog?.Dispose(); _catalog = null;
         _discoveryActions = null;
@@ -212,6 +218,13 @@ public sealed class FreeMusicPlugin : INoctisPlugin
             _catalog = CreateCatalog();
             _similar?.Dispose(); _similar = CreateSimilar();
             _lastFm?.Dispose(); _lastFm = CreateLastFm();
+            _sonic?.UpdateProxy(_proxy);
+        }
+        else if (key == SonicFeature.SettingKey)
+        {
+            _sonicEnabled = _host?.Settings.GetBool(SonicFeature.SettingKey, false) == true;
+            _sonic?.Changed(_sonicEnabled);
+            _forYou?.Forget();
         }
         else if (key == LastFmKey)
         {
