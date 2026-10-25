@@ -49,15 +49,21 @@ internal sealed class PlaylistLibrary : IPlaylistLibrary
 internal sealed class PlaylistMatcher
 {
     private readonly ILookup<string, LocalSong> _titles;
+    private readonly LocalSong[] _songs, _starred;
     public PlaylistMatcher(IEnumerable<LocalSong> songs)
     {
-        _titles = songs.Where(s => File.Exists(s.Path)).OrderBy(s => s.Path, StringComparer.OrdinalIgnoreCase)
-            .SelectMany(s => Keys(s.Title).Select(key => (key, s))).ToLookup(pair => pair.key, pair => pair.s);
+        _songs = songs.Where(s => File.Exists(s.Path)).OrderBy(s => s.Path, StringComparer.OrdinalIgnoreCase).ToArray();
+        _starred = _songs.Where(s => s.Title.Contains('*')).ToArray();
+        _titles = _songs.SelectMany(s => Keys(s.Title).Select(key => (key, s))).ToLookup(pair => pair.key, pair => pair.s);
     }
     // Looked up under the title without its brackets, and under its name alone: Spotify writes
     // "Song - Remix" and "Song (with Guest)" where the files say "Song (Remix)" and "Song".
     private static IEnumerable<string> Keys(string title) => new[] { BotText.Key(BotText.Plain(title)), RecordingMatch.TitleKey(title) }.Distinct();
-    private IEnumerable<LocalSong> Named(string title) => Keys(title).SelectMany(key => _titles[key]).Distinct();
+    // Owner #165: a starred word ("Trap N*ggas") is looked for among the songs that spell it out, and the other way round.
+    private IEnumerable<LocalSong> Named(string title) => Keys(title).SelectMany(key => _titles[key])
+        .Concat((title.Contains('*') ? _songs : _starred).Where(s => Keys(RecordingMatch.Uncensored(RecordingMatch.CensoredLike(s.Title, title)))
+            .Intersect(Keys(RecordingMatch.Uncensored(RecordingMatch.CensoredLike(title, s.Title)))).Any()))
+        .Distinct();
     private static TimeSpan? Length(LocalSong s) => s.Duration > TimeSpan.Zero ? s.Duration : null;
     private static bool ByArtist(MusicRequest request, LocalSong s, bool lengths = true) => RecordingMatch.Fits(request, s.Artist, s.Title, lengths ? Length(s) : null);
     // A song put out under another name (the uploader of a leak, a compilation) often keeps that name
@@ -72,6 +78,11 @@ internal sealed class PlaylistMatcher
         .ThenByDescending(s => BotText.Key(request.Title) == BotText.Key(s.Title))
         .ThenBy(s => request.Seconds is {} seconds ? Math.Abs(s.Duration.TotalSeconds - seconds) : 0)
         .ThenBy(s => s.Path, StringComparer.OrdinalIgnoreCase).FirstOrDefault();
+    /// <summary>Owner #165: the song in any cut by the same artist (<see cref="RecordingMatch.SameSong"/>), when the very
+    /// recording is not there. For You leaves such songs out.</summary>
+    public LocalSong? FindSong(MusicRequest request) => Find(request) ?? Named(request.Title)
+        .Where(s => RecordingMatch.SameSong(request, s.Artist, s.Title) || s.AlbumArtist.Length > 0 && RecordingMatch.SameSong(request, s.AlbumArtist, s.Title))
+        .OrderByDescending(s => s.Visible).FirstOrDefault();
     public string MissingReason(MusicRequest request)
     {
         var named = Named(request.Title).ToArray();

@@ -932,7 +932,7 @@ internal sealed class ForYouSource(Func<ArtistCatalog> catalog, DiscoveryActions
     private async Task<HashSet<string>> Unavailable(IReadOnlyList<CatalogSong> songs, CancellationToken ct)
     {
         if (actions is null) return [];
-        var matches = await actions.MatchAsync(songs, ct);
+        var matches = await actions.MatchAsync(songs, ct, anySong: true);
         return matches.Where(m => m.Value.Local is not null || m.Value.Download is not null).Select(m => m.Key).ToHashSet(StringComparer.Ordinal);
     }
 }

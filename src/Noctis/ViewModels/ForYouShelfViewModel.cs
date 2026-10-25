@@ -173,7 +173,7 @@ public sealed partial class ForYouShelfViewModel : ObservableObject, IDisposable
             page = page with { Songs = page.Songs.Where(s => !known.Contains(DiscoverIdentity.Key(s.Track.Song))).ToList() };
         }
         if (_actions is not { } actions || page.Songs.Count == 0) return page;
-        var matches = await actions.MatchAsync(page.Songs.Select(s => s.Track.Song), ct, reuse: true);
+        var matches = await actions.MatchAsync(page.Songs.Select(s => s.Track.Song), ct, reuse: true, anySong: true);
         return page with { Songs = page.Songs.Where(s => !matches.TryGetValue(s.Track.Song.Id, out var m) || m.Local is null && m.Download is null).ToList() };
     }
 

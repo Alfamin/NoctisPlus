@@ -178,7 +178,7 @@ internal static class RecordingMatch
     internal static bool Close(MusicRequest wanted, string artist, string title, TimeSpan? duration)
     {
         if (string.IsNullOrWhiteSpace(artist) || string.IsNullOrWhiteSpace(title)) return false;
-        title = Uncensored(title); wanted = wanted with { Title = Uncensored(wanted.Title) };
+        (wanted, title) = Starred(wanted, title);
         if (wanted.Explicit == true && Regex.IsMatch(title, @"\b(clean|censored|radio edit)\b", RegexOptions.IgnoreCase)) return false;
         foreach (var version in new[] { "live", "remix", "instrumental", "acoustic", "cover", "sped up", "slowed", "karaoke", "nightcore", "8d" })
             if (Regex.IsMatch(wanted.Title, @"\b" + version + @"\b", RegexOptions.IgnoreCase) != Regex.IsMatch(title, @"\b" + version + @"\b", RegexOptions.IgnoreCase)) return false;
@@ -195,7 +195,7 @@ internal static class RecordingMatch
     {
         if (string.IsNullOrWhiteSpace(artist) || string.IsNullOrWhiteSpace(title)) return false;
         // Catalogs star a censored word differently: Spotify "I'M DAT N***A", Deezer "I'M DAT N****" (owner #79).
-        title = Uncensored(title); wanted = wanted with { Title = Uncensored(wanted.Title) };
+        (wanted, title) = Starred(wanted, title);
         if (wanted.Explicit == true && Regex.IsMatch(title, @"\b(clean|censored|radio edit)\b",RegexOptions.IgnoreCase)) return false;
         static string Versions(string name)=>Regex.Replace(name,@"\(with instrumental by[^)]*\)","",RegexOptions.IgnoreCase);
         foreach (var version in new[]{"live","remix","instrumental","acoustic","cover","sped up","slowed"})
@@ -237,6 +237,39 @@ internal static class RecordingMatch
         if(b.Length<16 || b.Length>=a.Length || !a.StartsWith(b,StringComparison.Ordinal)) return false;
         var open=sent.Count(c=>c=='(')>sent.Count(c=>c==')') || sent.Count(c=>c=='[')>sent.Count(c=>c==']');
         return open || sent.TrimEnd().EndsWith('…') || sent.TrimEnd().EndsWith("...",StringComparison.Ordinal) || sent.Length>=60;
+    }
+
+    /// <summary>Owner #165: one title stars a word the other spells out (Deezer "Trap N*ggas", the file "Trap Niggas"): the
+    /// spelled-out word is starred too when it starts with the same letter, then both are <see cref="Uncensored"/>.</summary>
+    internal static (MusicRequest Wanted, string Title) Starred(MusicRequest wanted, string title)
+        => (wanted with { Title = Uncensored(CensoredLike(wanted.Title, title)) }, Uncensored(CensoredLike(title, wanted.Title)));
+
+    /// <summary><paramref name="title"/> with each word that <paramref name="starred"/> stars at the same place starred the same way.</summary>
+    internal static string CensoredLike(string title, string starred)
+    {
+        if (!starred.Contains('*') || title.Contains('*')) return title;
+        var words = title.Split(' '); var stars = starred.Split(' ');
+        if (words.Length != stars.Length) return title;
+        for (var i = 0; i < words.Length; i++)
+            if (stars[i].Contains('*') && words[i].Length > 0 && stars[i].Length > 0 && char.ToLowerInvariant(words[i][0]) == char.ToLowerInvariant(stars[i][0]))
+                words[i] = stars[i];
+        return string.Join(' ', words);
+    }
+
+    /// <summary>
+    /// Owner #165: the same song, whatever its cut or length: the same name and kind of version (never a remix for the
+    /// original, never clean for explicit) by a shared artist. For You leaves out a song the library has this way ("Drip
+    /// Too Hard (Lil Baby &amp; Gunna)", a 3:07 video cut, for the 2:26 album one); downloads still want the very recording.
+    /// </summary>
+    internal static bool SameSong(MusicRequest wanted, string artist, string title)
+    {
+        if (string.IsNullOrWhiteSpace(artist) || string.IsNullOrWhiteSpace(title)) return false;
+        (wanted, title) = Starred(wanted, title);
+        if (wanted.Explicit == true && Regex.IsMatch(title, @"\b(clean|censored|radio edit)\b", RegexOptions.IgnoreCase)) return false;
+        foreach (var version in new[] { "live", "remix", "instrumental", "acoustic", "cover", "sped up", "slowed", "karaoke", "nightcore", "8d" })
+            if (Regex.IsMatch(wanted.Title, @"\b" + version + @"\b", RegexOptions.IgnoreCase) != Regex.IsMatch(title, @"\b" + version + @"\b", RegexOptions.IgnoreCase)) return false;
+        static IEnumerable<string> ArtistKeys(string value) => Regex.Split(value, @"\s*(?:,|&|;|/|\bfeat\.?|\bft\.?|\bfeaturing\b|\bx\b)\s*", RegexOptions.IgnoreCase).Select(Key).Where(k => k.Length > 0);
+        return ArtistKeys(wanted.Artist).Intersect(ArtistKeys(artist)).Any() && Title(wanted.Title).Name == Title(title).Name;
     }
 
     /// <summary>A starred word is kept as its first letter and one star, however many letters were hidden.</summary>

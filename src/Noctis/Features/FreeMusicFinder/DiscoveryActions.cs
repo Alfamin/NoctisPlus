@@ -33,7 +33,8 @@ internal sealed class DiscoveryActions(IPlaylistLibrary library, Downloads downl
 
     /// <param name="reuse">Browsing (Search) may reuse a recent matcher; anything that decides
     /// what to download checks the disk afresh.</param>
-    public async Task<Dictionary<string, DiscoveryMatch>> MatchAsync(IEnumerable<CatalogSong> songs, CancellationToken ct, bool reuse = false)
+    /// <param name="anySong">Owner #165: For You. The song in another cut by the same artist counts as in the library.</param>
+    public async Task<Dictionary<string, DiscoveryMatch>> MatchAsync(IEnumerable<CatalogSong> songs, CancellationToken ct, bool reuse = false, bool anySong = false)
     {
         var rows = songs.ToArray(); var snapshot = await library.SnapshotAsync(); ct.ThrowIfCancellationRequested();
         return await Task.Run(() =>
@@ -41,7 +42,7 @@ internal sealed class DiscoveryActions(IPlaylistLibrary library, Downloads downl
             var matcher = reuse ? Matcher(snapshot) : new PlaylistMatcher(snapshot); var history = downloads.History;
             return rows.DistinctBy(s => s.Id).ToDictionary(s => s.Id, s =>
             {
-                var local = matcher.Find(s.Request);
+                var local = anySong ? matcher.FindSong(s.Request) : matcher.Find(s.Request);
                 var queued = history.LastOrDefault(d => d.Track.Request is {} r && SpotifyPlaylists.SameRecording(s.Request, r) &&
                     (d.IsActive || d.State == DownloadState.Failed || d.State is DownloadState.Saved or DownloadState.AlreadyThere && Downloader.FindExisting(d.Folder, d.Track.FileName) is not null));
                 return new DiscoveryMatch(local, queued, local is not null ? (local.Visible ? "In your library" : "In your library · hidden folder") : queued is not null ? queued.State switch

@@ -103,6 +103,20 @@ internal static class SpotifyPlaylistTests
         Check.Equal<LocalSong?>(null, new PlaylistMatcher(library.Songs).Find(new("Song 1 (Remix)", "Artist", 180)), "remix is not an original");
         Check.Equal<LocalSong?>(null, new PlaylistMatcher(library.Songs).Find(new("Song 1", "Artist", 400)), "duration mismatch stays missing");
         Check.True(new PlaylistMatcher(library.Songs).MissingReason(new("Song 1", "Artist", 400)).Contains("Different recording length"), "same-name wrong-length recordings explain why they were not matched");
+        // Owner #165: For You recommended songs the owner has under another spelling or cut.
+        var trap = library.Add(folder, "Trap Niggas", "Future", 184);
+        var drip = library.Add(folder, "Drip Too Hard (Lil Baby & Gunna)", "Lil Baby, Gunna", 187);
+        library.Add(folder, "Life Is Good", "Trap Nation (US)", 62);
+        var owned = new PlaylistMatcher(library.Songs);
+        Check.Equal(trap.Id, owned.Find(new("Trap N*ggas", "Future", 184, Explicit: true))?.Id, "a starred title finds the spelled-out file of the same length");
+        Check.True(RecordingMatch.Fits(new("Trap Niggas", "Future", 184), "Future", "Trap N****s", TimeSpan.FromSeconds(184)), "and the other way round");
+        Check.Equal<LocalSong?>(null, owned.Find(new("Trap N*ggas", "Future", 174, Explicit: true)), "another cut (56 Nights, 10 s shorter) is not that recording");
+        Check.Equal(trap.Id, owned.FindSong(new("Trap N*ggas", "Future", 174, Explicit: true))?.Id, "but For You knows the song is owned");
+        Check.Equal(drip.Id, owned.FindSong(new("Drip Too Hard", "Lil Baby, Gunna", 146, Explicit: true))?.Id, "a 3:07 cut with the artists in its title owns the 2:26 song");
+        Check.Equal<LocalSong?>(null, owned.Find(new("Drip Too Hard", "Lil Baby, Gunna", 146)), "downloads still want the very recording");
+        Check.Equal<LocalSong?>(null, owned.FindSong(new("Drip Too Hard (Remix)", "Lil Baby", 146)), "a remix is still another song");
+        Check.Equal<LocalSong?>(null, owned.FindSong(new("Drip Too Hard", "Someone Else", 146)), "the same name by another artist is another song");
+        Check.Equal<LocalSong?>(null, owned.FindSong(new("Song 1 (Live)", "Other Artist", 180)), "no shared artist, no match");
         // Spotify's way of writing a title against the tags of the files.
         var bonus = library.Add(folder, "Song 9 (Bonus)"); var guest = library.Add(folder, "Song 8", "Artist; Guest");
         Check.Equal(bonus.Id, new PlaylistMatcher(library.Songs).Find(new("Song 9 - Bonus", "Artist", 180))?.Id, "\"Song - Bonus\" finds the file tagged \"Song (Bonus)\"");
