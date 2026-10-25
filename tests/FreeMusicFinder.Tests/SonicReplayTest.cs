@@ -16,10 +16,12 @@ internal static class SonicReplayTest
         protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken ct)
         { Interlocked.Increment(ref Misses); throw new HttpRequestException("Offline sonic replay: metadata cache miss"); }
     }
-    private sealed class Scorer(Dictionary<string, SonicVector> vectors, double blend) : IDiscoverSonic
+    private sealed class Scorer(Dictionary<string, SonicVector> vectors, double blend, bool hold = false) : IDiscoverSonic
     {
         public int Pool, Covered;
         public List<CatalogSong> Candidates = [];
+        /// <summary>The sound scores of the last build; with <c>hold</c> the page itself keeps the normal order.</summary>
+        public IReadOnlyDictionary<string, double> Last = new Dictionary<string, double>();
         public Task<IReadOnlyDictionary<string, double>> RankAsync(IReadOnlyList<CatalogSong> candidates,
             IReadOnlyList<TasteRecording> liked, IReadOnlyList<TastePlay> plays, CancellationToken ct)
         {
@@ -29,20 +31,24 @@ internal static class SonicReplayTest
                 .Select(l => new SonicExample(DiscoverIdentity.Key(l.Title, l.Artist), vectors[DiscoverIdentity.Key(l.Title, l.Artist)], l.Weight)).ToList();
             foreach (var g in plays.Where(p => p.Weight < 0).GroupBy(p => DiscoverIdentity.Key(p.Title, p.Artist)))
                 if (vectors.TryGetValue(g.Key, out var v)) taste.Add(new(g.Key, v, Math.Max(-1, g.Sum(p => p.Weight))));
-            return Task.FromResult<IReadOnlyDictionary<string, double>>(SonicRanking.Multipliers(candidates, vectors, taste, blend));
+            Last = SonicRanking.Multipliers(candidates, vectors, taste, blend);
+            return Task.FromResult(hold ? new Dictionary<string, double>() : Last);
         }
     }
     private sealed record Row(string Model, double Blend, string Day, int Candidates, int Covered, int EligibleHeldOut,
-        int PoolHeldOut, int Hit10, int Hit20, double Ndcg20, double Mrr, int Artists, int MaxPerArtist, int[] FoundByRefresh, int PooledOverRefreshes);
-    /// <summary>Pages built in a row with Refresh: 8 x 20 = 160 songs, about what a listener sees in a sitting.</summary>
-    private const int Refreshes = 8;
+        int PoolHeldOut, int Hit10, int Hit20, double Ndcg20, double Mrr, int Artists, int MaxPerArtist, int[] FoundByRefresh, int PooledOverRefreshes, int FoundInPicks = 0);
+    /// <summary>Pages built in a row with Refresh: 12 x 20 = 240 songs (owner: 200+). FMF_SONIC_REPLAY_REFRESHES overrides
+    /// (8 reproduces the first TEST table).</summary>
+    private static readonly int Refreshes = int.TryParse(Environment.GetEnvironmentVariable("FMF_SONIC_REPLAY_REFRESHES"), out var n) && n is > 0 and <= 50 ? n : 12;
 
     public static async Task RunAsync(string work)
     {
         work = Path.GetFullPath(work);
         string profile = Environment.GetEnvironmentVariable("FMF_SONIC_TEST_PROFILE") ?? "";
-        if (new DirectoryInfo(profile).Name != "profile" || new DirectoryInfo(profile).Parent?.Name != "NoctisPlus-Test")
-            throw new ArgumentException("FMF_SONIC_TEST_PROFILE must be the in-place NoctisPlus-Test/profile");
+        // The TEST profile in place, or a read-only copy of the main profile's replay files under artifacts.
+        bool mainCopy = new DirectoryInfo(profile).Parent?.Name == "NoctisPlus-Main" && Path.GetFullPath(profile).Contains(@"\artifacts\sonic\", StringComparison.OrdinalIgnoreCase);
+        if (new DirectoryInfo(profile).Name != "profile" || !(new DirectoryInfo(profile).Parent?.Name == "NoctisPlus-Test" || mainCopy))
+            throw new ArgumentException("FMF_SONIC_TEST_PROFILE must be the in-place NoctisPlus-Test/profile or an artifacts copy of the main profile");
         var input = JsonSerializer.Deserialize<Input>(File.ReadAllText(Path.Combine(work, "manifest.json")))!;
         var names = input.tracks.ToDictionary(t => t.key, t => DiscoverIdentity.Key(t.title, t.artist));
         var events = input.events.OrderBy(e => e.at).ToList();
@@ -86,17 +92,34 @@ internal static class SonicReplayTest
         Taste.Seeds(nowPlays, library, DateTime.UtcNow, playlists: TasteSources.Playlists(profile), liked: nowLiked);
         Console.WriteLine($"live taste now: {nowPlays.Count} plays ({nowPlays.Count(p => p.Weight > 0)} positive), {library.Count} library songs, {nowLiked.Count} liked recordings"
             + $" (preview vectors for {nowLiked.Count(l => models.Values.Any(m => m.ContainsKey(DiscoverIdentity.Key(l.Title, l.Artist))))})");
+        // FMF_SONIC_REPLAY_OWNED=1: the library as it was on each day (from each song's date added). Owned songs are then
+        // filtered as in the app, and only later plays of songs not owned yet count: For you's real job, finding new music.
+        bool ownedMode = Environment.GetEnvironmentVariable("FMF_SONIC_REPLAY_OWNED") == "1";
+        var added = new Dictionary<string, DateTime>(StringComparer.Ordinal);
+        if (ownedMode)
+            foreach (var t in JsonDocument.Parse(File.ReadAllBytes(Path.Combine(profile, "library.json"))).RootElement.EnumerateArray())
+                if (t.TryGetProperty("dateAdded", out var d) && d.ValueKind == JsonValueKind.String && DateTime.TryParse(d.GetString(), out var at)
+                    && DiscoverIdentity.Key(t.GetProperty("title").GetString(), t.GetProperty("artist").GetString()) is { Length: > 0 } k)
+                    added[k] = added.TryGetValue(k, out var was) && was < at ? was : at.ToUniversalTime();
+        // FMF_SONIC_REPLAY_TOPPICKS=K: the owner's layout. The normal page stays as it is and a row of K "Top picks" chosen
+        // by sound from all the other candidates goes above it. Normal For you then shows K more of its own, so both show as many.
+        int picks = int.TryParse(Environment.GetEnvironmentVariable("FMF_SONIC_REPLAY_TOPPICKS"), out var k0) && k0 is > 0 and <= 40 ? k0 : 0;
+        if (picks > 0) Console.WriteLine($"top picks layout: {picks} picks + {Discover.Shelf} normal per refresh; normal For you shows {Discover.Shelf + picks}");
+        Console.WriteLine(ownedMode ? $"owned mode: {added.Count} library recordings with a date added" : "taste mode: ownership ignored");
         foreach (var day in days)
         {
             var before = events.Where(e => e.at.Date < day).Select(e => new TastePlay(e.artist, e.at, e.label > 0 ? 1.5 : -.7, e.title, Heard: e.label > 0, Sampled: e.label < 0)).ToList();
             if (before.Count(p => p.Weight > 0) < 2) continue;
             var known = before.Where(p => p.Heard).Select(p => DiscoverIdentity.Key(p.Title, p.Artist)).ToHashSet();
-            var held = events.Where(e => e.at.Date == day && e.label > 0).Select(e => DiscoverIdentity.Key(e.title, e.artist)).Where(k => !known.Contains(k)).ToHashSet();
+            var ownedThen = ownedMode ? library.Where(s => added.TryGetValue(DiscoverIdentity.Key(s.Title, s.Artist), out var a) && a < day).ToList() : [];
+            var ownedKeys = ownedThen.Select(s => DiscoverIdentity.Key(s.Title, s.Artist)).ToHashSet(StringComparer.Ordinal);
+            var held = events.Where(e => e.at.Date == day && e.label > 0).Select(e => DiscoverIdentity.Key(e.title, e.artist)).Where(k => !known.Contains(k) && !ownedKeys.Contains(k)).ToHashSet();
             if (held.Count == 0) continue;
             foreach (var model in new[] { "baseline" }.Concat(fill ? [] : models.Keys))
             foreach (double blend in model == "baseline" ? new[] { 0d } : new[] { .1, .2, .35 })
             {
-                var scorer = new Scorer(model == "baseline" ? [] : models[model], blend);
+                var scorer = new Scorer(model == "baseline" ? [] : models[model], blend, hold: picks > 0);
+                int inPicks = 0;
                 // Each fold starts with no shelf history; Refresh then behaves as in the app: kept pages and cards
                 // shown without being used sink, so later pages reach further into the candidates.
                 var history = Path.Combine(work, "replay-refresh", $"{model}-{blend:0.00}-{day:yyyyMMdd}.json");
@@ -115,20 +138,35 @@ internal static class SonicReplayTest
                 {
                     var onPages = kept.TakeLast(ForYouSource.PagesKept).SelectMany(k => k).ToHashSet(StringComparer.Ordinal);
                     // No current library/favorites/playlist marks are used: their historical state is unknown.
-                    var built = await Discover.ForListenerAsync(before, [], [], feedback, hidden, provider,
-                        (_, _) => Task.FromResult(new HashSet<string>()), null, clock, CancellationToken.None, onPages: onPages, sonic: scorer);
+                    var built = await Discover.ForListenerAsync(before, ownedThen, [], feedback, hidden, provider,
+                        (songs, _) => Task.FromResult(songs.Where(s => ownedKeys.Contains(DiscoverIdentity.Key(s))).Select(s => s.Id).ToHashSet()),
+                        null, clock, CancellationToken.None, onPages: onPages, sonic: scorer);
                     foreach (var s in scorer.Candidates) { allCandidates[s.Id] = s; if (held.Contains(DiscoverIdentity.Key(s))) pooled.Add(DiscoverIdentity.Key(s)); }
-                    var shown = built.Songs.Take(Discover.Shelf).ToList();
-                    var shownKeys = shown.Select(s => DiscoverIdentity.Key(s.Track.Song)).ToList();
+                    var shown = built.Songs.Take(Discover.Shelf + (picks > 0 && model == "baseline" ? picks : 0)).ToList();
+                    var cards = shown.Select((s, i) => new DiscoverShown(DiscoverIdentity.Key(s.Track.Song), s.Track.Song.Id,
+                        DiscoverIdentity.Artist(s.Track.Song.Artists.FirstOrDefault()?.Name), s.Seed, s.Own, i)).ToList();
+                    if (picks > 0 && model != "baseline")
+                    {
+                        // Best sound scores among the candidates not on this page or a kept one; at most two per artist.
+                        var taken = cards.Select(c => c.Key).Concat(onPages).ToHashSet(StringComparer.Ordinal);
+                        var perArtist = new Dictionary<string, int>(StringComparer.Ordinal);
+                        var row = scorer.Candidates.Where(s => scorer.Last.ContainsKey(DiscoverIdentity.Key(s)) && taken.Add(DiscoverIdentity.Key(s)))
+                            .OrderByDescending(s => scorer.Last[DiscoverIdentity.Key(s)])
+                            .Where(s => { var a = DiscoverIdentity.Artist(s.Artists.FirstOrDefault()?.Name); perArtist[a] = perArtist.GetValueOrDefault(a) + 1; return perArtist[a] <= 2; })
+                            .Take(picks).Select(s => new DiscoverShown(DiscoverIdentity.Key(s), s.Id, DiscoverIdentity.Artist(s.Artists.FirstOrDefault()?.Name), "", false, 0)).ToList();
+                        inPicks += row.Count(c => held.Contains(c.Key) && !reached.Contains(c.Key));
+                        cards = [.. row, .. cards];
+                        cards = cards.Select((c, i) => c with { Position = i }).ToList();
+                    }
+                    var shownKeys = cards.Select(c => c.Key).ToList();
                     if (r == 0) { page = shown; keys = shownKeys; }
                     reached.UnionWith(shownKeys.Where(held.Contains));
                     found[r] = reached.Count;
                     kept.Add(shownKeys);
                     if (built.Batch is { Length: > 0 } batch)
                     {
-                        feedback.Shown(batch, shown.Select((s, i) => new DiscoverShown(shownKeys[i], s.Track.Song.Id,
-                            DiscoverIdentity.Artist(s.Track.Song.Artists.FirstOrDefault()?.Name), s.Seed, s.Own, i)).ToList());
-                        feedback.Seen(batch, Enumerable.Range(0, Math.Min(DiscoverEvaluation.InView, shown.Count)));
+                        feedback.Shown(batch, cards);
+                        feedback.Seen(batch, Enumerable.Range(0, Math.Min(DiscoverEvaluation.InView, cards.Count)));
                     }
                     clock = clock.AddMinutes(10);
                 }
@@ -138,7 +176,7 @@ internal static class SonicReplayTest
                 var metrics = DiscoverPageMetrics.Of(page, new HashSet<string>(), known);
                 results.Add(new(model, blend, day.ToString("yyyy-MM-dd"), scorer.Pool, scorer.Covered, held.Count,
                     scorer.Candidates.Count(s => held.Contains(DiscoverIdentity.Key(s))), keys.Take(10).Count(held.Contains), keys.Count(held.Contains),
-                    ideal > 0 ? dcg / ideal : 0, first >= 0 ? 1d / (first + 1) : 0, metrics.Artists, metrics.MaxPerArtist, found, pooled.Count));
+                    ideal > 0 ? dcg / ideal : 0, first >= 0 ? 1d / (first + 1) : 0, metrics.Artists, metrics.MaxPerArtist, found, pooled.Count, inPicks));
             }
         }
         var report = new { Note = "TEST-only chronological diagnostic. Today's cached metadata, no historical ownership, no historical favorites. Audit recordings excluded upstream. Model/blend tuning must use earlier folds; later folds are holdout. Missing candidates are retrieval failures, not ranking failures.",
@@ -147,7 +185,8 @@ internal static class SonicReplayTest
         File.WriteAllText(Path.Combine(work, "pool-songs.json"), JsonSerializer.Serialize(allCandidates.Values));
         foreach (var g in results.GroupBy(r => (r.Model, r.Blend)))
             Console.WriteLine($"{g.Key.Model} blend {g.Key.Blend:0.00}: {g.Count()} folds, hit20 {g.Sum(r => r.Hit20)}/{g.Sum(r => r.EligibleHeldOut)}, ndcg20 {g.Average(r => r.Ndcg20):0.000}, mrr {g.Average(r => r.Mrr):0.000}, coverage {g.Sum(r => r.Covered)}/{g.Sum(r => r.Candidates)}, artists {g.Average(r => r.Artists):0.0}"
-                + $"; over refreshes (20,40..{Refreshes * 20} songs): {string.Join(" ", Enumerable.Range(0, Refreshes).Select(i => g.Sum(r => r.FoundByRefresh[i])))}, in any pool {g.Sum(r => r.PooledOverRefreshes)}");
+                + $"; over refreshes (20,40..{Refreshes * 20} songs): {string.Join(" ", Enumerable.Range(0, Refreshes).Select(i => g.Sum(r => r.FoundByRefresh[i])))}, in any pool {g.Sum(r => r.PooledOverRefreshes)}"
+                + (picks > 0 && g.Key.Model != "baseline" ? $", {g.Sum(r => r.FoundInPicks)} first found in the top picks" : ""));
         Console.WriteLine($"{allCandidates.Count} pool recordings; metadata misses {refuse.Misses}; no network requests sent.");
     }
 }

@@ -155,3 +155,21 @@ Sound was equal or better on every fold, never worse. Direction is positive but 
 two songs), so this is a lead, not proof. Why the rest are missed: of the held-out plays, 16 of 22 were by an artist
 For you already suggested (it showed other songs of theirs), only 6 by artists it never reached. The obvious next step
 is deeper per-artist candidates (more songs of each suggested artist), letting the sound lane choose among them.
+
+### Main profile (owner's go, read-only copy, 2026-10-26)
+The owner's main profile (2,138 library songs, 940 plays; 165 classified listens, 107 positive) was copied read-only
+(real AppData read via a process outside the Claude package; see the blueprint) and replayed over 12 refreshes (240 songs).
+Two scorings: *taste* (any later first play, ownership ignored; 51 held out, 8 days) and *discovery* (library rebuilt per
+day from each song's date added; owned songs filtered as in the app; only later plays of songs not owned yet; 10 held
+out, 5 days). Vector coverage ~91-95%.
+
+| | normal: found by 100 / 240 songs | sound 0.20: by 100 / 240 | in any candidate pool |
+|---|---|---|---|
+| taste (51) | 3 / 4 | 3 / 4 | 5 |
+| discovery (10) | 4 / 5 | 5 / 5 | 5 |
+
+"Top picks" layout (10 sound-chosen picks above the normal 20, against normal 30): 0 extra songs found in the picks; normal
+reached 5/10 discoveries by its 5th refresh, the layout by its 6th. Verdict: on real data the sound lane finds the same
+songs, at best a little sooner, and never more. The ceiling is retrieval: only 5 of 51 later first plays ever enter a
+pool. In the discovery scoring roughly half the misses are by artists For you already suggests, half by artists it never
+reaches. Keep the lane off; work on candidate retrieval before any more sound work.

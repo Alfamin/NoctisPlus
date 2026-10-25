@@ -34,8 +34,10 @@ def main():
     p.add_argument("--pool-file", type=Path, help="Candidate metadata exported by the offline native replay")
     args = p.parse_args()
     root, work = args.test_profile.resolve(), args.work.resolve()
-    if root.name != "profile" or root.parent.name != "NoctisPlus-Test":
-        raise ValueError("Only the in-place NoctisPlus-Test/profile is allowed")
+    # The TEST profile in place, or a read-only copy of the main profile's few replay files kept under artifacts.
+    copy = root.parent.name == "NoctisPlus-Main" and (Path(__file__).resolve().parents[2] / "artifacts") in root.parents
+    if root.name != "profile" or not (root.parent.name == "NoctisPlus-Test" or copy):
+        raise ValueError("Only the in-place NoctisPlus-Test/profile or an artifacts copy of the main profile is allowed")
     work.mkdir(parents=True, exist_ok=True)
     library = json.loads((root / "library.json").read_text(encoding="utf-8-sig"))
     audit = {key(s["artist"], s["title"]) for s in library if re.search("audit|scratch|testlib", s.get("filePath", ""), re.I)}
