@@ -113,3 +113,30 @@ the selected model's own licence/attribution before a public model download is o
 
 ## Final live checkpoint (2026-10-25)
 Native TEST For you shelf and Refresh were observed in the real app with the approved model installed. The new Last.fm configuration populated public catalog cache and was preserved. Active audio warming is NOT yet proved: no sonic cache folders appeared. Investigate service readiness/positive-seed count with bounded disk-visible diagnostics; the current plugin log is memory-only. Do not call the feature done. The audit restored only its temporary fields and verified the Last.fm key unchanged. Domain check on12 TEST tracks: median local/preview cosine .99385345; same-local 128k MP3 cosine .99771655. Keep domains separate pending full distributions. Final full gates:6813 total,0failed,43skipped; Finder1645ok,0wrong. Latest staged Release test build: publish-codex-sonic-c; feature remains experimental/off and is not released.
+## Claude continuation (2026-10-25 evening): live path proved, quality still not shown
+
+**Why the earlier live check made no vectors.** The lane now writes a few status/count lines to the session log
+(`[ForYou] sonic idle: …`, `sonic warm: taste … liked, … found now, … with sound; … candidates, … new vectors …`), with
+no paths, keys or song names. A hidden-desktop run showed `sonic warm stopped after 180 s (time ceiling): 0 taste found,
+0 new vectors, waited for a full-screen app`: on a non-interactive desktop Windows always reports "busy"
+(`SHQueryUserNotificationState` = 2), so the gaming guard paused the pass for its whole budget. That is the test
+setup, not a product bug; on the real desktop the guard only pauses while a full-screen app or game runs.
+The TEST taste is not too thin: 463 plays (103 positive) give **10 liked recordings**, all found in the catalog.
+
+**Live TEST check (normal desktop, nothing full-screen, Release `publish-claude-sonic-d`).** Search → For you →
+Refresh; the background pass found 10 liked + 20 skip examples and wrote **148 vectors in 100.5 s** (1 song had no
+preview); the next Refresh ranked with **117/296** candidate vectors and 30 taste examples, then topped up 12 more in
+7.7 s. Page build stayed ~5 s; nothing waited for audio. Feature switched off again afterwards (#170 profile kept;
+Last.fm key unchanged True). Harness `FMF_SONIC_LIVE` runs the same lane against the TEST taste in a scratch folder.
+
+**Offline replay, updated caches.** The new Last.fm relations named artists whose catalog pages were never cached
+(4,176 refused lookups), so `FMF_SONIC_REPLAY_CATALOG` + `FMF_SONIC_REPLAY_FILL=1` now fill a *copy* of the public
+cache once (Last.fm stays cache-only; TEST profile untouched), then the replay runs fully offline (0 misses).
+Previews for the larger pool were fetched (714/718) and embedded with the pinned INT8 model. Result, 5 folds:
+candidates 1,296, vector coverage **1,290/1,296**, held-out positives in any pool **5/20**, hit@20 **0/20 baseline,
+0/20 with sound at the app's fixed 0.20 blend** (0.10/0.35 likewise 0). No blend was tuned on these positives.
+
+**Conclusion.** With full coverage the sound lane still shows no gain, and retrieval, not ranking, is the binding
+limit: three quarters of the songs the listener went on to play never enter the candidate pool. Promotion stays
+blocked; the switch stays experimental and off. Better use of effort: candidate retrieval (more of the listener's
+real next plays in the pool) and a larger, untouched held-out history from real use, before revisiting embeddings.

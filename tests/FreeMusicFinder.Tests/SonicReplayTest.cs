@@ -56,13 +56,34 @@ internal static class SonicReplayTest
         // Today's metadata is deliberately separate from the history cutoff. No historical catalog is available.
         var cacheTime = DateTimeOffset.UtcNow;
         var folder = Path.Combine(profile, "plugin-data", "dev.moshi.freemusicfinder", "artist-catalog");
-        using var catalog = new ArtistCatalog(folder, refuse, () => cacheTime, TimeSpan.Zero);
-        using var similar = new SimilarArtists(folder, new Refusing(), () => cacheTime, TimeSpan.Zero);
+        // FMF_SONIC_REPLAY_CATALOG: a copy of the public cache (made on first use) so FMF_SONIC_REPLAY_FILL=1 can add the
+        // catalog pages the replay's artists need without writing the TEST profile. Last.fm stays cache-only either way.
+        if (Environment.GetEnvironmentVariable("FMF_SONIC_REPLAY_CATALOG") is { Length: > 0 } copy)
+        {
+            if (!Directory.Exists(copy))
+                foreach (var file in Directory.EnumerateFiles(folder, "*", SearchOption.AllDirectories))
+                {
+                    var target = Path.Combine(copy, Path.GetRelativePath(folder, file));
+                    Directory.CreateDirectory(Path.GetDirectoryName(target)!);
+                    File.Copy(file, target);
+                }
+            folder = Path.GetFullPath(copy);
+        }
+        bool fill = Environment.GetEnvironmentVariable("FMF_SONIC_REPLAY_FILL") == "1" && folder != Path.Combine(profile, "plugin-data", "dev.moshi.freemusicfinder", "artist-catalog");
+        string proxy = Environment.GetEnvironmentVariable("FMF_LIVE_PROXY") ?? "";
+        using var catalog = fill ? new ArtistCatalog(folder, PlaylistCatalog.MetadataHandler(proxy)) : new ArtistCatalog(folder, refuse, () => cacheTime, TimeSpan.Zero);
+        using var similar = fill ? new SimilarArtists(folder, PlaylistCatalog.MetadataHandler(proxy)) : new SimilarArtists(folder, new Refusing(), () => cacheTime, TimeSpan.Zero);
         // Fixture token only enables reading saved PUBLIC relations; the refusing handler guarantees it never leaves
         // this process. Never read the owner's real key, credentials or settings for an offline replay.
         using var lastFm = File.Exists(Path.Combine(folder, "lastfm.json"))
             ? new LastFmSimilar(folder, new Refusing(), () => new string('0', 32), () => cacheTime, TimeSpan.Zero) : null;
         var provider = new CatalogForDiscover(() => catalog, name => albums.GetValueOrDefault(BotText.Key(Taste.MainArtist(name))) ?? [], () => similar, () => lastFm);
+        // What the live shelf's sound lane gets today: the same taste sources, read-only. Fewer than two liked songs keeps it idle.
+        var nowPlays = TasteSources.Load(profile);
+        var nowLiked = new List<TasteRecording>();
+        Taste.Seeds(nowPlays, library, DateTime.UtcNow, playlists: TasteSources.Playlists(profile), liked: nowLiked);
+        Console.WriteLine($"live taste now: {nowPlays.Count} plays ({nowPlays.Count(p => p.Weight > 0)} positive), {library.Count} library songs, {nowLiked.Count} liked recordings"
+            + $" (preview vectors for {nowLiked.Count(l => models.Values.Any(m => m.ContainsKey(DiscoverIdentity.Key(l.Title, l.Artist))))})");
         foreach (var day in days)
         {
             var before = events.Where(e => e.at.Date < day).Select(e => new TastePlay(e.artist, e.at, e.label > 0 ? 1.5 : -.7, e.title, Heard: e.label > 0, Sampled: e.label < 0)).ToList();
@@ -70,7 +91,7 @@ internal static class SonicReplayTest
             var known = before.Where(p => p.Heard).Select(p => DiscoverIdentity.Key(p.Title, p.Artist)).ToHashSet();
             var held = events.Where(e => e.at.Date == day && e.label > 0).Select(e => DiscoverIdentity.Key(e.title, e.artist)).Where(k => !known.Contains(k)).ToHashSet();
             if (held.Count == 0) continue;
-            foreach (var model in new[] { "baseline" }.Concat(models.Keys))
+            foreach (var model in new[] { "baseline" }.Concat(fill ? [] : models.Keys))
             foreach (double blend in model == "baseline" ? new[] { 0d } : new[] { .1, .2, .35 })
             {
                 var scorer = new Scorer(model == "baseline" ? [] : models[model], blend);

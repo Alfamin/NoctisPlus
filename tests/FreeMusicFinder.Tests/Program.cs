@@ -9,6 +9,12 @@ if (Environment.GetEnvironmentVariable("FMF_SONIC_ENCODER") is { Length: > 0 } s
     return Check.Failed;
 }
 
+if (Environment.GetEnvironmentVariable("FMF_SONIC_LIVE") is { Length: > 0 } sonicLive)
+{
+    await SonicLiveCheck.RunAsync(sonicLive);
+    return 0;
+}
+
 if (Environment.GetEnvironmentVariable("FMF_SONIC_REPLAY") is { Length: > 0 } sonicWork)
 {
     await SonicReplayTest.RunAsync(sonicWork);

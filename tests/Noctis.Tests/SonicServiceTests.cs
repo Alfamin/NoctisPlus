@@ -34,8 +34,8 @@ public sealed class SonicServiceTests : IDisposable
             return Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK) { Content = new ByteArrayContent(bytes) });
         }
     }
-    private SonicService Make(Handler http, Encoder encoder, Func<TasteRecording, CancellationToken, Task<CatalogSong?>>? resolve = null) =>
-        new(new SonicCache(_folder, encoder.Model), encoder, new SonicPreviews(http), resolve ?? ((l, _) => Task.FromResult<CatalogSong?>(Song(int.Parse(l.Title[5..])))), () => false, _ => { });
+    private SonicService Make(Handler http, Encoder encoder, Func<TasteRecording, CancellationToken, Task<CatalogSong?>>? resolve = null, Action<string>? log = null) =>
+        new(new SonicCache(_folder, encoder.Model), encoder, new SonicPreviews(http), resolve ?? ((l, _) => Task.FromResult<CatalogSong?>(Song(int.Parse(l.Title[5..])))), () => false, log ?? (_ => { }));
     private static readonly TasteRecording[] Liked = [new("Artist", "Song 1", 2), new("Artist", "Song 2", 1)];
 
     [Fact] public async Task DisabledAndMissingModelNeverFetchAndNeverStartAnAnalysisQueue()
@@ -82,5 +82,25 @@ public sealed class SonicServiceTests : IDisposable
         release.TrySetResult();
         await service.Completion.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
         Assert.Contains("Song 8", resolved); Assert.DoesNotContain("Song 7", resolved);
+    }
+
+    /// <summary>The session log says once why the lane is idle, and what each background pass found and did.</summary>
+    [Fact] public async Task StatusLinesSayWhyTheLaneIsIdleOnce_AndCountEachPass()
+    {
+        var lines = new List<string>(); var encoder = new Encoder();
+        using var service = Make(new Handler(), encoder, log: l => { lock (lines) lines.Add(l); });
+        await service.RankAsync([Song(3)], Liked, [], TestContext.Current.CancellationToken);
+        await service.RankAsync([Song(3)], Liked, [], TestContext.Current.CancellationToken);
+        service.Enabled = true; encoder.Ready = false;
+        await service.RankAsync([Song(3)], Liked, [], TestContext.Current.CancellationToken);
+        encoder.Ready = true;
+        await service.RankAsync([Song(3)], [Liked[0]], [], TestContext.Current.CancellationToken);
+        await service.RankAsync([Song(3)], Liked, [], TestContext.Current.CancellationToken);
+        await service.Completion.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
+        Assert.Equal(1, lines.Count(l => l == "sonic idle: off"));
+        Assert.Contains("sonic idle: sound model unavailable", lines);
+        Assert.Contains("sonic idle: 1 liked songs", lines);
+        Assert.Contains(lines, l => l.StartsWith("sonic warm: taste 2 liked, 2 found now, 0 not in the catalog, 0 lookups deferred, 2 with sound; 1 candidates, 3 new vectors", StringComparison.Ordinal));
+        Assert.DoesNotContain(lines, l => l.Contains(_folder, StringComparison.OrdinalIgnoreCase) || l.Contains("Song 1", StringComparison.Ordinal));
     }
 }

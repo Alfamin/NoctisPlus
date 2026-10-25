@@ -9,6 +9,8 @@ internal interface ISonicEncoder : IDisposable
 {
     string Model { get; }
     bool Ready { get; }
+    /// <summary>Why <see cref="Ready"/> is false, in a few words without paths (for the session log).</summary>
+    string NotReady => Ready ? "" : "sound model unavailable";
     Task<SonicVector?> EncodeAsync(byte[] preview, CancellationToken ct);
 }
 
@@ -30,6 +32,20 @@ internal sealed class SonicEncoder(string modelPath, string model, Func<string?>
         {
             try { var f = new FileInfo(modelPath); return !_disposed && f.Exists && _broken != (f.Length, f.LastWriteTimeUtc) && ffmpeg() is not null; }
             catch (Exception ex) when (ex is IOException or UnauthorizedAccessException) { return false; }
+        }
+    }
+
+    public string NotReady
+    {
+        get
+        {
+            try
+            {
+                var f = new FileInfo(modelPath);
+                return _disposed ? "closed" : !f.Exists ? "no sound model" : _broken == (f.Length, f.LastWriteTimeUtc) ? "sound model failed to load"
+                    : ffmpeg() is null ? "no audio decoder" : "";
+            }
+            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException) { return "sound model unreadable"; }
         }
     }
 

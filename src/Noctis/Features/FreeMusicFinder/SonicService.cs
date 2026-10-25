@@ -37,12 +37,26 @@ internal sealed class SonicService(SonicCache cache, ISonicEncoder encoder, Soni
     }
     public bool Ready => encoder.Ready;
     internal Task Completion { get; private set; } = Task.CompletedTask;
+    private string? _status;
+
+    /// <summary>Why the lane is idle or working, once per change: the page-by-page lines below say how much it did.</summary>
+    private void Status(string status)
+    {
+        lock (_sync) { if (_status == status) return; _status = status; }
+        log(status);
+    }
 
     public Task<IReadOnlyDictionary<string, double>> RankAsync(IReadOnlyList<CatalogSong> candidates,
         IReadOnlyList<TasteRecording> liked, IReadOnlyList<TastePlay> plays, CancellationToken ct)
     {
         ct.ThrowIfCancellationRequested();
-        if (!_enabled || _disposed || !encoder.Ready || liked.Count < 2) return Task.FromResult<IReadOnlyDictionary<string, double>>(new Dictionary<string, double>());
+        var idle = !_enabled ? "off" : _disposed ? "closed" : !encoder.Ready ? encoder.NotReady : liked.Count < 2 ? $"{liked.Count} liked songs" : null;
+        if (idle is not null)
+        {
+            Status("sonic idle: " + idle);
+            return Task.FromResult<IReadOnlyDictionary<string, double>>(new Dictionary<string, double>());
+        }
+        Status("sonic ready");
         // A second page replaces waiting work; it does not grow an unbounded analysis queue.
         lock (_sync)
         {
@@ -89,53 +103,70 @@ internal sealed class SonicService(SonicCache cache, ISonicEncoder encoder, Soni
             {
                 Work? work;
                 lock (_sync) { work = _pending; _pending = null; if (work is null) return; }
-                if (!_enabled || !encoder.Ready || Noctis.Services.OnlineAccess.Shared.IsOffline) continue;
+                var skip = !_enabled ? "off" : !encoder.Ready ? encoder.NotReady : Noctis.Services.OnlineAccess.Shared.IsOffline ? "offline" : null;
+                if (skip is not null) { Status("sonic warm skipped: " + skip); continue; }
                 var watch = Stopwatch.StartNew();
-                int done = 0, errors = 0;
+                int done = 0, errors = 0, missing = 0, found = 0, notFound = 0, lookupErrors = 0;
+                _waited = false;
                 using var pass = CancellationTokenSource.CreateLinkedTokenSource(ct);
                 lock (_sync) _pass = pass;
                 pass.CancelAfter(TimeSpan.FromMinutes(3));
                 var token = pass.Token;
                 var taste = work.Liked.Concat(work.Plays.Where(p => p.Weight < 0).GroupBy(p => DiscoverIdentity.Key(p.Title, p.Artist))
                     .Take(20).Select(g => new TasteRecording(g.First().Artist, g.First().Title, -1))).ToList();
-                foreach (var like in taste)
+                try
                 {
-                    if (!_enabled) break;
-                    await BudgetAsync(token).ConfigureAwait(false);
-                    var key = DiscoverIdentity.Key(like.Title, like.Artist);
-                    if (key.Length == 0 || _resolved.ContainsKey(key) || _failed.TryGetValue(key, out var until) && until > DateTime.UtcNow) continue;
-                    try
+                    foreach (var like in taste)
                     {
-                        if (await resolve(like, token).ConfigureAwait(false) is { } song) _resolved[key] = song;
-                        else _failed[key] = DateTime.UtcNow.AddHours(12);
+                        if (!_enabled) break;
+                        await BudgetAsync(token).ConfigureAwait(false);
+                        var key = DiscoverIdentity.Key(like.Title, like.Artist);
+                        if (key.Length == 0 || _resolved.ContainsKey(key) || _failed.TryGetValue(key, out var until) && until > DateTime.UtcNow) continue;
+                        try
+                        {
+                            if (await resolve(like, token).ConfigureAwait(false) is { } song) { _resolved[key] = song; found++; }
+                            else { _failed[key] = DateTime.UtcNow.AddHours(12); notFound++; }
+                        }
+                        catch (Exception ex) when (!ct.IsCancellationRequested && !token.IsCancellationRequested)
+                        { _failed[key] = DateTime.UtcNow.AddMinutes(1); if (lookupErrors++ == 0) log("sonic taste lookup deferred: " + ex.GetType().Name); }
                     }
-                    catch (Exception ex) when (!ct.IsCancellationRequested) { _failed[key] = DateTime.UtcNow.AddMinutes(1); log("sonic taste lookup deferred: " + ex.GetType().Name); }
-                }
-                // Bounded pipelining: up to four network requests, one encoder. Existing Search has its own HTTP lane.
-                var tasteSongs = taste.Select(t => _resolved.GetValueOrDefault(DiscoverIdentity.Key(t.Title, t.Artist))).OfType<CatalogSong>().DistinctBy(s => s.Id).ToList();
-                async ValueTask Embed(CatalogSong song, CancellationToken stop)
-                {
-                    if (!_enabled || !encoder.Ready) return;
-                    await BudgetAsync(stop).ConfigureAwait(false);
-                    var key = DiscoverIdentity.Key(song);
-                    if (cache.Read(key, song.Id) is not null || _failed.TryGetValue(song.Id, out var until) && until > DateTime.UtcNow) return;
-                    try
+                    // Bounded pipelining: up to four network requests, one encoder. Existing Search has its own HTTP lane.
+                    var tasteSongs = taste.Select(t => _resolved.GetValueOrDefault(DiscoverIdentity.Key(t.Title, t.Artist))).OfType<CatalogSong>().DistinctBy(s => s.Id).ToList();
+                    async ValueTask Embed(CatalogSong song, CancellationToken stop)
                     {
-                        var audio = await previews.FetchAsync(song, stop).ConfigureAwait(false);
-                        if (audio is null) { _failed[song.Id] = DateTime.UtcNow.AddHours(12); return; }
+                        if (!_enabled || !encoder.Ready) return;
                         await BudgetAsync(stop).ConfigureAwait(false);
-                        if (!_enabled) return;
-                        if (await encoder.EncodeAsync(audio, stop).ConfigureAwait(false) is { } vector) { cache.Write(key, song.Id, vector); Interlocked.Increment(ref done); }
-                        else _failed[song.Id] = DateTime.UtcNow.AddHours(12);
+                        var key = DiscoverIdentity.Key(song);
+                        if (cache.Read(key, song.Id) is not null || _failed.TryGetValue(song.Id, out var until) && until > DateTime.UtcNow) return;
+                        try
+                        {
+                            var audio = await previews.FetchAsync(song, stop).ConfigureAwait(false);
+                            if (audio is null) { _failed[song.Id] = DateTime.UtcNow.AddHours(12); Interlocked.Increment(ref missing); return; }
+                            await BudgetAsync(stop).ConfigureAwait(false);
+                            if (!_enabled) return;
+                            if (await encoder.EncodeAsync(audio, stop).ConfigureAwait(false) is { } vector) { cache.Write(key, song.Id, vector); Interlocked.Increment(ref done); }
+                            else _failed[song.Id] = DateTime.UtcNow.AddHours(12);
+                        }
+                        catch (Exception ex) when (!ct.IsCancellationRequested && !stop.IsCancellationRequested)
+                        { _failed[song.Id] = DateTime.UtcNow.AddMinutes(1); if (Interlocked.Increment(ref errors) == 1) log("sonic preview deferred: " + ex.GetType().Name); }
                     }
-                    catch (Exception ex) when (!ct.IsCancellationRequested) { _failed[song.Id] = DateTime.UtcNow.AddMinutes(1); Interlocked.Increment(ref errors); }
+                    var parallel = new ParallelOptions { CancellationToken = token, MaxDegreeOfParallelism = 4 };
+                    await Parallel.ForEachAsync(tasteSongs, parallel, Embed).ConfigureAwait(false);
+                    // No usable taste means no reason to fetch a hundred candidates. Keep the metadata page instead.
+                    var usable = Examples(work.Liked, work.Plays).Count(t => t.Weight > 0);
+                    var tasteLine = $"taste {work.Liked.Count} liked, {found} found now, {notFound} not in the catalog, {lookupErrors} lookups deferred, {usable} with sound";
+                    if (usable < 2)
+                    {
+                        log($"sonic warm: {tasteLine}, {done} new vectors, {missing} without preview, {errors} deferred{(_waited ? ", waited for a full-screen app" : "")}; keeping normal picks");
+                        continue;
+                    }
+                    await Parallel.ForEachAsync(work.Candidates.DistinctBy(s => s.Id), parallel, Embed).ConfigureAwait(false);
+                    log($"sonic warm: {tasteLine}; {work.Candidates.Count} candidates, {done} new vectors, {missing} without preview, {errors} deferred{(_waited ? ", waited for a full-screen app" : "")}, {watch.Elapsed.TotalSeconds:0.0} s");
                 }
-                var parallel = new ParallelOptions { CancellationToken = token, MaxDegreeOfParallelism = 4 };
-                await Parallel.ForEachAsync(tasteSongs, parallel, Embed).ConfigureAwait(false);
-                // No usable taste means no reason to fetch a hundred candidates. Keep the metadata page instead.
-                if (Examples(work.Liked, work.Plays).Count(t => t.Weight > 0) < 2) { log("sonic warm: insufficient preview taste; keeping normal picks"); continue; }
-                await Parallel.ForEachAsync(work.Candidates.DistinctBy(s => s.Id), parallel, Embed).ConfigureAwait(false);
-                log($"sonic warm: {done} new vectors, {errors} deferred, {watch.Elapsed.TotalSeconds:0.0} s");
+                catch (OperationCanceledException) when (!ct.IsCancellationRequested)
+                {
+                    log($"sonic warm stopped after {watch.Elapsed.TotalSeconds:0} s ({(_enabled ? "time ceiling" : "turned off")}): {found} taste found, {done} new vectors{(_waited ? ", waited for a full-screen app" : "")}");
+                }
                 if (_resolved.Count > 256) _resolved.Clear();
                 if (_failed.Count > 1000) _failed.Clear();
             }
@@ -153,9 +184,10 @@ internal sealed class SonicService(SonicCache cache, ISonicEncoder encoder, Soni
         }
     }
 
+    private volatile bool _waited;
     private async Task BudgetAsync(CancellationToken ct)
     {
-        while (busy()) await Task.Delay(TimeSpan.FromSeconds(2), ct).ConfigureAwait(false);
+        while (busy()) { _waited = true; await Task.Delay(TimeSpan.FromSeconds(2), ct).ConfigureAwait(false); }
         Noctis.Services.OnlineAccess.Shared.ThrowIfOffline();
     }
 

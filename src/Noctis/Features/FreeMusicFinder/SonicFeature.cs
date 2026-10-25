@@ -31,16 +31,21 @@ internal sealed class SonicFeature : IDiscoverSonic, IDisposable
         var cache = new SonicCache(Path.Combine(_folder, "sonic-embeddings"), ModelSpace);
         var encoder = new SonicEncoder(Path.Combine(_folder, "sonic-models", ModelFile), ModelSpace,
             () => Noctis.App.Services?.GetService<IAudioConverterService>()?.GetFfmpegPath(), ModelSha256);
-        async Task<CatalogSong?> Resolve(TasteRecording like, CancellationToken ct)
-        {
-            var key = DiscoverIdentity.Key(like.Title, like.Artist);
-            var result = await catalog.SearchSongsAsync(like.Artist + " " + like.Title, ct).ConfigureAwait(false);
-            return result.Value.Select(s => s.Song).FirstOrDefault(s => DiscoverIdentity.Key(s) == key);
-        }
-        var service = new SonicService(cache, encoder, new SonicPreviews(PlaylistCatalog.MetadataHandler(proxy)), Resolve,
-            Noctis.Features.WordLyrics.GamingBudget.IsActive, s => _log(s));
+        var service = new SonicService(cache, encoder, new SonicPreviews(PlaylistCatalog.MetadataHandler(proxy)), Resolver(catalog),
+            Noctis.Features.WordLyrics.GamingBudget.IsActive, Log);
         return (service, catalog);
     }
+
+    /// <summary>A liked song's catalog recording: the same identity, so its preview is that song.</summary>
+    internal static Func<TasteRecording, CancellationToken, Task<CatalogSong?>> Resolver(ArtistCatalog catalog) => async (like, ct) =>
+    {
+        var key = DiscoverIdentity.Key(like.Title, like.Artist);
+        var result = await catalog.SearchSongsAsync(like.Artist + " " + like.Title, ct).ConfigureAwait(false);
+        return result.Value.Select(s => s.Song).FirstOrDefault(s => DiscoverIdentity.Key(s) == key);
+    };
+
+    // The plugin log is memory-only; the session log keeps the lane's few status/count lines (no paths, keys or song names).
+    private void Log(string line) { _log(line); Noctis.Services.DebugLog.Write("ForYou", line); }
 
     public Task<IReadOnlyDictionary<string, double>> RankAsync(IReadOnlyList<CatalogSong> candidates,
         IReadOnlyList<TasteRecording> liked, IReadOnlyList<TastePlay> plays, CancellationToken ct)

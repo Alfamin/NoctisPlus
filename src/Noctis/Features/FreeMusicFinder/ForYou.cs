@@ -666,7 +666,8 @@ internal static class Discover
                     ? (s.Track, s.Score * factor, s.Key, s.Seed, s.Like) : s).OrderByDescending(s => s.Item2).ToList();
                 sonicApplied = factors.Values.Any(f => double.IsFinite(f) && f is >= 0.6 and <= 1.65 && Math.Abs(f - 1) > 1e-6);
             }
-            catch (Exception) when (!ct.IsCancellationRequested) { /* The unchanged baseline is useful on its own. */ }
+            // The unchanged baseline is useful on its own.
+            catch (Exception ex) when (!ct.IsCancellationRequested) { Noctis.Services.DebugLog.Write("ForYou", "sonic rank skipped: " + ex.GetType().Name); }
         }
 
         var result = new List<DiscoverSong>();
