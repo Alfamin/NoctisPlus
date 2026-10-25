@@ -1,6 +1,20 @@
 {
   "releases": [
     {
+      "version": "2.4.0",
+      "added": [
+        { "icon": "LyricsIcon", "title": "Search by lyrics", "line": "Type a line you remember; its song comes up top", "top": true },
+        { "icon": "SaveDiskIcon", "title": "Albums download faster", "line": "The next songs are asked for while one arrives" },
+        { "icon": "ShuffleIcon", "title": "Shuffle starts at once", "line": "No wait on the first shuffle after opening the app" }
+      ],
+      "fixed": [
+        "A stuck download restarts by itself instead of holding up the queue",
+        "A short Telegram limit no longer stops downloads for a day",
+        "Albums download from Music Hunters without falling back to DeezLoad",
+        "Word timing moves on past a failing song instead of looping"
+      ]
+    },
+    {
       "version": "2.3.3",
       "added": [
         { "icon": "PlaylistsIcon", "title": "The queue scrolls as you drag", "line": "Hold a song near the top or bottom edge to move it further" }
