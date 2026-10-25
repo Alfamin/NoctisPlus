@@ -140,3 +140,18 @@ candidates 1,296, vector coverage **1,290/1,296**, held-out positives in any poo
 limit: three quarters of the songs the listener went on to play never enter the candidate pool. Promotion stays
 blocked; the switch stays experimental and off. Better use of effort: candidate retrieval (more of the listener's
 real next plays in the pool) and a larger, untouched held-out history from real use, before revisiting embeddings.
+
+### Across refreshes (owner's point: Refresh brings new songs, so one page is too strict)
+The replay now refreshes 8 times per fold the way the shelf does (kept pages and shown-but-unused cards sink), so
+up to 160 songs are seen. Coverage ~99% (1,712/1,724). Songs the listener later played that appeared somewhere in
+the first 20/40/…/160 songs (of 20 held out):
+
+| songs seen | 20 | 40 | 60 | 80 | 100 | 120 | 140 | 160 |
+|---|---|---|---|---|---|---|---|---|
+| normal For you | 0 | 0 | 0 | 1 | 1 | 1 | 2 | 2 |
+| with sound (0.20, app default) | 0 | 0 | 0 | 1 | 3 | 3 | 3 | 4 |
+
+Sound was equal or better on every fold, never worse. Direction is positive but the numbers are tiny (a difference of
+two songs), so this is a lead, not proof. Why the rest are missed: of the held-out plays, 16 of 22 were by an artist
+For you already suggested (it showed other songs of theirs), only 6 by artists it never reached. The obvious next step
+is deeper per-artist candidates (more songs of each suggested artist), letting the sound lane choose among them.
