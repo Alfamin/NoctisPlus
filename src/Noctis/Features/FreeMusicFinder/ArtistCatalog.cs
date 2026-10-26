@@ -276,6 +276,16 @@ internal sealed partial class ArtistCatalog : IDisposable
     /// again soon instead of a whole day later (owner test: picture-less artists all day).</summary>
     internal static readonly TimeSpan FallbackFresh = TimeSpan.FromMinutes(10);
 
+    /// <summary>
+    /// Owner #175: For you reads with this on. Saved metadata up to <see cref="SavedLimit"/> old answers at once and is renewed
+    /// in the background for next time: a day-old cache used to send For you's first refresh to Apple's paced lane (one
+    /// request per 3.1 s, over a minute). Search, artist pages and downloads keep the fresh-only rule. Set inside an async
+    /// method, it applies to that call and the work it starts, never to its caller.
+    /// </summary>
+    internal static readonly AsyncLocal<bool> PreferSaved = new();
+    internal static readonly TimeSpan SavedLimit = TimeSpan.FromDays(30);
+    private readonly System.Collections.Concurrent.ConcurrentDictionary<string, Task> _renewing = new(StringComparer.Ordinal);
+
     private async Task<CatalogResult<T>> Cached<T>(string key, TimeSpan age, bool refresh, Func<Task<T>> fetch, CancellationToken ct, Func<T, bool>? fallback = null)
     {
         ct.ThrowIfCancellationRequested();
@@ -283,6 +293,18 @@ internal sealed partial class ArtistCatalog : IDisposable
         var savedBeforeWait = await ReadAsync<T>(key, ct).ConfigureAwait(false);
         // Fresh local data never queues behind an unrelated slow network operation.
         if (!refresh && savedBeforeWait is not null && _now() - savedBeforeWait.SavedAt < Fresh(savedBeforeWait.Value)) return new(savedBeforeWait.Value, savedBeforeWait.SavedAt, true, savedBeforeWait.Warning);
+        if (!refresh && PreferSaved.Value && savedBeforeWait is not null && _now() - savedBeforeWait.SavedAt < SavedLimit)
+        {
+            // One renewal per key at a time, outside the For you lane (so it fetches), never cancelled by the page.
+            _renewing.GetOrAdd(key, k => Task.Run(async () =>
+            {
+                PreferSaved.Value = false;
+                try { await Cached(k, age, false, fetch, CancellationToken.None, fallback).ConfigureAwait(false); }
+                catch (Exception ex) when (ex is not OutOfMemoryException) { }
+                finally { _renewing.TryRemove(k, out _); }
+            }));
+            return new(savedBeforeWait.Value, savedBeforeWait.SavedAt, true, savedBeforeWait.Warning);
+        }
         using (await _locks.EnterAsync(key, ct).ConfigureAwait(false))
         {
             var old = Read<T>(key);

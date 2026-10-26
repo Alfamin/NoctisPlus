@@ -470,7 +470,10 @@ internal sealed class CatalogForDiscover(Func<ArtistCatalog> catalog, Func<strin
 /// </summary>
 internal static class Discover
 {
-    public const int SeedArtistsUsed = 15, CandidateArtists = 30, SongsPerArtist = 8, ArtistLookups = 6;
+    public const int SeedArtistsUsed = 15, CandidateArtists = 30, SongsPerArtist = 8;
+    /// <summary>Lookups For you runs at once. The catalog keeps its own few network connections (3), so this only keeps
+    /// saved answers from queueing behind slow network ones (owner #175).</summary>
+    public const int ArtistLookups = 12;
     /// <summary>The cards the shelf shows (owner #172: 25, up from 20); within them at most <see cref="PerSeed"/> come through
     /// one of the listener's artists (its own songs and its neighbours' together) and at most <see cref="PerArtist"/> are by one
     /// artist, while other songs are left. With nothing else left the shelf is still filled.</summary>
@@ -488,6 +491,37 @@ internal static class Discover
     public const double TurnPenalty = 0.15;
     /// <summary>Liked recordings a page looks for songs like: the best <see cref="LikedAlways"/> every time, the rest in turn.</summary>
     public const int LikedPerPage = 10, LikedAlways = 5;
+    /// <summary>
+    /// Owner #175: how long a page waits for the catalogs: first for related artists, then for songs. A lookup still going
+    /// then (a day-old cache sends some to Apple's lane, one request per 3.1 s: over a minute) is left to finish in the
+    /// background into the cache, so the next refresh has it; the page is built from what arrived. With nothing at all
+    /// yet, the page waits for it as before. Tests set it.
+    /// </summary>
+    internal static TimeSpan RelationsBudget { get; set; } = TimeSpan.FromSeconds(2);
+    internal static TimeSpan SongsBudget { get; set; } = TimeSpan.FromSeconds(4);
+
+    /// <summary>The results in order once all are in or the budget is over and one is useful (<paramref name="useful"/>);
+    /// a lookup not finished yet gives <paramref name="missing"/> and goes on in the background.</summary>
+    private static async Task<T[]> WithinAsync<T>(Task<T>[] tasks, TimeSpan budget, Func<T, bool> useful, Func<int, T> missing, CancellationToken ct)
+    {
+        var all = Task.WhenAll(tasks);
+        _ = all.ContinueWith(t => _ = t.Exception, CancellationToken.None, TaskContinuationOptions.OnlyOnFaulted, TaskScheduler.Default);
+        if (await Task.WhenAny(all, Task.Delay(budget, ct)).ConfigureAwait(false) == all) await all.ConfigureAwait(false);
+        else await UntilUsefulAsync(tasks, t => useful(((Task<T>)t).Result), ct).ConfigureAwait(false);
+        return [.. tasks.Select((t, i) => t.IsCompletedSuccessfully ? t.Result : missing(i))];
+    }
+
+    /// <summary>Past the budget with nothing useful yet: waits for the first useful lookup, not for every one.</summary>
+    private static async Task UntilUsefulAsync(IEnumerable<Task> tasks, Func<Task, bool> useful, CancellationToken ct)
+    {
+        ct.ThrowIfCancellationRequested(); // the budget ended by a real cancellation stops the build
+        var list = tasks.ToList();
+        while (!list.Any(t => t.IsCompletedSuccessfully && useful(t)) && list.Any(t => !t.IsCompleted))
+        {
+            ct.ThrowIfCancellationRequested();
+            await Task.WhenAny(list.Where(t => !t.IsCompleted)).ConfigureAwait(false);
+        }
+    }
     /// <summary>Songs kept per liked recording (after every filter), so one loved song cannot fill the shelf.</summary>
     public const int PerLiked = 3;
     /// <summary>What a song already on a kept page keeps of its score on a new page: it comes back only when nothing fresh is left.</summary>
@@ -521,6 +555,7 @@ internal static class Discover
         Func<IReadOnlyList<CatalogSong>, CancellationToken, Task<HashSet<string>>> unavailable, DiscoverHidden hidden,
         IProgress<string>? progress, CancellationToken ct, int songCount = 2 * Shelf, DiscoverContext? context = null)
     {
+        ArtistCatalog.PreferSaved.Value = true; // owner #175: saved metadata answers at once, renewed in the background
         var familiar = context?.Familiar ?? new HashSet<string>();
         var learning = context?.Learning ?? DiscoverLearning.None;
         var now = context?.Now ?? DateTimeOffset.UtcNow;
@@ -556,8 +591,10 @@ internal static class Discover
         int GroupOf(string artist) => favourites.Contains(artist) ? 0 : own.Contains(artist) ? 1 : knownArtists.Contains(artist) ? 2 : 3;
         var lists = new List<(TasteSeed Seed, List<SimilarArtist> Similar)>();
         int complete = 0;
-        using var concurrent = new SemaphoreSlim(ArtistLookups, ArtistLookups);
-        var relations = await Task.WhenAll(used.Select(async seed =>
+        bool built = false; // lookups left to finish in the background report nothing to the shelf
+        // Not disposed: a lookup past the budget still releases its place when it finishes.
+        var concurrent = new SemaphoreSlim(ArtistLookups, ArtistLookups);
+        var relationTasks = used.Select(async seed =>
         {
             await concurrent.WaitAsync(ct);
             try
@@ -565,8 +602,9 @@ internal static class Discover
                 return (Seed: seed, Similar: LastFmSimilar.Filter(await catalog.SimilarAsync(seed, null, ct), seed.Name, used.Select(s => s.Name)).Take(40).ToList(), Error: "");
             }
             catch (Exception ex) when (Failed(ex, ct)) { return (Seed: seed, Similar: new List<SimilarArtist>(), Error: ArtistCatalog.Explain(ex)); }
-            finally { progress?.Report($"Finding artists like the ones you play… {Interlocked.Increment(ref complete)} of {used.Count}"); concurrent.Release(); }
-        }));
+            finally { var n = Interlocked.Increment(ref complete); if (!built) progress?.Report($"Finding artists like the ones you play… {n} of {used.Count}"); concurrent.Release(); }
+        }).ToArray();
+        var relations = await WithinAsync(relationTasks, RelationsBudget, r => r.Similar.Count > 0, i => (Seed: used[i], Similar: new List<SimilarArtist>(), Error: ""), ct);
         // Merge in seed order, not completion order: network timing must not change ranking or reasons.
         foreach (var row in relations)
         {
@@ -622,13 +660,15 @@ internal static class Discover
         // Owner #94: every artist's songs at once (the catalog itself keeps to its few connections), merged in rank
         // order afterwards so network timing never changes the picks.
         int picked = 0, lookupCount = ranked.Count + (liked?.Count ?? 0);
-        using var lookups = new SemaphoreSlim(ArtistLookups, ArtistLookups);
-        var rowsTask = Task.WhenAll(ranked.Select(async row =>
+        var lookups = new SemaphoreSlim(ArtistLookups, ArtistLookups); // not disposed, as above
+        var rowTasks = ranked.Select(async row =>
         {
             await lookups.WaitAsync(ct);
             try
             {
-                if (own.Contains(row.Key))
+                // The favourites are identified with the listener's own albums (namesake-safe, can use Apple's paced lane);
+                // their artists they play less are looked up by name like related artists (owner #175: speed).
+                if (favourites.Contains(row.Key))
                 {
                     var artist = await catalog.FindAsync(mineBy[row.Key], ct);
                     return (Artist: artist, Songs: artist is null ? [] : await catalog.TopSongsAsync(artist, ct), Error: "");
@@ -637,18 +677,31 @@ internal static class Discover
                 return (relatedSongs.Artist, relatedSongs.Songs, Error: "");
             }
             catch (Exception ex) when (Failed(ex, ct)) { return (Artist: (CatalogArtist?)null, Songs: new List<CatalogSearchSong>(), Error: ArtistCatalog.Explain(ex)); }
-            finally { progress?.Report($"Picking songs you don't have… {Interlocked.Increment(ref picked)} of {lookupCount}"); lookups.Release(); }
-        }));
+            finally { var n = Interlocked.Increment(ref picked); if (!built) progress?.Report($"Picking songs you don't have… {n} of {lookupCount}"); lookups.Release(); }
+        }).ToArray();
         // Songs like the listener's best-liked recordings, looked up beside the artists'; one failing fails alone.
-        var likeTask = Task.WhenAll((liked ?? []).Select(async like =>
+        var likeTasks = (liked ?? []).Select(async like =>
         {
             await lookups.WaitAsync(ct);
             try { return (Songs: await catalog.SongsLikeAsync(like, ct), Error: ""); }
             catch (Exception ex) when (Failed(ex, ct)) { return (Songs: new List<CatalogSearchSong>(), Error: ArtistCatalog.Explain(ex)); }
-            finally { progress?.Report($"Picking songs you don't have… {Interlocked.Increment(ref picked)} of {lookupCount}"); lookups.Release(); }
-        }));
-        await Task.WhenAll(rowsTask, likeTask);
-        var (rows, likeRows) = (rowsTask.Result, likeTask.Result);
+            finally { var n = Interlocked.Increment(ref picked); if (!built) progress?.Report($"Picking songs you don't have… {n} of {lookupCount}"); lookups.Release(); }
+        }).ToArray();
+        // One budget for both: the songs phase as a whole, never one source waiting on the other.
+        var songsAll = Task.WhenAll(Task.WhenAll(rowTasks), Task.WhenAll(likeTasks));
+        _ = songsAll.ContinueWith(t => _ = t.Exception, CancellationToken.None, TaskContinuationOptions.OnlyOnFaulted, TaskScheduler.Default);
+        if (await Task.WhenAny(songsAll, Task.Delay(SongsBudget, ct)).ConfigureAwait(false) == songsAll) await songsAll.ConfigureAwait(false);
+        else await UntilUsefulAsync(rowTasks.Cast<Task>().Concat(likeTasks), t => t switch
+        {
+            Task<(CatalogArtist? Artist, List<CatalogSearchSong> Songs, string Error)> r => r.Result.Songs.Count > 0,
+            Task<(List<CatalogSearchSong> Songs, string Error)> l => l.Result.Songs.Count > 0,
+            _ => false,
+        }, ct).ConfigureAwait(false);
+        var rows = rowTasks.Select(t => t.IsCompletedSuccessfully ? t.Result : (Artist: (CatalogArtist?)null, Songs: new List<CatalogSearchSong>(), Error: "")).ToArray();
+        var likeRows = likeTasks.Select(t => t.IsCompletedSuccessfully ? t.Result : (Songs: new List<CatalogSearchSong>(), Error: "")).ToArray();
+        built = true;
+        int later = rowTasks.Count(t => !t.IsCompleted) + likeTasks.Count(t => !t.IsCompleted) + relationTasks.Count(t => !t.IsCompleted);
+        if (later > 0) Noctis.Services.DebugLog.Write("ForYou", $"page built with {lookupCount + used.Count - later} of {lookupCount + used.Count} lookups; {later} finish in the background for the next refresh");
         for (int k = 0; k < ranked.Count; k++)
         {
             var (key, value) = ranked[k];

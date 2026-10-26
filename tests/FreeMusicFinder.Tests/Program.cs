@@ -3,6 +3,12 @@ using Avalonia.Headless;
 using Avalonia.Themes.Fluent;
 using FreeMusicFinder.Tests;
 
+if (Environment.GetEnvironmentVariable("FMF_FORYOU_TIME") is { Length: > 0 } forYouTime)
+{
+    await ForYouTimingCheck.RunAsync(forYouTime);
+    return 0;
+}
+
 if (Environment.GetEnvironmentVariable("FMF_FORYOU_REPLAY") is { Length: > 0 } forYouWork)
 {
     await ForYouReplayTest.RunAsync(forYouWork);
