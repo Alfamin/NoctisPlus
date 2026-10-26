@@ -23,9 +23,9 @@ public partial class PlaylistViewModel
     private TracksThenRows? _rows;
     public TracksThenRows Rows => _rows ??= new TracksThenRows(Tracks, CatalogRows, BuildOrderedPlaylistRows);
     public bool HasCatalogMissing => CatalogRows.Count > 0;
-    // Owner #48: header Play/Shuffle/queue act on owned songs only. With none owned they would do nothing, so they
-    // hide, as on an online album; each missing row keeps its own Play.
-    public bool ShowPlayActions => (Tracks.Count > 0 || !HasCatalogMissing || StreamMissing && !IsPreview) && !IsPreviewLoading;
+    // With streaming enabled, found and saved playlists both play every available row. Local-only pages
+    // hide the header actions when none of their songs are owned.
+    public bool ShowPlayActions => (Tracks.Count > 0 || !HasCatalogMissing || StreamMissing) && !IsPreviewLoading;
     partial void OnTrackCountChanged(int value) => OnPropertyChanged(nameof(ShowPlayActions));
     private int CatalogMissingCount => CatalogRows.Count;
     private IReadOnlyList<ImportedPlaylistEntry>? _importedEntries;
@@ -163,12 +163,13 @@ public partial class PlaylistViewModel
         get => _player.StreamsPage(StreamPage);
         set { _player.SetStreamPage(StreamPage, value); OnPropertyChanged(); OnPropertyChanged(nameof(StreamToggleTip)); OnPropertyChanged(nameof(ShowPlayActions)); }
     }
-    public bool ShowStreamToggle => HasCatalogMissing && !IsPreview && _catalogOnline is not null;
+    public bool ShowStreamToggle => HasCatalogMissing && _catalogOnline is not null;
     public string StreamToggleTip => StreamToggle.Tip(StreamMissing);
     [RelayCommand] private void ToggleStreamMissing() => StreamMissing = !StreamMissing;
-    private string StreamPage => "playlist:" + PlaylistId;
+    // A found playlist gets a new local draft id each time it opens; remember its choice by catalog id instead.
+    private string StreamPage => IsPreview ? "playlist-preview:" + _preview!.Id : "playlist:" + PlaylistId;
 
-    private bool Streams => StreamMissing && HasCatalogMissing && !IsPreview && _catalogOnline is not null;
+    private bool Streams => StreamMissing && HasCatalogMissing && _catalogOnline is not null;
     private readonly System.Runtime.CompilerServices.ConditionalWeakTable<ArtistCatalogSong, Track> _standIns = new();
     private Track StandInFor(ArtistCatalogSong row, OnlineSong song)
         => _standIns.GetValue(row, _ => PlayerViewModel.StandIn(_catalogOnline!, song, keep: false, StreamPage));
