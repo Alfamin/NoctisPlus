@@ -1,6 +1,16 @@
 {
   "releases": [
     {
+      "version": "2.4.1",
+      "added": [
+        { "icon": "RailSparkleIcon", "title": "Bigger For you pages", "line": "25 songs: your favourites every page, plus new artists in turn", "top": true }
+      ],
+      "fixed": [
+        "For you no longer suggests songs you have under another name",
+        "The word timing pill no longer stays on after a skipped song"
+      ]
+    },
+    {
       "version": "2.4.0",
       "added": [
         { "icon": "LyricsIcon", "title": "Search by lyrics", "line": "Type a line you remember; its song comes up top", "top": true },
