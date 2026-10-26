@@ -127,6 +127,7 @@ public partial class MainWindowViewModel : ViewModelBase
     /// <summary>"Plugin: message" from a plugin's Notify(), shown for a few seconds in the notice pill
     /// (also the lyrics offset confirmation, GitHub #102).</summary>
     [ObservableProperty] private string _pluginNotice = string.Empty;
+    public RecommendationNoticeViewModel RecommendationNotice { get; } = new();
 
     /// <summary>Word timing's compact status pill (icon + a few words); null hides it.</summary>
     [ObservableProperty] private Features.WordLyrics.TimingPill? _wordTimingPill;

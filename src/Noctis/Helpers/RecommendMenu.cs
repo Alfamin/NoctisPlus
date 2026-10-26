@@ -2,6 +2,7 @@ using System.Windows.Input;
 using Avalonia;
 using Avalonia.Controls;
 using CommunityToolkit.Mvvm.Input;
+using Microsoft.Extensions.DependencyInjection;
 using Noctis.Models;
 using Noctis.Services.Search;
 using Noctis.ViewModels;
@@ -28,7 +29,8 @@ public static class RecommendMenu
 
     public static ICommand ToggleCommand { get; } = new RelayCommand<object?>(p =>
     {
-        if (p is RecommendToggle t) OnlineMusicSearch.Current?.SetArtistBlocked(t.Artist, t.Block);
+        if (p is not RecommendToggle t || OnlineMusicSearch.Current is not { } source || !source.SetArtistBlocked(t.Artist, t.Block)) return;
+        App.Services?.GetService<MainWindowViewModel>()?.RecommendationNotice.Show(source, t.Artist, t.Block);
     });
 
     static RecommendMenu()
@@ -55,6 +57,14 @@ public static class RecommendMenu
         if (sender is not MenuItem item) return;
         switch (GetEntry(item), item.DataContext)
         {
+            case ("pick", ForYouPick { Shelf: { } shelf } pick):
+                FillArtists(item, pick.Artists, shelf.BlockArtistCommand); break;
+            case ("blocked", ForYouShelfViewModel shelf):
+                item.Items.Clear();
+                item.IsVisible = shelf.BlockedArtists.Count > 0;
+                foreach (var name in shelf.BlockedArtists)
+                    item.Items.Add(new MenuItem { Header = name, Command = shelf.UnblockArtistCommand, CommandParameter = name });
+                break;
             case ("artist", ArtistDetailViewModel vm) when !string.IsNullOrWhiteSpace(vm.ArtistName): Bind(item, [vm.ArtistName]); break;
             case ("song", SearchSongItem { Online: { } song }): Bind(item, Track.ParseArtistTokens(song.ArtistDisplay)); break;
             default: item.IsVisible = false; break;
@@ -62,6 +72,16 @@ public static class RecommendMenu
     }
 
     public static void BindTrack(MenuItem item, Track track) => Bind(item, TrackContextMenuBuilder.CreditedArtists(track));
+
+    private static void FillArtists(MenuItem item, IReadOnlyList<string> names, ICommand command)
+    {
+        item.Items.Clear();
+        item.IsVisible = names.Count > 0;
+        item.Command = names.Count == 1 ? command : null;
+        item.CommandParameter = names.Count == 1 ? names[0] : null;
+        if (names.Count > 1)
+            foreach (var name in names) item.Items.Add(new MenuItem { Header = name, Command = command, CommandParameter = name });
+    }
 
     public static void Bind(MenuItem item, IReadOnlyList<string> names)
     {

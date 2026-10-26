@@ -178,10 +178,10 @@
             <Button Classes="section-toggle" Classes.expanded="{Binding IsExpanded}" Command="{Binding ToggleExpandedCommand}"
                     ToolTip.Tip="Hide or show this section">
                 <Button.ContextMenu>
-                    <ContextMenu Opening="OnHeadingMenuOpening">
+                    <ContextMenu>
                         <MenuItem Header="Reset For you (forget hidden songs and shown picks)" Command="{Binding ResetLearningCommand}" />
                         <!-- Owner #166: the artists blocked for recommendations; one click recommends them again. -->
-                        <MenuItem Header="Recommend again" Tag="unblock" />
+                        <MenuItem Header="Recommend again" helpers:RecommendMenu.Entry="blocked" />
                     </ContextMenu>
                 </Button.ContextMenu>
                 <StackPanel Orientation="Horizontal" Spacing="8">
@@ -217,6 +217,8 @@
 
         <ctrl:CollapsibleContent IsOpen="{Binding IsExpanded}" Lift="10" Motion="Glide">
             <StackPanel Margin="0,14,0,0" Spacing="10">
+                <TextBlock Text="{Binding ResetNotice}" IsVisible="{Binding ResetNotice, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"
+                           FontSize="13" Opacity="0.7" />
 
                 <!-- Hidden a song: the artist page's text link brings it back for a few seconds. -->
                 <StackPanel Orientation="Horizontal" Spacing="4" IsVisible="{Binding HasUndo}">
@@ -243,20 +245,20 @@
                                     Command="{Binding $parent[UserControl].((vm:ForYouShelfViewModel)DataContext).OpenPickCommand}"
                                     CommandParameter="{Binding}">
                                 <Button.ContextMenu>
-                                    <ContextMenu Opening="OnCardMenuOpening">
+                                    <ContextMenu>
                                         <MenuItem Header="Download now" IsVisible="{Binding Song.ShowDownload}"
-                                                  Command="{Binding $parent[UserControl].((vm:ForYouShelfViewModel)DataContext).DownloadCommand}" CommandParameter="{Binding}" />
+                                                  Command="{Binding Shelf.DownloadCommand}" CommandParameter="{Binding}" />
                                         <MenuItem Header="Add to downloads" IsVisible="{Binding Song.CanStartDownload}"
-                                                  Command="{Binding $parent[UserControl].((vm:ForYouShelfViewModel)DataContext).QueueDownloadCommand}" CommandParameter="{Binding}" />
+                                                  Command="{Binding Shelf.QueueDownloadCommand}" CommandParameter="{Binding}" />
                                         <MenuItem Header="Open album"
-                                                  Command="{Binding $parent[UserControl].((vm:ForYouShelfViewModel)DataContext).OpenPickCommand}" CommandParameter="{Binding}" />
+                                                  Command="{Binding Shelf.OpenPickCommand}" CommandParameter="{Binding}" />
                                         <MenuItem Header="Go to artist"
-                                                  Command="{Binding $parent[UserControl].((vm:ForYouShelfViewModel)DataContext).OpenPickArtistCommand}" CommandParameter="{Binding}" />
+                                                  Command="{Binding Shelf.OpenPickArtistCommand}" CommandParameter="{Binding}" />
                                         <Separator />
                                         <MenuItem Header="Not for me"
-                                                  Command="{Binding $parent[UserControl].((vm:ForYouShelfViewModel)DataContext).NotForMeCommand}" CommandParameter="{Binding}" />
+                                                  Command="{Binding Shelf.NotForMeCommand}" CommandParameter="{Binding}" />
                                         <!-- Owner #166: one artist blocks at once; several get one entry each (filled when the menu opens). -->
-                                        <MenuItem Header="Don't recommend artist" Tag="block" />
+                                        <MenuItem Header="Don't recommend artist" helpers:RecommendMenu.Entry="pick" />
                                     </ContextMenu>
                                 </Button.ContextMenu>
                                 <StackPanel Width="168" Spacing="0">

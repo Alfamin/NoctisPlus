@@ -85,6 +85,22 @@ internal static class NativeForYouTests
             "Don't recommend artist removes that artist's cards at once and offers Undo");
         vm.UndoCommand.Execute(null);
         Check.True(vm.Picks.Count == 1 && vm.BlockedArtists.Count == 0 && !vm.HasUndo, "Undo recommends the artist again and brings the cards back");
+        var guestSong = new CatalogSong("deezer:other-artist", "Other song", [new("deezer:other", "Other artist")], 180, true);
+        var guest = new ForYouPick(new(new(guestSong, null), 1, "Test"), new(new Noctis.Services.Search.OnlineSong(guestSong.Id, guestSong.Title, "Other artist")), "page-1", 2);
+        vm.Picks.Add(guest);
+        vm.BlockArtistCommand.Execute(other.Artists[0]);
+        source.Hidden.SetArtistBlocked("Other artist", true);
+        Dispatcher.UIThread.RunJobs();
+        vm.UndoCommand.Execute(null);
+        Check.True(vm.Picks.Count == 1 && !vm.Picks.Contains(guest) && source.Hidden.HidesArtist("Other artist"),
+            "Undo of one block cannot bring back an artist blocked later through another menu");
+        source.Hidden.SetArtistBlocked("Other artist", false);
+        Check.Until(() => vm.Picks.Contains(guest), "unblocking that other artist restores only their card");
+        vm.Picks.Remove(guest);
+        source.Hidden.SetArtistBlocked(other.Artists[0], true);
+        Check.Until(() => vm.Picks.Count == 0, "blocking through another menu removes the shelf's cards too");
+        source.Hidden.SetArtistBlocked(other.Artists[0], false);
+        Check.Until(() => vm.Picks.Count == 1, "another menu's Undo restores the cards on their original page");
         vm.SetActive(false);
         vm.SetActive(true);
         Check.Equal(1, vm.Picks.Count, "leaving and returning preserves the page instead of moving cards");
@@ -104,6 +120,14 @@ internal static class NativeForYouTests
         Check.Until(() => refresh.IsCompleted, "typing or leaving Search cancels recommendation requests promptly");
         refresh.GetAwaiter().GetResult();
         Check.False(vm.IsLoading, "cancelled shelf work cannot leave a permanent loading indicator");
+        http.Override = null;
+        source.Hidden.SetArtistBlocked(other.Artists[0], true);
+        vm.IsExpanded = false;
+        var reset = vm.ResetLearningCommand.ExecuteAsync(null);
+        Check.Equal("For you was reset", vm.ResetNotice, "Reset gives immediate feedback before the new page finishes");
+        Check.True(vm.IsExpanded, "Reset opens a folded shelf so its confirmation and new picks are visible");
+        Check.Until(() => reset.IsCompleted, "Reset finishes without waiting forever on the old cancelled request");
+        Check.True(source.Hidden.HidesArtist(other.Artists[0]), "Reset keeps artists the listener explicitly blocked");
         online.Detach();
         Dispatcher.UIThread.RunJobs();
     }

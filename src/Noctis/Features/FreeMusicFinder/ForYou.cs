@@ -959,6 +959,7 @@ internal sealed class DiscoverHidden
             if (blocked) _artists[key] = Taste.MainArtist(artist); else _artists.Remove(key);
             Save();
         }
+        Noctis.Services.DebugLog.Write("ForYou", (blocked ? "blocked: " : "unblocked: ") + BlockedArtists.Count + " artists");
         ArtistsChanged?.Invoke(this, EventArgs.Empty);
         return true;
     }

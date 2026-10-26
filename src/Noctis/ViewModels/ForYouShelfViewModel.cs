@@ -20,6 +20,7 @@ public sealed partial class ForYouShelfViewModel : ObservableObject, IDisposable
     private (ForYouPick Pick, int Index, DiscoverResult? Page, ForYouSource Source)? _dismissed;
     /// <summary>Owner #166: the artist just blocked from a card, and the cards that went with it (for Undo).</summary>
     private (string Artist, List<(ForYouPick Pick, int Index)> Removed, DiscoverResult? Page)? _blocked;
+    private readonly List<ForYouPick> _artistRemoved = [];
     private long _generation;
     private bool _active, _disposed;
     internal Func<IOnlineMusicSearch, OnlineSong, Task>? PlayRequested { get; set; }
@@ -53,6 +54,7 @@ public sealed partial class ForYouShelfViewModel : ObservableObject, IDisposable
     [ObservableProperty, NotifyPropertyChangedFor(nameof(RefreshTip))] private string _status = "";
     [ObservableProperty] private bool _hasUndo;
     [ObservableProperty] private string _undoLabel = "";
+    [ObservableProperty] private string _resetNotice = "";
     [ObservableProperty] private bool _hasNewPicks;
     [ObservableProperty] private bool _isExpanded = true;
     public bool IsAvailable => _source is not null && _online is not null;
@@ -100,6 +102,7 @@ public sealed partial class ForYouShelfViewModel : ObservableObject, IDisposable
         _load?.Cancel(); _generation++;
         _source = source; _online = online; _actions = actions;
         _page = null; Picks.Clear(); IsLoading = false;
+        _artistRemoved.Clear();
         if (_source is not null) { _source.PicksReady += NewPicks; _source.Hidden.ArtistsChanged += ArtistsChanged; }
         if (_online is not null) _online.DownloadsChanged += DownloadsChanged;
         OnPropertyChanged(nameof(IsAvailable));
@@ -241,10 +244,11 @@ public sealed partial class ForYouShelfViewModel : ObservableObject, IDisposable
     private void Show(DiscoverResult page, ForYouSource source, int? opened = null)
     {
         _page = page;
+        _artistRemoved.Clear();
         Picks.Clear();
         foreach (var pick in page.Songs.Where(s => !source.Hidden.HidesSong(s.Track.Song)).Take(Discover.Shelf))
         {
-            var row = new ForYouPick(pick, new SearchSongItem(_online!.Remember(pick.Track)), page.Batch ?? "", Picks.Count);
+            var row = new ForYouPick(pick, new SearchSongItem(_online!.Remember(pick.Track)), page.Batch ?? "", Picks.Count) { Shelf = this };
             Picks.Add(row);
             _ = LoadArt(row, _load!.Token);
         }
@@ -429,17 +433,27 @@ public sealed partial class ForYouShelfViewModel : ObservableObject, IDisposable
         _ = ExpireUndo(stop);
     }
 
-    [RelayCommand] private void UnblockArtist(string? artist) { if (!string.IsNullOrWhiteSpace(artist)) _source?.Hidden.SetArtistBlocked(artist, false); }
+    [RelayCommand] private void UnblockArtist(string? artist)
+    {
+        if (!string.IsNullOrWhiteSpace(artist) && _source?.Hidden.SetArtistBlocked(artist, false) == true)
+            Noctis.Helpers.TransientStatus.Show("ForYouArtist", v => Status = v, "Recommending again · " + artist);
+    }
 
     // Blocked from anywhere (a card, an artist page, Search, the player): that artist's cards leave the page shown.
     private void ArtistsChanged(object? sender, EventArgs e) => Dispatcher.UIThread.Post(RemoveBlockedCards);
     private void RemoveBlockedCards()
     {
         if (_disposed || _source is not { } source) return;
+        foreach (var pick in _artistRemoved.Where(p => !source.Hidden.HidesSong(p.Pick.Track.Song)).ToArray())
+        {
+            _artistRemoved.Remove(pick);
+            if (!Picks.Contains(pick)) Picks.Insert(Picks.Count(p => p.Position < pick.Position), pick);
+        }
         for (int i = Picks.Count - 1; i >= 0; i--)
         {
             if (!source.Hidden.HidesSong(Picks[i].Pick.Track.Song)) continue;
             _blocked?.Removed.Insert(0, (Picks[i], i));
+            if (!_artistRemoved.Contains(Picks[i])) _artistRemoved.Add(Picks[i]);
             Picks.RemoveAt(i);
         }
     }
@@ -454,7 +468,8 @@ public sealed partial class ForYouShelfViewModel : ObservableObject, IDisposable
             _source?.Hidden.SetArtistBlocked(block.Artist, false);
             if (ReferenceEquals(block.Page, _page))
                 foreach (var (pick, index) in block.Removed)
-                    if (!Picks.Contains(pick)) Picks.Insert(Math.Min(index, Picks.Count), pick);
+                    if (!Picks.Contains(pick) && _source?.Hidden.HidesSong(pick.Pick.Track.Song) != true)
+                        Picks.Insert(Math.Min(index, Picks.Count), pick);
             return;
         }
         if (!HasUndo || _dismissed is not { } old) return;
@@ -475,14 +490,18 @@ public sealed partial class ForYouShelfViewModel : ObservableObject, IDisposable
     /// <summary>Forgets For you's dismissals, shown pages and saved page, then finds new picks. The library and its
     /// listening history are not touched.</summary>
     [RelayCommand]
-    private Task ResetLearning()
+    private async Task ResetLearning()
     {
-        if (_disposed || _source is not { } source) return Task.CompletedTask;
-        _undo?.Cancel(); HasUndo = false; _dismissed = null;
+        if (_disposed || _source is not { } source) return;
+        _undo?.Cancel(); HasUndo = false; _dismissed = null; _blocked = null;
+        IsExpanded = true; // Reset must show its confirmation and new picks even when the shelf was folded.
         source.ResetLearning();
+        _artistRemoved.Clear();
+        Noctis.Helpers.TransientStatus.Show("ForYouReset", v => ResetNotice = v, "For you was reset", TimeSpan.FromSeconds(5));
         _page = null; Picks.Clear(); _pages = []; PageTabs.Clear();
         OnPropertyChanged(nameof(HasPageTabs)); OnPropertyChanged(nameof(CanPreviousPage)); OnPropertyChanged(nameof(CanNextPage));
-        return LoadAsync(true);
+        Noctis.Services.DebugLog.Write("ForYou", "Reset hidden songs and shown picks; blocked artists kept");
+        await LoadAsync(true);
     }
 
     public void Dispose()
@@ -509,6 +528,8 @@ public sealed partial class ForYouPageTab : ObservableObject
 
 public sealed class ForYouPick
 {
+    /// <summary>Explicit owner for detached popup bindings; never look through popup ancestors.</summary>
+    public ForYouShelfViewModel? Shelf { get; init; }
     internal DiscoverSong Pick { get; }
     /// <summary>Owner #166: the song's credited artists, for Don't recommend artist.</summary>
     public IReadOnlyList<string> Artists => [.. Pick.Track.Song.Artists.Select(a => a.Name).Where(n => n.Length > 0).Distinct(StringComparer.OrdinalIgnoreCase)];

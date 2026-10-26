@@ -1455,6 +1455,18 @@
                 Content="Offline" ToolTip.Tip="Go online" AutomationProperties.Name="Offline mode · go online"
                 Background="{DynamicResource IslandBackground}" Foreground="{DynamicResource IslandForeground}"
                 BorderBrush="#22FFFFFF" BorderThickness="1" CornerRadius="999" Padding="12,7"/>
+        <Border IsVisible="{Binding RecommendationNotice.IsShown}" HorizontalAlignment="Center"
+                Background="{DynamicResource IslandBackground}" BorderBrush="#22FFFFFF" BorderThickness="1"
+                CornerRadius="999" Padding="16,9" MaxWidth="560">
+            <StackPanel Orientation="Horizontal" Spacing="12">
+                <TextBlock Text="{Binding RecommendationNotice.Text}" FontSize="13" FontWeight="SemiBold"
+                           Foreground="{DynamicResource IslandForeground}" TextTrimming="CharacterEllipsis"
+                           MaxWidth="420" VerticalAlignment="Center" />
+                <Button Content="Undo" Command="{Binding RecommendationNotice.UndoCommand}"
+                        IsVisible="{Binding RecommendationNotice.HasUndo}" Classes="text-link"
+                        AutomationProperties.Name="Undo artist recommendation change" />
+            </StackPanel>
+        </Border>
         <Border IsVisible="{Binding PluginNotice, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"
                 IsHitTestVisible="False"
                 HorizontalAlignment="Center"
