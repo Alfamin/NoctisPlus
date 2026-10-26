@@ -1,6 +1,19 @@
 {
   "releases": [
     {
+      "version": "2.4.2",
+      "added": [
+        { "icon": "RailSparkleIcon", "title": "Choose artists you don't want", "line": "Don't recommend artist, with a choice for each credit and Undo", "top": true },
+        { "icon": "LyricsIcon", "title": "Not for me beside the lyrics", "line": "Dismiss a For you song without leaving its lyrics" },
+        { "icon": "RailInfoIcon", "title": "Updates ask at startup", "line": "Choose Update or Later when a new version is ready" }
+      ],
+      "fixed": [
+        "The first For you refresh no longer waits on slow catalog lookups",
+        "The Added check mark stays with the song you saved",
+        "Artist actions work on the first menu opening, and Reset confirms what happened"
+      ]
+    },
+    {
       "version": "2.4.1",
       "added": [
         { "icon": "RailSparkleIcon", "title": "Bigger For you pages", "line": "25 songs: your favourites every page, plus new artists in turn", "top": true }
