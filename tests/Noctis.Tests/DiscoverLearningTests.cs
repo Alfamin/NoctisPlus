@@ -77,6 +77,33 @@ public class DiscoverLearningTests : IDisposable
         Assert.All(result.Songs, s => Assert.Equal("Seed", s.Seed));
     }
 
+    /// <summary>Owner #172: 25 songs a page, mixed: the favourites' share every page (with new songs of theirs on a refresh), then
+    /// artists the listener plays less or knows, then artists new to them; at most two songs by one artist.</summary>
+    [Fact]
+    public async Task APage_MixesFavourites_ArtistsYouKnow_AndNewOnes_AndARefreshBringsNewSongsOfTheFavourites()
+    {
+        var catalog = new Catalog();
+        var favourites = Enumerable.Range(0, 15).Select(i => new TasteSeed("Fav" + i, 10 - i * 0.3, 5)).ToList();
+        var others = Enumerable.Range(0, 5).Select(i => new TasteSeed("Other" + i, 1, 2)).ToList();
+        for (int i = 0; i < 15; i++) { catalog.Add("f" + i, "Fav" + i, "New" + i, "Known" + i); catalog.Add("n" + i, "New" + i); catalog.Add("k" + i, "Known" + i); }
+        for (int i = 0; i < 5; i++) catalog.Add("o" + i, "Other" + i);
+        var known = favourites.Concat(others).Select(s => s.Name).Concat(Enumerable.Range(0, 15).Select(i => "Known" + i)).Select(DiscoverIdentity.Artist).ToHashSet();
+        var hidden = new DiscoverHidden(Path.Combine(_folder, "h.json"));
+        int Group(DiscoverSong s) => s.Track.Song.Artists[0].Name is var n && n.StartsWith("Fav") ? 0 : n.StartsWith("Other") ? 1 : n.StartsWith("Known") ? 2 : 3;
+        async Task<List<DiscoverSong>> Page(IReadOnlySet<string>? onPages) => (await Discover.BuildAsync(favourites, catalog, NothingOwned, hidden, null, default,
+            context: new(new HashSet<string>(), DiscoverLearning.None, Now, OnPages: onPages, Others: others, Known: known))).Songs.Take(Discover.Shelf).ToList();
+
+        var first = await Page(null);
+        Assert.Equal(25, first.Count);
+        Assert.Equal([Discover.FavouriteSongs, Discover.OtherSongs, Discover.KnownSongs, Discover.NewSongs], Enumerable.Range(0, 4).Select(g => first.Count(s => Group(s) == g)));
+        Assert.All(first.GroupBy(s => s.Track.Song.Artists[0].Name), g => Assert.True(g.Count() <= Discover.PerArtist, g.Key));
+
+        var shown = first.Select(s => DiscoverIdentity.Key(s.Track.Song)).ToHashSet();
+        var next = await Page(shown);
+        Assert.Equal(Discover.FavouriteSongs, next.Count(s => Group(s) == 0));
+        Assert.DoesNotContain(next, s => shown.Contains(DiscoverIdentity.Key(s.Track.Song)));
+    }
+
     [Fact]
     public async Task Discover_OneSeedOrOwnArtistsDoNotFillTheShelf()
     {

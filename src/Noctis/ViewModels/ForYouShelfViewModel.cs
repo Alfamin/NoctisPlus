@@ -240,7 +240,7 @@ public sealed partial class ForYouShelfViewModel : ObservableObject, IDisposable
     {
         _page = page;
         Picks.Clear();
-        foreach (var pick in page.Songs.Where(s => !source.Hidden.HidesSong(s.Track.Song)).Take(20))
+        foreach (var pick in page.Songs.Where(s => !source.Hidden.HidesSong(s.Track.Song)).Take(Discover.Shelf))
         {
             var row = new ForYouPick(pick, new SearchSongItem(_online!.Remember(pick.Track)), page.Batch ?? "", Picks.Count);
             Picks.Add(row);

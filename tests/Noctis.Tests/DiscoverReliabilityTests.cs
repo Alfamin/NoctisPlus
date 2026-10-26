@@ -58,7 +58,7 @@ public class DiscoverReliabilityTests : IDisposable
         var (source, catalog, _) = Source();
         using var _ = source;
         var first = await source.BuildAsync(true, null, CancellationToken.None);
-        Assert.Equal(40, first.Songs.Count);
+        Assert.Equal(2 * Discover.Shelf, first.Songs.Count);
         int news = 0; source.PicksReady += _ => news++;
         catalog.Before = (_, _) => throw new HttpRequestException("Synthetic outage");
         var outage = await source.BuildAsync(true, null, CancellationToken.None);
@@ -243,7 +243,7 @@ public class DiscoverReliabilityTests : IDisposable
         var (tiny, _, _) = Source("tiny");
         using var _ = tiny;
         var page = await tiny.BuildAsync(true, null, CancellationToken.None);
-        Assert.Equal(40, page.Songs.Count);
+        Assert.Equal(2 * Discover.Shelf, page.Songs.Count);
         Assert.Empty(page.Songs.Where(s => s.Track.Song.Title == "Folk 7 Song 1"));
     }
 

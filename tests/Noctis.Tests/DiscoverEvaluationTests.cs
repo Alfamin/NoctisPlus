@@ -298,7 +298,7 @@ public class DiscoverEvaluationTests(ITestOutputHelper output) : IDisposable
             + $"(learning {learned.TotalMilliseconds:0} ms, taste {tasted.TotalMilliseconds:0} ms, heard set {known.TotalMilliseconds:0} ms); {page.Songs.Count} songs";
         output.WriteLine(line);
         if (Environment.GetEnvironmentVariable("DISCOVER_EVAL_REPORT") is { Length: > 0 } path) File.AppendAllLines(path, [line]);
-        Assert.Equal(40, page.Songs.Count);
+        Assert.Equal(2 * Discover.Shelf, page.Songs.Count);
         Assert.True(total < TimeSpan.FromSeconds(20) && ranking < TimeSpan.FromSeconds(5), line);
     }
 }

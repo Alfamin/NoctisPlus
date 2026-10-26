@@ -35,8 +35,10 @@ internal sealed record DiscoverResult(List<DiscoverSong> Songs, List<DiscoverArt
 /// (kept runnable for the comparison).</summary>
 /// <summary><paramref name="OnPages"/>: recordings on the pages the shelf keeps (owner #139). A new page leaves them to those pages and
 /// only falls back on them when nothing fresh is left.</summary>
+/// <summary><paramref name="Others"/>: the listener's artists after their favourites, the ones they play less (owner #172).
+/// <paramref name="Known"/>: every artist they play or own; an artist outside it is new to them.</summary>
 internal sealed record DiscoverContext(IReadOnlySet<string> Familiar, DiscoverLearning Learning, DateTimeOffset Now, IReadOnlyList<TasteRecording>? Liked = null,
-    IReadOnlySet<string>? OnPages = null);
+    IReadOnlySet<string>? OnPages = null, IReadOnlyList<TasteSeed>? Others = null, IReadOnlySet<string>? Known = null);
 
 /// <summary>The listener's taste in artists, from what they play and what they own. Nothing leaves the computer.</summary>
 internal static class Taste
@@ -44,8 +46,8 @@ internal static class Taste
     private static readonly TimeSpan HalfLife = TimeSpan.FromDays(30), LongHalfLife = TimeSpan.FromDays(365);
     /// <summary>Seed places kept for lasting interests (years of one artist) that a recent phase would push out.</summary>
     public const int DurableSeeds = 5;
-    /// <summary>How many best-liked recordings seed songs like them.</summary>
-    public const int LikedRecordings = 10;
+    /// <summary>How many best-liked recordings can seed songs like them; a page uses <see cref="Discover.LikedPerPage"/> of them.</summary>
+    public const int LikedRecordings = 30;
 
     /// <summary>The first credited artist: "Juice WRLD feat. Halsey" and "Juice WRLD; Halsey" are Juice WRLD.</summary>
     public static string MainArtist(string? artist)
@@ -397,8 +399,26 @@ internal sealed class CatalogForDiscover(Func<ArtistCatalog> catalog, Func<strin
         if (result.Count == 0 && failure is not null) throw failure;
         return result;
     }
-    public async Task<List<CatalogSearchSong>> TopSongsAsync(CatalogArtist artist, CancellationToken ct) => (await catalog().ArtistSongsAsync(artist, ct)).Value;
+    public async Task<List<CatalogSearchSong>> TopSongsAsync(CatalogArtist artist, CancellationToken ct)
+        => await DeeperAsync(artist, (await catalog().ArtistSongsAsync(artist, ct)).Value, ct);
     public async Task<CatalogArtistSongs> SongsByNameAsync(string name, CancellationToken ct) => (await catalog().SongsByArtistNameAsync(name, ct)).Value;
+
+    /// <summary>
+    /// Owner #172: the listener's own artists come back on every page, so after their 25 best-known songs their longer list
+    /// (the one their page shows, kept for a day) brings new songs of theirs on later refreshes. Related artists keep the
+    /// short list (one request each, for speed). Deezer only: the Apple lane is paced. A failing longer list leaves the short one.
+    /// </summary>
+    private async Task<List<CatalogSearchSong>> DeeperAsync(CatalogArtist artist, List<CatalogSearchSong> best, CancellationToken ct)
+    {
+        if (!artist.Id.StartsWith("deezer:", StringComparison.Ordinal)) return best;
+        try
+        {
+            var more = (await catalog().ArtistSongsAsync(artist, false, ct)).Value;
+            var known = best.Select(s => DiscoverIdentity.Key(s.Song)).ToHashSet(StringComparer.Ordinal);
+            return [.. best, .. more.Where(s => known.Add(DiscoverIdentity.Key(s.Song)))];
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException || !ct.IsCancellationRequested) { return best; }
+    }
 
     /// <summary>How many of Last.fm's similar songs are looked up in the catalog (by their artist's songs) per liked recording.</summary>
     public const int LastFmSongLookups = 6;
@@ -451,10 +471,23 @@ internal sealed class CatalogForDiscover(Func<ArtistCatalog> catalog, Func<strin
 internal static class Discover
 {
     public const int SeedArtistsUsed = 15, CandidateArtists = 30, SongsPerArtist = 8, ArtistLookups = 6;
-    /// <summary>The cards the shelf shows; within them at most <see cref="PerSeed"/> come through one of the listener's artists
-    /// (its own songs and its neighbours' together) and at most <see cref="OwnArtists"/> are their own artists' songs, while
-    /// other songs are left. With nothing else left the shelf is still filled.</summary>
-    public const int Shelf = 20, PerSeed = 6, OwnArtists = 8;
+    /// <summary>The cards the shelf shows (owner #172: 25, up from 20); within them at most <see cref="PerSeed"/> come through
+    /// one of the listener's artists (its own songs and its neighbours' together) and at most <see cref="PerArtist"/> are by one
+    /// artist, while other songs are left. With nothing else left the shelf is still filled.</summary>
+    public const int Shelf = 25, PerSeed = 7, PerArtist = 2;
+    /// <summary>Owner #172: each page is a mix. <see cref="FavouriteSongs"/> by the listener's favourite artists (every page, new
+    /// songs of theirs each time), <see cref="OtherSongs"/> by their artists they play less, <see cref="KnownSongs"/> by related
+    /// artists they already know, <see cref="NewSongs"/> by artists new to them. All but the favourites take turns.</summary>
+    public const int FavouriteSongs = 12, OtherSongs = 4, KnownSongs = 3, NewSongs = 6;
+    /// <summary>At most this many of the shelf's songs are the listener's own artists' (favourites and the ones they play less).</summary>
+    public const int OwnArtists = FavouriteSongs + OtherSongs + KnownSongs;
+    /// <summary>The listener's artists after their favourites that can take a turn, and how many artists of the second and
+    /// third groups are looked up for one page.</summary>
+    public const int OtherArtists = 25, TurnArtists = 10;
+    /// <summary>How much each of an artist's songs on a kept page lowers its turn in the second and third groups.</summary>
+    public const double TurnPenalty = 0.15;
+    /// <summary>Liked recordings a page looks for songs like: the best <see cref="LikedAlways"/> every time, the rest in turn.</summary>
+    public const int LikedPerPage = 10, LikedAlways = 5;
     /// <summary>Songs kept per liked recording (after every filter), so one loved song cannot fill the shelf.</summary>
     public const int PerLiked = 3;
     /// <summary>What a song already on a kept page keeps of its score on a new page: it comes back only when nothing fresh is left.</summary>
@@ -469,12 +502,24 @@ internal static class Discover
         var learning = feedback.Learn(plays, library, playlists);
         var liked = new List<TasteRecording>();
         var seeds = Taste.Seeds(plays.Concat(learning.Saves), library, now.UtcDateTime, playlists: playlists, liked: liked);
-        return BuildAsync(seeds, catalog, unavailable, hidden, progress, ct, context: new(TasteSources.Familiar(plays, now.UtcDateTime), learning, now, songs ? liked : null, onPages));
+        // Owner #172: the artists after the favourites, and everyone the listener plays or owns (the rest is new to them).
+        var favourites = seeds.Take(SeedArtistsUsed).Select(s => BotText.Key(s.Name)).ToHashSet(StringComparer.Ordinal);
+        var others = Taste.Seeds(plays.Concat(learning.Saves), library, now.UtcDateTime, SeedArtistsUsed + OtherArtists, playlists)
+            .Where(s => !favourites.Contains(BotText.Key(s.Name))).Take(OtherArtists).ToList();
+        var known = plays.Select(p => DiscoverIdentity.Artist(p.Artist)).Concat(library.Select(s => DiscoverIdentity.Artist(s.Artist.Length > 0 ? s.Artist : s.AlbumArtist)))
+            .Where(k => k.Length > 0).ToHashSet(StringComparer.Ordinal);
+        // The best-liked recordings every page; the others take turns, a few more each refresh (the kept pages count them).
+        int page = (onPages?.Count ?? 0) / Shelf;
+        var rest = liked.Skip(LikedAlways).ToList();
+        var forPage = liked.Take(LikedAlways).Concat(Enumerable.Range(0, Math.Min(LikedPerPage - LikedAlways, rest.Count))
+            .Select(i => rest[(page * (LikedPerPage - LikedAlways) + i) % rest.Count])).ToList();
+        return BuildAsync(seeds, catalog, unavailable, hidden, progress, ct, songCount: 2 * Shelf,
+            context: new(TasteSources.Familiar(plays, now.UtcDateTime), learning, now, songs ? forPage : null, onPages, others, known));
     }
 
     public static async Task<DiscoverResult> BuildAsync(IReadOnlyList<TasteSeed> seeds, IDiscoverCatalog catalog,
         Func<IReadOnlyList<CatalogSong>, CancellationToken, Task<HashSet<string>>> unavailable, DiscoverHidden hidden,
-        IProgress<string>? progress, CancellationToken ct, int songCount = 40, DiscoverContext? context = null)
+        IProgress<string>? progress, CancellationToken ct, int songCount = 2 * Shelf, DiscoverContext? context = null)
     {
         var familiar = context?.Familiar ?? new HashSet<string>();
         var learning = context?.Learning ?? DiscoverLearning.None;
@@ -502,6 +547,13 @@ internal static class Discover
         }
         var used = seeds.Take(SeedArtistsUsed).ToList();
         foreach (var seed in used) own.Add(BotText.Key(seed.Name));
+        var favourites = new HashSet<string>(own, StringComparer.Ordinal);
+        var others = (context?.Others ?? []).Where(s => own.Add(BotText.Key(s.Name))).ToList();
+        var mineBy = used.Concat(others).GroupBy(s => BotText.Key(s.Name)).ToDictionary(g => g.Key, g => g.First(), StringComparer.Ordinal);
+        var knownArtists = new HashSet<string>(context?.Known ?? new HashSet<string>(), StringComparer.Ordinal);
+        knownArtists.UnionWith(own);
+        // 0: a favourite's, 1: one of the listener's artists they play less, 2: a related artist they already know, 3: new to them.
+        int GroupOf(string artist) => favourites.Contains(artist) ? 0 : own.Contains(artist) ? 1 : knownArtists.Contains(artist) ? 2 : 3;
         var lists = new List<(TasteSeed Seed, List<SimilarArtist> Similar)>();
         int complete = 0;
         using var concurrent = new SemaphoreSlim(ArtistLookups, ArtistLookups);
@@ -522,6 +574,7 @@ internal static class Discover
             lists.Add((row.Seed, row.Similar));
             Add(row.Seed.Name, Math.Sqrt(Math.Max(0, row.Seed.Weight)) * 0.6, row.Seed.Name);
         }
+        foreach (var seed in others) Add(seed.Name, Math.Sqrt(Math.Max(0, seed.Weight)) * 0.6, seed.Name);
         // An artist on nearly every list (the biggest names) says little about this listener: it counts for less.
         var onLists = new Dictionary<string, int>(StringComparer.Ordinal);
         foreach (var (_, similar) in lists)
@@ -536,7 +589,32 @@ internal static class Discover
                 Add(other.Name, voice * (0.4 + 0.6 * other.Score) * (1 - j / 60.0) / (1 + 0.6 * (common - 1)), seed.Name);
             }
         }
-        var ranked = score.OrderByDescending(s => s.Value).Take(CandidateArtists).ToList();
+        // Owner #172: the favourites every page; of the others and of the artists new to the listener, the ones least shown on
+        // the kept pages take their turn (best first among equals), so refreshing reaches more artists without dropping Drake.
+        var onKept = new Dictionary<string, int>(StringComparer.Ordinal);
+        foreach (var id in onPages ?? new HashSet<string>()) if (id.LastIndexOf('|') is var bar and >= 0) onKept[id[(bar + 1)..]] = onKept.GetValueOrDefault(id[(bar + 1)..]) + 1;
+        // Strong matches keep coming back with new songs (a related artist found on a fifth refresh is a real find); each
+        // appearance on a kept page lowers an artist a little, so the next ones get their turn too.
+        // Each artist taken from one favourite's circle lowers the next from that circle, so every favourite brings some.
+        List<KeyValuePair<string, double>> Turns(int group)
+        {
+            var left = score.Where(s => GroupOf(s.Key) == group).OrderBy(s => s.Key, StringComparer.Ordinal).ToList();
+            var taken = new List<KeyValuePair<string, double>>();
+            var fromSeed = new Dictionary<string, int>(StringComparer.Ordinal);
+            double Turn(KeyValuePair<string, double> s) => s.Value / (1 + TurnPenalty * onKept.GetValueOrDefault(DiscoverIdentity.Artist(display[s.Key])))
+                / (1 + 0.5 * fromSeed.GetValueOrDefault(because[s.Key].Seed));
+            while (taken.Count < TurnArtists && left.Count > 0)
+            {
+                int best = 0;
+                for (int i = 1; i < left.Count; i++) if (Turn(left[i]) > Turn(left[best])) best = i;
+                taken.Add(left[best]);
+                fromSeed[because[left[best].Key].Seed] = fromSeed.GetValueOrDefault(because[left[best].Key].Seed) + 1;
+                left.RemoveAt(best);
+            }
+            return taken;
+        }
+        var ranked = score.Where(s => GroupOf(s.Key) == 0).OrderByDescending(s => s.Value).ThenBy(s => s.Key, StringComparer.Ordinal)
+            .Concat(Turns(1)).Concat(Turns(2)).Concat(Turns(3)).ToList();
         // Seed: the listener's artist a song comes through. Like: the liked recording it is like, for songs from that source.
         var songs = new List<(CatalogSearchSong Track, double Score, string Key, string Seed, TasteRecording? Like)>();
         int heard = 0, rested = 0;
@@ -552,7 +630,7 @@ internal static class Discover
             {
                 if (own.Contains(row.Key))
                 {
-                    var artist = await catalog.FindAsync(used.First(s => BotText.Key(s.Name) == row.Key), ct);
+                    var artist = await catalog.FindAsync(mineBy[row.Key], ct);
                     return (Artist: artist, Songs: artist is null ? [] : await catalog.TopSongsAsync(artist, ct), Error: "");
                 }
                 var relatedSongs = await catalog.SongsByNameAsync(display[row.Key], ct);
@@ -643,6 +721,7 @@ internal static class Discover
 
         var result = new List<DiscoverSong>();
         var count = new Dictionary<string, int>(StringComparer.Ordinal);
+        var placedKeys = new List<string>(); // each placed song's artist, in page order
         var perSeed = new Dictionary<string, int>(StringComparer.Ordinal);
         int ownCount = 0;
         string? previous = null, previousSeed = null;
@@ -654,6 +733,16 @@ internal static class Discover
         double Share(string seed) => Math.Sqrt(Math.Max(0.05, share.GetValueOrDefault(seed)));
         bool Varied((CatalogSearchSong Track, double Score, string Key, string Seed, TasteRecording? Like) s) =>
             result.Count >= Shelf || perSeed.GetValueOrDefault(s.Seed) < PerSeed && (!own.Contains(s.Key) || ownCount < OwnArtists);
+        // Owner #172: the shelf's places go to the three groups in proportion, spread through the page (the group furthest
+        // behind its share takes the next place). A group with nothing left lends its place to the others.
+        int[] quota = [FavouriteSongs, OtherSongs, KnownSongs, NewSongs], placed = new int[quota.Length];
+        int Target()
+        {
+            int best = 0; double behind = double.MinValue;
+            for (int g = 0; g < quota.Length; g++)
+                if (quota[g] * (result.Count + 1.0) / Shelf - placed[g] is var d && d > behind + 1e-9) (best, behind) = (g, d);
+            return best;
+        }
         // Milestone C's page: best score first. With songs like liked recordings: the sources take turns, and so do the seeds.
         int Next(Func<(CatalogSearchSong Track, double Score, string Key, string Seed, TasteRecording? Like), bool> ok)
         {
@@ -674,19 +763,39 @@ internal static class Discover
         }
         while (result.Count < songCount && pool.Count > 0)
         {
-            int pick = Next(s => s.Key != previous && count.GetValueOrDefault(s.Key) < 3 && Varied(s));
+            bool shelf = result.Count < Shelf;
+            int cap = shelf ? PerArtist : 3, target = shelf ? Target() : -1;
+            bool Fits((CatalogSearchSong Track, double Score, string Key, string Seed, TasteRecording? Like) s) => s.Key != previous && count.GetValueOrDefault(s.Key) < cap
+                && onPages?.Contains(DiscoverIdentity.Key(s.Track.Song)) != true;
+            // A fresh song of the group whose turn it is, then any fresh song: variety (no one seed fills the shelf) before the
+            // shares, and a song from a kept page only when nothing fresh is left (owner #139). Then the older rules as before.
+            int pick = target < 0 ? -1 : Next(s => GroupOf(s.Key) == target && Fits(s) && Varied(s));
+            if (pick < 0) pick = Next(s => Fits(s) && Varied(s));
+            if (pick < 0) pick = Next(s => s.Key != previous && count.GetValueOrDefault(s.Key) < 3 && Varied(s));
             if (pick < 0) pick = Next(s => s.Key != previous && count.GetValueOrDefault(s.Key) < 3);
             if (pick < 0) pick = Next(s => s.Key != previous);
-            if (pick < 0) break; // only songs of the artist just placed are left
+            // Only songs of the artist just placed are left. Owner #172's shares can leave that sooner than ranking alone did:
+            // on a page not yet full, one goes earlier where neither neighbour is that artist, else the page ends here.
+            int at = result.Count;
+            if (pick < 0)
+            {
+                if (!shelf) break;
+                pick = pool.FindIndex(s => count.GetValueOrDefault(s.Key) < cap);
+                at = pick < 0 ? -1 : Enumerable.Range(0, placedKeys.Count)
+                    .Where(j => (j == 0 || placedKeys[j - 1] != pool[pick].Key) && placedKeys[j] != pool[pick].Key).DefaultIfEmpty(-1).First();
+                if (at < 0) break;
+            }
             var chosen = pool[pick]; pool.RemoveAt(pick);
+            if (shelf) placed[GroupOf(chosen.Key)]++;
             bool mine = own.Contains(chosen.Key);
             var name = chosen.Like is null ? mine ? resolved[chosen.Key].Name : because[chosen.Key].Seed
                 : mine ? Taste.MainArtist(chosen.Track.Song.Artists[0].Name) : chosen.Like.Artist;
-            result.Add(new(chosen.Track, Math.Round(chosen.Score, 4), (mine ? "More from " : "Because you play ") + name, name, mine));
+            result.Insert(at, new(chosen.Track, Math.Round(chosen.Score, 4), (mine ? "More from " : "Because you play ") + name, name, mine));
+            placedKeys.Insert(at, chosen.Key);
             count[chosen.Key] = count.GetValueOrDefault(chosen.Key) + 1;
             perSeed[chosen.Seed] = perSeed.GetValueOrDefault(chosen.Seed) + 1;
             if (mine) ownCount++;
-            (previous, previousSeed, previousLike) = (chosen.Key, chosen.Seed, chosen.Like is not null);
+            if (at == result.Count - 1) (previous, previousSeed, previousLike) = (chosen.Key, chosen.Seed, chosen.Like is not null);
         }
         var newArtists = ranked.Where(r => !own.Contains(r.Key) && resolved.ContainsKey(r.Key)).Take(12)
             .Select(r => new DiscoverArtist(resolved[r.Key], "Similar to " + because[r.Key].Seed)).ToList();

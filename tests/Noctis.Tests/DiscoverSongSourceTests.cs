@@ -244,7 +244,7 @@ public class DiscoverSongSourceTests : IDisposable
         var hidden = new DiscoverHidden(Path.Combine(_folder, "hidden.json"));
         hidden.Hide(Traps.Dismissed);
         var page = await Build(plays, persona, new Traps(new()), hidden, _folder);
-        Assert.Equal(40, page.Songs.Count);
+        Assert.Equal(2 * Discover.Shelf, page.Songs.Count);
         var keys = page.Songs.Select(s => DiscoverIdentity.Key(s.Track.Song)).ToList();
         var heard = TasteSources.Familiar(plays);
         Assert.DoesNotContain(keys, heard.Contains); // the liked recordings themselves and every heard song
@@ -292,13 +292,13 @@ public class DiscoverSongSourceTests : IDisposable
         var hidden = new DiscoverHidden(Path.Combine(_folder, "hidden.json"));
         var catalog = new Traps(new()) { Before = (_, _) => throw new HttpRequestException("Deezer radio down") };
         var page = await Build(plays, persona, catalog, hidden, _folder);
-        Assert.Equal(40, page.Songs.Count);
+        Assert.Equal(2 * Discover.Shelf, page.Songs.Count);
         Assert.False(page.Unreachable);
         Assert.Contains("Some artists could not be loaded", page.Notice);
         Assert.DoesNotContain(page.Songs, s => s.Track.Song.Title.StartsWith("Echo ", StringComparison.Ordinal));
 
         catalog.Before = (_, _) => throw new TaskCanceledException("HttpClient.Timeout elapsed"); // a provider's own timeout
-        Assert.Equal(40, (await Build(plays, persona, catalog, hidden, _folder)).Songs.Count);
+        Assert.Equal(2 * Discover.Shelf, (await Build(plays, persona, catalog, hidden, _folder)).Songs.Count);
 
         var started = new TaskCompletionSource();
         catalog.Before = async (_, ct) => { started.TrySetResult(); await Task.Delay(Timeout.Infinite, ct); };
