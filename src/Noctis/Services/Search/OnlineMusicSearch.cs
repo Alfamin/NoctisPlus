@@ -139,6 +139,12 @@ public interface IOnlineMusicSearch
     /// <summary>The download queue behind the Downloads page.</summary>
     IDownloadQueue Downloads { get; }
 
+    /// <summary>Owner #166: the source keeps a list of artists never to recommend (its For you). Without one, menus hide the action.</summary>
+    bool CanBlockArtists => false;
+    bool IsArtistBlocked(string artist) => false;
+    /// <summary>Blocks or unblocks an artist for recommendations; true when that changed anything.</summary>
+    bool SetArtistBlocked(string artist, bool blocked) => false;
+
     /// <summary>Opens the native artist page for an online artist.</summary>
     void OpenArtist(OnlineArtist artist);
 

@@ -178,8 +178,10 @@
             <Button Classes="section-toggle" Classes.expanded="{Binding IsExpanded}" Command="{Binding ToggleExpandedCommand}"
                     ToolTip.Tip="Hide or show this section">
                 <Button.ContextMenu>
-                    <ContextMenu>
+                    <ContextMenu Opening="OnHeadingMenuOpening">
                         <MenuItem Header="Reset For you (forget hidden songs and shown picks)" Command="{Binding ResetLearningCommand}" />
+                        <!-- Owner #166: the artists blocked for recommendations; one click recommends them again. -->
+                        <MenuItem Header="Recommend again" Tag="unblock" />
                     </ContextMenu>
                 </Button.ContextMenu>
                 <StackPanel Orientation="Horizontal" Spacing="8">
@@ -241,7 +243,7 @@
                                     Command="{Binding $parent[UserControl].((vm:ForYouShelfViewModel)DataContext).OpenPickCommand}"
                                     CommandParameter="{Binding}">
                                 <Button.ContextMenu>
-                                    <ContextMenu>
+                                    <ContextMenu Opening="OnCardMenuOpening">
                                         <MenuItem Header="Download now" IsVisible="{Binding Song.ShowDownload}"
                                                   Command="{Binding $parent[UserControl].((vm:ForYouShelfViewModel)DataContext).DownloadCommand}" CommandParameter="{Binding}" />
                                         <MenuItem Header="Add to downloads" IsVisible="{Binding Song.CanStartDownload}"
@@ -253,6 +255,8 @@
                                         <Separator />
                                         <MenuItem Header="Not for me"
                                                   Command="{Binding $parent[UserControl].((vm:ForYouShelfViewModel)DataContext).NotForMeCommand}" CommandParameter="{Binding}" />
+                                        <!-- Owner #166: one artist blocks at once; several get one entry each (filled when the menu opens). -->
+                                        <MenuItem Header="Don't recommend artist" Tag="block" />
                                     </ContextMenu>
                                 </Button.ContextMenu>
                                 <StackPanel Width="168" Spacing="0">

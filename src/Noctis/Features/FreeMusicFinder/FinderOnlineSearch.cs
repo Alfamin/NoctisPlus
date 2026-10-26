@@ -39,6 +39,8 @@ internal sealed class FinderOnlineSearch : IOnlineMusicSearch
 
     /// <summary>Owner #147: the "Download ahead" choice (0-4 songs).</summary>
     internal Func<int> DownloadAhead { get; init; } = () => StreamCache.DefaultAhead;
+    /// <summary>Owner #166: For you's list of artists never to recommend (null while For you is off).</summary>
+    internal Func<DiscoverHidden?> ForYouHidden { get; init; } = () => null;
     public int DownloadAheadSongs => Math.Clamp(DownloadAhead(), 0, StreamCache.MaxAhead);
     internal void AheadChanged() => DownloadsChanged?.Invoke(this, EventArgs.Empty);
 
@@ -350,6 +352,9 @@ internal sealed class FinderOnlineSearch : IOnlineMusicSearch
     }
 
     public IDownloadQueue Downloads => _queue ??= new FinderDownloadQueue(_actions.Downloads);
+    public bool CanBlockArtists => ForYouHidden() is not null;
+    public bool IsArtistBlocked(string artist) => ForYouHidden()?.HidesArtist(artist) == true;
+    public bool SetArtistBlocked(string artist, bool blocked) => ForYouHidden()?.SetArtistBlocked(artist, blocked) == true;
     private FinderDownloadQueue? _queue;
 
     public OnlineDownloadStatus StatusOf(OnlineSong song)

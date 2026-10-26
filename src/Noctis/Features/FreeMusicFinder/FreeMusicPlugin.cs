@@ -131,7 +131,7 @@ public sealed class FreeMusicPlugin : INoctisPlugin
         // must not compete with the user's first Search for metadata connections.
         // The app's own Search page reads the catalog and starts downloads through this.
         _online = new FinderOnlineSearch(() => _catalog, _discoveryActions, _artistPages, () => _telegram?.IsLoggedIn == true, ShowSignIn, () => _playlists)
-        { DownloadAhead = () => StreamCache.AheadSongs(_host?.Settings.GetString(StreamCache.AheadKey)) };
+        { DownloadAhead = () => StreamCache.AheadSongs(_host?.Settings.GetString(StreamCache.AheadKey)), ForYouHidden = () => _forYou?.Hidden };
         Current = this;
         Noctis.Services.Search.OnlineMusicSearch.Current = _online;
         _transfers.Changed += Announce;

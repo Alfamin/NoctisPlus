@@ -1764,6 +1764,7 @@ public partial class PlaybackBarView : UserControl
         FetchCurrentLyricsMenuItem.IsEnabled = CurrentLyricsStudioMenuItem.IsEnabled = completeLocal;
         RemoveCurrentLyricsMenuItem.IsEnabled = completeLocal;
         BindViewArtist(vm, track);
+        if (track is not null) RecommendMenu.BindTrack(DontRecommendMenuItem, track); else DontRecommendMenuItem.IsVisible = false;
 
         LyricsBackgroundClearMenuItem.IsVisible = track != null &&
             LyricsBackgroundOverrides.HasOverride(LyricsBackgroundOverrides.KeyForTrack(track));

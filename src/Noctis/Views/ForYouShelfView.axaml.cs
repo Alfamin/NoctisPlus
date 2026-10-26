@@ -40,6 +40,36 @@ public partial class ForYouShelfView : UserControl
         DataContextChanged += (_, _) => UpdateActivity();
         PropertyChanged += (_, e) => { if (e.Property == IsVisibleProperty) { UpdateActivity(); ViewChanged(this, EventArgs.Empty); } };
     }
+    // Owner #166: "Don't recommend artist" on a card: the artist itself when the song has one, else one entry per artist.
+    private void OnCardMenuOpening(object? sender, System.ComponentModel.CancelEventArgs e)
+    {
+        if (sender is not ContextMenu { DataContext: ForYouPick pick } menu || DataContext is not ForYouShelfViewModel vm) return;
+        if (menu.Items.OfType<MenuItem>().FirstOrDefault(i => Equals(i.Tag, "block")) is not { } item) return;
+        FillArtists(item, pick.Artists, vm.BlockArtistCommand);
+    }
+
+    // Owner #166: the For you heading lists the blocked artists; choosing one recommends them again.
+    private void OnHeadingMenuOpening(object? sender, System.ComponentModel.CancelEventArgs e)
+    {
+        if (sender is not ContextMenu menu || DataContext is not ForYouShelfViewModel vm) return;
+        if (menu.Items.OfType<MenuItem>().FirstOrDefault(i => Equals(i.Tag, "unblock")) is not { } item) return;
+        item.Items.Clear();
+        var names = vm.BlockedArtists;
+        item.IsVisible = names.Count > 0;
+        foreach (var name in names) item.Items.Add(new MenuItem { Header = name, Command = vm.UnblockArtistCommand, CommandParameter = name });
+    }
+
+    /// <summary>One name: the item itself runs <paramref name="command"/>; several: one sub-item each.</summary>
+    internal static void FillArtists(MenuItem item, IReadOnlyList<string> names, System.Windows.Input.ICommand command)
+    {
+        item.Items.Clear();
+        item.IsVisible = names.Count > 0;
+        var single = names.Count == 1;
+        item.Command = single ? command : null;
+        item.CommandParameter = single ? names[0] : null;
+        if (!single) foreach (var name in names) item.Items.Add(new MenuItem { Header = name, Command = command, CommandParameter = name });
+    }
+
     // The cover's dots circle opens the tile's own menu (the right-click one), as on Home.
     private void OnMoreClick(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
     {

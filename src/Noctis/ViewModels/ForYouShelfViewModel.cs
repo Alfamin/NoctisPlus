@@ -18,6 +18,8 @@ public sealed partial class ForYouShelfViewModel : ObservableObject, IDisposable
     private CancellationTokenSource? _load, _undo;
     private DiscoverResult? _page;
     private (ForYouPick Pick, int Index, DiscoverResult? Page, ForYouSource Source)? _dismissed;
+    /// <summary>Owner #166: the artist just blocked from a card, and the cards that went with it (for Undo).</summary>
+    private (string Artist, List<(ForYouPick Pick, int Index)> Removed, DiscoverResult? Page)? _blocked;
     private long _generation;
     private bool _active, _disposed;
     internal Func<IOnlineMusicSearch, OnlineSong, Task>? PlayRequested { get; set; }
@@ -93,12 +95,12 @@ public sealed partial class ForYouShelfViewModel : ObservableObject, IDisposable
 
     private void Attach(ForYouSource? source, FinderOnlineSearch? online, DiscoveryActions? actions)
     {
-        if (_source is not null) _source.PicksReady -= NewPicks;
+        if (_source is not null) { _source.PicksReady -= NewPicks; _source.Hidden.ArtistsChanged -= ArtistsChanged; }
         if (_online is not null) _online.DownloadsChanged -= DownloadsChanged;
         _load?.Cancel(); _generation++;
         _source = source; _online = online; _actions = actions;
         _page = null; Picks.Clear(); IsLoading = false;
-        if (_source is not null) _source.PicksReady += NewPicks;
+        if (_source is not null) { _source.PicksReady += NewPicks; _source.Hidden.ArtistsChanged += ArtistsChanged; }
         if (_online is not null) _online.DownloadsChanged += DownloadsChanged;
         OnPropertyChanged(nameof(IsAvailable));
         if (_active && IsAvailable) _ = LoadAsync(false);
@@ -368,7 +370,7 @@ public sealed partial class ForYouShelfViewModel : ObservableObject, IDisposable
         Record(pick, DiscoverAction.Dismiss);
         _undo?.Cancel(); _undo?.Dispose();
         var stop = _undo = new();
-        _dismissed = (pick, Picks.IndexOf(pick), _page, source);
+        _dismissed = (pick, Picks.IndexOf(pick), _page, source); _blocked = null;
         Picks.Remove(pick);
         if (pick.Song.Online is { } song) DismissRequested?.Invoke(song);
         UndoLabel = "Hidden · " + pick.Song.Title;
@@ -402,14 +404,59 @@ public sealed partial class ForYouShelfViewModel : ObservableObject, IDisposable
         try
         {
             await Task.Delay(_undoDuration, stop.Token);
-            if (!_disposed && ReferenceEquals(stop, _undo)) { HasUndo = false; _dismissed = null; }
+            if (!_disposed && ReferenceEquals(stop, _undo)) { HasUndo = false; _dismissed = null; _blocked = null; }
         }
         catch (OperationCanceledException) { }
+    }
+
+    /// <summary>Owner #166: the artists blocked for recommendations (the For you heading's Recommend again menu).</summary>
+    internal IReadOnlyList<string> BlockedArtists => _source?.Hidden.BlockedArtists ?? [];
+
+    /// <summary>Owner #166: never recommend this artist again (from a card; a song with several artists asks which). Their
+    /// cards leave the page at once, with Undo; the artist stays blocked until Recommend again.</summary>
+    [RelayCommand]
+    private void BlockArtist(string? artist)
+    {
+        if (_disposed || string.IsNullOrWhiteSpace(artist) || _source is not { } source) return;
+        _undo?.Cancel(); _undo?.Dispose();
+        _dismissed = null;
+        _blocked = (artist, [], _page);
+        if (!source.Hidden.SetArtistBlocked(artist, true)) { _blocked = null; return; }
+        RemoveBlockedCards();
+        var stop = _undo = new();
+        UndoLabel = "Won't recommend · " + Taste.MainArtist(artist);
+        HasUndo = true;
+        _ = ExpireUndo(stop);
+    }
+
+    [RelayCommand] private void UnblockArtist(string? artist) { if (!string.IsNullOrWhiteSpace(artist)) _source?.Hidden.SetArtistBlocked(artist, false); }
+
+    // Blocked from anywhere (a card, an artist page, Search, the player): that artist's cards leave the page shown.
+    private void ArtistsChanged(object? sender, EventArgs e) => Dispatcher.UIThread.Post(RemoveBlockedCards);
+    private void RemoveBlockedCards()
+    {
+        if (_disposed || _source is not { } source) return;
+        for (int i = Picks.Count - 1; i >= 0; i--)
+        {
+            if (!source.Hidden.HidesSong(Picks[i].Pick.Track.Song)) continue;
+            _blocked?.Removed.Insert(0, (Picks[i], i));
+            Picks.RemoveAt(i);
+        }
     }
 
     [RelayCommand]
     private void Undo()
     {
+        if (HasUndo && _blocked is { } block)
+        {
+            _undo?.Cancel();
+            _blocked = null; HasUndo = false;
+            _source?.Hidden.SetArtistBlocked(block.Artist, false);
+            if (ReferenceEquals(block.Page, _page))
+                foreach (var (pick, index) in block.Removed)
+                    if (!Picks.Contains(pick)) Picks.Insert(Math.Min(index, Picks.Count), pick);
+            return;
+        }
         if (!HasUndo || _dismissed is not { } old) return;
         _undo?.Cancel();
         old.Source.Hidden.Undo(old.Pick.Pick.Track.Song);
@@ -444,7 +491,7 @@ public sealed partial class ForYouShelfViewModel : ObservableObject, IDisposable
         _disposed = true;
         _load?.Cancel(); _undo?.Cancel();
         if (_followFeature) OnlineMusicSearch.CurrentChanged -= FeatureChanged;
-        if (_source is not null) _source.PicksReady -= NewPicks;
+        if (_source is not null) { _source.PicksReady -= NewPicks; _source.Hidden.ArtistsChanged -= ArtistsChanged; }
         if (_online is not null) _online.DownloadsChanged -= DownloadsChanged;
     }
 }
@@ -463,6 +510,8 @@ public sealed partial class ForYouPageTab : ObservableObject
 public sealed class ForYouPick
 {
     internal DiscoverSong Pick { get; }
+    /// <summary>Owner #166: the song's credited artists, for Don't recommend artist.</summary>
+    public IReadOnlyList<string> Artists => [.. Pick.Track.Song.Artists.Select(a => a.Name).Where(n => n.Length > 0).Distinct(StringComparer.OrdinalIgnoreCase)];
     /// <summary>The page this card was shown on.</summary>
     internal string Batch { get; }
     /// <summary>Where it was placed when the page was shown (Undo puts it back without changing it).</summary>

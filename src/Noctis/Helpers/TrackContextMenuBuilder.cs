@@ -70,6 +70,8 @@ public sealed class TrackContextMenuBuilder
     public MenuItem LyricsBackgroundChoose { get; private set; } = null!;
     public MenuItem LyricsBackgroundClear { get; private set; } = null!;
     public MenuItem DontScrobble { get; private set; } = null!;
+    /// <summary>Owner #166: Don't recommend artist (For you), bound per open by <see cref="RecommendMenu"/>.</summary>
+    public MenuItem DontRecommend { get; private set; } = null!;
     public MenuItem ShowFolder { get; private set; } = null!;
     public MenuItem OpenWith { get; private set; } = null!;
     public MenuItem Remove { get; private set; } = null!;
@@ -249,6 +251,8 @@ public sealed class TrackContextMenuBuilder
         // Don't Scrobble This Song (static command; header and visibility set per Bind).
         DontScrobble = new MenuItem { IsVisible = false };
         items.Add(DontScrobble);
+        DontRecommend = new MenuItem { IsVisible = false };
+        items.Add(DontRecommend);
 
         // Send to Folder (MusicBee's Send To → Folder): copies the selection to a drive/folder.
         SendToFolder = new MenuItem { Header = "Send to Folder…", IsVisible = false };
@@ -384,6 +388,8 @@ public sealed class TrackContextMenuBuilder
         Tools.Items.Add(OpenWith);
         DontScrobble = MenuV2.Row(host, string.Empty, "MenuLineScrobbleOff", visible: false);
         Tools.Items.Add(DontScrobble);
+        DontRecommend = MenuV2.Row(host, string.Empty, "MenuLineArtist", visible: false);
+        Tools.Items.Add(DontRecommend);
         items.Add(Tools);
 
         // Plugin commands are inserted after this separator on each Bind.
@@ -519,6 +525,7 @@ public sealed class TrackContextMenuBuilder
         LyricsBackgroundClear.IsVisible = LyricsBackgroundOverrides.HasOverride(LyricsBackgroundOverrides.KeyForTrack(track));
 
         ScrobbleMenu.BindTrack(DontScrobble, track);
+        RecommendMenu.BindTrack(DontRecommend, track);
 
         // Play
         Play.Header = "Play";

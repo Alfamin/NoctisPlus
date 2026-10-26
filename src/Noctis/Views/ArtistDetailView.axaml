@@ -955,6 +955,12 @@
                                                 <ctrl:LineIcon Classes="mv2-icon" Data="{StaticResource MenuLineSnooze}"/>
                                             </MenuItem.Icon>
                                         </MenuItem>
+                                        <!-- Owner #166: Don't recommend artist / Recommend again: binds itself on open (RecommendMenu.Entry) -->
+                                        <MenuItem helpers:RecommendMenu.Entry="artist">
+                                            <MenuItem.Icon>
+                                                <ctrl:LineIcon Classes="mv2-icon" Data="{StaticResource MenuLineArtist}"/>
+                                            </MenuItem.Icon>
+                                        </MenuItem>
                                         <!-- Don't Scrobble This Artist: binds itself on open (ScrobbleMenu.Entry) -->
                                         <MenuItem helpers:ScrobbleMenu.Entry="artist">
                                             <MenuItem.Icon>

@@ -3,6 +3,7 @@
              xmlns:views="using:Noctis.Views"
              xmlns:vm="using:Noctis.ViewModels"
              xmlns:controls="using:Noctis.Controls"
+             xmlns:helpers="using:Noctis.Helpers"
              x:Class="Noctis.Views.SearchView"
              x:DataType="vm:SearchViewModel"
              Focusable="True"
@@ -37,6 +38,8 @@
                             <MenuItem Header="Add to downloads"
                                       Command="{Binding $parent[UserControl].((vm:SearchViewModel)DataContext).QueueSongDownloadCommand}"
                                       CommandParameter="{Binding}" />
+                            <!-- Owner #166 -->
+                            <MenuItem helpers:RecommendMenu.Entry="song" />
                         </ContextMenu>
                     </Button.ContextMenu>
                     <Path Data="{StaticResource SearchDownloadGlyph}" Width="14" Height="14" Stretch="Uniform"

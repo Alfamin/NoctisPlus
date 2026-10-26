@@ -79,6 +79,12 @@ internal static class NativeForYouTests
             "Not for me from the lyrics page hides the song, offers Undo and moves the player on");
         vm.UndoCommand.Execute(null);
         Check.True(vm.Picks.Count == 1 && !source.Hidden.HidesSong(other.Pick.Track.Song), "its Undo works like the card's");
+        // Owner #166: Don't recommend artist from a card: their cards go at once, with Undo; nothing else is touched.
+        vm.BlockArtistCommand.Execute(other.Artists[0]);
+        Check.True(vm.Picks.Count == 0 && vm.HasUndo && vm.BlockedArtists.Count == 1 && source.Hidden.HidesArtist(other.Artists[0]),
+            "Don't recommend artist removes that artist's cards at once and offers Undo");
+        vm.UndoCommand.Execute(null);
+        Check.True(vm.Picks.Count == 1 && vm.BlockedArtists.Count == 0 && !vm.HasUndo, "Undo recommends the artist again and brings the cards back");
         vm.SetActive(false);
         vm.SetActive(true);
         Check.Equal(1, vm.Picks.Count, "leaving and returning preserves the page instead of moving cards");

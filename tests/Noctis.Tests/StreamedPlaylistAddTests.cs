@@ -16,6 +16,10 @@ public class StreamedPlaylistAddTests
     private sealed class Source : IOnlineMusicSearch
     {
         internal readonly List<string> Added = [];
+        internal readonly HashSet<string> Blocked = new(StringComparer.OrdinalIgnoreCase);
+        public bool CanBlockArtists => true;
+        public bool IsArtistBlocked(string artist) => Blocked.Contains(artist);
+        public bool SetArtistBlocked(string artist, bool blocked) => blocked ? Blocked.Add(artist) : Blocked.Remove(artist);
         internal Exception? Fail;
         public bool IsCachedFile(string? path) => path?.StartsWith(Cache, StringComparison.OrdinalIgnoreCase) == true;
         public bool IsStreamedFile(string? path) => IsCachedFile(path);
@@ -109,6 +113,40 @@ public class StreamedPlaylistAddTests
         Assert.Equal(["deezer:1"], asked);
         player.OnlinePlayingSongId = null;
         Assert.False(player.CanNotForMe);
+    }
+
+    /// <summary>Owner #166: Don't recommend artist in song and artist menus. One artist: the entry flips to Recommend again;
+    /// several: one ticked or unticked entry each, never all at once. Hidden without For you.</summary>
+    [Avalonia.Headless.XUnit.AvaloniaFact]
+    public void DontRecommendArtist_OneArtistFlips_SeveralAreChosenOneByOne_HiddenWithoutForYou()
+    {
+        var before = OnlineMusicSearch.Current;
+        var source = new Source();
+        OnlineMusicSearch.Current = source;
+        try
+        {
+            var item = new Avalonia.Controls.MenuItem();
+            Noctis.Helpers.RecommendMenu.Bind(item, ["Drake"]);
+            Assert.True(item.IsVisible);
+            Assert.Equal("Don't recommend artist", item.Header);
+            item.Command!.Execute(item.CommandParameter);
+            Assert.Contains("Drake", source.Blocked);
+            Noctis.Helpers.RecommendMenu.Bind(item, ["Drake"]);
+            Assert.Equal("Recommend again", item.Header);
+
+            Noctis.Helpers.RecommendMenu.Bind(item, ["Drake", "Future"]);
+            Assert.Null(item.Command);
+            var entries = item.Items.OfType<Avalonia.Controls.MenuItem>().ToList();
+            Assert.Equal(["Drake", "Future"], entries.Select(e => (string)e.Header!));
+            Assert.Equal([true, false], entries.Select(e => e.IsChecked));
+            entries[1].Command!.Execute(entries[1].CommandParameter);
+            Assert.Equal(2, source.Blocked.Count);
+
+            OnlineMusicSearch.Current = null;
+            Noctis.Helpers.RecommendMenu.Bind(item, ["Drake"]);
+            Assert.False(item.IsVisible);
+        }
+        finally { OnlineMusicSearch.Current = before; }
     }
 
     [Fact]

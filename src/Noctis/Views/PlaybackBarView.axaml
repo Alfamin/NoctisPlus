@@ -1426,6 +1426,12 @@
                                         <controls:LineIcon Classes="mv2-icon" Data="{StaticResource MenuLineArtist}"/>
                                     </MenuItem.Icon>
                                 </MenuItem>
+                                <!-- Owner #166: Don't recommend artist / Recommend again (filled per open by RecommendMenu). -->
+                                <MenuItem x:Name="DontRecommendMenuItem" IsVisible="False">
+                                    <MenuItem.Icon>
+                                        <controls:LineIcon Classes="mv2-icon" Data="{StaticResource MenuLineArtist}"/>
+                                    </MenuItem.Icon>
+                                </MenuItem>
                                 <Separator />
                                 <MenuItem Header="{loc:T PlaybackBar.Metadata}"
                                           Command="{Binding OpenCurrentTrackMetadataCommand}">

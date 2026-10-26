@@ -104,6 +104,32 @@ public class DiscoverLearningTests : IDisposable
         Assert.DoesNotContain(next, s => shown.Contains(DiscoverIdentity.Key(s.Track.Song)));
     }
 
+    /// <summary>Owner #166: a blocked artist is never recommended: not their songs, not songs they are featured on, not as a
+    /// related artist. Their relatives still are. The list survives a restart, and Reset For you keeps it.</summary>
+    [Fact]
+    public async Task ABlockedArtist_IsNeverRecommended_ButTheirRelativesAre_AndTheListLasts()
+    {
+        var path = Path.Combine(_folder, "blocked.json");
+        var hidden = new DiscoverHidden(path);
+        var big = A("1", "Big");
+        Assert.True(hidden.SetArtistBlocked("Big feat. Someone", true)); // the main artist is what gets blocked
+        Assert.False(hidden.SetArtistBlocked("Big", true));
+        Assert.True(hidden.HidesSong(S("x1", "Solo", big)));
+        Assert.True(hidden.HidesSong(new CatalogSong("x2", "Feature", [A("9", "Other"), big], 180, true)));
+        Assert.False(hidden.HidesSong(S("x3", "Fine", A("9", "Other"))));
+        hidden.Clear();
+        var reloaded = new DiscoverHidden(path);
+        Assert.Equal(["Big"], reloaded.BlockedArtists);
+
+        var catalog = new Catalog().Add("1", "Big", "B1").Add("2", "Small", "Big", "S1");
+        catalog.Add("10", "B1"); catalog.Add("11", "S1");
+        var page = await Discover.BuildAsync([new("Big", 40, 50), new("Small", 1, 1)], catalog, NothingOwned, reloaded, null, default);
+        Assert.DoesNotContain(page.Songs, s => s.Track.Song.Artists.Any(a => a.Name == "Big"));
+        Assert.Contains(page.Songs, s => s.Track.Song.Artists[0].Name == "B1"); // a relative of the blocked artist still comes
+        Assert.True(reloaded.SetArtistBlocked("Big", false));
+        Assert.Empty(new DiscoverHidden(path).BlockedArtists);
+    }
+
     [Fact]
     public async Task Discover_OneSeedOrOwnArtistsDoNotFillTheShelf()
     {

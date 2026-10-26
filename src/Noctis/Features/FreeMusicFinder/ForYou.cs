@@ -575,7 +575,7 @@ internal static class Discover
         void Add(string name, double value, string seed)
         {
             var key = BotText.Key(name);
-            if (key.Length == 0) return;
+            if (key.Length == 0 || hidden.HidesArtist(name)) return; // owner #166: a blocked artist is never a candidate
             display.TryAdd(key, name);
             score[key] = score.GetValueOrDefault(key) + value;
             if (!because.TryGetValue(key, out var best) || value > best.Weight) because[key] = (seed, value);
@@ -879,13 +879,19 @@ internal static class Discover
 internal sealed class DiscoverHidden
 {
     internal sealed record Identity(string Key, double? Seconds);
-    private sealed record Saved(List<string> Songs, Dictionary<string, string>? Recordings = null, int Version = 3, Dictionary<string, Identity>? Identities = null);
+    private sealed record Saved(List<string> Songs, Dictionary<string, string>? Recordings = null, int Version = 3, Dictionary<string, Identity>? Identities = null,
+        Dictionary<string, string>? BlockedArtists = null);
     public const int MaxSongs = 5000;
     private readonly string _path;
     private readonly HashSet<string> _songs = new(StringComparer.Ordinal);
     private readonly Dictionary<string, string> _recordings = new(StringComparer.Ordinal);
     private readonly Dictionary<string, Identity> _identities = new(StringComparer.Ordinal);
+    /// <summary>Owner #166: artists never to recommend (key: <see cref="DiscoverIdentity.Artist"/>, value: the name as shown).
+    /// The listener's own list: Reset learning keeps it; only Recommend again takes one off.</summary>
+    private readonly Dictionary<string, string> _artists = new(StringComparer.Ordinal);
     private readonly object _lock = new();
+    /// <summary>Raised (any thread) when an artist is blocked or unblocked.</summary>
+    public event EventHandler? ArtistsChanged;
 
     public DiscoverHidden(string path)
     {
@@ -898,6 +904,7 @@ internal sealed class DiscoverHidden
                 _songs.UnionWith((saved.Songs ?? []).Where(s => s is { Length: > 0 and <= 200 }));
                 foreach (var (k, v) in saved.Recordings ?? []) if (_songs.Contains(k) && v is { Length: > 0 and <= 2000 }) _recordings[k] = v;
                 foreach (var (k, v) in saved.Identities ?? []) if (_songs.Contains(k) && v is { Key.Length: > 0 and <= 2000 }) _identities[k] = v;
+                foreach (var (k, v) in saved.BlockedArtists ?? []) if (k is { Length: > 0 and <= 200 } && v is { Length: > 0 and <= 200 }) _artists[k] = v;
             }
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or JsonException) { }
@@ -909,6 +916,8 @@ internal sealed class DiscoverHidden
         lock (_lock)
         {
             if (_songs.Contains(song.Id) || _recordings.ContainsValue(Recording(song))) return true;
+            // A blocked artist's songs go, also those they are only featured on.
+            if (_artists.Count > 0 && song.Artists.Any(a => _artists.ContainsKey(DiscoverIdentity.Artist(a.Name)))) return true;
             var key = DiscoverIdentity.Key(song);
             return key.Length > 0 && _identities.Values.Any(i => i.Key == key && DiscoverIdentity.Same(song, new CatalogSong("", song.Title, song.Artists, i.Seconds, null)));
         }
@@ -929,14 +938,37 @@ internal sealed class DiscoverHidden
         }
     }
     public void Undo(CatalogSong song) { lock (_lock) { _songs.Remove(song.Id); _recordings.Remove(song.Id); _identities.Remove(song.Id); Save(); } }
+    /// <summary>Forgets the dismissed songs. Blocked artists stay: they are a choice, not something learned.</summary>
     public void Clear() { lock (_lock) { _songs.Clear(); _recordings.Clear(); _identities.Clear(); Save(); } }
+
+    public bool HidesArtist(string? artist)
+    {
+        var key = DiscoverIdentity.Artist(artist);
+        lock (_lock) return key.Length > 0 && _artists.ContainsKey(key);
+    }
+    /// <summary>The blocked artists, by name.</summary>
+    public IReadOnlyList<string> BlockedArtists { get { lock (_lock) return [.. _artists.Values.Order(StringComparer.CurrentCultureIgnoreCase)]; } }
+    /// <summary>Owner #166: blocks or unblocks one artist. True when that changed anything.</summary>
+    public bool SetArtistBlocked(string artist, bool blocked)
+    {
+        var key = DiscoverIdentity.Artist(artist);
+        if (key.Length == 0) return false;
+        lock (_lock)
+        {
+            if (blocked == _artists.ContainsKey(key)) return false;
+            if (blocked) _artists[key] = Taste.MainArtist(artist); else _artists.Remove(key);
+            Save();
+        }
+        ArtistsChanged?.Invoke(this, EventArgs.Empty);
+        return true;
+    }
     private void Save()
     {
         try
         {
             for (var dir = new DirectoryInfo(Path.GetDirectoryName(Path.GetFullPath(_path))!); dir is not null; dir = dir.Parent)
                 if (dir.Exists && (dir.Attributes & FileAttributes.ReparsePoint) != 0) return;
-            AtomicJson.Write(_path, new Saved([.. _songs], new(_recordings), 3, new(_identities)));
+            AtomicJson.Write(_path, new Saved([.. _songs], new(_recordings), 3, new(_identities), new(_artists)));
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException) { } // kept for this session at least
     }
