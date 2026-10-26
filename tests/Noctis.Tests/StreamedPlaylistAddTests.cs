@@ -92,6 +92,25 @@ public class StreamedPlaylistAddTests
         finally { OnlineMusicSearch.Current = before; }
     }
 
+    /// <summary>Owner #177: the lyrics page offers Not for me only while a For you song plays, and asks the shelf.</summary>
+    [Avalonia.Headless.XUnit.AvaloniaFact]
+    public void NotForMe_IsOfferedOnlyForAForYouSong_AndGoesToTheShelf()
+    {
+        using var persistence = new TestPersistenceService();
+        var player = new PlayerViewModel(new FakeAudioPlayer(), new FakeLibraryService(), persistence, new FakeAnimatedCoverService());
+        var asked = new List<string>();
+        player.IsForYouSong = id => id == "deezer:1";
+        player.DismissForYouSong = asked.Add;
+        player.OnlinePlayingSongId = "deezer:2";
+        Assert.False(player.CanNotForMe);
+        player.OnlinePlayingSongId = "deezer:1";
+        Assert.True(player.CanNotForMe);
+        player.NotForMeCommand.Execute(null);
+        Assert.Equal(["deezer:1"], asked);
+        player.OnlinePlayingSongId = null;
+        Assert.False(player.CanNotForMe);
+    }
+
     [Fact]
     public async Task ASongThatCannotBeCopied_KeepsItsOwnEntry_AndNothingThrows()
     {

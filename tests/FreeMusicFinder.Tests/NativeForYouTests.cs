@@ -69,6 +69,16 @@ internal static class NativeForYouTests
         vm.NotForMeCommand.Execute(first);
         Check.Until(() => !vm.HasUndo, "Undo expires after its short window");
         Check.True(source.Hidden.HidesSong(first.Pick.Track.Song), "expiry leaves only that song dismissed");
+        // Owner #177: the lyrics page's Not for me for a playing For you song is the card's own.
+        var other = vm.Picks[0];
+        var skipped = new List<string>();
+        vm.DismissRequested = s => skipped.Add(s.Id);
+        Check.True(vm.HasSong(other.Pick.Track.Song.Id) && !vm.HasSong("deezer:999"), "the lyrics page knows which playing song is a For you pick");
+        vm.DismissSong(other.Pick.Track.Song.Id);
+        Check.True(source.Hidden.HidesSong(other.Pick.Track.Song) && vm.HasUndo && skipped.SequenceEqual([other.Pick.Track.Song.Id]),
+            "Not for me from the lyrics page hides the song, offers Undo and moves the player on");
+        vm.UndoCommand.Execute(null);
+        Check.True(vm.Picks.Count == 1 && !source.Hidden.HidesSong(other.Pick.Track.Song), "its Undo works like the card's");
         vm.SetActive(false);
         vm.SetActive(true);
         Check.Equal(1, vm.Picks.Count, "leaving and returning preserves the page instead of moving cards");

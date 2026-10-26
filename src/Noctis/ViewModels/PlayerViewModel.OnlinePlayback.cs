@@ -17,6 +17,24 @@ public partial class PlayerViewModel
     [ObservableProperty] private double _onlinePreparingProgress;
     [ObservableProperty] private bool _canSeekCurrent = true;
     [ObservableProperty] private string? _onlinePlayingSongId;
+
+    /// <summary>Owner #177: the playing song is on one of For you's pages, so the lyrics page offers Not for me beside Add.
+    /// The For you shelf answers both (set by Search); without it the button never shows.</summary>
+    [ObservableProperty] private bool _canNotForMe;
+    internal Func<string, bool>? IsForYouSong { get; set; }
+    internal Action<string>? DismissForYouSong { get; set; }
+    internal void RefreshNotForMe()
+    {
+        try { CanNotForMe = OnlinePlayingSongId is { } id && IsForYouSong?.Invoke(id) == true; }
+        catch (Exception) { CanNotForMe = false; } // a feature fault must never break track changes
+    }
+    partial void OnOnlinePlayingSongIdChanged(string? value) => RefreshNotForMe();
+    [CommunityToolkit.Mvvm.Input.RelayCommand]
+    private void NotForMe()
+    {
+        if (CanNotForMe && OnlinePlayingSongId is { } id) DismissForYouSong?.Invoke(id);
+        RefreshNotForMe();
+    }
     private bool _inputWaiting;
     private long _lastOnlineAdvance;
     private TimeSpan _lastOnlinePosition;

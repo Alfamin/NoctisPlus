@@ -376,6 +376,27 @@ public sealed partial class ForYouShelfViewModel : ObservableObject, IDisposable
         _ = ExpireUndo(stop);
     }
 
+    /// <summary>Owner #177: whether a song (by catalog id) is on one of For you's pages, for the lyrics page's Not for me.</summary>
+    internal bool HasSong(string songId) => Picks.Any(p => p.Pick.Track.Song.Id == songId)
+        || _pages.Any(page => page.Songs.Take(Discover.Shelf).Any(s => s.Track.Song.Id == songId));
+
+    /// <summary>Owner #177: Not for me from the lyrics page, the same as on its card: on the page shown it is the card's own
+    /// (with Undo); on a kept page it is hidden and learned the same way. The playing song then goes on to the next.</summary>
+    internal void DismissSong(string songId)
+    {
+        if (Picks.FirstOrDefault(p => p.Pick.Track.Song.Id == songId) is { } pick) { NotForMe(pick); return; }
+        if (_source is not { } source || _online is not { } online) return;
+        foreach (var page in _pages)
+            if (page.Songs.Take(Discover.Shelf).FirstOrDefault(s => s.Track.Song.Id == songId) is { } card)
+            {
+                var song = card.Track.Song;
+                if (!source.Hidden.Hide(song)) return;
+                source.Feedback.Record(page.Batch, DiscoverIdentity.Key(song), DiscoverIdentity.Artist(song.Artists.FirstOrDefault()?.Name), song.Title, DiscoverAction.Dismiss);
+                DismissRequested?.Invoke(online.Remember(card.Track));
+                return;
+            }
+    }
+
     private async Task ExpireUndo(CancellationTokenSource stop)
     {
         try

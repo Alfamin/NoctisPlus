@@ -892,6 +892,12 @@
                               Foreground="{DynamicResource AccentColorBrush}" VerticalAlignment="Center"
                               IsVisible="{Binding Player.JustAddedToSongs}"
                               ToolTip.Tip="{Binding Player.AddToSongsMessage}" />
+                    <!-- Owner #177: a For you song can be dismissed here too, as on its card; it goes on to the next song. -->
+                    <Button x:Name="LyricsNotForMeButton" Classes="pill-btn"
+                            Content="Not for me"
+                            IsVisible="{Binding Player.CanNotForMe}"
+                            AutomationProperties.Name="Not for me"
+                            Command="{Binding Player.NotForMeCommand}" />
                     <Button x:Name="WordTimingButton" Classes="pill-btn"
                             Command="{Binding OpenWordTimingCommand}"
                             AutomationProperties.Name="{Binding WordTimingStatusText}">
