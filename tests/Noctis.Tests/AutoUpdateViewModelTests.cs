@@ -51,6 +51,7 @@ public class AutoUpdateViewModelTests : IDisposable
         await new PersistenceService(_root).SaveSettingsAsync(
             new AppSettings { AutoInstallUpdates = autoOn, IncludePrereleaseUpdates = prerelease });
         var vm = new SettingsViewModel(new PersistenceService(_root), new FakeLibraryService(), new NoOpPlayHistoryService());
+        vm.UpdatePromptIsGaming = () => false;
         await vm.LoadAsync();
         vm.SetUpdateService(new UpdateService(new HttpClient(api)));
         return vm;
@@ -103,6 +104,23 @@ public class AutoUpdateViewModelTests : IDisposable
         Assert.Equal(1, installs);
         Assert.False(await vm.OfferUpdateAsync()); // nothing left to offer once it is downloaded
         Assert.Equal(2, asked.Count);
+    }
+
+    [AvaloniaFact]
+    public async Task StartUpPrompt_WaitsForFullscreenWork_ThenOffersTheSameUpdate()
+    {
+        var vm = await CreateAsync(new FakeGitHub("v99.0.0"), autoOn: false);
+        int prompts = 0;
+        vm.ShowUpdatePrompt = _ => { prompts++; return Task.FromResult(new Noctis.Views.ConfirmationResult(false, false)); };
+        await vm.CheckForUpdateSilentAsync();
+        Dispatcher.UIThread.RunJobs();
+        vm.UpdatePromptIsGaming = () => true;
+        Assert.False(await vm.OfferUpdateAsync());
+        Assert.Equal(0, prompts);
+        Assert.True(vm.IsUpdateAvailable);
+        vm.UpdatePromptIsGaming = () => false;
+        Assert.False(await vm.OfferUpdateAsync());
+        Assert.Equal(1, prompts);
     }
 
     [AvaloniaFact]

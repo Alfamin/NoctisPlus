@@ -7409,10 +7409,12 @@ public partial class SettingsViewModel : ViewModelBase
     /// <summary>Starts the downloaded installer once the prompt's Update finished downloading. Swappable for tests.</summary>
     internal Action RunInstaller { get; set; }
     private bool _installWhenReady;
+    // Headless checks explicitly choose their fullscreen scenario instead of depending on the host desktop.
+    internal Func<bool> UpdatePromptIsGaming { get; set; } = Features.WordLyrics.GamingBudget.IsActive;
 
     /// <summary>Owner #174: a found update the listener has not acted on yet, and nothing full-screen to interrupt.</summary>
     internal bool ShouldOfferUpdate => IsUpdateAvailable && !IsDownloadingUpdate && !IsReadyToInstall && !IsAutoInstallPending
-        && !string.IsNullOrEmpty(LatestVersionTag) && !Features.WordLyrics.GamingBudget.IsActive();
+        && !string.IsNullOrEmpty(LatestVersionTag) && !UpdatePromptIsGaming();
 
     /// <summary>
     /// Owner #174: after the start-up check finds a newer version, ask once: Update or Later. Update downloads it the
