@@ -65,6 +65,33 @@ public class StreamedPlaylistAddTests
         Assert.Equal("Levitating", copy.Title);
     }
 
+    /// <summary>Owner #178: Add on one played song, then the next streamed song within the check's 2.5 s: the check stayed
+    /// on the new song, which was never added.</summary>
+    [Avalonia.Headless.XUnit.AvaloniaFact]
+    public async Task TheAddedCheck_StaysWithItsSong_WhenTheNextStreamedSongStarts()
+    {
+        using var persistence = new TestPersistenceService();
+        var player = new PlayerViewModel(new FakeAudioPlayer(), new FakeLibraryService(), persistence, new FakeAnimatedCoverService());
+        var before = OnlineMusicSearch.Current;
+        OnlineMusicSearch.Current = new Source();
+        try
+        {
+            var first = Streamed("A.flac"); var second = Streamed("B.flac");
+            player.ReplaceQueueAndPlay([first, second], 0); Avalonia.Threading.Dispatcher.UIThread.RunJobs();
+            Assert.True(player.IsStreamedTrack);
+            var add = player.AddToSongsCommand.ExecuteAsync(null);
+            await Task.Delay(50); Avalonia.Threading.Dispatcher.UIThread.RunJobs();
+            Assert.True(player.JustAddedToSongs);
+            player.NextCommand.Execute(null); Avalonia.Threading.Dispatcher.UIThread.RunJobs();
+            Assert.Same(second, player.CurrentTrack);
+            Assert.True(player.IsStreamedTrack); // its own Add is offered
+            Assert.False(player.JustAddedToSongs);
+            await add;
+            Assert.False(player.JustAddedToSongs);
+        }
+        finally { OnlineMusicSearch.Current = before; }
+    }
+
     [Fact]
     public async Task ASongThatCannotBeCopied_KeepsItsOwnEntry_AndNothingThrows()
     {

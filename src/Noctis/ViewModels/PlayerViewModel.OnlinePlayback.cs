@@ -96,6 +96,9 @@ public partial class PlayerViewModel
     private string? _favoriteWhenImported;
     /// <summary>Shown briefly after Add, in place of the button.</summary>
     [ObservableProperty] private bool _justAddedToSongs;
+    /// <summary>Owner #178: the song the check mark belongs to. Skipping on within its 2.5 s to another streamed song
+    /// carried the check over, and it stayed there.</summary>
+    private Models.Track? _justAddedFor;
     [ObservableProperty, NotifyPropertyChangedFor(nameof(AddToSongsTip))] private string _addToSongsMessage = "";
     /// <summary>The button's tooltip: why the last Add failed, else what it does.</summary>
     public string AddToSongsTip => IsStreamedTrack && AddToSongsMessage.Length > 0 && !JustAddedToSongs ? AddToSongsMessage : "Add to songs";
@@ -111,7 +114,7 @@ public partial class PlayerViewModel
         }
         try { IsStreamedTrack = CurrentTrack is { IsExternal: true, FilePath: { } path } && OnlineMusicSearch.Current?.IsStreamedFile(path) == true; }
         catch (Exception) { IsStreamedTrack = false; } // a feature fault must never break track changes
-        if (!IsStreamedTrack) JustAddedToSongs = false;
+        if (!IsStreamedTrack || !ReferenceEquals(CurrentTrack, _justAddedFor)) { JustAddedToSongs = false; _justAddedFor = null; }
         AddToSongsMessage = "";
     }
 
@@ -125,9 +128,10 @@ public partial class PlayerViewModel
             AddToSongsMessage = (await source.AddStreamedAsync(path, CancellationToken.None)).Message;
             if (!ReferenceEquals(CurrentTrack, track)) return;
             IsStreamedTrack = false;
+            _justAddedFor = track;
             JustAddedToSongs = true;
             await Task.Delay(2500);
-            if (ReferenceEquals(CurrentTrack, track)) JustAddedToSongs = false;
+            if (ReferenceEquals(_justAddedFor, track)) { JustAddedToSongs = false; _justAddedFor = null; }
         }
         catch (Exception ex)
         {
