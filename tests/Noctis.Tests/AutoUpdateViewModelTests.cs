@@ -36,6 +36,7 @@ public class AutoUpdateViewModelTests : IDisposable
     public void Dispose()
     {
         UpdateService.AutoModeOverride = null;
+        UpdateService.SupportsInAppUpdateOverride = null;
         foreach (var f in UpdaterTempFiles().Except(_tempBefore)) { try { File.Delete(f); } catch { } }
         try { Directory.Delete(_root, true); } catch { }
     }
@@ -72,6 +73,57 @@ public class AutoUpdateViewModelTests : IDisposable
     {
         await vm.CheckForUpdateSilentAsync();
         await PumpUntil(() => vm.IsReadyToInstall && vm.IsAutoInstallPending);
+    }
+
+    /// <summary>Owner #174: after the start-up check finds a newer version, the app asks: Update or Later. Later downloads
+    /// nothing and leaves the Update pill; Update downloads (verified) and then starts the installer once.</summary>
+    [AvaloniaFact]
+    public async Task StartUpPrompt_Later_KeepsThePill_Update_DownloadsAndInstalls()
+    {
+        UpdateService.SupportsInAppUpdateOverride = true;
+        var api = new FakeGitHub("v99.0.0");
+        var vm = await CreateAsync(api, autoOn: false);
+        var asked = new List<Noctis.Views.ConfirmationRequest>();
+        bool yes = false; int installs = 0;
+        vm.ShowUpdatePrompt = r => { asked.Add(r); return Task.FromResult(new Noctis.Views.ConfirmationResult(yes, false)); };
+        vm.RunInstaller = () => installs++;
+
+        await vm.CheckForUpdateSilentAsync();
+        Dispatcher.UIThread.RunJobs();
+        Assert.False(await vm.OfferUpdateAsync());
+        Assert.Single(asked);
+        Assert.Contains("v99.0.0", asked[0].Title);
+        Assert.Equal(("Update", "Later"), (asked[0].ConfirmText, asked[0].CancelText));
+        Assert.True(vm.IsUpdateAvailable);
+        Assert.Equal(0, api.InstallerRequests);
+
+        yes = true;
+        Assert.True(await vm.OfferUpdateAsync());
+        await PumpUntil(() => vm.IsReadyToInstall);
+        Assert.Equal(1, installs);
+        Assert.False(await vm.OfferUpdateAsync()); // nothing left to offer once it is downloaded
+        Assert.Equal(2, asked.Count);
+    }
+
+    [AvaloniaFact]
+    public async Task StartUpPrompt_NotShown_WhenUpToDate_OrForACopyThatCannotUpdateItself_OffersTheReleasePage()
+    {
+        UpdateService.SupportsInAppUpdateOverride = false;
+        var api = new FakeGitHub("v0.0.1");
+        var vm = await CreateAsync(api, autoOn: false);
+        var asked = new List<Noctis.Views.ConfirmationRequest>();
+        vm.ShowUpdatePrompt = r => { asked.Add(r); return Task.FromResult(new Noctis.Views.ConfirmationResult(false, false)); };
+        await vm.CheckForUpdateSilentAsync();
+        Dispatcher.UIThread.RunJobs();
+        Assert.False(await vm.OfferUpdateAsync());
+        Assert.Empty(asked);
+
+        var newer = await CreateAsync(new FakeGitHub("v99.0.0"), autoOn: false);
+        newer.ShowUpdatePrompt = vm.ShowUpdatePrompt;
+        await newer.CheckForUpdateSilentAsync();
+        Dispatcher.UIThread.RunJobs();
+        Assert.False(await newer.OfferUpdateAsync());
+        Assert.Equal("Download", Assert.Single(asked).ConfirmText);
     }
 
     [AvaloniaFact]

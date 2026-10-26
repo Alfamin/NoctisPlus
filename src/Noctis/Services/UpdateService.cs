@@ -94,7 +94,10 @@ public sealed class UpdateService
     /// build over itself). False for Scoop / Windows-portable / non-writable copies,
     /// where the in-app installer would create a second, parallel install or fail.
     /// </summary>
-    public static bool SupportsInAppUpdate => Source == InstallSource.Installed;
+    public static bool SupportsInAppUpdate => SupportsInAppUpdateOverride ?? Source == InstallSource.Installed;
+
+    /// <summary>Tests only: tests run from a build folder, which classifies as a portable copy.</summary>
+    internal static bool? SupportsInAppUpdateOverride { get; set; }
 
     /// <summary>
     /// Short guidance for updating a package-manager / portable copy, or null

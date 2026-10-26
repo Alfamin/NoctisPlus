@@ -1015,6 +1015,11 @@ public partial class MainWindowViewModel : ViewModelBase
             {
                 await Task.Delay(TimeSpan.FromSeconds(5));
                 await Settings.CheckForUpdateSilentAsync();
+                // Owner #174: a newer version asks once per start (Update / Later); Update shows its progress in About.
+                await Dispatcher.UIThread.InvokeAsync(async () =>
+                {
+                    if (await Settings.OfferUpdateAsync()) OpenWhatsNewSetting("about");
+                });
             }
             catch (Exception ex)
             {

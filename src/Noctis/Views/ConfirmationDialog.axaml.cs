@@ -13,7 +13,8 @@ public sealed record ConfirmationRequest(
     string? ConfirmText = null,
     string? OptionText = null,
     bool OptionChecked = false,
-    double Width = 380);
+    double Width = 380,
+    string? CancelText = null);
 
 /// <summary>What the user chose; <see cref="OptionChecked"/> is the checkbox state.</summary>
 public readonly record struct ConfirmationResult(bool Confirmed, bool OptionChecked);
@@ -40,6 +41,7 @@ public partial class ConfirmationDialog : Window
         if (request.Details is { Count: > 0 } details) { DetailsList.ItemsSource = details; DetailsList.IsVisible = true; }
         if (!string.IsNullOrWhiteSpace(request.Note)) { NoteText.Text = request.Note; NoteText.IsVisible = true; }
         if (!string.IsNullOrWhiteSpace(request.ConfirmText)) ConfirmButton.Content = request.ConfirmText;
+        if (!string.IsNullOrWhiteSpace(request.CancelText)) CancelButton.Content = request.CancelText;
         if (!string.IsNullOrWhiteSpace(request.OptionText))
         {
             OptionCheck.Content = request.OptionText;

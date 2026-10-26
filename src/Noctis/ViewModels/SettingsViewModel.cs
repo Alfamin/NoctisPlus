@@ -2489,6 +2489,7 @@ public partial class SettingsViewModel : ViewModelBase
         _playHistory = playHistory;
         _mediaServer = mediaServer;
         _settings = new AppSettings();
+        RunInstaller = InstallUpdate;
 
         // Rebindable keys live in the shared service (MainWindow matches against it); the
         // view-model only owns persistence. Saved through the same debounce as every toggle.
@@ -7403,6 +7404,39 @@ public partial class SettingsViewModel : ViewModelBase
         }
     }
 
+    /// <summary>Owner #174: the start-up prompt for a found update. Swappable for tests.</summary>
+    internal Func<Views.ConfirmationRequest, Task<Views.ConfirmationResult>> ShowUpdatePrompt { get; set; } = Views.ConfirmationDialog.ShowAsync;
+    /// <summary>Starts the downloaded installer once the prompt's Update finished downloading. Swappable for tests.</summary>
+    internal Action RunInstaller { get; set; }
+    private bool _installWhenReady;
+
+    /// <summary>Owner #174: a found update the listener has not acted on yet, and nothing full-screen to interrupt.</summary>
+    internal bool ShouldOfferUpdate => IsUpdateAvailable && !IsDownloadingUpdate && !IsReadyToInstall && !IsAutoInstallPending
+        && !string.IsNullOrEmpty(LatestVersionTag) && !Features.WordLyrics.GamingBudget.IsActive();
+
+    /// <summary>
+    /// Owner #174: after the start-up check finds a newer version, ask once: Update or Later. Update downloads it the
+    /// usual verified way and restarts into it when done (an install that cannot update itself opens the release page).
+    /// Later leaves the About page's Update pill; the next start asks again. True when a download started.
+    /// </summary>
+    internal async Task<bool> OfferUpdateAsync()
+    {
+        if (!ShouldOfferUpdate) return false;
+        var inApp = UpdateService.SupportsInAppUpdate;
+        var answer = await ShowUpdatePrompt(new Views.ConfirmationRequest(
+            inApp ? "Download it now? Noctis restarts to finish." : "Get it from the release page.",
+            Title: $"Noctis Plus {LatestVersionTag} is available",
+            ConfirmText: inApp ? "Update" : "Download",
+            CancelText: "Later"));
+        if (!answer.Confirmed || !ShouldOfferUpdateIgnoringGaming) return false;
+        if (!inApp) { OpenLatestRelease(); return false; }
+        _installWhenReady = true;
+        _ = DownloadUpdateCoreAsync(null, automatic: false);
+        return true;
+    }
+    // The prompt was already on screen when a game started: the answer still counts.
+    private bool ShouldOfferUpdateIgnoringGaming => IsUpdateAvailable && !IsDownloadingUpdate && !IsReadyToInstall;
+
     /// <summary>Shortest time the pill shows "Checking…" so a fast answer never flashes.</summary>
     private const int MinCheckingVisibleMs = 500;
 
@@ -7495,6 +7529,8 @@ public partial class SettingsViewModel : ViewModelBase
     private async Task DownloadUpdateCoreAsync(UpdateInfo? known, bool automatic)
     {
         if (_updateService is null || IsDownloadingUpdate) return;
+        var installAfter = _installWhenReady && !automatic;
+        _installWhenReady = false;
 
         IsUpdateAvailable = false;
         IsDownloadingUpdate = true;
@@ -7576,6 +7612,7 @@ public partial class SettingsViewModel : ViewModelBase
                 }
             }
             IsReadyToInstall = true;
+            if (installAfter) RunInstaller(); // owner #174: the prompt's Update already said yes
         }
         catch (InvalidOperationException ex) when (ex.Message.Contains("corrupted"))
         {
