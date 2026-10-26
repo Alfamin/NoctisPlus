@@ -25,7 +25,7 @@ public partial class PlayerViewModel
     internal Action<string>? DismissForYouSong { get; set; }
     internal void RefreshNotForMe()
     {
-        try { CanNotForMe = OnlinePlayingSongId is { } id && IsForYouSong?.Invoke(id) == true; }
+        try { CanNotForMe = IsStreamedTrack && OnlinePlayingSongId is { } id && IsForYouSong?.Invoke(id) == true; }
         catch (Exception) { CanNotForMe = false; } // a feature fault must never break track changes
     }
     partial void OnOnlinePlayingSongIdChanged(string? value) => RefreshNotForMe();
@@ -110,6 +110,7 @@ public partial class PlayerViewModel
 
     /// <summary>Owner #87: the playing song was only streamed (stream cache, not in Songs): the bar offers Add to songs.</summary>
     [ObservableProperty, NotifyPropertyChangedFor(nameof(AddToSongsTip))] private bool _isStreamedTrack;
+    partial void OnIsStreamedTrackChanged(bool value) => RefreshNotForMe();
     /// <summary>File name of a hearted played-only song: its library copy is marked favorite once imported.</summary>
     private string? _favoriteWhenImported;
     /// <summary>Shown briefly after Add, in place of the button.</summary>
@@ -143,8 +144,10 @@ public partial class PlayerViewModel
         var track = CurrentTrack;
         try
         {
-            AddToSongsMessage = (await source.AddStreamedAsync(path, CancellationToken.None)).Message;
+            var result = await source.AddStreamedAsync(path, CancellationToken.None);
             if (!ReferenceEquals(CurrentTrack, track)) return;
+            AddToSongsMessage = result.Message;
+            if (string.IsNullOrWhiteSpace(result.LibraryPath)) return;
             IsStreamedTrack = false;
             _justAddedFor = track;
             JustAddedToSongs = true;
@@ -153,6 +156,7 @@ public partial class PlayerViewModel
         }
         catch (Exception ex)
         {
+            if (!ReferenceEquals(CurrentTrack, track)) return;
             // The song stays streamed, so Add can be pressed again (disk full, folder unavailable).
             UpdateStreamedTrack();
             AddToSongsMessage = ex.Message;

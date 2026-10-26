@@ -21,10 +21,12 @@ public class StreamedPlaylistAddTests
         public bool IsArtistBlocked(string artist) => Blocked.Contains(artist);
         public bool SetArtistBlocked(string artist, bool blocked) => blocked ? Blocked.Add(artist) : Blocked.Remove(artist);
         internal Exception? Fail;
+        internal Func<string, Task<StreamedAdd>>? Add;
         public bool IsCachedFile(string? path) => path?.StartsWith(Cache, StringComparison.OrdinalIgnoreCase) == true;
         public bool IsStreamedFile(string? path) => IsCachedFile(path);
         public Task<StreamedAdd> AddStreamedAsync(string path, CancellationToken ct)
         {
+            if (Add is not null) return Add(path);
             if (Fail is not null) return Task.FromException<StreamedAdd>(Fail);
             Added.Add(path);
             return Task.FromResult(new StreamedAdd("Added to your songs.", Library + Path.GetFileName(path)));
@@ -105,6 +107,7 @@ public class StreamedPlaylistAddTests
         var asked = new List<string>();
         player.IsForYouSong = id => id == "deezer:1";
         player.DismissForYouSong = asked.Add;
+        player.IsStreamedTrack = true;
         player.OnlinePlayingSongId = "deezer:2";
         Assert.False(player.CanNotForMe);
         player.OnlinePlayingSongId = "deezer:1";
@@ -113,6 +116,81 @@ public class StreamedPlaylistAddTests
         Assert.Equal(["deezer:1"], asked);
         player.OnlinePlayingSongId = null;
         Assert.False(player.CanNotForMe);
+    }
+
+    [Avalonia.Headless.XUnit.AvaloniaFact]
+    public async Task AddingTheForYouSong_HidesNotForMeImmediately_AndItReturnsForTheNextUnsavedSong()
+    {
+        using var persistence = new TestPersistenceService();
+        var player = new PlayerViewModel(new FakeAudioPlayer(), new FakeLibraryService(), persistence, new FakeAnimatedCoverService());
+        var before = OnlineMusicSearch.Current;
+        var saved = new TaskCompletionSource<StreamedAdd>();
+        OnlineMusicSearch.Current = new Source { Add = _ => saved.Task };
+        try
+        {
+            var first = Streamed("A.flac"); var second = Streamed("B.flac");
+            player.IsForYouSong = _ => true;
+            player.ReplaceQueueAndPlay([first, second], 0);
+            player.OnlinePlayingSongId = "deezer:1";
+            Assert.True(player.CanNotForMe);
+            var add = player.AddToSongsCommand.ExecuteAsync(null);
+            Assert.True(player.CanNotForMe); // A pending save is not yet a kept song.
+            saved.SetResult(new("Saved to library", Library + "A.flac"));
+            await Task.Delay(25); Avalonia.Threading.Dispatcher.UIThread.RunJobs();
+            Assert.True(player.JustAddedToSongs);
+            Assert.False(player.CanNotForMe); // No need to wait for the Added check's timer or another page change.
+            player.RefreshNotForMe(); Assert.False(player.CanNotForMe);
+            player.NextCommand.Execute(null); player.OnlinePlayingSongId = "deezer:2";
+            Assert.True(player.CanNotForMe);
+            await add;
+            Assert.True(player.CanNotForMe);
+        }
+        finally { OnlineMusicSearch.Current = before; }
+    }
+
+    [Avalonia.Headless.XUnit.AvaloniaTheory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public async Task FailedOrDeclinedAdd_KeepsNotForMeAndDoesNotShowAdded(bool throws)
+    {
+        using var persistence = new TestPersistenceService();
+        var player = new PlayerViewModel(new FakeAudioPlayer(), new FakeLibraryService(), persistence, new FakeAnimatedCoverService());
+        var before = OnlineMusicSearch.Current;
+        OnlineMusicSearch.Current = new Source { Add = _ => throws ? Task.FromException<StreamedAdd>(new IOException("Disk full")) : Task.FromResult(new StreamedAdd("Not saved", null)) };
+        try
+        {
+            player.IsForYouSong = _ => true;
+            player.ReplaceQueueAndPlay([Streamed("A.flac")], 0); player.OnlinePlayingSongId = "deezer:1";
+            await player.AddToSongsCommand.ExecuteAsync(null);
+            Assert.True(player.IsStreamedTrack && player.CanNotForMe);
+            Assert.False(player.JustAddedToSongs);
+        }
+        finally { OnlineMusicSearch.Current = before; }
+    }
+
+    [Avalonia.Headless.XUnit.AvaloniaTheory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public async Task LateAddForAnOldSong_CannotChangeTheNextSongsActionsOrTooltip(bool succeeds)
+    {
+        using var persistence = new TestPersistenceService();
+        var player = new PlayerViewModel(new FakeAudioPlayer(), new FakeLibraryService(), persistence, new FakeAnimatedCoverService());
+        var before = OnlineMusicSearch.Current;
+        var saved = new TaskCompletionSource<StreamedAdd>();
+        OnlineMusicSearch.Current = new Source { Add = _ => saved.Task };
+        try
+        {
+            player.IsForYouSong = _ => true;
+            player.ReplaceQueueAndPlay([Streamed("A.flac"), Streamed("B.flac")], 0); player.OnlinePlayingSongId = "deezer:1";
+            var add = player.AddToSongsCommand.ExecuteAsync(null);
+            player.NextCommand.Execute(null); player.OnlinePlayingSongId = "deezer:2";
+            if (succeeds) saved.SetResult(new("Saved to library", Library + "A.flac")); else saved.SetException(new IOException("Disk full"));
+            await add;
+            Assert.True(player.CanNotForMe && player.IsStreamedTrack);
+            Assert.False(player.JustAddedToSongs);
+            Assert.Empty(player.AddToSongsMessage);
+        }
+        finally { OnlineMusicSearch.Current = before; }
     }
 
     /// <summary>Owner #166: Don't recommend artist in song and artist menus. One artist: the entry flips to Recommend again;
