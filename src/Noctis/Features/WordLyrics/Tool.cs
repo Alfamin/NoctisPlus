@@ -202,6 +202,8 @@ internal sealed class Tool
     // The standalone runner repairs packages and missing/corrupt models automatically.
     // Background native jobs must instead stop at setup and preserve their checkpoint.
     // Both guards are process-local; explicit, confirmed Setup keeps the normal installer.
+    // Owner #183: one voice-model piece per call (WordLyrics 1.6.5 does this itself). The 1.6.4 default of four held
+    // about 7 GB more memory on DirectML for the same speed; on an 8 GB card a run crawled at 7-10 GB of RAM.
     internal const string BackgroundEntry = """
         import os,sys
         import wordlyrics.runner as runner
@@ -216,8 +218,16 @@ internal sealed class Tool
                 return False
             return True
         runner.ensure=offline_check
+        try:
+            from wordlyrics import separate
+            separate.BATCH=1
+            separate.spec_batches.__defaults__=(1,)
+            separate.count_batches.__defaults__=(1,)
+        except Exception:
+            pass
         sys.exit(runner.main())
         """;
+
 
     internal string SetupText()
     {

@@ -356,6 +356,20 @@ public class WordLyricsBackendTests
         await child.WaitForExitAsync().WaitAsync(TimeSpan.FromSeconds(8));
         Assert.Equal(70, child.ExitCode); Assert.Contains("SETUP_CONSENT_REQUIRED", File.ReadAllText(log));
     }
+
+    [Fact] // Owner #183: an installed 1.6.4 gets one voice-model piece per call (four held ~7 GB more on an 8 GB card).
+    public async Task BackgroundRuns_GiveTheVoiceModelOnePiecePerCall()
+    {
+        using var rig = new Rig();
+        var module = Path.Combine(rig.App, "wordlyrics");
+        File.WriteAllText(Path.Combine(module, "separate.py"), "BATCH = 4\ndef count_batches(n, batch=BATCH):return batch\ndef spec_batches(mix, batch=BATCH):return batch\n");
+        File.WriteAllText(Path.Combine(module, "runner.py"), "from . import separate as S\ndef probe(python):return []\ndef main():\n    print('pieces', S.BATCH, S.count_batches(0), S.spec_batches(0), flush=True);return 0\n");
+        var list = Path.Combine(rig.Work, "songs.txt"); File.WriteAllLines(list, [rig.Song]);
+        var log = Path.Combine(rig.Work, "run.log");
+        using var child = new Tool(rig.App).StartQuietRun(rig.Music, list, rig.Result, log, "light", "", true);
+        await child.WaitForExitAsync().WaitAsync(TimeSpan.FromSeconds(8));
+        Assert.Equal(0, child.ExitCode); Assert.Contains("pieces 1 1 1", File.ReadAllText(log));
+    }
     // ── Owner #91: Restart, a stuck-run watchdog, a fixed setup and "time all songs without word timing" ──
 
     [Fact]
