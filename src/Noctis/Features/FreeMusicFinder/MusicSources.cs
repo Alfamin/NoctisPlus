@@ -377,12 +377,12 @@ internal sealed class MusicSources
     /// <summary>The preference was changed in the app: each bot's menu is checked once more.</summary>
     public async Task SynchronizeQualityAsync(CancellationToken ct)
     {
-        // No download runs while the menus are changed: every lane is taken.
+        // Owner #183: a friend's switch to MP3 took 2-3 minutes, because this waited for every transfer under way
+        // (stream-ahead FLACs included) and then walked the bots one by one. Transfers already under way finish in
+        // their own format; a song asked for now waits only for the menus (ConfigureQualityAsync holds the search gate).
         await _syncGate.WaitAsync(ct).ConfigureAwait(false);
-        var taken = 0;
         try
         {
-            for (; taken < FetchLanes; taken++) await _gate.WaitAsync(ct).ConfigureAwait(false);
             CheckGlobal();
             foreach (var source in _sources.OfType<IQualityMusicSource>()) source.ForgetQuality();
             var quality = _quality?.Invoke();
@@ -392,7 +392,7 @@ internal sealed class MusicSources
             if (errors.Count > 0) throw new BotAnswerException(string.Join(" ", errors.Values));
             if (quality is not null) _notice("Both bots confirmed preferred quality: " + quality);
         }
-        finally { if (taken > 0) _gate.Release(taken); _syncGate.Release(); }
+        finally { _syncGate.Release(); }
     }
 
     private async Task<Dictionary<string, string>> ConfigureQualityAsync(IProgress<double>? progress, CancellationToken ct, AudioQuality? preferred)
@@ -404,28 +404,30 @@ internal sealed class MusicSources
         try
         {
             var quality = preferred ?? _quality();
-            foreach (var source in _sources)
-            {
-                if (Cooling(source.Id)) continue;
-                if (source is not IQualityMusicSource configurable) continue;
-                // Confirmed before (kept with the login): no "/settings" message for this song.
-                if (configurable.QualityConfirmed(quality)) continue;
-                TransferProgress.Stage(progress, "Setting " + source.Id + " quality to " + quality + "…");
-                try { await configurable.SetQualityAsync(quality, ct).ConfigureAwait(false); }
-                catch (SourceLimitException ex) { Block(ex); if (ex.Global) throw Waiting(); errors[source.Id] = ex.Message; }
-                catch (TL.RpcException ex) when (BotLimits.Read(source.Id, ex, _now()) is { })
-                { var limit = BotLimits.Read(source.Id, ex, _now())!; Block(limit); if (limit.Global) throw Waiting(); errors[source.Id] = limit.Message; }
-                catch (TL.RpcException ex)
-                { errors[source.Id] = "BOT_QUALITY_FAILED: " + source.Id + " rejected the quality request: " + ex.Message; _notice(errors[source.Id]); }
-                catch (System.Net.Sockets.SocketException ex)
-                { throw; }
-                catch (Exception ex) when (ex is BotAnswerException or TimeoutException)
-                { errors[source.Id] = ex.Message; _notice(ex.Message); }
-            }
+            // Each bot is its own chat: both menus are walked at the same time.
+            var results = await Task.WhenAll(_sources.Select(source => ConfigureOneAsync(source, quality, progress, ct))).ConfigureAwait(false);
+            if (results.Any(r => r.Global)) throw Waiting();
+            foreach (var (id, error, _) in results) if (error is not null) errors[id] = error;
             return errors;
         }
         finally { _searchGate.Release(); }
     }
+    private async Task<(string Id, string? Error, bool Global)> ConfigureOneAsync(IMusicSource source, AudioQuality quality, IProgress<double>? progress, CancellationToken ct)
+    {
+        if (Cooling(source.Id) || source is not IQualityMusicSource configurable) return (source.Id, null, false);
+        // Confirmed before (kept with the login): no "/settings" message for this song.
+        if (configurable.QualityConfirmed(quality)) return (source.Id, null, false);
+        TransferProgress.Stage(progress, "Setting " + source.Id + " quality to " + quality + "…");
+        try { await configurable.SetQualityAsync(quality, ct).ConfigureAwait(false); return (source.Id, null, false); }
+        catch (SourceLimitException ex) { Block(ex); return (source.Id, ex.Message, ex.Global); }
+        catch (TL.RpcException ex) when (BotLimits.Read(source.Id, ex, _now()) is { })
+        { var limit = BotLimits.Read(source.Id, ex, _now())!; Block(limit); return (source.Id, limit.Message, limit.Global); }
+        catch (TL.RpcException ex)
+        { var error = "BOT_QUALITY_FAILED: " + source.Id + " rejected the quality request: " + ex.Message; _notice(error); return (source.Id, error, false); }
+        catch (Exception ex) when (ex is BotAnswerException or TimeoutException)
+        { _notice(ex.Message); return (source.Id, ex.Message, false); }
+    }
+
     /// <returns>True when the bot's setting had moved and was put back, so the song is worth asking for again.</returns>
     private async Task<bool> RecheckQualityAsync(IQualityMusicSource source, string id, AudioQuality quality, CancellationToken ct)
     {

@@ -124,7 +124,7 @@ internal static class BotPreferenceTests
 
     private static async Task TwoFetchLanesAsync()
     {
-        Check.Section("two downloads reach the bots side by side; a bot-menu change waits for both");
+        Check.Section("two downloads reach the bots side by side; a bot-menu change does not wait for them (owner #183)");
         var started = 0; var release = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
         var slow = new TransferTests.Source("DeezLoad")
         { Fetch = async (_, output) => { Interlocked.Increment(ref started); await release.Task; await output.WriteAsync("fLaC"u8.ToArray()); return "flac"; } };
@@ -136,7 +136,8 @@ internal static class BotPreferenceTests
         var third = sources.FetchAsync(new("Finesse", "Drake"), c, null, default);
         var sync = sources.SynchronizeQualityAsync(default);
         await Task.Delay(150);
-        Check.True(Volatile.Read(ref started) == 2 && !third.IsCompleted && !sync.IsCompleted, "a third download and the menu change wait for a free lane");
+        Check.True(Volatile.Read(ref started) == 2 && !third.IsCompleted, "a third download waits for a free lane");
+        Check.True(sync.IsCompleted, "the menu change is done while both songs still transfer (a friend's MP3 switch took minutes)");
         release.SetResult();
         await Task.WhenAll(first, second, third, sync);
         Check.Equal(3, Volatile.Read(ref started), "all three songs were fetched");

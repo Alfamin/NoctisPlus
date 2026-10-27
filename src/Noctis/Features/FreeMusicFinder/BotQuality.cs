@@ -243,7 +243,8 @@ internal sealed class TelegramQualityConversation(Client client, User user, stri
             ct.ThrowIfCancellationRequested();
             // Callbacks often EDIT the previous message. Keep it in the read, but require a changed body/keyboard.
             var history = await client.Messages_GetHistory(Peer, limit: 20).WaitAsync(TimeSpan.FromSeconds(25), ct).ConfigureAwait(false);
-            foreach (var message in history.Messages.OfType<Message>().Where(m => !m.flags.HasFlag(Message.Flags.out_) && (m.id > after || m.id == previous?.Id)).OrderByDescending(m => m.id))
+            // A song arriving for a transfer under way (they no longer wait for menu changes) is never a menu.
+            foreach (var message in history.Messages.OfType<Message>().Where(m => !m.flags.HasFlag(Message.Flags.out_) && m.media is not MessageMediaDocument && (m.id > after || m.id == previous?.Id)).OrderByDescending(m => m.id))
             {
                 if (BotLimits.Read(provider, message.message ?? "", DateTimeOffset.UtcNow) is { } limited) throw limited;
                 var reply = Read(message);

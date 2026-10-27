@@ -123,6 +123,11 @@ internal static class BotQualityTests
         Check.Equal(2, first.Asked + backup.Asked, "not confirmed yet: each bot is asked once, then never again");
         await sources.SynchronizeQualityAsync(default);
         Check.True(first.Forgotten > 0 && first.Asked == 2 && backup.Asked == 2, "changing the preference in the app checks each bot once more");
+        var both = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously); var walking = 0;
+        first.Configure = backup.Configure = async _ => { if (Interlocked.Increment(ref walking) == 2) both.SetResult(); await both.Task.WaitAsync(TimeSpan.FromSeconds(5)); };
+        await sources.SynchronizeQualityAsync(default);
+        Check.True(both.Task.IsCompletedSuccessfully, "both bots' menus are walked at the same time, not one after the other (owner #183)");
+        first.Configure = backup.Configure = null;
 
         Check.Section("a format changed inside the bot itself is noticed");
         var moved = new Source("Music Hunters") { Confirmed = AudioQuality.FLAC, Changes = true, Extensions = new(["mp3", "flac"]) };
