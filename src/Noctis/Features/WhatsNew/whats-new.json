@@ -1,6 +1,21 @@
 {
   "releases": [
     {
+      "version": "2.4.3",
+      "added": [
+        { "icon": "LyricsIcon", "title": "Word timing uses half the memory", "line": "8 GB graphics cards time songs smoothly", "top": true },
+        { "icon": "SaveDiskIcon", "title": "MP3 or FLAC switches in seconds", "line": "Even while songs are downloading" }
+      ],
+      "fixed": [
+        "Home no longer overlaps when you've only streamed songs",
+        "Statistics count each streamed song's real length",
+        "Unsaved playlists from Search play in order, missing songs included",
+        "Saving a For you song hides Not for me beside its lyrics",
+        "Before setup, WordLyrics only offers Set up; Settings opens above the search box",
+        "Telegram sign-in opens the API page for you"
+      ]
+    },
+    {
       "version": "2.4.2",
       "added": [
         { "icon": "RailSparkleIcon", "title": "Choose artists you don't want", "line": "Don't recommend artist, with a choice for each credit and Undo", "top": true },
