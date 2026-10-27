@@ -70,6 +70,12 @@ internal static class LogicTests
         warm.SetAccount("@someone");
         warm.BeginKeepingKey(98765, "fedcba9876543210fedcba9876543210");
         Check.False(warm.HasSession, "a signed-in session is never reused for a new sign-in");
+        var packed = Path.Combine(folder, TelegramDefaults.PackedFile);
+        File.WriteAllBytes(packed, TelegramDefaults.Pack("{\"api_id\":12345,\"api_hash\":\"" + hash + "\"}"));
+        var shipped = TelegramDefaults.ReadPacked(packed);
+        Check.True(shipped.Available && shipped.ApiId == 12345 && shipped.ApiHash == hash, "owner #186: the shipped pair is read from its scrambled file");
+        var raw = File.ReadAllText(packed);
+        Check.False(raw.Contains(hash) || raw.Contains("12345") || raw.Contains("api_hash"), "the shipped file does not show the pair as text");
     }
 
     private static BotText.Line Line(string artist, string title, string? length = null, string number = "1")

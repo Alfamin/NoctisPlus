@@ -143,6 +143,7 @@ public sealed class FreeMusicPlugin : INoctisPlugin
         _online = new FinderOnlineSearch(() => _catalog, _discoveryActions, _artistPages, () => _telegram?.IsLoggedIn == true, ShowSignIn, () => _playlists)
         { DownloadAhead = () => StreamCache.AheadSongs(_host?.Settings.GetString(StreamCache.AheadKey)), ForYouHidden = () => _forYou?.Hidden };
         Current = this;
+        TelegramStateChanged?.Invoke();
         Noctis.Services.Search.OnlineMusicSearch.Current = _online;
         _transfers.Changed += Announce;
         _downloads.Finished += Announce;
@@ -176,7 +177,7 @@ public sealed class FreeMusicPlugin : INoctisPlugin
     public void Shutdown()
     {
         _qualityStop.Cancel();
-        if (ReferenceEquals(Current, this)) Current = null;
+        if (ReferenceEquals(Current, this)) { Current = null; TelegramStateChanged?.Invoke(); }
         if (_host is not null) _host.Settings.Changed -= OnSettingChanged;
         _purge?.Dispose(); _purge = null;
         if (_streamCache is not null) Noctis.Services.LibraryExclusions.Unregister(_streamCache);
@@ -329,11 +330,15 @@ public sealed class FreeMusicPlugin : INoctisPlugin
         if (!Noctis.Services.Search.OnlineMusicSearch.RequestOpen(query))
             Log("Search is not ready yet. Wait for the main window to finish opening.");
     }
-    private void ShowSignIn() => ShowSignIn(null);
+    private void ShowSignIn() => _ = ShowSignInAsync(null);
 
-    internal async void ShowSignIn(Window? requestedOwner)
+    /// <summary>Owner #186: told when Free Music Finder starts or stops, and when the sign-in window closes.</summary>
+    internal static event Action? TelegramStateChanged;
+    internal void ShowSignIn(Window? requestedOwner) => _ = ShowSignInAsync(requestedOwner);
+
+    internal async Task ShowSignInAsync(Window? requestedOwner)
     {
-        if (!Dispatcher.UIThread.CheckAccess()) { Dispatcher.UIThread.Post(() => ShowSignIn(requestedOwner)); return; }
+        if (!Dispatcher.UIThread.CheckAccess()) { await Dispatcher.UIThread.InvokeAsync(() => ShowSignInAsync(requestedOwner)); return; }
         if (_host is null || _telegram is null) return;
         if (_signInDialog is not null) { _signInDialog.Activate(); return; }
         var owner = requestedOwner ?? (Application.Current?.ApplicationLifetime as IClassicDesktopStyleApplicationLifetime)?.MainWindow;
@@ -345,7 +350,7 @@ public sealed class FreeMusicPlugin : INoctisPlugin
             await _signInDialog.ShowDialog(owner);
         }
         catch (Exception ex) { Log("Could not open Telegram sign-in: " + ex.GetType().Name); }
-        finally { _signInDialog = null; }
+        finally { _signInDialog = null; TelegramStateChanged?.Invoke(); }
     }
 
     private bool Owns(BotTrack track)

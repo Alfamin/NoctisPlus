@@ -39,13 +39,13 @@ public class TelegramSignInQrTests
     private static TelegramSignInViewModel Vm(FakeAccount account) => new(account, _ => { });
 
     [AvaloniaFact]
-    public async Task ANewUser_SeesAQrCode_WithTheBuiltInAppFilledIn_ButNotSavedAsTheirOwn()
+    public async Task ANewUser_SeesAQrCode_SignedInWithTheBuiltInApp_WhichIsNeverShown()
     {
         var account = new FakeAccount(builtIn: true);
         var vm = Vm(account);
         Assert.True(vm.IsQr);
-        Assert.Equal("12345", vm.ApiId);
-        Assert.Equal("0123456789abcdef0123456789abcdef", vm.ApiHash);
+        Assert.Equal("", vm.ApiId);
+        Assert.Equal("", vm.ApiHash);
         Assert.False(vm.AdvancedOpen);
         Assert.False(vm.ShowContinue); // nothing to press while waiting for the scan
         var signIn = vm.StartQrAsync();

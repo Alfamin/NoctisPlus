@@ -167,7 +167,7 @@ internal static class WindowTests
         window.Show();
         var vm = (Noctis.ViewModels.TelegramSignInViewModel)window.DataContext!;
         Check.True(vm.IsQr && vm.Description.Contains("Link Desktop Device"), "a ready app opens on the QR code with where to scan it");
-        Check.True(vm.ApiHash.Length == 32 && vm.ApiId == "12345", "the built-in API pair is filled in (the hash field is masked)");
+        Check.True(vm.ApiHash.Length == 0 && vm.ApiId.Length == 0, "owner #186: the built-in API pair is never shown or copyable");
         Picture(window, "7a QR login");
         vm.UsePhoneCommand.Execute(null);
         var advanced = window.FindControl<StackPanel>("AdvancedFields")!;

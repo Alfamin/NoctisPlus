@@ -244,6 +244,18 @@ public partial class HomeViewModel : ViewModelBase, IDisposable
     }
     [RelayCommand] private void ImportPlaylistsFromHome() => ImportPlaylists?.Invoke();
 
+    /// <summary>Owner #186: the welcome card's Connect Telegram, while Free Music Finder runs with nobody signed in.
+    /// Set by the main window; null means the feature is off.</summary>
+    internal Func<bool?>? TelegramSignedIn { get; set; }
+    internal Func<Task>? ConnectTelegram { get; set; }
+    public bool ShowConnectTelegram => TelegramSignedIn?.Invoke() == false;
+    internal void RefreshTelegram() => OnPropertyChanged(nameof(ShowConnectTelegram));
+    [RelayCommand] private async Task ConnectTelegramFromHome()
+    {
+        if (ConnectTelegram is { } connect) await connect();
+        RefreshTelegram();
+    }
+
     /// <summary>The welcome card's Add music folder, after the view's folder picker.</summary>
     internal Task AddMusicFolderAsync(string path) => _settings?.AddFolderPath(path) ?? Task.CompletedTask;
 

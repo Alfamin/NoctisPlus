@@ -99,6 +99,37 @@ public class HomeViewMountTests
         finally { window.Close(); }
     }
 
+    [AvaloniaFact] // Owner #186: the first-run card offers Connect Telegram while nobody is signed in.
+    public async Task TheWelcomeCard_OffersConnectTelegram_UntilSignedIn()
+    {
+        EnsureAppStyles();
+        var library = new FakeLibraryService();
+        using var persistence = new TestPersistenceService();
+        var player = new PlayerViewModel(new FakeAudioPlayer(), library, persistence, new FakeAnimatedCoverService());
+        using var vm = new HomeViewModel(player, library, new SidebarViewModel(persistence, library));
+        await vm.RefreshAsync();
+        Assert.False(vm.ShowConnectTelegram); // Free Music Finder off: no button
+        bool? signedIn = false;
+        var opened = 0;
+        vm.TelegramSignedIn = () => signedIn;
+        vm.ConnectTelegram = () => { opened++; signedIn = true; return Task.CompletedTask; };
+        vm.RefreshTelegram();
+        var view = new HomeView { DataContext = vm };
+        var window = new Window { Content = view, Width = 1400, Height = 900 };
+        try
+        {
+            window.Show(); Dispatcher.UIThread.RunJobs(); window.UpdateLayout();
+            Button Connect() => view.GetVisualDescendants().OfType<Button>().Single(b => Avalonia.Automation.AutomationProperties.GetName(b) == "Connect Telegram");
+            Assert.True(Connect().IsEffectivelyVisible);
+            await vm.ConnectTelegramFromHomeCommand.ExecuteAsync(null);
+            Dispatcher.UIThread.RunJobs();
+            Assert.Equal(1, opened);
+            Assert.False(vm.ShowConnectTelegram);
+            Assert.False(Connect().IsEffectivelyVisible);
+        }
+        finally { window.Close(); }
+    }
+
     [AvaloniaFact]
     public async Task HomePage_MountsHeroAndSideBySideCharts()
     {

@@ -28,7 +28,7 @@ internal sealed class TelegramAccount : ITelegramSignIn, IDisposable
         _defaults = TelegramDefaults.Read(defaultsPath ?? Path.Combine(Path.GetDirectoryName(storePath)!, DefaultsFile));
         // Owner #185: releases carry the Noctis Plus Telegram app beside Noctis.exe, so a new user only signs in.
         if (defaultsPath is null && !_defaults.Available && _defaults.Error.Length == 0)
-            _defaults = TelegramDefaults.Read(Path.Combine(AppContext.BaseDirectory, DefaultsFile));
+            _defaults = TelegramDefaults.ReadPacked(Path.Combine(AppContext.BaseDirectory, TelegramDefaults.PackedFile));
         _proxy = proxy;
         _log = log;
     }

@@ -22,9 +22,9 @@ public sealed partial class TelegramSignInViewModel : ObservableObject, IDisposa
     {
         _account = account;
         _log = log;
-        // Owner #185: the fields come filled in (the built-in pair when the user has none); the hash stays masked.
-        ApiId = account.ApiId > 0 ? account.ApiId.ToString(CultureInfo.InvariantCulture) : "";
-        ApiHash = account.ApiHash;
+        // Owner #186: the built-in pair is never shown or copyable; the fields hold only a pair of the user's own.
+        ApiId = !account.UsesBuiltInApi && account.ApiId > 0 ? account.ApiId.ToString(CultureInfo.InvariantCulture) : "";
+        ApiHash = account.UsesBuiltInApi ? "" : account.ApiHash;
         AdvancedOpen = !account.HasCredentials;
         Step = account.IsLoggedIn ? LoginStep.SignedIn : account.HasCredentials ? LoginStep.Qr : LoginStep.Phone;
         Error = account.DefaultsError;
@@ -63,7 +63,7 @@ public sealed partial class TelegramSignInViewModel : ObservableObject, IDisposa
     public string ContinueLabel => IsSignedIn ? "Done" : IsQr ? "Try again" : IsPhone ? "Send code" : "Continue";
     /// <summary>Owner #185: a user without the built-in pair is told the fields are optional only when they are.</summary>
     public string AdvancedHint => _account.UsesBuiltInApi
-        ? "Filled in for you. Change only to use your own app from my.telegram.org."
+        ? "Optional: your own Telegram app from my.telegram.org."
         : "Telegram app settings from my.telegram.org. Existing settings are kept.";
 
     [RelayCommand]

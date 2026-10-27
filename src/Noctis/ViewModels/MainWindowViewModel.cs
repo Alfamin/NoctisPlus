@@ -830,6 +830,10 @@ public partial class MainWindowViewModel : ViewModelBase
         // The empty-library welcome card's shortcuts (owner 10-18: features easy to spot).
         _homeVm.OpenSearch = OpenSearchPage;
         _homeVm.ImportPlaylists = () => _playlistsVm.ImportPlaylistCommand.Execute(null);
+        // Owner #186: Connect Telegram on the welcome card opens sign-in with the QR code already showing.
+        _homeVm.TelegramSignedIn = () => FreeMusicFinder.FreeMusicPlugin.Current?.IsSignedIn;
+        _homeVm.ConnectTelegram = () => FreeMusicFinder.FreeMusicPlugin.Current?.ShowSignInAsync(null) ?? Task.CompletedTask;
+        FreeMusicFinder.FreeMusicPlugin.TelegramStateChanged += () => Dispatcher.UIThread.Post(_homeVm.RefreshTelegram);
         _downloadsVm.OpenSearch = OpenSearchPage;
 
         // Wire up artist → album navigation

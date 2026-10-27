@@ -42,8 +42,11 @@ Copy-Item -LiteralPath (Join-Path $repoRoot 'docs\fork\QUICKSTART.md') -Destinat
 # number. Never printed; without the secrets users enter their own pair under Advanced.
 $tgId = "$env:NOCTIS_TELEGRAM_API_ID".Trim(); $tgHash = "$env:NOCTIS_TELEGRAM_API_HASH".Trim()
 if ($tgId -match '\A[1-9][0-9]{0,9}\z' -and $tgHash -match '\A[a-fA-F0-9]{32}\z') {
-    $tgJson = '{"api_id":' + $tgId + ',"api_hash":"' + $tgHash + '"}'
-    [IO.File]::WriteAllText((Join-Path $publishRoot 'telegram-defaults.private.json'), $tgJson, (New-Object Text.UTF8Encoding($false)))
+    # Owner #186: scrambled (TelegramDefaults.Pack), so the pair is not readable or copyable from the install folder.
+    $tgBytes = [Text.Encoding]::UTF8.GetBytes('{"api_id":' + $tgId + ',"api_hash":"' + $tgHash + '"}')
+    $tgKey = [Text.Encoding]::ASCII.GetBytes('Noctis Plus - Free Music Finder - #186')
+    for ($i = 0; $i -lt $tgBytes.Length; $i++) { $tgBytes[$i] = $tgBytes[$i] -bxor $tgKey[$i % $tgKey.Length] }
+    [IO.File]::WriteAllBytes((Join-Path $publishRoot 'telegram-app.dat'), $tgBytes)
     Write-Host 'Built-in Telegram app included.'
 } elseif ($tgId -or $tgHash) { throw 'NOCTIS_TELEGRAM_API_ID / NOCTIS_TELEGRAM_API_HASH are set but not a valid pair.' }
 else { Write-Host 'No built-in Telegram app (secrets not set): users enter their own under Advanced.' }

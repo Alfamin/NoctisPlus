@@ -2824,6 +2824,10 @@
     <value>استيراد قوائم التشغيل</value>
     <comment>Text in HomeView.axaml</comment>
   </data>
+  <data name="Home.ConnectTelegram" xml:space="preserve">
+    <value>ربط تيليجرام</value>
+    <comment>Text in HomeView.axaml</comment>
+  </data>
   <data name="LibraryPlaylists.NoResults" xml:space="preserve">
     <value>لا نتائج</value>
     <comment>Text in LibraryPlaylistsView.axaml</comment>
