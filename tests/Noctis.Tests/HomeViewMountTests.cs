@@ -130,6 +130,35 @@ public class HomeViewMountTests
         finally { window.Close(); }
     }
 
+    [AvaloniaFact] // Owner #187: word lyrics setup sits on the same card and starts on one press.
+    public async Task TheWelcomeCard_OffersWordLyricsSetup_UntilItIsReady()
+    {
+        EnsureAppStyles();
+        var library = new FakeLibraryService();
+        using var persistence = new TestPersistenceService();
+        var player = new PlayerViewModel(new FakeAudioPlayer(), library, persistence, new FakeAnimatedCoverService());
+        using var vm = new HomeViewModel(player, library, new SidebarViewModel(persistence, library));
+        await vm.RefreshAsync();
+        Assert.False(vm.ShowSetUpWordLyrics); // the feature is off: no button
+        var ready = false; var started = 0;
+        vm.WordLyricsNeedsSetup = () => !ready;
+        vm.SetUpWordLyrics = () => { started++; ready = true; return Task.CompletedTask; };
+        vm.RefreshWordLyrics();
+        var view = new HomeView { DataContext = vm };
+        var window = new Window { Content = view, Width = 1400, Height = 900 };
+        try
+        {
+            window.Show(); Dispatcher.UIThread.RunJobs(); window.UpdateLayout();
+            Button SetUp() => view.GetVisualDescendants().OfType<Button>().Single(b => Avalonia.Automation.AutomationProperties.GetName(b) == "Word lyrics · 1.3 GB");
+            Assert.True(SetUp().IsEffectivelyVisible);
+            await vm.SetUpWordLyricsFromHomeCommand.ExecuteAsync(null);
+            Dispatcher.UIThread.RunJobs();
+            Assert.Equal(1, started);
+            Assert.False(SetUp().IsEffectivelyVisible);
+        }
+        finally { window.Close(); }
+    }
+
     [AvaloniaFact]
     public async Task HomePage_MountsHeroAndSideBySideCharts()
     {

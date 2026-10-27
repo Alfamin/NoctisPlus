@@ -834,6 +834,13 @@ public partial class MainWindowViewModel : ViewModelBase
         _homeVm.TelegramSignedIn = () => FreeMusicFinder.FreeMusicPlugin.Current?.IsSignedIn;
         _homeVm.ConnectTelegram = () => FreeMusicFinder.FreeMusicPlugin.Current?.ShowSignInAsync(null) ?? Task.CompletedTask;
         FreeMusicFinder.FreeMusicPlugin.TelegramStateChanged += () => Dispatcher.UIThread.Post(_homeVm.RefreshTelegram);
+        // Owner #187: the first-run card's word lyrics setup (the button itself names the download).
+        if (_wordTiming is { } words)
+        {
+            _homeVm.WordLyricsNeedsSetup = () => words.NeedsSetup;
+            _homeVm.SetUpWordLyrics = () => words.SetupAsync(_ => Task.FromResult(true));
+            words.Changed += () => Dispatcher.UIThread.Post(_homeVm.RefreshWordLyrics);
+        }
         _downloadsVm.OpenSearch = OpenSearchPage;
 
         // Wire up artist → album navigation

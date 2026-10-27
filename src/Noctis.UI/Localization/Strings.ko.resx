@@ -2828,6 +2828,10 @@
     <value>텔레그램 연결</value>
     <comment>Text in HomeView.axaml</comment>
   </data>
+  <data name="Home.SetUpWordLyrics" xml:space="preserve">
+    <value>단어별 가사 · 1.3GB</value>
+    <comment>Text in HomeView.axaml</comment>
+  </data>
   <data name="LibraryPlaylists.NoResults" xml:space="preserve">
     <value>결과 없음</value>
     <comment>Text in LibraryPlaylistsView.axaml</comment>

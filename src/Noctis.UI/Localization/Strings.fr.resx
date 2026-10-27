@@ -2828,6 +2828,10 @@
     <value>Connecter Telegram</value>
     <comment>Text in HomeView.axaml</comment>
   </data>
+  <data name="Home.SetUpWordLyrics" xml:space="preserve">
+    <value>Paroles mot à mot · 1,3 Go</value>
+    <comment>Text in HomeView.axaml</comment>
+  </data>
   <data name="LibraryPlaylists.NoResults" xml:space="preserve">
     <value>Aucun résultat</value>
     <comment>Text in LibraryPlaylistsView.axaml</comment>

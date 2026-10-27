@@ -2828,6 +2828,10 @@
     <value>连接 Telegram</value>
     <comment>Text in HomeView.axaml</comment>
   </data>
+  <data name="Home.SetUpWordLyrics" xml:space="preserve">
+    <value>逐字歌词 · 1.3 GB</value>
+    <comment>Text in HomeView.axaml</comment>
+  </data>
   <data name="LibraryPlaylists.NoResults" xml:space="preserve">
     <value>无结果</value>
     <comment>Text in LibraryPlaylistsView.axaml</comment>

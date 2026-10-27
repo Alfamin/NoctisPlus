@@ -1028,6 +1028,7 @@
   <data name="Home.AddMusicFolder" xml:space="preserve"><value>Add music folder</value><comment>Text in HomeView.axaml</comment></data>
   <data name="Home.ImportPlaylists" xml:space="preserve"><value>Import playlists</value><comment>Text in HomeView.axaml</comment></data>
   <data name="Home.ConnectTelegram" xml:space="preserve"><value>Connect Telegram</value><comment>Text in HomeView.axaml</comment></data>
+  <data name="Home.SetUpWordLyrics" xml:space="preserve"><value>Word lyrics · 1.3 GB</value><comment>Text in HomeView.axaml</comment></data>
   <data name="LibraryPlaylists.NoResults" xml:space="preserve"><value>No results</value><comment>Text in LibraryPlaylistsView.axaml</comment></data>
   <data name="LibraryPlaylists.NoPlaylistsMatchSearch" xml:space="preserve"><value>No playlists match your search</value><comment>Text in LibraryPlaylistsView.axaml</comment></data>
 

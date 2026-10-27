@@ -2828,6 +2828,10 @@
     <value>ربط تيليجرام</value>
     <comment>Text in HomeView.axaml</comment>
   </data>
+  <data name="Home.SetUpWordLyrics" xml:space="preserve">
+    <value>كلمات متزامنة · 1.3 غ.ب</value>
+    <comment>Text in HomeView.axaml</comment>
+  </data>
   <data name="LibraryPlaylists.NoResults" xml:space="preserve">
     <value>لا نتائج</value>
     <comment>Text in LibraryPlaylistsView.axaml</comment>

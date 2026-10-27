@@ -185,6 +185,15 @@
                             <TextBlock Text="{loc:T Home.ConnectTelegram}" VerticalAlignment="Center" />
                         </StackPanel>
                     </Button>
+                    <!-- Owner #187: word lyrics setup starts on this press; the label names the download. -->
+                    <Button Classes="pill-secondary" MinHeight="36" Padding="18,0" FontSize="13" FontWeight="SemiBold"
+                            Command="{Binding SetUpWordLyricsFromHomeCommand}" IsVisible="{Binding ShowSetUpWordLyrics}"
+                            AutomationProperties.Name="{loc:T Home.SetUpWordLyrics}">
+                        <StackPanel Orientation="Horizontal" Spacing="8">
+                            <PathIcon Data="{StaticResource LyricsIcon}" Width="14" Height="14" VerticalAlignment="Center" />
+                            <TextBlock Text="{loc:T Home.SetUpWordLyrics}" VerticalAlignment="Center" />
+                        </StackPanel>
+                    </Button>
                     <Button Classes="pill-secondary" MinHeight="36" Padding="18,0" FontSize="13" FontWeight="SemiBold"
                             Click="OnWelcomeAddFolderClicked" AutomationProperties.Name="{loc:T Home.AddMusicFolder}">
                         <StackPanel Orientation="Horizontal" Spacing="8">

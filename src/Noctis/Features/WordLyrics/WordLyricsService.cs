@@ -89,7 +89,11 @@ internal sealed class WordLyricsService(ILibraryService library, Func<AppSetting
         library.MusicFoldersChanged += FoldersChanged;
         OnlineMusicSearch.FileSaved += DownloadSaved;
         LibraryChanged(null, EventArgs.Empty);
+        Changed?.Invoke();
     }
+
+    /// <summary>Owner #187: running but not set up, so the first-run card offers its setup.</summary>
+    internal bool NeedsSetup => _worker is not null && _host is not null && !BackendReady;
 
     private Options ReadOptions()
     {

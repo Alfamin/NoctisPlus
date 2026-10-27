@@ -256,6 +256,19 @@ public partial class HomeViewModel : ViewModelBase, IDisposable
         RefreshTelegram();
     }
 
+    /// <summary>Owner #187: every setup on the first page. Word lyrics: the button names the 1.3 GB download, so
+    /// pressing it is the consent and the setup starts straight away.</summary>
+    internal Func<bool>? WordLyricsNeedsSetup { get; set; }
+    internal Func<Task>? SetUpWordLyrics { get; set; }
+    public bool ShowSetUpWordLyrics => WordLyricsNeedsSetup?.Invoke() == true;
+    // Only while the card shows: the service reports every timing step, and the check looks at the program's files.
+    internal void RefreshWordLyrics() { if (ShowWelcome) OnPropertyChanged(nameof(ShowSetUpWordLyrics)); }
+    [RelayCommand] private async Task SetUpWordLyricsFromHome()
+    {
+        if (SetUpWordLyrics is { } setUp) await setUp();
+        RefreshWordLyrics();
+    }
+
     /// <summary>The welcome card's Add music folder, after the view's folder picker.</summary>
     internal Task AddMusicFolderAsync(string path) => _settings?.AddFolderPath(path) ?? Task.CompletedTask;
 
