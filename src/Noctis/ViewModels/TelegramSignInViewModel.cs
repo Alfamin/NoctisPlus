@@ -47,6 +47,9 @@ public sealed partial class TelegramSignInViewModel : ObservableObject, IDisposa
     public bool CanStartOver => IsCode || IsPassword;
     public bool HasError => Error.Length > 0;
     [RelayCommand] private void ToggleAdvanced() => AdvancedOpen = !AdvancedOpen;
+    /// <summary>Owner #183: a first-time user has no API id/hash yet; this opens the page that makes them.</summary>
+    internal const string AppsPage = "https://my.telegram.org/apps";
+    [RelayCommand] private void OpenAppsPage() => Helpers.PlatformHelper.OpenUrl(AppsPage);
     public string ContinueLabel => IsSignedIn ? "Done" : IsPhone ? "Send code" : "Continue";
     public string Title => Step switch
     {

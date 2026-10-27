@@ -35,7 +35,7 @@
                         <TextBlock Text="Phone number" FontSize="12" Opacity="0.5" Margin="16,0,0,0" />
                         <TextBox x:Name="PhoneField" Classes="pill-field" Text="{Binding Phone}" Watermark="+98…" />
                     </StackPanel>
-                    <Button Classes="pill-secondary" Command="{Binding ToggleAdvancedCommand}" HorizontalAlignment="Left">
+                    <Button Classes="pill-secondary" Command="{Binding ToggleAdvancedCommand}" HorizontalAlignment="Left" AutomationProperties.Name="Advanced">
                         <StackPanel Orientation="Horizontal" Spacing="8">
                             <TextBlock Text="Advanced" VerticalAlignment="Center" />
                             <!-- The app's chevron (not a text glyph), pointing up while the section is open. -->
@@ -45,8 +45,13 @@
                         </StackPanel>
                     </Button>
                         <StackPanel x:Name="AdvancedFields" Spacing="10" IsVisible="{Binding AdvancedOpen}">
-                            <TextBlock Text="Telegram app settings from my.telegram.org. Existing settings are kept."
-                                       FontSize="12" Opacity="0.65" TextWrapping="Wrap" />
+                            <Grid ColumnDefinitions="*,Auto" ColumnSpacing="12">
+                                <TextBlock Text="Telegram app settings from my.telegram.org. Existing settings are kept."
+                                           FontSize="12" Opacity="0.65" TextWrapping="Wrap" VerticalAlignment="Center" />
+                                <Button Grid.Column="1" Classes="pill-secondary" Content="Open" VerticalAlignment="Center"
+                                        Command="{Binding OpenAppsPageCommand}" ToolTip.Tip="my.telegram.org/apps"
+                                        AutomationProperties.Name="Open my.telegram.org" />
+                            </Grid>
                             <TextBox Classes="pill-field" Text="{Binding ApiId}" Watermark="API id" />
                             <TextBox x:Name="ApiHashField" Classes="pill-field" Text="{Binding ApiHash}" Watermark="API hash" PasswordChar="●" />
                         </StackPanel>
