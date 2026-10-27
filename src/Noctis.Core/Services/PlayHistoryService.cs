@@ -139,7 +139,8 @@ public sealed class PlayHistoryService : IPlayHistoryService
                 Title = track.Title,
                 Artist = track.Artist,
                 PlayedAtUtc = DateTime.UtcNow,
-                Skipped = false
+                Skipped = false,
+                Seconds = track.Duration > TimeSpan.Zero ? Math.Round(track.Duration.TotalSeconds, 1) : null
             });
             _appended++;
 

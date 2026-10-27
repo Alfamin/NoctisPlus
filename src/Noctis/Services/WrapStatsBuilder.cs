@@ -202,7 +202,7 @@ public static class WrapStatsBuilder
             }
 
             var track = inThisPeriod || (local >= prevStart && local < prevEnd) ? resolver.Resolve(e) : null;
-            var minutes = e.Skipped ? 0 : Heard(track, ran).TotalMinutes;
+            var minutes = e.Skipped ? 0 : Heard(track, ran, e.Seconds).TotalMinutes;
             if (inThisPeriod)
             {
                 inPeriod.Add((e, local, track, minutes));
@@ -379,10 +379,15 @@ public static class WrapStatsBuilder
         };
     }
 
+    /// <summary>The library track's length, else the length logged with the play (a stream), else a typical song's.</summary>
+    internal static TimeSpan Length(Track? track, double? seconds) =>
+        track != null && track.Duration > TimeSpan.Zero ? track.Duration
+        : seconds is > 0 and < 86400 ? TimeSpan.FromSeconds(seconds.Value) : FallbackTrackLength;
+
     /// <summary>The song's length, or less when the next play started before it could end.</summary>
-    internal static TimeSpan Heard(Track? track, TimeSpan? ran)
+    internal static TimeSpan Heard(Track? track, TimeSpan? ran, double? seconds = null)
     {
-        var length = track != null && track.Duration > TimeSpan.Zero ? track.Duration : FallbackTrackLength;
+        var length = Length(track, seconds);
         return ran is { } r && r < length ? r : length;
     }
 

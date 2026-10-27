@@ -20,6 +20,21 @@ public class ListeningStatsCalculatorTests
         Skipped = skipped,
     };
 
+    [Fact] // Owner #183: streams never join the library; their logged length counts instead of a 3:30 guess.
+    public void PlaysOutsideTheLibrary_UseTheLengthLoggedWithThePlay()
+    {
+        var now = DateTime.Now;
+        var streamed = Play(Guid.NewGuid(), now.AddMinutes(-10)); streamed.Seconds = 125;
+        var old = Play(Guid.NewGuid(), now.AddMinutes(-20)); // a log from before lengths were kept
+        var one = ListeningStatsCalculator.Compute([streamed], new Dictionary<Guid, Track>(), now);
+        Assert.Equal(TimeSpan.FromSeconds(125).Ticks, one.AvgListenedTrackLengthTicks);
+        var both = ListeningStatsCalculator.Compute([old, streamed], new Dictionary<Guid, Track>(), now);
+        Assert.Equal((TimeSpan.FromSeconds(125) + WrapStatsBuilder.FallbackTrackLength).Ticks, both.TimeListenedTicks);
+        var library = MakeTrack(3);
+        var known = Play(library.Id, now.AddMinutes(-5)); known.Seconds = 999; // the library's own length wins
+        Assert.Equal(TimeSpan.FromMinutes(3).Ticks, ListeningStatsCalculator.Compute([known], new Dictionary<Guid, Track> { [library.Id] = library }, now).TimeListenedTicks);
+    }
+
     [Fact]
     public void Compute_NoEvents_ReturnsZeroStats()
     {

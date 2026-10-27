@@ -13,4 +13,9 @@ public class PlayHistoryEvent
 
     /// <summary>True when the user skipped away before hearing half the track.</summary>
     public bool Skipped { get; set; }
+
+    /// <summary>Owner #183: the song's length when it was played. A stream never joins the library, so without this
+    /// every streamed play counted as a 3:30 song in Statistics and the Wrap. Absent in older logs.</summary>
+    [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull)]
+    public double? Seconds { get; set; }
 }

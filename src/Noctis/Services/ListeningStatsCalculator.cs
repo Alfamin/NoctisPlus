@@ -114,7 +114,7 @@ public static class ListeningStatsCalculator
             else
             {
                 completed++;
-                listenedTicks += PlayedLength(resolver.Resolve(e)).Ticks;
+                listenedTicks += PlayedLength(resolver.Resolve(e), e.Seconds).Ticks;
             }
 
             var daysAgo = (today - localDate).Days;
@@ -138,8 +138,7 @@ public static class ListeningStatsCalculator
         };
     }
 
-    internal static TimeSpan PlayedLength(Track? track) =>
-        track != null && track.Duration > TimeSpan.Zero ? track.Duration : FallbackTrackLength;
+    internal static TimeSpan PlayedLength(Track? track, double? seconds = null) => WrapStatsBuilder.Length(track, seconds);
 
     /// <summary>
     /// Current streak counts back from today (or yesterday, as a grace day if the
@@ -414,7 +413,7 @@ public static class ListeningReportBuilder
             else
             {
                 completed++;
-                listened += WrapStatsBuilder.Heard(track, ran).Ticks;
+                listened += WrapStatsBuilder.Heard(track, ran, e.Seconds).Ticks;
             }
             recent.Add(new ListeningPlay(e, track, local));
 
