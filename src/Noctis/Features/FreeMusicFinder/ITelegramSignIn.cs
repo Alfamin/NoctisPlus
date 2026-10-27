@@ -9,7 +9,10 @@ internal interface ITelegramSignIn
     string ApiHash { get; }
     bool HasCredentials { get; }
     string DefaultsError { get; }
+    bool UsesBuiltInApi { get; }
     Task<string?> StartLoginAsync(int apiId, string apiHash, string phone);
     Task<string?> ContinueLoginAsync(string answer);
     Task LogOutAsync();
+    Task QrLoginAsync(int apiId, string apiHash, Action<string> show, Action<bool> passwordNeeded, CancellationToken ct);
+    void SendQrPassword(string password);
 }

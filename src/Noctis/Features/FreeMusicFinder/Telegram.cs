@@ -25,7 +25,10 @@ internal sealed class TelegramAccount : ITelegramSignIn, IDisposable
     {
         _store = new TelegramStore(storePath);
         DataFolder = Path.GetDirectoryName(Path.GetFullPath(storePath))!;
-        _defaults = TelegramDefaults.Read(defaultsPath ?? Path.Combine(Path.GetDirectoryName(storePath)!, "telegram-defaults.private.json"));
+        _defaults = TelegramDefaults.Read(defaultsPath ?? Path.Combine(Path.GetDirectoryName(storePath)!, DefaultsFile));
+        // Owner #185: releases carry the Noctis Plus Telegram app beside Noctis.exe, so a new user only signs in.
+        if (defaultsPath is null && !_defaults.Available && _defaults.Error.Length == 0)
+            _defaults = TelegramDefaults.Read(Path.Combine(AppContext.BaseDirectory, DefaultsFile));
         _proxy = proxy;
         _log = log;
     }
@@ -38,7 +41,10 @@ internal sealed class TelegramAccount : ITelegramSignIn, IDisposable
     /// <summary>Display name of the signed-in account; empty when logged out.</summary>
     public string SignedInAs => _store.Account;
 
+    internal const string DefaultsFile = "telegram-defaults.private.json";
     private readonly TelegramDefaults _defaults;
+    /// <summary>No API pair of the user's own: the built-in one is used (and stays unsaved, so a newer release's pair applies).</summary>
+    public bool UsesBuiltInApi => _store.ApiId <= 0 && _defaults.Available;
     public int ApiId => _store.ApiId > 0 ? _store.ApiId : _defaults.ApiId;
     public string ApiHash => _store.ApiId > 0 ? _store.ApiHash : _defaults.ApiHash;
     public bool HasCredentials => ApiId > 0 && ApiHash.Length > 0;
@@ -431,10 +437,75 @@ internal sealed class TelegramAccount : ITelegramSignIn, IDisposable
 
     private string? Config(string what) => what switch
     {
-        "api_id" => _store.ApiId.ToString(CultureInfo.InvariantCulture),
-        "api_hash" => _store.ApiHash,
+        "api_id" => ApiId.ToString(CultureInfo.InvariantCulture),
+        "api_hash" => ApiHash,
+        "password" => WaitForQrPassword(),
         _ => null, // WTelegramClient's defaults
     };
+
+    // Owner #185: QR sign-in. Telegram asks for a two-step password through Config (on a pool thread), so the
+    // dialog is told and the password is waited for here; the phone-number steps never get here.
+    private readonly object _qrSync = new();
+    private Action<bool>? _qrPasswordWanted;
+    private TaskCompletionSource<string>? _qrPassword;
+    private int _qrPasswordAsks;
+
+    /// <summary>
+    /// Signs in by QR code: <paramref name="show"/> gets a tg://login link (a new one about every 30 s) until the
+    /// phone accepts one. An account with a two-step password raises <paramref name="passwordNeeded"/> (true after a
+    /// wrong one) and waits for <see cref="SendQrPassword"/>. Pass 0 and "" to use the built-in API pair.
+    /// </summary>
+    public async Task QrLoginAsync(int apiId, string apiHash, Action<string> show, Action<bool> passwordNeeded, CancellationToken ct)
+    {
+        Client client;
+        await _gate.WaitAsync(ct).ConfigureAwait(false);
+        try
+        {
+            ObjectDisposedException.ThrowIf(_disposed, this);
+            _client?.Dispose();
+            _client = null;
+            _store.Begin(apiId, apiHash);
+            lock (_qrSync) { _qrPasswordWanted = passwordNeeded; _qrPasswordAsks = 0; }
+            client = _client = CreateClient();
+        }
+        finally { _gate.Release(); }
+        using var stop = ct.Register(() => { lock (_qrSync) _qrPassword?.TrySetCanceled(); });
+        try
+        {
+            var user = await client.LoginWithQRCode(show, logoutFirst: false, ct: ct).ConfigureAwait(false);
+            ct.ThrowIfCancellationRequested();
+            if (user is null || !ReferenceEquals(_client, client)) throw new OperationCanceledException(ct);
+            _store.SetAccount(user.MainUsername is { Length: > 0 } name ? "@" + name : user.first_name);
+        }
+        catch (OperationCanceledException)
+        {
+            // Closed or switched to the phone number: this half-made connection is not kept.
+            await _gate.WaitAsync(CancellationToken.None).ConfigureAwait(false);
+            try { if (ReferenceEquals(_client, client)) _client = null; }
+            finally { _gate.Release(); }
+            client.Dispose();
+            throw;
+        }
+        finally { lock (_qrSync) { _qrPasswordWanted = null; _qrPassword = null; } }
+    }
+
+    public void SendQrPassword(string password) { lock (_qrSync) _qrPassword?.TrySetResult(password); }
+
+    private string? WaitForQrPassword()
+    {
+        Action<bool> wanted;
+        TaskCompletionSource<string> answer;
+        bool again;
+        lock (_qrSync)
+        {
+            if (_qrPasswordWanted is null) return null;
+            wanted = _qrPasswordWanted;
+            answer = _qrPassword = new(TaskCreationOptions.RunContinuationsAsynchronously);
+            again = ++_qrPasswordAsks > 1;
+        }
+        wanted(again);
+        return answer.Task.GetAwaiter().GetResult();
+    }
 }
 
 /// <summary>

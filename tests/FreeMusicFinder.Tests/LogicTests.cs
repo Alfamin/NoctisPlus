@@ -36,11 +36,13 @@ internal static class LogicTests
         Check.True(config.Available, "valid private defaults accepted");
         using var account = new TelegramAccount(Path.Combine(folder, "telegram.dat"), () => "");
         Check.Equal(12345, account.ApiId, "new account uses deployment defaults");
+        Check.True(account.UsesBuiltInApi, "owner #185: the built-in pair is used without being saved as the user's own");
         Check.False(account.IsLoggedIn, "defaults never authenticate somebody else's account");
         var store = new TelegramStore(Path.Combine(folder, "saved.dat"));
         store.Begin(98765, "saved private hash");
         using var saved = new TelegramAccount(Path.Combine(folder, "saved.dat"), () => "");
         Check.Equal(98765, saved.ApiId, "existing custom API settings take precedence");
+        Check.False(saved.UsesBuiltInApi, "a pair of the user's own is not the built-in one");
         Check.Equal("saved private hash", saved.ApiHash, "saved API hash is preserved");
         store.ClearSession();
         using var loggedOut = new TelegramAccount(Path.Combine(folder, "saved.dat"), () => "");

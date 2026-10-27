@@ -136,6 +136,10 @@ jobs:
           Write-Host ('Inno Setup ' + (Get-Item -LiteralPath $iscc).VersionInfo.ProductVersion)
       - name: Package portable preview and installer
         shell: powershell
+        env:
+          # Owner #185: the built-in Telegram app for new users; empty (users bring their own) when not set.
+          NOCTIS_TELEGRAM_API_ID: ${{ secrets.TELEGRAM_API_ID }}
+          NOCTIS_TELEGRAM_API_HASH: ${{ secrets.TELEGRAM_API_HASH }}
         run: .\scripts\Build-NoctisPlus.ps1 -Installer
       - name: Install, first-start import, reinstall and uninstall on this runner
         shell: powershell

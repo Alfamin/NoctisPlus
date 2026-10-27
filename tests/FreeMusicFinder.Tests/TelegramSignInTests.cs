@@ -12,7 +12,9 @@ internal static class TelegramSignInTests
         var account = new Account();
         var logs = new List<string>();
         using var vm = new TelegramSignInViewModel(account, logs.Add);
-        Check.True(vm.IsPhone && !vm.AdvancedOpen, "ready credentials keep the dialog phone-first");
+        Check.True(vm.IsQr && !vm.AdvancedOpen && !vm.ShowContinue, "owner #185: ready credentials open on the QR code");
+        vm.UsePhoneCommand.Execute(null);
+        Check.True(vm.IsPhone && vm.ShowContinue, "Use phone number keeps the phone steps one click away");
         vm.Phone = "9123456789";
         Run(vm.ContinueCommand.ExecuteAsync(null));
         Check.True(vm.HasError && account.Calls == 0, "invalid phone does not call Telegram");
@@ -41,7 +43,8 @@ internal static class TelegramSignInTests
         Run(vm.StartOverCommand.ExecuteAsync(null));
         Check.Equal(0, account.Logouts, "start over cannot erase a signed-in account");
         Run(vm.DisconnectCommand.ExecuteAsync(null));
-        Check.True(vm.IsPhone && account.Logouts == 1, "explicit confirmed disconnect returns to phone");
+        Check.True(vm.IsQr && account.Logouts == 1 && account.QrCalls == 1, "explicit confirmed disconnect returns to the QR code");
+        vm.UsePhoneCommand.Execute(null);
 
         var pending = new TaskCompletionSource<string?>();
         account.Pending = pending.Task;
@@ -55,6 +58,7 @@ internal static class TelegramSignInTests
 
         var failing = new Account { Pending = Task.FromException<string?>(new IOException("secret-url=do-not-log")) };
         using var errorVm = new TelegramSignInViewModel(failing, logs.Add) { Phone = "+989123456789" };
+        errorVm.UsePhoneCommand.Execute(null);
         Run(errorVm.ContinueCommand.ExecuteAsync(null));
         Check.True(errorVm.IsPhone && errorVm.Error.Contains("Settings → Features") && !errorVm.IsBusy, "network error stays recoverable and points at native settings");
         Check.False(logs.Any(l => l.Contains("secret-url") || l.Contains("synthetic-secret")), "log records exception type without credentials");
@@ -62,6 +66,7 @@ internal static class TelegramSignInTests
 
         var rejected = new Account();
         using var rejectedVm = new TelegramSignInViewModel(rejected, logs.Add) { Phone = "+989123456789" };
+        rejectedVm.UsePhoneCommand.Execute(null);
         Run(rejectedVm.ContinueCommand.ExecuteAsync(null));
         rejected.Pending = Task.FromException<string?>(new Exception("API_ID_INVALID"));
         rejectedVm.Code = "12345";
@@ -85,6 +90,10 @@ internal static class TelegramSignInTests
         public string ApiHash => "0123456789abcdef0123456789abcdef";
         public bool HasCredentials => true;
         public string DefaultsError => "";
+        public bool UsesBuiltInApi => false;
+        public int QrCalls;
+        public Task QrLoginAsync(int id, string hash, Action<string> show, Action<bool> passwordNeeded, CancellationToken ct) { QrCalls++; return Task.Delay(Timeout.Infinite, ct); }
+        public void SendQrPassword(string password) { }
         public string? Next = "verification_code";
         public Task<string?>? Pending;
         public int Calls, Logouts;

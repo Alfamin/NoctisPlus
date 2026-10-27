@@ -30,11 +30,27 @@
             </Border>
             <StackPanel Grid.Row="1" Margin="28,20,28,24" Spacing="18">
                 <TextBlock Text="{Binding Description}" FontSize="13" Opacity="0.75" TextWrapping="Wrap" />
+                <!-- Owner #185: scan with Telegram on the phone; the phone number stays one click away. -->
+                <StackPanel IsVisible="{Binding IsQr}" Spacing="14">
+                    <Grid Width="212" Height="212" HorizontalAlignment="Center">
+                        <Border CornerRadius="16" Classes="pill-well" IsVisible="{Binding QrWaiting}">
+                            <controls:ProgressRing Width="28" Height="28" IsIndeterminate="True"
+                                                   HorizontalAlignment="Center" VerticalAlignment="Center" />
+                        </Border>
+                        <Border CornerRadius="16" Background="White" Padding="6" IsVisible="{Binding HasQr}">
+                            <Image Source="{Binding QrImage}" Stretch="Uniform" RenderOptions.BitmapInterpolationMode="None"
+                                   AutomationProperties.Name="Telegram login QR code" />
+                        </Border>
+                    </Grid>
+                    <Button Classes="pill-secondary" Content="Use phone number" Command="{Binding UsePhoneCommand}"
+                            HorizontalAlignment="Center" />
+                </StackPanel>
                 <StackPanel IsVisible="{Binding IsPhone}" Spacing="16" IsEnabled="{Binding CanInteract}">
                     <StackPanel Spacing="6">
                         <TextBlock Text="Phone number" FontSize="12" Opacity="0.5" Margin="16,0,0,0" />
                         <TextBox x:Name="PhoneField" Classes="pill-field" Text="{Binding Phone}" Watermark="+98…" />
                     </StackPanel>
+                    <Grid ColumnDefinitions="Auto,*,Auto">
                     <Button Classes="pill-secondary" Command="{Binding ToggleAdvancedCommand}" HorizontalAlignment="Left" AutomationProperties.Name="Advanced">
                         <StackPanel Orientation="Horizontal" Spacing="8">
                             <TextBlock Text="Advanced" VerticalAlignment="Center" />
@@ -44,9 +60,11 @@
                                       Classes="advanced-chevron" Classes.open="{Binding AdvancedOpen}" />
                         </StackPanel>
                     </Button>
+                    <Button Grid.Column="2" Classes="pill-secondary" Content="Use a QR code" Command="{Binding UseQrCommand}" />
+                    </Grid>
                         <StackPanel x:Name="AdvancedFields" Spacing="10" IsVisible="{Binding AdvancedOpen}">
                             <Grid ColumnDefinitions="*,Auto" ColumnSpacing="12">
-                                <TextBlock Text="Telegram app settings from my.telegram.org. Existing settings are kept."
+                                <TextBlock Text="{Binding AdvancedHint}"
                                            FontSize="12" Opacity="0.65" TextWrapping="Wrap" VerticalAlignment="Center" />
                                 <Button Grid.Column="1" Classes="pill-secondary" Content="Open" VerticalAlignment="Center"
                                         Command="{Binding OpenAppsPageCommand}" ToolTip.Tip="my.telegram.org/apps"
@@ -72,7 +90,7 @@
                                            IsIndeterminate="True" HorizontalAlignment="Right" Margin="0,0,12,0" />
                     <Button Grid.Column="2" Classes="pill-secondary" Content="Cancel" Click="OnCancel"
                             IsVisible="{Binding !IsSignedIn}" MinWidth="92" Margin="0,0,10,0" />
-                    <Button Grid.Column="3" x:Name="ContinueButton" Classes="pill-primary"
+                    <Button Grid.Column="3" x:Name="ContinueButton" Classes="pill-primary" IsVisible="{Binding ShowContinue}"
                             Content="{Binding ContinueLabel}" Command="{Binding ContinueCommand}" MinWidth="108" />
                 </Grid>
             </Border>

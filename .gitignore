@@ -87,3 +87,6 @@ dotnet
 *.jks
 *.keystore
 *.p12
+
+# Owner #185: the built-in Telegram app pair is only ever added by the release build
+telegram-defaults.private.json

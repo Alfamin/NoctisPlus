@@ -158,18 +158,23 @@ internal static class WindowTests
 
     private static void SimpleLogin(FakeHost host)
     {
-        Check.Section("phone-first Telegram login with optional Advanced settings");
+        Check.Section("QR-first Telegram login (owner #185), phone number and optional Advanced settings");
         var folder = Check.NewFolder("simple-login");
         File.WriteAllText(Path.Combine(folder, "telegram-defaults.private.json"), "{\"api_id\":12345,\"api_hash\":\"0123456789abcdef0123456789abcdef\"}");
-        using var account = new TelegramAccount(Path.Combine(folder, "telegram.dat"), () => "");
+        // The QR code starts as the dialog opens; a dead local proxy keeps this check off the network.
+        using var account = new TelegramAccount(Path.Combine(folder, "telegram.dat"), () => "socks5://127.0.0.1:9");
         var window = new Noctis.Views.TelegramSignInDialog(account, host.Log);
         window.Show();
+        var vm = (Noctis.ViewModels.TelegramSignInViewModel)window.DataContext!;
+        Check.True(vm.IsQr && vm.Description.Contains("Link Desktop Device"), "a ready app opens on the QR code with where to scan it");
+        Check.True(vm.ApiHash.Length == 0, "the built-in API hash is never put in the field");
+        Picture(window, "7a QR login");
+        vm.UsePhoneCommand.Execute(null);
         var advanced = window.FindControl<StackPanel>("AdvancedFields")!;
         var hash = window.FindControl<TextBox>("ApiHashField")!;
-        var vm = (Noctis.ViewModels.TelegramSignInViewModel)window.DataContext!;
         Check.False(advanced.IsVisible, "API settings are collapsed when defaults are ready");
         Check.True(hash.PasswordChar != '\0', "the API hash is masked");
-        Check.True(vm.Description.Contains("phone number"), "phone-number-first instructions");
+        Check.True(vm.Description.Contains("phone number"), "Use phone number shows the phone instructions");
         Check.Equal("+989123456789", Noctis.ViewModels.TelegramSignInViewModel.Digits("+۹۸۹۱۲۳۴۵۶۷۸۹"), "Persian phone/code digits are accepted");
         var rejected = Noctis.ViewModels.TelegramSignInViewModel.Explain("API_ID_INVALID");
         Check.True(rejected.Contains("Advanced") && rejected.Contains("API_CREDENTIALS_REJECTED"), "rejected defaults explain how to override them");

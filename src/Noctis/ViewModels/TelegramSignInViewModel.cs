@@ -7,39 +7,49 @@ using FreeMusicFinder;
 
 namespace Noctis.ViewModels;
 
-/// <summary>Phone → code → optional password, using the existing private Telegram session store.</summary>
+/// <summary>QR code (owner #185), or phone → code → optional password, using the existing private Telegram session store.</summary>
 public sealed partial class TelegramSignInViewModel : ObservableObject, IDisposable
 {
-    public enum LoginStep { Phone, Code, Password, SignedIn }
+    public enum LoginStep { Qr, Phone, Code, Password, SignedIn }
     private readonly ITelegramSignIn _account;
     private readonly Action<string> _log;
     private bool _disposed;
+    private CancellationTokenSource? _qr;
+    // The password step belongs to the QR sign-in, which waits for it inside Telegram's own login.
+    private bool _qrPassword;
 
     internal TelegramSignInViewModel(ITelegramSignIn account, Action<string> log)
     {
         _account = account;
         _log = log;
-        ApiId = account.ApiId > 0 ? account.ApiId.ToString(CultureInfo.InvariantCulture) : "";
-        ApiHash = account.ApiHash;
+        // Owner #185: the built-in API pair is never shown; the fields hold only a pair of the user's own.
+        ApiId = !account.UsesBuiltInApi && account.ApiId > 0 ? account.ApiId.ToString(CultureInfo.InvariantCulture) : "";
+        ApiHash = account.UsesBuiltInApi ? "" : account.ApiHash;
         AdvancedOpen = !account.HasCredentials;
-        Step = account.IsLoggedIn ? LoginStep.SignedIn : LoginStep.Phone;
+        Step = account.IsLoggedIn ? LoginStep.SignedIn : account.HasCredentials ? LoginStep.Qr : LoginStep.Phone;
         Error = account.DefaultsError;
     }
 
     public event Action? CloseRequested;
-    [ObservableProperty, NotifyPropertyChangedFor(nameof(IsPhone), nameof(IsCode), nameof(IsPassword), nameof(IsSignedIn), nameof(Title), nameof(Description), nameof(ContinueLabel), nameof(CanStartOver))]
+    [ObservableProperty, NotifyPropertyChangedFor(nameof(IsQr), nameof(IsPhone), nameof(IsCode), nameof(IsPassword), nameof(IsSignedIn), nameof(Title), nameof(Description), nameof(ContinueLabel), nameof(CanStartOver), nameof(ShowContinue), nameof(QrWaiting))]
     private LoginStep _step;
+    [ObservableProperty, NotifyPropertyChangedFor(nameof(QrWaiting), nameof(HasQr))] private Avalonia.Media.IImage? _qrImage;
     [ObservableProperty] private string _apiId = "";
     [ObservableProperty] private string _apiHash = "";
     [ObservableProperty] private string _phone = "";
     [ObservableProperty] private string _code = "";
     [ObservableProperty] private string _password = "";
     [ObservableProperty] private bool _advancedOpen;
-    [ObservableProperty, NotifyPropertyChangedFor(nameof(HasError))] private string _error = "";
+    [ObservableProperty, NotifyPropertyChangedFor(nameof(HasError), nameof(ShowContinue), nameof(QrWaiting), nameof(HasQr))] private string _error = "";
     [ObservableProperty, NotifyPropertyChangedFor(nameof(CanInteract)), NotifyCanExecuteChangedFor(nameof(ContinueCommand), nameof(StartOverCommand), nameof(DisconnectCommand))]
     private bool _isBusy;
 
     public bool CanInteract => !IsBusy && !_disposed;
+    public bool IsQr => Step == LoginStep.Qr;
+    public bool QrWaiting => IsQr && QrImage is null && !HasError;
+    public bool HasQr => QrImage is not null && !HasError;
+    /// <summary>The QR page has no main button until something went wrong ("Try again").</summary>
+    public bool ShowContinue => !IsQr || HasError;
     public bool IsPhone => Step == LoginStep.Phone;
     public bool IsCode => Step == LoginStep.Code;
     public bool IsPassword => Step == LoginStep.Password;
@@ -50,7 +60,95 @@ public sealed partial class TelegramSignInViewModel : ObservableObject, IDisposa
     /// <summary>Owner #183: a first-time user has no API id/hash yet; this opens the page that makes them.</summary>
     internal const string AppsPage = "https://my.telegram.org/apps";
     [RelayCommand] private void OpenAppsPage() => Helpers.PlatformHelper.OpenUrl(AppsPage);
-    public string ContinueLabel => IsSignedIn ? "Done" : IsPhone ? "Send code" : "Continue";
+    public string ContinueLabel => IsSignedIn ? "Done" : IsQr ? "Try again" : IsPhone ? "Send code" : "Continue";
+    /// <summary>Owner #185: a user without the built-in pair is told the fields are optional only when they are.</summary>
+    public string AdvancedHint => _account.UsesBuiltInApi
+        ? "Optional: your own Telegram app from my.telegram.org."
+        : "Telegram app settings from my.telegram.org. Existing settings are kept.";
+
+    [RelayCommand]
+    private void UsePhone()
+    {
+        StopQr();
+        Error = "";
+        Step = LoginStep.Phone;
+    }
+
+    /// <summary>Shows a QR code to scan with Telegram on the phone; started when the dialog opens and by "Use a QR code".</summary>
+    [RelayCommand] private void UseQr() => _ = StartQrAsync();
+
+    internal async Task StartQrAsync()
+    {
+        if (_disposed || IsSignedIn) return;
+        StopQr();
+        Error = "";
+        QrImage = null;
+        Code = Password = "";
+        Step = LoginStep.Qr;
+        if (!TryApi(out var id, out var hash)) return;
+        var run = _qr = new CancellationTokenSource();
+        try
+        {
+            await _account.QrLoginAsync(id, hash,
+                link => OnUi(() => { if (_qr == run) QrImage = Helpers.QrCodeBitmap.TryRender(link, 6); }),
+                again => OnUi(() =>
+                {
+                    if (_qr != run || _disposed) return;
+                    _qrPassword = true;
+                    IsBusy = false;
+                    Password = "";
+                    Step = LoginStep.Password;
+                    Error = again ? Explain("PASSWORD_HASH_INVALID") : "";
+                }), run.Token);
+            if (_qr == run && !_disposed) { Error = ""; Step = LoginStep.SignedIn; }
+        }
+        catch (OperationCanceledException) when (run.IsCancellationRequested) { }
+        catch (Exception ex)
+        {
+            _log("Telegram QR login failed: " + ex.GetType().Name);
+            if (_qr == run && !_disposed)
+            {
+                _qrPassword = false;
+                if (ex.Message.Contains("API_ID", StringComparison.Ordinal) || ex.Message.Contains("API_HASH", StringComparison.Ordinal))
+                {
+                    Step = LoginStep.Phone;
+                    AdvancedOpen = true;
+                }
+                else if (IsPassword) Step = LoginStep.Qr;
+                QrImage = null;
+                Error = Explain(ex);
+            }
+        }
+        finally { if (_qr == run) { IsBusy = false; } }
+    }
+
+    private void StopQr()
+    {
+        _qrPassword = false;
+        var run = Interlocked.Exchange(ref _qr, null);
+        run?.Cancel();
+    }
+
+    private static void OnUi(Action act)
+    {
+        if (Avalonia.Threading.Dispatcher.UIThread.CheckAccess()) act();
+        else Avalonia.Threading.Dispatcher.UIThread.Post(act);
+    }
+
+    /// <summary>The API pair to sign in with: the user's own when typed, else the built-in one (0 and "").</summary>
+    private bool TryApi(out int id, out string hash)
+    {
+        hash = ApiHash.Trim();
+        id = 0;
+        var typed = Digits(ApiId.Trim());
+        if (typed.Length == 0 && hash.Length == 0 && _account.UsesBuiltInApi) return true;
+        if (int.TryParse(typed, NumberStyles.None, CultureInfo.InvariantCulture, out id) && id > 0 && Regex.IsMatch(hash, "\\A[a-fA-F0-9]{32}\\z")) return true;
+        Step = LoginStep.Phone;
+        AdvancedOpen = true;
+        Error = "TELEGRAM_API_MISSING: enter a positive API id and a 32-character API hash under Advanced.";
+        return false;
+    }
+
     public string Title => Step switch
     {
         LoginStep.Code => "Check Telegram",
@@ -63,6 +161,7 @@ public sealed partial class TelegramSignInViewModel : ObservableObject, IDisposa
         LoginStep.Code => "Enter the login code sent to your Telegram app or by SMS.",
         LoginStep.Password => "Enter your Telegram password. It is never saved.",
         LoginStep.SignedIn => $"Signed in as {_account.SignedInAs}. You can now download songs.",
+        LoginStep.Qr => "Scan in Telegram on your phone: Settings › Devices › Link Desktop Device.",
         _ => "Use your own phone number to download music. Your session stays on this computer.",
     };
 
@@ -71,6 +170,16 @@ public sealed partial class TelegramSignInViewModel : ObservableObject, IDisposa
     {
         if (!CanInteract) return;
         if (IsSignedIn) { CloseRequested?.Invoke(); return; }
+        if (IsQr) { _ = StartQrAsync(); return; }
+        if (IsPassword && _qrPassword)
+        {
+            if (Password.Length == 0) { Error = "Enter your two-step verification password."; return; }
+            Error = "";
+            IsBusy = true; // until Telegram accepts it (signed in) or asks again
+            _account.SendQrPassword(Password);
+            Password = "";
+            return;
+        }
         Error = "";
         IsBusy = true;
         try
@@ -79,13 +188,7 @@ public sealed partial class TelegramSignInViewModel : ObservableObject, IDisposa
             if (IsPhone)
             {
                 var phone = Digits(Phone.Trim());
-                var hash = ApiHash.Trim();
-                if (!int.TryParse(Digits(ApiId.Trim()), NumberStyles.None, CultureInfo.InvariantCulture, out var id) || id <= 0 || !Regex.IsMatch(hash, "\\A[a-fA-F0-9]{32}\\z"))
-                {
-                    AdvancedOpen = true;
-                    Error = "TELEGRAM_API_MISSING: enter a positive API id and a 32-character API hash under Advanced.";
-                    return;
-                }
+                if (!TryApi(out var id, out var hash)) return;
                 if (!phone.StartsWith('+') || phone[1..].Count(char.IsDigit) is < 7 or > 15 || phone[1..].Any(ch => !char.IsDigit(ch) && ch != ' ' && ch != '-'))
                 {
                     Error = "PHONE_NUMBER_INVALID: include your country code, for example +98 followed by your number.";
@@ -137,6 +240,7 @@ public sealed partial class TelegramSignInViewModel : ObservableObject, IDisposa
     {
         // This action is only for an incomplete login; closing an existing session never logs out.
         if (!CanInteract || IsSignedIn) return;
+        if (_qrPassword) { _ = StartQrAsync(); return; }
         IsBusy = true;
         Error = "";
         try
@@ -161,7 +265,7 @@ public sealed partial class TelegramSignInViewModel : ObservableObject, IDisposa
         try
         {
             await _account.LogOutAsync();
-            if (!_disposed) { Error = ""; Step = LoginStep.Phone; }
+            if (!_disposed) { Error = ""; Step = LoginStep.Phone; if (_account.HasCredentials) _ = StartQrAsync(); }
         }
         catch (Exception ex)
         {
@@ -189,6 +293,7 @@ public sealed partial class TelegramSignInViewModel : ObservableObject, IDisposa
     public void Dispose()
     {
         _disposed = true;
+        StopQr();
         Phone = Code = Password = ApiHash = "";
         ContinueCommand.NotifyCanExecuteChanged();
         StartOverCommand.NotifyCanExecuteChanged();

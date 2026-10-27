@@ -49,6 +49,7 @@ internal static class NativeFeaturePreview
             "telegram-code" => TelegramSignInViewModel.LoginStep.Code,
             "telegram-password" => TelegramSignInViewModel.LoginStep.Password,
             "telegram-connected" => TelegramSignInViewModel.LoginStep.SignedIn,
+            "telegram-qr" => TelegramSignInViewModel.LoginStep.Qr,
             _ => TelegramSignInViewModel.LoginStep.Phone,
         };
         if (preview == "telegram-error") vm.Error = TelegramSignInViewModel.Explain(new IOException());
@@ -123,9 +124,16 @@ internal static class NativeFeaturePreview
         public string ApiHash => "0123456789abcdef0123456789abcdef";
         public bool HasCredentials => true;
         public string DefaultsError => "";
+        public bool UsesBuiltInApi => false;
         public Task<string?> StartLoginAsync(int id, string hash, string phone) => Task.FromResult<string?>("verification_code");
         public Task<string?> ContinueLoginAsync(string answer) => Task.FromResult<string?>(null);
         public Task LogOutAsync() => Task.CompletedTask;
+        public Task QrLoginAsync(int id, string hash, Action<string> show, Action<bool> passwordNeeded, CancellationToken ct)
+        {
+            show("tg://login?token=preview");
+            return Task.Delay(Timeout.Infinite, ct);
+        }
+        public void SendQrPassword(string password) { }
     }
 }
 #endif

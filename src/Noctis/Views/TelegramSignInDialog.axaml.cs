@@ -20,7 +20,11 @@ public partial class TelegramSignInDialog : Window
         DataContext = _vm = new TelegramSignInViewModel(account, log);
         _vm.CloseRequested += Close;
         _vm.PropertyChanged += OnStateChanged;
-        Opened += (_, _) => FocusStep();
+        Opened += (_, _) =>
+        {
+            FocusStep();
+            if (_vm.IsQr) _ = _vm.StartQrAsync(); // owner #185: the code is ready the moment the dialog shows
+        };
         Closed += (_, _) =>
         {
             _vm.CloseRequested -= Close;
@@ -70,7 +74,7 @@ public partial class TelegramSignInDialog : Window
     {
         if (_vm is null) { base.OnKeyDown(e); return; }
         if (e.Key == Key.Escape) { e.Handled = true; Close(); return; }
-        if (e.Key == Key.Enter && _vm.ContinueCommand.CanExecute(null))
+        if (e.Key == Key.Enter && _vm.ShowContinue && _vm.ContinueCommand.CanExecute(null))
         {
             e.Handled = true;
             _vm.ContinueCommand.Execute(null);

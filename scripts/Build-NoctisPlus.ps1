@@ -38,6 +38,15 @@ if ($LASTEXITCODE -ne 0) { throw 'Publish failed. No package was produced. This 
 Copy-Item -LiteralPath (Join-Path $repoRoot 'LICENSE') -Destination $publishRoot
 Copy-Item -LiteralPath (Join-Path $repoRoot 'docs\fork\PROVENANCE.md') -Destination $publishRoot
 Copy-Item -LiteralPath (Join-Path $repoRoot 'docs\fork\QUICKSTART.md') -Destination $publishRoot
+# Owner #185: the Noctis Plus Telegram app (repository secrets), so a new user only scans a QR code or types a
+# number. Never printed; without the secrets users enter their own pair under Advanced.
+$tgId = "$env:NOCTIS_TELEGRAM_API_ID".Trim(); $tgHash = "$env:NOCTIS_TELEGRAM_API_HASH".Trim()
+if ($tgId -match '\A[1-9][0-9]{0,9}\z' -and $tgHash -match '\A[a-fA-F0-9]{32}\z') {
+    $tgJson = '{"api_id":' + $tgId + ',"api_hash":"' + $tgHash + '"}'
+    [IO.File]::WriteAllText((Join-Path $publishRoot 'telegram-defaults.private.json'), $tgJson, (New-Object Text.UTF8Encoding($false)))
+    Write-Host 'Built-in Telegram app included.'
+} elseif ($tgId -or $tgHash) { throw 'NOCTIS_TELEGRAM_API_ID / NOCTIS_TELEGRAM_API_HASH are set but not a valid pair.' }
+else { Write-Host 'No built-in Telegram app (secrets not set): users enter their own under Advanced.' }
 Add-Type -AssemblyName System.IO.Compression.FileSystem
 $zip = Join-Path $outputRoot 'NoctisPlus-windows-x64.zip'
 # Build to a new file first, so an interrupted build leaves the previous package intact.
