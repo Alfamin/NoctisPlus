@@ -24,34 +24,49 @@ public partial class HomeView : UserControl, ITrackSelectionSource
 
     /// <summary>Below this width Last Played drops under Most Played.</summary>
     private const double HeroTwoColumnMinWidth = 1100;
-    private bool _heroNarrow;
+    private bool _heroSingle, _heroAlone;
+    private double _heroWidth;
+    private HomeViewModel? _rowsOwner;
 
     public HomeView()
     {
         InitializeComponent();
         AddHandler(PointerPressedEvent, OnTilePointerPressed, RoutingStrategies.Tunnel);
         SizeChanged += (_, e) => UpdateHeroLayout(e.NewSize.Width);
+        DataContextChanged += (_, _) =>
+        {
+            if (_rowsOwner is not null) _rowsOwner.TopSongRows.CollectionChanged -= OnTopSongRowsChanged;
+            _rowsOwner = DataContext as HomeViewModel;
+            if (_rowsOwner is not null) _rowsOwner.TopSongRows.CollectionChanged += OnTopSongRowsChanged;
+            UpdateHeroLayout(0);
+        };
         // Forward Ctrl+A from the window so it works without first clicking a tile.
         _ = new WindowKeyForwarder(this, OnViewKeyDown);
     }
 
+    private void OnTopSongRowsChanged(object? sender, System.Collections.Specialized.NotifyCollectionChangedEventArgs e) => UpdateHeroLayout(0);
+
     /// <summary>
     /// Two equal columns (Most Played | Last Played) when there is room; one column with
-    /// Last Played underneath otherwise. Only touches the grid when the mode actually flips.
+    /// Last Played underneath otherwise. Owner #183: Last Played alone (nothing ranked yet, say
+    /// streams on an empty library) takes the whole row instead of the right half.
+    /// Only touches the grid when the mode actually flips. A width of 0 keeps the last one.
     /// </summary>
     private void UpdateHeroLayout(double width)
     {
-        var narrow = width > 0 && width < HeroTwoColumnMinWidth;
-        if (narrow == _heroNarrow) return;
-        _heroNarrow = narrow;
+        if (width > 0) _heroWidth = width;
+        var alone = DataContext is HomeViewModel { TopSongRows.Count: 0 };
+        var single = alone || _heroWidth > 0 && _heroWidth < HeroTwoColumnMinWidth;
+        if (single == _heroSingle && alone == _heroAlone) return;
+        _heroSingle = single; _heroAlone = alone;
 
-        if (narrow)
+        if (single)
         {
             HeroGrid.ColumnDefinitions[1].Width = new GridLength(0);
             HeroGrid.ColumnDefinitions[2].Width = new GridLength(0);
             Grid.SetColumn(LastPlayedPanel, 0);
-            Grid.SetRow(LastPlayedPanel, 2);
-            LastPlayedPanel.Margin = new Thickness(0, 32, 0, 0);
+            Grid.SetRow(LastPlayedPanel, alone ? 1 : 2);
+            LastPlayedPanel.Margin = alone ? default : new Thickness(0, 32, 0, 0);
         }
         else
         {

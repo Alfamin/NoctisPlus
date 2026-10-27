@@ -86,7 +86,7 @@ public partial class HomeViewModel : ViewModelBase, IDisposable
     // what Resume acts on; otherwise the newest history entry.
     private const int MaxRecentAlbums = 6;
 
-    [ObservableProperty, NotifyPropertyChangedFor(nameof(ShowWelcome))] private Track? _continueTrack;
+    [ObservableProperty, NotifyPropertyChangedFor(nameof(ShowWelcome), nameof(ShowWelcomeCentered), nameof(ShowWelcomeInline))] private Track? _continueTrack;
     [ObservableProperty] private Album? _continueAlbum;
     /// <summary>" · Album · Year" after the accent-coloured artist name ("" when neither is known).</summary>
     [ObservableProperty] private string _continueDetail = string.Empty;
@@ -218,10 +218,15 @@ public partial class HomeViewModel : ViewModelBase, IDisposable
     public event EventHandler<Album>? AlbumOpened;
 
     /// <summary>No songs at all (fresh install): Home shows the welcome card instead of a blank page.</summary>
-    [ObservableProperty, NotifyPropertyChangedFor(nameof(ShowWelcome), nameof(WelcomeTitle), nameof(WelcomeLine), nameof(WelcomeActionText))]
+    [ObservableProperty, NotifyPropertyChangedFor(nameof(ShowWelcome), nameof(ShowWelcomeCentered), nameof(ShowWelcomeInline), nameof(WelcomeTitle), nameof(WelcomeLine), nameof(WelcomeActionText))]
     private bool _isLibraryEmpty;
-    [ObservableProperty, NotifyPropertyChangedFor(nameof(ShowWelcome))] private bool _isLibraryUnplayed;
+    [ObservableProperty, NotifyPropertyChangedFor(nameof(ShowWelcome), nameof(ShowWelcomeCentered), nameof(ShowWelcomeInline))] private bool _isLibraryUnplayed;
     public bool ShowWelcome => IsLibraryEmpty || IsLibraryUnplayed && ContinueTrack is null;
+    /// <summary>Owner #183: a friend streamed two songs on an empty library and Continue listening / Last Played drew
+    /// under the centred welcome card. Once something was played the card sits below those rows instead.</summary>
+    private bool HasPlays => ContinueTrack is not null || LastPlayedRows.Count > 0;
+    public bool ShowWelcomeCentered => ShowWelcome && !HasPlays;
+    public bool ShowWelcomeInline => ShowWelcome && HasPlays;
     public string WelcomeTitle => Loc.T(IsLibraryEmpty ? "Home.WelcomeTitle" : "Home.ReadyTitle");
     public string WelcomeLine => Loc.T(IsLibraryEmpty ? "Home.WelcomeLine" : "Home.ReadyLine");
     public string WelcomeActionText => Loc.T(IsLibraryEmpty ? "Home.FindMusic" : "Home.PlayTip");
@@ -953,6 +958,7 @@ public partial class HomeViewModel : ViewModelBase, IDisposable
             return;
         LastPlayed.ReplaceAll(next);
         LastPlayedRows.ReplaceAll(next.Select((t, i) => new TopSongRow { Track = t, Rank = i + 1, IsLastPlayed = true }).ToList());
+        OnPropertyChanged(nameof(ShowWelcomeCentered)); OnPropertyChanged(nameof(ShowWelcomeInline));
     }
 
     /// <summary>Row click for both charts: queues the row's own list (Most Played or Last Played).</summary>

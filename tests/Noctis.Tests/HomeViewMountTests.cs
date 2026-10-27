@@ -68,6 +68,37 @@ public class HomeViewMountTests
         finally { window.Close(); }
     }
 
+    [AvaloniaFact] // Owner #183: two streams on an empty library drew Last Played under the centred welcome card.
+    public async Task PlaysOnAnEmptyLibrary_SitAboveTheWelcomeCard_AndLastPlayedTakesTheWholeRow()
+    {
+        EnsureAppStyles();
+        var library = new FakeLibraryService();
+        using var persistence = new TestPersistenceService();
+        var player = new PlayerViewModel(new FakeAudioPlayer(), library, persistence, new FakeAnimatedCoverService());
+        using var empty = new HomeViewModel(player, library, new SidebarViewModel(persistence, library));
+        await empty.RefreshAsync();
+        Assert.True(empty.ShowWelcomeCentered); Assert.False(empty.ShowWelcomeInline);
+
+        player.History.Add(T("Streamed", "Someone", 1)); // not in the library, as a stream is
+        using var vm = new HomeViewModel(player, library, new SidebarViewModel(persistence, library));
+        await vm.RefreshAsync();
+        Assert.True(vm.IsLibraryEmpty); Assert.Single(vm.LastPlayedRows);
+        Assert.False(vm.ShowWelcomeCentered); Assert.True(vm.ShowWelcomeInline);
+        var view = new HomeView { DataContext = vm };
+        var window = new Window { Content = view, Width = 1400, Height = 900 };
+        try
+        {
+            window.Show(); Dispatcher.UIThread.RunJobs(); window.UpdateLayout();
+            var last = view.FindControl<StackPanel>("LastPlayedPanel")!;
+            Assert.Equal(0, Grid.GetColumn(last));
+            Assert.Equal(0, view.FindControl<Grid>("HeroGrid")!.ColumnDefinitions[2].Width.Value);
+            var welcome = view.GetVisualDescendants().OfType<TextBlock>().Where(t => t.IsEffectivelyVisible && t.Text == "Let's fill your library").ToList();
+            var title = Assert.Single(welcome);
+            Assert.True(title.TranslatePoint(default, view)!.Value.Y > last.TranslatePoint(new Point(0, last.Bounds.Height), view)!.Value.Y);
+        }
+        finally { window.Close(); }
+    }
+
     [AvaloniaFact]
     public async Task HomePage_MountsHeroAndSideBySideCharts()
     {
