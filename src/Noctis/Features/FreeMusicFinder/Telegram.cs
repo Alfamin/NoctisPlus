@@ -112,7 +112,9 @@ internal sealed class TelegramAccount : ITelegramSignIn, IDisposable
 
     private readonly Dictionary<string, User> _bots = new(StringComparer.OrdinalIgnoreCase);
     private readonly HashSet<string> _started = new(StringComparer.OrdinalIgnoreCase);
-    private readonly SemaphoreSlim _qualityGate = new(1, 1);
+    // One settings walk at a time per bot; owner #183: two bots are two chats, so their walks no longer queue up.
+    private readonly Dictionary<string, SemaphoreSlim> _qualityGates = new(StringComparer.OrdinalIgnoreCase);
+    private SemaphoreSlim QualityGate(string username) { lock (_qualityGates) return _qualityGates.TryGetValue(username, out var g) ? g : _qualityGates[username] = new(1, 1); }
 
     /// <summary>A bot's audio format as last confirmed for an account, or why its menu could not be used.</summary>
     internal sealed record BotQualityState(string Quality, DateTimeOffset At, string? Problem = null);
@@ -170,7 +172,8 @@ internal sealed class TelegramAccount : ITelegramSignIn, IDisposable
     /// <returns>True when the bot's setting had to be changed.</returns>
     public async Task<bool> SetQualityAsync(string username, string provider, AudioQuality quality, CancellationToken ct)
     {
-        await _qualityGate.WaitAsync(ct).ConfigureAwait(false);
+        var gate = QualityGate(username);
+        await gate.WaitAsync(ct).ConfigureAwait(false);
         try
         {
             BotQualityState? known;
@@ -209,7 +212,7 @@ internal sealed class TelegramAccount : ITelegramSignIn, IDisposable
             _log?.Invoke(provider + (changed ? " switched to " : " already uses ") + quality + ".");
             return changed;
         }
-        finally { _qualityGate.Release(); }
+        finally { gate.Release(); }
     }
     private Client? _botsClient;
 
