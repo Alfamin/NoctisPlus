@@ -464,7 +464,7 @@ internal sealed class TelegramAccount : ITelegramSignIn, IDisposable
             ObjectDisposedException.ThrowIf(_disposed, this);
             _client?.Dispose();
             _client = null;
-            _store.Begin(apiId, apiHash);
+            _store.BeginKeepingKey(apiId, apiHash);
             lock (_qrSync) { _qrPasswordWanted = passwordNeeded; _qrPasswordAsks = 0; }
             client = _client = CreateClient();
         }
@@ -472,7 +472,8 @@ internal sealed class TelegramAccount : ITelegramSignIn, IDisposable
         using var stop = ct.Register(() => { lock (_qrSync) _qrPassword?.TrySetCanceled(); });
         try
         {
-            var user = await client.LoginWithQRCode(show, logoutFirst: false, ct: ct).ConfigureAwait(false);
+            // logoutFirst: a kept session whose earlier scan was accepted but never finished here starts clean.
+            var user = await client.LoginWithQRCode(show, logoutFirst: true, ct: ct).ConfigureAwait(false);
             ct.ThrowIfCancellationRequested();
             if (user is null || !ReferenceEquals(_client, client)) throw new OperationCanceledException(ct);
             _store.SetAccount(user.MainUsername is { Length: > 0 } name ? "@" + name : user.first_name);
@@ -490,6 +491,25 @@ internal sealed class TelegramAccount : ITelegramSignIn, IDisposable
     }
 
     public void SendQrPassword(string password) { lock (_qrSync) _qrPassword?.TrySetResult(password); }
+
+    /// <summary>
+    /// Owner #185: while nobody is signed in, one connection makes Telegram's first handshake ahead of time. Its key is
+    /// kept in the login file, so the QR code needs one quick request when the dialog opens. Once per install.
+    /// </summary>
+    public async Task WarmUpAsync(CancellationToken ct)
+    {
+        await _gate.WaitAsync(ct).ConfigureAwait(false);
+        try
+        {
+            if (_disposed || IsLoggedIn || !HasCredentials || _store.HasSession || _client is not null) return;
+            _store.BeginKeepingKey(_store.ApiId, _store.ApiHash);
+            using var client = CreateClient();
+            await client.ConnectAsync().WaitAsync(TimeSpan.FromSeconds(30), ct).ConfigureAwait(false);
+            _log?.Invoke("Telegram handshake made ahead of sign-in.");
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException) { _log?.Invoke("Telegram warm-up skipped: " + ex.GetType().Name); }
+        finally { _gate.Release(); }
+    }
 
     private string? WaitForQrPassword()
     {

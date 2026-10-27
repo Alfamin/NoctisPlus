@@ -89,6 +89,16 @@ public sealed class FreeMusicPlugin : INoctisPlugin
         _firstBot = host.Settings.GetString("firstBot") == "DeezLoad" ? "DeezLoad" : BotSelections.Hunters;
         _lastFmKey = host.Settings.GetString(LastFmKey)?.Trim() ?? "";
         _telegram = new TelegramAccount(Path.Combine(host.DataDirectory, "telegram.dat"), () => _proxy, Log);
+        // Owner #185: a signed-out install makes Telegram's first handshake early, so the QR code shows at once.
+        if (!_telegram.IsLoggedIn && _telegram.HasCredentials)
+        {
+            var (account, stop) = (_telegram, _qualityStop.Token);
+            _ = Task.Run(async () =>
+            {
+                try { await Task.Delay(TimeSpan.FromSeconds(10), stop).ConfigureAwait(false); await account.WarmUpAsync(stop).ConfigureAwait(false); }
+                catch (OperationCanceledException) { }
+            });
+        }
         _deezLoad = new DeezLoadSource(_telegram,Announce, ResolveDeezLoadLinkAsync);
         _bot = new MusicSources(new HunterMusicSource(_telegram,Log, ResolveHunterLinkAsync),_deezLoad,Announce,
             Path.Combine(host.DataDirectory,"source-limits.json"),allowMp3:()=>_preferredQuality == AudioQuality.MP3 || _allowMp3,

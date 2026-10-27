@@ -61,6 +61,21 @@ internal sealed class TelegramStore
         }
     }
 
+    public bool HasSession { get { lock (_gate) return _session.Length > 0; } }
+
+    /// <summary>
+    /// Owner #185: like <see cref="Begin"/>, but a session nobody is signed in to keeps its key when the API pair is
+    /// the same, so Telegram's slow first handshake is not made again for every QR code.
+    /// </summary>
+    public void BeginKeepingKey(int apiId, string apiHash)
+    {
+        lock (_gate)
+        {
+            if (Account.Length == 0 && ApiId == apiId && ApiHash == apiHash && _session.Length > 0) return;
+            Begin(apiId, apiHash);
+        }
+    }
+
     public void SetAccount(string name)
     {
         lock (_gate)

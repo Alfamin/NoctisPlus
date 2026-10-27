@@ -59,6 +59,17 @@ internal static class LogicTests
         File.WriteAllText(path, new string('x', 4097));
         Check.False(TelegramDefaults.Read(path).Available, "oversized defaults rejected");
         Check.False(TelegramDefaults.Read(Path.Combine(folder, "missing.json")).Available, "public installation works without private defaults");
+        var warm = new TelegramStore(Path.Combine(folder, "warm.dat"));
+        warm.Begin(0, "");
+        using (var session = warm.OpenSession()) session.Write([1, 2, 3], 0, 3);
+        warm.BeginKeepingKey(0, "");
+        Check.True(warm.HasSession, "owner #185: a signed-out session keeps its handshake for the next QR code");
+        warm.BeginKeepingKey(98765, "fedcba9876543210fedcba9876543210");
+        Check.False(warm.HasSession, "another API pair starts from a new session");
+        warm.OpenSession().Write([1, 2, 3], 0, 3);
+        warm.SetAccount("@someone");
+        warm.BeginKeepingKey(98765, "fedcba9876543210fedcba9876543210");
+        Check.False(warm.HasSession, "a signed-in session is never reused for a new sign-in");
     }
 
     private static BotText.Line Line(string artist, string title, string? length = null, string number = "1")

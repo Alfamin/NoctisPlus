@@ -22,9 +22,9 @@ public sealed partial class TelegramSignInViewModel : ObservableObject, IDisposa
     {
         _account = account;
         _log = log;
-        // Owner #185: the built-in API pair is never shown; the fields hold only a pair of the user's own.
-        ApiId = !account.UsesBuiltInApi && account.ApiId > 0 ? account.ApiId.ToString(CultureInfo.InvariantCulture) : "";
-        ApiHash = account.UsesBuiltInApi ? "" : account.ApiHash;
+        // Owner #185: the fields come filled in (the built-in pair when the user has none); the hash stays masked.
+        ApiId = account.ApiId > 0 ? account.ApiId.ToString(CultureInfo.InvariantCulture) : "";
+        ApiHash = account.ApiHash;
         AdvancedOpen = !account.HasCredentials;
         Step = account.IsLoggedIn ? LoginStep.SignedIn : account.HasCredentials ? LoginStep.Qr : LoginStep.Phone;
         Error = account.DefaultsError;
@@ -63,7 +63,7 @@ public sealed partial class TelegramSignInViewModel : ObservableObject, IDisposa
     public string ContinueLabel => IsSignedIn ? "Done" : IsQr ? "Try again" : IsPhone ? "Send code" : "Continue";
     /// <summary>Owner #185: a user without the built-in pair is told the fields are optional only when they are.</summary>
     public string AdvancedHint => _account.UsesBuiltInApi
-        ? "Optional: your own Telegram app from my.telegram.org."
+        ? "Filled in for you. Change only to use your own app from my.telegram.org."
         : "Telegram app settings from my.telegram.org. Existing settings are kept.";
 
     [RelayCommand]
@@ -142,7 +142,12 @@ public sealed partial class TelegramSignInViewModel : ObservableObject, IDisposa
         id = 0;
         var typed = Digits(ApiId.Trim());
         if (typed.Length == 0 && hash.Length == 0 && _account.UsesBuiltInApi) return true;
-        if (int.TryParse(typed, NumberStyles.None, CultureInfo.InvariantCulture, out id) && id > 0 && Regex.IsMatch(hash, "\\A[a-fA-F0-9]{32}\\z")) return true;
+        if (int.TryParse(typed, NumberStyles.None, CultureInfo.InvariantCulture, out id) && id > 0 && Regex.IsMatch(hash, "\\A[a-fA-F0-9]{32}\\z"))
+        {
+            // The pre-filled built-in pair is not saved as the user's own, so a newer release's pair still applies.
+            if (_account.UsesBuiltInApi && id == _account.ApiId && string.Equals(hash, _account.ApiHash, StringComparison.OrdinalIgnoreCase)) { id = 0; hash = ""; }
+            return true;
+        }
         Step = LoginStep.Phone;
         AdvancedOpen = true;
         Error = "TELEGRAM_API_MISSING: enter a positive API id and a 32-character API hash under Advanced.";
