@@ -118,4 +118,9 @@ public sealed class StreamingImportRow
     public IReadOnlyList<StreamingMissingRow> Missing { get; }
 }
 
-public sealed record StreamingMissingRow(int Position, string Title, string Artist, string Reason);
+public sealed record StreamingMissingRow(int Position, string Title, string Artist, string Reason)
+{
+    /// <summary>Owner #183: the plain "not in your library" reason under every row (all 50 on an empty library) said what
+    /// the heading already says; only a reason worth reading (another length, another artist, unavailable) shows.</summary>
+    public bool ShowReason => !Reason.StartsWith("No matching local recording", StringComparison.Ordinal);
+}
