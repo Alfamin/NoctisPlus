@@ -109,7 +109,7 @@ internal sealed class Tool
     /// each song is written to <paramref name="resultFile"/>, the program's own output to <paramref name="logFile"/>.
     /// With <paramref name="controlFile"/> the program looks at that small file twice a second: "pause", "run" or "stop".
     /// </summary>
-    public Process StartQuietRun(string root, string listFile, string resultFile, string logFile, string speed, string backup, bool retry, string? progressFile = null, string? controlFile = null, TimingAction action = TimingAction.Missing, string? draft = null)
+    public Process StartQuietRun(string root, string listFile, string resultFile, string logFile, string speed, string backup, bool retry, string? progressFile = null, string? controlFile = null, TimingAction action = TimingAction.Missing, string? draft = null, bool adapt = false)
     {
         // Pass paths as real arguments. cmd.exe expands %variables% even inside quotes.
         var python = Environment.GetEnvironmentVariable("WORDLYRICS_PYTHON");
@@ -144,6 +144,7 @@ internal sealed class Tool
         info.Environment["WORDLYRICS_HOME"] = Folder;
         info.Environment["PYTHONPATH"] = Folder;
         info.Environment["WORDLYRICS_NO_PAUSE"] = "1"; // the launcher waits for a key press otherwise
+        info.Environment["WORDLYRICS_ADAPT"] = adapt ? "1" : "0"; // owner #187: ease off when the PC is busy (BackgroundEntry)
         File.WriteAllText(logFile, "WordLyrics background run\n", new UTF8Encoding(false));
         var gate = new object();
         void Log(object sender, DataReceivedEventArgs e)
@@ -204,6 +205,11 @@ internal sealed class Tool
     // Both guards are process-local; explicit, confirmed Setup keeps the normal installer.
     // Owner #183: one voice-model piece per call (WordLyrics 1.6.5 does this itself). The 1.6.4 default of four held
     // about 7 GB more memory on DirectML for the same speed; on an 8 GB card a run crawled at 7-10 GB of RAM.
+    // Owner #187: processor runs without onnxruntime's memory pool (8.2 -> 3.1 GB, same speed, measured). A graphics
+    // card that takes WordLyrics down before its first model call three starts running is left out for 3 days.
+    // With "Ease off when the PC is busy": a model call 1.5x slower than its best means a game or app is using the
+    // card/processor, so the models rest more (down to a quarter) and speed up again when calls are quick; under
+    // 2 GB free RAM they work a quarter of the time, under 1 GB they wait (up to a minute) before the next step.
     internal const string BackgroundEntry = """
         import os,sys
         import wordlyrics.runner as runner
@@ -223,6 +229,88 @@ internal sealed class Tool
             separate.BATCH=1
             separate.spec_batches.__defaults__=(1,)
             separate.count_batches.__defaults__=(1,)
+        except Exception:
+            pass
+        try:
+            import platform,time
+            from wordlyrics import engine as E
+            plain_session,plain_auto,plain_run=E.Engine._session,E.Engine._auto,E.Engine._run
+            def lean_session(self,model,where):
+                if where=='cpu' and (model,where) not in self.sessions:
+                    so=self.ort.SessionOptions()
+                    so.enable_cpu_mem_arena=False
+                    self.sessions[(model,where)]=self.ort.InferenceSession(os.path.join(self.dir,model),sess_options=so,providers=['CPUExecutionProvider'])
+                return plain_session(self,model,where)
+            def guarded_auto(self,settings_path):
+                self.unfinished=None
+                if not settings_path:
+                    return plain_auto(self,settings_path)
+                mark=settings_path+'.unfinished'
+                sig='%s|%s|%s|%s'%(self.ort.__version__,self.gpu,os.cpu_count(),platform.machine())
+                count,since=0,time.time()
+                try:
+                    seen,n,at=open(mark,encoding='utf-8').read().rsplit('#',2)
+                    if seen==sig and time.time()-float(at)<3*86400:
+                        count,since=int(n),float(at)
+                except Exception:
+                    pass
+                if count>=3:
+                    self.where={E.ALIGNER:'cpu',E.SEPARATOR:'cpu'}
+                    self.note='GPU_SKIPPED: the graphics card stopped WordLyrics while starting; using the processor for now.'
+                    self.say(self.note)
+                    return
+                try:
+                    with open(mark,'w',encoding='utf-8') as f:
+                        f.write('%s#%d#%f'%(sig,count+1,since))
+                    self.unfinished=mark
+                except OSError:
+                    pass
+                plain_auto(self,settings_path)
+            def proving_run(self,model,outs,feed):
+                self.current_model=model
+                out=plain_run(self,model,outs,feed)
+                mark,self.unfinished=getattr(self,'unfinished',None),None
+                if mark:
+                    try:
+                        os.remove(mark)
+                    except OSError:
+                        pass
+                return out
+            E.Engine._session,E.Engine._auto,E.Engine._run=lean_session,guarded_auto,proving_run
+            if os.environ.get('WORDLYRICS_ADAPT')=='1':
+                import ctypes
+                class Mem(ctypes.Structure):
+                    _fields_=[('size',ctypes.c_ulong),('load',ctypes.c_ulong)]+[(n,ctypes.c_ulonglong) for n in ('total','free','tp','fp','tv','fv','fe')]
+                def free_gb():
+                    m=Mem()
+                    m.size=ctypes.sizeof(Mem)
+                    return m.free/2**30 if ctypes.windll.kernel32.GlobalMemoryStatusEx(ctypes.byref(m)) else 99.0
+                plain_rest=E.Engine._rest
+                def easing_rest(self,worked):
+                    best=self.__dict__.setdefault('fastest',{})
+                    model,now=getattr(self,'current_model',None),time.monotonic()
+                    was,at=best.get(model,(worked,now))
+                    fastest=min(worked,was*(1+0.001*(now-at)))
+                    best[model]=(fastest,now)
+                    share=self.__dict__.get('share',1.0)
+                    share=max(0.25,share*0.7) if worked>1.5*fastest else min(1.0,share*1.1)
+                    free=free_gb()
+                    if free<2.0:
+                        share=0.25
+                    self.share=share
+                    waited=0
+                    while free_gb()<1.0 and waited<60 and not (self.stop is not None and self.stop.is_set()):
+                        if not waited:
+                            self.say('Memory is low; waiting for room before the next step.')
+                        time.sleep(2)
+                        waited+=2
+                    mine=self.pace
+                    self.pace=min(mine,share)
+                    try:
+                        plain_rest(self,worked)
+                    finally:
+                        self.pace=mine
+                E.Engine._rest=easing_rest
         except Exception:
             pass
         sys.exit(runner.main())

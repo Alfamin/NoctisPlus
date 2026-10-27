@@ -97,7 +97,7 @@ internal sealed class WordLyricsService(ILibraryService library, Func<AppSetting
         var mode = Enum.TryParse<WordTimingMode>(config.GetString(WordTimingSettings.ModeKey), out var value) && Enum.IsDefined(value) ? value : WordTimingMode.Medium;
         var oldValues = settings().PluginSettingValues?.FirstOrDefault(p => p.Key.Equals("dev.moshi.wordlyrics", StringComparison.OrdinalIgnoreCase)).Value;
         var oldSpeed = oldValues?.GetValueOrDefault("speed") ?? "Half";
-        return new(mode != WordTimingMode.Off, WordTimingSettings.BackendSpeed(mode) ?? oldSpeed, config.GetBool("notify", true), config.GetString("folder") ?? "", config.GetString("backup") ?? "", config.GetBool("lightWhileGaming", true));
+        return new(mode != WordTimingMode.Off, WordTimingSettings.BackendSpeed(mode) ?? oldSpeed, config.GetBool("notify", true), config.GetString("folder") ?? "", config.GetString("backup") ?? "", config.GetBool("lightWhileGaming", true), config.GetBool("adaptToPc", true));
     }
     internal void SettingChanged(string key)
     {

@@ -45,6 +45,13 @@
       "default": true
     },
     {
+      "key": "adaptToPc",
+      "label": "Ease off when the PC is busy",
+      "description": "Rests more while a game or app slows the models, and waits when memory runs low.",
+      "type": "bool",
+      "default": true
+    },
+    {
       "key": "notify",
       "label": "Say when a song is done",
       "description": "A short notification each time a song's word timing is finished.",

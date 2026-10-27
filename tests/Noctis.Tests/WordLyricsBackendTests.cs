@@ -370,6 +370,82 @@ public class WordLyricsBackendTests
         await child.WaitForExitAsync().WaitAsync(TimeSpan.FromSeconds(8));
         Assert.Equal(0, child.ExitCode); Assert.Contains("pieces 1 1 1", File.ReadAllText(log));
     }
+    [Fact] // Owner #187: processor runs skip the memory pool; a card that keeps crashing the start is left out.
+    public async Task BackgroundRuns_KeepProcessorMemoryLow_AndLeaveOutACardThatCrashesTheStart()
+    {
+        using var rig = new Rig();
+        var module = Path.Combine(rig.App, "wordlyrics");
+        File.WriteAllText(Path.Combine(module, "engine.py"), string.Join('\n',
+            "ALIGNER,SEPARATOR='a','s'",
+            "class Opts:",
+            "    enable_cpu_mem_arena=True",
+            "class FakeOrt:",
+            "    __version__='t'",
+            "    SessionOptions=Opts",
+            "    @staticmethod",
+            "    def InferenceSession(path,sess_options=None,providers=None):return ('cpu',sess_options.enable_cpu_mem_arena)",
+            "class Engine:",
+            "    def __init__(self,settings):",
+            "        self.ort,self.gpu,self.dir,self.sessions,self.note,self.say=FakeOrt,'card','m',{},'',lambda m:None",
+            "        self._auto(settings)",
+            "    def _session(self,model,where):return self.sessions.setdefault((model,where),('gpu',True))",
+            "    def _auto(self,settings_path):self.where={ALIGNER:'gpu',SEPARATOR:'gpu'}",
+            "    def _run(self,model,outs,feed):return 'ran'", ""));
+        File.WriteAllText(Path.Combine(module, "runner.py"), string.Join('\n',
+            "import os",
+            "from . import engine as E",
+            "def probe(python):return []",
+            "def main():",
+            "    s=os.path.join(os.environ['WORDLYRICS_HOME'],'speed test.json')",
+            "    for i in range(3):E.Engine(s)",
+            "    e=E.Engine(s);print('fourth',e.where[E.ALIGNER],e.note[:11],flush=True)",
+            "    os.remove(s+'.unfinished')",
+            "    e=E.Engine(s);e._run('a',None,None);print('proved',os.path.exists(s+'.unfinished'),flush=True)",
+            "    print('pool',e._session('a','cpu')[1],flush=True)",
+            "    return 0", ""));
+        var list = Path.Combine(rig.Work, "songs.txt"); File.WriteAllLines(list, [rig.Song]);
+        var log = Path.Combine(rig.Work, "run.log");
+        using var child = new Tool(rig.App).StartQuietRun(rig.Music, list, rig.Result, log, "light", "", true);
+        await child.WaitForExitAsync().WaitAsync(TimeSpan.FromSeconds(8));
+        var text = File.ReadAllText(log);
+        Assert.Equal(0, child.ExitCode);
+        Assert.Contains("fourth cpu GPU_SKIPPED", text);
+        Assert.Contains("proved False", text);
+        Assert.Contains("pool False", text);
+    }
+
+    [Theory] // Owner #187: "Ease off when the PC is busy" rests more while calls run slow, and only when it is on.
+    [InlineData(true, "paces 1.0 1.0 0.7 0.49 0.54 0.59")]
+    [InlineData(false, "paces 1.0 1.0 1.0 1.0 1.0 1.0")]
+    public async Task EaseOff_RestsMoreWhileModelCallsRunSlow(bool adapt, string expected)
+    {
+        using var rig = new Rig();
+        var module = Path.Combine(rig.App, "wordlyrics");
+        File.WriteAllText(Path.Combine(module, "engine.py"), string.Join('\n',
+            "ALIGNER,SEPARATOR='a','s'",
+            "class Engine:",
+            "    stop=None",
+            "    def __init__(self):self.pace,self.paces,self.say,self.current_model=1.0,[],lambda m:None,'a'",
+            "    def _session(self,model,where):return None",
+            "    def _auto(self,settings_path):pass",
+            "    def _run(self,model,outs,feed):return 'ran'",
+            "    def _rest(self,worked):self.paces.append(round(self.pace,2))", ""));
+        File.WriteAllText(Path.Combine(module, "runner.py"), string.Join('\n',
+            "from . import engine as E",
+            "def probe(python):return []",
+            "def main():",
+            "    e=E.Engine()",
+            "    for worked in (1.0,1.0,2.0,2.0,1.0,1.0):e._rest(worked)",
+            "    print('paces',' '.join(str(p) for p in e.paces),flush=True)",
+            "    return 0", ""));
+        var list = Path.Combine(rig.Work, "songs.txt"); File.WriteAllLines(list, [rig.Song]);
+        var log = Path.Combine(rig.Work, "run.log");
+        using var child = new Tool(rig.App).StartQuietRun(rig.Music, list, rig.Result, log, "full", "", true, adapt: adapt);
+        await child.WaitForExitAsync().WaitAsync(TimeSpan.FromSeconds(8));
+        Assert.Equal(0, child.ExitCode);
+        Assert.Contains(expected, File.ReadAllText(log));
+    }
+
     // ── Owner #91: Restart, a stuck-run watchdog, a fixed setup and "time all songs without word timing" ──
 
     [Fact]

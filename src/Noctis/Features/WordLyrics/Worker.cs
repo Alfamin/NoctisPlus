@@ -5,7 +5,7 @@ using System.Text.Json;
 namespace Noctis.Features.WordLyrics;
 
 /// <summary>What the user chose in Settings → Features. Read on the UI thread, used everywhere.</summary>
-internal sealed record Options(bool Auto, string Speed, bool Notify, string Folder, string Backup, bool LightWhileGaming = true);
+internal sealed record Options(bool Auto, string Speed, bool Notify, string Folder, string Backup, bool LightWhileGaming = true, bool AdaptToPc = true);
 
 /// <summary>
 /// Processes typed library/download requests, one background run at a time. Retains the
@@ -796,7 +796,7 @@ internal sealed class Worker : IDisposable
             File.WriteAllLines(ListFile, batch.Select(i => i.Path), new UTF8Encoding(false));
             if (controlled) WriteControl(_paused ? "pause" : "run");
             run = _run = tool.StartQuietRun(batch[0].Root, ListFile, ResultFile, OutputFile, speed, options.Backup, retry: batch[0].Asked, ProgressFile,
-                controlled ? ControlFile : null, batch[0].Action, batch[0].Draft);
+                controlled ? ControlFile : null, batch[0].Action, batch[0].Draft, options.AdaptToPc);
             _job = Job.Around(run);
             _activePaths.Clear();
             _activePaths.UnionWith(batch.Select(i => i.Path));
