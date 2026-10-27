@@ -32,6 +32,13 @@ public sealed partial class WordLyricsViewModel : ObservableObject, IDisposable
     /// (owner, 2026-10-18: it asked to download 1.33 GB that was already there).</summary>
     public bool IsSetUp { get; }
     public string SetupLabel => IsSetUp ? "WordLyrics settings" : "Set up WordLyrics";
+    /// <summary>Owner #183: before setup the panel offered Pause/Stop/Restart and a red Start timing that could do nothing;
+    /// a first-time user sees only Set up WordLyrics as the main action.</summary>
+    public bool ShowTimingActions => IsSetUp;
+    public bool ShowStart => CanQueue && IsSetUp;
+    public bool ShowMissing => !IsSong && IsSetUp;
+    public bool ShowFolders => IsLibrary && IsSetUp;
+    public bool ShowActions => IsSong && IsSetUp;
     public string Title { get; }
     public bool IsLibrary { get; }
     public bool IsSong { get; }

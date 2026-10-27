@@ -7,6 +7,7 @@ using System.Collections.Concurrent;
 using Avalonia.Controls;
 using Avalonia.Headless.XUnit;
 using Avalonia.Threading;
+using Avalonia.VisualTree;
 using Noctis.Features.WordLyrics;
 using Noctis.Models;
 using Noctis.Services.Plugins;
@@ -86,6 +87,27 @@ public class NativeWordLyricsTests
         Assert.False(panel.FindControl<Noctis.Controls.PillDialogHost>("TimingHost")!.ShowBackdrop);
         panel.UseWindowBackdrop();
         Assert.True(panel.FindControl<Noctis.Controls.PillDialogHost>("TimingHost")!.ShowBackdrop);
+    }
+
+    [AvaloniaFact] // Owner #183: a first-time user saw Pause/Stop/Restart and a red Start timing before WordLyrics was installed.
+    public void BeforeSetup_ThePanelOffersOnlySetUpAsTheMainAction()
+    {
+        using var rig = new Rig(); var track = rig.Library.TrackList[0];
+        using var vm = new WordLyricsViewModel(rig.Service, false, track, _ => Task.FromResult(true));
+        Assert.False(vm.IsSetUp); Assert.Equal("Set up WordLyrics", vm.SetupLabel);
+        Assert.False(vm.ShowStart); Assert.False(vm.ShowTimingActions); Assert.False(vm.ShowActions);
+        var panel = new WordLyricsPanel { DataContext = vm };
+        var window = new Window { Content = panel, Width = 900, Height = 800 };
+        try
+        {
+            window.Show(); Dispatcher.UIThread.RunJobs();
+            var buttons = panel.GetVisualDescendants().OfType<Button>().Where(b => b.IsEffectivelyVisible).ToList();
+            var setup = Assert.Single(buttons, b => Equals(b.Content, "Set up WordLyrics"));
+            Assert.Contains("pill-primary", setup.Classes);
+            Assert.DoesNotContain(buttons, b => Equals(b.Content, "Start timing") || Equals(b.Content, "Stop") || Equals(b.Content, "Restart"));
+            Assert.Contains(buttons, b => Equals(b.Content, vm.IgnoreLabel));
+        }
+        finally { window.Close(); }
     }
 
     [AvaloniaFact]

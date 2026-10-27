@@ -26,7 +26,7 @@
             </StackPanel>
           </Grid>
           <TextBlock Text="{Binding DetailLine}" FontSize="12" Opacity="0.65" TextTrimming="CharacterEllipsis" MaxLines="1" />
-          <StackPanel Orientation="Horizontal" Spacing="8">
+          <StackPanel Orientation="Horizontal" Spacing="8" IsVisible="{Binding ShowTimingActions}">
             <Button Content="{Binding PauseLabel}" Classes="pill-secondary" Command="{Binding TogglePauseCommand}" />
             <Button Content="Stop" Classes="pill-secondary" Command="{Binding StopCommand}" />
             <!-- Owner #91: one press closes every WordLyrics run and starts the waiting songs again. -->
@@ -36,10 +36,10 @@
           </StackPanel>
           <!-- Owner #91: every library song without word timing, in one press. -->
           <Button Content="{Binding MissingLabel}" Classes="pill-primary" Command="{Binding TimeAllMissingCommand}"
-                  IsVisible="{Binding !IsSong}" IsEnabled="{Binding HasMissing}" HorizontalAlignment="Left" />
-          <ComboBox ItemsSource="{Binding Folders}" SelectedIndex="{Binding FolderIndex}" IsVisible="{Binding IsLibrary}"
+                  IsVisible="{Binding ShowMissing}" IsEnabled="{Binding HasMissing}" HorizontalAlignment="Left" />
+          <ComboBox ItemsSource="{Binding Folders}" SelectedIndex="{Binding FolderIndex}" IsVisible="{Binding ShowFolders}"
                     IsEnabled="{Binding CanInteract}" Classes="pill-field" HorizontalAlignment="Stretch" />
-          <ComboBox ItemsSource="{Binding Actions}" SelectedIndex="{Binding ActionIndex}" IsVisible="{Binding IsSong}"
+          <ComboBox ItemsSource="{Binding Actions}" SelectedIndex="{Binding ActionIndex}" IsVisible="{Binding ShowActions}"
                     IsEnabled="{Binding CanInteract}" Classes="pill-field" HorizontalAlignment="Stretch" />
           <Button Content="{Binding IgnoreLabel}" Classes="pill-secondary" Command="{Binding ToggleIgnoreCommand}" IsVisible="{Binding IsSong}" HorizontalAlignment="Left" />
           <StackPanel IsVisible="{Binding IsCustom}" Spacing="10">
@@ -57,8 +57,8 @@
       </ScrollViewer>
       <Border Grid.Row="2" Padding="28,14" BorderThickness="0,1,0,0" BorderBrush="{DynamicResource SystemControlForegroundBaseLowBrush}">
         <Grid ColumnDefinitions="Auto,*,Auto,Auto" ColumnSpacing="10">
-          <Button Content="{Binding SetupLabel}" Classes="pill-secondary" Command="{Binding SetupCommand}" />
-            <Button Grid.Column="2" Content="Start timing" IsVisible="{Binding CanQueue}" Classes="pill-primary" Command="{Binding StartCommand}" />
+          <Button Content="{Binding SetupLabel}" Classes.pill-secondary="{Binding IsSetUp}" Classes.pill-primary="{Binding !IsSetUp}" Command="{Binding SetupCommand}" />
+            <Button Grid.Column="2" Content="Start timing" IsVisible="{Binding ShowStart}" Classes="pill-primary" Command="{Binding StartCommand}" />
           <Button Grid.Column="3" Content="Done" Classes="pill-secondary" Click="OnDone" />
         </Grid>
       </Border>
