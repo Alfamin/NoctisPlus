@@ -17,10 +17,17 @@
             <Border Padding="28,22,28,18" BorderThickness="0,0,0,1"
                     BorderBrush="{DynamicResource SystemControlForegroundBaseLowBrush}">
                 <Grid ColumnDefinitions="56,16,*">
-                    <Border Width="56" Height="56" CornerRadius="18" Classes="pill-well">
-                        <controls:LineIcon Data="M22 2 9 15 M22 2 15 22 9 15 2 9 22 2Z"
-                                           Width="24" Height="24" Opacity="0.6"
-                                           HorizontalAlignment="Center" VerticalAlignment="Center" />
+                    <!-- Owner (2026-10-28): Telegram's own mark, so the window is recognised at a glance. -->
+                    <Border Width="56" Height="56" CornerRadius="28" AutomationProperties.Name="Telegram">
+                        <Border.Background>
+                            <LinearGradientBrush StartPoint="50%,0%" EndPoint="50%,100%">
+                                <GradientStop Color="#2AABEE" Offset="0" />
+                                <GradientStop Color="#229ED9" Offset="1" />
+                            </LinearGradientBrush>
+                        </Border.Background>
+                        <Path Fill="White" Width="30" Height="26" Stretch="Uniform" Margin="0,2,3,0"
+                              HorizontalAlignment="Center" VerticalAlignment="Center"
+                              Data="M5.5 11.8 L18.2 6.9 C18.8 6.7 19.3 7.1 19.1 7.9 L16.9 18.2 C16.7 19 16.2 19.2 15.5 18.8 L12.2 16.3 L10.6 17.8 C10.4 18 10.3 18.1 9.9 18.1 L10.1 14.7 L16.3 9.1 C16.6 8.8 16.2 8.7 15.9 8.9 L8.2 13.7 L4.9 12.7 C4.2 12.5 4.2 12 5.5 11.8 Z" />
                     </Border>
                     <StackPanel Grid.Column="2" Spacing="5" VerticalAlignment="Center">
                         <TextBlock Text="{Binding Title}" FontSize="18" FontWeight="Bold" />
@@ -29,9 +36,16 @@
                 </Grid>
             </Border>
             <StackPanel Grid.Row="1" Margin="28,20,28,24" Spacing="18">
-                <TextBlock Text="{Binding Description}" FontSize="13" Opacity="0.75" TextWrapping="Wrap" />
+                <TextBlock Text="{Binding Description}" FontSize="13" Opacity="0.75" TextWrapping="Wrap" IsVisible="{Binding !IsQr}" />
                 <!-- Owner #185: scan with Telegram on the phone; the phone number stays one click away. -->
                 <StackPanel IsVisible="{Binding IsQr}" Spacing="14">
+                    <!-- Owner (2026-10-28): people reach for the camera first, so the first line says not to, large. -->
+                    <StackPanel Spacing="6" HorizontalAlignment="Center">
+                        <TextBlock Text="Scan with the Telegram app, not your camera" FontSize="17" FontWeight="SemiBold"
+                                   TextAlignment="Center" TextWrapping="Wrap" />
+                        <TextBlock Text="Telegram  ›  Settings  ›  Devices  ›  Add Device" FontSize="14" Opacity="0.75"
+                                   TextAlignment="Center" TextWrapping="Wrap" />
+                    </StackPanel>
                     <Grid Width="212" Height="212" HorizontalAlignment="Center">
                         <Border CornerRadius="16" Classes="pill-well" IsVisible="{Binding QrWaiting}">
                             <controls:ProgressRing Width="28" Height="28" IsIndeterminate="True"

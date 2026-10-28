@@ -236,7 +236,7 @@ public sealed partial class TelegramSignInViewModel : ObservableObject, IDisposa
         LoginStep.Code => "Enter the login code sent to your Telegram app or by SMS.",
         LoginStep.Password => "Enter your Telegram password. It is never saved.",
         LoginStep.SignedIn => $"Signed in as {_account.SignedInAs}. You can now download songs.",
-        LoginStep.Qr => "Scan in Telegram on your phone: Settings › Devices › Link Desktop Device.",
+        LoginStep.Qr => "Scan with the Telegram app, not your camera: Telegram › Settings › Devices › Add Device.",
         _ => "Use your own phone number to download music. Your session stays on this computer.",
     };
 
