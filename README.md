@@ -21,7 +21,7 @@ and True Shuffle built into the app.
 
 <br/>
 
-**[Install](#-install)** &nbsp;·&nbsp; **[Features](#-whats-inside)** &nbsp;·&nbsp; **[All 245 changes](#-every-difference-from-noctis)** &nbsp;·&nbsp; **[Credits](#-credits)**
+**[Install](#-install)** &nbsp;·&nbsp; **[Features](#-whats-inside)** &nbsp;·&nbsp; **[All changes](#-every-difference-from-noctis)** &nbsp;·&nbsp; **[Credits](#-credits)**
 
 </div>
 
@@ -50,9 +50,9 @@ Any song, album or artist, including ones you don't have yet.
 ### 🧭 Search
 One search box for your library **and** the online catalog.
 
-- **"kanye"** gives Kanye West, **"plot twis"** gives Drake's Plot Twist
-- Typos and missing accents are fine
-- Type a **line of lyrics** to find its song
+- Results ranked by **popularity**
+- Tolerant of typos and missing accents
+- Search by a **line of lyrics**
 - **Songs, Albums, Artists and Playlists**
 
 </td>
@@ -86,7 +86,7 @@ Shuffle modes in the player, mini player and queue.
 ### 🎤 WordLyrics
 Word-by-word lyric timing, made on your own PC.
 
-- Times the song **you're playing**, and new songs by themselves
+- Times the song **you're playing**, and new songs automatically
 - No lyrics? One **Time words** button
 - **Eases off** while you're gaming or the PC is busy
 - Nothing downloads until you press **Set up** (1.3 GB)
@@ -129,7 +129,7 @@ irm https://raw.githubusercontent.com/Alfamin/NoctisPlus/main/scripts/install.ps
 
 Or grab the **Setup** from the [latest release](https://github.com/Alfamin/NoctisPlus/releases/latest). It isn't code-signed, so Windows SmartScreen may warn the first time: **More info › Run anyway**.
 
-**Needs:** Windows 10 or 11, and a Telegram account for finding and downloading songs. Word lyrics also need a graphics card or about 3 GB of free memory.
+**Requirements:** Windows 10 or 11, and a Telegram account for finding and downloading songs. Word lyrics also need a graphics card or about 3 GB of free memory.
 
 > [!TIP]
 > Already using Noctis? Keep it. Plus installs separately, and both can run.
@@ -163,279 +163,213 @@ These started out as add-on plugins. Since **2.0** they're part of the app itsel
 On top of Noctis 1.6.3, biggest first.
 
 <details>
-<summary><b>Show all 245 changes</b></summary>
+<summary><b>Show all 179 changes</b></summary>
 
 #### 🔥 The big ones
 
 1. Search any song, album, artist or playlist and download it into your library
 2. Press Play on a song you don't have and it starts while it downloads
-3. The top search result is who you mean: "kanye" gives Kanye West, "plot twis" gives Drake's Plot Twist
-4. One search box for your own music and the whole online catalog
-5. Sign in to Telegram by scanning a QR code, no app id needed
-6. A new install has every setup on the first page: music, folders, playlists, Telegram, word lyrics
-7. For you: 25 songs a page from what you play, learning as you listen
-8. Played songs stay in a cache, and Add to songs keeps them
-9. Imported playlists, albums and artist pages play their missing songs too
-10. Artist pages show everything the artist released, not just what's on your drive
-11. Own half an album? The missing songs are listed under yours
-12. Artists and albums you don't own at all still open as full Noctis pages
-13. Bring over Spotify and Deezer playlists by pasting the link
-14. Find public playlists in Search and save them as your own
-15. Search by a line of lyrics
-16. Shuffle modes: Equal chance, No repeats, Discovery, Never played, For you
-17. Karaoke-style word-by-word lyrics, made on your own PC
-18. Songs get word timing while you listen, and new ones get it by themselves (Off, Light, Medium or Full)
-19. Lyrics animate letter by letter, in time with the singer
-20. Persian, Arabic and Hebrew lyrics read right to left
-21. Offline mode: your own music keeps playing while online stuff waits
-22. A Downloads page where finished songs play right from the list
-23. MP3 by default, FLAC if you want it
-24. Two download bots: if one is busy or can't find a song, the other is asked
-25. Installs next to the original Noctis without touching it
-26. First start copies your whole Noctis: library, play counts, playlists, stats and sign-ins
-27. Updates itself, asks Update or Later at startup, and checks every update against its checksum
-28. Installs with one line in PowerShell
-29. Every feature has its own switch in Settings > Features
-30. Scroll the lyrics freely; a Sync button brings you back to the current line
-31. Opens about twice as fast
-32. Dark theme and Liquid Glass out of the box
-33. Community plugins made for Noctis 1.6.3 keep working
-34. Your Last.fm sign-in stays put
+3. One search box for your own music and the whole online catalog
+4. Sign in to Telegram by scanning a QR code
+5. Every setup on the first page of a new install: music, folders, playlists, Telegram, word lyrics
+6. For you: 25 songs a page from what you play, learning as you listen
+7. Played songs stay in a cache, and Add to songs keeps them
+8. Imported playlists, albums and artist pages play their missing songs too
+9. Artist pages show everything the artist released, not just what's on your drive
+10. Own half an album? The missing songs are listed under yours
+11. Artists and albums you don't own still open as full Noctis pages
+12. Import Spotify and Deezer playlists by pasting the link
+13. Find public playlists in Search and save them as your own
+14. Search by a line of lyrics
+15. Shuffle modes: Equal chance, No repeats, Discovery, Never played, For you
+16. Karaoke-style word-by-word lyrics, made on your own PC
+17. Word timing while you listen, and for new songs automatically (Off, Light, Medium or Full)
+18. Lyrics animate letter by letter, in time with the singer
+19. Right-to-left lyrics for Persian, Arabic and Hebrew
+20. Offline mode: your own music keeps playing while online work waits
+21. A Downloads page where finished songs play right from the list
+22. MP3 or FLAC
+23. Two download bots, with automatic fallback to the other
+24. Installs next to the original Noctis without touching it
+25. First start copies your whole Noctis: library, play counts, playlists, stats and sign-ins
+26. Updates itself, with Update or Later at startup and checksum-verified downloads
+27. One-line install in PowerShell
+28. Every feature has its own switch in Settings > Features
+29. Scroll the lyrics freely; a Sync button brings you back to the current line
+30. Opens about twice as fast
+31. Dark theme and Liquid Glass out of the box
+32. Community plugins made for Noctis 1.6.3 keep working
 
 #### ⭐ Search and downloads
 
-35. "drake passionfruit" gives Drake's Passionfruit, not karaoke covers
-36. Type an artist's name and their songs come first
-37. Small typos still find the right artist ("post melone")
-38. Accents don't matter ("rosalia despecha" finds ROSALÍA's DESPECHÁ)
-39. "The" is optional: "killers" finds The Killers
-40. A famous artist comes before a tiny account with the same name
-41. Half-typed names and titles already lead with what most people mean
-42. Songs you already own show up as yours, ready to play
-43. Songs, Artists, Albums and Playlists filters
-44. Songs, playlists and Favorites each get their own search bar
-45. Your library results appear as you type, online ones a moment later
-46. Leave Search and come back: your query and results are still there
-47. No internet? A clear banner with a Retry button
-48. Turn your VPN on and Search reconnects by itself
-49. Ctrl+Shift+F opens Search from anywhere (you can change the keys)
-50. "Find more by this artist…" from any song's menu
-51. A small badge marks songs and albums that aren't in your library yet
-52. Download right from the search results
-53. The Downloads button shows how many are going
-54. Clear a download from the list without deleting the song
-55. Downloads go into your library by themselves
-56. Choose any folder for your downloads
-57. Works through your VPN's system proxy with no setup
-58. Or set your own proxy, Telegram proxy links included
-59. See which Telegram account is signed in, switch it or disconnect
-60. Your own Telegram app id still works, under Advanced
-61. Two-step passwords are asked in the same sign-in window
-62. Phone number sign-in is one click away from the QR code
-63. Your last click plays first; earlier downloads wait
-64. The next 2 songs download ahead (choose Off to 4)
-65. Albums download back to back: the next songs are asked for while one arrives
-66. Choose which bot goes first: Music Hunters or DeezLoad
-67. Files the bots sent before are remembered, so they aren't asked for twice
-68. A small icon shows each step: asking the bot, trying the other, receiving, saving
-69. Allow MP3 when a song has no FLAC, or keep it FLAC-only
-70. Switching between MP3 and FLAC takes seconds, even mid-download
-71. 100% means the file is actually saved
-72. A stuck download restarts by itself instead of holding up the queue
-73. A short Telegram limit is waited out instead of stopping downloads for a day
-74. A dead bot or dropped connection never freezes your queue
-75. Close the app mid-download and the queue is still there next time
-76. Clicking Play five times sends one request, not five
-77. A song that just failed isn't sent again and again
-78. Gets the right song even when Apple and Deezer list slightly different lengths
-79. Censored titles still match
-80. A remix, live cut or radio edit never sneaks in as the original
-81. Two different songs with the same title never overwrite each other
-82. Long titles that Telegram cuts short still download
-83. Seeking works as soon as the download is saved
-84. A slow connection pauses once with a ring instead of stuttering
-85. The first seconds of a downloading song are never skipped
-86. Interrupted streams carry on instead of starting over
-87. A paused song comes back at the same spot after a restart
-88. Choose how long played songs stay in the cache
+33. Results ranked by popularity across artists, songs and albums
+34. Tolerant of typos and missing accents
+35. Your own songs show up in results, ready to play
+36. Songs, Artists, Albums and Playlists filters
+37. Public playlists ranked by how many people saved them
+38. Songs, playlists and Favorites each have their own search bar
+39. Library results appear as you type, online ones a moment later
+40. Your query and results are kept when you leave Search
+41. Offline notice with a Retry button; reconnects by itself when your VPN comes on
+42. Ctrl+Shift+F opens Search from anywhere (rebindable)
+43. "Find more by this artist…" in every song's menu
+44. A badge marks songs and albums that aren't in your library yet
+45. Download straight from the results
+46. The Downloads button shows how many are running
+47. Clear a download from the list without deleting the song
+48. Downloads are added to your library automatically
+49. Choose any folder for your downloads
+50. Uses your VPN's system proxy with no setup
+51. Or set your own proxy, Telegram proxy links included
+52. See which Telegram account is signed in, switch it or disconnect
+53. Your own Telegram app id and phone number sign-in are still available
+54. Two-step verification passwords are asked in the same window
+55. The song you last pressed Play on goes first; earlier downloads wait
+56. Download ahead: Off to 4 of the next songs (2 by default)
+57. Albums download back to back
+58. Choose which bot goes first: Music Hunters or DeezLoad
+59. Files the bots sent before are remembered and reused
+60. A small icon shows each step: asking the bot, trying the other, receiving, saving
+61. Optional MP3 fallback when a song has no FLAC
+62. Switch between MP3 and FLAC at any time, even mid-download
+63. Stuck downloads restart automatically
+64. The download queue survives closing the app
+65. Remixes, live versions and radio edits are kept apart from the original
+66. Interrupted streams resume instead of starting over
+67. A paused song resumes at the same spot after a restart
+68. Choose how long played songs stay in the cache
 
 #### 🎨 Artist, album and playlist pages
 
-89. Online albums open instantly and fill in as they load
-90. Song count and album length update as the details arrive
-91. Never a fake "0 songs" or "0 min"
-92. The artist's newest release sits at the top of their page
-93. The latest release shows its real song count
-94. Small catalog covers swap to sharp ones
-95. A soft glowing line while an artist's releases load
-96. When several artists share a name, the best-known one opens straight away
-97. Songs on artist pages play while they download
-98. Artists you own open as the right online artist, not a namesake
-99. Your own albums find their missing songs in the background
-100. Missing songs sit under "Not in your library" with a download button
-101. Just looking around never downloads anything
-102. Albums with nothing on your drive hide the buttons that wouldn't work
-103. Every missing song in a playlist has its own Play and Download
-104. A song you download moves into its spot in the playlist
-105. Repeated songs and unavailable entries stay in the playlist, like on Spotify
-106. Playlist cards count all the songs, not just the ones you own
-107. Playlists from Search play in order, missing songs included, before you save them
-108. Play and Shuffle hide while a playlist has nothing to play yet
-109. Missing songs get a music note instead of an empty black box
-110. Sorting and filtering include the songs you don't have yet
-111. Album tracklists stay up during a library scan, with Retry if one fails to load
-112. The empty Playlists page points you straight to Spotify or Deezer import
+69. Online albums open instantly and fill in as they load
+70. Song count and album length update as the details arrive
+71. The artist's newest release sits at the top of their page
+72. Small catalog covers are replaced by high-resolution ones
+73. A loading line while an artist's releases come in
+74. When several artists share a name, the best-known one opens
+75. Songs on artist pages play while they download
+76. Your own albums find their missing songs in the background
+77. Missing songs sit under "Not in your library" with a download button
+78. Every missing song in a playlist has its own Play and Download
+79. A downloaded song moves into its place in the playlist
+80. Playlists keep repeated songs and unavailable entries, like Spotify does
+81. Playlist cards count every song, not just the ones you own
+82. Playlists from Search play in order before you save them
+83. Sorting and filtering include the songs you don't have yet
+84. Album tracklists offer Retry if they fail to load
+85. The empty Playlists page links straight to Spotify and Deezer import
 
 #### 🏠 Home and For you
 
-113. A fresh install opens with Find music, Add folder, Import playlists, Connect Telegram and Word lyrics
-114. A brand-new library gets a Play button on Home right away
-115. Empty Songs, Albums and Artists pages show how to add music
-116. For you lives on Home, with album tiles
-117. 25 songs a page: about half from your favourite artists, the rest from related and new ones
-118. Learns from what you play, keep, save, skip and scroll past
-119. Picks come from your favourite songs too, not only their artists
-120. At most two songs by one artist on a page
-121. Leaves out songs you've heard, even ones you have under another name
-122. Every pick can be played right away
-123. Playing a For you song queues the rest of that page
-124. A quick skip isn't a no; Not for me hides a song for good
-125. Not for me next to the lyrics
-126. Not for me on the playing song skips to the next one
-127. Don't recommend artist from cards, song menus, the player, artist pages and Search, with Undo
-128. Your last 10 pages are kept, with a pager under the shelf
-129. Reset For you clears what it learned
-130. Refresh shows its progress, step by step
-131. If a refresh fails you keep the picks you had
-132. Add a free Last.fm key for even better picks
-133. Opening one album from For you doesn't grey out the others
+86. A new install opens with Find music, Add folder, Import playlists, Connect Telegram and Word lyrics
+87. A new library gets a Play button on Home right away
+88. Empty Songs, Albums and Artists pages show how to add music
+89. For you on Home, with album tiles
+90. About half of each page from your favourite artists, the rest from related and new ones
+91. Learns from what you play, keep, save, skip and scroll past
+92. Picks based on your favourite songs as well as their artists
+93. At most two songs per artist on a page
+94. Songs you've already heard are left out
+95. Every pick plays right away
+96. Playing a For you song queues the rest of that page
+97. Short plays don't count as skips; Not for me hides a song for good
+98. Not for me next to the lyrics
+99. Not for me on the playing song skips to the next one
+100. Don't recommend artist, from cards, song menus, the player, artist pages and Search, with Undo
+101. Your last 10 pages are kept, with a pager under the shelf
+102. Reset For you clears what it learned
+103. Refresh shows its progress, step by step
+104. Optional Last.fm key for better picks
 
 #### 🔀 Shuffle and queue
 
-134. Shuffle modes in the player, mini player and queue
-135. The shuffle button lights up for every mode
-136. The menu shows which mode you're in
-137. Songs you add yourself play before the shuffle, in your order
-138. Shuffle the queue, the open playlist or your whole library
-139. Leave out songs you disliked
-140. Choose how many unheard songs the For you mix brings in
-141. Ctrl+S still opens shuffle, now with the modes
-142. The first shuffle after opening the app starts at once
-143. You can see the shuffle getting ready
-144. The queue scrolls by itself while you drag a song near its edge
+105. Shuffle modes in the player, mini player and queue
+106. The shuffle button lights up for every mode
+107. The menu shows which mode you're in
+108. Songs you add yourself play before the shuffle, in your order
+109. Shuffle the queue, the open playlist or your whole library
+110. Leave out songs you disliked
+111. Choose how many unheard songs the For you mix brings in
+112. Ctrl+S opens shuffle, with the modes
+113. The first shuffle after opening the app starts at once
+114. A progress indicator while the shuffle gets ready
+115. The queue scrolls by itself while you drag a song near its edge
 
 #### 🎤 Lyrics
 
-145. No lyrics? One "Time words" button gets them timed
-146. The song you're playing and the next two get timed first
-147. The lyrics page shows when a song is queued or being timed
-148. Fix a song's timing from its menu
-149. Ignore a song from its lyrics menu; Time words turns it back on
-150. Pause, resume or stop timing whenever you want
-151. Time a whole folder, or your whole library, in one go
-152. Eases off while a game or another app is using the PC
-153. Switches to Light while a fullscreen app is open
-154. Needs about 3 GB of memory on the processor instead of 8
-155. A graphics card that keeps crashing it is set aside for the processor
-156. Nothing big downloads until you say so, and you see the size first
-157. Your audio files are backed up before anything touches them
-158. Get a quick note when a song's timing is ready
-159. Songs with no lyrics online wait ten days before another try
-160. Animation styles: smooth, crisp, flowing or off
-161. Make the motion subtle or bold
-162. Long notes grow and glow
-163. Letters light up one by one, or whole words at once
-164. The same motion in the side panel and the mini player
-165. A Persian line inside an English song still reads right
-166. Lyrics stay in time after you pause and play
-167. Lyrics keep following as long as the current line is on screen
-168. Scrolling the lyrics no longer snaps back on its own
-169. The Sync button works in the side panel too
-170. Finishing word timing never flashes or freezes the lyrics on screen
-171. Removing a song cleans up its lyric files too
-172. The timing panel opens inside the app, not in a separate window
+116. One "Time words" button on songs without lyrics
+117. The playing song and the next two are timed first
+118. The lyrics page shows when a song is queued or being timed
+119. Fix a song's timing from its menu
+120. Ignore a song from its lyrics menu; Time words turns it back on
+121. Pause, resume or stop timing at any time
+122. Time a whole folder, or your whole library, in one go
+123. Eases off while a game or another app is using the PC
+124. Switches to Light while a fullscreen app is open
+125. About 3 GB of memory on the processor
+126. Falls back to the processor if a graphics card keeps crashing
+127. Nothing large downloads without your go, and you see the size first
+128. Your audio files are backed up before anything is written
+129. A notification when a song's timing is ready
+130. Animation styles: smooth, crisp, flowing or off
+131. Motion strength from subtle to expressive
+132. Long notes grow and glow
+133. Letters light up one by one, or whole words at once
+134. The same motion in the side panel and the mini player
+135. Mixed-direction lines, such as Persian inside an English song
+136. The Sync button in the side panel too
+137. Removing a song removes its lyric files too
+138. The timing panel opens inside the app
 
 #### 🧩 Smaller touches
 
-173. The player bar is frosted, so it stays readable over anything
-174. Shuffle and 15-second skip buttons on the player by default
-175. Settings that open something are proper buttons, not switches
-176. Settings search finds the new feature settings
-177. Less text on screen: a label and one short line
-178. 41 long tooltips cut down
-179. No more wall-of-text tooltip on the search box
-180. Short albums say "24 sec", not "0 min"
-181. No "0 KB" on playlists with nothing downloaded
-182. The Favorites tab lights up like the other tabs
-183. The Favorites heart sits properly centred
-184. Empty Downloads and Favorites pages tell you what to do in one line
-185. The search bar stays above the results while you scroll
-186. The side rail lights up Search while you're on it
-187. Search and Downloads stay as you left them
-188. Pages opened from Search don't carry a stray "Search" title
-189. Back takes you to the same search
-190. An old song no longer shows a Pause button
-191. Statistics and Wrap count streamed songs at their real length
-192. What's new shows every update you missed, biggest changes first
-193. Every update's notes stay in Settings > About
-194. New text is translated into all 10 Noctis languages
-195. The mini player says Noctis Plus
-196. About credits Noctis 1.6.3 and heartached
-197. The About page opens faster
-198. The Downloads menu uses Noctis's own icon
-199. Screen readers can name many more buttons
-200. The Telegram sign-in's Advanced toggle matches the app
-201. Album footers under a minute show seconds
+139. A frosted player bar that stays readable over anything
+140. Shuffle and 15-second skip buttons on the player by default
+141. Settings that open something are buttons, not switches
+142. Settings search covers the new features
+143. Shorter text and tooltips throughout
+144. Empty Downloads and Favorites pages say what to do in one line
+145. The search bar stays above the results while you scroll
+146. The side rail highlights Search while you're on it
+147. Search and Downloads keep their state between visits
+148. Back returns to the same search
+149. What's new shows every update you missed, biggest changes first
+150. Every update's notes in Settings > About
+151. New text translated into all 10 Noctis languages
+152. The mini player and About page say Noctis Plus, and credit Noctis 1.6.3 and heartached
+153. Screen-reader names on many more buttons
 
 #### 📦 Install and updates
 
-202. Its own data folder, so nothing mixes with official Noctis
-203. Its own install folder
-204. Its own server ports, so both apps can run side by side
-205. Waits for official Noctis to close before copying your profile
-206. Never copies over a Plus profile that already has your stuff
-207. New installs download MP3; anyone who used the finder before keeps their choice
-208. The installer works through your VPN
-209. A broken download of the installer resumes and is verified
-210. The install command finishes even while Plus is open
-211. The first start after an update is quick
-212. A smaller download
-213. Updates like 1.6.3.1 and 1.6.3.2 are never skipped
-214. Slow connections can still finish an update
-215. A stalled update download tries again
-216. Every release is built, tested and test-installed before it goes out
-217. Anyone can see which tests failed on a build
+154. Its own data folder, install folder and server ports, so it runs side by side with Noctis
+155. Waits for Noctis to close before copying your profile
+156. Never overwrites a Plus profile that already has your data
+157. New installs download MP3; existing users keep their choice
+158. The installer works through your VPN
+159. Installer and update downloads resume and are verified
+160. A quick first start after an update
+161. A smaller download
+162. Every release is built, tested and test-installed before it goes out
+163. Public build results, including which tests failed
 
 #### 🔧 Under the hood
 
-218. One connection stays warm, so searches are quick
-219. If Deezer is down, Apple Music's catalog fills in
-220. Once Deezer is back, its results return within 10 minutes
-221. Switching your VPN on or off refreshes the connection
-222. Big playlists only load covers for the rows you can see
-223. The bots' menus are pressed at a human pace, so they don't get confused
-224. A bot menu that changes is reported once, not on every song
-225. A bot that stops answering isn't waited on for every song
-226. Telegram sign-in gives up after a minute with a clear message
-227. Turning downloads off really disconnects Telegram
-228. MP3 downloads no longer fail with "Stream does not support reading"
-229. A file that claims to be FLAC is checked before it's kept
-230. Bad file names from the bots are refused
-231. Half-finished files are cleaned up after a crash
-232. If the app ever dies, the log of that run is kept for a fix
-233. Every download step is logged with its timing
-234. The queue remembers the current song by its file
-235. Different artists with the same name stay separate
-236. Huge playlists update in one go instead of row by row
-237. Older imports without covers show a placeholder
-238. Building a For you page never slows the app's screen down
-239. Precompiled builds, less waiting on first use
-240. About 6,800 automated tests and 1,700 download checks run on every change
-241. Tests that used to fail at random were fixed
-242. Reset and fallback themes are Dark too
-243. Noctis Plus changes are MIT licensed
-244. Every built-in part ships with its licence
-245. Where every piece came from is written down in [PROVENANCE](docs/fork/PROVENANCE.md)
+164. One connection kept warm, so searches are quick
+165. Apple Music's catalog fills in while Deezer is down
+166. The connection refreshes when your VPN switches on or off
+167. Big playlists load covers only for the rows on screen
+168. Bot menus are pressed at a human pace
+169. FLAC files are checked before they're kept
+170. Unsafe file names from the bots are refused
+171. Half-finished files are cleaned up after a crash
+172. The log of a crashed run is kept
+173. Every download step is logged with its timing
+174. Huge playlists update in one go instead of row by row
+175. Precompiled builds, less waiting on first use
+176. About 6,800 automated tests and 1,700 download checks run on every change
+177. Noctis Plus changes are MIT licensed
+178. Every built-in part ships with its licence
+179. Where every piece came from is written down in [PROVENANCE](docs/fork/PROVENANCE.md)
 
 </details>
 
