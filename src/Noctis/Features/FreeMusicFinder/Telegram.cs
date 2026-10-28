@@ -284,12 +284,13 @@ internal sealed class TelegramAccount : ITelegramSignIn, IDisposable
         {
             var user = await BotAsync(client, bot, ct).ConfigureAwait(false);
             await StartBotAsync(client, user, bot, ct).ConfigureAwait(false);
-            // In the bot's channel: nothing to ask. Otherwise its latest answer may predate the gate (an account that
-            // used the bot, then left; owner live check 2026-10-28), so it is greeted once for a fresh one.
-            var knownTask = BotJoin.Known.TryGetValue(bot, out var known) ? UnjoinedAsync(client, bot, provider, known, ct) : null;
-            var latestTask = LatestAnswerAsync(client, user, ct);
-            if (knownTask is not null && await knownTask.ConfigureAwait(false) is null) return [];
-            var latest = await latestTask.ConfigureAwait(false);
+            // A bot whose channel is known: being in it is what counts. DeezLoad greets /start normally and asks for its
+            // channel only on a real request (owner, live 2026-10-28), so its answers cannot be relied on here.
+            if (BotJoin.Known.TryGetValue(bot, out var known))
+                return await UnjoinedAsync(client, bot, provider, known, ct).ConfigureAwait(false) is { } channel ? [channel] : [];
+            // Another bot: its latest answer may predate a gate (an account that used it, then left), so it is greeted
+            // once for a fresh one.
+            var latest = await LatestAnswerAsync(client, user, ct).ConfigureAwait(false);
             if (latest is null || BotJoin.Links(latest.Value.Answer, bot, latest.Value.Welcome).Count == 0)
             {
                 await GreetAsync(client, user, ct).ConfigureAwait(false);
