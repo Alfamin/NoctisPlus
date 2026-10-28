@@ -18,10 +18,16 @@ internal static class BotJoinTests
     {
         Check.Section("Bots that ask for their channel first (#190)");
 
-        var gate = Bot("⚠️ To use this bot you must join our channel first.", Url("📢 Join channel", "https://t.me/HuntersNews"), Press("✅ I joined", [1, 2]));
-        Check.Equal("HuntersNews", string.Join(",", BotJoin.Links(gate, "MusicsHuntersbot")), "a join button's channel is read");
-        Check.Equal("1,2", string.Join(",", BotJoin.CheckButton(gate) ?? []), "the gate's I joined button is found");
-        Check.Equal("HuntersNews", string.Join(",", BotJoin.Links(gate, "MusicsHuntersbot", welcome: true)), "a greeting that says the channel is needed is a gate");
+        // Word for word what both bots sent a new account (owner, 2026-10-28); the links are in their buttons.
+        var hunters = Bot("🔒 Please join our channel to use this bot.\n\nJoin the channel below, then press 🔄 Refresh to continue.",
+            Url("📢 Join channel", "https://t.me/HuntersNews"), Press("🔄 Refresh", [1, 2]));
+        Check.Equal("HuntersNews", string.Join(",", BotJoin.Links(hunters, "MusicsHuntersbot", welcome: true)), "Music Hunters' greeting with Join and Refresh is a gate");
+        Check.Equal("HuntersNews", string.Join(",", BotJoin.Links(hunters, "MusicsHuntersbot")), "and so is the same answer to a request");
+        var deezload = Bot("Join Updates Channel to use this Bot!\n\nOnly Channel Subscribers can use the Bot!", Url("Join Updates Channel", "https://t.me/+AbCdEf1234"));
+        Check.Equal("+AbCdEf1234", string.Join(",", BotJoin.Links(deezload, "deezload2bot", welcome: true)), "DeezLoad's greeting with its join link is a gate");
+        Check.True(BotJoin.IsUnlocked(Bot("✅ Thanks for joining! You can use the bot now.")) && BotJoin.IsUnlocked(Bot("🎧🎧 Welcome to @DeezLoad2bot 🎧🎧\n\nClick /help for more information.")),
+            "the greetings once joined are known, so a request is not left waiting on them");
+        Check.False(BotJoin.IsUnlocked(Bot("Downloading… 45%")), "an ordinary answer is not a greeting");
 
         var mention = Bot("Подпишитесь на канал @deez_news чтобы пользоваться ботом");
         Check.Equal("deez_news", string.Join(",", BotJoin.Links(mention, "deezload2bot")), "a Russian answer naming the channel is read");

@@ -15,8 +15,13 @@ internal static partial class BotJoin
     private static partial Regex JoinWords();
     [GeneratedRegex(@"\b(must|need|needs|required|requires|first|before|to use|in order|only)\b|ابتدا|باید|لطفا|сначала|необходимо|нужно|должн|يجب|أولا|primero|önce|zuerst|obligatoire", RegexOptions.IgnoreCase)]
     private static partial Regex Required();
-    [GeneratedRegex(@"\b(joined|done|check|verify|confirm|continue|ready)\b|✅|تایید|تأیید|عضو شدم|провер|подписал|تحقق|اشتركت|verificar|kontrol", RegexOptions.IgnoreCase)]
-    private static partial Regex CheckWords();
+    // The buttons a gate has besides its links: "Refresh" (Music Hunters, live 2026-10-28), "I joined", "Check".
+    [GeneratedRegex(@"\b(refresh|retry|reload|joined|done|check|verify|confirm|continue|ready)\b|✅|🔄|تایید|تأیید|عضو شدم|بروز|провер|обнов|подписал|تحقق|تحديث|اشتركت|verificar|kontrol|yenile", RegexOptions.IgnoreCase)]
+    private static partial Regex AfterJoin();
+    // What a bot says to the first message once its channel was joined (live 2026-10-28: "Thanks for joining! You can use
+    // the bot now.", "Welcome to @DeezLoad2bot"). It answers no request.
+    [GeneratedRegex(@"thanks? (you )?for joining|you can (now )?use (the|this) bot|\A\W*welcome to\b", RegexOptions.IgnoreCase)]
+    private static partial Regex Unlocked();
     [GeneratedRegex(@"(?:https?://)?(?:www\.)?(?:t|telegram)\.me/(\+[\w-]{6,}|joinchat/[\w-]{6,}|[A-Za-z]\w{3,31})", RegexOptions.IgnoreCase)]
     private static partial Regex Link();
     [GeneratedRegex(@"(?<![\w@./])@([A-Za-z]\w{3,31})")]
@@ -50,7 +55,7 @@ internal static partial class BotJoin
         var buttons = message.reply_markup is ReplyInlineMarkup markup ? markup.rows.SelectMany(r => r.buttons).ToList() : [];
         // A menu (quality choices, numbered results) that also names the bot's channel is not a gate: a gate's only
         // buttons are links and an "I joined" check.
-        if (buttons.Any(b => b.type is InlineButtonTypeCallback && !CheckWords().IsMatch(b.text))) return [];
+        if (buttons.Any(b => b.type is InlineButtonTypeCallback && !AfterJoin().IsMatch(b.text))) return [];
         var words = text + "\n" + string.Join("\n", buttons.Select(b => b.text));
         if (!JoinWords().IsMatch(words) || welcome && !Required().IsMatch(words)) return [];
         var found = new List<string>();
@@ -74,6 +79,10 @@ internal static partial class BotJoin
         }
     }
 
+    /// <summary>The greeting a bot sends once its channel was joined, instead of answering the request.</summary>
+    internal static bool IsUnlocked(Message message)
+        => !message.flags.HasFlag(Message.Flags.out_) && message.media is not MessageMediaDocument && Unlocked().IsMatch(message.message ?? "");
+
     /// <summary>"@name", "t.me/name" or "https://t.me/name/12" → "name"; "t.me/+hash" or "t.me/joinchat/hash" → "+hash";
     /// null for anything else.</summary>
     internal static string? Normal(string? raw)
@@ -87,11 +96,4 @@ internal static partial class BotJoin
         if (path.StartsWith("joinchat/", StringComparison.OrdinalIgnoreCase)) return "+" + path["joinchat/".Length..];
         return NotChannels.Contains(path) ? null : path;
     }
-
-    /// <summary>The button a gate offers to press once joined ("I joined", "Check"), if any.</summary>
-    internal static byte[]? CheckButton(Message message)
-        => message.reply_markup is ReplyInlineMarkup markup
-            ? markup.rows.SelectMany(r => r.buttons).Where(b => CheckWords().IsMatch(b.text))
-                .Select(b => b.type is InlineButtonTypeCallback callback ? callback.data : null).FirstOrDefault(data => data is not null)
-            : null;
 }

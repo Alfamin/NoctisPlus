@@ -479,6 +479,8 @@ internal sealed class DeezLoadSource : IRacingMusicSource, IQualityMusicSource
             {
                 if(BotLimits.Read(Id,m.message??"",DateTimeOffset.UtcNow) is {} limited) throw limited;
                 if(BotJoin.Links(m,Bot) is {Count:>0} channels) throw BotJoin.Gate(Id,Bot,channels);
+                // Joined in Telegram itself: the bot greets this first message instead of answering it.
+                if(BotJoin.IsUnlocked(m)) throw new TrackUnavailableException("DeezLoad was just unlocked by joining its channel; the other bot takes this song.");
                 if(m.media is MessageMediaDocument {document:Document doc})
                 {
                     if(Fits(request,doc)) { BotPacing.Answered("deezload"); return doc; }

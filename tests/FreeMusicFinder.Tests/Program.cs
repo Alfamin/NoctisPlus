@@ -72,6 +72,13 @@ if (Environment.GetEnvironmentVariable("FMF_LIVE_ROUTE") is { Length: > 0 } link
 // With FMF_LIVE_BOT set to a track link and FMF_TELEGRAM_STORE to the plugin's login file, only
 // LiveBotTest runs: it asks DeezLoad for that track with the real account (one message is sent) and
 // prints what the bot answers, without downloading the file. Noctis must be closed for it.
+// With FMF_LIVE_SAVED set to a number and FMF_TELEGRAM_STORE to the login file, only LiveSavedTest runs: it reads
+// that many newest Saved Messages and says which read as a bot's "join our channel first". Nothing is sent.
+if (int.TryParse(Environment.GetEnvironmentVariable("FMF_LIVE_SAVED"), out var saved) && saved > 0)
+{
+    await LiveSavedTest.RunAsync(Math.Min(saved, 30), Environment.GetEnvironmentVariable("FMF_TELEGRAM_STORE"), Environment.GetEnvironmentVariable("FMF_LIVE_PROXY"));
+    return 0;
+}
 if (Environment.GetEnvironmentVariable("FMF_LIVE_BOT") is { Length: > 0 } track)
 {
     await LiveBotTest.RunAsync(track, Environment.GetEnvironmentVariable("FMF_TELEGRAM_STORE"), Environment.GetEnvironmentVariable("FMF_LIVE_PROXY"));

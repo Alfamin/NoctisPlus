@@ -312,8 +312,8 @@ internal sealed class TelegramAccount : ITelegramSignIn, IDisposable
     }
 
     /// <summary>
-    /// Owner #190: joins the channels the user chose to join (the Join press is their consent), presses a gate's
-    /// "I joined" button when it has one, and has each bot's settings checked again.
+    /// Owner #190: joins the channels the user chose to join (the Join press is their consent), greets each bot once
+    /// so its "thanks for joining" is out of the way, and has each bot's settings checked again.
     /// </summary>
     public async Task JoinAsync(IReadOnlyList<BotChannel> channels, CancellationToken ct)
     {
@@ -335,11 +335,11 @@ internal sealed class TelegramAccount : ITelegramSignIn, IDisposable
             ForgetQuality(bot);
             try
             {
+                // Owner (live, 2026-10-28): once joined, any message unlocks the bot; it answers that first message
+                // with "Thanks for joining" / its welcome, not a song. /start takes that answer before any request.
                 var user = await BotAsync(client, bot, ct).ConfigureAwait(false);
-                var history = await client.Messages_GetHistory(user, limit: 6).WaitAsync(TimeSpan.FromSeconds(25), ct).ConfigureAwait(false);
-                var gate = history.Messages.OfType<Message>().OrderByDescending(m => m.id).FirstOrDefault(m => BotJoin.Links(m, bot).Count > 0);
-                if (gate is not null && BotJoin.CheckButton(gate) is { } data)
-                    await client.Messages_GetBotCallbackAnswer(user, gate.id, data).WaitAsync(TimeSpan.FromSeconds(15), ct).ConfigureAwait(false);
+                await client.SendMessageAsync(user, "/start").WaitAsync(TimeSpan.FromSeconds(25), ct).ConfigureAwait(false);
+                await Task.Delay(TimeSpan.FromSeconds(3), ct).ConfigureAwait(false);
             }
             catch (Exception ex) when (ex is RpcException or TimeoutException) { _log?.Invoke(bot + ": " + ex.Message); }
         }
