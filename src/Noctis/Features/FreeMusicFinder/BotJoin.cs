@@ -5,7 +5,11 @@ namespace FreeMusicFinder;
 
 /// <summary>A channel a bot asks its users to join before it answers (owner #190). <paramref name="Link"/> is a public
 /// username ("name") or a private invite ("+hash").</summary>
-internal sealed record BotChannel(string Bot, string Provider, string Link, string Title);
+internal sealed record BotChannel(string Bot, string Provider, string Link, string Title)
+{
+    /// <summary>The channel as Telegram gave it while checking, so joining needs no second lookup.</summary>
+    public Channel? Peer { get; init; }
+}
 
 /// <summary>Owner #190: a new account's bot may answer "join our channel first" instead of sending songs. Reading that
 /// answer; no Telegram calls in here.</summary>
@@ -36,9 +40,10 @@ internal static partial class BotJoin
     private static readonly HashSet<string> NotChannels = new(StringComparer.OrdinalIgnoreCase)
         { "share", "addstickers", "addemoji", "addlist", "proxy", "socks", "setlanguage", "login", "iv", "boost", "contact", "invoice", "joinchat" };
 
-    /// <summary>How long a bot that asked rests before it is tried again; the other bot takes its songs meanwhile.</summary>
-    internal static readonly TimeSpan Rest = TimeSpan.FromMinutes(2);
-    internal const string Asks = " asks you to join its channel first";
+    /// <summary>How long a bot that asked rests while the app joins its channel (about 7 s live); the other bot takes
+    /// its songs meanwhile.</summary>
+    internal static readonly TimeSpan Rest = TimeSpan.FromSeconds(10);
+    internal const string Asks = " asks for its channel first";
 
     /// <summary>Raised with the provider, the bot's username and the links, whenever a bot answers with a channel to join.</summary>
     internal static event Action<string, string, IReadOnlyList<string>>? Needed;
@@ -47,7 +52,7 @@ internal static partial class BotJoin
     internal static SourceLimitException Gate(string provider, string bot, IReadOnlyList<string> links)
     {
         try { Needed?.Invoke(provider, bot, links); } catch { /* the notice is best effort; the download carries on */ }
-        return new SourceLimitException(provider, provider + Asks + ". Join it from Telegram account in Settings; the other bot takes the songs meanwhile.",
+        return new SourceLimitException(provider, provider + Asks + "; joining it.",
             DateTimeOffset.UtcNow.Add(Rest));
     }
 

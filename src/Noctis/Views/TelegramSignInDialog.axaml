@@ -77,7 +77,7 @@
                 <!-- Owner #190: a bot that wants its channel joined first; one press joins it. -->
                 <StackPanel Orientation="Horizontal" Spacing="10" IsVisible="{Binding ShowBotsChecking}">
                     <controls:ProgressRing Width="16" Height="16" IsIndeterminate="True" VerticalAlignment="Center" />
-                    <TextBlock Text="Checking the music bots…" FontSize="12" Opacity="0.6" VerticalAlignment="Center" />
+                    <TextBlock Text="Getting the music bots ready…" FontSize="12" Opacity="0.6" VerticalAlignment="Center" />
                 </StackPanel>
                 <Border Classes="pill-well" CornerRadius="16" Padding="16,12" IsVisible="{Binding NeedsJoin}">
                     <Grid ColumnDefinitions="*,Auto" ColumnSpacing="12">

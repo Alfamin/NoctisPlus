@@ -461,6 +461,12 @@ internal sealed class MusicSources
         return new("Downloads saved for later. " + string.Join(" ", active.Select(c => c.Reason)),
             active.Where(c => c.Id == "Telegram").Select(c => c.Until).DefaultIfEmpty(active.Min(c => c.Until)).Max());
     }
+    /// <summary>Owner #190: a bot whose channel was just joined takes songs again at once.</summary>
+    internal void Unblock(string provider)
+    {
+        lock (_cooldowns)
+            if (_cooldowns.Remove(provider) && _state is not null) AtomicJson.Write(_state, _cooldowns.Values.ToArray());
+    }
     private void Block(SourceLimitException error)
     {
         lock (_cooldowns)

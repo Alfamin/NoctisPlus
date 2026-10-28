@@ -58,6 +58,16 @@ public sealed partial class TelegramSignInViewModel : ObservableObject, IDisposa
         try
         {
             var channels = await _account.BotChannelsAsync(run.Token);
+            // Owner (live 2026-10-28): joined for the user at once; the Join button is only the fallback when that fails.
+            if (channels.Count > 0)
+            {
+                try
+                {
+                    await _account.JoinAsync(channels, run.Token);
+                    channels = await _account.BotChannelsAsync(run.Token);
+                }
+                catch (Exception ex) when (ex is not OperationCanceledException) { _log("Telegram join failed: " + ex.GetType().Name); }
+            }
             if (_bots != run || _disposed) return;
             _channels = channels;
             JoinText = JoinLine(channels);

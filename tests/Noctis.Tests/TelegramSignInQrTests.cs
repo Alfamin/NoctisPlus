@@ -37,7 +37,12 @@ public class TelegramSignInQrTests
         public List<BotChannel> Channels = [];
         public readonly List<IReadOnlyList<BotChannel>> Joined = [];
         public Task<IReadOnlyList<BotChannel>> BotChannelsAsync(CancellationToken ct) => Task.FromResult<IReadOnlyList<BotChannel>>([.. Channels]);
-        public Task JoinAsync(IReadOnlyList<BotChannel> channels, CancellationToken ct) { Joined.Add(channels); Channels.Clear(); return Task.CompletedTask; }
+        public bool JoinFails;
+        public Task JoinAsync(IReadOnlyList<BotChannel> channels, CancellationToken ct)
+        {
+            if (JoinFails) throw new TL.RpcException(400, "CHANNELS_TOO_MUCH");
+            Joined.Add(channels); Channels.Clear(); return Task.CompletedTask;
+        }
     }
 
     private static TelegramSignInViewModel Vm(FakeAccount account) => new(account, _ => { });
@@ -150,19 +155,23 @@ public class TelegramSignInQrTests
     }
 
     [AvaloniaFact]
-    public async Task OnceSignedIn_ABotThatWantsItsChannel_GetsOneJoinPress()
+    public async Task OnceSignedIn_ABotsChannel_IsJoinedForTheUser_TheButtonOnlyWhenThatFails()
     {
         var account = new FakeAccount(builtIn: true) { IsLoggedIn = true };
-        account.Channels.Add(new BotChannel("MusicsHuntersbot", "Music Hunters", "HuntersNews", "Hunters News"));
+        account.Channels.Add(new BotChannel("MusicsHuntersbot", "Music Hunters", "MusicsHunter", "Musics Hunter"));
         var vm = Vm(account);
         Assert.True(vm.IsSignedIn);
         await vm.CheckBotsAsync();
-        Assert.True(vm.NeedsJoin);
-        Assert.Equal("Music Hunters needs you to join its channel first.", vm.JoinText);
-        await vm.JoinCommand.ExecuteAsync(null);
-        Assert.Equal("HuntersNews", Assert.Single(Assert.Single(account.Joined)).Link);
-        Assert.False(vm.NeedsJoin); // checked again: nothing left to join
+        Assert.Equal("MusicsHunter", Assert.Single(Assert.Single(account.Joined)).Link); // no press needed
+        Assert.False(vm.NeedsJoin);
         Assert.False(vm.ShowBotsChecking);
+
+        var stuck = new FakeAccount(builtIn: true) { IsLoggedIn = true, JoinFails = true };
+        stuck.Channels.Add(new BotChannel("deezload2bot", "DeezLoad", "DEDSEClulz", ">DEDSEC:/"));
+        var fallback = Vm(stuck);
+        await fallback.CheckBotsAsync();
+        Assert.True(fallback.NeedsJoin);
+        Assert.Equal("DeezLoad needs you to join its channel first.", fallback.JoinText);
 
         var ready = Vm(new FakeAccount(builtIn: true) { IsLoggedIn = true });
         await ready.CheckBotsAsync();

@@ -373,8 +373,31 @@ public sealed class FreeMusicPlugin : INoctisPlugin
 
     // Owner #190: said once per bot each run; the Join press is in the Telegram account window.
     private readonly HashSet<string> _joinAnnounced = new(StringComparer.Ordinal);
+    // Owner #190 (live): the app joins the channel itself; a bot is tried at most every ten minutes.
+    private readonly Dictionary<string, DateTimeOffset> _joinTried = new(StringComparer.OrdinalIgnoreCase);
     private void OnJoinNeeded(string provider, string bot, IReadOnlyList<string> links)
     {
+        lock (_joinTried)
+        {
+            if (_joinTried.TryGetValue(bot, out var at) && DateTimeOffset.UtcNow - at < TimeSpan.FromMinutes(10)) return;
+            _joinTried[bot] = DateTimeOffset.UtcNow;
+        }
+        _ = JoinChannelAsync(provider, bot, links);
+    }
+
+    private async Task JoinChannelAsync(string provider, string bot, IReadOnlyList<string> links)
+    {
+        try
+        {
+            if (_telegram is { } account && await account.JoinGateAsync(bot, provider, links, _qualityStop.Token))
+            {
+                _bot?.Unblock(provider);
+                Announce("Joined " + provider + "'s channel, so it can send songs.");
+                return;
+            }
+        }
+        catch (OperationCanceledException) { return; }
+        catch (Exception ex) { Log(provider + ": joining its channel failed: " + ex.Message); }
         lock (_joinAnnounced) if (!_joinAnnounced.Add(provider)) return;
         Announce(provider + " needs you to join its channel: Settings › Free Music Finder › Telegram account.");
     }

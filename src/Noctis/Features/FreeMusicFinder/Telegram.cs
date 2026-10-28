@@ -252,10 +252,8 @@ internal sealed class TelegramAccount : ITelegramSignIn, IDisposable
         var history = await client.Messages_GetHistory(bot, limit: 1).WaitAsync(TimeSpan.FromSeconds(25), ct).ConfigureAwait(false);
         if (history.Messages.Length == 0)
         {
-            await client.SendMessageAsync(bot, "/start").WaitAsync(TimeSpan.FromSeconds(25), ct).ConfigureAwait(false);
+            await GreetAsync(client, bot, ct).ConfigureAwait(false);
             _log?.Invoke("started the chat with @" + username);
-            // Its welcome arrives first, so it is not taken for the answer to the request that follows.
-            await Task.Delay(TimeSpan.FromSeconds(3), ct).ConfigureAwait(false);
         }
         lock (_bots)
         {
@@ -275,33 +273,66 @@ internal sealed class TelegramAccount : ITelegramSignIn, IDisposable
     public async Task<IReadOnlyList<BotChannel>> BotChannelsAsync(CancellationToken ct)
     {
         var client = await ConnectAsync(ct).ConfigureAwait(false);
-        var needed = new List<BotChannel>();
-        foreach (var (bot, provider) in MusicBots)
+        // Both bots at once (owner: as fast as possible).
+        var found = await Task.WhenAll(MusicBots.Select(b => NeededAsync(client, b.Bot, b.Provider, ct))).ConfigureAwait(false);
+        return found.SelectMany(channels => channels).ToList();
+    }
+
+    private async Task<IReadOnlyList<BotChannel>> NeededAsync(Client client, string bot, string provider, CancellationToken ct)
+    {
+        try
         {
-            try
+            var user = await BotAsync(client, bot, ct).ConfigureAwait(false);
+            await StartBotAsync(client, user, bot, ct).ConfigureAwait(false);
+            // In the bot's channel: nothing to ask. Otherwise its latest answer may predate the gate (an account that
+            // used the bot, then left; owner live check 2026-10-28), so it is greeted once for a fresh one.
+            var knownTask = BotJoin.Known.TryGetValue(bot, out var known) ? UnjoinedAsync(client, bot, provider, known, ct) : null;
+            var latestTask = LatestAnswerAsync(client, user, ct);
+            if (knownTask is not null && await knownTask.ConfigureAwait(false) is null) return [];
+            var latest = await latestTask.ConfigureAwait(false);
+            if (latest is null || BotJoin.Links(latest.Value.Answer, bot, latest.Value.Welcome).Count == 0)
             {
-                var user = await BotAsync(client, bot, ct).ConfigureAwait(false);
-                await StartBotAsync(client, user, bot, ct).ConfigureAwait(false);
-                // In the bot's channel: nothing to ask. Otherwise its latest answer may predate the gate (an account
-                // that used the bot, then left; owner live check 2026-10-28), so it is greeted once for a fresh one.
-                if (BotJoin.Known.TryGetValue(bot, out var known) && await UnjoinedAsync(client, bot, provider, known, ct).ConfigureAwait(false) is null) continue;
-                var latest = await LatestAnswerAsync(client, user, ct).ConfigureAwait(false);
-                if (latest is null || BotJoin.Links(latest.Value.Answer, bot, latest.Value.Welcome).Count == 0)
-                {
-                    await client.SendMessageAsync(user, "/start").WaitAsync(TimeSpan.FromSeconds(25), ct).ConfigureAwait(false);
-                    await Task.Delay(TimeSpan.FromSeconds(3), ct).ConfigureAwait(false);
-                    latest = await LatestAnswerAsync(client, user, ct).ConfigureAwait(false);
-                }
-                if (latest is not { } fresh) continue;
-                foreach (var link in BotJoin.Links(fresh.Answer, bot, fresh.Welcome))
-                    if (await UnjoinedAsync(client, bot, provider, link, ct).ConfigureAwait(false) is { } channel) needed.Add(channel);
+                await GreetAsync(client, user, ct).ConfigureAwait(false);
+                latest = await LatestAnswerAsync(client, user, ct).ConfigureAwait(false);
             }
-            catch (Exception ex) when (!(ex is OperationCanceledException && ct.IsCancellationRequested))
-            {
-                _log?.Invoke(provider + ": could not check what it needs: " + ex.Message);
-            }
+            if (latest is not { } fresh) return [];
+            var channels = await Task.WhenAll(BotJoin.Links(fresh.Answer, bot, fresh.Welcome)
+                .Select(link => UnjoinedAsync(client, bot, provider, link, ct))).ConfigureAwait(false);
+            return channels.OfType<BotChannel>().ToList();
         }
-        return needed;
+        catch (Exception ex) when (!(ex is OperationCanceledException && ct.IsCancellationRequested))
+        {
+            _log?.Invoke(provider + ": could not check what it needs: " + ex.Message);
+            return [];
+        }
+    }
+
+    /// <summary>Sends /start and waits until the bot answers it (3 s at most; live answers took under one), so that
+    /// greeting is never taken for the answer to a request sent after it.</summary>
+    private static async Task GreetAsync(Client client, InputPeer bot, CancellationToken ct)
+    {
+        var sent = await client.SendMessageAsync(bot, "/start").WaitAsync(TimeSpan.FromSeconds(25), ct).ConfigureAwait(false);
+        var clock = System.Diagnostics.Stopwatch.StartNew();
+        while (clock.Elapsed < TimeSpan.FromSeconds(3))
+        {
+            await Task.Delay(250, ct).ConfigureAwait(false);
+            var answer = await client.Messages_GetHistory(bot, min_id: sent.id, limit: 3).WaitAsync(TimeSpan.FromSeconds(25), ct).ConfigureAwait(false);
+            if (answer.Messages.OfType<Message>().Any(m => !m.flags.HasFlag(Message.Flags.out_))) return;
+        }
+    }
+
+    /// <summary>
+    /// Owner #190 (live 2026-10-28): a bot that answered "join our channel first" during a download gets its channel
+    /// joined at once, so the user never has to find a button. False when there was nothing left to join.
+    /// </summary>
+    public async Task<bool> JoinGateAsync(string bot, string provider, IReadOnlyList<string> links, CancellationToken ct)
+    {
+        var client = await ConnectAsync(ct).ConfigureAwait(false);
+        var channels = (await Task.WhenAll(links.Select(link => UnjoinedAsync(client, bot, provider, link, ct))).ConfigureAwait(false))
+            .OfType<BotChannel>().ToList();
+        if (channels.Count == 0) return false;
+        await JoinAsync(channels, ct).ConfigureAwait(false);
+        return true;
     }
 
     /// <summary>The bot's newest message, and whether it answers a bare /start (a greeting only counts as a gate when it
@@ -322,12 +353,12 @@ internal sealed class TelegramAccount : ITelegramSignIn, IDisposable
                 ChatInvite invite => new BotChannel(bot, provider, link, invite.title),
                 ChatInvitePeek { chat: var chat } => new BotChannel(bot, provider, link, chat.Title),
                 // Live 2026-10-28: a PUBLIC channel's invite answers "already" to an account that left it (DeezLoad's
-                // ">DEDSEC:/"); its own flag says whether the account is in it.
-                ChatInviteAlready { chat: Channel left } when left.flags.HasFlag(Channel.Flags.left) => new BotChannel(bot, provider, link, left.title),
+                // ">DEDSEC:/"); its own flag says whether the account is in it, and it is joined directly.
+                ChatInviteAlready { chat: Channel left } when left.flags.HasFlag(Channel.Flags.left) => new BotChannel(bot, provider, link, left.title) { Peer = left },
                 _ => null, // a member
             };
         var resolved = await client.Contacts_ResolveUsername(link).WaitAsync(TimeSpan.FromSeconds(25), ct).ConfigureAwait(false);
-        return resolved.Chat is Channel channel && channel.flags.HasFlag(Channel.Flags.left) ? new BotChannel(bot, provider, link, channel.title) : null;
+        return resolved.Chat is Channel channel && channel.flags.HasFlag(Channel.Flags.left) ? new BotChannel(bot, provider, link, channel.title) { Peer = channel } : null;
     }
 
     /// <summary>
@@ -337,36 +368,38 @@ internal sealed class TelegramAccount : ITelegramSignIn, IDisposable
     public async Task JoinAsync(IReadOnlyList<BotChannel> channels, CancellationToken ct)
     {
         var client = await ConnectAsync(ct).ConfigureAwait(false);
-        foreach (var channel in channels)
-        {
-            try
-            {
-                if (channel.Link.StartsWith('+'))
-                {
-                    // A public channel's invite cannot be "imported"; such a channel is joined by itself.
-                    if (await client.Messages_CheckChatInvite(channel.Link[1..]).WaitAsync(TimeSpan.FromSeconds(25), ct).ConfigureAwait(false) is ChatInviteAlready { chat: Channel open })
-                        await client.Channels_JoinChannel(open).WaitAsync(TimeSpan.FromSeconds(25), ct).ConfigureAwait(false);
-                    else await client.Messages_ImportChatInvite(channel.Link[1..]).WaitAsync(TimeSpan.FromSeconds(25), ct).ConfigureAwait(false);
-                }
-                else if ((await client.Contacts_ResolveUsername(channel.Link).WaitAsync(TimeSpan.FromSeconds(25), ct).ConfigureAwait(false)).Chat is Channel found)
-                    await client.Channels_JoinChannel(found).WaitAsync(TimeSpan.FromSeconds(25), ct).ConfigureAwait(false);
-                _log?.Invoke(channel.Provider + ": joined " + channel.Title + ".");
-            }
-            catch (RpcException ex) when (ex.Message is "USER_ALREADY_PARTICIPANT" or "INVITE_REQUEST_SENT") { _log?.Invoke(channel.Provider + ": " + ex.Message); }
-        }
-        foreach (var bot in channels.Select(c => c.Bot).Distinct(StringComparer.OrdinalIgnoreCase))
+        // Every channel at once, then every bot at once (owner: as fast as possible; live: 7 s one after another).
+        await Task.WhenAll(channels.Select(channel => JoinOneAsync(client, channel, ct))).ConfigureAwait(false);
+        await Task.WhenAll(channels.Select(c => c.Bot).Distinct(StringComparer.OrdinalIgnoreCase).Select(async bot =>
         {
             ForgetQuality(bot);
             try
             {
                 // Owner (live, 2026-10-28): once joined, any message unlocks the bot; it answers that first message
                 // with "Thanks for joining" / its welcome, not a song. /start takes that answer before any request.
-                var user = await BotAsync(client, bot, ct).ConfigureAwait(false);
-                await client.SendMessageAsync(user, "/start").WaitAsync(TimeSpan.FromSeconds(25), ct).ConfigureAwait(false);
-                await Task.Delay(TimeSpan.FromSeconds(3), ct).ConfigureAwait(false);
+                await GreetAsync(client, await BotAsync(client, bot, ct).ConfigureAwait(false), ct).ConfigureAwait(false);
             }
             catch (Exception ex) when (ex is RpcException or TimeoutException) { _log?.Invoke(bot + ": " + ex.Message); }
+        })).ConfigureAwait(false);
+    }
+
+    private async Task JoinOneAsync(Client client, BotChannel channel, CancellationToken ct)
+    {
+        try
+        {
+            if (channel.Peer is { } known) await client.Channels_JoinChannel(known).WaitAsync(TimeSpan.FromSeconds(25), ct).ConfigureAwait(false);
+            else if (channel.Link.StartsWith('+'))
+            {
+                // A public channel's invite cannot be "imported"; such a channel is joined by itself.
+                if (await client.Messages_CheckChatInvite(channel.Link[1..]).WaitAsync(TimeSpan.FromSeconds(25), ct).ConfigureAwait(false) is ChatInviteAlready { chat: Channel open })
+                    await client.Channels_JoinChannel(open).WaitAsync(TimeSpan.FromSeconds(25), ct).ConfigureAwait(false);
+                else await client.Messages_ImportChatInvite(channel.Link[1..]).WaitAsync(TimeSpan.FromSeconds(25), ct).ConfigureAwait(false);
+            }
+            else if ((await client.Contacts_ResolveUsername(channel.Link).WaitAsync(TimeSpan.FromSeconds(25), ct).ConfigureAwait(false)).Chat is Channel found)
+                await client.Channels_JoinChannel(found).WaitAsync(TimeSpan.FromSeconds(25), ct).ConfigureAwait(false);
+            _log?.Invoke(channel.Provider + ": joined " + channel.Title + ".");
         }
+        catch (RpcException ex) when (ex.Message is "USER_ALREADY_PARTICIPANT" or "INVITE_REQUEST_SENT") { _log?.Invoke(channel.Provider + ": " + ex.Message); }
     }
 
     /// <summary>
