@@ -19,6 +19,7 @@ public sealed record SettingShortcut(string Tab, string? Control = null, string?
         "offline" => new("General", Control: "OfflineModeRow"),
         "wordTiming" => new("Features", Feature: "dev.moshi.wordlyrics", Key: "timePlayed"),
         "gaming" => new("Features", Feature: "dev.moshi.wordlyrics", Key: "lightWhileGaming"),
+        "easeOff" => new("Features", Feature: "dev.moshi.wordlyrics", Key: "adaptToPc"),
         "cache" => new("Features", Feature: "dev.moshi.freemusicfinder", Key: "streamCacheDays"),
         "firstBot" => new("Features", Feature: "dev.moshi.freemusicfinder", Key: "firstBot"),
         "downloadAhead" => new("Features", Feature: "dev.moshi.freemusicfinder", Key: "downloadAhead"),

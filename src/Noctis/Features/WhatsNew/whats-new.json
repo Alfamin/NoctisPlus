@@ -1,6 +1,19 @@
 {
   "releases": [
     {
+      "version": "2.4.4",
+      "added": [
+        { "icon": "SearchIcon", "title": "Search knows who you mean", "line": "The top result is the song or artist people play, even half typed", "top": true },
+        { "icon": "GlobeIcon", "title": "Sign in to Telegram with a QR code", "line": "Scan it in Telegram on your phone; no app id needed" },
+        { "icon": "RailSparkleIcon", "title": "Every setup on the first page", "line": "Connect Telegram and word lyrics in one press" },
+        { "icon": "LyricsIcon", "title": "Word timing eases off when the PC is busy", "line": "Rests while a game runs; a third of the memory on the processor", "setting": "easeOff" }
+      ],
+      "fixed": [
+        "New installs download MP3 by default; your quality choice is kept",
+        "A graphics card that keeps crashing word timing is set aside for the processor"
+      ]
+    },
+    {
       "version": "2.4.3",
       "added": [
         { "icon": "LyricsIcon", "title": "Word timing uses half the memory", "line": "8 GB graphics cards time songs smoothly", "top": true },
