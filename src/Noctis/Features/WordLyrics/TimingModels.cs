@@ -59,3 +59,7 @@ internal static class LyricDrafts
         return Normalize(embedded.TimedText is { Length: > 0 } timed ? timed : embedded.PlainText);
     }
 }
+
+/// <summary>Owner #194: one song on word timing's list. <paramref name="NextTryUtc"/>: when it is tried next, if later
+/// than now. <paramref name="Failed"/>: it did not work before (<paramref name="Times"/> tries).</summary>
+internal sealed record QueuedSong(string Path, bool Running, DateTime? NextTryUtc, bool Failed, int Times);

@@ -74,6 +74,47 @@ public sealed partial class WordLyricsViewModel : ObservableObject, IDisposable
         Refresh();
     }
     public string PauseLabel => Paused ? "Resume" : "Pause";
+
+    /// <summary>Owner #194: the songs word timing is working on, the ones that keep coming back first. Remove = never
+    /// time this song again, until Time words on its lyrics page.</summary>
+    public ObservableCollection<WordTimingQueueRow> Queue { get; } = [];
+    public bool ShowQueue => !IsSong && IsSetUp && Queue.Count > 0;
+    public string QueueTitle => Queue.Count == 1 ? "1 song in line" : $"{Queue.Count:N0} songs in line";
+    private string _queueKey = "";
+
+    private void RefreshQueue()
+    {
+        if (IsSong) return;
+        var now = DateTime.UtcNow;
+        var rows = _service.Queue
+            .OrderByDescending(s => s.Failed).ThenByDescending(s => s.Running).ThenByDescending(s => s.Times)
+            .ThenBy(s => s.NextTryUtc ?? DateTime.MinValue).ThenBy(s => Path.GetFileName(s.Path), StringComparer.OrdinalIgnoreCase)
+            .Select(s => new WordTimingQueueRow(s.Path, Path.GetFileNameWithoutExtension(s.Path), QueueLine(s, now), s.Failed && !s.Running, RemoveCommand))
+            .ToList();
+        var key = string.Join("\n", rows.Select(r => r.Path + "|" + r.Line));
+        if (key == _queueKey) return;
+        _queueKey = key;
+        Queue.Clear();
+        foreach (var row in rows) Queue.Add(row);
+        OnPropertyChanged(nameof(ShowQueue)); OnPropertyChanged(nameof(QueueTitle));
+    }
+
+    internal static string QueueLine(QueuedSong song, DateTime nowUtc)
+    {
+        if (song.Running) return "Timing now";
+        var next = NextTry(song.NextTryUtc, nowUtc);
+        if (song.Failed) return (song.Times > 1 ? $"Didn't work · tried {song.Times} times" : "Didn't work") + next;
+        return next.Length > 0 ? "Waiting" + next : "Waiting";
+    }
+
+    [RelayCommand]
+    private void Remove(WordTimingQueueRow? row)
+    {
+        if (row is null) return;
+        _service.SetIgnored(row.Path, true);
+        _queueKey = "";
+        Refresh();
+    }
     public ObservableCollection<string> SourceLabels { get; } = [];
     public bool HasSources => SourceLabels.Count > 0;
     private List<LyricChoice> _sources = [];
@@ -108,6 +149,7 @@ public sealed partial class WordLyricsViewModel : ObservableObject, IDisposable
         OnPropertyChanged(nameof(CanInteract));
         OnPropertyChanged(nameof(IsIgnored)); OnPropertyChanged(nameof(IgnoreLabel)); OnPropertyChanged(nameof(CanStart));
         StartCommand.NotifyCanExecuteChanged(); FindLyricsCommand.NotifyCanExecuteChanged(); SetupCommand.NotifyCanExecuteChanged();
+        RefreshQueue();
     }
     /// <summary>Owner #91: "3 waiting" with nothing running looked stuck; songs held for a later try say when it is.</summary>
     internal static string NextTry(DateTime? atUtc, DateTime nowUtc)
@@ -185,3 +227,6 @@ public sealed partial class WordLyricsViewModel : ObservableObject, IDisposable
     [RelayCommand] private void OpenReport() { try { _service.OpenReport(); } catch (Exception ex) { Error = ex.Message; } }
     public void Dispose() { _disposed = true; _tick.Stop(); _stop.Cancel(); _service.Changed -= Refresh; _stop.Dispose(); }
 }
+
+/// <summary>Owner #194: one row of word timing's list. <paramref name="Failing"/>: it did not work and keeps coming back.</summary>
+public sealed record WordTimingQueueRow(string Path, string Name, string Line, bool Failing, System.Windows.Input.ICommand Remove);

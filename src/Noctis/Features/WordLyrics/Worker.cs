@@ -163,6 +163,15 @@ internal sealed class Worker : IDisposable
             return soonest > now + TimeSpan.FromMinutes(1) ? soonest : null;
         }
     }
+    /// <summary>Owner #194: every song on the list, for the list in the word timing window. Failed: it did not work before
+    /// and waits for another try (the ones that keep coming back).</summary>
+    internal IReadOnlyList<QueuedSong> Queue(DateTime now)
+    {
+        lock (_gate)
+            return _items.Values.Where(i => !IsIgnored(i.Path)).Select(i => new QueuedSong(i.Path, _activePaths.Contains(i.Path),
+                i.NotBefore > now ? i.NotBefore : null, i.Deferred || i.Tries > 0 || i.Waits > 0, Math.Max(i.Tries + i.Waits, i.Deferred ? 1 : 0))).ToList();
+    }
+
     internal SongTimingStatus StatusFor(string path)
     {
         lock (_gate)

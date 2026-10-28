@@ -37,6 +37,30 @@
           <!-- Owner #91: every library song without word timing, in one press. -->
           <Button Content="{Binding MissingLabel}" Classes="pill-primary" Command="{Binding TimeAllMissingCommand}"
                   IsVisible="{Binding ShowMissing}" IsEnabled="{Binding HasMissing}" HorizontalAlignment="Left" />
+          <!-- Owner #194: what word timing is working on, the songs that keep coming back first; Remove = never time it. -->
+          <StackPanel Spacing="8" IsVisible="{Binding ShowQueue}">
+            <TextBlock Text="{Binding QueueTitle}" FontSize="13" FontWeight="SemiBold" />
+            <Border Classes="pill-well" CornerRadius="16" Padding="4">
+              <ScrollViewer MaxHeight="248" HorizontalScrollBarVisibility="Disabled">
+                <ItemsControl ItemsSource="{Binding Queue}">
+                  <ItemsControl.ItemTemplate>
+                    <DataTemplate x:DataType="vm:WordTimingQueueRow">
+                      <Grid ColumnDefinitions="*,Auto" ColumnSpacing="12" Margin="12,6">
+                        <StackPanel Spacing="2" VerticalAlignment="Center">
+                          <TextBlock Text="{Binding Name}" FontSize="13" TextTrimming="CharacterEllipsis" />
+                          <TextBlock Text="{Binding Line}" FontSize="11" Opacity="0.6" Classes.problem="{Binding Failing}" TextTrimming="CharacterEllipsis" />
+                        </StackPanel>
+                        <Button Grid.Column="1" Classes="pill-secondary" Content="Remove" VerticalAlignment="Center"
+                                Command="{Binding Remove}" CommandParameter="{Binding}"
+                                ToolTip.Tip="Never time this song. Time words on its lyrics brings it back."
+                                AutomationProperties.Name="{Binding Name, StringFormat='Never time {0}'}" />
+                      </Grid>
+                    </DataTemplate>
+                  </ItemsControl.ItemTemplate>
+                </ItemsControl>
+              </ScrollViewer>
+            </Border>
+          </StackPanel>
           <ComboBox ItemsSource="{Binding Folders}" SelectedIndex="{Binding FolderIndex}" IsVisible="{Binding ShowFolders}"
                     IsEnabled="{Binding CanInteract}" Classes="pill-field" HorizontalAlignment="Stretch" />
           <ComboBox ItemsSource="{Binding Actions}" SelectedIndex="{Binding ActionIndex}" IsVisible="{Binding ShowActions}"

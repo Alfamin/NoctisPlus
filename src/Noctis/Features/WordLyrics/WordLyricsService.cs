@@ -39,6 +39,7 @@ internal sealed class WordLyricsService(ILibraryService library, Func<AppSetting
     internal event Action? PillChanged;
     internal event Action<IReadOnlyList<string>>? LyricsWritten;
     internal int WaitingCount => _worker?.WaitingCount ?? 0;
+    internal IReadOnlyList<QueuedSong> Queue => _worker?.Queue(DateTime.UtcNow) ?? [];
     internal DateTime? NextTryUtc => _worker?.NextTryUtc(DateTime.UtcNow);
     internal SongTimingStatus StatusFor(string path)
     {

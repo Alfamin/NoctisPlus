@@ -89,6 +89,40 @@ public class NativeWordLyricsTests
         Assert.True(panel.FindControl<Noctis.Controls.PillDialogHost>("TimingHost")!.ShowBackdrop);
     }
 
+    /// <summary>Owner #194: the word timing window lists the songs in line; Remove takes one off for good, and only Time
+    /// words on that song brings it back.</summary>
+    [AvaloniaFact]
+    public void TheSongsInLine_AreListed_AndRemoveMeansNeverUntilTimeWords()
+    {
+        using var rig = new Rig(); var track = rig.Library.TrackList[0];
+        var ask = rig.Service.TimeSongAsync(track); Until(() => ask.IsCompleted); ask.GetAwaiter().GetResult();
+        using var vm = new WordLyricsViewModel(rig.Service, true, null, _ => Task.FromResult(true));
+        var row = Assert.Single(vm.Queue);
+        Assert.Equal("Existing", row.Name);
+        Assert.Equal("Waiting", row.Line);
+        Assert.False(row.Failing);
+        Assert.Equal("1 song in line", vm.QueueTitle);
+        row.Remove.Execute(row);
+        Assert.Empty(vm.Queue);
+        Assert.True(rig.Service.IsIgnored(track.FilePath));
+        Assert.Equal(0, rig.Service.WaitingCount);
+        // Playback and new-download timing leave it alone; Time words on its lyrics brings it back.
+        var again = rig.Service.TimeSongAsync(track); Until(() => again.IsCompleted); again.GetAwaiter().GetResult();
+        Assert.False(rig.Service.IsIgnored(track.FilePath));
+        Until(() => rig.Service.WaitingCount == 1);
+    }
+
+    [Fact]
+    public void ASongThatKeepsFailing_SaysSo_AndWhenItIsTriedNext()
+    {
+        var now = new DateTime(2026, 10, 29, 12, 0, 0, DateTimeKind.Utc);
+        Assert.Equal("Timing now", WordLyricsViewModel.QueueLine(new("a.mp3", true, null, true, 2), now));
+        Assert.Equal("Didn't work · tried 2 times · next try in 3 h 0 min", WordLyricsViewModel.QueueLine(new("a.mp3", false, now.AddHours(3), true, 2), now));
+        Assert.Equal("Didn't work · next try in 10 days", WordLyricsViewModel.QueueLine(new("a.mp3", false, now.AddDays(10), true, 1), now));
+        Assert.Equal("Waiting", WordLyricsViewModel.QueueLine(new("a.mp3", false, null, false, 0), now));
+        Assert.Equal("Waiting · next try in 2 min", WordLyricsViewModel.QueueLine(new("a.mp3", false, now.AddMinutes(2), false, 0), now));
+    }
+
     [AvaloniaFact] // Owner #183: a first-time user saw Pause/Stop/Restart and a red Start timing before WordLyrics was installed.
     public void BeforeSetup_ThePanelOffersOnlySetUpAsTheMainAction()
     {
