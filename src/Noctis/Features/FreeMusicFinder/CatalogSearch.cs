@@ -179,14 +179,18 @@ internal static class SearchRanking
         // artist is vastly more popular than a tiny exact namesake (owner, 2026-10-18). Comparable namesakes keep the
         // exact match first.
         var queryKey = BotText.Key(query.Text);
-        var exactFans = artists.Where(a => BotText.Key(a.Name) == queryKey).Select(a => fansOf?.Invoke(a) ?? -1).DefaultIfEmpty(-1).Max();
+        var typed = WordList(query.Text);
+        var exactFans = artists.Where(a => BotText.Key(a.Name) == queryKey || NameMatch(typed, a.Name) == NameFit.Exact).Select(a => fansOf?.Invoke(a) ?? -1).DefaultIfEmpty(-1).Max();
         var dominant = new HashSet<string>(StringComparer.Ordinal);
         for (var i = 0; i < artists.Count; i++)
         {
-            var a = artists[i]; var key = BotText.Key(a.Name); var exact = key == queryKey;
+            var a = artists[i]; var key = BotText.Key(a.Name); var exact = key == queryKey || NameMatch(typed, a.Name) == NameFit.Exact; // "beatles": The Beatles (#188)
             var near = !exact && query.Artist.Length == 0 && NearName(queryKey, key);
             var fans = fansOf?.Invoke(a) ?? -1;
             if (near && fans >= 100_000 && fans >= 1000 * Math.Max(1, exactFans)) dominant.Add(a.Id);
+            // Owner #188: "kanye" means Kanye West (4.6 million fans), not an exact namesake with 121; "travis" Travis Scott.
+            if (!exact && query.Artist.Length == 0 && exactFans >= 0 && NameMatch(typed, a.Name) == NameFit.Typed && fans >= 100_000 && fans >= 10 * Math.Max(1, exactFans))
+                dominant.Add(a.Id);
             var support = songs.Count(s => s.Song.Artists.Any(by => by.Id == a.Id));
             var fit = near ? 82 : Fit(query.Artist.Length > 0 ? query.Artist : query.Text, a.Name);
             var score = fit + (exact || dominant.Contains(a.Id) ? 18 : 0) + Math.Min(12, support * 2) - Math.Min(4, i * .15);
@@ -196,8 +200,10 @@ internal static class SearchRanking
             if (matched) score += 16;
             output.Add(new("Artists", a.Id, a.Name, matched ? "Matches your library · " + string.Join(", ", identity!.Albums.Take(3)) : "Artist" + (a.Genre.Length > 0 ? " · " + a.Genre : ""), score, Artist: a));
         }
-        var artistIntent = identity?.Artist ?? output.Where(h => h.Artist is not null && (BotText.Key(h.Artist.Name) == queryKey || dominant.Contains(h.Artist.Id)))
-            .OrderByDescending(h => h.Score).Select(h => h.Artist).FirstOrDefault();
+        // A far more followed artist than the exact namesake is the one meant (the most followed of them, owner #188).
+        var artistIntent = identity?.Artist ?? (dominant.Count > 0
+            ? output.Where(h => h.Artist is not null && dominant.Contains(h.Artist.Id)).OrderByDescending(h => fansOf?.Invoke(h.Artist!) ?? -1).Select(h => h.Artist).FirstOrDefault()
+            : output.Where(h => h.Artist is not null && (BotText.Key(h.Artist.Name) == queryKey || NameMatch(typed, h.Artist.Name) == NameFit.Exact)).OrderByDescending(h => fansOf?.Invoke(h.Artist!) ?? -1).ThenByDescending(h => h.Score).Select(h => h.Artist).FirstOrDefault());
         foreach (var s in DeduplicateSongs(songs))
         {
             var by = string.Join(", ", s.Song.Artists.Select(a => a.Name));
@@ -247,7 +253,8 @@ internal static class SearchRanking
         {
             foreach (var by in hit.Track!.Song.Artists)
             {
-                var titleMatch = Fit(query.Title, hit.Title) >= 60;
+                // A title typed so far counts too ("plot twis": Drake, artist of Plot Twist; owner #188).
+                var titleMatch = Fit(query.Title, hit.Title) >= 60 || query.Artist.Length == 0 && NameMatch(typed, BotText.Plain(hit.Title), artist: false) is NameFit.Typed or NameFit.Exact;
                 var named = query.Artist.Length == 0 && TitleBesideArtist(query.Text, hit.Track!.Song) is not null && Words(by.Name) is { Count: > 0 } byWords && byWords.All(Words(query.Text).Contains);
                 if (!titleMatch && !named && Fit(query.Text, by.Name) < 60 && (query.Artist.Length == 0 || Fit(query.Artist, by.Name) < 60)) continue;
                 Remember(by, hit.Score + 18, hit.Score, titleMatch ? "Artist of “" + hit.Title + "”" : "Artist · " + by.Name);
@@ -273,7 +280,7 @@ internal static class SearchRanking
             if (best?.Track is { } track && track.Song.Artists.Any(a => a.Id == artistIntent.Id) && best.Score >= output[leading].Score)
                 output[leading] = output[leading] with { Score = best.Score + 1 };
         }
-        var ranked = output.OrderByDescending(h => h.Score).ThenBy(h => h.Kind == "Albums" ? 0 : h.Kind == "Songs" ? 1 : 2).ToList();
+        var ranked = MeantFirst(query, typed, output.OrderByDescending(h => h.Score).ThenBy(h => h.Kind == "Albums" ? 0 : h.Kind == "Songs" ? 1 : 2).ToList(), fansOf);
         // Keep the Artists shelf consistent with this search's strongest result. Related album
         // context must not push a literal namesake ahead of the artist of the leading song.
         var credited = ranked.FirstOrDefault() switch
@@ -295,6 +302,134 @@ internal static class SearchRanking
             if (!related.TryGetValue(by.Id, out var old) || rank > old.Rank) related[by.Id] = (by, rank, sourceScore, reason);
         }
     }
+    // ── Owner #188: the top result is what people mean ──────────────────────────────────────────────────────────────
+    // "plot twis" (still typing) led with an artist called Plot Twist (848 fans) over Drake's Plot Twist, and "kanye" with a
+    // song called KANYE by FEEL over Kanye West. The words only decide WHICH results can be meant; among those, how many
+    // people listen decides. The ranking above stays as it is unless this is sure: the result it puts first must be about
+    // three times better on that measure (ten times the listeners when it is only typed so far against an exact name).
+
+    /// <summary>How typed words name something. Typed: the words from the start, the last one possibly unfinished.</summary>
+    internal enum NameFit { None, Typo, Words, Typed, Exact }
+    // A name typed in full means the artist ("kiss": KISS, not Kiss It Better), as Spotify reads it: an artist's match
+    // counts twice a song's or album's, so a song needs ten times the listeners to lead over an artist matched as well;
+    // a title only typed so far counts least ("heart" is the band Heart, not Heartless; "cardi" Cardi B, not cardigan).
+    private static double Weight(NameFit fit, bool artist = false) => fit switch
+    {
+        NameFit.Exact => artist ? 2 : 1, NameFit.Typed => artist ? 1 : .3, NameFit.Words => artist ? .3 : 0, NameFit.Typo => artist ? 0 : -1, _ => double.NaN,
+    };
+
+    /// <summary>A leading "The" may be left out of an artist's name: "beatles" is The Beatles, "killers" The Killers (not for
+    /// titles: "nights" is Frank Ocean's Nights, not Avicii's The Nights).</summary>
+    internal static NameFit NameMatch(IReadOnlyList<string> typed, string name, bool artist = true)
+    {
+        var words = WordList(name);
+        var fit = Match(typed, words);
+        if (artist && words.Count > 1 && words[0] == "the" && typed.Count > 0 && typed[0] != "the" && Match(typed, words.Skip(1).ToList()) is var bare && bare > fit) fit = bare;
+        return fit;
+    }
+
+    private static NameFit Match(IReadOnlyList<string> typed, List<string> words)
+    {
+        if (typed.Count == 0 || words.Count == 0) return NameFit.None;
+        if (string.Concat(typed) == string.Concat(words)) return NameFit.Exact;
+        var last = typed.Count - 1;
+        if (typed.Count <= words.Count && Enumerable.Range(0, last).All(i => typed[i] == words[i]) && words[last].StartsWith(typed[last], StringComparison.Ordinal))
+            return NameFit.Typed;
+        if (typed.Take(last).All(words.Contains) && words.Any(w => w.StartsWith(typed[last], StringComparison.Ordinal))) return NameFit.Words;
+        return NearName(string.Concat(typed), string.Concat(words)) ? NameFit.Typo : NameFit.None;
+    }
+
+    private static NameFit Best(IReadOnlyList<string> typed, IEnumerable<string> names)
+        => names.Select(n => NameMatch(typed, n, artist: false)).DefaultIfEmpty(NameFit.None).MaxBy(Weight0);
+    private static double Weight0(NameFit fit) => fit == NameFit.None ? -9 : Weight(fit);
+
+    /// <summary>The names a result answers to. A song or album also answers to "artist title" and "title artist", but only
+    /// when the words say more than the artist's name: "drake" alone names Drake, not each of his songs.</summary>
+    private static NameFit Level(FinderQuery query, IReadOnlyList<string> typed, FinderHit hit)
+    {
+        if (hit.Artist is { } artist) return NameMatch(typed, artist.Name);
+        if (hit.Track is { } track)
+        {
+            var titles = new[] { track.Song.Title, BotText.Plain(track.Song.Title) }.Distinct().ToList();
+            var names = TitleBesideArtist(query.Text, track.Song) is null ? titles
+                : titles.Concat(track.Song.Artists.SelectMany(a => titles.SelectMany(t => new[] { a.Name + " " + t, t + " " + a.Name }))).ToList();
+            return Best(typed, names);
+        }
+        if (hit.Album is { } album)
+        {
+            var title = Regex.Replace(album.Title, @"\s*[\(\[](?:deluxe|expanded|remastered|anniversary)[^\)\]]*[\)\]]", "", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant);
+            var named = WordList(album.Artist.Name) is { Count: > 0 } byWords && byWords.All(WordList(query.Text).Contains) && typed.Count > byWords.Count;
+            return Best(typed, named ? [album.Title, title, album.Artist.Name + " " + title, title + " " + album.Artist.Name] : [album.Title, title]);
+        }
+        return NameFit.None;
+    }
+
+    /// <summary>How many people listen, comparable across kinds: an artist's fans; a song's credited artist's fans times
+    /// its share of plays (Deezer's rank, cubed: only real hits come near their artist); an album, a third of its
+    /// artist's. A song whose artist's fans are not known yet is guessed from its rank alone. Null: nothing to go on.</summary>
+    internal static double? Reach(FinderHit hit, Func<CatalogArtist, long?>? fansOf)
+    {
+        if (hit.Artist is { } artist) return fansOf?.Invoke(artist);
+        if (hit.Track is { } track)
+        {
+            var rank = Math.Clamp(track.Song.Popularity / 1_000_000d, 0, 1);
+            var fans = (double?)track.Song.Artists.Select(a => fansOf?.Invoke(a)).Max();
+            if (fans is null && track.Song.ArtistReach > 0) fans = track.Song.ArtistReach;
+            if (rank <= 0) return fans is { } known ? known * .001 : null;
+            fans ??= Math.Pow(10, 1 + 6 * rank);
+            return fans * rank * rank * rank;
+        }
+        if (hit.Album is { } album && fansOf?.Invoke(album.Artist) is { } albumFans) return albumFans / 3d;
+        return null;
+    }
+
+    /// <summary>The reach comes from real fan counts, not a guess from a song's rank.</summary>
+    private static bool Measured(FinderHit hit, Func<CatalogArtist, long?>? fansOf) => hit switch
+    {
+        { Artist: { } artist } => fansOf?.Invoke(artist) is not null,
+        { Track: { } track } => track.Song.Popularity > 0 && (track.Song.ArtistReach > 0 || track.Song.Artists.Any(a => fansOf?.Invoke(a) is not null)),
+        { Album: { } album } => fansOf?.Invoke(album.Artist) is not null,
+        _ => false,
+    };
+
+    internal static IReadOnlyList<string> TypedWords(string text) => WordList(text);
+    internal static bool CouldBeMeant(FinderQuery query, CatalogSearchSong song)
+        => Level(query, WordList(query.Text), new("Songs", song.Song.Id, song.Song.Title, "", 0, Track: song)) != NameFit.None;
+    /// <summary>The artist the words name, exactly or as typed so far ("kanye" → Kanye West).</summary>
+    internal static bool NamesArtist(string text, CatalogArtist artist)
+        => BotText.Key(artist.Name) == BotText.Key(text) || NameMatch(WordList(text), artist.Name) is NameFit.Typed or NameFit.Exact;
+
+    private static List<FinderHit> MeantFirst(FinderQuery query, IReadOnlyList<string> typed, List<FinderHit> ranked, Func<CatalogArtist, long?>? fansOf)
+    {
+        if (query.Artist.Length > 0 || typed.Count == 0 || ranked.Count < 2) return ranked;
+        // When the words name something exactly, a title that only starts with them is a longer word ("heart": the band
+        // Heart and songs called Heart, not Heartless).
+        var exactly = ranked.Any(h => h.Artist is { } named && fansOf?.Invoke(named) >= 10_000 && Level(query, typed, h) == NameFit.Exact);
+        double? Value(FinderHit hit) => Level(query, typed, hit) is var level && level != NameFit.None && Reach(hit, fansOf) is { } reach
+            ? (exactly && level == NameFit.Typed && hit.Artist is null ? -.5 : Weight(level, hit.Artist is not null)) + Math.Log10(Math.Max(1, reach)) : null;
+        var leadLevel = Level(query, typed, ranked[0]);
+        var lead = leadLevel == NameFit.None ? -2 : Value(ranked[0]) ?? Weight(leadLevel, ranked[0].Artist is not null);
+        var best = ranked.Select((hit, at) => (hit, at, value: Value(hit))).Where(c => c.value is not null)
+            .OrderByDescending(c => c.value).ThenBy(c => c.at).FirstOrDefault();
+        // A guess from a song's rank alone needs a clear lead; real counts on both sides simply decide ("olivia": Olivia
+        // Rodrigo's 1.8 million fans over One Direction's song Olivia).
+        var margin = Measured(ranked[0], fansOf) && best.hit is not null && Measured(best.hit, fansOf) ? 0 : .5;
+        if (best.hit is null || best.at == 0 || best.value <= lead + margin) return ranked;
+        // Which of several songs (or albums) named alike is the one is the ranking's own call: it weighs each recording's
+        // plays ("runaway": Kanye West's, not Linkin Park's less played one by a bigger following).
+        if (best.hit.Kind == ranked[0].Kind && best.hit.Artist is null && leadLevel == NameFit.Exact && Level(query, typed, best.hit) == NameFit.Exact &&
+            BotText.Key(BotText.Plain(best.hit.Title)) == BotText.Key(BotText.Plain(ranked[0].Title))) return ranked;
+        // An album wins over its own title song by the same artist ("Take Care"), as the ranking above already says.
+        var meant = best.hit;
+        if (meant.Track is { } song && ranked.FirstOrDefault(h => h.Album is { Kind: "album", Count: > 1 } a && song.Song.Artists.Any(x => x.Id == a.Artist.Id) &&
+            Level(query, typed, h) >= Level(query, typed, meant)) is { } album) meant = album;
+        var top = ranked[0].Score + 1;
+        var rank = ranked.Where(h => h.Artist is not null).Select(h => h.ArtistRank ?? h.Score).DefaultIfEmpty(top).Max() + 1;
+        var list = ranked.Where(h => !ReferenceEquals(h, meant)).ToList();
+        list.Insert(0, meant with { Score = top, ArtistRank = meant.Artist is not null ? rank : meant.ArtistRank });
+        return list;
+    }
+
     /// <summary>The query without the words of one credited artist's name, when it contains all of them and
     /// something else; otherwise null.</summary>
     private static string? TitleBesideArtist(string query, CatalogSong song)

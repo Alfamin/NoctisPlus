@@ -99,7 +99,7 @@ internal static class UnifiedSearchTests
         // An exact-title album can give a literal namesake a stronger contextual rank without making it the top result.
         var namesake = new CatalogArtist("deezer:9999", "Runaway");
         var contextual = SearchRanking.Build(FinderQuery.Parse("runaway"), [namesake], [runaway],
-            [new("deezer:777", "Runaway", namesake, "2020", "single", 1)], fansOf: _ => 1000);
+            [new("deezer:777", "Runaway", namesake, "2020", "single", 1)], fansOf: a => a.Id == "deezer:1" ? 4_557_014 : 1000); // owner #188: real followings
         Check.Equal(runaway.Song.Artists[0].Id, SearchRanking.Artists(contextual).First().Artist?.Id,
             "a matching namesake album cannot replace the leading song's artist");
         Check.Equal(Main.Id, SearchRanking.Artists(songArtist).First().Artist?.Id, "Artists filter for a song title leads with the credited performer rather than a literal-name namesake");
@@ -115,6 +115,7 @@ internal static class UnifiedSearchTests
         Check.True(SearchRanking.Artists(SearchRanking.Build(FinderQuery.Parse(lesser.Name), [lesser], [Song(109, lesser.Name)], [])).Any(h => h.Artist?.Id == lesser.Id), "small artist remains selectable when a different performer has a song with that name");
         Check.Equal("deezer:111", ArtistCatalog.RelevanceEditions([Orbit, Orbit with { Id = "deezer:999", Title = "A newer unrelated record", Date = "2027" }])[0].Id, "search album consolidation preserves provider relevance instead of sorting by release date");
         Check.Equal(Main.Id, SearchRanking.Build(FinderQuery.Parse("North Star"), [Other, Main], [], [], new(Main, [Other, Main], ["Long Enough Album"], true))[0].Artist?.Id, "verified local album evidence outranks a provider's wrong namesake");
+        TopResultIsWhatPeopleMean();
         var variants = new[] { Song(105, "Flaws & Sins", explicitFlag: false), songs[0], Song(106, "Flaws & Sins (Live)"), songs[0] with { Song = songs[0].Song with { Id = "deezer:107", Seconds = 240 } } };
         var selected = SearchRanking.DeduplicateSongs(variants).ToArray();
         Check.Equal(3, selected.Length, "equivalent clean and explicit copies collapse; live and different-length recordings stay distinct");
@@ -141,6 +142,42 @@ internal static class UnifiedSearchTests
         await Check.ThrowsAsync<OperationCanceledException>(() => cancelled.SearchSongsAsync("Cancel me", stop.Token), "switching query cancels in-flight metadata without fallback traffic");
         Check.Equal(1, cancelHttp.Calls.Count, "cancelled metadata sends no second-provider request");
     }
+    /// <summary>Owner #188, with Deezer's real counts (2026-10-28): the words decide what can be meant, how many people
+    /// listen decides which. 172 of 175 live searches led as meant; these are the ones that went wrong before.</summary>
+    private static void TopResultIsWhatPeopleMean()
+    {
+        Check.Section("owner #188: the top result is what people mean");
+        var fans = new Dictionary<string, long>();
+        CatalogArtist A(int id, string name, long? following = null) { var a = new CatalogArtist("deezer:" + id, name); if (following is { } f) fans[a.Id] = f; return a; }
+        CatalogSearchSong S(int id, string title, CatalogArtist by, int rank) => Song(id, title, by) with { Song = new("deezer:" + id, title, [by], 200, true, Popularity: rank) };
+        FinderHit Top(string typed, CatalogArtist[] artists, CatalogSearchSong[] songs) => SearchRanking.Build(FinderQuery.Parse(typed), artists, songs, [], fansOf: a => fans.TryGetValue(a.Id, out var f) ? f : null)[0];
+        var words = SearchRanking.TypedWords("plot twis");
+        Check.Equal(SearchRanking.NameFit.Typed, SearchRanking.NameMatch(words, "Plot Twist"), "an unfinished last word still names it");
+        Check.Equal(SearchRanking.NameFit.Exact, SearchRanking.NameMatch(SearchRanking.TypedWords("beatles"), "The Beatles"), "a leading The may be left out of an artist's name");
+        Check.Equal(SearchRanking.NameFit.Words, SearchRanking.NameMatch(SearchRanking.TypedWords("nights"), "The Nights", artist: false), "but not out of a title");
+
+        var drake = A(246791, "Drake");
+        var plotTwist = new[] { S(1, "Plot Twist", drake, 716839), S(2, "plot twist", A(2, "TWS"), 386597) };
+        var namesakes = new[] { A(1703135, "Plot Twist", 848), A(14077421, "Plot Twist", 99) };
+        Check.Equal("deezer:1", Top("plot twis", namesakes, plotTwist).Track?.Song.Id, "\"plot twis\": Drake's Plot Twist, even before Drake's following is known");
+        fans[drake.Id] = 24_117_689;
+        Check.Equal("deezer:1", Top("plot twis", namesakes, plotTwist).Track?.Song.Id, "\"plot twis\": Drake's Plot Twist with his following known");
+        Check.Equal(drake.Id, SearchRanking.Artists(SearchRanking.Build(FinderQuery.Parse("plot twis"), namesakes, plotTwist, [], fansOf: a => fans.TryGetValue(a.Id, out var f) ? f : null)).First().Artist?.Id, "\"plot twis\": Drake leads the artists too");
+
+        var kanyeWest = A(230, "Kanye West", 4_557_014);
+        Check.Equal(kanyeWest.Id, Top("kanye", [A(5175553, "Kanye", 121), kanyeWest], [S(10, "KANYE", A(269444452, "FEEL"), 367856)]).Artist?.Id, "\"kanye\": Kanye West, not a song called KANYE or a namesake with 121 fans");
+        var travisScott = A(4495513, "Travis Scott", 8_000_000);
+        Check.Equal(travisScott.Id, Top("travis", [A(1181, "Travis", 289866), travisScott], [S(11, "Sing", A(1181, "Travis"), 806232)]).Artist?.Id, "\"travis\": Travis Scott, 28 times the band's following");
+        Check.Equal("deezer:12", Top("beatles", [A(99999, "Beat Les", 40), A(12, "The Beatles", 3_000_000)], []).Artist?.Id, "\"beatles\": The Beatles, not Beat Les");
+        Check.Equal("deezer:13", Top("kiss", [A(13, "KISS", 1_900_000)], [S(14, "Kiss It Better", A(564, "Rihanna", 15_000_000), 800000)]).Artist?.Id, "\"kiss\": the band, not Kiss It Better");
+        Check.Equal("deezer:15", Top("heart", [A(15, "Heart", 125311)], [S(16, "Heartless", A(4050205, "The Weeknd", 14_762_391), 771398), S(17, "Heart", A(986, "Pet Shop Boys", 1_057_551), 454983)]).Artist?.Id, "\"heart\": the band, not Heartless");
+        Check.Equal("deezer:18", Top("olivia", [A(18, "Olivia Rodrigo", 1_844_923)], [S(19, "Olivia", A(1424821, "One Direction", 6_592_526), 533763)]).Artist?.Id, "\"olivia\": Olivia Rodrigo, not One Direction's song");
+        Check.Equal("deezer:22", Top("shape of", [], [S(20, "Shape Of", A(20, "RePLAY", 5000), 300000), S(21, "Shape Of My Heart", A(368, "Sting", 1_500_000), 700000), S(22, "Shape of You", A(384236, "Ed Sheeran", 14_000_000), 950000)]).Track?.Song.Id, "\"shape of\": Shape of You");
+        var kanyeRunaway = S(23, "Runaway", kanyeWest, 870128);
+        Check.Equal("deezer:23", Top("runaway", [], [kanyeRunaway, S(24, "Runaway", A(1424, "Linkin Park", 15_000_000), 650000)]).Track?.Song.Id, "\"runaway\": same title, the more played recording keeps its place");
+        Check.Equal("deezer:25", Top("drake", [A(25, "Drake", 24_117_689)], [S(26, "God's Plan", drake, 937522), S(27, "Drake", A(27, "Small Band", 300), 9000)]).Artist?.Id, "\"drake\": the artist, not one of his songs");
+    }
+
     public static void RunUi(string? pictures)
     {
         Check.Section("unified search UI: filters, owned songs, chosen downloads and native navigation");

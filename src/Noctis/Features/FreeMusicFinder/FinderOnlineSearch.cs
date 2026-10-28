@@ -133,9 +133,16 @@ internal sealed class FinderOnlineSearch : IOnlineMusicSearch
             }
         }
 
-        // An artist search ("drake"): that artist's own top songs lead the song list.
+        // Owner #188: the real following of the artists behind songs that could be meant, so the top result weighs them
+        // instead of guessing from each song's rank.
+        var weighed = false;
+        try { weighed = await catalog.SongArtistFansAsync(query, songs, ct).ConfigureAwait(false); }
+        catch (Exception ex) when (ex is not OperationCanceledException) { warnings.Enqueue("Popularity: " + ArtistCatalog.Explain(ex)); }
+        if (weighed) yield return Result(false);
+
+        // An artist search ("drake", or "kanye" for Kanye West): that artist's own top songs lead the song list.
         var hits = SearchRanking.Build(query, artists, songs, albums, fansOf: catalog.FansOf);
-        if (hits.FirstOrDefault() is { Artist: { } leading } && BotText.Key(leading.Name) == BotText.Key(text))
+        if (hits.FirstOrDefault() is { Artist: { } leading } && SearchRanking.NamesArtist(text, leading))
         {
             var added = false;
             try
@@ -230,7 +237,7 @@ internal sealed class FinderOnlineSearch : IOnlineMusicSearch
                 LyricLeads, Track: lyric));
         }
         // Searching an artist: their own songs lead, songs they only feature on follow.
-        var leading = hits.FirstOrDefault() is { Artist: { } a } && BotText.Key(a.Name) == BotText.Key(query.Text) ? a.Id : null;
+        var leading = hits.FirstOrDefault() is { Artist: { } a } && SearchRanking.NamesArtist(query.Text, a) ? a.Id : null;
         var songRows = new List<OnlineSong>();
         foreach (var hit in hits.Where(h => h.Track is not null))
         {

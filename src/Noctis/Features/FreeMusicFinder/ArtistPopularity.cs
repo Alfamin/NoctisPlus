@@ -47,6 +47,33 @@ internal sealed partial class ArtistCatalog
         }
     }
 
+    /// <summary>Owner #188: fans of the artists behind the songs that could be the top result, so a famous artist's song
+    /// ("plot twis": Drake's) is weighed by Drake's real following instead of a guess from its rank. At most four small
+    /// lookups, each remembered for a week; true when any count was added.</summary>
+    internal async Task<bool> SongArtistFansAsync(FinderQuery query, IReadOnlyList<CatalogSearchSong> songs, CancellationToken ct)
+    {
+        if (query.Artist.Length > 0 || songs.Count == 0) return false;
+        await LoadArtistFansAsync(ct).ConfigureAwait(false);
+        var wanted = songs.Where(s => SearchRanking.CouldBeMeant(query, s)).OrderByDescending(s => s.Song.Popularity)
+            .Select(s => s.Song.Artists.FirstOrDefault()).OfType<CatalogArtist>()
+            .Where(a => a.Id.StartsWith("deezer:", StringComparison.Ordinal) && FansOf(a) is null).DistinctBy(a => a.Id).Take(4).ToList();
+        if (wanted.Count == 0) return false;
+        var added = await Task.WhenAll(wanted.Select(async a =>
+        {
+            try
+            {
+                var fans = await Cached("artist-reach-v1:" + a.Id, TimeSpan.FromDays(7), false, async () =>
+                {
+                    using var data = await Get("deezer", "/artist/" + Split(a.Id).Id, ct);
+                    return (int)Math.Clamp(Number(data.RootElement, "nb_fan"), 0, 100_000_000);
+                }, ct).ConfigureAwait(false);
+                return _artistFans.TryAdd(a.Id, fans.Value);
+            }
+            catch (Exception ex) when (Recoverable(ex)) { return false; }
+        })).ConfigureAwait(false);
+        return added.Any(a => a);
+    }
+
     /// <summary>Album evidence and manual choices have already had first say. Owner #140: after that the page never
     /// asks which namesake is meant; it opens the most likely one at once: the most followed, or, with no counts at all,
     /// the catalog's own first result. <paramref name="decisive"/> (For you's songs, where a wrong guess shows another
