@@ -282,12 +282,18 @@ internal sealed class TelegramAccount : ITelegramSignIn, IDisposable
             {
                 var user = await BotAsync(client, bot, ct).ConfigureAwait(false);
                 await StartBotAsync(client, user, bot, ct).ConfigureAwait(false);
-                var history = await client.Messages_GetHistory(user, limit: 6).WaitAsync(TimeSpan.FromSeconds(25), ct).ConfigureAwait(false);
-                var messages = history.Messages.OfType<Message>().OrderByDescending(m => m.id).ToList();
-                if (messages.FirstOrDefault(m => !m.flags.HasFlag(Message.Flags.out_)) is not { } latest) continue;
-                // Its greeting after a bare /start only counts when it says the channel is needed.
-                var welcome = messages.FirstOrDefault(m => m.flags.HasFlag(Message.Flags.out_) && m.id < latest.id)?.message?.Trim() == "/start";
-                foreach (var link in BotJoin.Links(latest, bot, welcome))
+                // In the bot's channel: nothing to ask. Otherwise its latest answer may predate the gate (an account
+                // that used the bot, then left; owner live check 2026-10-28), so it is greeted once for a fresh one.
+                if (BotJoin.Known.TryGetValue(bot, out var known) && await UnjoinedAsync(client, bot, provider, known, ct).ConfigureAwait(false) is null) continue;
+                var latest = await LatestAnswerAsync(client, user, ct).ConfigureAwait(false);
+                if (latest is null || BotJoin.Links(latest.Value.Answer, bot, latest.Value.Welcome).Count == 0)
+                {
+                    await client.SendMessageAsync(user, "/start").WaitAsync(TimeSpan.FromSeconds(25), ct).ConfigureAwait(false);
+                    await Task.Delay(TimeSpan.FromSeconds(3), ct).ConfigureAwait(false);
+                    latest = await LatestAnswerAsync(client, user, ct).ConfigureAwait(false);
+                }
+                if (latest is not { } fresh) continue;
+                foreach (var link in BotJoin.Links(fresh.Answer, bot, fresh.Welcome))
                     if (await UnjoinedAsync(client, bot, provider, link, ct).ConfigureAwait(false) is { } channel) needed.Add(channel);
             }
             catch (Exception ex) when (!(ex is OperationCanceledException && ct.IsCancellationRequested))
@@ -298,6 +304,16 @@ internal sealed class TelegramAccount : ITelegramSignIn, IDisposable
         return needed;
     }
 
+    /// <summary>The bot's newest message, and whether it answers a bare /start (a greeting only counts as a gate when it
+    /// says the channel is needed).</summary>
+    private static async Task<(Message Answer, bool Welcome)?> LatestAnswerAsync(Client client, InputPeer bot, CancellationToken ct)
+    {
+        var history = await client.Messages_GetHistory(bot, limit: 6).WaitAsync(TimeSpan.FromSeconds(25), ct).ConfigureAwait(false);
+        var messages = history.Messages.OfType<Message>().OrderByDescending(m => m.id).ToList();
+        if (messages.FirstOrDefault(m => !m.flags.HasFlag(Message.Flags.out_)) is not { } latest) return null;
+        return (latest, messages.FirstOrDefault(m => m.flags.HasFlag(Message.Flags.out_) && m.id < latest.id)?.message?.Trim() == "/start");
+    }
+
     private static async Task<BotChannel?> UnjoinedAsync(Client client, string bot, string provider, string link, CancellationToken ct)
     {
         if (link.StartsWith('+'))
@@ -305,7 +321,10 @@ internal sealed class TelegramAccount : ITelegramSignIn, IDisposable
             {
                 ChatInvite invite => new BotChannel(bot, provider, link, invite.title),
                 ChatInvitePeek { chat: var chat } => new BotChannel(bot, provider, link, chat.Title),
-                _ => null, // already a member
+                // Live 2026-10-28: a PUBLIC channel's invite answers "already" to an account that left it (DeezLoad's
+                // ">DEDSEC:/"); its own flag says whether the account is in it.
+                ChatInviteAlready { chat: Channel left } when left.flags.HasFlag(Channel.Flags.left) => new BotChannel(bot, provider, link, left.title),
+                _ => null, // a member
             };
         var resolved = await client.Contacts_ResolveUsername(link).WaitAsync(TimeSpan.FromSeconds(25), ct).ConfigureAwait(false);
         return resolved.Chat is Channel channel && channel.flags.HasFlag(Channel.Flags.left) ? new BotChannel(bot, provider, link, channel.title) : null;
@@ -323,7 +342,12 @@ internal sealed class TelegramAccount : ITelegramSignIn, IDisposable
             try
             {
                 if (channel.Link.StartsWith('+'))
-                    await client.Messages_ImportChatInvite(channel.Link[1..]).WaitAsync(TimeSpan.FromSeconds(25), ct).ConfigureAwait(false);
+                {
+                    // A public channel's invite cannot be "imported"; such a channel is joined by itself.
+                    if (await client.Messages_CheckChatInvite(channel.Link[1..]).WaitAsync(TimeSpan.FromSeconds(25), ct).ConfigureAwait(false) is ChatInviteAlready { chat: Channel open })
+                        await client.Channels_JoinChannel(open).WaitAsync(TimeSpan.FromSeconds(25), ct).ConfigureAwait(false);
+                    else await client.Messages_ImportChatInvite(channel.Link[1..]).WaitAsync(TimeSpan.FromSeconds(25), ct).ConfigureAwait(false);
+                }
                 else if ((await client.Contacts_ResolveUsername(channel.Link).WaitAsync(TimeSpan.FromSeconds(25), ct).ConfigureAwait(false)).Chat is Channel found)
                     await client.Channels_JoinChannel(found).WaitAsync(TimeSpan.FromSeconds(25), ct).ConfigureAwait(false);
                 _log?.Invoke(channel.Provider + ": joined " + channel.Title + ".");

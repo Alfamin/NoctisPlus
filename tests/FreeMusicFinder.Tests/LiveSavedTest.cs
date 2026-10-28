@@ -51,6 +51,18 @@ internal static class LiveSavedTest
         var client = await account.ConnectAsync(patience.Token);
         foreach (var name in names.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
         {
+            if (name.StartsWith('+'))
+            {
+                var invite = await client.Messages_CheckChatInvite(name[1..]);
+                Console.WriteLine($"  {name}: {invite.GetType().Name} " + invite switch
+                {
+                    ChatInviteAlready already => $"\"{already.chat.Title}\" (a member)",
+                    ChatInvitePeek peek => $"\"{peek.chat.Title}\" (can peek, not a member)",
+                    ChatInvite open => $"\"{open.title}\" (not a member)",
+                    _ => "",
+                });
+                continue;
+            }
             var resolved = await client.Contacts_ResolveUsername(name);
             if (resolved.Chat is Channel channel)
             {
@@ -58,9 +70,49 @@ internal static class LiveSavedTest
                 Console.WriteLine($"  {name}: {(channel.IsChannel ? "channel" : "group")} \"{channel.title}\", member: {!channel.flags.HasFlag(Channel.Flags.left)}, " +
                     $"about: {((full.full_chat as ChannelFull)?.about ?? "").ReplaceLineEndings(" / ")}");
             }
-            else if (resolved.User is { } user) Console.WriteLine($"  {name}: {(user.IsBot ? "bot" : "user")} \"{user.first_name}\"");
+            else if (resolved.User is { } user)
+            {
+                Console.WriteLine($"  {name}: {(user.IsBot ? "bot" : "user")} \"{user.first_name}\"");
+                if (!user.IsBot) continue;
+                var chat = await client.Messages_GetHistory(user, limit: 4);
+                foreach (var m in chat.Messages.OfType<Message>().OrderBy(m => m.id))
+                {
+                    Console.WriteLine($"    {m.date:HH:mm:ss} {(m.flags.HasFlag(Message.Flags.out_) ? "<-" : "->")} " + (m.message ?? "").ReplaceLineEndings(" / "));
+                    if (m.reply_markup is ReplyInlineMarkup markup)
+                        foreach (var b in markup.rows.SelectMany(r => r.buttons))
+                            Console.WriteLine("       button \"" + b.text + "\" [" + string.Join(" ", b.text.EnumerateRunes().Select(r => "U+" + r.Value.ToString("X4"))) + "] " + b.type?.GetType().Name + (b.type is InlineButtonTypeUrl url ? " → " + url.url : ""));
+                }
+            }
             else Console.WriteLine($"  {name}: nothing");
         }
+    }
+
+    /// <summary>Owner #190 live check: what the sign-in window does once signed in. "check" asks the bots what they need
+    /// (a /start is sent to a bot whose channel the account is not in); "join" also joins those channels, as the Join
+    /// press does, and checks again.</summary>
+    public static async Task JoinAsync(string mode, string? store, string? proxy)
+    {
+        Console.WriteLine("\nBot channels, " + mode);
+        if (string.IsNullOrWhiteSpace(store) || !File.Exists(store)) throw new ArgumentException("FMF_TELEGRAM_STORE is required with FMF_LIVE_JOIN.");
+        using var account = new TelegramAccount(store, () => proxy ?? "", way => Console.WriteLine("  " + way));
+        using var patience = new CancellationTokenSource(TimeSpan.FromMinutes(3));
+        var clock = System.Diagnostics.Stopwatch.StartNew();
+        var needed = await account.BotChannelsAsync(patience.Token);
+        Console.WriteLine($"  needed after {clock.Elapsed.TotalSeconds:0.0} s: " + (needed.Count == 0 ? "nothing" : string.Join("; ", needed.Select(c => $"{c.Provider} -> {c.Link} \"{c.Title}\""))));
+        Console.WriteLine("  window line: " + (needed.Count == 0 ? "(none)" : Noctis.ViewModels.TelegramSignInViewModel.JoinLine(needed)));
+        if (mode != "join" || needed.Count == 0) return;
+        clock.Restart();
+        await account.JoinAsync(needed, patience.Token);
+        Console.WriteLine($"  joined in {clock.Elapsed.TotalSeconds:0.0} s");
+        var client = await account.ConnectAsync(patience.Token);
+        foreach (var bot in needed.Select(c => c.Bot).Distinct())
+        {
+            var history = await client.Messages_GetHistory((await client.Contacts_ResolveUsername(bot)).User, limit: 3);
+            foreach (var m in history.Messages.OfType<Message>().OrderBy(m => m.id))
+                Console.WriteLine($"    @{bot} {(m.flags.HasFlag(Message.Flags.out_) ? "<-" : "->")} " + (m.message ?? "").ReplaceLineEndings(" / "));
+        }
+        var after = await account.BotChannelsAsync(patience.Token);
+        Console.WriteLine("  needed after joining: " + (after.Count == 0 ? "nothing" : string.Join("; ", after.Select(c => c.Provider + " -> " + c.Link))));
     }
 
     private static string Slice(string? text, MessageEntity e)

@@ -158,7 +158,7 @@ public class TelegramSignInQrTests
         Assert.True(vm.IsSignedIn);
         await vm.CheckBotsAsync();
         Assert.True(vm.NeedsJoin);
-        Assert.Equal("Music Hunters needs you to join Hunters News first.", vm.JoinText);
+        Assert.Equal("Music Hunters needs you to join its channel first.", vm.JoinText);
         await vm.JoinCommand.ExecuteAsync(null);
         Assert.Equal("HuntersNews", Assert.Single(Assert.Single(account.Joined)).Link);
         Assert.False(vm.NeedsJoin); // checked again: nothing left to join
@@ -167,7 +167,7 @@ public class TelegramSignInQrTests
         var ready = Vm(new FakeAccount(builtIn: true) { IsLoggedIn = true });
         await ready.CheckBotsAsync();
         Assert.False(ready.NeedsJoin); // bots that ask nothing show nothing
-        Assert.Equal("Music Hunters and DeezLoad need you to join News, Deez first.", TelegramSignInViewModel.JoinLine(
+        Assert.Equal("Music Hunters and DeezLoad need you to join their channels first.", TelegramSignInViewModel.JoinLine(
             [new("a", "Music Hunters", "n", "News"), new("b", "DeezLoad", "d", "Deez")]));
     }
 }

@@ -71,8 +71,8 @@ public sealed partial class TelegramSignInViewModel : ObservableObject, IDisposa
     {
         if (channels.Count == 0) return "";
         var bots = channels.Select(c => c.Provider).Distinct().ToList();
-        var names = string.Join(", ", channels.Select(c => c.Title).Distinct());
-        return bots.Count == 1 ? $"{bots[0]} needs you to join {names} first." : $"{string.Join(" and ", bots)} need you to join {names} first.";
+        // Channel names can be anything (">DEDSEC:/"); the bots are what the user knows.
+        return bots.Count == 1 ? $"{bots[0]} needs you to join its channel first." : $"{string.Join(" and ", bots)} need you to join their channels first.";
     }
 
     [RelayCommand(CanExecute = nameof(CanInteract))]
