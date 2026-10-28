@@ -74,6 +74,11 @@ if (Environment.GetEnvironmentVariable("FMF_LIVE_ROUTE") is { Length: > 0 } link
 // prints what the bot answers, without downloading the file. Noctis must be closed for it.
 // With FMF_LIVE_SAVED set to a number and FMF_TELEGRAM_STORE to the login file, only LiveSavedTest runs: it reads
 // that many newest Saved Messages and says which read as a bot's "join our channel first". Nothing is sent.
+if (Environment.GetEnvironmentVariable("FMF_LIVE_RESOLVE") is { Length: > 0 } usernames)
+{
+    await LiveSavedTest.ResolveAsync(usernames, Environment.GetEnvironmentVariable("FMF_TELEGRAM_STORE"), Environment.GetEnvironmentVariable("FMF_LIVE_PROXY"));
+    return 0;
+}
 if (int.TryParse(Environment.GetEnvironmentVariable("FMF_LIVE_SAVED"), out var saved) && saved > 0)
 {
     await LiveSavedTest.RunAsync(Math.Min(saved, 30), Environment.GetEnvironmentVariable("FMF_TELEGRAM_STORE"), Environment.GetEnvironmentVariable("FMF_LIVE_PROXY"));

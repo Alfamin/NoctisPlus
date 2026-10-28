@@ -26,6 +26,12 @@ internal static partial class BotJoin
     private static partial Regex Link();
     [GeneratedRegex(@"(?<![\w@./])@([A-Za-z]\w{3,31})")]
     private static partial Regex Mention();
+    [GeneratedRegex(@"\b(channel|channels)\b|канал|کانال|قناة|canal|kanal", RegexOptions.IgnoreCase)]
+    private static partial Regex ChannelWord();
+    // Owner (2026-10-28): each bot's channel, for a gate whose link cannot be read (its button gone or changed).
+    // Music Hunters' says "Bot link - @MusicsHuntersbot"; DeezLoad's is the other one the owner gave.
+    internal static readonly IReadOnlyDictionary<string, string> Known = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+        { ["MusicsHuntersbot"] = "MusicsHunter", ["deezload2bot"] = "DEDSEClulz" };
     // t.me paths that are never a channel.
     private static readonly HashSet<string> NotChannels = new(StringComparer.OrdinalIgnoreCase)
         { "share", "addstickers", "addemoji", "addlist", "proxy", "socks", "setlanguage", "login", "iv", "boost", "contact", "invoice", "joinchat" };
@@ -68,6 +74,9 @@ internal static partial class BotJoin
         }
         foreach (Match match in Link().Matches(text)) Add(match.Value);
         foreach (Match match in Mention().Matches(text)) Add(match.Value);
+        // No link to read, but plainly a gate ("Join our channel to use this bot", "Only Channel Subscribers can use the
+        // Bot"): the bot's known channel.
+        if (found.Count == 0 && Known.TryGetValue(bot, out var known) && Required().IsMatch(words) && ChannelWord().IsMatch(words)) found.Add(known);
         return found;
 
         void Add(string? raw)

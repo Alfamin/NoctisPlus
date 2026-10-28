@@ -25,6 +25,11 @@ internal static class BotJoinTests
         Check.Equal("HuntersNews", string.Join(",", BotJoin.Links(hunters, "MusicsHuntersbot")), "and so is the same answer to a request");
         var deezload = Bot("Join Updates Channel to use this Bot!\n\nOnly Channel Subscribers can use the Bot!", Url("Join Updates Channel", "https://t.me/+AbCdEf1234"));
         Check.Equal("+AbCdEf1234", string.Join(",", BotJoin.Links(deezload, "deezload2bot", welcome: true)), "DeezLoad's greeting with its join link is a gate");
+        // Without their buttons (as forwarded): each bot's known channel.
+        Check.Equal("MusicsHunter", string.Join(",", BotJoin.Links(Bot(hunters.message), "MusicsHuntersbot", welcome: true)), "Music Hunters' gate without a link means its known channel");
+        Check.Equal("DEDSEClulz", string.Join(",", BotJoin.Links(Bot(deezload.message), "deezload2bot")), "DeezLoad's gate without a link means its known channel");
+        Check.Equal(0, BotJoin.Links(Bot(deezload.message), "someotherbot").Count, "an unknown bot's gate without a link names nothing");
+        Check.Equal(0, BotJoin.Links(Bot("Premium members get FLAC first."), "deezload2bot").Count, "a mention of members is not a gate");
         Check.True(BotJoin.IsUnlocked(Bot("✅ Thanks for joining! You can use the bot now.")) && BotJoin.IsUnlocked(Bot("🎧🎧 Welcome to @DeezLoad2bot 🎧🎧\n\nClick /help for more information.")),
             "the greetings once joined are known, so a request is not left waiting on them");
         Check.False(BotJoin.IsUnlocked(Bot("Downloading… 45%")), "an ordinary answer is not a greeting");

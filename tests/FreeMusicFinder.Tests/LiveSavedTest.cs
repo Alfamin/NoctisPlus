@@ -40,6 +40,29 @@ internal static class LiveSavedTest
         }
     }
 
+    /// <summary>Owner #190: what a public username is (channel, bot), its title and description, and whether this account
+    /// is in it. Read-only.</summary>
+    public static async Task ResolveAsync(string names, string? store, string? proxy)
+    {
+        Console.WriteLine("\nResolving " + names);
+        if (string.IsNullOrWhiteSpace(store) || !File.Exists(store)) throw new ArgumentException("FMF_TELEGRAM_STORE is required with FMF_LIVE_RESOLVE.");
+        using var account = new TelegramAccount(store, () => proxy ?? "", way => Console.WriteLine("  " + way));
+        using var patience = new CancellationTokenSource(TimeSpan.FromMinutes(2));
+        var client = await account.ConnectAsync(patience.Token);
+        foreach (var name in names.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
+        {
+            var resolved = await client.Contacts_ResolveUsername(name);
+            if (resolved.Chat is Channel channel)
+            {
+                var full = await client.Channels_GetFullChannel(channel);
+                Console.WriteLine($"  {name}: {(channel.IsChannel ? "channel" : "group")} \"{channel.title}\", member: {!channel.flags.HasFlag(Channel.Flags.left)}, " +
+                    $"about: {((full.full_chat as ChannelFull)?.about ?? "").ReplaceLineEndings(" / ")}");
+            }
+            else if (resolved.User is { } user) Console.WriteLine($"  {name}: {(user.IsBot ? "bot" : "user")} \"{user.first_name}\"");
+            else Console.WriteLine($"  {name}: nothing");
+        }
+    }
+
     private static string Slice(string? text, MessageEntity e)
         => text is not null && e.offset >= 0 && e.offset + e.length <= text.Length ? text.Substring(e.offset, e.length) : "?";
 }
