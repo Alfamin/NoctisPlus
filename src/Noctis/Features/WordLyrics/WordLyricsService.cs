@@ -35,6 +35,7 @@ internal sealed class WordLyricsService(ILibraryService library, Func<AppSetting
     internal event Action? Changed;
     /// <summary>The compact status pill (null: hidden). Replaces the long top notices for word timing.</summary>
     internal TimingPill? Pill { get; private set; }
+    private readonly PillPolicy _pills = new();
     internal event Action? PillChanged;
     internal event Action<IReadOnlyList<string>>? LyricsWritten;
     internal int WaitingCount => _worker?.WaitingCount ?? 0;
@@ -360,7 +361,7 @@ internal sealed class WordLyricsService(ILibraryService library, Func<AppSetting
         State = state; Changed?.Invoke();
         // A small native pill (icon + a few words), never a focus-stealing window over playback or a game.
         // "Show timing status" covers work in progress, "Say when a song is done" the result; problems always show.
-        var pill = TimingPill.From(state);
+        var pill = _pills.Decide(state, Pill);
         var settings = _host?.Settings;
         if (pill is { Kind: TimingPillKind.Working or TimingPillKind.Paused } && settings?.GetBool("showProgress", true) == false) pill = null;
         if (pill is { Kind: TimingPillKind.Done } && settings?.GetBool("notify", true) == false && settings.GetBool("showProgress", true) == false) pill = null;

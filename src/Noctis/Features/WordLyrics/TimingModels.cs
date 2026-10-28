@@ -7,7 +7,10 @@ internal enum TimingAction { Missing, Current, Fresh, Custom }
 internal enum SongTimingStatus { None, Queued, Processing, Paused, Retry, SetupNeeded }
 internal sealed record ProgressState(string Message, string Detail = "", int Completed = 0, int Total = 0,
     double? Fraction = null, bool Finished = false, bool Error = false, string Report = "",
-    bool Controllable = false, bool Paused = false, bool Cancelling = false);
+    bool Controllable = false, bool Paused = false, bool Cancelling = false,
+    // Owner #193: what the pill may say. Asked: the user asked for this work (false for automatic timing). Retry: every song
+    // in the run failed or waited before. Listening: the song playing now or the next ones (the lyrics page shows those).
+    bool Asked = true, bool Retry = false, bool Listening = false);
 
 internal static class EmbeddedWordLyrics
 {

@@ -526,6 +526,24 @@ public class WordLyricsBackendTests
         Assert.True(worker.IsWaiting(rig.Song)); // kept, no failed try
     }
 
+    /// <summary>Owner #193: the pill goes by who asked. A song asked for by hand is marked asked; the song playing now
+    /// (timed automatically) is marked as neither asked nor shown, so its run stays off the screen.</summary>
+    [Fact]
+    public async Task RunsSayWhoAskedForThem_ByHandOrBecauseASongIsPlaying()
+    {
+        using var rig = new Rig(hold: true, done: 1);
+        var states = new ConcurrentQueue<ProgressState>();
+        using var worker = rig.Worker(states.Enqueue);
+        worker.Ask(rig.Song);
+        await Until(() => states.Any(s => s.Fraction is > 0 and < 0.75));
+        Assert.Contains(states, s => s.Asked && !s.Listening && !s.Retry && !s.Finished);
+        var played = Path.Combine(rig.Music, "played now.mp3"); File.WriteAllText(played, "synthetic");
+        worker.AskPlayed(played, out var accepted); Assert.True(accepted);
+        worker.MakeRoom(played);
+        await Until(() => states.Any(s => !s.Asked && s.Listening && !s.Finished), () => string.Join(" | ", states.Select(s => $"{s.Message} asked={s.Asked} listening={s.Listening}")));
+        Assert.Null(new PillPolicy().Decide(states.Last(s => s.Listening), null));
+    }
+
     /// <summary>Owner #168: the run was stopped to make room, and nothing followed (the streamed song it was on left the
     /// cache when it was skipped): the pill sat on "Starting WordLyrics" for good. It goes back to idle.</summary>
     [Fact]

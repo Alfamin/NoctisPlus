@@ -67,6 +67,7 @@ internal sealed class Worker : IDisposable
     private bool? _wasReady;            // whether WordLyrics was set up at the last look (null: not looked yet)
     private bool _yielding;             // owner #108: the run finishes the song it is on and stops for the song playing now
     private double _runProgress;        // how far the run is (0..1), from its stages
+    private bool _runHand, _runRetry, _runListening; // owner #193: see ProgressState (asked by hand, a retry, for the songs playing)
     private int _lastCompleted;         // songs the run has finished, at the last look
     private readonly HashSet<string> _reported = new(StringComparer.OrdinalIgnoreCase);
     internal Func<bool> FullscreenWorkload { get; set; } = GamingBudget.IsActive;
@@ -100,6 +101,7 @@ internal sealed class Worker : IDisposable
         public TimingAction Action;
         public string? Draft;
         public bool Asked;              // the user asked for this song by hand
+        public bool Hand;               // owner #193: a button press this session (Time words, Time library), not playback: what the pill may say
         public DateTime Urgent;         // owner #108: the song playing now (newest first, alone in its run; not saved)
         public bool Ahead, AheadOnly;
         public int AheadOrder;
@@ -445,8 +447,8 @@ internal sealed class Worker : IDisposable
             foreach (var (path, root) in fresh)
             {
                 if (AutomaticBlocked(path)) continue;
-                if (_items.TryGetValue(path, out var existing)) { existing.Asked = true; existing.NotBefore = now; continue; }
-                _items[path] = new Item { Path = path, Root = root, Asked = true, Action = _rules.Get(path).RetryUtc != default ? TimingAction.Fresh : TimingAction.Missing, Seen = now, QuietSince = now, NotBefore = now };
+                if (_items.TryGetValue(path, out var existing)) { existing.Asked = true; existing.Hand = true; existing.NotBefore = now; continue; }
+                _items[path] = new Item { Path = path, Root = root, Asked = true, Hand = true, Action = _rules.Get(path).RetryUtc != default ? TimingAction.Fresh : TimingAction.Missing, Seen = now, QuietSince = now, NotBefore = now };
                 added++;
             }
             SaveState();
@@ -505,11 +507,12 @@ internal sealed class Worker : IDisposable
             {
                 existing.Asked = true;
                 existing.AheadOnly = false;
+                if (!automatic) existing.Hand = true;
                 SaveState();
                 accepted = true;
                 return "Already queued for word timing.";
             }
-            _items[path] = new Item { Path = path, Root = root, Asked = true, Action = action, Draft = draft, Seen = now, QuietSince = now, NotBefore = now };
+            _items[path] = new Item { Path = path, Root = root, Asked = true, Hand = !automatic, Action = action, Draft = draft, Seen = now, QuietSince = now, NotBefore = now };
             SaveState();
             accepted = true;
         }
@@ -633,7 +636,7 @@ internal sealed class Worker : IDisposable
                 _saidBadFolder = true;
                 var message = $"The WordLyrics folder in the feature settings is not a usable folder name ({ex.GetType().Name}). Correct it in Settings → Features → WordLyrics; the waiting songs are kept.";
                 _log(message);
-                _progress(new ProgressState("Setup is needed", message, Error: true, Finished: true));
+                _progress(new ProgressState("Setup is needed", message, Error: true, Finished: true, Asked: waiting.Any(i => i.Hand)));
             }
             return;
         }
@@ -648,7 +651,7 @@ internal sealed class Worker : IDisposable
                 _saidNotReady = true;
                 _log("songs are waiting, but WordLyrics is not set up in " + tool.Folder);
                 var problem = !repairReady ? "WORDLYRICS_REPAIR_UPDATE_REQUIRED: this backend lacks backed-up rerun support. Use Set up WordLyrics to update it; the request is saved." : NotReady(tool);
-                _progress(new ProgressState("Setup is needed", problem, Error: true, Finished: true));
+                _progress(new ProgressState("Setup is needed", problem, Error: true, Finished: true, Asked: batch.Any(i => i.Hand)));
             }
             return;
         }
@@ -656,10 +659,13 @@ internal sealed class Worker : IDisposable
         try { Start(tool, batch, options); }
         catch (Exception ex)
         {
-            foreach (var item in batch) item.NotBefore = now + TimeSpan.FromMinutes(2);
-            var message = $"WORDLYRICS_START_FAILED ({ex.GetType().Name}): the background program could not start. Check the WordLyrics folder and installation. Retrying in two minutes.";
+            // Owner #193: an antivirus or a broken install can block every start; the wait grows instead of a try (and a
+            // message) every two minutes.
+            var wait = Backoff(batch.Max(i => i.Waits));
+            foreach (var item in batch) { item.NotBefore = now + wait; item.Waits++; }
+            var message = $"WORDLYRICS_START_FAILED ({ex.GetType().Name}): the background program could not start. Check the WordLyrics folder and installation. Retrying in {(wait.TotalHours >= 1 ? $"{wait.TotalHours:0} h" : $"{wait.TotalMinutes:0} min")}.";
             _log(message);
-            _progress(new ProgressState("WordLyrics could not start", message, Total: batch.Count, Finished: true, Error: true));
+            _progress(new ProgressState("WordLyrics could not start", message, Total: batch.Count, Finished: true, Error: true, Asked: batch.Any(i => i.Hand), Retry: true));
         }
     }
 
@@ -734,7 +740,7 @@ internal sealed class Worker : IDisposable
             if (!item.AccessReported)
             {
                 item.AccessReported = true;
-                _progress(new ProgressState("Waiting for file access", $"WORDLYRICS_FILE_ACCESS: {Path.GetFileName(item.Path)} could not be read ({ex.GetType().Name}). Close any app writing to this file or check its permissions. The request is saved and retries automatically.", Error: true, Finished: true));
+                _progress(new ProgressState("Waiting for file access", $"WORDLYRICS_FILE_ACCESS: {Path.GetFileName(item.Path)} could not be read ({ex.GetType().Name}). Close any app writing to this file or check its permissions. The request is saved and retries automatically.", Error: true, Finished: true, Asked: item.Hand));
             }
             return false;
         }
@@ -801,6 +807,8 @@ internal sealed class Worker : IDisposable
             _activePaths.Clear();
             _activePaths.UnionWith(batch.Select(i => i.Path));
             _reported.Clear(); _lastCompleted = 0; _runProgress = 0; _yielding = false;
+            _runHand = batch.Any(i => i.Hand); _runRetry = batch.All(i => i.Tries > 0 || i.Waits > 0);
+            _runListening = batch.Any(i => i.Urgent != default || i.Ahead || i.AheadOnly);
             _controlled = controlled;
             _cancelling = false;
             _restarting = false;
@@ -846,7 +854,7 @@ internal sealed class Worker : IDisposable
         _log("WordLyrics stopped responding again; it is stopped. Press Restart in the word timing panel to try again");
         Restart(automatic: true);
         lock (_gate) { _restartNotice = null; foreach (var item in _items.Values.Where(i => !i.Deferred)) item.NotBefore = now + TimeSpan.FromMinutes(30); SaveState(); }
-        _progress(new ProgressState("WordLyrics stopped responding", "It made no progress twice. The songs are kept and tried again in 30 minutes; press Restart to try now. If it keeps happening, run Set up WordLyrics again.", Finished: true, Error: true));
+        _progress(new ProgressState("WordLyrics stopped responding", "It made no progress twice. The songs are kept and tried again in 30 minutes; press Restart to try now. If it keeps happening, run Set up WordLyrics again.", Finished: true, Error: true, Asked: _runHand));
     }
 
     private void ReadProgress()
@@ -916,6 +924,8 @@ internal sealed class Worker : IDisposable
         if (_disposed) return;
 
         var now = DateTime.UtcNow;
+        // Owner #193: what the pill may say about this run, read before its songs are updated below.
+        bool hand = batch.Any(i => i.Hand), retry = batch.All(i => i.Tries > 0 || i.Waits > 0), listening = batch.Any(i => i.Urgent != default || i.Ahead || i.AheadOnly);
         var outcome = new Dictionary<string, (string Status, string Title)>(StringComparer.OrdinalIgnoreCase);
         var error = "";
         var reason = "";
@@ -1077,12 +1087,12 @@ internal sealed class Worker : IDisposable
         if (code == ExitAlreadyRunning)
         {
             _log("WordLyrics is running in another window; trying again in a minute");
-            _progress(new ProgressState("Waiting for another WordLyrics run", OtherHolder(), Total: batch.Count, Paused: held));
+            _progress(new ProgressState("Waiting for another WordLyrics run", OtherHolder(), Total: batch.Count, Paused: held, Asked: hand, Retry: retry, Listening: listening));
             return;
         }
         if (code == ExitSetupFailed)
         {
-            _progress(new ProgressState("Setup is needed", "ENVIRONMENT_REPAIR_FAILED: private packages could not be repaired. Open Set up WordLyrics; the queued songs are saved and tried again later. Startup log: " + OutputFile, Finished: true, Error: true, Report: report, Paused: held));
+            _progress(new ProgressState("Setup is needed", "ENVIRONMENT_REPAIR_FAILED: private packages could not be repaired. Open Set up WordLyrics; the queued songs are saved and tried again later. Startup log: " + OutputFile, Finished: true, Error: true, Report: report, Paused: held, Asked: hand, Retry: retry, Listening: listening));
             return;
         }
         _log($"WordLyrics finished (exit code {code}): " +
@@ -1096,7 +1106,7 @@ internal sealed class Worker : IDisposable
         var retrying = counts.Count == 0 && outcome.Count != 0 || (counts.Count == 0 && code != 0);
         _progress(new ProgressState(retrying ? "Retry scheduled" : timed > 0 ? $"{timed} songs received word timestamps" : "No new word timestamps were written",
             detail + (failed > 0 ? $"\n{failed} songs need attention." : "") + (held ? "\nPaused: the songs still waiting start when you press Resume." : ""),
-            counts.Values.Sum(), batch.Count, Finished: true, Error: failed > 0 || code != 0, Report: report, Paused: held));
+            counts.Values.Sum(), batch.Count, Finished: true, Error: failed > 0 || code != 0, Report: report, Paused: held, Asked: hand, Retry: retry, Listening: listening));
         // The result itself is shown by the status pill from the progress above; the summary stays in the log.
         if (message is not null) _log(message);
         // Said when a song first has to wait, not at every later try.
@@ -1133,7 +1143,7 @@ internal sealed class Worker : IDisposable
             detail = (view.EnginePaused ? "WordLyrics is paused. Press Resume to continue." : "Pausing: the step in progress is finishing. Press Resume to continue.") + "\n" + detail;
         }
         _progress(new ProgressState(message, detail, view.Completed, view.Total, view.Fraction,
-            Controllable: _controlled, Paused: _paused && !_cancelling, Cancelling: _cancelling));
+            Controllable: _controlled, Paused: _paused && !_cancelling, Cancelling: _cancelling, Asked: _runHand || _paused || _cancelling, Retry: _runRetry, Listening: _runListening));
     }
 
     /// <summary>Writes "pause", "run" or "stop" for the program to find. Called under the lock; the file is replaced whole.</summary>
