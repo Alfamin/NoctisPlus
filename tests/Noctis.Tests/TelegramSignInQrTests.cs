@@ -34,6 +34,10 @@ public class TelegramSignInQrTests
             IsLoggedIn = true;
         }
         public void SendQrPassword(string password) => Passwords.Add(password);
+        public List<BotChannel> Channels = [];
+        public readonly List<IReadOnlyList<BotChannel>> Joined = [];
+        public Task<IReadOnlyList<BotChannel>> BotChannelsAsync(CancellationToken ct) => Task.FromResult<IReadOnlyList<BotChannel>>([.. Channels]);
+        public Task JoinAsync(IReadOnlyList<BotChannel> channels, CancellationToken ct) { Joined.Add(channels); Channels.Clear(); return Task.CompletedTask; }
     }
 
     private static TelegramSignInViewModel Vm(FakeAccount account) => new(account, _ => { });
@@ -143,5 +147,27 @@ public class TelegramSignInQrTests
             Assert.Equal("MP3", chose[QualityDefault.Key]);
         }
         finally { try { Directory.Delete(root, true); } catch (IOException) { } }
+    }
+
+    [AvaloniaFact]
+    public async Task OnceSignedIn_ABotThatWantsItsChannel_GetsOneJoinPress()
+    {
+        var account = new FakeAccount(builtIn: true) { IsLoggedIn = true };
+        account.Channels.Add(new BotChannel("MusicsHuntersbot", "Music Hunters", "HuntersNews", "Hunters News"));
+        var vm = Vm(account);
+        Assert.True(vm.IsSignedIn);
+        await vm.CheckBotsAsync();
+        Assert.True(vm.NeedsJoin);
+        Assert.Equal("Music Hunters needs you to join Hunters News first.", vm.JoinText);
+        await vm.JoinCommand.ExecuteAsync(null);
+        Assert.Equal("HuntersNews", Assert.Single(Assert.Single(account.Joined)).Link);
+        Assert.False(vm.NeedsJoin); // checked again: nothing left to join
+        Assert.False(vm.ShowBotsChecking);
+
+        var ready = Vm(new FakeAccount(builtIn: true) { IsLoggedIn = true });
+        await ready.CheckBotsAsync();
+        Assert.False(ready.NeedsJoin); // bots that ask nothing show nothing
+        Assert.Equal("Music Hunters and DeezLoad need you to join News, Deez first.", TelegramSignInViewModel.JoinLine(
+            [new("a", "Music Hunters", "n", "News"), new("b", "DeezLoad", "d", "Deez")]));
     }
 }

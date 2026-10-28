@@ -96,6 +96,7 @@ try
     BotTimingTests.Run();
     await TransferTests.RunAsync();
     await BotQualityTests.RunAsync();
+    BotJoinTests.Run();
     await QueueManagementTests.RunAsync();
     await StreamCacheTests.RunAsync();
     await BotSelectionTests.RunAsync();

@@ -247,6 +247,7 @@ internal sealed class TelegramQualityConversation(Client client, User user, stri
             foreach (var message in history.Messages.OfType<Message>().Where(m => !m.flags.HasFlag(Message.Flags.out_) && m.media is not MessageMediaDocument && (m.id > after || m.id == previous?.Id)).OrderByDescending(m => m.id))
             {
                 if (BotLimits.Read(provider, message.message ?? "", DateTimeOffset.UtcNow) is { } limited) throw limited;
+                if (BotJoin.Links(message, user.MainUsername ?? "") is { Count: > 0 } channels) throw BotJoin.Gate(provider, user.MainUsername ?? provider, channels);
                 var reply = Read(message);
                 if (previous is not null && reply.Id == previous.Id && Fingerprint(reply) == Fingerprint(previous)) continue;
                 if (reply.Buttons.Count > 0 || BotQuality.Confirmed(reply, AudioQuality.FLAC) || BotQuality.Confirmed(reply, AudioQuality.MP3))

@@ -147,6 +147,7 @@ public sealed class FreeMusicPlugin : INoctisPlugin
         Noctis.Services.Search.OnlineMusicSearch.Current = _online;
         _transfers.Changed += Announce;
         _downloads.Finished += Announce;
+        BotJoin.Needed += OnJoinNeeded;
 
         _registrations.Add(host.RegisterTrackCommand(
             "Find more by this artist…",
@@ -177,6 +178,7 @@ public sealed class FreeMusicPlugin : INoctisPlugin
     public void Shutdown()
     {
         _qualityStop.Cancel();
+        BotJoin.Needed -= OnJoinNeeded;
         if (ReferenceEquals(Current, this)) { Current = null; TelegramStateChanged?.Invoke(); }
         if (_host is not null) _host.Settings.Changed -= OnSettingChanged;
         _purge?.Dispose(); _purge = null;
@@ -367,6 +369,14 @@ public sealed class FreeMusicPlugin : INoctisPlugin
         try { if (_playlists is {} playlists) await playlists.UpdateProxyAsync(_proxy, Log); }
         catch (OperationCanceledException) { }
         catch (Exception ex) { Announce("Playlist metadata proxy: " + ex.Message); }
+    }
+
+    // Owner #190: said once per bot each run; the Join press is in the Telegram account window.
+    private readonly HashSet<string> _joinAnnounced = new(StringComparer.Ordinal);
+    private void OnJoinNeeded(string provider, string bot, IReadOnlyList<string> links)
+    {
+        lock (_joinAnnounced) if (!_joinAnnounced.Add(provider)) return;
+        Announce(provider + " needs you to join its channel: Settings › Free Music Finder › Telegram account.");
     }
 
     /// <summary>Tells the user what was saved. Called from the download thread.</summary>

@@ -206,7 +206,9 @@ internal sealed class TelegramAccount : ITelegramSignIn, IDisposable
             catch (Exception ex) when (!(ex is OperationCanceledException && ct.IsCancellationRequested))
             {
                 // A menu Noctis could not follow waits a day; a bot or network that did not answer, ten minutes.
-                var message = ex is BotAnswerException || ex.Message.StartsWith("BOT_QUALITY_", StringComparison.Ordinal) ? ex.Message
+                // Owner #190: a bot that asks for its channel first is checked again soon, and at once after Join.
+                var message = ex is SourceLimitException && ex.Message.Contains(BotJoin.Asks, StringComparison.Ordinal) ? "BOT_QUALITY_TIMEOUT: " + ex.Message
+                    : ex is BotAnswerException || ex.Message.StartsWith("BOT_QUALITY_", StringComparison.Ordinal) ? ex.Message
                     : ex is TimeoutException or RpcException or IOException or System.Net.Sockets.SocketException
                         ? "BOT_QUALITY_TIMEOUT: " + provider + " did not answer: " + ex.Message
                         : "BOT_QUALITY_UNVERIFIED: " + provider + "'s settings failed: " + ex.Message;
@@ -259,6 +261,87 @@ internal sealed class TelegramAccount : ITelegramSignIn, IDisposable
         {
             if (!ReferenceEquals(_botsClient, client)) { _bots.Clear(); _started.Clear(); _botsClient = client; }
             _started.Add(username);
+        }
+    }
+
+    /// <summary>The bots songs come from, with the names shown for them.</summary>
+    internal static readonly (string Bot, string Provider)[] MusicBots = [(TelegramBotSource.Bot, BotSelections.Hunters), (DeezLoadSource.Bot, "DeezLoad")];
+
+    /// <summary>
+    /// Owner #190: the channels the music bots still ask this account to join. Each bot is started if it never was, and
+    /// its latest answer read; a channel the account already belongs to is left out. A bot that cannot be checked is
+    /// skipped: its next answer during a download says so too.
+    /// </summary>
+    public async Task<IReadOnlyList<BotChannel>> BotChannelsAsync(CancellationToken ct)
+    {
+        var client = await ConnectAsync(ct).ConfigureAwait(false);
+        var needed = new List<BotChannel>();
+        foreach (var (bot, provider) in MusicBots)
+        {
+            try
+            {
+                var user = await BotAsync(client, bot, ct).ConfigureAwait(false);
+                await StartBotAsync(client, user, bot, ct).ConfigureAwait(false);
+                var history = await client.Messages_GetHistory(user, limit: 6).WaitAsync(TimeSpan.FromSeconds(25), ct).ConfigureAwait(false);
+                var messages = history.Messages.OfType<Message>().OrderByDescending(m => m.id).ToList();
+                if (messages.FirstOrDefault(m => !m.flags.HasFlag(Message.Flags.out_)) is not { } latest) continue;
+                // Its greeting after a bare /start only counts when it says the channel is needed.
+                var welcome = messages.FirstOrDefault(m => m.flags.HasFlag(Message.Flags.out_) && m.id < latest.id)?.message?.Trim() == "/start";
+                foreach (var link in BotJoin.Links(latest, bot, welcome))
+                    if (await UnjoinedAsync(client, bot, provider, link, ct).ConfigureAwait(false) is { } channel) needed.Add(channel);
+            }
+            catch (Exception ex) when (!(ex is OperationCanceledException && ct.IsCancellationRequested))
+            {
+                _log?.Invoke(provider + ": could not check what it needs: " + ex.Message);
+            }
+        }
+        return needed;
+    }
+
+    private static async Task<BotChannel?> UnjoinedAsync(Client client, string bot, string provider, string link, CancellationToken ct)
+    {
+        if (link.StartsWith('+'))
+            return await client.Messages_CheckChatInvite(link[1..]).WaitAsync(TimeSpan.FromSeconds(25), ct).ConfigureAwait(false) switch
+            {
+                ChatInvite invite => new BotChannel(bot, provider, link, invite.title),
+                ChatInvitePeek { chat: var chat } => new BotChannel(bot, provider, link, chat.Title),
+                _ => null, // already a member
+            };
+        var resolved = await client.Contacts_ResolveUsername(link).WaitAsync(TimeSpan.FromSeconds(25), ct).ConfigureAwait(false);
+        return resolved.Chat is Channel channel && channel.flags.HasFlag(Channel.Flags.left) ? new BotChannel(bot, provider, link, channel.title) : null;
+    }
+
+    /// <summary>
+    /// Owner #190: joins the channels the user chose to join (the Join press is their consent), presses a gate's
+    /// "I joined" button when it has one, and has each bot's settings checked again.
+    /// </summary>
+    public async Task JoinAsync(IReadOnlyList<BotChannel> channels, CancellationToken ct)
+    {
+        var client = await ConnectAsync(ct).ConfigureAwait(false);
+        foreach (var channel in channels)
+        {
+            try
+            {
+                if (channel.Link.StartsWith('+'))
+                    await client.Messages_ImportChatInvite(channel.Link[1..]).WaitAsync(TimeSpan.FromSeconds(25), ct).ConfigureAwait(false);
+                else if ((await client.Contacts_ResolveUsername(channel.Link).WaitAsync(TimeSpan.FromSeconds(25), ct).ConfigureAwait(false)).Chat is Channel found)
+                    await client.Channels_JoinChannel(found).WaitAsync(TimeSpan.FromSeconds(25), ct).ConfigureAwait(false);
+                _log?.Invoke(channel.Provider + ": joined " + channel.Title + ".");
+            }
+            catch (RpcException ex) when (ex.Message is "USER_ALREADY_PARTICIPANT" or "INVITE_REQUEST_SENT") { _log?.Invoke(channel.Provider + ": " + ex.Message); }
+        }
+        foreach (var bot in channels.Select(c => c.Bot).Distinct(StringComparer.OrdinalIgnoreCase))
+        {
+            ForgetQuality(bot);
+            try
+            {
+                var user = await BotAsync(client, bot, ct).ConfigureAwait(false);
+                var history = await client.Messages_GetHistory(user, limit: 6).WaitAsync(TimeSpan.FromSeconds(25), ct).ConfigureAwait(false);
+                var gate = history.Messages.OfType<Message>().OrderByDescending(m => m.id).FirstOrDefault(m => BotJoin.Links(m, bot).Count > 0);
+                if (gate is not null && BotJoin.CheckButton(gate) is { } data)
+                    await client.Messages_GetBotCallbackAnswer(user, gate.id, data).WaitAsync(TimeSpan.FromSeconds(15), ct).ConfigureAwait(false);
+            }
+            catch (Exception ex) when (ex is RpcException or TimeoutException) { _log?.Invoke(bot + ": " + ex.Message); }
         }
     }
 
@@ -929,6 +1012,7 @@ internal sealed class TelegramBotSource : IHunterBotSource
                 // Owner #84: the bot is still sending another song; the caller races the other bot meanwhile.
                 if (BotText.IsBusy(reply.message)) { if (busyAnswers) throw new BotBusyException(BotSelections.Hunters, "Music Hunters is finishing another download.", reply.id); continue; }
                 if (BotLimits.Read("Music Hunters", reply.message ?? "", DateTimeOffset.UtcNow) is { } limited) throw limited;
+                if (BotJoin.Links(reply, Bot) is { Count: > 0 } channels) throw BotJoin.Gate(BotSelections.Hunters, Bot, channels);
             }
             var found = history.Messages.OfType<Message>().Reverse()
                 .FirstOrDefault(m => !m.flags.HasFlag(Message.Flags.out_) && matches(m));

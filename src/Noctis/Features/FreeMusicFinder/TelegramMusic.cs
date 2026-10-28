@@ -478,6 +478,7 @@ internal sealed class DeezLoadSource : IRacingMusicSource, IQualityMusicSource
             foreach(var m in replies)
             {
                 if(BotLimits.Read(Id,m.message??"",DateTimeOffset.UtcNow) is {} limited) throw limited;
+                if(BotJoin.Links(m,Bot) is {Count:>0} channels) throw BotJoin.Gate(Id,Bot,channels);
                 if(m.media is MessageMediaDocument {document:Document doc})
                 {
                     if(Fits(request,doc)) { BotPacing.Answered("deezload"); return doc; }

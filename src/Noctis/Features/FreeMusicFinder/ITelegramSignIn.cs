@@ -15,4 +15,7 @@ internal interface ITelegramSignIn
     Task LogOutAsync();
     Task QrLoginAsync(int apiId, string apiHash, Action<string> show, Action<bool> passwordNeeded, CancellationToken ct);
     void SendQrPassword(string password);
+    /// <summary>Owner #190: channels the music bots still ask this account to join.</summary>
+    Task<IReadOnlyList<BotChannel>> BotChannelsAsync(CancellationToken ct);
+    Task JoinAsync(IReadOnlyList<BotChannel> channels, CancellationToken ct);
 }

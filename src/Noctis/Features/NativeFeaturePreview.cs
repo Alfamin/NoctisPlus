@@ -134,6 +134,8 @@ internal static class NativeFeaturePreview
             return Task.Delay(Timeout.Infinite, ct);
         }
         public void SendQrPassword(string password) { }
+        public Task<IReadOnlyList<BotChannel>> BotChannelsAsync(CancellationToken ct) => Task.FromResult<IReadOnlyList<BotChannel>>([]);
+        public Task JoinAsync(IReadOnlyList<BotChannel> channels, CancellationToken ct) => Task.CompletedTask;
     }
 }
 #endif

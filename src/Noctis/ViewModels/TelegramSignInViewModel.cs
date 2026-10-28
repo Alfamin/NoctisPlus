@@ -31,8 +31,68 @@ public sealed partial class TelegramSignInViewModel : ObservableObject, IDisposa
     }
 
     public event Action? CloseRequested;
-    [ObservableProperty, NotifyPropertyChangedFor(nameof(IsQr), nameof(IsPhone), nameof(IsCode), nameof(IsPassword), nameof(IsSignedIn), nameof(Title), nameof(Description), nameof(ContinueLabel), nameof(CanStartOver), nameof(ShowContinue), nameof(QrWaiting))]
+    [ObservableProperty, NotifyPropertyChangedFor(nameof(IsQr), nameof(IsPhone), nameof(IsCode), nameof(IsPassword), nameof(IsSignedIn), nameof(Title), nameof(Description), nameof(ContinueLabel), nameof(CanStartOver), nameof(ShowContinue), nameof(QrWaiting), nameof(ShowBotsChecking), nameof(NeedsJoin))]
     private LoginStep _step;
+
+    // Owner #190: once signed in, the music bots are started and asked what they need; a bot that wants its channel
+    // joined first gets one Join press here instead of silently sending no songs.
+    private CancellationTokenSource? _bots;
+    private IReadOnlyList<BotChannel> _channels = [];
+    [ObservableProperty, NotifyPropertyChangedFor(nameof(ShowBotsChecking))] private bool _botsChecking;
+    [ObservableProperty, NotifyPropertyChangedFor(nameof(NeedsJoin))] private string _joinText = "";
+    public bool ShowBotsChecking => IsSignedIn && BotsChecking;
+    public bool NeedsJoin => IsSignedIn && JoinText.Length > 0;
+
+    partial void OnStepChanged(LoginStep value)
+    {
+        if (value == LoginStep.SignedIn) _ = CheckBotsAsync();
+        else { _bots?.Cancel(); JoinText = ""; BotsChecking = false; }
+    }
+
+    internal async Task CheckBotsAsync()
+    {
+        if (_disposed || !IsSignedIn) return;
+        _bots?.Cancel();
+        var run = _bots = new CancellationTokenSource();
+        BotsChecking = true;
+        try
+        {
+            var channels = await _account.BotChannelsAsync(run.Token);
+            if (_bots != run || _disposed) return;
+            _channels = channels;
+            JoinText = JoinLine(channels);
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException) { _log("Telegram bot check failed: " + ex.GetType().Name); }
+        catch (OperationCanceledException) { }
+        finally { if (_bots == run) BotsChecking = false; }
+    }
+
+    internal static string JoinLine(IReadOnlyList<BotChannel> channels)
+    {
+        if (channels.Count == 0) return "";
+        var bots = channels.Select(c => c.Provider).Distinct().ToList();
+        var names = string.Join(", ", channels.Select(c => c.Title).Distinct());
+        return bots.Count == 1 ? $"{bots[0]} needs you to join {names} first." : $"{string.Join(" and ", bots)} need you to join {names} first.";
+    }
+
+    [RelayCommand(CanExecute = nameof(CanInteract))]
+    private async Task Join()
+    {
+        if (!CanInteract || _channels.Count == 0) return;
+        IsBusy = true;
+        try
+        {
+            await _account.JoinAsync(_channels, CancellationToken.None);
+            if (!_disposed) { JoinText = ""; Error = ""; }
+        }
+        catch (Exception ex)
+        {
+            _log("Telegram join failed: " + ex.GetType().Name);
+            if (!_disposed) Error = Explain(ex);
+        }
+        finally { IsBusy = false; }
+        if (!_disposed) await CheckBotsAsync();
+    }
     [ObservableProperty, NotifyPropertyChangedFor(nameof(QrWaiting), nameof(HasQr))] private Avalonia.Media.IImage? _qrImage;
     [ObservableProperty] private string _apiId = "";
     [ObservableProperty] private string _apiHash = "";
@@ -41,7 +101,7 @@ public sealed partial class TelegramSignInViewModel : ObservableObject, IDisposa
     [ObservableProperty] private string _password = "";
     [ObservableProperty] private bool _advancedOpen;
     [ObservableProperty, NotifyPropertyChangedFor(nameof(HasError), nameof(ShowContinue), nameof(QrWaiting), nameof(HasQr))] private string _error = "";
-    [ObservableProperty, NotifyPropertyChangedFor(nameof(CanInteract)), NotifyCanExecuteChangedFor(nameof(ContinueCommand), nameof(StartOverCommand), nameof(DisconnectCommand))]
+    [ObservableProperty, NotifyPropertyChangedFor(nameof(CanInteract)), NotifyCanExecuteChangedFor(nameof(ContinueCommand), nameof(StartOverCommand), nameof(DisconnectCommand), nameof(JoinCommand))]
     private bool _isBusy;
 
     public bool CanInteract => !IsBusy && !_disposed;
@@ -299,6 +359,7 @@ public sealed partial class TelegramSignInViewModel : ObservableObject, IDisposa
     {
         _disposed = true;
         StopQr();
+        _bots?.Cancel();
         Phone = Code = Password = ApiHash = "";
         ContinueCommand.NotifyCanExecuteChanged();
         StartOverCommand.NotifyCanExecuteChanged();

@@ -94,6 +94,8 @@ internal static class TelegramSignInTests
         public int QrCalls;
         public Task QrLoginAsync(int id, string hash, Action<string> show, Action<bool> passwordNeeded, CancellationToken ct) { QrCalls++; return Task.Delay(Timeout.Infinite, ct); }
         public void SendQrPassword(string password) { }
+        public Task<IReadOnlyList<BotChannel>> BotChannelsAsync(CancellationToken ct) => Task.FromResult<IReadOnlyList<BotChannel>>([]);
+        public Task JoinAsync(IReadOnlyList<BotChannel> channels, CancellationToken ct) => Task.CompletedTask;
         public string? Next = "verification_code";
         public Task<string?>? Pending;
         public int Calls, Logouts;

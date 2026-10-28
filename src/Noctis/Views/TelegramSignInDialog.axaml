@@ -74,6 +74,18 @@
                             <TextBox x:Name="ApiHashField" Classes="pill-field" Text="{Binding ApiHash}" Watermark="API hash" PasswordChar="●" />
                         </StackPanel>
                 </StackPanel>
+                <!-- Owner #190: a bot that wants its channel joined first; one press joins it. -->
+                <StackPanel Orientation="Horizontal" Spacing="10" IsVisible="{Binding ShowBotsChecking}">
+                    <controls:ProgressRing Width="16" Height="16" IsIndeterminate="True" VerticalAlignment="Center" />
+                    <TextBlock Text="Checking the music bots…" FontSize="12" Opacity="0.6" VerticalAlignment="Center" />
+                </StackPanel>
+                <Border Classes="pill-well" CornerRadius="16" Padding="16,12" IsVisible="{Binding NeedsJoin}">
+                    <Grid ColumnDefinitions="*,Auto" ColumnSpacing="12">
+                        <TextBlock Text="{Binding JoinText}" FontSize="13" TextWrapping="Wrap" VerticalAlignment="Center" />
+                        <Button Grid.Column="1" Classes="pill-primary" Content="Join" Command="{Binding JoinCommand}"
+                                VerticalAlignment="Center" MinWidth="80" AutomationProperties.Name="Join the bot's channel" />
+                    </Grid>
+                </Border>
                 <TextBox x:Name="CodeField" Classes="pill-field" Text="{Binding Code}" Watermark="Login code"
                          IsVisible="{Binding IsCode}" IsEnabled="{Binding CanInteract}" />
                 <TextBox x:Name="PasswordField" Classes="pill-field" Text="{Binding Password}" Watermark="Password"
