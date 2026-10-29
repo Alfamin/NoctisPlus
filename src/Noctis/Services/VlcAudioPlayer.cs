@@ -428,7 +428,8 @@ public class VlcAudioPlayer : IAudioPlayer, IOpenFileHolder
     public event EventHandler<string>? PlaybackError;
     public event EventHandler<TimeSpan>? DurationResolved;
     public event EventHandler<bool>? BufferingChanged;
-    public bool CanSeek => _currentMedia is not ProgressiveMedia { Complete: false };
+    public bool CanSeek => _currentMedia is not ProgressiveMedia { Complete: false } growing || growing.SeekableUntil > TimeSpan.Zero;
+    public TimeSpan? SeekableUntil => _currentMedia is ProgressiveMedia { Complete: false } growing ? growing.SeekableUntil : null;
     // A growing MP3's length estimate describes the buffered prefix. Keep the
     // recording's metadata duration until it is reopened as a complete local file.
     private long CurrentLengthMs => _currentMedia is ProgressiveMedia { Duration: { TotalMilliseconds: > 0 } duration }
@@ -5247,7 +5248,9 @@ public class VlcAudioPlayer : IAudioPlayer, IOpenFileHolder
     public void Seek(TimeSpan position)
     {
         if (_disposed) return;
-        if (_currentMedia is ProgressiveMedia growing)
+        // Owner #204: inside the part already downloaded a song still arriving seeks like any other (below).
+        if (_currentMedia is ProgressiveMedia growing
+            && !(!growing.Complete && position > TimeSpan.Zero && position <= growing.SeekableUntil))
         {
             if (_currentMediaPath is null) return;
             if (!growing.Complete)

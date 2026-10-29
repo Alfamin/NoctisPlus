@@ -16,7 +16,17 @@ public partial class PlayerViewModel
     [ObservableProperty] private OnlineDownloadStep _onlinePreparingStep;
     [ObservableProperty] private double _onlinePreparingProgress;
     [ObservableProperty] private bool _canSeekCurrent = true;
+    /// <summary>Owner #204: the share of the song a seek can reach while it still downloads (1: all of it, not streaming).
+    /// The seek bar draws it faintly under the played part.</summary>
+    [ObservableProperty] private double _seekableFraction = 1;
     [ObservableProperty] private string? _onlinePlayingSongId;
+
+    private void RefreshSeekable()
+    {
+        CanSeekCurrent = _audioPlayer.CanSeek;
+        SeekableFraction = _audioPlayer.SeekableUntil is { } until && Duration.TotalSeconds > 0
+            ? Math.Clamp(until / Duration, 0, 1) : 1;
+    }
 
     /// <summary>Owner #177: the playing song is on one of For you's pages, so the lyrics page offers Not for me beside Add.
     /// The For you shelf answers both (set by Search); without it the button never shows.</summary>
@@ -43,7 +53,7 @@ public partial class PlayerViewModel
     {
         _inputWaiting = waiting;
         UpdateAudibleBuffering(Position);
-        CanSeekCurrent = _audioPlayer.CanSeek;
+        RefreshSeekable();
     }
     private void UpdateAudibleBuffering(TimeSpan position)
     {

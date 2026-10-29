@@ -182,6 +182,45 @@ public class WaveformSeekBarTests
         finally { win.Close(); }
     }
 
+    [AvaloniaFact]
+    public void Island_ShowsHowFarAStreamingSongCanBeSought_UnderThePlayedPart()
+    {
+        // Owner #204: the download progress beside the playback progress, distinguishable, not flashy.
+        EnsureAppResources();
+        var player = MakePlayer();
+        player.CurrentTrack = new Track { Title = "Song", Artist = "Artist", FilePath = @"C:\m\song.flac" };
+        var bar = new PlaybackBarView { DataContext = player, CompactWhenLyricsPageActive = false };
+        var win = new Window { Width = 900, Height = 200, Content = bar };
+        win.Show();
+        try
+        {
+            Frame();
+            var line = bar.FindControl<Border>("SeekTrackBackground")!;
+            var reach = bar.FindControl<Border>("SeekTrackBuffered")!;
+            var fill = bar.FindControl<Border>("SeekTrackFill")!;
+            Assert.False(reach.IsVisible);                        // a song on disk: nothing extra
+
+            player.SeekableFraction = 0.6;
+            player.PositionFraction = 0.2;
+            Frame();
+            Assert.True(reach.IsVisible);
+            Assert.Equal(line.Width * 0.6, reach.Width, 1);
+            Assert.Equal(Canvas.GetLeft(line), Canvas.GetLeft(reach), 3);
+            Assert.True(reach.Width > fill.Width);                // the played part is drawn over it
+            var canvas = (Canvas)reach.Parent!;
+            Assert.True(canvas.Children.IndexOf(reach) < canvas.Children.IndexOf(fill));
+
+            player.SeekableFraction = 1;                          // fully downloaded
+            Frame();
+            Assert.False(reach.IsVisible);
+            player.SeekableFraction = 0.5;
+            player.WaveformSeekBarEnabled = true;                  // the waveform draws its own line
+            Frame();
+            Assert.False(reach.IsVisible);
+        }
+        finally { win.Close(); }
+    }
+
     // ── Mini player ──────────────────────────────────────────
 
     private static MiniPlayerViewModel MakeMiniViewModel(PlayerViewModel player)

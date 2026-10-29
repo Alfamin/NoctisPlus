@@ -927,6 +927,8 @@ public partial class PlayerViewModel : ViewModelBase
 
         fraction = Math.Clamp(fraction, 0.0, 1.0);
         var target = TimeSpan.FromTicks((long)(Duration.Ticks * fraction));
+        // Owner #204: while a song streams, only the part already downloaded can be sought (seek bar, lyric lines).
+        if (_audioPlayer.SeekableUntil is { } until && target > TimeSpan.Zero && target > until) return;
         var remaining = Duration - target;
         if (remaining < TimeSpan.Zero) remaining = TimeSpan.Zero;
 
@@ -2915,6 +2917,7 @@ public partial class PlayerViewModel : ViewModelBase
 
         CurrentTrack = track;
         CanSeekCurrent = !Features.ProgressivePlayback.ProgressiveTransfer.IsAvailable(track.FilePath);
+        SeekableFraction = CanSeekCurrent ? 1 : 0;
         LoadAlbumArt(track);
         Duration = track.Duration;
         DurationText = FormatTime(track.Duration);
@@ -3620,7 +3623,7 @@ public partial class PlayerViewModel : ViewModelBase
         Dispatcher.UIThread.Post(() =>
         {
             _positionUpdateQueued = false;
-            CanSeekCurrent = _audioPlayer.CanSeek;
+            RefreshSeekable();
             // Audio is demonstrably playing — the error-cascade breaker resets.
             if (_consecutivePlaybackErrors != 0) _consecutivePlaybackErrors = 0;
             if (_errorSkippedTracks.Count != 0) _errorSkippedTracks.Clear();

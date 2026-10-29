@@ -287,6 +287,9 @@ public partial class PlaybackBarView : UserControl
         if (e.PropertyName == nameof(PlayerViewModel.IsMuted))
             UpdateVolumeMuteLook();
 
+        if (e.PropertyName is nameof(PlayerViewModel.SeekableFraction) or nameof(PlayerViewModel.WaveformSeekBarEnabled))
+            UpdateSeekBuffered();
+
         if (e.PropertyName == nameof(PlayerViewModel.CurrentTrack) ||
             e.PropertyName == nameof(PlayerViewModel.TrackTitleMarqueeEnabled))
         {
@@ -948,6 +951,24 @@ public partial class PlaybackBarView : UserControl
         }
     }
 
+    /// <summary>Owner #204: the part of a streaming song a seek can reach, from the track's start (hidden otherwise).</summary>
+    private void UpdateSeekBuffered()
+    {
+        if (SeekSlider == null || SeekTrackBuffered == null) return;
+        if (_observedPlayerViewModel is not { WaveformSeekBarEnabled: false, SeekableFraction: var fraction })
+        {
+            SeekTrackBuffered.IsVisible = false;   // the waveform draws its own line
+            return;
+        }
+        var width = SeekSlider.Bounds.Width;
+        var show = fraction < 1 && width > 0 && SeekSlider.IsEnabled;
+        SeekTrackBuffered.IsVisible = show;
+        if (!show) return;
+        var trackWidth = Math.Max(0, width - SeekThumbSize);
+        SeekTrackBuffered.Width = Math.Clamp(trackWidth * fraction, 0, trackWidth);
+        Canvas.SetLeft(SeekTrackBuffered, SeekThumbSize / 2.0);
+    }
+
     private void UpdateSeekSliderVisual()
     {
         if (SeekSlider == null ||
@@ -963,6 +984,8 @@ public partial class PlaybackBarView : UserControl
             SeekThumb,
             _seekThumbTransform,
             SeekThumbSize);
+
+        UpdateSeekBuffered();
 
         // No extra width trim here: the helper already ends the fill at the thumb's
         // centre (the volume slider uses it as-is). Shaving another half-thumb off

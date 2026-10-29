@@ -13,6 +13,8 @@ internal sealed class FakeAudioPlayer : IAudioPlayer
     public List<string?> PlayedFallbacks { get; } = new();
     public List<string> PreparedPaths { get; } = new();
     public List<TimeSpan> Seeks { get; } = new();
+    /// <summary>#204: a stream still arriving can be sought only this far (null: anywhere).</summary>
+    public TimeSpan? SeekableUntil { get; set; }
 
     public event EventHandler? TrackEnded;
     public event EventHandler<TimeSpan>? PositionChanged;

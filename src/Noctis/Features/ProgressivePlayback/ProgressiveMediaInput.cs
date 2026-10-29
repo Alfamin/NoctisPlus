@@ -21,7 +21,10 @@ internal sealed class ProgressiveMediaInput : MediaInput
     { _buffer = buffer; _stop = CancellationTokenSource.CreateLinkedTokenSource(cancel); _cancel = _stop.Token; CanSeek = true; }
     public override bool Open(out ulong size)
     {
-        size = ulong.MaxValue;
+        // #204: the song's real size (the transfer knows it). With "unknown" VLC's FLAC reader cannot seek at all and a
+        // seek restarted the song; with it both formats seek inside the downloaded part (measured, real VLC). Reads
+        // beyond it still wait, and Seek below still refuses unwritten bytes, so an end-of-file probe fails at once.
+        size = _buffer.Expected > 0 ? (ulong)_buffer.Expected : ulong.MaxValue;
         try
         {
             _cancel.ThrowIfCancellationRequested();

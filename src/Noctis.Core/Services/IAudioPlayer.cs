@@ -40,6 +40,10 @@ public interface IAudioPlayer : IDisposable
     /// <summary>False while a download-backed input cannot safely seek yet.</summary>
     bool CanSeek => true;
 
+    /// <summary>While a download-backed input still arrives: how far a seek may go (the part already downloaded).
+    /// Null: anywhere.</summary>
+    TimeSpan? SeekableUntil => null;
+
     /// <summary>How far <see cref="Position"/> (and PositionChanged) lead the speaker:
     /// the depth of output buffer already filled but not yet heard. Zero when the
     /// reported position is already the audible one. Lyrics subtract it.</summary>

@@ -29,6 +29,18 @@ internal sealed class ProgressiveMedia : Media
     }
 
     internal bool Complete => _lease.Buffer.Complete;
+    /// <summary>Owner #204: how far a seek may go while the song still arrives (zero: not yet).</summary>
+    internal TimeSpan SeekableUntil => SeekableUntilFor(_lease.Buffer.Prefix, _lease.Buffer.Expected, Duration);
+
+    /// <summary>The downloaded share of the song's length, less a margin (bytes are not spread evenly over time: the
+    /// header and cover art come first, an MP3 may be VBR). A seek past the real edge only waits for the bytes.</summary>
+    internal static TimeSpan SeekableUntilFor(long prefix, long expected, TimeSpan? duration)
+    {
+        if (prefix <= 0 || expected <= 0 || duration is not { TotalSeconds: > 0 } length) return TimeSpan.Zero;
+        var reached = length * Math.Min(1.0, prefix / (double)expected);
+        var margin = TimeSpan.FromSeconds(Math.Max(2, length.TotalSeconds * 0.03));
+        return reached > margin ? reached - margin : TimeSpan.Zero;
+    }
     internal TimeSpan? Duration => _lease.Duration;
     internal bool Cancelled => _input.Cancelled;
     internal Exception? Error => _input.Error ?? _lease.Error;
