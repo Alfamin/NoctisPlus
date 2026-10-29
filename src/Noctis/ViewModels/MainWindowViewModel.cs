@@ -349,6 +349,8 @@ public partial class MainWindowViewModel : ViewModelBase
 
     private readonly QueueViewModel _queueVm;
     private readonly LyricsViewModel _lyricsVm;
+    /// <summary>#200: kept alive for the whole run (its loop and the player/library hooks).</summary>
+    private Services.Lyrics.OnlineTimingLane? _onlineTiming;
     private readonly Services.Search.DownloadedFileImporter _downloadImporter;
     private readonly StatisticsViewModel _statisticsVm;
     private readonly CoverFlowViewModel _coverFlowVm;
@@ -776,6 +778,28 @@ public partial class MainWindowViewModel : ViewModelBase
             _lyricsVm.ExtraLyricsSources = Services.Lyrics.OnlineLyricsSource.BuiltIns(musixmatch, kugou, youTubeMusic, lrcRed, unison);
             // "Word-sync with lrc.red's model" on the lyrics page and in Search Lyrics.
             _lyricsVm.LrcRed = lrcRed;
+
+            // #200: automatic online word timing (lrc.red → Unison → Kugou) for the songs on disk: the playing song,
+            // the queue, then the whole library; only what fits the recording is written, as a .ttml beside the .elrc.
+            if (App.Services.GetService<Services.Lyrics.LyricsWriter>() is { } lyricsWriter)
+            {
+                var converter = App.Services.GetService<IAudioConverterService>();
+                var lane = new Services.Lyrics.OnlineTimingLane(
+                    new Services.Lyrics.OnlineWordTiming(lrcRed, unison, kugou, () => Settings.GetSettings().LrcRedEnabled),
+                    new Services.Lyrics.OnlineTimingMisses(Path.Combine(AppPaths.DataRoot, "online-timing-misses.json")),
+                    lyricsWriter, () => converter?.GetFfmpegPath(), () => OnlineAccess.Shared.IsOffline,
+                    path => wordService.IsIgnored(path) || Services.Lyrics.OnlineTimingLane.StudioTimed(path));
+                lane.Written += paths => Dispatcher.UIThread.Post(() => _lyricsVm.ReloadWrittenLyrics(paths));
+                Player.PropertyChanged += (_, e) =>
+                {
+                    if (e.PropertyName == nameof(PlayerViewModel.CurrentTrack)) lane.SetPlaying(Player.CurrentTrack, Player.UpNext);
+                };
+                Player.UpNext.CollectionChanged += (_, _) => lane.SetPlaying(Player.CurrentTrack, Player.UpNext);
+                library.LibraryUpdated += (_, _) => Dispatcher.UIThread.Post(() => lane.SetLibrary(library.AllTracks));
+                lane.SetLibrary(library.AllTracks);
+                lane.Start(TimeSpan.FromSeconds(45));   // the library after startup has settled
+                _onlineTiming = lane;
+            }
         }
         _lyricsVm.ShowLyricsSearchDialog = MetadataHelper.OpenLyricsSearchDialog;
         // Lyrics saved inside audio files (GitHub #135) wait until the song is not playing.
