@@ -942,7 +942,7 @@
                     <controls:SeekReachLine Grid.Column="1" Margin="6,0" Height="16" VerticalAlignment="Center"
                                             IsVisible="{Binding !Player.WaveformSeekBarEnabled}"
                                             Fraction="{Binding Player.SeekableFraction}"
-                                            Brush="{DynamicResource AccentColorBrush}" Opacity="0.35"/>
+                                            Brush="{DynamicResource AccentColorBrush}" Opacity="0.55"/>
                     <TextBlock Grid.Column="2" Classes="mini-time" Text="{Binding Player.RemainingTimeText}"
                                FontSize="10" Foreground="#A0FFFFFF"
                                VerticalAlignment="Center" MinWidth="32" TextAlignment="Right"/>
@@ -1111,7 +1111,7 @@
                     <controls:SeekReachLine Grid.Column="1" Margin="6,0" Height="16" VerticalAlignment="Center"
                                             IsVisible="{Binding !Player.WaveformSeekBarEnabled}"
                                             Fraction="{Binding Player.SeekableFraction}"
-                                            Brush="{DynamicResource AccentColorBrush}" Opacity="0.35"/>
+                                            Brush="{DynamicResource AccentColorBrush}" Opacity="0.55"/>
                     <TextBlock Grid.Column="2" Classes="mini-time" Text="{Binding Player.RemainingTimeText}"
                                FontSize="10" Foreground="#A0FFFFFF"
                                VerticalAlignment="Center" MinWidth="32" TextAlignment="Right"/>
@@ -1376,7 +1376,7 @@
                     <controls:SeekReachLine Grid.Column="1" Margin="6,0" Height="16" VerticalAlignment="Center"
                                             IsVisible="{Binding !Player.WaveformSeekBarEnabled}"
                                             Fraction="{Binding Player.SeekableFraction}"
-                                            Brush="{DynamicResource AccentColorBrush}" Opacity="0.35"/>
+                                            Brush="{DynamicResource AccentColorBrush}" Opacity="0.55"/>
                     <TextBlock Grid.Column="2" Classes="mini-time" Text="{Binding Player.RemainingTimeText}"
                                FontSize="10" Foreground="#A0FFFFFF"
                                VerticalAlignment="Center" MinWidth="32" TextAlignment="Right"/>
@@ -1654,7 +1654,7 @@
                     <controls:SeekReachLine Grid.Row="1" Margin="0,4,0,0" Height="16" VerticalAlignment="Center"
                                             IsVisible="{Binding !Player.WaveformSeekBarEnabled}"
                                             Fraction="{Binding Player.SeekableFraction}"
-                                            Brush="{DynamicResource AccentColorBrush}" Opacity="0.35"/>
+                                            Brush="{DynamicResource AccentColorBrush}" Opacity="0.55"/>
 
                     <!-- Codec quality tag (Lossless / Hi-Res / codec) centered like Apple Music;
                          hidden while a music video's own audio plays (it describes the song file). -->
@@ -2164,7 +2164,7 @@
                                 <controls:SeekReachLine Grid.Column="1" Margin="4,0" Height="16" VerticalAlignment="Center"
                                                         IsVisible="{Binding !Player.WaveformSeekBarEnabled}"
                                                         Fraction="{Binding Player.SeekableFraction}"
-                                                        Brush="{DynamicResource AccentColorBrush}" Opacity="0.35"/>
+                                                        Brush="{DynamicResource AccentColorBrush}" Opacity="0.55"/>
                                 <TextBlock Grid.Column="2" Classes="mini-time" Text="{Binding Player.DurationText}" FontSize="10"
                                            Foreground="{DynamicResource SystemControlForegroundBaseMediumBrush}" VerticalAlignment="Center" MinWidth="26" TextAlignment="Right"/>
                             </Grid>
@@ -2360,7 +2360,7 @@
                                 <controls:SeekReachLine Grid.Column="1" Margin="6,0" Height="16" VerticalAlignment="Center"
                                                         IsVisible="{Binding !Player.WaveformSeekBarEnabled}"
                                                         Fraction="{Binding Player.SeekableFraction}"
-                                                        Brush="{DynamicResource AccentColorBrush}" Opacity="0.35"/>
+                                                        Brush="{DynamicResource AccentColorBrush}" Opacity="0.55"/>
                                 <TextBlock Grid.Column="2" Classes="mini-time" Text="{Binding Player.DurationText}" FontSize="11"
                                            Foreground="{DynamicResource SystemControlForegroundBaseMediumBrush}" VerticalAlignment="Center" MinWidth="30" TextAlignment="Right"/>
                             </Grid>

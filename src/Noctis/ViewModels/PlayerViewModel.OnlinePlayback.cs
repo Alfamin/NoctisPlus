@@ -21,13 +21,20 @@ public partial class PlayerViewModel
     [ObservableProperty] private double _seekableFraction = 1;
     [ObservableProperty] private string? _onlinePlayingSongId;
 
+    private Models.Track? _seekableLoggedFor;
+    private double _seekableLogged;
+
     private void RefreshSeekable()
     {
         CanSeekCurrent = _audioPlayer.CanSeek;
         var fraction = _audioPlayer.SeekableUntil is { } until && Duration.TotalSeconds > 0
             ? Math.Clamp(until / Duration, 0, 1) : 1;
-        if (fraction < 1 && SeekableFraction >= 1 && CurrentTrack is { } track)
-            Services.DebugLog.Write("Playback", $"download indicator shown: {fraction:P0} reachable of \"{track.Title}\"");
+        // Once per song and then every 10 % (a song starts at 0, so "the line was 1 before" never fired): the bar's value.
+        if (fraction < 1 && CurrentTrack is { } track && (!ReferenceEquals(_seekableLoggedFor, track) || fraction >= _seekableLogged + 0.1))
+        {
+            _seekableLoggedFor = track; _seekableLogged = fraction;
+            Services.DebugLog.Write("Playback", $"download line: {fraction:P0} of \"{track.Title}\" reachable (seek enabled {CanSeekCurrent})");
+        }
         SeekableFraction = fraction;
     }
 
@@ -64,7 +71,56 @@ public partial class PlayerViewModel
         if (position > _lastOnlinePosition) _lastOnlineAdvance = now;
         _lastOnlinePosition = position;
         // Decoder read-ahead can wait while buffered PCM is still audibly playing.
-        IsBuffering = _inputWaiting && State == Models.PlaybackState.Playing && now - _lastOnlineAdvance >= 1000;
+        IsBuffering = _reachSeek != null || _inputWaiting && State == Models.PlaybackState.Playing && now - _lastOnlineAdvance >= 1000;
+    }
+
+    /// <summary>Owner #213: a seek past the part downloaded so far, waiting for the download to get there.</summary>
+    private TimeSpan? _reachSeek;
+
+    /// <summary>
+    /// Owner #213 ("it goes there, then comes back"): while a song still downloads, a seek past what has arrived goes
+    /// there and waits, like a video: the bar and the lyrics stay on the chosen spot, the song is silent and shows as
+    /// buffering, and it plays from there the moment the download reaches it. False when the target is reachable now.
+    /// </summary>
+    private bool HoldSeekUntilReached(TimeSpan target)
+    {
+        if (_audioPlayer.SeekableUntil is not { } until || target <= until || target <= TimeSpan.Zero || Duration <= TimeSpan.Zero) return false;
+        var first = _reachSeek == null;
+        _reachSeek = target;
+        _audioPlayer.IsMuted = true;
+        Position = target;
+        PositionText = FormatTime(target);
+        PositionFraction = Math.Clamp(target / Duration, 0, 1);
+        RemainingTimeText = FormatTime(Duration - target);
+        IsBuffering = true;
+        Services.DebugLog.Write("Playback", $"seek past the download: waits at {target.TotalSeconds:0.0} s (reachable {until.TotalSeconds:0.0} s){(first ? "" : ", moved")}");
+        Seeked?.Invoke(this, target);
+        return true;
+    }
+
+    /// <summary>The download reached the waiting spot (or finished): the song plays from there.</summary>
+    private void TryFinishReachSeek()
+    {
+        if (_reachSeek is not { } target) return;
+        if (_audioPlayer.SeekableUntil is { } until && target > until) return;
+        _reachSeek = null;
+        _lastSeekTime = DateTime.UtcNow;
+        _lastCommittedSeekTarget = target;
+        _audioPlayer.Seek(target);
+        _audioPlayer.IsMuted = IsMuted;
+        UpdateAudibleBuffering(target);
+        Services.DebugLog.Write("Playback", $"seek past the download: reached, playing from {target.TotalSeconds:0.0} s");
+        Seeked?.Invoke(this, target);
+    }
+
+    /// <summary>Another seek, another song: a waiting seek is dropped and the sound comes back.</summary>
+    private void CancelReachSeek()
+    {
+        if (_reachSeek == null) return;
+        _reachSeek = null;
+        _audioPlayer.IsMuted = IsMuted;
+        UpdateAudibleBuffering(Position);
+        Services.DebugLog.Write("Playback", "seek past the download: dropped (another seek or song)");
     }
 
     /// <summary>Latest Play wins across Search and album pages. Local playback, pause,

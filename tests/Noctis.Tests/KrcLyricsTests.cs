@@ -85,6 +85,32 @@ public class KrcLyricsTests
         Assert.Equal("[00:06.59]<00:06.59>Hello <00:09.25>it's <00:09.40>me<00:09.70>", KrcLyrics.ToElrc(krc));
     }
 
+    [Theory]
+    [InlineData("Pop Smoke、Ye、Pusha T")]
+    [InlineData("Someone Else")]   // the tags do not name them at all: the credit lines still mark the head
+    public void ToElrc_DropsAHeadWhoseTitleLineNamesTheArtistsAnotherWay(string artist)
+    {
+        // Owner #213, Pop Smoke "Tell The Vision": every credit line stayed above the lyrics.
+        var krc =
+            $"[ti:Tell The Vision]\n[ar:{artist}]\n" +
+            "[0,120]<0,120,0>Tell The Vision - Pop Smoke/Ye /Pusha T (Explicit)\n" +
+            "[120,200]<0,200,0>Lyrics by：FNZ/Jahlil\n" +
+            "[320,210]<0,210,0>Composed by：Boogz/FNZ\n" +
+            "[530,30]<0,30,0>Kanye West：\n" +
+            "[560,3000]<0,3000,0>Tripping\n";
+
+        Assert.Equal("[00:00.56]<00:00.56>Tripping<00:03.56>", KrcLyrics.ToElrc(krc));
+    }
+
+    [Fact]
+    public void ToElrc_KeepsALyricThatHasAColonOnceTheSongHasBegun()
+    {
+        const string krc = "[ti:Song]\n[ar:Artist]\n" +
+            "[1000,1000]<0,1000,0>First line\n" +
+            "[2000,1000]<0,1000,0>She said：go\n";
+        Assert.Equal(2, KrcLyrics.ToElrc(krc)!.Split('\n').Length);
+    }
+
     [Fact]
     public void ToElrc_FoldsLoneSpaceTokensIntoThePreviousWord()
     {

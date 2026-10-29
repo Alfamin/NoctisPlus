@@ -961,7 +961,10 @@ public partial class PlaybackBarView : UserControl
             return;
         }
         var width = SeekSlider.Bounds.Width;
-        var show = fraction < 1 && width > 0 && SeekSlider.IsEnabled;
+        // Owner #213: shown from the value alone (0 = nothing reachable yet); the slider's enabled state can lag a tick.
+        var show = fraction is > 0 and < 1 && width > 0;
+        if (show != SeekTrackBuffered.IsVisible)
+            Services.DebugLog.Write("Playback", $"download line {(show ? "shown" : "hidden")} on the playback bar ({fraction:P0}, bar {width:0} px)");
         SeekTrackBuffered.IsVisible = show;
         if (!show) return;
         var trackWidth = Math.Max(0, width - SeekThumbSize);

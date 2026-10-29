@@ -136,6 +136,7 @@ internal sealed class Worker : IDisposable
         Directory.CreateDirectory(_data);
 
         _rules = new SongRules(_data, _log);
+        ReturnHeldOnline(); // a run that never finished (app closed, crash): every song gets its online timing back
         _rules.Load();
         HasCheckpoint = File.Exists(StateFile);
         LoadState();
@@ -804,6 +805,87 @@ internal sealed class Worker : IDisposable
     private string ProgressFile => Path.Combine(_data, "progress.json");
     private string StateFile => Path.Combine(_data, "state.json");
     private string ControlFile => Path.Combine(_data, "control.txt");
+    private string HeldFolder => Path.Combine(_data, "held-online");
+
+    /// <summary>#213: the song's online .ttml (only a marked one) is moved into <see cref="HeldFolder"/> for a run, with a
+    /// note of where it belongs.</summary>
+    private void HoldOnline(string path, TimingAction action)
+    {
+        foreach (var ttml in Services.Lyrics.LyricsWriter.SidecarsOnDisk(path, ".ttml"))
+        {
+            try
+            {
+                var text = File.ReadAllText(ttml);
+                if (Services.Lyrics.OnlineTimingSidecar.SourceOf(text) == null) continue;
+                Directory.CreateDirectory(HeldFolder);
+                var held = Path.Combine(HeldFolder, Guid.NewGuid().ToString("N") + ".ttml");
+                // Retime existing words: those words are the online timing's, given to WordLyrics as a line-timed .lrc
+                // (removed again if the run times nothing).
+                var lrc = Path.ChangeExtension(path, ".lrc");
+                var madeLrc = action == TimingAction.Current && !File.Exists(lrc) && LinesOf(text) is { } lines;
+                if (madeLrc) File.WriteAllText(lrc, LinesOf(text)!, new UTF8Encoding(false));
+                File.WriteAllText(held + ".from", ttml + (madeLrc ? "\n" + lrc : ""), new UTF8Encoding(false));
+                File.Move(ttml, held);
+                _log("online timing set aside while WordLyrics times " + Path.GetFileName(path));
+            }
+            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException) { _log("could not set the online timing aside: " + ex.Message); }
+        }
+    }
+
+    /// <summary>#213: after the run, a held online timing is removed when WordLyrics timed the song, else put back (unless
+    /// another .ttml is there by now).</summary>
+    /// <summary>The TTML's lines as a line-timed LRC (no word tags, no background lines); null when it has none.</summary>
+    internal static string? LinesOf(string ttml)
+    {
+        if (Services.TtmlParser.ToLrc(ttml) is not { Length: > 0 } elrc) return null;
+        var lines = elrc.Split('\n')
+            .Where(l => !l.StartsWith("[bg:", StringComparison.Ordinal))
+            .Select(l => System.Text.RegularExpressions.Regex.Replace(l, @"<\d+:\d+(?:\.\d+)?>", "").Replace("  ", " ").TrimEnd())
+            .Where(l => l.Length > 0);
+        var text = string.Join("\n", lines);
+        return text.Contains(']') ? text + "\n" : null;
+    }
+
+    private void SettleHeldOnline(string path, bool timed)
+    {
+        if (!Directory.Exists(HeldFolder)) return;
+        foreach (var note in Directory.EnumerateFiles(HeldFolder, "*.ttml.from"))
+        {
+            try
+            {
+                var from = File.ReadAllText(note).Split('\n')[0];
+                var song = Path.Combine(Path.GetDirectoryName(from)!, Path.GetFileNameWithoutExtension(from));
+                if (!string.Equals(song, Path.Combine(Path.GetDirectoryName(path)!, Path.GetFileNameWithoutExtension(path)), StringComparison.OrdinalIgnoreCase)) continue;
+                Settle(note, from, timed);
+            }
+            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or ArgumentException) { }
+        }
+    }
+
+    private void ReturnHeldOnline()
+    {
+        try
+        {
+            if (!Directory.Exists(HeldFolder)) return;
+            foreach (var note in Directory.EnumerateFiles(HeldFolder, "*.ttml.from"))
+                try { Settle(note, File.ReadAllText(note).Split('\n')[0], timed: false); }
+                catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or ArgumentException) { }
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException) { }
+    }
+
+    private void Settle(string note, string from, bool timed)
+    {
+        var held = note[..^".from".Length];
+        if (!timed && File.ReadAllText(note).Split('\n') is [_, { Length: > 0 } madeLrc] && File.Exists(madeLrc)) File.Delete(madeLrc);
+        if (!timed && !File.Exists(from) && File.Exists(held) && Directory.Exists(Path.GetDirectoryName(from)))
+        {
+            File.Move(held, from);
+            _log("online timing back: WordLyrics did not time " + Path.GetFileNameWithoutExtension(from));
+        }
+        if (File.Exists(held)) File.Delete(held);
+        File.Delete(note);
+    }
 
     private void Start(Tool tool, List<Item> batch, Options options)
     {
@@ -823,6 +905,9 @@ internal sealed class Worker : IDisposable
             if (batch.Count == 0) return;
             File.WriteAllLines(ListFile, batch.Select(i => i.Path), new UTF8Encoding(false));
             if (controlled) WriteControl(_paused ? "pause" : "run");
+            // #213: WordLyrics leaves alone any song with a .ttml ("protected"); chosen by hand for an online-timed song,
+            // that timing steps out for the run: gone if WordLyrics times it, back otherwise.
+            foreach (var item in batch.Where(i => i.Hand && i.Action != TimingAction.Missing)) HoldOnline(item.Path, item.Action);
             run = _run = tool.StartQuietRun(batch[0].Root, ListFile, ResultFile, OutputFile, speed, options.Backup, retry: batch[0].Asked, ProgressFile,
                 controlled ? ControlFile : null, batch[0].Action, batch[0].Draft, options.AdaptToPc);
             _job = Job.Around(run);
@@ -977,6 +1062,9 @@ internal sealed class Worker : IDisposable
                 error = "the result could not be read: " + ex.Message;
             }
         }
+
+        foreach (var item in batch)
+            SettleHeldOnline(item.Path, outcome.TryGetValue(item.Path, out var said) && said.Status == "timed");
 
         // Owner #161: broke off with nothing said about any song (not a stop, a restart, another window or a setup failure).
         var crashed = code is not 0 and not ExitAlreadyRunning and not ExitSetupFailed && outcome.Count == 0;

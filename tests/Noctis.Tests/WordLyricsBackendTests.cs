@@ -111,6 +111,30 @@ public class WordLyricsBackendTests
     }
 
     [Fact]
+    public async Task RetimeOnAnOnlineTimedSong_GetsItsWords_AndTheOnlineTimingComesBackWhenNothingWasTimed()
+    {
+        // #213 (ALL RED): WordLyrics leaves a song with any .ttml alone ("protected"), so Retime never ran.
+        using var rig = new Rig(outcome: "no_lyrics"); var states = new ConcurrentQueue<ProgressState>();
+        var ttml = Path.ChangeExtension(rig.Song, ".ttml");
+        var lrc = Path.ChangeExtension(rig.Song, ".lrc");
+        var online = Noctis.Services.Lyrics.OnlineTimingSidecar.Mark(OnlineTtml, Noctis.Services.Lyrics.WordTimingSource.LrcRed, 0)!;
+        File.WriteAllText(ttml, online);
+        using var worker = rig.Worker(states.Enqueue);
+        worker.Ask(rig.Song, TimingAction.Current);
+        await Until(() => states.Any(s => s.Finished));
+        Assert.Equal(online, File.ReadAllText(ttml));
+        Assert.False(File.Exists(lrc));
+        Assert.Empty(Directory.EnumerateFiles(rig.Work, "*", SearchOption.AllDirectories).Where(f => f.Contains("held-online")));
+    }
+
+    [Fact]
+    public void TheOnlineWordsGoToWordLyricsAsLineTimedLyrics()
+    {
+        var lines = Worker.LinesOf(OnlineTtml)!;
+        Assert.Equal("[00:01.00]word\n", lines);
+    }
+
+    [Fact]
     public async Task AutomaticTiming_NeverRemovesAnOnlineTiming()
     {
         using var rig = new Rig(); var states = new ConcurrentQueue<ProgressState>();

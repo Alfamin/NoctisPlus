@@ -61,6 +61,7 @@ public static partial class KrcLyrics
     {
         string? title = null, artist = null;
         var output = new List<string>();
+        var texts = new List<string>();
         var inHead = true;
         var sawLine = false;
 
@@ -85,7 +86,16 @@ public static partial class KrcLyrics
 
             sawLine = true;
             output.Add($"[{TimedLyricsBuilder.FormatTimestamp(lineStart)}]{body}");
+            texts.Add(text);
         }
+
+        // Owner #213: a head the tags did not recognise (its title line written another way) still ends in credit lines:
+        // everything up to the last credit line near the top goes, when all of it is the title line or credits.
+        var lastCredit = -1;
+        for (var i = 0; i < Math.Min(texts.Count, HeadLines); i++)
+            if (IsCredit(texts[i])) lastCredit = i;
+        if (lastCredit >= 0 && Enumerable.Range(0, lastCredit).All(i => IsCredit(texts[i]) || i == 0 && texts[0].Contains(" - ", StringComparison.Ordinal)))
+            output.RemoveRange(0, lastCredit + 1);
 
         return output.Count == 0 ? null : string.Join('\n', output);
     }
@@ -126,6 +136,11 @@ public static partial class KrcLyrics
         return (string.Concat(words.Select(w => w.Text)).Trim(), body);
     }
 
+    /// <summary>How far down a credit line still counts as Kugou's head.</summary>
+    private const int HeadLines = 8;
+
+    private static bool IsCredit(string text) => text.Contains('：') || CreditRegex().IsMatch(text);
+
     /// <summary>The lines Kugou puts above the lyrics: "Title (translation) - Artist" first, then credits.</summary>
     private static bool IsHeadLine(string text, string? title, string? artist, bool first)
     {
@@ -133,11 +148,16 @@ public static partial class KrcLyrics
         if (!first || !text.Contains(" - ", StringComparison.Ordinal)) return false;
         var hasTitle = !string.IsNullOrWhiteSpace(title);
         var hasArtist = !string.IsNullOrWhiteSpace(artist);
-        // Both names when the header tags carry both, so a first lyric that merely has a dash survives.
+        // Both names when the header tags carry both, so a first lyric that merely has a dash survives. Owner #213 (Pop
+        // Smoke "Tell The Vision"): Kugou writes the artists its own way there ("Pop Smoke/Ye /Pusha T" for "Pop Smoke、Ye、
+        // Pusha T"), and the credits under a missed title line stayed: one of the artists is enough beside the title.
         return (hasTitle || hasArtist)
                && (!hasTitle || text.Contains(title!, StringComparison.OrdinalIgnoreCase))
-               && (!hasArtist || text.Contains(artist!, StringComparison.OrdinalIgnoreCase));
+               && (!hasArtist || ArtistsOf(artist!).Any(a => text.Contains(a, StringComparison.OrdinalIgnoreCase)));
     }
+
+    private static IEnumerable<string> ArtistsOf(string artist) =>
+        artist.Split(['、', '/', ',', '&', ';', '，'], StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries).Where(a => a.Length > 1);
 
     private static string TagValue(string line)
     {

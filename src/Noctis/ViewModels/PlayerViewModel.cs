@@ -931,9 +931,10 @@ public partial class PlayerViewModel : ViewModelBase
         if (_audioPlayer.SeekableUntil is { } until)
         {
             var reached = target <= TimeSpan.Zero || target <= until;
-            DebugLog.Write("Playback", $"seek while downloading: to {target.TotalSeconds:0.0} s, reachable {until.TotalSeconds:0.0} s{(reached ? "" : " (not yet: ignored)")}");
-            if (!reached) return;
+            DebugLog.Write("Playback", $"seek while downloading: to {target.TotalSeconds:0.0} s, reachable {until.TotalSeconds:0.0} s{(reached ? "" : " (not yet: waits there)")}");
+            if (!reached) { HoldSeekUntilReached(target); return; }
         }
+        CancelReachSeek();
         var remaining = Duration - target;
         if (remaining < TimeSpan.Zero) remaining = TimeSpan.Zero;
 
@@ -2492,7 +2493,7 @@ public partial class PlayerViewModel : ViewModelBase
     {
         // Every writer (toggle, adjust, queue restore) reaches the audio player here; the
         // restore used to set only this property, so a saved mute showed Muted but played.
-        _audioPlayer.IsMuted = value;
+        _audioPlayer.IsMuted = value || _reachSeek != null;   // a seek waiting for the download stays silent
         RefreshSignalPath();
     }
 
@@ -2557,6 +2558,7 @@ public partial class PlayerViewModel : ViewModelBase
         }
         if (newValue != null) newValue.IsNowPlaying = true;
         SyncNowPlayingFlags();
+        CancelReachSeek();
         OnCurrentTrackChangedForRows(oldValue, newValue);
         DebugLogger.Info(DebugLogger.Category.Playback, "CurrentTrack.Changed",
             $"old={oldValue?.Title ?? "<null>"} new={newValue?.Title ?? "<null>"}");
@@ -2782,6 +2784,8 @@ public partial class PlayerViewModel : ViewModelBase
         DebugLogger.Info(DebugLogger.Category.Playback, "EndSeek", $"targetMs={target.TotalMilliseconds:F0}, debounce={SeekDebounceMs}ms");
         _seekDebounceTimer?.Dispose();
         _seekDebounceTimer = null;
+        if (HoldSeekUntilReached(target)) return;
+        CancelReachSeek();
         if (DeferSeekWhileStopped(target))
         {
             Seeked?.Invoke(this, target);
@@ -3636,6 +3640,8 @@ public partial class PlayerViewModel : ViewModelBase
             UpdateAudibleBuffering(latest);
 
             if (_isSeeking) return; // don't update while user is dragging
+            // Owner #213: the bar stays on the spot chosen past the download until the song can play there.
+            if (_reachSeek != null) { TryFinishReachSeek(); return; }
 
             // Ignore stale position updates after seeking to prevent snap-back.
             // VLC needs time to flush old buffers and settle at the new position.
