@@ -17,5 +17,12 @@ internal static class PressedAnswerTests
         Check.True(!RecordingMatch.SameAnswer(wanted, "HUGEL", "I´m Moving To The Sun (Remix)", length), "a remix is never the original");
         Check.True(!RecordingMatch.SameAnswer(wanted, "HUGEL", "Sun", length), "one word in common is not enough");
         Check.True(!RecordingMatch.SameAnswer(new MusicRequest("Movin' To The Sun", "HUGEL", null), "HUGEL", "I´m Moving To The Sun", length), "without the wanted length: not taken");
+
+        // Pink Floyd "Eclipse" (owner, the same evening): the very title, refused for its length (segued album songs).
+        var eclipse = new MusicRequest("Eclipse", "Pink Floyd", 123);
+        Check.True(!RecordingMatch.Fits(eclipse, "Pink Floyd", "Eclipse", TimeSpan.FromSeconds(131)), "the usual check refuses it 8 s apart");
+        Check.True(RecordingMatch.SameAnswer(eclipse, "Pink Floyd", "Eclipse", TimeSpan.FromSeconds(131)), "the pressed result's file is taken: the same title by the same artist");
+        Check.True(!RecordingMatch.SameAnswer(eclipse, "Pink Floyd", "Eclipse (Live)", TimeSpan.FromSeconds(131)), "a live take is still another recording");
+        Check.True(!RecordingMatch.SameAnswer(eclipse, "Someone Else", "Eclipse", TimeSpan.FromSeconds(123)), "another artist's Eclipse is not it");
     }
 }

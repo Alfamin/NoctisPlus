@@ -232,13 +232,12 @@ internal static class RecordingMatch
     /// <summary>
     /// Owner #205: Music Hunters' result "Movin' To The Sun" (HUGEL) came as a file tagged "I´m Moving To The Sun" (HUGEL,
     /// Imael Angel, Ultra Nate) and was refused, three times. For the file that answers the result just pressed only: a
-    /// shared artist, the same length (3 s) and every title word of one in the other ("movin'" = "moving"), the same
-    /// kind of version. Never for a file nobody pressed for.
+    /// shared artist, the same kind of version, and the same title words (any length), or every title word of one in the
+    /// other ("movin'" = "moving") at the same length (3 s). Never for a file nobody pressed for.
     /// </summary>
     internal static bool SameAnswer(MusicRequest wanted, string artist, string title, TimeSpan? duration)
     {
         if (string.IsNullOrWhiteSpace(artist) || string.IsNullOrWhiteSpace(title)) return false;
-        if (wanted.Duration is not { } length || duration is not { } other || Math.Abs((length - other).TotalSeconds) > 3) return false;
         (wanted, title) = Starred(wanted, title);
         if (wanted.Explicit == true && Regex.IsMatch(title, @"\b(clean|censored|radio edit)\b", RegexOptions.IgnoreCase)) return false;
         foreach (var version in new[] { "live", "remix", "instrumental", "acoustic", "cover", "sped up", "slowed", "karaoke", "nightcore", "8d", "edit", "mix", "version" })
@@ -253,6 +252,10 @@ internal static class RecordingMatch
         }
         HashSet<string> a = Words(BotText.Plain(wanted.Title)), b = Words(BotText.Plain(title));
         if (a.Count == 0 || b.Count == 0) return false;
+        // Owner #205, Pink Floyd "Eclipse": the very title by the same artist, refused for its length (the album's songs run
+        // into each other, so editions cut them seconds apart). The answer to the press is that song, whatever its length.
+        if (a.SetEquals(b)) return true;
+        if (wanted.Duration is not { } length || duration is not { } other || Math.Abs((length - other).TotalSeconds) > 3) return false;
         var (fewer, more) = a.Count <= b.Count ? (a, b) : (b, a);
         return fewer.Count >= 2 && fewer.IsSubsetOf(more) && more.Count - fewer.Count <= 2;
     }
