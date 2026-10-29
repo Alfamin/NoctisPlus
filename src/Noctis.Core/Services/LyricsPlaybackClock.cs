@@ -41,6 +41,13 @@ public sealed class LyricsPlaybackClock
     /// <summary>Time constant of the catch-up after a resume.</summary>
     public const double ResumeTauMs = 200;
 
+    /// <summary>
+    /// Media milliseconds per wall millisecond: the player's playback speed (owner #211). The clock ran at 1x between
+    /// readings and could only bend 8% toward a song played at 1.5x, so it fell behind until the 400 ms snap: the
+    /// lyrics jumped about once a second. Set before each <see cref="Sample"/>; 1 by default.
+    /// </summary>
+    public double Rate { get; set; } = 1;
+
     private double _raw = double.NaN;   // last raw reading
     private double _rawAtMs;            // wall time it was observed
     private double _estimate = double.NaN;
@@ -100,7 +107,8 @@ public sealed class LyricsPlaybackClock
             return _estimate;
 
         // The raw reading was accurate when observed; where it says the player is now.
-        var target = _raw + (nowMs - _rawAtMs);
+        var speed = double.IsFinite(Rate) && Rate > 0 ? Rate : 1;
+        var target = _raw + (nowMs - _rawAtMs) * speed;
         var error = target - _estimate;
         if (Math.Abs(error) > SnapThresholdMs)
         {
@@ -117,7 +125,7 @@ public sealed class LyricsPlaybackClock
             if (Math.Abs(error) < 4) _catchUp = false;
         }
         else rate = Math.Clamp(1 + error / CorrectionTauMs, 1 - MaxRateError, 1 + MaxRateError);
-        _estimate += dt * rate;
+        _estimate += dt * speed * rate;
         return _estimate;
     }
 

@@ -187,6 +187,30 @@ public class LyricsPlaybackClockTests
             "the legacy integrator passed the smoothness bound — the bound is too loose to prove anything");
     }
 
+    [Theory]
+    [InlineData(0.75)]
+    [InlineData(1.25)]
+    [InlineData(1.5)]
+    public void ASongPlayedFasterOrSlower_GlidesAtItsOwnPace_NoSnaps(double speed)
+    {
+        // Owner #211 sweep: at 1.5x the clock ran at 1x between 100 ms readings, fell behind and snapped every ~1 s.
+        var clock = new LyricsPlaybackClock { Rate = speed };
+        double now = 0, raw = 10_000, shown = clock.Sample(raw, now), worst = 0;
+        for (var frame = 0; frame < 60 * 20; frame++)
+        {
+            now += FrameMs; raw += FrameMs * speed;
+            var next = clock.Sample(Math.Floor(raw / PollMs) * PollMs, now);
+            var step = next - shown;
+            if (frame > 30)
+            {
+                Assert.InRange(step, FrameMs * speed * (1 - LyricsPlaybackClock.MaxRateError) - 0.01, FrameMs * speed * (1 + LyricsPlaybackClock.MaxRateError) + 0.01);
+                worst = Math.Max(worst, Math.Abs(next - raw));
+            }
+            shown = next;
+        }
+        Assert.True(worst < 120, $"{worst:0} ms off the player at {speed}x");
+    }
+
     [Fact]
     public void SeekBackwards_SnapsToTheNewPositionAtOnce()
     {

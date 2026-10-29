@@ -119,6 +119,47 @@ public class NativeLyricMotionTests
     }
 
     [AvaloniaFact]
+    public void ASungLineAllocatesAlmostNothingPerFrame_AndTheSweepIsStillThePlusGradient()
+    {
+        // Owner #211 sweep: every word on the line built a new gradient brush on every frame (~4.6 KB each, an 8-word
+        // line churned megabytes a second into the garbage collector, whose pauses hitch the motion), and a sung word's
+        // lift a new transform. Now a sung word allocates nothing per frame and a held word only what Avalonia's own
+        // change notices take.
+        var held = new MotionWordPresenter { Word = new WordTiming { Text = "Holding ", Progress = 0 }, Text = "Holding ", Foreground = Brushes.White, FontSize = 46 };
+        var sung = new MotionWordPresenter { Word = new WordTiming { Text = "done ", Progress = 1 }, Text = "done ", Foreground = Brushes.White, FontSize = 46 };
+        var root = new StackPanel { Orientation = Avalonia.Layout.Orientation.Horizontal, Children = { held, sung } };
+        var window = new Window { Content = root, Width = 700, Height = 300 };
+        try
+        {
+            window.Show(); window.UpdateLayout();
+            var tuning = Tuning.From(null);
+            long Measure(MotionWordPresenter p, Func<int, double> progress)
+            {
+                for (var i = 0; i < 30; i++) { p.Word!.Progress = progress(i); p.Step(i * 16, i * 16, 4000, false, tuning); }
+                var before = GC.GetAllocatedBytesForCurrentThread();
+                for (var i = 30; i < 130; i++) { p.Word!.Progress = progress(i); p.Step(i * 16, i * 16, 4000, false, tuning); }
+                return (GC.GetAllocatedBytesForCurrentThread() - before) / 100;
+            }
+            Assert.InRange(Measure(sung, _ => 1), 0, 64);                              // was ~5.4 KB a frame
+            Assert.InRange(Measure(held, i => Math.Min(0.99, i / 250.0)), 0, 2048);  // was ~5.7 KB a frame
+
+            // The same pixels: the word's own brush carries exactly the stops the shared converter paints.
+            held.Word!.Progress = 0.4; held.UpdateProgress();
+            IBrush? Own() => held.SweepText.GetBaseValue(TextBlock.ForegroundProperty) is { HasValue: true } v ? v.Value : null;   // under the letter layer's override
+            var own = Assert.IsType<LinearGradientBrush>(Own());
+            var stock = Assert.IsType<LinearGradientBrush>(new Noctis.Converters.PlusSweepForegroundConverter().Convert(
+                [0.4, (IBrush)Brushes.White, held.SweepText.Bounds.Width, held.BaseText.FontSize], typeof(IBrush), null, System.Globalization.CultureInfo.InvariantCulture));
+            Assert.Equal(stock.GradientStops.Select(s => (s.Color, s.Offset)), own.GradientStops.Select(s => (s.Color, s.Offset)));
+            Assert.Equal(stock.StartPoint, own.StartPoint); Assert.Equal(stock.EndPoint, own.EndPoint);
+            held.Word.Progress = 2; held.UpdateProgress();
+            Assert.Same(Brushes.White, Own());   // fully sung: the lyrics colour itself
+            held.Word.Progress = -2; held.UpdateProgress();
+            Assert.Same(Brushes.Transparent, Own());
+        }
+        finally { window.Close(); }
+    }
+
+    [AvaloniaFact]
     public void CachedGlyphLayoutsStayStableAcrossFrames_IncludingLongAndRtlWords()
     {
         foreach (var text in new[] { "Holding ", new string('a', 80), "فارسی" })

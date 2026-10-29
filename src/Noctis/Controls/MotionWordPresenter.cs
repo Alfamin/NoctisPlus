@@ -1,4 +1,3 @@
-using System.Globalization;
 using Avalonia;
 using Avalonia.Automation;
 using Avalonia.Automation.Peers;
@@ -28,8 +27,6 @@ internal sealed class MotionWordPresenter : Panel
     public Thickness Padding { get => GetValue(PaddingProperty); set => SetValue(PaddingProperty, value); }
     internal TextBlock BaseText { get; } = new() { FontWeight = FontWeight.Bold, ClipToBounds = false };
     internal TextBlock SweepText { get; } = new() { FontWeight = FontWeight.Bold, HorizontalAlignment = Avalonia.Layout.HorizontalAlignment.Left, ClipToBounds = false };
-    private readonly PlusSweepForegroundConverter _fill = new();
-    private readonly object?[] _fillValues = new object?[4];
     private LetterLayer? _letters;
     private bool _settling, _seen;
     // Like the plugin: a word whose letters cannot be redrawn is not tried again and keeps Noctis's text.
@@ -85,29 +82,52 @@ internal sealed class MotionWordPresenter : Panel
 
     internal void UpdateProgress()
     {
-        _fillValues[0] = Word?.Progress ?? -2;
-        _fillValues[1] = Foreground;
-        _fillValues[2] = SweepText.Bounds.Width;
-        _fillValues[3] = BaseText.FontSize;
-        var next = (IBrush?)_fill.Convert(_fillValues, typeof(IBrush), null, CultureInfo.InvariantCulture);
-        // Same Plus gradient, same pixels. Replacing TextBlock.Foreground per frame invalidates
-        // text measurement; mutating this word's own brush redraws without reshaping its text.
-        if (next is LinearGradientBrush fresh && SweepText.Foreground is LinearGradientBrush existing
-            && fresh.GradientStops.Count == existing.GradientStops.Count)
+        // Same Plus gradient, same pixels (PlusSweepForegroundConverter.Compute). Owner #211: the converter built a new
+        // brush for every word on every frame (~4.6 KB each, a sung line churned megabytes a second into the garbage
+        // collector, whose pauses hitch the motion). The numbers go straight into this word's own brush instead, and
+        // nothing is written when they are unchanged. Replacing TextBlock.Foreground per frame would also invalidate
+        // text measurement; mutating our own brush redraws without reshaping the text.
+        var band = PlusSweepForegroundConverter.Compute(Word?.Progress ?? -2, Foreground, SweepText.Bounds.Width, BaseText.FontSize);
+        if (band.Unlit) { SetSweep(Brushes.Transparent); return; }
+        if (band.Lit)
         {
-            existing.StartPoint = fresh.StartPoint;
-            existing.EndPoint = fresh.EndPoint;
-            existing.SpreadMethod = fresh.SpreadMethod;
-            existing.Opacity = fresh.Opacity;
-            for (var i = 0; i < existing.GradientStops.Count; i++)
-            {
-                existing.GradientStops[i].Color = fresh.GradientStops[i].Color;
-                existing.GradientStops[i].Offset = fresh.GradientStops[i].Offset;
-            }
+            var lit = Foreground ?? Brushes.White;
+            if (!(lit is ISolidColorBrush solid && Sweep is ISolidColorBrush current && solid.Color == current.Color && solid.Opacity == current.Opacity))
+                SetSweep(lit);
+            return;
         }
-        else if (next is ISolidColorBrush solid && SweepText.Foreground is ISolidColorBrush current
-                 && solid.Color == current.Color && solid.Opacity == current.Opacity) { }
-        else SweepText.Foreground = next;
+        if (_sweepBrush is null)
+            _sweepBrush = new LinearGradientBrush
+            {
+                StartPoint = new RelativePoint(0, 0.5, RelativeUnit.Relative),
+                EndPoint = new RelativePoint(1, 0.5, RelativeUnit.Relative),
+                GradientStops = { new GradientStop(band.LoColor, band.Lo), new GradientStop(band.HiColor, band.Hi) },
+            };
+        else
+        {
+            var stops = _sweepBrush.GradientStops;
+            if (stops[0].Color != band.LoColor) stops[0].Color = band.LoColor;
+            if (stops[0].Offset != band.Lo) stops[0].Offset = band.Lo;
+            if (stops[1].Color != band.HiColor) stops[1].Color = band.HiColor;
+            if (stops[1].Offset != band.Hi) stops[1].Offset = band.Hi;
+        }
+        SetSweep(_sweepBrush);
+    }
+
+    /// <summary>This word's own sweep brush (never shared, so it may be changed in place).</summary>
+    private LinearGradientBrush? _sweepBrush;
+    /// <summary>The word's own sweep brush, under the letter layer's transparent override while the word is redrawn
+    /// (comparing with the override re-set a new brush on every frame of every redrawn word).</summary>
+    private IBrush? Sweep => SweepText.GetBaseValue(TextBlock.ForegroundProperty) is { HasValue: true } own ? own.Value : null;
+    private void SetSweep(IBrush brush) { if (!ReferenceEquals(Sweep, brush)) SweepText.Foreground = brush; }
+
+    /// <summary>The resting lift of a word already sung, kept and moved rather than made anew each frame.</summary>
+    private readonly TranslateTransform _lift = new();
+    private void SetLift(double lift)
+    {
+        if (lift <= 0) { if (RenderTransform is not null) RenderTransform = null; return; }
+        if (_lift.Y != -lift) _lift.Y = -lift;
+        if (!ReferenceEquals(RenderTransform, _lift)) RenderTransform = _lift;
     }
 
     internal void Step(double mediaMs, double nowMs, double durationMs, bool last, Tuning tuning,
@@ -130,8 +150,7 @@ internal sealed class MotionWordPresenter : Panel
         if (_letters is null)
         {
             // A previously sung word keeps the plugin's resting lift; future text remains stock.
-            var lift = word.Progress >= 1 ? Reach(tuning, background) : 0;
-            RenderTransform = lift > 0 ? new TranslateTransform(0, -lift) : null;
+            SetLift(word.Progress >= 1 ? Reach(tuning, background) : 0);
             return;
         }
         RenderTransform = null;

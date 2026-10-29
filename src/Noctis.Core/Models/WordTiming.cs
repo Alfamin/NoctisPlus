@@ -33,7 +33,8 @@ public partial class WordTiming : ObservableObject
     /// whitespace — a visible stall at the end of each word. Leading whitespace must
     /// stay so the overlay's glyphs keep lining up with the base layer.
     /// </summary>
-    public string SweepText => Text.TrimEnd();
+    public string SweepText => _sweepText ??= Text.TrimEnd();   // Text is set once; read every frame (owner #211)
+    private string? _sweepText;
 
     /// <summary>Word start time.</summary>
     public TimeSpan Start { get; init; }

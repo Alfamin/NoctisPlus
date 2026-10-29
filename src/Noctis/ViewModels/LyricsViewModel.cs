@@ -2851,6 +2851,19 @@ public partial class LyricsViewModel : ViewModelBase, IDisposable
             RefreshLyricsCredit();
             return;
         }
+        _ = SwapInOnlineTimingAsync(shown, probe, generation);
+    }
+
+    /// <summary>Owner #211: other lines than the ones on screen arrive behind the same fade as any lyrics load (they
+    /// jumped in without it).</summary>
+    private async Task SwapInOnlineTimingAsync(Track shown, LocalLyricsProbe probe, int generation)
+    {
+        if (LyricsSwapPending != null)
+        {
+            LyricsSwapPending.Invoke(this, EventArgs.Empty);
+            await Task.Delay(LyricsSwapFadeOutMs);
+            if (generation != _searchGeneration || !ReferenceEquals(_currentTrack, shown)) return;
+        }
         _timeline.Reset();
         IsSyncTabSelected = true;
         IsUnsyncTabSelected = false;
@@ -4029,7 +4042,8 @@ public partial class LyricsViewModel : ViewModelBase, IDisposable
         }
 
         var nowMs = System.Diagnostics.Stopwatch.GetTimestamp() * 1000.0 / System.Diagnostics.Stopwatch.Frequency;
-        var estimate = _clock.Sample(raw.TotalMilliseconds, nowMs) - _player.OutputLatency.TotalMilliseconds;
+        _clock.Rate = _player.PlaybackRate;   // owner #211: a song played faster or slower glides at its own pace
+        var estimate = _clock.Sample(raw.TotalMilliseconds, nowMs) - _player.OutputLatency.TotalMilliseconds * _clock.Rate;
         return TimeSpan.FromMilliseconds(Math.Max(0, estimate));
     }
 

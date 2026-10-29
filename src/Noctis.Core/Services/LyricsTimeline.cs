@@ -697,7 +697,7 @@ public sealed class LyricsTimeline
     }
 
     /// <summary>Visible characters the front crosses in a word (at least one).</summary>
-    private static int SweepLength(WordTiming w) => Math.Max(1, w.SweepText.Trim().Length);
+    private static int SweepLength(WordTiming w) => Math.Max(1, w.SweepText.AsSpan().Trim().Length);   // no string per frame
 
     /// <summary>
     /// The front's position inside word <paramref name="i"/>, 0..1: the elapsed fraction of
