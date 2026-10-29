@@ -187,7 +187,8 @@ internal sealed class TelegramAccount : ITelegramSignIn, IDisposable
             if (known is not null && known.Quality == quality.ToString())
             {
                 if (known.Problem is null) return false;
-                var silent = known.Problem.StartsWith("BOT_QUALITY_TIMEOUT", StringComparison.Ordinal);
+                // Owner #203: a "Join Channel / Refresh" answer saved before #190 kept Music Hunters last for a day.
+                var silent = known.Problem.StartsWith("BOT_QUALITY_TIMEOUT", StringComparison.Ordinal) || BotJoin.LooksLikeGate(known.Problem);
                 if (DateTimeOffset.UtcNow - known.At < (silent ? SilentRetry : ProblemRetry))
                     throw silent ? new TimeoutException(known.Problem) : new BotAnswerException(known.Problem);
             }
@@ -207,7 +208,7 @@ internal sealed class TelegramAccount : ITelegramSignIn, IDisposable
             {
                 // A menu Noctis could not follow waits a day; a bot or network that did not answer, ten minutes.
                 // Owner #190: a bot that asks for its channel first is checked again soon, and at once after Join.
-                var message = ex is SourceLimitException && ex.Message.Contains(BotJoin.Asks, StringComparison.Ordinal) ? "BOT_QUALITY_TIMEOUT: " + ex.Message
+                var message = ex is SourceLimitException && ex.Message.Contains(BotJoin.Asks, StringComparison.Ordinal) || BotJoin.LooksLikeGate(ex.Message) ? "BOT_QUALITY_TIMEOUT: " + ex.Message
                     : ex is BotAnswerException || ex.Message.StartsWith("BOT_QUALITY_", StringComparison.Ordinal) ? ex.Message
                     : ex is TimeoutException or RpcException or IOException or System.Net.Sockets.SocketException
                         ? "BOT_QUALITY_TIMEOUT: " + provider + " did not answer: " + ex.Message

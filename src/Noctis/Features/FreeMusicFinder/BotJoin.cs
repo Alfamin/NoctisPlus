@@ -24,6 +24,11 @@ internal static partial class BotJoin
     private static partial Regex AfterJoin();
     // What a bot says to the first message once its channel was joined (live 2026-10-28: "Thanks for joining! You can use
     // the bot now.", "Welcome to @DeezLoad2bot"). It answers no request.
+    /// <summary>Owner #203: text (a saved quality problem with its menu) that is a channel gate: join words plus a
+    /// refresh/check step. Such a problem is retried soon, like a bot that did not answer, never kept for a day.</summary>
+    internal static bool LooksLikeGate(string? text) =>
+        !string.IsNullOrEmpty(text) && (text.Contains(Asks, StringComparison.Ordinal) || JoinWords().IsMatch(text) && AfterJoin().IsMatch(text));
+
     [GeneratedRegex(@"thanks? (you )?for joining|you can (now )?use (the|this) bot|\A\W*welcome to\b", RegexOptions.IgnoreCase)]
     private static partial Regex Unlocked();
     [GeneratedRegex(@"(?:https?://)?(?:www\.)?(?:t|telegram)\.me/(\+[\w-]{6,}|joinchat/[\w-]{6,}|[A-Za-z]\w{3,31})", RegexOptions.IgnoreCase)]

@@ -18,6 +18,12 @@ internal static class BotJoinTests
     {
         Check.Section("Bots that ask for their channel first (#190)");
 
+        // Owner #203: word for word the problem TEST had kept since 2026-10-28 (Music Hunters last for a whole day).
+        Check.True(BotJoin.LooksLikeGate("BOT_QUALITY_UNVERIFIED: Music Hunters did not confirm FLAC. Its settings may have changed or this quality may be unavailable. No arbitrary option was selected; the other provider will be tried. Menu: \"📢 Join Channel\" (web page) | \"🔄 Refresh\""),
+            "a saved quality problem whose menu is Join Channel / Refresh is a channel gate (retried soon)");
+        Check.True(!BotJoin.LooksLikeGate("BOT_QUALITY_UNVERIFIED: Music Hunters did not confirm FLAC. Menu: \"MP3 320\" | \"FLAC\" | \"Back\""),
+            "a quality menu Noctis could not follow is not");
+
         // Word for word what both bots sent a new account (owner, 2026-10-28); the links are in their buttons.
         var hunters = Bot("🔒 Please join our channel to use this bot.\n\nJoin the channel below, then press 🔄 Refresh to continue.",
             Url("📢 Join channel", "https://t.me/HuntersNews"), Press("🔄 Refresh", [1, 2]));
