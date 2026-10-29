@@ -1,3 +1,5 @@
+using System.Globalization;
+using System.Text.RegularExpressions;
 using Noctis.Models;
 using System.Text.Json;
 using Noctis.Services.LyricsStudio;
@@ -132,5 +134,47 @@ internal sealed class OnlineTimingMisses
             File.Move(temp, _path, overwrite: true);
         }
         catch (Exception e) when (e is IOException or UnauthorizedAccessException) { }
+    }
+}
+
+/// <summary>
+/// The mark an online word timing carries inside its own .ttml (#200): which source it came from and the fit shift that
+/// was applied, as namespaced attributes on the root element. The credit travels with the file; TTML readers ignore
+/// foreign attributes; and only a marked .ttml is ever replaced by a later online timing.
+/// </summary>
+internal static class OnlineTimingSidecar
+{
+    public const string Namespace = "urn:noctisplus:online-timing";
+
+    static readonly Regex Root = new(@"<tt\b", RegexOptions.CultureInvariant);
+    static readonly Regex Source = new(@"\splus:source\s*=\s*""([^""]*)""", RegexOptions.CultureInvariant);
+
+    public static string Name(WordTimingSource source) => source switch
+    {
+        WordTimingSource.LrcRed => "lrc.red",
+        WordTimingSource.Unison => "Unison",
+        WordTimingSource.Kugou => "Kugou",
+        _ => "WordLyrics",
+    };
+
+    /// <summary>The document with the mark on its root; null when it has no &lt;tt&gt; root or is marked already.</summary>
+    public static string? Mark(string ttml, WordTimingSource source, double shift)
+    {
+        if (SourceOf(ttml) != null) return null;
+        var root = Root.Match(ttml);
+        if (!root.Success) return null;
+        var mark = $" xmlns:plus=\"{Namespace}\" plus:source=\"{Name(source)}\" plus:shift=\"{shift.ToString("0.00", CultureInfo.InvariantCulture)}\"";
+        return ttml.Insert(root.Index + root.Length, mark);
+    }
+
+    /// <summary>The source an online timing names, or null for any other TTML (the user's own, Lyrics Studio's).</summary>
+    public static WordTimingSource? SourceOf(string? ttml)
+    {
+        if (ttml == null || !ttml.Contains(Namespace, StringComparison.Ordinal)) return null;
+        var m = Source.Match(ttml);
+        if (!m.Success) return null;
+        foreach (var s in new[] { WordTimingSource.LrcRed, WordTimingSource.Unison, WordTimingSource.Kugou })
+            if (m.Groups[1].Value == Name(s)) return s;
+        return null;
     }
 }

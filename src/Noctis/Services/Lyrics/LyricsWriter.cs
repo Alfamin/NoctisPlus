@@ -267,6 +267,35 @@ public sealed class LyricsWriter
             QueueTagWrite(path, () => _metadata.WriteLyrics(path, null, null));
     }
 
+    /// <summary>
+    /// #200: an online word timing (<see cref="OnlineTimingSidecar.Mark"/>ed TTML) as the song's .ttml, and nothing
+    /// else: WordLyrics' .elrc, the .lrc and the tags stay as they are, so the song falls back to them when the .ttml
+    /// is ignored or removed. An existing .ttml is replaced only when it is an earlier online timing; the user's own
+    /// (Lyrics Studio, downloaded, any other) is kept, as is any song with a .lyricsfile (it out-ranks .ttml).
+    /// False when nothing was written (kept, unwritable, read-only).
+    /// </summary>
+    public bool WriteOnlineTiming(string audioPath, string markedTtml)
+    {
+        if (string.IsNullOrWhiteSpace(audioPath) || OnlineTimingSidecar.SourceOf(markedTtml) == null) return false;
+        if (SidecarsOnDisk(audioPath, ".lyricsfile").Count > 0) return false;
+        var existing = SidecarsOnDisk(audioPath, ".ttml");
+        var path = existing.FirstOrDefault() ?? Path.ChangeExtension(audioPath, ".ttml");
+        try
+        {
+            if (existing.Count > 1) return false;
+            if (existing.Count == 1 && OnlineTimingSidecar.SourceOf(File.ReadAllText(path)) == null) return false;
+            if (existing.Count == 1 && HoldsAlready(path, markedTtml)) return true;
+            File.WriteAllText(path, Normalize(markedTtml), new UTF8Encoding(false));
+            _registry.Add(path);
+            return true;
+        }
+        catch (Exception e) when (e is IOException or UnauthorizedAccessException)
+        {
+            DebugLogger.Warn(DebugLogger.Category.Lyrics, "Lyrics.OnlineTimingNotWritten", path);
+            return false;
+        }
+    }
+
     /// <summary>Writes one sidecar unless a foreign file sits there and we were not asked to replace it (trash first when we were).</summary>
     private void WriteSidecar(string sidecarPath, string content, bool replaceForeign, ref bool written, ref bool replaced, ref bool kept)
     {
