@@ -2,7 +2,10 @@ using Avalonia;
 using Avalonia.Automation;
 using Avalonia.Automation.Peers;
 using Avalonia.Controls;
+using Avalonia.Automation.Provider;
+using Avalonia.Headless;
 using Avalonia.Headless.XUnit;
+using Avalonia.Input;
 using Avalonia.LogicalTree;
 using Avalonia.Threading;
 using Avalonia.VisualTree;
@@ -559,6 +562,157 @@ public class AccessibleNamesTests
         var text = new Button { Content = "Play" };
         ToolTip.SetTip(text, "Play all songs in order");
         Assert.Equal("Play", NameOf(text));
+    }
+
+    /// <summary>A button whose content is a lone TextBlock read "Avalonia.Controls.TextBlock"
+    /// (Lyrics Studio's Back / Skip / Done and the lyrics page's Search lyrics, 10-13). It
+    /// reads the text, follows it, and an explicit name still wins.</summary>
+    [AvaloniaFact]
+    public void TextBlockContentNamesTheButton()
+    {
+        var label = new TextBlock { Text = "Search lyrics" };
+        var button = new Button { Content = label };
+        ToolTip.SetTip(button, "Opens the Search Lyrics dialog");
+        Assert.Equal("Search lyrics", NameOf(button));
+        label.Text = "Buscar letras";
+        Assert.Equal("Buscar letras", NameOf(button));
+        // No text (a description not loaded yet): the tooltip still names it.
+        label.Text = "";
+        Assert.Equal("Opens the Search Lyrics dialog", NameOf(button));
+        label.Text = "Search lyrics";
+        Assert.Equal("Search lyrics", NameOf(button));
+
+        button.Content = new PathIcon();
+        Assert.Equal("Opens the Search Lyrics dialog", NameOf(button));
+
+        var named = new Button { Content = new TextBlock { Text = "Done" } };
+        AutomationProperties.SetName(named, "Finish");
+        Assert.Equal("Finish", NameOf(named));
+    }
+
+    /// <summary>Every input an editor exposes: the button-like controls of
+    /// <see cref="Unnamed"/> plus text boxes, combo boxes, sliders and switches.</summary>
+    private static List<string> UnnamedInputs(IEnumerable<Control> controls)
+        => Unnamed(controls).Concat(controls
+                .Where(c => c is TextBox or ComboBox or Slider or Noctis.Controls.LottieToggle)
+                .Where(c => AutomationProperties.GetAccessibilityView(c) != AccessibilityView.Raw)
+                // A plain combo box's template keeps a hidden PART_EditableTextBox; never shown, never read.
+                .Where(c => c.TemplatedParent is null || c.IsVisible)
+                .Select(c => (Control: c, Name: NameOf(c)))
+                .Where(x => IsJunk(x.Name))
+                .Select(x => Describe(x.Control, x.Name)))
+            .ToList();
+
+    /// <summary>Edit Info (UIA on the live dialog, 10-13): the section list read
+    /// "Avalonia.Controls.ScrollViewer" / "Avalonia.Controls.DockPanel", Save read
+    /// "Avalonia.Controls.Panel", and every field was a nameless Edit next to its label.
+    /// Walks every section and requires each row, button and field to carry a real name.</summary>
+    /// <summary>The Edit Info dialog on one song with plain and synced lyrics, loaded.</summary>
+    private static async Task<(MetadataViewModel Vm, MetadataWindow Win)> OpenEditInfo()
+    {
+        AddToPlaylistDialogTests.EnsureAppStyles();
+        var track = Song("Head Like A Hole");
+        track.Lyrics = "No you can't take it";
+        track.SyncedLyrics = "[00:01.00]No you can't take it\n[00:03.50]No you can't take that away from me";
+        var lib = new FakeLibraryService();
+        lib.TrackList.Add(track);
+        var vm = new MetadataViewModel(track, new SearchPopupsShotsTests.OkTags(), lib, new TestPersistenceService(),
+            new FakeAnimatedCoverService(), metadataSearch: new MetadataSearchPanelTests.FakeSearch());
+        var win = new MetadataWindow(vm) { Width = 1100, Height = 820 };
+        win.Show();
+        var load = vm.InitializeAsync();
+        await PumpUntil(() => load.IsCompleted);
+        Pump(win);
+        return (vm, win);
+    }
+
+    [AvaloniaFact]
+    public async Task EditInfo_SectionsSaveAndEveryFieldAreNamed()
+    {
+        var (vm, win) = await OpenEditInfo();
+        try
+        {
+            vm.CustomTags.Add(new CustomTagItem { Key = "MOOD", Value = "Angry" });
+            Pump(win);
+
+            var tabs = win.FindControl<TabControl>("MetaTabControl")!;
+            var sections = tabs.Items.OfType<TabItem>().Where(t => t.IsVisible).ToList();
+            Assert.True(sections.Count >= 8, $"only {sections.Count} sections shown");
+            foreach (var section in sections)
+                Assert.Equal((string)section.Header!, NameOf(section));
+
+            var save = win.GetVisualDescendants().OfType<Button>().Single(b => b.Command == vm.SaveCommand);
+            Assert.Equal(Loc.T("Metadata.Save"), NameOf(save));
+
+            // Title, the first field on Details.
+            var title = win.GetLogicalDescendants().OfType<TextBox>()
+                .First(t => t.Text == "Head Like A Hole" && t.FindLogicalAncestorOfType<TabItem>() == sections[0]);
+            Assert.Equal(Loc.T("Metadata.Title"), NameOf(title));
+
+            // Every section's content, presented (templated parts such as the genre box's
+            // editable text box only exist while their section is shown).
+            var search = win.FindControl<Control>("SearchPanelView")!;
+            foreach (var section in sections)
+            {
+                tabs.SelectedItem = section;
+                Pump(win);
+                var controls = win.GetVisualDescendants().OfType<Control>()
+                    .Concat(win.GetLogicalDescendants().OfType<Control>())
+                    .Distinct()
+                    .Where(c => c != search && !c.GetLogicalAncestors().Contains(search))
+                    // The slider's own track halves (every Slider in the app; not this dialog's).
+                    .Where(c => c.TemplatedParent is not Slider)
+                    .ToList();
+                if (Equals(section.Header, Loc.T("Metadata.TimestampLyrics")))
+                    Assert.Contains(controls.OfType<TextBox>(), t => NameOf(t) == Loc.T("Metadata.TypeTimestampMmSsTip"));
+                var unnamed = UnnamedInputs(controls);
+                Assert.True(unnamed.Count == 0,
+                    $"{section.Header}: {unnamed.Count} unnamed:\n" + string.Join('\n', unnamed));
+            }
+        }
+        finally
+        {
+            win.Close();
+        }
+    }
+
+    /// <summary>Edit Info's rating took only a mouse click: the stars were not focusable,
+    /// ignored keys and gave UI Automation no name and no value to read or set.</summary>
+    [AvaloniaFact]
+    public async Task EditInfo_RatingIsSetByKeyboardAndAutomation()
+    {
+        var (vm, win) = await OpenEditInfo();
+        try
+        {
+            var stars = win.GetLogicalDescendants().OfType<Noctis.Controls.RatingStars>().Distinct().Single();
+            Assert.Equal(Loc.T("Metadata.Rating"), NameOf(stars));
+            Assert.Equal(0, vm.Rating);
+
+            Assert.True(stars.Focus(NavigationMethod.Tab), "the rating takes no keyboard focus");
+            Pump(win);
+            win.KeyPressQwerty(PhysicalKey.ArrowRight, RawInputModifiers.None);
+            win.KeyPressQwerty(PhysicalKey.ArrowRight, RawInputModifiers.None);
+            win.KeyPressQwerty(PhysicalKey.ArrowRight, RawInputModifiers.None);
+            Assert.Equal(3, vm.Rating);
+            win.KeyPressQwerty(PhysicalKey.ArrowLeft, RawInputModifiers.None);
+            Assert.Equal(2, vm.Rating);
+            win.KeyPressQwerty(PhysicalKey.End, RawInputModifiers.None);
+            Assert.Equal(5, vm.Rating);
+            win.KeyPressQwerty(PhysicalKey.Home, RawInputModifiers.None);
+            Assert.Equal(0, vm.Rating);
+
+            var range = Assert.IsAssignableFrom<IRangeValueProvider>(ControlAutomationPeer.CreatePeerForElement(stars));
+            Assert.False(range.IsReadOnly);
+            Assert.Equal(0, range.Minimum);
+            Assert.Equal(5, range.Maximum);
+            range.SetValue(4);
+            Assert.Equal(4, vm.Rating);
+            Assert.Equal(4, range.Value);
+        }
+        finally
+        {
+            win.Close();
+        }
     }
 
     [Fact]

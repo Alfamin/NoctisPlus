@@ -306,7 +306,7 @@
                                                 Command="{Binding ToggleQueueCommand}">
                                             <Panel>
                                                 <Border Classes="wash" />
-                                                <PathIcon Data="{DynamicResource PhList}" />
+                                                <PathIcon Data="{DynamicResource PhQueue}" />
                                             </Panel>
                                         </Button>
                                         <Button Grid.Column="1" Name="QueueRepeatButton" Classes="icon" Classes.on="{Binding Player.IsRepeatOn}"

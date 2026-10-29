@@ -55,4 +55,23 @@ public class DiscordArtworkKeyTests
             incomingUrl: "   ", identity: "a", lastKey: null, lastIdentity: null);
         Assert.Null(key);
     }
+
+    [Fact]
+    public void Truncate_NeverSplitsAnEmojiInHalf()
+    {
+        // A 130-char title whose emoji straddles the 125-char cut: the old cut kept only the
+        // emoji's high surrogate, which UTF-8 can't encode and Discord shows as U+FFFD.
+        var title = new string('a', 124) + "\U0001F600" + "tail";
+        var cut = DiscordPresenceService.Truncate(title, 128);
+
+        Assert.True(cut.Length <= 128);
+        Assert.EndsWith("...", cut);
+        Assert.Equal(new string('a', 124) + "...", cut);
+        Assert.Equal(cut, System.Text.Encoding.UTF8.GetString(System.Text.Encoding.UTF8.GetBytes(cut)));
+
+        // Emoji wholly inside the kept part survive; short titles are untouched.
+        var fits = new string('a', 123) + "\U0001F600" + "tail";
+        Assert.Equal(new string('a', 123) + "\U0001F600...", DiscordPresenceService.Truncate(fits, 128));
+        Assert.Equal("\U0001F600 Song", DiscordPresenceService.Truncate("\U0001F600 Song", 128));
+    }
 }

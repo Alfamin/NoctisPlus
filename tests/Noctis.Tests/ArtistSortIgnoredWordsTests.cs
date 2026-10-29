@@ -186,7 +186,7 @@ public class ArtistSortIgnoredWordsTests : IDisposable
         new PersistenceService(_root), new FakeLibraryService(), new NoOpPlayHistoryService());
 
     [Fact]
-    public void FreshInstall_IsOffWithJustThe()
+    public void FreshInstall_IsOnWithJustThe()
     {
         var fresh = new AppSettings();
         Assert.False(fresh.IgnoreLeadingWordsInArtistSort);
@@ -199,6 +199,8 @@ public class ArtistSortIgnoredWordsTests : IDisposable
         var vm = CreateSettings();
         await vm.LoadAsync();
         Assert.Equal(The, vm.ArtistSortIgnoredWords);
+        // Plus keeps this opt-in; the saved list remains available while off.
+        Assert.False(vm.IgnoreLeadingWordsInArtistSort);
         Assert.Empty(vm.ActiveArtistSortIgnoredWords);
 
         var raised = 0;

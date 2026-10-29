@@ -60,7 +60,7 @@ public sealed class SendToFolderMoveTests : IDisposable
         var library = new LibraryService(new MetadataService(), persistence,
             new SqliteLibraryIndexService(persistence), new FolderMetadataBackfillTests.FakeAuditTrail());
         await library.ScanAsync(new[] { _music });
-        Assert.Equal(2, library.Tracks.Count);
+        if (library.Tracks.Count != 2) Assert.Fail(ScanMissReport.Describe(library, _music));
         return library;
     }
 
@@ -147,6 +147,9 @@ public sealed class SendToFolderMoveTests : IDisposable
         var library = new LibraryService(new MetadataService(), persistence,
             new SqliteLibraryIndexService(persistence), new FolderMetadataBackfillTests.FakeAuditTrail());
         await library.LoadAsync();
+        // A fresh profile's schema backfill re-reads every song in the background; under a
+        // loaded test run it could still hold First.mp3 when the move ran (Copied 0, 10-17).
+        await library.BackgroundInit;
         var track = ByTitle(library, "First");
         Assert.Equal(oddId, track.Id);
 

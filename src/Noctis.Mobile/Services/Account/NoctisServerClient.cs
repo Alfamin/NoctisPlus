@@ -165,16 +165,22 @@ internal sealed partial class NoctisServerClient : IDisposable
             using var response = await http.GetAsync($"{baseUrl}/rest/ping.view?f=json&c={ClientName}&v={ApiVersion}",
                 HttpCompletionOption.ResponseContentRead, timeout.Token).ConfigureAwait(false);
             var body = await response.Content.ReadAsStringAsync(timeout.Token).ConfigureAwait(false);
-            if (!response.IsSuccessStatusCode) throw Log(new NoctisServerException(NoctisErrorKind.Server, "The server did not answer like a Noctis server."), "probe", (int)response.StatusCode);
+            if (!response.IsSuccessStatusCode) throw Log(NotNoctis(), "probe", (int)response.StatusCode);
             ParseEnvelope(body, signingIn: false);
+        }
+        catch (NoctisServerException ex) when (ex.Kind == NoctisErrorKind.Server)
+        {
+            // Whatever answered is not a Noctis server: the page says check the address and
+            // port, not "try again in a moment".
+            throw Log(NotNoctis(), "probe", 0);
         }
         catch (OperationCanceledException) when (!ct.IsCancellationRequested)
         {
             throw Log(Unreachable(), "probe", 0);
         }
-        catch (HttpRequestException)
+        catch (HttpRequestException ex)
         {
-            throw Log(Unreachable(), "probe", 0);
+            throw Log(ConnectFailure(ex), "probe", 0);
         }
         if (!baseUrl.StartsWith("https://", StringComparison.Ordinal)) return string.Empty;
         return seen ?? throw Log(new NoctisServerException(NoctisErrorKind.Server, "The server presented no certificate."), "probe", 0);
@@ -194,7 +200,7 @@ internal sealed partial class NoctisServerClient : IDisposable
         };
         var r = await PostFormAsync("noctisSignIn", form, signingIn: true, withKey: false, ct).ConfigureAwait(false);
         if (!r.TryGetProperty("noctisSignIn", out var s) || s.ValueKind != JsonValueKind.Object)
-            throw new NoctisServerException(NoctisErrorKind.Server, "This desktop's Noctis is too old to sign in phones. Update it.");
+            throw new NoctisServerException(NoctisErrorKind.Outdated, "This desktop's Noctis is too old to sign in phones. Update it.");
         var key = Str(s, "apiKey");
         if (string.IsNullOrWhiteSpace(key) || key.Length > 256 || key.Any(c => c < 0x21 || c > 0x7E))
             throw new NoctisServerException(NoctisErrorKind.Server, "The server sent an unusable device key.");
@@ -766,6 +772,32 @@ internal sealed partial class NoctisServerClient : IDisposable
 
     private static NoctisServerException Unreachable() =>
         new(NoctisErrorKind.Unreachable, "Can't reach the desktop. Check that it is on, Noctis Server is running, and both are on the same network.");
+
+    private static NoctisServerException NotNoctis() =>
+        new(NoctisErrorKind.NotNoctis, "Something answered at that address, but not a Noctis server.");
+
+    /// <summary>First contact failed before any answer: a name that does not resolve, a TLS
+    /// handshake that failed (the port speaks plain http, or not https at all), else unreachable.
+    /// Read from the exception chain by kind and type name: SocketsHttpHandler sets
+    /// HttpRequestError, Android's handler wraps Java's UnknownHostException / SSLException.</summary>
+    internal static NoctisServerException ConnectFailure(HttpRequestException ex)
+    {
+        if (ex.HttpRequestError == HttpRequestError.NameResolutionError) return UnknownHost();
+        if (ex.HttpRequestError == HttpRequestError.SecureConnectionError) return NotNoctis();
+        for (Exception? e = ex.InnerException; e != null; e = e.InnerException)
+        {
+            if (e is System.Net.Sockets.SocketException { SocketErrorCode: System.Net.Sockets.SocketError.HostNotFound or System.Net.Sockets.SocketError.NoData }
+                || e.GetType().Name.Contains("UnknownHost", StringComparison.Ordinal))
+                return UnknownHost();
+            if (e is System.Security.Authentication.AuthenticationException
+                || e.GetType().Name.Contains("SSL", StringComparison.OrdinalIgnoreCase))
+                return NotNoctis();
+        }
+        return Unreachable();
+    }
+
+    private static NoctisServerException UnknownHost() =>
+        new(NoctisErrorKind.UnknownHost, "No computer answers to that name.");
 
     /// <summary>Kind and status only: messages from HttpClient can carry the URL.</summary>
     private static NoctisServerException Log(NoctisServerException ex, string what, int status)

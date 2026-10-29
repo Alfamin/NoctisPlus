@@ -176,35 +176,47 @@ public sealed class DeezerArtistPhotos
         }
     }
 
+    /// <summary>A download's outcome: the photo's bytes, or null. <see cref="NoPhoto"/> is true
+    /// when Deezer answered with its "no photo" silhouette: the artist has no photo, which is
+    /// an answer (unlike a refusal or a failure).</summary>
+    public sealed record ImageDownload(byte[]? Bytes, bool NoPhoto);
+
     /// <summary>
     /// The photo's bytes, or null when the server refuses, answers with something other than an
-    /// image, or the body fails the magic-byte check. A 1800 px URL that is refused is retried
-    /// at Deezer's 1000 px original. Network errors and cancellation propagate.
+    /// image, the body fails the magic-byte check, or it is Deezer's silhouette. A 1800 px URL
+    /// that is refused is retried at Deezer's 1000 px original. Network errors and cancellation
+    /// propagate.
     /// </summary>
-    public async Task<byte[]?> DownloadImageAsync(string imageUrl, CancellationToken ct = default)
+    public async Task<ImageDownload> DownloadImageAsync(string imageUrl, CancellationToken ct = default)
     {
-        var bytes = await DownloadImageOnceAsync(imageUrl, ct).ConfigureAwait(false);
-        // Should Deezer ever refuse the large size, the 1000px original still exists.
-        if (bytes == null && imageUrl.Contains("/1800x1800-", StringComparison.Ordinal))
-            bytes = await DownloadImageOnceAsync(imageUrl.Replace("/1800x1800-", "/1000x1000-", StringComparison.Ordinal), ct).ConfigureAwait(false);
-        return bytes;
+        var download = await DownloadImageOnceAsync(imageUrl, ct).ConfigureAwait(false);
+        // Should Deezer ever refuse the large size, the 1000px original still exists. The
+        // silhouette is not retried: a hash Deezer lacks is redirected at every size (10-12).
+        if (download.Bytes == null && !download.NoPhoto && imageUrl.Contains("/1800x1800-", StringComparison.Ordinal))
+            download = await DownloadImageOnceAsync(imageUrl.Replace("/1800x1800-", "/1000x1000-", StringComparison.Ordinal), ct).ConfigureAwait(false);
+        return download;
     }
 
-    private async Task<byte[]?> DownloadImageOnceAsync(string imageUrl, CancellationToken token)
+    private async Task<ImageDownload> DownloadImageOnceAsync(string imageUrl, CancellationToken token)
     {
         using var request = new HttpRequestMessage(HttpMethod.Get, imageUrl);
         using var response = await _http
             .SendAsync(request, HttpCompletionOption.ResponseHeadersRead, token).ConfigureAwait(false);
         if (!response.IsSuccessStatusCode ||
             response.Content.Headers.ContentType?.MediaType?.StartsWith("image/", StringComparison.OrdinalIgnoreCase) != true)
-            return null;
+            return new(null, false);
+        // A followed redirect leaves the final URL on the request.
+        if (IsPlaceholderUrl((response.RequestMessage ?? request).RequestUri?.AbsoluteUri ?? ""))
+            return new(null, true);
 
         var imageData = await HttpSafety
             .ReadBytesBoundedAsync(response.Content, HttpSafety.MaxImageBytes, token).ConfigureAwait(false);
         // Magic-byte check: an error/HTML page must never be cached as artwork.
         if (imageData.Length == 0 || !HttpSafety.LooksLikeImage(imageData))
-            return null;
-        return imageData;
+            return new(null, false);
+        if (IsNoPhotoImage(imageData))
+            return new(null, true);
+        return new(imageData, false);
     }
 
     /// <summary>Deezer serves the same photo at any square size up to 1800px; the search
@@ -319,8 +331,50 @@ public sealed class DeezerArtistPhotos
         return null;
     }
 
-    /// <summary>Deezer's "no photo" artists carry an empty image hash ("/artist//").</summary>
+    /// <summary>The image hash of Deezer's grey "no photo" silhouette: the MD5 of an empty
+    /// string. The CDN redirects a photo hash it lacks there (302, same size), so the API's own
+    /// URL looks like any photo (measured 10-12: "Xavier Mayne", "Yesir" and six more; the API
+    /// response has no field that tells).</summary>
+    public const string NoPhotoHash = "d41d8cd98f00b204e9800998ecf8427e";
+
+    /// <summary>Deezer's "no photo" artists carry an empty image hash ("/artist//"), or the
+    /// silhouette's <see cref="NoPhotoHash"/> once the CDN redirected there.</summary>
     public static bool IsPlaceholderUrl(string url)
         => url.Contains("/artist//", StringComparison.Ordinal)
-           || url.Contains("/images/artist//", StringComparison.Ordinal);
+           || url.Contains("/images/artist//", StringComparison.Ordinal)
+           || url.Contains("/images/artist/" + NoPhotoHash + "/", StringComparison.Ordinal);
+
+    /// <summary>The silhouette as the CDN served it on 10-12, at the sizes Noctis downloads:
+    /// length and MD5. Recognising it by its bytes is the fallback: a photo cached before this
+    /// check kept only the URL it was asked for (no hint), and a client whose handler does not
+    /// report the redirect's target still gets these bytes.</summary>
+    private static readonly (long Length, string Md5)[] NoPhotoImages =
+    {
+        (44_631, "BFD8A5BF261AB328BA9D72EB34B4FAC0"),   // asked at 1800 px (served at 1200)
+        (32_022, "CF0B6A5247E606F67470140451774CB5"),   // 1000 px
+    };
+
+    /// <summary>True when the bytes are Deezer's silhouette (hashed only at its exact lengths).</summary>
+    public static bool IsNoPhotoImage(ReadOnlySpan<byte> image)
+    {
+        foreach (var (length, md5) in NoPhotoImages)
+            if (image.Length == length)
+                return Convert.ToHexString(System.Security.Cryptography.MD5.HashData(image)) == md5;
+        return false;
+    }
+
+    /// <summary><see cref="IsNoPhotoImage"/> for a cached file: only a file of the silhouette's
+    /// exact length is read. False when the file cannot be read.</summary>
+    public static bool IsNoPhotoFile(string path)
+    {
+        try
+        {
+            var length = new FileInfo(path).Length;
+            return NoPhotoImages.Any(i => i.Length == length) && IsNoPhotoImage(File.ReadAllBytes(path));
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            return false;
+        }
+    }
 }

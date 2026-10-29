@@ -146,6 +146,7 @@ public class AlbumPageTintStrengthTests : IDisposable
     {
         var vm = CreateSettings();
         await vm.LoadAsync();
+        // Plus retains its shipped off default; the toggle opens the slider.
         Assert.False(vm.AlbumPageTintEnabled);
         vm.SelectedSettingsTab = SettingsViewModel.TabAppearance;
         var view = new SettingsView { DataContext = vm };
@@ -158,7 +159,9 @@ public class AlbumPageTintStrengthTests : IDisposable
             Assert.NotNull(slider);
             Assert.Equal(0, slider.Minimum);
             Assert.Equal(100, slider.Maximum);
-            Assert.True(slider.IsSnapToTickEnabled);
+            // Whole percents for the setting, a gliding thumb (10-12).
+            Assert.Equal(1, Assert.IsType<Noctis.Controls.SmoothSlider>(slider).Step);
+            Assert.False(slider.IsSnapToTickEnabled);
             var fold = slider.GetLogicalAncestors().OfType<CollapsibleContent>().First();
             Assert.False(fold.IsOpen);
 

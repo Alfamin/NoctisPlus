@@ -25,7 +25,13 @@ public sealed class DiscordPresenceService : IDiscordPresenceService
     private const int ClearFlushDelayMs = 250;
 
     private readonly SemaphoreSlim _gate = new(1, 1);
+    private readonly Func<DiscordRpcClient> _createClient;
     private DiscordRpcClient? _client;
+
+    public DiscordPresenceService() : this(() => new DiscordRpcClient(ApplicationId)) { }
+
+    /// <summary>Tests hand in a client over a fake pipe to read the frames Discord would get.</summary>
+    internal DiscordPresenceService(Func<DiscordRpcClient> createClient) => _createClient = createClient;
 
     // Monotonic stamp for presence mutations (updates and clears). SemaphoreSlim
     // wakes waiters in no particular order, so when tracks are skipped rapidly an
@@ -109,13 +115,13 @@ public sealed class DiscordPresenceService : IDiscordPresenceService
             // Tear down stale client if it exists
             DisposeClient();
 
-            var client = new DiscordRpcClient(ApplicationId)
-            {
-                SkipIdenticalPresence = true,
-            };
+            var client = _createClient();
+            client.SkipIdenticalPresence = true;
 
+            // Discord answers a SET_ACTIVITY it refuses with an error and keeps showing the
+            // previous activity, so this is the only sign an update never took effect.
             client.OnError += (_, e) =>
-                Debug.WriteLine($"[Discord] RPC error: {e.Message}");
+                DebugLog.Write("Discord", $"Discord refused the update: ({e.Code}) {e.Message}");
 
             client.OnConnectionFailed += (_, _) =>
                 Debug.WriteLine("[Discord] Connection failed — Discord may not be running.");
@@ -217,7 +223,7 @@ public sealed class DiscordPresenceService : IDiscordPresenceService
             var presence = new RichPresence
             {
                 Type = ActivityType.Listening,
-                StatusDisplay = StatusDisplayType.State,
+                StatusDisplay = MapStatusDisplay(track.StatusDisplay),
                 Details = Truncate(title, 128),
                 State = Truncate(artist, 128),
                 // Only the artwork URL goes in here. Every asset *name* this used to send
@@ -245,7 +251,14 @@ public sealed class DiscordPresenceService : IDiscordPresenceService
                 };
             }
 
-            _client!.SetPresence(presence);
+            // SkipIdenticalPresence compares every field except StatusDisplay, so a change of
+            // the status line alone (Settings while paused: no timestamps to differ) was
+            // dropped and the member list kept the old line until the next song.
+            var client = _client!;
+            var forceSend = StatusDisplayChanged(client.CurrentPresence, presence);
+            if (forceSend) client.SkipIdenticalPresence = false;
+            try { client.SetPresence(presence); }
+            finally { if (forceSend) client.SkipIdenticalPresence = true; }
         }
         catch (Exception ex)
         {
@@ -327,13 +340,24 @@ public sealed class DiscordPresenceService : IDiscordPresenceService
         => $"{title}{artist}{album}";
 
     /// <summary>
-    /// Chooses the Discord <c>LargeImageKey</c>. Prefers a fresh artwork URL; if none is
-    /// available (relay transiently down) it reuses the last good key for the SAME track so
-    /// Discord keeps showing the already-cached cover instead of losing it. Returns null
-    /// for a track we have no art for at all, which omits the image from the payload —
-    /// the application has no uploaded art assets to fall back on, so naming one only
-    /// produced a broken-image placeholder.
+    /// Which presence field Discord's one-line status shows after "Listening to": State
+    /// carries the artist, Details the title, and Name the application's name.
     /// </summary>
+    internal static StatusDisplayType MapStatusDisplay(DiscordStatusDisplay display) => display switch
+    {
+        DiscordStatusDisplay.Title => StatusDisplayType.Details,
+        DiscordStatusDisplay.AppName => StatusDisplayType.Name,
+        _ => StatusDisplayType.State,
+    };
+
+    /// <summary>
+    /// True when <paramref name="next"/> differs from the last sent presence in its status
+    /// line. The library's identical-presence check ignores that field, so such an update
+    /// must be sent with the check off or it never reaches Discord.
+    /// </summary>
+    internal static bool StatusDisplayChanged(RichPresence? current, RichPresence next)
+        => current != null && current.StatusDisplay != next.StatusDisplay;
+
     /// <summary>
     /// The large image's hover text, which Discord's "Listening to" card renders as the
     /// third line under the artist. Album by default; with "Show album" off the line is
@@ -347,6 +371,14 @@ public sealed class DiscordPresenceService : IDiscordPresenceService
         return Truncate(!string.IsNullOrWhiteSpace(album) ? album : artist, 128);
     }
 
+    /// <summary>
+    /// Chooses the Discord <c>LargeImageKey</c>. Prefers a fresh artwork URL; if none is
+    /// available (relay transiently down) it reuses the last good key for the SAME track so
+    /// Discord keeps showing the already-cached cover instead of losing it. Returns null
+    /// for a track we have no art for at all, which omits the image from the payload —
+    /// the application has no uploaded art assets to fall back on, so naming one only
+    /// produced a broken-image placeholder.
+    /// </summary>
     public static string? ResolveArtworkKey(string? incomingUrl, string identity, string? lastKey, string? lastIdentity)
     {
         if (!string.IsNullOrWhiteSpace(incomingUrl)) return incomingUrl;
@@ -357,12 +389,21 @@ public sealed class DiscordPresenceService : IDiscordPresenceService
     /// <summary>
     /// Truncates a string to fit Discord's field limits (max 128 chars)
     /// and pads to meet the minimum 2-character requirement.
-    /// Discord silently drops the entire presence update when any text field is 1 char.
+    /// Discord rejects the entire SET_ACTIVITY (error 4000, "length must be at least 2
+    /// characters long") when any text field is 1 char.
     /// </summary>
-    private static string Truncate(string? value, int maxLength)
+    internal static string Truncate(string? value, int maxLength)
     {
+        // DiscordRPC trims every field before sending, so measure what it will send: a tag
+        // like "A " passed the length check here, went out as "A" and Discord refused the
+        // whole update, leaving the previous song on the card.
+        value = value?.Trim();
         if (string.IsNullOrEmpty(value)) return string.Empty;
-        var result = value.Length <= maxLength ? value : value[..(maxLength - 3)] + "...";
+        var cut = maxLength - 3;
+        // Never split an emoji (or any surrogate pair) in half: the lone high surrogate is
+        // not valid UTF-8 and reaches Discord as U+FFFD, a "?" box before the "...".
+        if (value.Length > maxLength && char.IsHighSurrogate(value[cut - 1])) cut--;
+        var result = value.Length <= maxLength ? value : value[..cut] + "...";
         // Discord requires all text fields to be at least 2 characters.
         // Single-char names (e.g. album "?") cause the entire SetPresence call to fail silently.
         if (result.Length == 1)

@@ -63,6 +63,50 @@ public partial class WordTiming : ObservableObject
     /// </summary>
     public double HeldDurationMs { get; set; }
 
+    /// <summary>True for the last word of its line (or layer). AMLL gives that word a
+    /// stronger, longer held-note swell. Set by <see cref="LyricLine"/>.</summary>
+    public bool IsLastInLine { get; set; }
+
+    /// <summary>
+    /// True when a rest (or the line start) comes before this word, so the sweep's soft
+    /// edge must enter from fully dark at the word's start instead of already straddling
+    /// it from the previous word. Set by <see cref="LyricLine"/>.
+    /// </summary>
+    public bool SweepLeadIn { get; set; }
+
+    /// <summary>
+    /// True when a rest (or the line end) follows this word, so the soft edge must have
+    /// fully crossed the word by its end time — nothing would carry it on afterwards,
+    /// and the line deactivating snapped the half-lit last letter to lit. Set by
+    /// <see cref="LyricLine"/>.
+    /// </summary>
+    public bool SweepTrailOut { get; set; }
+
+    /// <summary>
+    /// Time since the word started (ms) while its held-note letter animation is in
+    /// flight (<see cref="EmphasisMotion"/>), NaN at rest. Driven per frame by
+    /// <see cref="LyricsTimeline"/> for <see cref="IsEmphasis"/> words only.
+    /// </summary>
+    [ObservableProperty]
+    private double _emphasisMs = double.NaN;
+
+    /// <summary>
+    /// How far the word has floated up as it is sung (<see cref="WordFloat"/>): 0 at rest,
+    /// 1 at the full lift. Driven per frame by <see cref="LyricsTimeline"/> while the word
+    /// rises and while its line settles back; 0 on lines that are not word-synced.
+    /// </summary>
+    [ObservableProperty]
+    private double _lift;
+
+    /// <summary>Letters the held-note animation staggers across (text elements of the
+    /// visible word) — shared by the timeline's window and the renderer.</summary>
+    public int EmphasisCharCount =>
+        _emphasisCharCount ??= new System.Globalization.StringInfo(Text.Trim()).LengthInTextElements;
+    private int? _emphasisCharCount;
+
+    /// <summary>Held-note animation strength for this word (AMLL params).</summary>
+    public EmphasisParams EmphasisParams => EmphasisMotion.For(HeldDurationMs, IsLastInLine);
+
     /// <summary>True once the playhead has advanced past this word.</summary>
     [ObservableProperty]
     private bool _isPast;
@@ -72,8 +116,9 @@ public partial class WordTiming : ObservableObject
     private bool _isCurrent;
 
     /// <summary>
-    /// Reveal progress driving the AMLL-style left-to-right colour sweep. Runs
-    /// slightly past [0..1] on the words neighbouring the current one, so the
+    /// Reveal progress driving the AMLL-style left-to-right colour sweep: where the
+    /// line's one sweep front is, through this word (0..1). On the words neighbouring
+    /// the current one it runs past [0..1] (the same front measured from them), so the
     /// feathered edge can straddle token boundaries; words out of the band's reach
     /// rest at <see cref="KaraokeSweep.InertFuture"/> / <see cref="KaraokeSweep.InertPast"/>.
     /// </summary>

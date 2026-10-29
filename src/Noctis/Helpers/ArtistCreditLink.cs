@@ -141,18 +141,25 @@ public static class ArtistCreditLink
         var fill = presenter.TryFindResource(resourceKey, presenter.ActualThemeVariant, out var res) && res is IBrush b
             ? b
             : new SolidColorBrush(Color.FromArgb(0x15, 0xFF, 0xFF, 0xFF));
-        var radius = presenter.CornerRadius.TopLeft;
+        presenter.Background = NameBoxBrush(size, rect, fill, presenter.CornerRadius.TopLeft);
+    }
+
+    /// <summary>A background for a control of <paramref name="size"/> that fills only
+    /// <paramref name="box"/> (in that control's coordinates) — the per-name hover box. Also
+    /// painted by the player island's artist line, on the marquee run itself.</summary>
+    internal static IBrush NameBoxBrush(Size size, Rect box, IBrush fill, double radius)
+    {
         var full = new Rect(size);
-        presenter.Background = new DrawingBrush
+        return new DrawingBrush
         {
-            // The transparent full-size rect pins the drawing's bounds to the presenter, so with
+            // The transparent full-size rect pins the drawing's bounds to the control, so with
             // Stretch None the name box lands at its own coordinates.
             Drawing = new DrawingGroup
             {
                 Children =
                 {
                     new GeometryDrawing { Brush = Brushes.Transparent, Geometry = new RectangleGeometry(full) },
-                    new GeometryDrawing { Brush = fill, Geometry = new RectangleGeometry(rect) { RadiusX = radius, RadiusY = radius } },
+                    new GeometryDrawing { Brush = fill, Geometry = new RectangleGeometry(box) { RadiusX = radius, RadiusY = radius } },
                 },
             },
             Stretch = Stretch.None,
@@ -174,11 +181,26 @@ public static class ArtistCreditLink
         var text = button.GetVisualDescendants().OfType<TextBlock>().FirstOrDefault();
         if (text == null) return null;
         var credit = text is HighlightTextBlock h ? h.DisplayText : text.Text;
-        var spans = ArtistCreditSpans.Locate(credit);
-        if (spans.Count == 0) return null;
 
         var p = button.TranslatePoint(buttonPoint, text);
-        if (p is not { } local || local.X < 0 || local.Y < 0 || local.X > text.Bounds.Width || local.Y > text.Bounds.Height)
+        if (p is not { } local || NameExtentAt(text, credit, local) is not { } hit) return null;
+        if (hit.Right - hit.Left < 1) return null;
+        var topLeft = text.TranslatePoint(new Point(hit.Left, 0), presenter);
+        if (topLeft is not { } tl) return null;
+        return new Rect(tl.X, 0, hit.Right - hit.Left, presenter.Bounds.Height);
+    }
+
+    /// <summary>The credited name of <paramref name="credit"/> under <paramref name="local"/>
+    /// (in <paramref name="text"/> coordinates) and its left/right edges in the same
+    /// coordinates, clamped to the visible text — a trimmed credit's hidden tail is zero wide
+    /// ("Bonobo, Jor…"). Null on a separator or outside the text; a single-name credit
+    /// resolves to that name anywhere on the text.</summary>
+    internal static (ArtistCreditSpans.Span Span, double Left, double Right)? NameExtentAt(
+        TextBlock text, string? credit, Point local)
+    {
+        var spans = ArtistCreditSpans.Locate(credit);
+        if (spans.Count == 0) return null;
+        if (local.X < 0 || local.Y < 0 || local.X > text.Bounds.Width || local.Y > text.Bounds.Height)
             return null;
         var index = text.TextLayout.HitTestPoint(local).TextPosition;
         ArtistCreditSpans.Span? hit = spans.Count == 1 ? spans[0] : null;
@@ -188,13 +210,9 @@ public static class ArtistCreditLink
         }
         if (hit is not { } s) return null;
 
-        // Clamp to the visible text: a trimmed credit's hidden tail has no box ("Bonobo, Jor…").
         var left = Math.Clamp(text.TextLayout.HitTestTextPosition(s.Start).X, 0, text.Bounds.Width);
         var right = Math.Clamp(text.TextLayout.HitTestTextPosition(s.Start + s.Length).X, 0, text.Bounds.Width);
-        if (right - left < 1) return null;
-        var topLeft = text.TranslatePoint(new Point(left, 0), presenter);
-        if (topLeft is not { } tl) return null;
-        return new Rect(tl.X, 0, right - left, presenter.Bounds.Height);
+        return (s, left, right);
     }
 
     private static void OnClick(object? sender, RoutedEventArgs e)

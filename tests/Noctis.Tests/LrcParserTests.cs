@@ -23,6 +23,21 @@ public class LrcParserTests
     }
 
     [Fact]
+    public void Parse_Offset_ShiftsSyllablesWithTheirWord()
+    {
+        // A word sung in two timed syllables keeps them under an [offset:], shifted like the
+        // word itself; dropping them made the sweep cross the word at one even pace.
+        var lines = LrcParser.Parse("[offset:+100]\n[00:01.00]<00:01.00>tal<00:01.50>king <00:02.00>now<00:03.00>");
+
+        var word = lines[0].Words![0];
+        Assert.Equal("talking ", word.Text);
+        Assert.Equal(
+            new[] { (TimeSpan.FromSeconds(1.1), (TimeSpan?)TimeSpan.FromSeconds(1.6)), (TimeSpan.FromSeconds(1.6), (TimeSpan?)TimeSpan.FromSeconds(2.1)) },
+            word.Syllables!.Select(s => (s.Start, s.End)));
+        Assert.Equal(new[] { 3, 4 }, word.Syllables!.Select(s => s.Length));
+    }
+
+    [Fact]
     public void DesktopForwarder_ReturnsTheSameLines()
     {
         const string lrc = "[00:01.00]a\n[00:02.00]b";

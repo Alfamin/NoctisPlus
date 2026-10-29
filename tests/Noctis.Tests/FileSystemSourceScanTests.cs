@@ -64,6 +64,7 @@ public class FileSystemSourceScanTests : IDisposable
     {
         var (library, _) = MakeLibrary(new LocalFileSystemSource());
         await library.ScanAsync(new[] { Path.Combine(_root, "music") });
+        if (library.Tracks.Count != 2) Assert.Fail(ScanMissReport.Describe(library, _music));
         Assert.Equal(new[] { "First", "Second" }, library.Tracks.Select(t => t.Title).OrderBy(t => t));
         Assert.All(library.Tracks, t => Assert.True(File.Exists(t.FilePath)));
     }
@@ -112,6 +113,39 @@ public class FileSystemSourceScanTests : IDisposable
         Assert.Equal(before.Id, after.Id);
         Assert.Equal("fake://tree/music/01 - First.mp3", after.FilePath);
         Assert.Equal(7, after.PlayCount);
+    }
+
+    /// <summary>
+    /// A phone library scanned before the ALAC atom was read from the stream stored its ALAC
+    /// files with no bit depth (emulator-5560, 10-14: "48 kHz ALAC" on a 24-bit file). The next
+    /// scan reads such a file once more, unchanged or not, keeping its user state; the others
+    /// stay on the fast path, and the scan after that reads nothing.
+    /// </summary>
+    [Fact]
+    public async Task PathlessAlac_StoredWithoutABitDepth_IsReadAgainOnce()
+    {
+        File.Copy(Path.Combine(AppContext.BaseDirectory, "Fixtures", "Audio", "alac_96k_tiny.m4a"), Path.Combine(_music, "03 - Alac.m4a"));
+        var source = new StreamOnlySource(_music);
+        var (library, _) = MakeLibrary(source);
+        await library.ScanAsync(new[] { "fake://tree/music" }, TestContext.Current.CancellationToken);
+        Assert.Equal(3, source.Opened);
+        var alac = library.Tracks.Single(t => t.FilePath.EndsWith(".m4a", StringComparison.Ordinal));
+        Assert.Equal(24, alac.BitsPerSample);
+
+        // As the old scan stored it.
+        alac.BitsPerSample = 0;
+        alac.SampleRate = 48000;
+        alac.PlayCount = 5;
+        await library.ScanAsync(new[] { "fake://tree/music" }, TestContext.Current.CancellationToken);
+        Assert.Equal(4, source.Opened);                  // the ALAC alone
+        var after = library.Tracks.Single(t => t.Id == alac.Id);
+        Assert.Equal(24, after.BitsPerSample);
+        Assert.Equal(96000, after.SampleRate);
+        Assert.True(after.IsHiResLossless);
+        Assert.Equal(5, after.PlayCount);
+
+        await library.ScanAsync(new[] { "fake://tree/music" }, TestContext.Current.CancellationToken);
+        Assert.Equal(4, source.Opened);
     }
 
     [Fact]

@@ -20,10 +20,13 @@ public sealed partial class ReviewWord : ObservableObject
 
     public ReviewLine Line { get; }
 
-    [ObservableProperty] private string _text;
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(AccessibleName))]
+    private string _text;
 
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(TimeText))]
+    [NotifyPropertyChangedFor(nameof(AccessibleName))]
     private TimeSpan _start;
 
     /// <summary>Set by tap-to-time; cleared by a re-sync.</summary>
@@ -35,8 +38,14 @@ public sealed partial class ReviewWord : ObservableObject
     /// <summary>The word tap mode is waiting for.</summary>
     [ObservableProperty] private bool _isTapTarget;
 
+    /// <summary>The source wrote no space after this word (<see cref="AlignedWord.JoinsNext"/>:
+    /// CJK characters, punctuation timed on its own). The row still shows one, for editing.</summary>
+    internal bool JoinsNext { get; init; }
+
     public TimeSpan End => Line.EndOf(this);
     public string TimeText => TimedLyricsBuilder.FormatTimestamp(Start);
+    /// <summary>The chip's screen-reader name, "word, 00:05.10": its content is a panel, which UIA read as its type name.</summary>
+    public string AccessibleName => $"{Text}, {TimeText}";
 
     partial void OnTextChanged(string value) => Line.WordTextEdited();
 }
@@ -66,6 +75,8 @@ public sealed partial class ReviewLine : ObservableObject
         Confidence = line.Confidence;
         Interpolated = line.Interpolated;
         Companions = line.Companions;
+        Background = line.Background;
+        Voice = line.Voice;
         // An interpolated line's words are the aligner's even spread, not heard times.
         HasWordTimings = line.Words.Count > 0 && !line.Interpolated;
         var start = line.Start;
@@ -75,7 +86,7 @@ public sealed partial class ReviewLine : ObservableObject
         if (line.Words.Count > 0)
         {
             foreach (var w in line.Words)
-                Words.Add(new ReviewWord(this, w.Text, w.Start));
+                Words.Add(new ReviewWord(this, w.Text, w.Start) { JoinsNext = w.JoinsNext });
             End = line.Words[^1].End > line.Words[^1].Start ? line.Words[^1].End : end;
         }
         else
@@ -101,6 +112,12 @@ public sealed partial class ReviewLine : ObservableObject
     /// <summary>The source line's romaji / translation (GitHub #116): not timed here, written back at its start.</summary>
     public IReadOnlyList<string>? Companions { get; }
 
+    /// <summary>The source line's background vocal: not timed here, it moves with the line (<see cref="Shift"/>) and is written back under it.</summary>
+    public IReadOnlyList<AlignedWord>? Background { get; private set; }
+
+    /// <summary>The source line's duet voice ("v2:"/"v3:"), written back with it.</summary>
+    public Noctis.Models.LyricVoice Voice { get; }
+
     public bool IsLow => Interpolated || Confidence < 0.5;
 
     /// <summary>True when the words carry real (heard, nudged or tapped) times rather than an even spread.</summary>
@@ -108,6 +125,9 @@ public sealed partial class ReviewLine : ObservableObject
 
     /// <summary>Word strip open under the line.</summary>
     [ObservableProperty] private bool _isExpanded;
+
+    /// <summary>The line the nudge bar acts on (its time pill, a word or its text was clicked).</summary>
+    [ObservableProperty] private bool _isSelected;
 
     /// <summary>ELRC chosen in the Studio toolbar: the row shows, and edits, the line as ELRC will save it.</summary>
     [ObservableProperty] private bool _showWordTags;
@@ -313,6 +333,11 @@ public sealed partial class ReviewLine : ObservableObject
         }
         foreach (var w in Words) w.Start += delta;
         End += delta;
+        if (Background is { } background)
+            Background = background.Select(w => w with
+            {
+                Start = TimeSpan.FromTicks(Math.Max(0, (w.Start + delta).Ticks)), End = TimeSpan.FromTicks(Math.Max(0, (w.End + delta).Ticks)),
+            }).ToList();
         SnapshotBaseline();
         RaiseTimes();
         Changed?.Invoke();
@@ -323,6 +348,35 @@ public sealed partial class ReviewLine : ObservableObject
     /// word). Marks the line as word-timed. Returns the time actually applied.
     /// </summary>
     public TimeSpan NudgeWord(ReviewWord word, TimeSpan delta) => SetWordStart(word, word.Start + delta);
+
+    /// <summary>
+    /// One step of the review's nudge bar or its , and . keys: the line (<paramref name="word"/>
+    /// null) or one of its words, by the <see cref="TimingNudge"/> rules. A word nudge marks the
+    /// line word-timed, as the other word edits do; a line nudge leaves that as it was. False
+    /// when nothing could move.
+    /// </summary>
+    public bool Nudge(ReviewWord? word, NudgeEdge edge, TimeSpan delta, TimeSpan? previousStart, TimeSpan? nextStart, TimeSpan duration)
+    {
+        var index = word is null ? -1 : Words.IndexOf(word);
+        if (word is not null && index < 0) return false;
+        var before = new NudgeLine(Words.Select(w => w.Start).ToList(), End);
+        var after = TimingNudge.Apply(before, index, edge, delta, previousStart, nextStart, duration, spread: index < 0 && !HasWordTimings);
+        if (ReferenceEquals(after, before)) return false;
+        for (var i = 0; i < Words.Count; i++) Words[i].Start = after.WordStarts[i];
+        End = after.End;
+        // A whole line takes its background vocal along, as Shift does.
+        var moved = after.WordStarts[0] - before.WordStarts[0];
+        if (index < 0 && edge == NudgeEdge.Whole && Background is { } background)
+            Background = background.Select(w => w with
+            {
+                Start = TimeSpan.FromTicks(Math.Max(0, (w.Start + moved).Ticks)), End = TimeSpan.FromTicks(Math.Max(0, (w.End + moved).Ticks)),
+            }).ToList();
+        if (index >= 0) HasWordTimings = true;
+        SnapshotBaseline();
+        RaiseTimes();
+        Changed?.Invoke();
+        return true;
+    }
 
     /// <summary>Tap-to-time: stamps a time on one word with the same clamping as a nudge.</summary>
     public TimeSpan SetWordStart(ReviewWord word, TimeSpan time, bool tapped = false)
@@ -398,13 +452,15 @@ public sealed partial class ReviewLine : ObservableObject
     /// <summary>Words are exported only when they carry real times; a spread line exports as line-level.</summary>
     public AlignedLine ToAlignedLine()
     {
-        var text = JoinWords();
+        // As the source wrote it: no space after a word that joins the next, or a CJK line
+        // timed a character at a time was saved as "偶 尔".
+        var text = JoinWordsAsSaved();
         var end = End > Start ? End : Start;
         IReadOnlyList<AlignedWord> words = HasWordTimings
-            ? Words.Select(w => new AlignedWord(w.Text, w.Start, w.End)).ToList()
+            ? Words.Select(w => new AlignedWord(w.Text, w.Start, w.End) { JoinsNext = w.JoinsNext }).ToList()
             : Array.Empty<AlignedWord>();
         // A line the user timed by hand is no longer a guess: keep its words on the next rebuild.
-        return new AlignedLine(text, Start, end, words, Confidence, Interpolated && !HasWordTimings) { Companions = Companions };
+        return new AlignedLine(text, Start, end, words, Confidence, Interpolated && !HasWordTimings) { Companions = Companions, Background = Background, Voice = Voice };
     }
 
     // ── Helpers ───────────────────────────────────────────────────────────────
@@ -413,6 +469,21 @@ public sealed partial class ReviewLine : ObservableObject
         (text ?? string.Empty).Split(' ', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
 
     private string JoinWords() => string.Join(' ', Words.Select(w => w.Text).Where(t => t.Length > 0));
+
+    /// <summary><see cref="JoinWords"/> without the space after a word that joins the next.</summary>
+    private string JoinWordsAsSaved()
+    {
+        var text = new System.Text.StringBuilder();
+        ReviewWord? before = null;
+        foreach (var w in Words)
+        {
+            if (w.Text.Length == 0) continue;
+            if (before is { JoinsNext: false }) text.Append(' ');
+            text.Append(w.Text);
+            before = w;
+        }
+        return text.ToString();
+    }
 
     private void SnapshotBaseline() => _baseline = Words.Select(w => (w.Text, w.Start)).ToList();
 

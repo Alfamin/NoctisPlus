@@ -173,8 +173,13 @@ public sealed class DeezerArtistPhotoSource : IArtistPhotoSource
                 return null;
             }
             // The phone never draws a portrait wider than its screen: Deezer's 1000 px original.
-            var bytes = await _deezer.DownloadImageAsync(DeezerArtistPhotos.OriginalSize(match.ImageUrl), timeout.Token).ConfigureAwait(false);
-            if (bytes == null) return null;
+            var download = await _deezer.DownloadImageAsync(DeezerArtistPhotos.OriginalSize(match.ImageUrl), timeout.Token).ConfigureAwait(false);
+            if (download.Bytes is not { } bytes)
+            {
+                // Deezer's "no photo" silhouette: an answer, so remembered like a miss.
+                if (download.NoPhoto) RecordMiss(key);
+                return null;
+            }
             return await SaveAsync(key, bytes, timeout.Token).ConfigureAwait(false);
         }
         catch (OperationCanceledException) when (!token.IsCancellationRequested)
@@ -283,6 +288,8 @@ public sealed class DeezerArtistPhotoSource : IArtistPhotoSource
                     var name = Path.GetFileNameWithoutExtension(file);
                     switch (Path.GetExtension(file))
                     {
+                        // One saved before downloads recognised Deezer's silhouette is dropped.
+                        case ".jpg" when DeezerArtistPhotos.IsNoPhotoFile(file): TryDelete(file); break;
                         case ".jpg": photos.Add(name); break;
                         case ".miss": misses[name] = File.GetLastWriteTimeUtc(file); break;
                     }

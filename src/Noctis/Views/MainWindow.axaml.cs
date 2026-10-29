@@ -170,6 +170,17 @@ public partial class MainWindow : Window, IPageKeyOverlayHost
     private DockPanel? _rootPanel;
     private Border? _settingsOverlay;
     private Controls.BlurredBackdrop? _settingsScrim;
+
+    /// <summary>
+    /// Whether a Settings property change repaints the app under the open sheet, so the
+    /// scrim's blurred snapshot of it is retaken. Progress streams (scan, downloads) change
+    /// nothing visible under the blur. Background Blur changes only the blur itself: the scrim
+    /// re-blurs the snapshot it holds (BackdropSnapshot.BlurRadiusChanged), and a full retake
+    /// per drag step on top of that made the slider stutter (owner 10-18).
+    /// </summary>
+    internal static bool SettingChangeRepaintsUnderSheet(string? propertyName) =>
+        RepaintsAppUnderSettings(propertyName)
+        && propertyName is not (nameof(SettingsViewModel.BackgroundBlurAmount) or nameof(SettingsViewModel.BackgroundBlurLabel));
     /// <summary>Bumped on every Settings open/close, so a reveal still waiting for the
     /// backdrop snapshot knows when it has been overtaken.</summary>
     private int _settingsSheetEpoch;
@@ -196,6 +207,21 @@ public partial class MainWindow : Window, IPageKeyOverlayHost
         }
 
         if (DataContext is not MainWindowViewModel vm) return;
+
+        // macOS: Hide() below on a native-fullscreen window leaves its Space up and empty — a
+        // black screen with no menu bar or Dock, only the mini player floating on it. Leave
+        // fullscreen first and come back here once the exit transition is over; the main
+        // window re-enters fullscreen when the mini player closes (OnMiniPlayerClosed).
+        if (OperatingSystem.IsMacOS() && WindowState == WindowState.FullScreen)
+        {
+            _restoreFullScreenAfterMini = true;
+            LeaveMacFullScreenThen(() =>
+            {
+                if (_miniPlayer == null) ToggleMiniPlayer();
+            });
+            return;
+        }
+        if (_leavingMacFullScreen) return; // a second press during the exit transition
 
         var miniVm = vm.CreateMiniPlayerViewModel();
         _miniPlayer = new MiniPlayerWindow { DataContext = miniVm };
@@ -274,6 +300,52 @@ public partial class MainWindow : Window, IPageKeyOverlayHost
         if (WindowState == WindowState.Minimized)
             WindowState = WindowState.Normal;
         Activate();
+
+        // Opened from fullscreen on macOS (see ToggleMiniPlayer): go back to it, as the
+        // Windows build does when Show() restores a hidden fullscreen window.
+        if (_restoreFullScreenAfterMini)
+        {
+            _restoreFullScreenAfterMini = false;
+            Dispatcher.UIThread.Post(() =>
+            {
+                if (_miniPlayer == null && IsVisible && WindowState != WindowState.FullScreen)
+                    ToggleFullScreen();
+            }, DispatcherPriority.Background);
+        }
+    }
+
+    /// <summary>Set when the mini player was opened from macOS fullscreen.</summary>
+    private bool _restoreFullScreenAfterMini;
+
+    /// <summary>True while <see cref="LeaveMacFullScreenThen"/> waits out the exit transition.</summary>
+    private bool _leavingMacFullScreen;
+
+    /// <summary>Long enough for AppKit's exit-fullscreen transition (measured: an orderOut
+    /// 300 ms after the request was dropped, 700 ms landed, on an M-series MacBook).</summary>
+    private const int MacFullScreenExitMs = 1000;
+
+    /// <summary>
+    /// macOS only: a native-fullscreen window has its own Space, and hiding it leaves that
+    /// Space on screen, empty and black, with no menu bar or Dock. This leaves fullscreen and
+    /// runs <paramref name="then"/> after the transition. An orderOut sent DURING the transition
+    /// is dropped: the window stays on screen while Avalonia reports it hidden. Anywhere else,
+    /// or when not fullscreen, <paramref name="then"/> runs right away.
+    /// </summary>
+    private void LeaveMacFullScreenThen(Action then)
+    {
+        if (!OperatingSystem.IsMacOS() || WindowState != WindowState.FullScreen)
+        {
+            then();
+            return;
+        }
+        if (_leavingMacFullScreen) return;
+        _leavingMacFullScreen = true;
+        ToggleFullScreen();
+        DispatcherTimer.RunOnce(() =>
+        {
+            _leavingMacFullScreen = false;
+            then();
+        }, TimeSpan.FromMilliseconds(MacFullScreenExitMs));
     }
 
     // Parameterless overload kept for the XAML previewer/designer; the app always
@@ -484,6 +556,25 @@ public partial class MainWindow : Window, IPageKeyOverlayHost
         if (opacity is { } o) _settingsScrim.Opacity = o;
     }
 
+    /// <summary>
+    /// Whether a Settings property change can repaint the app under the sheet, so the scrim's
+    /// snapshot is retaken (RefreshSoon). Not the sheet's own state (owner 10-18): moving
+    /// between tabs, typing in its search box, and the status / progress / log lines changed
+    /// nothing under it, yet each retook the snapshot, and with lyrics moving under it the
+    /// frozen background jumped forward at every click or keystroke.
+    /// </summary>
+    internal static bool RepaintsAppUnderSettings(string? propertyName) =>
+        propertyName is not { Length: > 0 } name // "everything changed" (a reset, a load)
+        || !name.EndsWith("Progress", StringComparison.Ordinal)
+        && !name.EndsWith("Status", StringComparison.Ordinal)
+        && !name.EndsWith("StatusText", StringComparison.Ordinal)
+        && !name.EndsWith("StatusIsError", StringComparison.Ordinal)
+        && !(name.StartsWith("Is", StringComparison.Ordinal)
+             && (name.EndsWith("TabSelected", StringComparison.Ordinal) || name.EndsWith("TabVisible", StringComparison.Ordinal)))
+        && name is not (nameof(SettingsViewModel.SelectedSettingsTab) or nameof(SettingsViewModel.SelectedTabTitle)
+            or nameof(SettingsViewModel.SelectedTabDescription) or nameof(SettingsViewModel.SearchQuery)
+            or nameof(SettingsViewModel.DevLogText) or nameof(SettingsViewModel.DevLogsCopied));
+
     /// <summary>Reads a theme surface color from Application resources for the active
     /// theme variant; theme overlays (built-in and custom) win over the base palette.</summary>
     private static Color ResolveThemeColor(string key, Color fallback)
@@ -545,11 +636,12 @@ public partial class MainWindow : Window, IPageKeyOverlayHost
                 // A setting changed from the open sheet (theme, Liquid Glass, accent,
                 // language…) repaints the app under it: retake the blurred backdrop right
                 // after that renders, so it keeps up with the sheet (owner 10-09). No-op while
-                // Settings is closed (no snapshot up). Progress streams (scan, downloads)
-                // change nothing visible under the blur.
+                // Settings is closed (no snapshot up), and with the live blur (Liquid Glass
+                // off) there is no snapshot to retake. Only for what can repaint the app:
+                // see RepaintsAppUnderSettings.
                 _settingsBackdropRefreshHandler = (_, e) =>
                 {
-                    if (e.PropertyName?.EndsWith("Progress", StringComparison.Ordinal) != true)
+                    if (SettingChangeRepaintsUnderSheet(e.PropertyName))
                         _settingsScrim?.RefreshSoon();
                 };
                 vm.Settings.PropertyChanged += _settingsBackdropRefreshHandler;
@@ -1088,6 +1180,22 @@ public partial class MainWindow : Window, IPageKeyOverlayHost
             var windowMenu = new NativeMenu();
             windowMenu.Items.Add(new NativeMenuItem("Playback") { Menu = playback });
             NativeMenu.SetMenu(this, windowMenu);
+
+            // Dock icon menu: the macOS counterpart of the Windows taskbar thumbnail buttons
+            // (InitializeTaskbarButtons) — Previous, Play/Pause, Next, Favorite.
+            var dock = new NativeMenu();
+            void AddDockItem(string header, Action run)
+            {
+                var item = new NativeMenuItem(header);
+                item.Click += (_, _) => run();
+                dock.Items.Add(item);
+            }
+            AddDockItem("Play / Pause", () => vm.Player.PlayPauseCommand.Execute(null));
+            AddDockItem("Next Track", () => vm.Player.NextCommand.Execute(null));
+            AddDockItem("Previous Track", () => vm.Player.PreviousCommand.Execute(null));
+            dock.Items.Add(new NativeMenuItemSeparator());
+            AddDockItem("Favorite", () => vm.Player.ToggleCurrentTrackFavoriteCommand.Execute(null));
+            NativeDock.SetMenu(Application.Current!, dock);
         }
         catch (Exception ex)
         {
@@ -1266,7 +1374,8 @@ public partial class MainWindow : Window, IPageKeyOverlayHost
             // graceful shutdown (OS shutdown while in tray), so snapshot the
             // queue now for next launch's restore.
             vm.Player.SaveQueueStateInBackground();
-            Hide();
+            // macOS fullscreen: hiding in place leaves a black, empty Space (see helper).
+            LeaveMacFullScreenThen(Hide);
             return;
         }
 
@@ -1460,6 +1569,8 @@ public partial class MainWindow : Window, IPageKeyOverlayHost
             if (handle == null) return;
 
             _taskbar = new TaskbarIntegrationService();
+            // Before Initialize, so the first add already honours the setting (no flash).
+            _taskbar.SetButtonsVisible(vm.Settings.TaskbarMediaControlsEnabled);
             _taskbar.Initialize(handle.Handle);
 
             // Wire button clicks to player commands (dispatched to UI thread)
@@ -1517,11 +1628,14 @@ public partial class MainWindow : Window, IPageKeyOverlayHost
             RebindCurrentTrack();
 
             // Taskbar progress (GitHub #53) follows its Settings toggle live: switching
-            // it off must clear the overlay, not leave the last frame painted.
+            // it off must clear the overlay, not leave the last frame painted. The
+            // thumbnail buttons follow theirs the same way.
             vm.Settings.PropertyChanged += (_, e) =>
             {
                 if (e.PropertyName == nameof(SettingsViewModel.TaskbarProgressEnabled))
                     UpdateTaskbarProgress(vm);
+                else if (e.PropertyName == nameof(SettingsViewModel.TaskbarMediaControlsEnabled))
+                    _taskbar?.SetButtonsVisible(vm.Settings.TaskbarMediaControlsEnabled);
             };
             UpdateTaskbarProgress(vm);
         }
@@ -2212,11 +2326,11 @@ public partial class MainWindow : Window, IPageKeyOverlayHost
             if (selection.Count == 0) return;
             selection.Clear();
         }
-        else if (e.Key == Key.A && e.KeyModifiers == KeyModifiers.Control)
+        else if (e.Key == Key.A && e.KeyModifiers == PlatformHelper.PrimaryModifier)
         {
             selection.SelectAll();
         }
-        else if (e.Key == Key.Delete && e.KeyModifiers == KeyModifiers.None)
+        else if (PlatformHelper.IsDeleteKey(e.Key) && e.KeyModifiers == KeyModifiers.None)
         {
             if (selection.Count == 0) return;
             vm.Player.RemoveQueueRows(selection.Snapshot());
@@ -2302,7 +2416,7 @@ public partial class MainWindow : Window, IPageKeyOverlayHost
             && _queueSelection is { } selection
             && QueueRowIndex(listBox, rowControl) is var row and >= 0)
         {
-            var ctrl = e.KeyModifiers.HasFlag(KeyModifiers.Control);
+            var ctrl = e.KeyModifiers.HasFlag(PlatformHelper.PrimaryModifier);
             var shift = e.KeyModifiers.HasFlag(KeyModifiers.Shift);
             if (shift) selection.SelectRangeTo(row, additive: ctrl);
             else if (ctrl) selection.Toggle(row);
@@ -2591,7 +2705,7 @@ public partial class MainWindow : Window, IPageKeyOverlayHost
 
         var onRow = (e.Source as Visual)?.GetSelfAndVisualAncestors()
             .Any(v => v is Border b && b.Classes.Contains("queue-row")) == true;
-        var modifiers = e.KeyModifiers & (KeyModifiers.Control | KeyModifiers.Shift);
+        var modifiers = e.KeyModifiers & (PlatformHelper.PrimaryModifier | KeyModifiers.Shift);
         if (onRow && modifiers == KeyModifiers.None) return;
 
         var pos = e.GetPosition(listBox);

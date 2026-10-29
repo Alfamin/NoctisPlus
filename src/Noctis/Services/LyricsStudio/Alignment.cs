@@ -7,7 +7,15 @@ namespace Noctis.Services.LyricsStudio;
 public sealed record RecognizedWord(string Text, TimeSpan Start, TimeSpan End, float Probability);
 
 /// <summary>A lyric word with the time it is sung.</summary>
-public sealed record AlignedWord(string Text, TimeSpan Start, TimeSpan End);
+public sealed record AlignedWord(string Text, TimeSpan Start, TimeSpan End)
+{
+    /// <summary>
+    /// The next word follows with no space between, as the source file wrote it: CJK lyrics,
+    /// timed a character at a time, or punctuation timed on its own ("Hey" + ","). False for
+    /// words of text split on spaces. The writers put no space after such a word.
+    /// </summary>
+    public bool JoinsNext { get; init; }
+}
 
 /// <summary>
 /// One lyric line placed on the timeline. <see cref="Confidence"/> is the share of the
@@ -27,6 +35,18 @@ public sealed record AlignedLine(
     /// (GitHub #116). Not sung, so never aligned; written back at the line's start. Null when none.
     /// </summary>
     public IReadOnlyList<string>? Companions { get; init; }
+
+    /// <summary>
+    /// The source line's background vocal (an ELRC "[bg: …]" line under it, a TTML x-bg span).
+    /// Not aligned; it moves with the line and is written back under it. Null when none.
+    /// </summary>
+    public IReadOnlyList<AlignedWord>? Background { get; init; }
+
+    /// <summary>
+    /// The duet voice the source line carried (ELRC "v2:"/"v3:"), written back as a TTML agent.
+    /// <see cref="Noctis.Models.LyricVoice.Default"/> for plain lines and for timed text.
+    /// </summary>
+    public Noctis.Models.LyricVoice Voice { get; init; }
 }
 
 /// <summary>

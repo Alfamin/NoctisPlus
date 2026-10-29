@@ -91,6 +91,18 @@ public partial class LyricsStudioPanel : UserControl
         else if (e.Key == Key.Escape) e.Handled = line.RevertRowText();
     }
 
+    /// <summary>Typing in a row picks its line for the nudge bar (a word of it stays picked).</summary>
+    private void OnLineEditGotFocus(object? sender, FocusChangedEventArgs e)
+    {
+        if (sender is TextBox { DataContext: ReviewLine line } && DataContext is LyricsStudioViewModel vm) vm.SelectLine(line);
+    }
+
+    /// <summary>A click on a row's own space (not its pill, text or chips, which handle it) picks the line.</summary>
+    private void OnReviewRowPointerPressed(object? sender, PointerPressedEventArgs e)
+    {
+        if (sender is Border { DataContext: ReviewLine line } && DataContext is LyricsStudioViewModel vm) vm.SelectLine(line);
+    }
+
     /// <summary>Leaving a row applies its typing; a refused edit shows the line again, marked with why.</summary>
     private void OnLineEditLostFocus(object? sender, RoutedEventArgs e)
     {
@@ -128,10 +140,88 @@ public partial class LyricsStudioPanel : UserControl
             if (DataContext is LyricsStudioViewModel { PickLyricsFile: null } studio)
                 studio.PickLyricsFile = PickLyricsFileAsync;
             WireLyricsPagePreview();
-            if (this.IsAttachedToVisualTree()) WatchModel();
+            if (this.IsAttachedToVisualTree()) { WatchModel(); WatchLivePreview(); }
         };
-        AttachedToVisualTree += (_, _) => { WireLyricsPagePreview(); HookKeys(); WatchModel(); };
-        DetachedFromVisualTree += (_, _) => { UnhookKeys(); UnwatchModel(); };
+        AttachedToVisualTree += (_, _) => { WireLyricsPagePreview(); HookKeys(); WatchModel(); WatchLivePreview(); };
+        DetachedFromVisualTree += (_, _) => { UnhookKeys(); UnwatchModel(); _liveWatch?.SuspendLivePreview(); UnwatchLivePreview(); };
+    }
+
+    // ── Live preview pane (10-14) ──
+    // The pane shows the review through the app's lyrics view model, in a second copy of the
+    // lyrics side panel's view. The panel wires it (the view model never holds the window) and
+    // follows the player while on screen, so the pane knows when the song under review plays.
+
+    /// <summary>The lyrics the pane renders; null = the main window's (tests set their own).</summary>
+    internal LyricsViewModel? PreviewLyrics { get; set; }
+
+    private LyricsStudioViewModel? _liveWatch;
+    private PlayerViewModel? _livePlayer;
+    private LyricsViewModel? _liveLyrics;
+
+    /// <summary>The app's lyrics: the main window's, or for the per-song dialog its owner's.</summary>
+    private LyricsViewModel? ResolveLyrics()
+    {
+        if (PreviewLyrics is { } own) return own;
+        var top = TopLevel.GetTopLevel(this) as Window;
+        if (top?.DataContext is MainWindowViewModel main) return main.Lyrics;
+        return top?.Owner is Window { DataContext: MainWindowViewModel owner } ? owner.Lyrics : null;
+    }
+
+    private void WatchLivePreview()
+    {
+        UnwatchLivePreview();
+        if (DataContext is not LyricsStudioViewModel vm || ResolveLyrics() is not { } lyrics) return;
+        _liveWatch = vm;
+        _liveLyrics = lyrics;
+        if (vm.UpdateLivePreview is null)
+        {
+            vm.ClearLivePreview = lyrics.ClearPreview;
+            vm.UpdateLivePreview = lyrics.UpdatePreview;
+        }
+        vm.PropertyChanged += OnStudioPropertyChanged;
+        _livePlayer = lyrics.Player;
+        _livePlayer.PropertyChanged += OnLivePlayerPropertyChanged;
+        SyncLivePreviewView();
+        vm.ResumeLivePreview();
+    }
+
+    private void UnwatchLivePreview()
+    {
+        if (_liveWatch is not null) _liveWatch.PropertyChanged -= OnStudioPropertyChanged;
+        if (_livePlayer is not null) _livePlayer.PropertyChanged -= OnLivePlayerPropertyChanged;
+        _liveWatch = null;
+        _livePlayer = null;
+    }
+
+    private void OnStudioPropertyChanged(object? sender, System.ComponentModel.PropertyChangedEventArgs e)
+    {
+        if (e.PropertyName == nameof(LyricsStudioViewModel.IsLivePreviewOpen)) SyncLivePreviewView();
+    }
+
+    private void OnLivePlayerPropertyChanged(object? sender, System.ComponentModel.PropertyChangedEventArgs e)
+    {
+        if (e.PropertyName is nameof(PlayerViewModel.CurrentTrack) or nameof(PlayerViewModel.IsPlayingMusicVideoAudio))
+            _liveWatch?.RefreshLivePreview();
+    }
+
+    /// <summary>
+    /// Builds the pane's lyrics view the first time it opens (its karaoke layout is not built for a
+    /// Studio that never shows it), and keeps it counted as a lyrics surface only while open:
+    /// hiding does not detach it (the side panel's own SetShown reason).
+    /// </summary>
+    private void SyncLivePreviewView()
+    {
+        if (_liveWatch is not { } vm || _liveLyrics is not { } lyrics) return;
+        var open = vm.IsLivePreviewOpen;
+        if (LivePreviewHost.Content is not LyricsPanelView view)
+        {
+            if (!open) return;
+            view = new LyricsPanelView { DataContext = lyrics };
+            view.SetCloseAction(() => { if (DataContext is LyricsStudioViewModel studio) studio.ShowLivePreview = false; },
+                Noctis.Localization.Loc.T("LyricsStudio.HidePreview"));
+            LivePreviewHost.Content = view;
+        }
+        view.SetShown(open);
     }
 
     // The model banner follows the shared model manager while the panel is on screen: a download
@@ -184,9 +274,25 @@ public partial class LyricsStudioPanel : UserControl
         if (!IsEffectivelyVisible || DataContext is not LyricsStudioViewModel m) return;
         if (e.Source is TextBox) return;
         // [ and ] shift every line 0.1 s (the "Shift all lines" buttons), outside text boxes.
+        // Every Studio key leaves typing alone; Ctrl+, (Settings) and Alt/Shift+arrows (back, seek) are not used.
         if (m.HasReview && e.KeyModifiers == KeyModifiers.None && e.Key is Key.OemOpenBrackets or Key.OemCloseBrackets)
         {
             (e.Key == Key.OemOpenBrackets ? m.NudgeEarlierCommand : m.NudgeLaterCommand).Execute(null);
+            e.Handled = true;
+            return;
+        }
+        // , and . nudge the selected line or word 10 ms (Shift: 100 ms); / plays from just before it.
+        if (m is { HasReview: true, HasNudgeTarget: true } && e.Key is Key.OemComma or Key.OemPeriod
+            && e.KeyModifiers is KeyModifiers.None or KeyModifiers.Shift)
+        {
+            var ms = e.KeyModifiers == KeyModifiers.Shift ? 100 : 10;
+            m.NudgeSelectionBy(System.TimeSpan.FromMilliseconds(e.Key == Key.OemComma ? -ms : ms));
+            e.Handled = true;
+            return;
+        }
+        if (m is { HasReview: true, HasNudgeTarget: true } && e.Key == Key.OemQuestion && e.KeyModifiers == KeyModifiers.None)
+        {
+            m.AuditionCommand.Execute(null);
             e.Handled = true;
             return;
         }

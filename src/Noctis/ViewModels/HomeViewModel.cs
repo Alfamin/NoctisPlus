@@ -225,7 +225,7 @@ public partial class HomeViewModel : ViewModelBase, IDisposable
     /// <summary>Owner #183: a friend streamed two songs on an empty library and Continue listening / Last Played drew
     /// under the centred welcome card. Once something was played the card sits below those rows instead.</summary>
     private bool HasPlays => ContinueTrack is not null || LastPlayedRows.Count > 0;
-    public bool ShowWelcomeCentered => ShowWelcome && !HasPlays;
+    public bool ShowWelcomeCentered => ShowWelcome && !HasPlays && !ShowLibraryScanning;
     public bool ShowWelcomeInline => ShowWelcome && HasPlays;
     public string WelcomeTitle => Loc.T(IsLibraryEmpty ? "Home.WelcomeTitle" : "Home.ReadyTitle");
     public string WelcomeLine => Loc.T(IsLibraryEmpty ? "Home.WelcomeLine" : "Home.ReadyLine");
@@ -275,6 +275,70 @@ public partial class HomeViewModel : ViewModelBase, IDisposable
     /// <summary>Exposes the sidebar's playlists for the Add to Playlist submenu.</summary>
     public ObservableCollection<Playlist> Playlists => _sidebar.Playlists;
 
+    // ── Empty library (10-17) ──
+    //
+    // A brand-new profile opened on a blank Home: no rows, no hint, no way forward. Home now
+    // says the library is empty and offers Settings' own Add Folder flow; while the scan that
+    // follows has found nothing yet it says so instead.
+
+    /// <summary>No songs anywhere (hidden folders and the Inbox included) and no scan running.</summary>
+    [ObservableProperty] private bool _showEmptyLibrary;
+
+    /// <summary>No songs yet, and a library scan is running (the first one after Add Folder).</summary>
+    [ObservableProperty, NotifyPropertyChangedFor(nameof(ShowWelcomeCentered))] private bool _showLibraryScanning;
+
+    /// <summary>
+    /// Songs in the library, yet every Home section is empty: nothing has been played. That
+    /// is where Add Folder lands a new user, and Home was just as blank there.
+    /// </summary>
+    [ObservableProperty] private bool _showNothingPlayed;
+
+    /// <summary>
+    /// Set by the first <see cref="RefreshAsync"/>. That runs once the window has loaded the
+    /// library (startup navigation or its first publish), so an existing library never
+    /// flashes the empty state while library.json is still being read.
+    /// </summary>
+    private bool _hasBuilt;
+
+    /// <summary>Set once a full rebuild has filled the rows, so an existing listener never
+    /// sees "nothing played" while the first rebuild is still ranking off the UI thread.</summary>
+    private bool _rowsBuilt;
+
+    private bool HasHomeContent =>
+        ContinueTrack != null || TopArtists.Count > 0 || TopSongRows.Count > 0 || LastPlayedRows.Count > 0
+        || RecentlyPlayedAlbums.Count > 0 || TimeRotationTracks.Count > 0 || IsHeavyRotationVisible
+        || RediscoveredTracks.Count > 0;
+
+    private void UpdateEmptyLibraryState()
+    {
+        var empty = _hasBuilt && _library.AllTracks.Count == 0;
+        if (_hasBuilt) IsLibraryEmpty = empty;
+        var scanning = _settings?.IsScanning == true;
+        ShowEmptyLibrary = empty && !scanning;
+        ShowLibraryScanning = empty && scanning;
+        ShowNothingPlayed = _rowsBuilt && _library.Tracks.Count > 0 && !HasHomeContent;
+    }
+
+    partial void OnContinueTrackChanged(Track? value) => UpdateEmptyLibraryState();
+
+    /// <summary>"Nothing played yet": shuffle the whole library (Songs' Shuffle All).</summary>
+    [RelayCommand]
+    private void ShuffleLibrary()
+    {
+        var tracks = _library.Tracks.ToList();
+        if (tracks.Count == 0) return;
+        _player.PlayShuffled(tracks);
+    }
+
+    /// <summary>Settings › Library › Add Folder, the same command (picker + add + scan).</summary>
+    public IAsyncRelayCommand? AddMusicFolderCommand => _settings?.AddMusicFolderCommand;
+
+    /// <summary>Fires when the user wants Settings opened at the media folders.</summary>
+    public event EventHandler? NavigateToSettingsRequested;
+
+    [RelayCommand]
+    private void OpenMediaFolderSettings() => NavigateToSettingsRequested?.Invoke(this, EventArgs.Empty);
+
     public HomeViewModel(PlayerViewModel player, ILibraryService library, SidebarViewModel sidebar,
         ArtistImageService? artistImages = null, IPlayHistoryService? playHistory = null,
         SettingsViewModel? settings = null)
@@ -289,14 +353,23 @@ public partial class HomeViewModel : ViewModelBase, IDisposable
         AdoptPersistedSectionState();
 
         HeavyRotationTracks.CollectionChanged += (_, _) => OnPropertyChanged(nameof(IsHeavyRotationVisible));
+        // Any row filling or emptying moves the "nothing played yet" state.
+        foreach (var rows in new System.Collections.Specialized.INotifyCollectionChanged[]
+                 { TopArtists, TopSongRows, LastPlayedRows, RecentlyPlayedAlbums, TimeRotationTracks, HeavyRotationTracks, RediscoveredTracks })
+            rows.CollectionChanged += (_, _) => UpdateEmptyLibraryState();
         if (_settings != null)
         {
             _settings.PropertyChanged += (_, e) =>
             {
                 if (e.PropertyName == nameof(SettingsViewModel.HomeShowHeavyRotation))
+                {
                     OnPropertyChanged(nameof(IsHeavyRotationVisible));
+                    UpdateEmptyLibraryState();
+                }
                 else if (e.PropertyName is nameof(SettingsViewModel.AlbumTileSizeAuto) or nameof(SettingsViewModel.AlbumTileTargetSize))
                     UpdateAlbumTileSize(_lastAlbumUsableWidth);
+                else if (e.PropertyName == nameof(SettingsViewModel.IsScanning))
+                    UpdateEmptyLibraryState();
             };
         }
 
@@ -316,7 +389,8 @@ public partial class HomeViewModel : ViewModelBase, IDisposable
         // and catch up once on activation, like the other library view models.
         // FavoritesChanged rides the same 500 ms debounce — a heart click used to
         // trigger an immediate full rebuild.
-        _libraryUpdatedHandler = (_, _) => { _isDirty = true; if (_isActive) Dispatcher.UIThread.Post(() =>
+        // The empty-library state follows every publish, Home visible or not (cheap: a count).
+        _libraryUpdatedHandler = (_, _) => { _isDirty = true; Dispatcher.UIThread.Post(UpdateEmptyLibraryState); if (_isActive) Dispatcher.UIThread.Post(() =>
         {
             _refreshDebounce.Stop();
             _refreshDebounce.Start();
@@ -484,6 +558,9 @@ public partial class HomeViewModel : ViewModelBase, IDisposable
 
     internal async Task RefreshAsync()
     {
+        _hasBuilt = true;
+        UpdateEmptyLibraryState();
+
         if (!_isDirty && TopSongs.Count > 0)
         {
             Greeting = GetGreeting();
@@ -569,23 +646,34 @@ public partial class HomeViewModel : ViewModelBase, IDisposable
                 // Resolve the play-count ranking back to actual Artist rows so the row
                 // benefits from the existing image-cache flow.
                 var byName = _library.Artists.ToDictionary(a => a.Name, a => a, StringComparer.OrdinalIgnoreCase);
-                return plays
+                var top = plays
                     .OrderByDescending(kv => kv.Value)
                     .Take(MaxTopArtists)
                     .Select(kv => byName.TryGetValue(kv.Key, out var artist)
                         ? artist
                         : new Artist { Name = kv.Key, Id = ComputeArtistId(kv.Key) })
                     .ToList();
+
+                // The row is built with each cached portrait in hand, as the artist page
+                // does (GitHub #137): a scan publish hands over new Artist objects with no
+                // ImagePath every 1.5 s, and the fetch below can queue behind other sweeps.
+                foreach (var artist in top)
+                    artist.ImagePath = StatisticsViewModel.CachedArtistPhoto(artist, _artistImages);
+                return top;
             });
             ReplaceTopArtistsIfChanged(topArtists);
 
             // Kick a background image-fetch for any artist that doesn't have a cached
             // picture yet, then re-materialize the row so the portraits are actually read.
-            if (_artistImages != null && topArtists.Count > 0)
-                _ = _artistImages.FetchAndCacheAsync(topArtists, (_, _) =>
-                    Dispatcher.UIThread.Post(ScheduleTopArtistImageRefresh));
+            // For the instances the row shows: ReplaceTopArtistsIfChanged keeps the old
+            // ones when only the objects changed, and filling in the new ones left the
+            // shown tiles blank.
+            if (_artistImages != null && TopArtists.Count > 0)
+                _ = FetchTopArtistImagesAsync(TopArtists.ToList());
 
             await RefreshTimeAwareRowsAsync();
+            _rowsBuilt = true;
+            UpdateEmptyLibraryState();
             if (log) DebugLog.Write("Home", $"rebuild #{rebuild}: done");
         }
         catch (Exception ex)
@@ -633,7 +721,8 @@ public partial class HomeViewModel : ViewModelBase, IDisposable
         // Hide a row entirely when it has too few tracks to earn its header.
         List<Track> Resolve(List<Guid> ids)
         {
-            var tracks = ids.Select(_library.GetTrackById).OfType<Track>().ToList();
+            // Inbox songs resolve by id (they play) but are not in the library yet.
+            var tracks = ids.Select(_library.GetTrackById).OfType<Track>().Where(t => !t.IsInInbox).ToList();
             return tracks.Count >= HomeRowsBuilder.MinRowItems ? tracks : new List<Track>();
         }
 
@@ -752,10 +841,30 @@ public partial class HomeViewModel : ViewModelBase, IDisposable
         _topArtistImageDebounce.Start();
     }
 
+    private async Task FetchTopArtistImagesAsync(List<Artist> shown)
+    {
+        var painted = shown.Select(a => a.ImagePath).ToList();
+        var reported = new HashSet<Artist>(ReferenceEqualityComparer.Instance);
+        await _artistImages!.FetchAndCacheAsync(shown, (artist, _) =>
+        {
+            reported.Add(artist);
+            Dispatcher.UIThread.Post(ScheduleTopArtistImageRefresh);
+        });
+
+        // A shown artist is the library's own object, so another sweep (the Artists tab's)
+        // can put a portrait on it first; this fetch then finds the path already set and
+        // never reports it, and the row kept its placeholder (GitHub #137).
+        if (shown.Where((a, i) => a.ImagePath != painted[i] && !reported.Contains(a)).Any())
+            Dispatcher.UIThread.Post(ScheduleTopArtistImageRefresh);
+    }
+
     private void ReplaceTopArtistsIfChanged(IReadOnlyList<Artist> artists)
     {
+        // Same artists but a different portrait (a fresh instance from a scan publish
+        // that has one where the shown tile has none) is a change too.
         if (TopArtists.Count == artists.Count &&
-            TopArtists.Zip(artists).All(pair => pair.First.Id == pair.Second.Id))
+            TopArtists.Zip(artists).All(pair => pair.First.Id == pair.Second.Id
+                                                && pair.First.ImagePath == pair.Second.ImagePath))
             return;
 
         TopArtists.ReplaceAll(artists);
@@ -957,7 +1066,9 @@ public partial class HomeViewModel : ViewModelBase, IDisposable
         // still holds them (restored from queue.json), so fall back to its copies.
         Dictionary<Guid, Track>? external = null;
         return BuildRecentFromLog(events,
-            id => _library.GetTrackById(id) ?? (external ??= _player.GetExternalTracksById()).GetValueOrDefault(id),
+            id => _library.GetTrackById(id) is { } t
+                ? (t.IsInInbox ? null : t) // played from the Inbox: not in the library yet
+                : (external ??= _player.GetExternalTracksById()).GetValueOrDefault(id),
             RecentLogScan);
     }
 

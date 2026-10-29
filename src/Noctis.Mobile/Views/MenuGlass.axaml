@@ -1,0 +1,79 @@
+<controls:GlassPanel xmlns="https://github.com/avaloniaui"
+                     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+                     xmlns:controls="using:Noctis.Controls"
+                     x:Class="Noctis.Mobile.Views.MenuGlass"
+                     CornerRadius="28" UseAppGlass="False" IsGlassActive="True"
+                     BlurRadius="9" Saturation="1.2" Refraction="14" RefractionAmount="10"
+                     Specular="0.24" SpecularStyle="TopCatch" BackdropShade="0.16"
+                     BackdropMinLuminance="{DynamicResource MenuGlassMinLuminance}"
+                     BackdropMaxLuminance="{DynamicResource MenuGlassMaxLuminance}"
+                     BackdropToneCurve="{DynamicResource MenuGlassToneCurve}"
+                     BackdropLift="1" BackdropSpill="{DynamicResource MenuGlassSpill}"
+                     Background="{DynamicResource MenuGlassTint}"
+                     EdgeThickness="0" BoxShadow="{DynamicResource MenuGlassShadow}"
+                     Sheen="{DynamicResource MenuGlassSheen}"
+                     TextElement.Foreground="{DynamicResource MenuGlassText}">
+    <!-- Apple's iOS 26 menu glass (owner 10-14, measured off Apple Music), the one card every
+         pop-up on the phone is made of: the ⋯ menus, the sort and filter menus, the album's
+         quality note (all PopMenu) and the Add to Playlist sheet (ContextSheet). No outline of
+         its own, the edge drawn by the glass itself - a catch-light along the top that fades
+         down the sides (GlassPanel.SpecularStyle TopCatch), a dark contact line (faint on light
+         glass, so it never reads as an outline) and a soft wide shadow. Behind it the backdrop is
+         lightly blurred, so the cover's shapes stay readable, and lifted: a lighter view of what
+         lies beneath rather than a flat white tint over it, the lift a white veil over dark
+         content, not its colour scaled up (which turned dark ink into orange and red blotches).
+         The luminance range is what keeps the labels readable over any cover: on dark glass the
+         backdrop shows through no brighter than MenuGlassMaxLuminance, on light glass no darker
+         than MenuGlassMinLuminance (MobilePopMenuTests checks the worst case against the text).
+         The tone curve climbs fast from the dark end so most covers show bright and only the
+         brightest is held down. The card takes the theme it is shown in, so Now Playing's menu
+         is the dark glass.
+         Measured off Apple Music's dark menus (10-14, Silk Sonic and ANTI covers): the glass is
+         0.20..0.50 in luminance with a curve near 2.5, and it KEEPS the backdrop's hue and
+         saturation (a plain brown lifts to a brighter brown, 0.58 saturated before and after), while
+         dark content inside it takes the colour of its surroundings. So the glass spills: a share
+         (MenuGlassSpill) of what it shows is the backdrop blurred four times as wide, at the same
+         luminance (GlassPanel.BackdropSpill), and the white veil only comes in as the lift grows.
+         The rim also shades the face (BackdropShade), the soft dark crescent under Apple's top
+         edge, and the frost is a touch heavier. The cap stays at 0.41 for the 4.5:1 text contrast
+         MobilePopMenuTests asks for (Apple's own 0.50 would be about 4:1). -->
+    <controls:GlassPanel.Resources>
+        <ResourceDictionary>
+            <ResourceDictionary.ThemeDictionaries>
+                <ResourceDictionary x:Key="Dark">
+                    <SolidColorBrush x:Key="MenuGlassTint" Color="#0AFFFFFF" />
+                    <x:Double x:Key="MenuGlassMinLuminance">0.22</x:Double>
+                    <x:Double x:Key="MenuGlassMaxLuminance">0.41</x:Double>
+                    <x:Double x:Key="MenuGlassToneCurve">2.5</x:Double>
+                    <x:Double x:Key="MenuGlassSpill">0.58</x:Double>
+                    <BoxShadows x:Key="MenuGlassShadow">0 0 0.8 0.3 #73000000, 0 12 40 0 #33000000</BoxShadows>
+                    <LinearGradientBrush x:Key="MenuGlassSheen" StartPoint="0%,0%" EndPoint="0%,100%">
+                        <GradientStop Offset="0" Color="#0AFFFFFF" />
+                        <GradientStop Offset="0.25" Color="#00FFFFFF" />
+                    </LinearGradientBrush>
+                    <SolidColorBrush x:Key="MenuGlassText" Color="#FFFFFFFF" />
+                    <SolidColorBrush x:Key="MenuGlassSecondaryText" Color="#B3FFFFFF" />
+                    <SolidColorBrush x:Key="MenuGlassHairline" Color="#2EFFFFFF" />
+                    <!-- Apple's group break between a menu's sections (Sort By, then the order). -->
+                    <SolidColorBrush x:Key="MenuGlassGroupGap" Color="#33000000" />
+                </ResourceDictionary>
+                <ResourceDictionary x:Key="Light">
+                    <SolidColorBrush x:Key="MenuGlassTint" Color="#4DFFFFFF" />
+                    <x:Double x:Key="MenuGlassMinLuminance">0.74</x:Double>
+                    <x:Double x:Key="MenuGlassMaxLuminance">1</x:Double>
+                    <x:Double x:Key="MenuGlassToneCurve">1</x:Double>
+                    <x:Double x:Key="MenuGlassSpill">0.3</x:Double>
+                    <BoxShadows x:Key="MenuGlassShadow">0 0 1 0 #1F000000, 0 12 40 0 #1F000000</BoxShadows>
+                    <LinearGradientBrush x:Key="MenuGlassSheen" StartPoint="0%,0%" EndPoint="0%,100%">
+                        <GradientStop Offset="0" Color="#33FFFFFF" />
+                        <GradientStop Offset="0.3" Color="#00FFFFFF" />
+                    </LinearGradientBrush>
+                    <SolidColorBrush x:Key="MenuGlassText" Color="#FF000000" />
+                    <SolidColorBrush x:Key="MenuGlassSecondaryText" Color="#99000000" />
+                    <SolidColorBrush x:Key="MenuGlassHairline" Color="#1F000000" />
+                    <SolidColorBrush x:Key="MenuGlassGroupGap" Color="#0F000000" />
+                </ResourceDictionary>
+            </ResourceDictionary.ThemeDictionaries>
+        </ResourceDictionary>
+    </controls:GlassPanel.Resources>
+</controls:GlassPanel>

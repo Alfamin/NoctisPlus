@@ -36,7 +36,7 @@ public static class ProductIdentity
     /// against it, because community plugins target Noctis versions: Noctis Plus 2.0.0 is still Noctis 1.6.3 to them.
     /// Change it only when an upstream Noctis release is merged.
     /// </summary>
-    public const string NoctisBaseVersion = "1.6.3";
+    public const string NoctisBaseVersion = "1.6.5";
 
     /// <summary>The credit line on the About page.</summary>
     public const string BasedOn = "Based on Noctis " + NoctisBaseVersion + " by heartached · MIT";

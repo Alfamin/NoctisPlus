@@ -21,6 +21,20 @@ public class GaplessLinuxEngineTests
         Assert.Equal(expected, VlcAudioPlayer.IsGaplessEnginePlatform(isWindows, isLinux));
     }
 
+    // GitHub #139: without these args Linux VLC resampled 48/96/192 kHz files into the
+    // 44.1 kHz engine with "ugly" (harness on a pulse null sink: 48k/24 at 11 dB vs a
+    // soxr reference; speex q10 73.5 dB multitone SINAD, the 16-bit floor).
+    [Theory]
+    [InlineData(true, false, true)]
+    [InlineData(false, true, true)]
+    [InlineData(false, false, false)] // macOS keeps VLC's default resampler
+    public void SpeexResampler_ForcedWhereverTheEngineRuns(bool isWindows, bool isLinux, bool expected)
+    {
+        Assert.Equal(expected, VlcAudioPlayer.ShouldForceSpeexResampler(isWindows, isLinux));
+        Assert.Equal(VlcAudioPlayer.IsGaplessEnginePlatform(isWindows, isLinux),
+            VlcAudioPlayer.ShouldForceSpeexResampler(isWindows, isLinux));
+    }
+
     [Fact]
     public void LinuxEngineRate_IsCdRate()
     {

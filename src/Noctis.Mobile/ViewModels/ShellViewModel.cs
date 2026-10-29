@@ -12,7 +12,7 @@ using Noctis.Services;
 namespace Noctis.Mobile.ViewModels;
 
 /// <summary>
-/// Root of the phone UI: three tabs, one stack of pages pushed over the active tab's root,
+/// Root of the phone UI: five tabs, one stack of pages pushed over the active tab's root,
 /// the Now Playing / Lyrics / Queue overlays and the mini bar. Every Android Back decision
 /// is made here (<see cref="TryHandleBack"/>) so it is testable on Windows.
 /// </summary>
@@ -161,13 +161,14 @@ public sealed partial class ShellViewModel : ObservableObject
     }
 
     [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(IsFavoritesSelected), nameof(IsLibrarySelected), nameof(IsSearchSelected), nameof(IsPlaylistsSelected),
-        nameof(IsFavoritesRootVisible), nameof(IsLibraryRootVisible), nameof(IsSearchRootVisible), nameof(IsPlaylistsRootVisible))]
-    private MobileTab _selectedTab = MobileTab.Library;
+    [NotifyPropertyChangedFor(nameof(IsHomeSelected), nameof(IsFavoritesSelected), nameof(IsLibrarySelected), nameof(IsSearchSelected),
+        nameof(IsPlaylistsSelected), nameof(IsHomeRootVisible), nameof(IsFavoritesRootVisible), nameof(IsLibraryRootVisible),
+        nameof(IsSearchRootVisible), nameof(IsPlaylistsRootVisible))]
+    private MobileTab _selectedTab = MobileTab.Home;
 
     [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(HasPage), nameof(IsFavoritesRootVisible), nameof(IsLibraryRootVisible), nameof(IsSearchRootVisible),
-        nameof(IsPlaylistsRootVisible))]
+    [NotifyPropertyChangedFor(nameof(HasPage), nameof(IsHomeRootVisible), nameof(IsFavoritesRootVisible), nameof(IsLibraryRootVisible),
+        nameof(IsSearchRootVisible), nameof(IsPlaylistsRootVisible))]
     private MobilePage? _currentPage;
 
     /// <summary>
@@ -187,11 +188,69 @@ public sealed partial class ShellViewModel : ObservableObject
     [NotifyPropertyChangedFor(nameof(TopSafePadding), nameof(BottomSafePadding))]
     private Thickness _safeArea;
 
+    /// <summary>
+    /// The actions of the song, album, playlist or artist a ⋯ (or a long press) was opened on.
+    /// They show as Apple's glass menu popping out of what was tapped (PopMenu); only the Add to
+    /// Playlist list, which needs the room, moves to the bottom sheet (ContextSheet) once picked.
+    /// Every action closes it through <see cref="CloseSheet"/>.
+    /// </summary>
     [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(IsSheetOpen))]
+    [NotifyPropertyChangedFor(nameof(IsSheetOpen), nameof(IsPlaylistPickerOpen), nameof(PopMenu), nameof(IsMenuOpen))]
     private ContextSheetViewModel? _sheet;
 
+    /// <summary>An item's actions are up, as the menu or the playlist list.</summary>
     public bool IsSheetOpen => Sheet != null;
+
+    /// <summary>The bottom sheet: only the Add to Playlist list.</summary>
+    public bool IsPlaylistPickerOpen => Sheet is { IsPickingPlaylist: true };
+
+    /// <summary>The Library tab's ⋯ menu (Add Folder…, Rescan Library, Settings).</summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(PopMenu), nameof(IsMenuOpen))]
+    private LibraryMenuViewModel? _libraryMenu;
+
+    /// <summary>A page's sort or filter menu, or an album's quality note (<see cref="ShowOptions"/>).</summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(PopMenu), nameof(IsMenuOpen))]
+    private OptionsMenuViewModel? _optionsMenu;
+
+    /// <summary>Now Playing's artist line tapped: Go to Album and Go to Artist (Apple's bubble).</summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(PopMenu), nameof(IsMenuOpen))]
+    private TrackLinksMenuViewModel? _linksMenu;
+
+    /// <summary>Now Playing's quality badge tapped: what the playing file is (<see cref="ShowQualityCard"/>).</summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(PopMenu), nameof(IsMenuOpen))]
+    private QualityCardViewModel? _qualityCard;
+
+    /// <summary>What the glass pop menu shows: the Library menu, a sort or filter menu, the
+    /// playing song's album and artist links or its quality card, or an item's actions until
+    /// its playlist list takes over.</summary>
+    public object? PopMenu => (object?)LibraryMenu ?? (object?)OptionsMenu ?? (object?)LinksMenu ?? (object?)QualityCard
+        ?? (Sheet is { IsPickingPlaylist: false } sheet ? sheet : null);
+
+    public bool IsMenuOpen => PopMenu != null;
+
+    partial void OnSheetChanged(ContextSheetViewModel? oldValue, ContextSheetViewModel? newValue)
+    {
+        if (oldValue != null) oldValue.PropertyChanged -= OnSheetPropertyChanged;
+        if (newValue == null) return;
+        newValue.PropertyChanged += OnSheetPropertyChanged;
+        LibraryMenu = null;
+        OptionsMenu = null;
+        LinksMenu = null;
+        QualityCard = null;
+    }
+
+    /// <summary>Add to Playlist picked in the menu: the menu closes and the sheet opens on the list.</summary>
+    private void OnSheetPropertyChanged(object? sender, PropertyChangedEventArgs e)
+    {
+        if (e.PropertyName != nameof(ContextSheetViewModel.IsPickingPlaylist)) return;
+        OnPropertyChanged(nameof(IsPlaylistPickerOpen));
+        OnPropertyChanged(nameof(PopMenu));
+        OnPropertyChanged(nameof(IsMenuOpen));
+    }
 
     private LibraryRowsViewModel? _libraryRows;
 
@@ -199,12 +258,14 @@ public sealed partial class ShellViewModel : ObservableObject
     /// first use, after the host has set <see cref="Account"/> (it decides the Downloaded row).</summary>
     public LibraryRowsViewModel LibraryRows => _libraryRows ??= new LibraryRowsViewModel(this);
 
+    public bool IsHomeSelected => SelectedTab == MobileTab.Home;
     public bool IsFavoritesSelected => SelectedTab == MobileTab.Favorites;
     public bool IsLibrarySelected => SelectedTab == MobileTab.Library;
     public bool IsSearchSelected => SelectedTab == MobileTab.Search;
     public bool IsPlaylistsSelected => SelectedTab == MobileTab.Playlists;
 
     public bool HasPage => CurrentPage != null;
+    public bool IsHomeRootVisible => IsHomeSelected && !HasPage;
     public bool IsFavoritesRootVisible => IsFavoritesSelected && !HasPage;
     public bool IsLibraryRootVisible => IsLibrarySelected && !HasPage;
     public bool IsSearchRootVisible => IsSearchSelected && !HasPage;
@@ -345,6 +406,75 @@ public sealed partial class ShellViewModel : ObservableObject
         MiniProgressLine = new Avalonia.Media.Immutable.ImmutableSolidColorBrush(Avalonia.Media.Color.FromArgb((byte)(neutral ? 0x99 : 0xE6), c.R, c.G, c.B));
     }
 
+    // Settings › Appearance › Player Bar and Album Colours. The player bar's two are off by
+    // default: the capsule is plain glass, as Apple's. Saved to settings.json
+    // (MobilePlayerBarProgress*, MobileArtworkPageColors) and applied live.
+
+    /// <summary>The elapsed fill in the cover's colour (<see cref="MiniProgressFill"/>).</summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(ShowsMiniProgress))]
+    private bool _showMiniProgressFill;
+
+    /// <summary>The bright line along the capsule's bottom edge (<see cref="MiniProgressLine"/>).</summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(ShowsMiniProgress))]
+    private bool _showMiniProgressLine;
+
+    /// <summary>Album Colours: album and artist pages painted in a deep shade of the cover's
+    /// colour (<see cref="PageTint.Enabled"/>, which the open pages follow); off, they keep the
+    /// theme's plain pages. On by default.</summary>
+    [ObservableProperty] private bool _artworkPageColors = true;
+
+    public bool ShowsMiniProgress => ShowMiniProgressFill || ShowMiniProgressLine;
+
+    private bool _playerBarLoaded;
+    private Task _playerBarSaveChain = Task.CompletedTask;
+
+    /// <summary>The tail of the player-bar saves; tests await it.</summary>
+    internal Task PendingPlayerBarSave { get; private set; } = Task.CompletedTask;
+
+    partial void OnShowMiniProgressFillChanged(bool value) => SavePlayerBarSettings();
+    partial void OnShowMiniProgressLineChanged(bool value) => SavePlayerBarSettings();
+    partial void OnArtworkPageColorsChanged(bool value) => SavePlayerBarSettings();
+
+    private async Task LoadPlayerBarSettingsAsync()
+    {
+        try
+        {
+            var settings = await Library.Persistence.LoadSettingsAsync();
+            ShowMiniProgressFill = settings.MobilePlayerBarProgressFill;
+            ShowMiniProgressLine = settings.MobilePlayerBarProgressLine;
+            ArtworkPageColors = settings.MobileArtworkPageColors;
+        }
+        catch (Exception ex)
+        {
+            DebugLog.Write("Settings", $"Player bar settings load failed: {ex.Message}");
+        }
+        _playerBarLoaded = true;
+    }
+
+    /// <summary>One save after another, so a quick on-off never lands out of order.</summary>
+    private void SavePlayerBarSettings()
+    {
+        if (!_playerBarLoaded) return;
+        bool fill = ShowMiniProgressFill, line = ShowMiniProgressLine, pages = ArtworkPageColors;
+        PendingPlayerBarSave = _playerBarSaveChain = _playerBarSaveChain.ContinueWith(async _ =>
+        {
+            try
+            {
+                var settings = await Library.Persistence.LoadSettingsAsync();
+                settings.MobilePlayerBarProgressFill = fill;
+                settings.MobilePlayerBarProgressLine = line;
+                settings.MobileArtworkPageColors = pages;
+                await Library.Persistence.SaveSettingsAsync(settings);
+            }
+            catch (Exception ex)
+            {
+                DebugLog.Write("Settings", $"Player bar settings save failed: {ex.Message}");
+            }
+        }, TaskScheduler.Default).Unwrap();
+    }
+
     /// <summary>A started track's play reached the log: the Library's play-log rails re-read it,
     /// and a desktop song's play is queued for the desktop (sent as a scrobble on the next sync).</summary>
     private void OnPlayRecorded(object? sender, EventArgs e)
@@ -372,13 +502,27 @@ public sealed partial class ShellViewModel : ObservableObject
         UnfoldTabBar();
     }
 
-    /// <summary>Push <paramref name="page"/> over the current tab. A page opened from Now
-    /// Playing (the artist link) closes the player first.</summary>
-    public void Navigate(MobilePage page)
+    /// <summary>How the last change of <see cref="CurrentPage"/> came about, raised before it:
+    /// ShellView moves the pages to match (a push slides in, a pop slides out, a reset jumps).</summary>
+    public PageMove LastPageMove { get; private set; }
+
+    private bool _resetting;
+
+    /// <summary>Push <paramref name="page"/> over the current tab (inside the sheet, when one is
+    /// up). A page opened from Now Playing (the artist link) closes the player first.</summary>
+    public void Navigate(MobilePage page) => Push(page, sheet: false);
+
+    /// <summary>Present <paramref name="page"/> as a sheet over everything (Settings); Back or its
+    /// close button drops it, and pages pushed from it open inside it.</summary>
+    public void Present(MobilePage page) => Push(page, sheet: !Pages.Any(p => p.IsSheet));
+
+    private void Push(MobilePage page, bool sheet)
     {
-        Sheet = null;
+        CloseSheet();
         if (IsNowPlayingOpen) CloseNowPlaying();
+        page.IsSheet = sheet;
         Pages.Add(page);
+        LastPageMove = PageMove.Push;
         CurrentPage = page;
     }
 
@@ -389,13 +533,32 @@ public sealed partial class ShellViewModel : ObservableObject
         var top = Pages[^1];
         Pages.RemoveAt(Pages.Count - 1);
         top.OnClosed();
+        LastPageMove = _resetting ? PageMove.Reset : PageMove.Pop;
         CurrentPage = Pages.Count > 0 ? Pages[^1] : null;
         return true;
     }
 
+    /// <summary>Drops the sheet (Settings, with Account if it is open inside it): a swipe down on
+    /// it. False when no sheet is up.</summary>
+    public bool DismissSheet()
+    {
+        if (!Pages.Any(p => p.IsSheet)) return false;
+        while (Pages.Any(p => p.IsSheet)) GoBack();
+        return true;
+    }
+
+    /// <summary>Back to the tab's root at once (a tab tap): no page slides on the way.</summary>
     public void PopToRoot()
     {
-        while (GoBack()) { }
+        _resetting = true;
+        try
+        {
+            while (GoBack()) { }
+        }
+        finally
+        {
+            _resetting = false;
+        }
     }
 
     [RelayCommand] private void NavigateBack() => GoBack();
@@ -419,6 +582,7 @@ public sealed partial class ShellViewModel : ObservableObject
         // otherwise the Queue overlay is left floating over the Library page.
         IsQueueOpen = false;
         IsLyricsOpen = false;
+        CloseSheet();
         IsNowPlayingOpen = false;
     }
 
@@ -427,20 +591,22 @@ public sealed partial class ShellViewModel : ObservableObject
     [RelayCommand] private void ToggleLyrics() => IsLyricsOpen = !IsLyricsOpen;
 
     /// <summary>
-    /// Android Back: the topmost thing closes first — the long-press sheet, Queue, Lyrics, Now
-    /// Playing, then pushed pages, then a non-start tab returns to Library. The Library rows'
-    /// Edit mode then finishes (as Done would). Returns whether the press was consumed; only at
-    /// the Library root does the activity fall through to the system default (finish).
+    /// Android Back: the topmost thing closes first — a ⋯ menu or its sheet, Queue, Lyrics, Now
+    /// Playing, then pushed pages (a page's own inner page first), then the Library rows' Edit
+    /// mode finishes (as Done would), then a non-start tab returns to Home. Returns whether the
+    /// press was consumed; only at the Home root does the activity fall through to the system
+    /// default (finish).
     /// </summary>
     public bool TryHandleBack()
     {
-        if (IsSheetOpen) { CloseSheet(); return true; }
+        if (IsSheetOpen || IsMenuOpen) { CloseSheet(); return true; }
         if (IsQueueOpen) { IsQueueOpen = false; return true; }
         if (IsLyricsOpen) { IsLyricsOpen = false; return true; }
         if (IsNowPlayingOpen) { IsNowPlayingOpen = false; return true; }
+        if (CurrentPage?.TryGoBackWithin() == true) return true;
         if (GoBack()) return true;
-        if (SelectedTab != MobileTab.Library) { SelectedTab = MobileTab.Library; return true; }
         if (_libraryRows is { IsEditing: true } rows) { rows.FinishEditing(); return true; }
+        if (SelectedTab != MobileTab.Home) { SelectedTab = MobileTab.Home; return true; }
         return false;
     }
 
@@ -511,7 +677,7 @@ public sealed partial class ShellViewModel : ObservableObject
     private void OpenAlbum(Album? album)
     {
         if (album == null) return;
-        Navigate(new AlbumPageViewModel(this, album));
+        Navigate(new AlbumPageViewModel(this, CurrentAlbum(album)));
     }
 
     /// <summary>An artist row or link: the artist page.</summary>
@@ -537,7 +703,7 @@ public sealed partial class ShellViewModel : ObservableObject
     [RelayCommand]
     private void OpenRailItem(RailItem? item)
     {
-        switch (item?.Payload)
+        switch (CurrentPayload(item))
         {
             case Album album:
                 OpenAlbum(album);
@@ -550,8 +716,8 @@ public sealed partial class ShellViewModel : ObservableObject
                 break;
             case Track track:
                 // A song plays the rail it sits on: On Repeat, else the pinned songs.
-                var onRepeat = Library.OnRepeatRail.Select(r => r.Payload).OfType<Track>().ToList();
-                var pinned = Library.PinnedRail.Select(r => r.Payload).OfType<Track>().ToList();
+                var onRepeat = Library.OnRepeatRail.Select(CurrentPayload).OfType<Track>().ToList();
+                var pinned = Library.PinnedRail.Select(CurrentPayload).OfType<Track>().ToList();
                 if (onRepeat.IndexOf(track) is var r and >= 0) Player.PlayTracks(onRepeat, r, "On Repeat");
                 else if (pinned.IndexOf(track) is var p and >= 0) Player.PlayTracks(pinned, p, "Pinned");
                 else Player.PlayTracks(new[] { track }, 0, null);
@@ -568,7 +734,7 @@ public sealed partial class ShellViewModel : ObservableObject
     [RelayCommand]
     private void OpenAlbumSheet(Album? album)
     {
-        if (album != null) Sheet = ContextSheetViewModel.ForAlbum(this, album);
+        if (album != null) Sheet = ContextSheetViewModel.ForAlbum(this, CurrentAlbum(album));
     }
 
     [RelayCommand]
@@ -580,14 +746,27 @@ public sealed partial class ShellViewModel : ObservableObject
     [RelayCommand]
     private void OpenRailItemSheet(RailItem? item)
     {
-        switch (item?.Payload)
+        switch (CurrentPayload(item))
         {
             case Album album: OpenAlbumSheet(album); break;
             case Playlist playlist: OpenPlaylistSheet(playlist); break;
             case Track track: OpenTrackSheet(track); break;
-            case Artist artist: Sheet = ContextSheetViewModel.ForArtist(this, artist, item.ArtworkPath); break;
+            case Artist artist: Sheet = ContextSheetViewModel.ForArtist(this, artist, item!.ArtworkPath); break;
         }
     }
+
+    /// <summary>Album grids and rails keep unchanged tiles across library refreshes, so a tile's
+    /// album can be an object from before a rescan: open the one the library holds now.</summary>
+    private Album CurrentAlbum(Album album) => Library.Service.GetAlbumById(album.Id) ?? album;
+
+    /// <summary>A rail keeps an unchanged tile across library refreshes (<see cref="RailItem.Equals(RailItem?)"/>),
+    /// so its payload can be an object from before a rescan: act on what the library holds now.</summary>
+    private object? CurrentPayload(RailItem? item) => item?.Payload switch
+    {
+        Track track => Library.Service.GetTrackById(track.Id) ?? track,
+        Artist artist => Library.Service.Artists.FirstOrDefault(a => string.Equals(a.Name, artist.Name, StringComparison.OrdinalIgnoreCase)) ?? artist,
+        var other => other,
+    };
 
     /// <summary>A long-pressed artist row: play, queue or pin the artist.</summary>
     [RelayCommand]
@@ -596,8 +775,27 @@ public sealed partial class ShellViewModel : ObservableObject
         if (item != null) Sheet = ContextSheetViewModel.ForArtist(this, item.Artist, item.ArtworkPath);
     }
 
+    /// <summary>Closes whichever menu or sheet is open.</summary>
     [RelayCommand]
-    public void CloseSheet() => Sheet = null;
+    public void CloseSheet()
+    {
+        Sheet = null;
+        LibraryMenu = null;
+        OptionsMenu = null;
+        LinksMenu = null;
+        QualityCard = null;
+    }
+
+    /// <summary>Opens a sort or filter menu (or a note) on the glass pop menu, out of the button
+    /// tapped, closing whatever menu was up.</summary>
+    public void ShowOptions(OptionsMenuViewModel menu)
+    {
+        Sheet = null;
+        LibraryMenu = null;
+        LinksMenu = null;
+        QualityCard = null;
+        OptionsMenu = menu;
+    }
 
     /// <summary>
     /// Favourite or unfavourite <paramref name="tracks"/>: the flag, one journal write through
@@ -632,18 +830,55 @@ public sealed partial class ShellViewModel : ObservableObject
         if (Player.CurrentTrack is { } track) await SetFavouriteAsync(new[] { track }, !track.IsFavorite);
     }
 
-    /// <summary>Now Playing's ⋯: the song's sheet, over the player.</summary>
+    /// <summary>Now Playing's ⋯: the song's glass menu, over the player.</summary>
+    [RelayCommand]
+    private void OpenNowPlayingMenu()
+    {
+        if (Player.CurrentTrack is { } track) Sheet = ContextSheetViewModel.ForTrack(this, track);
+    }
+
+    /// <summary>The Library tab's ⋯: Add Folder…, Rescan Library and Settings on the glass menu.</summary>
+    [RelayCommand]
+    private void OpenLibraryMenu()
+    {
+        Sheet = null;
+        OptionsMenu = null;
+        LinksMenu = null;
+        QualityCard = null;
+        LibraryMenu = new LibraryMenuViewModel(this);
+    }
+
+    /// <summary>The Queue's ⋯: the song's menu, over the Queue.</summary>
     [RelayCommand]
     private void OpenCurrentTrackSheet()
     {
         if (Player.CurrentTrack is { } track) Sheet = ContextSheetViewModel.ForTrack(this, track);
     }
 
-    /// <summary>Now Playing's artist line: the artist page (Navigate closes the player).</summary>
+    /// <summary>Now Playing's artist line (Apple's): a glass bubble out of the artist with Go to
+    /// Album and Go to Artist, each opening its page (Navigate closes the player).</summary>
     [RelayCommand]
-    private void OpenCurrentArtist()
+    private void OpenCurrentLinks()
     {
-        if (Player.CurrentTrack is { } track) OpenArtist(track.GroupingArtist);
+        if (Player.CurrentTrack is not { } track) return;
+        Sheet = null;
+        LibraryMenu = null;
+        OptionsMenu = null;
+        QualityCard = null;
+        LinksMenu = new TrackLinksMenuViewModel(this, track);
+    }
+
+    /// <summary>Now Playing's quality badge: what the playing file is, on a glass card out of the
+    /// badge (<see cref="QualityCardViewModel"/>). Nothing without a badge to tap.</summary>
+    [RelayCommand]
+    private void ShowQualityCard()
+    {
+        if (Player.Quality is not { } quality) return;
+        Sheet = null;
+        LibraryMenu = null;
+        OptionsMenu = null;
+        LinksMenu = null;
+        QualityCard = new QualityCardViewModel(this, quality);
     }
 
     [RelayCommand]
@@ -656,16 +891,18 @@ public sealed partial class ShellViewModel : ObservableObject
     [RelayCommand]
     private void OpenSettings()
     {
+        // A second tap while the sheet rises is the same request, not a second sheet.
+        if (Pages.Any(p => p is SettingsPageViewModel)) return;
         var page = new SettingsPageViewModel(this);
-        Navigate(page);
+        Present(page);
         _ = page.LoadAsync();
     }
 
-    /// <summary>Settings → Account.</summary>
+    /// <summary>Settings → Account, pushed inside the Settings sheet.</summary>
     [RelayCommand]
     private void OpenAccount()
     {
-        if (Account != null) Navigate(new AccountPageViewModel(this, Account));
+        if (Account != null && CurrentPage is not AccountPageViewModel) Navigate(new AccountPageViewModel(this, Account));
     }
 
     /// <summary>The sheet's Download: fetches <paramref name="tracks"/> for offline play. Failures
@@ -693,10 +930,18 @@ public sealed partial class ShellViewModel : ObservableObject
     public async Task InitializeAsync()
     {
         await Library.InitializeAsync();
+        await LoadPlayerBarSettingsAsync();
         // Lyrics settings before the queue restore: restoring sets CurrentTrack, which loads
         // that track's lyrics with the saved split-word and layer preferences.
         await Lyrics.InitializeAsync();
-        await Player.RestoreStateAsync();
+        try
+        {
+            await Player.RestoreStateAsync();
+        }
+        finally
+        {
+            _queueRestored = true;
+        }
         // Signed in: pull the desktop's changes and push ours. Fire-and-forget over a loaded
         // library; a failure (the computer is off, another network) is logged and never
         // reaches the UI — Settings → Account shows the next manual sync's error instead.
@@ -718,5 +963,15 @@ public sealed partial class ShellViewModel : ObservableObject
         }
     }
 
-    public Task SaveStateAsync() => Player.SaveStateAsync();
+    // Set once the saved queue has been read back (InitializeAsync).
+    private bool _queueRestored;
+
+    /// <summary>
+    /// The activity's background checkpoint (MainActivity.OnPause). Not before the saved queue
+    /// has been restored: the activity pauses mid-start (Android 13's notification prompt, or a
+    /// switch away while the library loads), and saving then wrote the empty, not yet restored
+    /// queue over queue.json, so the restore found nothing and the mini player never came back.
+    /// A queue the owner changes before the restore is saved by the player's own mutators.
+    /// </summary>
+    public Task SaveStateAsync() => _queueRestored ? Player.SaveStateAsync() : Task.CompletedTask;
 }

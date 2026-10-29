@@ -148,6 +148,33 @@ public class LyricsBackgroundModeTests : IDisposable
     }
 
     /// <summary>
+    /// CI flake: the light, medium and dark palettes are shared by every lyrics page, and were
+    /// SolidColorBrushes owned by whichever thread first touched LyricsViewModel. When that was
+    /// a plain test on the thread pool (one reading LyricsCacheDir), every lyrics page after it
+    /// threw "a different thread owns it" reading or drawing them. Shared brushes are immutable.
+    /// </summary>
+    [AvaloniaFact]
+    public async Task SharedPalettes_ReadFromAnyThread()
+    {
+        foreach (var (hex, btnBg) in new[] { ("#FFFFFF", "#22000000"), ("#808080", "#44000000"), ("#000000", "#33FFFFFF") })
+        {
+            var vm = NewVm(NewPlayer(Cover("#C8C8C8")));
+            vm.SelectColorModeSolidCommand.Execute(null);
+            vm.SetBackgroundColorCommand.Execute(hex);
+            Dispatcher.UIThread.RunJobs();
+            var palette = new[]
+            {
+                vm.LyricsSecondaryFg, vm.LyricsSubtleFg, vm.LyricsSliderFilled, vm.LyricsSliderUnfilled,
+                vm.LyricsBtnBg, vm.LyricsBtnBgHover, vm.LyricsSliderThumb,
+            };
+
+            var colors = await Task.Run(() => palette.Select(ColorOf).ToList());
+
+            Assert.Equal(Color.Parse(btnBg), colors[4]);
+        }
+    }
+
+    /// <summary>
     /// Bug (seen live 10-12): picking Magenta Fire (#4B134F to #C94B4B) put a green band in
     /// the middle of the lyrics page. The middle stop averaged the two hues straight, (296° +
     /// 0°) / 2 = 148°, which is green, instead of going the short way round through pink.

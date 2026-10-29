@@ -224,6 +224,7 @@
                                              so the swatch keeps its original resting position. -->
                                         <controls:ColorPickerFlyout Grid.Column="0"
                                                                     Hex="{Binding MainHex, Mode=TwoWay}"
+                                                                    AutomationProperties.Name="{loc:T ThemeEditor.MainBackground}"
                                                                     SwatchSize="26"
                                                                     Margin="-3"
                                                                     VerticalAlignment="Center"/>
@@ -231,7 +232,7 @@
                                                    FontSize="13" Margin="10,0,8,0"
                                                    VerticalAlignment="Center"/>
                                         <TextBlock Grid.Column="2" Text="{Binding MainHex}"
-                                                   FontFamily="Consolas, Courier New, monospace"
+                                                   FontFamily="Consolas, Menlo, Courier New, monospace"
                                                    FontSize="12" FontWeight="Bold"
                                                    Foreground="{DynamicResource SystemControlForegroundBaseMediumBrush}"
                                                    VerticalAlignment="Center"/>
@@ -240,6 +241,7 @@
                                     <Grid ColumnDefinitions="Auto,*,Auto" Height="44">
                                         <controls:ColorPickerFlyout Grid.Column="0"
                                                                     Hex="{Binding SidebarHex, Mode=TwoWay}"
+                                                                    AutomationProperties.Name="{loc:T ThemeEditor.SidebarSelection}"
                                                                     SwatchSize="26"
                                                                     Margin="-3"
                                                                     VerticalAlignment="Center"/>
@@ -247,7 +249,7 @@
                                                    FontSize="13" Margin="10,0,8,0"
                                                    VerticalAlignment="Center"/>
                                         <TextBlock Grid.Column="2" Text="{Binding SidebarHex}"
-                                                   FontFamily="Consolas, Courier New, monospace"
+                                                   FontFamily="Consolas, Menlo, Courier New, monospace"
                                                    FontSize="12" FontWeight="Bold"
                                                    Foreground="{DynamicResource SystemControlForegroundBaseMediumBrush}"
                                                    VerticalAlignment="Center"/>
@@ -256,6 +258,7 @@
                                     <Grid ColumnDefinitions="Auto,*,Auto" Height="44">
                                         <controls:ColorPickerFlyout Grid.Column="0"
                                                                     Hex="{Binding AccentHex, Mode=TwoWay}"
+                                                                    AutomationProperties.Name="{loc:T ThemeEditor.Accent}"
                                                                     SwatchSize="26"
                                                                     Margin="-3"
                                                                     VerticalAlignment="Center"/>
@@ -263,7 +266,7 @@
                                                    FontSize="13" Margin="10,0,8,0"
                                                    VerticalAlignment="Center"/>
                                         <TextBlock Grid.Column="2" Text="{Binding AccentHex}"
-                                                   FontFamily="Consolas, Courier New, monospace"
+                                                   FontFamily="Consolas, Menlo, Courier New, monospace"
                                                    FontSize="12" FontWeight="Bold"
                                                    Foreground="{DynamicResource SystemControlForegroundBaseMediumBrush}"
                                                    VerticalAlignment="Center"/>

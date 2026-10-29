@@ -10,7 +10,7 @@ using Noctis.Services.LyricsStudio;
 namespace Noctis.ViewModels;
 
 /// <summary>Lyrics Studio choices the user changes inside the dialog; persisted by Settings.</summary>
-public sealed record LyricsStudioPrefs(string Model, string Language, bool WordTimings, bool SkipAlreadyTimed, bool EmbedTags, bool OnlineLyrics = true, bool SaveTtml = false);
+public sealed record LyricsStudioPrefs(string Model, string Language, bool WordTimings, bool SkipAlreadyTimed, bool EmbedTags, bool OnlineLyrics = true, bool SaveTtml = false, bool LivePreview = true);
 
 public sealed record SpeechLanguageOption(string Code, string Name)
 {
@@ -65,6 +65,8 @@ public partial class LyricsStudioViewModel : ViewModelBase
     [ObservableProperty] private bool _onlineLyrics;
     /// <summary>Also save a .ttml next to the song: players that read TTML and LRC but not ELRC get the word timings (Discord: Light Cone).</summary>
     [ObservableProperty] private bool _saveTtml;
+    /// <summary>The live preview pane beside the review is open (remembered like the options).</summary>
+    [ObservableProperty] private bool _showLivePreview;
 
     // ── Model state ──
     [ObservableProperty] private bool _isModelInstalled;
@@ -124,7 +126,7 @@ public partial class LyricsStudioViewModel : ViewModelBase
     [ObservableProperty] private string _queueFormatText = string.Empty;
 
     public bool HasFfmpeg => _engine.HasFfmpeg;
-    public bool CanStart => !IsRunning && IsModelInstalled && HasFfmpeg
+    public bool CanStart => !IsRunning && !IsLrcRedSyncing && IsModelInstalled && HasFfmpeg
         && (Queue.Any(i => i.Status == StudioStatus.Waiting) || Selected is { Status: StudioStatus.Loaded or StudioStatus.Ready });
     /// <summary>"Start" runs the queue; with nothing queued the button re-times the song on screen.</summary>
     public string StartLabel => Queue.Any(i => i.Status == StudioStatus.Waiting) ? "Start" : Selected is { Status: StudioStatus.Loaded or StudioStatus.Ready } ? "Re-sync" : "Start";
@@ -160,13 +162,14 @@ public partial class LyricsStudioViewModel : ViewModelBase
         LyricsStudioSource.Lrclib => "From LRCLIB",
         LyricsStudioSource.Transcription => "Transcribed · check the words",
         LyricsStudioSource.PastedLyrics => "From your lyrics",
+        LyricsStudioSource.LrcRed => Loc("LyricsStudio.LrcRedSource"),
         LyricsStudioSource.ExistingFile => Selected?.Existing is { } e
             ? $"From {e.Origin} · {(e.Format == LyricsFormat.Elrc ? "word timings" : "line timings")}"
             : "Loaded",
         _ => string.Empty,
     };
     public string ReviewConfidenceText => Selected?.Result is { } r
-        ? (r.Source == LyricsStudioSource.ExistingFile ? string.Empty : $"{Math.Round(r.Confidence * 100)}% heard · ")
+        ? (r.Source is LyricsStudioSource.ExistingFile or LyricsStudioSource.LrcRed ? string.Empty : $"{Math.Round(r.Confidence * 100)}% heard · ")
           + $"{r.Lines.Count} lines · saves {(WordTimings ? "ELRC" : "LRC")}{(SaveTtml ? " + TTML" : string.Empty)}"
         : string.Empty;
     public bool ReviewIsTranscription => Selected?.Result?.Source == LyricsStudioSource.Transcription;
@@ -265,6 +268,7 @@ public partial class LyricsStudioViewModel : ViewModelBase
         _embedTags = s.LyricsStudioEmbedTags;
         _onlineLyrics = s.LyricsStudioOnlineLyrics;
         _saveTtml = s.LyricsStudioSaveTtml;
+        _showLivePreview = s.LyricsStudioLivePreview;
         _loadingPrefs = false;
         Clock = () => _clock.Elapsed;
 
@@ -325,6 +329,7 @@ public partial class LyricsStudioViewModel : ViewModelBase
         OnPropertyChanged(nameof(LineTimings));
         // The rows show the chosen format: word tags for ELRC, plain text for LRC.
         foreach (var line in ReviewLines) line.ShowWordTags = value;
+        ScheduleLivePreview();
     }
     partial void OnSkipAlreadyTimedChanged(bool value) => PersistPrefs();
     partial void OnEmbedTagsChanged(bool value) => PersistPrefs();
@@ -337,6 +342,7 @@ public partial class LyricsStudioViewModel : ViewModelBase
     partial void OnIsRunningChanged(bool value)
     {
         RaiseStartState();
+        RaiseLrcRedState();
         OnPropertyChanged(nameof(ReviewCanUpgrade));
         OnPropertyChanged(nameof(CanAlignDraft));
         OnPropertyChanged(nameof(CanTranscribeDraft));
@@ -350,6 +356,7 @@ public partial class LyricsStudioViewModel : ViewModelBase
             PersistDraft(leaving);
             CancelTap();
             SelectedWord = null;
+            SelectedLine = null;
             leaving.PropertyChanged -= OnSelectedItemPropertyChanged;
         }
     }
@@ -373,6 +380,7 @@ public partial class LyricsStudioViewModel : ViewModelBase
             TryLoadExisting(fresh);
         if (value is { Result: null } compose)
             PrefillDraft(compose);
+        ResetReviewSelection();
         ReviewLines.Clear();
         _reviewDirty = false;
         if (value?.Result is { } result)
@@ -385,11 +393,54 @@ public partial class LyricsStudioViewModel : ViewModelBase
             }
         }
         RaiseReviewChanged();
+        _ = LookUpLrcRedAsync(value);
     }
 
     /// <summary>Any text, time or word edit on the review on screen; drafts of loaded songs are only written when this is set.</summary>
     private bool _reviewDirty;
-    private void MarkReviewDirty() => _reviewDirty = true;
+    private void MarkReviewDirty()
+    {
+        _reviewDirty = true;
+        ScheduleDraftSave();
+        ScheduleLivePreview();
+    }
+
+    /// <summary>
+    /// The review on screen is rebuilt (a run's result, a stopped re-run, Clear lyrics): tap mode
+    /// and the selected word belonged to the lines just dropped. Tap mode used to outlive a
+    /// Re-sync, so Space kept stamping times on a line no longer on screen.
+    /// </summary>
+    private void ResetReviewSelection()
+    {
+        CancelTap();
+        SelectedWord = null;
+        SelectedLine = null;
+    }
+
+    private CancellationTokenSource? _draftSaveCts;
+    /// <summary>How long after the last edit the review on screen is written to its draft.</summary>
+    internal const int DraftSaveDelayMs = 1000;
+
+    /// <summary>
+    /// Edits are kept as they are made, a second after the last one. Drafts were only written
+    /// when the user moved to another song, previewed or closed the dialog; the sidebar page's
+    /// Studio is never closed, so quitting the app lost every fix made on the song on screen.
+    /// </summary>
+    private void ScheduleDraftSave()
+    {
+        if (_drafts is null || Selected is not { } item) return;
+        _draftSaveCts?.Cancel();
+        var cts = _draftSaveCts = new CancellationTokenSource();
+        _ = SaveDraftSoonAsync(item, cts.Token);
+    }
+
+    private async Task SaveDraftSoonAsync(StudioItem item, CancellationToken token)
+    {
+        try { await Task.Delay(DraftSaveDelayMs, token); }
+        catch (OperationCanceledException) { return; }
+        // Saved, skipped or re-run since: PersistDraft keeps only reviews still open.
+        if (ReferenceEquals(Selected, item)) PersistDraft(item);
+    }
 
     /// <summary>
     /// Selecting a song shows what it already has — .elrc, then .lrc, then embedded — with no
@@ -459,12 +510,126 @@ public partial class LyricsStudioViewModel : ViewModelBase
         OnPropertyChanged(nameof(IsSelectedWorking));
         OnPropertyChanged(nameof(ShowReviewEmpty));
         OnPropertyChanged(nameof(CanAlignDraft));
+        RaiseLrcRedState();
+        RefreshLivePreview();
+    }
+
+    // ── Live preview: the review rendered by the lyrics view, beside the editor (10-14) ──
+    // Discord "Manual lyrics editing": switching between Preview and the editor was the hassle.
+    // The pane is the lyrics side panel's own view over the app's lyrics view model, fed the
+    // review through the same unsaved-preview path as Preview: memory only, nothing saved.
+
+    /// <summary>Set by the panel: shows (or updates in place) these synced lyrics, unsaved, for the track in the preview pane. Null = no pane.</summary>
+    public Action<Track, string>? UpdateLivePreview
+    {
+        get => _updateLivePreview;
+        set { _updateLivePreview = value; RefreshLivePreview(); }
+    }
+    private Action<Track, string>? _updateLivePreview;
+    /// <summary>Set with <see cref="UpdateLivePreview"/>: drops the preview so the song's own lyrics come back.</summary>
+    public Action? ClearLivePreview { get; set; }
+
+    public bool CanLivePreview => _updateLivePreview is not null;
+    /// <summary>The pane is on screen: open, and an editable review to show.</summary>
+    public bool IsLivePreviewOpen => ShowLivePreview && CanLivePreview && CanSave;
+    /// <summary>The song under review is the one playing (from the song file, not a music video's audio).</summary>
+    public bool LivePreviewOnSong => _player is { } p && Selected is { } s && p.CurrentTrack?.Id == s.Track.Id && !p.IsPlayingMusicVideoAudio;
+    /// <summary>The pane is open on a song that is not playing: it offers Play instead of lyrics of another song.</summary>
+    public bool ShowLivePreviewIdle => IsLivePreviewOpen && !LivePreviewOnSong;
+
+    /// <summary>What the pane last showed was pushed by it: closing it, or leaving the review, puts the real lyrics back.</summary>
+    private bool _livePreviewShown;
+    private bool _livePreviewPending;
+    /// <summary>Edits reach the pane at most this often (a held , or . repeats ~30 times a second).</summary>
+    internal const int LivePreviewDelayMs = 120;
+
+    partial void OnShowLivePreviewChanged(bool value)
+    {
+        PersistPrefs();
+        RefreshLivePreview();
+    }
+
+    [RelayCommand]
+    private void ToggleLivePreview() => ShowLivePreview = !ShowLivePreview;
+
+    /// <summary>The pane's Play: the song under review from just before the selected line (else its first), like Preview's lead-in.</summary>
+    [RelayCommand]
+    private Task PlayLivePreview()
+    {
+        if (ReviewLines.Count == 0) return Task.CompletedTask;
+        var from = SelectedLine?.Start ?? ReviewLines[0].Start;
+        return PlayFromTime(from - TimeSpan.FromSeconds(2));
+    }
+
+    /// <summary>The pane's state changed (the review, the song playing, the pane itself): say so and bring it up to date.</summary>
+    /// <summary>
+    /// The panel left the screen (another page, or the dialog closed): the pane's preview lives in
+    /// the app's lyrics view model, so it stayed on the lyrics page and side panel, with Save and
+    /// Search off, until the song changed. Drop it now and push nothing until
+    /// <see cref="ResumeLivePreview"/>.
+    /// </summary>
+    internal void SuspendLivePreview()
+    {
+        _livePreviewSuspended = true;
+        if (!_livePreviewShown) return;
+        _livePreviewShown = false;
+        try { ClearLivePreview?.Invoke(); } catch { }
+    }
+
+    /// <summary>The panel is on screen again: the pane shows the review again.</summary>
+    internal void ResumeLivePreview()
+    {
+        _livePreviewSuspended = false;
+        RefreshLivePreview();
+    }
+
+    private bool _livePreviewSuspended;
+
+    internal void RefreshLivePreview()
+    {
+        OnPropertyChanged(nameof(CanLivePreview));
+        OnPropertyChanged(nameof(IsLivePreviewOpen));
+        OnPropertyChanged(nameof(LivePreviewOnSong));
+        OnPropertyChanged(nameof(ShowLivePreviewIdle));
+        ScheduleLivePreview();
+    }
+
+    private void ScheduleLivePreview()
+    {
+        if (_livePreviewPending || (_updateLivePreview is null && !_livePreviewShown)) return;
+        _livePreviewPending = true;
+        _ = PushLivePreviewSoonAsync();
+    }
+
+    private async Task PushLivePreviewSoonAsync()
+    {
+        await Task.Delay(LivePreviewDelayMs);
+        _livePreviewPending = false;
+        PushLivePreview();
+    }
+
+    private void PushLivePreview()
+    {
+        if (IsLivePreviewOpen && !_livePreviewSuspended && Selected is { } item && ReviewLines.Count > 0)
+        {
+            try
+            {
+                _updateLivePreview!(item.Track, BuildReviewText());
+                _livePreviewShown = true;
+            }
+            catch (Exception ex) { DebugLogger.Warn(DebugLogger.Category.Lyrics, "LyricsStudio.LivePreviewFailed", ex.Message); }
+        }
+        else if (_livePreviewShown)
+        {
+            _livePreviewShown = false;
+            try { ClearLivePreview?.Invoke(); } catch { }
+        }
     }
 
     private void PersistPrefs()
     {
         if (_loadingPrefs) return;
-        try { _savePrefs(new LyricsStudioPrefs(WhisperModelManager.Lullaby.Size.ToString(), SelectedLanguage.Code, WordTimings, SkipAlreadyTimed, EmbedTags, OnlineLyrics, SaveTtml)); }
+        try { _savePrefs(new LyricsStudioPrefs(WhisperModelManager.Lullaby.Size.ToString(), SelectedLanguage.Code, WordTimings, SkipAlreadyTimed, EmbedTags, OnlineLyrics, SaveTtml, ShowLivePreview)); }
         catch { /* preferences are a convenience */ }
     }
 
@@ -698,8 +863,9 @@ public partial class LyricsStudioViewModel : ViewModelBase
             Requeue(current);
             // The user's own lyrics (pasted, typed, a corrected transcript) are re-timed as the
             // review shows them now, edits included: Re-sync used to time the lyrics box, or the
-            // song's .lrc the user had replaced (Discord, Mistery 2026-10-10).
-            if (current.BeforeRerun?.Result is { Source: LyricsStudioSource.PastedLyrics } shown)
+            // song's .lrc the user had replaced (Discord, Mistery 2026-10-10). So are lrc.red's,
+            // which replaced the song's own on screen.
+            if (current.BeforeRerun?.Result is { Source: LyricsStudioSource.PastedLyrics or LyricsStudioSource.LrcRed } shown)
                 current.SourceOverride = shown.Lines.Select(l => l.Text).ToList();
             items.Add(current);
         }
@@ -725,6 +891,133 @@ public partial class LyricsStudioViewModel : ViewModelBase
         await RunAsync(new List<StudioItem> { item });
     }
 
+    // ── lrc.red's model: word timings in seconds instead of Lullaby's minutes ──
+
+    /// <summary>lrc.red, for "Sync with lrc.red's model"; set by the app. Null: never offered.</summary>
+    internal ILrcRedLyricsService? LrcRed
+    {
+        get => _lrcRed;
+        set
+        {
+            _lrcRed = value;
+            _ = LookUpLrcRedAsync(Selected);
+            RaiseLrcRedState();
+        }
+    }
+    private ILrcRedLyricsService? _lrcRed;
+    private CancellationTokenSource? _lrcRedCts;
+
+    [ObservableProperty] private bool _isLrcRedSyncing;
+
+    partial void OnIsLrcRedSyncingChanged(bool value)
+    {
+        RaiseStartState();
+        RaiseLrcRedState();
+    }
+
+    private bool LrcRedOn()
+    {
+        try { return _settings().LrcRedEnabled; }
+        catch { return false; }
+    }
+
+    /// <summary>
+    /// The selected song is one lrc.red has only line-synced or plain (its lookup matched it), lrc.red
+    /// is on in Settings, and the review on screen has no word timing yet; nothing else is running.
+    /// </summary>
+    public bool CanLrcRedSync => _lrcRed != null && !IsRunning && !IsLrcRedSyncing && LrcRedOn()
+        && Selected is { LrcRedMatch.IsWordSynced: false, Status: not (StudioStatus.Working or StudioStatus.Saved) } item
+        && item.ExistingFormat != LyricsFormat.Elrc
+        && !(item.Result is { } shown && ExistingLyricsLoader.HasWordTimings(shown.Lines));
+
+    /// <summary>The button stays while lrc.red's model runs, saying so.</summary>
+    public bool ShowLrcRedSync => IsLrcRedSyncing || CanLrcRedSync;
+    public string LrcRedSyncLabel => Loc(IsLrcRedSyncing ? "LyricsStudio.LrcRedSyncWorking" : "LyricsStudio.LrcRedSync");
+
+    private void RaiseLrcRedState()
+    {
+        OnPropertyChanged(nameof(CanLrcRedSync));
+        OnPropertyChanged(nameof(ShowLrcRedSync));
+        OnPropertyChanged(nameof(LrcRedSyncLabel));
+    }
+
+    /// <summary>
+    /// Asks lrc.red's lookup once per song whether it has it (the service remembers the answer), so
+    /// the button only shows for a match. Only the lookup: the model runs on the button's press.
+    /// </summary>
+    private async Task LookUpLrcRedAsync(StudioItem? item)
+    {
+        if (item is null || _lrcRed is not { } lrcRed || item.LrcRedLooked || !LrcRedOn()) return;
+        item.LrcRedLooked = true;
+        try
+        {
+            item.LrcRedMatch = await lrcRed.FindMatchAsync(item.Track.Artist ?? string.Empty, item.Track.Title ?? string.Empty, item.Track.Duration.TotalSeconds);
+        }
+        catch (Exception ex)
+        {
+            // Asked again the next time the song is selected.
+            item.LrcRedLooked = false;
+            DebugLogger.Warn(DebugLogger.Category.Lyrics, "LyricsStudio.LrcRedLookupFailed", ex.Message);
+        }
+        if (ReferenceEquals(Selected, item)) RaiseLrcRedState();
+    }
+
+    /// <summary>
+    /// "Sync with lrc.red's model": lrc.red's in-house model times every word of its own copy of the
+    /// song, in seconds where Lullaby takes minutes, and its lyrics open for review like a run's
+    /// result. As Re-sync does, a review on screen (or lyrics typed in the box) is replaced only after
+    /// asking; nothing is written until Save. One request per press, never retried on its own.
+    /// </summary>
+    [RelayCommand]
+    private async Task SyncWithLrcRed()
+    {
+        if (!CanLrcRedSync || Selected is not { LrcRedMatch: { } match } item || _lrcRed is not { } lrcRed) return;
+        if ((item.Result is not null && item.Status is StudioStatus.Loaded or StudioStatus.Ready || item.HasUnsavedLyricsBox)
+            && !await ConfirmAsync(Loc("LyricsStudio.LrcRedSyncConfirm", item.Title)))
+            return;
+        if (!CanLrcRedSync || !ReferenceEquals(Selected, item)) return;
+
+        var cts = new CancellationTokenSource();
+        _lrcRedCts = cts;
+        var before = item.StatusText;
+        IsLrcRedSyncing = true;
+        item.StatusText = RunStatusText = Loc("LyricsStudio.LrcRedSyncWorking");
+        DebugLogger.Info(DebugLogger.Category.Lyrics, "LyricsStudio.LrcRedSync", $"{item.Title} | isrc={match.Isrc}");
+        try
+        {
+            var synced = await lrcRed.SyncWithModelAsync(match.Isrc, cts.Token);
+            var lines = ExistingLyricsLoader.ParseTimed(LyricsViewModel.SyncedToWrite(synced) ?? string.Empty);
+            if (!ExistingLyricsLoader.HasWordTimings(lines))
+                throw new LrcRedSyncException(LrcRedSyncFailure.NotWordSynced);
+            var result = new LyricsStudioResult(item.Track, lines, LyricsStudioSource.LrcRed, 1, string.Empty, 0);
+            // Word timings are what was asked for: Save writes ELRC, as after Time every word.
+            WordTimings = true;
+            item.BeforeRerun = null;
+            item.Result = result;
+            item.Status = StudioStatus.Ready;
+            item.StatusText = RunStatusText = Loc("LyricsStudio.LrcRedSynced");
+            _drafts?.Save(item.Track.Id, LyricsStudioDraft.From(result));
+            DebugLogger.Info(DebugLogger.Category.Lyrics, "LyricsStudio.LrcRedSynced", $"{item.Title} | lines={lines.Count}");
+            if (ReferenceEquals(Selected, item))
+                OnSelectedChanged(item);
+        }
+        catch (OperationCanceledException) when (cts.IsCancellationRequested)
+        {
+            item.StatusText = before;
+        }
+        catch (Exception ex)
+        {
+            item.StatusText = RunStatusText = LyricsViewModel.LrcRedSyncMessage(ex);
+            DebugLogger.Warn(DebugLogger.Category.Lyrics, "LyricsStudio.LrcRedSyncFailed", $"{item.Title} | {ex.Message}");
+        }
+        finally
+        {
+            if (ReferenceEquals(_lrcRedCts, cts)) _lrcRedCts = null;
+            cts.Dispose();
+            IsLrcRedSyncing = false;
+        }
+    }
+
     private async Task<bool> ConfirmAsync(string message)
     {
         if (Confirm is null) return true;
@@ -744,7 +1037,11 @@ public partial class LyricsStudioViewModel : ViewModelBase
         item.ForceRun = true;
         item.Status = StudioStatus.Waiting;
         item.Result = null;
-        if (ReferenceEquals(Selected, item)) ReviewLines.Clear();
+        if (ReferenceEquals(Selected, item))
+        {
+            ResetReviewSelection();
+            ReviewLines.Clear();
+        }
         RaiseReviewChanged();
     }
 
@@ -894,7 +1191,13 @@ public partial class LyricsStudioViewModel : ViewModelBase
                         done++;
                         continue;
                     }
-                    if (pasted is not null && !prefilledBox) result = result with { Source = LyricsStudioSource.PastedLyrics };
+                    if (pasted is not null && !prefilledBox)
+                    {
+                        result = result with { Source = LyricsStudioSource.PastedLyrics };
+                        // lrc.red's lyrics re-timed: their romaji / translation lines ride along.
+                        if (item.BeforeRerun?.Result is { Source: LyricsStudioSource.LrcRed } fromLrcRed)
+                            result = result with { Lines = ExistingLyricsLoader.CarryCompanions(fromLrcRed.Lines, result.Lines) };
+                    }
                     // Timed from the song's own lyrics: their romaji / translation lines ride along.
                     else if (item.Existing is { } source)
                         result = result with { Lines = ExistingLyricsLoader.CarryCompanions(source.Lines, result.Lines) };
@@ -945,6 +1248,12 @@ public partial class LyricsStudioViewModel : ViewModelBase
             DebugLogger.Info(DebugLogger.Category.Lyrics, ct.IsCancellationRequested ? "LyricsStudio.RunStopped" : "LyricsStudio.RunFinished",
                 $"done={done}/{total}, ready={Queue.Count(i => i.Status == StudioStatus.Ready)}");
             DebugLogger.Info(DebugLogger.Category.Lyrics, "LyricsStudio.SessionClosing", "disposing the speech model");
+        }
+        catch (WhisperEngineUnavailableException ex)
+        {
+            // Whisper.net's own text names NuGet packages; the user gets what to do instead.
+            RunStatusText = Loc(OperatingSystem.IsWindows() ? "LyricsStudio.EngineUnavailableWindows" : "LyricsStudio.EngineUnavailable");
+            DebugLogger.Error(DebugLogger.Category.Lyrics, "LyricsStudio.EngineUnavailable", $"{ex.InnerException?.GetType().Name}: {ex.Message}");
         }
         catch (Exception ex)
         {
@@ -1083,6 +1392,8 @@ public partial class LyricsStudioViewModel : ViewModelBase
             else if (_player.State != PlaybackState.Playing)
                 _player.PlayPauseCommand.Execute(null);
         }
+        // The lyrics page now shows Preview's own copy: leaving the Studio for it must not drop it.
+        _livePreviewShown = false;
         try { await ShowOnLyricsPage(item.Track, synced); }
         catch (Exception ex) { DebugLogger.Warn(DebugLogger.Category.Lyrics, "LyricsStudio.PreviewFailed", ex.Message); }
     }
@@ -1246,10 +1557,106 @@ public partial class LyricsStudioViewModel : ViewModelBase
     {
         if (oldValue is not null) oldValue.IsSelected = false;
         if (newValue is not null) newValue.IsSelected = true;
+        // A word belongs to its line: the bar's line is the word's.
+        if (newValue is not null) SelectedLine = newValue.Line;
         OnPropertyChanged(nameof(HasSelectedWord));
+        RaiseNudgeTarget();
     }
 
     public bool HasSelectedWord => SelectedWord is not null;
+
+    // ── Nudge bar: the selected line or word, earlier / later by 10 or 100 ms ──
+
+    /// <summary>The line the nudge bar acts on: its time pill, text box or one of its words was clicked.</summary>
+    [ObservableProperty] private ReviewLine? _selectedLine;
+
+    partial void OnSelectedLineChanged(ReviewLine? oldValue, ReviewLine? newValue)
+    {
+        if (oldValue is not null) oldValue.IsSelected = false;
+        if (newValue is not null) newValue.IsSelected = true;
+        if (SelectedWord is { } word && !ReferenceEquals(word.Line, newValue)) SelectedWord = null;
+        RaiseNudgeTarget();
+    }
+
+    /// <summary>What a nudge moves: the whole line or word (start and end together), or one edge.</summary>
+    [ObservableProperty] private NudgeEdge _nudgeEdge = NudgeEdge.Whole;
+
+    partial void OnNudgeEdgeChanged(NudgeEdge value)
+    {
+        OnPropertyChanged(nameof(NudgeWhole));
+        OnPropertyChanged(nameof(NudgeStart));
+        OnPropertyChanged(nameof(NudgeEnd));
+    }
+
+    // The edge picker's three segments (radio buttons); a segment being unchecked changes nothing.
+    public bool NudgeWhole { get => NudgeEdge == NudgeEdge.Whole; set { if (value) NudgeEdge = NudgeEdge.Whole; } }
+    public bool NudgeStart { get => NudgeEdge == NudgeEdge.Start; set { if (value) NudgeEdge = NudgeEdge.Start; } }
+    public bool NudgeEnd { get => NudgeEdge == NudgeEdge.End; set { if (value) NudgeEdge = NudgeEdge.End; } }
+
+    public bool HasNudgeTarget => SelectedLine is not null;
+
+    /// <summary>The bar's label: what a nudge moves now, with its times.</summary>
+    public string NudgeTargetText => SelectedWord is { } word
+        ? Loc("LyricsStudio.NudgeTargetWord", word.Text, word.TimeText, TimedLyricsBuilder.FormatTimestamp(word.End))
+        : SelectedLine is { } line
+            ? Loc("LyricsStudio.NudgeTargetLine", line.TimeText, TimedLyricsBuilder.FormatTimestamp(line.End))
+            : Loc("LyricsStudio.NudgeNoTarget");
+
+    private void RaiseNudgeTarget()
+    {
+        OnPropertyChanged(nameof(HasNudgeTarget));
+        OnPropertyChanged(nameof(NudgeTargetText));
+    }
+
+    /// <summary>Focus on a line's text box (or a click on its row): the bar acts on that line, keeping a word of it.</summary>
+    internal void SelectLine(ReviewLine? line)
+    {
+        if (line is null || !ReviewLines.Contains(line)) return;
+        SelectedLine = line;
+    }
+
+    /// <summary>The bar's steps and the , and . keys: "-100", "-10", "10" or "100" ms.</summary>
+    [RelayCommand]
+    private void NudgeSelection(string? milliseconds)
+    {
+        if (int.TryParse(milliseconds, System.Globalization.NumberStyles.AllowLeadingSign, System.Globalization.CultureInfo.InvariantCulture, out var ms))
+            NudgeSelectionBy(TimeSpan.FromMilliseconds(ms));
+    }
+
+    /// <summary>
+    /// Moves the selected word (else the selected line) by <paramref name="delta"/> along the
+    /// chosen edge, by the <see cref="TimingNudge"/> rules: the neighbouring lines' starts and the
+    /// song's length are the limits. One nudge is one change of the review (and of its draft).
+    /// </summary>
+    internal bool NudgeSelectionBy(TimeSpan delta)
+    {
+        if (IsRunning || SelectedLine is not { } line) return false;
+        var i = ReviewLines.IndexOf(line);
+        if (i < 0) return false;
+        // A word dropped by a text edit no longer has a chip: the line is what is left selected.
+        if (SelectedWord is { } gone && !line.Words.Contains(gone)) SelectedWord = null;
+        TimeSpan? previous = i > 0 ? ReviewLines[i - 1].Start : null;
+        TimeSpan? next = i + 1 < ReviewLines.Count ? ReviewLines[i + 1].Start : null;
+        var duration = Selected?.Track.Duration ?? TimeSpan.Zero;
+        var moved = line.Nudge(SelectedWord, NudgeEdge, delta, previous, next, duration);
+        if (moved) OnPropertyChanged(nameof(NudgeTargetText));
+        return moved;
+    }
+
+    /// <summary>
+    /// "Hear it" and the / key: plays from a second before the time being nudged (the start, or
+    /// the end with End chosen), so you hear it land. The time pill still plays from the line
+    /// itself, with no lead-in (user ask 09-17).
+    /// </summary>
+    [RelayCommand]
+    private Task Audition()
+    {
+        if (SelectedLine is not { } line) return Task.CompletedTask;
+        var at = SelectedWord is { } word
+            ? (NudgeEdge == NudgeEdge.End ? word.End : word.Start)
+            : (NudgeEdge == NudgeEdge.End ? line.End : line.Start);
+        return PlayFromTime(at - TimeSpan.FromSeconds(1));
+    }
 
     /// <summary>Chip click: select the word and seek a little ahead of it so you hear it land.</summary>
     [RelayCommand]
@@ -1261,15 +1668,10 @@ public partial class LyricsStudioViewModel : ViewModelBase
     }
 
     [RelayCommand]
-    private void NudgeWordEarlier() => SelectedWord?.Line.NudgeWord(SelectedWord, TimeSpan.FromMilliseconds(-50));
-
-    [RelayCommand]
-    private void NudgeWordLater() => SelectedWord?.Line.NudgeWord(SelectedWord, TimeSpan.FromMilliseconds(50));
-
-    [RelayCommand]
     private void ToggleWords(ReviewLine? line)
     {
         if (line is null) return;
+        SelectLine(line);
         line.IsExpanded = !line.IsExpanded;
         if (!line.IsExpanded && SelectedWord?.Line == line) SelectedWord = null;
         if (!line.IsExpanded && TapLine == line) CancelTap();
@@ -1355,10 +1757,16 @@ public partial class LyricsStudioViewModel : ViewModelBase
         if (_player is { State: PlaybackState.Playing }) _player.PlayPauseCommand.Execute(null);
     }
 
-    /// <summary>The time pill plays the line from its own timestamp, no pre-roll (user ask 09-17).</summary>
+    /// <summary>The time pill plays the line from its own timestamp, no pre-roll (user ask 09-17), and selects the line for the nudge bar.</summary>
     [RelayCommand]
-    private Task PlayFromLine(ReviewLine? line) =>
-        line is null ? Task.CompletedTask : PlayFromTime(line.Start);
+    private Task PlayFromLine(ReviewLine? line)
+    {
+        if (line is null) return Task.CompletedTask;
+        // The pill picks the line itself: a word of it selected before is let go.
+        SelectedWord = null;
+        SelectLine(line);
+        return PlayFromTime(line.Start);
+    }
 
     private async Task PlayFromTime(TimeSpan target)
     {
@@ -1408,7 +1816,11 @@ public partial class LyricsStudioViewModel : ViewModelBase
     private async Task Close()
     {
         _runCts?.Cancel();
+        _lrcRedCts?.Cancel();
         if (Selected is { } current) PersistDraft(current);
+        // The dialog's pane leaves with it: the lyrics page and side panel show the song's own lyrics
+        // again, and an edit still waiting for the pane is not pushed after the dialog closed.
+        SuspendLivePreview();
         if (_savedCount > 0)
         {
             try { await _library.SaveAsync(); } catch { }
@@ -1437,6 +1849,10 @@ public partial class LyricsStudioViewModel : ViewModelBase
         }
 
         public Track Track { get; }
+
+        /// <summary>A queue row reads its song, "title, artist" (it read
+        /// "Noctis.ViewModels.LyricsStudioViewModel+StudioItem").</summary>
+        public override string ToString() => Track.ToString();
 
         /// <summary>What the song has right now — .elrc / .lrc sidecars and embedded tags, LRC and ELRC told apart.</summary>
         [ObservableProperty]
@@ -1503,6 +1919,11 @@ public partial class LyricsStudioViewModel : ViewModelBase
 
         /// <summary>Timed lyrics loaded from the song itself (null until selected, or when it has none).</summary>
         public ExistingLyrics? Existing { get; set; }
+
+        /// <summary>lrc.red's recording of the song (null: none, or not asked yet — see <see cref="LrcRedLooked"/>).</summary>
+        internal LrcRedMatch? LrcRedMatch { get; set; }
+        /// <summary>lrc.red's lookup has answered for this song (or is asking).</summary>
+        internal bool LrcRedLooked { get; set; }
 
         /// <summary>Set by Re-sync / Upgrade so the "skip songs that already have this format" rule does not apply.</summary>
         public bool ForceRun { get; set; }

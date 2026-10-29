@@ -25,6 +25,10 @@ public partial class ArtistPage : UserControl
     /// how much of the next card or column shows at the right edge.</summary>
     public const double PageInset = 16, CardGap = 16, CardPeek = 44, ColumnGap = 16, ColumnPeek = 30;
 
+    /// <summary>The gap after each Top Songs column, carried by the column itself (its panel
+    /// virtualises and has no Spacing).</summary>
+    public static readonly Thickness ColumnMargin = new(0, 0, ColumnGap, 0);
+
     /// <summary>How far the round buttons' and the cards' fills move from the page colour
     /// (HSL lightness; see <see cref="Shade"/>).</summary>
     internal const double ButtonShade = 0.1, CardShade = 0.07;
@@ -41,7 +45,7 @@ public partial class ArtistPage : UserControl
     public ArtistPage()
     {
         InitializeComponent();
-        _chrome = new HeroChrome(this, HeroFade, TopFade, TopScrim, TopBar, "Artist", UpdateScrollChrome, ApplyShades);
+        _chrome = new HeroChrome(this, Hero, HeroFade, TopFade, TopScrim, TopBar, PageBody, "Artist", UpdateScrollChrome, ApplyShades);
         ArtistScroll.SizeChanged += (_, _) => LayoutPage();
         ArtistScroll.ScrollChanged += (_, _) => UpdateScrollChrome();
         ArtistName.SizeChanged += (_, _) => LayoutTitle();
@@ -112,11 +116,13 @@ public partial class ArtistPage : UserControl
         var height = Math.Min(width, Math.Max(320, ArtistScroll.Bounds.Height * HeroMaxViewportShare));
         Hero.Height = height;
         HeroFade.Height = Math.Round(height * HeroFadeShare);
+        _chrome.ApplyFades();   // the fade and the body's ramp follow the hero's size
         var cards = _vm?.Cards.Count ?? 0;
         CardWidth = cards > 1 ? width - PageInset - CardGap - CardPeek : width - 2 * PageInset;
         CardList.Margin = new Thickness(PageInset, 0, cards > 1 ? CardGap + CardPeek : PageInset, 0);
         TopSongPageWidth = width - PageInset - ColumnGap - ColumnPeek;
-        TopSongPages.Margin = new Thickness(PageInset, 0, ColumnGap + ColumnPeek, 0);
+        // The last column's own right margin is the gap; the peek's room comes after it.
+        TopSongPages.Margin = new Thickness(PageInset, 0, ColumnPeek, 0);
         LayoutTitle();
     }
 
@@ -142,7 +148,7 @@ public partial class ArtistPage : UserControl
     {
         var titleTop = Hero.Height + TitleBlock.Margin.Top - ArtistScroll.Offset.Y;
         var chrome = HeroChrome.ScrollChrome(titleTop, ArtistName.Bounds.Height, _chrome.BarBottom);
-        _chrome.ApplyScrim(chrome.Scrim);
+        _chrome.ApplyScrim(chrome.Scrim, ArtistScroll.Offset.Y + _chrome.BarBottom - Hero.Height);
         ArtistName.Opacity = chrome.BigTitle;
         SmallTitle.Opacity = chrome.SmallTitle;
     }

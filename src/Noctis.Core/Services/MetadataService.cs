@@ -47,13 +47,14 @@ public class MetadataService : IMetadataService
     /// <summary>
     /// Audio file extensions we consider valid.
     /// Includes lossless (FLAC, ALAC, AIFF, WAV, APE, WavPack),
-    /// lossy (MP3, AAC, OGG, Opus, WMA), and container formats (M4A, MP4, ASF).
+    /// lossy (MP3, AAC, OGG, Opus, WMA), and container formats (M4A, M4B, MP4, ASF).
     /// .m4a can contain either AAC (lossy) or ALAC (lossless) — both are supported.
+    /// .m4b is the same MP4 container under Apple's audiobook name (usually AAC + chapters).
     /// </summary>
     public static readonly HashSet<string> SupportedExtensions = new(StringComparer.OrdinalIgnoreCase)
     {
         ".mp3", ".flac", ".ogg", ".oga", ".m4a", ".wav", ".wma", ".aac",
-        ".opus", ".aiff", ".aif", ".aifc", ".ape", ".wv", ".alac", ".mp4",
+        ".opus", ".aiff", ".aif", ".aifc", ".ape", ".wv", ".alac", ".mp4", ".m4b",
         // ASF is the container behind .wma (TagLib reads/writes its tags natively;
         // the bundled VLC ships an asf demuxer + WMA decoders in libavcodec).
         // Like .mp4 above, a video-bearing .asf plays audio-only (--no-video).
@@ -182,21 +183,57 @@ public class MetadataService : IMetadataService
         if (Path.GetExtension(filePath).Equals(".dff", StringComparison.OrdinalIgnoreCase))
             return ReadDsdiffTrack(filePath, out embeddedArt);
 
-        try
+        for (var attempt = 0; ; attempt++)
         {
-            // PictureLazy: pictures load only when SelectBestEmbeddedPicture reads
-            // their bytes below, so a file whose art is not wanted (embedded artwork
-            // off) never materialises it.
-            using var file = TagLib.File.Create(filePath, TagLib.ReadStyle.Average | TagLib.ReadStyle.PictureLazy);
-            var fileInfo = new FileInfo(filePath);
-            return BuildTrack(file, filePath, fileInfo.Name, fileInfo.Length, fileInfo.LastWriteTimeUtc, localPath: filePath, out embeddedArt);
-        }
-        catch (Exception)
-        {
-            // File is corrupted, unsupported, or locked — skip it
-            return null;
+            try
+            {
+                // PictureLazy: pictures load only when SelectBestEmbeddedPicture reads
+                // their bytes below, so a file whose art is not wanted (embedded artwork
+                // off) never materialises it.
+                using var file = TagLib.File.Create(filePath, TagLib.ReadStyle.Average | TagLib.ReadStyle.PictureLazy);
+                var fileInfo = new FileInfo(filePath);
+                return BuildTrack(file, filePath, fileInfo.Name, fileInfo.Length, fileInfo.LastWriteTimeUtc, localPath: filePath, out embeddedArt);
+            }
+            catch (Exception ex) when (IsFileBusy(ex) && attempt < ReadRetryDelaysMs.Length)
+            {
+                // Another program has the file open right now: a download or copy finishing,
+                // a tag editor saving, an antivirus or indexer scan. Giving up at once left a
+                // new song out of the scan (or the folder watcher's import) with nothing to
+                // bring it back before the next full scan, so a short hold is waited out.
+                Thread.Sleep(ReadRetryDelaysMs[attempt]);
+            }
+            catch (Exception ex)
+            {
+                // File is corrupted, unsupported, or still held after the waits — skip it
+                // (a scan records nothing for it, so the next pass reads it again).
+                if (IsFileBusy(ex))
+                    DebugLog.Write("Metadata", $"Skipped '{Path.GetFileName(filePath)}': still in use by "
+                        + $"another program after {ReadRetryDelaysMs.Sum()} ms");
+                else if (ex is not TagLib.CorruptFileException and not TagLib.UnsupportedFormatException)
+                    UnexpectedReadFailure.Note($"'{Path.GetFileName(filePath)}': {ex.GetType().Name}: {ex.Message}");
+                return null;
+            }
         }
     }
+
+    // Waits between tag-read attempts while another program holds the file (see ReadTrackMetadata).
+    private static readonly int[] ReadRetryDelaysMs = [50, 100, 200, 400, 800];
+
+    // A tag read that failed for a reason other than a corrupt or unsupported file drops the
+    // song just as silently; the first few per session are named with the exception.
+    private static readonly CappedBreadcrumb UnexpectedReadFailure =
+        new("Metadata", "tag read failed:", cap: 20, isEnabled: () => true);
+
+    /// <summary>
+    /// What reading a file another program has open throws: a sharing violation at the open
+    /// (a writer, or anything that opened it exclusively) or a lock violation on a locked
+    /// range. Windows names both by code, so a failing disk or a vanished share is not waited
+    /// on; elsewhere the only refusal is .NET's own share-mode lock, and any I/O error but a
+    /// missing file counts.
+    /// </summary>
+    private static bool IsFileBusy(Exception ex) => ex is IOException io && (OperatingSystem.IsWindows()
+        ? io.HResult is unchecked((int)0x80070020) or unchecked((int)0x80070021) // ERROR_SHARING_VIOLATION, ERROR_LOCK_VIOLATION
+        : io is not FileNotFoundException and not DirectoryNotFoundException and not EndOfStreamException);
 
     /// <summary>
     /// Reads a scan entry: by path when the entry has one (the desktop path with its
@@ -240,8 +277,10 @@ public class MetadataService : IMetadataService
     /// <summary>
     /// Builds the Track from an opened TagLib file. <paramref name="localPath"/> is null
     /// for stream-backed entries (Android SAF): those skip the path-only extras (ffprobe
-    /// metrics, the ALAC atom re-read, folder-derived metadata) rather than throwing on a
-    /// content:// string.
+    /// metrics, folder-derived metadata) rather than throwing on a content:// string. The
+    /// ALAC atom is read from the entry's own stream instead: without it every ALAC on the
+    /// phone had no bit depth (TagLib# gives none for ALAC, and the path read failed on the
+    /// content:// name), so a 24-bit file read as "48 kHz ALAC" and a 96 kHz one as 48 kHz.
     /// </summary>
     private Track? BuildTrack(TagLib.File file, string filePath, string fileName, long length, DateTime lastWriteUtc,
         string? localPath, out byte[]? embeddedArt)
@@ -254,8 +293,10 @@ public class MetadataService : IMetadataService
         var codec = DetermineCodec(file, ext);
         var sampleRate = NormalizeSampleRate(props.AudioSampleRate);
         // ALAC: the decoder config atom is the authority for bit depth AND sample rate (see
-        // ResolveAlacSampleRate). Read once here; path-based, so only for entries reachable by path.
-        var alacConfig = localPath != null && IsAlacContainer(ext, codec) ? TryReadAlacConfigFromFile(localPath) : (BitDepth: 0, SampleRate: 0);
+        // ResolveAlacSampleRate). Read once here: from the path, or from the stream TagLib read.
+        var alacConfig = !IsAlacContainer(ext, codec) ? (BitDepth: 0, SampleRate: 0)
+            : localPath != null ? TryReadAlacConfigFromFile(localPath)
+            : TryReadAlacConfig(file.FileAbstraction.ReadStream);
         var bitsPerSample = NormalizeBitsPerSample(props.BitsPerSample, file, ext, sampleRate, codec, alacConfig.BitDepth);
         sampleRate = ResolveAlacSampleRate(sampleRate, alacConfig.SampleRate);
         var bitrate = NormalizeBitrate(props.AudioBitrate, length, props.Duration);
@@ -706,8 +747,8 @@ public class MetadataService : IMetadataService
     /// Writing to a same-directory copy and atomically renaming it over the original
     /// leaves the player's open file descriptor pointing at the untouched original
     /// inode, so playback is undisturbed and the new tags take effect on next load.
-    /// Windows already serializes this through its file share lock, so the in-place
-    /// path is kept there to avoid a needless full-file copy.
+    /// Windows takes the same path (crash safety); there the rename over the playing
+    /// file needs POSIX semantics or the player letting go of it (see <see cref="ReplaceWithCopy"/>).
     /// </summary>
     private static bool SaveTagsAtomically(string targetFilePath, Action<TagLib.File> applyTags)
         => SaveTagsAtomically(targetFilePath, applyTags, out _);
@@ -740,8 +781,11 @@ public class MetadataService : IMetadataService
     /// The temp-copy + atomic-rename save behind <see cref="SaveTagsAtomically(string, Action{TagLib.File})"/>,
     /// throwing on failure (after removing the temp copy) so callers that retry on a
     /// transient <see cref="IOException"/> — the ReplayGain scanner — can tell it apart.
+    /// <paramref name="releaseOpenFile"/> false never has the player let go of the file (see
+    /// <see cref="ReplaceWithCopy"/>): a background write must not put a gap in the music.
     /// </summary>
-    internal static void SaveTagsAtomicallyOrThrow(string targetFilePath, Action<TagLib.File> applyTags)
+    internal static void SaveTagsAtomicallyOrThrow(string targetFilePath, Action<TagLib.File> applyTags,
+        bool releaseOpenFile = true)
     {
         // Same directory keeps the rename on one filesystem (so it is atomic); the
         // leading dot hides the transient file; the original extension is preserved
@@ -770,14 +814,93 @@ public class MetadataService : IMetadataService
                 applyTags(file);
                 file.Save();
             }
-            File.Move(tempPath, targetFilePath, overwrite: true);
+            ReplaceWithCopy(tempPath, targetFilePath, releaseOpenFile);
         }
         catch
         {
-            try { if (File.Exists(tempPath)) File.Delete(tempPath); } catch { }
+            try
+            {
+                if (File.Exists(tempPath))
+                {
+                    // File.Copy carries a read-only original's attribute over to the copy,
+                    // and File.Delete refuses a read-only file: every failed save of a
+                    // read-only track left a full .noctis-* copy beside it.
+                    File.SetAttributes(tempPath, FileAttributes.Normal);
+                    File.Delete(tempPath);
+                }
+            }
+            catch { }
             throw;
         }
     }
+
+    // Waits between rename attempts once the first one was refused: covers handles that
+    // close on their own (a waveform or BPM decode, an antivirus scan of the fresh copy)
+    // and a released holder whose handle closes a moment late (an ffmpeg being killed).
+    private static readonly int[] ReplaceRetryDelaysMs = [50, 100, 200, 400, 800];
+
+    /// <summary>Test seam: skip the POSIX rename, so a test reaches the release fallback on NTFS.</summary>
+    internal static bool PosixReplaceDisabled { get; set; }
+
+    /// <summary>
+    /// Renames the tagged copy over the original. Windows refuses to replace a file while
+    /// any handle on it is open (also one shared for delete: MoveFileEx is no POSIX rename),
+    /// and LibVLC keeps the playing and the staged next track open, so every save of the
+    /// playing track failed with "Access to the path is denied" (live, 10-13).
+    /// A refused rename is retried with POSIX semantics first: LibVLC's handle shares
+    /// delete, so on NTFS the new file takes the name while the player keeps reading the
+    /// old data, untouched, exactly as on macOS/Linux. Where that is refused too (FAT,
+    /// exFAT, network shares; a reader not sharing delete, like the side decode's ffmpeg)
+    /// the registered holders (<see cref="OpenFileHolders"/>) let go of the file, the rename
+    /// is retried briefly, and the holders open it again where they were.
+    /// </summary>
+    private static void ReplaceWithCopy(string tempPath, string targetFilePath, bool releaseOpenFile)
+    {
+        try
+        {
+            File.Move(tempPath, targetFilePath, overwrite: true);
+            return;
+        }
+        catch (Exception ex) when (IsFileInUse(ex))
+        {
+            if (OperatingSystem.IsWindows() && !PosixReplaceDisabled)
+            {
+                if (WindowsPosixRename.TryReplace(tempPath, targetFilePath, out var error))
+                    return;
+                DebugLog.Write("Metadata", $"POSIX replace of '{Path.GetFileName(targetFilePath)}' refused: "
+                    + WindowsPosixRename.Describe(error));
+            }
+            DebugLog.Write("Metadata", $"Replace of '{Path.GetFileName(targetFilePath)}' refused ({ex.Message}), retrying"
+                + (releaseOpenFile ? " with the file released" : ""));
+        }
+
+        if (releaseOpenFile)
+            OpenFileHolders.RunReleased(targetFilePath, () => MoveWithRetries(tempPath, targetFilePath));
+        else
+            MoveWithRetries(tempPath, targetFilePath);
+    }
+
+    private static void MoveWithRetries(string tempPath, string targetFilePath)
+    {
+        for (var attempt = 0; ; attempt++)
+        {
+            try
+            {
+                File.Move(tempPath, targetFilePath, overwrite: true);
+                return;
+            }
+            catch (Exception ex) when (IsFileInUse(ex) && attempt < ReplaceRetryDelaysMs.Length)
+            {
+                Thread.Sleep(ReplaceRetryDelaysMs[attempt]);
+            }
+        }
+    }
+
+    /// <summary>What a rename over a file something has open throws: access denied, or a
+    /// sharing violation. A missing file or folder is not worth a retry.</summary>
+    private static bool IsFileInUse(Exception ex) =>
+        ex is UnauthorizedAccessException ||
+        (ex is IOException && ex is not FileNotFoundException && ex is not DirectoryNotFoundException);
 
     /// <summary>Copies Unix mode bits from source to destination. No-op on Windows.</summary>
     private static void TryCopyUnixFileMode(string source, string destination)
@@ -946,9 +1069,9 @@ public class MetadataService : IMetadataService
     }
 
     /// <summary>An MP4-family file whose codec reads as Apple Lossless.</summary>
-    private static bool IsAlacContainer(string ext, string? codec)
+    internal static bool IsAlacContainer(string ext, string? codec)
     {
-        if (ext is not (".m4a" or ".mp4" or ".alac"))
+        if (ext is not (".m4a" or ".m4b" or ".mp4" or ".alac"))
             return false;
         var codecLower = (codec ?? string.Empty).ToLowerInvariant();
         return codecLower.Contains("alac") || codecLower.Contains("lossless");
@@ -1012,44 +1135,90 @@ public class MetadataService : IMetadataService
         try
         {
             using var fs = new FileStream(filePath, FileMode.Open, FileAccess.Read, FileShare.ReadWrite);
-            var scanSize = (int)Math.Min(fs.Length, 1024 * 1024);
-            var data = new byte[scanSize];
-            int bytesRead = fs.Read(data, 0, scanSize);
-
-            for (int i = 4; i < bytesRead - 32; i++)
-            {
-                if (data[i] != 'a' || data[i + 1] != 'l' || data[i + 2] != 'a' || data[i + 3] != 'c')
-                    continue;
-
-                // Box size is the 4 bytes before the type (big-endian).
-                int boxSize = (data[i - 4] << 24) | (data[i - 3] << 16) | (data[i - 2] << 8) | data[i - 1];
-
-                // Inner ALAC config box is small (typically 36 bytes).
-                // Outer ALAC sample entry is much larger (300+ bytes). Skip it.
-                if (boxSize < 28 || boxSize > 64)
-                    continue;
-
-                int configStart = i + 4; // past 'alac' type bytes
-
-                // bitDepth at config offset 9: version(4) + frameLength(4) + compatVersion(1)
-                int bdOffset = configStart + 9;
-                // sampleRate at config offset 24: +tuning(3) +channels(1) +maxRun(2) +maxFrameBytes(4) +avgBitRate(4)
-                int srOffset = configStart + 24;
-
-                if (srOffset + 3 >= bytesRead)
-                    continue;
-
-                int bd = data[bdOffset];
-                int sr = (data[srOffset] << 24) | (data[srOffset + 1] << 16) |
-                         (data[srOffset + 2] << 8) | data[srOffset + 3];
-
-                if (bd is 16 or 24 or 32)
-                    return (bd, sr >= 8000 ? sr : 0);
-            }
+            return TryReadAlacConfig(fs);
         }
         catch
         {
             // Best-effort fallback only; return zeros if anything goes wrong.
+        }
+
+        return (0, 0);
+    }
+
+    /// <summary>
+    /// <see cref="TryReadAlacConfigFromFile"/> over an open seekable stream (a file, or the
+    /// Android content stream TagLib read): the stream's position is put back afterwards.
+    /// </summary>
+    private static (int BitDepth, int SampleRate) TryReadAlacConfig(Stream stream)
+    {
+        var position = stream.CanSeek ? stream.Position : 0;
+        try
+        {
+            stream.Position = 0;
+            var scanSize = (int)Math.Min(stream.Length, 1024 * 1024);
+            var data = new byte[scanSize];
+            // A content stream may hand back less than asked per read; fill the window.
+            var bytesRead = 0;
+            while (bytesRead < scanSize)
+            {
+                var n = stream.Read(data, bytesRead, scanSize - bytesRead);
+                if (n <= 0) break;
+                bytesRead += n;
+            }
+            var config = FindAlacConfig(data, bytesRead);
+            if (config.BitDepth > 0)
+                return config;
+
+            // moov after mdat (ffmpeg without +faststart — the Audio Converter's own ALAC
+            // output): the atom sits past the first megabyte. Read moov itself.
+            if (stream.Length > scanSize && Mp4ChapterReader.ReadTopLevelBox(stream, "moov") is { } moov)
+                return FindAlacConfig(moov, moov.Length);
+        }
+        catch
+        {
+            // Best-effort fallback only; return zeros if anything goes wrong.
+        }
+        finally
+        {
+            try { if (stream.CanSeek) stream.Position = position; } catch { /* already unusable */ }
+        }
+
+        return (0, 0);
+    }
+
+    /// <summary>The ALAC decoder config box's bit depth and sample rate within
+    /// <paramref name="data"/>, or zeros (layout on <see cref="TryReadAlacConfigFromFile"/>).</summary>
+    private static (int BitDepth, int SampleRate) FindAlacConfig(byte[] data, int bytesRead)
+    {
+        for (int i = 4; i < bytesRead - 32; i++)
+        {
+            if (data[i] != 'a' || data[i + 1] != 'l' || data[i + 2] != 'a' || data[i + 3] != 'c')
+                continue;
+
+            // Box size is the 4 bytes before the type (big-endian).
+            int boxSize = (data[i - 4] << 24) | (data[i - 3] << 16) | (data[i - 2] << 8) | data[i - 1];
+
+            // Inner ALAC config box is small (typically 36 bytes).
+            // Outer ALAC sample entry is much larger (300+ bytes). Skip it.
+            if (boxSize < 28 || boxSize > 64)
+                continue;
+
+            int configStart = i + 4; // past 'alac' type bytes
+
+            // bitDepth at config offset 9: version(4) + frameLength(4) + compatVersion(1)
+            int bdOffset = configStart + 9;
+            // sampleRate at config offset 24: +tuning(3) +channels(1) +maxRun(2) +maxFrameBytes(4) +avgBitRate(4)
+            int srOffset = configStart + 24;
+
+            if (srOffset + 3 >= bytesRead)
+                continue;
+
+            int bd = data[bdOffset];
+            int sr = (data[srOffset] << 24) | (data[srOffset + 1] << 16) |
+                     (data[srOffset + 2] << 8) | data[srOffset + 3];
+
+            if (bd is 16 or 24 or 32)
+                return (bd, sr >= 8000 ? sr : 0);
         }
 
         return (0, 0);
@@ -1250,7 +1419,7 @@ public class MetadataService : IMetadataService
             ".mp3" => "MPEG Audio Layer 3",
             ".flac" => "FLAC",
             ".ogg" or ".oga" => "Vorbis",
-            ".m4a" or ".mp4" or ".aac" => "AAC",
+            ".m4a" or ".m4b" or ".mp4" or ".aac" => "AAC",
             ".alac" => "Apple Lossless (ALAC)",
             ".wav" => "PCM (WAV)",
             ".aiff" or ".aif" or ".aifc" => "PCM (AIFF)",
@@ -1452,6 +1621,7 @@ public class MetadataService : IMetadataService
             ".flac" => "FLAC",
             ".ogg" or ".oga" => "OGG Vorbis",
             ".m4a" => "Apple Audio (M4A)",
+            ".m4b" => "Apple Audiobook (M4B)",
             ".mp4" => "MPEG-4 Audio",
             ".aac" => "AAC",
             ".alac" => "Apple Lossless",

@@ -187,4 +187,50 @@ public class AnimatedArtworkLookupTests
         Assert.False(ITunesArtworkService.IsLikelySameAlbum("", "Juice WRLD", "Legends Never Die", "Juice WRLD"));
         Assert.False(ITunesArtworkService.IsLikelySameAlbum("Legends Never Die", "Juice WRLD", null, "Juice WRLD"));
     }
+
+    // What people type into the animated-artwork box. Read as a title, "album artist" matched
+    // nothing, so "YHLQMDLG Bad Bunny" missed an album that has a loop.
+    [Theory]
+    [InlineData("YHLQMDLG", "Bad Bunny", "YHLQMDLG")]
+    [InlineData("YHLQMDLG", "Bad Bunny", "YHLQMDLG Bad Bunny")]
+    [InlineData("YHLQMDLG", "Bad Bunny", "Bad Bunny YHLQMDLG")]
+    [InlineData("YHLQMDLG", "Bad Bunny", "yhlqmdlg - bad bunny")]
+    [InlineData("Happier Than Ever", "Billie Eilish", "Happier Than Ever by Billie Eilish")]
+    [InlineData("Die With A Smile - Single", "Lady Gaga & Bruno Mars", "Die With A Smile Lady Gaga")]
+    [InlineData("Die With A Smile - Single", "Lady Gaga & Bruno Mars", "Die With A Smile Bruno Mars")]
+    [InlineData("Midnights (3am Edition)", "Taylor Swift", "Midnights (3am Edition) Taylor Swift")]
+    [InlineData("Happier Than Ever (Deluxe Edition)", "Billie Eilish", "Happier Than Ever Billie Eilish")]
+    public void TypedQueryMatchesTheAlbumWithOrWithoutItsArtist(string album, string artist, string typed)
+    {
+        Assert.True(ITunesArtworkService.MatchesTypedAlbumQuery(album, artist, typed));
+    }
+
+    [Theory]
+    // A different act's same-titled record: the leftover is not their credit.
+    [InlineData("Happier Than Ever - Single", "ASTN", "Happier Than Ever Billie Eilish")]
+    // Another edition, not the album asked for.
+    [InlineData("Happier Than Ever (Edit) - Single", "Billie Eilish", "Happier Than Ever Billie Eilish")]
+    // A re-recording is its own release; the typed text names the original.
+    [InlineData("1989 (Taylor's Version)", "Taylor Swift", "1989 Taylor Swift")]
+    // The reverse: the extra words are not the artist, so the original 1989 is not it either.
+    [InlineData("1989", "Taylor Swift", "1989 Taylor's Version Taylor Swift")]
+    // A part of a word is not the artist.
+    [InlineData("MAYHEM", "Lady Gaga", "MAYHEM Gag")]
+    // A different album that merely starts with the typed title.
+    [InlineData("Lover", "Taylor Swift", "Lover Boy Taylor Swift")]
+    public void TypedQueryRejectsOtherReleases(string album, string artist, string typed)
+    {
+        Assert.False(ITunesArtworkService.MatchesTypedAlbumQuery(album, artist, typed));
+    }
+
+    [Fact]
+    public void SaysWhetherAPageHasNoLoopOrHasMoved()
+    {
+        Assert.Contains("videoArtwork is null",
+            ITunesArtworkService.DescribeMissingAnimatedArtwork("{\"videoArtwork\":null,\"tallVideoArtwork\":null}"));
+        Assert.Contains("page format may have changed",
+            ITunesArtworkService.DescribeMissingAnimatedArtwork("{\"videoArtwork\":{\"dictionary\":{}}}"));
+        Assert.Contains("no videoArtwork field",
+            ITunesArtworkService.DescribeMissingAnimatedArtwork("<html></html>"));
+    }
 }

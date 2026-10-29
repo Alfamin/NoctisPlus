@@ -695,7 +695,7 @@ public partial class SettingsViewModel : ViewModelBase
     /// <summary>Settings ▸ Lyrics ▸ Preferred lyrics type (GitHub #135): "WordSynced", "LineSynced" or "Plain".</summary>
     [ObservableProperty] private string _lyricsPreferredType = nameof(Models.LyricsPreferredType.WordSynced);
 
-    /// <summary>One row of a lyrics saving picker: the stored value and its label.</summary>
+    /// <summary>One row of a string-valued picker (lyrics saving, Discord status): the stored value and its label.</summary>
     public sealed record LyricsChoiceOption(string Value, string Label)
     {
         public override string ToString() => Label;
@@ -751,6 +751,32 @@ public partial class SettingsViewModel : ViewModelBase
         {
             if (value is null) return;
             LyricsPreferredType = value.Value;
+        }
+    }
+
+    public IReadOnlyList<LyricsChoiceOption> DiscordStatusDisplayOptions
+    {
+        get => _discordStatusDisplayOptions;
+        private set => SetProperty(ref _discordStatusDisplayOptions, value);
+    }
+    private IReadOnlyList<LyricsChoiceOption> _discordStatusDisplayOptions = BuildDiscordStatusDisplayOptions();
+
+    private static IReadOnlyList<LyricsChoiceOption> BuildDiscordStatusDisplayOptions() =>
+        Enum.GetValues<Models.DiscordStatusDisplay>()
+            .Select(d => new LyricsChoiceOption(d.ToString(), Loc.T($"Settings.DiscordStatusDisplay.{d}")))
+            .ToList();
+
+    public LyricsChoiceOption? SelectedDiscordStatusDisplayOption
+    {
+        get
+        {
+            var current = DiscordPresenceOptions.ParseStatusDisplay(DiscordStatusDisplay).ToString();
+            return DiscordStatusDisplayOptions.FirstOrDefault(o => o.Value == current);
+        }
+        set
+        {
+            if (value is null) return;
+            DiscordStatusDisplay = value.Value;
         }
     }
 
@@ -986,6 +1012,8 @@ public partial class SettingsViewModel : ViewModelBase
         OnPropertyChanged(nameof(SelectedLyricsSaveTargetOption));
         LyricsPreferredTypeOptions = BuildLyricsPreferredTypeOptions();
         OnPropertyChanged(nameof(SelectedLyricsPreferredTypeOption));
+        DiscordStatusDisplayOptions = BuildDiscordStatusDisplayOptions();
+        OnPropertyChanged(nameof(SelectedDiscordStatusDisplayOption));
     }
 
     public VisualizerStyle LyricsVisualizerStyleMode => VisualizerStyles.Parse(LyricsVisualizerStyle);
@@ -1043,6 +1071,7 @@ public partial class SettingsViewModel : ViewModelBase
     /// <summary>Percent floor (0–60) under the dimmed lyric lines; 0 = default ramp.</summary>
     [ObservableProperty] private int _lyricsMinLineOpacity;
     [ObservableProperty] private bool _lyricsJoinSplitWords;
+    [ObservableProperty] private bool _lyricsGlowAndLift = true;
     [ObservableProperty] private bool _lyricsShowTranslations = true;
     [ObservableProperty] private bool _lyricsShowRomanization = true;
     [ObservableProperty] private bool _lyricsShowBackgroundVocals = true;
@@ -1096,15 +1125,22 @@ public partial class SettingsViewModel : ViewModelBase
             return;
         }
 
-        LaunchAtStartupError = value
-            ? "Couldn't register Noctis to launch at login. Check the app has permission to write its startup entry."
-            : "Couldn't remove the launch-at-login entry.";
+        LaunchAtStartupError = !value
+            ? "Couldn't remove the launch-at-login entry."
+            : OperatingSystem.IsMacOS() && !Helpers.StartupHelper.IsRunningFromMacAppBundle
+                ? "Launch at login needs Noctis to run from its app bundle (Noctis.app), e.g. from the Applications folder."
+                : "Couldn't register Noctis to launch at login. Check the app has permission to write its startup entry.";
 
         if (actual != value)
         {
-            _suppressLaunchAtStartupHandler = true;
-            try { LaunchAtStartup = actual; }
-            finally { _suppressLaunchAtStartupHandler = false; }
+            // Posted: this runs inside the toggle's own TwoWay write, and a value raised from
+            // there never reaches the switch, so it stayed drawn ON with nothing registered.
+            Dispatcher.UIThread.Post(() =>
+            {
+                _suppressLaunchAtStartupHandler = true;
+                try { LaunchAtStartup = actual; }
+                finally { _suppressLaunchAtStartupHandler = false; }
+            });
         }
     }
 
@@ -1161,6 +1197,8 @@ public partial class SettingsViewModel : ViewModelBase
     [ObservableProperty] private string _albumReleaseTypeFilter = "";
     [ObservableProperty] private string _artistSortMode = "name";
     [ObservableProperty] private bool _artistSortAscending = true;
+    /// <summary>Artists page layout: "grid" (portrait tiles, default) or "list" (Songs-style rows).</summary>
+    [ObservableProperty] private string _artistViewMode = "grid";
     [ObservableProperty] private string _foldersSortMode = "default";
     [ObservableProperty] private string _artistReleaseSortMode = "newest";
     [ObservableProperty] private bool _artistSimilarExpanded = true;
@@ -1176,6 +1214,7 @@ public partial class SettingsViewModel : ViewModelBase
     partial void OnAlbumReleaseTypeFilterChanged(string value) { if (_settingsLoaded) _ = SaveAsync(); }
     partial void OnArtistSortModeChanged(string value) { if (_settingsLoaded) _ = SaveAsync(); }
     partial void OnArtistSortAscendingChanged(bool value) { if (_settingsLoaded) _ = SaveAsync(); }
+    partial void OnArtistViewModeChanged(string value) { if (_settingsLoaded) _ = SaveAsync(); }
     partial void OnFoldersSortModeChanged(string value) { if (_settingsLoaded) _ = SaveAsync(); }
     partial void OnArtistReleaseSortModeChanged(string value) { if (_settingsLoaded) _ = SaveAsync(); }
     partial void OnArtistSimilarExpandedChanged(bool value) { if (_settingsLoaded) _ = SaveAsync(); }
@@ -1969,6 +2008,7 @@ public partial class SettingsViewModel : ViewModelBase
         RefreshFileAssociationState();
     }
     [ObservableProperty] private bool _taskbarProgressEnabled;
+    [ObservableProperty] private bool _taskbarMediaControlsEnabled = true;
     [ObservableProperty] private bool _liquidGlassEnabled;
     [ObservableProperty] private bool _collapseAlbumEditions;
     [ObservableProperty] private bool _mergeFeaturedFromTitles = true;
@@ -1997,6 +2037,14 @@ public partial class SettingsViewModel : ViewModelBase
     /// <summary>Text of the "add separator" box on the Library tab.</summary>
     [ObservableProperty] private string _newArtistSeparator = string.Empty;
 
+    /// <summary>"Keep these names together": names the separators never cut apart
+    /// ("Tyler, The Creator"). Edited as chips. Starts on the built-ins so a regroup that
+    /// runs before settings load (the mode or separators arriving first) keeps them.</summary>
+    public ObservableCollection<string> ArtistProtectedNames { get; } = new(ArtistCredit.DefaultProtectedNames);
+
+    /// <summary>Text of the "add name" box under <see cref="ArtistProtectedNames"/>.</summary>
+    [ObservableProperty] private string _newArtistProtectedName = string.Empty;
+
     // ── Artist sort: ignore leading words (GitHub #99) ──
 
     /// <summary>When on, the Artists grid's name sort skips a leading word from
@@ -2021,6 +2069,8 @@ public partial class SettingsViewModel : ViewModelBase
     [ObservableProperty] private bool _netEaseEnabled = true;
     [ObservableProperty] private bool _musixmatchEnabled;
     [ObservableProperty] private bool _kugouEnabled = true;
+    [ObservableProperty] private bool _lrcRedEnabled = true;
+    [ObservableProperty] private bool _unisonEnabled = true;
     [ObservableProperty] private bool _youTubeMusicLyricsEnabled;
 
     // ── Metadata Providers ──
@@ -2148,6 +2198,8 @@ public partial class SettingsViewModel : ViewModelBase
     [ObservableProperty] private bool _discordRichPresenceEnabled;
     /// <summary>Album line on the Discord card; see <see cref="AppSettings.DiscordShowAlbum"/>.</summary>
     [ObservableProperty] private bool _discordShowAlbum = true;
+    /// <summary>Discord status line: "Artist", "Title" or "AppName"; see <see cref="AppSettings.DiscordStatusDisplay"/>.</summary>
+    [ObservableProperty] private string _discordStatusDisplay = nameof(Models.DiscordStatusDisplay.Artist);
     [ObservableProperty] private bool _lastFmScrobblingEnabled;
     [ObservableProperty] private string _lastFmUsername = "";
     [ObservableProperty] private bool _isLastFmConnected;
@@ -2221,6 +2273,9 @@ public partial class SettingsViewModel : ViewModelBase
     [ObservableProperty] private bool _scanOnStartup = true;
 
     [ObservableProperty] private bool _watchFoldersEnabled = true;
+
+    /// <summary>Settings › Library › Inbox for New Music (AppSettings.InboxEnabled).</summary>
+    [ObservableProperty] private bool _inboxEnabled;
 
     [ObservableProperty] private bool _useEmbeddedArtwork = true;
 
@@ -2504,6 +2559,11 @@ public partial class SettingsViewModel : ViewModelBase
             {
                 ScanProgress = count;
                 ScanStatusText = $"Scanning Library {count:N0}";
+                // A scan Settings didn't start (Scan on Startup, the folder watcher) never
+                // reaches RunScanCoreAsync's closing status, so its count stayed up for the
+                // rest of the session.
+                if (!IsScanning)
+                    _ = ClearExternalScanStatusWhenDoneAsync();
             });
         };
 
@@ -2578,6 +2638,7 @@ public partial class SettingsViewModel : ViewModelBase
     public void SetAudioPlayer(IAudioPlayer audioPlayer)
     {
         _audioPlayer = audioPlayer;
+        OnPropertyChanged(nameof(HeadphoneSurroundNeedsRestart));
         // Only surface the output-mode status while Exclusive Mode is enabled (it
         // describes the exclusive/fell-back-to-shared state). When exclusive is off
         // the line stays hidden. This also prevents a flicker: toggling exclusive
@@ -2760,6 +2821,7 @@ public partial class SettingsViewModel : ViewModelBase
 
             ScanOnStartup = _settings.ScanOnStartup;
             WatchFoldersEnabled = _settings.WatchFoldersEnabled;
+            InboxEnabled = _settings.InboxEnabled;
             UseEmbeddedArtwork = _settings.UseEmbeddedArtwork;
             OrganizePattern = _settings.OrganizePattern;
             OrganizeTargetRoot = _settings.OrganizeTargetRoot;
@@ -2847,6 +2909,7 @@ public partial class SettingsViewModel : ViewModelBase
             LyricsFullScreenFocusEnabled = _settings.LyricsFullScreenFocusEnabled;
             LyricsMinLineOpacity = Math.Clamp(_settings.LyricsMinLineOpacity, 0, 60);
             LyricsJoinSplitWords = _settings.LyricsJoinSplitWords;
+            LyricsGlowAndLift = _settings.LyricsGlowAndLift;
             LyricsSaveTarget = LyricsSaveOptions.ParseTarget(_settings.LyricsSaveTarget).ToString();
             LyricsAutoDownload = _settings.LyricsAutoDownload;
             LyricsPreferredType = LyricsSaveOptions.ParsePreferredType(_settings.LyricsPreferredType).ToString();
@@ -2884,6 +2947,7 @@ public partial class SettingsViewModel : ViewModelBase
             AlbumReleaseTypeFilter = _settings.AlbumReleaseTypeFilter;
             ArtistSortMode = _settings.ArtistSortMode;
             ArtistSortAscending = _settings.ArtistSortAscending;
+            ArtistViewMode = _settings.ArtistViewMode;
             FoldersSortMode = _settings.FoldersSortMode;
             ArtistReleaseSortMode = _settings.ArtistReleaseSortMode;
             ArtistSimilarExpanded = _settings.ArtistSimilarExpanded;
@@ -2910,11 +2974,13 @@ public partial class SettingsViewModel : ViewModelBase
             SidebarAlwaysExpanded = _settings.SidebarAlwaysExpanded;
             LiquidGlassEnabled = _settings.LiquidGlassEnabled;
             TaskbarProgressEnabled = _settings.TaskbarProgressEnabled;
+            TaskbarMediaControlsEnabled = _settings.TaskbarMediaControlsEnabled;
             RefreshFileAssociationState();
             CollapseAlbumEditions = _settings.CollapseAlbumEditions;
             MergeFeaturedFromTitles = _settings.MergeFeaturedFromTitles;
             ArtistGroupMode = ArtistGroupModes.Parse(_settings.ArtistGroupMode).ToString();
             ReplaceArtistTagSeparators(_settings.ArtistTagSeparators);
+            ReplaceArtistProtectedNames(_settings.ArtistProtectedNames ?? ArtistCredit.DefaultProtectedNames.ToList());
             IgnoreLeadingWordsInArtistSort = _settings.IgnoreLeadingWordsInArtistSort;
             ReplaceArtistSortIgnoredWords(_settings.ArtistSortIgnoredWords);
 
@@ -2943,6 +3009,8 @@ public partial class SettingsViewModel : ViewModelBase
             NetEaseEnabled = _settings.NetEaseEnabled;
             MusixmatchEnabled = _settings.MusixmatchEnabled;
             KugouEnabled = _settings.KugouEnabled;
+            LrcRedEnabled = _settings.LrcRedEnabled;
+            UnisonEnabled = _settings.UnisonEnabled;
             YouTubeMusicLyricsEnabled = _settings.YouTubeMusicLyricsEnabled;
             LoadFeatureSettings();
 
@@ -2994,6 +3062,7 @@ public partial class SettingsViewModel : ViewModelBase
             // Integrations
             DiscordRichPresenceEnabled = _settings.DiscordRichPresenceEnabled;
             DiscordShowAlbum = _settings.DiscordShowAlbum;
+            DiscordStatusDisplay = DiscordPresenceOptions.ParseStatusDisplay(_settings.DiscordStatusDisplay).ToString();
             LastFmScrobblingEnabled = _settings.LastFmScrobblingEnabled;
             LastFmUsername = _settings.LastFmUsername;
 
@@ -3240,6 +3309,7 @@ public partial class SettingsViewModel : ViewModelBase
 
         _settings.ScanOnStartup = ScanOnStartup;
         _settings.WatchFoldersEnabled = WatchFoldersEnabled;
+        _settings.InboxEnabled = InboxEnabled;
         _settings.UseEmbeddedArtwork = UseEmbeddedArtwork;
         _settings.OrganizePattern = OrganizePattern;
         _settings.OrganizeTargetRoot = OrganizeTargetRoot;
@@ -3330,6 +3400,7 @@ public partial class SettingsViewModel : ViewModelBase
         _settings.LyricsFullScreenFocusEnabled = LyricsFullScreenFocusEnabled;
         _settings.LyricsMinLineOpacity = LyricsMinLineOpacity;
         _settings.LyricsJoinSplitWords = LyricsJoinSplitWords;
+        _settings.LyricsGlowAndLift = LyricsGlowAndLift;
         _settings.LyricsSaveTarget = LyricsSaveOptions.ParseTarget(LyricsSaveTarget).ToString();
         _settings.LyricsAutoDownload = LyricsAutoDownload;
         _settings.LyricsPreferredType = LyricsSaveOptions.ParsePreferredType(LyricsPreferredType).ToString();
@@ -3364,6 +3435,7 @@ public partial class SettingsViewModel : ViewModelBase
         _settings.AlbumReleaseTypeFilter = AlbumReleaseTypeFilter;
         _settings.ArtistSortMode = ArtistSortMode;
         _settings.ArtistSortAscending = ArtistSortAscending;
+        _settings.ArtistViewMode = ArtistViewMode;
         _settings.FoldersSortMode = FoldersSortMode;
         _settings.ArtistReleaseSortMode = ArtistReleaseSortMode;
         _settings.ArtistSimilarExpanded = ArtistSimilarExpanded;
@@ -3389,10 +3461,12 @@ public partial class SettingsViewModel : ViewModelBase
         _settings.SidebarAlwaysExpanded = SidebarAlwaysExpanded;
         _settings.LiquidGlassEnabled = LiquidGlassEnabled;
         _settings.TaskbarProgressEnabled = TaskbarProgressEnabled;
+        _settings.TaskbarMediaControlsEnabled = TaskbarMediaControlsEnabled;
         _settings.CollapseAlbumEditions = CollapseAlbumEditions;
         _settings.MergeFeaturedFromTitles = MergeFeaturedFromTitles;
         _settings.ArtistGroupMode = ArtistGroupModes.Parse(ArtistGroupMode).ToString();
         _settings.ArtistTagSeparators = ArtistTagSeparators.ToList();
+        _settings.ArtistProtectedNames = ArtistProtectedNames.ToList();
         _settings.IgnoreLeadingWordsInArtistSort = IgnoreLeadingWordsInArtistSort;
         _settings.ArtistSortIgnoredWords = ArtistSortIgnoredWords.ToList();
         _settings.LrcLibEnabled = LrcLibEnabled;
@@ -3415,6 +3489,8 @@ public partial class SettingsViewModel : ViewModelBase
         _settings.NetEaseEnabled = NetEaseEnabled;
         _settings.MusixmatchEnabled = MusixmatchEnabled;
         _settings.KugouEnabled = KugouEnabled;
+        _settings.LrcRedEnabled = LrcRedEnabled;
+        _settings.UnisonEnabled = UnisonEnabled;
         _settings.YouTubeMusicLyricsEnabled = YouTubeMusicLyricsEnabled;
         _settings.EqualizerEnabled = EqualizerEnabled;
         _settings.EqPreampDb = EqPreampDb;
@@ -3429,6 +3505,7 @@ public partial class SettingsViewModel : ViewModelBase
         _settings.EqualizerBands = GetGraphicEqBands().bands;
         _settings.DiscordRichPresenceEnabled = DiscordRichPresenceEnabled;
         _settings.DiscordShowAlbum = DiscordShowAlbum;
+        _settings.DiscordStatusDisplay = DiscordPresenceOptions.ParseStatusDisplay(DiscordStatusDisplay).ToString();
         _settings.LastFmScrobblingEnabled = LastFmScrobblingEnabled;
         _settings.LastFmUsername = LastFmUsername;
         if (_lastFm is LastFmService lfm)
@@ -3645,20 +3722,38 @@ public partial class SettingsViewModel : ViewModelBase
         _player.LyricsFullScreenFocusEnabled = LyricsFullScreenFocusEnabled;
         _player.LyricsMinLineOpacity = LyricsMinLineOpacity;
         _player.LyricsJoinSplitWords = LyricsJoinSplitWords;
+        _player.LyricsGlowAndLift = LyricsGlowAndLift;
         _player.LyricsSaveTarget = LyricsSaveTarget;
         _player.LyricsAutoDownload = LyricsAutoDownload;
         _player.LyricsPreferredType = LyricsPreferredType;
         _player.LyricsShowTranslations = LyricsShowTranslations;
         _player.LyricsShowRomanization = LyricsShowRomanization;
         _player.LyricsShowBackgroundVocals = LyricsShowBackgroundVocals;
-        Controls.MarqueeTextBlock.GlobalCoverFlowScrollEnabled = CoverFlowMarqueeEnabled;
-        Controls.MarqueeTextBlock.GlobalCoverFlowArtistScrollEnabled = CoverFlowArtistMarqueeEnabled;
-        Controls.MarqueeTextBlock.GlobalCoverFlowAlbumScrollEnabled = CoverFlowAlbumMarqueeEnabled;
-        Controls.MarqueeTextBlock.GlobalLyricsTitleScrollEnabled = LyricsTitleMarqueeEnabled;
-        Controls.MarqueeTextBlock.GlobalLyricsArtistScrollEnabled = LyricsArtistMarqueeEnabled;
-        Controls.MarqueeTextBlock.GlobalMiniPlayerTitleScrollEnabled = MiniPlayerTitleMarqueeEnabled;
-        Controls.MarqueeTextBlock.GlobalMiniPlayerAlbumScrollEnabled = MiniPlayerAlbumMarqueeEnabled;
-        Controls.MarqueeTextBlock.NotifyGlobalSettingsChanged();
+        ApplyMarqueeSwitches();
+    }
+
+    /// <summary>
+    /// Writes the marquee switches and re-raises them only when one changed: the notification
+    /// sends every attached marquee back to its start for another 7 s rest, and ApplyPlayerSettings
+    /// runs for dozens of unrelated settings (10-18).
+    /// </summary>
+    private void ApplyMarqueeSwitches()
+    {
+        var changed = false;
+        void Set(bool current, bool value, Action<bool> write)
+        {
+            if (current == value) return;
+            write(value);
+            changed = true;
+        }
+        Set(Controls.MarqueeTextBlock.GlobalCoverFlowScrollEnabled, CoverFlowMarqueeEnabled, v => Controls.MarqueeTextBlock.GlobalCoverFlowScrollEnabled = v);
+        Set(Controls.MarqueeTextBlock.GlobalCoverFlowArtistScrollEnabled, CoverFlowArtistMarqueeEnabled, v => Controls.MarqueeTextBlock.GlobalCoverFlowArtistScrollEnabled = v);
+        Set(Controls.MarqueeTextBlock.GlobalCoverFlowAlbumScrollEnabled, CoverFlowAlbumMarqueeEnabled, v => Controls.MarqueeTextBlock.GlobalCoverFlowAlbumScrollEnabled = v);
+        Set(Controls.MarqueeTextBlock.GlobalLyricsTitleScrollEnabled, LyricsTitleMarqueeEnabled, v => Controls.MarqueeTextBlock.GlobalLyricsTitleScrollEnabled = v);
+        Set(Controls.MarqueeTextBlock.GlobalLyricsArtistScrollEnabled, LyricsArtistMarqueeEnabled, v => Controls.MarqueeTextBlock.GlobalLyricsArtistScrollEnabled = v);
+        Set(Controls.MarqueeTextBlock.GlobalMiniPlayerTitleScrollEnabled, MiniPlayerTitleMarqueeEnabled, v => Controls.MarqueeTextBlock.GlobalMiniPlayerTitleScrollEnabled = v);
+        Set(Controls.MarqueeTextBlock.GlobalMiniPlayerAlbumScrollEnabled, MiniPlayerAlbumMarqueeEnabled, v => Controls.MarqueeTextBlock.GlobalMiniPlayerAlbumScrollEnabled = v);
+        if (changed) Controls.MarqueeTextBlock.NotifyGlobalSettingsChanged();
     }
 
     private void ApplyEqualizer()
@@ -4188,6 +4283,32 @@ public partial class SettingsViewModel : ViewModelBase
         App.Services?.GetService<ILibraryWatcherService>()?.Refresh();
     }
 
+    partial void OnInboxEnabledChanged(bool value)
+    {
+        _settings.InboxEnabled = value;
+        if (!_settingsLoaded) return;
+        _ = ApplyInboxEnabledAsync(value);
+    }
+
+    /// <summary>Saves the Inbox switch; off moves every song waiting in the Inbox into the
+    /// library, so nothing stays hidden once the feature is gone. Saved first, so a scan
+    /// starting meanwhile reads "off".</summary>
+    internal async Task ApplyInboxEnabledAsync(bool enabled)
+    {
+        try
+        {
+            await SaveAsync();
+            if (enabled) return;
+            var waiting = _library.AllTracks.Where(t => t.IsInInbox).Select(t => t.Id).ToList();
+            if (waiting.Count > 0)
+                await _library.AcceptInboxTracksAsync(waiting);
+        }
+        catch (Exception ex)
+        {
+            DebugLog.Write("Settings", $"Inbox switch failed: {ex.Message}");
+        }
+    }
+
     partial void OnUseEmbeddedArtworkChanged(bool value)
     {
         // Keep the extractor's static mirror current even during settings load, so
@@ -4258,7 +4379,8 @@ public partial class SettingsViewModel : ViewModelBase
             PlayPauseFadeMs = clamped;
             return;
         }
-        ApplyAudioSettings();
+        // Slider-driven: only the fade length moved (see OnCrossfadeDurationChanged).
+        _audioPlayer?.SetPlayPauseFade(PlayPauseFadeEnabled, (int)Math.Round(PlayPauseFadeMs));
         if (_settingsLoaded) QueueSettingsSave();
     }
 
@@ -4324,7 +4446,9 @@ public partial class SettingsViewModel : ViewModelBase
             return;
         }
 
-        ApplyAudioSettings();
+        // Slider-driven: only the crossfade length moved. The whole ApplyAudioSettings per drag
+        // sample also rebuilt the EQ curve and re-applied it and ReplayGain (10-18).
+        _audioPlayer?.SetCrossfade(SongTransitionsEnabled && IsCrossfadeStyle, (int)Math.Round(CrossfadeDuration));
         QueueSettingsSave();
     }
 
@@ -4371,7 +4495,9 @@ public partial class SettingsViewModel : ViewModelBase
             return;
         }
 
-        ApplyPlayerSettings();
+        // Slider-driven: push just this value. The whole ApplyPlayerSettings per drag sample
+        // also re-raised the marquee switches, snapping every scrolling title back (10-18).
+        if (_player != null) _player.IslandBackgroundOpacity = value;
         if (_settingsLoaded && !_suspendSettingPersistence) QueueSettingsSave();
     }
 
@@ -4399,7 +4525,8 @@ public partial class SettingsViewModel : ViewModelBase
             return;
         }
 
-        ApplyPlayerSettings();
+        // Slider-driven: push just this value (see OnPlaybackBarBackgroundOpacityChanged).
+        if (_player != null) _player.IslandTrackBoxOpacity = value;
         if (_settingsLoaded && !_suspendSettingPersistence) QueueSettingsSave();
     }
 
@@ -4427,6 +4554,13 @@ public partial class SettingsViewModel : ViewModelBase
     partial void OnTaskbarProgressEnabledChanged(bool value)
     {
         // MainWindow listens to this property to paint/clear the taskbar overlay.
+        if (_suspendSettingPersistence) return;
+        _ = SaveAsync();
+    }
+
+    partial void OnTaskbarMediaControlsEnabledChanged(bool value)
+    {
+        // MainWindow listens to this property to show/hide the thumbnail buttons.
         if (_suspendSettingPersistence) return;
         _ = SaveAsync();
     }
@@ -4516,6 +4650,41 @@ public partial class SettingsViewModel : ViewModelBase
     [RelayCommand]
     private void ResetArtistSeparators() => ReplaceArtistTagSeparators(ArtistCredit.DefaultSeparators);
 
+    /// <summary>Swaps the "keep together" chips with one regroup at the end.</summary>
+    private void ReplaceArtistProtectedNames(IEnumerable<string>? names)
+    {
+        var normalized = ArtistCredit.NormalizeProtectedNames(names);
+        if (normalized.SequenceEqual(ArtistProtectedNames, StringComparer.Ordinal))
+            return;
+        ArtistProtectedNames.Clear();
+        foreach (var n in normalized)
+            ArtistProtectedNames.Add(n);
+        ApplyArtistGrouping();
+    }
+
+    [RelayCommand]
+    private void AddArtistProtectedName()
+    {
+        var value = NewArtistProtectedName?.Trim() ?? string.Empty;
+        NewArtistProtectedName = string.Empty;
+        if (value.Length == 0) return;
+        if (ArtistProtectedNames.Any(n => string.Equals(n, value, StringComparison.OrdinalIgnoreCase)))
+            return;
+        ArtistProtectedNames.Add(value);
+        ApplyArtistGrouping();
+    }
+
+    [RelayCommand]
+    private void RemoveArtistProtectedName(string name)
+    {
+        // Unlike the separators an empty list is fine: nothing is kept together.
+        if (!ArtistProtectedNames.Remove(name)) return;
+        ApplyArtistGrouping();
+    }
+
+    [RelayCommand]
+    private void ResetArtistProtectedNames() => ReplaceArtistProtectedNames(ArtistCredit.DefaultProtectedNames);
+
     partial void OnIgnoreLeadingWordsInArtistSortChanged(bool value) => ApplyArtistSortIgnoredWords();
 
     /// <summary>
@@ -4566,7 +4735,7 @@ public partial class SettingsViewModel : ViewModelBase
     }
 
     /// <summary>
-    /// Pushes the grouping mode and separators into the process-wide tokenizer. Runs during
+    /// Pushes the grouping mode, separators and kept-together names into the process-wide tokenizer. Runs during
     /// settings load too (before LibraryService restores its index cache) so startup sees
     /// the persisted configuration; only a real change after load saves and regroups.
     /// </summary>
@@ -4574,7 +4743,7 @@ public partial class SettingsViewModel : ViewModelBase
     {
         var before = ArtistCredit.Version;
         var joinBefore = ArtistCredit.JoinText;
-        ArtistCredit.Configure(ArtistGroupModes.Parse(ArtistGroupMode), ArtistTagSeparators);
+        ArtistCredit.Configure(ArtistGroupModes.Parse(ArtistGroupMode), ArtistTagSeparators, ArtistProtectedNames);
         if (_suspendSettingPersistence) return;
         _ = SaveAsync();
         if (ArtistCredit.Version == before) return;
@@ -4708,7 +4877,8 @@ public partial class SettingsViewModel : ViewModelBase
     partial void OnAlbumPageTintStrengthChanged(int value)
     {
         // Same as the toggle: open album pages watch this VM and re-blend their tint.
-        if (_settingsLoaded) _ = SaveAsync();
+        // Slider-driven, so the write is debounced: a full save per step stalled the drag (10-18).
+        if (_settingsLoaded) QueueSettingsSave();
     }
 
     partial void OnAlbumPageTintWholePageChanged(bool value)
@@ -5110,11 +5280,18 @@ public partial class SettingsViewModel : ViewModelBase
 
     partial void OnLyricsMinLineOpacityChanged(int value)
     {
+        // Slider-driven: push just this value and persist on the trailing edge (10-18).
+        if (_player != null) _player.LyricsMinLineOpacity = value;
+        if (_settingsLoaded) QueueSettingsSave();
+    }
+
+    partial void OnLyricsJoinSplitWordsChanged(bool value)
+    {
         ApplyPlayerSettings();
         if (_settingsLoaded) _ = SaveAsync();
     }
 
-    partial void OnLyricsJoinSplitWordsChanged(bool value)
+    partial void OnLyricsGlowAndLiftChanged(bool value)
     {
         ApplyPlayerSettings();
         if (_settingsLoaded) _ = SaveAsync();
@@ -5157,6 +5334,18 @@ public partial class SettingsViewModel : ViewModelBase
     }
 
     partial void OnKugouEnabledChanged(bool value)
+    {
+        if (_suspendSettingPersistence) return;
+        _ = SaveAsync();
+    }
+
+    partial void OnLrcRedEnabledChanged(bool value)
+    {
+        if (_suspendSettingPersistence) return;
+        _ = SaveAsync();
+    }
+
+    partial void OnUnisonEnabledChanged(bool value)
     {
         if (_suspendSettingPersistence) return;
         _ = SaveAsync();
@@ -5383,6 +5572,22 @@ public partial class SettingsViewModel : ViewModelBase
         var top = Avalonia.Controls.TopLevel.GetTopLevel(owner);
         if (top == null) return;
 
+        if (OperatingSystem.IsMacOS())
+        {
+            // A macOS program is a .app bundle — a folder — which the file picker cannot
+            // return (picking TextEdit.app left the path empty). The folder picker can.
+            var folders = await top.StorageProvider.OpenFolderPickerAsync(new Avalonia.Platform.Storage.FolderPickerOpenOptions
+            {
+                Title = "Choose a program",
+                AllowMultiple = false,
+                SuggestedStartLocation = await top.StorageProvider.TryGetFolderFromPathAsync(new Uri("file:///Applications/")),
+            });
+            var app = folders.Count > 0 ? folders[0].Path.LocalPath.TrimEnd('/') : null;
+            if (app != null && app.EndsWith(".app", StringComparison.OrdinalIgnoreCase))
+                ExternalOpenAppPath = app;
+            return;
+        }
+
         var picks = await top.StorageProvider.OpenFilePickerAsync(new Avalonia.Platform.Storage.FilePickerOpenOptions
         {
             Title = "Choose a program",
@@ -5495,7 +5700,8 @@ public partial class SettingsViewModel : ViewModelBase
             Artist: track.Artist ?? "Unknown Artist",
             Album: track.Album,
             ArtworkUrl: artworkUrl,
-            ShowAlbum: DiscordShowAlbum);
+            ShowAlbum: DiscordShowAlbum,
+            StatusDisplay: DiscordPresenceOptions.ParseStatusDisplay(DiscordStatusDisplay));
 
         var isPlaying = _player.State == PlaybackState.Playing;
         await _discord.UpdateAsync(dto, _player.Position, _player.Duration, isPlaying);
@@ -5506,6 +5712,15 @@ public partial class SettingsViewModel : ViewModelBase
         if (_suspendSettingPersistence) return;
         _ = SaveAsync();
         // Re-send the current track so the card reflects the flip without a song change.
+        _ = RepublishDiscordPresenceAsync();
+    }
+
+    partial void OnDiscordStatusDisplayChanged(string value)
+    {
+        OnPropertyChanged(nameof(SelectedDiscordStatusDisplayOption));
+        if (_suspendSettingPersistence) return;
+        _ = SaveAsync();
+        // Same as the album toggle: the status line changes now, not at the next song.
         _ = RepublishDiscordPresenceAsync();
     }
 
@@ -6520,6 +6735,45 @@ public partial class SettingsViewModel : ViewModelBase
 
     // ── Files / folder commands ──
 
+    /// <summary>
+    /// The folder picker behind <see cref="AddMusicFolderCommand"/>: the main window's native
+    /// folder dialog, returning the picked path or null when cancelled. Internal for tests
+    /// (InternalsVisibleTo Noctis.Tests).
+    /// </summary>
+    internal Func<Task<string?>> PickMusicFolder { get; set; } = PickMusicFolderFromMainWindowAsync;
+
+    private static async Task<string?> PickMusicFolderFromMainWindowAsync()
+    {
+        var owner = (Avalonia.Application.Current?.ApplicationLifetime as Avalonia.Controls.ApplicationLifetimes.IClassicDesktopStyleApplicationLifetime)?.MainWindow;
+        var top = owner is null ? null : Avalonia.Controls.TopLevel.GetTopLevel(owner);
+        if (top is null) return null;
+        var folders = await top.StorageProvider.OpenFolderPickerAsync(new Avalonia.Platform.Storage.FolderPickerOpenOptions
+        {
+            Title = "Select Music Folder",
+            AllowMultiple = false
+        });
+        return folders.Count > 0 ? folders[0].Path.LocalPath : null;
+    }
+
+    /// <summary>
+    /// Add Folder: pick a folder, then <see cref="AddFolderPath"/> (register it and scan).
+    /// The one flow behind Settings › Library › Add Folder and Home's empty-library button.
+    /// </summary>
+    [RelayCommand]
+    private async Task AddMusicFolder()
+    {
+        try
+        {
+            var path = await PickMusicFolder();
+            if (path != null)
+                await AddFolderPath(path);
+        }
+        catch (Exception ex)
+        {
+            System.Diagnostics.Debug.WriteLine($"[Settings] Failed to add folder: {ex.Message}");
+        }
+    }
+
     /// <summary>Called from the View after the folder picker dialog returns a path.</summary>
     /// <param name="autoScan">
     /// When false the root is registered without kicking off a library scan. The
@@ -6617,6 +6871,31 @@ public partial class SettingsViewModel : ViewModelBase
             var cts = new CancellationTokenSource();
             _scanStatusClearCts = cts;
             _ = ClearScanStatusAfterDelay(cts.Token);
+        }
+    }
+
+    /// <summary>True while a wait for a scan Settings didn't start is already running.</summary>
+    private bool _externalScanClearArmed;
+
+    /// <summary>
+    /// Clears the progress line of a scan Settings didn't start once the library stops
+    /// scanning. One wait per scan; a scan Settings starts in the meantime owns the line.
+    /// </summary>
+    private async Task ClearExternalScanStatusWhenDoneAsync()
+    {
+        if (_externalScanClearArmed) return;
+        _externalScanClearArmed = true;
+        try
+        {
+            do await Task.Delay(1000);
+            while (_library.IsScanning && !IsScanning);
+
+            if (!IsScanning && ScanStatusText.StartsWith("Scanning Library", StringComparison.Ordinal))
+                ScanStatusText = "";
+        }
+        finally
+        {
+            _externalScanClearArmed = false;
         }
     }
 
@@ -7017,6 +7296,7 @@ public partial class SettingsViewModel : ViewModelBase
             // Preferences
             ScanOnStartup = true;
             WatchFoldersEnabled = true;
+            InboxEnabled = defaultSettings.InboxEnabled;
             UseEmbeddedArtwork = defaultSettings.UseEmbeddedArtwork;
             OrganizePattern = "{AlbumArtist}/{Album}/{TrackNo} {Title}";
             OrganizeTargetRoot = string.Empty;
@@ -7041,6 +7321,7 @@ public partial class SettingsViewModel : ViewModelBase
             MergeFeaturedFromTitles = defaultSettings.MergeFeaturedFromTitles;
             ArtistGroupMode = defaultSettings.ArtistGroupMode;
             ReplaceArtistTagSeparators(defaultSettings.ArtistTagSeparators);
+            ReplaceArtistProtectedNames(defaultSettings.ArtistProtectedNames);
             IgnoreLeadingWordsInArtistSort = defaultSettings.IgnoreLeadingWordsInArtistSort;
             ReplaceArtistSortIgnoredWords(defaultSettings.ArtistSortIgnoredWords);
             EnableAnimatedCovers = defaultSettings.EnableAnimatedCovers;
@@ -7084,6 +7365,7 @@ public partial class SettingsViewModel : ViewModelBase
             LyricsFullScreenFocusEnabled = defaultSettings.LyricsFullScreenFocusEnabled;
             LyricsMinLineOpacity = defaultSettings.LyricsMinLineOpacity;
             LyricsJoinSplitWords = defaultSettings.LyricsJoinSplitWords;
+            LyricsGlowAndLift = defaultSettings.LyricsGlowAndLift;
             LyricsSaveTarget = defaultSettings.LyricsSaveTarget;
             LyricsAutoDownload = defaultSettings.LyricsAutoDownload;
             LyricsPreferredType = defaultSettings.LyricsPreferredType;
@@ -7158,6 +7440,7 @@ public partial class SettingsViewModel : ViewModelBase
             SidebarAlwaysExpanded = defaultSettings.SidebarAlwaysExpanded;
             LiquidGlassEnabled = defaultSettings.LiquidGlassEnabled;
             TaskbarProgressEnabled = defaultSettings.TaskbarProgressEnabled;
+            TaskbarMediaControlsEnabled = defaultSettings.TaskbarMediaControlsEnabled;
             // Upmix, sync, YouTube downloads and Lyrics Studio: re-read from the defaulted
             // _settings the same way LoadAsync does (ApplyAudioSettings below pushes upmix).
             LoadFeatureSettings();
@@ -7167,6 +7450,8 @@ public partial class SettingsViewModel : ViewModelBase
             NetEaseEnabled = true;
             MusixmatchEnabled = defaultSettings.MusixmatchEnabled;
             KugouEnabled = defaultSettings.KugouEnabled;
+            LrcRedEnabled = defaultSettings.LrcRedEnabled;
+            UnisonEnabled = defaultSettings.UnisonEnabled;
             YouTubeMusicLyricsEnabled = defaultSettings.YouTubeMusicLyricsEnabled;
 
             // Metadata providers
@@ -7192,6 +7477,7 @@ public partial class SettingsViewModel : ViewModelBase
             // Integrations
             DiscordRichPresenceEnabled = false;
             DiscordShowAlbum = defaultSettings.DiscordShowAlbum;
+            DiscordStatusDisplay = DiscordPresenceOptions.ParseStatusDisplay(defaultSettings.DiscordStatusDisplay).ToString();
             LastFmScrobblingEnabled = defaultSettings.LastFmScrobblingEnabled;
             LastFmUsername = "";
             IsLastFmConnected = false;

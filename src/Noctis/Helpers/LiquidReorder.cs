@@ -25,6 +25,8 @@ namespace Noctis.Helpers;
 /// </list>
 /// The card must use a TransformGroup { ScaleTransform, TranslateTransform } with a 50%
 /// origin; its Y is in the coordinates of the panel it is laid out in (top-aligned).
+/// Any ItemsControl works (a ListBox, or the mini player's plain queue list): only its
+/// realized row containers are moved.
 /// </summary>
 public sealed class LiquidReorder
 {
@@ -38,10 +40,10 @@ public sealed class LiquidReorder
     private const int CardHoldMs = 160;
 
     private readonly Visual _host;
-    private readonly ListBox _list;
+    private readonly ItemsControl _list;
     private readonly Border _card;
     private readonly Action? _cardHidden;
-    private readonly Dictionary<ListBoxItem, double> _rowOffsets = new();
+    private readonly Dictionary<Control, double> _rowOffsets = new();
 
     private bool _frameQueued;
     private TimeSpan? _lastFrame;
@@ -54,7 +56,7 @@ public sealed class LiquidReorder
     /// <param name="list">The list whose realized rows open the gap.</param>
     /// <param name="card">The floating card (see class remarks for its transform).</param>
     /// <param name="cardHidden">Runs when the card is finally hidden (e.g. clear its DataContext).</param>
-    public LiquidReorder(Visual host, ListBox list, Border card, Action? cardHidden = null)
+    public LiquidReorder(Visual host, ItemsControl list, Border card, Action? cardHidden = null)
     {
         _host = host;
         _list = list;
@@ -161,7 +163,7 @@ public sealed class LiquidReorder
     /// whole container. Reading layout rather than rendered positions keeps the pick
     /// stable while the rows are mid-slide.
     /// </summary>
-    public static int NearestSlot(ListBox list, Visual probeSpace, double probeY, Func<Control, Rect>? slotOf = null)
+    public static int NearestSlot(ItemsControl list, Visual probeSpace, double probeY, Func<Control, Rect>? slotOf = null)
     {
         var best = -1;
         var bestDist = double.MaxValue;
@@ -182,7 +184,7 @@ public sealed class LiquidReorder
 
     /// <summary>Top of row <paramref name="index"/>'s original slot in <paramref name="space"/>
     /// coordinates (null when the row isn't realized).</summary>
-    public static double? SlotTop(ListBox list, int index, Visual space, Func<Control, Rect>? slotOf = null)
+    public static double? SlotTop(ItemsControl list, int index, Visual space, Func<Control, Rect>? slotOf = null)
     {
         if (list.ContainerFromIndex(index) is not Control container) return null;
         if (container.GetVisualParent() is not Visual panel) return null;
@@ -229,10 +231,9 @@ public sealed class LiquidReorder
         ApplyCard();
 
         var rowStep = 1 - Math.Exp(-RowSlideRate * dt);
-        var live = new HashSet<ListBoxItem>();
-        foreach (var container in _list.GetRealizedContainers())
+        var live = new HashSet<Control>();
+        foreach (var item in _list.GetRealizedContainers())
         {
-            if (container is not ListBoxItem item) continue;
             live.Add(item);
             var index = _list.IndexFromContainer(item);
             // Recycled containers are re-evaluated every frame, so the hole follows the row.
@@ -275,12 +276,11 @@ public sealed class LiquidReorder
 
     private void SnapRowsHome()
     {
-        foreach (var container in _list.GetRealizedContainers())
-            if (container is ListBoxItem item)
-            {
-                item.Opacity = 1;
-                SetRowOffset(item, 0);
-            }
+        foreach (var item in _list.GetRealizedContainers())
+        {
+            item.Opacity = 1;
+            SetRowOffset(item, 0);
+        }
         foreach (var item in _rowOffsets.Keys) SetRowOffset(item, 0);
         _rowOffsets.Clear();
         SourceIndex = TargetIndex = -1;
@@ -293,7 +293,7 @@ public sealed class LiquidReorder
         _cardHidden?.Invoke();
     }
 
-    private static void SetRowOffset(ListBoxItem item, double y)
+    private static void SetRowOffset(Control item, double y)
     {
         if (y == 0)
         {

@@ -93,6 +93,28 @@ public class AppleMusicAlbumSearchTests
         Assert.Equal(1710982865, withPrefix);
     }
 
+    [Theory]
+    // The slug is the album title and can be a number: Vnuk's "1000000 - EP". The first 6+ digit
+    // run was read, so the paste looked up id 1000000 (no such album) and found nothing.
+    [InlineData("https://music.apple.com/us/album/1000000-ep/1628626875", 1628626875)]
+    // A track link inside its album: the path's id is the album, ?i= is the song.
+    [InlineData("https://music.apple.com/us/album/si-veo-a-tu-mama/1500776322?i=1500776323", 1500776322)]
+    // Copied from an address bar without the scheme — the form this method's comment promises.
+    [InlineData("music.apple.com/us/album/yhlqmdlg/1500776322", 1500776322)]
+    [InlineData("https://itunes.apple.com/us/album/yhlqmdlg/id1500776322?uo=4", 1500776322)]
+    public void ReadsTheAlbumIdFromTheEndOfTheLinkPath(string pasted, long expected)
+    {
+        Assert.True(MetadataViewModel.TryExtractAppleAlbumId(pasted, out var id));
+        Assert.Equal(expected, id);
+    }
+
+    [Fact]
+    public void OnlyAppleLinksCountAsLinks()
+    {
+        // EndsWith("apple.com") let a lookalike host through.
+        Assert.False(MetadataViewModel.TryExtractAppleAlbumId("https://notapple.com/us/album/x/1500776322", out _));
+    }
+
     [Fact]
     public void ReadsABareAlbumId()
     {

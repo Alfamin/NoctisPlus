@@ -14,8 +14,8 @@
 
     <UserControl.Resources>
         <conv:ArtworkPathConverter x:Key="ArtworkConverter"/>
-        <conv:ProgressToSweepForegroundConverter x:Key="ProgressToSweepFg"/>
-        <conv:EmphasisGlowConverter x:Key="EmphasisGlow"/>
+        <conv:PlusSweepForegroundConverter x:Key="ProgressToSweepFg"/>
+        <conv:PlusEmphasisGlowConverter x:Key="EmphasisGlow"/>
         <conv:WordOverflowPaddingConverter x:Key="WordOverflowPad"/>
         <conv:BlurRadiusToEffectConverter x:Key="BlurToEffect"/>
         <conv:PreBlurredArtworkConverter x:Key="PreBlurArt"/>
@@ -85,7 +85,7 @@
                      words already carry a trailing space and get zero padding. -->
                 <TextBlock Text="{Binding Text}"
                            Classes="word-base"
-                           Padding="{Binding Text, Converter={StaticResource WordOverflowPad}}"
+                           Padding="{Binding Converter={StaticResource WordOverflowPad}}"
                            FontWeight="Bold"
                            Foreground="{Binding $parent[UserControl].((vm:LyricsViewModel)DataContext).LyricsPrimaryFg}"/>
                 <!-- Bright overlay revealed left-to-right by the Progress sweep, painted
@@ -187,6 +187,11 @@
         </Style>
         <Style Selector="Button.pill-btn:pointerover">
             <Setter Property="Background" Value="{DynamicResource LyricsBtnBgHoverRes}"/>
+        </Style>
+        <!-- The lrc.red sync pill is disabled while its model runs: it keeps its look and only
+             its label changes ("Timing every word…"), instead of Fluent's grey disabled box. -->
+        <Style Selector="Button.lrcred-sync:disabled /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Background" Value="{DynamicResource LyricsBtnBgRes}"/>
         </Style>
 
         <!-- "Sync" pill: the owner's reference shape (a roomy pill, sound bars, "Sync") in
@@ -659,9 +664,12 @@
                          scrolls); a multi-artist credit renders one link per name, like the
                          album page (Discord, aaron 09-21: "Kanye West, GLC, Consequence" was
                          one button that always opened the first name). -->
+                    <!-- Named by the text it shows: the marquee inside read as
+                         "Noctis.Controls.MarqueeTextBlock" (UIA 10-13). -->
                     <Button x:Name="ArtistLinkButton"
                             Classes="link-btn"
                             Command="{Binding ViewArtistCommand}"
+                            AutomationProperties.Name="{Binding Player.CurrentTrack.ArtistDisplay}"
                             HorizontalAlignment="Center"
                             IsVisible="{Binding !HasMultipleArtists}">
                         <controls:MarqueeTextBlock x:Name="ArtistMarquee"
@@ -706,6 +714,7 @@
                     <Button x:Name="AlbumLinkButton"
                             Classes="link-btn"
                             Command="{Binding ViewAlbumCommand}"
+                            AutomationProperties.Name="{Binding Player.CurrentTrack.Album}"
                             HorizontalAlignment="Center"
                             IsVisible="{Binding Player.CurrentTrack.Album, Converter={x:Static StringConverters.IsNotNullOrEmpty}}">
                         <controls:MarqueeTextBlock x:Name="AlbumMarquee"
@@ -732,7 +741,7 @@
                             <!-- MetadataLine skips empty segments: untagged files (no genre/year)
                                  otherwise render a stray leading "· 2018 · 24 tracks" dot. -->
                             <MultiBinding Converter="{StaticResource MetadataLine}" ConverterParameter="track">
-                                <Binding Path="Player.CurrentTrack.Genre" FallbackValue=""/>
+                                <Binding Path="Player.CurrentTrack.GenreDisplay" FallbackValue=""/>
                                 <Binding Path="Player.CurrentTrack.DisplayYear" FallbackValue="0"/>
                                 <!-- Album-wide count (every disc), not the file's per-disc TRCK
                                      total: "9 tracks" on a 19-song, 3-disc album (Discord, aaron 09-21). -->
@@ -851,6 +860,7 @@
                         </Canvas>
                         <Slider x:Name="LyricsTimelineSlider"
                                 Classes="lyrics-timeline-slider"
+                                AutomationProperties.Name="{loc:T PlaybackBar.Seek}"
                                 Value="{Binding Player.PositionFraction, Mode=TwoWay}"
                                 Minimum="0"
                                 Maximum="1"
@@ -922,7 +932,8 @@
                             Padding="10,5"
                             Height="30" MinHeight="30"
                             IsVisible="{Binding HasAlternateLyrics}"
-                            Command="{Binding SwitchToAlternateLyricsCommand}">
+                            Command="{Binding SwitchToAlternateLyricsCommand}"
+                            AutomationProperties.Name="{Binding AlternateLyricsLabel}">
                         <StackPanel Orientation="Horizontal" Spacing="5">
                             <!-- Swap arrows, not the paperclip (AttachIcon) this used to borrow. -->
                             <controls:LineIcon Data="{DynamicResource PageLineSwapSource}"
@@ -931,6 +942,30 @@
                             <TextBlock Text="{Binding AlternateLyricsLabel}" FontSize="11" Foreground="{Binding LyricsPrimaryFg}" VerticalAlignment="Center"/>
                         </StackPanel>
                     </Button>
+
+                    <!-- lrc.red has this song only line-synced or plain: its in-house model can time
+                         every word. One request per press; reads "Timing every word…" while it runs
+                         and "Try again" after a failure (the reason beside it). -->
+                    <Button Classes="pill-btn lrcred-sync"
+                            Padding="10,5"
+                            Height="30" MinHeight="30"
+                            IsVisible="{Binding ShowLrcRedSync}"
+                            Command="{Binding WordSyncWithLrcRedCommand}"
+                            AutomationProperties.Name="{Binding LrcRedSyncLabel}">
+                        <StackPanel Orientation="Horizontal" Spacing="5">
+                            <controls:LineIcon Data="{DynamicResource MenuLineTimer}"
+                                               Width="13" Height="13" Foreground="{Binding LyricsPrimaryFg}"
+                                               VerticalAlignment="Center"/>
+                            <TextBlock Text="{Binding LrcRedSyncLabel}" FontSize="11" Foreground="{Binding LyricsPrimaryFg}" VerticalAlignment="Center"/>
+                        </StackPanel>
+                    </Button>
+                    <TextBlock Text="{Binding LrcRedSyncError}"
+                               FontSize="11"
+                               MaxWidth="260"
+                               TextWrapping="Wrap"
+                               Foreground="{Binding LyricsSubtleFg}"
+                               VerticalAlignment="Center"
+                               IsVisible="{Binding LrcRedSyncError, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"/>
 
                     <!-- Lyrics Studio preview: the lines shown are unsaved -->
                     <Border Background="{DynamicResource LyricsBtnBgRes}"
@@ -947,6 +982,14 @@
                                Foreground="{Binding LyricsSubtleFg}"
                                VerticalAlignment="Center"
                                IsVisible="{Binding SaveStatusText, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"/>
+
+                    <!-- lrc.red's API asks to be credited: "Lyrics from lrc.red" under its lyrics,
+                         "Word-synced by lrc.red's model" after its model timed them. -->
+                    <TextBlock Text="{Binding LyricsCreditText}"
+                               FontSize="11"
+                               Foreground="{Binding LyricsSubtleFg}"
+                               VerticalAlignment="Center"
+                               IsVisible="{Binding LyricsCreditText, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"/>
                 </StackPanel>
             </StackPanel>
         </Border>
@@ -1127,9 +1170,10 @@
                         </ItemsControl.MinWidth>
                         <ItemsControl.ItemTemplate>
                             <DataTemplate x:DataType="m:LyricLine">
+                                <!-- Reads its line (UIA read "Avalonia.Controls.StackPanel", 10-13). -->
                                 <Button Background="Transparent"
                                         Classes="lyric-line-btn"
-                                        AutomationProperties.Name="{Binding Text}"
+                                        AutomationProperties.Name="{Binding Converter={x:Static helpers:AccessibleNames.ItemName}}"
                                         Classes.active="{Binding IsActive}"
                                         BorderThickness="0"
                                         Padding="0"

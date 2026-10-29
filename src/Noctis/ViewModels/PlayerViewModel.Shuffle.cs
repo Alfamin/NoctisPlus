@@ -11,7 +11,7 @@ public partial class PlayerViewModel
 {
     internal TrueShuffleService? NativeShuffle { get; set; }
 
-    [ObservableProperty, NotifyPropertyChangedFor(nameof(IsShuffleLit)), NotifyPropertyChangedFor(nameof(IsForYouShuffle))]
+    [ObservableProperty, NotifyPropertyChangedFor(nameof(IsShuffleLit)), NotifyPropertyChangedFor(nameof(IsForYouShuffle)), NotifyPropertyChangedFor(nameof(ShowReshuffle))]
     private PlayerShuffleMode _shuffleMode;
     [ObservableProperty] private bool _isShuffleBusy;
     [ObservableProperty] private string _shuffleStatus = "";
@@ -32,6 +32,7 @@ public partial class PlayerViewModel
         if (ShuffleMode is PlayerShuffleMode.Off or PlayerShuffleMode.Noctis)
             ShuffleMode = value ? PlayerShuffleMode.Noctis : PlayerShuffleMode.Off;
         OnPropertyChanged(nameof(IsShuffleLit));
+        OnPropertyChanged(nameof(ShowReshuffle));
     }
 
     [RelayCommand(AllowConcurrentExecutions = true)]

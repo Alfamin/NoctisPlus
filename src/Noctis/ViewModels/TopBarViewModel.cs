@@ -226,8 +226,15 @@ public partial class TopBarViewModel : ViewModelBase
     // placement — same pattern as the Albums sort chip.
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(HasBarContent))]
+    [NotifyPropertyChangedFor(nameof(ArtistSortVisible))]
     private bool _hasArtistSort;
+    /// <summary>Cover Flow shows albums over the section, so the Artists sort and view icons
+    /// hide there like the Folders / Playlists / Favorites actions do.</summary>
+    public bool ArtistSortVisible => HasArtistSort && !IsCoverFlowMode;
     [ObservableProperty] private ICommand? _artistSortCommand;
+    /// <summary>Artists page grid ↔ list icon (rides <see cref="ArtistSortVisible"/>).</summary>
+    [ObservableProperty] private ICommand? _toggleArtistViewCommand;
+    [ObservableProperty] private bool _isArtistListView;
     [ObservableProperty] private string _artistSortLabel = "Name";
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(ArtistSortDescending))]
@@ -237,12 +244,15 @@ public partial class TopBarViewModel : ViewModelBase
     private string _artistSortMode = "name";
     public bool ArtistSortDescending => !ArtistSortAscending;
 
-    public void ShowArtistSort(ICommand sortCommand, string label, string mode, bool ascending)
+    public void ShowArtistSort(ICommand sortCommand, string label, string mode, bool ascending,
+        ICommand? toggleViewCommand = null, bool isListView = false)
     {
         ArtistSortCommand = sortCommand;
         ArtistSortLabel = label;
         ArtistSortMode = mode;
         ArtistSortAscending = ascending;
+        ToggleArtistViewCommand = toggleViewCommand;
+        IsArtistListView = isListView;
         HasArtistSort = true;
     }
 
@@ -250,6 +260,7 @@ public partial class TopBarViewModel : ViewModelBase
     {
         HasArtistSort = false;
         ArtistSortCommand = null;
+        ToggleArtistViewCommand = null;
     }
     [ObservableProperty] private ICommand? _pageCreatePlaylistCommand;
     [ObservableProperty] private ICommand? _pageCreateSmartPlaylistCommand;
@@ -274,6 +285,7 @@ public partial class TopBarViewModel : ViewModelBase
     [NotifyPropertyChangedFor(nameof(PlaylistActionsVisible))]
     [NotifyPropertyChangedFor(nameof(FoldersActionsVisible))]
     [NotifyPropertyChangedFor(nameof(FavoritesActionsVisible))]
+    [NotifyPropertyChangedFor(nameof(ArtistSortVisible))]
     [NotifyPropertyChangedFor(nameof(PageTitleDisplay))]
     [NotifyPropertyChangedFor(nameof(HasBarContent))]
     private bool _isCoverFlowMode;

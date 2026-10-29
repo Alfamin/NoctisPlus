@@ -380,4 +380,64 @@ public class FfmpegPcmPipeTests
             try { File.Delete(wav); } catch { }
         }
     }
+
+    // Live, 10-13: the tag save of the playing track renames a tagged copy over it, and
+    // Windows refuses while anything has the file open. The side decode's ffmpeg keeps the
+    // track open for as long as it decodes it, through a pause too (it sits blocked on the
+    // full pipe), so it lets go of the file for the save like the player does.
+    [Fact]
+    public void Feed_PausedOnTheTrack_LetsGoOfTheFileForATagSave_AndDecodesAgainAfter()
+    {
+        var ffmpeg = FindFfmpeg();
+        if (ffmpeg == null) return;
+        var wav = WriteTwoToneWav();
+        var player = new FakeAudioPlayer { OutputTapsMeters = false };
+        var opens = 0;
+        double now = 0;
+        var feed = new SideDecodeMeterFeed(player, () => ffmpeg,
+            (exe, path, frame) => { opens++; return FfmpegPcmPipe.Open(exe, path, frame, Rate); },
+            new SpectrumMeter(() => 0), new BeatMeter(() => 0), null, () => now);
+        void Run(int ms)
+        {
+            for (var t = 0; t < ms; t += 20)
+            {
+                if (player.State == Noctis.Models.PlaybackState.Playing)
+                    player.Position += TimeSpan.FromMilliseconds(20);
+                now += 20;
+                feed.Tick();
+            }
+        }
+        try
+        {
+            player.Play(wav);
+            Run(200);
+            Assert.Equal(1, opens);
+            player.Pause();
+            Run(100);
+
+            OpenFileHolders.Register(feed);
+            try
+            {
+                MetadataService.SaveTagsAtomicallyOrThrow(wav, f => f.Tag.Title = "Saved");
+            }
+            finally
+            {
+                OpenFileHolders.Unregister(feed);
+            }
+
+            using (var f = TagLib.File.Create(wav))
+                Assert.Equal("Saved", f.Tag.Title);
+            player.Resume();
+            Run(100);
+            Assert.Equal(2, opens);
+        }
+        finally
+        {
+            // A track change drops the decode (kills ffmpeg).
+            player.CurrentMediaPath = null;
+            feed.Tick();
+            feed.Dispose();
+            try { File.Delete(wav); } catch { }
+        }
+    }
 }

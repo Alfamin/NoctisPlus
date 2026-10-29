@@ -73,6 +73,7 @@ internal sealed class FakeAudioPlayer : IAudioPlayer
     public void SetPitchSemitones(double semitones) => PitchSemitones = semitones;
     public string UpmixMode { get; private set; } = "Off";
     public void SetUpmixMode(string mode) => UpmixMode = mode;
+    public bool HeadphoneSurroundActive { get; set; }
     public void PrepareNext(string filePath, long startPositionMs = -1) => PreparedPaths.Add(filePath);
     public bool PreparesRemoteStreams { get; set; }
     public int CancelledCount { get; private set; }
@@ -97,6 +98,7 @@ internal sealed class FakeLibraryService : ILibraryService
     public event EventHandler<int>? ScanProgress;
 
     public void RaiseLibraryUpdated() => LibraryUpdated?.Invoke(this, EventArgs.Empty);
+    public void RaiseScanProgress(int count) => ScanProgress?.Invoke(this, count);
     public bool IsPublishingPartial { get; set; }
     public event EventHandler? FavoritesChanged;
     public event EventHandler<List<string>>? MusicFoldersChanged;
@@ -108,11 +110,24 @@ internal sealed class FakeLibraryService : ILibraryService
 
     public List<string> ScannedFolders { get; } = new();
 
+    /// <summary>Each scan's folders, one entry per ScanAsync call.</summary>
+    public List<List<string>> ScanPasses { get; } = new();
+
+    /// <summary>When set, a scan stays running until the test completes it.</summary>
+    public TaskCompletionSource? HoldScan { get; set; }
+
     public Task ScanAsync(IEnumerable<string> folders, CancellationToken ct = default)
     {
-        ScannedFolders.AddRange(folders);
+        var list = folders.ToList();
+        ScannedFolders.AddRange(list);
+        ScanPasses.Add(list);
         if (AbortScanWithRoots is { } roots)
             ScanAborted?.Invoke(this, roots);
+        if (HoldScan is { } hold)
+        {
+            HoldScan = null;
+            return hold.Task;
+        }
         return Task.CompletedTask;
     }
     public Task PauseActiveScanForShutdownAsync(TimeSpan timeout) => Task.CompletedTask;

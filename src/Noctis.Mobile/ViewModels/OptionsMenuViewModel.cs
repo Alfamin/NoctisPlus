@@ -1,0 +1,104 @@
+using CommunityToolkit.Mvvm.Input;
+
+namespace Noctis.Mobile.ViewModels;
+
+/// <summary>
+/// A short list of choices on the glass pop menu (PopMenu), Apple-style: a sort menu (the order in
+/// use ticked, a group break, then Ascending / Descending), a filter menu, or a note with no
+/// choices at all (an album's quality). Built from the page's state each time it opens, so the
+/// ticks always match what the page shows. Each row closes the menu before it acts.
+/// </summary>
+public sealed class OptionsMenuViewModel
+{
+    public OptionsMenuViewModel(IReadOnlyList<OptionsMenuItem> items, string? title = null, string? detail = null, string? note = null)
+    {
+        Items = items;
+        Title = title;
+        Detail = detail;
+        Note = note;
+    }
+
+    public IReadOnlyList<OptionsMenuItem> Items { get; }
+
+    /// <summary>A heading over the rows (a note's title); none on a sort or filter menu.</summary>
+    public string? Title { get; }
+    public string? Detail { get; }
+    public string? Note { get; }
+    public bool HasTitle => !string.IsNullOrEmpty(Title);
+    public bool HasDetail => !string.IsNullOrEmpty(Detail);
+    public bool HasNote => !string.IsNullOrEmpty(Note);
+    public bool HasItems => Items.Count > 0;
+
+    /// <summary>A page's sort menu: its orders, the one in use ticked; then, when it has one, the
+    /// direction after a group break.</summary>
+    public static OptionsMenuViewModel ForSort(ShellViewModel shell, ISortable page)
+    {
+        var items = new List<OptionsMenuItem>();
+        foreach (var choice in page.SortChoices)
+            items.Add(new OptionsMenuItem(shell, choice.Label, choice.IsSelected, () => page.ChooseSort(choice)));
+        if (page.HasSortDirection)
+        {
+            items.Add(new OptionsMenuItem(shell, "Ascending", !page.IsDescending, () => page.ChooseDirection(false)) { StartsGroup = true });
+            items.Add(new OptionsMenuItem(shell, "Descending", page.IsDescending, () => page.ChooseDirection(true)));
+        }
+        return Lined(items);
+    }
+
+    /// <summary>A song list's filter menu: favourites, and (with an account) the desktop songs
+    /// kept offline; Show All after a group break while one is on.</summary>
+    public static OptionsMenuViewModel ForFilter(ShellViewModel shell, SongListPageViewModel list)
+    {
+        var items = new List<OptionsMenuItem>
+        {
+            new(shell, "Favorites", list.OnlyFavourites, () => list.OnlyFavourites = !list.OnlyFavourites),
+        };
+        if (list.CanFilterDownloaded)
+            items.Add(new OptionsMenuItem(shell, "Downloaded", list.OnlyDownloaded, () => list.OnlyDownloaded = !list.OnlyDownloaded));
+        if (list.IsFiltered)
+            items.Add(new OptionsMenuItem(shell, "Show All", false, () => { list.OnlyFavourites = false; list.OnlyDownloaded = false; }) { StartsGroup = true });
+        return Lined(items);
+    }
+
+    /// <summary>A note with no choices: a heading, a detail line and a paragraph.</summary>
+    public static OptionsMenuViewModel ForNote(string title, string? detail, string? note) =>
+        new(Array.Empty<OptionsMenuItem>(), title, detail, note);
+
+    // Apple's inset hairline over every row but the first of each group.
+    private static OptionsMenuViewModel Lined(List<OptionsMenuItem> items)
+    {
+        for (var i = 1; i < items.Count; i++) items[i].HasLine = !items[i].StartsGroup;
+        return new OptionsMenuViewModel(items);
+    }
+}
+
+/// <summary>One row of an <see cref="OptionsMenuViewModel"/>: its label, whether it is ticked,
+/// and what picking it does (after the menu closes).</summary>
+public sealed partial class OptionsMenuItem
+{
+    private readonly ShellViewModel _shell;
+    private readonly Action _pick;
+
+    public OptionsMenuItem(ShellViewModel shell, string label, bool isChecked, Action pick)
+    {
+        _shell = shell;
+        Label = label;
+        IsChecked = isChecked;
+        _pick = pick;
+    }
+
+    public string Label { get; }
+    public bool IsChecked { get; }
+
+    /// <summary>The first row of a new group (Ascending, Show All): a band above it, no hairline.</summary>
+    public bool StartsGroup { get; init; }
+
+    /// <summary>The inset hairline over the row.</summary>
+    public bool HasLine { get; internal set; }
+
+    [RelayCommand]
+    private void Pick()
+    {
+        _shell.CloseSheet();
+        _pick();
+    }
+}

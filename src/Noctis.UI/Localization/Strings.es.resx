@@ -816,6 +816,14 @@
     <value>Mostrar progreso de la canción en el botón de la barra de tareas. Ámbar mientras está en pausa.</value>
     <comment>Text in SettingsView.axaml</comment>
   </data>
+  <data name="Settings.MediaControlsTaskbar" xml:space="preserve">
+    <value>Controles multimedia en la barra de tareas</value>
+    <comment>Text in SettingsView.axaml</comment>
+  </data>
+  <data name="Settings.MediaControlsTaskbarDesc" xml:space="preserve">
+    <value>Mostrar los botones Anterior, Reproducir/Pausa, Siguiente y Favorita al pasar el ratón sobre el icono de la barra de tareas.</value>
+    <comment>Text in SettingsView.axaml</comment>
+  </data>
   <data name="Settings.AutomaticAlbumCoverSize" xml:space="preserve">
     <value>Tamaño automático de las portadas</value>
     <comment>Text in SettingsView.axaml</comment>
@@ -1018,6 +1026,14 @@
   </data>
   <data name="Settings.KeepWordsWholeWhen" xml:space="preserve">
     <value>Mantén las palabras enteras cuando las letras TTML las dividan en sílabas.</value>
+    <comment>Text in SettingsView.axaml</comment>
+  </data>
+  <data name="Settings.LyricsGlowAndLift" xml:space="preserve">
+    <value>Brillo y elevación</value>
+    <comment>Text in SettingsView.axaml</comment>
+  </data>
+  <data name="Settings.LyricsGlowAndLiftHint" xml:space="preserve">
+    <value>Las palabras cantadas se elevan suavemente y las notas sostenidas brillan, como en Apple Music. Desactivado, la letra sincronizada por palabras queda quieta.</value>
     <comment>Text in SettingsView.axaml</comment>
   </data>
   <data name="Settings.PlayerBarOpacity" xml:space="preserve">
@@ -1299,6 +1315,26 @@
   <data name="Settings.AddAlbumNameUnder" xml:space="preserve">
     <value>Muestra el nombre del álbum bajo el artista en tu tarjeta Discord.</value>
     <comment>Text in SettingsView.axaml</comment>
+  </data>
+  <data name="Settings.DiscordStatusDisplay" xml:space="preserve">
+    <value>Estado en Discord</value>
+    <comment>Settings ▸ Integrations ▸ Discord, SettingsView.axaml</comment>
+  </data>
+  <data name="Settings.DiscordStatusDisplayHint" xml:space="preserve">
+    <value>Lo que Discord muestra tras "Escuchando" en la lista de miembros.</value>
+    <comment>Settings ▸ Integrations ▸ Discord, SettingsView.axaml</comment>
+  </data>
+  <data name="Settings.DiscordStatusDisplay.Artist" xml:space="preserve">
+    <value>Artista</value>
+    <comment>Discord status line choice (SettingsViewModel)</comment>
+  </data>
+  <data name="Settings.DiscordStatusDisplay.Title" xml:space="preserve">
+    <value>Título de la canción</value>
+    <comment>Discord status line choice (SettingsViewModel)</comment>
+  </data>
+  <data name="Settings.DiscordStatusDisplay.AppName" xml:space="preserve">
+    <value>Noctis</value>
+    <comment>Discord status line choice (SettingsViewModel)</comment>
   </data>
   <data name="Settings.LastFmScrobbling" xml:space="preserve">
     <value>Scrobbling de Last.fm</value>
@@ -4417,6 +4453,10 @@
     <value>Reproducir</value>
     <comment>Text in PlaybackBarView.axaml</comment>
   </data>
+  <data name="PlaybackBar.Pause" xml:space="preserve">
+    <value>Pausa</value>
+    <comment>Play/pause button tooltip and accessible name while playing</comment>
+  </data>
   <data name="PlaybackBar.PlayNext" xml:space="preserve">
     <value>Reproducir a continuación</value>
     <comment>Header in PlaybackBarView.axaml</comment>
@@ -5700,6 +5740,18 @@
     <value>Solo el motor de salida integrado. El modo exclusivo mantiene la propia disposición del archivo.</value>
     <comment>Upmix footnote</comment>
   </data>
+  <data name="Settings.HeadphoneSurround" xml:space="preserve">
+    <value>Envolvente para auriculares</value>
+    <comment>Text in SettingsView.axaml</comment>
+  </data>
+  <data name="Settings.HeadphoneSurroundDesc" xml:space="preserve">
+    <value>Convierte los archivos 5.1 y 7.1 en sonido espacial para auriculares en lugar de una mezcla estéreo plana. Las canciones estéreo no cambian.</value>
+    <comment>Text in SettingsView.axaml</comment>
+  </data>
+  <data name="Settings.HeadphoneSurroundRestart" xml:space="preserve">
+    <value>Reinicia Noctis para aplicar este cambio.</value>
+    <comment>Shown under Headphone Surround after a change, in SettingsView.axaml</comment>
+  </data>
   <data name="Server.AccountsMoved" xml:space="preserve">
     <value>Cuentas y sincronización de dispositivos se administran en Cuenta y Sincronización.</value>
     <comment>Integrations → Noctis Server card footer</comment>
@@ -6075,14 +6127,6 @@
   <data name="LyricsStudio.WordsTip" xml:space="preserve">
     <value>Mostrar cada palabra con su tiempo. Haga clic en una para escucharla.</value>
     <comment>Word toggle tooltip</comment>
-  </data>
-  <data name="LyricsStudio.WordEarlier" xml:space="preserve">
-    <value>Palabra seleccionada 50 ms antes (sus vecinos permanecen puestos)</value>
-    <comment>Word nudge tooltip</comment>
-  </data>
-  <data name="LyricsStudio.WordLater" xml:space="preserve">
-    <value>Palabra seleccionada 50 ms más tarde (sus vecinos permanecen puestos)</value>
-    <comment>Word nudge tooltip</comment>
   </data>
   <data name="LyricsStudio.TapWords" xml:space="preserve">
     <value>Toca palabras</value>

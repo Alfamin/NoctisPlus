@@ -41,12 +41,15 @@ public sealed partial class LibraryViewModel : ObservableObject
         _marshal = marshal ?? (a => Avalonia.Threading.Dispatcher.UIThread.Post(a));
 
         _library.LibraryUpdated += (_, _) => _marshal(RefreshFromLibrary);
-        _library.FavoritesChanged += (_, _) => _marshal(RefreshFromLibrary);
+        _library.FavoritesChanged += (_, _) => _marshal(RefreshFavourites);
         _library.ScanProgress += (_, n) => _marshal(() => ScanProgress = n);
         _library.ScanAborted += (_, roots) => _marshal(() =>
         {
+            UnavailableFolders = roots;
             NeedsReconnect = true;
-            StatusText = $"{roots.Length} folder(s) unavailable. Reconnect them and rescan.";
+            StatusText = roots.Length == 1
+                ? $"“{FolderName(roots[0])}” is unavailable. Reconnect it and rescan."
+                : $"{roots.Length} folders are unavailable. Reconnect them and rescan.";
         });
     }
 
@@ -81,7 +84,7 @@ public sealed partial class LibraryViewModel : ObservableObject
     [ObservableProperty] private int _scanProgress;
 
     [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(ShowConnectCard), nameof(HasNotice))]
+    [NotifyPropertyChangedFor(nameof(ShowConnectCard), nameof(HasNotice), nameof(ShowSections))]
     private bool _hasFolders;
 
     /// <summary>The last scan aborted on an unreadable root (a revoked SAF grant, spec §7):
@@ -90,13 +93,17 @@ public sealed partial class LibraryViewModel : ObservableObject
     [NotifyPropertyChangedFor(nameof(ShowStatusLine), nameof(HasNotice))]
     private bool _needsReconnect;
 
+    /// <summary>The folders the last scan could not reach (a card taken out, a folder deleted),
+    /// set with <see cref="NeedsReconnect"/>; Settings marks them.</summary>
+    public IReadOnlyList<string> UnavailableFolders { get; private set; } = Array.Empty<string>();
+
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(ShowStatusLine))]
     private string _statusText = string.Empty;
 
     /// <summary>InitializeAsync has read the settings: until then HasFolders is unknown, not false.</summary>
     [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(ShowConnectCard), nameof(HasNotice))]
+    [NotifyPropertyChangedFor(nameof(ShowConnectCard), nameof(HasNotice), nameof(ShowSections))]
     private bool _isLoaded;
 
     [ObservableProperty] private bool _hasShelf;
@@ -114,6 +121,11 @@ public sealed partial class LibraryViewModel : ObservableObject
     /// <summary>First launch: no folder yet, so the only thing to show is the way in. Held
     /// back until the settings have loaded, or a user with folders sees it flash on launch.</summary>
     public bool ShowConnectCard => IsLoaded && !HasFolders;
+
+    /// <summary>The sections under the rows (Pinned and its hint): the rows show from the settings
+    /// alone (<see cref="ApplySettings"/>), the sections wait for the library, or the pin hint
+    /// flashed over a Pinned rail still loading.</summary>
+    public bool ShowSections => IsLoaded && HasFolders;
 
     /// <summary>Any card above the Library sections (connect, reconnect, scan progress), so an
     /// empty card area takes no room.</summary>
@@ -305,16 +317,29 @@ public sealed partial class LibraryViewModel : ObservableObject
         Refreshed?.Invoke(this, EventArgs.Empty);
     }
 
+    /// <summary>
+    /// What the settings alone decide: the folders (so the Library rows show) and the rows'
+    /// order, and the pins. The host applies these as soon as it has read the settings at start,
+    /// before the play log and the library load: the Library tab sat as a bare title for that
+    /// whole load on a cold launch (~1 s on the emulator, longer with a big library).
+    /// </summary>
+    public void ApplySettings(AppSettings settings)
+    {
+        SetFolders(settings.MusicFolders);
+        _applyingSettings = true;
+        ScanOnStartup = settings.ScanOnStartup;
+        _applyingSettings = false;
+        _pinnedAlbumIds = settings.PinnedAlbumIds.ToList();
+        _pinnedArtistNames = settings.PinnedArtistNames.ToList();
+        _pinnedTrackIds = settings.PinnedTrackIds.ToList();
+        LibraryRowKeys = settings.PhoneLibraryRows.ToList();
+    }
+
     public async Task InitializeAsync()
     {
         try
         {
-            var settings = await _persistence.LoadSettingsAsync();
-            SetFolders(settings.MusicFolders);
-            _pinnedAlbumIds = settings.PinnedAlbumIds.ToList();
-            _pinnedArtistNames = settings.PinnedArtistNames.ToList();
-            _pinnedTrackIds = settings.PinnedTrackIds.ToList();
-            LibraryRowKeys = settings.PhoneLibraryRows.ToList();
+            ApplySettings(await _persistence.LoadSettingsAsync());
             await LoadPlaylistsAsync();
             RefreshFromLibrary();
         }
@@ -331,6 +356,15 @@ public sealed partial class LibraryViewModel : ObservableObject
     /// <summary>Whether <paramref name="folder"/> is still readable; see IFolderPicker.HasAccess.</summary>
     public bool HasAccess(string folder) => _picker.HasAccess(folder);
 
+    /// <summary>The storage <paramref name="folder"/> is on when not the phone's own; see IFolderPicker.StorageName.</summary>
+    public string? StorageName(string folder) => _picker.StorageName(folder);
+
+    /// <summary>
+    /// Desktop parity (SettingsViewModel.AddFolderPath): the same folder again is silent (and
+    /// rescans, which is how a folder whose access was lost comes back); a folder inside one
+    /// already listed, or around one, is refused with a note, as the scan would list its songs
+    /// twice (a SAF song's path carries the folder it was found through).
+    /// </summary>
     [RelayCommand]
     private async Task AddFolderAsync()
     {
@@ -338,33 +372,155 @@ public sealed partial class LibraryViewModel : ObservableObject
         if (string.IsNullOrWhiteSpace(picked)) return;
 
         var settings = await _persistence.LoadSettingsAsync();
-        if (!settings.MusicFolders.Contains(picked))
+        if (!settings.MusicFolders.Any(f => FolderKey(f) == FolderKey(picked)))
         {
+            if (settings.MusicFolders.FirstOrDefault(f => IsInside(picked, f)) is { } covering)
+            {
+                RefusePick(picked, $"Already covered by “{FolderName(covering)}”.");
+                return;
+            }
+            if (settings.MusicFolders.FirstOrDefault(f => IsInside(f, picked)) is { } inner)
+            {
+                RefusePick(picked, $"“{FolderName(inner)}” is inside that folder. Remove it first.");
+                return;
+            }
             settings.MusicFolders.Add(picked);
             await SaveSettingsAsync(settings, "Folder");
         }
         SetFolders(settings.MusicFolders);
-        await ScanAsync(settings.MusicFolders);
+        await ScanAsync();
+    }
+
+    /// <summary>
+    /// Desktop parity (SettingsViewModel.RemoveFolder): the folder leaves the list and a rescan
+    /// takes its songs out of the library (removing the last one empties it). The files stay
+    /// where they are; the phone gives up its access to the folder.
+    /// </summary>
+    public async Task RemoveFolderAsync(string folder)
+    {
+        var settings = await _persistence.LoadSettingsAsync();
+        if (settings.MusicFolders.RemoveAll(f => f == folder) == 0) return;
+        await SaveSettingsAsync(settings, "Folder");
+        SetFolders(settings.MusicFolders);
+        _picker.ReleaseAccess(folder);
+        await ScanAsync(evenWithoutFolders: true);
+    }
+
+    /// <summary>A refused pick: say why (cleared after a while, as on the desktop) and give the
+    /// access just granted back, as nothing will use it.</summary>
+    private void RefusePick(string picked, string why)
+    {
+        _picker.ReleaseAccess(picked);
+        StatusText = why;
+        _ = ClearStatusLaterAsync(why);
+    }
+
+    private async Task ClearStatusLaterAsync(string text)
+    {
+        await Task.Delay(TimeSpan.FromSeconds(6)).ConfigureAwait(false);
+        _marshal(() =>
+        {
+            if (StatusText == text) StatusText = string.Empty;
+        });
+    }
+
+    /// <summary>What identifies a folder: a SAF tree URI's provider and its document id
+    /// ("content://…/tree/primary%3AMusic%2FTones" → "content://…", "primary:Music/Tones");
+    /// anything else as a plain path.</summary>
+    internal static (string Scope, string Path) FolderKey(string folder)
+    {
+        var tree = folder.IndexOf("/tree/", StringComparison.Ordinal);
+        if (tree < 0) return (string.Empty, folder.Replace('\\', '/').TrimEnd('/'));
+        return (folder[..tree], Uri.UnescapeDataString(folder[(tree + "/tree/".Length)..]).TrimEnd('/'));
+    }
+
+    /// <summary>True when <paramref name="folder"/> is below <paramref name="root"/> (not the
+    /// same folder). "primary:Music/Tones" is under "primary:Music" and under a whole card
+    /// ("1234-ABCD:"); "primary:MusicVideos" is not under "primary:Music".</summary>
+    internal static bool IsInside(string folder, string root)
+    {
+        var (folderScope, folderPath) = FolderKey(folder);
+        var (rootScope, rootPath) = FolderKey(root);
+        if (folderScope != rootScope || folderPath.Length <= rootPath.Length
+            || !folderPath.StartsWith(rootPath, StringComparison.Ordinal)) return false;
+        return rootPath.EndsWith(':') || folderPath[rootPath.Length] == '/';
+    }
+
+    /// <summary>A folder's own name for a note ("Tones").</summary>
+    private static string FolderName(string folder)
+    {
+        var path = FolderKey(folder).Path;
+        var cut = Math.Max(path.LastIndexOf('/'), path.LastIndexOf(':'));
+        return cut >= 0 && cut < path.Length - 1 ? path[(cut + 1)..] : path;
     }
 
     [RelayCommand]
-    private async Task RescanAsync()
+    private Task RescanAsync() => ScanAsync();
+
+    /// <summary>Desktop parity (Settings › Library › Scan on Startup, AppSettings.ScanOnStartup):
+    /// each launch rescans the folders, so songs copied onto the phone since show up without a
+    /// Rescan. Unchanged songs are not read again.</summary>
+    [ObservableProperty] private bool _scanOnStartup = true;
+
+    private bool _applyingSettings;
+
+    partial void OnScanOnStartupChanged(bool value)
     {
-        var settings = await _persistence.LoadSettingsAsync();
-        if (settings.MusicFolders.Count == 0) return;
-        await ScanAsync(settings.MusicFolders);
+        if (!_applyingSettings) _ = SaveScanOnStartupAsync(value);
     }
 
-    private async Task ScanAsync(IEnumerable<string> folders)
+    private async Task SaveScanOnStartupAsync(bool value)
     {
-        if (IsScanning) return;
-        IsScanning = true;
-        NeedsReconnect = false;
-        ScanProgress = 0;
-        StatusText = "Scanning…";
         try
         {
-            await _library.ScanAsync(folders);
+            var settings = await _persistence.LoadSettingsAsync();
+            settings.ScanOnStartup = value;
+            await SaveSettingsAsync(settings, "Scan on startup");
+        }
+        catch (Exception ex)
+        {
+            DebugLog.Write("Library", $"Scan on startup save failed: {ex.Message}");
+        }
+    }
+
+    /// <summary>The host calls this once the library has loaded at launch.</summary>
+    public Task ScanAtStartupAsync() => ScanOnStartup && HasFolders ? ScanAsync() : Task.CompletedTask;
+
+    /// <summary>Set when a scan is asked for while one runs: the running one goes again once it
+    /// ends, so a folder added or removed mid-scan is never left out of (or in) the library.</summary>
+    private bool _scanAgain;
+
+    /// <summary>The last folder was removed: a pass with no folders must still run, to take its
+    /// songs out. Any other scan with none does nothing (a settings read that came back empty
+    /// must never empty the library).</summary>
+    private bool _scanWithoutFolders;
+
+    /// <summary>Scans the folders in the settings as they are when each pass starts.</summary>
+    private async Task ScanAsync(bool evenWithoutFolders = false)
+    {
+        _scanWithoutFolders |= evenWithoutFolders;
+        if (IsScanning)
+        {
+            _scanAgain = true;
+            return;
+        }
+        IsScanning = true;
+        ScanProgress = 0;
+        try
+        {
+            do
+            {
+                _scanAgain = false;
+                // Each pass judges the folders afresh: one back in reach is no longer flagged.
+                UnavailableFolders = Array.Empty<string>();
+                NeedsReconnect = false;
+                StatusText = "Scanning…";
+                var folders = (await _persistence.LoadSettingsAsync()).MusicFolders.ToList();
+                if (folders.Count == 0 && !_scanWithoutFolders) break;
+                _scanWithoutFolders = false;
+                await _library.ScanAsync(folders);
+            }
+            while (_scanAgain);
             if (StatusText == "Scanning…") StatusText = string.Empty; // ScanAborted may have replaced it
         }
         catch (Exception ex)
@@ -420,6 +576,18 @@ public sealed partial class LibraryViewModel : ObservableObject
         Songs.ReplaceAll(tracks.OrderBy(t => t.Title, StringComparer.CurrentCultureIgnoreCase));
         RefreshRails();
         RefreshRecents();
+        Refreshed?.Invoke(this, EventArgs.Empty);
+    }
+
+    /// <summary>
+    /// A heart toggled: the count and the open lists re-read (Favorites, a filtered list). The
+    /// songs, albums and their order are what they were, so nothing is re-sorted or rebuilt:
+    /// this used to run the full refresh, whose title sort of every song (culture-aware) held
+    /// the UI thread for a good part of a second on a big library, on every tap of a heart.
+    /// </summary>
+    private void RefreshFavourites()
+    {
+        FavoriteCount = _library.Tracks.Count(t => t.IsFavorite);
         Refreshed?.Invoke(this, EventArgs.Empty);
     }
 

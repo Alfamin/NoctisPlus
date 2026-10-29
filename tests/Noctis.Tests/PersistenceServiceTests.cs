@@ -174,6 +174,54 @@ public class PersistenceServiceTests : IDisposable
         Assert.Null((await svc.LoadSettingsAsync()).CommunityPluginsEnabled);
     }
 
+    /// <summary>CI 10-18 (InboxPageTests): Windows refuses to rename over a file a reader has
+    /// open, so a save landing while anything was reading settings.json threw "Access to the
+    /// path is denied" and the setting was lost. The save now waits the read out.</summary>
+    [Fact]
+    public async Task Save_WhileTheFileIsBeingRead_LandsOnceTheReadEnds()
+    {
+        var svc = Create();
+        await svc.SaveSettingsAsync(new AppSettings { Volume = 10 });
+
+        Task save;
+        // Opened the way every load opens it, held a little longer than a read takes.
+        using (new FileStream(Path.Combine(_root, "settings.json"), FileMode.Open, FileAccess.Read, FileShare.Read))
+        {
+            save = svc.SaveSettingsAsync(new AppSettings { Volume = 20 });
+            await Task.Delay(150, TestContext.Current.CancellationToken);
+        }
+        await save;
+
+        Assert.Equal(20, (await svc.LoadSettingsAsync()).Volume);
+    }
+
+    /// <summary>CI 10-18 (InboxPageTests): the library's genre pass loaded settings.json to
+    /// stamp its schema version, Settings saved the Inbox switch meanwhile, and the pass then
+    /// wrote its stale copy over it. A save that comes while an update is under way now waits
+    /// for it instead of being undone by it.</summary>
+    [Fact]
+    public async Task UpdateSettings_ASaveFromElsewhereMeanwhile_IsNotUndone()
+    {
+        var svc = Create();
+        await svc.SaveSettingsAsync(new AppSettings());
+        using var loaded = new ManualResetEventSlim();
+        using var resume = new ManualResetEventSlim();
+
+        var update = Task.Run(() => svc.UpdateSettingsAsync(s =>
+        {
+            loaded.Set();   // the update has read the file...
+            resume.Wait(TestContext.Current.CancellationToken);
+            s.MetadataSchemaVersion = 12;
+        }), TestContext.Current.CancellationToken);
+        loaded.Wait(TestContext.Current.CancellationToken);
+        var save = svc.SaveSettingsAsync(new AppSettings { InboxEnabled = true });   // ...when Settings saves
+        await Task.Delay(100, TestContext.Current.CancellationToken);
+        resume.Set();
+        await Task.WhenAll(update, save);
+
+        Assert.True((await svc.LoadSettingsAsync()).InboxEnabled);
+    }
+
     [Fact]
     public async Task OutOfRangeNumbers_AreClampedOnLoad()
     {

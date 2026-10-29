@@ -47,6 +47,13 @@ public class Album : ObservableObject
     /// <summary>Genre (from the first track that has one).</summary>
     public string Genre { get; set; } = "Unknown";
 
+    /// <summary>The album's genres for the header line, each one separate like the artist
+    /// page's GENRE fact ("Alternative Rock · Alt-Pop · Indie", GitHub #136); empty for the
+    /// "Unknown" placeholder.</summary>
+    public string GenreDisplay => string.Equals(Genre?.Trim(), "Unknown", StringComparison.OrdinalIgnoreCase)
+        ? string.Empty
+        : Track.DotGenres(Genre);
+
     /// <summary>Number of tracks in this album.</summary>
     public int TrackCount
     {
@@ -166,24 +173,7 @@ public class Album : ObservableObject
         {
             if (IsMixedQuality) return MixedQualityDetailedInfo();
 
-            var track = GetRepresentativeQualityTrack();
-            if (track == null) return string.Empty;
-
-            var parts = new List<string>();
-            if (!track.IsLossless && track.Bitrate > 0)
-                parts.Add($"{track.Bitrate} kbps");
-            if (track.BitsPerSample > 0 && track.SampleRate > 0)
-                parts.Add($"{track.BitsPerSample}-bit/{track.SampleRate / 1000.0:0.###} kHz");
-            else if (track.BitsPerSample > 0)
-                parts.Add($"{track.BitsPerSample}-bit");
-            else if (track.SampleRate > 0)
-                parts.Add($"{track.SampleRate / 1000.0:0.###} kHz");
-
-            var codec = track.CodecShortName;
-            if (!string.IsNullOrEmpty(codec))
-                parts.Add(codec);
-
-            return string.Join(" ", parts);
+            return GetRepresentativeQualityTrack()?.QualityDetailLine ?? string.Empty;
         }
     }
 
@@ -411,16 +401,30 @@ public class Album : ObservableObject
         return 0;
     }
 
+    /// <summary>
+    /// Album genre from its tracks in album order: the first tagged track's, as
+    /// <see cref="Genre"/> documents. The first track's alone left an album whose opener is
+    /// untagged (a bonus intro, an undated WAV copy) with no genre at all.
+    /// </summary>
+    public static string ResolveGenre(IReadOnlyList<Track> tracks)
+    {
+        foreach (var t in tracks)
+            if (!string.IsNullOrWhiteSpace(t.Genre)) return t.Genre;
+        return string.Empty;
+    }
+
     /// <summary>"12 tracks" / "1 track" for the album header's facts line.</summary>
     // Empty while an online album's songs are still being read (never "0 tracks").
     public string TrackCountText => TrackCount <= 0 ? "" : TrackCount == 1 ? "1 track" : $"{TrackCount} tracks";
 
     /// <summary>Header duration with seconds ("55m 51s"), hours when long ("1h 12m").</summary>
-    public string HeaderDurationFormatted =>
-        TotalDuration <= TimeSpan.Zero ? "" :
-        TotalDuration.TotalHours >= 1
-            ? $"{(int)TotalDuration.TotalHours}h {TotalDuration.Minutes}m"
-            : $"{(int)TotalDuration.TotalMinutes}m {TotalDuration.Seconds:00}s";
+    public string HeaderDurationFormatted => TotalDuration <= TimeSpan.Zero ? "" : FormatHeaderDuration(TotalDuration);
+
+    /// <summary>"55m 51s", or "1h 12m" from an hour up; the Artists list's Time column too.</summary>
+    public static string FormatHeaderDuration(TimeSpan duration) =>
+        duration.TotalHours >= 1
+            ? $"{(int)duration.TotalHours}h {duration.Minutes}m"
+            : $"{(int)duration.TotalMinutes}m {duration.Seconds:00}s";
 
     public override string ToString() => $"{Artist} - {Name}";
 

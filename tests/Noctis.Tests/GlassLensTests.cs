@@ -188,6 +188,23 @@ public class GlassLensTests
         Assert.True(colour.Red - colour.Green > 50 + 10, $"{colour}: not more saturated than 160/110/110");
     }
 
+    /// <summary>Bug (phone ⋯ menu, 10-13): a raised floor lifted near-black by dividing by its
+    /// luminance, so the 8-bit residue a blur leaves on black — (0,1,2) — was scaled ~50x into
+    /// bright blue: streaks and specks across dark glass over a black page. Below a small
+    /// luminance the hue is noise, so the floor lifts it to grey.</summary>
+    [Fact]
+    public void Tone_LiftsNearBlackToGrey_NotItsQuantisationNoiseToColour()
+    {
+        using var surface = SKSurface.Create(new SKImageInfo(W, H, SKColorType.Rgba8888, SKAlphaType.Premul));
+        surface.Canvas.Clear(new SKColor(0, 1, 2));
+        Lens(surface, Frame(band: 0, bend: 0, toneMin: 0.18f, toneMax: 0.3f));
+        var c = Pixel(surface, 120, 80);
+        Assert.True(c.Blue - c.Red <= 4, $"{c}: near-black lifted to a colour");
+        Assert.Equal(0.18 * 255, c.Green, 3.0);
+        var (r, _, b) = GlassLens.Tone(0, 1 / 255f, 2 / 255f, 0.18f, 0.3f);
+        Assert.True((b - r) * 255 <= 4, "the C# twin too");
+    }
+
     [Fact]
     public void Tone_SqueezesTheBackdropsLuminance_SoTextOnTheGlassKeepsItsContrast()
     {
@@ -226,6 +243,138 @@ public class GlassLensTests
         Assert.True(Pixel(surface, 120, 80).Red < 10, "the centre is lit");
         Assert.Equal(SKColors.Black, Pixel(surface, 120, 36));
         Assert.Equal(SKColors.Black, Pixel(surface, 20, 20));
+    }
+
+    [Fact]
+    public void ToneCurve_ClimbsFastFromTheDarkEnd_AndKeepsTheRangesEnds()
+    {
+        var (straight, _, _) = GlassLens.Tone(0.3f, 0.3f, 0.3f, 0.2f, 0.4f);
+        var (curved, _, _) = GlassLens.Tone(0.3f, 0.3f, 0.3f, 0.2f, 0.4f, curve: 2);
+        Assert.Equal(0.26f, straight, 3);
+        Assert.Equal(0.2f + 0.2f * (1 - 0.7f * 0.7f), curved, 3);   // brighter than the straight line
+        Assert.Equal(0.4f, GlassLens.Tone(1, 1, 1, 0.2f, 0.4f, curve: 2).R, 3);   // white still capped at the top
+        Assert.Equal(0.2f, GlassLens.Tone(0, 0, 0, 0.2f, 0.4f, curve: 2).R, 3);   // black still at the floor
+
+        // The shader draws what the twin says.
+        using var surface = SKSurface.Create(new SKImageInfo(W, H, SKColorType.Rgba8888, SKAlphaType.Premul));
+        surface.Canvas.Clear(new SKColor(77, 77, 77));
+        Lens(surface, Frame(band: 0, bend: 0, toneMin: 0.2f, toneMax: 0.4f) with { ToneCurve = 2 });
+        var expected = GlassLens.Tone(77 / 255f, 77 / 255f, 77 / 255f, 0.2f, 0.4f, curve: 2).R * 255;
+        Assert.Equal(expected, Pixel(surface, 120, 80).Red, 2.0);
+    }
+
+    [Fact]
+    public void ToneLift_VeilsADarkColour_InsteadOfScalingItIntoAVividBlotch()
+    {
+        // Dark brown ink behind light glass (floor 0.62): scaled up, red runs out of range and the
+        // ink turns orange; under a white veil it is a soft light tint at the same luminance.
+        const float r = 78 / 255f, g = 42 / 255f, b = 30 / 255f;
+        var scaled = GlassLens.Tone(r, g, b, 0.62f, 1);
+        var veiled = GlassLens.Tone(r, g, b, 0.62f, 1, lift: 1);
+        Assert.Equal(1f, scaled.R, 3);
+        Assert.True(veiled.R < 0.95f, $"veiled red {veiled.R}");
+        Assert.True(veiled.R - veiled.B < (scaled.R - scaled.B) / 2, "the veil keeps the colour soft");
+        Assert.True(veiled.R > veiled.G && veiled.G > veiled.B, "and its hue");
+        var l = 0.2126f * veiled.R + 0.7152f * veiled.G + 0.0722f * veiled.B;
+        Assert.Equal(0.62f + 0.38f * (0.2126f * r + 0.7152f * g + 0.0722f * b), l, 3);
+        // Darkening is untouched by the lift: still a scale.
+        Assert.Equal(GlassLens.Tone(0.9f, 0.5f, 0.3f, 0, 0.4f), GlassLens.Tone(0.9f, 0.5f, 0.3f, 0, 0.4f, lift: 1));
+
+        using var surface = SKSurface.Create(new SKImageInfo(W, H, SKColorType.Rgba8888, SKAlphaType.Premul));
+        surface.Canvas.Clear(new SKColor(78, 42, 30));
+        Lens(surface, Frame(band: 0, bend: 0, toneMin: 0.62f, toneMax: 1) with { ToneLift = 1 });
+        var c = Pixel(surface, 120, 80);
+        Assert.Equal(veiled.R * 255, c.Red, 2.5);
+        Assert.Equal(veiled.G * 255, c.Green, 2.5);
+        Assert.Equal(veiled.B * 255, c.Blue, 2.5);
+    }
+
+    /// <summary>Apple's dark menu glass (measured 10-14): a plain backdrop keeps its own hue and
+    /// saturation through the glass (brown lifts to a brighter brown, not a milky grey-brown), and
+    /// dark content inside it takes the colour of its surroundings at the floor, not neutral grey.</summary>
+    [Fact]
+    public void Spill_KeepsAPlainBackdropsColour_AndFillsDarkContentWithItsSurroundings()
+    {
+        static SKSurface BrownWithInk()
+        {
+            var surface = SKSurface.Create(new SKImageInfo(W, H, SKColorType.Rgba8888, SKAlphaType.Premul));
+            surface.Canvas.Clear(new SKColor(120, 70, 30));
+            using var ink = new SKPaint { Color = SKColors.Black };
+            surface.Canvas.DrawRect(new SKRect(116, 76, 124, 84), ink);
+            return surface;
+        }
+        static float Lum(SKColor c) => (0.2126f * c.Red + 0.7152f * c.Green + 0.0722f * c.Blue) / 255f;
+
+        // A floor of 0.4 lifts the brown (luminance 0.305) a little, as a dark menu lifts a dark page.
+        using var veiled = BrownWithInk();
+        Lens(veiled, Frame(band: 0, bend: 0, toneMin: 0.4f, toneMax: 0.5f) with { ToneLift = 1 });
+        using var spilled = BrownWithInk();
+        Lens(spilled, Frame(band: 0, bend: 0, toneMin: 0.4f, toneMax: 0.5f) with { ToneLift = 1, Spill = 0.6f, SpillSigma = 10 });
+
+        // The ink: grey at the floor under the veil; under the spill, the brown around it at the floor.
+        var greyInk = Pixel(veiled, 120, 80);
+        var brownInk = Pixel(spilled, 120, 80);
+        Assert.True(Math.Abs(greyInk.Red - greyInk.Blue) <= 2, $"veiled ink {greyInk} is not grey");
+        Assert.True(brownInk.Red > brownInk.Blue + 12, $"spilled ink {brownInk} took no colour from its surroundings");
+        Assert.Equal(0.4f, Lum(brownInk), 1);
+        // The plain brown: both lift it to the same luminance, but the veil greys it and the spill does not.
+        var plain = new SKColor(120, 70, 30);
+        var veiledBrown = Pixel(veiled, 60, 80);
+        var spilledBrown = Pixel(spilled, 60, 80);
+        Assert.Equal(Lum(veiledBrown), Lum(spilledBrown), 1);
+        static float Saturation(SKColor c)
+        {
+            int max = Math.Max((int)c.Red, Math.Max((int)c.Green, (int)c.Blue)), min = Math.Min((int)c.Red, Math.Min((int)c.Green, (int)c.Blue));
+            return (max - min) / (float)Math.Max(1, max);
+        }
+        Assert.True(Saturation(spilledBrown) > Saturation(plain) - 0.08f, $"spill: {spilledBrown} lost its saturation ({Saturation(plain):0.00})");
+        Assert.True(Saturation(veiledBrown) < Saturation(spilledBrown) - 0.1f, $"veil {veiledBrown} vs spill {spilledBrown}");
+    }
+
+    /// <summary>The rim's shadow on the face: a soft dark band inside the top edge that faces the
+    /// light, none along the bottom, the centre untouched.</summary>
+    [Fact]
+    public void Shade_DarkensUnderTheTopEdge_NotTheBottomOrTheCentre()
+    {
+        using var surface = SKSurface.Create(new SKImageInfo(W, H, SKColorType.Rgba8888, SKAlphaType.Premul));
+        surface.Canvas.Clear(new SKColor(120, 70, 30));
+        Lens(surface, Frame(band: 24, bend: 0) with { Shade = 0.5f });
+        var top = Pixel(surface, 120, 42);
+        var centre = Pixel(surface, 120, 80);
+        var bottom = Pixel(surface, 120, 117);
+        Assert.Equal(120, centre.Red);
+        Assert.True(top.Red < centre.Red * 0.7f, $"top {top.Red} is not shaded");
+        Assert.Equal(centre.Red, bottom.Red, 2.0);
+    }
+
+    [Fact]
+    public void Rim_TopCatch_LightsTheTopEdge_AndFadesDownTheSides_SoThereIsNoOutline()
+    {
+        static (SKColor Top, SKColor Side, SKColor Bottom) Rim(GlassRimShape? shape, bool additive, SKColor under, float strength = 1)
+        {
+            using var surface = SKSurface.Create(new SKImageInfo(W, H, SKColorType.Rgba8888, SKAlphaType.Premul));
+            surface.Canvas.Clear(under);
+            GlassLens.DrawRim(surface.Canvas, Capsule, new GlassCornerRadii(40, 40, 40, 40), strength, lineWidth: 2,
+                glowWidth: 6, glow: 0.2f, iridescence: 0, shape, additive);
+            return (Pixel(surface, 120, 40), Pixel(surface, 40, 80), Pixel(surface, 120, 119));
+        }
+
+        var diagonal = Rim(null, false, SKColors.Black);
+        var catchLight = Rim(GlassRimShape.TopCatch, false, SKColors.Black);
+        // The default rim runs all the way round: its sides are lit nearly as much as its top.
+        Assert.True(diagonal.Side.Red > diagonal.Top.Red / 2, $"diagonal side {diagonal.Side.Red} top {diagonal.Top.Red}");
+        // The catch-light is the top's: the sides keep a faint trace, the bottom a dimmer catch.
+        Assert.True(catchLight.Top.Red > 200, $"top {catchLight.Top.Red}");
+        Assert.True(catchLight.Side.Red < catchLight.Top.Red / 4, $"side {catchLight.Side.Red} top {catchLight.Top.Red}");
+        Assert.True(catchLight.Bottom.Red > catchLight.Side.Red && catchLight.Bottom.Red < catchLight.Top.Red,
+            $"bottom {catchLight.Bottom.Red}");
+
+        // Added to what lies beneath, the light takes its colour instead of greying it.
+        var warm = new SKColor(100, 50, 20);
+        var added = Rim(GlassRimShape.TopCatch, true, warm, 0.3f).Top;
+        var laid = Rim(GlassRimShape.TopCatch, false, warm, 0.3f).Top;
+        Assert.True(added.Red > 150 && added.Red - added.Blue >= 75, $"added {added}");
+        Assert.True(laid.Red - laid.Blue < added.Red - added.Blue - 20, $"laid over {laid} vs added {added}");
     }
 
     [Fact]
@@ -269,6 +418,11 @@ public class GlassLensTests
         Assert.Equal(0, panel.BoxShadow.Count);
         Assert.Equal(0, panel.BackdropMinLuminance);
         Assert.Equal(1, panel.BackdropMaxLuminance);
+        Assert.Equal(1, panel.BackdropToneCurve);
+        Assert.Equal(0, panel.BackdropLift);
+        Assert.Equal(0, panel.BackdropSpill);
+        Assert.Equal(0, panel.BackdropShade);
+        Assert.Equal(GlassSpecularStyle.Diagonal, panel.SpecularStyle);
         Assert.False(panel.HasLens);
         Assert.Null(panel.LensSettings());
         Assert.True(panel.NeedsBackdrop);                // BlurRadius 18

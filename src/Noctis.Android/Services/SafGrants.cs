@@ -19,12 +19,33 @@ internal static class SafGrants
         {
             var grants = context.ContentResolver?.PersistedUriPermissions;
             if (grants == null) return true;
-            return grants.Any(g => g.IsReadPermission && g.Uri?.ToString() is { } granted
-                                   && uri.StartsWith(granted, StringComparison.Ordinal));
+            return grants.Any(g => g.IsReadPermission && g.Uri?.ToString() is { } granted && IsCoveredBy(uri, granted));
         }
         catch (Exception)
         {
             return true;
+        }
+    }
+
+    /// <summary>The grant's own URI, or one under it ("…/tree/X/document/…"). A bare string
+    /// prefix also matched a sibling or child TREE ("…/tree/primary%3AMusic%2FTones" under a
+    /// grant for "…/tree/primary%3AMusic"), which Android does not let the app read: Settings
+    /// said the folder was fine while every scan of it failed.</summary>
+    internal static bool IsCoveredBy(string uri, string granted) =>
+        uri.Equals(granted, StringComparison.Ordinal) || uri.StartsWith(granted + "/", StringComparison.Ordinal);
+
+    /// <summary>Drops the app's persisted read grant on <paramref name="uri"/>, if it has one.</summary>
+    public static void Release(Context context, string uri)
+    {
+        if (!uri.StartsWith("content://", StringComparison.OrdinalIgnoreCase)) return;
+        try
+        {
+            context.ContentResolver?.ReleasePersistableUriPermission(global::Android.Net.Uri.Parse(uri)!, ActivityFlags.GrantReadUriPermission);
+        }
+        catch (Exception ex)
+        {
+            // No grant to release (never taken, already gone): nothing to do.
+            Noctis.Services.DebugLog.Write("Library", $"Releasing the grant on {uri} failed: {ex.Message}");
         }
     }
 }

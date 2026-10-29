@@ -35,14 +35,20 @@ public class ArtistImageService
 
         // Defer the placeholder purge off the DI resolution path so it doesn't
         // enumerate the artwork directory on the UI thread during startup.
-        _ = Task.Run(PurgeLastFmPlaceholders);
+        PlaceholderPurge = Task.Run(PurgePlaceholders);
     }
+
+    /// <summary>The startup placeholder purge (tests await it).</summary>
+    internal Task PlaceholderPurge { get; }
 
     /// <summary>
     /// One-time cleanup: remove old Last.fm placeholder images (all ≤5KB, same generic star icon)
-    /// so they get re-fetched from Deezer with real artist photos.
+    /// so they get re-fetched from Deezer with real artist photos, and Deezer's grey "no photo"
+    /// silhouettes cached before downloads recognised them (10-12), so those artists get the
+    /// app's own placeholder. Only a file of the silhouette's exact length is read, and a
+    /// user-picked portrait is never touched.
     /// </summary>
-    private void PurgeLastFmPlaceholders()
+    private void PurgePlaceholders()
     {
         try
         {
@@ -51,6 +57,11 @@ public class ArtistImageService
                 var info = new FileInfo(file);
                 if (info.Length > 0 && info.Length <= 5120)
                     info.Delete();
+                else if (!File.Exists(Path.ChangeExtension(file, ".custom")) && DeezerArtistPhotos.IsNoPhotoFile(file))
+                {
+                    info.Delete();
+                    TryDelete(Path.ChangeExtension(file, ".src"));
+                }
             }
         }
         catch { }
@@ -241,6 +252,16 @@ public class ArtistImageService
         // on the UI thread before the tab could paint.
         await Task.Yield();
 
+        // Portraits already on disk are surfaced before queueing for the gate (GitHub #137).
+        // The loop below holds the gate through all of its network work (a paced re-check
+        // of every portrait older than RefreshInterval, up to DownloadTimeout per stalled
+        // request), so Home's six artists waited behind the Artists tab's full-library
+        // sweep and an artist late in the name order waited for every earlier refresh:
+        // pictures that were already cached stayed blank for minutes.
+        // On the thread pool: Task.Yield resumes on the caller's context, which for the
+        // Home and Artists tabs is the UI thread, and this is one stat per artist.
+        await Task.Run(() => SurfaceCachedImages(artists, onImageReady)).ConfigureAwait(false);
+
         await _fetchGate.WaitAsync().ConfigureAwait(false);
 
         try
@@ -352,6 +373,32 @@ public class ArtistImageService
     }
 
     /// <summary>
+    /// Points each artist at its cached portrait, or clears it for one the user removed,
+    /// reporting every newly surfaced path. Local files only, never the network; runs
+    /// off the caller's thread. The gated loop re-checks all of it, so a removal or a
+    /// download landing in between is still honored there.
+    /// </summary>
+    private void SurfaceCachedImages(IReadOnlyList<Artist> artists, Action<Artist, string>? onImageReady)
+    {
+        foreach (var artist in artists)
+        {
+            if (File.Exists(GetRemovedMarkerPath(artist.Id)))
+            {
+                if (artist.ImagePath != null)
+                    artist.ImagePath = null;
+                continue;
+            }
+
+            var cachedPath = GetCachedImagePath(artist.Id);
+            if (artist.ImagePath != cachedPath && File.Exists(cachedPath))
+            {
+                artist.ImagePath = cachedPath;
+                onImageReady?.Invoke(artist, cachedPath);
+            }
+        }
+    }
+
+    /// <summary>
     /// Looks the artist up online and re-downloads their photo, clearing any prior
     /// "removed" marker so the restored image isn't suppressed on the next refresh.
     /// Use to bring a portrait back after Remove, or to refresh a custom one.
@@ -412,8 +459,8 @@ public class ArtistImageService
             return false;
         WriteFanCount(artistId, match.Fans);
 
-        var imageData = await DownloadImageBytesAsync(match.ImageUrl, token).ConfigureAwait(false);
-        if (imageData == null)
+        // Deezer's silhouette is no photo: the no-match path takes over.
+        if ((await DownloadImageBytesAsync(match.ImageUrl, token).ConfigureAwait(false)).Bytes is not { } imageData)
             return false;
 
         await WriteImageAtomicAsync(cachedPath, imageData, token).ConfigureAwait(false);
@@ -494,9 +541,15 @@ public class ArtistImageService
             return false;
         }
 
-        var imageData = await DownloadImageBytesAsync(imageUrl, token).ConfigureAwait(false);
-        if (imageData == null)
+        var download = await DownloadImageBytesAsync(imageUrl, token).ConfigureAwait(false);
+        if (download.Bytes is not { } imageData)
+        {
+            // Deezer's silhouette: keep the portrait we have, and record the URL so the next
+            // sweep finds it unchanged instead of downloading the silhouette again.
+            if (download.NoPhoto)
+                WriteSourceMarker(artistId, imageUrl);
             return false;
+        }
 
         WriteSourceMarker(artistId, imageUrl);
 
@@ -515,7 +568,7 @@ public class ArtistImageService
     /// <summary>Deezer's 1800px size for a 1000px photo URL (see <see cref="DeezerArtistPhotos.UpgradeSize"/>).</summary>
     internal static string UpgradeDeezerSize(string imageUrl) => DeezerArtistPhotos.UpgradeSize(imageUrl);
 
-    private Task<byte[]?> DownloadImageBytesAsync(string imageUrl, CancellationToken token)
+    private Task<DeezerArtistPhotos.ImageDownload> DownloadImageBytesAsync(string imageUrl, CancellationToken token)
         => _deezer.DownloadImageAsync(imageUrl, token);
 
     /// <summary>

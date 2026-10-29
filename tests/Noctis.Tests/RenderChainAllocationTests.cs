@@ -1,0 +1,47 @@
+using System;
+using NAudio.Wave;
+using NAudio.Wave.SampleProviders;
+using Noctis.Services;
+using Xunit;
+
+namespace Noctis.Tests;
+
+// GitHub #139 log: GaplessEngine.RenderStall lines on Linux carried 23-45 ms GC pauses.
+// The render thread is managed, so a GC suspends it whatever its priority; this pins
+// that the steady-state render chain itself (splice -> mute gate -> beat tap -> level ->
+// float-to-bytes, the GaplessSink order) adds no garbage that could trigger those GCs.
+public class RenderChainAllocationTests
+{
+    private readonly ITestOutputHelper _out;
+    public RenderChainAllocationTests(ITestOutputHelper output) => _out = output;
+
+    [Fact]
+    public void SteadyStateRenderRead_AllocatesAlmostNothing()
+    {
+        const int rate = 44100, channels = 2, periodMs = 10;
+        var provider = new GaplessSpliceProvider(rate, channels, startThresholdMs: 200, startFadeMs: 5);
+        var segment = new GaplessTrackSegment(rate, channels, source: null, capacitySeconds: 30);
+        provider.Enqueue(segment);
+        var block = new short[rate * channels]; // 1 s of a 441 Hz tone
+        for (int i = 0; i < rate; i++)
+            block[2 * i] = block[2 * i + 1] = (short)(12000 * Math.Sin(2 * Math.PI * 441 * i / rate));
+        for (int s = 0; s < 25; s++) Assert.True(segment.Write(block));
+
+        ISampleProvider chain = new MuteGateProvider(provider);
+        chain = new BeatTapProvider(chain, 100);
+        chain = new OutputLevelProvider(chain);
+        var bytes = new SampleToWaveProvider(chain);
+        var buffer = new byte[rate * periodMs / 1000 * channels * 4];
+
+        for (int i = 0; i < 100; i++) bytes.Read(buffer, 0, buffer.Length); // warm-up (JIT, first-read state)
+        const int reads = 1000; // 10 s of audio
+        var before = GC.GetAllocatedBytesForCurrentThread();
+        for (int i = 0; i < reads; i++) bytes.Read(buffer, 0, buffer.Length);
+        var perRead = (GC.GetAllocatedBytesForCurrentThread() - before) / (double)reads;
+        _out.WriteLine($"render chain: {perRead:F1} bytes allocated per 10 ms read");
+
+        // NAudio's SampleToWaveProvider wraps the buffer in a WaveBuffer per call (~40 B);
+        // anything beyond a few hundred bytes would be the chain itself allocating.
+        Assert.True(perRead < 256, $"render chain allocated {perRead:F1} B per read");
+    }
+}

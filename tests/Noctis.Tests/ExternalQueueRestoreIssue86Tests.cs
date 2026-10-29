@@ -147,6 +147,9 @@ public class ExternalQueueRestoreIssue86Tests : IDisposable
         Assert.Equal(TimeSpan.FromSeconds(42), after.Position);   // where it was paused
         Assert.Equal(next.Id, Assert.Single(after.UpNext).Id);
 
+        // A second app starts after the first app's shutdown save has drained its snapshots.
+        await after.SaveQueueStateAsync();
+
         var rescanned = new FakeLibraryService();
         var copy = new Track { Id = Guid.NewGuid(), Title = "Joke (library)", FilePath = song.FilePath, Duration = TimeSpan.FromMinutes(3) };
         rescanned.TrackList.AddRange([copy, next]);

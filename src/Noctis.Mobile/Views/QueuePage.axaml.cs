@@ -9,7 +9,6 @@ using Avalonia.Media;
 using Avalonia.Media.Transformation;
 using Avalonia.Threading;
 using Avalonia.VisualTree;
-using Noctis.Helpers;
 using Noctis.Mobile.ViewModels;
 using Noctis.Models;
 
@@ -35,8 +34,8 @@ public partial class QueuePage : UserControl
     private Track? _track;      // UpNext[_index] at press
     private Point _start;
 
-    /// <summary>The sheet's slide up and down.</summary>
-    private static readonly TimeSpan Slide = TimeSpan.FromMilliseconds(350);
+    /// <summary>The sheet's slide up and down: every sheet's (Motion).</summary>
+    private static readonly TimeSpan Slide = Motion.Sheet;
     private const double PillHeight = 56, PillGap = 12, ListEndGap = 16;
 
     private ShellViewModel? _vm;
@@ -240,8 +239,8 @@ public partial class QueuePage : UserControl
     {
         if (_transitionsOn) return;
         _transitionsOn = true;
-        // ShellView's glass bar curve, an iOS sheet's: fast out of the gate, a long soft landing.
-        var ease = new CubicBezierEase(0.32, 0.72, 0, 1);
+        // Every sheet's curve (Motion), an iOS sheet's: fast out of the gate, a long soft landing.
+        var ease = Motion.Ease;
         Sheet.Transitions = new Transitions
         {
             new TransformOperationsTransition { Property = RenderTransformProperty, Duration = Slide, Easing = ease },

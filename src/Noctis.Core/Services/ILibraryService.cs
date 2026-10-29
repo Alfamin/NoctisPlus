@@ -8,11 +8,13 @@ namespace Noctis.Services;
 public interface ILibraryService
 {
     /// <summary>All tracks in the library, minus those under a hidden folder
-    /// (<see cref="HiddenFolders"/>). Albums, artists and <see cref="GetTrackById"/> follow it.</summary>
+    /// (<see cref="HiddenFolders"/>) and those waiting in the Inbox (<see cref="InboxTracks"/>).
+    /// Albums, artists and <see cref="GetTrackById"/> follow it (GetTrackById also finds
+    /// Inbox songs).</summary>
     IReadOnlyList<Track> Tracks { get; }
 
-    /// <summary>Every track, hidden folders included — for the Folders view (which must keep
-    /// showing a hidden folder so it can be shown again) and file bookkeeping.</summary>
+    /// <summary>Every track, hidden folders and the Inbox included — for the Folders view (which
+    /// must keep showing a hidden folder so it can be shown again) and file bookkeeping.</summary>
     IReadOnlyList<Track> AllTracks => Tracks;
 
     /// <summary>Folders hidden from the library (AppSettings.HiddenLibraryFolders).</summary>
@@ -24,6 +26,29 @@ public interface ILibraryService
     /// tracks already in memory and <see cref="LibraryUpdated"/> fires.
     /// </summary>
     Task SetFolderHiddenAsync(string folderPath, bool hidden) => Task.CompletedTask;
+
+    /// <summary>
+    /// Songs waiting in the Inbox (<see cref="Track.IsInInbox"/>, AppSettings.InboxEnabled),
+    /// minus those under a hidden folder. They are not in <see cref="Tracks"/>, albums or
+    /// artists, but <see cref="GetTrackById"/> still finds them so they play, queue and
+    /// survive a restart like any other song.
+    /// </summary>
+    IReadOnlyList<Track> InboxTracks => Array.Empty<Track>();
+
+    /// <summary>
+    /// Moves the given Inbox songs into the library (ids not in the Inbox are ignored):
+    /// clears the mark, stamps <see cref="Track.DateAdded"/>, rebuilds, saves and raises
+    /// <see cref="LibraryUpdated"/>. Turning the Inbox off passes every Inbox id.
+    /// </summary>
+    Task AcceptInboxTracksAsync(IEnumerable<Guid> ids) => Task.CompletedTask;
+
+    /// <summary>
+    /// <see cref="ImportFilesAsync"/> for files the folder watcher found on its own (not a
+    /// drop, download or conversion the user started): with the Inbox on, a new song under a
+    /// music folder that already holds songs lands in the Inbox.
+    /// </summary>
+    Task ImportDiscoveredFilesAsync(IEnumerable<string> filePaths, CancellationToken ct = default)
+        => ImportFilesAsync(filePaths, ct);
 
     /// <summary>All albums, aggregated from tracks.</summary>
     IReadOnlyList<Album> Albums { get; }

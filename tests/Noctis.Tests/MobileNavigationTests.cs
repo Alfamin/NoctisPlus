@@ -77,7 +77,7 @@ public class MobileNavigationTests : IDisposable
         shell.Navigate(first);
         shell.Navigate(second);
         Assert.Same(second, shell.CurrentPage);
-        Assert.False(shell.IsLibraryRootVisible);
+        Assert.False(shell.IsHomeRootVisible);
 
         Assert.True(shell.GoBack());
         Assert.Same(first, shell.CurrentPage);
@@ -85,12 +85,12 @@ public class MobileNavigationTests : IDisposable
 
         Assert.True(shell.GoBack());
         Assert.Null(shell.CurrentPage);
-        Assert.True(shell.IsLibraryRootVisible);
+        Assert.True(shell.IsHomeRootVisible);
         Assert.False(shell.GoBack());
     }
 
     [Fact]
-    public void TryHandleBack_ClosesOverlays_ThenPopsPages_ThenReturnsToLibrary_ThenLetsTheSystemHaveIt()
+    public void TryHandleBack_ClosesOverlays_ThenPopsPages_ThenReturnsToHome_ThenLetsTheSystemHaveIt()
     {
         var shell = MakeShell();
         shell.SelectTabCommand.Execute(MobileTab.Search);
@@ -110,10 +110,10 @@ public class MobileNavigationTests : IDisposable
         Assert.Null(shell.CurrentPage);
         Assert.Equal(MobileTab.Search, shell.SelectedTab);
 
-        Assert.True(shell.TryHandleBack());                // a non-start tab goes back to Library
-        Assert.Equal(MobileTab.Library, shell.SelectedTab);
+        Assert.True(shell.TryHandleBack());                // a non-start tab goes back to Home
+        Assert.Equal(MobileTab.Home, shell.SelectedTab);
 
-        Assert.False(shell.TryHandleBack());               // Library root: the system finishes the activity
+        Assert.False(shell.TryHandleBack());               // Home root: the system finishes the activity
     }
 
     /// <summary>S23 2026-10-05: a 3-button-nav Back is an Escape key AND the activity's
@@ -229,26 +229,30 @@ public class MobileNavigationTests : IDisposable
     }
 
     [AvaloniaFact]
-    public void PageHost_ShowsTheTopPage_AndHidesTheLibraryRoot()
+    public void PageHost_ShowsTheTopPage_AndHidesTheHomeRoot()
     {
         var shell = MakeShell();
         var (view, window) = Mount(shell);
-        var library = view.GetVisualDescendants().OfType<LibraryPage>().Single();
-        var host = view.FindControl<ContentControl>("PageHost")!;
-        Assert.True(library.IsVisible);
-        Assert.False(host.IsVisible);
+        var library = view.GetVisualDescendants().OfType<HomePage>().Single();   // the start tab
+        var host = view.FindControl<PageStack>("PageHost")!;
+        Assert.True(library.IsEffectivelyVisible);
+        Assert.Null(host.Top);
 
         shell.Navigate(new NavTestPage("Pushed Page"));
         window.UpdateLayout();
+        Assert.True(library.IsEffectivelyVisible);   // under the page while it slides in
+        MobileFixtures.Land(window);
 
-        Assert.False(library.IsVisible);
-        Assert.True(host.IsVisible);
+        Assert.False(library.IsEffectivelyVisible);
+        Assert.Same(shell.CurrentPage, host.Top);
         // No DataTemplate matches the test page, so Avalonia's default template shows ToString().
         Assert.Contains(host.GetVisualDescendants().OfType<TextBlock>(), t => t.Text == "Pushed Page");
 
         shell.NavigateBackCommand.Execute(null);
         window.UpdateLayout();
-        Assert.True(library.IsVisible);
+        Assert.True(library.IsEffectivelyVisible);   // back at once, under the page sliding away
+        MobileFixtures.Land(window);
+        Assert.DoesNotContain(host.GetVisualDescendants().OfType<TextBlock>(), t => t.Text == "Pushed Page");
         window.Close();
     }
 
@@ -311,7 +315,7 @@ public class MobileNavigationTests : IDisposable
         window.Show();
         window.UpdateLayout();
 
-        var scroll = MobileFixtures.Named<ScrollViewer>(view, "LibraryScroll");
+        var scroll = MobileFixtures.Named<ScrollViewer>(view, "HomeScroll");
         Assert.True(scroll.AllowAutoHide);
         var bars = scroll.GetVisualDescendants().OfType<Avalonia.Controls.Primitives.ScrollBar>().ToList();
         Assert.NotEmpty(bars);   // Fluent's ScrollViewer template always realizes both bars

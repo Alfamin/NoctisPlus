@@ -52,6 +52,13 @@ public enum NoctisErrorKind
     StorageFull,
     /// <summary>The desktop lists the song but its file is gone from the computer (download error 70).</summary>
     FileMissing,
+    /// <summary>First contact: something answered at the address, but not a Noctis server over
+    /// https (another web page, a plain-http port, a router login).</summary>
+    NotNoctis,
+    /// <summary>First contact: the address's name does not resolve ("studio-pc.lan" typed wrong).</summary>
+    UnknownHost,
+    /// <summary>The desktop answers but is too old to sign phones in (no noctisSignIn).</summary>
+    Outdated,
 }
 
 public sealed class NoctisServerException(NoctisErrorKind kind, string message, Exception? inner = null)

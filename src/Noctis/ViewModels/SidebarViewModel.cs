@@ -76,6 +76,7 @@ public partial class SidebarViewModel : ViewModelBase
         "home" => "Nav.Home", "songs" => "Nav.Songs", "albums" => "Nav.Albums", "artists" => "Nav.Artists",
         "folders" => "Nav.Folders", "playlists" => "Nav.Playlists", "visualizer" => "Nav.Visualizer", "lyricsstudio" => "Nav.LyricsStudio",
         "settings" => "Nav.Settings", "favorites" => "Nav.Favorites", "server" => "Nav.Server", "cd" => "Nav.AudioCd",
+        "inbox" => "Nav.Inbox",
         _ => navKey,
     };
 
@@ -110,8 +111,38 @@ public partial class SidebarViewModel : ViewModelBase
         // Imported playlists' cards read the music feature's saved import lists once it starts.
         Services.Search.OnlineMusicSearch.CurrentChanged += (_, _) => OnImportsChanged();
         _library.FavoritesChanged += (_, _) => RefreshFavoritesCount();
+        _library.LibraryUpdated += (_, _) => Dispatcher.UIThread.Post(RefreshInbox);
         Loc.Instance.CultureChanged += (_, _) => RelabelSections();
     }
+
+    /// <summary>Settings › Library › Inbox for New Music, mirrored by MainWindowViewModel.</summary>
+    private bool _inboxEnabled;
+
+    /// <summary>Follows the Inbox setting: the entry shows while it is on (UI thread).</summary>
+    public void SetInboxEnabled(bool enabled)
+    {
+        _inboxEnabled = enabled;
+        RefreshInbox();
+    }
+
+    /// <summary>
+    /// Shows the "Inbox" entry (below Folders) while the setting is on or songs still wait
+    /// in it, with their count and the accent dot while any do. UI thread.
+    /// </summary>
+    public void RefreshInbox()
+    {
+        var count = _library.InboxTracks.Count;
+        SetOptionalSectionVisible(_inboxEnabled || count > 0, "inbox", Loc.T("Nav.Inbox"), "SidebarInboxIcon",
+            after: "folders", before: "playlists");
+        if (NavItems.FirstOrDefault(i => i.Key == "inbox") is { } item)
+        {
+            item.Count = count;
+            item.ShowBadge = count > 0;
+        }
+    }
+
+    /// <summary>True while the sidebar has an Inbox entry.</summary>
+    public bool IsInboxSectionVisible => NavItems.Any(i => i.Key == "inbox");
 
     /// <summary>
     /// Shows or hides the "Server" entry (between Playlists and Settings). The item
@@ -521,6 +552,8 @@ public partial class SidebarViewModel : ViewModelBase
     private int CountShownTracks(Playlist pl)
     {
         if (_library.Tracks.Count == 0) return pl.TrackIds.Count;
+        // A smart playlist keeps rules, not ids: its tile said "0 tracks" over a full page.
+        if (pl.IsSmartPlaylist) return SmartPlaylistEvaluator.Evaluate(pl, _library.Tracks).Count;
         var shown = 0;
         foreach (var id in pl.TrackIds)
             if (_library.GetTrackById(id) != null) shown++;
@@ -612,6 +645,11 @@ public partial class SidebarViewModel : ViewModelBase
             }
             item.TrackCount = shown;
             item.CanPlay = imported.Any(e => e.LocalId is { } id && (_library.Tracks.Count == 0 || _library.GetTrackById(id) != null));
+        }
+        else if (pl.IsSmartPlaylist)
+        {
+            foreach (var t in SmartPlaylistEvaluator.Evaluate(pl, _library.Tracks))
+                totalDuration += t.Duration;
         }
         else
         {

@@ -38,6 +38,8 @@ internal class Program
         if (OperatingSystem.IsWindows() && Array.IndexOf(args, "--warm-audio") >= 0) { WarmAudio(); return; }
         ConfigureBundledTools();
         Services.StartupTrace.Begin();
+        // Before anything can spawn a host tool: children must not inherit the AppImage's libraries.
+        Helpers.PlatformHelper.ScrubAppImageLoaderPathsForChildren();
         // The core's log header must name this app, not the core assembly.
         Services.DebugLog.DescribeBuild = Services.UpdateService.DescribeBuild;
         try
@@ -125,6 +127,10 @@ internal class Program
             // resolve and delays first paint. DI serializes singleton creation,
             // so the UI-thread resolve either finds it ready or waits exactly as
             // it does today — the instance is never built twice.
+            // Headphone surround is a LibVLC instance option, so it has to be known
+            // before the player exists — ahead of the settings load.
+            VlcAudioPlayer.HeadphoneSurroundAtLaunch = PersistenceService.ReadBoolSettingAtLaunch(
+                AppPaths.DataRoot, nameof(Noctis.Models.AppSettings.HeadphoneSurround));
             // Not while a profile import is pending: nothing may read the profile before it is filled.
             if (profileImport == null)
                 _ = Task.Run(() =>
@@ -388,6 +394,10 @@ internal class Program
         services.AddSingleton<INetEaseService, NetEaseService>();
         services.AddSingleton<IMusixmatchService, MusixmatchService>();
         services.AddSingleton<IKugouLyricsService, KugouLyricsService>();
+        // The model sync gets a client of its own: the shared one gives up after 15 s.
+        services.AddSingleton<ILrcRedLyricsService>(sp =>
+            new LrcRedLyricsService(sp.GetRequiredService<HttpClient>(), LrcRedLyricsService.CreateModelHttpClient()));
+        services.AddSingleton<IUnisonLyricsService, UnisonLyricsService>();
         services.AddSingleton<IYouTubeMusicLyricsService, YouTubeMusicLyricsService>();
         services.AddSingleton<IPlayHistoryService, PlayHistoryService>();
         // Singleton so the startup archive pass and the Wrap dialog share one instance

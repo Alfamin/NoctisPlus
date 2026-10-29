@@ -195,7 +195,7 @@
                         </StackPanel>
                     </Button>
                     <Button Classes="pill-secondary" MinHeight="36" Padding="18,0" FontSize="13" FontWeight="SemiBold"
-                            Click="OnWelcomeAddFolderClicked" AutomationProperties.Name="{loc:T Home.AddMusicFolder}">
+                            Command="{Binding AddMusicFolderCommand}" AutomationProperties.Name="{loc:T Home.AddMusicFolder}">
                         <StackPanel Orientation="Horizontal" Spacing="8">
                             <controls:LineIcon Data="{DynamicResource MenuLineFolder}" Width="15" Height="15" VerticalAlignment="Center" />
                             <TextBlock Text="{loc:T Home.AddMusicFolder}" VerticalAlignment="Center" />
@@ -214,8 +214,43 @@
     </UserControl.Resources>
 
     <UserControl.Styles>
-        <!-- The app's pill buttons, for the empty-library welcome card. -->
         <StyleInclude Source="avares://Noctis.UI/Assets/PillDialog.axaml" />
+        <!-- Empty-library state: the secondary "Open Settings" link (the artist page's
+             Button.text-link recipe) and the scan spinner (WrapDialog's 22 px arc). -->
+        <Style Selector="Button.home-empty-link">
+            <Setter Property="Background" Value="Transparent"/>
+            <Setter Property="BorderThickness" Value="0"/>
+            <Setter Property="Padding" Value="12,6"/>
+            <Setter Property="MinHeight" Value="0"/>
+            <Setter Property="CornerRadius" Value="999"/>
+            <Setter Property="FontSize" Value="13"/>
+            <Setter Property="FontWeight" Value="SemiBold"/>
+            <Setter Property="Foreground" Value="{DynamicResource AccentTextExactBrush}"/>
+            <Setter Property="Cursor" Value="Hand"/>
+        </Style>
+        <Style Selector="Button.home-empty-link:pointerover /template/ ContentPresenter">
+            <Setter Property="Background" Value="{DynamicResource ChipBackground}"/>
+            <Setter Property="Foreground" Value="{DynamicResource AccentTextExactBrush}"/>
+        </Style>
+        <Style Selector="Ellipse.loading-spinner">
+            <Setter Property="Width" Value="22"/>
+            <Setter Property="Height" Value="22"/>
+            <Setter Property="Stroke" Value="{DynamicResource AccentColorBrush}"/>
+            <Setter Property="StrokeThickness" Value="2.5"/>
+            <Setter Property="StrokeDashArray" Value="11,5"/>
+            <Setter Property="StrokeLineCap" Value="Round"/>
+            <Setter Property="RenderTransformOrigin" Value="50%,50%"/>
+        </Style>
+        <!-- Keyed on [IsVisible=True] so a hidden spinner's INFINITE clock stops. -->
+        <Style Selector="Ellipse.loading-spinner[IsVisible=True]">
+            <Style.Animations>
+                <Animation Duration="0:0:0.85" IterationCount="INFINITE" Easing="LinearEasing">
+                    <KeyFrame Cue="0%"><Setter Property="RotateTransform.Angle" Value="0"/></KeyFrame>
+                    <KeyFrame Cue="100%"><Setter Property="RotateTransform.Angle" Value="360"/></KeyFrame>
+                </Animation>
+            </Style.Animations>
+        </Style>
+
         <!-- Track pill for the play-history rows (same look as the Top Songs pills) -->
         <Style Selector="Button.home-history-pill">
             <Setter Property="Background" Value="{DynamicResource HomeCardBackground}"/>
@@ -1110,8 +1145,32 @@
 
         <!-- Fresh install, no songs: Home was a blank page. Owner 10-18: the good features must be
              easy to spot, with minimal text — the logo, a title, one line, and the three ways in. -->
-        <ContentControl IsVisible="{Binding ShowWelcomeCentered}" Content="{Binding}" ContentTemplate="{StaticResource WelcomeCard}"
+        <ContentControl x:Name="WelcomeCentered" IsVisible="{Binding ShowWelcomeCentered}" Content="{Binding}" ContentTemplate="{StaticResource WelcomeCard}"
                         HorizontalAlignment="Center" VerticalAlignment="Center" Margin="0,0,0,60" />
+        <!-- The scan after Add Folder, until its first songs publish. -->
+        <StackPanel x:Name="LibraryScanningState"
+                    IsVisible="{Binding ShowLibraryScanning}"
+                    HorizontalAlignment="Center"
+                    VerticalAlignment="Center"
+                    Margin="28,0,28,115"
+                    Spacing="8">
+            <Ellipse Classes="loading-spinner"
+                     IsVisible="{Binding ShowLibraryScanning}"
+                     HorizontalAlignment="Center"
+                     Margin="0,0,0,6" />
+            <TextBlock Text="{loc:T Home.Scanning}"
+                       FontSize="18" FontWeight="SemiBold"
+                       Opacity="0.8"
+                       HorizontalAlignment="Center"
+                       TextAlignment="Center" />
+            <TextBlock Text="{loc:T Home.ScanningBody}"
+                       FontSize="13"
+                       Opacity="0.5"
+                       MaxWidth="380"
+                       TextWrapping="Wrap"
+                       HorizontalAlignment="Center"
+                       TextAlignment="Center" />
+        </StackPanel>
     </Grid>
 
 </UserControl>

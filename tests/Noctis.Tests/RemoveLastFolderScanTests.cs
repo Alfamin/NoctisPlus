@@ -51,7 +51,7 @@ public class RemoveLastFolderScanTests : IDisposable
             new SqliteLibraryIndexService(persistence), new NoOpAudit());
         await persistence.SaveSettingsAsync(new AppSettings { MusicFolders = { _music } });
         await library.ScanAsync(new[] { _music });
-        Assert.Equal(2, library.Tracks.Count);
+        if (library.Tracks.Count != 2) Assert.Fail(ScanMissReport.Describe(library, _music));
         return (library, persistence);
     }
 

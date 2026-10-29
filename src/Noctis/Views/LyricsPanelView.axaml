@@ -14,8 +14,8 @@
              Background="Transparent">
 
     <UserControl.Resources>
-        <conv:ProgressToSweepForegroundConverter x:Key="ProgressToSweepFg"/>
-        <conv:EmphasisGlowConverter x:Key="EmphasisGlow"/>
+        <conv:PlusSweepForegroundConverter x:Key="ProgressToSweepFg"/>
+        <conv:PlusEmphasisGlowConverter x:Key="EmphasisGlow"/>
         <conv:WordOverflowPaddingConverter x:Key="WordOverflowPad"/>
         <conv:BlurRadiusToEffectConverter x:Key="BlurToEffect"/>
         <conv:PreBlurredArtworkConverter x:Key="PreBlurArt"/>
@@ -70,7 +70,7 @@
                 </Canvas>
                 <TextBlock Text="{Binding Text}"
                            Classes="word-base"
-                           Padding="{Binding Text, Converter={StaticResource WordOverflowPad}}"
+                           Padding="{Binding Converter={StaticResource WordOverflowPad}}"
                            FontWeight="Bold"
                            Foreground="{Binding $parent[UserControl].((vm:LyricsViewModel)DataContext).LyricsPrimaryFg}"/>
                 <TextBlock Text="{Binding SweepText}"
@@ -393,9 +393,10 @@
                     </ItemsControl.MinWidth>
                     <ItemsControl.ItemTemplate>
                         <DataTemplate x:DataType="m:LyricLine">
+                            <!-- Reads its line (UIA read "Avalonia.Controls.StackPanel", 10-13). -->
                             <Button Background="Transparent"
                                     Classes="panel-lyric-line-btn"
-                                        AutomationProperties.Name="{Binding Text}"
+                                    AutomationProperties.Name="{Binding Converter={x:Static helpers:AccessibleNames.ItemName}}"
                                     Classes.active="{Binding IsActive}"
                                     BorderThickness="0"
                                     Padding="0"
@@ -618,7 +619,8 @@
         <!-- Last child so it paints above the lyric flow and its glow spill
              (PanelLyricsHost runs with ClipToBounds=False). The 12px inset clears
              the wrapper's 16px corner radius, which clips to bounds. -->
-        <Button Classes="panel-close"
+        <Button x:Name="PanelCloseButton"
+                Classes="panel-close"
                 Click="OnCloseClick"
                 HorizontalAlignment="Right"
                 VerticalAlignment="Top"

@@ -28,7 +28,7 @@ internal sealed class MotionWordPresenter : Panel
     public Thickness Padding { get => GetValue(PaddingProperty); set => SetValue(PaddingProperty, value); }
     internal TextBlock BaseText { get; } = new() { FontWeight = FontWeight.Bold, ClipToBounds = false };
     internal TextBlock SweepText { get; } = new() { FontWeight = FontWeight.Bold, HorizontalAlignment = Avalonia.Layout.HorizontalAlignment.Left, ClipToBounds = false };
-    private readonly ProgressToSweepForegroundConverter _fill = new();
+    private readonly PlusSweepForegroundConverter _fill = new();
     private readonly object?[] _fillValues = new object?[4];
     private LetterLayer? _letters;
     private bool _settling, _seen;
@@ -89,7 +89,25 @@ internal sealed class MotionWordPresenter : Panel
         _fillValues[1] = Foreground;
         _fillValues[2] = SweepText.Bounds.Width;
         _fillValues[3] = BaseText.FontSize;
-        SweepText.Foreground = (IBrush?)_fill.Convert(_fillValues, typeof(IBrush), null, CultureInfo.InvariantCulture);
+        var next = (IBrush?)_fill.Convert(_fillValues, typeof(IBrush), null, CultureInfo.InvariantCulture);
+        // Same Plus gradient, same pixels. Replacing TextBlock.Foreground per frame invalidates
+        // text measurement; mutating this word's own brush redraws without reshaping its text.
+        if (next is LinearGradientBrush fresh && SweepText.Foreground is LinearGradientBrush existing
+            && fresh.GradientStops.Count == existing.GradientStops.Count)
+        {
+            existing.StartPoint = fresh.StartPoint;
+            existing.EndPoint = fresh.EndPoint;
+            existing.SpreadMethod = fresh.SpreadMethod;
+            existing.Opacity = fresh.Opacity;
+            for (var i = 0; i < existing.GradientStops.Count; i++)
+            {
+                existing.GradientStops[i].Color = fresh.GradientStops[i].Color;
+                existing.GradientStops[i].Offset = fresh.GradientStops[i].Offset;
+            }
+        }
+        else if (next is ISolidColorBrush solid && SweepText.Foreground is ISolidColorBrush current
+                 && solid.Color == current.Color && solid.Opacity == current.Opacity) { }
+        else SweepText.Foreground = next;
     }
 
     internal void Step(double mediaMs, double nowMs, double durationMs, bool last, Tuning tuning,

@@ -168,7 +168,7 @@ public class MobileContextSheetTests
         using var rig = MobileFixtures.MakeRig(new[] { a });
         var window = MobileFixtures.Mount(rig.Shell, out var view);
         rig.Shell.OpenSongsCommand.Execute(null);
-        window.UpdateLayout();
+        MobileFixtures.Land(window);   // the page takes touches once it has slid in
         var row = FirstSongRow(view);
         var centre = row.TranslatePoint(new Point(row.Bounds.Width / 2, row.Bounds.Height / 2), window)!.Value;
 
@@ -270,7 +270,7 @@ public class MobileContextSheetTests
         using var rig = MobileFixtures.MakeRig(new[] { a });
         var window = MobileFixtures.Mount(rig.Shell, out var view);
         rig.Shell.OpenSongsCommand.Execute(null);
-        window.UpdateLayout();
+        MobileFixtures.Land(window);   // the page takes touches once it has slid in
         var row = FirstSongRow(view);
         var centre = row.TranslatePoint(new Point(row.Bounds.Width / 2, row.Bounds.Height / 2), window)!.Value;
 
@@ -280,6 +280,7 @@ public class MobileContextSheetTests
 
         Assert.True(rig.Shell.IsSheetOpen);
         Assert.Same(a, rig.Shell.Sheet!.Track);
+        Assert.Same(row, view.FindControl<PopMenu>("Menu")!.Anchor);  // the menu grows out of the held row
         Assert.Null(rig.Shell.Player.CurrentTrack);                  // the lift after the hold is not a tap
 
         rig.Shell.CloseSheet();
@@ -291,23 +292,26 @@ public class MobileContextSheetTests
     }
 
     [AvaloniaFact]
-    public void OverflowButton_OpensTheTrackSheet_AndTheScrimClosesIt()
+    public void OverflowButton_OpensTheGlassMenu_AndATapOffItClosesIt()
     {
         var a = MobileFixtures.Song("Alpha");
         using var rig = MobileFixtures.MakeRig(new[] { a });
         var window = MobileFixtures.Mount(rig.Shell, out var view);
         rig.Shell.OpenSongsCommand.Execute(null);
-        window.UpdateLayout();
+        MobileFixtures.Land(window);   // the page takes touches once it has slid in
 
         var more = FirstSongRow(view).GetVisualDescendants().OfType<Button>().First(b => b.Name == "MoreButton");
-        more.Command!.Execute(more.CommandParameter);
+        var centre = more.TranslatePoint(new Point(more.Bounds.Width / 2, more.Bounds.Height / 2), window)!.Value;
+        window.MouseDown(centre, MouseButton.Left, RawInputModifiers.None);
+        window.MouseUp(centre, MouseButton.Left, RawInputModifiers.None);
         window.UpdateLayout();
         Assert.Same(a, rig.Shell.Sheet!.Track);
-        Assert.True(view.FindControl<ContextSheet>("Sheet")!.IsVisible);
-        Assert.True(MobileFixtures.Named<Button>(view, "PlayNextAction").IsEffectivelyVisible);
-        Assert.True(MobileFixtures.Named<Button>(view, "PinAction").IsEffectivelyVisible);
+        Assert.False(view.FindControl<ContextSheet>("Sheet")!.IsVisible);   // the menu, not the bottom sheet
+        Assert.True(view.FindControl<PopMenu>("Menu")!.IsVisible);
+        Assert.True(MobileFixtures.Named<Button>(view, "MenuPlayNext").IsEffectivelyVisible);
+        Assert.True(MobileFixtures.Named<Button>(view, "MenuPin").IsEffectivelyVisible);
 
-        window.MouseDown(new Point(200, 40), MouseButton.Left, RawInputModifiers.None);   // above the card: the scrim
+        window.MouseDown(new Point(200, 40), MouseButton.Left, RawInputModifiers.None);   // off the card
         Assert.False(rig.Shell.IsSheetOpen);
         window.Close();
     }

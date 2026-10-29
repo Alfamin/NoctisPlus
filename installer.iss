@@ -101,6 +101,8 @@ Root: HKA; Subkey: "Software\NoctisPlus\Capabilities\FileAssociations"; ValueTyp
 Root: HKA; Subkey: "Software\Classes\.dsf\OpenWithProgids"; ValueType: none; ValueName: "NoctisPlus.AudioFile"; Flags: uninsdeletevalue; Tasks: fileassoc
 Root: HKA; Subkey: "Software\NoctisPlus\Capabilities\FileAssociations"; ValueType: string; ValueName: ".dff"; ValueData: "NoctisPlus.AudioFile"; Tasks: fileassoc
 Root: HKA; Subkey: "Software\Classes\.dff\OpenWithProgids"; ValueType: none; ValueName: "NoctisPlus.AudioFile"; Flags: uninsdeletevalue; Tasks: fileassoc
+Root: HKA; Subkey: "Software\NoctisPlus\Capabilities\FileAssociations"; ValueType: string; ValueName: ".m4b"; ValueData: "NoctisPlus.AudioFile"; Tasks: fileassoc
+Root: HKA; Subkey: "Software\Classes\.m4b\OpenWithProgids"; ValueType: none; ValueName: "NoctisPlus.AudioFile"; Flags: uninsdeletevalue; Tasks: fileassoc
 
 [Files]
 ; Copy everything CI published rather than an allowlist of patterns. The old

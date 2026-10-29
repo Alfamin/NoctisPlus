@@ -314,6 +314,9 @@ public partial class LyricsViewModel : ViewModelBase, IDisposable
     [ObservableProperty]
     private int _activeLineIndex = -1;
 
+    /// <summary>Plus follows its active line without upstream's early-scroll lead.</summary>
+    public int ScrollLineIndex => ActiveLineIndex;
+
     /// <summary>Whether to show favorite heart in metadata row (reflects current track's favorite status).</summary>
     public bool ShowMetadataFavoriteHeart => Player?.CurrentTrack?.IsFavorite ?? false;
 
@@ -389,10 +392,11 @@ public partial class LyricsViewModel : ViewModelBase, IDisposable
     // Cached per-branch brushes. UpdateForegroundsForBackground runs on every track
     // change; fresh instances made every colour binding on every word control
     // re-evaluate even when the branch didn't change (the setters skip same-instance
-    // sets). Immutable: a SolidColorBrush is an AvaloniaObject that belongs to the thread
-    // that built it, and these statics are built by whichever thread first touches the
-    // class (a test thread in the suite), so the UI thread then could not use them.
-    // LyricsView.SetResourceBrush copies colours from any ISolidColorBrush.
+    // sets). Immutable, like every other shared brush: a SolidColorBrush belongs to the
+    // thread that made it, and these were made by whichever thread first touched this
+    // class. A plain test on the thread pool reading LyricsCacheDir got there first on some
+    // CI runs, and every lyrics page after it threw "a different thread owns it" reading
+    // or drawing them. Never mutated; LyricsView.SetResourceBrush copies their colour.
     private static ImmutableSolidColorBrush Solid(string hex) => new(Color.Parse(hex));
     private static readonly ImmutableSolidColorBrush LightPrimaryFg = Solid("#111111");
     private static readonly ImmutableSolidColorBrush LightSecondaryFg = Solid("#55111111");
@@ -619,7 +623,9 @@ public partial class LyricsViewModel : ViewModelBase, IDisposable
 
     public LyricsViewModel(PlayerViewModel player, ILrcLibService lrcLib, INetEaseService netEase, IMetadataService metadata, IPersistenceService persistence, ILibraryService library)
     {
-        _timeline = new LyricsTimeline(LyricLines, WordLookahead, LyricsLookahead);
+        // Keep Plus's painter and timing cadence. Accept the shared engine's duet correctness
+        // fixes without upstream's separate lift/glow animation clock or early-scroll lead.
+        _timeline = new LyricsTimeline(LyricLines, WordLookahead, LyricsLookahead) { WordMotion = false };
         _player = player;
         _lrcLib = lrcLib;
         _netEase = netEase;
@@ -1187,6 +1193,8 @@ public partial class LyricsViewModel : ViewModelBase, IDisposable
         LyricsSourceName = string.Empty;
         _alternateOnlineResult = null;
         _alternateSource = null;
+        _lrcRedTarget = null;
+        RefreshLrcRedOffer();
 
         try
         {
@@ -1387,6 +1395,12 @@ public partial class LyricsViewModel : ViewModelBase, IDisposable
                     HasAlternateLyrics = true;
                     AlternateLyricsLabel = $"Try {altSource}";
                 }
+
+                // lrc.red (searched, so on in Settings) has the song only line-synced or plain:
+                // its model can word-sync it from the page.
+                var lrcRedAt = extraSources.FindIndex(s => s.Name == Services.Lyrics.OnlineLyricsSource.LrcRed);
+                if (lrcRedAt >= 0 && extraTasks[lrcRedAt].IsCompleted)
+                    OfferLrcRedSync(track, extraResults[lrcRedAt]);
             }
             else
             {
@@ -1469,6 +1483,7 @@ public partial class LyricsViewModel : ViewModelBase, IDisposable
                 : null,
             Lyricsfile = null,
             HasWordSync = false,
+            Isrc = result.Isrc,
         };
     }
 
@@ -1617,7 +1632,20 @@ public partial class LyricsViewModel : ViewModelBase, IDisposable
         AllSourceNames(),
         async () => AutoSourceNames(await _persistence.LoadSettingsAsync()),
         (sources, artist, title, ct) => SearchSourcesAsync(sources, artist, title, track.Duration.TotalSeconds, track.Album ?? "", ct),
-        (result, source) => ApplySearchedLyrics(track, result, source));
+        (result, source) => ApplySearchedLyrics(track, result, source))
+    {
+        // lrc.red's row offers its model only while lrc.red is on in Settings. Its answer, once
+        // used, is credited on the page as the model's.
+        SyncWithLrcRedModel = LrcRed is { } lrcRed
+            ? async (isrc, ct) =>
+            {
+                var synced = await lrcRed.SyncWithModelAsync(isrc, ct);
+                _lrcRedModelResult = synced;
+                return synced;
+            }
+            : null,
+        CanOfferLrcRedModel = async () => LrcRed != null && await LrcRedModelAllowedAsync(),
+    };
 
     private IReadOnlyList<Services.Plugins.PluginLyricsSource> CurrentPluginSources()
     {
@@ -1680,7 +1708,8 @@ public partial class LyricsViewModel : ViewModelBase, IDisposable
             catch (Exception ex)
             {
                 DebugLogger.Warn(DebugLogger.Category.Lyrics, "SourceSearch:Error", $"{name}: {ex.Message}");
-                return new Services.Lyrics.LyricsSourceHit(name, null, Errored: true);
+                return new Services.Lyrics.LyricsSourceHit(name, null, Errored: true,
+                    Busy: ex is LyricsProviderException { IsBusy: true });
             }
         }
     }
@@ -1713,7 +1742,200 @@ public partial class LyricsViewModel : ViewModelBase, IDisposable
         _alternateSource = null;
         HasAlternateLyrics = false;
         AlternateLyricsLabel = string.Empty;
+        // lrc.red's line-synced or plain pick: its model can word-sync it from the page.
+        _lrcRedTarget = null;
+        if (source == Services.Lyrics.OnlineLyricsSource.LrcRed)
+            _ = OfferLrcRedSyncAsync(track, result);
+        RefreshLrcRedOffer();
+        RefreshLyricsCredit(); // lrc.red to lrc.red (its model's answer) leaves the name as it was
     }
+
+    // ── Word-sync with lrc.red's model ──
+    //
+    // lrc.red can time every word of songs it has only line-synced or plain with its in-house
+    // model (LrcRedLyricsService.SyncWithModelAsync). It is donation-funded and asks for credit,
+    // so the model runs only on a press of the page's pill (or lrc.red's row in Search Lyrics),
+    // one request per press, while lrc.red is on in Settings; a song change cancels it.
+
+    /// <summary>lrc.red, for its model sync; set by MainWindowViewModel. Null: never offered.</summary>
+    internal ILrcRedLyricsService? LrcRed { get; set; }
+
+    /// <summary>The lrc.red recording of the lyrics on the page that its model can word-sync.</summary>
+    private (Guid TrackId, string Isrc)? _lrcRedTarget;
+    private CancellationTokenSource? _lrcRedSyncCts;
+    private Guid? _lrcRedSyncTrackId;
+    /// <summary>The model's answer, while it is on the page: credited as the model's.</summary>
+    private LrcLibResult? _lrcRedModelResult;
+
+    /// <summary>The pill shows: the page's lyrics are lrc.red-matched and not word-synced, or a sync is running.</summary>
+    [ObservableProperty] private bool _showLrcRedSync;
+    [ObservableProperty] private bool _isLrcRedSyncing;
+    /// <summary>"Word-sync with lrc.red's model", "Timing every word… a few seconds", or "Try again" after a failure.</summary>
+    [ObservableProperty] private string _lrcRedSyncLabel = string.Empty;
+    /// <summary>Why the last sync failed, beside the pill; empty otherwise.</summary>
+    [ObservableProperty] private string _lrcRedSyncError = string.Empty;
+    /// <summary>"Lyrics from lrc.red" / "Word-synced by lrc.red's model" under lrc.red's lyrics (its API asks to be credited).</summary>
+    [ObservableProperty] private string _lyricsCreditText = string.Empty;
+
+    partial void OnLyricsSourceNameChanged(string value) => RefreshLyricsCredit();
+
+    private void RefreshLyricsCredit() =>
+        LyricsCreditText = LyricsSourceName != Services.Lyrics.OnlineLyricsSource.LrcRed ? string.Empty
+            : Localization.Loc.T(_lrcRedModelResult != null && ReferenceEquals(_currentOnlineResult, _lrcRedModelResult)
+                ? "Lyrics.LrcRedModelCredit" : "Lyrics.LrcRedCredit");
+
+    /// <summary>The model is offered while lrc.red is on in Settings and the preferred lyrics type keeps word timings.</summary>
+    private async Task<bool> LrcRedModelAllowedAsync()
+    {
+        if (LyricsSaveOptions.ParsePreferredType(_player.LyricsPreferredType) != LyricsPreferredType.WordSynced) return false;
+        try { return (await _persistence.LoadSettingsAsync()).LrcRedEnabled; }
+        catch { return false; }
+    }
+
+    /// <summary>
+    /// Remembers lrc.red's answer for the track on the page when its model could word-sync it:
+    /// lrc.red has lyrics for the recording (an ISRC), only line-synced or plain. The caller has
+    /// checked that lrc.red is on.
+    /// </summary>
+    private void OfferLrcRedSync(Track track, LrcLibResult? lrcRed)
+    {
+        if (LrcRed == null || lrcRed is not { HasLyrics: true, Isrc: { Length: > 0 } isrc }
+            || LyricsSearchSelector.FormatRank(lrcRed) >= LyricsSearchSelector.WordSyncedRank
+            || LyricsSaveOptions.ParsePreferredType(_player.LyricsPreferredType) != LyricsPreferredType.WordSynced
+            || _currentTrack?.Id != track.Id)
+            return;
+        _lrcRedTarget = (track.Id, isrc);
+        RefreshLrcRedOffer();
+    }
+
+    private async Task OfferLrcRedSyncAsync(Track track, LrcLibResult lrcRed)
+    {
+        if (LrcRed == null || lrcRed.Isrc == null || !await LrcRedModelAllowedAsync()) return;
+        OfferLrcRedSync(track, lrcRed);
+    }
+
+    private void RefreshLrcRedOffer()
+    {
+        var shownRank = LyricsSearchSelector.FormatRank(_currentOnlineResult);
+        var offered = LrcRed != null && _lrcRedTarget is { } target && _currentTrack?.Id == target.TrackId && !IsPreviewActive
+                      && shownRank is > 0 and < LyricsSearchSelector.WordSyncedRank;
+        ShowLrcRedSync = offered || IsLrcRedSyncing;
+        LrcRedSyncLabel = Localization.Loc.T(IsLrcRedSyncing ? "Lyrics.LrcRedSyncWorking"
+            : LrcRedSyncError.Length > 0 ? "Lyrics.LrcRedSyncRetry" : "Lyrics.LrcRedSync");
+        if (!ShowLrcRedSync) LrcRedSyncError = string.Empty;
+    }
+
+    /// <summary>Drops the offer; <paramref name="cancel"/> also stops a sync in flight.</summary>
+    private void ResetLrcRedSync(bool cancel)
+    {
+        if (cancel && _lrcRedSyncCts is { } running)
+        {
+            running.Cancel();
+            _lrcRedSyncCts = null;
+            _lrcRedSyncTrackId = null;
+            IsLrcRedSyncing = false;
+        }
+        _lrcRedTarget = null;
+        LrcRedSyncError = string.Empty;
+        RefreshLrcRedOffer();
+    }
+
+    /// <summary>
+    /// The pill's press: one POST to lrc.red's model for the recording on the page. On success the
+    /// page switches to the word-synced lyrics and keeps them as any picked online lyrics are kept
+    /// (cache, and the sidecar or tags per Settings ▸ Lyrics ▸ Save lyrics to); on failure it says
+    /// why and the pill reads Try again — nothing is retried on its own.
+    /// </summary>
+    [RelayCommand]
+    private async Task WordSyncWithLrcRed()
+    {
+        if (IsLrcRedSyncing || LrcRed is not { } lrcRed || _lrcRedTarget is not { } target
+            || _currentTrack is not { } track || track.Id != target.TrackId)
+            return;
+        // Settings are read at the press too: the model only runs while lrc.red is on.
+        if (!await LrcRedModelAllowedAsync())
+        {
+            ResetLrcRedSync(cancel: false);
+            return;
+        }
+        if (_currentTrack?.Id != track.Id || IsLrcRedSyncing) return;
+
+        var cts = new CancellationTokenSource();
+        _lrcRedSyncCts = cts;
+        _lrcRedSyncTrackId = track.Id;
+        IsLrcRedSyncing = true;
+        LrcRedSyncError = string.Empty;
+        RefreshLrcRedOffer();
+        DebugLogger.Info(DebugLogger.Category.Lyrics, "LrcRed.ModelSync", $"isrc={target.Isrc}, title={track.Title}");
+        try
+        {
+            var result = await lrcRed.SyncWithModelAsync(target.Isrc, cts.Token);
+            if (cts.IsCancellationRequested || _currentTrack?.Id != track.Id) return;
+            DebugLogger.Info(DebugLogger.Category.Lyrics, "LrcRed.ModelSynced", $"isrc={target.Isrc}");
+
+            // The lyrics shown before stay one tap away, unless they were lrc.red's own line timing.
+            var previous = _currentOnlineResult;
+            var previousSource = LyricsSourceName;
+            ++_searchGeneration; // an automatic search still in flight must not land over these
+            IsSearching = false;
+            SearchFailedMessage = string.Empty;
+            _lrcRedModelResult = result;
+            // Done for this song: switching back to the line-synced lyrics offers no second run.
+            _lrcRedTarget = null;
+            DisplayOnlineLyrics(result, userSwitchedSource: true);
+            LyricsSourceName = Services.Lyrics.OnlineLyricsSource.LrcRed;
+            if (previous is { HasLyrics: true } && previousSource.Length > 0 && previousSource != Services.Lyrics.OnlineLyricsSource.LrcRed)
+            {
+                _alternateOnlineResult = previous;
+                _alternateSource = previousSource;
+                HasAlternateLyrics = true;
+                AlternateLyricsLabel = $"Try {previousSource}";
+            }
+            else if (_alternateSource == Services.Lyrics.OnlineLyricsSource.LrcRed)
+            {
+                _alternateOnlineResult = null;
+                _alternateSource = null;
+                HasAlternateLyrics = false;
+                AlternateLyricsLabel = string.Empty;
+            }
+            RefreshLyricsCredit();
+        }
+        catch (OperationCanceledException) when (cts.IsCancellationRequested)
+        {
+            // The song changed: nothing to say.
+        }
+        catch (Exception ex)
+        {
+            DebugLogger.Warn(DebugLogger.Category.Lyrics, "LrcRed.ModelSyncFailed", ex.Message);
+            if (!cts.IsCancellationRequested && _currentTrack?.Id == track.Id)
+                LrcRedSyncError = LrcRedSyncMessage(ex);
+        }
+        finally
+        {
+            if (ReferenceEquals(_lrcRedSyncCts, cts))
+            {
+                _lrcRedSyncCts = null;
+                _lrcRedSyncTrackId = null;
+                IsLrcRedSyncing = false;
+                RefreshLrcRedOffer();
+            }
+            cts.Dispose();
+        }
+    }
+
+    /// <summary>A failed model sync in words, for the page, Search Lyrics and Lyrics Studio.</summary>
+    internal static string LrcRedSyncMessage(Exception ex) => ex is not LrcRedSyncException sync
+        ? Localization.Loc.T("Lyrics.LrcRedSyncBadAnswer")
+        : sync.Failure switch
+        {
+            LrcRedSyncFailure.Network => Localization.Loc.T("Lyrics.LrcRedSyncNetwork"),
+            LrcRedSyncFailure.Timeout => Localization.Loc.T("Lyrics.LrcRedSyncTimeout"),
+            LrcRedSyncFailure.RateLimited => Localization.Loc.T("Lyrics.LrcRedSyncBusy"),
+            LrcRedSyncFailure.NotWordSynced => Localization.Loc.T("Lyrics.LrcRedSyncNoWords"),
+            LrcRedSyncFailure.Refused when sync.ServerMessage is { Length: > 0 } said => Localization.Loc.T("Lyrics.LrcRedSyncRefused", said),
+            LrcRedSyncFailure.Refused => Localization.Loc.T("Lyrics.LrcRedSyncStatus", sync.StatusCode?.ToString(System.Globalization.CultureInfo.InvariantCulture) ?? "?"),
+            _ => Localization.Loc.T("Lyrics.LrcRedSyncBadAnswer"),
+        };
 
     /// <summary>Asks before Save replaces the song's lyrics files; the message names them. Tests swap it.</summary>
     internal Func<string, Task<bool>> ConfirmReplaceLyrics { get; set; } = Views.ConfirmationDialog.ShowAsync;
@@ -1830,7 +2052,9 @@ public partial class LyricsViewModel : ViewModelBase, IDisposable
             });
             if (changed.Count > 0)
             {
-                var message = Localization.Loc.T(changed.Count == 1 ? "Lyrics.SaveReplaceOne" : "Lyrics.SaveReplaceMany",
+                // macOS/Linux variants say "Trash": there is no Recycle Bin there.
+                var trash = OperatingSystem.IsWindows() ? "" : "Trash";
+                var message = Localization.Loc.T((changed.Count == 1 ? "Lyrics.SaveReplaceOne" : "Lyrics.SaveReplaceMany") + trash,
                     track.Title, string.Join(Localization.Loc.T("Lyrics.SaveFilesJoin"), changed));
                 bool confirmed;
                 try { confirmed = await ConfirmReplaceLyrics(message); } catch { confirmed = false; }
@@ -1854,7 +2078,7 @@ public partial class LyricsViewModel : ViewModelBase, IDisposable
             if (ReferenceEquals(_currentTrack, track))
                 LoadLyricsForTrack(track);
             ShowStatusText(
-                outcome.KeptForeignSidecar ? Localization.Loc.T("Lyrics.SaveKeptOld")
+                outcome.KeptForeignSidecar ? Localization.Loc.T(OperatingSystem.IsWindows() ? "Lyrics.SaveKeptOld" : "Lyrics.SaveKeptOldTrash")
                 : outcome.Saved ? Localization.Loc.T("Lyrics.Saved")
                 : Localization.Loc.T("Lyrics.SaveFailed"),
                 outcome.Saved && !outcome.KeptForeignSidecar ? 3000 : 5000);
@@ -2227,6 +2451,8 @@ public partial class LyricsViewModel : ViewModelBase, IDisposable
         _currentOnlineResult = null;
         _alternateOnlineResult = null;
         _alternateSource = null;
+        _lrcRedModelResult = null;
+        ResetLrcRedSync(cancel: true);
         _timeline.Reset();
         _hasSyncedLyrics = false;
         IsSynced = false;
@@ -2330,6 +2556,32 @@ public partial class LyricsViewModel : ViewModelBase, IDisposable
         _previewText = syncedText;
         if (_player.CurrentTrack is { } current && current.Id == track.Id)
             LoadLyricsForTrack(current);
+    }
+
+    /// <summary>
+    /// The Lyrics Studio's live preview pane (10-14): like <see cref="ShowPreview"/>, but when this
+    /// track's preview is already on screen the new text is applied in place — no fade, no disk
+    /// probe — so a nudge shows at once. A preview of another song is dropped first: it would stay
+    /// on screen (<see cref="ShowPreview"/> only reloads the track it is given).
+    /// </summary>
+    public void UpdatePreview(Track track, string syncedText)
+    {
+        if (_previewTrackId is { } other && other != track.Id) ClearPreview();
+        if (!IsPreviewActive || _previewTrackId != track.Id || _currentTrack is not { } current
+            || current.Id != track.Id || _player.CurrentTrack?.Id != track.Id)
+        {
+            ShowPreview(track, syncedText);
+            return;
+        }
+        if (syncedText == _previewText) return;
+        _previewText = syncedText;
+        var lines = ParseLrcContent(syncedText);
+        if (lines.Count == 0) return;
+        // A probe still in flight (an earlier reload) must not land over these lines.
+        ++_searchGeneration;
+        _timeline.Reset();
+        ActiveLineIndex = -1;
+        ApplyLocalLyricsResult(current, new LocalLyricsProbe(lines, null, PreviewSource, FromCache: false));
     }
 
     /// <summary>Drops the preview; if it was for the loaded track, its real lyrics reload.</summary>
@@ -2470,6 +2722,7 @@ public partial class LyricsViewModel : ViewModelBase, IDisposable
         // switch may replace an app-written sidecar so the choice sticks.
         PersistOnlineLyricsToSidecar(result, allowReplaceAppSidecar: userSwitchedSource);
         KeepPlainStreamLyricsInBackground();
+        RefreshLrcRedOffer();
 
         // Start sync timer if synced lyrics and playing
         if (_hasSyncedLyrics && IsSyncTabSelected && _player.State == Models.PlaybackState.Playing)
@@ -2484,6 +2737,8 @@ public partial class LyricsViewModel : ViewModelBase, IDisposable
         _currentOnlineResult = null;
         _alternateOnlineResult = null;
         _alternateSource = null;
+        _lrcRedModelResult = null;
+        ResetLrcRedSync(cancel: true);
         _timeline.Reset();
         _hasSyncedLyrics = false;
         IsSynced = false;
@@ -2786,10 +3041,13 @@ public partial class LyricsViewModel : ViewModelBase, IDisposable
     private void LoadLyricsForTrack(Track track, bool inPlace = false)
     {
         DebugLogger.Info(DebugLogger.Category.Lyrics, "LoadLyricsForTrack", $"title={track.Title}, id={track.Id}");
+        // A model sync for another song stops; one for this song (a reload) may still land.
+        ResetLrcRedSync(cancel: _lrcRedSyncTrackId is { } syncing && syncing != track.Id);
         _currentTrack = track;
         _currentOnlineResult = null;
         _alternateOnlineResult = null;
         _alternateSource = null;
+        _lrcRedModelResult = null;
         ShowSearchButton = false;
         SearchFailedMessage = string.Empty;
         IsSearching = false;
@@ -3039,12 +3297,16 @@ public partial class LyricsViewModel : ViewModelBase, IDisposable
         // or lyrics saved for the song since.
         var hasSyncedField = !string.IsNullOrWhiteSpace(track.SyncedLyrics);
         var hasPlainField = !string.IsNullOrWhiteSpace(track.Lyrics);
+        // A whole TTML document as the song's lyrics text (pasted into a tagger's lyrics field,
+        // GitHub #132) is Apple's timed lyrics, not words to print: it showed as its markup.
+        if (!hasSyncedField && ProbeTtmlText(track.Lyrics, joinSplitWords, uiLanguage) is { } ttmlField)
+            return ttmlField;
         // Without timed lyrics there, the file's tags are read now (GitHub #135): a SYLT frame,
         // a SYNCEDLYRICS comment or an UNSYNCEDLYRICS alias was never scanned before #135, and
         // a library is not rescanned until its files change. Before the online cache, which
         // must not shadow the file's own lyrics.
         if (!hasSyncedField && !LrcParser.ContainsTimestamp(track.Lyrics)
-            && ProbeEmbeddedTags(track, hasPlainField ? track.Lyrics : null) is { } fromTags)
+            && ProbeEmbeddedTags(track, hasPlainField ? track.Lyrics : null, joinSplitWords, uiLanguage) is { } fromTags)
             return fromTags;
         if (hasSyncedField || hasPlainField)
             return new LocalLyricsProbe(null, null, "Embedded", FromCache: false);
@@ -3082,12 +3344,15 @@ public partial class LyricsViewModel : ViewModelBase, IDisposable
     /// <paramref name="rowPlain"/> on the Plain tab when given), or plain text when the row has
     /// none. Null when the file adds nothing, or is not a local file that exists.
     /// </summary>
-    private static LocalLyricsProbe? ProbeEmbeddedTags(Track track, string? rowPlain)
+    private static LocalLyricsProbe? ProbeEmbeddedTags(Track track, string? rowPlain, bool joinSplitWords, string uiLanguage)
     {
         var path = track.FilePath;
         if (track.SourceType != SourceType.Local || string.IsNullOrWhiteSpace(path) || !File.Exists(path)) return null;
         var embedded = EmbeddedLyrics.ReadFile(path);
         if (embedded.IsEmpty) return null;
+
+        if (string.IsNullOrWhiteSpace(rowPlain) && ProbeTtmlText(embedded.Text, joinSplitWords, uiLanguage) is { } ttml)
+            return ttml;
 
         var timed = embedded.TimedText;
         if (!string.IsNullOrWhiteSpace(timed))
@@ -3104,6 +3369,20 @@ public partial class LyricsViewModel : ViewModelBase, IDisposable
         if (string.IsNullOrWhiteSpace(text)) return null;
         var rows = LrcParser.SplitPlain(text).Select(l => new LyricLine { Text = LrcParser.SoftWrap(l), IsActive = true }).ToList();
         return rows.Count == 0 ? null : new LocalLyricsProbe(rows, text, "Embedded:Tags", FromCache: false);
+    }
+
+    /// <summary>
+    /// Lyrics text that is a TTML document, read as a .ttml beside the song would be (word and
+    /// line timing, singers, layers); its LRC form backs "Save Lyrics to File". Null when the
+    /// text is not TTML or does not parse.
+    /// </summary>
+    private static LocalLyricsProbe? ProbeTtmlText(string? text, bool joinSplitWords, string uiLanguage)
+    {
+        if (!TtmlParser.LooksLikeTtml(text)) return null;
+        var (lines, plain) = TtmlParser.Parse(text, joinSplitWords, uiLanguage);
+        if (lines is not { Count: > 0 }) return null;
+        return new LocalLyricsProbe(lines, plain, "Embedded:Ttml", FromCache: false,
+            TtmlParser.ToLrc(text, joinSplitWords, uiLanguage));
     }
 
     private void ApplyLocalLyricsResult(Track track, LocalLyricsProbe probe)
@@ -3535,17 +3814,16 @@ public partial class LyricsViewModel : ViewModelBase, IDisposable
     {
         if (!_hasSyncedLyrics || LyricLines.Count == 0) return null;
 
-        // A line's romanization / translation go back as lines at its own timestamp
-        // (GitHub #116) — the LRC shape they load from — so the editor's save keeps them.
         var lines = LyricLines
             .Where(l => !string.IsNullOrWhiteSpace(l.Text) && l.Text != "...")
-            .SelectMany(l => LrcParser.CompanionLines(l)
-                .Prepend(l.Text.Replace("\r\n", " ").Replace('\n', ' ').Trim())
-                .Select(text => (l.Timestamp, Text: text)))
             .ToList();
 
+        // Written back in the LRC shape each layer loads from: word tags, "v2:"/"v3:" voices,
+        // the "[bg: …]" vocal, romanization / translation at the line's own timestamp (GitHub
+        // #116). Plain "[mm:ss.xx]text" lost all but the last, so a save from the editor —
+        // a line untouched, even — turned a word-timed sidecar into line timing.
         return lines.Any(l => l.Timestamp.HasValue)
-            ? LrcEditorViewModel.BuildLrcPreservingUntimed(lines)
+            ? TtmlParser.ToLrc(lines)
             : null;
     }
 
@@ -3666,7 +3944,7 @@ public partial class LyricsViewModel : ViewModelBase, IDisposable
         position -= LyricsOffset;
         if (position < TimeSpan.Zero) position = TimeSpan.Zero;
         var step = _timeline.Update(position);
-        if (!step.LineChanged) return;
+        if (!step.ActiveSetChanged) return;
         if (DebugLog.VlcBridgeEnabled)
             Views.LyricsView.Trace($"active {ActiveLineIndex}→{step.ActiveIndex} at {position.TotalMilliseconds:0}ms" +
                                    (step.ActiveLine?.Timestamp is { } ts ? $" (line starts {ts.TotalMilliseconds:0}ms)" : ""));
@@ -3782,8 +4060,14 @@ public partial class LyricsViewModel : ViewModelBase, IDisposable
         && IsAnyLyricsSurfaceVisible
         && _player.State == Models.PlaybackState.Playing
         && _lyricsSyncTimer.IsEnabled
-        && (_timeline.ActiveLine?.HasWords == true || _timeline.ActiveLine?.HasBackgroundWords == true
-            || _timeline.ActiveLine?.HasTransliterationWords == true || HasNativeMotionHandover);
+        && (AnyActiveLineHasWordLayer() || HasNativeMotionHandover);
+
+    private bool AnyActiveLineHasWordLayer()
+    {
+        foreach (var line in _timeline.ActiveLines)
+            if (line.HasWords || line.HasBackgroundWords || line.HasTransliterationWords) return true;
+        return false;
+    }
 
     private void OnWordClockFrame(TimeSpan _)
     {
@@ -3840,8 +4124,7 @@ public partial class LyricsViewModel : ViewModelBase, IDisposable
 
         for (int i = 0; i < LyricLines.Count; i++)
         {
-            var dist = i - activeIndex;
-            var absDist = Math.Abs(dist);
+            var absDist = LyricsTimeline.DistanceToNearestActive(i, activeIndex, _timeline.ActiveIndices);
             var opacity = focus
                 ? absDist switch
                 {

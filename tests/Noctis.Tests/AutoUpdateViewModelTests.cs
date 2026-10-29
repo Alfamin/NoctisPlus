@@ -433,7 +433,7 @@ public class AutoUpdateViewModelTests : IDisposable
         public Task FlushAsync() => Task.CompletedTask;
     }
 
-    /// <summary>One two-day-old release (soaked) with a Windows installer and its SHA256SUMS.</summary>
+    /// <summary>One two-day-old release (soaked) with this platform's installer and its SHA256SUMS.</summary>
     private sealed class FakeGitHub(string tag, bool prerelease = false) : HttpMessageHandler
     {
         public int ReleaseChecks;

@@ -85,7 +85,8 @@
                             Background="Transparent" BorderThickness="0"
                             Width="32" Height="32" Padding="0"
                             HorizontalAlignment="Right" VerticalAlignment="Top"
-                            Cursor="Hand" Click="OnCloseClick">
+                            Cursor="Hand" Click="OnCloseClick"
+                            ToolTip.Tip="{loc:T Common.Close}">
                         <controls:LineIcon Data="{StaticResource MenuLineClose}" Width="24" Height="24" Opacity="0.75"/>
                     </Button>
                 </Grid>
@@ -137,7 +138,7 @@
                                         Command="{Binding $parent[Window].((vm:LrcEditorViewModel)DataContext).PlayFromLineCommand}"
                                         CommandParameter="{Binding}">
                                     <TextBlock Text="{Binding TimestampLabel}"
-                                               FontFamily="Consolas,monospace"
+                                               FontFamily="Consolas,Menlo,monospace"
                                                FontSize="12"
                                                HorizontalAlignment="Center"
                                                Opacity="{Binding HasTimestamp, Converter={StaticResource BoolToOpacity}}"/>

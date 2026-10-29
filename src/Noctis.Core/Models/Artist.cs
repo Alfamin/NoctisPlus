@@ -36,6 +36,7 @@ public class ArtistRow
 {
     public List<Artist> Artists { get; init; } = new();
 
-    /// <summary>What screen readers and UI Automation read for the row (otherwise its type name).</summary>
+    /// <summary>A screen reader reads the row (a ListBoxItem) as the artists on it; it read
+    /// "Noctis.Models.ArtistRow".</summary>
     public override string ToString() => string.Join(", ", Artists.Select(a => a.Name));
 }

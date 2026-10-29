@@ -1,4 +1,7 @@
 using Avalonia;
+using Avalonia.Automation;
+using Avalonia.Automation.Peers;
+using Avalonia.Automation.Provider;
 using Avalonia.Controls;
 using Avalonia.Data;
 using Avalonia.Input;
@@ -10,6 +13,8 @@ namespace Noctis.Controls;
 /// Lightweight 5-star rating display/editor. Renders the stars directly (no per-star
 /// buttons) so it stays cheap inside track-row item templates. When <see cref="IsInteractive"/>
 /// is true, clicking a star sets <see cref="Value"/>; clicking the current value clears to 0.
+/// With Focusable set, the arrow keys step the rating, Home clears it and End gives five stars;
+/// UI Automation reads and sets it as a 0–5 range.
 /// </summary>
 public class RatingStars : Control
 {
@@ -152,6 +157,65 @@ public class RatingStars : Control
         InvalidateVisual();
         e.Handled = true;
         UserRated?.Invoke(this, newValue);
+    }
+
+    protected override void OnKeyDown(KeyEventArgs e)
+    {
+        base.OnKeyDown(e);
+        if (!IsInteractive || e.Handled || e.KeyModifiers != KeyModifiers.None) return;
+
+        int? newValue = e.Key switch
+        {
+            Key.Right or Key.Up => Value + 1,
+            Key.Left or Key.Down => Value - 1,
+            Key.Home => 0,
+            Key.End => StarCount,
+            _ => null,
+        };
+        if (newValue is not { } rated) return;
+        e.Handled = true;
+        Rate(rated);
+    }
+
+    private void Rate(int value)
+    {
+        value = System.Math.Clamp(value, 0, StarCount);
+        if (value == Value) return;
+        SetCurrentValue(ValueProperty, value);
+        UserRated?.Invoke(this, value);
+    }
+
+    protected override AutomationPeer OnCreateAutomationPeer() => new RatingStarsPeer(this);
+
+    /// <summary>A 0–5 range a screen reader can read and, when interactive, set.</summary>
+    private sealed class RatingStarsPeer : ControlAutomationPeer, IRangeValueProvider
+    {
+        public RatingStarsPeer(RatingStars owner) : base(owner)
+        {
+            owner.PropertyChanged += (_, e) =>
+            {
+                if (e.Property == ValueProperty)
+                    RaisePropertyChangedEvent(RangeValuePatternIdentifiers.ValueProperty,
+                        (double)e.GetOldValue<int>(), (double)e.GetNewValue<int>());
+            };
+        }
+
+        private RatingStars Stars => (RatingStars)Owner;
+
+        public bool IsReadOnly => !Stars.IsInteractive;
+        public double Minimum => 0;
+        public double Maximum => StarCount;
+        public double Value => System.Math.Clamp(Stars.Value, 0, StarCount);
+        public double SmallChange => 1;
+        public double LargeChange => 1;
+
+        public void SetValue(double value)
+        {
+            if (IsReadOnly) throw new InvalidOperationException("The rating is display-only.");
+            Stars.Rate((int)System.Math.Round(value));
+        }
+
+        protected override AutomationControlType GetAutomationControlTypeCore() => AutomationControlType.Slider;
     }
 
     private int StarFromPosition(double x)

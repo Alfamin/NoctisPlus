@@ -387,7 +387,7 @@ public class NativeLyricMotionTests
     {
         public Task<LrcLibResult?> SearchLyricsAsync(string artist, string title, double seconds, CancellationToken ct = default) => Task.FromResult<LrcLibResult?>(null);
     }
-    private sealed class Values : IPluginSettings
+    internal sealed class Values : IPluginSettings
     {
         internal Dictionary<string, string> Strings { get; } = [];
         internal Dictionary<string, bool> Bools { get; } = [];
@@ -398,7 +398,7 @@ public class NativeLyricMotionTests
         public event EventHandler<string>? Changed;
         internal void Set(string key, string value) { Strings[key] = value; Changed?.Invoke(this, key); }
     }
-    private sealed class SettingsHost(Values values) : IPluginHost
+    internal sealed class SettingsHost(Values values) : IPluginHost
     {
         public IPluginSettings Settings => values;
         public string AppVersion => "1.6.3";

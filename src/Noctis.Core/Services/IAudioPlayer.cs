@@ -141,10 +141,24 @@ public interface IAudioPlayer : IDisposable
     void SetPitchSemitones(double semitones);
 
     /// <summary>
+    /// True when <see cref="SetPitchSemitones"/> is audible, i.e. playback runs through the
+    /// gapless engine. False on macOS (no engine there) and when the engine fell back to a
+    /// LibVLC output, so the UI can hide a Pitch control that would do nothing.
+    /// </summary>
+    bool SupportsPitch => false;
+
+    /// <summary>
     /// Multi-channel upmix for 5.1/7.1 devices ("Off", "Duplicate" or "Surround" — see
     /// <see cref="UpmixMode"/>). Shared-mode gapless engine only; Exclusive Mode stays bit-exact.
     /// </summary>
     void SetUpmixMode(string mode);
+
+    /// <summary>
+    /// True when this player was started with Headphone surround on: 5.1/7.1 sources render
+    /// binaurally to stereo. Fixed for the player's lifetime (a LibVLC instance option), so
+    /// Settings compares it with the saved choice to say a restart is needed.
+    /// </summary>
+    bool HeadphoneSurroundActive => false;
 
     /// <summary>Prepares a next media item for an AutoMix transition without making it active.</summary>
     void PrepareNext(string filePath, long startPositionMs = -1);

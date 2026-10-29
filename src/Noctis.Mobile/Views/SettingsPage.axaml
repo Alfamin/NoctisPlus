@@ -1,202 +1,219 @@
 <UserControl xmlns="https://github.com/avaloniaui"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:vm="using:Noctis.Mobile.ViewModels"
+             xmlns:controls="using:Noctis.Controls"
              xmlns:views="using:Noctis.Mobile.Views"
              x:Class="Noctis.Mobile.Views.SettingsPage"
              x:DataType="vm:SettingsPageViewModel">
 
-    <!-- Each section is one rounded card: a header (the desktop Settings rail's icon for that
-         section, accent-tinted, and its name) over rows of icon + label + control, split by thin
-         inset lines. Rows are at least 56 dp tall; every button is a round-ended pill. -->
+    <!-- Settings as Apple Music's account sheet: few things on the top level, each calm. The
+         profile card with a grey note under it; the Look tiles (System / Light / Dark, each a
+         live mini preview of that theme); plain rows into Music Folders, Appearance and Lyrics
+         (text, a grey value, a chevron: no icons); then the actions, the only accent rows, each
+         with its note. Music Folders, Appearance and Lyrics are pages pushed inside the sheet:
+         they slide in from the right under a back button. Shared look: GroupedStyles.axaml. -->
 
     <UserControl.Resources>
-        <!-- Row glyphs Noctis.UI's icon set has no shape for, drawn on its 24-grid in the same
-             outline weight as the Rail icons. -->
-        <!-- Half-filled circle: the System / Dark / Light choice. -->
-        <StreamGeometry x:Key="SettingsThemeGlyph">M12 22c5.523 0 10-4.477 10-10S17.523 2 12 2 2 6.477 2 12s4.477 10 10 10Zm0-1.5v-17a8.5 8.5 0 0 1 0 17Z</StreamGeometry>
-        <!-- Crescent: which dark style. -->
-        <StreamGeometry x:Key="SettingsMoonGlyph">M10.46 3.64A8.5 8.5 0 1 0 20.36 13.54A7 7 0 0 1 10.46 3.64Z</StreamGeometry>
-        <!-- A Latin capital: romanized lyrics. -->
-        <StreamGeometry x:Key="SettingsLetterGlyph">M11.05 4h1.9l5.3 15h-1.6l-1.5-4.3H8.85L7.35 19H5.75ZM9.35 13.2h5.2L12 5.9Z</StreamGeometry>
-        <!-- Small and large capital: lyrics text size. -->
-        <StreamGeometry x:Key="SettingsTextSizeGlyph">M14.3 4h1.9l5.3 15h-1.6l-1.5-4.3H12.1L10.6 19H9ZM12.6 13.2h5.2L15.25 5.9ZM4.92 10.75h1.04l2.92 8.25H8l-.83-2.37H3.71L2.88 19H2ZM3.98 15.81H6.84L5.44 11.8Z</StreamGeometry>
+        <!-- A Look tile's mini preview: a theme's grouped page with two cards on it, the first
+             carrying the accent. It fills the rim's inside (56 x 38), and its padding leaves the
+             two cards (13 + 4 + 11) exactly that height, so nothing is cut at the edges. -->
+        <DataTemplate x:Key="LookPreviewTemplate" x:DataType="vm:LookPreview">
+            <Border CornerRadius="8" Background="{Binding Page}" Padding="6,5">
+                <StackPanel Spacing="4">
+                    <Border Height="13" CornerRadius="4" Background="{Binding Card}">
+                        <Ellipse Width="6" Height="6" Margin="4,0,0,0" HorizontalAlignment="Left" VerticalAlignment="Center"
+                                 Fill="{DynamicResource AccentColorBrush}" />
+                    </Border>
+                    <Border Height="11" CornerRadius="4" Background="{Binding Card}" />
+                </StackPanel>
+            </Border>
+        </DataTemplate>
     </UserControl.Resources>
 
     <UserControl.Styles>
-        <!-- Cards and their headers -->
-        <Style Selector="Border.settings-card">
-            <Setter Property="Background" Value="{DynamicResource HomeCardBackground}" />
-            <Setter Property="CornerRadius" Value="20" />
-            <Setter Property="ClipToBounds" Value="True" />
-        </Style>
-        <Style Selector="Grid.section-head">
-            <Setter Property="Margin" Value="16,14,16,4" />
-        </Style>
-        <Style Selector="Border.section-badge">
-            <Setter Property="Width" Value="32" />
-            <Setter Property="Height" Value="32" />
-            <Setter Property="CornerRadius" Value="10" />
-            <Setter Property="ClipToBounds" Value="True" />
-        </Style>
-        <!-- The badge's fill is the accent at low strength, so it follows the accent and theme. -->
-        <Style Selector="Border.section-badge > Panel > Border.badge-fill">
-            <Setter Property="Background" Value="{DynamicResource AccentColorBrush}" />
-            <Setter Property="Opacity" Value="0.18" />
-        </Style>
-        <Style Selector="Border.section-badge views|GridIcon">
-            <Setter Property="Width" Value="20" />
-            <Setter Property="Height" Value="20" />
-            <Setter Property="Foreground" Value="{DynamicResource AccentColorBrush}" />
-            <Setter Property="HorizontalAlignment" Value="Center" />
-            <Setter Property="VerticalAlignment" Value="Center" />
-        </Style>
-        <Style Selector="TextBlock.section-title">
-            <Setter Property="FontSize" Value="17" />
-            <Setter Property="FontWeight" Value="Bold" />
-            <Setter Property="Margin" Value="12,0,0,0" />
-            <Setter Property="VerticalAlignment" Value="Center" />
+        <StyleInclude Source="avares://Noctis.Mobile/Views/GroupedStyles.axaml" />
+
+        <!-- A little more air between groups than Account's. -->
+        <Style Selector="StackPanel.grouped-content">
+            <Setter Property="Spacing" Value="30" />
         </Style>
 
-        <!-- Rows -->
-        <Style Selector="Grid.setting-row">
-            <Setter Property="MinHeight" Value="56" />
+        <!-- Header: no glyph, so the title starts near the cards' edge; a pushed page puts its
+             back button there. The hairline under it shows once content scrolls beneath. -->
+        <Style Selector="Grid.settings-header TextBlock.sheet-title">
+            <Setter Property="Margin" Value="4,0,0,0" />
+        </Style>
+        <Style Selector="Grid.settings-header.sub TextBlock.sheet-title">
+            <Setter Property="Margin" Value="12,0,0,0" />
+        </Style>
+        <Style Selector="Border.header-hairline">
+            <Setter Property="Height" Value="0.5" />
+            <Setter Property="VerticalAlignment" Value="Bottom" />
+            <Setter Property="Background" Value="{DynamicResource PhoneSeparatorBrush}" />
+            <Setter Property="IsHitTestVisible" Value="False" />
+            <Setter Property="Transitions">
+                <Transitions>
+                    <DoubleTransition Property="Opacity" Duration="0:0:0.15" />
+                </Transitions>
+            </Setter>
+        </Style>
+
+        <!-- The profile card: taller, the avatar first. The inset is the grid's margin: a Button
+             padding loses to MobileStyles' Button.row (Padding 0), which sat the avatar flush on
+             the card's edge. No picture: initials or the person glyph on a neutral disc. -->
+        <Style Selector="Grid.profile-row">
+            <Setter Property="MinHeight" Value="80" />
+            <Setter Property="Margin" Value="16,12" />
+        </Style>
+        <Style Selector="Border.avatar.neutral">
+            <Setter Property="Background" Value="{DynamicResource PhoneSeparatorBrush}" />
+        </Style>
+        <!-- The grey line wraps rather than cut off the invitation's last words. -->
+        <Style Selector="Grid.profile-row TextBlock.profile-sub">
+            <Setter Property="TextWrapping" Value="Wrap" />
+            <Setter Property="TextTrimming" Value="None" />
+        </Style>
+        <Style Selector="Border.avatar.neutral TextBlock.initials">
+            <Setter Property="Foreground" Value="{DynamicResource PrimaryTextBrush}" />
+        </Style>
+        <Style Selector="Border.avatar.neutral views|GridIcon">
+            <Setter Property="Foreground" Value="{DynamicResource PhoneSecondaryTextBrush}" />
+        </Style>
+
+        <!-- Plain rows (navigation, choices, toggles) have no icon: their hairline starts under
+             the text, 16 dp in. -->
+        <Style Selector="Border.row-separator.plain">
             <Setter Property="Margin" Value="16,0" />
         </Style>
-        <!-- Every row icon is a GridIcon: drawn at its 24-grid size, so all of them match in size
-             and sit on the same centre line (PathIcon stretched each glyph's own bounds). -->
-        <Style Selector="views|GridIcon.row-icon">
-            <Setter Property="Width" Value="24" />
-            <Setter Property="Height" Value="24" />
-            <Setter Property="Margin" Value="0,0,16,0" />
-            <Setter Property="VerticalAlignment" Value="Center" />
-            <Setter Property="Foreground" Value="{DynamicResource SecondaryTextBrush}" />
-        </Style>
-        <Style Selector="TextBlock.row-label">
-            <Setter Property="FontSize" Value="15" />
-            <Setter Property="VerticalAlignment" Value="Center" />
-            <Setter Property="TextWrapping" Value="Wrap" />
-        </Style>
         <Style Selector="TextBlock.row-value">
-            <Setter Property="FontSize" Value="14" />
-            <Setter Property="Foreground" Value="{DynamicResource SecondaryTextBrush}" />
-            <Setter Property="VerticalAlignment" Value="Center" />
+            <Setter Property="TextTrimming" Value="CharacterEllipsis" />
+        </Style>
+        <!-- A small grey caption over a card on a pushed page ("Dark Style"). -->
+        <Style Selector="TextBlock.group-caption">
+            <Setter Property="FontSize" Value="13.5" />
+            <Setter Property="Foreground" Value="{DynamicResource PhoneSecondaryTextBrush}" />
+            <Setter Property="Margin" Value="16,0,16,7" />
+        </Style>
+        <!-- The Music Folders row's mark for a folder that lost its access. -->
+        <Style Selector="Ellipse.warning-dot">
+            <Setter Property="Width" Value="8" />
+            <Setter Property="Height" Value="8" />
+            <Setter Property="Fill" Value="#E5484D" />
             <Setter Property="Margin" Value="12,0,0,0" />
-        </Style>
-        <!-- Thin line between rows, starting under the label (16 margin + 24 icon + 16 gap). -->
-        <Style Selector="Border.row-separator">
-            <Setter Property="Height" Value="1" />
-            <Setter Property="Margin" Value="56,0,0,0" />
-            <Setter Property="Background" Value="#26808080" />
-        </Style>
-        <!-- A pill inside a card: the card's own fill would hide the shared pill's background. -->
-        <Style Selector="Border.settings-card Button.pill">
-            <Setter Property="Background" Value="#26808080" />
-            <Setter Property="Padding" Value="16,0" />
-        </Style>
-        <Style Selector="Border.settings-card Button.pill views|GridIcon">
-            <Setter Property="Width" Value="20" />
-            <Setter Property="Height" Value="20" />
             <Setter Property="VerticalAlignment" Value="Center" />
-            <Setter Property="Margin" Value="0,0,8,0" />
+        </Style>
+        <!-- The footer: the version, small and grey, centred under everything. -->
+        <Style Selector="TextBlock.version-footer">
+            <Setter Property="FontSize" Value="13" />
+            <Setter Property="Foreground" Value="{DynamicResource PhoneSecondaryTextBrush}" />
+            <Setter Property="HorizontalAlignment" Value="Center" />
+            <Setter Property="Margin" Value="0,2,0,8" />
         </Style>
 
-        <!-- On/off rows: the whole row is the toggle (a 56 dp target), drawn as label + switch. -->
-        <Style Selector="ToggleButton.switch-row">
-            <Setter Property="Background" Value="Transparent" />
-            <Setter Property="BorderThickness" Value="0" />
-            <Setter Property="Padding" Value="16,0" />
-            <Setter Property="MinHeight" Value="56" />
-            <Setter Property="HorizontalAlignment" Value="Stretch" />
-            <Setter Property="HorizontalContentAlignment" Value="Stretch" />
-            <Setter Property="Template">
-                <ControlTemplate>
-                    <Border Background="Transparent" Padding="{TemplateBinding Padding}">
-                        <Grid ColumnDefinitions="*,Auto">
-                            <ContentPresenter Content="{TemplateBinding Content}" VerticalAlignment="Center" />
-                            <Border Name="PART_Track" Grid.Column="1" Width="50" Height="30" CornerRadius="15"
-                                    Margin="12,0,0,0" VerticalAlignment="Center">
-                                <Border Name="PART_Knob" Width="24" Height="24" CornerRadius="12" Margin="3"
-                                        HorizontalAlignment="Left" Background="White" />
-                            </Border>
-                        </Grid>
-                    </Border>
-                </ControlTemplate>
-            </Setter>
-        </Style>
-        <Style Selector="ToggleButton.switch-row /template/ Border#PART_Track">
-            <Setter Property="Background" Value="#4D808080" />
-            <Setter Property="Transitions">
-                <Transitions>
-                    <BrushTransition Property="Background" Duration="0:0:0.18" />
-                </Transitions>
-            </Setter>
-        </Style>
-        <Style Selector="ToggleButton.switch-row:checked /template/ Border#PART_Track">
-            <Setter Property="Background" Value="{DynamicResource AccentColorBrush}" />
-        </Style>
-        <Style Selector="ToggleButton.switch-row /template/ Border#PART_Knob">
-            <Setter Property="RenderTransform" Value="translateX(0px)" />
-            <Setter Property="Transitions">
-                <Transitions>
-                    <TransformOperationsTransition Property="RenderTransform" Duration="0:0:0.18">
-                        <TransformOperationsTransition.Easing><CubicEaseOut /></TransformOperationsTransition.Easing>
-                    </TransformOperationsTransition>
-                </Transitions>
-            </Setter>
-        </Style>
-        <Style Selector="ToggleButton.switch-row:checked /template/ Border#PART_Knob">
-            <Setter Property="RenderTransform" Value="translateX(20px)" />
-        </Style>
-        <Style Selector="ToggleButton.switch-row:pressed">
-            <Setter Property="Opacity" Value="0.6" />
-        </Style>
-
-        <!-- Segmented choices (theme, dark style): equal pills on a pill track; the chosen one
-             turns accent. Fluent's ListBoxItem repaints its presenter on pointerover/pressed
-             (a touch), and Noctis.UI's Styles.axaml clears every ListBoxItem's selected look,
-             so every state is set here. -->
-        <Style Selector="Border.segment-track">
-            <Setter Property="Background" Value="#1F808080" />
+        <!-- Look tiles: three equal cards, each a mini preview over its name. The chosen one
+             takes an accent outline and an accent name. -->
+        <Style Selector="Button.look-tile">
+            <Setter Property="Background" Value="{DynamicResource PhoneCardBrush}" />
+            <Setter Property="BorderBrush" Value="Transparent" />
+            <Setter Property="BorderThickness" Value="2" />
             <Setter Property="CornerRadius" Value="22" />
-            <Setter Property="Padding" Value="4" />
-            <Setter Property="Margin" Value="16,0,16,14" />
-        </Style>
-        <Style Selector="ListBox.segments">
-            <Setter Property="Background" Value="Transparent" />
-            <Setter Property="Padding" Value="0" />
-        </Style>
-        <Style Selector="ListBox.segments ListBoxItem">
-            <Setter Property="CornerRadius" Value="18" />
-            <Setter Property="MinHeight" Value="36" />
-            <Setter Property="Padding" Value="6,0" />
-            <Setter Property="Margin" Value="0" />
-            <Setter Property="FontSize" Value="14" />
-            <Setter Property="FontWeight" Value="SemiBold" />
+            <Setter Property="Padding" Value="0,14,0,11" />
+            <Setter Property="HorizontalAlignment" Value="Stretch" />
             <Setter Property="HorizontalContentAlignment" Value="Center" />
             <Setter Property="VerticalContentAlignment" Value="Center" />
-            <Setter Property="Background" Value="Transparent" />
+            <Setter Property="RenderTransform" Value="scale(1)" />
+            <Setter Property="Transitions">
+                <Transitions>
+                    <DoubleTransition Property="Opacity" Duration="0:0:0.12">
+                        <DoubleTransition.Easing><CubicEaseOut /></DoubleTransition.Easing>
+                    </DoubleTransition>
+                    <TransformOperationsTransition Property="RenderTransform" Duration="0:0:0.16">
+                        <TransformOperationsTransition.Easing><CubicEaseOut /></TransformOperationsTransition.Easing>
+                    </TransformOperationsTransition>
+                    <BrushTransition Property="BorderBrush" Duration="0:0:0.18" />
+                </Transitions>
+            </Setter>
         </Style>
-        <Style Selector="ListBox.segments ListBoxItem /template/ ContentPresenter#PART_ContentPresenter, ListBox.segments ListBoxItem:pointerover /template/ ContentPresenter#PART_ContentPresenter, ListBox.segments ListBoxItem:pressed /template/ ContentPresenter#PART_ContentPresenter">
-            <Setter Property="Background" Value="Transparent" />
-            <Setter Property="Foreground" Value="{DynamicResource PrimaryTextBrush}" />
-            <Setter Property="CornerRadius" Value="18" />
+        <Style Selector="Button.look-tile:pressed">
+            <Setter Property="Opacity" Value="0.6" />
+            <Setter Property="RenderTransform" Value="scale(0.96)" />
         </Style>
-        <Style Selector="ListBox.segments ListBoxItem:selected /template/ ContentPresenter#PART_ContentPresenter, ListBox.segments ListBoxItem:selected:pointerover /template/ ContentPresenter#PART_ContentPresenter, ListBox.segments ListBoxItem:selected:pressed /template/ ContentPresenter#PART_ContentPresenter, ListBox.segments ListBoxItem:selected:focus /template/ ContentPresenter#PART_ContentPresenter">
-            <Setter Property="Background" Value="{DynamicResource AccentColorBrush}" />
-            <Setter Property="Foreground" Value="{DynamicResource AccentForegroundBrush}" />
+        <Style Selector="Button.look-tile.selected">
+            <Setter Property="BorderBrush" Value="{DynamicResource AccentTextExactBrush}" />
+        </Style>
+        <Style Selector="Button.look-tile:pointerover /template/ ContentPresenter#PART_ContentPresenter, Button.look-tile:pressed /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Background" Value="{Binding $parent[Button].Background}" />
+            <Setter Property="BorderBrush" Value="{Binding $parent[Button].BorderBrush}" />
+            <Setter Property="Foreground" Value="{Binding $parent[Button].Foreground}" />
+        </Style>
+        <Style Selector="Button.look-tile TextBlock.look-name">
+            <Setter Property="FontSize" Value="14" />
+            <Setter Property="HorizontalAlignment" Value="Center" />
+            <Setter Property="Margin" Value="0,9,0,0" />
+        </Style>
+        <Style Selector="Button.look-tile.selected TextBlock.look-name">
+            <Setter Property="Foreground" Value="{DynamicResource AccentTextBrush}" />
+            <Setter Property="FontWeight" Value="SemiBold" />
+        </Style>
+        <!-- The preview's thin rim, so the light one still reads on a white card. -->
+        <Style Selector="Border.look-preview">
+            <Setter Property="Width" Value="58" />
+            <Setter Property="Height" Value="40" />
+            <Setter Property="CornerRadius" Value="9" />
+            <Setter Property="ClipToBounds" Value="True" />
+            <Setter Property="BorderBrush" Value="{DynamicResource PhoneSeparatorBrush}" />
+            <Setter Property="BorderThickness" Value="1" />
         </Style>
 
-        <!-- Accent swatches: a dot each; the chosen one gets a ring and a tick. -->
-        <Style Selector="ListBox.swatches">
+        <!-- Check lists (Dark Style): Apple's rows, the chosen one with an accent checkmark.
+             Fluent's ListBoxItem repaints its presenter on pointerover / pressed / selected (a
+             touch), and Noctis.UI's Styles.axaml clears every ListBoxItem's selected look, so
+             every state is set here. -->
+        <Style Selector="ListBox.check-list, ListBox.swatches">
             <Setter Property="Background" Value="Transparent" />
             <Setter Property="Padding" Value="0" />
-            <Setter Property="Margin" Value="10,0,10,10" />
+        </Style>
+        <Style Selector="ListBox.check-list:disabled">
+            <Setter Property="Opacity" Value="0.45" />
+        </Style>
+        <Style Selector="ListBox.check-list ListBoxItem">
+            <Setter Property="Padding" Value="0" />
+            <Setter Property="Margin" Value="0" />
+            <Setter Property="MinHeight" Value="0" />
+            <Setter Property="Background" Value="Transparent" />
+            <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+        </Style>
+        <Style Selector="ListBox.check-list ListBoxItem /template/ ContentPresenter#PART_ContentPresenter, ListBox.check-list ListBoxItem:pointerover /template/ ContentPresenter#PART_ContentPresenter, ListBox.check-list ListBoxItem:pressed /template/ ContentPresenter#PART_ContentPresenter, ListBox.check-list ListBoxItem:selected /template/ ContentPresenter#PART_ContentPresenter, ListBox.check-list ListBoxItem:selected:pointerover /template/ ContentPresenter#PART_ContentPresenter, ListBox.check-list ListBoxItem:selected:pressed /template/ ContentPresenter#PART_ContentPresenter, ListBox.check-list ListBoxItem:selected:focus /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Background" Value="Transparent" />
+            <Setter Property="Foreground" Value="{DynamicResource PrimaryTextBrush}" />
+        </Style>
+        <Style Selector="ListBox.check-list ListBoxItem:nth-child(1) Border.row-separator">
+            <Setter Property="IsVisible" Value="False" />
+        </Style>
+        <Style Selector="ListBox.check-list views|GridIcon.check">
+            <Setter Property="Width" Value="22" />
+            <Setter Property="Height" Value="22" />
+            <Setter Property="Margin" Value="12,0,0,0" />
+            <Setter Property="VerticalAlignment" Value="Center" />
+            <Setter Property="Foreground" Value="{DynamicResource AccentTextExactBrush}" />
+            <Setter Property="Opacity" Value="0" />
+        </Style>
+        <Style Selector="ListBox.check-list ListBoxItem:selected views|GridIcon.check">
+            <Setter Property="Opacity" Value="1" />
+        </Style>
+
+        <!-- Accent swatches: nine dots, five over four centred under them, each cell a full
+             touch target (a fifth of the card by 48); the chosen one gets a ring and a tick. -->
+        <Style Selector="ListBox.swatches">
+            <Setter Property="Margin" Value="8,10" />
         </Style>
         <Style Selector="ListBox.swatches ListBoxItem">
             <Setter Property="Padding" Value="0" />
             <Setter Property="Margin" Value="0" />
-            <Setter Property="Width" Value="44" />
-            <Setter Property="Height" Value="44" />
+            <Setter Property="Height" Value="48" />
+            <Setter Property="MinHeight" Value="0" />
+            <Setter Property="HorizontalContentAlignment" Value="Center" />
+            <Setter Property="VerticalContentAlignment" Value="Center" />
             <Setter Property="Background" Value="Transparent" />
         </Style>
         <Style Selector="ListBox.swatches ListBoxItem /template/ ContentPresenter#PART_ContentPresenter, ListBox.swatches ListBoxItem:pointerover /template/ ContentPresenter#PART_ContentPresenter, ListBox.swatches ListBoxItem:pressed /template/ ContentPresenter#PART_ContentPresenter, ListBox.swatches ListBoxItem:selected /template/ ContentPresenter#PART_ContentPresenter, ListBox.swatches ListBoxItem:selected:pointerover /template/ ContentPresenter#PART_ContentPresenter, ListBox.swatches ListBoxItem:selected:pressed /template/ ContentPresenter#PART_ContentPresenter, ListBox.swatches ListBoxItem:selected:focus /template/ ContentPresenter#PART_ContentPresenter">
@@ -209,17 +226,75 @@
             <Setter Property="Opacity" Value="1" />
         </Style>
 
-        <!-- Library: a folder whose access was lost reads as a warning. -->
-        <Style Selector="TextBlock.folder-lost">
-            <Setter Property="FontSize" Value="13" />
+        <!-- Music Folders: a folder whose access was lost, or that the last scan could not reach, reads as a warning. -->
+        <Style Selector="TextBlock.folder-lost, TextBlock.folder-unavailable">
+            <Setter Property="FontSize" Value="13.5" />
             <Setter Property="Foreground" Value="#E5484D" />
             <Setter Property="TextWrapping" Value="Wrap" />
+            <Setter Property="Margin" Value="0,2,0,0" />
         </Style>
+        <Style Selector="ItemsControl#FolderList ContentPresenter:nth-child(1) Border.row-separator">
+            <Setter Property="IsVisible" Value="False" />
+        </Style>
+        <!-- A folder's Remove: a red bin at the row's end, a full finger wide. -->
+        <Style Selector="Button.folder-remove">
+            <Setter Property="Width" Value="44" />
+            <Setter Property="Height" Value="44" />
+            <Setter Property="Padding" Value="0" />
+            <Setter Property="Margin" Value="8,0,-10,0" />
+            <Setter Property="Background" Value="Transparent" />
+            <Setter Property="BorderThickness" Value="0" />
+            <Setter Property="VerticalAlignment" Value="Center" />
+            <Setter Property="HorizontalContentAlignment" Value="Center" />
+            <Setter Property="VerticalContentAlignment" Value="Center" />
+        </Style>
+        <Style Selector="Button.folder-remove views|GridIcon">
+            <Setter Property="Width" Value="22" />
+            <Setter Property="Height" Value="22" />
+            <Setter Property="Foreground" Value="#E5484D" />
+        </Style>
+        <Style Selector="Button.folder-remove:pointerover /template/ ContentPresenter#PART_ContentPresenter, Button.folder-remove:pressed /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Background" Value="Transparent" />
+        </Style>
+        <Style Selector="Button.folder-remove:pressed">
+            <Setter Property="Opacity" Value="0.5" />
+        </Style>
+        <!-- Removing a folder asks first (AccountPage's "are you sure?" card): the question, then its rows. -->
+        <Style Selector="TextBlock.confirm-text">
+            <Setter Property="FontSize" Value="15" />
+            <Setter Property="TextWrapping" Value="Wrap" />
+            <Setter Property="Margin" Value="16,14,16,10" />
+        </Style>
+        <Style Selector="Border.confirm-separator">
+            <Setter Property="Height" Value="0.5" />
+            <Setter Property="Margin" Value="16,0" />
+            <Setter Property="Background" Value="{DynamicResource PhoneSeparatorBrush}" />
+        </Style>
+        <Style Selector="Button.confirm-row">
+            <Setter Property="MinHeight" Value="52" />
+            <Setter Property="Padding" Value="16,0" />
+        </Style>
+        <Style Selector="Button.confirm-row TextBlock">
+            <Setter Property="FontSize" Value="17" />
+            <Setter Property="VerticalAlignment" Value="Center" />
+        </Style>
+        <Style Selector="Button.confirm-row.danger TextBlock">
+            <Setter Property="Foreground" Value="#E5484D" />
+        </Style>
+
         <!-- The Windows Settings slider (SettingsView's accent-slider): an 8 dp round-ended track,
-             the accent filling up to a round thumb, the rest a soft grey. -->
+             the accent filling up to a round thumb, the rest a soft grey. A SmoothSlider, as on
+             the desktop: the thumb follows the finger, the setting moves in whole steps.
+             The thumb is a 44 dp touch box with the 26 dp circle centred in it (10-13): the
+             circle's shadow was cut to a square at the circle's own edges (the thumb clips to
+             its bounds), so the box leaves the shadow 9 dp on every side. The slider sits 7 dp
+             outside the row's 16 dp inset so the circle still lines up with the text at either
+             end. Each bar's outer end sits 10 dp in, as far in as its inner end tucks under the
+             circle, so at the minimum the accent bar is 0 wide (at 9 dp it was 1 dp, a red sliver
+             left of the circle) and at the maximum the grey one is. -->
         <Style Selector="Slider.accent-slider">
             <Setter Property="Foreground" Value="{DynamicResource AccentColorBrush}" />
-            <Setter Property="Height" Value="32" />
+            <Setter Property="Height" Value="44" />
             <Setter Property="BorderThickness" Value="0" />
             <Setter Property="Background" Value="Transparent" />
             <Setter Property="TickPlacement" Value="None" />
@@ -234,12 +309,13 @@
                 </ControlTemplate>
             </Setter>
         </Style>
-        <!-- 1 dp under the thumb, as on Windows: the ends meet the circle without a notch. -->
+        <!-- 1 dp under the circle, as on Windows: the ends meet it without a notch. The circle
+             sits 9 dp inside the thumb's box, so the inner ends reach 10 dp into the box. -->
         <Style Selector="Slider.accent-slider /template/ RepeatButton#PART_DecreaseButton">
-            <Setter Property="Margin" Value="0,0,-1,0" />
+            <Setter Property="Margin" Value="10,0,-10,0" />
         </Style>
         <Style Selector="Slider.accent-slider /template/ RepeatButton#PART_IncreaseButton">
-            <Setter Property="Margin" Value="-1,0,0,0" />
+            <Setter Property="Margin" Value="-10,0,10,0" />
         </Style>
         <Style Selector="Slider.accent-slider /template/ RepeatButton /template/ Border">
             <Setter Property="Background" Value="{DynamicResource AccentColorBrush}" />
@@ -249,269 +325,412 @@
             <Setter Property="CornerRadius" Value="4,0,0,4" />
         </Style>
         <Style Selector="Slider.accent-slider /template/ RepeatButton#PART_IncreaseButton /template/ Border">
-            <Setter Property="Background" Value="#73808080" />
+            <Setter Property="Background" Value="{DynamicResource PhoneFillBrush}" />
             <Setter Property="CornerRadius" Value="0,4,4,0" />
         </Style>
         <Style Selector="Slider.accent-slider /template/ Thumb">
-            <Setter Property="Background" Value="{DynamicResource AccentColorBrush}" />
+            <Setter Property="Background" Value="White" />
             <Setter Property="BorderThickness" Value="0" />
-            <Setter Property="Width" Value="22" />
-            <Setter Property="Height" Value="22" />
+            <Setter Property="Width" Value="44" />
+            <Setter Property="Height" Value="44" />
             <Setter Property="Template">
                 <ControlTemplate>
-                    <Border Width="{TemplateBinding Width}" Height="{TemplateBinding Height}"
-                            Background="{TemplateBinding Background}" CornerRadius="999" />
+                    <!-- The circle centred in its box (the shadow fits inside), with a hairline rim
+                         and a firmer shadow: on Light's white card the white circle was white on
+                         white, only a faint shadow showing it. -->
+                    <Panel Background="Transparent">
+                        <Border Name="PART_Circle" Width="26" Height="26" HorizontalAlignment="Center" VerticalAlignment="Center"
+                                Background="{TemplateBinding Background}" CornerRadius="999"
+                                BorderBrush="{DynamicResource PhoneChromeOutlineBrush}" BorderThickness="1"
+                                BoxShadow="0 1 5 0 #4D000000" />
+                    </Panel>
                 </ControlTemplate>
             </Setter>
         </Style>
-        <Style Selector="views|GridIcon.row-icon.lost">
-            <Setter Property="Foreground" Value="#E5484D" />
-        </Style>
     </UserControl.Styles>
 
-    <Grid RowDefinitions="Auto,*">
-        <Grid Grid.Row="0" ColumnDefinitions="Auto,*" Margin="8,4,20,4">
-            <Button Classes="icon" Command="{Binding Shell.NavigateBackCommand}">
-                <PathIcon Data="{DynamicResource PhBack}" />
-            </Button>
-            <TextBlock Grid.Column="1" Classes="title" FontSize="26" Text="{Binding Title}" VerticalAlignment="Center" />
-        </Grid>
+    <Panel Classes="grouped-root">
+        <Border Name="PageBackdrop" Classes="grouped-backdrop" />
+        <Grid RowDefinitions="Auto,*">
+            <Panel Grid.Row="0">
+                <Grid Classes="sheet-header settings-header" Classes.sub="{Binding IsSubPane}" ColumnDefinitions="Auto,*,Auto">
+                    <Button Name="BackButton" Classes="sheet-close" AutomationProperties.Name="Back to Settings"
+                            IsVisible="{Binding IsSubPane}" Command="{Binding ShowMainCommand}">
+                        <views:GridIcon Data="{DynamicResource PhBack}" />
+                    </Button>
+                    <TextBlock Grid.Column="1" Name="SettingsTitle" Classes="sheet-title" Text="{Binding HeaderTitle}" />
+                    <Button Grid.Column="2" Name="CloseButton" Classes="sheet-close" AutomationProperties.Name="Close"
+                            Command="{Binding Shell.NavigateBackCommand}">
+                        <views:GridIcon Data="{DynamicResource PhClose}" />
+                    </Button>
+                </Grid>
+                <Border Name="HeaderHairline" Classes="header-hairline" Opacity="0" />
+            </Panel>
 
-        <ScrollViewer Classes="page-scroll" Grid.Row="1" HorizontalScrollBarVisibility="Disabled">
-            <StackPanel Margin="16,4,16,32" Spacing="16">
+            <!-- The top level and the pushed page share the area; SettingsPage.axaml.cs slides
+                 one over the other. -->
+            <Panel Grid.Row="1" Name="PaneHost" ClipToBounds="True">
+                <ScrollViewer Name="MainScroll" Classes="page-scroll" HorizontalScrollBarVisibility="Disabled">
+                    <StackPanel Classes="grouped-content">
 
-                <!-- Account: only where the head wires an account service (Shell.Account). -->
-                <Border Name="AccountCard" Classes="settings-card" IsVisible="{Binding Shell.HasAccount}">
-                    <StackPanel>
-                        <Grid Classes="section-head" ColumnDefinitions="Auto,*">
-                            <Border Classes="section-badge">
-                                <Panel>
-                                    <Border Classes="badge-fill" />
-                                    <views:GridIcon Data="{DynamicResource RailPersonIcon}" />
-                                </Panel>
+                        <!-- Profile: only where the head wires an account service (Shell.Account).
+                             The picture (else initials, else the person glyph), the name, the
+                             computer and its last sync; the chevron into Account. -->
+                        <StackPanel Name="AccountGroup" IsVisible="{Binding Shell.HasAccount}">
+                            <Border Name="AccountCard" Classes="group-card">
+                                <Button Name="AccountRow" Classes="row" Command="{Binding Shell.OpenAccountCommand}"
+                                        AutomationProperties.Name="{Binding AccountRowText}">
+                                    <Grid Classes="profile-row" ColumnDefinitions="Auto,*,Auto">
+                                        <Border Name="ProfileAvatar" Classes="avatar large neutral">
+                                            <Panel>
+                                                <TextBlock Classes="initials" Text="{Binding AccountInitials}" IsVisible="{Binding ShowAccountInitials}" />
+                                                <views:GridIcon Data="{DynamicResource PhPerson}" IsVisible="{Binding ShowAccountGlyph}" />
+                                                <controls:CachedImage SourcePath="{Binding AccountAvatarPath}" IsVisible="{Binding HasAccountAvatar}"
+                                                                      DecodeWidth="224" Stretch="UniformToFill" />
+                                            </Panel>
+                                        </Border>
+                                        <StackPanel Grid.Column="1" Margin="14,0,0,0" VerticalAlignment="Center">
+                                            <TextBlock Name="AccountRowLabel" Classes="profile-name" Text="{Binding AccountTitle}" />
+                                            <TextBlock Name="AccountRowSub" Classes="profile-sub" Text="{Binding AccountSubtitle}" />
+                                        </StackPanel>
+                                        <views:GridIcon Grid.Column="2" Classes="row-chevron" Data="{DynamicResource PhChevronRight}" />
+                                    </Grid>
+                                </Button>
                             </Border>
-                            <TextBlock Grid.Column="1" Classes="section-title" Text="Account" />
-                        </Grid>
-                        <Button Name="AccountRow" Classes="row" Command="{Binding Shell.OpenAccountCommand}" Padding="0,0,0,4">
-                            <Grid Classes="setting-row" ColumnDefinitions="Auto,*,Auto">
-                                <views:GridIcon Classes="row-icon" Data="{DynamicResource PersonIcon}" />
-                                <TextBlock Grid.Column="1" Name="AccountRowLabel" Classes="row-label" Text="{Binding AccountRowText}" />
-                                <PathIcon Grid.Column="2" Data="{DynamicResource PhChevronRight}" Width="20" Height="20" Opacity="0.6"
-                                          Margin="12,0,0,0" VerticalAlignment="Center" />
-                            </Grid>
-                        </Button>
-                    </StackPanel>
-                </Border>
-
-                <!-- Library: on Android, folders are how local music gets in. -->
-                <Border Name="LibraryCard" Classes="settings-card">
-                    <StackPanel>
-                        <Grid Classes="section-head" ColumnDefinitions="Auto,*">
-                            <Border Classes="section-badge">
-                                <Panel>
-                                    <Border Classes="badge-fill" />
-                                    <views:GridIcon Data="{DynamicResource RailFolderIcon}" />
-                                </Panel>
-                            </Border>
-                            <TextBlock Grid.Column="1" Classes="section-title" Text="Library" />
-                        </Grid>
-                        <ItemsControl Name="FolderList" ItemsSource="{Binding FolderRows}">
-                            <ItemsControl.ItemTemplate>
-                                <DataTemplate x:DataType="vm:SettingsFolder">
-                                    <StackPanel>
-                                        <Grid Classes="setting-row" ColumnDefinitions="Auto,*">
-                                            <views:GridIcon Classes="row-icon" Classes.lost="{Binding AccessLost}" Data="{DynamicResource FolderIcon}" />
-                                            <StackPanel Grid.Column="1" VerticalAlignment="Center" Margin="0,8">
-                                                <TextBlock Classes="row-label" Text="{Binding Name}" />
-                                                <TextBlock Classes="folder-lost" IsVisible="{Binding AccessLost}"
-                                                           Text="Access lost. Add this folder again to play its songs." />
-                                            </StackPanel>
-                                        </Grid>
-                                        <Border Classes="row-separator" />
-                                    </StackPanel>
-                                </DataTemplate>
-                            </ItemsControl.ItemTemplate>
-                        </ItemsControl>
-                        <StackPanel IsVisible="{Binding !Shell.Library.HasFolders}">
-                            <Grid Name="NoFoldersRow" Classes="setting-row" ColumnDefinitions="Auto,*">
-                                <views:GridIcon Classes="row-icon" Data="{DynamicResource FolderIcon}" />
-                                <TextBlock Grid.Column="1" Classes="row-label" Foreground="{DynamicResource SecondaryTextBrush}"
-                                           Text="No music folders yet" />
-                            </Grid>
-                            <Border Classes="row-separator" />
+                            <TextBlock Name="AccountFootnote" Classes="group-footnote" Text="{Binding AccountFootnote}" />
                         </StackPanel>
-                        <TextBlock Name="ScanStatusLabel" Classes="subtle" Margin="16,10,16,0" TextWrapping="Wrap"
-                                   Text="{Binding Shell.Library.StatusText}"
-                                   IsVisible="{Binding Shell.Library.StatusText, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
-                        <UniformGrid Columns="2" Margin="12,12,12,14">
-                            <Button Name="AddFolderButton" Classes="pill" Margin="4,0" HorizontalAlignment="Stretch"
-                                    Command="{Binding Shell.Library.AddFolderCommand}">
-                                <StackPanel Orientation="Horizontal">
-                                    <views:GridIcon Data="{DynamicResource AddIcon}" />
-                                    <TextBlock Text="Add folder" VerticalAlignment="Center" />
+
+                        <!-- Look: System / Light / Dark, each a live preview; a tap applies it. -->
+                        <Grid Name="LookTiles" ColumnDefinitions="*,12,*,12,*">
+                            <Button Name="LookSystem" Classes="look-tile" Classes.selected="{Binding IsSystemLook}"
+                                    Command="{Binding ChooseAppearanceCommand}" CommandParameter="System"
+                                    AutomationProperties.Name="Look: System">
+                                <StackPanel>
+                                    <!-- Half Light, half the dark style: whichever the phone is in. -->
+                                    <Border Classes="look-preview">
+                                        <Panel>
+                                            <ContentControl Content="{Binding DarkPreview}" ContentTemplate="{StaticResource LookPreviewTemplate}" />
+                                            <Border Width="28" HorizontalAlignment="Left" ClipToBounds="True">
+                                                <Canvas>
+                                                    <ContentControl Width="56" Height="38" Content="{Binding LightPreview}" ContentTemplate="{StaticResource LookPreviewTemplate}" />
+                                                </Canvas>
+                                            </Border>
+                                        </Panel>
+                                    </Border>
+                                    <TextBlock Classes="look-name" Text="System" />
                                 </StackPanel>
                             </Button>
-                            <Button Name="RescanButton" Classes="pill" Margin="4,0" HorizontalAlignment="Stretch"
-                                    Command="{Binding Shell.Library.RescanCommand}">
-                                <StackPanel Orientation="Horizontal">
-                                    <views:GridIcon Data="{DynamicResource SyncIcon}" />
-                                    <TextBlock Text="Rescan" VerticalAlignment="Center" />
+                            <Button Grid.Column="2" Name="LookLight" Classes="look-tile" Classes.selected="{Binding IsLightLook}"
+                                    Command="{Binding ChooseAppearanceCommand}" CommandParameter="Light"
+                                    AutomationProperties.Name="Look: Light">
+                                <StackPanel>
+                                    <Border Classes="look-preview">
+                                        <ContentControl Content="{Binding LightPreview}" ContentTemplate="{StaticResource LookPreviewTemplate}" />
+                                    </Border>
+                                    <TextBlock Classes="look-name" Text="Light" />
                                 </StackPanel>
                             </Button>
-                        </UniformGrid>
-                    </StackPanel>
-                </Border>
+                            <Button Grid.Column="4" Name="LookDark" Classes="look-tile" Classes.selected="{Binding IsDarkLook}"
+                                    Command="{Binding ChooseAppearanceCommand}" CommandParameter="Dark"
+                                    AutomationProperties.Name="Look: Dark">
+                                <StackPanel>
+                                    <Border Classes="look-preview">
+                                        <ContentControl Content="{Binding DarkPreview}" ContentTemplate="{StaticResource LookPreviewTemplate}" />
+                                    </Border>
+                                    <TextBlock Classes="look-name" Text="Dark" />
+                                </StackPanel>
+                            </Button>
+                        </Grid>
 
-                <!-- Appearance: System / Dark / Light first, then the dark style and the accent. -->
-                <Border Name="AppearanceCard" Classes="settings-card">
-                    <StackPanel>
-                        <Grid Classes="section-head" ColumnDefinitions="Auto,*">
-                            <Border Classes="section-badge">
-                                <Panel>
-                                    <Border Classes="badge-fill" />
-                                    <views:GridIcon Data="{DynamicResource RailPaletteIcon}" />
-                                </Panel>
-                            </Border>
-                            <TextBlock Grid.Column="1" Classes="section-title" Text="Appearance" />
-                        </Grid>
-                        <Grid Classes="setting-row" ColumnDefinitions="Auto,*">
-                            <views:GridIcon Classes="row-icon" Data="{StaticResource SettingsThemeGlyph}" />
-                            <TextBlock Grid.Column="1" Classes="row-label" Text="Theme" />
-                        </Grid>
-                        <Border Classes="segment-track">
-                            <ListBox Name="AppearanceList" Classes="segments" ItemsSource="{Binding Appearances}" SelectedItem="{Binding Appearance}">
-                                <ListBox.ItemsPanel>
-                                    <ItemsPanelTemplate>
-                                        <UniformGrid Rows="1" />
-                                    </ItemsPanelTemplate>
-                                </ListBox.ItemsPanel>
-                            </ListBox>
-                        </Border>
-                        <StackPanel Name="DarkThemeSection" IsVisible="{Binding ShowsDarkThemes}">
-                            <Border Classes="row-separator" />
-                            <Grid Classes="setting-row" ColumnDefinitions="Auto,*">
-                                <views:GridIcon Classes="row-icon" Data="{StaticResource SettingsMoonGlyph}" />
-                                <TextBlock Grid.Column="1" Classes="row-label" Text="Dark style" />
-                            </Grid>
-                            <Border Classes="segment-track">
-                                <ListBox Name="DarkThemeList" Classes="segments" ItemsSource="{Binding DarkThemes}" SelectedItem="{Binding DarkTheme}">
-                                    <ListBox.ItemsPanel>
-                                        <ItemsPanelTemplate>
-                                            <UniformGrid Rows="1" />
-                                        </ItemsPanelTemplate>
-                                    </ListBox.ItemsPanel>
-                                </ListBox>
-                            </Border>
-                        </StackPanel>
-                        <Border Classes="row-separator" />
-                        <Grid Classes="setting-row" ColumnDefinitions="Auto,*">
-                            <!-- The row's icon is the accent itself. -->
-                            <Ellipse Width="18" Height="18" Margin="3,0,19,0" VerticalAlignment="Center"
-                                     Fill="{DynamicResource AccentColorBrush}" />
-                            <TextBlock Grid.Column="1" Classes="row-label" Text="Accent colour" />
-                        </Grid>
-                        <ListBox Name="AccentList" Classes="swatches" ItemsSource="{Binding AccentChoices}" SelectedItem="{Binding SelectedAccent}">
-                            <ListBox.ItemsPanel>
-                                <ItemsPanelTemplate>
-                                    <WrapPanel />
-                                </ItemsPanelTemplate>
-                            </ListBox.ItemsPanel>
-                            <ListBox.ItemTemplate>
-                                <DataTemplate x:DataType="vm:AccentSwatch">
-                                    <Panel Width="36" Height="36" AutomationProperties.Name="{Binding Name}">
-                                        <Ellipse Classes="swatch-ring" Stroke="{DynamicResource PrimaryTextBrush}" StrokeThickness="2" />
-                                        <Ellipse Width="28" Height="28" Fill="{Binding Brush}" />
-                                        <PathIcon Classes="swatch-tick" Data="{DynamicResource CheckmarkIcon}" Width="14" Height="14"
-                                                  Foreground="{DynamicResource AccentForegroundBrush}" />
-                                    </Panel>
-                                </DataTemplate>
-                            </ListBox.ItemTemplate>
-                        </ListBox>
-                    </StackPanel>
-                </Border>
-
-                <!-- Lyrics -->
-                <Border Name="LyricsCard" Classes="settings-card">
-                    <StackPanel>
-                        <Grid Classes="section-head" ColumnDefinitions="Auto,*">
-                            <Border Classes="section-badge">
-                                <Panel>
-                                    <Border Classes="badge-fill" />
-                                    <views:GridIcon Data="{DynamicResource RailLyricsIcon}" />
-                                </Panel>
-                            </Border>
-                            <TextBlock Grid.Column="1" Classes="section-title" Text="Lyrics" />
-                        </Grid>
-                        <ToggleButton Name="TranslationSwitch" Classes="switch-row" AutomationProperties.Name="Show translations" IsChecked="{Binding Shell.Lyrics.ShowTranslation}">
-                            <Grid ColumnDefinitions="Auto,*">
-                                <views:GridIcon Classes="row-icon" Data="{DynamicResource GlobeIcon}" />
-                                <TextBlock Grid.Column="1" Classes="row-label" Text="Show translations" />
-                            </Grid>
-                        </ToggleButton>
-                        <Border Classes="row-separator" />
-                        <ToggleButton Name="RomajiSwitch" Classes="switch-row" AutomationProperties.Name="Show romanization" IsChecked="{Binding Shell.Lyrics.ShowRomanization}">
-                            <Grid ColumnDefinitions="Auto,*">
-                                <views:GridIcon Classes="row-icon" Data="{StaticResource SettingsLetterGlyph}" />
-                                <TextBlock Grid.Column="1" Classes="row-label" Text="Show romanization" />
-                            </Grid>
-                        </ToggleButton>
-                        <Border Classes="row-separator" />
-                        <Grid Classes="setting-row" ColumnDefinitions="Auto,*,Auto">
-                            <views:GridIcon Classes="row-icon" Data="{StaticResource SettingsTextSizeGlyph}" />
-                            <TextBlock Grid.Column="1" Classes="row-label" Text="Text size" />
-                            <TextBlock Grid.Column="2" Name="LyricsSizeLabel" Classes="row-value"
-                                       Text="{Binding LyricsTextScale, StringFormat={}{0:P0}}" />
-                        </Grid>
-                        <Slider Name="LyricsSizeSlider" Classes="accent-slider" Margin="16,-4,16,12" Minimum="0.8" Maximum="1.6" TickFrequency="0.1"
-                                IsSnapToTickEnabled="True" Value="{Binding LyricsTextScale}" />
-                    </StackPanel>
-                </Border>
-
-                <!-- Advanced: the log, for a bug report. -->
-                <Border Name="AdvancedCard" Classes="settings-card">
-                    <StackPanel>
-                        <Grid Classes="section-head" ColumnDefinitions="Auto,*">
-                            <Border Classes="section-badge">
-                                <Panel>
-                                    <Border Classes="badge-fill" />
-                                    <views:GridIcon Data="{DynamicResource RailWrenchIcon}" />
-                                </Panel>
-                            </Border>
-                            <TextBlock Grid.Column="1" Classes="section-title" Text="Advanced" />
-                        </Grid>
-                        <Grid Classes="setting-row" ColumnDefinitions="Auto,*,Auto" Margin="16,0,16,6">
-                            <views:GridIcon Classes="row-icon" Data="{DynamicResource ClipboardIcon}" />
-                            <StackPanel Grid.Column="1" VerticalAlignment="Center" Margin="0,8">
-                                <TextBlock Classes="row-label" Text="Logs" />
-                                <TextBlock Name="ExportStatusLabel" Classes="subtle" TextWrapping="Wrap" Text="{Binding ExportStatus}"
-                                           IsVisible="{Binding ExportStatus, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
+                        <!-- Into the pages: plain text, the current value in grey, a chevron. -->
+                        <Border Name="PagesCard" Classes="group-card">
+                            <StackPanel>
+                                <Button Name="FoldersRow" Classes="row" Command="{Binding OpenPaneCommand}"
+                                        CommandParameter="{x:Static vm:SettingsPane.Folders}" AutomationProperties.Name="Music Folders">
+                                    <Grid Classes="setting-row" ColumnDefinitions="*,Auto,Auto,Auto">
+                                        <TextBlock Classes="row-label" Text="Music Folders" />
+                                        <Ellipse Grid.Column="1" Name="FolderWarningDot" Classes="warning-dot" IsVisible="{Binding HasLostFolder}" />
+                                        <TextBlock Grid.Column="2" Name="FoldersValueLabel" Classes="row-value" Text="{Binding FoldersValue}" />
+                                        <views:GridIcon Grid.Column="3" Classes="row-chevron" Data="{DynamicResource PhChevronRight}" />
+                                    </Grid>
+                                </Button>
+                                <Border Classes="row-separator plain" />
+                                <Button Name="AppearanceRow" Classes="row" Command="{Binding OpenPaneCommand}"
+                                        CommandParameter="{x:Static vm:SettingsPane.Appearance}" AutomationProperties.Name="Appearance">
+                                    <Grid Classes="setting-row" ColumnDefinitions="Auto,*,Auto">
+                                        <TextBlock Classes="row-label" Text="Appearance" />
+                                        <TextBlock Grid.Column="1" Name="AppearanceValueLabel" Classes="row-value" HorizontalAlignment="Right"
+                                                   Text="{Binding AppearanceValue}" />
+                                        <views:GridIcon Grid.Column="2" Classes="row-chevron" Data="{DynamicResource PhChevronRight}" />
+                                    </Grid>
+                                </Button>
+                                <Border Classes="row-separator plain" />
+                                <Button Name="LyricsRow" Classes="row" Command="{Binding OpenPaneCommand}"
+                                        CommandParameter="{x:Static vm:SettingsPane.Lyrics}" AutomationProperties.Name="Lyrics">
+                                    <Grid Classes="setting-row" ColumnDefinitions="Auto,*,Auto">
+                                        <TextBlock Classes="row-label" Text="Lyrics" />
+                                        <TextBlock Grid.Column="1" Name="LyricsValueLabel" Classes="row-value" HorizontalAlignment="Right"
+                                                   Text="{Binding LyricsValue}" />
+                                        <views:GridIcon Grid.Column="2" Classes="row-chevron" Data="{DynamicResource PhChevronRight}" />
+                                    </Grid>
+                                </Button>
                             </StackPanel>
-                            <Button Grid.Column="2" Name="ExportLogsButton" Classes="pill" Margin="12,0,0,0"
-                                    Content="Export" Command="{Binding ExportLogsCommand}" />
-                        </Grid>
-                    </StackPanel>
-                </Border>
+                        </Border>
 
-                <!-- About -->
-                <Border Name="AboutCard" Classes="settings-card">
-                    <StackPanel>
-                        <Grid Classes="section-head" ColumnDefinitions="Auto,*">
-                            <Border Classes="section-badge">
-                                <Panel>
-                                    <Border Classes="badge-fill" />
-                                    <views:GridIcon Data="{DynamicResource RailInfoIcon}" />
-                                </Panel>
+                        <!-- Rescan: one accent row, the scan's state (or why it is off) under it. -->
+                        <StackPanel>
+                            <Border Classes="group-card">
+                                <Button Name="RescanButton" Classes="row accent-row" Command="{Binding Shell.Library.RescanCommand}"
+                                        IsEnabled="{Binding CanRescan}">
+                                    <Grid Classes="setting-row">
+                                        <TextBlock Classes="row-label" Text="Rescan Library" />
+                                    </Grid>
+                                </Button>
                             </Border>
-                            <TextBlock Grid.Column="1" Classes="section-title" Text="About" />
-                        </Grid>
-                        <Grid Classes="setting-row" ColumnDefinitions="Auto,*,Auto">
-                            <views:GridIcon Classes="row-icon" Data="{DynamicResource TagIcon}" />
-                            <TextBlock Grid.Column="1" Classes="row-label" Text="Version" />
-                            <TextBlock Grid.Column="2" Name="VersionLabel" Classes="row-value" Text="{Binding VersionText}" />
-                        </Grid>
+                            <TextBlock Name="ScanStatusLabel" Classes="group-footnote" Text="{Binding RescanFootnote}"
+                                       IsVisible="{Binding RescanFootnote, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
+                        </StackPanel>
+
+                        <!-- Export Logs: the log, for a bug report. -->
+                        <StackPanel>
+                            <Border Name="AdvancedCard" Classes="group-card">
+                                <Button Name="ExportLogsButton" Classes="row accent-row" Command="{Binding ExportLogsCommand}">
+                                    <Grid Classes="setting-row">
+                                        <TextBlock Classes="row-label" Text="Export Logs" />
+                                    </Grid>
+                                </Button>
+                            </Border>
+                            <TextBlock Name="ExportStatusLabel" Classes="group-footnote" Text="{Binding ExportFootnote}" />
+                        </StackPanel>
+
+                        <TextBlock Name="VersionLabel" Classes="version-footer" Text="{Binding VersionText}" />
                     </StackPanel>
-                </Border>
-            </StackPanel>
-        </ScrollViewer>
-    </Grid>
+                </ScrollViewer>
+
+                <ScrollViewer Name="SubScroll" Classes="page-scroll" HorizontalScrollBarVisibility="Disabled" IsVisible="False">
+                    <Panel>
+                        <!-- Music Folders: each folder with its Remove, then Add Folder, then Scan on Startup. -->
+                        <StackPanel Name="FoldersPane" Classes="grouped-content" IsVisible="{Binding ShowsFoldersPane}">
+                            <StackPanel>
+                                <Border Name="FoldersCard" Classes="group-card">
+                                    <StackPanel>
+                                        <ItemsControl Name="FolderList" ItemsSource="{Binding FolderRows}">
+                                            <ItemsControl.ItemTemplate>
+                                                <DataTemplate x:DataType="vm:SettingsFolder">
+                                                    <StackPanel>
+                                                        <Border Classes="row-separator plain" />
+                                                        <Grid Classes="setting-row" ColumnDefinitions="*,Auto">
+                                                            <StackPanel VerticalAlignment="Center" Margin="0,10">
+                                                                <TextBlock Classes="row-label" Text="{Binding Title}" />
+                                                                <TextBlock Classes="row-sub" Text="{Binding Name}" IsVisible="{Binding ShowsPath}" />
+                                                                <TextBlock Classes="folder-lost" IsVisible="{Binding AccessLost}"
+                                                                           Text="Access lost. Add this folder again to play its songs." />
+                                                                <TextBlock Classes="folder-unavailable" IsVisible="{Binding Unavailable}"
+                                                                           Text="Not available. Reconnect its storage, then rescan." />
+                                                            </StackPanel>
+                                                            <Button Grid.Column="1" Classes="folder-remove"
+                                                                    Command="{Binding $parent[ItemsControl].((vm:SettingsPageViewModel)DataContext).AskRemoveFolderCommand}"
+                                                                    CommandParameter="{Binding}"
+                                                                    AutomationProperties.Name="{Binding Title, StringFormat='Remove {0}'}">
+                                                                <views:GridIcon Data="{DynamicResource PhTrash}" />
+                                                            </Button>
+                                                        </Grid>
+                                                    </StackPanel>
+                                                </DataTemplate>
+                                            </ItemsControl.ItemTemplate>
+                                        </ItemsControl>
+                                        <Grid Name="NoFoldersRow" Classes="setting-row" IsVisible="{Binding !Shell.Library.HasFolders}">
+                                            <TextBlock Classes="row-label" Foreground="{DynamicResource PhoneSecondaryTextBrush}"
+                                                       Text="No Music Folders Yet" />
+                                        </Grid>
+                                    </StackPanel>
+                                </Border>
+                                <TextBlock Classes="group-footnote" Text="Your library on this phone is the music in these folders." />
+                            </StackPanel>
+                            <!-- Remove asks first. -->
+                            <Border Name="RemoveFolderCard" Classes="group-card" IsVisible="{Binding IsConfirmingRemoveFolder}">
+                                <StackPanel>
+                                    <TextBlock Name="RemoveFolderQuestion" Classes="confirm-text" Text="{Binding RemoveFolderQuestion}" />
+                                    <Border Classes="confirm-separator" />
+                                    <Button Name="ConfirmRemoveFolderButton" Classes="row confirm-row danger" Command="{Binding ConfirmRemoveFolderCommand}">
+                                        <TextBlock Text="Remove Folder" FontWeight="SemiBold" />
+                                    </Button>
+                                    <Border Classes="confirm-separator" />
+                                    <Button Name="CancelRemoveFolderButton" Classes="row confirm-row" Command="{Binding CancelRemoveFolderCommand}">
+                                        <TextBlock Text="Cancel" />
+                                    </Button>
+                                </StackPanel>
+                            </Border>
+                            <StackPanel>
+                                <Border Classes="group-card">
+                                    <Button Name="AddFolderButton" Classes="row accent-row" Command="{Binding Shell.Library.AddFolderCommand}"
+                                            AutomationProperties.Name="Add Folder">
+                                        <Grid Classes="setting-row" ColumnDefinitions="Auto,*">
+                                            <views:GridIcon Classes="row-icon" Data="{DynamicResource AddIcon}" />
+                                            <TextBlock Grid.Column="1" Classes="row-label" Text="Add Folder" />
+                                        </Grid>
+                                    </Button>
+                                </Border>
+                                <TextBlock Name="FoldersFootnoteLabel" Classes="group-footnote" Text="{Binding FoldersFootnote}" />
+                            </StackPanel>
+                            <StackPanel>
+                                <Border Classes="group-card">
+                                    <ToggleButton Name="ScanOnStartupSwitch" Classes="switch-row" AutomationProperties.Name="Scan on Startup"
+                                                  IsChecked="{Binding Shell.Library.ScanOnStartup}">
+                                        <TextBlock Classes="row-label" Text="Scan on Startup" />
+                                    </ToggleButton>
+                                </Border>
+                                <TextBlock Classes="group-footnote" Text="Looks for new songs in these folders each time Noctis opens." />
+                            </StackPanel>
+                        </StackPanel>
+
+                        <!-- Appearance: the dark style as a check list, the accent, then the player bar. -->
+                        <StackPanel Name="AppearancePane" Classes="grouped-content" IsVisible="{Binding ShowsAppearancePane}">
+                            <StackPanel Name="DarkThemeSection">
+                                <TextBlock Classes="group-caption" Text="Dark Style" />
+                                <Border Classes="group-card">
+                                    <ListBox Name="DarkThemeList" Classes="check-list" ItemsSource="{Binding DarkThemes}"
+                                             SelectedItem="{Binding DarkTheme}" IsEnabled="{Binding ShowsDarkThemes}">
+                                        <ListBox.ItemTemplate>
+                                            <DataTemplate x:DataType="x:String">
+                                                <StackPanel>
+                                                    <Border Classes="row-separator plain" />
+                                                    <Grid Classes="setting-row" ColumnDefinitions="*,Auto">
+                                                        <TextBlock Classes="row-label" Text="{Binding}" />
+                                                        <views:GridIcon Grid.Column="1" Classes="check" Data="{DynamicResource PhCheck}" />
+                                                    </Grid>
+                                                </StackPanel>
+                                            </DataTemplate>
+                                        </ListBox.ItemTemplate>
+                                    </ListBox>
+                                </Border>
+                                <TextBlock Name="DarkStyleFootnote" Classes="group-footnote" Text="{Binding DarkStyleFootnote}" />
+                            </StackPanel>
+                            <StackPanel>
+                                <TextBlock Classes="group-caption" Text="Accent Colour" />
+                                <Border Classes="group-card">
+                                    <ListBox Name="AccentList" Classes="swatches" ItemsSource="{Binding AccentChoices}" SelectedItem="{Binding SelectedAccent}">
+                                        <ListBox.ItemsPanel>
+                                            <ItemsPanelTemplate>
+                                                <views:CenteredRowsPanel Columns="5" />
+                                            </ItemsPanelTemplate>
+                                        </ListBox.ItemsPanel>
+                                        <ListBox.ItemTemplate>
+                                            <DataTemplate x:DataType="vm:AccentSwatch">
+                                                <Panel Width="38" Height="38" AutomationProperties.Name="{Binding Name}">
+                                                    <Ellipse Classes="swatch-ring" Stroke="{DynamicResource PrimaryTextBrush}" StrokeThickness="2" />
+                                                    <!-- The hairline rim keeps a pale swatch (Gold) round on a white card. -->
+                                                    <Ellipse Width="30" Height="30" Fill="{Binding Brush}"
+                                                             Stroke="{DynamicResource PhoneChromeOutlineBrush}" StrokeThickness="1" />
+                                                    <PathIcon Classes="swatch-tick" Data="{DynamicResource CheckmarkIcon}" Width="14" Height="14"
+                                                              Foreground="{DynamicResource AccentForegroundBrush}" />
+                                                </Panel>
+                                            </DataTemplate>
+                                        </ListBox.ItemTemplate>
+                                    </ListBox>
+                                </Border>
+                                <TextBlock Classes="group-footnote" Text="{Binding AccentName, StringFormat='{}{0}. The accent colours buttons, switches and highlights.'}" />
+                            </StackPanel>
+                            <!-- Album and artist pages in a deep shade of the cover's colour (on by
+                                 default); off, the theme's plain pages. The shell applies it at once
+                                 (the open pages follow it) and saves it. -->
+                            <StackPanel>
+                                <TextBlock Classes="group-caption" Text="Album Colours" />
+                                <Border Name="ArtworkColoursCard" Classes="group-card">
+                                    <ToggleButton Name="ArtworkColoursSwitch" Classes="switch-row" AutomationProperties.Name="Colour Pages from Artwork"
+                                                  IsChecked="{Binding Shell.ArtworkPageColors}">
+                                        <TextBlock Classes="row-label" Text="Colour Pages from Artwork" />
+                                    </ToggleButton>
+                                </Border>
+                                <TextBlock Classes="group-footnote"
+                                           Text="Album and artist pages take a deep shade of the cover's colour, with white text. Off, they use the plain Light or Dark theme." />
+                            </StackPanel>
+                            <!-- The mini player's progress, both off by default (Apple's plain glass
+                                 capsule); the shell applies each switch at once and saves it. -->
+                            <StackPanel>
+                                <TextBlock Classes="group-caption" Text="Player Bar" />
+                                <Border Name="PlayerBarCard" Classes="group-card">
+                                    <StackPanel>
+                                        <ToggleButton Name="ProgressColourSwitch" Classes="switch-row" AutomationProperties.Name="Progress Colour"
+                                                      IsChecked="{Binding Shell.ShowMiniProgressFill}">
+                                            <TextBlock Classes="row-label" Text="Progress Colour" />
+                                        </ToggleButton>
+                                        <Border Classes="row-separator plain" />
+                                        <ToggleButton Name="ProgressLineSwitch" Classes="switch-row" AutomationProperties.Name="Progress Line"
+                                                      IsChecked="{Binding Shell.ShowMiniProgressLine}">
+                                            <TextBlock Classes="row-label" Text="Progress Line" />
+                                        </ToggleButton>
+                                    </StackPanel>
+                                </Border>
+                                <TextBlock Classes="group-footnote"
+                                           Text="Progress Colour fills the player bar in the cover's colour as the song plays. Progress Line draws a thin line along its bottom edge. With both off the bar is plain glass." />
+                            </StackPanel>
+                        </StackPanel>
+
+                        <!-- Lyrics: the desktop's lyrics display settings that the phone's lyrics
+                             page honours: the extra lines, the text size and the dimmed lines'
+                             floor, then joining split words. (The desktop's online sources,
+                             backgrounds, visualizer and fullscreen focus have nothing to act
+                             on here.) -->
+                        <StackPanel Name="LyricsPane" Classes="grouped-content" IsVisible="{Binding ShowsLyricsPane}">
+                            <StackPanel>
+                                <Border Name="LyricsCard" Classes="group-card">
+                                    <StackPanel>
+                                        <ToggleButton Name="TranslationSwitch" Classes="switch-row" AutomationProperties.Name="Show Translations"
+                                                      IsChecked="{Binding Shell.Lyrics.ShowTranslation}">
+                                            <TextBlock Classes="row-label" Text="Show Translations" />
+                                        </ToggleButton>
+                                        <Border Classes="row-separator plain" />
+                                        <ToggleButton Name="RomajiSwitch" Classes="switch-row" AutomationProperties.Name="Show Romanization"
+                                                      IsChecked="{Binding Shell.Lyrics.ShowRomanization}">
+                                            <TextBlock Classes="row-label" Text="Show Romanization" />
+                                        </ToggleButton>
+                                        <Border Classes="row-separator plain" />
+                                        <ToggleButton Name="BackgroundVocalsSwitch" Classes="switch-row" AutomationProperties.Name="Show Background Vocals"
+                                                      IsChecked="{Binding Shell.Lyrics.ShowBackgroundVocals}">
+                                            <TextBlock Classes="row-label" Text="Show Background Vocals" />
+                                        </ToggleButton>
+                                    </StackPanel>
+                                </Border>
+                                <TextBlock Classes="group-footnote" Text="Shown under a line, in smaller text, when the song's lyrics have them." />
+                            </StackPanel>
+                            <StackPanel>
+                                <Border Name="LyricsSizeCard" Classes="group-card">
+                                    <StackPanel>
+                                        <Grid Classes="setting-row" ColumnDefinitions="*,Auto">
+                                            <TextBlock Classes="row-label" Text="Text Size" />
+                                            <TextBlock Grid.Column="1" Name="LyricsSizeLabel" Classes="row-value"
+                                                       Text="{Binding LyricsTextScale, StringFormat={}{0:P0}}" />
+                                        </Grid>
+                                        <controls:SmoothSlider Name="LyricsSizeSlider" Classes="accent-slider" Margin="7,-12,7,6"
+                                                               Minimum="0.8" Maximum="1.6" Step="0.1" SteppedValue="{Binding LyricsTextScale}"
+                                                               AutomationProperties.Name="Lyrics text size" />
+                                        <Border Classes="row-separator plain" />
+                                        <Grid Classes="setting-row" ColumnDefinitions="*,Auto">
+                                            <TextBlock Classes="row-label" Text="Minimum Line Opacity" />
+                                            <TextBlock Grid.Column="1" Name="LyricsOpacityLabel" Classes="row-value"
+                                                       Text="{Binding Shell.Lyrics.MinLineOpacity, StringFormat={}{0}%}" />
+                                        </Grid>
+                                        <controls:SmoothSlider Name="LyricsOpacitySlider" Classes="accent-slider" Margin="7,-12,7,6"
+                                                               Minimum="0" Maximum="60" Step="1" SteppedValue="{Binding Shell.Lyrics.MinLineOpacity}"
+                                                               AutomationProperties.Name="Minimum line opacity" />
+                                    </StackPanel>
+                                </Border>
+                                <TextBlock Classes="group-footnote" Text="Keeps every line faintly visible, so you can tap any line to jump there. 0% hides lines far from the current one." />
+                            </StackPanel>
+                            <StackPanel>
+                                <Border Classes="group-card">
+                                    <ToggleButton Name="JoinWordsSwitch" Classes="switch-row" AutomationProperties.Name="Join Split Words"
+                                                  IsChecked="{Binding Shell.Lyrics.JoinSplitWords}">
+                                        <TextBlock Classes="row-label" Text="Join Split Words" />
+                                    </ToggleButton>
+                                </Border>
+                                <TextBlock Classes="group-footnote" Text="Keeps words whole when TTML lyrics split them into syllables." />
+                            </StackPanel>
+                        </StackPanel>
+                    </Panel>
+                </ScrollViewer>
+            </Panel>
+        </Grid>
+    </Panel>
 </UserControl>

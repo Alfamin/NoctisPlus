@@ -439,7 +439,7 @@
                         <Border Grid.Column="4" Width="110"
                                 IsVisible="{Binding $parent[Window].((vm:MainWindowViewModel)DataContext).Settings.ShowGenreColumn, FallbackValue=True}">
                             <controls:HighlightTextBlock Classes="accent-link"
-                                                         DisplayText="{Binding Genre}"
+                                                         DisplayText="{Binding GenreDisplay}"
                                                          HighlightText="{Binding $parent[UserControl].((vm:LibrarySongsViewModel)DataContext).SearchText}"
                                                          FontSize="12"
                                                          FontWeight="SemiBold"

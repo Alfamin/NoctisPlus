@@ -12,8 +12,8 @@ using Noctis.Mobile.ViewModels;
 namespace Noctis.Mobile.Views;
 
 /// <summary>
-/// The Library tab root: header, the list rows, then the Pinned / Recently Added / On Repeat /
-/// Recently Played sections. The code here is the rows' Edit mode motion: rows switched off
+/// The Library tab root (Apple's Library): header, the list rows, then Recently Added; the
+/// listening rails live on Home. The code here is the rows' Edit mode motion: rows switched off
 /// arrive with the check marks, and a ≡ handle drags a row into place, the rows it passes
 /// stepping aside (the Queue page's handle drag, with live room-making).
 /// </summary>

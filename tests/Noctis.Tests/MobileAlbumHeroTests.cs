@@ -184,16 +184,15 @@ public class MobileAlbumHeroTests : IDisposable
         var (album, tracks) = Sample();
         using var rig = MobileFixtures.MakeRig(tracks, new[] { album });
         var window = MobileFixtures.Mount(rig.Shell, out var view);
-        var host = MobileFixtures.Named<ContentControl>(view, "PageHost");
-        Assert.True(host.ClipToBounds);
-
         rig.Shell.OpenAlbumsCommand.Execute(null);
         rig.Shell.OpenAlbumCommand.Execute(album);
         window.UpdateLayout();
+        var host = MobileFixtures.PageView(view, rig.Shell.CurrentPage!);
         Assert.False(host.ClipToBounds);
 
+        // Back: the album slides away, then lets go of its host.
         rig.Shell.NavigateBackCommand.Execute(null);
-        window.UpdateLayout();
+        MobileFixtures.Land(window);
         Assert.True(host.ClipToBounds);
         window.Close();
     }
@@ -241,11 +240,12 @@ public class MobileAlbumHeroTests : IDisposable
         window.Close();
     }
 
-    /// <summary>Play is a dark pill with light text on a light tint, a light pill on a dark tint.</summary>
+    /// <summary>Play is Apple's white pill with black text: the page is a deep shade of the cover's
+    /// colour whether the cover is light or dark, so the pill contrasts with it either way.</summary>
     [AvaloniaTheory]
-    [InlineData(0xF0, 0xE8, 0xD8, true)]
-    [InlineData(0x1C, 0x24, 0x4A, false)]
-    public void PlayPill_ContrastsWithTheTint(byte r, byte g, byte b, bool darkPill)
+    [InlineData(0xF0, 0xE8, 0xD8)]
+    [InlineData(0x1C, 0x24, 0x4A)]
+    public void PlayPill_IsWhiteOnTheDeepPage(byte r, byte g, byte b)
     {
         var (album, tracks) = Sample(FakeCover());
         using var rig = MobileFixtures.MakeRig(tracks, new[] { album }, tint: Tint(Color.FromRgb(r, g, b)));
@@ -254,9 +254,11 @@ public class MobileAlbumHeroTests : IDisposable
         rig.Shell.OpenAlbumCommand.Execute(album);
         window.UpdateLayout();
 
-        var play = MobileFixtures.Named<Button>(MobileFixtures.Find<AlbumPage>(view), "PlayButton");
-        Assert.Equal(darkPill ? Colors.Black : Colors.White, ((ISolidColorBrush)play.Background!).Color);
-        Assert.Equal(darkPill ? Colors.White : Colors.Black, ((ISolidColorBrush)play.Foreground!).Color);
+        var page = MobileFixtures.Find<AlbumPage>(view);
+        var play = MobileFixtures.Named<Button>(page, "PlayButton");
+        Assert.Equal(Colors.White, ((ISolidColorBrush)play.Background!).Color);
+        Assert.Equal(Colors.Black, ((ISolidColorBrush)play.Foreground!).Color);
+        Assert.True(PageTint.ContrastRatio(Colors.White, ((ISolidColorBrush)page.Background!).Color) >= 4.5);
         window.Close();
     }
 
@@ -324,6 +326,9 @@ public class MobileAlbumHeroTests : IDisposable
         Assert.NotNull(scrim.Background);
         Assert.NotNull(fade.Background);
         Assert.NotNull(MobileFixtures.Named<Border>(page, "HeroFade").Background);
+        // The top fade is the page's tint, not a white (theme) haze over the cover.
+        var top = Assert.IsType<LinearGradientBrush>(fade.Background).GradientStops[0].Color;
+        Assert.Equal((0x30, 0x40, 0x60), (top.R, top.G, top.B));
 
         MobileFixtures.Named<ScrollViewer>(page, "AlbumScroll").Offset = new Vector(0, 600);
         window.UpdateLayout();
@@ -452,7 +457,7 @@ public class MobileAlbumHeroTests : IDisposable
         Assert.Equal(false, theme.Icons[^1]);
 
         rig.Shell.NavigateBackCommand.Execute(null);
-        window.UpdateLayout();
+        MobileFixtures.Land(window);   // the album slides away before it hands the bar back
         Assert.Null(theme.Icons[^1]);
         window.Close();
     }

@@ -331,7 +331,7 @@
                         Classes.expanded="{Binding IsExpanded}"
                         IsEnabled="{Binding TopBar.IsSearchActionAvailable, FallbackValue=False}"
                         Click="OnSearchButtonClick"
-                        ToolTip.Tip="{loc:T Sidebar.SearchCtrlFTip}">
+                        ToolTip.Tip="{loc:T Sidebar.SearchCtrlFTip, MacKeys=True}">
                     <StackPanel Orientation="Horizontal" Spacing="14"
                                 HorizontalAlignment="{Binding IsExpanded, Converter={StaticResource BoolToAlignment}}">
                         <Grid x:Name="SearchIconHost" Width="28" Height="28">
@@ -569,6 +569,19 @@
                                     <TextBlock Text="{Binding Label}"
                                                VerticalAlignment="Center"
                                                IsVisible="{Binding $parent[UserControl].((vm:SidebarViewModel)DataContext).IsExpanded}" />
+                                    <!-- Inbox: songs waiting to be checked. -->
+                                    <TextBlock Text="{Binding Count}"
+                                               FontSize="12"
+                                               Opacity="0.5"
+                                               FontFeatures="+tnum"
+                                               VerticalAlignment="Center">
+                                        <TextBlock.IsVisible>
+                                            <MultiBinding Converter="{x:Static BoolConverters.And}">
+                                                <Binding Path="HasCount"/>
+                                                <Binding Path="$parent[UserControl].((vm:SidebarViewModel)DataContext).IsExpanded"/>
+                                            </MultiBinding>
+                                        </TextBlock.IsVisible>
+                                    </TextBlock>
                                 </StackPanel>
                             </DataTemplate>
                         </ListBox.ItemTemplate>

@@ -23,7 +23,9 @@ namespace Noctis.Helpers;
 /// always wins, and it follows the tooltip: a state tooltip (Play/Pause) and a language
 /// switch re-name the button. Only string tooltips count (a TextBlock tooltip's runs bind
 /// later; those buttons name themselves), and a button whose content is already plain text
-/// keeps that text as its name, which is what its peer reads.
+/// keeps that text as its name, which is what its peer reads. A button whose content is a
+/// lone TextBlock reads that text the same way (its peer read "Avalonia.Controls.TextBlock",
+/// UIA 10-13), following it as it changes; while the text is empty the tooltip names it.
 /// </remarks>
 public static class AccessibleNames
 {
@@ -36,6 +38,10 @@ public static class AccessibleNames
         _installed = true;
         ToolTip.TipProperty.Changed.AddClassHandler<Button>(static (button, _) => Sync(button));
         ContentControl.ContentProperty.Changed.AddClassHandler<Button>(static (button, _) => Sync(button));
+        TextBlock.TextProperty.Changed.AddClassHandler<TextBlock>(static (text, _) =>
+        {
+            if (text.Parent is Button button && button.Content == text) Sync(button);
+        });
     }
 
     /// <summary>The name a button takes from its tooltip, or null when it has its own
@@ -45,6 +51,11 @@ public static class AccessibleNames
             : ToolTip.GetTip(button) is string tip && !string.IsNullOrWhiteSpace(tip) ? tip
             : null;
 
+    /// <summary>The text of a button whose content is a lone TextBlock, else its tooltip's.</summary>
+    private static string? NameFor(Button button)
+        => button.Content is TextBlock { Text: { } text } && !string.IsNullOrWhiteSpace(text) ? text
+            : FromTip(button);
+
     /// <summary>
     /// Names a templated row after the item it shows, for a row button or container that
     /// would otherwise read its content's type name ("Avalonia.Controls.Border", UIA 10-09):
@@ -53,10 +64,16 @@ public static class AccessibleNames
     public static readonly IValueConverter ItemName = new FuncValueConverter<object?, string?>(NameOfItem);
 
     /// <summary>A song reads "title, artist" (<see cref="Track.ToString"/>), a chart row its
-    /// song, a folder "name, N songs"; anything else its ToString().</summary>
+    /// song, a folder "name, N songs", a lyric line its words ("..." when it has none, like
+    /// the intro), a Search Lyrics source "lrc.red, Word-synced" (", Best" on Auto's pick);
+    /// anything else its ToString().</summary>
     public static string? NameOfItem(object? item) => item switch
     {
         TopSongRow row => row.Track.ToString(),
+        ViewModels.LyricsSearchResultRow source => source.IsBest
+            ? $"{source.Source}, {source.FormatLabel}, {Loc.T("LyricsSearch.Best")}"
+            : $"{source.Source}, {source.FormatLabel}",
+        LyricLine line => string.IsNullOrWhiteSpace(line.Text) ? "..." : line.Text,
         FolderNode folder => $"{folder.DisplayName}, "
                              + (folder.TotalTrackCount == 1
                                  ? Loc.T("DescriptionDialog.Song")
@@ -71,7 +88,7 @@ public static class AccessibleNames
             Mirrored.Remove(button);
             previous.Dispose();
         }
-        if (FromTip(button) is not { } name) return;
+        if (NameFor(button) is not { } name) return;
         if (button.SetValue(AutomationProperties.NameProperty, name, BindingPriority.Style) is { } handle)
             Mirrored.Add(button, handle);
     }
