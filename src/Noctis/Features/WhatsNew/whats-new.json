@@ -1,6 +1,22 @@
 {
   "releases": [
     {
+      "version": "2.5.0",
+      "added": [
+        { "icon": "LyricsIcon", "title": "Word lyrics in seconds", "line": "Timing from lrc.red, Unison or Kugou, checked against the song", "top": true },
+        { "icon": "LyricsIcon", "title": "Censored words filled in", "line": "Masked words take the real ones from LRCLIB" },
+        { "icon": "PlayIcon", "title": "Seek while a song downloads", "line": "The bar shows how far; further waits and plays when it's there" },
+        { "icon": "RailInfoIcon", "title": "Built on Noctis 1.6.5", "line": "Its fixes and smart playlists, with Plus's lyrics kept" }
+      ],
+      "fixed": [
+        "Previous on a streamed song plays it again instead of going forward",
+        "A streamed song played again keeps its online word timing",
+        "Kugou lyrics no longer start with credits",
+        "Word timing runs in the background; its window lists the songs in line",
+        "Searching LRCLIB no longer fails on some songs"
+      ]
+    },
+    {
       "version": "2.4.5",
       "added": [
         { "icon": "GlobeIcon", "title": "Music bots ready on sign-in", "line": "Their channels are joined for you, in about a second", "top": true }
