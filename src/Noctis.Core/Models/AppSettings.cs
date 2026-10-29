@@ -612,7 +612,7 @@ public class AppSettings : IJsonOnDeserializing
     public bool PlaybackBarShowShuffle { get; set; } = true;
 
     /// <summary>Noctis Plus defaults applied once to profiles made before them (1: island shuffle + skip buttons and
-    /// Liquid Glass on).
+    /// Liquid Glass on; 2: Dark theme; 3: lrc.red on).
     /// Later choices are kept: it runs only while this is below the current level.</summary>
     public int PlusDefaultsLevel { get; set; }
 
@@ -974,10 +974,11 @@ public class AppSettings : IJsonOnDeserializing
     public bool KugouEnabled { get; set; } = true;
 
     /// <summary>Whether lrc.red (TTML: word-synced with duet voices, else line-synced or plain) is
-    /// searched automatically. Off on fresh installs: its word-synced files carry Apple Music's
-    /// agent ids and fields, and Apple Music lyrics stay plugin-only (#119); opt in here
-    /// (2026-10-17). Always available in the Search Lyrics source picker.</summary>
-    public bool LrcRedEnabled { get; set; }
+    /// searched automatically. Upstream keeps it off on fresh installs (its word-synced files carry Apple Music's
+    /// agent ids and fields, and Apple Music lyrics stay plugin-only, #119). Noctis Plus (owner, 2026-10-29, #200,
+    /// told why): on by default, the first source of automatic word timing. Always available in the Search Lyrics
+    /// source picker.</summary>
+    public bool LrcRedEnabled { get; set; } = true;
 
     /// <summary>Whether Unison (Better Lyrics' community lyrics, mostly word-synced TTML) is searched
     /// automatically. On: keyless, documented for third-party reads (120 a minute per IP), two

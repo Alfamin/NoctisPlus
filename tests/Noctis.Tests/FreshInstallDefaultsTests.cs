@@ -168,11 +168,11 @@ public class FreshInstallDefaultsTests
     }
 
     [Fact]
-    public void Unison_SearchesAutomatically_LrcRed_IsOptIn()
+    public void Unison_AndLrcRed_SearchAutomatically()
     {
-        // Unison: keyless, documented for third-party reads (2026-10-17). lrc.red's word-synced
-        // files look Apple-sourced, so it waits for the user to switch it on.
-        Assert.False(Fresh.LrcRedEnabled);
+        // Unison: keyless, documented for third-party reads (2026-10-17). lrc.red's word-synced files look
+        // Apple-sourced (upstream keeps it opt-in); Noctis Plus turns it on, the owner's call (2026-10-29, #200).
+        Assert.True(Fresh.LrcRedEnabled);
         Assert.True(Fresh.UnisonEnabled);
     }
 }

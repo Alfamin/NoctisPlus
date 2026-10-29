@@ -43,19 +43,33 @@ public class PlusDefaultsOnceTests : IDisposable
         var persistence = new PersistenceService(_root);
         await persistence.SaveSettingsAsync(new AppSettings
         {
-            Theme = "Gray", LiquidGlassEnabled = false, PlaybackBarShowShuffle = false, PlusDefaultsLevel = 0,
+            Theme = "Gray", LiquidGlassEnabled = false, PlaybackBarShowShuffle = false, PlusDefaultsLevel = 0, LrcRedEnabled = false,
         });
 
         var first = await Launch(persistence);
         Assert.True(first.IsDarkTheme);          // "full default at dark"
         Assert.True(first.LiquidGlassEnabled);
+        Assert.True(first.LrcRedEnabled);        // #200: lrc.red on
         first.SetGrayThemeCommand.Execute(null); // the user changes their mind afterwards
         first.LiquidGlassEnabled = false;
+        first.LrcRedEnabled = false;
         await first.SaveAsync();
-        Assert.Equal(2, (await persistence.LoadSettingsAsync()).PlusDefaultsLevel);
+        Assert.Equal(3, (await persistence.LoadSettingsAsync()).PlusDefaultsLevel);
 
         var second = await Launch(persistence);
         Assert.True(second.IsGrayTheme);
         Assert.False(second.LiquidGlassEnabled);
+        Assert.False(second.LrcRedEnabled);
+    }
+
+    [AvaloniaFact]
+    public async Task ALevel2Profile_GetsOnlyLrcRed_ItsThemeStays()
+    {
+        var persistence = new PersistenceService(_root);
+        await persistence.SaveSettingsAsync(new AppSettings { Theme = "Gray", PlusDefaultsLevel = 2, LrcRedEnabled = false, LiquidGlassEnabled = false });
+        var vm = await Launch(persistence);
+        Assert.True(vm.IsGrayTheme);
+        Assert.False(vm.LiquidGlassEnabled);
+        Assert.True(vm.LrcRedEnabled);
     }
 }

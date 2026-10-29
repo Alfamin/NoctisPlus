@@ -2759,10 +2759,17 @@ public partial class SettingsViewModel : ViewModelBase
             }
             // Level 2 (owner, 2026-10-18: "full default at dark"): existing profiles move to Dark once;
             // the theme picker is free afterwards.
-            if (_settings.PlusDefaultsLevel < PlusDefaultsCurrent)
+            if (_settings.PlusDefaultsLevel < 2)
             {
                 storedTheme = AppSettings.DefaultTheme;
                 _settings.Theme = AppSettings.DefaultTheme;
+                _settings.PlusDefaultsLevel = 2;
+            }
+            // Level 3 (owner, 2026-10-29, #200): lrc.red on, the first source of automatic word timing. Plus profiles
+            // only had lrc.red's switch from the 1.6.5 merge on, with upstream's "off"; a later choice is kept.
+            if (_settings.PlusDefaultsLevel < PlusDefaultsCurrent)
+            {
+                _settings.LrcRedEnabled = true;
                 _settings.PlusDefaultsLevel = PlusDefaultsCurrent;
             }
 
@@ -3250,7 +3257,7 @@ public partial class SettingsViewModel : ViewModelBase
     };
 
     /// <summary>The newest one-time Noctis Plus defaults step (see LoadAsync).</summary>
-    private const int PlusDefaultsCurrent = 2;
+    private const int PlusDefaultsCurrent = 3;
 
     private async Task MergeExternalSettingChangesAsync()
     {

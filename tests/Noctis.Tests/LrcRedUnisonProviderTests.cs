@@ -310,7 +310,7 @@ public class LrcRedUnisonProviderTests
         var on = new AppSettings { LrcRedEnabled = true, UnisonEnabled = true };
         Assert.True(sources[1].IsEnabled(on));
         Assert.True(sources[2].IsEnabled(on));
-        Assert.False(sources[1].IsEnabled(new AppSettings())); // lrc.red is opt-in
+        Assert.True(sources[1].IsEnabled(new AppSettings()));  // lrc.red on by default in Noctis Plus (#200)
         Assert.True(sources[2].IsEnabled(new AppSettings()));
     }
 }
