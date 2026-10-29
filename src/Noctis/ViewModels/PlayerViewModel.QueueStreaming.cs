@@ -104,6 +104,7 @@ public partial class PlayerViewModel
             if (_resumeTrackId == standIn.Id) _resumeTrackId = real.Id;
             SwapStandIn(standIn, real);
             PlayTrack(real);
+            if (ReferenceEquals(real, track)) RememberStreamOrigin(real, pending);   // a library song is not fetched again
             OnlinePlayingSongId = pending.Song.Id;
         }
         catch (OperationCanceledException) when (stop.IsCancellationRequested)

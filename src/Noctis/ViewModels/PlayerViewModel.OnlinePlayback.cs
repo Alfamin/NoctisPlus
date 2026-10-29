@@ -74,6 +74,26 @@ public partial class PlayerViewModel
         IsBuffering = _reachSeek != null || _inputWaiting && State == Models.PlaybackState.Playing && now - _lastOnlineAdvance >= 1000;
     }
 
+    /// <summary>Owner #215 (Previous "goes forward"): the online song each streamed track came from. A track played again
+    /// (Previous, history, repeat) whose download was cut off when it was skipped has no file: it is fetched again like a
+    /// queued stream, instead of failing and skipping on to the next song.</summary>
+    private readonly System.Runtime.CompilerServices.ConditionalWeakTable<Models.Track, PendingStream> _streamOrigins = new();
+
+    private void RememberStreamOrigin(Models.Track track, PendingStream origin) => _streamOrigins.AddOrUpdate(track, origin);
+
+    /// <summary>The stream to fetch again for this track: it came from one, and nothing of it can be played now.</summary>
+    private PendingStream? RefetchFor(Models.Track track)
+    {
+        if (!_streamOrigins.TryGetValue(track, out var origin) || string.IsNullOrWhiteSpace(track.FilePath)) return null;
+        try
+        {
+            if (File.Exists(track.FilePath) || Features.ProgressivePlayback.ProgressiveTransfer.IsAvailable(track.FilePath)) return null;
+        }
+        catch (Exception e) when (e is IOException or UnauthorizedAccessException or ArgumentException) { return null; }
+        Services.DebugLog.Write("Playback", $"\"{track.Title}\" was streamed and its file is gone (its download stopped when it was skipped): fetched again");
+        return origin;
+    }
+
     /// <summary>Owner #213: a seek past the part downloaded so far, waiting for the download to get there.</summary>
     private TimeSpan? _reachSeek;
 
@@ -162,7 +182,10 @@ public partial class PlayerViewModel
             // Preserve the current queue. This one explicit request replaces its playing
             // song, while Add to downloads continues to be entirely playback-neutral.
             if (CurrentTrack is { } outgoing) { History.Insert(0, outgoing); TrimHistory(); }
-            PlayTrack(_library.Tracks.FirstOrDefault(t => t.Id == track.Id) ?? track);
+            var played = _library.Tracks.FirstOrDefault(t => t.Id == track.Id) ?? track;
+            PlayTrack(played);
+            // After its first play: from now on a play of it again with no file left fetches it again.
+            if (ReferenceEquals(played, track)) RememberStreamOrigin(track, new PendingStream(source, song, keep));
             OnlinePlayingSongId = song.Id;
             PostStreamAhead();
         }

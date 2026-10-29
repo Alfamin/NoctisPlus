@@ -2898,6 +2898,7 @@ public partial class PlayerViewModel : ViewModelBase
         // Owner #95: a playlist song not on this computer yet: fetched first, then played (the song before keeps going
         // meanwhile when it was a skip).
         if (track.PendingStream is PendingStream pending) { PlayStandIn(track, pending); return; }
+        if (RefetchFor(track) is { } again) { PlayStandIn(track, again); return; }
         _preparingStandIn = null;
         CancelOnlinePlayback();
         var playTrackStart = Stopwatch.GetTimestamp();

@@ -135,6 +135,28 @@ public class OnlinePlaybackTests
     }
 
     [AvaloniaFact]
+    public async Task PreviousToAStreamWhoseDownloadWasCutOff_FetchesItAgain_InsteadOfSkippingForward()
+    {
+        // Owner #215: Previous "goes forward": the song before had no file (its download stopped when it was skipped), so
+        // it failed and the player moved on to the next song.
+        using var data = new TestPersistenceService(); var audio = new FakeAudioPlayer(); var source = new Source();
+        var player = new PlayerViewModel(audio, new FakeLibraryService(), data, new FakeAnimatedCoverService());
+        var first = player.PlayOnlineAsync(source, new("first", "First", "Synthetic"));
+        source.Pending["first"].SetResult(Track("First")); await first;
+        var second = player.PlayOnlineAsync(source, new("second", "Second", "Synthetic"));
+        source.Pending["second"].SetResult(Track("Second")); await second;
+        Assert.Equal("Second", player.CurrentTrack?.Title);
+
+        player.PreviousCommand.Execute(null);
+        Assert.Equal(3, source.Asked);                      // "First" is asked for again
+        source.Pending["first"].SetResult(Track("First"));
+        await Task.Delay(50);
+        Avalonia.Threading.Dispatcher.UIThread.RunJobs();
+        Assert.Equal("First", player.CurrentTrack?.Title);
+        player.StopAndClear();
+    }
+
+    [AvaloniaFact]
     public async Task RepeatClicksOnTheSongBeingPrepared_ShareOneRequest()
     {
         // Owner #29: every click on a song sent the bots the same request again.
