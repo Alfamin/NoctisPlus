@@ -229,6 +229,34 @@ internal static class RecordingMatch
         return lengths && (extras.IsSubsetOf(otherExtras) || otherExtras.IsSubsetOf(extras)) && (close || LabelsOnly(extras,otherExtras));
     }
 
+    /// <summary>
+    /// Owner #205: Music Hunters' result "Movin' To The Sun" (HUGEL) came as a file tagged "I´m Moving To The Sun" (HUGEL,
+    /// Imael Angel, Ultra Nate) and was refused, three times. For the file that answers the result just pressed only: a
+    /// shared artist, the same length (3 s) and every title word of one in the other ("movin'" = "moving"), the same
+    /// kind of version. Never for a file nobody pressed for.
+    /// </summary>
+    internal static bool SameAnswer(MusicRequest wanted, string artist, string title, TimeSpan? duration)
+    {
+        if (string.IsNullOrWhiteSpace(artist) || string.IsNullOrWhiteSpace(title)) return false;
+        if (wanted.Duration is not { } length || duration is not { } other || Math.Abs((length - other).TotalSeconds) > 3) return false;
+        (wanted, title) = Starred(wanted, title);
+        if (wanted.Explicit == true && Regex.IsMatch(title, @"\b(clean|censored|radio edit)\b", RegexOptions.IgnoreCase)) return false;
+        foreach (var version in new[] { "live", "remix", "instrumental", "acoustic", "cover", "sped up", "slowed", "karaoke", "nightcore", "8d", "edit", "mix", "version" })
+            if (Regex.IsMatch(wanted.Title, @"\b" + version + @"\b", RegexOptions.IgnoreCase) != Regex.IsMatch(title, @"\b" + version + @"\b", RegexOptions.IgnoreCase)) return false;
+        static IEnumerable<string> ArtistKeys(string value) => Regex.Split(value, @"\s*(?:,|&|;|/|\bfeat\.?|\bft\.?|\bfeaturing\b|\bx\b)\s*", RegexOptions.IgnoreCase).Select(Key).Where(k => k.Length > 0);
+        if (!ArtistKeys(wanted.Artist).Intersect(ArtistKeys(artist)).Any()) return false;
+        static HashSet<string> Words(string value)
+        {
+            value = Regex.Replace(value.ToLowerInvariant(), @"(\p{L}{2,})in['’´`]", "$1ing");   // movin' -> moving
+            value = Regex.Replace(value, @"['’´`]", "");                                        // i´m -> im
+            return Regex.Matches(value, @"[\p{L}\p{N}]+").Select(m => m.Value).ToHashSet(StringComparer.Ordinal);
+        }
+        HashSet<string> a = Words(BotText.Plain(wanted.Title)), b = Words(BotText.Plain(title));
+        if (a.Count == 0 || b.Count == 0) return false;
+        var (fewer, more) = a.Count <= b.Count ? (a, b) : (b, a);
+        return fewer.Count >= 2 && fewer.IsSubsetOf(more) && more.Count - fewer.Count <= 2;
+    }
+
     /// <summary>Is <paramref name="sent"/> the cut-off start of <paramref name="wanted"/>? It must look cut (a bracket left open,
     /// a trailing "…", or long enough to have hit the limit) and keep enough of the title to mean something.</summary>
     internal static bool Truncated(string wanted,string sent)
@@ -531,6 +559,12 @@ internal sealed class DeezLoadSource : IRacingMusicSource, IQualityMusicSource
     {
         var sent=Request(doc,null);
         return sent is not null && RecordingMatch.Fits(wanted,sent.Artist,sent.Title,sent.Duration);
+    }
+    /// <summary>Owner #205: the file sent for the result just pressed, tagged another way (<see cref="RecordingMatch.SameAnswer"/>).</summary>
+    internal static bool AnswersPress(MusicRequest wanted,Document doc)
+    {
+        var sent=Request(doc,null);
+        return sent is not null && RecordingMatch.SameAnswer(wanted,sent.Artist,sent.Title,sent.Duration);
     }
     private async Task<string> Download(Client client,Document doc,Stream output,IProgress<double>? progress,CancellationToken ct)
     {

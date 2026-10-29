@@ -838,6 +838,16 @@ internal sealed class TelegramBotSource : IHunterBotSource
             var fileClock = System.Diagnostics.Stopwatch.StartNew();
             for (var press = 1; file is null; press++)
             {
+                // Owner #205: the bot already answered a press with a file (not this track's tags): pressing again
+                // only makes it send that file again (it sent one three times). The rest of the time is waited out.
+                if (press > 1 && other is not null)
+                {
+                    var rest = FileBudget - fileClock.Elapsed;
+                    if (rest > TimeSpan.Zero)
+                        file = await WaitForAsync(client, bot, newest, m => m.media is MessageMediaDocument { document: Document late }
+                            && Extension(late) is not null && (DeezLoadSource.Fits(request, late) || DeezLoadSource.AnswersPress(request, late)), rest, ct).ConfigureAwait(false);
+                    break;
+                }
                 // Telegram can hold a press until the bot acknowledges it; never longer than a moment here.
                 try { notice = (await client.Messages_GetBotCallbackAnswer(bot, resultsId, button).WaitAsync(PressAnswerWait, ct).ConfigureAwait(false))?.message; }
                 catch (RpcException ex) when (ex.Message.Contains("TIMEOUT", StringComparison.OrdinalIgnoreCase)) { }
@@ -854,7 +864,7 @@ internal sealed class TelegramBotSource : IHunterBotSource
                 file = await WaitForAsync(client, bot, newest, m =>
                 {
                     if (m.media is not MessageMediaDocument { document: Document sent }) return false;
-                    if (Extension(sent) is not null && DeezLoadSource.Fits(request, sent)) return true;
+                    if (Extension(sent) is not null && (DeezLoadSource.Fits(request, sent) || DeezLoadSource.AnswersPress(request, sent))) return true;
                     other = Describe(sent);
                     return false;
                 }, window, ct).ConfigureAwait(false);
