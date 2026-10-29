@@ -2675,6 +2675,7 @@ public partial class LyricsViewModel : ViewModelBase, IDisposable
                 LrcParser.InsertIntroPlaceholderIfNeeded(parsedLines);
 
             List<LyricLine> synced = parsedLines;
+            LogShown("online search", synced);
             FillLyricCollections(
                 () => LyricLines.ReplaceAll(synced),
                 () =>
@@ -2687,6 +2688,7 @@ public partial class LyricsViewModel : ViewModelBase, IDisposable
         }
         else if (!string.IsNullOrWhiteSpace(result.PlainLyrics))
         {
+            LogShown("online search", null);
             var rendered = new List<LyricLine>();
             var lines = LrcParser.SplitPlain(result.PlainLyrics);
             foreach (var line in lines)
@@ -2820,6 +2822,14 @@ public partial class LyricsViewModel : ViewModelBase, IDisposable
             OnPropertyChanged(nameof(ShowMetadataFavoriteHeart));
     }
 
+    /// <summary>Test builds and bug reports: which lyrics the page shows for which song, and how they are timed
+    /// (owner 2026-10-29: "if anything goes wrong you can tell immediately what it was"). One line per load.</summary>
+    private void LogShown(string from, IReadOnlyList<LyricLine>? lines)
+    {
+        var kind = lines == null ? "plain" : lines.Any(l => l.HasWords) ? "word-timed" : lines.Any(l => l.IsSynced) ? "line-timed" : "plain";
+        DebugLog.Write("Lyrics", $"shown for \"{_currentTrack?.Artist} - {_currentTrack?.Title}\": {kind}, {lines?.Count ?? 0} lines, from {from}");
+    }
+
     internal void ReloadWrittenLyrics(IReadOnlyList<string> paths)
     {
         // A sidecar is not a Track tag edit. Reload the currently shown song directly;
@@ -2838,8 +2848,8 @@ public partial class LyricsViewModel : ViewModelBase, IDisposable
     internal void ShowOnlineTiming(Track track, string ttml, string source)
     {
         if (_currentTrack is not { } shown || shown.Id != track.Id || IsPreviewActive) return;
-        if (_hasSyncedLyrics && LyricLines.Any(l => l.HasWords)) return;
-        if (ProbeTtmlText(ttml, _player.LyricsJoinSplitWords, Localization.Loc.Instance.Culture.Name) is not { } probe) return;
+        if (_hasSyncedLyrics && LyricLines.Any(l => l.HasWords)) { DebugLog.Write("Lyrics", $"online timing from {source} not shown: the song shows word timing already"); return; }
+        if (ProbeTtmlText(ttml, _player.LyricsJoinSplitWords, Localization.Loc.Instance.Culture.Name) is not { } probe) { DebugLog.Write("Lyrics", $"online timing from {source} not shown: unreadable"); return; }
         probe = probe with { OnlineTimingSource = source };
         var generation = ++_searchGeneration;   // an online search still running for this song does not replace it
         IsSearching = false;
@@ -2848,6 +2858,7 @@ public partial class LyricsViewModel : ViewModelBase, IDisposable
         _onlineTiming = (shown.FilePath, source);
         if (TryTakeTimingInPlace(shown, probe, generation))
         {
+            DebugLog.Write("Lyrics", $"online timing from {source} taken in place by the lines on screen");
             RefreshLyricsCredit();
             return;
         }
@@ -3442,6 +3453,7 @@ public partial class LyricsViewModel : ViewModelBase, IDisposable
         if (probe.Lines != null && probe.Lines.Count > 0)
         {
             DebugLogger.Info(DebugLogger.Category.Lyrics, probe.Source, $"lines={probe.Lines.Count}");
+            LogShown(probe.Source + (probe.OnlineTimingSource is { } from ? ", word timing from " + from : ""), probe.Lines);
 
             _hasSyncedLyrics = probe.Lines.Any(l => l.IsSynced);
             IsSynced = _hasSyncedLyrics;
@@ -3594,6 +3606,7 @@ public partial class LyricsViewModel : ViewModelBase, IDisposable
             }
         }
 
+        if (syncedLines != null) LogShown("the song's tags", syncedLines);
         FillLyricCollections(
             () => { if (syncedLines != null) LyricLines.ReplaceAll(syncedLines); },
             () => fillUnsynced?.Invoke());

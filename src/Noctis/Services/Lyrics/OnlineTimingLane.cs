@@ -162,9 +162,13 @@ internal sealed class OnlineTimingLane : IDisposable
         lock (_gate)
         {
             if (_done.Contains(path)) { _wanted.Remove(path); return false; }
-            if (!_wanted.ContainsKey(path)) _wanted[path] = now;
+            if (!_wanted.ContainsKey(path)) { _wanted[path] = now; Log("WordLyrics waits: online first for " + Path.GetFileName(path)); }
             if (string.Equals(_working, path, StringComparison.OrdinalIgnoreCase) && now - _workingSince >= WaitLimit)
-            { _wanted.Remove(path); _done.Add(path); return false; }
+            {
+                _wanted.Remove(path); _done.Add(path);
+                Log($"WordLyrics goes on: the online look took over {WaitLimit.TotalSeconds:0} s for " + Path.GetFileName(path));
+                return false;
+            }
         }
         Wake();
         return true;
@@ -208,10 +212,19 @@ internal sealed class OnlineTimingLane : IDisposable
                     continue;
                 }
                 var outcome = await ProcessAsync(track, ct);
-                if (outcome == Outcome.Transient) _restUntil = Now() + FailureRest;
+                if (outcome == Outcome.Transient)
+                {
+                    _restUntil = Now() + FailureRest;
+                    Log($"a source could not answer: the lane rests {FailureRest.TotalMinutes:0} min (WordLyrics does not wait meanwhile)");
+                }
             }
             catch (OperationCanceledException) when (ct.IsCancellationRequested) { return; }
-            catch (Exception ex) { DebugLogger.Warn(DebugLogger.Category.Lyrics, "Lyrics.OnlineTimingLane", ex.Message); await Task.Delay(Spacing, ct).ConfigureAwait(false); }
+            catch (Exception ex)
+            {
+                DebugLogger.Warn(DebugLogger.Category.Lyrics, "Lyrics.OnlineTimingLane", ex.Message);
+                Log("lane error: " + ex);
+                await Task.Delay(Spacing, ct).ConfigureAwait(false);
+            }
         }
     }
 
@@ -220,13 +233,26 @@ internal sealed class OnlineTimingLane : IDisposable
     {
         var path = Local(track)!;
         StartedOn(path);
+        string why;
+        lock (_gate) why = ReferenceEquals(track, _current) ? "playing" : _upNext.Contains(track) ? "up next" : _wanted.ContainsKey(path) ? "WordLyrics asked" : "library";
+        var clock = System.Diagnostics.Stopwatch.StartNew();
+        _detail = "";
         Outcome outcome;
         try { outcome = await ProcessCoreAsync(track, path, ct); }
         finally { lock (_gate) if (string.Equals(_working, path, StringComparison.OrdinalIgnoreCase)) _working = null; }
         if (outcome != Outcome.Transient) lock (_gate) { _done.Add(path); _wanted.Remove(path); }
+        // The library pass would flood the log with songs that need nothing: those are told only for songs in use.
+        if (why != "library" || outcome is Outcome.Written or Outcome.Kept or Outcome.Transient)
+            Log($"{outcome} ({why}) {Describe(track)} in {clock.ElapsedMilliseconds} ms{_detail}");
         if (outcome == Outcome.Written) Written?.Invoke(Paths(path, track));
         return outcome;
     }
+
+    /// <summary>Why the last song came out as it did (the loop's own thread only).</summary>
+    string _detail = "";
+
+    static void Log(string message) => DebugLog.Write("Online timing", message);
+    static string Describe(Track t) => $"\"{t.Artist} - {t.Title}\" ({t.Duration.TotalSeconds:0} s)";
 
     /// <summary>lrc.red, Unison, Kugou (owner #209), paced: lrc.red is asked about one song every <see cref="Spacing"/>,
     /// counted from the last ask, so the fit check of one song overlaps the wait before the next.</summary>
@@ -255,7 +281,9 @@ internal sealed class OnlineTimingLane : IDisposable
         var key = OnlineTimingMisses.Key(track.Artist ?? "", track.Title, seconds);
         lock (_gate) if (!_streamAsked.Add(key)) return false;
         if (_misses.IsMiss(key, Now())) return false;
+        var clock = System.Diagnostics.Stopwatch.StartNew();
         var found = await FindAsync(track, seconds, ct);
+        Log($"streaming {Describe(track)}: {(found.Found ? "shown from " + OnlineTimingSidecar.Name(found.Source!.Value) : "nothing to show")} in {clock.ElapsedMilliseconds} ms; {found.Trace}");
         if (!found.Found)
         {
             // A source that could not answer is asked again with the finished file (never in a loop here).
@@ -281,24 +309,29 @@ internal sealed class OnlineTimingLane : IDisposable
 
     async Task<Outcome> ProcessCoreAsync(Track track, string path, CancellationToken ct)
     {
-        if (!File.Exists(path) || string.IsNullOrWhiteSpace(track.Title)) return Outcome.Skipped;
-        if (LyricsWriter.SidecarsOnDisk(path, ".lyricsfile").Count > 0) return Outcome.Skipped;
+        if (!File.Exists(path) || string.IsNullOrWhiteSpace(track.Title)) { _detail = ": no file or no title"; return Outcome.Skipped; }
+        if (LyricsWriter.SidecarsOnDisk(path, ".lyricsfile").Count > 0) { _detail = ": has a .lyricsfile"; return Outcome.Skipped; }
         var ttmls = LyricsWriter.SidecarsOnDisk(path, ".ttml");
         if (ttmls.Count > 0)
-            return OnlineTimingSidecar.SourceOf(SafeRead(ttmls[0])) != null ? Outcome.AlreadyTimed : Outcome.Skipped;
+        {
+            var source = OnlineTimingSidecar.SourceOf(SafeRead(ttmls[0]));
+            _detail = source != null ? ": has online timing from " + OnlineTimingSidecar.Name(source.Value) : ": has the user's own .ttml";
+            return source != null ? Outcome.AlreadyTimed : Outcome.Skipped;
+        }
         var seconds = track.Duration.TotalSeconds;
         var key = OnlineTimingMisses.Key(track.Artist ?? "", track.Title, seconds);
         bool streamedOnline;
         lock (_gate) streamedOnline = _provisional.ContainsKey(key);
         // Owner 2026-10-29: a song that already has word timing (WordLyrics, Lyrics Studio, anything) is fine as it is;
         // except a stream already showing its online timing, whose WordLyrics file may have landed meanwhile.
-        if (!streamedOnline && LyricsWriter.SidecarsOnDisk(path, ".elrc").Count > 0) return Outcome.AlreadyTimed;
-        if (_userTimed(path)) return Outcome.Skipped;
+        if (!streamedOnline && LyricsWriter.SidecarsOnDisk(path, ".elrc").Count > 0) { _detail = ": has an .elrc"; return Outcome.AlreadyTimed; }
+        if (_userTimed(path)) { _detail = ": timed by the user"; return Outcome.Skipped; }
 
-        if (_misses.IsMiss(key, Now())) return Outcome.Miss;
+        if (_misses.IsMiss(key, Now())) { _detail = $": no source had it (remembered {OnlineTimingMisses.Keep.TotalDays:0} days)"; return Outcome.Miss; }
         OnlineWordTiming.Lookup? shown;
         lock (_gate) _provisional.Remove(key, out shown);
         var found = shown ?? await FindAsync(track, seconds, ct);
+        _detail = shown != null ? "; the answer shown while streaming" : "; " + found.Trace;
         if (!found.Found)
         {
             if (found.Transient) return Outcome.Transient;
@@ -308,9 +341,16 @@ internal sealed class OnlineTimingLane : IDisposable
         // Owner 2026-10-29 (Circo Loco: shown at Play, then taken back for WordLyrics): the online timing of the same
         // recording stays; the fit check only moves it when it is sure the file is shifted (Kiss Me More +0.48 s).
         // Measured: 55 of 59 songs within 80 ms this way, none taken away; unsure (25 of 59) = left as it is.
-        var shift = _ffmpeg() is { } ffmpeg && await Check(ffmpeg, path, found.Ttml!, ct) is { Shift: { } sure } ? sure : 0;
+        var ffmpegPath = _ffmpeg();
+        var fit = ffmpegPath is { } ffmpeg ? await Check(ffmpeg, path, found.Ttml!, ct) : null;
+        var shift = fit is { Shift: { } sure } ? sure : 0;
+        _detail += $"; from {OnlineTimingSidecar.Name(found.Source!.Value)}, " + (ffmpegPath == null ? "no ffmpeg: not fit-checked" : fit == null ? "fit check could not read the audio"
+            : (fit.Shift is { } moved ? $"fit sure: moved {moved:+0.00;-0.00} s" : "fit unsure: left as found")
+              + $" (estimate {fit.Estimate:+0.00;-0.00} s, sharpness {fit.Sharpness:0.00}, significance {fit.Significance:0.0}, energy {fit.EnergyEstimate:+0.00;-0.00} s)");
         var marked = OnlineTimingSidecar.Mark(OnlineTimingFit.Shift(found.Ttml!, shift), found.Source!.Value, shift);
-        return marked != null && _writer.WriteOnlineTiming(path, marked) ? Outcome.Written : Outcome.Kept;
+        var written = marked != null && _writer.WriteOnlineTiming(path, marked);
+        if (!written) _detail += "; not written (a .ttml of the user's, read-only or unwritable)";
+        return written ? Outcome.Written : Outcome.Kept;
     }
 
     static string? SafeRead(string path)

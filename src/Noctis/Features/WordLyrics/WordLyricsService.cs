@@ -504,7 +504,12 @@ internal sealed class WordLyricsService(ILibraryService library, Func<AppSetting
             finally { _dialogOpen = false; }
         }
     }
-    private void Log(string text) => Dispatcher.UIThread.Post(() => { if (!_disposed) _host?.Log(text); });
+    private void Log(string text)
+    {
+        // The session log too (the host's log reaches only the debug panel): a report or a test run shows what WordLyrics did.
+        DebugLog.Write("WordLyrics", text);
+        Dispatcher.UIThread.Post(() => { if (!_disposed) _host?.Log(text); });
+    }
     private void Notify(string text) => Dispatcher.UIThread.Post(() => { if (!_disposed) _host?.Notify(text); });
     public void Dispose()
     {

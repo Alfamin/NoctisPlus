@@ -47,7 +47,26 @@ public static class CrashJournal
     /// grow session.log without bound (the in-memory ring trims itself; the file
     /// deliberately keeps everything up to this cap for post-mortems).
     /// </summary>
-    private const int MaxStreamedLines = 5000;
+    private static int MaxStreamedLines => KeepFolder != null ? 100_000 : 5000;
+
+    /// <summary>
+    /// Test builds (owner 2026-10-29: "enable all the logs, so if anything goes wrong you can tell"): with
+    /// NOCTISPLUS_KEEP_SESSION_LOGS naming a folder, every session's log is kept there as session-*.log — a clean
+    /// exit no longer deletes it — and the line cap is far higher. Unset (every normal install): nothing changes.
+    /// </summary>
+    private static readonly string? KeepFolder = Environment.GetEnvironmentVariable("NOCTISPLUS_KEEP_SESSION_LOGS") is { Length: > 0 } keep ? keep : null;
+
+    private static void KeepCopy(string sessionPath)
+    {
+        if (KeepFolder == null || !File.Exists(sessionPath)) return;
+        try
+        {
+            Directory.CreateDirectory(KeepFolder);
+            var stamp = File.GetLastWriteTime(sessionPath).ToString(PreservedStampFormat, CultureInfo.InvariantCulture);
+            File.Copy(sessionPath, Path.Combine(KeepFolder, "session-" + stamp + ".log"), overwrite: true);
+        }
+        catch { /* a test aid: never in the way of the app */ }
+    }
 
     /// <summary>Lines of a preserved log surfaced in the pane / Copy Logs; the
     /// full file stays in the data folder for anything longer.</summary>
@@ -84,6 +103,7 @@ public static class CrashJournal
                 if (File.Exists(sessionPath))
                 {
                     var content = File.ReadAllText(sessionPath);
+                    KeepCopy(sessionPath);
                     if (Classify(content) == SessionEnd.Clean)
                     {
                         // Marker present (or nothing written): the delete at
@@ -228,7 +248,10 @@ public static class CrashJournal
                 _writer.WriteLine(CleanMarker);
                 _writer.Dispose();
                 if (_dataRoot != null)
+                {
+                    KeepCopy(Path.Combine(_dataRoot, SessionFileName));
                     File.Delete(Path.Combine(_dataRoot, SessionFileName));
+                }
             }
             catch { /* the marker alone makes the next launch discard it */ }
             _writer = null;

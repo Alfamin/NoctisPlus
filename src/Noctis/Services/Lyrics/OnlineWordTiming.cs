@@ -24,6 +24,8 @@ internal sealed class OnlineWordTiming
     public sealed record Lookup(WordTimingSource? Source, string? Ttml, bool Transient)
     {
         public bool Found => Ttml != null;
+        /// <summary>What each source answered and how fast, for the session log ("lrc.red words 412 ms, Unison none 230 ms").</summary>
+        public string Trace { get; init; } = "";
     }
 
     readonly ILrcRedLyricsService _lrcRed;
@@ -57,20 +59,34 @@ internal sealed class OnlineWordTiming
         var transient = false;
         var timed = new string?[asks.Count];
         var read = new bool[asks.Count];
+        var said = new string?[asks.Count];
         var clock = System.Diagnostics.Stopwatch.StartNew();
+        string Trace() => string.Join(", ", asks.Select((a, i) => OnlineTimingSidecar.Name(a.Source) + " " + (said[i] ?? "still asking")));
         while (true)
         {
             for (var i = 0; i < asks.Count; i++)
             {
                 if (read[i] || !asks[i].Answer.IsCompleted) continue;
                 read[i] = true;
-                try { timed[i] = WordTimed(await asks[i].Answer.ConfigureAwait(false), durationSeconds); }
-                catch (LyricsProviderException) { transient = true; }
+                var ms = (int)clock.ElapsedMilliseconds;
+                try
+                {
+                    var answer = await asks[i].Answer.ConfigureAwait(false);
+                    timed[i] = WordTimed(answer, durationSeconds);
+                    said[i] = (timed[i] != null ? "words" : answer == null ? "none" : "not word-timed or another length") + $" {ms} ms";
+                }
+                // Any failure of one source (its own error, a timeout, a dropped connection) is "could not answer":
+                // never a miss, and never the whole lookup thrown away (the lane would ask the same song again at once).
+                catch (Exception e) when (!ct.IsCancellationRequested)
+                {
+                    transient = true;
+                    said[i] = $"error {ms} ms ({e.GetType().Name}: {e.Message})";
+                }
             }
             var best = Array.FindIndex(timed, t => t != null);
             var betterOut = Enumerable.Range(0, best < 0 ? asks.Count : best).Any(i => !read[i]);
-            if (best >= 0 && (!betterOut || clock.Elapsed >= PreferWait)) return new Lookup(asks[best].Source, timed[best], transient);
-            if (best < 0 && !betterOut) return new Lookup(null, null, transient);
+            if (best >= 0 && (!betterOut || clock.Elapsed >= PreferWait)) return new Lookup(asks[best].Source, timed[best], transient) { Trace = Trace() };
+            if (best < 0 && !betterOut) return new Lookup(null, null, transient) { Trace = Trace() };
             var waits = asks.Where((_, i) => !read[i]).Select(a => (Task)a.Answer).ToList();
             if (best >= 0) waits.Add(Task.Delay(PreferWait - clock.Elapsed, ct));
             await Task.WhenAny(waits).ConfigureAwait(false);
