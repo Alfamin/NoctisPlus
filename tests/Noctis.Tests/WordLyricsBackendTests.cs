@@ -187,6 +187,29 @@ public class WordLyricsBackendTests
     }
 
     [Fact]
+    public void ASongWithOnlineTimingIsNotTimedAutomatically_ThisRunOnly_AndATimeWordsPressStays()
+    {
+        // #200 (owner 2026-10-29): "Processing lyrics" showed under lrc.red's word timing of a stream.
+        using var rig = new Rig();
+        using (var worker = new Worker(rig.Work, () => [rig.Music], new(true, "Light", false, rig.App, ""), _ => { }, _ => { }, startTimer: false))
+        {
+            worker.AskPlayed(rig.Song, out var accepted); Assert.True(accepted); Assert.Equal(1, worker.WaitingCount);
+            worker.SetCoveredOnline(rig.Song, true);
+            Assert.Equal(0, worker.WaitingCount);
+            Assert.Equal(SongTimingStatus.None, worker.StatusFor(rig.Song));
+            worker.AskPlayed(rig.Song, out accepted); Assert.False(accepted);
+            Assert.False(worker.EnqueueAutomatic(rig.Song, rig.Music));
+            Assert.False(worker.IsIgnored(rig.Song));               // not the user's Remove
+            worker.SetCoveredOnline(rig.Song, false);               // did not fit the finished file
+            Assert.True(worker.EnqueueAutomatic(rig.Song, rig.Music));
+        }
+        using var next = new Worker(rig.Work, () => [rig.Music], new(true, "Light", false, rig.App, ""), _ => { }, _ => { }, startTimer: false);
+        next.SetCoveredOnline(rig.Song, true);
+        next.Ask(rig.Song);                                          // a Time words press is the user's
+        Assert.Equal(1, next.WaitingCount);
+    }
+
+    [Fact]
     public async Task NativeRunnerPreservesPathsGuidesAndPreferredProxy_WithoutShellExpansion()
     {
         using var rig = new Rig(); var tool = new Tool(rig.App);

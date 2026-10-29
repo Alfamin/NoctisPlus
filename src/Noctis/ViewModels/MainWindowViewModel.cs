@@ -790,8 +790,17 @@ public partial class MainWindowViewModel : ViewModelBase
                     lyricsWriter, () => converter?.GetFfmpegPath(), () => OnlineAccess.Shared.IsOffline,
                     path => wordService.IsIgnored(path) || Services.Lyrics.OnlineTimingLane.StudioTimed(path));
                 lane.Written += paths => Dispatcher.UIThread.Post(() => _lyricsVm.ReloadWrittenLyrics(paths));
-                lane.Provisional += (track, ttml, source) => Dispatcher.UIThread.Post(() => _lyricsVm.ShowOnlineTiming(track, ttml, source));
-                lane.Rejected += paths => Dispatcher.UIThread.Post(() => _lyricsVm.DropOnlineTiming(paths));
+                // Online timing on screen: WordLyrics does not time that song too ("Processing lyrics" under lrc.red's).
+                lane.Provisional += (track, ttml, source) => Dispatcher.UIThread.Post(() =>
+                {
+                    wordService.SetCoveredOnline([track.FilePath], covered: true);
+                    _lyricsVm.ShowOnlineTiming(track, ttml, source);
+                });
+                lane.Rejected += paths => Dispatcher.UIThread.Post(() =>
+                {
+                    wordService.SetCoveredOnline(paths, covered: false);
+                    _lyricsVm.DropOnlineTiming(paths);
+                });
                 Player.PropertyChanged += (_, e) =>
                 {
                     if (e.PropertyName == nameof(PlayerViewModel.CurrentTrack)) lane.SetPlaying(Player.CurrentTrack, Player.UpNext);

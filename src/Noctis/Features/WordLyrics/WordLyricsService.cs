@@ -65,6 +65,15 @@ internal sealed class WordLyricsService(ILibraryService library, Func<AppSetting
         _playingAsked = false;
         Changed?.Invoke();
     }
+    /// <summary>#200: these songs have online word timing on screen (covered) or it was taken back (not covered: the song
+    /// playing is asked for again as usual on its next move).</summary>
+    internal void SetCoveredOnline(IReadOnlyList<string> paths, bool covered)
+    {
+        if (_worker is not { } worker) return;
+        foreach (var path in paths) worker.SetCoveredOnline(path, covered);
+        if (!covered) _playingAsked = false;
+        Changed?.Invoke();
+    }
     internal string[] Folders => _folders;
     internal IReadOnlyList<Track> Tracks => library.AllTracks;
 

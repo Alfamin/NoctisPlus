@@ -1336,8 +1336,34 @@ internal sealed class Worker : IDisposable
     internal bool IsIgnored(string path) => _rules.Get(path).Ignored;
     internal bool AutomaticBlocked(string path)
     {
+        if (_coveredOnline.ContainsKey(path)) return true;
         var rule = _rules.Get(path);
         return rule.Ignored || rule.RetryUtc > DateTime.UtcNow;
+    }
+
+    /// <summary>#200: songs whose online word timing is shown (a stream, before its .ttml is written). This run only.</summary>
+    private readonly System.Collections.Concurrent.ConcurrentDictionary<string, byte> _coveredOnline = new(StringComparer.OrdinalIgnoreCase);
+
+    /// <summary>
+    /// #200 (owner 2026-10-29: "Processing lyrics" showed under lrc.red's timing): a song with online word timing is not
+    /// timed automatically; its automatic job leaves the queue (a run with it stops, like Remove). A Time words press
+    /// is the user's and stays. Off again (the timing did not fit the finished file): the song is timed as usual.
+    /// </summary>
+    internal void SetCoveredOnline(string path, bool covered)
+    {
+        if (string.IsNullOrWhiteSpace(path)) return;
+        if (!covered) { _coveredOnline.TryRemove(path, out _); StatusChanged?.Invoke(); return; }
+        _coveredOnline[path] = 0;
+        bool stopRun;
+        lock (_gate)
+        {
+            if (!_items.TryGetValue(path, out var item) || item.Hand) return;
+            stopRun = _activePaths.Contains(path);
+            _items.Remove(path);
+            SaveState();
+        }
+        if (stopRun) MakeRoom("");
+        StatusChanged?.Invoke();
     }
     internal void SetIgnored(string path, bool ignored)
     {
