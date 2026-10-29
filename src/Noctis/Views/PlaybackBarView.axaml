@@ -1310,13 +1310,14 @@
                                       CornerRadius="999"
                                       Background="{DynamicResource IslandTrackBoxSliderUnfilled}"
                                       Canvas.Top="2"/>
-                              <!-- Owner #204: while a song streams, how far a seek can reach - the same faint line
-                                   once more over the remainder (a touch brighter), under the played part. -->
+                              <!-- Owner #204: while a song streams, how far a seek can reach: the played line's
+                                   colour, faint, under the played part (between the remainder and the fill). -->
                               <Border x:Name="SeekTrackBuffered"
                                       Classes="seek-track"
                                       IsVisible="False"
                                       CornerRadius="999"
-                                      Background="{DynamicResource IslandTrackBoxSliderUnfilled}"
+                                      Background="{DynamicResource IslandSliderFilled}"
+                                      Opacity="0.35"
                                       Canvas.Top="2"/>
                               <Border x:Name="SeekTrackFill"
                                       Classes="seek-track"

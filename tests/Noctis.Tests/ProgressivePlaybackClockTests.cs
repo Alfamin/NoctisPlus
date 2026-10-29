@@ -44,6 +44,22 @@ public class ProgressivePlaybackClockTests
     }
 
     [Fact]
+    public void AUserSeekInsideADownloadIsTheFlushRightAfterIt_NotALaterResync()
+    {
+        // Owner #204: the sound went to the new spot but the bar and lyrics ran on from the old one, because every
+        // flush of a download was treated as VLC's resync. Only the flush following a user seek re-bases the clock.
+        Assert.True(VlcAudioPlayer.FlushFollowsUserSeek(10_000, 10_400));
+        Assert.False(VlcAudioPlayer.FlushFollowsUserSeek(0, 10_400));        // no seek asked
+        Assert.False(VlcAudioPlayer.FlushFollowsUserSeek(10_000, 14_000));   // a resync long after
+        var segment = new GaplessTrackSegment(8000, 1, null);
+        Assert.True(segment.Write(new short[24000]));
+        segment.Read(new float[8000], 0, 8000);
+        VlcAudioPlayer.FlushEngineInput(segment, 95_000, nonseekableDownload: false);   // the seek's flush
+        Assert.Equal(0, segment.BufferedSamples);
+        Assert.Equal(95_000, segment.PositionMs);
+    }
+
+    [Fact]
     public void OrdinaryLocalSeekStillFlushesTheRingAndUsesItsRequestedPosition()
     {
         var segment = new GaplessTrackSegment(8000, 1, null);

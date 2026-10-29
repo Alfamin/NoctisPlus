@@ -4495,9 +4495,12 @@ public class VlcAudioPlayer : IAudioPlayer, IOpenFileHolder
             // VLC also flushes at input teardown AFTER drain; clearing then
             // would eat the un-played tail mid-splice. A drained segment is
             // final — ignore the flush.
+            // Owner #204: a flush right after the user sought inside a song still downloading is that seek: the ring
+            // empties and the clock starts at the target. Any other flush of a download is VLC's resync (kept).
+            var userSeek = FlushFollowsUserSeek(Interlocked.Exchange(ref _engineUserSeekTicks[slot], 0), Environment.TickCount64);
             if (seg != null && !seg.EndOfStream)
                 FlushEngineInput(seg, Interlocked.Read(ref _enginePendingBaseMs[slot]),
-                    ReferenceEquals(_enginePlayers[slot], _player) && _currentMedia is ProgressiveMedia,
+                    ReferenceEquals(_enginePlayers[slot], _player) && _currentMedia is ProgressiveMedia && !userSeek,
                     seg.SampleRate * EngineSeekResamplerTailMs / 1000);
         }
         catch { /* libvlc thread */ }
@@ -4523,6 +4526,12 @@ public class VlcAudioPlayer : IAudioPlayer, IOpenFileHolder
 
     /// <summary>Re-buffering after a download-backed input ran dry (see GaplessTrackSegment.UnderrunRefillMs).</summary>
     internal const int DownloadUnderrunRefillMs = 2500;
+
+    /// <summary>When the user last sought inside a download, per player slot (Environment.TickCount64; 0: no seek).</summary>
+    private readonly long[] _engineUserSeekTicks = new long[2];
+
+    /// <summary>A flush within 3 s of a user seek is that seek (VLC flushes as soon as its demuxer moves).</summary>
+    internal static bool FlushFollowsUserSeek(long seekTicks, long nowTicks) => seekTicks != 0 && nowTicks - seekTicks is >= 0 and < 3000;
 
     internal static void FlushEngineInput(GaplessTrackSegment segment, long seekBaseMs, bool nonseekableDownload, int discardFrames = 0)
     {
@@ -5285,9 +5294,12 @@ public class VlcAudioPlayer : IAudioPlayer, IOpenFileHolder
         // Engine: the seek's flush callback re-bases the active segment's
         // position from this value (the flush itself clears the stale ring).
         if (_gaplessEngine)
+        {
             Interlocked.Exchange(
                 ref _enginePendingBaseMs[EngineSlotOf(_player)],
                 (long)position.TotalMilliseconds);
+            if (_currentMedia is ProgressiveMedia) Interlocked.Exchange(ref _engineUserSeekTicks[EngineSlotOf(_player)], Environment.TickCount64);
+        }
 
         // After a track ends (or is stopped) the audio output is torn down and
         // CurrentLengthMs reports 0, so the in-place seek below early-returns and the

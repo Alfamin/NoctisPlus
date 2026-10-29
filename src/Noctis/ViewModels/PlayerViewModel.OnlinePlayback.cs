@@ -24,8 +24,11 @@ public partial class PlayerViewModel
     private void RefreshSeekable()
     {
         CanSeekCurrent = _audioPlayer.CanSeek;
-        SeekableFraction = _audioPlayer.SeekableUntil is { } until && Duration.TotalSeconds > 0
+        var fraction = _audioPlayer.SeekableUntil is { } until && Duration.TotalSeconds > 0
             ? Math.Clamp(until / Duration, 0, 1) : 1;
+        if (fraction < 1 && SeekableFraction >= 1 && CurrentTrack is { } track)
+            Services.DebugLog.Write("Playback", $"download indicator shown: {fraction:P0} reachable of \"{track.Title}\"");
+        SeekableFraction = fraction;
     }
 
     /// <summary>Owner #177: the playing song is on one of For you's pages, so the lyrics page offers Not for me beside Add.

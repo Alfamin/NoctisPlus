@@ -928,7 +928,12 @@ public partial class PlayerViewModel : ViewModelBase
         fraction = Math.Clamp(fraction, 0.0, 1.0);
         var target = TimeSpan.FromTicks((long)(Duration.Ticks * fraction));
         // Owner #204: while a song streams, only the part already downloaded can be sought (seek bar, lyric lines).
-        if (_audioPlayer.SeekableUntil is { } until && target > TimeSpan.Zero && target > until) return;
+        if (_audioPlayer.SeekableUntil is { } until)
+        {
+            var reached = target <= TimeSpan.Zero || target <= until;
+            DebugLog.Write("Playback", $"seek while downloading: to {target.TotalSeconds:0.0} s, reachable {until.TotalSeconds:0.0} s{(reached ? "" : " (not yet: ignored)")}");
+            if (!reached) return;
+        }
         var remaining = Duration - target;
         if (remaining < TimeSpan.Zero) remaining = TimeSpan.Zero;
 
