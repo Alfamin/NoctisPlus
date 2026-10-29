@@ -79,12 +79,23 @@ public sealed class OnlineTimingLaneTests : IDisposable
     }
 
     [Fact]
-    public async Task AFittingTimingIsWrittenShiftedAndMarked_TheElrcStays()
+    public async Task ASongWithWordTimingIsLeftAsItIs_NoLookup()
+    {
+        var song = Song("timed");
+        File.WriteAllText(Path.ChangeExtension(song.FilePath, ".elrc"), "[00:10.00]<00:10.00>w0 <00:10.30>");
+        _lrcRed.Answer = () => new LrcLibResult { Duration = 200, SyncedLyrics = "x", OriginalTtml = WordTtml() };
+        Assert.Equal(OnlineTimingLane.Outcome.AlreadyTimed, await Lane().ProcessAsync(song, CancellationToken.None));
+        Assert.Equal(0, _lrcRed.Calls + _unison.Calls + _kugou.Calls);
+        Assert.False(File.Exists(Path.ChangeExtension(song.FilePath, ".ttml")));
+    }
+
+    [Fact]
+    public async Task AFittingTimingIsWrittenShiftedAndMarked_TheLrcStays()
     {
         using var lane = Lane();
         var song = Song("Kiss Me More");
-        var elrc = Path.ChangeExtension(song.FilePath, ".elrc");
-        File.WriteAllText(elrc, "[00:10.00]<00:10.00>w0 <00:10.30>w1 <00:10.60>");
+        var lrc = Path.ChangeExtension(song.FilePath, ".lrc");
+        File.WriteAllText(lrc, "[00:10.00]w0 w1");
         _lrcRed.Answer = () => new LrcLibResult { Duration = 200.3, SyncedLyrics = "x", OriginalTtml = WordTtml() };
         IReadOnlyList<string>? written = null;
         lane.Written += p => written = p;
@@ -92,7 +103,7 @@ public sealed class OnlineTimingLaneTests : IDisposable
         var ttml = File.ReadAllText(Path.ChangeExtension(song.FilePath, ".ttml"));
         Assert.Equal(WordTimingSource.LrcRed, OnlineTimingSidecar.SourceOf(ttml));
         Assert.Equal(10.48, OnlineTimingFit.WordsOf(ttml)[0].Start, 3);
-        Assert.Equal("[00:10.00]<00:10.00>w0 <00:10.30>w1 <00:10.60>", File.ReadAllText(elrc));
+        Assert.Equal("[00:10.00]w0 w1", File.ReadAllText(lrc));
         Assert.Equal([song.FilePath], written);
         lane.SetPlaying(song, []);
         Assert.Null(lane.Next(true));                                    // done for this run

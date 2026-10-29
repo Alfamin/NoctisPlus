@@ -986,7 +986,8 @@
                     <!-- lrc.red's API asks to be credited: "Lyrics from lrc.red" under its lyrics,
                          "Word-synced by lrc.red's model" after its model timed them. -->
                     <TextBlock Text="{Binding LyricsCreditText}"
-                               FontSize="11"
+                               FontSize="10"
+                               Opacity="0.55"
                                Foreground="{Binding LyricsSubtleFg}"
                                VerticalAlignment="Center"
                                IsVisible="{Binding LyricsCreditText, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"/>

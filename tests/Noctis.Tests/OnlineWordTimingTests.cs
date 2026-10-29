@@ -68,7 +68,26 @@ public class OnlineWordTimingTests
         var found = await t.FindAsync("A", "B", 200.4, CancellationToken.None);
         Assert.Equal(WordTimingSource.LrcRed, found.Source);
         Assert.Same(answer.OriginalTtml, found.Ttml);
-        Assert.Equal(0, unison.Calls);
+        Assert.Equal(1, unison.Calls);   // asked at the same time; lrc.red still wins
+    }
+
+    [Fact]
+    public async Task AllSourcesAreAskedAtOnce()
+    {
+        var slow = new TaskCompletionSource<LrcLibResult?>();
+        var started = 0;
+        var timing = new OnlineWordTiming(new Gate(slow, () => started++), new Gate(slow, () => started++), new Gate(slow, () => started++), () => true);
+        var find = timing.FindAsync("A", "B", 200, CancellationToken.None);
+        Assert.Equal(3, started);        // nobody waited for the one before
+        slow.SetResult(Word());
+        Assert.Equal(WordTimingSource.LrcRed, (await find).Source);
+    }
+
+    sealed class Gate(TaskCompletionSource<LrcLibResult?> answer, Action started) : ILrcRedLyricsService, IUnisonLyricsService, IKugouLyricsService
+    {
+        public Task<LrcLibResult?> SearchLyricsAsync(string artist, string trackName, double durationSeconds, CancellationToken ct = default) { started(); return answer.Task; }
+        public Task<LrcRedMatch?> FindMatchAsync(string artist, string trackName, double durationSeconds, CancellationToken ct = default) => Task.FromResult<LrcRedMatch?>(null);
+        public Task<LrcLibResult> SyncWithModelAsync(string isrc, CancellationToken ct = default) => throw new InvalidOperationException();
     }
 
     [Fact]

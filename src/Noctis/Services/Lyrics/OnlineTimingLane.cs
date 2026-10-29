@@ -148,6 +148,8 @@ internal sealed class OnlineTimingLane : IDisposable
         var ttmls = LyricsWriter.SidecarsOnDisk(path, ".ttml");
         if (ttmls.Count > 0)
             return OnlineTimingSidecar.SourceOf(SafeRead(ttmls[0])) != null ? Outcome.AlreadyTimed : Outcome.Skipped;
+        // Owner 2026-10-29: a song that already has word timing (WordLyrics, Lyrics Studio, anything) is fine as it is.
+        if (LyricsWriter.SidecarsOnDisk(path, ".elrc").Count > 0) return Outcome.AlreadyTimed;
         if (_userTimed(path)) return Outcome.Skipped;
 
         var seconds = track.Duration.TotalSeconds;

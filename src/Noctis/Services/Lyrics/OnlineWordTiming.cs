@@ -39,25 +39,30 @@ internal sealed class OnlineWordTiming
         _lrcRedEnabled = lrcRedEnabled;
     }
 
+    /// <summary>All sources are asked at once (owner, 2026-10-29): one that fails or has nothing costs no extra wait;
+    /// the first in order (lrc.red, Unison, Kugou) with word timing for this recording wins.</summary>
     public async Task<Lookup> FindAsync(string artist, string title, double durationSeconds, CancellationToken ct)
     {
+        var asks = new List<(WordTimingSource Source, Task<LrcLibResult?> Answer)>();
+        if (_lrcRedEnabled()) asks.Add((WordTimingSource.LrcRed, Ask(() => _lrcRed.SearchLyricsAsync(artist, title, durationSeconds, ct))));
+        asks.Add((WordTimingSource.Unison, Ask(() => _unison.SearchLyricsAsync(artist, title, durationSeconds, ct))));
+        asks.Add((WordTimingSource.Kugou, Ask(() => _kugou.SearchLyricsAsync(artist, title, durationSeconds, ct))));
         bool transient = false;
-        foreach (var source in new[] { WordTimingSource.LrcRed, WordTimingSource.Unison, WordTimingSource.Kugou })
+        foreach (var (source, answer) in asks)
         {
-            if (source == WordTimingSource.LrcRed && !_lrcRedEnabled()) continue;
             try
             {
-                var result = source switch
-                {
-                    WordTimingSource.LrcRed => await _lrcRed.SearchLyricsAsync(artist, title, durationSeconds, ct),
-                    WordTimingSource.Unison => await _unison.SearchLyricsAsync(artist, title, durationSeconds, ct),
-                    _ => await _kugou.SearchLyricsAsync(artist, title, durationSeconds, ct),
-                };
-                if (WordTimed(result, durationSeconds) is { } ttml) return new Lookup(source, ttml, transient);
+                if (WordTimed(await answer, durationSeconds) is { } ttml) return new Lookup(source, ttml, transient);
             }
             catch (LyricsProviderException) { transient = true; }
         }
         return new Lookup(null, null, transient);
+    }
+
+    static Task<LrcLibResult?> Ask(Func<Task<LrcLibResult?>> search)
+    {
+        try { return search(); }
+        catch (Exception e) { return Task.FromException<LrcLibResult?>(e); }
     }
 
     /// <summary>The result as a word-timed TTML document, or null when it is line-timed/plain or another length.</summary>
