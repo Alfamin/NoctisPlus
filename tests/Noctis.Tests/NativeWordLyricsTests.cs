@@ -89,6 +89,24 @@ public class NativeWordLyricsTests
         Assert.True(panel.FindControl<Noctis.Controls.PillDialogHost>("TimingHost")!.ShowBackdrop);
     }
 
+    /// <summary>Owner #206: Word timing on a song already word-timed said "already exist, right-click the song…", which opens this
+    /// same window. It opens on Retime existing words, and Start times it again.</summary>
+    [AvaloniaFact]
+    public void ASongAlreadyWordTimed_OpensOnRetime_AndStartQueuesIt()
+    {
+        using var rig = new Rig(); var track = rig.Library.TrackList[0];
+        using (var fresh = new WordLyricsViewModel(rig.Service, false, track, _ => Task.FromResult(true)))
+            Assert.Equal(0, fresh.ActionIndex);   // no word timing yet: Time missing words
+        File.WriteAllText(Path.ChangeExtension(track.FilePath, ".elrc"), "[00:01.00]<00:01.00>Hello <00:01.50>you <00:02.00>");
+        using var vm = new WordLyricsViewModel(rig.Service, false, track, _ => Task.FromResult(true));
+        Assert.Equal(1, vm.ActionIndex);
+        Assert.Equal("Retime existing words", vm.Actions[vm.ActionIndex]);
+        Assert.True(vm.CanStart);
+        vm.StartCommand.Execute(null);
+        Until(() => rig.Service.WaitingCount == 1);
+        Assert.DoesNotContain("right-click", vm.Error ?? "");
+    }
+
     /// <summary>Owner #194: the word timing window lists the songs in line; Remove takes one off for good, and only Time
     /// words on that song brings it back.</summary>
     [AvaloniaFact]

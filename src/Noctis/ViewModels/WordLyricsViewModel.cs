@@ -21,6 +21,9 @@ public sealed partial class WordLyricsViewModel : ObservableObject, IDisposable
         Folders = new[] { "All library folders" }.Concat(service.Folders).ToArray();
         if (service.Folders.Length == 1) FolderIndex = 1;
         _service.Changed += Refresh; Refresh();
+        // Owner #206: a song that already has word timing opens on Retime existing words (Time missing words would only
+        // say it is already timed).
+        if (track is not null && (Worker.HasWordLyrics(track.FilePath) || EmbeddedWordLyrics.HasWords(track.FilePath))) ActionIndex = 1;
         if (track is not null) _ = LoadWordsAsync(track.FilePath);
         else _ = CountMissingAsync();
         IsSetUp = service.BackendReady;

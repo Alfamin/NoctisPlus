@@ -484,7 +484,8 @@ internal sealed class Worker : IDisposable
             return "Wait for the song to finish downloading.";
         if (string.IsNullOrWhiteSpace(path) || !File.Exists(path)) return "The song's file is not there.";
         if (!Audio.Contains(Path.GetExtension(path))) return "WordLyrics cannot read this kind of file.";
-        if (action == TimingAction.Missing && (HasWordLyrics(path) || EmbeddedWordLyrics.HasWords(path))) return "Word-timed lyrics already exist. To fix wrong words or timing, right-click this song and choose Wrong lyrics / redo with fresh lyrics (WordLyrics), or Edit / paste custom lyrics.";
+        // Owner #206: the old text sent people to the song's menu, which opens this same window: a loop.
+        if (action == TimingAction.Missing && (HasWordLyrics(path) || EmbeddedWordLyrics.HasWords(path))) return "Already word-timed. To time it again, choose Retime existing words or Fetch fresh lyrics.";
         var tool = new Tool(Options.Folder);
 
         path = Path.GetFullPath(path);
