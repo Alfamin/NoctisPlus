@@ -41,6 +41,8 @@ internal sealed class OnlineTimingLane : IDisposable
     internal Func<string, string, string, CancellationToken, Task<OnlineTimingFit.Result?>> Check { get; set; } = OnlineTimingFit.CheckAsync;
     internal Func<DateTime> Now { get; set; } = () => DateTime.UtcNow;
     internal TimeSpan Spacing { get; set; } = Pace;
+    /// <summary>A fullscreen game (the owner games): the library waits; the song being heard is still looked up.</summary>
+    internal Func<bool> Busy { get; set; } = Features.WordLyrics.GamingBudget.IsActive;
 
     /// <param name="userTimed">True for a song whose word timing the user made or chose (Lyrics Studio's .elrc, a song
     /// taken out of word timing): never given an online .ttml that would out-rank it.</param>
@@ -112,7 +114,7 @@ internal sealed class OnlineTimingLane : IDisposable
             try
             {
                 var now = Now();
-                var track = _offline() || now < _restUntil ? null : Next(now >= libraryAt);
+                var track = _offline() || now < _restUntil ? null : Next(now >= libraryAt && !Busy());
                 if (track == null)
                 {
                     var wait = now < _restUntil ? _restUntil - now : now < libraryAt ? libraryAt - now : TimeSpan.FromMinutes(1);

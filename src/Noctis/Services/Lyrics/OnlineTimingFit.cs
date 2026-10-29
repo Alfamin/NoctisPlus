@@ -66,6 +66,7 @@ internal static class OnlineTimingFit
             using var p = Process.Start(psi);
             if (p == null) return null;
             using var kill = timeout.Token.Register(() => { try { if (!p.HasExited) p.Kill(true); } catch { } });
+            try { p.PriorityClass = ProcessPriorityClass.BelowNormal; } catch (Exception e) when (e is InvalidOperationException or System.ComponentModel.Win32Exception or PlatformNotSupportedException) { }
             var errors = p.StandardError.ReadToEndAsync(timeout.Token);
             var features = new Features();
             var buffer = new byte[64 * 1024];
