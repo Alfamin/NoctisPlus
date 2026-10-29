@@ -187,6 +187,33 @@ public sealed class OnlineTimingLaneTests : IDisposable
     }
 
     [Fact]
+    public async Task AStreamCutOffBySkippingAndPlayedAgain_ShowsItsTimingAgain_AndGetsItWrittenOnceWhole()
+    {
+        // Owner #217: lrc.red's timing showed, Previous, then back: gone for good (the lane had marked the song done
+        // while its file was missing, and did not show the answer it already had).
+        using var lane = Lane();
+        _lrcRed.Answer = () => new LrcLibResult { Duration = 200, SyncedLyrics = "x", OriginalTtml = WordTtml() };
+        var first = Song("beibs in the trap");
+        var shows = 0;
+        lane.Provisional += (_, _, _) => shows++;
+        Assert.True(await lane.ShowWhileStreamingAsync(first, CancellationToken.None));
+        File.Delete(first.FilePath);                       // skipped: its download stopped, nothing on disk
+        lane.SetPlaying(first, []);
+        Assert.Null(lane.Next(libraryOpen: true));          // nothing to look at yet
+        Assert.Equal(OnlineTimingLane.Outcome.NotYet, await lane.ProcessAsync(first, CancellationToken.None));
+
+        var again = new Track { FilePath = first.FilePath, Title = first.Title, Artist = first.Artist, Duration = first.Duration };
+        Assert.True(await lane.ShowWhileStreamingAsync(again, CancellationToken.None));   // back: shown again
+        Assert.Equal(2, shows);
+        Assert.Equal(1, _lrcRed.Calls);                    // from the answer found the first time
+        File.WriteAllBytes(again.FilePath, [1, 2, 3]);     // fetched again, now whole
+        lane.SetPlaying(again, []);
+        Assert.Same(again, lane.Next(libraryOpen: false));
+        Assert.Equal(OnlineTimingLane.Outcome.Written, await lane.ProcessAsync(again, CancellationToken.None));
+        Assert.Equal(1, _lrcRed.Calls);
+    }
+
+    [Fact]
     public async Task AStreamedTimingTheFitCheckIsUnsureOfIsNeverTakenBack()
     {
         // Owner 2026-10-29: Circo Loco's lrc.red timing showed at Play, then vanished for WordLyrics.

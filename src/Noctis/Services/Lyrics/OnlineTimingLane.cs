@@ -12,7 +12,7 @@ namespace Noctis.Services.Lyrics;
 /// </summary>
 internal sealed class OnlineTimingLane : IDisposable
 {
-    public enum Outcome { Written, AlreadyTimed, Skipped, Miss, Kept, Transient }
+    public enum Outcome { Written, AlreadyTimed, Skipped, Miss, Kept, Transient, NotYet }
 
     public static readonly TimeSpan Pace = TimeSpan.FromSeconds(2);
     public static readonly TimeSpan FailureRest = TimeSpan.FromMinutes(5);
@@ -35,6 +35,7 @@ internal sealed class OnlineTimingLane : IDisposable
     Task? _loop;
 
     readonly HashSet<string> _streamAsked = new(StringComparer.Ordinal);
+    Track? _shownTrack;   // the stream whose online timing was last put on screen (each play of it is its own Track)
     readonly Dictionary<string, OnlineWordTiming.Lookup> _provisional = new(StringComparer.Ordinal);
 
     /// <summary>Lyrics files written for these songs: the lyrics page reloads the one shown in place.</summary>
@@ -95,7 +96,9 @@ internal sealed class OnlineTimingLane : IDisposable
         lock (_gate)
         {
             foreach (var t in Candidates(libraryOpen))
-                if (Local(t) is { } path && !_done.Contains(path)) return t;
+                // Owner #217: a song whose file is not there (yet, or any more: a stream cut off by a skip) waits; it was
+                // marked done before and never looked at again when it came back.
+                if (Local(t) is { } path && !_done.Contains(path) && File.Exists(path)) return t;
             return null;
         }
     }
@@ -177,7 +180,8 @@ internal sealed class OnlineTimingLane : IDisposable
     /// <summary>A song is playing that is not looked at yet only because its file is still arriving.</summary>
     bool CurrentPending()
     {
-        lock (_gate) return _current is { IsRemoteStream: false } t && Local(t) == null && (t.PendingStream != null || !string.IsNullOrWhiteSpace(t.FilePath));
+        lock (_gate)
+            return _current is { IsRemoteStream: false } t && (Local(t) is { } path ? !File.Exists(path) : t.PendingStream != null || !string.IsNullOrWhiteSpace(t.FilePath));
     }
 
     /// <summary>The complete file to look at: a song on disk, or a stream once its file is fully saved; null while it is
@@ -240,7 +244,8 @@ internal sealed class OnlineTimingLane : IDisposable
         Outcome outcome;
         try { outcome = await ProcessCoreAsync(track, path, ct); }
         finally { lock (_gate) if (string.Equals(_working, path, StringComparison.OrdinalIgnoreCase)) _working = null; }
-        if (outcome != Outcome.Transient) lock (_gate) { _done.Add(path); _wanted.Remove(path); }
+        if (outcome is not (Outcome.Transient or Outcome.NotYet)) lock (_gate) { _done.Add(path); _wanted.Remove(path); }
+        if (outcome == Outcome.NotYet) return outcome;
         // The library pass would flood the log with songs that need nothing: those are told only for songs in use.
         if (why != "library" || outcome is Outcome.Written or Outcome.Kept or Outcome.Transient)
             Log($"{outcome} ({why}) {Describe(track)} in {clock.ElapsedMilliseconds} ms{_detail}");
@@ -284,7 +289,22 @@ internal sealed class OnlineTimingLane : IDisposable
         if (string.IsNullOrWhiteSpace(track.Title)) return false;
         var seconds = track.Duration.TotalSeconds;
         var key = OnlineTimingMisses.Key(track.Artist ?? "", track.Title, seconds);
-        lock (_gate) if (!_streamAsked.Add(key)) return false;
+        OnlineWordTiming.Lookup? known;
+        lock (_gate)
+        {
+            if (ReferenceEquals(_shownTrack, track)) return false;
+            _shownTrack = track;
+            _provisional.TryGetValue(key, out known);
+            if (known == null && !_streamAsked.Add(key)) return false;
+        }
+        // Owner #217: the same song played again before its file was whole (Previous, then back): the answer found the
+        // first time is shown again, without asking again.
+        if (known != null)
+        {
+            Log($"streaming {Describe(track)}: shown again from {OnlineTimingSidecar.Name(known.Source!.Value)} (found earlier)");
+            Provisional?.Invoke(track, OnlineTimingSidecar.Mark(known.Ttml!, known.Source!.Value, 0) ?? known.Ttml!, OnlineTimingSidecar.Name(known.Source!.Value));
+            return true;
+        }
         if (_misses.IsMiss(key, Now())) return false;
         var clock = System.Diagnostics.Stopwatch.StartNew();
         var found = await FindAsync(track, seconds, ct);
@@ -308,13 +328,16 @@ internal sealed class OnlineTimingLane : IDisposable
         {
             if (_current is not { IsRemoteStream: false } t || Local(t) != null || string.IsNullOrWhiteSpace(t.Title)) return null;
             if (t.PendingStream == null && string.IsNullOrWhiteSpace(t.FilePath)) return null;
-            return _streamAsked.Contains(OnlineTimingMisses.Key(t.Artist ?? "", t.Title, t.Duration.TotalSeconds)) ? null : t;
+            if (ReferenceEquals(t, _shownTrack)) return null;
+            var key = OnlineTimingMisses.Key(t.Artist ?? "", t.Title, t.Duration.TotalSeconds);
+            return !_streamAsked.Contains(key) || _provisional.ContainsKey(key) ? t : null;
         }
     }
 
     async Task<Outcome> ProcessCoreAsync(Track track, string path, CancellationToken ct)
     {
-        if (!File.Exists(path) || string.IsNullOrWhiteSpace(track.Title)) { _detail = ": no file or no title"; return Outcome.Skipped; }
+        if (!File.Exists(path)) return Outcome.NotYet;   // owner #217: looked at when its file is there
+        if (string.IsNullOrWhiteSpace(track.Title)) { _detail = ": no title"; return Outcome.Skipped; }
         if (LyricsWriter.SidecarsOnDisk(path, ".lyricsfile").Count > 0) { _detail = ": has a .lyricsfile"; return Outcome.Skipped; }
         var ttmls = LyricsWriter.SidecarsOnDisk(path, ".ttml");
         if (ttmls.Count > 0)
