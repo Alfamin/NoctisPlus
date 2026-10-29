@@ -7,10 +7,10 @@ using Xunit;
 
 namespace Noctis.Tests;
 
-/// <summary>#200 automatic online word timing: source order, word-synced only, same length, failures vs misses. No network.</summary>
+/// <summary>#200 automatic online word timing (lrc.red, Unison; Kugou left out, owner #208): source order, word-synced only, same length, failures vs misses. No network.</summary>
 public class OnlineWordTimingTests
 {
-    sealed class Source : ILrcRedLyricsService, IUnisonLyricsService, IKugouLyricsService
+    sealed class Source : ILrcRedLyricsService, IUnisonLyricsService
     {
         public Func<LrcLibResult?> Answer = () => null;
         public int Calls;
@@ -53,18 +53,19 @@ public class OnlineWordTimingTests
     static LrcLibResult Word(double duration = 200) => new() { Duration = duration, SyncedLyrics = "x", PlainLyrics = "x", OriginalTtml = WordTtml() };
     static LyricsProviderException Down() => new("test", new HttpRequestException("offline"));
 
-    (OnlineWordTiming Timing, Source LrcRed, Source Unison, Source Kugou) Make(bool lrcRed = true)
+    (OnlineWordTiming Timing, Source LrcRed, Source Unison) Make(bool lrcRed = true)
     {
-        Source a = new(), b = new(), c = new();
-        return (new OnlineWordTiming(a, b, c, () => lrcRed), a, b, c);
+        Source a = new(), b = new();
+        return (new OnlineWordTiming(a, b, () => lrcRed), a, b);
     }
 
     [Fact]
     public async Task LrcRedFirstAndItsOwnDocument()
     {
-        var (t, lrcRed, unison, _) = Make();
+        var (t, lrcRed, unison) = Make();
         var answer = Word();
         lrcRed.Answer = () => answer;
+        unison.Answer = () => Word();
         var found = await t.FindAsync("A", "B", 200.4, CancellationToken.None);
         Assert.Equal(WordTimingSource.LrcRed, found.Source);
         Assert.Same(answer.OriginalTtml, found.Ttml);
@@ -72,18 +73,31 @@ public class OnlineWordTimingTests
     }
 
     [Fact]
-    public async Task AllSourcesAreAskedAtOnce()
+    public async Task BothSourcesAreAskedAtOnce()
     {
         var slow = new TaskCompletionSource<LrcLibResult?>();
         var started = 0;
-        var timing = new OnlineWordTiming(new Gate(slow, () => started++), new Gate(slow, () => started++), new Gate(slow, () => started++), () => true);
+        var timing = new OnlineWordTiming(new Gate(slow, () => started++), new Gate(slow, () => started++), () => true);
         var find = timing.FindAsync("A", "B", 200, CancellationToken.None);
-        Assert.Equal(3, started);        // nobody waited for the one before
+        Assert.Equal(2, started);        // nobody waited for the one before
         slow.SetResult(Word());
         Assert.Equal(WordTimingSource.LrcRed, (await find).Source);
     }
 
-    sealed class Gate(TaskCompletionSource<LrcLibResult?> answer, Action started) : ILrcRedLyricsService, IUnisonLyricsService, IKugouLyricsService
+    [Fact]
+    public async Task AReadyUnisonAnswerWaitsForASlowLrcRedOnlyAMoment()
+    {
+        // Owner #208: answers came 20-25 s late. A word-timed Unison answer is used once lrc.red has had PreferWait.
+        var never = new TaskCompletionSource<LrcLibResult?>();
+        var ready = new TaskCompletionSource<LrcLibResult?>(); ready.SetResult(Word());
+        var timing = new OnlineWordTiming(new Gate(never, () => { }), new Gate(ready, () => { }), () => true);
+        var clock = System.Diagnostics.Stopwatch.StartNew();
+        var found = await timing.FindAsync("A", "B", 200, CancellationToken.None).WaitAsync(TimeSpan.FromSeconds(10));
+        Assert.Equal(WordTimingSource.Unison, found.Source);
+        Assert.InRange(clock.Elapsed.TotalSeconds, OnlineWordTiming.PreferWait.TotalSeconds - 0.2, OnlineWordTiming.PreferWait.TotalSeconds + 2);
+    }
+
+    sealed class Gate(TaskCompletionSource<LrcLibResult?> answer, Action started) : ILrcRedLyricsService, IUnisonLyricsService
     {
         public Task<LrcLibResult?> SearchLyricsAsync(string artist, string trackName, double durationSeconds, CancellationToken ct = default) { started(); return answer.Task; }
         public Task<LrcRedMatch?> FindMatchAsync(string artist, string trackName, double durationSeconds, CancellationToken ct = default) => Task.FromResult<LrcRedMatch?>(null);
@@ -93,23 +107,24 @@ public class OnlineWordTimingTests
     [Fact]
     public async Task LineTimedOrOtherLengthGoesToTheNextSource()
     {
-        var (t, lrcRed, unison, kugou) = Make();
+        var (t, lrcRed, unison) = Make();
         lrcRed.Answer = () => new LrcLibResult { Duration = 200, SyncedLyrics = "[00:10.00]a line", OriginalTtml = LineTtml };
-        unison.Answer = () => Word(duration: 201.5);
-        kugou.Answer = () => Word(duration: 199.1);
+        unison.Answer = () => Word(duration: 199.1);
         var found = await t.FindAsync("A", "B", 200, CancellationToken.None);
-        Assert.Equal(WordTimingSource.Kugou, found.Source);
+        Assert.Equal(WordTimingSource.Unison, found.Source);
         Assert.False(found.Transient);
+        unison.Answer = () => Word(duration: 201.5);
+        Assert.False((await t.FindAsync("A", "B", 200, CancellationToken.None)).Found);
     }
 
     [Fact]
-    public async Task KugouElrcIsCarriedAsTtml()
+    public async Task AnElrcAnswerIsCarriedAsTtml_AndAFailedSourceIsTransient()
     {
-        var (t, lrcRed, unison, kugou) = Make();
+        var (t, lrcRed, unison) = Make();
         lrcRed.Answer = () => throw Down();
-        kugou.Answer = () => new LrcLibResult { Duration = 200, SyncedLyrics = WordElrc(), PlainLyrics = "x" };
+        unison.Answer = () => new LrcLibResult { Duration = 200, SyncedLyrics = WordElrc(), PlainLyrics = "x" };
         var found = await t.FindAsync("A", "B", 200, CancellationToken.None);
-        Assert.Equal(WordTimingSource.Kugou, found.Source);
+        Assert.Equal(WordTimingSource.Unison, found.Source);
         Assert.True(found.Transient);    // lrc.red could not answer: not a definitive miss for it
         var words = OnlineTimingFit.WordsOf(found.Ttml);
         Assert.Equal(48, words.Count);
@@ -119,7 +134,7 @@ public class OnlineWordTimingTests
     [Fact]
     public async Task NothingAnywhereIsAMissAndAFailureIsNot()
     {
-        var (t, lrcRed, _, _) = Make();
+        var (t, lrcRed, _) = Make();
         var miss = await t.FindAsync("A", "B", 200, CancellationToken.None);
         Assert.False(miss.Found);
         Assert.False(miss.Transient);
@@ -132,7 +147,7 @@ public class OnlineWordTimingTests
     [Fact]
     public async Task LrcRedOffIsNotAsked()
     {
-        var (t, lrcRed, unison, _) = Make(lrcRed: false);
+        var (t, lrcRed, unison) = Make(lrcRed: false);
         lrcRed.Answer = () => Word();
         unison.Answer = () => Word();
         var found = await t.FindAsync("A", "B", 200, CancellationToken.None);

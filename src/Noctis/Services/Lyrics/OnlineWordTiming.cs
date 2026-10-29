@@ -10,9 +10,9 @@ namespace Noctis.Services.Lyrics;
 internal enum WordTimingSource { WordLyrics, LrcRed, Unison, Kugou }
 
 /// <summary>
-/// One song's automatic online word timing (#200): lrc.red, then Unison, then Kugou, word-synced only, the same
-/// recording (title/artist from the source's own match, length within <see cref="LengthSlack"/>). Kugou's KRC arrives as
-/// ELRC and is carried as TTML too, so every source can be written beside WordLyrics' .elrc without touching it.
+/// One song's automatic online word timing (#200): lrc.red, then Unison, word-synced only, the same recording
+/// (title/artist from the source's own match, length within <see cref="LengthSlack"/>), as a TTML document so it can be
+/// written beside WordLyrics' .elrc without touching it (an ELRC answer is carried as TTML too).
 /// Never the paid Musixmatch, never lrc.red's model sync (user press only). Misses are remembered; failures are not.
 /// </summary>
 internal sealed class OnlineWordTiming
@@ -28,10 +28,11 @@ internal sealed class OnlineWordTiming
 
     readonly ILrcRedLyricsService _lrcRed;
     readonly IUnisonLyricsService _unison;
-    readonly IKugouLyricsService _kugou;
+    readonly IKugouLyricsService? _kugou;
     readonly Func<bool> _lrcRedEnabled;
 
-    public OnlineWordTiming(ILrcRedLyricsService lrcRed, IUnisonLyricsService unison, IKugouLyricsService kugou, Func<bool> lrcRedEnabled)
+    /// <param name="kugou">Owner #208: the last source, after WordLyrics (see <see cref="FindKugouAsync"/>).</param>
+    public OnlineWordTiming(ILrcRedLyricsService lrcRed, IUnisonLyricsService unison, Func<bool> lrcRedEnabled, IKugouLyricsService? kugou = null)
     {
         _lrcRed = lrcRed;
         _unison = unison;
@@ -39,24 +40,53 @@ internal sealed class OnlineWordTiming
         _lrcRedEnabled = lrcRedEnabled;
     }
 
-    /// <summary>All sources are asked at once (owner, 2026-10-29): one that fails or has nothing costs no extra wait;
-    /// the first in order (lrc.red, Unison, Kugou) with word timing for this recording wins.</summary>
+    /// <summary>
+    /// Owner #208: Kugou's word timing is often choppy, so it comes after WordLyrics: asked only for a song WordLyrics will
+    /// not time (not set up, off). Its KRC arrives as ELRC and is carried as TTML like the others.
+    /// </summary>
+    public async Task<Lookup> FindKugouAsync(string artist, string title, double durationSeconds, CancellationToken ct)
+    {
+        if (_kugou is null) return new Lookup(null, null, false);
+        try { return WordTimed(await _kugou.SearchLyricsAsync(artist, title, durationSeconds, ct).ConfigureAwait(false), durationSeconds) is { } ttml
+            ? new Lookup(WordTimingSource.Kugou, ttml, false) : new Lookup(null, null, false); }
+        catch (LyricsProviderException) { return new Lookup(null, null, true); }
+    }
+
+    /// <summary>How long a word-timed Unison answer that is ready waits for lrc.red, which ranks first.</summary>
+    internal static readonly TimeSpan PreferWait = TimeSpan.FromSeconds(3);
+
+    /// <summary>
+    /// lrc.red and Unison are asked at once (owner, 2026-10-29): one that fails or has nothing costs no extra wait. lrc.red
+    /// wins when it has word timing for this recording; a Unison answer that is ready waits for a slow lrc.red only
+    /// <see cref="PreferWait"/>. Kugou is not asked here (owner #208: its word timing is often choppy and came 20-25 s
+    /// late): it comes after WordLyrics (<see cref="FindKugouAsync"/>) and stays in the lyrics page's source picker.
+    /// </summary>
     public async Task<Lookup> FindAsync(string artist, string title, double durationSeconds, CancellationToken ct)
     {
-        var asks = new List<(WordTimingSource Source, Task<LrcLibResult?> Answer)>();
-        if (_lrcRedEnabled()) asks.Add((WordTimingSource.LrcRed, Ask(() => _lrcRed.SearchLyricsAsync(artist, title, durationSeconds, ct))));
-        asks.Add((WordTimingSource.Unison, Ask(() => _unison.SearchLyricsAsync(artist, title, durationSeconds, ct))));
-        asks.Add((WordTimingSource.Kugou, Ask(() => _kugou.SearchLyricsAsync(artist, title, durationSeconds, ct))));
-        bool transient = false;
-        foreach (var (source, answer) in asks)
+        var lrcRed = _lrcRedEnabled() ? Ask(() => _lrcRed.SearchLyricsAsync(artist, title, durationSeconds, ct)) : null;
+        var unison = Ask(() => _unison.SearchLyricsAsync(artist, title, durationSeconds, ct));
+        var transient = false;
+        async Task<string?> Timed(Task<LrcLibResult?> answer)
         {
-            try
-            {
-                if (WordTimed(await answer, durationSeconds) is { } ttml) return new Lookup(source, ttml, transient);
-            }
-            catch (LyricsProviderException) { transient = true; }
+            try { return WordTimed(await answer.ConfigureAwait(false), durationSeconds); }
+            catch (LyricsProviderException) { transient = true; return null; }
         }
-        return new Lookup(null, null, transient);
+        var clock = System.Diagnostics.Stopwatch.StartNew();
+        string? fromUnison = null;
+        var unisonRead = false;
+        while (lrcRed is { IsCompleted: false })
+        {
+            if (unison.IsCompleted && !unisonRead) { unisonRead = true; fromUnison = await Timed(unison).ConfigureAwait(false); }
+            if (fromUnison != null && clock.Elapsed >= PreferWait) return new Lookup(WordTimingSource.Unison, fromUnison, transient);
+            var waits = new List<Task> { lrcRed };
+            if (!unisonRead) waits.Add(unison);
+            if (fromUnison != null) waits.Add(Task.Delay(PreferWait - clock.Elapsed, ct));
+            await Task.WhenAny(waits).ConfigureAwait(false);
+            ct.ThrowIfCancellationRequested();
+        }
+        if (lrcRed != null && await Timed(lrcRed).ConfigureAwait(false) is { } fromLrcRed) return new Lookup(WordTimingSource.LrcRed, fromLrcRed, transient);
+        if (!unisonRead) fromUnison = await Timed(unison).ConfigureAwait(false);
+        return fromUnison != null ? new Lookup(WordTimingSource.Unison, fromUnison, transient) : new Lookup(null, null, transient);
     }
 
     static Task<LrcLibResult?> Ask(Func<Task<LrcLibResult?>> search)

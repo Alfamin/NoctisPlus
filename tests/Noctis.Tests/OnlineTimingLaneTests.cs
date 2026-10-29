@@ -27,6 +27,7 @@ public sealed class OnlineTimingLaneTests : IDisposable
     readonly Source _lrcRed = new(), _unison = new(), _kugou = new();
     readonly HashSet<string> _userTimed = new(StringComparer.OrdinalIgnoreCase);
     string? _ffmpeg = "ffmpeg.exe";
+    bool _offline;
     double? _fit = 0.48;
     int _checks;
 
@@ -52,9 +53,9 @@ public sealed class OnlineTimingLaneTests : IDisposable
         return new Track { FilePath = path, Title = name, Artist = "Artist", Duration = TimeSpan.FromSeconds(200), SourceType = source };
     }
 
-    OnlineTimingLane Lane() => new(new OnlineWordTiming(_lrcRed, _unison, _kugou, () => true), new OnlineTimingMisses(Path.Combine(_dir, "misses.json")),
-        new LyricsWriter(null!, null, new AppWrittenSidecarRegistry(Path.Combine(_dir, "registry.json")), Path.Combine(_dir, "cache")),
-        () => _ffmpeg, () => false, _userTimed.Contains)
+    OnlineTimingLane Lane() => new(new OnlineWordTiming(_lrcRed, _unison, () => true, _kugou), new OnlineTimingMisses(Path.Combine(_dir, "misses.json")),
+        new LyricsWriter(null!, null, new AppWrittenSidecarRegistry(Path.Combine(_dir, "registry.json")), Path.Combine(_dir, "cache")) { TrashFile = p => { File.Delete(p); return true; } },
+        () => _ffmpeg, () => _offline, _userTimed.Contains)
     {
         Check = (_, _, ttml, _) =>
         {
@@ -85,7 +86,7 @@ public sealed class OnlineTimingLaneTests : IDisposable
         File.WriteAllText(Path.ChangeExtension(song.FilePath, ".elrc"), "[00:10.00]<00:10.00>w0 <00:10.30>");
         _lrcRed.Answer = () => new LrcLibResult { Duration = 200, SyncedLyrics = "x", OriginalTtml = WordTtml() };
         Assert.Equal(OnlineTimingLane.Outcome.AlreadyTimed, await Lane().ProcessAsync(song, CancellationToken.None));
-        Assert.Equal(0, _lrcRed.Calls + _unison.Calls + _kugou.Calls);
+        Assert.Equal(0, _lrcRed.Calls + _unison.Calls);
         Assert.False(File.Exists(Path.ChangeExtension(song.FilePath, ".ttml")));
     }
 
@@ -125,9 +126,9 @@ public sealed class OnlineTimingLaneTests : IDisposable
         Assert.Contains("plus:shift=\"0.00\"", ttml);
         _unison.Answer = () => null;
         Assert.Equal(OnlineTimingLane.Outcome.Miss, await Lane().ProcessAsync(nowhere, CancellationToken.None));
-        var calls = _lrcRed.Calls + _unison.Calls + _kugou.Calls;
+        var calls = _lrcRed.Calls + _unison.Calls;
         Assert.Equal(OnlineTimingLane.Outcome.Miss, await Lane().ProcessAsync(nowhere, CancellationToken.None));
-        Assert.Equal(calls, _lrcRed.Calls + _unison.Calls + _kugou.Calls);
+        Assert.Equal(calls, _lrcRed.Calls + _unison.Calls);
     }
 
     [Fact]
@@ -214,6 +215,87 @@ public sealed class OnlineTimingLaneTests : IDisposable
     }
 
     [Fact]
+    public async Task WordLyricsWaitsForTheOnlineSourcesFirst_ForASongFromAnywhere()
+    {
+        // Owner #207 (hard rule): a song fetched ahead kept getting WordLyrics' timing, never the online one. WordLyrics
+        // asks first; the lane looks at that song before the library (even before the library pass opens).
+        using var lane = Lane();
+        var library = Song("downloaded");
+        lane.SetLibrary([Song("old library song"), library]);
+        _lrcRed.Answer = () => new LrcLibResult { Duration = 200, SyncedLyrics = "x", OriginalTtml = WordTtml() };
+        Assert.True(lane.WantsFirst(library.FilePath));
+        Assert.Same(library, lane.Next(libraryOpen: false));
+        Assert.Equal(OnlineTimingLane.Outcome.Written, await lane.ProcessAsync(library, CancellationToken.None));
+        Assert.False(lane.WantsFirst(library.FilePath));   // answered: WordLyrics finds the .ttml and lets it be
+
+        var nothing = Song("nothing online");
+        lane.SetLibrary([nothing]);
+        _lrcRed.Answer = () => null;
+        Assert.True(lane.WantsFirst(nothing.FilePath));
+        Assert.Equal(OnlineTimingLane.Outcome.Miss, await lane.ProcessAsync(nothing, CancellationToken.None));
+        Assert.False(lane.WantsFirst(nothing.FilePath));   // nothing online: WordLyrics goes on
+    }
+
+    [Fact]
+    public async Task KugouComesAfterWordLyrics_OnlyForASongWordLyricsWillNotTime()
+    {
+        // Owner #208: lrc.red, Unison, then WordLyrics; Kugou (often choppy) last.
+        _kugou.Answer = () => new LrcLibResult { Duration = 200, SyncedLyrics = "x", OriginalTtml = WordTtml() };
+        var timed = Song("WordLyrics will time it");
+        Assert.Equal(OnlineTimingLane.Outcome.Miss, await Lane().ProcessAsync(timed, CancellationToken.None));
+        Assert.Equal(0, _kugou.Calls);
+
+        using var lane = Lane();
+        lane.WordLyricsTimes = () => false;   // not set up, or off
+        var untimed = Song("no WordLyrics here");
+        Assert.Equal(OnlineTimingLane.Outcome.Written, await lane.ProcessAsync(untimed, CancellationToken.None));
+        Assert.Equal(WordTimingSource.Kugou, OnlineTimingSidecar.SourceOf(File.ReadAllText(Path.ChangeExtension(untimed.FilePath, ".ttml"))));
+    }
+
+    [Fact]
+    public async Task AnEarlierKugouTimingLeavesWhereWordLyricsTakesOver()
+    {
+        var song = Song("kugou before");
+        var ttml = Path.ChangeExtension(song.FilePath, ".ttml");
+        File.WriteAllText(ttml, OnlineTimingSidecar.Mark(WordTtml(), WordTimingSource.Kugou, 0)!);
+        using (var noWordLyrics = Lane())
+        {
+            noWordLyrics.WordLyricsTimes = () => false;
+            Assert.Equal(OnlineTimingLane.Outcome.AlreadyTimed, await noWordLyrics.ProcessAsync(song, CancellationToken.None));
+            Assert.True(File.Exists(ttml));   // kept: nothing else would time it
+        }
+        using var lane = Lane();
+        IReadOnlyList<string>? reloaded = null;
+        lane.Written += p => reloaded = p;
+        _lrcRed.Answer = () => new LrcLibResult { Duration = 200, SyncedLyrics = "x", OriginalTtml = WordTtml() };
+        Assert.Equal(OnlineTimingLane.Outcome.Written, await lane.ProcessAsync(song, CancellationToken.None));
+        Assert.Equal(WordTimingSource.LrcRed, OnlineTimingSidecar.SourceOf(File.ReadAllText(ttml)));   // looked up again: lrc.red now
+        Assert.NotNull(reloaded);
+    }
+
+    [Fact]
+    public void WordLyricsIsNeverHeldForGood()
+    {
+        using var lane = Lane();
+        var now = new DateTime(2026, 10, 29, 12, 0, 0, DateTimeKind.Utc);
+        lane.Now = () => now;
+        var song = Song("slow source");
+        lane.SetLibrary([song]);
+        Assert.True(lane.WantsFirst(song.FilePath));
+        now += OnlineTimingLane.WaitLimit;
+        Assert.False(lane.WantsFirst(song.FilePath));      // waited long enough
+        _offline = true;
+        Assert.False(lane.WantsFirst(Song("offline").FilePath));
+        _offline = false;
+        var unknown = Path.Combine(_dir, "not in the library.mp3");
+        Assert.True(lane.WantsFirst(unknown));
+        Assert.Null(lane.Next(false));                     // not listed yet: waits a moment for the library
+        now += OnlineTimingLane.FindGrace;
+        Assert.Null(lane.Next(false));
+        Assert.False(lane.WantsFirst(unknown));            // never listed: WordLyrics goes on
+    }
+
+    [Fact]
     public async Task TheLoopTimesThePlayingSongWithoutWaitingForTheLibrary()
     {
         using var lane = Lane();
@@ -237,9 +319,9 @@ public sealed class OnlineTimingLaneTests : IDisposable
         var ffmpeg = Environment.GetEnvironmentVariable("FIT200_FFMPEG");
         if (spec is not { Length: 4 } || string.IsNullOrEmpty(ffmpeg) || spec[0].StartsWith(@"D:\", StringComparison.OrdinalIgnoreCase)) return;
         var http = new HttpClient { Timeout = TimeSpan.FromSeconds(20) };
-        var lane = new OnlineTimingLane(new OnlineWordTiming(new LrcRedLyricsService(http), new UnisonLyricsService(http), new KugouLyricsService(http), () => true),
+        var lane = new OnlineTimingLane(new OnlineWordTiming(new LrcRedLyricsService(http), new UnisonLyricsService(http), () => true),
             new OnlineTimingMisses(Path.Combine(_dir, "misses.json")),
-            new LyricsWriter(null!, null, new AppWrittenSidecarRegistry(Path.Combine(_dir, "registry.json")), Path.Combine(_dir, "cache")),
+            new LyricsWriter(null!, null, new AppWrittenSidecarRegistry(Path.Combine(_dir, "registry.json")), Path.Combine(_dir, "cache")) { TrashFile = p => { File.Delete(p); return true; } },
             () => ffmpeg, () => false, _ => false);
         var track = new Track { FilePath = spec[0], Artist = spec[1], Title = spec[2], Duration = TimeSpan.FromSeconds(double.Parse(spec[3], System.Globalization.CultureInfo.InvariantCulture)) };
         var elrc = Path.ChangeExtension(spec[0], ".elrc");

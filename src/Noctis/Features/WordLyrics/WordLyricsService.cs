@@ -65,6 +65,13 @@ internal sealed class WordLyricsService(ILibraryService library, Func<AppSetting
         _playingAsked = false;
         Changed?.Invoke();
     }
+    /// <summary>Owner #208: WordLyrics times songs on its own (on, set up, a timing mode chosen). When it does not, Kugou is
+    /// the online lane's last source instead.</summary>
+    internal bool TimesAutomatically => _worker is { } worker && !_disposed && BackendReady && worker.Options.Auto;
+
+    /// <summary>#207: asks the online word timing lane whether it still wants to look at this song first (set by the window).</summary>
+    internal Func<string, bool>? OnlineFirst { get; set; }
+
     /// <summary>#200: these songs have online word timing on screen (covered) or it was taken back (not covered: the song
     /// playing is asked for again as usual on its next move).</summary>
     internal void SetCoveredOnline(IReadOnlyList<string> paths, bool covered)
@@ -90,6 +97,7 @@ internal sealed class WordLyricsService(ILibraryService library, Func<AppSetting
         OnlineAccess.Shared.RetryHint += NetworkRecovered;
         OnlineAccess.Shared.Changed += NetworkModeChanged;
         _worker.Watched = () => Volatile.Read(ref _playingPath);
+        _worker.WaitsForOnline = path => OnlineFirst?.Invoke(path) == true;
         // Owner #96: song copies earlier runs left that are exact duplicates of their song go (in the background, after
         // startup has settled, at low priority).
         BackupCleaner.Temporary = source => FreeMusicFinder.FreeMusicPlugin.Current?.StreamCacheFolder is { Length: > 0 } cache

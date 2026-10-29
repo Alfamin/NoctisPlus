@@ -48,6 +48,8 @@ internal sealed class OnlineTimingLane : IDisposable
     internal TimeSpan Spacing { get; set; } = Pace;
     /// <summary>A fullscreen game (the owner games): the library waits; the song being heard is still looked up.</summary>
     internal Func<bool> Busy { get; set; } = Features.WordLyrics.GamingBudget.IsActive;
+    /// <summary>Owner #208: WordLyrics times songs on its own; when it does not, Kugou is asked last (after it otherwise).</summary>
+    internal Func<bool> WordLyricsTimes { get; set; } = () => true;
 
     /// <param name="userTimed">True for a song whose word timing the user made or chose (Lyrics Studio's .elrc, a song
     /// taken out of word timing): never given an online .ttml that would out-rank it.</param>
@@ -104,8 +106,49 @@ internal sealed class OnlineTimingLane : IDisposable
     {
         if (_current != null) yield return _current;
         foreach (var t in _upNext) yield return t;
+        // #207: songs WordLyrics is about to time (a download, a song fetched ahead, a new library song): before the library.
+        foreach (var (path, since) in _wanted.OrderBy(w => w.Value).ToList())
+        {
+            if (Find(path) is { } wanted) { yield return wanted; continue; }
+            if (Now() - since < FindGrace) continue;   // a new download may reach the library list a moment later
+            _wanted.Remove(path);   // nothing to look it up by: WordLyrics goes on
+            _done.Add(path);
+        }
         if (!libraryOpen) yield break;
         foreach (var t in _library) yield return t;
+    }
+
+    Track? Find(string path)
+    {
+        bool Same(string? other) => string.Equals(other, path, StringComparison.OrdinalIgnoreCase);
+        if (_current is { } c && Same(Local(c))) return c;
+        return _upNext.FirstOrDefault(t => Same(Local(t))) ?? _library.FirstOrDefault(t => Same(t.FilePath));
+    }
+
+    /// <summary>#207: songs WordLyrics asked about, and since when. </summary>
+    readonly Dictionary<string, DateTime> _wanted = new(StringComparer.OrdinalIgnoreCase);
+    /// <summary>The longest WordLyrics waits for an answer (a slow source must not hold it back for good).</summary>
+    internal static readonly TimeSpan WaitLimit = TimeSpan.FromSeconds(90);
+    internal static readonly TimeSpan FindGrace = TimeSpan.FromSeconds(10);
+
+    /// <summary>
+    /// Owner #207, hard rule: lrc.red, Unison and Kugou come first for every song, wherever it comes from. WordLyrics asks
+    /// before it times a song automatically: true = wait, the lane looks at it next (before the library); false = go on
+    /// (looked at already, offline, resting after a failure, or waited <see cref="WaitLimit"/>).
+    /// </summary>
+    public bool WantsFirst(string path)
+    {
+        if (string.IsNullOrWhiteSpace(path) || _offline()) return false;
+        var now = Now();
+        if (now < _restUntil) return false;
+        lock (_gate)
+        {
+            if (_done.Contains(path)) { _wanted.Remove(path); return false; }
+            if (!_wanted.TryGetValue(path, out var since)) _wanted[path] = since = now;
+            if (now - since >= WaitLimit) { _wanted.Remove(path); _done.Add(path); return false; }
+        }
+        Wake();
+        return true;
     }
 
     /// <summary>A song is playing that is not looked at yet only because its file is still arriving.</summary>
@@ -160,9 +203,18 @@ internal sealed class OnlineTimingLane : IDisposable
     {
         var path = Local(track)!;
         var outcome = await ProcessCoreAsync(track, path, ct);
-        if (outcome != Outcome.Transient) lock (_gate) _done.Add(path);
+        if (outcome != Outcome.Transient) lock (_gate) { _done.Add(path); _wanted.Remove(path); }
         if (outcome == Outcome.Written) Written?.Invoke(Paths(path, track));
         return outcome;
+    }
+
+    /// <summary>lrc.red, then Unison; Kugou only for a song WordLyrics will not time (owner #208).</summary>
+    async Task<OnlineWordTiming.Lookup> FindAsync(Track track, double seconds, CancellationToken ct)
+    {
+        var found = await _timing.FindAsync(track.Artist ?? "", track.Title, seconds, ct);
+        if (found.Found || WordLyricsTimes()) return found;
+        var last = await _timing.FindKugouAsync(track.Artist ?? "", track.Title, seconds, ct);
+        return last.Found ? last with { Transient = found.Transient } : found with { Transient = found.Transient || last.Transient };
     }
 
     static List<string> Paths(string path, Track track) =>
@@ -180,7 +232,7 @@ internal sealed class OnlineTimingLane : IDisposable
         var key = OnlineTimingMisses.Key(track.Artist ?? "", track.Title, seconds);
         lock (_gate) if (!_streamAsked.Add(key)) return false;
         if (_misses.IsMiss(key, Now())) return false;
-        var found = await _timing.FindAsync(track.Artist ?? "", track.Title, seconds, ct);
+        var found = await FindAsync(track, seconds, ct);
         if (!found.Found)
         {
             // A source that could not answer is asked again with the finished file (never in a loop here).
@@ -209,6 +261,12 @@ internal sealed class OnlineTimingLane : IDisposable
         if (!File.Exists(path) || string.IsNullOrWhiteSpace(track.Title)) return Outcome.Skipped;
         if (LyricsWriter.SidecarsOnDisk(path, ".lyricsfile").Count > 0) return Outcome.Skipped;
         var ttmls = LyricsWriter.SidecarsOnDisk(path, ".ttml");
+        // Owner #208: an earlier Kugou timing leaves (choppy); the song is looked up again, or keeps its own lyrics.
+        if (ttmls.Count > 0 && WordLyricsTimes() && _writer.RemoveKugouTiming(path))
+        {
+            Written?.Invoke(Paths(path, track));
+            ttmls = LyricsWriter.SidecarsOnDisk(path, ".ttml");
+        }
         if (ttmls.Count > 0)
             return OnlineTimingSidecar.SourceOf(SafeRead(ttmls[0])) != null ? Outcome.AlreadyTimed : Outcome.Skipped;
         var seconds = track.Duration.TotalSeconds;
@@ -223,7 +281,7 @@ internal sealed class OnlineTimingLane : IDisposable
         if (_misses.IsMiss(key, Now())) return Outcome.Miss;
         OnlineWordTiming.Lookup? shown;
         lock (_gate) _provisional.Remove(key, out shown);
-        var found = shown ?? await _timing.FindAsync(track.Artist ?? "", track.Title, seconds, ct);
+        var found = shown ?? await FindAsync(track, seconds, ct);
         if (!found.Found)
         {
             if (found.Transient) return Outcome.Transient;

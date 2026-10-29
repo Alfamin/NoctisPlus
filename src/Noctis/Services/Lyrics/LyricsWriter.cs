@@ -296,6 +296,24 @@ public sealed class LyricsWriter
         }
     }
 
+    /// <summary>
+    /// Owner #208: Kugou's word timing is choppy, so it is no longer an automatic source; the .ttml it wrote goes to the
+    /// Recycle Bin and the song falls back to its .elrc / .lrc. Only a .ttml marked as Kugou's online timing is touched.
+    /// </summary>
+    public bool RemoveKugouTiming(string audioPath)
+    {
+        var existing = SidecarsOnDisk(audioPath, ".ttml");
+        if (existing.Count != 1) return false;
+        try
+        {
+            if (OnlineTimingSidecar.SourceOf(File.ReadAllText(existing[0])) != WordTimingSource.Kugou) return false;
+            if (!TrashFile(existing[0]) && File.Exists(existing[0])) return false;
+            _registry.Remove(existing[0]);
+            return true;
+        }
+        catch (Exception e) when (e is IOException or UnauthorizedAccessException) { return false; }
+    }
+
     /// <summary>Writes one sidecar unless a foreign file sits there and we were not asked to replace it (trash first when we were).</summary>
     private void WriteSidecar(string sidecarPath, string content, bool replaceForeign, ref bool written, ref bool replaced, ref bool kept)
     {

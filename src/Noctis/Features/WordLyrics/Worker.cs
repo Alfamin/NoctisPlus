@@ -741,6 +741,13 @@ internal sealed class Worker : IDisposable
                 item.Length = -2;
                 return false;
             }
+            // Owner #207 (hard rule: everywhere): lrc.red, Unison and Kugou come first for every song timed automatically
+            // (playing, queued, fetched ahead, downloaded, library); it waits here, kept in line, until they have answered.
+            if (!item.Hand && item.Action == TimingAction.Missing && WaitsForOnline?.Invoke(item.Path) == true)
+            {
+                item.NotBefore = now + TimeSpan.FromSeconds(2);
+                return false;
+            }
             return true;
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
@@ -1341,6 +1348,9 @@ internal sealed class Worker : IDisposable
         var rule = _rules.Get(path);
         return rule.Ignored || rule.RetryUtc > DateTime.UtcNow;
     }
+
+    /// <summary>#207: true while the online word timing sources have not answered for this song yet (they go first).</summary>
+    internal Func<string, bool>? WaitsForOnline { get; set; }
 
     /// <summary>#200: songs whose online word timing is shown (a stream, before its .ttml is written). This run only.</summary>
     private readonly System.Collections.Concurrent.ConcurrentDictionary<string, byte> _coveredOnline = new(StringComparer.OrdinalIgnoreCase);
