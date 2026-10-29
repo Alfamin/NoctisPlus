@@ -1779,10 +1779,16 @@ public partial class LyricsViewModel : ViewModelBase, IDisposable
 
     partial void OnLyricsSourceNameChanged(string value) => RefreshLyricsCredit();
 
+    /// <summary>#200: the song's lyrics are an automatic online word timing (its .ttml names the source).</summary>
+    private (string Path, string Source)? _onlineTiming;
+
     private void RefreshLyricsCredit() =>
-        LyricsCreditText = LyricsSourceName != Services.Lyrics.OnlineLyricsSource.LrcRed ? string.Empty
-            : Localization.Loc.T(_lrcRedModelResult != null && ReferenceEquals(_currentOnlineResult, _lrcRedModelResult)
-                ? "Lyrics.LrcRedModelCredit" : "Lyrics.LrcRedCredit");
+        LyricsCreditText = LyricsSourceName == Services.Lyrics.OnlineLyricsSource.LrcRed
+            ? Localization.Loc.T(_lrcRedModelResult != null && ReferenceEquals(_currentOnlineResult, _lrcRedModelResult)
+                ? "Lyrics.LrcRedModelCredit" : "Lyrics.LrcRedCredit")
+            : string.IsNullOrEmpty(LyricsSourceName) && _onlineTiming is { } online && _currentTrack?.FilePath == online.Path
+                ? Localization.Loc.T("Lyrics.OnlineTimingCredit", online.Source)
+                : string.Empty;
 
     /// <summary>The model is offered while lrc.red is on in Settings and the preferred lyrics type keeps word timings.</summary>
     private async Task<bool> LrcRedModelAllowedAsync()
@@ -3236,7 +3242,8 @@ public partial class LyricsViewModel : ViewModelBase, IDisposable
         string? UnsyncedPlain,
         string Source,
         bool FromCache,
-        string? SyncedText = null);
+        string? SyncedText = null,
+        string? OnlineTimingSource = null);
 
     /// <summary>Synchronous probe helper — must only be called off the UI thread.</summary>
     internal static LocalLyricsProbe ProbeLocalLyricSources(Track track, bool joinSplitWords, string uiLanguage)
@@ -3262,7 +3269,8 @@ public partial class LyricsViewModel : ViewModelBase, IDisposable
             {
                 var (lines, plain) = TtmlParser.Parse(sidecarTtml, joinSplitWords, uiLanguage);
                 if (lines != null && lines.Count > 0)
-                    return new LocalLyricsProbe(lines, plain, "Sidecar:Ttml", FromCache: false);
+                    return new LocalLyricsProbe(lines, plain, "Sidecar:Ttml", FromCache: false,
+                        OnlineTimingSource: Services.Lyrics.OnlineTimingSidecar.SourceOf(sidecarTtml) is { } online ? Services.Lyrics.OnlineTimingSidecar.Name(online) : null);
             }
         }
         catch { }
@@ -3388,6 +3396,8 @@ public partial class LyricsViewModel : ViewModelBase, IDisposable
     private void ApplyLocalLyricsResult(Track track, LocalLyricsProbe probe)
     {
         IsPreviewActive = probe.Source == PreviewSource;
+        _onlineTiming = probe.OnlineTimingSource is { } online ? (track.FilePath, online) : null;
+        RefreshLyricsCredit();
         if (probe.Lines != null && probe.Lines.Count > 0)
         {
             DebugLogger.Info(DebugLogger.Category.Lyrics, probe.Source, $"lines={probe.Lines.Count}");

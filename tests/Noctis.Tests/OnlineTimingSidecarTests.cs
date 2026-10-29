@@ -47,6 +47,21 @@ public sealed class OnlineTimingSidecarTests : IDisposable
     }
 
     [Fact]
+    public void TheLyricsPageReadsTheTtmlFirstAndKnowsItsSource()
+    {
+        File.WriteAllText(Path.ChangeExtension(_song, ".elrc"), "[00:10.00]<00:10.00>hello <00:10.50>you <00:11.00>");
+        var track = new Noctis.Models.Track { FilePath = _song, Title = "Song" };
+        var before = Noctis.ViewModels.LyricsViewModel.ProbeLocalLyricSources(track, true, "en");
+        Assert.Equal("Sidecar:Elrc", before.Source);
+        Assert.Null(before.OnlineTimingSource);
+        Assert.True(_writer.WriteOnlineTiming(_song, Marked(WordTimingSource.Unison, 0)));
+        var after = Noctis.ViewModels.LyricsViewModel.ProbeLocalLyricSources(track, true, "en");
+        Assert.Equal("Sidecar:Ttml", after.Source);
+        Assert.Equal("Unison", after.OnlineTimingSource);
+        Assert.Equal("Word timing from Unison", Noctis.Localization.Loc.T("Lyrics.OnlineTimingCredit", "Unison"));
+    }
+
+    [Fact]
     public void WritesOnlyTheTtmlBesideWordLyrics()
     {
         var elrc = Path.ChangeExtension(_song, ".elrc");

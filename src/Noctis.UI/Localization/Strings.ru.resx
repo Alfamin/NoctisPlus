@@ -1231,6 +1231,7 @@
   <data name="Lyrics.LrcRedSync" xml:space="preserve"><value>Синхронизировать по словам моделью lrc.red</value><comment>Lyrics page pill and lrc.red's row in Search Lyrics: has lrc.red's in-house model time every word of a song it has only line-synced</comment></data>
   <data name="Lyrics.LrcRedSyncWorking" xml:space="preserve"><value>Расставляем время каждого слова… несколько секунд</value><comment>Lyrics page pill / Search Lyrics row while lrc.red's model runs</comment></data>
   <data name="Lyrics.LrcRedSyncRetry" xml:space="preserve"><value>Попробовать снова</value><comment>Lyrics page pill / Search Lyrics row after lrc.red's model sync failed</comment></data>
+  <data name="Lyrics.OnlineTimingCredit" xml:space="preserve"><value>Тайминг слов: {0}</value><comment>Lyrics page credit under a song's automatic online word timing; {0} = lrc.red, Unison or Kugou</comment></data>
   <data name="Lyrics.LrcRedCredit" xml:space="preserve"><value>Текст с lrc.red</value><comment>Lyrics page credit under lyrics that came from lrc.red</comment></data>
   <data name="Lyrics.LrcRedModelCredit" xml:space="preserve"><value>Синхронизировано по словам моделью lrc.red</value><comment>Lyrics page credit, and the Search Lyrics row format, for lyrics lrc.red's model word-synced</comment></data>
   <data name="Lyrics.LrcRedSyncNetwork" xml:space="preserve"><value>Не удалось подключиться к lrc.red. Проверьте подключение к интернету.</value><comment>Lyrics page / Search Lyrics / Lyrics Studio: lrc.red model sync failed</comment></data>
