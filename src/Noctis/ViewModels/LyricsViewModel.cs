@@ -2830,6 +2830,48 @@ public partial class LyricsViewModel : ViewModelBase, IDisposable
             LoadLyricsForTrack(track, inPlace: LyricLines.Count > 0);
     }
 
+    /// <summary>
+    /// Owner 2026-10-29 (#200): a stream's online word timing, shown the moment it is found, before the file has arrived.
+    /// It can be read and scrolled; tapping a line seeks only where the player can (as the seek bar while streaming).
+    /// Lyrics already word-timed on screen stay; the same lines take the timing in place, others swap as usual.
+    /// </summary>
+    internal void ShowOnlineTiming(Track track, string ttml, string source)
+    {
+        if (_currentTrack is not { } shown || shown.Id != track.Id || IsPreviewActive) return;
+        if (_hasSyncedLyrics && LyricLines.Any(l => l.HasWords)) return;
+        if (ProbeTtmlText(ttml, _player.LyricsJoinSplitWords, Localization.Loc.Instance.Culture.Name) is not { } probe) return;
+        probe = probe with { OnlineTimingSource = source };
+        var generation = ++_searchGeneration;   // an online search still running for this song does not replace it
+        IsSearching = false;
+        ShowSearchButton = false;
+        SearchFailedMessage = string.Empty;
+        _onlineTiming = (shown.FilePath, source);
+        _shownWhileStreaming = shown.Id;
+        if (TryTakeTimingInPlace(shown, probe, generation))
+        {
+            RefreshLyricsCredit();
+            return;
+        }
+        _timeline.Reset();
+        IsSyncTabSelected = true;
+        IsUnsyncTabSelected = false;
+        ApplyLocalLyricsResult(shown, probe);
+        LyricsSwapped?.Invoke(this, EventArgs.Empty);
+    }
+
+    private Guid? _shownWhileStreaming;
+
+    /// <summary>The timing shown while streaming did not fit the finished file: the song's usual lyrics come back.</summary>
+    internal void DropOnlineTiming(IReadOnlyList<string> paths)
+    {
+        if (_currentTrack is { } track && _shownWhileStreaming == track.Id && !IsPreviewActive
+            && (paths.Contains(track.FilePath, StringComparer.OrdinalIgnoreCase) || string.IsNullOrWhiteSpace(track.FilePath)))
+        {
+            _shownWhileStreaming = null;
+            LoadLyricsForTrack(track);
+        }
+    }
+
     private void OnLibraryUpdated(object? sender, EventArgs e)
     {
         Dispatcher.UIThread.Post(() =>

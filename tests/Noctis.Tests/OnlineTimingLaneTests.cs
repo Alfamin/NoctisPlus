@@ -164,6 +164,55 @@ public sealed class OnlineTimingLaneTests : IDisposable
     }
 
     [Fact]
+    public async Task AStreamShowsItsTimingAtOnce_TheFinishedFileThenGetsItFitted()
+    {
+        using var lane = Lane();
+        var song = Song("streamed");
+        _lrcRed.Answer = () => new LrcLibResult { Duration = 200, SyncedLyrics = "x", OriginalTtml = WordTtml() };
+        (Track Track, string Ttml, string Source)? shown = null;
+        lane.Provisional += (t, ttml, source) => shown = (t, ttml, source);
+        Assert.True(await lane.ShowWhileStreamingAsync(song, CancellationToken.None));
+        Assert.Same(song, shown!.Value.Track);
+        Assert.Equal("lrc.red", shown.Value.Source);
+        Assert.Equal(WordTimingSource.LrcRed, OnlineTimingSidecar.SourceOf(shown.Value.Ttml));
+        Assert.False(await lane.ShowWhileStreamingAsync(song, CancellationToken.None));   // once per song
+        Assert.Equal(0, _checks);                                                        // no file needed to show it
+        // WordLyrics' file for the finished stream landed meanwhile: the online timing shown still gets its fit check.
+        File.WriteAllText(Path.ChangeExtension(song.FilePath, ".elrc"), "[00:10.00]<00:10.00>w0 <00:10.30>");
+        Assert.Equal(OnlineTimingLane.Outcome.Written, await lane.ProcessAsync(song, CancellationToken.None));
+        Assert.Equal(1, _lrcRed.Calls);   // the answer found at Play is reused
+        Assert.Equal(1, _checks);
+    }
+
+    [Fact]
+    public async Task AStreamedTimingThatDoesNotFitIsTakenBack()
+    {
+        using var lane = Lane();
+        var song = Song("shifted stream");
+        _lrcRed.Answer = () => new LrcLibResult { Duration = 200, SyncedLyrics = "x", OriginalTtml = WordTtml() };
+        IReadOnlyList<string>? rejected = null;
+        lane.Rejected += p => rejected = p;
+        Assert.True(await lane.ShowWhileStreamingAsync(song, CancellationToken.None));
+        _fit = null;
+        Assert.Equal(OnlineTimingLane.Outcome.NoFit, await lane.ProcessAsync(song, CancellationToken.None));
+        Assert.Equal([song.FilePath], rejected);
+        Assert.False(File.Exists(Path.ChangeExtension(song.FilePath, ".ttml")));
+    }
+
+    [Fact]
+    public async Task AStreamNoSourceHasIsNotShownAndIsRemembered()
+    {
+        using var lane = Lane();
+        var song = Song("nothing online");
+        var shown = false;
+        lane.Provisional += (_, _, _) => shown = true;
+        Assert.False(await lane.ShowWhileStreamingAsync(song, CancellationToken.None));
+        Assert.False(shown);
+        Assert.Equal(OnlineTimingLane.Outcome.Miss, await lane.ProcessAsync(song, CancellationToken.None));
+        Assert.Equal(1, _lrcRed.Calls);
+    }
+
+    [Fact]
     public async Task TheLoopTimesThePlayingSongWithoutWaitingForTheLibrary()
     {
         using var lane = Lane();

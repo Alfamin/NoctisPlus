@@ -790,6 +790,8 @@ public partial class MainWindowViewModel : ViewModelBase
                     lyricsWriter, () => converter?.GetFfmpegPath(), () => OnlineAccess.Shared.IsOffline,
                     path => wordService.IsIgnored(path) || Services.Lyrics.OnlineTimingLane.StudioTimed(path));
                 lane.Written += paths => Dispatcher.UIThread.Post(() => _lyricsVm.ReloadWrittenLyrics(paths));
+                lane.Provisional += (track, ttml, source) => Dispatcher.UIThread.Post(() => _lyricsVm.ShowOnlineTiming(track, ttml, source));
+                lane.Rejected += paths => Dispatcher.UIThread.Post(() => _lyricsVm.DropOnlineTiming(paths));
                 Player.PropertyChanged += (_, e) =>
                 {
                     if (e.PropertyName == nameof(PlayerViewModel.CurrentTrack)) lane.SetPlaying(Player.CurrentTrack, Player.UpNext);

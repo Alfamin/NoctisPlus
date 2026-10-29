@@ -34,8 +34,15 @@ internal sealed class OnlineTimingLane : IDisposable
     DateTime _restUntil;
     Task? _loop;
 
+    readonly HashSet<string> _streamAsked = new(StringComparer.Ordinal);
+    readonly Dictionary<string, OnlineWordTiming.Lookup> _provisional = new(StringComparer.Ordinal);
+
     /// <summary>Lyrics files written for these songs: the lyrics page reloads the one shown in place.</summary>
     public event Action<IReadOnlyList<string>>? Written;
+    /// <summary>A stream's online word timing to show now (the song, its marked TTML, the source name); not on disk yet.</summary>
+    public event Action<Track, string, string>? Provisional;
+    /// <summary>The timing shown while streaming did not fit the finished file: these paths go back to their usual lyrics.</summary>
+    public event Action<IReadOnlyList<string>>? Rejected;
 
     /// <summary>The fit check; a seam for tests (the real one decodes with ffmpeg).</summary>
     internal Func<string, string, string, CancellationToken, Task<OnlineTimingFit.Result?>> Check { get; set; } = OnlineTimingFit.CheckAsync;
@@ -126,6 +133,12 @@ internal sealed class OnlineTimingLane : IDisposable
             try
             {
                 var now = Now();
+                // A stream that just started: its word timing first, no file needed (owner 2026-10-29).
+                if (!_offline() && StreamToShow() is { } streaming)
+                {
+                    await ShowWhileStreamingAsync(streaming, ct);
+                    continue;
+                }
                 var track = _offline() || now < _restUntil ? null : Next(now >= libraryAt && !Busy());
                 if (track == null)
                 {
@@ -150,8 +163,47 @@ internal sealed class OnlineTimingLane : IDisposable
         var path = Local(track)!;
         var outcome = await ProcessCoreAsync(track, path, ct);
         if (outcome != Outcome.Transient) lock (_gate) _done.Add(path);
-        if (outcome == Outcome.Written) Written?.Invoke(new[] { path, track.FilePath }.Where(p => !string.IsNullOrWhiteSpace(p)).Distinct(StringComparer.OrdinalIgnoreCase).ToList());
+        if (outcome == Outcome.Written) Written?.Invoke(Paths(path, track));
         return outcome;
+    }
+
+    static List<string> Paths(string path, Track track) =>
+        new[] { path, track.FilePath }.Where(p => !string.IsNullOrWhiteSpace(p)).Distinct(StringComparer.OrdinalIgnoreCase).ToList();
+
+    /// <summary>
+    /// Owner 2026-10-29: a song being streamed shows its online word timing at once, before its file has arrived (only
+    /// the length is compared then). The answer is kept for the fit check when the file is complete: it fits → the
+    /// .ttml is written (shifted if needed) and the lyrics update in place; it does not → <see cref="Rejected"/>.
+    /// </summary>
+    internal async Task<bool> ShowWhileStreamingAsync(Track track, CancellationToken ct)
+    {
+        if (string.IsNullOrWhiteSpace(track.Title)) return false;
+        var seconds = track.Duration.TotalSeconds;
+        var key = OnlineTimingMisses.Key(track.Artist ?? "", track.Title, seconds);
+        lock (_gate) if (!_streamAsked.Add(key)) return false;
+        if (_misses.IsMiss(key, Now())) return false;
+        var found = await _timing.FindAsync(track.Artist ?? "", track.Title, seconds, ct);
+        if (!found.Found)
+        {
+            // A source that could not answer is asked again with the finished file (never in a loop here).
+            if (!found.Transient) _misses.Remember(key, Now());
+            return false;
+        }
+        lock (_gate) _provisional[key] = found;
+        var marked = OnlineTimingSidecar.Mark(found.Ttml!, found.Source!.Value, 0) ?? found.Ttml!;
+        Provisional?.Invoke(track, marked, OnlineTimingSidecar.Name(found.Source!.Value));
+        return true;
+    }
+
+    /// <summary>The song playing is a stream still arriving that was not looked up yet.</summary>
+    Track? StreamToShow()
+    {
+        lock (_gate)
+        {
+            if (_current is not { IsRemoteStream: false } t || Local(t) != null || string.IsNullOrWhiteSpace(t.Title)) return null;
+            if (t.PendingStream == null && string.IsNullOrWhiteSpace(t.FilePath)) return null;
+            return _streamAsked.Contains(OnlineTimingMisses.Key(t.Artist ?? "", t.Title, t.Duration.TotalSeconds)) ? null : t;
+        }
     }
 
     async Task<Outcome> ProcessCoreAsync(Track track, string path, CancellationToken ct)
@@ -161,14 +213,19 @@ internal sealed class OnlineTimingLane : IDisposable
         var ttmls = LyricsWriter.SidecarsOnDisk(path, ".ttml");
         if (ttmls.Count > 0)
             return OnlineTimingSidecar.SourceOf(SafeRead(ttmls[0])) != null ? Outcome.AlreadyTimed : Outcome.Skipped;
-        // Owner 2026-10-29: a song that already has word timing (WordLyrics, Lyrics Studio, anything) is fine as it is.
-        if (LyricsWriter.SidecarsOnDisk(path, ".elrc").Count > 0) return Outcome.AlreadyTimed;
-        if (_userTimed(path)) return Outcome.Skipped;
-
         var seconds = track.Duration.TotalSeconds;
         var key = OnlineTimingMisses.Key(track.Artist ?? "", track.Title, seconds);
+        bool streamedOnline;
+        lock (_gate) streamedOnline = _provisional.ContainsKey(key);
+        // Owner 2026-10-29: a song that already has word timing (WordLyrics, Lyrics Studio, anything) is fine as it is;
+        // except a stream already showing its online timing, whose WordLyrics file may have landed meanwhile.
+        if (!streamedOnline && LyricsWriter.SidecarsOnDisk(path, ".elrc").Count > 0) return Outcome.AlreadyTimed;
+        if (_userTimed(path)) return Outcome.Skipped;
+
         if (_misses.IsMiss(key, Now())) return Outcome.Miss;
-        var found = await _timing.FindAsync(track.Artist ?? "", track.Title, seconds, ct);
+        OnlineWordTiming.Lookup? shown;
+        lock (_gate) _provisional.Remove(key, out shown);
+        var found = shown ?? await _timing.FindAsync(track.Artist ?? "", track.Title, seconds, ct);
         if (!found.Found)
         {
             if (found.Transient) return Outcome.Transient;
@@ -181,6 +238,7 @@ internal sealed class OnlineTimingLane : IDisposable
         if (fit.Shift is not { } shift)
         {
             _misses.Remember(key, Now());   // the same recording file, the same verdict next start
+            if (shown != null) Rejected?.Invoke(Paths(path, track));   // the timing shown at Play goes; the usual route takes over
             return Outcome.NoFit;
         }
         var marked = OnlineTimingSidecar.Mark(OnlineTimingFit.Shift(found.Ttml!, shift), found.Source!.Value, shift);
