@@ -1042,6 +1042,7 @@ internal sealed class Worker : IDisposable
         // Owner #193: what the pill may say about this run, read before its songs are updated below.
         bool hand = batch.Any(i => i.Hand), retry = batch.All(i => i.Tries > 0 || i.Waits > 0), listening = batch.Any(i => i.Urgent != default || i.Ahead || i.AheadOnly);
         var outcome = new Dictionary<string, (string Status, string Title)>(StringComparer.OrdinalIgnoreCase);
+        var reasons = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
         var error = "";
         var reason = "";
         var report = "";
@@ -1059,6 +1060,7 @@ internal sealed class Worker : IDisposable
                     foreach (var song in songs.EnumerateArray())
                     {
                         outcome[Usual(Text(song, "path"))] = (Text(song, "status"), Text(song, "title"));
+                        reasons[Usual(Text(song, "path"))] = Text(song, "reason");
                         if (reason.Length == 0 && Text(song, "status") is not "timed" and not "skipped") reason = Text(song, "reason");
                     }
                 if (root.TryGetProperty("left_out", out var left) && left.ValueKind == JsonValueKind.Array)
@@ -1154,6 +1156,15 @@ internal sealed class Worker : IDisposable
                     }
                 }
                 if (IsIgnored(item.Path)) { _items.Remove(item.Path); continue; }
+                // Owner #219 (Young Thug "Hot"): Retime of words written censored ("n***a", often an online source's) is
+                // refused by WordLyrics: the song goes on at once as Fetch fresh lyrics (uncensored ones, when found).
+                if (!cancelled && status == "not_timed" && item.Action == TimingAction.Current
+                    && reasons.TryGetValue(item.Path, out var why) && why.Contains("censored", StringComparison.OrdinalIgnoreCase))
+                {
+                    item.Action = TimingAction.Fresh; item.Draft = null; item.NotBefore = now; item.Tries = 0;
+                    _log("the words to retime are censored: fetching fresh lyrics for " + Path.GetFileNameWithoutExtension(item.Path));
+                    continue;
+                }
                 if (!cancelled && status is "no_lyrics" or "rejected" or "not_timed" or "lines_only" or "failed")
                 {
                     _rules.Set(item.Path, new(RetryUtc: now + SongRules.RetryAfter));

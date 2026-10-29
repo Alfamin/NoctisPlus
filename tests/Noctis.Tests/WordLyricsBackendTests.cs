@@ -15,7 +15,7 @@ public class WordLyricsBackendTests
         internal readonly TestPersistenceService Data = new();
         internal readonly string App, Music, Song, Work;
         private readonly string? _before = Environment.GetEnvironmentVariable("WORDLYRICS_PYTHON");
-        internal Rig(bool hold = false, string outcome = "timed", bool stuck = false, double done = 1, bool earlyWords = false, string? crashOn = null)
+        internal Rig(bool hold = false, string outcome = "timed", bool stuck = false, double done = 1, bool earlyWords = false, string? crashOn = null, string reason = "")
         {
             var python = Environment.GetEnvironmentVariable("NOCTIS_TEST_PYTHON") ?? "python";
             try
@@ -31,7 +31,7 @@ public class WordLyricsBackendTests
             File.WriteAllText(Path.Combine(module, "__init__.py"), "__version__ = \"1.6.4\"\n");
             File.WriteAllText(Path.Combine(App, "WordLyrics.bat"), "fixture only");
             File.WriteAllText(Path.Combine(module, "__main__.py"), "# --confirm-redo is supported by this synthetic backend\n");
-            File.WriteAllText(Path.Combine(App, "fixture.json"), JsonSerializer.Serialize(new { hold, outcome, stuck, done, earlyWords, crashOn }));
+            File.WriteAllText(Path.Combine(App, "fixture.json"), JsonSerializer.Serialize(new { hold, outcome, stuck, done, earlyWords, crashOn, reason }));
             File.WriteAllText(Path.Combine(module, "models.py"), "class ModelError(Exception):pass\ndef missing(folder):return []\ndef download(*a,**k):raise Exception('Original download must never run')\n");
             var run = """
                 import json,sys,time,os
@@ -62,7 +62,7 @@ public class WordLyricsBackendTests
                 # Owner #161: a song that brings the whole program down: no result file at all.
                 if config.get('crashOn') and any(config['crashOn'] in Path(p).name for p in songs): os._exit(9)
                 proxy=urlsplit(os.environ.get('https_proxy',''))
-                put(value('--result'),{'run_folder':'','songs':[{'path':p,'title':Path(p).stem,'status':config['outcome']} for p in songs],
+                put(value('--result'),{'run_folder':'','songs':[{'path':p,'title':Path(p).stem,'status':config['outcome'],'reason':config.get('reason','')} for p in songs],
                     'args':args,'authenticated_loopback_proxy':proxy.hostname=='127.0.0.1' and bool(proxy.password)})
                 sys.exit(4 if config['outcome']=='network_error' else 0)
                 """;
@@ -158,6 +158,20 @@ public class WordLyricsBackendTests
         // Retimed from the online timing's own words (no lyrics search); the words file goes again when nothing was timed.
         Assert.Contains("--retime-mode", File.ReadAllText(rig.Result));
         Assert.Equal(!kept, File.Exists(Path.ChangeExtension(rig.Song, ".lrc")));
+    }
+
+    [Fact]
+    public async Task ARetimeOfCensoredWords_GoesOnAsFetchFreshLyrics()
+    {
+        // Owner #219 (Young Thug "Hot"): Start timing said "needs attention": the words to retime were censored.
+        using var rig = new Rig(outcome: "not_timed", reason: "current lyrics are censored; choose fresh lyrics or another source");
+        var states = new ConcurrentQueue<ProgressState>();
+        var logs = new ConcurrentQueue<string>();
+        File.WriteAllText(Path.ChangeExtension(rig.Song, ".lrc"), "[00:01.00]n***a word\n");
+        using var worker = new Worker(rig.Work, () => [rig.Music], new(true, "Light", false, rig.App, ""), logs.Enqueue, _ => { }, states.Enqueue, readiness: _ => true);
+        worker.Ask(rig.Song, TimingAction.Current);
+        await Until(() => logs.Any(l => l.Contains("fetching fresh lyrics")), () => string.Join(" | ", logs));
+        await Until(() => File.Exists(rig.Result) && File.ReadAllText(rig.Result).Contains("--repair-lyrics"), () => string.Join(" | ", logs));
     }
 
     [Fact]
