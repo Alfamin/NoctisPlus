@@ -65,10 +65,6 @@ internal sealed class WordLyricsService(ILibraryService library, Func<AppSetting
         _playingAsked = false;
         Changed?.Invoke();
     }
-    /// <summary>Owner #208: WordLyrics times songs on its own (on, set up, a timing mode chosen). When it does not, Kugou is
-    /// the online lane's last source instead.</summary>
-    internal bool TimesAutomatically => _worker is { } worker && !_disposed && BackendReady && worker.Options.Auto;
-
     /// <summary>#207: asks the online word timing lane whether it still wants to look at this song first (set by the window).</summary>
     internal Func<string, bool>? OnlineFirst { get; set; }
 

@@ -102,6 +102,7 @@ internal sealed class Worker : IDisposable
         public string? Draft;
         public bool Asked;              // the user asked for this song by hand
         public bool Hand;               // owner #193: a button press this session (Time words, Time library), not playback: what the pill may say
+        public bool OnlineWait;         // owner #207: waiting while lrc.red, Unison and Kugou are asked first (says nothing yet)
         public DateTime Urgent;         // owner #108: the song playing now (newest first, alone in its run; not saved)
         public bool Ahead, AheadOnly;
         public int AheadOrder;
@@ -181,6 +182,7 @@ internal sealed class Worker : IDisposable
             if (!_activePaths.Contains(path) && !item.Asked && !_options.Auto) return SongTimingStatus.None;
             if (_paused) return SongTimingStatus.Paused;
             if (_activePaths.Contains(path)) return SongTimingStatus.Processing;
+            if (item.OnlineWait) return SongTimingStatus.None;   // the online sources may answer in a moment
             return item.NotBefore > DateTime.UtcNow ? SongTimingStatus.Retry : SongTimingStatus.Queued;
         }
     }
@@ -741,13 +743,16 @@ internal sealed class Worker : IDisposable
                 item.Length = -2;
                 return false;
             }
-            // Owner #207 (hard rule: everywhere): lrc.red, Unison and Kugou come first for every song timed automatically
-            // (playing, queued, fetched ahead, downloaded, library); it waits here, kept in line, until they have answered.
-            if (!item.Hand && item.Action == TimingAction.Missing && WaitsForOnline?.Invoke(item.Path) == true)
+            // Owner #207/#210 (hard rule: everywhere): lrc.red, Unison and Kugou come first for every song WordLyrics would
+            // time (playing, queued, fetched ahead, downloaded, library, a saved backlog, after Restart or Time library); it
+            // waits here, kept in line, until they have answered. Only Retime / Fresh / Custom chosen by hand go straight on.
+            if ((item.Action == TimingAction.Missing || item.Action == TimingAction.Fresh && !item.Hand) && WaitsForOnline?.Invoke(item.Path) == true)
             {
+                item.OnlineWait = true;
                 item.NotBefore = now + TimeSpan.FromSeconds(2);
                 return false;
             }
+            item.OnlineWait = false;
             return true;
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)

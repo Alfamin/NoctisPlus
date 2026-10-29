@@ -187,6 +187,26 @@ public class WordLyricsBackendTests
     }
 
     [Fact]
+    public void EverySongWaitingForWordLyrics_AsksTheOnlineSourcesFirst_TimeLibraryAndRestartToo()
+    {
+        // Owner #207/#210: a backlog, a Time library press, Restart: all go through the online sources before WordLyrics.
+        using var rig = new Rig();
+        var asked = new List<string>();
+        using var worker = new Worker(rig.Work, () => [rig.Music], new(true, "Light", false, rig.App, ""), _ => { }, _ => { }, startTimer: false)
+        { WaitsForOnline = p => { lock (asked) asked.Add(p); return true; } };
+        Assert.Equal(1, worker.AskMany([rig.Song]));   // Time library: pressed by hand, still online first
+        worker.TickNow();
+        Assert.Contains(asked, p => string.Equals(p, Path.GetFullPath(rig.Song), StringComparison.OrdinalIgnoreCase));
+        Assert.Equal(1, worker.WaitingCount);                                 // kept in line, not started
+        Assert.Equal(SongTimingStatus.None, worker.StatusFor(rig.Song));     // and says nothing while the sources answer
+        asked.Clear();
+        worker.Restart();
+        worker.TickNow();
+        Assert.NotEmpty(asked);
+        Assert.Equal(1, worker.WaitingCount);
+    }
+
+    [Fact]
     public void ASongWithOnlineTimingIsNotTimedAutomatically_ThisRunOnly_AndATimeWordsPressStays()
     {
         // #200 (owner 2026-10-29): "Processing lyrics" showed under lrc.red's word timing of a stream.

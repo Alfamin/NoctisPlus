@@ -57,6 +57,7 @@ public sealed class OnlineTimingLaneTests : IDisposable
         new LyricsWriter(null!, null, new AppWrittenSidecarRegistry(Path.Combine(_dir, "registry.json")), Path.Combine(_dir, "cache")) { TrashFile = p => { File.Delete(p); return true; } },
         () => _ffmpeg, () => _offline, _userTimed.Contains)
     {
+        Spacing = TimeSpan.Zero,
         Check = (_, _, ttml, _) =>
         {
             _checks++;
@@ -237,62 +238,76 @@ public sealed class OnlineTimingLaneTests : IDisposable
     }
 
     [Fact]
-    public async Task KugouComesAfterWordLyrics_OnlyForASongWordLyricsWillNotTime()
+    public async Task KugouIsThird_AfterLrcRedAndUnison_BeforeWordLyrics()
     {
-        // Owner #208: lrc.red, Unison, then WordLyrics; Kugou (often choppy) last.
+        // Owner #209: lrc.red, then the better of Unison and Kugou (measured: Unison), then the other, WordLyrics last.
         _kugou.Answer = () => new LrcLibResult { Duration = 200, SyncedLyrics = "x", OriginalTtml = WordTtml() };
-        var timed = Song("WordLyrics will time it");
-        Assert.Equal(OnlineTimingLane.Outcome.Miss, await Lane().ProcessAsync(timed, CancellationToken.None));
-        Assert.Equal(0, _kugou.Calls);
+        var onlyKugou = Song("only on Kugou");
+        Assert.Equal(OnlineTimingLane.Outcome.Written, await Lane().ProcessAsync(onlyKugou, CancellationToken.None));
+        Assert.Equal(WordTimingSource.Kugou, OnlineTimingSidecar.SourceOf(File.ReadAllText(Path.ChangeExtension(onlyKugou.FilePath, ".ttml"))));
 
-        using var lane = Lane();
-        lane.WordLyricsTimes = () => false;   // not set up, or off
-        var untimed = Song("no WordLyrics here");
-        Assert.Equal(OnlineTimingLane.Outcome.Written, await lane.ProcessAsync(untimed, CancellationToken.None));
-        Assert.Equal(WordTimingSource.Kugou, OnlineTimingSidecar.SourceOf(File.ReadAllText(Path.ChangeExtension(untimed.FilePath, ".ttml"))));
-    }
+        _unison.Answer = () => new LrcLibResult { Duration = 200, SyncedLyrics = "x", OriginalTtml = WordTtml() };
+        var both = Song("on Unison and Kugou");
+        Assert.Equal(OnlineTimingLane.Outcome.Written, await Lane().ProcessAsync(both, CancellationToken.None));
+        Assert.Equal(WordTimingSource.Unison, OnlineTimingSidecar.SourceOf(File.ReadAllText(Path.ChangeExtension(both.FilePath, ".ttml"))));
 
-    [Fact]
-    public async Task AnEarlierKugouTimingLeavesWhereWordLyricsTakesOver()
-    {
-        var song = Song("kugou before");
-        var ttml = Path.ChangeExtension(song.FilePath, ".ttml");
-        File.WriteAllText(ttml, OnlineTimingSidecar.Mark(WordTtml(), WordTimingSource.Kugou, 0)!);
-        using (var noWordLyrics = Lane())
-        {
-            noWordLyrics.WordLyricsTimes = () => false;
-            Assert.Equal(OnlineTimingLane.Outcome.AlreadyTimed, await noWordLyrics.ProcessAsync(song, CancellationToken.None));
-            Assert.True(File.Exists(ttml));   // kept: nothing else would time it
-        }
-        using var lane = Lane();
-        IReadOnlyList<string>? reloaded = null;
-        lane.Written += p => reloaded = p;
         _lrcRed.Answer = () => new LrcLibResult { Duration = 200, SyncedLyrics = "x", OriginalTtml = WordTtml() };
-        Assert.Equal(OnlineTimingLane.Outcome.Written, await lane.ProcessAsync(song, CancellationToken.None));
-        Assert.Equal(WordTimingSource.LrcRed, OnlineTimingSidecar.SourceOf(File.ReadAllText(ttml)));   // looked up again: lrc.red now
-        Assert.NotNull(reloaded);
+        var all = Song("everywhere");
+        Assert.Equal(OnlineTimingLane.Outcome.Written, await Lane().ProcessAsync(all, CancellationToken.None));
+        Assert.Equal(WordTimingSource.LrcRed, OnlineTimingSidecar.SourceOf(File.ReadAllText(Path.ChangeExtension(all.FilePath, ".ttml"))));
     }
 
     [Fact]
-    public void WordLyricsIsNeverHeldForGood()
+    public void ABacklogWaitsItsTurn_OnlyTheSongBeingLookedAtCanRunOutOfTime()
+    {
+        // Owner #210: 300 songs waiting for WordLyrics after an update are all looked up online first, however long the
+        // line; only a look that hangs lets WordLyrics go on for that song.
+        using var lane = Lane();
+        var now = new DateTime(2026, 10, 29, 12, 0, 0, DateTimeKind.Utc);
+        lane.Now = () => now;
+        var backlog = Enumerable.Range(0, 300).Select(i => Song("waiting " + i)).ToList();
+        lane.SetLibrary(backlog);
+        Assert.All(backlog, s => Assert.True(lane.WantsFirst(s.FilePath)));
+        now += TimeSpan.FromMinutes(10);
+        Assert.True(lane.WantsFirst(backlog[299].FilePath));   // still in line: still waits
+        lane.StartedOn(backlog[0].FilePath);
+        now += OnlineTimingLane.WaitLimit;
+        Assert.False(lane.WantsFirst(backlog[0].FilePath));    // its look hung: WordLyrics goes on with it
+        Assert.True(lane.WantsFirst(backlog[1].FilePath));
+    }
+
+    [Fact]
+    public void OfflineOrAPathNothingKnows_WordLyricsGoesOn()
     {
         using var lane = Lane();
         var now = new DateTime(2026, 10, 29, 12, 0, 0, DateTimeKind.Utc);
         lane.Now = () => now;
-        var song = Song("slow source");
-        lane.SetLibrary([song]);
-        Assert.True(lane.WantsFirst(song.FilePath));
-        now += OnlineTimingLane.WaitLimit;
-        Assert.False(lane.WantsFirst(song.FilePath));      // waited long enough
         _offline = true;
         Assert.False(lane.WantsFirst(Song("offline").FilePath));
         _offline = false;
-        var unknown = Path.Combine(_dir, "not in the library.mp3");
+        var unknown = Path.Combine(_dir, "not there.mp3");   // no file, no list: nothing to look it up by
         Assert.True(lane.WantsFirst(unknown));
-        Assert.Null(lane.Next(false));                     // not listed yet: waits a moment for the library
+        Assert.Null(lane.Next(false));                      // waits a moment (a new download may be listed soon)
         now += OnlineTimingLane.FindGrace;
         Assert.Null(lane.Next(false));
-        Assert.False(lane.WantsFirst(unknown));            // never listed: WordLyrics goes on
+        Assert.False(lane.WantsFirst(unknown));
+    }
+
+    [Fact]
+    public async Task ASongNoListKnowsIsLookedUpByItsOwnTags()
+    {
+        // Owner #210: a stream-cache copy or an old queue entry WordLyrics has waiting is in no list: its tags are used.
+        using var lane = Lane();
+        var audio = await ProgressiveDecoderTests.AudioAsync("mp3", _dir);
+        var path = Path.Combine(_dir, "stream cache copy.mp3");
+        File.WriteAllBytes(path, audio);
+        using (var file = TagLib.File.Create(path)) { file.Tag.Title = "Movin' To The Sun"; file.Tag.Performers = ["HUGEL"]; file.Save(); }
+        Assert.True(lane.WantsFirst(path));
+        var found = lane.Next(false);
+        Assert.NotNull(found);
+        Assert.Equal(path, found!.FilePath);
+        Assert.Equal("Movin' To The Sun", found.Title);
+        Assert.Equal("HUGEL", found.Artist);
     }
 
     [Fact]

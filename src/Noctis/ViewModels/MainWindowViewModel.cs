@@ -792,8 +792,6 @@ public partial class MainWindowViewModel : ViewModelBase
                 lane.Written += paths => Dispatcher.UIThread.Post(() => _lyricsVm.ReloadWrittenLyrics(paths));
                 // #207 hard rule: every song WordLyrics would time automatically is looked up online first.
                 wordService.OnlineFirst = lane.WantsFirst;
-                // Owner #208: lrc.red, Unison, then WordLyrics; Kugou only for songs WordLyrics will not time.
-                lane.WordLyricsTimes = () => wordService.TimesAutomatically;
                 // Online timing on screen: WordLyrics does not time that song too ("Processing lyrics" under lrc.red's).
                 lane.Provisional += (track, ttml, source) => Dispatcher.UIThread.Post(() =>
                 {
