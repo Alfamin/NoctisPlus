@@ -276,6 +276,50 @@ public class WaveformSeekBarTests
         finally { win.Close(); }
     }
 
+    [Fact]
+    public void ReachLine_RunsFromTheStartToWhereTheThumbWouldSitAtTheFraction()
+    {
+        Assert.Equal(0, SeekReachLine.ReachWidth(1, 200, 6));      // a song on disk
+        Assert.Equal(0, SeekReachLine.ReachWidth(0, 200, 6));      // cannot seek at all
+        Assert.Equal(0, SeekReachLine.ReachWidth(0.5, 0, 6));      // not laid out yet
+        Assert.Equal(6 + 188 * 0.5, SeekReachLine.ReachWidth(0.5, 200, 6), 6);
+    }
+
+    [AvaloniaFact]
+    public void MiniPlayer_EverySeekSliderShowsHowFarAStreamingSongCanBeSought()
+    {
+        // Owner #204 everywhere: the mini player's six seek bars carry the island bar's reach line.
+        EnsureAppResources();
+        var player = MakePlayer();
+        player.CurrentTrack = new Track { Title = "Song", Artist = "Artist", FilePath = @"C:\m\song.flac" };
+        var vm = MakeMiniViewModel(player);
+        var win = new MiniPlayerWindow { DataContext = vm, Width = 340, Height = 520 };
+        win.Show();
+        try
+        {
+            player.SeekableFraction = 0.6;
+            PumpUntil(() => false, 150);
+            var names = new[] { "SeekSlider", "BarSeekSlider", "LargeSeekSlider", "LyricsSeekSlider", "PillSeekSlider", "SleeveSeekSlider" };
+            foreach (var name in names)
+            {
+                var slider = win.FindControl<Slider>(name)!;
+                var parent = (Panel)slider.GetVisualParent()!;
+                var reach = parent.Children.OfType<SeekReachLine>().Single();
+                Assert.True(parent.Children.IndexOf(reach) > parent.Children.IndexOf(slider), $"{name}: drawn over the remainder");
+                Assert.False(reach.IsHitTestVisible, $"{name}: clicks must reach the slider");
+                Assert.Equal(0.6, reach.Fraction, 6);
+                Assert.Equal(slider.Margin, reach.Margin);
+                Assert.True(reach.IsVisible);
+            }
+
+            player.WaveformSeekBarEnabled = true;                  // the waveform replaces the line
+            PumpUntil(() => false, 50);
+            var large = win.FindControl<Slider>("LargeSeekSlider")!;
+            Assert.False(((Panel)large.GetVisualParent()!).Children.OfType<SeekReachLine>().Single().IsVisible);
+        }
+        finally { win.Close(); }
+    }
+
     // ── PlayerViewModel glue ─────────────────────────────────
 
     private sealed class InstantDecoder : IWaveformDecoder
