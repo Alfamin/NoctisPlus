@@ -123,6 +123,7 @@ public partial class LrcRedLyricsService : ILrcRedLyricsService
                     SyncedLyrics = lyrics.Synced,
                     PlainLyrics = lyrics.Plain,
                     Isrc = song.Isrc,
+                    OriginalTtml = ttml,
                 };
             }
             Remember(_cache, cacheKey, result);
@@ -314,8 +315,9 @@ public partial class LrcRedLyricsService : ILrcRedLyricsService
             var root = doc.RootElement;
             if (root.ValueKind != JsonValueKind.Object) return null;
             var hasLines = root.TryGetProperty("lyrics", out var lyricsElement) && lyricsElement.ValueKind == JsonValueKind.Object;
-            var lyrics = OnlineTtml.Convert(Str(root, "source"))
-                         ?? (hasLines ? LinesToLyrics(lyricsElement) : null);
+            var source = Str(root, "source");
+            var converted = OnlineTtml.Convert(source);
+            var lyrics = converted ?? (hasLines ? LinesToLyrics(lyricsElement) : null);
             if (lyrics is not { } found) return null;
             var duration = Num(root, "duration");
             if (duration <= 0 && hasLines) duration = Num(lyricsElement, "duration");
@@ -328,6 +330,7 @@ public partial class LrcRedLyricsService : ILrcRedLyricsService
                 SyncedLyrics = found.Synced,
                 PlainLyrics = found.Plain,
                 Isrc = isrc,
+                OriginalTtml = converted is not null ? source : null,
             };
         }
     }

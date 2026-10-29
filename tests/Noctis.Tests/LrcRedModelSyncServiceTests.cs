@@ -22,6 +22,21 @@ public class LrcRedModelSyncServiceTests
         "\"year\":2024,\"language\":\"en\",\"lyrics\":{\"sync\":\"word\",\"timing\":\"word\",\"meta\":{},\"lines\":" + SyncLines + ",\"duration\":251.728}," +
         "\"source\":" + System.Text.Json.JsonSerializer.Serialize(SyncTtml) + ",\"duration\":251.728,\"level\":\"word\"}";
 
+    [Fact]
+    public void LinesFallback_DoesNotExposeMalformedSourceAsTtml()
+    {
+        var json = System.Text.Json.JsonSerializer.Serialize(new
+        {
+            source = "<tt><broken>",
+            lyrics = System.Text.Json.JsonSerializer.Deserialize<System.Text.Json.JsonElement>(
+                "{\"lines\":" + SyncLines + "}")
+        });
+        var result = LrcRedLyricsService.ParseSong(json, AcousticIsrc);
+        Assert.NotNull(result);
+        Assert.NotEmpty(result.SyncedLyrics!);
+        Assert.Null(result.OriginalTtml);
+    }
+
     internal const string SyncLines =
         "[{\"words\":[[{\"text\":\"(Ooh,\",\"begin\":3.856,\"end\":4.776}],[{\"text\":\"ooh)\",\"begin\":4.776,\"end\":4.998}]],\"text\":\"(Ooh, ooh)\",\"begin\":3.856,\"end\":4.998,\"voice\":\"a\",\"first\":true,\"timed\":true}," +
         "{\"words\":[[{\"text\":\"I,\",\"begin\":9.556,\"end\":11.855}],[{\"text\":\"I\",\"begin\":11.855,\"end\":12.269}],[{\"text\":\"just\",\"begin\":12.269,\"end\":12.636}],[{\"text\":\"woke\",\"begin\":12.636,\"end\":13.015}],[{\"text\":\"up\",\"begin\":13.015,\"end\":13.355}],[{\"text\":\"from\",\"begin\":13.355,\"end\":13.905}],[{\"text\":\"a\",\"begin\":13.905,\"end\":14.145}],[{\"text\":\"dream\",\"begin\":14.145,\"end\":14.195}]],\"text\":\"I, I just woke up from a dream\",\"begin\":9.556,\"end\":14.195,\"voice\":\"a\",\"first\":true,\"timed\":true}]";
@@ -86,6 +101,7 @@ public class LrcRedModelSyncServiceTests
         Assert.False(request.HasBody);
         Assert.StartsWith("Noctis", request.UserAgent);
         Assert.Equal(AcousticIsrc, result.Isrc);
+        Assert.Equal(SyncTtml, result.OriginalTtml);
         Assert.Equal("Die With A Smile (Acoustic)", result.TrackName);
         Assert.Equal("Lady Gaga, Bruno Mars", result.ArtistName);
         Assert.Equal(251.728, result.Duration, 3);

@@ -150,6 +150,7 @@ public class UnisonLyricsService : IUnisonLyricsService
         if (string.IsNullOrWhiteSpace(lyrics)) return null;
 
         string? synced = null;
+        string? originalTtml = null;
         string? plain;
         switch (Str(data, "format"))
         {
@@ -158,6 +159,7 @@ public class UnisonLyricsService : IUnisonLyricsService
                     ?? throw new InvalidDataException("Unison sent TTML that does not parse.");
                 synced = converted.Synced;
                 plain = converted.Plain;
+                originalTtml = lyrics;
                 break;
             case "lrc":
                 synced = lyrics;
@@ -176,6 +178,7 @@ public class UnisonLyricsService : IUnisonLyricsService
             Duration = Num(data, "duration"),
             SyncedLyrics = synced,
             PlainLyrics = plain,
+            OriginalTtml = originalTtml,
         };
     }
 

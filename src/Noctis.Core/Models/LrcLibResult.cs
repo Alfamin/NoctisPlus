@@ -49,6 +49,11 @@ public class LrcLibResult
     [JsonIgnore]
     public string? Isrc { get; set; }
 
+    /// <summary>The validated provider document, before conversion to enhanced LRC.
+    /// Kept separately so saving an online TTML sidecar need not replace WordLyrics' ELRC.</summary>
+    [JsonIgnore]
+    public string? OriginalTtml { get; set; }
+
     public bool HasSyncedLyrics => !string.IsNullOrWhiteSpace(SyncedLyrics);
     public bool HasLyricsfile => !string.IsNullOrWhiteSpace(Lyricsfile);
 

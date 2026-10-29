@@ -93,6 +93,8 @@ public class LrcRedUnisonProviderTests
         Assert.All(router.UserAgents, ua => Assert.StartsWith("Noctis", ua));
         Assert.Equal("Die With A Smile", result!.TrackName);
         Assert.Equal("MAYHEM", result.AlbumName);
+        Assert.Equal(LrcRedTtml, result.OriginalTtml);
+        Assert.DoesNotContain("OriginalTtml", System.Text.Json.JsonSerializer.Serialize(result));
         Assert.Equal(LyricsSearchSelector.WordSyncedRank, LyricsSearchSelector.FormatRank(result));
 
         var lines = LrcParser.Parse(result.SyncedLyrics!).Where(l => l.IsSynced).ToList();
@@ -238,6 +240,7 @@ public class LrcRedUnisonProviderTests
         Assert.Equal(2, router.Requests.Count);
         Assert.StartsWith("https://unison.boidu.dev/lyrics/search?q=AD%C3%89LA%20Ain%27t%20In%20LA", router.Requests[0]);
         Assert.Equal("https://unison.boidu.dev/lyrics/4688", router.Requests[1]);
+        Assert.Equal(UnisonTtml, result!.OriginalTtml);
         Assert.All(router.UserAgents, ua => Assert.StartsWith("Noctis", ua));
         Assert.Equal("PRIMA", result!.AlbumName);
         Assert.Equal(185, result.Duration); // from the search hit: the entry has none
@@ -280,6 +283,7 @@ public class LrcRedUnisonProviderTests
         var result = await svc.SearchLyricsAsync("ADÉLA", "Ain't In LA", 185);
 
         Assert.Equal(lrc, result!.SyncedLyrics);
+        Assert.Null(result.OriginalTtml);
         Assert.Equal(2, LyricsSearchSelector.FormatRank(result));
     }
 
