@@ -342,8 +342,18 @@ internal sealed class OnlineTimingLane : IDisposable
         var ttmls = LyricsWriter.SidecarsOnDisk(path, ".ttml");
         if (ttmls.Count > 0)
         {
-            var source = OnlineTimingSidecar.SourceOf(SafeRead(ttmls[0]));
+            var saved = SafeRead(ttmls[0]);
+            var source = OnlineTimingSidecar.SourceOf(saved);
             _detail = source != null ? ": has online timing from " + OnlineTimingSidecar.Name(source.Value) : ": has the user's own .ttml";
+            // Owner #220: an online timing saved with masked words ("****") gets them filled once, from LRCLIB.
+            if (source != null && OnlineTimingUncensor.Needs(saved) && !saved!.Contains(UncensorTried, StringComparison.Ordinal))
+            {
+                var (clean, note) = await _timing.UncensorAsync(saved, track.Artist ?? "", track.Title, track.Duration.TotalSeconds, ct);
+                _detail += note;
+                try { File.WriteAllText(ttmls[0], clean.Replace("plus:source=", UncensorTried + " plus:source="), new System.Text.UTF8Encoding(false)); }
+                catch (Exception e) when (e is IOException or UnauthorizedAccessException) { return Outcome.AlreadyTimed; }
+                return clean == saved ? Outcome.Kept : Outcome.Written;
+            }
             return source != null ? Outcome.AlreadyTimed : Outcome.Skipped;
         }
         var seconds = track.Duration.TotalSeconds;
@@ -385,6 +395,9 @@ internal sealed class OnlineTimingLane : IDisposable
         if (written && recheck) _recheck = Paths(path, track);
         return written ? Outcome.Written : Outcome.Kept;
     }
+
+    /// <summary>Owner #220: a saved online timing whose masked words were looked up once (not again every start).</summary>
+    const string UncensorTried = "plus:uncensor=\"tried\"";
 
     static string? SafeRead(string path)
     {

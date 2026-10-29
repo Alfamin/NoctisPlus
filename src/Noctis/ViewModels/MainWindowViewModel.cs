@@ -785,7 +785,7 @@ public partial class MainWindowViewModel : ViewModelBase
             {
                 var converter = App.Services.GetService<IAudioConverterService>();
                 var lane = new Services.Lyrics.OnlineTimingLane(
-                    new Services.Lyrics.OnlineWordTiming(lrcRed, unison, () => Settings.GetSettings().LrcRedEnabled, kugou),
+                    new Services.Lyrics.OnlineWordTiming(lrcRed, unison, () => Settings.GetSettings().LrcRedEnabled, kugou, lrcLib),
                     new Services.Lyrics.OnlineTimingMisses(Path.Combine(AppPaths.DataRoot, "online-timing-misses.json")),
                     lyricsWriter, () => converter?.GetFfmpegPath(), () => OnlineAccess.Shared.IsOffline,
                     path => wordService.IsIgnored(path) || Services.Lyrics.OnlineTimingLane.StudioTimed(path));

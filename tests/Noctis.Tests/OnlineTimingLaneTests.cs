@@ -65,6 +65,59 @@ public sealed class OnlineTimingLaneTests : IDisposable
         },
     };
 
+    static string MaskedTtml(string masked)
+    {
+        var b = new StringBuilder("<tt xmlns=\"http://www.w3.org/ns/ttml\"><body><div>");
+        for (int l = 0; l < 5; l++)
+        {
+            b.Append($"<p begin=\"{10 + l * 4}.000\" end=\"{13 + l * 4}.000\">");
+            var words = l == 2 ? new[] { "pull", "up", "with", "my", masked, "we", "ride", "out" } : Enumerable.Range(0, 8).Select(w => $"w{l}{w}").ToArray();
+            for (int w = 0; w < 8; w++) b.Append($"<span begin=\"{10 + l * 4 + w * 0.3:0.000}\" end=\"{10 + l * 4 + w * 0.3 + 0.25:0.000}\">{words[w]}</span> ");
+            b.Append("</p>");
+        }
+        return b.Append("</div></body></tt>").ToString();
+    }
+
+    sealed class Copy(string lyrics) : ILrcLibService
+    {
+        public int Calls;
+        public Task<LrcLibResult?> GetLyricsAsync(string artist, string trackName, double durationSeconds, CancellationToken ct = default)
+        { Calls++; return Task.FromResult<LrcLibResult?>(new LrcLibResult { Duration = 200, PlainLyrics = lyrics }); }
+        public Task<List<LrcLibResult>> SearchLyricsAsync(string artist, string trackName, CancellationToken ct = default) => Task.FromResult(new List<LrcLibResult>());
+    }
+
+    [Fact]
+    public async Task AFoundTimingsMaskedWords_AreFilledFromTheUncensoredCopy_BeforeItIsShownOrWritten()
+    {
+        // Owner #220: lrc.red masks whole words ("****").
+        var copy = new Copy("pull up with my nigga we ride out");
+        var timing = new OnlineWordTiming(_lrcRed, _unison, () => true, _kugou, copy);
+        _lrcRed.Answer = () => new LrcLibResult { Duration = 200, SyncedLyrics = "x", OriginalTtml = MaskedTtml("****") };
+        var found = await timing.FindAsync("Artist", "Song", 200, CancellationToken.None);
+        Assert.Contains(">nigga</span>", found.Ttml);
+        Assert.DoesNotContain("****", found.Ttml);
+        Assert.Contains("uncensored 1 of 1", found.Trace);
+    }
+
+    [Fact]
+    public async Task ASavedTimingWithMaskedWords_IsFixedOnce_FromItsLetters()
+    {
+        using var lane = Lane();
+        var song = Song("saved masked");
+        var ttml = Path.ChangeExtension(song.FilePath, ".ttml");
+        File.WriteAllText(ttml, OnlineTimingSidecar.Mark(MaskedTtml("n**ga"), WordTimingSource.Kugou, 0)!);
+        IReadOnlyList<string>? written = null;
+        lane.Written += p => written = p;
+        Assert.Equal(OnlineTimingLane.Outcome.Written, await lane.ProcessAsync(song, CancellationToken.None));
+        Assert.Contains(">nigga</span>", File.ReadAllText(ttml));
+        Assert.Equal(WordTimingSource.Kugou, OnlineTimingSidecar.SourceOf(File.ReadAllText(ttml)));
+        Assert.Equal([song.FilePath], written);
+
+        File.WriteAllText(ttml, File.ReadAllText(ttml).Replace(">nigga<", ">n**ga<"));   // tried already: not again
+        using var again = Lane();
+        Assert.Equal(OnlineTimingLane.Outcome.AlreadyTimed, await again.ProcessAsync(song, CancellationToken.None));
+    }
+
     [Fact]
     public void PlayingThenQueueThenLibrary()
     {

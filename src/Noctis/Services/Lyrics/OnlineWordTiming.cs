@@ -32,14 +32,49 @@ internal sealed class OnlineWordTiming
     readonly IUnisonLyricsService _unison;
     readonly IKugouLyricsService? _kugou;
     readonly Func<bool> _lrcRedEnabled;
+    readonly ILrcLibService? _uncensored;
 
-    public OnlineWordTiming(ILrcRedLyricsService lrcRed, IUnisonLyricsService unison, Func<bool> lrcRedEnabled, IKugouLyricsService? kugou = null)
+    /// <param name="uncensored">Owner #220: an uncensored copy of the lyrics (LRCLIB), asked alongside, for masked words.</param>
+    public OnlineWordTiming(ILrcRedLyricsService lrcRed, IUnisonLyricsService unison, Func<bool> lrcRedEnabled, IKugouLyricsService? kugou = null,
+        ILrcLibService? uncensored = null)
     {
         _lrcRed = lrcRed;
         _unison = unison;
         _kugou = kugou;
         _lrcRedEnabled = lrcRedEnabled;
+        _uncensored = uncensored;
     }
+
+    /// <summary>How long a masked answer waits for the uncensored copy, beyond the sources' own time.</summary>
+    internal static readonly TimeSpan UncensorWait = TimeSpan.FromSeconds(2.5);
+
+    /// <summary>The uncensored copy's words, or null (none, failed, no source).</summary>
+    Task<List<string>?> Reference(string artist, string title, double durationSeconds, CancellationToken ct)
+    {
+        if (_uncensored is not { } lrcLib) return Task.FromResult<List<string>?>(null);
+        return Task.Run(async () =>
+        {
+            try
+            {
+                return await OnlineTimingUncensor.CopyAsync(lrcLib, artist, title, durationSeconds, ct).ConfigureAwait(false);
+            }
+            catch (Exception e) when (e is not OperationCanceledException || !ct.IsCancellationRequested) { return null; }
+        }, ct);
+    }
+
+    /// <summary>Owner #220: the masked words of a found timing filled in (the copy asked earlier, or now).</summary>
+    internal async Task<(string Ttml, string Note)> UncensorAsync(string ttml, Task<List<string>?> reference, CancellationToken ct)
+    {
+        if (!OnlineTimingUncensor.Needs(ttml)) return (ttml, "");
+        await Task.WhenAny(reference, Task.Delay(UncensorWait, ct)).ConfigureAwait(false);
+        var words = reference.IsCompletedSuccessfully ? reference.Result : null;
+        var (clean, filled, masked) = OnlineTimingUncensor.Apply(ttml, words);
+        return (clean, $"; uncensored {filled} of {masked} masked words{(words == null ? " (no LRCLIB copy)" : "")}");
+    }
+
+    /// <summary>The same for a timing found earlier (a saved file): the copy is asked now.</summary>
+    internal Task<(string Ttml, string Note)> UncensorAsync(string ttml, string artist, string title, double durationSeconds, CancellationToken ct) =>
+        UncensorAsync(ttml, Reference(artist, title, durationSeconds, ct), ct);
 
     /// <summary>How long a word-timed answer that is ready waits for a better-ranked source still answering.</summary>
     internal static readonly TimeSpan PreferWait = TimeSpan.FromSeconds(3);
@@ -53,6 +88,7 @@ internal sealed class OnlineWordTiming
     public async Task<Lookup> FindAsync(string artist, string title, double durationSeconds, CancellationToken ct)
     {
         var asks = new List<(WordTimingSource Source, Task<LrcLibResult?> Answer)>();
+        var reference = Reference(artist, title, durationSeconds, ct);   // owner #220: asked alongside, used only for masked words
         if (_lrcRedEnabled()) asks.Add((WordTimingSource.LrcRed, Ask(() => _lrcRed.SearchLyricsAsync(artist, title, durationSeconds, ct))));
         asks.Add((WordTimingSource.Unison, Ask(() => _unison.SearchLyricsAsync(artist, title, durationSeconds, ct))));
         if (_kugou is { } kugou) asks.Add((WordTimingSource.Kugou, Ask(() => kugou.SearchLyricsAsync(artist, title, durationSeconds, ct))));
@@ -85,7 +121,11 @@ internal sealed class OnlineWordTiming
             }
             var best = Array.FindIndex(timed, t => t != null);
             var betterOut = Enumerable.Range(0, best < 0 ? asks.Count : best).Any(i => !read[i]);
-            if (best >= 0 && (!betterOut || clock.Elapsed >= PreferWait)) return new Lookup(asks[best].Source, timed[best], transient) { Trace = Trace() };
+            if (best >= 0 && (!betterOut || clock.Elapsed >= PreferWait))
+            {
+                var (clean, note) = await UncensorAsync(timed[best]!, reference, ct).ConfigureAwait(false);
+                return new Lookup(asks[best].Source, clean, transient) { Trace = Trace() + note };
+            }
             if (best < 0 && !betterOut) return new Lookup(null, null, transient) { Trace = Trace() };
             var waits = asks.Where((_, i) => !read[i]).Select(a => (Task)a.Answer).ToList();
             if (best >= 0) waits.Add(Task.Delay(PreferWait - clock.Elapsed, ct));

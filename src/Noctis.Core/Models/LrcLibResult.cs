@@ -22,8 +22,17 @@ public class LrcLibResult
     [JsonPropertyName("albumName")]
     public string? AlbumName { get; set; }
 
+    /// <summary>Seconds; 0 when LRCLIB has none (it sends null for some entries, which broke the whole search).</summary>
     [JsonPropertyName("duration")]
+    [JsonConverter(typeof(NullAsZeroConverter))]
     public double Duration { get; set; }
+
+    private sealed class NullAsZeroConverter : JsonConverter<double>
+    {
+        public override double Read(ref System.Text.Json.Utf8JsonReader reader, Type typeToConvert, System.Text.Json.JsonSerializerOptions options) =>
+            reader.TokenType == System.Text.Json.JsonTokenType.Number ? reader.GetDouble() : 0;
+        public override void Write(System.Text.Json.Utf8JsonWriter writer, double value, System.Text.Json.JsonSerializerOptions options) => writer.WriteNumberValue(value);
+    }
 
     [JsonPropertyName("instrumental")]
     public bool Instrumental { get; set; }
