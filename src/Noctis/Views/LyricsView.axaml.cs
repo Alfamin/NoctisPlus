@@ -682,6 +682,8 @@ public partial class LyricsView : UserControl
                 or nameof(PlayerViewModel.LyricsBackgroundMediaPath) &&
             DataContext is LyricsViewModel vm)
             UpdateFlowAnimationState(vm);
+        if (e.PropertyName is nameof(PlayerViewModel.SeekableFraction) or nameof(PlayerViewModel.WaveformSeekBarEnabled))
+            UpdateTimelineBuffered();
     }
 
     // ── Plugin visual layers ──
@@ -770,6 +772,22 @@ public partial class LyricsView : UserControl
             LyricsTimelineThumbSize,
             enabledBackgroundOpacity: 0.55,
             disabledBackgroundOpacity: 0.25);
+        UpdateTimelineBuffered();
+    }
+
+    /// <summary>Owner #214: the lyrics page's own timeline shows the reachable part too (the playback bar's line alone
+    /// was out of sight here).</summary>
+    private void UpdateTimelineBuffered()
+    {
+        if (LyricsTimelineSlider == null || LyricsTimelineTrackBuffered == null) return;
+        var fraction = (DataContext as LyricsViewModel)?.Player is { WaveformSeekBarEnabled: false } player ? player.SeekableFraction : 1;
+        var width = LyricsTimelineSlider.Bounds.Width;
+        var show = fraction is > 0 and < 1 && width > 0;
+        LyricsTimelineTrackBuffered.IsVisible = show;
+        if (!show) return;
+        var trackWidth = Math.Max(0, width - LyricsTimelineThumbSize);
+        LyricsTimelineTrackBuffered.Width = Math.Clamp(trackWidth * fraction, 0, trackWidth);
+        Canvas.SetLeft(LyricsTimelineTrackBuffered, LyricsTimelineThumbSize / 2.0);
     }
 
     private void OnTimelineSeekStart(object? sender, PointerPressedEventArgs e)

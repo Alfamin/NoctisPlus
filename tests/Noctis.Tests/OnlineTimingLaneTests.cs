@@ -257,6 +257,37 @@ public sealed class OnlineTimingLaneTests : IDisposable
         Assert.Equal(WordTimingSource.LrcRed, OnlineTimingSidecar.SourceOf(File.ReadAllText(Path.ChangeExtension(all.FilePath, ".ttml"))));
     }
 
+    [Theory]
+    [InlineData(true)]    // the fit check is unsure
+    [InlineData(false)]   // no ffmpeg: nothing to check it with
+    public async Task KugouIsUsedOnlyWithAFitTheCheckIsSureOf_ElseWordLyricsTimesIt(bool unsure)
+    {
+        // Owner #214: White Iverson from Kugou was far out of sync (its fit unsure: +0.47 s against the energy's -0.47 s).
+        _kugou.Answer = () => new LrcLibResult { Duration = 200, SyncedLyrics = "x", OriginalTtml = WordTtml() };
+        if (unsure) _fit = null; else _ffmpeg = null;
+        using var lane = Lane();
+        var song = Song("White Iverson");
+        Assert.True(lane.WantsFirst(song.FilePath));
+        Assert.Equal(OnlineTimingLane.Outcome.Miss, await lane.ProcessAsync(song, CancellationToken.None));
+        Assert.False(File.Exists(Path.ChangeExtension(song.FilePath, ".ttml")));
+        Assert.False(lane.WantsFirst(song.FilePath));   // WordLyrics goes on
+    }
+
+    [Fact]
+    public async Task AStreamFromKugouIsNotShownAtPlay_ItWaitsForTheFitCheckOnTheWholeFile()
+    {
+        _kugou.Answer = () => new LrcLibResult { Duration = 200, SyncedLyrics = "x", OriginalTtml = WordTtml() };
+        using var lane = Lane();
+        var song = Song("streamed from Kugou");
+        var shown = false;
+        lane.Provisional += (_, _, _) => shown = true;
+        Assert.False(await lane.ShowWhileStreamingAsync(song, CancellationToken.None));
+        Assert.False(shown);
+        Assert.Equal(OnlineTimingLane.Outcome.Written, await lane.ProcessAsync(song, CancellationToken.None));   // sure fit
+        Assert.Equal(1, _kugou.Calls);   // the answer found at Play is reused
+        Assert.Equal(WordTimingSource.Kugou, OnlineTimingSidecar.SourceOf(File.ReadAllText(Path.ChangeExtension(song.FilePath, ".ttml"))));
+    }
+
     [Fact]
     public void ABacklogWaitsItsTurn_OnlyTheSongBeingLookedAtCanRunOutOfTime()
     {

@@ -845,6 +845,15 @@
                                     CornerRadius="3.5"
                                     Background="{Binding LyricsSliderUnfilled}"
                                     Canvas.Top="8.5"/>
+                            <!-- Owner #204/#214: while the song streams, how far a seek plays at once (the played
+                                 line's colour, faint, under the played part). -->
+                            <Border x:Name="LyricsTimelineTrackBuffered"
+                                    Height="7"
+                                    CornerRadius="3.5"
+                                    IsVisible="False"
+                                    Background="{Binding LyricsAccentFg}"
+                                    Opacity="0.4"
+                                    Canvas.Top="8.5"/>
                             <Border x:Name="LyricsTimelineTrackFill"
                                     Height="7"
                                     CornerRadius="3.5"
