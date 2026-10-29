@@ -127,6 +127,26 @@ public class LyricsTrackChangeTimingTests : IDisposable
     }
 
     [AvaloniaFact]
+    public async Task OnlineTimingGivenBeforeThePageLoadedTheSong_IsShownOnceItHas()
+    {
+        // Owner #218: back to a half-downloaded stream: its online timing (known already) came at once, before the page
+        // had moved to the song, and was dropped as another song's: nothing showed until the file was whole.
+        using var persistence = new TestPersistenceService();
+        var player = new PlayerViewModel(new FakeAudioPlayer(), new FakeLibraryService(), persistence, new FakeAnimatedCoverService());
+        using var vm = new LyricsViewModel(player, new StubLrcLib(), new StubNetEase(), new StubMetadata(), persistence, new FakeLibraryService());
+        var first = MakeTrack("first", Elrc("first"));
+        var stream = MakeTrack("stream", "");
+        File.Delete(Path.ChangeExtension(stream.FilePath, ".elrc"));
+        player.ReplaceQueueAndPlay([first, stream], 0); await Pump(300);
+
+        const string ttml = "<tt xmlns=\"http://www.w3.org/ns/ttml\"><body><div><p begin=\"0.30\" end=\"1.60\"><span begin=\"0.30\" end=\"0.80\">online</span> <span begin=\"0.80\" end=\"1.60\">words</span></p></div></body></tt>";
+        vm.ShowOnlineTiming(stream, ttml, "lrc.red");       // before the page moved to it
+        player.NextCommand.Execute(null); await Pump(600);
+        Assert.Equal(stream.Id, player.CurrentTrack?.Id);
+        Assert.Contains(vm.LyricLines, l => l.Words is not null && l.Text.Contains("online"));
+    }
+
+    [AvaloniaFact]
     public async Task CompletedWordTimingOfThePlayingSong_SwapsInPlace_WithoutFadeOrLosingTheLine()
     {
         using var persistence = new TestPersistenceService();

@@ -2847,6 +2847,9 @@ public partial class LyricsViewModel : ViewModelBase, IDisposable
     /// </summary>
     internal void ShowOnlineTiming(Track track, string ttml, string source)
     {
+        // Owner #218: the answer for a song played again comes at once, often before this page has moved to that song;
+        // it is kept and put on screen when the page's own load for the song is done (it was dropped as "another song").
+        _onlineWaiting = (track.Id, ttml, source);
         if (_currentTrack is not { } shown || shown.Id != track.Id || IsPreviewActive) return;
         if (_hasSyncedLyrics && LyricLines.Any(l => l.HasWords)) { DebugLog.Write("Lyrics", $"online timing from {source} not shown: the song shows word timing already"); return; }
         if (ProbeTtmlText(ttml, _player.LyricsJoinSplitWords, Localization.Loc.Instance.Culture.Name) is not { } probe) { DebugLog.Write("Lyrics", $"online timing from {source} not shown: unreadable"); return; }
@@ -2863,6 +2866,18 @@ public partial class LyricsViewModel : ViewModelBase, IDisposable
             return;
         }
         _ = SwapInOnlineTimingAsync(shown, probe, generation);
+    }
+
+    private (Guid Id, string Ttml, string Source)? _onlineWaiting;
+
+    /// <summary>Owner #218: a stream's online timing given before this page loaded the song: shown now, unless the song
+    /// already shows word timing of its own.</summary>
+    private void ApplyWaitingOnlineTiming(Track track)
+    {
+        if (_onlineWaiting is not { } waiting || waiting.Id != track.Id || !ReferenceEquals(_currentTrack, track)) return;
+        if (_hasSyncedLyrics && LyricLines.Any(l => l.HasWords)) return;   // word timing on screen (this one, or the song's own)
+        DebugLog.Write("Lyrics", $"online timing from {waiting.Source} given before the song loaded: shown now");
+        ShowOnlineTiming(track, waiting.Ttml, waiting.Source);
     }
 
     /// <summary>Owner #211: other lines than the ones on screen arrive behind the same fade as any lyrics load (they
@@ -3244,6 +3259,7 @@ public partial class LyricsViewModel : ViewModelBase, IDisposable
             }
         });
         await applied.Task;
+        if (generation == _searchGeneration) ApplyWaitingOnlineTiming(track);
     }
 
     /// <summary>Lines given word timing per dispatcher turn: each one builds its word cells, so a few at a time keep frames flowing.</summary>
