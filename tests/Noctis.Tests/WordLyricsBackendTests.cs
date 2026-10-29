@@ -92,6 +92,35 @@ public class WordLyricsBackendTests
         worker.Ask(rig.Song, TimingAction.Current);
         Assert.Equal(SongTimingStatus.Queued, worker.StatusFor(rig.Song));
     }
+
+    private const string OnlineTtml = "<tt xmlns=\"http://www.w3.org/ns/ttml\"><body><div><p begin=\"1.0\" end=\"2.0\"><span begin=\"1.0\" end=\"2.0\">word</span></p></div></body></tt>";
+
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public async Task WordLyricsChosenByHand_ShowsInsteadOfTheOnlineTiming_TheUsersOwnTtmlStays(bool online)
+    {
+        // #200: a .ttml out-ranks the .elrc, so Retime on an online-timed song would never show without this.
+        using var rig = new Rig(); var states = new ConcurrentQueue<ProgressState>();
+        var ttml = Path.ChangeExtension(rig.Song, ".ttml");
+        File.WriteAllText(ttml, online ? Noctis.Services.Lyrics.OnlineTimingSidecar.Mark(OnlineTtml, Noctis.Services.Lyrics.WordTimingSource.LrcRed, 0)! : OnlineTtml);
+        using var worker = rig.Worker(states.Enqueue);
+        worker.Ask(rig.Song, TimingAction.Current);
+        await Until(() => states.Any(s => s.Finished));
+        Assert.Equal(!online, File.Exists(ttml));
+    }
+
+    [Fact]
+    public async Task AutomaticTiming_NeverRemovesAnOnlineTiming()
+    {
+        using var rig = new Rig(); var states = new ConcurrentQueue<ProgressState>();
+        var ttml = Path.ChangeExtension(rig.Song, ".ttml");
+        File.WriteAllText(ttml, Noctis.Services.Lyrics.OnlineTimingSidecar.Mark(OnlineTtml, Noctis.Services.Lyrics.WordTimingSource.Unison, 0)!);
+        using var worker = rig.Worker(states.Enqueue);
+        worker.Ask(rig.Song, TimingAction.Fresh, null, out _, automatic: true);
+        await Until(() => states.Any(s => s.Finished));
+        Assert.True(File.Exists(ttml));
+    }
     [Theory]
     [InlineData("no_lyrics")]
     [InlineData("not_timed")]

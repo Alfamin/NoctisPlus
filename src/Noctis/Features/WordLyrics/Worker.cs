@@ -1069,6 +1069,9 @@ internal sealed class Worker : IDisposable
                 {
                     _items.Remove(item.Path);
                     if (status == "timed") _rules.Set(item.Path, new());
+                    // #200: WordLyrics chosen by hand for a song with online timing (Retime, Fetch fresh, own words):
+                    // its result is what shows from now on, and the online lane leaves a song with an .elrc alone.
+                    if (status == "timed" && item.Hand) Services.Lyrics.OnlineTimingSidecar.StepAside(item.Path);
                 }
                 counts[status] = counts.GetValueOrDefault(status) + 1;
                 titles[status] = title;

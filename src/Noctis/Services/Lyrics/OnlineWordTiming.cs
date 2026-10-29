@@ -201,4 +201,25 @@ internal static class OnlineTimingSidecar
             if (m.Groups[1].Value == Name(s)) return s;
         return null;
     }
+
+    /// <summary>
+    /// The song's online timing makes way so the timing just written beside it shows — a .ttml out-ranks the .elrc.
+    /// Removed, not trashed: it can be fetched again, and a Recycle Bin prompt must not come from a background run.
+    /// Only a marked .ttml; the user's own is never touched. Returns how many went.
+    /// </summary>
+    public static int StepAside(string audioPath)
+    {
+        var gone = 0;
+        foreach (var ttml in LyricsWriter.SidecarsOnDisk(audioPath, ".ttml"))
+        {
+            try
+            {
+                if (SourceOf(File.ReadAllText(ttml)) == null) continue;
+                File.Delete(ttml);
+                gone++;
+            }
+            catch (Exception e) when (e is IOException or UnauthorizedAccessException) { }
+        }
+        return gone;
+    }
 }
