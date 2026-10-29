@@ -260,32 +260,48 @@ public sealed class OnlineTimingLaneTests : IDisposable
     [Theory]
     [InlineData(true)]    // the fit check is unsure
     [InlineData(false)]   // no ffmpeg: nothing to check it with
-    public async Task KugouIsUsedOnlyWithAFitTheCheckIsSureOf_ElseWordLyricsTimesIt(bool unsure)
+    public async Task KugouTheFitCheckIsNotSureOf_StaysOnScreen_AndWordLyricsTimesTheSongQuietly(bool unsure)
     {
-        // Owner #214: White Iverson from Kugou was far out of sync (its fit unsure: +0.47 s against the energy's -0.47 s).
+        // Owner #215: White Iverson from Kugou was far out of sync, most Kugou songs are good: keep showing it, and
+        // let WordLyrics replace it quietly when the check cannot confirm it.
         _kugou.Answer = () => new LrcLibResult { Duration = 200, SyncedLyrics = "x", OriginalTtml = WordTtml() };
         if (unsure) _fit = null; else _ffmpeg = null;
         using var lane = Lane();
+        IReadOnlyList<string>? recheck = null;
+        lane.Recheck += p => recheck = p;
         var song = Song("White Iverson");
         Assert.True(lane.WantsFirst(song.FilePath));
-        Assert.Equal(OnlineTimingLane.Outcome.Miss, await lane.ProcessAsync(song, CancellationToken.None));
-        Assert.False(File.Exists(Path.ChangeExtension(song.FilePath, ".ttml")));
+        Assert.Equal(OnlineTimingLane.Outcome.Written, await lane.ProcessAsync(song, CancellationToken.None));
+        var ttml = File.ReadAllText(Path.ChangeExtension(song.FilePath, ".ttml"));
+        Assert.Equal(WordTimingSource.Kugou, OnlineTimingSidecar.SourceOf(ttml));
+        Assert.True(OnlineTimingSidecar.Unverified(ttml));
+        Assert.Equal([song.FilePath], recheck);
         Assert.False(lane.WantsFirst(song.FilePath));   // WordLyrics goes on
     }
 
     [Fact]
-    public async Task AStreamFromKugouIsNotShownAtPlay_ItWaitsForTheFitCheckOnTheWholeFile()
+    public async Task KugouTheFitCheckIsSureOf_IsKeptAsIs_NoWordLyrics()
+    {
+        _kugou.Answer = () => new LrcLibResult { Duration = 200, SyncedLyrics = "x", OriginalTtml = WordTtml() };
+        using var lane = Lane();
+        var rechecked = false;
+        lane.Recheck += _ => rechecked = true;
+        var song = Song("Grenade");
+        Assert.Equal(OnlineTimingLane.Outcome.Written, await lane.ProcessAsync(song, CancellationToken.None));
+        Assert.False(OnlineTimingSidecar.Unverified(File.ReadAllText(Path.ChangeExtension(song.FilePath, ".ttml"))));
+        Assert.False(rechecked);
+    }
+
+    [Fact]
+    public async Task AStreamFromKugouIsShownAtPlay_LikeTheOthers()
     {
         _kugou.Answer = () => new LrcLibResult { Duration = 200, SyncedLyrics = "x", OriginalTtml = WordTtml() };
         using var lane = Lane();
         var song = Song("streamed from Kugou");
-        var shown = false;
-        lane.Provisional += (_, _, _) => shown = true;
-        Assert.False(await lane.ShowWhileStreamingAsync(song, CancellationToken.None));
-        Assert.False(shown);
-        Assert.Equal(OnlineTimingLane.Outcome.Written, await lane.ProcessAsync(song, CancellationToken.None));   // sure fit
-        Assert.Equal(1, _kugou.Calls);   // the answer found at Play is reused
-        Assert.Equal(WordTimingSource.Kugou, OnlineTimingSidecar.SourceOf(File.ReadAllText(Path.ChangeExtension(song.FilePath, ".ttml"))));
+        string? shown = null;
+        lane.Provisional += (_, _, source) => shown = source;
+        Assert.True(await lane.ShowWhileStreamingAsync(song, CancellationToken.None));
+        Assert.Equal("Kugou", shown);
     }
 
     [Fact]

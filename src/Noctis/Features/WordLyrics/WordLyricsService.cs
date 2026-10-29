@@ -77,6 +77,19 @@ internal sealed class WordLyricsService(ILibraryService library, Func<AppSetting
         if (!covered) _playingAsked = false;
         Changed?.Invoke();
     }
+    /// <summary>Owner #215: songs whose online timing the fit check was not sure of: timed next, with no status shown
+    /// (the online timing stays on screen until this timing replaces it).</summary>
+    internal void TimeQuietly(IReadOnlyList<string> paths)
+    {
+        if (_worker is not { } worker) return;
+        _ = Task.Run(() =>
+        {
+            foreach (var path in paths.Where(File.Exists))
+                if (worker.AskQuietly(path))
+                    Log("retiming quietly from the online words (their timing may not fit): " + Path.GetFileName(path));
+        });
+    }
+
     internal string[] Folders => _folders;
     internal IReadOnlyList<Track> Tracks => library.AllTracks;
 

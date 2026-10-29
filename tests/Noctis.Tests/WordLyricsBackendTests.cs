@@ -93,6 +93,19 @@ public class WordLyricsBackendTests
         Assert.Equal(SongTimingStatus.Queued, worker.StatusFor(rig.Song));
     }
 
+    [Fact]
+    public void ASongTheOnlineSourcesComeFirstFor_SaysNothingUntilTheyHaveAnswered()
+    {
+        // Owner #215: "Lyrics queued" showed for a moment before every song's online look, then "Processing lyrics".
+        using var rig = new Rig();
+        using var worker = new Worker(rig.Work, () => [rig.Music], new(false, "Light", false, rig.App, ""), _ => { }, _ => { }, _ => { }, startTimer: false, readiness: _ => false)
+        { WaitsForOnline = _ => true };
+        worker.Ask(rig.Song);
+        Assert.Equal(SongTimingStatus.None, worker.StatusFor(Path.GetFullPath(rig.Song)));
+        worker.Ask(rig.Song, TimingAction.Current);   // a Retime press does not wait for them: it says so at once
+        Assert.Equal(SongTimingStatus.Queued, worker.StatusFor(Path.GetFullPath(rig.Song)));
+    }
+
     private const string OnlineTtml = "<tt xmlns=\"http://www.w3.org/ns/ttml\"><body><div><p begin=\"1.0\" end=\"2.0\"><span begin=\"1.0\" end=\"2.0\">word</span></p></div></body></tt>";
 
     [Theory]
@@ -125,6 +138,26 @@ public class WordLyricsBackendTests
         Assert.Equal(online, File.ReadAllText(ttml));
         Assert.False(File.Exists(lrc));
         Assert.Empty(Directory.EnumerateFiles(rig.Work, "*", SearchOption.AllDirectories).Where(f => f.Contains("held-online")));
+    }
+
+    [Theory]
+    [InlineData("timed", false)]
+    [InlineData("no_lyrics", true)]
+    public async Task AnUnverifiedOnlineTiming_IsTimedQuietly_AndMakesWayOnlyForATiming(string outcome, bool kept)
+    {
+        // Owner #215: Kugou the fit check was not sure of stays on screen while WordLyrics times the song.
+        using var rig = new Rig(outcome: outcome); var states = new ConcurrentQueue<ProgressState>();
+        var ttml = Path.ChangeExtension(rig.Song, ".ttml");
+        File.WriteAllText(ttml, Noctis.Services.Lyrics.OnlineTimingSidecar.Mark(OnlineTtml, Noctis.Services.Lyrics.WordTimingSource.Kugou, 0, unverified: true)!);
+        Assert.False(Worker.HasWordLyrics(rig.Song));
+        using var worker = rig.Worker(states.Enqueue);
+        Assert.True(worker.AskQuietly(rig.Song));
+        Assert.Equal(SongTimingStatus.None, worker.StatusFor(Path.GetFullPath(rig.Song)));
+        await Until(() => states.Any(s => s.Finished));
+        Assert.Equal(kept, File.Exists(ttml));
+        // Retimed from the online timing's own words (no lyrics search); the words file goes again when nothing was timed.
+        Assert.Contains("--retime-mode", File.ReadAllText(rig.Result));
+        Assert.Equal(!kept, File.Exists(Path.ChangeExtension(rig.Song, ".lrc")));
     }
 
     [Fact]

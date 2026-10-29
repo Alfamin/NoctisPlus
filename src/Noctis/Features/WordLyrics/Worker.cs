@@ -101,7 +101,9 @@ internal sealed class Worker : IDisposable
         public TimingAction Action;
         public string? Draft;
         public bool Asked;              // the user asked for this song by hand
+        public bool Silent;             // owner #215: timed behind an online timing kept on screen: no status (this run)
         public bool Hand;               // owner #193: a button press this session (Time words, Time library), not playback: what the pill may say
+        public bool OnlineAnswered;     // owner #215: the online sources have had their turn (or were not needed)
         public bool OnlineWait;         // owner #207: waiting while lrc.red, Unison and Kugou are asked first (says nothing yet)
         public DateTime Urgent;         // owner #108: the song playing now (newest first, alone in its run; not saved)
         public bool Ahead, AheadOnly;
@@ -184,6 +186,10 @@ internal sealed class Worker : IDisposable
             if (_paused) return SongTimingStatus.Paused;
             if (_activePaths.Contains(path)) return SongTimingStatus.Processing;
             if (item.OnlineWait) return SongTimingStatus.None;   // the online sources may answer in a moment
+            // Owner #215 ("Lyrics queued", then "Processing lyrics"): a song the online sources come first for says nothing
+            // until they have answered, not "queued" for the moment before its first look.
+            if (WaitsForOnline != null && !item.OnlineAnswered && GatedOnline(item)) return SongTimingStatus.None;
+            if (item.Silent) return SongTimingStatus.None;       // owner #215: the online timing stays on screen meanwhile
             return item.NotBefore > DateTime.UtcNow ? SongTimingStatus.Retry : SongTimingStatus.Queued;
         }
     }
@@ -747,13 +753,14 @@ internal sealed class Worker : IDisposable
             // Owner #207/#210 (hard rule: everywhere): lrc.red, Unison and Kugou come first for every song WordLyrics would
             // time (playing, queued, fetched ahead, downloaded, library, a saved backlog, after Restart or Time library); it
             // waits here, kept in line, until they have answered. Only Retime / Fresh / Custom chosen by hand go straight on.
-            if ((item.Action == TimingAction.Missing || item.Action == TimingAction.Fresh && !item.Hand) && WaitsForOnline?.Invoke(item.Path) == true)
+            if (GatedOnline(item) && WaitsForOnline?.Invoke(item.Path) == true)
             {
                 item.OnlineWait = true;
                 item.NotBefore = now + TimeSpan.FromSeconds(2);
                 return false;
             }
             item.OnlineWait = false;
+            item.OnlineAnswered = true;
             return true;
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
@@ -907,7 +914,8 @@ internal sealed class Worker : IDisposable
             if (controlled) WriteControl(_paused ? "pause" : "run");
             // #213: WordLyrics leaves alone any song with a .ttml ("protected"); chosen by hand for an online-timed song,
             // that timing steps out for the run: gone if WordLyrics times it, back otherwise.
-            foreach (var item in batch.Where(i => i.Hand && i.Action != TimingAction.Missing)) HoldOnline(item.Path, item.Action);
+            foreach (var item in batch.Where(i => i.Hand && i.Action != TimingAction.Missing || Services.Lyrics.OnlineTimingSidecar.HasUnverified(i.Path)))
+                HoldOnline(item.Path, item.Action);
             run = _run = tool.StartQuietRun(batch[0].Root, ListFile, ResultFile, OutputFile, speed, options.Backup, retry: batch[0].Asked, ProgressFile,
                 controlled ? ControlFile : null, batch[0].Action, batch[0].Draft, options.AdaptToPc);
             _job = Job.Around(run);
@@ -1492,10 +1500,40 @@ internal sealed class Worker : IDisposable
     private static string Text(JsonElement element, string name)
         => element.TryGetProperty(name, out var value) && value.ValueKind == JsonValueKind.String ? value.GetString() ?? "" : "";
 
+    /// <summary>#207: the songs WordLyrics waits for the online sources on (any automatic timing, a Time words press).</summary>
+    private static bool GatedOnline(Item item) => item.Action == TimingAction.Missing || item.Action == TimingAction.Fresh && !item.Hand;
+
     internal static bool HasWordLyrics(string song)
     {
         var stem = Path.Combine(Path.GetDirectoryName(song) ?? "", Path.GetFileNameWithoutExtension(song));
-        return WordLyrics.Any(extension => File.Exists(stem + extension));
+        // Owner #215: an online timing the fit check was not sure of is shown, but the song still gets WordLyrics' timing.
+        return WordLyrics.Any(extension => File.Exists(stem + extension) && !(extension == ".ttml" && UnverifiedOnline(stem + extension)));
+    }
+
+    private static bool UnverifiedOnline(string ttml)
+    {
+        try { return Services.Lyrics.OnlineTimingSidecar.Unverified(File.ReadAllText(ttml)); }
+        catch (Exception e) when (e is IOException or UnauthorizedAccessException) { return false; }
+    }
+
+    /// <summary>
+    /// Owner #215: a song whose online timing the fit check was not sure of is retimed next, quietly, from that timing's
+    /// own words (its lines as the guide): many such songs are in no lyrics database WordLyrics searches. True = queued.
+    /// </summary>
+    internal bool AskQuietly(string path)
+    {
+        Ask(path, TimingAction.Current, null, out var accepted, automatic: true);
+        if (!accepted) return false;
+        Prioritize(Path.GetFullPath(path));
+        MarkSilent(path);
+        return true;
+    }
+
+    /// <summary>Owner #215: this song is timed quietly (no status on the pill or the lyrics page).</summary>
+    internal void MarkSilent(string path)
+    {
+        lock (_gate) if (_items.TryGetValue(Path.GetFullPath(path), out var item)) item.Silent = true;
+        StatusChanged?.Invoke();
     }
 
     /// <summary>The program names very long paths in Windows' long form; the list uses the usual one.</summary>

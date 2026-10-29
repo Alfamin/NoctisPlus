@@ -198,13 +198,30 @@ internal static class OnlineTimingSidecar
     };
 
     /// <summary>The document with the mark on its root; null when it has no &lt;tt&gt; root or is marked already.</summary>
-    public static string? Mark(string ttml, WordTimingSource source, double shift)
+    /// <param name="unverified">Owner #215: the fit check was not sure of it: shown until WordLyrics' timing replaces it.</param>
+    public static string? Mark(string ttml, WordTimingSource source, double shift, bool unverified = false)
     {
         if (SourceOf(ttml) != null) return null;
         var root = Root.Match(ttml);
         if (!root.Success) return null;
-        var mark = $" xmlns:plus=\"{Namespace}\" plus:source=\"{Name(source)}\" plus:shift=\"{shift.ToString("0.00", CultureInfo.InvariantCulture)}\"";
+        var mark = $" xmlns:plus=\"{Namespace}\" plus:source=\"{Name(source)}\" plus:shift=\"{shift.ToString("0.00", CultureInfo.InvariantCulture)}\"" +
+                   (unverified ? $" {UnverifiedMark}" : "");
         return ttml.Insert(root.Index + root.Length, mark);
+    }
+
+    const string UnverifiedMark = "plus:fit=\"unsure\"";
+
+    /// <summary>Owner #215: an online timing kept on screen while WordLyrics times the song (it counts as no word timing
+    /// for WordLyrics, and makes way when WordLyrics' timing lands).</summary>
+    public static bool Unverified(string? ttml) => SourceOf(ttml) != null && ttml!.Contains(UnverifiedMark, StringComparison.Ordinal);
+
+    /// <summary>A song whose .ttml is such an unverified online timing.</summary>
+    public static bool HasUnverified(string audioPath)
+    {
+        foreach (var ttml in LyricsWriter.SidecarsOnDisk(audioPath, ".ttml"))
+            try { if (Unverified(File.ReadAllText(ttml))) return true; }
+            catch (Exception e) when (e is IOException or UnauthorizedAccessException) { }
+        return false;
     }
 
     /// <summary>The source an online timing names, or null for any other TTML (the user's own, Lyrics Studio's).</summary>

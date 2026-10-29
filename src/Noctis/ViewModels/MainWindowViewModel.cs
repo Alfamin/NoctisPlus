@@ -790,6 +790,12 @@ public partial class MainWindowViewModel : ViewModelBase
                     lyricsWriter, () => converter?.GetFfmpegPath(), () => OnlineAccess.Shared.IsOffline,
                     path => wordService.IsIgnored(path) || Services.Lyrics.OnlineTimingLane.StudioTimed(path));
                 lane.Written += paths => Dispatcher.UIThread.Post(() => _lyricsVm.ReloadWrittenLyrics(paths));
+                // Owner #215: Kugou the fit check was not sure of stays on screen; WordLyrics times the song quietly.
+                lane.Recheck += paths => Dispatcher.UIThread.Post(() =>
+                {
+                    wordService.SetCoveredOnline(paths, covered: false);
+                    wordService.TimeQuietly(paths);
+                });
                 // #207 hard rule: every song WordLyrics would time automatically is looked up online first.
                 wordService.OnlineFirst = lane.WantsFirst;
                 // Online timing on screen: WordLyrics does not time that song too ("Processing lyrics" under lrc.red's).

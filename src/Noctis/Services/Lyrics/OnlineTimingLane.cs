@@ -245,8 +245,13 @@ internal sealed class OnlineTimingLane : IDisposable
         if (why != "library" || outcome is Outcome.Written or Outcome.Kept or Outcome.Transient)
             Log($"{outcome} ({why}) {Describe(track)} in {clock.ElapsedMilliseconds} ms{_detail}");
         if (outcome == Outcome.Written) Written?.Invoke(Paths(path, track));
+        if (_recheck is { } recheck) { _recheck = null; Recheck?.Invoke(recheck); }
         return outcome;
     }
+
+    /// <summary>Owner #215: written but unverified (Kugou the fit check was not sure of): WordLyrics times these quietly.</summary>
+    public event Action<IReadOnlyList<string>>? Recheck;
+    List<string>? _recheck;
 
     /// <summary>Why the last song came out as it did (the loop's own thread only).</summary>
     string _detail = "";
@@ -283,8 +288,7 @@ internal sealed class OnlineTimingLane : IDisposable
         if (_misses.IsMiss(key, Now())) return false;
         var clock = System.Diagnostics.Stopwatch.StartNew();
         var found = await FindAsync(track, seconds, ct);
-        var checkFirst = found.Source == WordTimingSource.Kugou;
-        Log($"streaming {Describe(track)}: {(!found.Found ? "nothing to show" : checkFirst ? "Kugou found, shown only if the fit check is sure once the file is whole" : "shown from " + OnlineTimingSidecar.Name(found.Source!.Value))} in {clock.ElapsedMilliseconds} ms; {found.Trace}");
+        Log($"streaming {Describe(track)}: {(found.Found ? "shown from " + OnlineTimingSidecar.Name(found.Source!.Value) : "nothing to show")} in {clock.ElapsedMilliseconds} ms; {found.Trace}");
         if (!found.Found)
         {
             // A source that could not answer is asked again with the finished file (never in a loop here).
@@ -292,8 +296,6 @@ internal sealed class OnlineTimingLane : IDisposable
             return false;
         }
         lock (_gate) _provisional[key] = found;
-        // Owner #214 (White Iverson): Kugou is often off; it waits for the audio check (on the finished file) instead.
-        if (checkFirst) return false;
         var marked = OnlineTimingSidecar.Mark(found.Ttml!, found.Source!.Value, 0) ?? found.Ttml!;
         Provisional?.Invoke(track, marked, OnlineTimingSidecar.Name(found.Source!.Value));
         return true;
@@ -350,17 +352,14 @@ internal sealed class OnlineTimingLane : IDisposable
         _detail += $"; from {OnlineTimingSidecar.Name(found.Source!.Value)}, " + (ffmpegPath == null ? "no ffmpeg: not fit-checked" : fit == null ? "fit check could not read the audio"
             : (fit.Shift is { } moved ? $"fit sure: moved {moved:+0.00;-0.00} s" : "fit unsure: left as found")
               + $" (estimate {fit.Estimate:+0.00;-0.00} s, sharpness {fit.Sharpness:0.00}, significance {fit.Significance:0.0}, energy {fit.EnergyEstimate:+0.00;-0.00} s)");
-        // Owner #214 (White Iverson "so out of sync"; 150 songs: Kugou 43% of words within 0.1 s of lrc.red, WordLyrics
-        // 76%): Kugou only with a fit the check is sure of; otherwise WordLyrics times the song.
-        if (found.Source == WordTimingSource.Kugou && fit?.Shift == null)
-        {
-            _detail += "; Kugou not used (the fit check is not sure): WordLyrics times it";
-            _misses.Remember(key, Now());
-            return Outcome.Miss;
-        }
-        var marked = OnlineTimingSidecar.Mark(OnlineTimingFit.Shift(found.Ttml!, shift), found.Source!.Value, shift);
+        // Owner #215 (White Iverson far out of sync; Kugou otherwise mostly good): Kugou the fit check is not sure of stays
+        // on screen, marked unverified, and WordLyrics times the song quietly; its timing replaces Kugou's when it lands.
+        var recheck = found.Source == WordTimingSource.Kugou && fit?.Shift == null;
+        if (recheck) _detail += "; kept on screen, WordLyrics times it quietly";
+        var marked = OnlineTimingSidecar.Mark(OnlineTimingFit.Shift(found.Ttml!, shift), found.Source!.Value, shift, unverified: recheck);
         var written = marked != null && _writer.WriteOnlineTiming(path, marked);
         if (!written) _detail += "; not written (a .ttml of the user's, read-only or unwritable)";
+        if (written && recheck) _recheck = Paths(path, track);
         return written ? Outcome.Written : Outcome.Kept;
     }
 
