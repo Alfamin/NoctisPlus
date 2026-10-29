@@ -103,8 +103,20 @@ internal sealed class OnlineTimingLane : IDisposable
         foreach (var t in _library) yield return t;
     }
 
-    static string? Local(Track? t) =>
-        t is { IsRemoteStream: false, IsPendingStream: false } && !string.IsNullOrWhiteSpace(t.FilePath) ? t.FilePath : null;
+    /// <summary>A song is playing that is not looked at yet only because its file is still arriving.</summary>
+    bool CurrentPending()
+    {
+        lock (_gate) return _current is { IsRemoteStream: false } t && Local(t) == null && (t.PendingStream != null || !string.IsNullOrWhiteSpace(t.FilePath));
+    }
+
+    /// <summary>The complete file to look at: a song on disk, or a stream once its file is fully saved; null while it is
+    /// still arriving (the fit check needs the whole recording).</summary>
+    static string? Local(Track? t)
+    {
+        if (t is null || t.IsRemoteStream) return null;
+        var path = t.PendingStream is Noctis.ViewModels.PendingStream p ? p.Source.CompletedPlaybackPath(p.Song) : t.IsPendingStream ? null : t.FilePath;
+        return string.IsNullOrWhiteSpace(path) || Features.ProgressivePlayback.ProgressiveTransfer.IsDownloading(path) ? null : path;
+    }
 
     async Task RunAsync(TimeSpan firstLibraryDelay, CancellationToken ct)
     {
@@ -117,7 +129,8 @@ internal sealed class OnlineTimingLane : IDisposable
                 var track = _offline() || now < _restUntil ? null : Next(now >= libraryAt && !Busy());
                 if (track == null)
                 {
-                    var wait = now < _restUntil ? _restUntil - now : now < libraryAt ? libraryAt - now : TimeSpan.FromMinutes(1);
+                    // The song playing may still be arriving: look again soon, so its lyrics come online before WordLyrics starts.
+                    var wait = now < _restUntil ? _restUntil - now : CurrentPending() ? TimeSpan.FromSeconds(2) : now < libraryAt ? libraryAt - now : TimeSpan.FromMinutes(1);
                     await _wake.WaitAsync(wait < TimeSpan.FromSeconds(1) ? TimeSpan.FromSeconds(1) : wait, ct);
                     continue;
                 }
@@ -137,7 +150,7 @@ internal sealed class OnlineTimingLane : IDisposable
         var path = Local(track)!;
         var outcome = await ProcessCoreAsync(track, path, ct);
         if (outcome != Outcome.Transient) lock (_gate) _done.Add(path);
-        if (outcome == Outcome.Written) Written?.Invoke([path]);
+        if (outcome == Outcome.Written) Written?.Invoke(new[] { path, track.FilePath }.Where(p => !string.IsNullOrWhiteSpace(p)).Distinct(StringComparer.OrdinalIgnoreCase).ToList());
         return outcome;
     }
 
