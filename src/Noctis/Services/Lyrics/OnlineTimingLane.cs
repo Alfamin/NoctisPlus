@@ -4,15 +4,15 @@ namespace Noctis.Services.Lyrics;
 
 /// <summary>
 /// #200 automatic online word timing for the songs on disk: the song playing first, then the next ones in the queue,
-/// then every library song in the background (songs WordLyrics already timed included). One lookup per song, paced
-/// (<see cref="Pace"/> between songs), definitive misses and "does not fit this recording" remembered for days, a
-/// failure (offline, busy, error) never. Found and fitting (<see cref="OnlineTimingFit"/>) → the song's .ttml, marked
-/// with its source, beside WordLyrics' .elrc (<see cref="LyricsWriter.WriteOnlineTiming"/>); anything else leaves the
-/// song on its current route. Needs no WordLyrics install. Never blocks playback: it only writes sidecars and says so.
+/// then the library songs without word timing in the background (a song that has it is left as it is). One lookup per
+/// song, paced (<see cref="Pace"/> between songs), definitive misses remembered for days, a failure (offline, busy,
+/// error) never. Found → the song's .ttml, marked with its source (<see cref="LyricsWriter.WriteOnlineTiming"/>), moved
+/// first when <see cref="OnlineTimingFit"/> is sure the file is shifted; nothing found → the current route. Needs no
+/// WordLyrics install. Never blocks playback: it only writes sidecars and says so.
 /// </summary>
 internal sealed class OnlineTimingLane : IDisposable
 {
-    public enum Outcome { Written, AlreadyTimed, Skipped, Miss, NoFit, Kept, Transient, NoDecoder }
+    public enum Outcome { Written, AlreadyTimed, Skipped, Miss, Kept, Transient }
 
     public static readonly TimeSpan Pace = TimeSpan.FromSeconds(2);
     public static readonly TimeSpan FailureRest = TimeSpan.FromMinutes(5);
@@ -41,8 +41,6 @@ internal sealed class OnlineTimingLane : IDisposable
     public event Action<IReadOnlyList<string>>? Written;
     /// <summary>A stream's online word timing to show now (the song, its marked TTML, the source name); not on disk yet.</summary>
     public event Action<Track, string, string>? Provisional;
-    /// <summary>The timing shown while streaming did not fit the finished file: these paths go back to their usual lyrics.</summary>
-    public event Action<IReadOnlyList<string>>? Rejected;
 
     /// <summary>The fit check; a seam for tests (the real one decodes with ffmpeg).</summary>
     internal Func<string, string, string, CancellationToken, Task<OnlineTimingFit.Result?>> Check { get; set; } = OnlineTimingFit.CheckAsync;
@@ -149,7 +147,7 @@ internal sealed class OnlineTimingLane : IDisposable
                 }
                 var outcome = await ProcessAsync(track, ct);
                 if (outcome == Outcome.Transient) _restUntil = Now() + FailureRest;
-                if (outcome is Outcome.Written or Outcome.Miss or Outcome.NoFit or Outcome.Kept or Outcome.Transient)
+                if (outcome is Outcome.Written or Outcome.Miss or Outcome.Kept or Outcome.Transient)
                     await Task.Delay(Spacing, ct);   // the sources were asked: be gentle
             }
             catch (OperationCanceledException) when (ct.IsCancellationRequested) { return; }
@@ -172,8 +170,8 @@ internal sealed class OnlineTimingLane : IDisposable
 
     /// <summary>
     /// Owner 2026-10-29: a song being streamed shows its online word timing at once, before its file has arrived (only
-    /// the length is compared then). The answer is kept for the fit check when the file is complete: it fits → the
-    /// .ttml is written (shifted if needed) and the lyrics update in place; it does not → <see cref="Rejected"/>.
+    /// the length is compared then). The same answer is written as the .ttml when the file is complete (moved first if
+    /// the fit check is sure it is shifted) and the lyrics update in place; it is never taken back.
     /// </summary>
     internal async Task<bool> ShowWhileStreamingAsync(Track track, CancellationToken ct)
     {
@@ -232,15 +230,10 @@ internal sealed class OnlineTimingLane : IDisposable
             _misses.Remember(key, Now());
             return Outcome.Miss;
         }
-        if (_ffmpeg() is not { } ffmpeg) return Outcome.NoDecoder;
-        var fit = await Check(ffmpeg, path, found.Ttml!, ct);
-        if (fit == null) return Outcome.NoDecoder;   // the file would not decode: not a verdict on the timing
-        if (fit.Shift is not { } shift)
-        {
-            _misses.Remember(key, Now());   // the same recording file, the same verdict next start
-            if (shown != null) Rejected?.Invoke(Paths(path, track));   // the timing shown at Play goes; the usual route takes over
-            return Outcome.NoFit;
-        }
+        // Owner 2026-10-29 (Circo Loco: shown at Play, then taken back for WordLyrics): the online timing of the same
+        // recording stays; the fit check only moves it when it is sure the file is shifted (Kiss Me More +0.48 s).
+        // Measured: 55 of 59 songs within 80 ms this way, none taken away; unsure (25 of 59) = left as it is.
+        var shift = _ffmpeg() is { } ffmpeg && await Check(ffmpeg, path, found.Ttml!, ct) is { Shift: { } sure } ? sure : 0;
         var marked = OnlineTimingSidecar.Mark(OnlineTimingFit.Shift(found.Ttml!, shift), found.Source!.Value, shift);
         return marked != null && _writer.WriteOnlineTiming(path, marked) ? Outcome.Written : Outcome.Kept;
     }

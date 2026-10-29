@@ -112,18 +112,20 @@ public sealed class OnlineTimingLaneTests : IDisposable
     }
 
     [Fact]
-    public async Task NoFitAndNoSourceAreRememberedAcrossStarts()
+    public async Task AnUnsureFitKeepsTheTimingAsItIs_NoSourceIsRememberedAcrossStarts()
     {
-        var shifted = Song("shifted");
+        // Owner 2026-10-29 (Circo Loco): unsure is not wrong; the online timing stays, unmoved.
+        var unsure = Song("unsure");
         var nowhere = Song("nowhere");
         _unison.Answer = () => new LrcLibResult { Duration = 200, SyncedLyrics = "x", OriginalTtml = WordTtml() };
         _fit = null;
-        Assert.Equal(OnlineTimingLane.Outcome.NoFit, await Lane().ProcessAsync(shifted, CancellationToken.None));
-        Assert.False(File.Exists(Path.ChangeExtension(shifted.FilePath, ".ttml")));
+        Assert.Equal(OnlineTimingLane.Outcome.Written, await Lane().ProcessAsync(unsure, CancellationToken.None));
+        var ttml = File.ReadAllText(Path.ChangeExtension(unsure.FilePath, ".ttml"));
+        Assert.Equal(10.0, OnlineTimingFit.WordsOf(ttml)[0].Start, 3);
+        Assert.Contains("plus:shift=\"0.00\"", ttml);
         _unison.Answer = () => null;
         Assert.Equal(OnlineTimingLane.Outcome.Miss, await Lane().ProcessAsync(nowhere, CancellationToken.None));
         var calls = _lrcRed.Calls + _unison.Calls + _kugou.Calls;
-        Assert.Equal(OnlineTimingLane.Outcome.Miss, await Lane().ProcessAsync(shifted, CancellationToken.None));
         Assert.Equal(OnlineTimingLane.Outcome.Miss, await Lane().ProcessAsync(nowhere, CancellationToken.None));
         Assert.Equal(calls, _lrcRed.Calls + _unison.Calls + _kugou.Calls);
     }
@@ -155,12 +157,10 @@ public sealed class OnlineTimingLaneTests : IDisposable
         File.WriteAllText(Path.ChangeExtension(lyricsfile.FilePath, ".lyricsfile"), "x");
         Assert.Equal(OnlineTimingLane.Outcome.Skipped, await Lane().ProcessAsync(lyricsfile, CancellationToken.None));
         Assert.Equal(0, _lrcRed.Calls);
-        _ffmpeg = null;
+        _ffmpeg = null;   // no decoder: the timing is written as found, unchecked
         var plain = Song("plain");
-        Assert.Equal(OnlineTimingLane.Outcome.NoDecoder, await Lane().ProcessAsync(plain, CancellationToken.None));
-        _ffmpeg = "ffmpeg.exe";
-        Assert.Equal(OnlineTimingLane.Outcome.Written, await Lane().ProcessAsync(plain, CancellationToken.None)); // not remembered as a miss
-        Assert.Equal(1, _checks);
+        Assert.Equal(OnlineTimingLane.Outcome.Written, await Lane().ProcessAsync(plain, CancellationToken.None));
+        Assert.Equal(0, _checks);
     }
 
     [Fact]
@@ -185,18 +185,19 @@ public sealed class OnlineTimingLaneTests : IDisposable
     }
 
     [Fact]
-    public async Task AStreamedTimingThatDoesNotFitIsTakenBack()
+    public async Task AStreamedTimingTheFitCheckIsUnsureOfIsNeverTakenBack()
     {
+        // Owner 2026-10-29: Circo Loco's lrc.red timing showed at Play, then vanished for WordLyrics.
         using var lane = Lane();
-        var song = Song("shifted stream");
+        var song = Song("Circo Loco");
         _lrcRed.Answer = () => new LrcLibResult { Duration = 200, SyncedLyrics = "x", OriginalTtml = WordTtml() };
-        IReadOnlyList<string>? rejected = null;
-        lane.Rejected += p => rejected = p;
+        IReadOnlyList<string>? written = null;
+        lane.Written += p => written = p;
         Assert.True(await lane.ShowWhileStreamingAsync(song, CancellationToken.None));
         _fit = null;
-        Assert.Equal(OnlineTimingLane.Outcome.NoFit, await lane.ProcessAsync(song, CancellationToken.None));
-        Assert.Equal([song.FilePath], rejected);
-        Assert.False(File.Exists(Path.ChangeExtension(song.FilePath, ".ttml")));
+        Assert.Equal(OnlineTimingLane.Outcome.Written, await lane.ProcessAsync(song, CancellationToken.None));
+        Assert.Equal([song.FilePath], written);
+        Assert.Equal(WordTimingSource.LrcRed, OnlineTimingSidecar.SourceOf(File.ReadAllText(Path.ChangeExtension(song.FilePath, ".ttml"))));
     }
 
     [Fact]

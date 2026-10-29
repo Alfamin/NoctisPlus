@@ -2846,7 +2846,6 @@ public partial class LyricsViewModel : ViewModelBase, IDisposable
         ShowSearchButton = false;
         SearchFailedMessage = string.Empty;
         _onlineTiming = (shown.FilePath, source);
-        _shownWhileStreaming = shown.Id;
         if (TryTakeTimingInPlace(shown, probe, generation))
         {
             RefreshLyricsCredit();
@@ -2857,19 +2856,6 @@ public partial class LyricsViewModel : ViewModelBase, IDisposable
         IsUnsyncTabSelected = false;
         ApplyLocalLyricsResult(shown, probe);
         LyricsSwapped?.Invoke(this, EventArgs.Empty);
-    }
-
-    private Guid? _shownWhileStreaming;
-
-    /// <summary>The timing shown while streaming did not fit the finished file: the song's usual lyrics come back.</summary>
-    internal void DropOnlineTiming(IReadOnlyList<string> paths)
-    {
-        if (_currentTrack is { } track && _shownWhileStreaming == track.Id && !IsPreviewActive
-            && (paths.Contains(track.FilePath, StringComparer.OrdinalIgnoreCase) || string.IsNullOrWhiteSpace(track.FilePath)))
-        {
-            _shownWhileStreaming = null;
-            LoadLyricsForTrack(track);
-        }
     }
 
     private void OnLibraryUpdated(object? sender, EventArgs e)

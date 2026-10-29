@@ -796,11 +796,6 @@ public partial class MainWindowViewModel : ViewModelBase
                     wordService.SetCoveredOnline([track.FilePath], covered: true);
                     _lyricsVm.ShowOnlineTiming(track, ttml, source);
                 });
-                lane.Rejected += paths => Dispatcher.UIThread.Post(() =>
-                {
-                    wordService.SetCoveredOnline(paths, covered: false);
-                    _lyricsVm.DropOnlineTiming(paths);
-                });
                 Player.PropertyChanged += (_, e) =>
                 {
                     if (e.PropertyName == nameof(PlayerViewModel.CurrentTrack)) lane.SetPlaying(Player.CurrentTrack, Player.UpNext);
