@@ -3880,6 +3880,8 @@ public partial class LyricsViewModel : ViewModelBase, IDisposable
         OnPropertyChanged(nameof(OnlineTimingHint));
         OnPropertyChanged(nameof(LyricsEmptyStatus));
         OnPropertyChanged(nameof(CanStartWordTiming));
+        OnPropertyChanged(nameof(CanTimeCurrentWords));
+        OpenWordTimingCommand.NotifyCanExecuteChanged();
         OnPropertyChanged(nameof(CanPressTimeWords));
         OnPropertyChanged(nameof(IsWaitingForDownload));
         OnPropertyChanged(nameof(CreditTimeLabel));

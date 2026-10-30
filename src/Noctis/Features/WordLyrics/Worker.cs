@@ -654,8 +654,17 @@ internal sealed class Worker : IDisposable
         }
         if (ripe.Count == 0) return;
         // Owner #108: the song playing now runs alone, so it is done (and the next one played can go first) at once.
-        var batch = ripe[0].Urgent != default || ripe[0].Ahead ? [ripe[0]]
-            : ripe.Where(i => i.Urgent == default && !i.Ahead && i.Asked == ripe[0].Asked && i.Action == ripe[0].Action && i.Draft == ripe[0].Draft && SamePath(i.Root, ripe[0].Root)).Take(_oneAtATime ? 1 : MaxSongsPerRun).ToList();
+        List<Item> batch;
+        lock (_gate)
+        {
+            // Prioritize/SetAhead can change urgency while files are inspected outside
+            // this lock. Select a consistent batch so its first item cannot disappear
+            // between the urgency branch and the filter (#234/#236 live race).
+            var first = ripe[0];
+            batch = first.Urgent != default || first.Ahead ? [first]
+                : ripe.Where(i => i.Urgent == default && !i.Ahead && i.Asked == first.Asked && i.Action == first.Action && i.Draft == first.Draft && SamePath(i.Root, first.Root)).Take(_oneAtATime ? 1 : MaxSongsPerRun).ToList();
+        }
+        if (batch.Count == 0) return;
 
         var options = Options;
         Tool tool;

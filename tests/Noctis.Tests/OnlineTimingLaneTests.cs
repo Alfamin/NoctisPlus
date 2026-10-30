@@ -116,6 +116,7 @@ public sealed class OnlineTimingLaneTests : IDisposable
         () => _ffmpeg, () => _offline, _userTimed.Contains)
     {
         Spacing = TimeSpan.Zero,
+        Busy = () => false, // deterministic: unrelated foreground workloads must not suppress this fixture's library
         Check = (_, _, ttml, _) =>
         {
             _checks++;

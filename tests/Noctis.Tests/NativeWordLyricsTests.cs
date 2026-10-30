@@ -73,6 +73,23 @@ public class NativeWordLyricsTests
         Assert.True(rig.Service.State.Error);
         Assert.True(rig.Service.Pill?.IsProblem);
     }
+    [Fact]
+    public async Task BatchSelectionSurvivesPlayingPriorityChangingDuringReadinessChecks()
+    {
+        using var data = new TestPersistenceService();
+        var song = Path.Combine(data.DataDirectory, "priority-race.mp3"); File.WriteAllText(song, "fixture");
+        var errors = new ConcurrentQueue<string>();
+        using var worker = new Worker(Path.Combine(data.DataDirectory, "work"), () => [data.DataDirectory],
+            new(true, "Light", false, Path.Combine(data.DataDirectory, "absent"), ""), errors.Enqueue, _ => { },
+            startTimer: false, readiness: _ => false);
+        worker.Ask(song);
+        var updates = Task.Run(() => { for (var i = 0; i < 100; i++) { worker.SetAhead([], null); worker.Prioritize(song); } });
+        for (var i = 0; i < 100; i++) worker.TickNow();
+        await updates;
+        worker.TickNow();
+        Assert.DoesNotContain(errors, s => s.StartsWith("error:", StringComparison.Ordinal));
+        Assert.Equal(1, worker.WaitingCount);
+    }
     [AvaloniaFact]
     public void AutomaticTimingStatus_IsPerSong_AndCancelClearsItWithoutDownloading()
     {

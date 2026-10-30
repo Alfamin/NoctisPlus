@@ -86,9 +86,10 @@ public class LyricsTrackChangeTimingTests : IDisposable
         "[00:06.00]<00:06.00>" + tag + " <00:06.40>five <00:06.80>six<00:07.20>\n";
 
     [AvaloniaTheory]
-    [InlineData(false)]
-    [InlineData(true)]
-    public async Task TimeWordsDuringDownload_WaitsOnce_SurvivesTrackChange_AndNeverTimesAFailedTransfer(bool fail)
+    [InlineData(false, false)]
+    [InlineData(false, true)]
+    [InlineData(true, true)]
+    public async Task TimeWordsDuringDownload_WaitsOnce_SurvivesTrackChange_AndNeverTimesAFailedTransfer(bool fail, bool switchAway)
     {
         var part = Path.Combine(_dir, "waiting.part");
         var target = Path.Combine(_dir, "waiting.flac");
@@ -103,17 +104,25 @@ public class LyricsTrackChangeTimingTests : IDisposable
         var song = new Track { FilePath = target, Title = "Waiting", Duration = TimeSpan.FromMinutes(3) };
         player.CurrentTrack = song;
         var calls = new List<Track>(); vm.WordTimingStartRequested = t => { calls.Add(t); return Task.CompletedTask; };
+        var detailsEnabled = false;
+        vm.OpenWordTimingCommand.CanExecuteChanged += (_, _) => detailsEnabled |= vm.OpenWordTimingCommand.CanExecute(null);
         try
         {
             Assert.True(vm.TimeWordsCommand.CanExecute(null));
             await vm.TimeWordsCommand.ExecuteAsync(null);
             Assert.True(vm.IsWaitingForDownload); Assert.Contains("Waiting for the download", vm.WordTimingStatusText);
             Assert.False(vm.TimeWordsCommand.CanExecute(null)); Assert.Empty(calls);
-            player.CurrentTrack = new Track { Title = "Other", FilePath = Path.Combine(_dir, "other.flac") };
-            Assert.False(vm.IsWaitingForDownload);
+            Assert.False(detailsEnabled);
+            if (switchAway)
+            {
+                player.CurrentTrack = new Track { Title = "Other", FilePath = Path.Combine(_dir, "other.flac") };
+                Assert.False(vm.IsWaitingForDownload);
+                detailsEnabled = false;
+            }
             File.Move(part, target);
             transfer.End(fail ? null : target, fail ? new IOException("offline") : null);
             await Pump(100);
+            Assert.True(detailsEnabled);
             Assert.Equal(fail ? 0 : 1, calls.Count);
             if (!fail) Assert.Same(song, calls[0]);
         }
