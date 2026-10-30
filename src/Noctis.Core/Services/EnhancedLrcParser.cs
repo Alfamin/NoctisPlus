@@ -261,6 +261,30 @@ public static partial class EnhancedLrcParser
     private static bool IsJoinable(char c) =>
         (char.IsLetterOrDigit(c) || c is '\'' or '’' or '-') && c < '⺀';
 
+    /// <summary>Keep a separately timed closing mark with its preceding word for layout.
+    /// The segments retain their own clocks; no timestamp is moved or written back.</summary>
+    public static List<WordTiming> MergeClosingPunctuation(List<WordTiming> words)
+    {
+        var result = new List<WordTiming>(words.Count);
+        foreach (var word in words)
+        {
+            var mark = word.Text.TrimEnd();
+            if (result.Count > 0 && mark.Length > 0 && mark.All(c => ",.!?;:…)]}»”。，、！？；：）】》」』".Contains(c))
+                && result[^1].Text is { Length: > 0 } previousText && !char.IsWhiteSpace(previousText[^1]))
+            {
+                var previous = result[^1];
+                var text = previous.Text + word.Text;
+                var segments = previous.Syllables?.ToList() ?? [new WordSyllable(previous.Start, previous.End, previous.Text.Length)];
+                if (word.Syllables is { } inner) segments.AddRange(inner);
+                else segments.Add(new WordSyllable(word.Start, word.End, word.Text.Length));
+                result[^1] = new WordTiming { Text = text, Start = previous.Start, End = word.End,
+                    Syllables = TrimTrailingSpace(segments, text) };
+            }
+            else result.Add(word);
+        }
+        return result;
+    }
+
     /// <summary>
     /// Folds fully-parenthesized word-timed lines — the common ELRC convention for
     /// Apple Music background vocals / adlibs — into the preceding synced line's

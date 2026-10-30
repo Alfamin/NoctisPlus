@@ -202,7 +202,7 @@ public class WordLyricsBackendTests
         using var rig = new Rig(hold: true);
         var states = new ConcurrentQueue<ProgressState>();
         using var worker = rig.Worker(states.Enqueue);
-        worker.AskPlayed(rig.Song, out var accepted); Assert.True(accepted);
+        worker.Ask(rig.Song, TimingAction.Missing, null, out var accepted); Assert.True(accepted); // Time library is also a missing-only request
         await Until(() => worker.StatusFor(rig.Song) == SongTimingStatus.Processing);
         var ttml = Path.ChangeExtension(rig.Song, ".ttml");
         var online = Noctis.Services.Lyrics.OnlineTimingSidecar.Mark(OnlineTtml, Noctis.Services.Lyrics.WordTimingSource.Kugou, 0, unverified: true)!;
@@ -347,7 +347,7 @@ public class WordLyricsBackendTests
         }
         using var next = new Worker(rig.Work, () => [rig.Music], new(true, "Light", false, rig.App, ""), _ => { }, _ => { }, startTimer: false);
         next.SetCoveredOnline(rig.Song, true);
-        next.Ask(rig.Song);                                          // a Time words press is the user's
+        next.Ask(rig.Song, TimingAction.Current);                    // explicit repair is the user's override
         Assert.Equal(1, next.WaitingCount);
     }
 

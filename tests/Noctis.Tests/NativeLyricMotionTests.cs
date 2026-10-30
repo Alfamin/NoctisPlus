@@ -39,7 +39,10 @@ public class NativeLyricMotionTests
             window.UpdateLayout();
             Assert.All(cells[..^1], c => Assert.Equal(default(Thickness), c.Presenter.Padding));
             Assert.Equal(new Thickness(0, 0, 24, 0), cells[^1].Presenter.Padding);
-            Assert.Contains(cells, c => c.Word!.Text.Trim() == "?");
+            var question = Assert.Single(cells.Where(c => c.Word!.Text.Trim() == "true?"));
+            Assert.Equal(2, question.Word!.Syllables!.Count);
+            Assert.Equal(TimeSpan.FromMilliseconds(1800), question.Word.Syllables[0].Start);
+            Assert.Equal(TimeSpan.FromMilliseconds(2200), question.Word.Syllables[1].Start);
         }
         finally { window.Close(); }
     }

@@ -508,7 +508,7 @@ public static class TtmlParser
             };
         }
 
-        return EnhancedLrcParser.MergeSyllables(words);
+        return EnhancedLrcParser.MergeClosingPunctuation(EnhancedLrcParser.MergeSyllables(words));
     }
 
     /// <summary>

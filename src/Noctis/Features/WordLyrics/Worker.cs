@@ -181,7 +181,7 @@ internal sealed class Worker : IDisposable
         lock (_gate)
         {
             if (_disposed || IsIgnored(path) || !_items.TryGetValue(path, out var item) || item.Deferred) return SongTimingStatus.None;
-            if (!item.Hand && (AutomaticBlocked(path) || HasTtml(path))) return SongTimingStatus.None;
+            if (!UserRepair(item) && (AutomaticBlocked(path) || HasTtml(path))) return SongTimingStatus.None;
             if (item.Action == TimingAction.Missing && !_activePaths.Contains(path) && HasWordLyrics(path)) return SongTimingStatus.None;
             if (!_activePaths.Contains(path) && !item.Asked && !_options.Auto) return SongTimingStatus.None;
             if (_paused) return SongTimingStatus.Paused;
@@ -717,7 +717,7 @@ internal sealed class Worker : IDisposable
     /// <summary>Has the file been left alone long enough, and does it still need lyrics? Called under the lock.</summary>
     private bool Ripe(Item item, DateTime now)
     {
-        if (!item.Hand && (AutomaticBlocked(item.Path) || HasTtml(item.Path))) { item.Length = -2; return false; }
+        if (!UserRepair(item) && (AutomaticBlocked(item.Path) || HasTtml(item.Path))) { item.Length = -2; return false; }
         if (now < item.NotBefore) return false;
         if (IsIgnored(item.Path)) { item.Length = -2; return false; }
         var rule = _rules.Get(item.Path);
@@ -911,7 +911,7 @@ internal sealed class Worker : IDisposable
         {
             if (_disposed || _run is not null) return;
             // A user can ignore a song after Ripe inspected the batch, before process launch.
-            batch = batch.Where(i => !IsIgnored(i.Path) && (i.Hand || !HasTtml(i.Path) && !AutomaticBlocked(i.Path))
+            batch = batch.Where(i => !IsIgnored(i.Path) && (UserRepair(i) || !HasTtml(i.Path) && !AutomaticBlocked(i.Path))
                 && _items.TryGetValue(i.Path, out var current) && ReferenceEquals(current, i)).ToList();
             if (batch.Count == 0) return;
             File.WriteAllLines(ListFile, batch.Select(i => i.Path), new UTF8Encoding(false));
@@ -920,7 +920,7 @@ internal sealed class Worker : IDisposable
             // that timing steps out for the run: gone if WordLyrics times it, back otherwise.
             foreach (var item in batch.Where(i => i.Hand && i.Action != TimingAction.Missing))
                 HoldOnline(item.Path, item.Action);
-            foreach (var item in batch) _userRuns[item.Path] = item.Hand;
+            foreach (var item in batch) _userRuns[item.Path] = UserRepair(item);
             run = _run = tool.StartQuietRun(batch[0].Root, ListFile, ResultFile, OutputFile, speed, options.Backup, retry: batch[0].Asked, ProgressFile,
                 controlled ? ControlFile : null, batch[0].Action, batch[0].Draft, options.AdaptToPc);
             _job = Job.Around(run);
@@ -1183,7 +1183,7 @@ internal sealed class Worker : IDisposable
                     if (status == "timed") _rules.Set(item.Path, new());
                     // #200: WordLyrics chosen by hand for a song with online timing (Retime, Fetch fresh, own words):
                     // its result is what shows from now on, and the online lane leaves a song with an .elrc alone.
-                    if (status == "timed" && item.Hand) Services.Lyrics.OnlineTimingSidecar.StepAside(item.Path);
+                    if (status == "timed" && UserRepair(item)) Services.Lyrics.OnlineTimingSidecar.StepAside(item.Path);
                 }
                 counts[status] = counts.GetValueOrDefault(status) + 1;
                 titles[status] = title;
@@ -1488,7 +1488,7 @@ internal sealed class Worker : IDisposable
         bool stopRun;
         lock (_gate)
         {
-            if (!_items.TryGetValue(path, out var item) || item.Hand) return;
+            if (!_items.TryGetValue(path, out var item) || UserRepair(item)) return;
             stopRun = _activePaths.Contains(path);
             _items.Remove(path);
             SaveState();
@@ -1518,6 +1518,7 @@ internal sealed class Worker : IDisposable
 
     /// <summary>#207: the songs WordLyrics waits for the online sources on (any automatic timing, a Time words press).</summary>
     private static bool GatedOnline(Item item) => item.Action == TimingAction.Missing || item.Action == TimingAction.Fresh && !item.Hand;
+    private static bool UserRepair(Item item) => item.Hand && item.Action != TimingAction.Missing;
 
     internal static bool HasWordLyrics(string song)
     {
