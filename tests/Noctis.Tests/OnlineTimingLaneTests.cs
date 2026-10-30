@@ -84,6 +84,35 @@ public sealed class OnlineTimingLaneTests : IDisposable
     }
 
     [Fact]
+    public async Task ExplicitRepairKeepsTheShownWords_ButALateFitCannotRecreateTheHeldTtml()
+    {
+        using var lane = Lane();
+        var missing = Path.Combine(_dir, "not-downloaded.mp3");
+        lane.PrepareForRepair(missing);
+        Assert.True(lane.WantsFirst(missing)); // rejected requests do not stop automatic lookup
+        var song = Song("repair during fit");
+        _lrcRed.Answer = () => new LrcLibResult { Duration = 200, OriginalTtml = WordTtml() };
+        var fitting = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var finish = new TaskCompletionSource<OnlineTimingFit.Result?>(TaskCreationOptions.RunContinuationsAsynchronously);
+        lane.Check = (_, _, _, _) => { fitting.TrySetResult(); return finish.Task; }; // deliberately ignores cancellation
+        lane.SetPlaying(song, []);
+        var processing = lane.ProcessAsync(song, CancellationToken.None);
+        await fitting.Task.WaitAsync(TimeSpan.FromSeconds(3));
+        lane.PrepareForRepair(song.FilePath);
+        var ttml = Path.ChangeExtension(song.FilePath, ".ttml");
+        Assert.Equal(WordTimingSource.LrcRed, OnlineTimingSidecar.SourceOf(File.ReadAllText(ttml)));
+        File.Move(ttml, ttml + ".held"); // the backend's normal HoldOnline
+        finish.SetResult(null);
+        Assert.Equal(OnlineTimingLane.Outcome.Kept, await processing);
+        Assert.False(File.Exists(ttml));
+        Assert.True(File.Exists(ttml + ".held"));
+        Assert.False(lane.WantsFirst(song.FilePath));
+        File.WriteAllText(Path.ChangeExtension(song.FilePath, ".elrc"), "[00:01.00]<00:01.00>chosen words");
+        lane.PrepareForRepair(song.FilePath);
+        Assert.False(File.Exists(ttml)); // a later retime of chosen WordLyrics words must not restore the old online choice
+    }
+
+    [Fact]
     public async Task QueueChangeCancelsDiscardedLookAhead_ButKeepsThePromotedSong()
     {
         using var lane = Lane();

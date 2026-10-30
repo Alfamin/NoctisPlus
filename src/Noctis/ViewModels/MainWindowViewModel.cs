@@ -803,6 +803,7 @@ public partial class MainWindowViewModel : ViewModelBase
                 lane.SearchChanged += (track, state) => Dispatcher.UIThread.Post(() => _lyricsVm.OnlineTimingChanged(track, state));
                 // #207 hard rule: every song WordLyrics would time automatically is looked up online first.
                 wordService.OnlineFirst = lane.WantsFirst;
+                wordService.PrepareOnlineRepair = lane.PrepareForRepair;
                 // Online timing on screen: WordLyrics does not time that song too ("Processing lyrics" under lrc.red's).
                 lane.Provisional += (track, ttml, source) => Dispatcher.UIThread.Post(() =>
                 {

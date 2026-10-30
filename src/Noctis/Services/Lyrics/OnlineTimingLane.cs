@@ -28,6 +28,7 @@ internal sealed class OnlineTimingLane : IDisposable
     readonly Func<string, bool> _userTimed;
     readonly object _gate = new();
     readonly HashSet<string> _done = new(StringComparer.OrdinalIgnoreCase);
+    readonly HashSet<string> _repairs = new(StringComparer.OrdinalIgnoreCase);
     readonly SemaphoreSlim _wake = new(0, int.MaxValue);
     readonly SemaphoreSlim _lrcRedPace = new(1, 1);
     readonly CancellationTokenSource _stop = new();
@@ -366,6 +367,27 @@ internal sealed class OnlineTimingLane : IDisposable
     }
     long _lastAskTicks;   // Environment.TickCount64 of the last ask; 0: none yet
 
+    /// <summary>An explicit repair takes ownership before its backend starts. Publish
+    /// already-shown words now so Worker can hold them, and stop a late fit write from
+    /// recreating the protected TTML in the middle of that run.</summary>
+    internal void PrepareForRepair(string path)
+    {
+        // A rejected partial/missing-file request must not take ownership from the lane.
+        if (Features.ProgressivePlayback.ProgressiveTransfer.IsDownloading(path) || !File.Exists(path)) return;
+        lock (_gate)
+        {
+            _done.Add(path);
+            _repairs.Add(path);
+            _wanted.Remove(path);
+            if (string.Equals(_working, path, StringComparison.OrdinalIgnoreCase)) _activeWork?.Cancel();
+            if (LyricsWriter.SidecarsOnDisk(path, ".ttml").Count > 0 || LyricsWriter.SidecarsOnDisk(path, ".elrc").Count > 0
+                || Find(path) is not { } track) return;
+            var key = OnlineTimingMisses.Key(track.Artist ?? "", track.Title, OnlineTimingDuration.Seconds(track, path));
+            if (_provisional.TryGetValue(key, out var found) && found.Found)
+                _writer.WriteOnlineTiming(path, OnlineTimingSidecar.Mark(found.Ttml!, found.Source!.Value, 0) ?? found.Ttml!);
+        }
+    }
+
     static List<string> Paths(string path, Track track) =>
         new[] { path, track.FilePath }.Where(p => !string.IsNullOrWhiteSpace(p)).Distinct(StringComparer.OrdinalIgnoreCase).ToList();
 
@@ -516,7 +538,13 @@ internal sealed class OnlineTimingLane : IDisposable
         var recheck = found.Source == WordTimingSource.Kugou && fit?.Shift == null;
         if (recheck) _detail += "; kept online (no automatic model replacement)";
         var marked = OnlineTimingSidecar.Mark(OnlineTimingFit.Shift(found.Ttml!, shift), found.Source!.Value, shift, unverified: recheck);
-        var written = marked != null && _writer.WriteOnlineTiming(path, marked);
+        bool written;
+        lock (_gate)
+        {
+            ct.ThrowIfCancellationRequested();
+            if (_repairs.Contains(path)) return Outcome.Kept;
+            written = marked != null && _writer.WriteOnlineTiming(path, marked);
+        }
         if (written) lock (_gate) _provisional.Remove(key);
         if (!written) _detail += "; not written (a .ttml of the user's, read-only or unwritable)";
         return written ? Outcome.Written : Outcome.Kept;

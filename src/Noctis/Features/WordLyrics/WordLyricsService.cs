@@ -67,6 +67,7 @@ internal sealed class WordLyricsService(ILibraryService library, Func<AppSetting
     }
     /// <summary>#207: asks the online word timing lane whether it still wants to look at this song first (set by the window).</summary>
     internal Func<string, bool>? OnlineFirst { get; set; }
+    internal Action<string>? PrepareOnlineRepair { get; set; }
 
     /// <summary>#200: these songs have online word timing on screen (covered) or it was taken back (not covered: the song
     /// playing is asked for again as usual on its next move).</summary>
@@ -339,6 +340,7 @@ internal sealed class WordLyricsService(ILibraryService library, Func<AppSetting
             int queued = 0; string? last = null;
             foreach (var path in selected)
             {
+                if (action != TimingAction.Missing) PrepareOnlineRepair?.Invoke(path);
                 var before = worker.WaitingCount;
                 last = worker.Ask(path, action, draft, out var accepted);
                 if (accepted && SameSong(path, Volatile.Read(ref _playingPath)))
@@ -371,6 +373,7 @@ internal sealed class WordLyricsService(ILibraryService library, Func<AppSetting
                 var playing = SameSong(track.FilePath, Volatile.Read(ref _playingPath));
                 var saved = Volatile.Read(ref _playingTimingPath);
                 var path = playing && saved is not null && File.Exists(saved) ? saved : track.FilePath;
+                if (action != TimingAction.Missing) PrepareOnlineRepair?.Invoke(path);
                 if (playing) worker.ShareRules(track.FilePath, path);
                 var message = worker.Ask(path, action, null, out var accepted, enableIgnored: true);
                 if (accepted && playing)
