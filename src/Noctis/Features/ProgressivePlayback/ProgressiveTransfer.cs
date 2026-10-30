@@ -105,6 +105,36 @@ internal sealed class ProgressiveTransfer(string folder, string fileName, TimeSp
     // That lease must not keep complete-file actions disabled for the rest of the song.
     internal static bool IsDownloading(string path) => Ready.TryGetValue(path, out var transfer) && !transfer.Finished;
 
+    internal static byte[]? ReadPrefix(string path)
+    {
+        using var lease = Acquire(path);
+        if (lease is null) return null;
+        var bytes = new byte[(int)Math.Min(65536, lease.Buffer.Prefix)];
+        if (bytes.Length == 0) return null;
+        using var reader = lease.Buffer.OpenReader();
+        return bytes.AsSpan(0, reader.Read(bytes)).ToArray();
+    }
+
+    // Keep the actual attempt, not just registry membership: cancellation also removes
+    // a transfer, and must never be mistaken for a completed audio file.
+    internal static async Task<bool> WaitForDownloadAsync(string path, CancellationToken ct)
+    {
+        if (!Ready.TryGetValue(path, out var transfer)) return File.Exists(path);
+        var ended = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
+        void OnEnded() => ended.TrySetResult(true);
+        lock (transfer._gate)
+        {
+            if (!transfer._finished) transfer.Ended += OnEnded;
+            else ended.TrySetResult(true);
+        }
+        try
+        {
+            await ended.Task.WaitAsync(ct).ConfigureAwait(false);
+            lock (transfer._gate) return transfer._error is null && File.Exists(path);
+        }
+        finally { lock (transfer._gate) transfer.Ended -= OnEnded; }
+    }
+
     internal sealed class Lease(ProgressiveTransfer owner, ProgressiveAudioBuffer buffer) : IDisposable
     {
         private int _disposed;

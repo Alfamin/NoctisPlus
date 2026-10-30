@@ -85,6 +85,41 @@ public class LyricsTrackChangeTimingTests : IDisposable
         "[00:03.00]<00:03.00>" + tag + " <00:03.40>three <00:03.80>four<00:04.20>\n" +
         "[00:06.00]<00:06.00>" + tag + " <00:06.40>five <00:06.80>six<00:07.20>\n";
 
+    [AvaloniaTheory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task TimeWordsDuringDownload_WaitsOnce_SurvivesTrackChange_AndNeverTimesAFailedTransfer(bool fail)
+    {
+        var part = Path.Combine(_dir, "waiting.part");
+        var target = Path.Combine(_dir, "waiting.flac");
+        var transfer = new Noctis.Features.ProgressivePlayback.ProgressiveTransfer(_dir, "waiting", TimeSpan.FromMinutes(3));
+        using var writer = transfer.Attach(new FileStream(part, FileMode.Create, FileAccess.ReadWrite, FileShare.ReadWrite | FileShare.Delete, 1));
+        var format = (Noctis.Features.ProgressivePlayback.IProgressiveAudioWriter)writer;
+        format.SetFormatPolicy(_ => true); format.BeginAudio(1024 * 1024, "flac");
+        var bytes = new byte[1024 * 1024]; "fLaC"u8.CopyTo(bytes); writer.Write(bytes);
+        await Pump(600); Assert.Equal(target, transfer.ReadyPath);
+        var player = new PlayerViewModel(new FakeAudioPlayer(), new FakeLibraryService(), new TestPersistenceService(), new FakeAnimatedCoverService());
+        using var vm = new LyricsViewModel(player, new StubLrcLib(), new StubNetEase(), new StubMetadata(), new TestPersistenceService(), new FakeLibraryService());
+        var song = new Track { FilePath = target, Title = "Waiting", Duration = TimeSpan.FromMinutes(3) };
+        player.CurrentTrack = song;
+        var calls = new List<Track>(); vm.WordTimingStartRequested = t => { calls.Add(t); return Task.CompletedTask; };
+        try
+        {
+            Assert.True(vm.TimeWordsCommand.CanExecute(null));
+            await vm.TimeWordsCommand.ExecuteAsync(null);
+            Assert.True(vm.IsWaitingForDownload); Assert.Contains("Waiting for the download", vm.WordTimingStatusText);
+            Assert.False(vm.TimeWordsCommand.CanExecute(null)); Assert.Empty(calls);
+            player.CurrentTrack = new Track { Title = "Other", FilePath = Path.Combine(_dir, "other.flac") };
+            Assert.False(vm.IsWaitingForDownload);
+            File.Move(part, target);
+            transfer.End(fail ? null : target, fail ? new IOException("offline") : null);
+            await Pump(100);
+            Assert.Equal(fail ? 0 : 1, calls.Count);
+            if (!fail) Assert.Same(song, calls[0]);
+        }
+        finally { transfer.End(null, new IOException("cleanup")); }
+    }
+
     private static void Tick()
     {
         AvaloniaHeadlessPlatform.ForceRenderTimerTick();

@@ -5,6 +5,25 @@ namespace Noctis.Tests;
 
 public class ProgressiveTransferTests
 {
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task TimingWaitChecksTheActualTransferOutcome_NotJustDisappearance(bool fail)
+    {
+        using var rig = new Rig(TimeSpan.FromMinutes(3)).Open();
+        var bytes = Audio(1024 * 1024);
+        OnlineTimingDurationTests.Flac(264.76).CopyTo(bytes, 0);
+        rig.Writer.Write(bytes);
+        await Ready(rig.Transfer);
+        Assert.False(File.Exists(rig.Target));
+        Assert.Equal(264.76, Noctis.Services.Lyrics.OnlineTimingDuration.Seconds(new() { FilePath = rig.Target, Duration = TimeSpan.FromSeconds(266) }), 2);
+        var wait = ProgressiveTransfer.WaitForDownloadAsync(rig.Target, CancellationToken.None);
+        Assert.False(wait.IsCompleted);
+        File.Move(rig.Part, rig.Target);
+        rig.Transfer.End(fail ? null : rig.Target, fail ? new IOException("offline") : null);
+        Assert.Equal(!fail, await wait.WaitAsync(TimeSpan.FromSeconds(2)));
+    }
+
     [Fact]
     public async Task WordTimingRejectsAPlayableButIncompleteTransfer_WithoutQueuingPartialAudio()
     {

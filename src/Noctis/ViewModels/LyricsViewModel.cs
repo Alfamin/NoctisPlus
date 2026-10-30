@@ -1837,8 +1837,12 @@ public partial class LyricsViewModel : ViewModelBase, IDisposable
     /// <summary>Owner #233: times the song with WordLyrics from the menu, at once (as Start timing); the online timing
     /// stays on screen until WordLyrics' replaces it.</summary>
     [RelayCommand]
-    private Task TimeWithWordLyrics() => CreditCanTimeWithWordLyrics && !HasPendingWordTiming && _currentTrack is { } track
-        ? WordTimingWithRequested?.Invoke(track, TimingAction.Current) ?? Task.CompletedTask : Task.CompletedTask;
+    private Task TimeWithWordLyrics() => !CreditCanTimeWithWordLyrics || HasPendingWordTiming || _currentTrack is not { } track ? Task.CompletedTask
+        : IsDownloadingNow ? WaitForDownload(TimingAction.Current)
+        : WordTimingWithRequested?.Invoke(track, TimingAction.Current) ?? Task.CompletedTask;
+
+    /// <summary>Owner #234: while the song still downloads the menu says WordLyrics starts once it is whole.</summary>
+    public string CreditTimeLabel => Localization.Loc.T(IsDownloadingNow ? "Lyrics.TimeWithWordLyricsAfterDownload" : "Lyrics.TimeWithWordLyrics");
 
     internal Func<Track, TimingAction, Task>? WordTimingWithRequested { get; set; }
 
@@ -3842,9 +3846,11 @@ public partial class LyricsViewModel : ViewModelBase, IDisposable
     }
     public bool IsOnlineTimingSearching => _onlineTimingState == OnlineTimingSearchState.Searching
         && !(_hasSyncedLyrics && LyricLines.Any(l => l.HasWords));
-    public bool HasPendingWordTiming => _currentWordTimingStatus != SongTimingStatus.None || IsOnlineTimingSearching;
+    public bool HasPendingWordTiming => _currentWordTimingStatus != SongTimingStatus.None || IsOnlineTimingSearching || IsWaitingForDownload;
     public bool IsWordTimingProcessing => _currentWordTimingStatus == SongTimingStatus.Processing || IsOnlineTimingSearching;
-    public string WordTimingStatusText => Localization.Loc.T(IsOnlineTimingSearching && _currentWordTimingStatus == SongTimingStatus.None
+    public string WordTimingStatusText => IsWaitingForDownload && _currentWordTimingStatus == SongTimingStatus.None
+        ? Localization.Loc.T("Lyrics.WaitingForDownload", Math.Round(_player.SeekableFraction * 100).ToString(System.Globalization.CultureInfo.CurrentCulture))
+        : Localization.Loc.T(IsOnlineTimingSearching && _currentWordTimingStatus == SongTimingStatus.None
         ? "Lyrics.OnlineSearching" : _currentWordTimingStatus switch
     {
         SongTimingStatus.Processing => "Lyrics.TimingProcessing",
@@ -3874,7 +3880,11 @@ public partial class LyricsViewModel : ViewModelBase, IDisposable
         OnPropertyChanged(nameof(OnlineTimingHint));
         OnPropertyChanged(nameof(LyricsEmptyStatus));
         OnPropertyChanged(nameof(CanStartWordTiming));
+        OnPropertyChanged(nameof(CanPressTimeWords));
+        OnPropertyChanged(nameof(IsWaitingForDownload));
+        OnPropertyChanged(nameof(CreditTimeLabel));
         TimeWordsCommand.NotifyCanExecuteChanged();
+        TimeWithWordLyricsCommand.NotifyCanExecuteChanged();
     }
     public bool CanTimeCurrentWords => _player.CurrentTrack is { IsRemoteStream: false } track
         && !Features.ProgressivePlayback.ProgressiveTransfer.IsDownloading(track.FilePath);
@@ -3886,9 +3896,59 @@ public partial class LyricsViewModel : ViewModelBase, IDisposable
         if (CanTimeCurrentWords && _player.CurrentTrack is { } track) WordTimingRequested?.Invoke(track);
     }
 
-    [RelayCommand(CanExecute = nameof(CanStartWordTiming))]
+    [RelayCommand(CanExecute = nameof(CanPressTimeWords))]
     private Task TimeWords() => CanStartWordTiming && _player.CurrentTrack is { } track
-        ? WordTimingStartRequested?.Invoke(track) ?? Task.CompletedTask : Task.CompletedTask;
+        ? WordTimingStartRequested?.Invoke(track) ?? Task.CompletedTask
+        : WaitForDownload(TimingAction.Missing);
+
+    /// <summary>Owner #234: Time words is also pressed while the song still downloads: it starts once the file is whole.</summary>
+    public bool CanPressTimeWords => CanStartWordTiming || IsDownloadingNow && !HasPendingWordTiming;
+
+    private bool IsDownloadingNow => _player.CurrentTrack is { IsRemoteStream: false, FilePath.Length: > 0 } track
+        && Features.ProgressivePlayback.ProgressiveTransfer.IsDownloading(track.FilePath);
+
+    /// <summary>
+    /// Owner #234: WordLyrics asked for while the song is still downloading (Time words, or Time with WordLyrics in the
+    /// credit's menu) is not dropped: the pill says it waits, with the download's progress, and it starts by itself the
+    /// moment the file is whole (the song may be left meanwhile).
+    /// </summary>
+    private readonly HashSet<string> _timeAfterDownload = new(StringComparer.OrdinalIgnoreCase);
+    private readonly CancellationTokenSource _downloadWaitStop = new();
+    private DispatcherTimer? _downloadWatch;
+
+    public bool IsWaitingForDownload => _player.CurrentTrack is { } track && _timeAfterDownload.Contains(track.FilePath);
+
+    private Task WaitForDownload(TimingAction action)
+    {
+        if (_player.CurrentTrack is not { } track || !IsDownloadingNow) return Task.CompletedTask;
+        if (!_timeAfterDownload.Add(track.FilePath)) return Task.CompletedTask;
+        _downloadWatch ??= new DispatcherTimer(TimeSpan.FromSeconds(1), DispatcherPriority.Background, (_, _) => RefreshWordTiming());
+        _downloadWatch.Start();
+        RefreshWordTiming();
+        _ = TimeAfterDownloadAsync(track, action);
+        return Task.CompletedTask;
+    }
+
+    private async Task TimeAfterDownloadAsync(Track track, TimingAction action)
+    {
+        try
+        {
+            var complete = await Features.ProgressivePlayback.ProgressiveTransfer.WaitForDownloadAsync(track.FilePath, _downloadWaitStop.Token);
+            _downloadWaitStop.Token.ThrowIfCancellationRequested();
+            _timeAfterDownload.Remove(track.FilePath);
+            if (complete)
+                await ((action == TimingAction.Missing ? WordTimingStartRequested?.Invoke(track)
+                    : WordTimingWithRequested?.Invoke(track, action)) ?? Task.CompletedTask);
+        }
+        catch (OperationCanceledException) when (_downloadWaitStop.IsCancellationRequested) { }
+        catch (Exception ex) { DebugLog.Write("WordLyrics", "Deferred request failed: " + ex.Message); }
+        finally
+        {
+            _timeAfterDownload.Remove(track.FilePath);
+            if (_timeAfterDownload.Count == 0) _downloadWatch?.Stop();
+            if (!_downloadWaitStop.IsCancellationRequested) RefreshWordTiming();
+        }
+    }
 
     partial void OnShowSearchButtonChanged(bool value)
     {
@@ -4347,6 +4407,8 @@ public partial class LyricsViewModel : ViewModelBase, IDisposable
 
     public void Dispose()
     {
+        _downloadWaitStop.Cancel();
+        _downloadWatch?.Stop();
         if (_wordTiming is not null) _wordTiming.Changed -= RefreshWordTiming;
         ResetNativeMotion();
         _player.Seeked -= OnPlayerSeekedForLyrics;

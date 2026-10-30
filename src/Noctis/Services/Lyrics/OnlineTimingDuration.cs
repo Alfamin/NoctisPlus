@@ -13,6 +13,13 @@ internal static class OnlineTimingDuration
         var path = recordingPath ?? track.FilePath;
         try
         {
+            // Playback exposes the final name before the .part file is renamed. Read
+            // only published bytes from its transfer instead of falling back to catalog length.
+            if (ProgressiveTransfer.ReadPrefix(path) is { } prefix)
+            {
+                var offset = prefix.Length >= 10 && prefix.AsSpan(0, 3).SequenceEqual("ID3"u8) ? Mp3GaplessInfo.Id3v2TotalSize(prefix) : 0;
+                if (offset >= 0 && offset < prefix.Length && HeaderSeconds(prefix.AsSpan((int)offset)) is { } partial) return partial;
+            }
             using var stream = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.ReadWrite | FileShare.Delete);
             Span<byte> head = stackalloc byte[10];
             if (stream.ReadAtLeast(head, 10, false) == 10)

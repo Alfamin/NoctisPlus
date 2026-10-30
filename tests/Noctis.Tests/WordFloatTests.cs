@@ -31,7 +31,7 @@ public class WordFloatTests
         Assert.Contains("No matching", vm.OnlineTimingHint);
         song.SourceType = SourceType.Navidrome; // same not-local hint as a downloading recording
         vm.OnlineTimingChanged(song, Noctis.Services.Lyrics.OnlineTimingSearchState.Miss);
-        Assert.Contains("Waiting for download", vm.OnlineTimingHint);
+        Assert.Equal("No match yet · Rechecking when downloaded", vm.OnlineTimingHint);
         song.SourceType = SourceType.Local;
         vm.OnlineTimingChanged(song, Noctis.Services.Lyrics.OnlineTimingSearchState.Unavailable);
         Assert.Contains("unavailable", vm.OnlineTimingHint);

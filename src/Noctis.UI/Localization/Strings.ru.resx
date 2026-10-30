@@ -1233,6 +1233,8 @@
   <data name="Lyrics.LrcRedSyncRetry" xml:space="preserve"><value>Попробовать снова</value><comment>Lyrics page pill / Search Lyrics row after lrc.red's model sync failed</comment></data>
   <data name="Lyrics.OnlineTimingCredit" xml:space="preserve"><value>Тайминг слов: {0}</value><comment>Lyrics page credit under a song's automatic online word timing; {0} = lrc.red, Unison or Kugou</comment></data>
   <data name="Lyrics.TimeWithWordLyrics" xml:space="preserve"><value>Time with WordLyrics</value><comment>Lyrics credit menu: times this song with WordLyrics now (the online timing stays until it is done)</comment></data>
+  <data name="Lyrics.TimeWithWordLyricsAfterDownload" xml:space="preserve"><value>Time with WordLyrics once downloaded</value><comment>Lyrics credit menu while the song still downloads: WordLyrics starts by itself when it is whole</comment></data>
+  <data name="Lyrics.WaitingForDownload" xml:space="preserve"><value>Waiting for the download · {0}%</value><comment>Word timing pill: WordLyrics starts when the song has downloaded; {0} = percent downloaded</comment></data>
   <data name="Lyrics.LrcRedCredit" xml:space="preserve"><value>Текст с lrc.red</value><comment>Lyrics page credit under lyrics that came from lrc.red</comment></data>
   <data name="Lyrics.LrcRedModelCredit" xml:space="preserve"><value>Синхронизировано по словам моделью lrc.red</value><comment>Lyrics page credit, and the Search Lyrics row format, for lyrics lrc.red's model word-synced</comment></data>
   <data name="Lyrics.LrcRedSyncNetwork" xml:space="preserve"><value>Не удалось подключиться к lrc.red. Проверьте подключение к интернету.</value><comment>Lyrics page / Search Lyrics / Lyrics Studio: lrc.red model sync failed</comment></data>
