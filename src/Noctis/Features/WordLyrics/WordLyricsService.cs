@@ -390,7 +390,12 @@ internal sealed class WordLyricsService(ILibraryService library, Func<AppSetting
         catch (Exception ex) { Progress(new("Could not queue song", ex.Message, Error: true, Finished: true)); }
     }
 
-    private void Progress(ProgressState state) => Dispatcher.UIThread.Post(() =>
+    private void Progress(ProgressState state)
+    {
+        if (Dispatcher.UIThread.CheckAccess()) ApplyProgress(state);
+        else Dispatcher.UIThread.Post(() => ApplyProgress(state));
+    }
+    private void ApplyProgress(ProgressState state)
     {
         if (_disposed) return;
         State = state; Changed?.Invoke();
@@ -402,7 +407,7 @@ internal sealed class WordLyricsService(ILibraryService library, Func<AppSetting
         if (pill is { Kind: TimingPillKind.Done } && settings?.GetBool("notify", true) == false && settings.GetBool("showProgress", true) == false) pill = null;
         if (pill == Pill) return;
         Pill = pill; PillChanged?.Invoke();
-    });
+    }
     internal Task PauseAsync(bool paused) => Task.Run(() => _worker?.SetPaused(paused));
     internal Task CancelAsync() => Task.Run(() => _worker?.Cancel());
 

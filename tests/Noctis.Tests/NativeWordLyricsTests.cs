@@ -56,6 +56,24 @@ public class NativeWordLyricsTests
         Assert.True(condition());
     }
     [AvaloniaFact]
+    public void ExplicitRetryReplacesOldErrorBeforeOpeningThePanel_RealNewFailureStillShows()
+    {
+        using var rig = new Rig();
+        rig.Service.Presenter = (_, _) => { };
+        rig.Service.SetPreviewState(new("Old failure", "Earlier attempt failed", Error: true, Finished: true, Asked: true));
+        Assert.True(rig.Service.State.Error);
+        var states = new List<ProgressState>(); rig.Service.Changed += () => states.Add(rig.Service.State);
+        var song = rig.Song("Retry now");
+        var queue = rig.Service.QueueAsync([song.FilePath]);
+        Until(() => queue.IsCompleted); queue.GetAwaiter().GetResult();
+        Dispatcher.UIThread.RunJobs();
+        Assert.Contains(states, s => s.Message == "Queued" && !s.Error && !s.Finished);
+        Assert.DoesNotContain(states.SkipWhile(s => s.Message != "Queued"), s => s.Message == "Old failure");
+        rig.Service.SetPreviewState(new("New failure", "A real failure is not suppressed", Error: true, Finished: true, Asked: true));
+        Assert.True(rig.Service.State.Error);
+        Assert.True(rig.Service.Pill?.IsProblem);
+    }
+    [AvaloniaFact]
     public void AutomaticTimingStatus_IsPerSong_AndCancelClearsItWithoutDownloading()
     {
         using var rig = new Rig();

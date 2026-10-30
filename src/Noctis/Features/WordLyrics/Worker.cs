@@ -536,11 +536,17 @@ internal sealed class Worker : IDisposable
                 if (!automatic) existing.Hand = true;
                 SaveState();
                 accepted = true;
+                if (!automatic && !_activePaths.Contains(path))
+                    _progress(new ProgressState("Queued", "Waiting for word timing.", Asked: true));
                 return "Already queued for word timing.";
             }
             _items[path] = new Item { Path = path, Root = root, Asked = true, Hand = !automatic, Action = action, Draft = draft, Seen = now, QuietSince = now, NotBefore = now };
             SaveState();
             accepted = true;
+            // A new accepted manual request replaces the previous run's error now,
+            // before the panel opens, not after the backend's first progress poll.
+            if (!automatic && !_activePaths.Contains(path))
+                _progress(new ProgressState("Queued", "Waiting for word timing.", Asked: true));
         }
         _timer.Change(TimeSpan.Zero, Tick);
         return !tool.Ready ? "Queued. WordLyrics setup is needed; the request is saved." : _run is null ? "Queued for word timing…" : "Queued: WordLyrics is busy with another song.";
