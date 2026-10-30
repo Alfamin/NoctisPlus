@@ -1,6 +1,21 @@
 {
   "releases": [
     {
+      "version": "2.6.0",
+      "added": [
+        { "icon": "LyricsIcon", "title": "Choose your word timing", "line": "Tap the credit: online or WordLyrics, either way", "top": true },
+        { "icon": "LyricsIcon", "title": "Online timing for timed songs", "line": "Songs WordLyrics timed can find an online one too" },
+        { "icon": "PlayIcon", "title": "Lyrics ready for the next songs", "line": "The next two in the queue are looked up while one plays" }
+      ],
+      "fixed": [
+        "Songs with feat., accents or apostrophes are found online",
+        "Time with WordLyrics on a streamed song waits for the download and starts by itself",
+        "No false \"needs attention\" before a timing starts",
+        "Not for me stays after Previous; reset keeps dismissed songs",
+        "Kugou picks the explicit version over the clean one"
+      ]
+    },
+    {
       "version": "2.5.0",
       "added": [
         { "icon": "LyricsIcon", "title": "Word lyrics in seconds", "line": "Timing from lrc.red, Unison or Kugou, checked against the song", "top": true },
