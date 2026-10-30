@@ -246,6 +246,17 @@ public class WordLyricsBackendTests
     }
 
     [Fact]
+    public void OnlineDuetGuidesContainSungText_NotTheExportedSpeakerMarkers()
+    {
+        var ttml = "<tt xmlns=\"http://www.w3.org/ns/ttml\" xmlns:ttm=\"http://www.w3.org/ns/ttml#metadata\"><head><metadata>" +
+            "<ttm:agent xml:id=\"a\" type=\"person\"/><ttm:agent xml:id=\"b\" type=\"person\"/></metadata></head><body><div>" +
+            "<p begin=\"1.0\" end=\"2.0\" ttm:agent=\"a\"><span begin=\"1.0\" end=\"2.0\">first singer</span></p>" +
+            "<p begin=\"3.0\" end=\"4.0\" ttm:agent=\"b\"><span begin=\"3.0\" end=\"4.0\">second singer</span></p></div></body></tt>";
+        Assert.Contains("v2:", Noctis.Services.TtmlParser.ToLrc(ttml)); // prove the fixture reaches the duet case
+        Assert.Equal("[00:01.00]first singer\n[00:03.00]second singer\n", Worker.LinesOf(ttml));
+    }
+
+    [Fact]
     public void AutomaticTiming_NeverStartsOrRemovesAnOnlineTiming()
     {
         using var rig = new Rig(); var states = new ConcurrentQueue<ProgressState>();

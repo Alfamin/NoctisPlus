@@ -874,13 +874,12 @@ internal sealed class Worker : IDisposable
     /// <summary>The TTML's lines as a line-timed LRC (no word tags, no background lines); null when it has none.</summary>
     internal static string? LinesOf(string ttml)
     {
-        if (Services.TtmlParser.ToLrc(ttml) is not { Length: > 0 } elrc) return null;
-        var lines = elrc.Split('\n')
-            .Where(l => !l.StartsWith("[bg:", StringComparison.Ordinal))
-            .Select(l => System.Text.RegularExpressions.Regex.Replace(l, @"<\d+:\d+(?:\.\d+)?>", "").Replace("  ", " ").TrimEnd())
-            .Where(l => l.Length > 0);
-        var text = string.Join("\n", lines);
-        return text.Contains(']') ? text + "\n" : null;
+        var (lines, _) = Services.TtmlParser.Parse(ttml);
+        // The display/export format contains duet markers and optional translated or
+        // background lines. The aligner needs only the actual primary words and clocks.
+        var guides = lines?.Where(l => l.Timestamp.HasValue && !l.IsBackgroundOnly && !string.IsNullOrWhiteSpace(l.Text))
+            .Select(l => new Noctis.Models.LyricLine { Timestamp = l.Timestamp, Text = l.Text }).ToList();
+        return guides is { Count: > 0 } ? Services.TtmlParser.ToLrc(guides) + "\n" : null;
     }
 
     private void SettleHeldOnline(string path, bool timed)
