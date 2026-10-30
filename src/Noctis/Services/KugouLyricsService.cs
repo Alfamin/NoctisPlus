@@ -100,7 +100,17 @@ public class KugouLyricsService : IKugouLyricsService
     private async Task<(string Hash, string Name, string Singer, double DurationSeconds)?> FindSongAsync(
         string artist, string trackName, double durationSeconds, CancellationToken ct)
     {
-        var keyword = LyricsSearchSelector.IsUnknownArtist(artist) ? trackName : $"{artist} {trackName}";
+        var found = await SearchSongAsync(artist, trackName, trackName, durationSeconds, ct);
+        // Owner #230: the keyword's "(feat. …)" can bury the song ("BIA LONDON (feat. J. Cole)" lists J. Cole's songs).
+        if (found == null && LyricsSearchSelector.PlainerTitle(trackName, apostropheAsSpace: false) is { } plainer)
+            found = await SearchSongAsync(artist, plainer, plainer, durationSeconds, ct);
+        return found;
+    }
+
+    private async Task<(string Hash, string Name, string Singer, double DurationSeconds)?> SearchSongAsync(
+        string artist, string query, string trackName, double durationSeconds, CancellationToken ct)
+    {
+        var keyword = LyricsSearchSelector.IsUnknownArtist(artist) ? query : $"{artist} {query}";
         var json = await GetStringAsync(
             $"{SongSearchUrl}?format=json&keyword={Uri.EscapeDataString(keyword)}&page=1&pagesize=20&showtype=1", ct);
         return PickSong(json, artist, trackName, durationSeconds);

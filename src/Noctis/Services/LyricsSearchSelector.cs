@@ -107,9 +107,29 @@ public static partial class LyricsSearchSelector
         if (string.IsNullOrWhiteSpace(candidate) || string.IsNullOrWhiteSpace(local))
             return false;
 
-        var c = candidate.Trim();
-        var l = local.Trim();
+        var c = FoldApostrophes(candidate.Trim());
+        var l = FoldApostrophes(local.Trim());
         return c.Contains(l, StringComparison.OrdinalIgnoreCase)
             || l.Contains(c, StringComparison.OrdinalIgnoreCase);
+    }
+
+    /// <summary>Owner #231: "What’s Next" (a curly apostrophe, the library's) is Kugou's "What's Next".</summary>
+    public static string FoldApostrophes(string text) => ApostropheKinds().Replace(text, "'");
+
+    [GeneratedRegex("[’‘ʼ`´]")]
+    private static partial Regex ApostropheKinds();
+
+    /// <summary>
+    /// The title to ask a source again with when the full one found nothing, or null when there is none plainer:
+    /// without "(feat. …)" (owner #230: lrc.red has BIA "LONDON", not "LONDON (feat. J. Cole)"), and, for lrc.red,
+    /// with a space for each apostrophe (#231: its search finds Drake "What’s Next" only as "What s Next").
+    /// </summary>
+    public static string? PlainerTitle(string? title, bool apostropheAsSpace)
+    {
+        if (string.IsNullOrWhiteSpace(title)) return null;
+        var plain = MetadataSearch.MatchText.StripFeaturing(title);
+        if (apostropheAsSpace) plain = ApostropheKinds().Replace(plain, " ").Replace('\'', ' ');
+        plain = string.Join(' ', plain.Split(' ', StringSplitOptions.RemoveEmptyEntries));
+        return plain.Length == 0 || string.Equals(plain, title.Trim(), StringComparison.Ordinal) ? null : plain;
     }
 }

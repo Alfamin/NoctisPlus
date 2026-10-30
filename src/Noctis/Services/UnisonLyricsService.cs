@@ -44,6 +44,12 @@ public class UnisonLyricsService : IUnisonLyricsService
             var query = LyricsSearchSelector.IsUnknownArtist(artist) ? trackName.Trim() : $"{artist.Trim()} {trackName.Trim()}";
             var search = await GetStringAsync($"{BaseUrl}/lyrics/search?q={Uri.EscapeDataString(query)}&limit=20", ct);
             var version = search == null ? null : PickVersion(search, artist, trackName, durationSeconds);
+            // Owner #230: once more without "(feat. …)" when the full title found nothing.
+            if (version == null && LyricsSearchSelector.PlainerTitle(trackName, apostropheAsSpace: false) is { } plainer)
+            {
+                var again = await GetStringAsync($"{BaseUrl}/lyrics/search?q={Uri.EscapeDataString(LyricsSearchSelector.IsUnknownArtist(artist) ? plainer : $"{artist.Trim()} {plainer}")}&limit=20", ct);
+                version = again == null ? null : PickVersion(again, artist, plainer, durationSeconds);
+            }
             if (version == null)
             {
                 Remember(cacheKey, null);

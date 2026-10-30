@@ -167,6 +167,8 @@ public partial class LrcRedLyricsService : ILrcRedLyricsService
             return known;
         var lookup = await SharedLookupAsync(LookupQuery(artist, trackName, durationSeconds), ct);
         var song = PickSong(lookup, artist, trackName, durationSeconds);
+        if (song == null && LyricsSearchSelector.PlainerTitle(trackName, apostropheAsSpace: true) is { } plainer)
+            song = PickSong(await SharedLookupAsync(LookupQuery(artist, plainer, durationSeconds), ct), artist, trackName, durationSeconds);
         Remember(_matches, key, song);
         return song;
     }
@@ -459,7 +461,7 @@ public partial class LrcRedLyricsService : ILrcRedLyricsService
 
             var timing = Str(r, "timing_type") is "word" or "line" ? Str(r, "timing_type")! : "none";
             var key = (
-                Exact: string.Equals(candidate.TrackName!.Trim(), trackName.Trim(), StringComparison.OrdinalIgnoreCase) ? 1 : 0,
+                Exact: Same(candidate.TrackName!, trackName) || Same(candidate.TrackName!, MetadataSearch.MatchText.StripFeaturing(trackName)) ? 1 : 0,
                 Timing: timing switch { "word" => 2, "line" => 1, _ => 0 },
                 Delta: durationSeconds > 0 && candidate.Duration > 0 ? Math.Abs(candidate.Duration - durationSeconds) : 0);
             if (best != null && !IsBetter(key, bestKey)) continue;
@@ -468,6 +470,9 @@ public partial class LrcRedLyricsService : ILrcRedLyricsService
         }
         return best;
     }
+
+    private static bool Same(string a, string b) => string.Equals(
+        LyricsSearchSelector.FoldApostrophes(a.Trim()), LyricsSearchSelector.FoldApostrophes(b.Trim()), StringComparison.OrdinalIgnoreCase);
 
     private static bool IsBetter((int Exact, int Timing, double Delta) a, (int Exact, int Timing, double Delta) b) =>
         a.Exact != b.Exact ? a.Exact > b.Exact

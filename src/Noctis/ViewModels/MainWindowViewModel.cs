@@ -787,7 +787,8 @@ public partial class MainWindowViewModel : ViewModelBase
                 var lane = new Services.Lyrics.OnlineTimingLane(
                     new Services.Lyrics.OnlineWordTiming(lrcRed, unison, () => Settings.GetSettings().LrcRedEnabled, kugou, lrcLib)
                     { KugouFirst = Environment.GetEnvironmentVariable("NOCTISPLUS_TEST_KUGOU_FIRST") == "1" },
-                    new Services.Lyrics.OnlineTimingMisses(Path.Combine(AppPaths.DataRoot, "online-timing-misses.json")),
+                    // "-2": misses from before #230/#231 (titles with "(feat. …)" or an apostrophe) are asked again once.
+                    new Services.Lyrics.OnlineTimingMisses(Path.Combine(AppPaths.DataRoot, "online-timing-misses-2.json")),
                     lyricsWriter, () => converter?.GetFfmpegPath(), () => OnlineAccess.Shared.IsOffline,
                     path => wordService.IsIgnored(path) || Services.Lyrics.OnlineTimingLane.StudioTimed(path));
                 if (Environment.GetEnvironmentVariable("NOCTISPLUS_TEST_KUGOU_FIRST") == "1")
