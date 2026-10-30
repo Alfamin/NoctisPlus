@@ -91,7 +91,7 @@ public sealed class MotionWordCell : Panel
     /// </summary>
     private void UpdatePadding()
     {
-        var final = Word?.Text is { Length: > 0 } text && !char.IsWhiteSpace(text[^1]);
+        var final = Word is { IsLastInLine: true, Text: { Length: > 0 } text } && !char.IsWhiteSpace(text[^1]);
         if (!final) { Presenter.Padding = default; return; }
         var enabled = GetValue(RightToLeftEnabledProperty);
         var song = enabled && GetValue(RightToLeftSongProperty);

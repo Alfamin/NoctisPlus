@@ -21,6 +21,29 @@ namespace Noctis.Tests;
 
 public class NativeLyricMotionTests
 {
+    [AvaloniaFact]
+    public void KugouPunctuationDoesNotGetLineEndingPaddingBeforeIt()
+    {
+        const string krc = "[1000,4000]<0,400,0>Was <400,400,0>it <800,400,0>true<1200,100,0>? <1300,400,0>Yes<1700,100,0>, <1800,400,0>really<2200,100,0>!";
+        var elrc = Noctis.Services.Lyrics.KrcLyrics.ToElrc(krc)!;
+        var ttml = Noctis.Services.LyricsStudio.TimedLyricsBuilder.BuildTtml(Noctis.Services.LyricsStudio.ExistingLyricsLoader.ParseTimed(elrc));
+        var line = TtmlParser.Parse(ttml).Lines![0];
+        Assert.Equal("Was it true? Yes, really!", line.Text);
+        var cells = line.Words!.Select(w => new MotionWordCell { Word = w, Line = line }).ToArray();
+        var panel = new WrapPanel(); foreach (var c in cells) panel.Children.Add(c);
+        var window = new Window { Content = panel, Width = 1000, Height = 200 };
+        try
+        {
+            window.Show();
+            foreach (var c in cells) c.SetMode(true, false);
+            window.UpdateLayout();
+            Assert.All(cells[..^1], c => Assert.Equal(default(Thickness), c.Presenter.Padding));
+            Assert.Equal(new Thickness(0, 0, 24, 0), cells[^1].Presenter.Padding);
+            Assert.Contains(cells, c => c.Word!.Text.Trim() == "?");
+        }
+        finally { window.Close(); }
+    }
+
     [Theory]
     [InlineData("Word by word (smooth)", "Smooth")]
     [InlineData("Word by word (crisp)", "Crisp")]

@@ -2,6 +2,7 @@ using Avalonia;
 using Avalonia.Animation;
 using Avalonia.Controls;
 using Avalonia.Media;
+using Avalonia.Threading;
 
 namespace Noctis.Controls;
 
@@ -44,6 +45,8 @@ public sealed class ProgressRing : Control
     };
     private CancellationTokenSource? _spinning;
     internal Task SpinTask { get; private set; } = Task.CompletedTask;
+    internal double SpinAngle => GetValue(SpinProperty);
+    private bool _spinCheckQueued;
 
     static ProgressRing()
     {
@@ -53,6 +56,9 @@ public sealed class ProgressRing : Control
     public ProgressRing()
     {
         Transitions = new Transitions { new DoubleTransition { Property = ShownProperty, Duration = TimeSpan.FromMilliseconds(220) } };
+        // A parent's async empty-state visibility can change after the deferred check.
+        // LayoutUpdated also observes that transition without a polling timer.
+        LayoutUpdated += (_, _) => UpdateSpin();
     }
 
     public double Value { get => GetValue(ValueProperty); set => SetValue(ValueProperty, value); }
@@ -64,13 +70,13 @@ public sealed class ProgressRing : Control
     {
         base.OnPropertyChanged(change);
         if (change.Property == ValueProperty) SetValue(ShownProperty, Math.Clamp(Value, 0, 1));
-        else if (change.Property == IsIndeterminateProperty || change.Property == IsVisibleProperty || change.Property.Name == nameof(IsEffectivelyVisible)) UpdateSpin();
+        else if (change.Property == IsIndeterminateProperty || change.Property == IsVisibleProperty || change.Property.Name == nameof(IsEffectivelyVisible)) RefreshSpin();
     }
 
     protected override void OnAttachedToVisualTree(VisualTreeAttachmentEventArgs e)
     {
         base.OnAttachedToVisualTree(e);
-        UpdateSpin();
+        RefreshSpin();
     }
 
     protected override void OnDetachedFromVisualTree(VisualTreeAttachmentEventArgs e)
@@ -88,6 +94,16 @@ public sealed class ProgressRing : Control
         if (!want) { _spinning?.Cancel(); _spinning?.Dispose(); _spinning = null; return; }
         _spinning = new CancellationTokenSource();
         SpinTask = SpinAsync(_spinning.Token);
+    }
+
+    private void RefreshSpin()
+    {
+        UpdateSpin(); // Hidden/detached controls stop immediately.
+        if (_spinCheckQueued || !IsIndeterminate || VisualRoot is null) return;
+        _spinCheckQueued = true;
+        // Song-change bindings can show the child before its status button. Effective
+        // ancestor visibility is not an observable property: recheck after bindings/layout settle.
+        Dispatcher.UIThread.Post(() => { _spinCheckQueued = false; UpdateSpin(); }, DispatcherPriority.Loaded);
     }
 
     private async Task SpinAsync(CancellationToken ct)

@@ -73,7 +73,12 @@ internal sealed class WordLyricsService(ILibraryService library, Func<AppSetting
     internal void SetCoveredOnline(IReadOnlyList<string> paths, bool covered)
     {
         if (_worker is not { } worker) return;
-        foreach (var path in paths) worker.SetCoveredOnline(path, covered);
+        foreach (var path in paths)
+        {
+            worker.SetCoveredOnline(path, covered);
+            foreach (var alias in new[] { Volatile.Read(ref _playingPath), Volatile.Read(ref _playingLibraryPath) })
+                if (alias is not null && SameSong(path, alias)) worker.SetCoveredOnline(alias, covered);
+        }
         if (!covered) _playingAsked = false;
         Changed?.Invoke();
     }
@@ -310,7 +315,8 @@ internal sealed class WordLyricsService(ILibraryService library, Func<AppSetting
                 foreach (var extension in new[] { ".elrc", ".ttml", ".lyricsfile", ".lrc" })
                     if (File.Exists(from + extension)) File.Copy(from + extension, to + extension, overwrite: true);
                 // #200: the timed copy's online timing stepped aside for this result: the copy being heard follows.
-                if (File.Exists(from + ".elrc") && !File.Exists(from + ".ttml")) Services.Lyrics.OnlineTimingSidecar.StepAside(target!);
+                if (_worker?.WasUserRun(timed) == true && File.Exists(from + ".elrc") && !File.Exists(from + ".ttml"))
+                    Services.Lyrics.OnlineTimingSidecar.StepAside(target!);
                 shown.Add(target!);
             }
             catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or ArgumentException)

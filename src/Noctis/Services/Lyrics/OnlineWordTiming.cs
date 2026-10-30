@@ -272,8 +272,8 @@ internal static class OnlineTimingSidecar
 
     const string UnverifiedMark = "plus:fit=\"unsure\"";
 
-    /// <summary>Owner #215: an online timing kept on screen while WordLyrics times the song (it counts as no word timing
-    /// for WordLyrics, and makes way when WordLyrics' timing lands).</summary>
+    /// <summary>Audio fit confidence only. Owner #226: unsure timing still covers the song;
+    /// it never grants permission for automatic WordLyrics replacement.</summary>
     public static bool Unverified(string? ttml) => SourceOf(ttml) != null && ttml!.Contains(UnverifiedMark, StringComparison.Ordinal);
 
     /// <summary>A song whose .ttml is such an unverified online timing.</summary>

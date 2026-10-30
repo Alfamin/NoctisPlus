@@ -792,14 +792,13 @@ public partial class MainWindowViewModel : ViewModelBase
                     path => wordService.IsIgnored(path) || Services.Lyrics.OnlineTimingLane.StudioTimed(path));
                 if (Environment.GetEnvironmentVariable("NOCTISPLUS_TEST_KUGOU_FIRST") == "1")
                     DebugLog.Write("Online timing", "TEST comparison: Kugou first, lrc.red then Unison; ready fallback after 10 s maximum preference wait");
-                lane.Written += paths => Dispatcher.UIThread.Post(() => _lyricsVm.ReloadWrittenLyrics(paths));
-                lane.SearchChanged += (track, state) => Dispatcher.UIThread.Post(() => _lyricsVm.OnlineTimingChanged(track, state));
-                // Owner #215: Kugou the fit check was not sure of stays on screen; WordLyrics times the song quietly.
-                lane.Recheck += paths => Dispatcher.UIThread.Post(() =>
+                lane.Written += paths => Dispatcher.UIThread.Post(() =>
                 {
-                    wordService.SetCoveredOnline(paths, covered: false);
-                    wordService.TimeQuietly(paths);
+                    // The library copy may have appeared after provisional lyrics were shown.
+                    wordService.SetCoveredOnline(paths, covered: true);
+                    _lyricsVm.ReloadWrittenLyrics(paths);
                 });
+                lane.SearchChanged += (track, state) => Dispatcher.UIThread.Post(() => _lyricsVm.OnlineTimingChanged(track, state));
                 // #207 hard rule: every song WordLyrics would time automatically is looked up online first.
                 wordService.OnlineFirst = lane.WantsFirst;
                 // Online timing on screen: WordLyrics does not time that song too ("Processing lyrics" under lrc.red's).

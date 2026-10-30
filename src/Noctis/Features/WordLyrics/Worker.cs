@@ -181,6 +181,7 @@ internal sealed class Worker : IDisposable
         lock (_gate)
         {
             if (_disposed || IsIgnored(path) || !_items.TryGetValue(path, out var item) || item.Deferred) return SongTimingStatus.None;
+            if (!item.Hand && (AutomaticBlocked(path) || HasTtml(path))) return SongTimingStatus.None;
             if (item.Action == TimingAction.Missing && !_activePaths.Contains(path) && HasWordLyrics(path)) return SongTimingStatus.None;
             if (!_activePaths.Contains(path) && !item.Asked && !_options.Auto) return SongTimingStatus.None;
             if (_paused) return SongTimingStatus.Paused;
@@ -493,6 +494,7 @@ internal sealed class Worker : IDisposable
             return "Wait for the song to finish downloading.";
         if (string.IsNullOrWhiteSpace(path) || !File.Exists(path)) return "The song's file is not there.";
         if (!Audio.Contains(Path.GetExtension(path))) return "WordLyrics cannot read this kind of file.";
+        if (automatic && HasTtml(path)) return "Online lyrics already cover this song.";
         // Owner #206: the old text sent people to the song's menu, which opens this same window: a loop.
         if (action == TimingAction.Missing && (HasWordLyrics(path) || EmbeddedWordLyrics.HasWords(path))) return "Already word-timed. To time it again, choose Retime existing words or Fetch fresh lyrics.";
         var tool = new Tool(Options.Folder);
@@ -715,6 +717,7 @@ internal sealed class Worker : IDisposable
     /// <summary>Has the file been left alone long enough, and does it still need lyrics? Called under the lock.</summary>
     private bool Ripe(Item item, DateTime now)
     {
+        if (!item.Hand && (AutomaticBlocked(item.Path) || HasTtml(item.Path))) { item.Length = -2; return false; }
         if (now < item.NotBefore) return false;
         if (IsIgnored(item.Path)) { item.Length = -2; return false; }
         var rule = _rules.Get(item.Path);
@@ -908,14 +911,16 @@ internal sealed class Worker : IDisposable
         {
             if (_disposed || _run is not null) return;
             // A user can ignore a song after Ripe inspected the batch, before process launch.
-            batch = batch.Where(i => !IsIgnored(i.Path) && _items.TryGetValue(i.Path, out var current) && ReferenceEquals(current, i)).ToList();
+            batch = batch.Where(i => !IsIgnored(i.Path) && (i.Hand || !HasTtml(i.Path) && !AutomaticBlocked(i.Path))
+                && _items.TryGetValue(i.Path, out var current) && ReferenceEquals(current, i)).ToList();
             if (batch.Count == 0) return;
             File.WriteAllLines(ListFile, batch.Select(i => i.Path), new UTF8Encoding(false));
             if (controlled) WriteControl(_paused ? "pause" : "run");
             // #213: WordLyrics leaves alone any song with a .ttml ("protected"); chosen by hand for an online-timed song,
             // that timing steps out for the run: gone if WordLyrics times it, back otherwise.
-            foreach (var item in batch.Where(i => i.Hand && i.Action != TimingAction.Missing || Services.Lyrics.OnlineTimingSidecar.HasUnverified(i.Path)))
+            foreach (var item in batch.Where(i => i.Hand && i.Action != TimingAction.Missing))
                 HoldOnline(item.Path, item.Action);
+            foreach (var item in batch) _userRuns[item.Path] = item.Hand;
             run = _run = tool.StartQuietRun(batch[0].Root, ListFile, ResultFile, OutputFile, speed, options.Backup, retry: batch[0].Asked, ProgressFile,
                 controlled ? ControlFile : null, batch[0].Action, batch[0].Draft, options.AdaptToPc);
             _job = Job.Around(run);
@@ -1517,15 +1522,13 @@ internal sealed class Worker : IDisposable
     internal static bool HasWordLyrics(string song)
     {
         var stem = Path.Combine(Path.GetDirectoryName(song) ?? "", Path.GetFileNameWithoutExtension(song));
-        // Owner #215: an online timing the fit check was not sure of is shown, but the song still gets WordLyrics' timing.
-        return WordLyrics.Any(extension => File.Exists(stem + extension) && !(extension == ".ttml" && UnverifiedOnline(stem + extension)));
+        return WordLyrics.Any(extension => File.Exists(stem + extension));
     }
 
-    private static bool UnverifiedOnline(string ttml)
-    {
-        try { return Services.Lyrics.OnlineTimingSidecar.Unverified(File.ReadAllText(ttml)); }
-        catch (Exception e) when (e is IOException or UnauthorizedAccessException) { return false; }
-    }
+    private static bool HasTtml(string path) => File.Exists(Path.ChangeExtension(path, ".ttml"));
+    private readonly System.Collections.Concurrent.ConcurrentDictionary<string, bool> _userRuns = new(StringComparer.OrdinalIgnoreCase);
+    internal bool WasUserRun(string path) => _userRuns.GetValueOrDefault(Path.GetFullPath(path));
+    internal bool IsRunning { get { lock (_gate) return _run is { HasExited: false }; } }
 
     /// <summary>
     /// Owner #215: a song whose online timing the fit check was not sure of is retimed next, quietly, from that timing's

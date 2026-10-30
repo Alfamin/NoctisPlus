@@ -274,13 +274,9 @@ internal sealed class OnlineTimingLane : IDisposable
         if (why != "library" || outcome is Outcome.Written or Outcome.Kept or Outcome.Transient)
             Log($"{outcome} ({why}) {Describe(track)} in {clock.ElapsedMilliseconds} ms{_detail}");
         if (outcome == Outcome.Written) Written?.Invoke(Paths(path, track));
-        if (_recheck is { } recheck) { _recheck = null; Recheck?.Invoke(recheck); }
         return outcome;
     }
 
-    /// <summary>Owner #215: written but unverified (Kugou the fit check was not sure of): WordLyrics times these quietly.</summary>
-    public event Action<IReadOnlyList<string>>? Recheck;
-    List<string>? _recheck;
 
     /// <summary>Why the last song came out as it did (the loop's own thread only).</summary>
     string _detail = "";
@@ -450,15 +446,14 @@ internal sealed class OnlineTimingLane : IDisposable
         _detail += $"; from {OnlineTimingSidecar.Name(found.Source!.Value)}, " + (ffmpegPath == null ? "no ffmpeg: not fit-checked" : fit == null ? "fit check could not read the audio"
             : (fit.Shift is { } moved ? $"fit sure: moved {moved:+0.00;-0.00} s" : "fit unsure: left as found")
               + $" (estimate {fit.Estimate:+0.00;-0.00} s, sharpness {fit.Sharpness:0.00}, significance {fit.Significance:0.0}, energy {fit.EnergyEstimate:+0.00;-0.00} s)");
-        // Owner #215 (White Iverson far out of sync; Kugou otherwise mostly good): Kugou the fit check is not sure of stays
-        // on screen, marked unverified, and WordLyrics times the song quietly; its timing replaces Kugou's when it lands.
+        // #226 supersedes #215: uncertainty records fit confidence, never permission to replace
+        // usable online timing automatically. WordLyrics repair is the user's explicit choice.
         var recheck = found.Source == WordTimingSource.Kugou && fit?.Shift == null;
-        if (recheck) _detail += "; kept on screen, WordLyrics times it quietly";
+        if (recheck) _detail += "; kept online (no automatic model replacement)";
         var marked = OnlineTimingSidecar.Mark(OnlineTimingFit.Shift(found.Ttml!, shift), found.Source!.Value, shift, unverified: recheck);
         var written = marked != null && _writer.WriteOnlineTiming(path, marked);
         if (written) lock (_gate) _provisional.Remove(key);
         if (!written) _detail += "; not written (a .ttml of the user's, read-only or unwritable)";
-        if (written && recheck) _recheck = Paths(path, track);
         return written ? Outcome.Written : Outcome.Kept;
     }
 

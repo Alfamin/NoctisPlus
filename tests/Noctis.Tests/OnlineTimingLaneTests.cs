@@ -342,22 +342,20 @@ public sealed class OnlineTimingLaneTests : IDisposable
     [Theory]
     [InlineData(true)]    // the fit check is unsure
     [InlineData(false)]   // no ffmpeg: nothing to check it with
-    public async Task KugouTheFitCheckIsNotSureOf_StaysOnScreen_AndWordLyricsTimesTheSongQuietly(bool unsure)
+    public async Task KugouWithUnsureFitStaysOnline_AndCountsAsAlreadyTimed(bool unsure)
     {
-        // Owner #215: White Iverson from Kugou was far out of sync, most Kugou songs are good: keep showing it, and
-        // let WordLyrics replace it quietly when the check cannot confirm it.
+        // Owner #226 supersedes #215: keep online timing even when the check is unsure;
+        // replacing it with WordLyrics requires an explicit repair.
         _kugou.Answer = () => new LrcLibResult { Duration = 200, SyncedLyrics = "x", OriginalTtml = WordTtml() };
         if (unsure) _fit = null; else _ffmpeg = null;
         using var lane = Lane();
-        IReadOnlyList<string>? recheck = null;
-        lane.Recheck += p => recheck = p;
         var song = Song("White Iverson");
         Assert.True(lane.WantsFirst(song.FilePath));
         Assert.Equal(OnlineTimingLane.Outcome.Written, await lane.ProcessAsync(song, CancellationToken.None));
         var ttml = File.ReadAllText(Path.ChangeExtension(song.FilePath, ".ttml"));
         Assert.Equal(WordTimingSource.Kugou, OnlineTimingSidecar.SourceOf(ttml));
         Assert.True(OnlineTimingSidecar.Unverified(ttml));
-        Assert.Equal([song.FilePath], recheck);
+        Assert.True(Noctis.Features.WordLyrics.Worker.HasWordLyrics(song.FilePath));
         Assert.False(lane.WantsFirst(song.FilePath));   // WordLyrics goes on
     }
 
@@ -366,12 +364,10 @@ public sealed class OnlineTimingLaneTests : IDisposable
     {
         _kugou.Answer = () => new LrcLibResult { Duration = 200, SyncedLyrics = "x", OriginalTtml = WordTtml() };
         using var lane = Lane();
-        var rechecked = false;
-        lane.Recheck += _ => rechecked = true;
         var song = Song("Grenade");
         Assert.Equal(OnlineTimingLane.Outcome.Written, await lane.ProcessAsync(song, CancellationToken.None));
         Assert.False(OnlineTimingSidecar.Unverified(File.ReadAllText(Path.ChangeExtension(song.FilePath, ".ttml"))));
-        Assert.False(rechecked);
+        Assert.True(Noctis.Features.WordLyrics.Worker.HasWordLyrics(song.FilePath));
     }
 
     [Fact]

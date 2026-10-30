@@ -140,24 +140,25 @@ public class WordLyricsBackendTests
         Assert.Empty(Directory.EnumerateFiles(rig.Work, "*", SearchOption.AllDirectories).Where(f => f.Contains("held-online")));
     }
 
-    [Theory]
-    [InlineData("timed", false)]
-    [InlineData("no_lyrics", true)]
-    public async Task AnUnverifiedOnlineTiming_IsTimedQuietly_AndMakesWayOnlyForATiming(string outcome, bool kept)
+    [Fact]
+    public async Task AnUnverifiedOnlineTimingIsProtected_UnlessTheUserChoosesRepair()
     {
         // Owner #215: Kugou the fit check was not sure of stays on screen while WordLyrics times the song.
-        using var rig = new Rig(outcome: outcome); var states = new ConcurrentQueue<ProgressState>();
+        using var rig = new Rig(); var states = new ConcurrentQueue<ProgressState>();
         var ttml = Path.ChangeExtension(rig.Song, ".ttml");
         File.WriteAllText(ttml, Noctis.Services.Lyrics.OnlineTimingSidecar.Mark(OnlineTtml, Noctis.Services.Lyrics.WordTimingSource.Kugou, 0, unverified: true)!);
-        Assert.False(Worker.HasWordLyrics(rig.Song));
+        Assert.True(Worker.HasWordLyrics(rig.Song));
         using var worker = rig.Worker(states.Enqueue);
-        Assert.True(worker.AskQuietly(rig.Song));
+        Assert.False(worker.AskQuietly(rig.Song));
         Assert.Equal(SongTimingStatus.None, worker.StatusFor(Path.GetFullPath(rig.Song)));
+        Assert.True(File.Exists(ttml));
+        Assert.False(File.Exists(rig.Result));
+        worker.Ask(rig.Song, TimingAction.Current); // explicit repair still replaces online timing
         await Until(() => states.Any(s => s.Finished));
-        Assert.Equal(kept, File.Exists(ttml));
+        Assert.False(File.Exists(ttml));
         // Retimed from the online timing's own words (no lyrics search); the words file goes again when nothing was timed.
         Assert.Contains("--retime-mode", File.ReadAllText(rig.Result));
-        Assert.Equal(!kept, File.Exists(Path.ChangeExtension(rig.Song, ".lrc")));
+        Assert.True(File.Exists(Path.ChangeExtension(rig.Song, ".lrc")));
     }
 
     [Fact]
@@ -182,15 +183,36 @@ public class WordLyricsBackendTests
     }
 
     [Fact]
-    public async Task AutomaticTiming_NeverRemovesAnOnlineTiming()
+    public void AutomaticTiming_NeverStartsOrRemovesAnOnlineTiming()
     {
         using var rig = new Rig(); var states = new ConcurrentQueue<ProgressState>();
         var ttml = Path.ChangeExtension(rig.Song, ".ttml");
         File.WriteAllText(ttml, Noctis.Services.Lyrics.OnlineTimingSidecar.Mark(OnlineTtml, Noctis.Services.Lyrics.WordTimingSource.Unison, 0)!);
         using var worker = rig.Worker(states.Enqueue);
-        worker.Ask(rig.Song, TimingAction.Fresh, null, out _, automatic: true);
-        await Until(() => states.Any(s => s.Finished));
+        worker.Ask(rig.Song, TimingAction.Fresh, null, out var accepted, automatic: true);
+        Assert.False(accepted);
+        Assert.Equal(0, worker.WaitingCount);
+        Assert.False(File.Exists(rig.Result));
         Assert.True(File.Exists(ttml));
+    }
+
+    [Fact]
+    public async Task OnlineTimingArrivingDuringAutomaticRunStopsIt_WithoutRemovingTheTtml()
+    {
+        using var rig = new Rig(hold: true);
+        var states = new ConcurrentQueue<ProgressState>();
+        using var worker = rig.Worker(states.Enqueue);
+        worker.AskPlayed(rig.Song, out var accepted); Assert.True(accepted);
+        await Until(() => worker.StatusFor(rig.Song) == SongTimingStatus.Processing);
+        var ttml = Path.ChangeExtension(rig.Song, ".ttml");
+        var online = Noctis.Services.Lyrics.OnlineTimingSidecar.Mark(OnlineTtml, Noctis.Services.Lyrics.WordTimingSource.Kugou, 0, unverified: true)!;
+        File.WriteAllText(ttml, online);
+        worker.SetCoveredOnline(rig.Song, true);
+        Assert.Equal(SongTimingStatus.None, worker.StatusFor(rig.Song));
+        await Until(() => !worker.IsRunning); // stopped workers may be killed without a result file
+        Assert.Equal(online, File.ReadAllText(ttml));
+        Assert.False(worker.WasUserRun(rig.Song));
+        Assert.Equal(0, worker.WaitingCount);
     }
     [Theory]
     [InlineData("no_lyrics")]
