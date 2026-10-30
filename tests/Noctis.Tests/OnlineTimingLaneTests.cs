@@ -48,6 +48,62 @@ public sealed class OnlineTimingLaneTests : IDisposable
         return b.Append("</div></body></tt>").ToString();
     }
 
+    [Fact]
+    public async Task LookAheadNeedsNoAudio_OnlyNextTwo_AndPlayingReusesTheAnswer()
+    {
+        using var lane = Lane();
+        var one = new Track { Title = "one", Artist = "Artist", Duration = TimeSpan.FromSeconds(200), FilePath = "absent-one.flac" };
+        var two = new Track { Title = "two", Artist = "Artist", Duration = one.Duration, FilePath = "absent-two.flac" };
+        var third = new Track { Title = "third", Artist = "Artist", Duration = one.Duration, FilePath = "absent-third.flac" };
+        _lrcRed.Answer = () => new LrcLibResult { Duration = 200, OriginalTtml = WordTtml() };
+        lane.SetPlaying(null, [one, two, third]);
+        await lane.StartLookAhead();
+        Assert.Equal(2, _lrcRed.Calls);
+        var shown = 0; lane.Provisional += (_, _, _) => shown++;
+        lane.SetPlaying(one, [two, third]);
+        Assert.True(await lane.ShowWhileStreamingAsync(one, CancellationToken.None));
+        Assert.Equal(1, shown); Assert.Equal(2, _lrcRed.Calls);
+        Assert.False(File.Exists(Path.ChangeExtension(one.FilePath, ".ttml")));
+    }
+
+    [Fact]
+    public async Task APreviousStreamingMissCannotHideANewLookAheadAnswerOnReplay()
+    {
+        using var lane = Lane();
+        var song = new Track { Title = "replayed", FilePath = "absent-replayed.flac", Duration = TimeSpan.FromSeconds(200) };
+        Assert.False(await lane.ShowWhileStreamingAsync(song, CancellationToken.None));
+        _lrcRed.Answer = () => new LrcLibResult { Duration = 200, OriginalTtml = WordTtml() };
+        lane.SetPlaying(null, [song]);
+        await lane.StartLookAhead();
+        var replay = new Track { Title = song.Title, FilePath = song.FilePath, Duration = song.Duration };
+        var shown = 0; lane.Provisional += (_, _, _) => shown++;
+        lane.SetPlaying(replay, []);
+        Assert.True(await lane.ShowWhileStreamingAsync(replay, CancellationToken.None));
+        Assert.Equal(1, shown);
+        Assert.Equal(2, _lrcRed.Calls);
+    }
+
+    [Fact]
+    public async Task QueueChangeCancelsDiscardedLookAhead_ButKeepsThePromotedSong()
+    {
+        using var lane = Lane();
+        var one = new Track { Title = "one", FilePath = "absent-one.flac" };
+        var two = new Track { Title = "two", FilePath = "absent-two.flac" };
+        var tokens = new System.Collections.Concurrent.ConcurrentDictionary<string, CancellationToken>();
+        var answer = new TaskCompletionSource<LrcLibResult?>(TaskCreationOptions.RunContinuationsAsynchronously);
+        _lrcRed.AsyncAnswer = (title, ct) => { tokens[title] = ct; return answer.Task.WaitAsync(ct); };
+        lane.SetPlaying(null, [one, two]);
+        var warm = lane.StartLookAhead();
+        var end = DateTime.UtcNow.AddSeconds(3);
+        while (tokens.Count < 2 && DateTime.UtcNow < end) await Task.Delay(5);
+        Assert.Equal(2, tokens.Count);
+        lane.SetPlaying(one, []);
+        Assert.False(tokens["one"].IsCancellationRequested);
+        Assert.True(tokens["two"].IsCancellationRequested);
+        answer.SetResult(new LrcLibResult { OriginalTtml = WordTtml() });
+        await warm.WaitAsync(TimeSpan.FromSeconds(3));
+    }
+
     Track Song(string name, SourceType source = SourceType.Local)
     {
         var path = Path.Combine(_dir, name + ".mp3");

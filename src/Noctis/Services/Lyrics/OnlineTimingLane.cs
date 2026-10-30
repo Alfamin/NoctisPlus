@@ -41,6 +41,10 @@ internal sealed class OnlineTimingLane : IDisposable
     readonly HashSet<string> _streamAsked = new(StringComparer.Ordinal);
     Track? _shownTrack;   // the stream whose online timing was last put on screen (each play of it is its own Track)
     readonly Dictionary<string, OnlineWordTiming.Lookup> _provisional = new(StringComparer.Ordinal);
+    // Only the current queue window. Promotion to playing retains the in-flight lookup;
+    // removing a song cancels it without remembering a miss or writing any sidecar.
+    sealed record AheadLookup(CancellationTokenSource Stop, Task<OnlineWordTiming.Lookup> Task);
+    readonly Dictionary<string, AheadLookup> _aheadLookups = new(StringComparer.Ordinal);
 
     /// <summary>Lyrics files written for these songs: the lyrics page reloads the one shown in place.</summary>
     public event Action<IReadOnlyList<string>>? Written;
@@ -86,6 +90,15 @@ internal sealed class OnlineTimingLane : IDisposable
             if (!ReferenceEquals(_current, current)) _activeWork?.Cancel();
             _current = current;
             _upNext = upNext.Take(Ahead).ToList();
+            var keep = _upNext.Take(2).Prepend(current).Where(t => t != null)
+                .Select(t => MetadataKey(t!)).ToHashSet(StringComparer.Ordinal);
+            foreach (var key in _aheadLookups.Keys.Where(k => !keep.Contains(k)).ToList())
+            {
+                var removed = _aheadLookups[key];
+                removed.Stop.Cancel();
+                _ = removed.Task.ContinueWith(_ => removed.Stop.Dispose(), TaskScheduler.Default);
+                _aheadLookups.Remove(key);
+            }
         }
         Wake();
     }
@@ -217,17 +230,20 @@ internal sealed class OnlineTimingLane : IDisposable
                 if (!_offline() && StreamToShow() is { } streaming)
                 {
                     await ShowWhileStreamingAsync(streaming, work.Token);
+                    _ = StartLookAhead();
                     continue;
                 }
                 var track = _offline() || now < _restUntil ? null : Next(now >= libraryAt && !Busy());
                 if (track == null)
                 {
+                    _ = StartLookAhead();
                     // The song playing may still be arriving: look again soon, so its lyrics come online before WordLyrics starts.
                     var wait = now < _restUntil ? _restUntil - now : CurrentPending() ? TimeSpan.FromSeconds(2) : now < libraryAt ? libraryAt - now : TimeSpan.FromMinutes(1);
                     await _wake.WaitAsync(wait < TimeSpan.FromSeconds(1) ? TimeSpan.FromSeconds(1) : wait, work.Token);
                     continue;
                 }
                 var outcome = await ProcessAsync(track, work.Token);
+                _ = StartLookAhead();
                 if (outcome == Outcome.Transient)
                 {
                     _restUntil = Now() + FailureRest;
@@ -286,8 +302,55 @@ internal sealed class OnlineTimingLane : IDisposable
 
     /// <summary>lrc.red, Unison, Kugou (owner #209), paced: lrc.red is asked about one song every <see cref="Spacing"/>,
     /// counted from the last ask, so the fit check of one song overlaps the wait before the next.</summary>
-    Task<OnlineWordTiming.Lookup> FindAsync(Track track, double seconds, CancellationToken ct) =>
-        _timing.FindAsync(track.Artist ?? "", track.Title, seconds, ct, WaitForLrcRedAsync);
+    Task<OnlineWordTiming.Lookup> FindAsync(Track track, double seconds, CancellationToken ct)
+    {
+        lock (_gate)
+            if (_aheadLookups.TryGetValue(OnlineTimingMisses.Key(track.Artist ?? "", track.Title, seconds), out var ahead))
+            {
+                if (!ahead.Task.IsCompletedSuccessfully || !ahead.Task.Result.Transient) return ahead.Task.WaitAsync(ct);
+                _aheadLookups.Remove(OnlineTimingMisses.Key(track.Artist ?? "", track.Title, seconds));
+                ahead.Stop.Dispose();
+            }
+        return _timing.FindAsync(track.Artist ?? "", track.Title, seconds, ct, WaitForLrcRedAsync);
+    }
+
+    static string MetadataKey(Track t) => OnlineTimingMisses.Key(t.Artist ?? "", t.Title, t.Duration.TotalSeconds);
+
+    internal Task StartLookAhead()
+    {
+        lock (_gate)
+        {
+            if (_stop.IsCancellationRequested || _offline())
+            {
+                foreach (var pending in _aheadLookups.Values) pending.Stop.Cancel();
+                return Task.CompletedTask;
+            }
+            foreach (var track in _upNext.Take(2))
+            {
+                var key = MetadataKey(track);
+                if (string.IsNullOrWhiteSpace(track.Title) || _aheadLookups.ContainsKey(key) || _misses.IsMiss(key, Now())) continue;
+                // Existing timed files need no speculative traffic. Missing files still can
+                // be searched using catalog metadata; final recording length is rechecked.
+                if (Local(track) is { } path && (LyricsWriter.SidecarsOnDisk(path, ".ttml").Count > 0
+                    || LyricsWriter.SidecarsOnDisk(path, ".elrc").Count > 0 || _userTimed(path))) continue;
+                var stop = CancellationTokenSource.CreateLinkedTokenSource(_stop.Token);
+                var task = Task.Run(async () =>
+                {
+                    try
+                    {
+                        var clock = System.Diagnostics.Stopwatch.StartNew();
+                        var answer = await _timing.FindAsync(track.Artist ?? "", track.Title, track.Duration.TotalSeconds, stop.Token, WaitForLrcRedAsync);
+                        Log($"look ahead {Describe(track)}: {(answer.Found ? OnlineTimingSidecar.Name(answer.Source!.Value) : "no words")} in {clock.ElapsedMilliseconds} ms; {answer.Trace}");
+                        return answer;
+                    }
+                    catch (OperationCanceledException) when (stop.IsCancellationRequested) { return new OnlineWordTiming.Lookup(null, null, true); }
+                    catch (Exception ex) { Log("look ahead failed: " + ex.Message); return new OnlineWordTiming.Lookup(null, null, true); }
+                }, CancellationToken.None);
+                _aheadLookups[key] = new(stop, task);
+            }
+            return Task.WhenAll(_aheadLookups.Values.Select(v => v.Task));
+        }
+    }
 
     async Task WaitForLrcRedAsync(CancellationToken ct)
     {
@@ -322,7 +385,9 @@ internal sealed class OnlineTimingLane : IDisposable
             if (ReferenceEquals(_shownTrack, track)) return false;
             _shownTrack = track;
             _provisional.TryGetValue(key, out known);
-            if (known == null && !_streamAsked.Add(key)) return false;
+            if (known == null && _aheadLookups.TryGetValue(key, out var ahead) && ahead.Task.IsCompletedSuccessfully && ahead.Task.Result.Found)
+                known = ahead.Task.Result;
+            if (known == null && !_streamAsked.Add(key) && !_aheadLookups.ContainsKey(key)) return false;
         }
         // Owner #217: the same song played again before its file was whole (Previous, then back): the answer found the
         // first time is shown again, without asking again.
@@ -373,7 +438,7 @@ internal sealed class OnlineTimingLane : IDisposable
             if (t.PendingStream == null && string.IsNullOrWhiteSpace(t.FilePath)) return null;
             if (ReferenceEquals(t, _shownTrack)) return null;
             var key = OnlineTimingMisses.Key(t.Artist ?? "", t.Title, OnlineTimingDuration.Seconds(t));
-            return !_streamAsked.Contains(key) || _provisional.ContainsKey(key) ? t : null;
+            return !_streamAsked.Contains(key) || _provisional.ContainsKey(key) || _aheadLookups.ContainsKey(key) ? t : null;
         }
     }
 
