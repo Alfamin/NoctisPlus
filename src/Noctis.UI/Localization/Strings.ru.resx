@@ -2857,4 +2857,9 @@
   <data name="LibrarySongs.Search" xml:space="preserve"><value>Search your songs</value></data>
   <data name="Playlist.Search" xml:space="preserve"><value>Search this playlist</value></data>
   <data name="Favorites.Search" xml:space="preserve"><value>Search your favorites</value></data>
+  <data name="Lyrics.OnlineNoMatch" xml:space="preserve"><value>No matching online word timing</value></data>
+  <data name="Lyrics.OnlineNoMatchWaiting" xml:space="preserve"><value>No matching word timing · Waiting for download</value></data>
+  <data name="Lyrics.OnlineSearching" xml:space="preserve"><value>Searching lyrics</value></data>
+  <data name="Lyrics.OnlineUnavailable" xml:space="preserve"><value>Lyrics sources unavailable</value></data>
+  <data name="Lyrics.OnlineUnavailableWaiting" xml:space="preserve"><value>Sources unavailable · Waiting for download</value></data>
 </root>

@@ -336,7 +336,7 @@
                     VerticalAlignment="Center"
                     Spacing="6"
                     IsVisible="{Binding ShowSearchButton}">
-            <TextBlock Text="{loc:T LyricsPanel.NoLyricsTrack}"
+            <TextBlock Text="{Binding LyricsEmptyStatus}"
                        FontSize="14"
                        Foreground="{Binding LyricsPrimaryFg}"
                        Opacity="0.55"

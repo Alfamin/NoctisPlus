@@ -2,6 +2,8 @@ using Noctis.Models;
 
 namespace Noctis.Services.Lyrics;
 
+internal enum OnlineTimingSearchState { Idle, Searching, Found, Miss, Unavailable }
+
 /// <summary>
 /// #200 automatic online word timing for the songs on disk: the song playing first, then the next ones in the queue,
 /// then the library songs without word timing in the background (a song that has it is left as it is). One lookup per
@@ -44,6 +46,7 @@ internal sealed class OnlineTimingLane : IDisposable
     public event Action<IReadOnlyList<string>>? Written;
     /// <summary>A stream's online word timing to show now (the song, its marked TTML, the source name); not on disk yet.</summary>
     public event Action<Track, string, string>? Provisional;
+    public event Action<Track, OnlineTimingSearchState>? SearchChanged;
 
     /// <summary>The fit check; a seam for tests (the real one decodes with ffmpeg).</summary>
     internal Func<string, string, string, CancellationToken, Task<OnlineTimingFit.Result?>> Check { get; set; } = OnlineTimingFit.CheckAsync;
@@ -248,15 +251,25 @@ internal sealed class OnlineTimingLane : IDisposable
     {
         var path = Local(track)!;
         StartedOn(path);
+        SearchChanged?.Invoke(track, OnlineTimingSearchState.Searching);
         string why;
         lock (_gate) why = ReferenceEquals(track, _current) ? "playing" : _upNext.Contains(track) ? "up next" : _wanted.ContainsKey(path) ? "WordLyrics asked" : "library";
         var clock = System.Diagnostics.Stopwatch.StartNew();
         _detail = "";
         Outcome outcome;
         try { outcome = await ProcessCoreAsync(track, path, ct); }
+        catch (OperationCanceledException) { SearchChanged?.Invoke(track, OnlineTimingSearchState.Idle); throw; }
+        catch { SearchChanged?.Invoke(track, OnlineTimingSearchState.Unavailable); throw; }
         finally { lock (_gate) if (string.Equals(_working, path, StringComparison.OrdinalIgnoreCase)) _working = null; }
         if (outcome is not (Outcome.Transient or Outcome.NotYet)) lock (_gate) { _done.Add(path); _wanted.Remove(path); }
-        if (outcome == Outcome.NotYet) return outcome;
+        if (outcome == Outcome.NotYet) { SearchChanged?.Invoke(track, OnlineTimingSearchState.Idle); return outcome; }
+        SearchChanged?.Invoke(track, outcome switch
+        {
+            Outcome.Written or Outcome.AlreadyTimed => OnlineTimingSearchState.Found,
+            Outcome.Miss => OnlineTimingSearchState.Miss,
+            Outcome.Transient => OnlineTimingSearchState.Unavailable,
+            _ => OnlineTimingSearchState.Idle
+        });
         // The library pass would flood the log with songs that need nothing: those are told only for songs in use.
         if (why != "library" || outcome is Outcome.Written or Outcome.Kept or Outcome.Transient)
             Log($"{outcome} ({why}) {Describe(track)} in {clock.ElapsedMilliseconds} ms{_detail}");
@@ -305,7 +318,7 @@ internal sealed class OnlineTimingLane : IDisposable
     internal async Task<bool> ShowWhileStreamingAsync(Track track, CancellationToken ct)
     {
         if (string.IsNullOrWhiteSpace(track.Title)) return false;
-        var seconds = track.Duration.TotalSeconds;
+        var seconds = OnlineTimingDuration.Seconds(track);
         var key = OnlineTimingMisses.Key(track.Artist ?? "", track.Title, seconds);
         OnlineWordTiming.Lookup? known;
         lock (_gate)
@@ -319,12 +332,14 @@ internal sealed class OnlineTimingLane : IDisposable
         // first time is shown again, without asking again.
         if (known != null)
         {
+            SearchChanged?.Invoke(track, OnlineTimingSearchState.Found);
             Log($"streaming {Describe(track)}: shown again from {OnlineTimingSidecar.Name(known.Source!.Value)} (found earlier)");
             Provisional?.Invoke(track, OnlineTimingSidecar.Mark(known.Ttml!, known.Source!.Value, 0) ?? known.Ttml!, OnlineTimingSidecar.Name(known.Source!.Value));
             return true;
         }
-        if (_misses.IsMiss(key, Now())) return false;
+        if (_misses.IsMiss(key, Now())) { SearchChanged?.Invoke(track, OnlineTimingSearchState.Miss); return false; }
         var clock = System.Diagnostics.Stopwatch.StartNew();
+        SearchChanged?.Invoke(track, OnlineTimingSearchState.Searching);
         OnlineWordTiming.Lookup found;
         try { found = await FindAsync(track, seconds, ct); ct.ThrowIfCancellationRequested(); }
         catch (OperationCanceledException) when (ct.IsCancellationRequested)
@@ -334,15 +349,19 @@ internal sealed class OnlineTimingLane : IDisposable
                 _streamAsked.Remove(key);
                 if (ReferenceEquals(_shownTrack, track)) _shownTrack = null;
             }
+            SearchChanged?.Invoke(track, OnlineTimingSearchState.Idle);
             throw;
         }
         Log($"streaming {Describe(track)}: {(found.Found ? "shown from " + OnlineTimingSidecar.Name(found.Source!.Value) : "nothing to show")} in {clock.ElapsedMilliseconds} ms; {found.Trace}");
         if (!found.Found)
         {
             // A source that could not answer is asked again with the finished file (never in a loop here).
-            if (!found.Transient) _misses.Remember(key, Now());
+            // Catalog duration is not proof of a miss while bytes are arriving. Recheck the
+            // finished recording with its actual duration instead of caching a bad estimate.
+            SearchChanged?.Invoke(track, found.Transient ? OnlineTimingSearchState.Unavailable : OnlineTimingSearchState.Miss);
             return false;
         }
+        SearchChanged?.Invoke(track, OnlineTimingSearchState.Found);
         lock (_gate) _provisional[key] = found;
         var marked = OnlineTimingSidecar.Mark(found.Ttml!, found.Source!.Value, 0) ?? found.Ttml!;
         Provisional?.Invoke(track, marked, OnlineTimingSidecar.Name(found.Source!.Value));
@@ -357,7 +376,7 @@ internal sealed class OnlineTimingLane : IDisposable
             if (_current is not { IsRemoteStream: false } t || Local(t) != null || string.IsNullOrWhiteSpace(t.Title)) return null;
             if (t.PendingStream == null && string.IsNullOrWhiteSpace(t.FilePath)) return null;
             if (ReferenceEquals(t, _shownTrack)) return null;
-            var key = OnlineTimingMisses.Key(t.Artist ?? "", t.Title, t.Duration.TotalSeconds);
+            var key = OnlineTimingMisses.Key(t.Artist ?? "", t.Title, OnlineTimingDuration.Seconds(t));
             return !_streamAsked.Contains(key) || _provisional.ContainsKey(key) ? t : null;
         }
     }
@@ -384,13 +403,17 @@ internal sealed class OnlineTimingLane : IDisposable
             }
             return source != null ? Outcome.AlreadyTimed : Outcome.Skipped;
         }
-        var seconds = track.Duration.TotalSeconds;
+        var seconds = OnlineTimingDuration.Seconds(track, path);
         var key = OnlineTimingMisses.Key(track.Artist ?? "", track.Title, seconds);
         bool streamedOnline;
         lock (_gate) streamedOnline = _provisional.ContainsKey(key);
+        // Repair earlier false misses caused by catalog length (#224), without replacing
+        // a user's own timing or retiming every already-timed song.
+        var correctedMiss = Math.Abs(seconds - track.Duration.TotalSeconds) > OnlineWordTiming.LengthSlack
+            && _misses.IsMiss(OnlineTimingMisses.Key(track.Artist ?? "", track.Title, track.Duration.TotalSeconds), Now());
         // Owner 2026-10-29: a song that already has word timing (WordLyrics, Lyrics Studio, anything) is fine as it is;
         // except a stream already showing its online timing, whose WordLyrics file may have landed meanwhile.
-        if (!streamedOnline && LyricsWriter.SidecarsOnDisk(path, ".elrc").Count > 0) { _detail = ": has an .elrc"; return Outcome.AlreadyTimed; }
+        if (!streamedOnline && !correctedMiss && LyricsWriter.SidecarsOnDisk(path, ".elrc").Count > 0) { _detail = ": has an .elrc"; return Outcome.AlreadyTimed; }
         if (_userTimed(path)) { _detail = ": timed by the user"; return Outcome.Skipped; }
 
         if (_misses.IsMiss(key, Now())) { _detail = $": no source had it (remembered {OnlineTimingMisses.Keep.TotalDays:0} days)"; return Outcome.Miss; }

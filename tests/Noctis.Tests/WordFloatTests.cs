@@ -13,6 +13,33 @@ namespace Noctis.Tests;
 /// </summary>
 public class WordFloatTests
 {
+    [Avalonia.Headless.XUnit.AvaloniaFact]
+    public void OnlineSearchStatusFollowsTheSongAndDoesNotOfferDuplicateTiming()
+    {
+        var player = new PlayerViewModel(new FakeAudioPlayer(), new FakeLibraryService(), new TestPersistenceService(), new FakeAnimatedCoverService());
+        var song = new Track { Title = "Searching", FilePath = "missing.flac", Duration = TimeSpan.FromSeconds(298) };
+        player.CurrentTrack = song;
+        using var vm = new LyricsViewModel(player, new NullLrcLib(), new NullNetEase(), new NullMetadata(), new TestPersistenceService(), new FakeLibraryService());
+        vm.OnlineTimingChanged(song, Noctis.Services.Lyrics.OnlineTimingSearchState.Searching);
+        Assert.True(vm.HasPendingWordTiming);
+        Assert.True(vm.IsWordTimingProcessing);
+        Assert.False(vm.CanStartWordTiming);
+        Assert.Equal("Searching lyrics", vm.WordTimingStatusText);
+        Assert.Equal("", vm.OnlineTimingHint);
+        vm.OnlineTimingChanged(song, Noctis.Services.Lyrics.OnlineTimingSearchState.Miss);
+        Assert.False(vm.HasPendingWordTiming);
+        Assert.Contains("No matching", vm.OnlineTimingHint);
+        song.SourceType = SourceType.Navidrome; // same not-local hint as a downloading recording
+        vm.OnlineTimingChanged(song, Noctis.Services.Lyrics.OnlineTimingSearchState.Miss);
+        Assert.Contains("Waiting for download", vm.OnlineTimingHint);
+        song.SourceType = SourceType.Local;
+        vm.OnlineTimingChanged(song, Noctis.Services.Lyrics.OnlineTimingSearchState.Unavailable);
+        Assert.Contains("unavailable", vm.OnlineTimingHint);
+        player.CurrentTrack = new Track { Title = "Next", FilePath = "other.flac" };
+        vm.OnlineTimingChanged(song, Noctis.Services.Lyrics.OnlineTimingSearchState.Searching);
+        Assert.False(vm.IsOnlineTimingSearching);
+    }
+
     private static readonly TimeSpan Lookahead = TimeSpan.FromMilliseconds(80);
 
     private const string Sample =

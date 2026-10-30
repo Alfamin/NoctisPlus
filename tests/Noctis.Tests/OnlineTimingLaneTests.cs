@@ -19,8 +19,9 @@ public sealed class OnlineTimingLaneTests : IDisposable
         public Func<LrcLibResult?> Answer = () => null;
         public Func<string, CancellationToken, Task<LrcLibResult?>>? AsyncAnswer;
         public int Calls;
+        public double LastDuration;
         public Task<LrcLibResult?> SearchLyricsAsync(string artist, string trackName, double durationSeconds, CancellationToken ct = default)
-        { Calls++; return AsyncAnswer?.Invoke(trackName, ct) ?? Task.FromResult(Answer()); }
+        { Calls++; LastDuration = durationSeconds; return AsyncAnswer?.Invoke(trackName, ct) ?? Task.FromResult(Answer()); }
         public Task<LrcRedMatch?> FindMatchAsync(string artist, string trackName, double durationSeconds, CancellationToken ct = default) => Task.FromResult<LrcRedMatch?>(null);
         public Task<LrcLibResult> SyncWithModelAsync(string isrc, CancellationToken ct = default) => throw new InvalidOperationException("never automatic");
     }
@@ -284,7 +285,7 @@ public sealed class OnlineTimingLaneTests : IDisposable
     }
 
     [Fact]
-    public async Task AStreamNoSourceHasIsNotShownAndIsRemembered()
+    public async Task AStreamMissIsNotShown_AndIsRecheckedWhenComplete()
     {
         using var lane = Lane();
         var song = Song("nothing online");
@@ -293,7 +294,7 @@ public sealed class OnlineTimingLaneTests : IDisposable
         Assert.False(await lane.ShowWhileStreamingAsync(song, CancellationToken.None));
         Assert.False(shown);
         Assert.Equal(OnlineTimingLane.Outcome.Miss, await lane.ProcessAsync(song, CancellationToken.None));
-        Assert.Equal(1, _lrcRed.Calls);
+        Assert.Equal(2, _lrcRed.Calls);
     }
 
     [Fact]
@@ -472,6 +473,53 @@ public sealed class OnlineTimingLaneTests : IDisposable
         finish.SetResult(null);
         Assert.Equal(OnlineTimingLane.Outcome.Written, await processing);
         Assert.True(OnlineTimingSidecar.HasUnverified(song.FilePath));
+    }
+
+    [Fact]
+    public async Task WrongCatalogDurationDoesNotRejectOrReuseOldMiss_ForPartialMrRager()
+    {
+        using var lane = Lane();
+        var song = Song("Mr. Rager"); song.Duration = TimeSpan.FromSeconds(298);
+        File.WriteAllBytes(song.FilePath, OnlineTimingDurationTests.Flac(294.23));
+        new OnlineTimingMisses(Path.Combine(_dir, "misses.json")).Remember(OnlineTimingMisses.Key(song.Artist!, song.Title, 298), DateTime.UtcNow);
+        _lrcRed.Answer = () => new() { Duration = 294, OriginalTtml = WordTtml() };
+        var states = new List<OnlineTimingSearchState>();
+        lane.SearchChanged += (_, state) => states.Add(state);
+        Assert.True(await lane.ShowWhileStreamingAsync(song, CancellationToken.None));
+        Assert.InRange(_lrcRed.LastDuration, 294.229, 294.231);
+        Assert.Equal(new[] { OnlineTimingSearchState.Searching, OnlineTimingSearchState.Found }, states);
+    }
+
+    [Fact]
+    public async Task StreamingMissDoesNotPoisonTheCompletedFileLookup()
+    {
+        using var lane = Lane();
+        var song = Song("retry completed");
+        var states = new List<OnlineTimingSearchState>();
+        lane.SearchChanged += (_, state) => states.Add(state);
+        Assert.False(await lane.ShowWhileStreamingAsync(song, CancellationToken.None));
+        Assert.Equal(OnlineTimingSearchState.Miss, states.Last());
+        _lrcRed.Answer = () => new() { Duration = 200, OriginalTtml = WordTtml() };
+        Assert.Equal(OnlineTimingLane.Outcome.Written, await lane.ProcessAsync(song, CancellationToken.None));
+        Assert.Equal(2, _lrcRed.Calls);
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task EarlierWrongDurationMissCanRecoverBesideWordLyrics_WithoutDeletingElrc(bool userChoseTiming)
+    {
+        using var lane = Lane();
+        var song = Song("earlier Mr. Rager"); song.Duration = TimeSpan.FromSeconds(298);
+        File.WriteAllBytes(song.FilePath, OnlineTimingDurationTests.Flac(294.23));
+        var elrc = Path.ChangeExtension(song.FilePath, ".elrc");
+        File.WriteAllText(elrc, "keep WordLyrics");
+        if (userChoseTiming) _userTimed.Add(song.FilePath);
+        new OnlineTimingMisses(Path.Combine(_dir, "misses.json")).Remember(OnlineTimingMisses.Key(song.Artist!, song.Title, 298), DateTime.UtcNow);
+        _lrcRed.Answer = () => new() { Duration = 294, OriginalTtml = WordTtml() };
+        Assert.Equal(userChoseTiming ? OnlineTimingLane.Outcome.Skipped : OnlineTimingLane.Outcome.Written, await lane.ProcessAsync(song, CancellationToken.None));
+        Assert.Equal("keep WordLyrics", File.ReadAllText(elrc));
+        Assert.Equal(!userChoseTiming, File.Exists(Path.ChangeExtension(song.FilePath, ".ttml")));
     }
 
     [Fact]

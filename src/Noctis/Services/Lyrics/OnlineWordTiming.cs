@@ -121,7 +121,9 @@ internal sealed class OnlineWordTiming
                 {
                     var answer = await asks[i].Answer.ConfigureAwait(false);
                     timed[i] = WordTimed(answer, durationSeconds);
-                    said[i] = (timed[i] != null ? "words" : answer == null ? "none" : "not word-timed or another length") + $" {ms} ms";
+                    var rejected = answer is { Duration: > 0 } && durationSeconds > 0 && Math.Abs(answer.Duration - durationSeconds) > LengthSlack
+                        ? $"length mismatch ({answer.Duration:0.00} s vs recording {durationSeconds:0.00} s)" : "not word-timed";
+                    said[i] = (timed[i] != null ? "words" : answer == null ? "none" : rejected) + $" {ms} ms";
                 }
                 // Any failure of one source (its own error, a timeout, a dropped connection) is "could not answer":
                 // never a miss, and never the whole lookup thrown away (the lane would ask the same song again at once).

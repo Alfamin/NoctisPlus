@@ -116,7 +116,7 @@ internal readonly record struct Mp3GaplessInfo(int SampleRate, int EncoderDelay,
 
     // MPEG audio frame header, Layer III only. sideInfo = bytes between the header and
     // the Xing/Info tag (17/32 for MPEG-1 mono/stereo, 9/17 for MPEG-2 and 2.5).
-    private static bool TryReadFrameHeader(ReadOnlySpan<byte> h, out int sampleRate, out int sideInfo)
+    internal static bool TryReadFrameHeader(ReadOnlySpan<byte> h, out int sampleRate, out int sideInfo)
     {
         sampleRate = 0;
         sideInfo = 0;

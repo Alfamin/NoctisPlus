@@ -793,6 +793,7 @@ public partial class MainWindowViewModel : ViewModelBase
                 if (Environment.GetEnvironmentVariable("NOCTISPLUS_TEST_KUGOU_FIRST") == "1")
                     DebugLog.Write("Online timing", "TEST comparison: Kugou first, lrc.red then Unison; ready fallback after 10 s maximum preference wait");
                 lane.Written += paths => Dispatcher.UIThread.Post(() => _lyricsVm.ReloadWrittenLyrics(paths));
+                lane.SearchChanged += (track, state) => Dispatcher.UIThread.Post(() => _lyricsVm.OnlineTimingChanged(track, state));
                 // Owner #215: Kugou the fit check was not sure of stays on screen; WordLyrics times the song quietly.
                 lane.Recheck += paths => Dispatcher.UIThread.Post(() =>
                 {

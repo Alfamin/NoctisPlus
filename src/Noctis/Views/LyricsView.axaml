@@ -1053,9 +1053,9 @@
                                    Foreground="White" VerticalAlignment="Center"/>
                     </StackPanel>
                 </Button>
-                <TextBlock Text="{loc:T Lyrics.TimeWordsLocalOnly}" FontSize="12"
+                <TextBlock Text="{Binding OnlineTimingHint}" FontSize="12"
                            Foreground="{Binding LyricsSubtleFg}" HorizontalAlignment="Center"
-                           IsVisible="{Binding !CanTimeCurrentWords}"/>
+                           IsVisible="{Binding OnlineTimingHint, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"/>
             </StackPanel>
 
             <!-- Searching indicator: three staggered pulsing dots + label -->

@@ -13,6 +13,7 @@ using Noctis.Models;
 using Noctis.Services;
 using Noctis.Services.Search;
 using Noctis.Features.WordLyrics;
+using Noctis.Services.Lyrics;
 
 namespace Noctis.ViewModels;
 
@@ -2980,6 +2981,7 @@ public partial class LyricsViewModel : ViewModelBase, IDisposable
     {
         if (e.PropertyName is nameof(PlayerViewModel.CurrentTrack) or nameof(PlayerViewModel.CanSeekCurrent))
         {
+            if (e.PropertyName == nameof(PlayerViewModel.CurrentTrack)) _onlineTimingState = OnlineTimingSearchState.Idle;
             OnPropertyChanged(nameof(CanTimeCurrentWords));
             OpenWordTimingCommand.NotifyCanExecuteChanged();
             TimeWordsCommand.NotifyCanExecuteChanged();
@@ -3776,9 +3778,19 @@ public partial class LyricsViewModel : ViewModelBase, IDisposable
         RefreshWordTiming();
     }
     private SongTimingStatus _currentWordTimingStatus;
-    public bool HasPendingWordTiming => _currentWordTimingStatus != SongTimingStatus.None;
-    public bool IsWordTimingProcessing => _currentWordTimingStatus == SongTimingStatus.Processing;
-    public string WordTimingStatusText => Localization.Loc.T(_currentWordTimingStatus switch
+    private OnlineTimingSearchState _onlineTimingState;
+    internal void OnlineTimingChanged(Track track, OnlineTimingSearchState state)
+    {
+        if (_player.CurrentTrack?.Id != track.Id) return;
+        _onlineTimingState = state;
+        RefreshWordTiming();
+    }
+    public bool IsOnlineTimingSearching => _onlineTimingState == OnlineTimingSearchState.Searching
+        && !(_hasSyncedLyrics && LyricLines.Any(l => l.HasWords));
+    public bool HasPendingWordTiming => _currentWordTimingStatus != SongTimingStatus.None || IsOnlineTimingSearching;
+    public bool IsWordTimingProcessing => _currentWordTimingStatus == SongTimingStatus.Processing || IsOnlineTimingSearching;
+    public string WordTimingStatusText => Localization.Loc.T(IsOnlineTimingSearching && _currentWordTimingStatus == SongTimingStatus.None
+        ? "Lyrics.OnlineSearching" : _currentWordTimingStatus switch
     {
         SongTimingStatus.Processing => "Lyrics.TimingProcessing",
         SongTimingStatus.Paused => "Lyrics.TimingPaused",
@@ -3786,17 +3798,26 @@ public partial class LyricsViewModel : ViewModelBase, IDisposable
         SongTimingStatus.SetupNeeded => "Lyrics.TimingSetup",
         _ => "Lyrics.TimingQueued"
     });
+    public string OnlineTimingHint => IsOnlineTimingSearching || _currentWordTimingStatus != SongTimingStatus.None ? ""
+        : Localization.Loc.T(_onlineTimingState switch
+        {
+            OnlineTimingSearchState.Miss => CanTimeCurrentWords ? "Lyrics.OnlineNoMatch" : "Lyrics.OnlineNoMatchWaiting",
+            OnlineTimingSearchState.Unavailable => CanTimeCurrentWords ? "Lyrics.OnlineUnavailable" : "Lyrics.OnlineUnavailableWaiting",
+            _ => !CanTimeCurrentWords ? "Lyrics.TimeWordsLocalOnly" : ""
+        });
+    public string LyricsEmptyStatus => IsOnlineTimingSearching ? Localization.Loc.T("Lyrics.OnlineSearching")
+        : string.IsNullOrEmpty(OnlineTimingHint) ? Localization.Loc.T("LyricsPanel.NoLyricsTrack") : OnlineTimingHint;
     private void RefreshWordTiming()
     {
         var state = _player.CurrentTrack is { } track
             ? _wordTiming?.StatusFor(track.FilePath) ?? SongTimingStatus.None : SongTimingStatus.None;
-        if (state != _currentWordTimingStatus)
-        {
-            _currentWordTimingStatus = state;
-            OnPropertyChanged(nameof(HasPendingWordTiming));
-            OnPropertyChanged(nameof(IsWordTimingProcessing));
-            OnPropertyChanged(nameof(WordTimingStatusText));
-        }
+        _currentWordTimingStatus = state;
+        OnPropertyChanged(nameof(HasPendingWordTiming));
+        OnPropertyChanged(nameof(IsWordTimingProcessing));
+        OnPropertyChanged(nameof(WordTimingStatusText));
+        OnPropertyChanged(nameof(IsOnlineTimingSearching));
+        OnPropertyChanged(nameof(OnlineTimingHint));
+        OnPropertyChanged(nameof(LyricsEmptyStatus));
         OnPropertyChanged(nameof(CanStartWordTiming));
         TimeWordsCommand.NotifyCanExecuteChanged();
     }
@@ -3814,7 +3835,11 @@ public partial class LyricsViewModel : ViewModelBase, IDisposable
     private Task TimeWords() => CanStartWordTiming && _player.CurrentTrack is { } track
         ? WordTimingStartRequested?.Invoke(track) ?? Task.CompletedTask : Task.CompletedTask;
 
-    partial void OnShowSearchButtonChanged(bool value) => OnPropertyChanged(nameof(ShareAvailable));
+    partial void OnShowSearchButtonChanged(bool value)
+    {
+        OnPropertyChanged(nameof(ShareAvailable));
+        RefreshWordTiming();
+    }
     partial void OnIsSearchingChanged(bool value) => OnPropertyChanged(nameof(ShareAvailable));
 
     /// <summary>
