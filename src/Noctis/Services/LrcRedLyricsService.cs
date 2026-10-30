@@ -472,7 +472,7 @@ public partial class LrcRedLyricsService : ILrcRedLyricsService
     }
 
     private static bool Same(string a, string b) => string.Equals(
-        LyricsSearchSelector.FoldApostrophes(a.Trim()), LyricsSearchSelector.FoldApostrophes(b.Trim()), StringComparison.OrdinalIgnoreCase);
+        LyricsSearchSelector.Fold(a.Trim()), LyricsSearchSelector.Fold(b.Trim()), StringComparison.OrdinalIgnoreCase);
 
     private static bool IsBetter((int Exact, int Timing, double Delta) a, (int Exact, int Timing, double Delta) b) =>
         a.Exact != b.Exact ? a.Exact > b.Exact

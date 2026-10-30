@@ -353,7 +353,7 @@ internal sealed class WordLyricsService(ILibraryService library, Func<AppSetting
     }
 
     /// <summary>Explicit lyrics-page request for one complete local song. Setup remains opt-in.</summary>
-    internal async Task TimeSongAsync(Track track)
+    internal async Task TimeSongAsync(Track track, TimingAction action = TimingAction.Missing)
     {
         if (!Enabled) { OpenSettings?.Invoke(); return; }
         if (track.IsRemoteStream || ProgressivePlayback.ProgressiveTransfer.IsDownloading(track.FilePath)) return;
@@ -372,7 +372,7 @@ internal sealed class WordLyricsService(ILibraryService library, Func<AppSetting
                 var saved = Volatile.Read(ref _playingTimingPath);
                 var path = playing && saved is not null && File.Exists(saved) ? saved : track.FilePath;
                 if (playing) worker.ShareRules(track.FilePath, path);
-                var message = worker.Ask(path, TimingAction.Missing, null, out var accepted, enableIgnored: true);
+                var message = worker.Ask(path, action, null, out var accepted, enableIgnored: true);
                 if (accepted && playing)
                 {
                     worker.Prioritize(path);

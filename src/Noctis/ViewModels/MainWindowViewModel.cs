@@ -739,7 +739,8 @@ public partial class MainWindowViewModel : ViewModelBase
             if (wordService.Enabled) wordService.Show(track: track);
             else wordService.OpenSettings?.Invoke();
         };
-        _lyricsVm.WordTimingStartRequested = wordService.TimeSongAsync;
+        _lyricsVm.WordTimingStartRequested = track => wordService.TimeSongAsync(track);
+        _lyricsVm.WordTimingWithRequested = wordService.TimeSongAsync;
         _lyricsVm.AttachWordTiming(wordService);
         wordService.LyricsWritten += _lyricsVm.ReloadWrittenLyrics;
         var timingAheadPosted = false;

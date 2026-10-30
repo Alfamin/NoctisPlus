@@ -49,15 +49,15 @@ public static partial class LyricsSearchSelector
     /// </summary>
     private static bool ShareAnArtist(string? candidate, string? local)
     {
-        var mine = SplitCredit(local);
-        return mine.Length > 0 && SplitCredit(candidate).Any(c => mine.Contains(c, StringComparer.OrdinalIgnoreCase));
+        var mine = SplitCredit(local).Select(Fold).ToArray();
+        return mine.Length > 0 && SplitCredit(candidate).Any(c => mine.Contains(Fold(c), StringComparer.OrdinalIgnoreCase));
     }
 
     private static string[] SplitCredit(string? credit) => string.IsNullOrWhiteSpace(credit)
         ? Array.Empty<string>()
         : CreditJoins().Split(credit).Select(a => a.Trim()).Where(a => a.Length > 1).ToArray();
 
-    [GeneratedRegex(@"\s*(?:,|&|;|/|\+|\bfeat\b\.?|\bft\.|\bfeaturing\b)\s*", RegexOptions.IgnoreCase)]
+    [GeneratedRegex(@"\s*(?:,|、|&|;|/|\+|\bfeat\b\.?|\bft\.|\bfeaturing\b)\s*", RegexOptions.IgnoreCase)]
     private static partial Regex CreditJoins();
 
     /// <summary>
@@ -107,14 +107,22 @@ public static partial class LyricsSearchSelector
         if (string.IsNullOrWhiteSpace(candidate) || string.IsNullOrWhiteSpace(local))
             return false;
 
-        var c = FoldApostrophes(candidate.Trim());
-        var l = FoldApostrophes(local.Trim());
+        var c = Fold(candidate.Trim());
+        var l = Fold(local.Trim());
         return c.Contains(l, StringComparison.OrdinalIgnoreCase)
             || l.Contains(c, StringComparison.OrdinalIgnoreCase);
     }
 
-    /// <summary>Owner #231: "What’s Next" (a curly apostrophe, the library's) is Kugou's "What's Next".</summary>
-    public static string FoldApostrophes(string text) => ApostropheKinds().Replace(text, "'");
+    /// <summary>Owner #231: "What’s Next" (a curly apostrophe, the library's) is Kugou's "What's Next"; #232: a file's
+    /// "Amine" is Kugou's "Aminé". Apostrophes made one kind, accents dropped.</summary>
+    public static string Fold(string text)
+    {
+        var decomposed = ApostropheKinds().Replace(text, "'").Normalize(System.Text.NormalizationForm.FormD);
+        var plain = new System.Text.StringBuilder(decomposed.Length);
+        foreach (var c in decomposed)
+            if (System.Globalization.CharUnicodeInfo.GetUnicodeCategory(c) != System.Globalization.UnicodeCategory.NonSpacingMark) plain.Append(c);
+        return plain.ToString().Normalize(System.Text.NormalizationForm.FormC);
+    }
 
     [GeneratedRegex("[’‘ʼ`´]")]
     private static partial Regex ApostropheKinds();

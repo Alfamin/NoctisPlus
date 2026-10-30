@@ -139,12 +139,16 @@ public class KugouLyricsService : IKugouLyricsService
             if (!LyricsSearchSelector.MatchesTrack(candidate, artist, trackName, durationSeconds)) continue;
 
             var delta = durationSeconds > 0 && candidate.Duration > 0 ? Math.Abs(candidate.Duration - durationSeconds) : 0;
-            if (best != null && delta >= bestDelta) continue;
+            // Owner #232: Kugou lists "(Clean)" and "(Explicit)" cuts of one length; the clean one hides words.
+            var cleanerTie = best != null && Math.Abs(delta - bestDelta) < 0.5 && IsClean(best.Value.Name) && !IsClean(candidate.TrackName);
+            if (best != null && delta >= bestDelta && !cleanerTie) continue;
             best = (hash, candidate.TrackName!, candidate.ArtistName!, candidate.Duration);
             bestDelta = delta;
         }
         return best;
     }
+
+    private static bool IsClean(string? name) => name?.Contains("(Clean", StringComparison.OrdinalIgnoreCase) == true;
 
     /// <summary>The highest-scored lyrics candidate Kugou lists for the song hash, or null.</summary>
     private async Task<(string Id, string AccessKey)?> FindLyricsCandidateAsync(string hash, double durationSeconds, CancellationToken ct)

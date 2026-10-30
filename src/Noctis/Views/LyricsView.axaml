@@ -150,6 +150,43 @@
             <Setter Property="RenderTransform" Value="scale(1)"/>
         </Style>
 
+        <!-- Owner #233: the word timing credit, when it has a choice: the same small faint text, which brightens
+             (with its little arrow) under the pointer, and opens a menu just above it. -->
+        <Style Selector="Button.lyrics-credit">
+            <Setter Property="Background" Value="Transparent"/>
+            <Setter Property="BorderThickness" Value="0"/>
+            <Setter Property="Padding" Value="6,3"/>
+            <Setter Property="CornerRadius" Value="8"/>
+            <Setter Property="MinHeight" Value="0"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="VerticalAlignment" Value="Center"/>
+        </Style>
+        <Style Selector="Button.lyrics-credit /template/ ContentPresenter">
+            <Setter Property="Background" Value="Transparent"/>
+            <Setter Property="Transitions">
+                <Transitions>
+                    <BrushTransition Property="Background" Duration="0:0:0.16"/>
+                </Transitions>
+            </Setter>
+        </Style>
+        <Style Selector="Button.lyrics-credit:pointerover /template/ ContentPresenter">
+            <Setter Property="Background" Value="#14FFFFFF"/>
+        </Style>
+        <Style Selector="Button.lyrics-credit:pressed /template/ ContentPresenter">
+            <Setter Property="Background" Value="#22FFFFFF"/>
+        </Style>
+        <Style Selector="Button.lyrics-credit StackPanel.credit-face">
+            <Setter Property="Opacity" Value="0.55"/>
+            <Setter Property="Transitions">
+                <Transitions>
+                    <DoubleTransition Property="Opacity" Duration="0:0:0.16"/>
+                </Transitions>
+            </Setter>
+        </Style>
+        <Style Selector="Button.lyrics-credit:pointerover StackPanel.credit-face">
+            <Setter Property="Opacity" Value="0.95"/>
+        </Style>
+
         <!-- Play/Pause prominent button -->
         <Style Selector="Button.lyrics-play-btn">
             <Setter Property="Background" Value="Transparent"/>
@@ -998,8 +1035,55 @@
                                FontSize="10"
                                Opacity="0.55"
                                Foreground="{Binding LyricsSubtleFg}"
-                               VerticalAlignment="Center"
-                               IsVisible="{Binding LyricsCreditText, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"/>
+                               VerticalAlignment="Center">
+                        <TextBlock.IsVisible>
+                            <MultiBinding Converter="{x:Static BoolConverters.And}">
+                                <Binding Path="LyricsCreditText" Converter="{x:Static StringConverters.IsNotNullOrEmpty}"/>
+                                <Binding Path="!HasCreditChoice"/>
+                            </MultiBinding>
+                        </TextBlock.IsVisible>
+                    </TextBlock>
+                    <!-- Owner #233: online word timing (or WordLyrics' with an online one kept): a choice, right here. -->
+                    <Button Classes="lyrics-credit"
+                            Margin="-6,0"
+                            AutomationProperties.Name="{Binding LyricsCreditText}">
+                        <Button.IsVisible>
+                            <MultiBinding Converter="{x:Static BoolConverters.And}">
+                                <Binding Path="LyricsCreditText" Converter="{x:Static StringConverters.IsNotNullOrEmpty}"/>
+                                <Binding Path="HasCreditChoice"/>
+                            </MultiBinding>
+                        </Button.IsVisible>
+                        <StackPanel Classes="credit-face" Orientation="Horizontal" Spacing="4">
+                            <TextBlock Text="{Binding LyricsCreditText}" FontSize="10"
+                                       Foreground="{Binding LyricsSubtleFg}" VerticalAlignment="Center"/>
+                            <PathIcon Data="M2 8 L6 4 L10 8" Width="7" Height="7" Foreground="{Binding LyricsSubtleFg}" VerticalAlignment="Center"/>
+                        </StackPanel>
+                        <Button.Flyout>
+                            <MenuFlyout Placement="TopEdgeAlignedLeft" helpers:MenuOpenAnimation.EnableFlyoutClose="True">
+                                <MenuItem Header="{Binding CreditOnlineLabel}" Command="{Binding UseOnlineTimingCommand}">
+                                    <MenuItem.Icon>
+                                        <Panel>
+                                            <controls:LineIcon Classes="mv2-icon mv2-check" Data="{StaticResource MenuLineCheck}" IsVisible="{Binding CreditShowsOnline}"/>
+                                        </Panel>
+                                    </MenuItem.Icon>
+                                </MenuItem>
+                                <MenuItem Header="{Binding CreditWordLyricsLabel}" Command="{Binding UseWordLyricsTimingCommand}"
+                                          IsVisible="{Binding CreditHasWordLyrics}">
+                                    <MenuItem.Icon>
+                                        <Panel>
+                                            <controls:LineIcon Classes="mv2-icon mv2-check" Data="{StaticResource MenuLineCheck}" IsVisible="{Binding !CreditShowsOnline}"/>
+                                        </Panel>
+                                    </MenuItem.Icon>
+                                </MenuItem>
+                                <MenuItem Header="{loc:T Lyrics.TimeWithWordLyrics}" Command="{Binding TimeWithWordLyricsCommand}"
+                                          IsVisible="{Binding CreditCanTimeWithWordLyrics}" IsEnabled="{Binding !HasPendingWordTiming}">
+                                    <MenuItem.Icon>
+                                        <controls:LineIcon Classes="mv2-icon" Data="{StaticResource MenuLineTimer}"/>
+                                    </MenuItem.Icon>
+                                </MenuItem>
+                            </MenuFlyout>
+                        </Button.Flyout>
+                    </Button>
                 </StackPanel>
             </StackPanel>
         </Border>

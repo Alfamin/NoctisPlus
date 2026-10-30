@@ -119,6 +119,8 @@ internal sealed class Worker : IDisposable
         public bool AccessReported;
         public bool NetworkWait;
         public bool Deferred;
+        public bool FromPlain;          // owner #232: went online first because the song's own lyrics are plain
+        public bool PlainKept;          // owner #232: online had none: the song's own plain lyrics are used
     }
 
     /// <param name="dataDirectory">The plugin's own folder (list of waiting songs, last result, last output).</param>
@@ -133,6 +135,7 @@ internal sealed class Worker : IDisposable
         _log = log;
         _notify = notify;
         _progress = progress ?? (_ => { });
+        Services.Lyrics.OnlineTimingAside.Folder = Path.Combine(dataDirectory, "online-kept");
         _readiness = readiness ?? (tool => tool.Ready);
         _lyricsWritten = lyricsWritten ?? (_ => { });
         Directory.CreateDirectory(_data);
@@ -186,6 +189,8 @@ internal sealed class Worker : IDisposable
             if (!_activePaths.Contains(path) && !item.Asked && !_options.Auto) return SongTimingStatus.None;
             if (_paused) return SongTimingStatus.Paused;
             if (_activePaths.Contains(path)) return SongTimingStatus.Processing;
+            // Owner #232: the run on another song is being stopped for this one: it starts in a moment, not "queued".
+            if ((_restarting || _yielding) && item.Urgent != default) return SongTimingStatus.Processing;
             if (item.OnlineWait) return SongTimingStatus.None;   // the online sources may answer in a moment
             // Owner #215 ("Lyrics queued", then "Processing lyrics"): a song the online sources come first for says nothing
             // until they have answered, not "queued" for the moment before its first look.
@@ -753,6 +758,12 @@ internal sealed class Worker : IDisposable
                 item.Length = -2;
                 return false;
             }
+            // Owner #232 (Aminé "REEL IT IN"): a song whose only lyrics are plain words in its own tags is timed from line-timed
+            // lyrics found online first (as Fetch fresh lyrics; plain words time far worse); its own words if online has none.
+            if (item.Action == TimingAction.Missing && !item.PlainKept && OnlyPlainLyrics(item.Path))
+            {
+                item.Action = TimingAction.Fresh; item.FromPlain = true;
+            }
             // Owner #207/#210 (hard rule: everywhere): lrc.red, Unison and Kugou come first for every song WordLyrics would
             // time (playing, queued, fetched ahead, downloaded, library, a saved backlog, after Restart or Time library); it
             // waits here, kept in line, until they have answered. Only Retime / Fresh / Custom chosen by hand go straight on.
@@ -836,6 +847,7 @@ internal sealed class Worker : IDisposable
                 if (madeLrc) File.WriteAllText(lrc, LinesOf(text)!, new UTF8Encoding(false));
                 File.WriteAllText(held + ".from", ttml + (madeLrc ? "\n" + lrc : ""), new UTF8Encoding(false));
                 File.Move(ttml, held);
+                Services.Lyrics.OnlineTimingAside.Holding(ttml, held);   // owner #233: still shown while WordLyrics runs
                 _log("online timing set aside while WordLyrics times " + Path.GetFileName(path));
             }
             catch (Exception ex) when (ex is IOException or UnauthorizedAccessException) { _log("could not set the online timing aside: " + ex.Message); }
@@ -893,7 +905,10 @@ internal sealed class Worker : IDisposable
             File.Move(held, from);
             _log("online timing back: WordLyrics did not time " + Path.GetFileNameWithoutExtension(from));
         }
+        // Owner #233: WordLyrics timed it: the online timing is kept, so the lyrics credit can switch back to it.
+        if (timed && File.Exists(held)) Services.Lyrics.OnlineTimingAside.Keep(from, held);
         if (File.Exists(held)) File.Delete(held);
+        Services.Lyrics.OnlineTimingAside.Released(from);
         File.Delete(note);
     }
 
@@ -1168,6 +1183,22 @@ internal sealed class Worker : IDisposable
                 {
                     item.Action = TimingAction.Fresh; item.Draft = null; item.NotBefore = now; item.Tries = 0;
                     _log("the words to retime are censored: fetching fresh lyrics for " + Path.GetFileNameWithoutExtension(item.Path));
+                    continue;
+                }
+                // Owner #232: online had no lyrics for a song whose own are plain: its own plain words, once.
+                if (!cancelled && item.FromPlain && item.Action == TimingAction.Fresh && status is "no_lyrics" or "not_timed" or "rejected")
+                {
+                    item.Action = TimingAction.Missing; item.FromPlain = false; item.PlainKept = true; item.NotBefore = now; item.Tries = 0;
+                    _log("no line-timed lyrics found online: timing its own plain lyrics for " + Path.GetFileNameWithoutExtension(item.Path));
+                    continue;
+                }
+                // Owner #232 (Aminé "REEL IT IN"): the song's own plain lyrics (no line times) could not be timed; line-timed
+                // lyrics found online can. The first try goes on at once as Fetch fresh lyrics, as pressing it did.
+                if (!cancelled && !item.PlainKept && status == "not_timed" && item.Action == TimingAction.Missing
+                    && reasons.TryGetValue(item.Path, out var unsure) && unsure.Contains("line guides", StringComparison.OrdinalIgnoreCase))
+                {
+                    item.Action = TimingAction.Fresh; item.Draft = null; item.NotBefore = now; item.Tries = 0;
+                    _log("its plain lyrics could not be timed: fetching line-timed lyrics for " + Path.GetFileNameWithoutExtension(item.Path));
                     continue;
                 }
                 if (!cancelled && status is "no_lyrics" or "rejected" or "not_timed" or "lines_only" or "failed")
@@ -1527,9 +1558,23 @@ internal sealed class Worker : IDisposable
     }
 
     private static bool HasTtml(string path) => File.Exists(Path.ChangeExtension(path, ".ttml"));
+
+    /// <summary>Owner #232: no lyrics file beside the song and only untimed words in its tags.</summary>
+    internal static bool OnlyPlainLyrics(string song, Func<string, Noctis.Services.EmbeddedLyricsText>? read = null)
+    {
+        var stem = Path.Combine(Path.GetDirectoryName(song) ?? "", Path.GetFileNameWithoutExtension(song));
+        if (WordLyrics.Append(".lrc").Any(extension => File.Exists(stem + extension))) return false;
+        try
+        {
+            var tags = (read ?? Noctis.Services.EmbeddedLyrics.ReadFile)(song);
+            return tags.TimedText.Length == 0 && !string.IsNullOrWhiteSpace(tags.PlainText);
+        }
+        catch (Exception e) when (e is IOException or UnauthorizedAccessException or ArgumentException or InvalidOperationException) { return false; }
+    }
     private readonly System.Collections.Concurrent.ConcurrentDictionary<string, bool> _userRuns = new(StringComparer.OrdinalIgnoreCase);
     internal bool WasUserRun(string path) => _userRuns.GetValueOrDefault(Path.GetFullPath(path));
-    internal bool IsRunning { get { lock (_gate) return _run is { HasExited: false }; } }
+    // A run set up but not started yet has no process to ask: it counts as running.
+    internal bool IsRunning { get { lock (_gate) { try { return _run is { HasExited: false }; } catch (InvalidOperationException) { return _run is not null; } } } }
 
     /// <summary>
     /// Owner #215: a song whose online timing the fit check was not sure of is retimed next, quietly, from that timing's

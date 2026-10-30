@@ -1783,13 +1783,64 @@ public partial class LyricsViewModel : ViewModelBase, IDisposable
     /// <summary>#200: the song's lyrics are an automatic online word timing (its .ttml names the source).</summary>
     private (string Path, string Source)? _onlineTiming;
 
-    private void RefreshLyricsCredit() =>
+    /// <summary>Owner #233: the song on the page shows word timing WordLyrics wrote (its path), or null.</summary>
+    private string? _wordLyricsTimed;
+
+    private void RefreshLyricsCredit()
+    {
+        var path = _currentTrack?.FilePath;
+        var onlineShown = string.IsNullOrEmpty(LyricsSourceName) && _onlineTiming is { } shown && path == shown.Path ? shown.Source : null;
+        var wordLyricsShown = string.IsNullOrEmpty(LyricsSourceName) && onlineShown == null && path != null && _wordLyricsTimed == path;
         LyricsCreditText = LyricsSourceName == Services.Lyrics.OnlineLyricsSource.LrcRed
             ? Localization.Loc.T(_lrcRedModelResult != null && ReferenceEquals(_currentOnlineResult, _lrcRedModelResult)
                 ? "Lyrics.LrcRedModelCredit" : "Lyrics.LrcRedCredit")
-            : string.IsNullOrEmpty(LyricsSourceName) && _onlineTiming is { } online && _currentTrack?.FilePath == online.Path
-                ? Localization.Loc.T("Lyrics.OnlineTimingCredit", online.Source)
-                : string.Empty;
+            : onlineShown != null ? Localization.Loc.T("Lyrics.OnlineTimingCredit", onlineShown)
+            : wordLyricsShown ? Localization.Loc.T("Lyrics.OnlineTimingCredit", "WordLyrics")
+            : string.Empty;
+        // The credit is a button when there is a choice: online timing shown (time it with WordLyrics, or switch to
+        // WordLyrics' timing when there is one), or WordLyrics' timing with the online one kept to switch back to.
+        CreditOnlineSource = onlineShown ?? (wordLyricsShown ? Services.Lyrics.OnlineTimingAside.KeptSource(path!) : null);
+        CreditShowsOnline = onlineShown != null;
+        CreditHasWordLyrics = path != null && (wordLyricsShown || onlineShown != null && File.Exists(Path.ChangeExtension(path, ".elrc"))
+            && !Services.Lyrics.OnlineTimingLane.StudioTimed(path));
+        OnPropertyChanged(nameof(HasCreditChoice));
+        OnPropertyChanged(nameof(CreditOnlineLabel));
+        OnPropertyChanged(nameof(CreditCanTimeWithWordLyrics));
+    }
+
+    /// <summary>Owner #233: "Kugou", "lrc.red", "Unison" for the credit's menu; null when the song has no online timing.</summary>
+    [ObservableProperty] private string? _creditOnlineSource;
+    [ObservableProperty] private bool _creditShowsOnline;
+    [ObservableProperty] private bool _creditHasWordLyrics;
+
+    public bool HasCreditChoice => CreditOnlineSource != null;
+    public string CreditOnlineLabel => CreditOnlineSource is { } source ? Localization.Loc.T("Lyrics.OnlineTimingCredit", source) : "";
+    public bool CreditCanTimeWithWordLyrics => CreditShowsOnline && !CreditHasWordLyrics;
+    public string CreditWordLyricsLabel => Localization.Loc.T("Lyrics.OnlineTimingCredit", "WordLyrics");
+
+    /// <summary>Owner #233: back to the online word timing kept beside WordLyrics' (it shows again at once).</summary>
+    [RelayCommand]
+    private void UseOnlineTiming()
+    {
+        if (_currentTrack is { } track && !CreditShowsOnline && Services.Lyrics.OnlineTimingAside.UseOnline(track.FilePath))
+            ReloadWrittenLyrics([track.FilePath]);
+    }
+
+    /// <summary>Owner #233: WordLyrics' timing instead of the online one (kept, to switch back).</summary>
+    [RelayCommand]
+    private void UseWordLyricsTiming()
+    {
+        if (_currentTrack is { } track && CreditShowsOnline && Services.Lyrics.OnlineTimingAside.UseWordLyrics(track.FilePath))
+            ReloadWrittenLyrics([track.FilePath]);
+    }
+
+    /// <summary>Owner #233: times the song with WordLyrics from the menu, at once (as Start timing); the online timing
+    /// stays on screen until WordLyrics' replaces it.</summary>
+    [RelayCommand]
+    private Task TimeWithWordLyrics() => CreditCanTimeWithWordLyrics && !HasPendingWordTiming && _currentTrack is { } track
+        ? WordTimingWithRequested?.Invoke(track, TimingAction.Current) ?? Task.CompletedTask : Task.CompletedTask;
+
+    internal Func<Track, TimingAction, Task>? WordTimingWithRequested { get; set; }
 
     /// <summary>The model is offered while lrc.red is on in Settings and the preferred lyrics type keeps word timings.</summary>
     private async Task<bool> LrcRedModelAllowedAsync()
@@ -3334,7 +3385,8 @@ public partial class LyricsViewModel : ViewModelBase, IDisposable
         // Priority 2: .ttml sidecar (word- or line-level, Apple Music style).
         try
         {
-            var sidecarTtml = TryReadSidecar(track.FilePath, new[] { ".ttml", ".TTML", ".Ttml" });
+            // Owner #233: while WordLyrics times the song its online timing is set aside, and still shown.
+            var sidecarTtml = TryReadSidecar(track.FilePath, new[] { ".ttml", ".TTML", ".Ttml" }) ?? Services.Lyrics.OnlineTimingAside.ReadHeld(track.FilePath);
             if (sidecarTtml != null)
             {
                 var (lines, plain) = TtmlParser.Parse(sidecarTtml, joinSplitWords, uiLanguage);
@@ -3467,6 +3519,9 @@ public partial class LyricsViewModel : ViewModelBase, IDisposable
     {
         IsPreviewActive = probe.Source == PreviewSource;
         _onlineTiming = probe.OnlineTimingSource is { } online ? (track.FilePath, online) : null;
+        // Owner #233: word timing WordLyrics wrote (an .elrc Noctis itself did not write, e.g. Lyrics Studio's).
+        _wordLyricsTimed = probe.Source == "Sidecar:Elrc" && probe.Lines?.Any(l => l.Words is { Count: > 0 }) == true
+            && !Services.Lyrics.OnlineTimingLane.StudioTimed(track.FilePath) ? track.FilePath : null;
         RefreshLyricsCredit();
         if (probe.Lines != null && probe.Lines.Count > 0)
         {

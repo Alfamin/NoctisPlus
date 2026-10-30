@@ -22,6 +22,26 @@ public class LyricsTitleVariantsTests
         Assert.True(LyricsSearchSelector.MatchesTrack(
             new Noctis.Models.LrcLibResult { TrackName = "What's Next (Explicit)", ArtistName = "Drake", Duration = 178 }, "Drake", "What’s Next", 178));
 
+    [Fact]
+    public void AnAccentMatchesThePlainLetter_AndKugousCreditSeparatorSplits()
+    {
+        // Owner #232: the file says "Amine", Kugou "Aminé、Aminé".
+        Assert.True(LyricsSearchSelector.MatchesTrack(
+            new Noctis.Models.LrcLibResult { TrackName = "REEL IT IN (Explicit)", ArtistName = "Aminé、Aminé", Duration = 121 }, "Amine", "REEL IT IN", 121));
+        Assert.True(LyricsSearchSelector.MatchesTrack(
+            new Noctis.Models.LrcLibResult { TrackName = "Song", ArtistName = "Beyoncé、JAY-Z", Duration = 200 }, "JAY-Z & Beyonce", "Song", 200));
+        Assert.False(LyricsSearchSelector.MatchesTrack(
+            new Noctis.Models.LrcLibResult { TrackName = "Song", ArtistName = "Bruno Major", Duration = 200 }, "Bruno Mars", "Song", 200));
+    }
+
+    [Fact]
+    public void Kugou_TheExplicitCutBeatsTheCleanOneOfTheSameLength()
+    {
+        var json = "{\"data\":{\"info\":[{\"hash\":\"C1\",\"songname\":\"REEL IT IN (Clean)\",\"singername\":\"Aminé\",\"duration\":121}," +
+                   "{\"hash\":\"E1\",\"songname\":\"REEL IT IN (Explicit)\",\"singername\":\"Aminé、Aminé\",\"duration\":121}]}}";
+        Assert.Equal("E1", Noctis.Services.KugouLyricsService.PickSong(json, "Amine", "REEL IT IN", 121.3)?.Hash);
+    }
+
     sealed class Router(Func<Uri, string> answer) : HttpMessageHandler
     {
         public List<string> Asked { get; } = [];

@@ -176,6 +176,69 @@ public class WordLyricsBackendTests
     }
 
     [Fact]
+    public async Task TimingWithWordLyrics_KeepsTheOnlineTiming_AndTheCreditSwitchesBothWays()
+    {
+        // Owner #233: from the lyrics credit, Kugou -> WordLyrics -> Kugou; not a one-way trip.
+        using var rig = new Rig(); var states = new ConcurrentQueue<ProgressState>();
+        var ttml = Path.ChangeExtension(rig.Song, ".ttml");
+        var online = Noctis.Services.Lyrics.OnlineTimingSidecar.Mark(OnlineTtml, Noctis.Services.Lyrics.WordTimingSource.Kugou, 0)!;
+        File.WriteAllText(ttml, online);
+        using var worker = rig.Worker(states.Enqueue);
+        worker.Ask(rig.Song, TimingAction.Current);
+        // Meanwhile the lyrics page still reads the online timing.
+        await Until(() => !File.Exists(ttml) || states.Any(s => s.Finished));
+        if (!states.Any(s => s.Finished)) Assert.Equal(online, Noctis.Services.Lyrics.OnlineTimingAside.ReadHeld(rig.Song));
+        await Until(() => states.Any(s => s.Finished));
+        File.WriteAllText(Path.ChangeExtension(rig.Song, ".elrc"), "[00:01.00]<00:01.00>word<00:02.00>");   // WordLyrics' result
+        Assert.False(File.Exists(ttml));
+        Assert.Equal("Kugou", Noctis.Services.Lyrics.OnlineTimingAside.KeptSource(rig.Song));
+        Assert.True(Noctis.Services.Lyrics.OnlineTimingAside.UseOnline(rig.Song));
+        Assert.Equal(online, File.ReadAllText(ttml));
+        Assert.Null(Noctis.Services.Lyrics.OnlineTimingAside.KeptSource(rig.Song));
+        Assert.True(Noctis.Services.Lyrics.OnlineTimingAside.UseWordLyrics(rig.Song));
+        Assert.False(File.Exists(ttml));
+        Assert.Equal("Kugou", Noctis.Services.Lyrics.OnlineTimingAside.KeptSource(rig.Song));
+    }
+
+    [Fact]
+    public void TheCreditNeverMovesAUsersOwnTtml_OrOneWithNothingToShowInstead()
+    {
+        using var rig = new Rig();
+        using var worker = rig.Worker(_ => { });
+        var ttml = Path.ChangeExtension(rig.Song, ".ttml");
+        File.WriteAllText(ttml, Noctis.Services.Lyrics.OnlineTimingSidecar.Mark(OnlineTtml, Noctis.Services.Lyrics.WordTimingSource.LrcRed, 0)!);
+        Assert.False(Noctis.Services.Lyrics.OnlineTimingAside.UseWordLyrics(rig.Song));   // no WordLyrics timing yet
+        File.WriteAllText(Path.ChangeExtension(rig.Song, ".elrc"), "[00:01.00]<00:01.00>word<00:02.00>");
+        File.WriteAllText(ttml, OnlineTtml);                                                // the user's own, unmarked
+        Assert.False(Noctis.Services.Lyrics.OnlineTimingAside.UseWordLyrics(rig.Song));
+        Assert.True(File.Exists(ttml));
+    }
+
+    [Fact]
+    public void OnlyPlainLyrics_IsTheSongsUntimedTags_WithNoLyricsFileBeside()
+    {
+        using var rig = new Rig();
+        Assert.True(Worker.OnlyPlainLyrics(rig.Song, _ => new Noctis.Services.EmbeddedLyricsText("Plain words\nMore words", "")));
+        Assert.False(Worker.OnlyPlainLyrics(rig.Song, _ => new Noctis.Services.EmbeddedLyricsText("", "[00:01.00]Timed words")));
+        Assert.False(Worker.OnlyPlainLyrics(rig.Song, _ => Noctis.Services.EmbeddedLyricsText.Empty));
+        File.WriteAllText(Path.ChangeExtension(rig.Song, ".lrc"), "[00:01.00]Timed words\n");
+        Assert.False(Worker.OnlyPlainLyrics(rig.Song, _ => new Noctis.Services.EmbeddedLyricsText("Plain words", "")));
+    }
+
+    [Fact]
+    public async Task OwnPlainWordsThatCouldNotBeTimed_GoOnAsFetchFreshLyrics()
+    {
+        // Owner #232 (Aminé "REEL IT IN"): the automatic run timed the song's own plain lyrics, unsure of 23% of them.
+        using var rig = new Rig(outcome: "not_timed", reason: "the model is unsure of 23% of the lines. Supply synced LRC line guides or keep existing guides when retiming.");
+        var states = new ConcurrentQueue<ProgressState>();
+        var logs = new ConcurrentQueue<string>();
+        using var worker = new Worker(rig.Work, () => [rig.Music], new(true, "Light", false, rig.App, ""), logs.Enqueue, _ => { }, states.Enqueue, readiness: _ => true);
+        worker.Ask(rig.Song);
+        await Until(() => logs.Any(l => l.Contains("fetching line-timed lyrics")), () => string.Join(" | ", logs));
+        await Until(() => File.Exists(rig.Result) && File.ReadAllText(rig.Result).Contains("--repair-lyrics"), () => string.Join(" | ", logs));
+    }
+
+    [Fact]
     public void TheOnlineWordsGoToWordLyricsAsLineTimedLyrics()
     {
         var lines = Worker.LinesOf(OnlineTtml)!;
@@ -686,7 +749,9 @@ public class WordLyricsBackendTests
         var played = Path.Combine(rig.Music, "played now.mp3"); File.WriteAllText(played, "synthetic");
         worker.AskPlayed(played, out var accepted); Assert.True(accepted);
         worker.MakeRoom(played);
-        await Until(() => worker.StatusFor(played) == SongTimingStatus.Processing);
+        // #232: Processing shows while the other run stops; the played song's own run is what is waited for.
+        await Until(() => worker.StatusFor(played) == SongTimingStatus.Processing && worker.IsRunning
+            && File.Exists(Path.Combine(rig.Work, "songs.txt")) && File.ReadAllLines(Path.Combine(rig.Work, "songs.txt")).SequenceEqual([played]));
         Assert.Equal([played], File.ReadAllLines(Path.Combine(rig.Work, "songs.txt"))); // alone in its run
         Assert.True(worker.IsWaiting(rig.Song)); // kept, no failed try
     }
@@ -742,7 +807,9 @@ public class WordLyricsBackendTests
         var played = Path.Combine(rig.Music, "played now.mp3"); File.WriteAllText(played, "synthetic");
         worker.AskPlayed(played, out _);
         worker.MakeRoom(played);
-        await Until(() => worker.StatusFor(played) == SongTimingStatus.Processing);
+        // #232: Processing shows while the other run stops; the played song's own run is what is waited for.
+        await Until(() => worker.StatusFor(played) == SongTimingStatus.Processing && worker.IsRunning
+            && File.Exists(Path.Combine(rig.Work, "songs.txt")) && File.ReadAllLines(Path.Combine(rig.Work, "songs.txt")).SequenceEqual([played]));
         Assert.False(worker.IsWaiting(rig.Song), string.Join("\n", reports)); // it finished (timed), then the played song started
         Assert.Equal([played], File.ReadAllLines(Path.Combine(rig.Work, "songs.txt")));
     }
