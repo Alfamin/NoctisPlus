@@ -233,6 +233,39 @@ public sealed class OnlineTimingLaneTests : IDisposable
     }
 
     [Fact]
+    public async Task OnTheUsersAsk_ASongWordLyricsTimedGetsItsOnlineTiming_AndItsElrcStays()
+    {
+        // Owner #240: a library song WordLyrics timed before can switch to an online timing too.
+        using var lane = Lane();
+        var song = Song("timed before");
+        var elrc = Path.ChangeExtension(song.FilePath, ".elrc");
+        File.WriteAllText(elrc, "[00:10.00]<00:10.00>w0 <00:10.30>");
+        _lrcRed.Answer = () => new LrcLibResult { Duration = 200, SyncedLyrics = "x", OriginalTtml = WordTtml() };
+        IReadOnlyList<string>? written = null;
+        lane.Written += p => written = p;
+        Assert.Equal(OnlineTimingSearchState.Found, await lane.FindOnRequestAsync(song));
+        Assert.Equal(WordTimingSource.LrcRed, OnlineTimingSidecar.SourceOf(File.ReadAllText(Path.ChangeExtension(song.FilePath, ".ttml"))));
+        Assert.Equal("[00:10.00]<00:10.00>w0 <00:10.30>", File.ReadAllText(elrc));
+        Assert.Equal([song.FilePath], written);
+
+        var nowhere = Song("nowhere");
+        File.WriteAllText(Path.ChangeExtension(nowhere.FilePath, ".elrc"), "[00:10.00]<00:10.00>w0 <00:10.30>");
+        _lrcRed.Answer = () => null;
+        Assert.Equal(OnlineTimingSearchState.Miss, await lane.FindOnRequestAsync(nowhere));
+        Assert.False(File.Exists(Path.ChangeExtension(nowhere.FilePath, ".ttml")));
+        _lrcRed.Answer = () => throw new LyricsProviderException("lrc.red", new HttpRequestException("offline"));
+        Assert.Equal(OnlineTimingSearchState.Unavailable, await lane.FindOnRequestAsync(Song("offline")));
+
+        // The user's own timing (Lyrics Studio, taken out of word timing) is never asked about.
+        var studio = Song("studio");
+        _userTimed.Add(studio.FilePath);
+        var calls = _lrcRed.Calls + _unison.Calls + _kugou.Calls;
+        Assert.Equal(OnlineTimingSearchState.Miss, await lane.FindOnRequestAsync(studio));
+        Assert.Equal(calls, _lrcRed.Calls + _unison.Calls + _kugou.Calls);
+        Assert.False(File.Exists(Path.ChangeExtension(studio.FilePath, ".ttml")));
+    }
+
+    [Fact]
     public async Task AFittingTimingIsWrittenShiftedAndMarked_TheLrcStays()
     {
         using var lane = Lane();

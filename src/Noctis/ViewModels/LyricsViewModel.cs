@@ -1795,7 +1795,7 @@ public partial class LyricsViewModel : ViewModelBase, IDisposable
             ? Localization.Loc.T(_lrcRedModelResult != null && ReferenceEquals(_currentOnlineResult, _lrcRedModelResult)
                 ? "Lyrics.LrcRedModelCredit" : "Lyrics.LrcRedCredit")
             : onlineShown != null ? Localization.Loc.T("Lyrics.OnlineTimingCredit", onlineShown)
-            : wordLyricsShown ? Localization.Loc.T("Lyrics.OnlineTimingCredit", "WordLyrics")
+            : wordLyricsShown ? _creditNote is { } note && note.Path == path ? note.Text : Localization.Loc.T("Lyrics.OnlineTimingCredit", "WordLyrics")
             : string.Empty;
         // The credit is a button when there is a choice: online timing shown (time it with WordLyrics, or switch to
         // WordLyrics' timing when there is one), or WordLyrics' timing with the online one kept to switch back to.
@@ -1803,7 +1803,10 @@ public partial class LyricsViewModel : ViewModelBase, IDisposable
         CreditShowsOnline = onlineShown != null;
         CreditHasWordLyrics = path != null && (wordLyricsShown || onlineShown != null && File.Exists(Path.ChangeExtension(path, ".elrc"))
             && !Services.Lyrics.OnlineTimingLane.StudioTimed(path));
+        // Owner #240: WordLyrics' timing with no online one kept (a library song timed before): find one, here.
+        CreditCanFindOnline = wordLyricsShown && CreditOnlineSource == null && OnlineTimingFindRequested != null;
         OnPropertyChanged(nameof(HasCreditChoice));
+        OnPropertyChanged(nameof(HasCreditOnline));
         OnPropertyChanged(nameof(CreditOnlineLabel));
         OnPropertyChanged(nameof(CreditCanTimeWithWordLyrics));
     }
@@ -1813,7 +1816,8 @@ public partial class LyricsViewModel : ViewModelBase, IDisposable
     [ObservableProperty] private bool _creditShowsOnline;
     [ObservableProperty] private bool _creditHasWordLyrics;
 
-    public bool HasCreditChoice => CreditOnlineSource != null;
+    public bool HasCreditChoice => CreditOnlineSource != null || CreditCanFindOnline;
+    public bool HasCreditOnline => CreditOnlineSource != null;
     public string CreditOnlineLabel => CreditOnlineSource is { } source ? Localization.Loc.T("Lyrics.OnlineTimingCredit", source) : "";
     public bool CreditCanTimeWithWordLyrics => CreditShowsOnline && !CreditHasWordLyrics;
     public string CreditWordLyricsLabel => Localization.Loc.T("Lyrics.OnlineTimingCredit", "WordLyrics");
@@ -1845,6 +1849,52 @@ public partial class LyricsViewModel : ViewModelBase, IDisposable
     public string CreditTimeLabel => Localization.Loc.T(IsDownloadingNow ? "Lyrics.TimeWithWordLyricsAfterDownload" : "Lyrics.TimeWithWordLyrics");
 
     internal Func<Track, TimingAction, Task>? WordTimingWithRequested { get; set; }
+
+    [ObservableProperty] private bool _creditCanFindOnline;
+    /// <summary>Owner #240: "Find online word timing" is asking lrc.red, Unison and Kugou now.</summary>
+    [ObservableProperty] private bool _isFindingOnlineTiming;
+    /// <summary>What the credit says meanwhile, then for a moment after a miss ("No matching online word timing").</summary>
+    private (string Path, string Text)? _creditNote;
+    private IDisposable? _creditNoteEnd;
+
+    /// <summary>The online lane's look-up on the user's ask; set by MainWindowViewModel. Null: never offered.</summary>
+    internal Func<Track, Task<OnlineTimingSearchState>>? OnlineTimingFindRequested { get; set; }
+
+    /// <summary>Owner #240: looks the song WordLyrics timed up online; found → shown at once, WordLyrics' timing stays
+    /// a choice in the same menu.</summary>
+    [RelayCommand]
+    private async Task FindOnlineTiming()
+    {
+        if (!CreditCanFindOnline || IsFindingOnlineTiming || HasPendingWordTiming || _currentTrack is not { } track
+            || OnlineTimingFindRequested is not { } find) return;
+        var path = track.FilePath;
+        IsFindingOnlineTiming = true;
+        SetCreditNote(path, Localization.Loc.T("Lyrics.OnlineSearching"), null);
+        OnlineTimingSearchState state;
+        try { state = await find(track); }
+        catch (Exception ex)
+        {
+            DebugLogger.Warn(DebugLogger.Category.Lyrics, "Lyrics.FindOnlineTiming", ex.Message);
+            state = OnlineTimingSearchState.Unavailable;
+        }
+        finally { IsFindingOnlineTiming = false; }
+        SetCreditNote(path, state switch
+        {
+            OnlineTimingSearchState.Found => null,
+            OnlineTimingSearchState.Miss => Localization.Loc.T("Lyrics.OnlineNoMatch"),
+            _ => Localization.Loc.T("Lyrics.OnlineUnavailable")
+        }, TimeSpan.FromSeconds(4));
+    }
+
+    private void SetCreditNote(string path, string? text, TimeSpan? lasts)
+    {
+        _creditNoteEnd?.Dispose();
+        _creditNoteEnd = null;
+        _creditNote = text == null ? null : (path, text);
+        RefreshLyricsCredit();
+        if (text != null && lasts is { } wait)
+            _creditNoteEnd = DispatcherTimer.RunOnce(() => { _creditNote = null; RefreshLyricsCredit(); }, wait);
+    }
 
     /// <summary>The model is offered while lrc.red is on in Settings and the preferred lyrics type keeps word timings.</summary>
     private async Task<bool> LrcRedModelAllowedAsync()

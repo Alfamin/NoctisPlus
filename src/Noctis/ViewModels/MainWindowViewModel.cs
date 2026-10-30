@@ -804,6 +804,8 @@ public partial class MainWindowViewModel : ViewModelBase
                 // #207 hard rule: every song WordLyrics would time automatically is looked up online first.
                 wordService.OnlineFirst = lane.WantsFirst;
                 wordService.PrepareOnlineRepair = lane.PrepareForRepair;
+                // Owner #240: the credit's "Find online word timing" for a song WordLyrics timed before.
+                _lyricsVm.OnlineTimingFindRequested = track => Task.Run(() => lane.FindOnRequestAsync(track));
                 // Online timing on screen: WordLyrics does not time that song too ("Processing lyrics" under lrc.red's).
                 lane.Provisional += (track, ttml, source) => Dispatcher.UIThread.Post(() =>
                 {

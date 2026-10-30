@@ -524,20 +524,8 @@ internal sealed class OnlineTimingLane : IDisposable
             Log($"playing {Describe(track)}: shown before fit from {OnlineTimingSidecar.Name(found.Source!.Value)}; {found.Trace}");
             Provisional?.Invoke(track, OnlineTimingSidecar.Mark(found.Ttml!, found.Source!.Value, 0) ?? found.Ttml!, OnlineTimingSidecar.Name(found.Source!.Value));
         }
-        // Owner 2026-10-29 (Circo Loco: shown at Play, then taken back for WordLyrics): the online timing of the same
-        // recording stays; the fit check only moves it when it is sure the file is shifted (Kiss Me More +0.48 s).
-        // Measured: 55 of 59 songs within 80 ms this way, none taken away; unsure (25 of 59) = left as it is.
-        var ffmpegPath = _ffmpeg();
-        var fit = ffmpegPath is { } ffmpeg ? await Check(ffmpeg, path, found.Ttml!, ct) : null;
-        var shift = fit is { Shift: { } sure } ? sure : 0;
-        _detail += $"; from {OnlineTimingSidecar.Name(found.Source!.Value)}, " + (ffmpegPath == null ? "no ffmpeg: not fit-checked" : fit == null ? "fit check could not read the audio"
-            : (fit.Shift is { } moved ? $"fit sure: moved {moved:+0.00;-0.00} s" : "fit unsure: left as found")
-              + $" (estimate {fit.Estimate:+0.00;-0.00} s, sharpness {fit.Sharpness:0.00}, significance {fit.Significance:0.0}, energy {fit.EnergyEstimate:+0.00;-0.00} s)");
-        // #226 supersedes #215: uncertainty records fit confidence, never permission to replace
-        // usable online timing automatically. WordLyrics repair is the user's explicit choice.
-        var recheck = found.Source == WordTimingSource.Kugou && fit?.Shift == null;
-        if (recheck) _detail += "; kept online (no automatic model replacement)";
-        var marked = OnlineTimingSidecar.Mark(OnlineTimingFit.Shift(found.Ttml!, shift), found.Source!.Value, shift, unverified: recheck);
+        var (marked, fitted) = await FitAsync(path, found, ct);
+        _detail += fitted;
         bool written;
         lock (_gate)
         {
@@ -548,6 +536,61 @@ internal sealed class OnlineTimingLane : IDisposable
         if (written) lock (_gate) _provisional.Remove(key);
         if (!written) _detail += "; not written (a .ttml of the user's, read-only or unwritable)";
         return written ? Outcome.Written : Outcome.Kept;
+    }
+
+    /// <summary>The found timing fitted to the file and marked with its source, and what the fit check said.</summary>
+    async Task<(string? Marked, string Detail)> FitAsync(string path, OnlineWordTiming.Lookup found, CancellationToken ct)
+    {
+        // Owner 2026-10-29 (Circo Loco: shown at Play, then taken back for WordLyrics): the online timing of the same
+        // recording stays; the fit check only moves it when it is sure the file is shifted (Kiss Me More +0.48 s).
+        // Measured: 55 of 59 songs within 80 ms this way, none taken away; unsure (25 of 59) = left as it is.
+        var ffmpegPath = _ffmpeg();
+        var fit = ffmpegPath is { } ffmpeg ? await Check(ffmpeg, path, found.Ttml!, ct) : null;
+        var shift = fit is { Shift: { } sure } ? sure : 0;
+        var detail = $"; from {OnlineTimingSidecar.Name(found.Source!.Value)}, " + (ffmpegPath == null ? "no ffmpeg: not fit-checked" : fit == null ? "fit check could not read the audio"
+            : (fit.Shift is { } moved ? $"fit sure: moved {moved:+0.00;-0.00} s" : "fit unsure: left as found")
+              + $" (estimate {fit.Estimate:+0.00;-0.00} s, sharpness {fit.Sharpness:0.00}, significance {fit.Significance:0.0}, energy {fit.EnergyEstimate:+0.00;-0.00} s)");
+        // #226 supersedes #215: uncertainty records fit confidence, never permission to replace
+        // usable online timing automatically. WordLyrics repair is the user's explicit choice.
+        var recheck = found.Source == WordTimingSource.Kugou && fit?.Shift == null;
+        if (recheck) detail += "; kept online (no automatic model replacement)";
+        return (OnlineTimingSidecar.Mark(OnlineTimingFit.Shift(found.Ttml!, shift), found.Source!.Value, shift, unverified: recheck), detail);
+    }
+
+    /// <summary>
+    /// Owner #240: the lyrics credit's "Find online word timing" for a song WordLyrics already timed (the lane leaves
+    /// those as they are). Asked now, whatever was remembered; found → the song's .ttml, shown at once over WordLyrics'
+    /// .elrc, which stays (the credit switches back). Never for the user's own timing or a song still arriving.
+    /// </summary>
+    internal async Task<OnlineTimingSearchState> FindOnRequestAsync(Track track, CancellationToken ct = default)
+    {
+        if (Local(track) is not { } path || !File.Exists(path) || string.IsNullOrWhiteSpace(track.Title)
+            || _userTimed(path) || LyricsWriter.SidecarsOnDisk(path, ".lyricsfile").Count > 0)
+            return OnlineTimingSearchState.Miss;
+        if (LyricsWriter.SidecarsOnDisk(path, ".ttml").Count > 0) return OnlineTimingSearchState.Found;
+        if (_offline()) return OnlineTimingSearchState.Unavailable;
+        var clock = System.Diagnostics.Stopwatch.StartNew();
+        var seconds = OnlineTimingDuration.Seconds(track, path);
+        var found = await FindAsync(track, seconds, ct);
+        ct.ThrowIfCancellationRequested();
+        if (!found.Found)
+        {
+            Log($"asked by the user {Describe(track)}: {(found.Transient ? "a source could not answer" : "no words")} in {clock.ElapsedMilliseconds} ms; {found.Trace}");
+            return found.Transient ? OnlineTimingSearchState.Unavailable : OnlineTimingSearchState.Miss;
+        }
+        var (marked, detail) = await FitAsync(path, found, ct);
+        bool written;
+        lock (_gate)
+        {
+            ct.ThrowIfCancellationRequested();
+            _done.Add(path);
+            _repairs.Remove(path);   // the user's newer choice; an earlier WordLyrics repair of this song is over
+            written = marked != null && _writer.WriteOnlineTiming(path, marked);
+        }
+        Log($"asked by the user {Describe(track)}: {(written ? "written" : "not written")} in {clock.ElapsedMilliseconds} ms; {found.Trace}{detail}");
+        if (!written) return OnlineTimingSearchState.Unavailable;
+        Written?.Invoke(Paths(path, track));
+        return OnlineTimingSearchState.Found;
     }
 
     /// <summary>Owner #220: a saved online timing whose masked words were looked up once (not again every start).</summary>

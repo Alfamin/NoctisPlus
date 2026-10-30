@@ -1066,11 +1066,16 @@
                         <StackPanel Classes="credit-face" Orientation="Horizontal" Spacing="4">
                             <TextBlock Text="{Binding LyricsCreditText}" FontSize="10"
                                        Foreground="{Binding LyricsSubtleFg}" VerticalAlignment="Center"/>
-                            <PathIcon Data="M2 8 L6 4 L10 8" Width="7" Height="7" Foreground="{Binding LyricsSubtleFg}" VerticalAlignment="Center"/>
+                            <PathIcon Data="M2 8 L6 4 L10 8" Width="7" Height="7" Foreground="{Binding LyricsSubtleFg}" VerticalAlignment="Center"
+                                      IsVisible="{Binding !IsFindingOnlineTiming}"/>
+                            <!-- Owner #240: looking online for a song WordLyrics timed. -->
+                            <controls:ProgressRing Width="9" Height="9" IsIndeterminate="True" VerticalAlignment="Center"
+                                                   IsVisible="{Binding IsFindingOnlineTiming}"/>
                         </StackPanel>
                         <Button.Flyout>
                             <MenuFlyout Placement="TopEdgeAlignedLeft" helpers:MenuOpenAnimation.EnableFlyoutClose="True">
-                                <MenuItem Header="{Binding CreditOnlineLabel}" Command="{Binding UseOnlineTimingCommand}">
+                                <MenuItem Header="{Binding CreditOnlineLabel}" Command="{Binding UseOnlineTimingCommand}"
+                                          IsVisible="{Binding HasCreditOnline}">
                                     <MenuItem.Icon>
                                         <Panel>
                                             <controls:LineIcon Classes="mv2-icon mv2-check" Data="{StaticResource MenuLineCheck}" IsVisible="{Binding CreditShowsOnline}"/>
@@ -1089,6 +1094,13 @@
                                           IsVisible="{Binding CreditCanTimeWithWordLyrics}" IsEnabled="{Binding !HasPendingWordTiming}">
                                     <MenuItem.Icon>
                                         <controls:LineIcon Classes="mv2-icon" Data="{StaticResource MenuLineTimer}"/>
+                                    </MenuItem.Icon>
+                                </MenuItem>
+                                <MenuItem Header="{loc:T Lyrics.FindOnlineTiming}"
+                                          Command="{Binding FindOnlineTimingCommand}"
+                                          IsVisible="{Binding CreditCanFindOnline}" IsEnabled="{Binding !IsFindingOnlineTiming}">
+                                    <MenuItem.Icon>
+                                        <controls:LineIcon Classes="mv2-icon" Data="{StaticResource MenuLineSearch}"/>
                                     </MenuItem.Icon>
                                 </MenuItem>
                             </MenuFlyout>
