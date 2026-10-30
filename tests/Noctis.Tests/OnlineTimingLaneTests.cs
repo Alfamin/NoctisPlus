@@ -17,9 +17,10 @@ public sealed class OnlineTimingLaneTests : IDisposable
     sealed class Source : ILrcRedLyricsService, IUnisonLyricsService, IKugouLyricsService
     {
         public Func<LrcLibResult?> Answer = () => null;
+        public Func<string, CancellationToken, Task<LrcLibResult?>>? AsyncAnswer;
         public int Calls;
         public Task<LrcLibResult?> SearchLyricsAsync(string artist, string trackName, double durationSeconds, CancellationToken ct = default)
-        { Calls++; return Task.FromResult(Answer()); }
+        { Calls++; return AsyncAnswer?.Invoke(trackName, ct) ?? Task.FromResult(Answer()); }
         public Task<LrcRedMatch?> FindMatchAsync(string artist, string trackName, double durationSeconds, CancellationToken ct = default) => Task.FromResult<LrcRedMatch?>(null);
         public Task<LrcLibResult> SyncWithModelAsync(string isrc, CancellationToken ct = default) => throw new InvalidOperationException("never automatic");
     }
@@ -450,6 +451,57 @@ public sealed class OnlineTimingLaneTests : IDisposable
         lane.SetPlaying(song, []);
         var done = await Task.WhenAny(written.Task, Task.Delay(5000));
         Assert.Same(written.Task, done);
+    }
+
+    [Fact]
+    public async Task PlayingFileShowsKugouBeforeFitCompletes()
+    {
+        using var lane = Lane();
+        var song = Song("instant Kugou");
+        _kugou.Answer = () => new() { Duration = 200, OriginalTtml = WordTtml() };
+        lane.SetPlaying(song, []);
+        var fitting = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var finish = new TaskCompletionSource<OnlineTimingFit.Result?>();
+        bool shown = false;
+        lane.Provisional += (track, _, source) => { Assert.Same(song, track); Assert.Equal("Kugou", source); shown = true; };
+        lane.Check = (_, _, _, _) => { fitting.SetResult(); return finish.Task; };
+        var processing = lane.ProcessAsync(song, CancellationToken.None);
+        await fitting.Task.WaitAsync(TimeSpan.FromSeconds(5));
+        Assert.True(shown);
+        Assert.False(processing.IsCompleted);
+        finish.SetResult(null);
+        Assert.Equal(OnlineTimingLane.Outcome.Written, await processing);
+        Assert.True(OnlineTimingSidecar.HasUnverified(song.FilePath));
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task NewPlayingSongPreemptsBackgroundLookupOrFit(bool fit)
+    {
+        using var lane = Lane();
+        var background = Song("background");
+        var current = Song("current");
+        var started = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var never = new TaskCompletionSource<LrcLibResult?>();
+        _lrcRed.AsyncAnswer = (title, _) =>
+        {
+            if (!fit && title == background.Title) { started.TrySetResult(); return never.Task; }
+            return Task.FromResult<LrcLibResult?>(new() { Duration = 200, OriginalTtml = WordTtml() });
+        };
+        lane.Check = async (_, path, _, ct) =>
+        {
+            if (fit && path == background.FilePath) { started.TrySetResult(); await Task.Delay(Timeout.Infinite, ct); }
+            return null;
+        };
+        var displayed = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        lane.Provisional += (track, _, _) => { if (ReferenceEquals(track, current)) displayed.TrySetResult(); };
+        lane.SetLibrary([background]);
+        lane.Start(TimeSpan.Zero);
+        await started.Task.WaitAsync(TimeSpan.FromSeconds(5));
+        lane.SetPlaying(current, []);
+        await displayed.Task.WaitAsync(TimeSpan.FromSeconds(5));
+        Assert.True(lane.WantsFirst(background.FilePath)); // interrupted work was not marked a miss/done
     }
 
     /// <summary>Opt-in, real sources + real ffmpeg on a scratch COPY of a song (FIT200_LANE = "copy.mp3|artist|title|seconds",

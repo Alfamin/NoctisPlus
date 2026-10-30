@@ -129,7 +129,7 @@ internal sealed class OnlineWordTiming
             if (best < 0 && !betterOut) return new Lookup(null, null, transient) { Trace = Trace() };
             var waits = asks.Where((_, i) => !read[i]).Select(a => (Task)a.Answer).ToList();
             if (best >= 0) waits.Add(Task.Delay(PreferWait - clock.Elapsed, ct));
-            await Task.WhenAny(waits).ConfigureAwait(false);
+            await Task.WhenAny(waits).WaitAsync(ct).ConfigureAwait(false);
             ct.ThrowIfCancellationRequested();
         }
     }

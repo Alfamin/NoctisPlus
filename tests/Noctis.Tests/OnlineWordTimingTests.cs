@@ -85,6 +85,17 @@ public class OnlineWordTimingTests
     }
 
     [Fact]
+    public async Task CancellationStopsWaitingEvenIfProviderIgnoresTheToken()
+    {
+        var never = new TaskCompletionSource<LrcLibResult?>();
+        var timing = new OnlineWordTiming(new Gate(never, () => { }), new Gate(never, () => { }), () => true);
+        using var stop = new CancellationTokenSource();
+        var find = timing.FindAsync("A", "B", 200, stop.Token);
+        stop.Cancel();
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(() => find.WaitAsync(TimeSpan.FromSeconds(2)));
+    }
+
+    [Fact]
     public async Task AReadyUnisonAnswerWaitsForASlowLrcRedOnlyAMoment()
     {
         // Owner #208: answers came 20-25 s late. A word-timed Unison answer is used once lrc.red has had PreferWait.

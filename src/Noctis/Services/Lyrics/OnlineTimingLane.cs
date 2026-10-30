@@ -33,6 +33,7 @@ internal sealed class OnlineTimingLane : IDisposable
     List<Track> _library = [];
     DateTime _restUntil;
     Task? _loop;
+    CancellationTokenSource? _activeWork;
 
     readonly HashSet<string> _streamAsked = new(StringComparer.Ordinal);
     Track? _shownTrack;   // the stream whose online timing was last put on screen (each play of it is its own Track)
@@ -76,7 +77,12 @@ internal sealed class OnlineTimingLane : IDisposable
     /// <summary>The song playing and the queue after it (UI thread); replaces the earlier priorities.</summary>
     public void SetPlaying(Track? current, IEnumerable<Track> upNext)
     {
-        lock (_gate) { _current = current; _upNext = upNext.Take(Ahead).ToList(); }
+        lock (_gate)
+        {
+            if (!ReferenceEquals(_current, current)) _activeWork?.Cancel();
+            _current = current;
+            _upNext = upNext.Take(Ahead).ToList();
+        }
         Wake();
     }
 
@@ -198,13 +204,15 @@ internal sealed class OnlineTimingLane : IDisposable
         var libraryAt = Now() + firstLibraryDelay;
         while (!ct.IsCancellationRequested)
         {
+            using var work = CancellationTokenSource.CreateLinkedTokenSource(ct);
+            lock (_gate) _activeWork = work;
             try
             {
                 var now = Now();
                 // A stream that just started: its word timing first, no file needed (owner 2026-10-29).
                 if (!_offline() && StreamToShow() is { } streaming)
                 {
-                    await ShowWhileStreamingAsync(streaming, ct);
+                    await ShowWhileStreamingAsync(streaming, work.Token);
                     continue;
                 }
                 var track = _offline() || now < _restUntil ? null : Next(now >= libraryAt && !Busy());
@@ -212,10 +220,10 @@ internal sealed class OnlineTimingLane : IDisposable
                 {
                     // The song playing may still be arriving: look again soon, so its lyrics come online before WordLyrics starts.
                     var wait = now < _restUntil ? _restUntil - now : CurrentPending() ? TimeSpan.FromSeconds(2) : now < libraryAt ? libraryAt - now : TimeSpan.FromMinutes(1);
-                    await _wake.WaitAsync(wait < TimeSpan.FromSeconds(1) ? TimeSpan.FromSeconds(1) : wait, ct);
+                    await _wake.WaitAsync(wait < TimeSpan.FromSeconds(1) ? TimeSpan.FromSeconds(1) : wait, work.Token);
                     continue;
                 }
-                var outcome = await ProcessAsync(track, ct);
+                var outcome = await ProcessAsync(track, work.Token);
                 if (outcome == Outcome.Transient)
                 {
                     _restUntil = Now() + FailureRest;
@@ -223,12 +231,14 @@ internal sealed class OnlineTimingLane : IDisposable
                 }
             }
             catch (OperationCanceledException) when (ct.IsCancellationRequested) { return; }
+            catch (OperationCanceledException) when (work.IsCancellationRequested) { /* New playing song goes first. */ }
             catch (Exception ex)
             {
                 DebugLogger.Warn(DebugLogger.Category.Lyrics, "Lyrics.OnlineTimingLane", ex.Message);
                 Log("lane error: " + ex);
                 await Task.Delay(Spacing, ct).ConfigureAwait(false);
             }
+            finally { lock (_gate) if (ReferenceEquals(_activeWork, work)) _activeWork = null; }
         }
     }
 
@@ -307,7 +317,17 @@ internal sealed class OnlineTimingLane : IDisposable
         }
         if (_misses.IsMiss(key, Now())) return false;
         var clock = System.Diagnostics.Stopwatch.StartNew();
-        var found = await FindAsync(track, seconds, ct);
+        OnlineWordTiming.Lookup found;
+        try { found = await FindAsync(track, seconds, ct); ct.ThrowIfCancellationRequested(); }
+        catch (OperationCanceledException) when (ct.IsCancellationRequested)
+        {
+            lock (_gate)
+            {
+                _streamAsked.Remove(key);
+                if (ReferenceEquals(_shownTrack, track)) _shownTrack = null;
+            }
+            throw;
+        }
         Log($"streaming {Describe(track)}: {(found.Found ? "shown from " + OnlineTimingSidecar.Name(found.Source!.Value) : "nothing to show")} in {clock.ElapsedMilliseconds} ms; {found.Trace}");
         if (!found.Found)
         {
@@ -367,14 +387,28 @@ internal sealed class OnlineTimingLane : IDisposable
 
         if (_misses.IsMiss(key, Now())) { _detail = $": no source had it (remembered {OnlineTimingMisses.Keep.TotalDays:0} days)"; return Outcome.Miss; }
         OnlineWordTiming.Lookup? shown;
-        lock (_gate) _provisional.Remove(key, out shown);
+        lock (_gate) _provisional.TryGetValue(key, out shown);
         var found = shown ?? await FindAsync(track, seconds, ct);
+        ct.ThrowIfCancellationRequested();
         _detail = shown != null ? "; the answer shown while streaming" : "; " + found.Trace;
         if (!found.Found)
         {
             if (found.Transient) return Outcome.Transient;
             _misses.Remember(key, Now());
             return Outcome.Miss;
+        }
+        // #222: display the playing song's answer before decoding/checking its complete file too.
+        // Fit and quiet WordLyrics replacement still run; the raw answer survives a priority switch.
+        bool playing;
+        lock (_gate)
+        {
+            _provisional[key] = found;
+            playing = ReferenceEquals(track, _current);
+        }
+        if (playing)
+        {
+            Log($"playing {Describe(track)}: shown before fit from {OnlineTimingSidecar.Name(found.Source!.Value)}; {found.Trace}");
+            Provisional?.Invoke(track, OnlineTimingSidecar.Mark(found.Ttml!, found.Source!.Value, 0) ?? found.Ttml!, OnlineTimingSidecar.Name(found.Source!.Value));
         }
         // Owner 2026-10-29 (Circo Loco: shown at Play, then taken back for WordLyrics): the online timing of the same
         // recording stays; the fit check only moves it when it is sure the file is shifted (Kiss Me More +0.48 s).
@@ -391,6 +425,7 @@ internal sealed class OnlineTimingLane : IDisposable
         if (recheck) _detail += "; kept on screen, WordLyrics times it quietly";
         var marked = OnlineTimingSidecar.Mark(OnlineTimingFit.Shift(found.Ttml!, shift), found.Source!.Value, shift, unverified: recheck);
         var written = marked != null && _writer.WriteOnlineTiming(path, marked);
+        if (written) lock (_gate) _provisional.Remove(key);
         if (!written) _detail += "; not written (a .ttml of the user's, read-only or unwritable)";
         if (written && recheck) _recheck = Paths(path, track);
         return written ? Outcome.Written : Outcome.Kept;
