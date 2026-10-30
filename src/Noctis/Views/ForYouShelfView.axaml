@@ -179,7 +179,7 @@
                     ToolTip.Tip="Hide or show this section">
                 <Button.ContextMenu>
                     <ContextMenu>
-                        <MenuItem Header="Reset For you (forget hidden songs and shown picks)" Command="{Binding ResetLearningCommand}" />
+                        <MenuItem Header="Reset learned preferences" Command="{Binding ResetLearningCommand}" />
                         <!-- Owner #166: the artists blocked for recommendations; one click recommends them again. -->
                         <MenuItem Header="Recommend again" helpers:RecommendMenu.Entry="blocked" />
                     </ContextMenu>

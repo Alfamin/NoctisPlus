@@ -487,8 +487,7 @@ public sealed partial class ForYouShelfViewModel : ObservableObject, IDisposable
         HasUndo = false; _dismissed = null;
     }
 
-    /// <summary>Forgets For you's dismissals, shown pages and saved page, then finds new picks. The library and its
-    /// listening history are not touched.</summary>
+    /// <summary>Forgets learned feedback and saved pages, then finds new picks. Explicit exclusions stay.</summary>
     [RelayCommand]
     private async Task ResetLearning()
     {
@@ -500,7 +499,7 @@ public sealed partial class ForYouShelfViewModel : ObservableObject, IDisposable
         Noctis.Helpers.TransientStatus.Show("ForYouReset", v => ResetNotice = v, "For you was reset", TimeSpan.FromSeconds(5));
         _page = null; Picks.Clear(); _pages = []; PageTabs.Clear();
         OnPropertyChanged(nameof(HasPageTabs)); OnPropertyChanged(nameof(CanPreviousPage)); OnPropertyChanged(nameof(CanNextPage));
-        Noctis.Services.DebugLog.Write("ForYou", "Reset hidden songs and shown picks; blocked artists kept");
+        Noctis.Services.DebugLog.Write("ForYou", "Reset learned feedback and shown picks; hidden songs and blocked artists kept");
         await LoadAsync(true);
     }
 

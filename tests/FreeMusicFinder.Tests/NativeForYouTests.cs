@@ -128,6 +128,10 @@ internal static class NativeForYouTests
         Check.True(vm.IsExpanded, "Reset opens a folded shelf so its confirmation and new picks are visible");
         Check.Until(() => reset.IsCompleted, "Reset finishes without waiting forever on the old cancelled request");
         Check.True(source.Hidden.HidesArtist(other.Artists[0]), "Reset keeps artists the listener explicitly blocked");
+        Check.True(source.Hidden.HidesSong(first.Pick.Track.Song), "Reset keeps songs explicitly dismissed with Not for me");
+        var reloadedHidden = new DiscoverHidden(Path.Combine(folder, "hidden.json"));
+        Check.True(reloadedHidden.HidesSong(first.Pick.Track.Song), "the dismissal survives restarting after Reset");
+        Check.False(vm.Picks.Any(p => p.Pick.Track.Song.Id == first.Pick.Track.Song.Id), "Reset's new page cannot show a dismissed song");
         online.Detach();
         Dispatcher.UIThread.RunJobs();
     }

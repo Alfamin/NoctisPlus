@@ -873,8 +873,8 @@ internal static class Discover
 
 /// <summary>
 /// Song-only dismissals ("Not for me"). Each hides that one recording, on any album or provider and as a remaster or clean
-/// edition, but never its live, remix or other versions, its artist, album or neighbours. They last until Undo or a reset of
-/// For you's learning; they do not expire. Legacy automatic artist exclusions are intentionally ignored.
+/// edition, but never its live, remix or other versions, its artist, album or neighbours. They last until Undo,
+/// including after resetting learned preferences. Legacy automatic artist exclusions are intentionally ignored.
 /// </summary>
 internal sealed class DiscoverHidden
 {
@@ -1097,11 +1097,11 @@ internal sealed class ForYouSource(Func<ArtistCatalog> catalog, DiscoveryActions
 
     public void Forget() { lock (_sync) { _last = null; _invalidation++; } }
 
-    /// <summary>Forgets what For you learned here: dismissed songs, shown pages and their actions, and the saved pages.
-    /// Listening history, favorites and playlists belong to the library and are not touched.</summary>
+    /// <summary>Forgets learned feedback and saved pages. Explicit song/artist exclusions
+    /// survive a reset (#239); they are user choices, not inferred preferences.</summary>
     public void ResetLearning()
     {
-        Hidden.Clear(); Feedback.Reset();
+        Feedback.Reset();
         lock (_sync) { _last = null; _loaded = true; _invalidation++; _cache.Delete(); _earlier = []; _earlierFile.Delete(); }
     }
 

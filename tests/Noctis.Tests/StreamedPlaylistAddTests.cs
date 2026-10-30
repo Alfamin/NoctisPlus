@@ -22,8 +22,10 @@ public class StreamedPlaylistAddTests
         public bool SetArtistBlocked(string artist, bool blocked) => blocked ? Blocked.Add(artist) : Blocked.Remove(artist);
         internal Exception? Fail;
         internal Func<string, Task<StreamedAdd>>? Add;
+        internal Track? PlaybackTrack;
+        public Task<Track> PreparePlaybackAsync(OnlineSong song, bool keep, CancellationToken ct) => Task.FromResult(PlaybackTrack!);
         public bool IsCachedFile(string? path) => path?.StartsWith(Cache, StringComparison.OrdinalIgnoreCase) == true;
-        public bool IsStreamedFile(string? path) => IsCachedFile(path);
+        public bool IsStreamedFile(string? path) => IsCachedFile(path) || PlaybackTrack?.FilePath == path;
         public Task<StreamedAdd> AddStreamedAsync(string path, CancellationToken ct)
         {
             if (Add is not null) return Add(path);
@@ -50,6 +52,31 @@ public class StreamedPlaylistAddTests
 
     private static Track Streamed(string name) => new()
     { Id = Guid.NewGuid(), FilePath = Cache + name, Title = "Levitating", Artist = "Dua Lipa", IsExternal = true };
+
+    [Avalonia.Headless.XUnit.AvaloniaFact]
+    public async Task CachedForYouSong_ReplayedFromHistory_KeepsItsIdentityAndNotForMe()
+    {
+        using var data = new TestPersistenceService();
+        var file = Path.Combine(data.DataDirectory, "cached.flac"); File.WriteAllText(file, "fixture");
+        var song = new Track { FilePath = file, Title = "Recommendation", IsExternal = true };
+        var source = new Source { PlaybackTrack = song };
+        var before = OnlineMusicSearch.Current; OnlineMusicSearch.Current = source;
+        try
+        {
+            var player = new PlayerViewModel(new FakeAudioPlayer(), new FakeLibraryService(), data, new FakeAnimatedCoverService());
+            player.IsForYouSong = id => id == "deezer:1";
+            player.ReplaceQueueAndPlay([new Track { Title = "Start", FilePath = "start.flac" }, new Track { Title = "Next", FilePath = "next.flac" }], 0);
+            await player.PlayOnlineAsync(source, new OnlineSong("deezer:1", "Recommendation", "Artist"));
+            Assert.True(player.CanNotForMe);
+            player.NextCommand.Execute(null);
+            Assert.False(player.CanNotForMe);
+            player.PreviousCommand.Execute(null);
+            Assert.Same(song, player.CurrentTrack);
+            Assert.Equal("deezer:1", player.OnlinePlayingSongId);
+            Assert.True(player.CanNotForMe);
+        }
+        finally { OnlineMusicSearch.Current = before; }
+    }
 
     [Fact]
     public async Task APlayedSong_AddedToAPlaylist_JoinsSongs_AndThePlaylistHoldsTheLibraryCopy()

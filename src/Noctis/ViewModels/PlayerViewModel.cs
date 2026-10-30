@@ -2904,7 +2904,7 @@ public partial class PlayerViewModel : ViewModelBase
         var playTrackStart = Stopwatch.GetTimestamp();
         IsBuffering = false;
         _inputWaiting = false; _lastOnlineAdvance = Environment.TickCount64; _lastOnlinePosition = TimeSpan.Zero;
-        OnlinePlayingSongId = null;
+        OnlinePlayingSongId = _streamOrigins.TryGetValue(track, out var streamOrigin) ? streamOrigin.Song.Id : null;
         _seekDebounceTimer?.Dispose();
         _seekDebounceTimer = null;
         CancelNaturalEndFallback();
