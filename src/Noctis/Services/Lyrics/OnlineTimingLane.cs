@@ -27,6 +27,7 @@ internal sealed class OnlineTimingLane : IDisposable
     readonly object _gate = new();
     readonly HashSet<string> _done = new(StringComparer.OrdinalIgnoreCase);
     readonly SemaphoreSlim _wake = new(0, int.MaxValue);
+    readonly SemaphoreSlim _lrcRedPace = new(1, 1);
     readonly CancellationTokenSource _stop = new();
     Track? _current;
     List<Track> _upNext = [];
@@ -276,13 +277,20 @@ internal sealed class OnlineTimingLane : IDisposable
 
     /// <summary>lrc.red, Unison, Kugou (owner #209), paced: lrc.red is asked about one song every <see cref="Spacing"/>,
     /// counted from the last ask, so the fit check of one song overlaps the wait before the next.</summary>
-    async Task<OnlineWordTiming.Lookup> FindAsync(Track track, double seconds, CancellationToken ct)
+    Task<OnlineWordTiming.Lookup> FindAsync(Track track, double seconds, CancellationToken ct) =>
+        _timing.FindAsync(track.Artist ?? "", track.Title, seconds, ct, WaitForLrcRedAsync);
+
+    async Task WaitForLrcRedAsync(CancellationToken ct)
     {
-        if (Interlocked.Read(ref _lastAskTicks) is var last && last != 0
-            && last + (long)Spacing.TotalMilliseconds - Environment.TickCount64 is var waitMs && waitMs > 0)
-            await Task.Delay(TimeSpan.FromMilliseconds(waitMs), ct);
-        Interlocked.Exchange(ref _lastAskTicks, Environment.TickCount64);
-        return await _timing.FindAsync(track.Artist ?? "", track.Title, seconds, ct);
+        await _lrcRedPace.WaitAsync(ct).ConfigureAwait(false);
+        try
+        {
+            if (Interlocked.Read(ref _lastAskTicks) is var last && last != 0
+                && last + (long)Spacing.TotalMilliseconds - Environment.TickCount64 is var waitMs && waitMs > 0)
+                await Task.Delay(TimeSpan.FromMilliseconds(waitMs), ct);
+            Interlocked.Exchange(ref _lastAskTicks, Environment.TickCount64);
+        }
+        finally { _lrcRedPace.Release(); }
     }
     long _lastAskTicks;   // Environment.TickCount64 of the last ask; 0: none yet
 

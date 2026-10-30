@@ -785,10 +785,13 @@ public partial class MainWindowViewModel : ViewModelBase
             {
                 var converter = App.Services.GetService<IAudioConverterService>();
                 var lane = new Services.Lyrics.OnlineTimingLane(
-                    new Services.Lyrics.OnlineWordTiming(lrcRed, unison, () => Settings.GetSettings().LrcRedEnabled, kugou, lrcLib),
+                    new Services.Lyrics.OnlineWordTiming(lrcRed, unison, () => Settings.GetSettings().LrcRedEnabled, kugou, lrcLib)
+                    { KugouFirst = Environment.GetEnvironmentVariable("NOCTISPLUS_TEST_KUGOU_FIRST") == "1" },
                     new Services.Lyrics.OnlineTimingMisses(Path.Combine(AppPaths.DataRoot, "online-timing-misses.json")),
                     lyricsWriter, () => converter?.GetFfmpegPath(), () => OnlineAccess.Shared.IsOffline,
                     path => wordService.IsIgnored(path) || Services.Lyrics.OnlineTimingLane.StudioTimed(path));
+                if (Environment.GetEnvironmentVariable("NOCTISPLUS_TEST_KUGOU_FIRST") == "1")
+                    DebugLog.Write("Online timing", "TEST comparison: Kugou first, lrc.red then Unison; ready fallback after 10 s maximum preference wait");
                 lane.Written += paths => Dispatcher.UIThread.Post(() => _lyricsVm.ReloadWrittenLyrics(paths));
                 // Owner #215: Kugou the fit check was not sure of stays on screen; WordLyrics times the song quietly.
                 lane.Recheck += paths => Dispatcher.UIThread.Post(() =>

@@ -54,7 +54,7 @@ public sealed class OnlineTimingLaneTests : IDisposable
         return new Track { FilePath = path, Title = name, Artist = "Artist", Duration = TimeSpan.FromSeconds(200), SourceType = source };
     }
 
-    OnlineTimingLane Lane() => new(new OnlineWordTiming(_lrcRed, _unison, () => true, _kugou), new OnlineTimingMisses(Path.Combine(_dir, "misses.json")),
+    OnlineTimingLane Lane(bool kugouFirst = false) => new(new OnlineWordTiming(_lrcRed, _unison, () => true, _kugou) { KugouFirst = kugouFirst }, new OnlineTimingMisses(Path.Combine(_dir, "misses.json")),
         new LyricsWriter(null!, null, new AppWrittenSidecarRegistry(Path.Combine(_dir, "registry.json")), Path.Combine(_dir, "cache")) { TrashFile = p => { File.Delete(p); return true; } },
         () => _ffmpeg, () => _offline, _userTimed.Contains)
     {
@@ -472,6 +472,26 @@ public sealed class OnlineTimingLaneTests : IDisposable
         finish.SetResult(null);
         Assert.Equal(OnlineTimingLane.Outcome.Written, await processing);
         Assert.True(OnlineTimingSidecar.HasUnverified(song.FilePath));
+    }
+
+    [Fact]
+    public async Task FastKugouAnswersDoNotBunchUpDeferredLrcRedRequests()
+    {
+        using var lane = Lane(kugouFirst: true);
+        lane.Spacing = TimeSpan.FromMilliseconds(50);
+        var times = new System.Collections.Concurrent.ConcurrentQueue<long>();
+        var allAsked = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        _lrcRed.Answer = () =>
+        {
+            times.Enqueue(Environment.TickCount64);
+            if (times.Count == 5) allAsked.TrySetResult();
+            return null;
+        };
+        _kugou.Answer = () => new() { Duration = 200, OriginalTtml = WordTtml() };
+        for (var i = 0; i < 5; i++) await lane.ProcessAsync(Song("fast " + i), CancellationToken.None);
+        await allAsked.Task.WaitAsync(TimeSpan.FromSeconds(5));
+        var starts = times.ToArray();
+        for (var i = 1; i < starts.Length; i++) Assert.True(starts[i] - starts[i - 1] >= 45);
     }
 
     [Theory]

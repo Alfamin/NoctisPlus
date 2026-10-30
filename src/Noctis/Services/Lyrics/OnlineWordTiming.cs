@@ -78,6 +78,8 @@ internal sealed class OnlineWordTiming
 
     /// <summary>How long a word-timed answer that is ready waits for a better-ranked source still answering.</summary>
     internal static readonly TimeSpan PreferWait = TimeSpan.FromSeconds(3);
+    // Local TEST comparison only; normal installs retain lrc.red, Unison, Kugou.
+    internal bool KugouFirst { get; init; }
 
     /// <summary>
     /// Owner #209 order: lrc.red, Unison, Kugou (measured on 150 of the owner's songs: Unison rarely has a song, 4 of 150,
@@ -85,18 +87,28 @@ internal sealed class OnlineWordTiming
     /// costs no extra wait; the best-ranked word-timed answer wins, and a ready one waits for a better-ranked source still
     /// answering only <see cref="PreferWait"/>. WordLyrics comes after all of them (the lane's caller).
     /// </summary>
-    public async Task<Lookup> FindAsync(string artist, string title, double durationSeconds, CancellationToken ct)
+    public async Task<Lookup> FindAsync(string artist, string title, double durationSeconds, CancellationToken ct,
+        Func<CancellationToken, Task>? beforeLrcRed = null)
     {
+        var clock = System.Diagnostics.Stopwatch.StartNew();
         var asks = new List<(WordTimingSource Source, Task<LrcLibResult?> Answer)>();
         var reference = Reference(artist, title, durationSeconds, ct);   // owner #220: asked alongside, used only for masked words
-        if (_lrcRedEnabled()) asks.Add((WordTimingSource.LrcRed, Ask(() => _lrcRed.SearchLyricsAsync(artist, title, durationSeconds, ct))));
+        async Task<LrcLibResult?> LrcRed()
+        {
+            if (beforeLrcRed != null) await beforeLrcRed(ct).ConfigureAwait(false);
+            return await _lrcRed.SearchLyricsAsync(artist, title, durationSeconds, ct).ConfigureAwait(false);
+        }
+        if (_lrcRedEnabled()) asks.Add((WordTimingSource.LrcRed, Ask(LrcRed)));
         asks.Add((WordTimingSource.Unison, Ask(() => _unison.SearchLyricsAsync(artist, title, durationSeconds, ct))));
         if (_kugou is { } kugou) asks.Add((WordTimingSource.Kugou, Ask(() => kugou.SearchLyricsAsync(artist, title, durationSeconds, ct))));
+        if (KugouFirst && asks.FindIndex(a => a.Source == WordTimingSource.Kugou) is var index && index > 0)
+        {
+            var first = asks[index]; asks.RemoveAt(index); asks.Insert(0, first);
+        }
         var transient = false;
         var timed = new string?[asks.Count];
         var read = new bool[asks.Count];
         var said = new string?[asks.Count];
-        var clock = System.Diagnostics.Stopwatch.StartNew();
         string Trace() => string.Join(", ", asks.Select((a, i) => OnlineTimingSidecar.Name(a.Source) + " " + (said[i] ?? "still asking")));
         while (true)
         {
@@ -121,14 +133,21 @@ internal sealed class OnlineWordTiming
             }
             var best = Array.FindIndex(timed, t => t != null);
             var betterOut = Enumerable.Range(0, best < 0 ? asks.Count : best).Any(i => !read[i]);
-            if (best >= 0 && (!betterOut || clock.Elapsed >= PreferWait))
+            // Only the comparison source gets extra preference; a Kugou miss restores normal fallback speed.
+            var preferWait = KugouFirst && asks[0].Source == WordTimingSource.Kugou && !read[0]
+                ? TimeSpan.FromSeconds(10) : PreferWait;
+            if (best >= 0 && (!betterOut || clock.Elapsed >= preferWait))
             {
                 var (clean, note) = await UncensorAsync(timed[best]!, reference, ct).ConfigureAwait(false);
                 return new Lookup(asks[best].Source, clean, transient) { Trace = Trace() + note };
             }
             if (best < 0 && !betterOut) return new Lookup(null, null, transient) { Trace = Trace() };
             var waits = asks.Where((_, i) => !read[i]).Select(a => (Task)a.Answer).ToList();
-            if (best >= 0) waits.Add(Task.Delay(PreferWait - clock.Elapsed, ct));
+            if (best >= 0)
+            {
+                var remaining = preferWait - clock.Elapsed;
+                waits.Add(Task.Delay(remaining > TimeSpan.Zero ? remaining : TimeSpan.Zero, ct));
+            }
             await Task.WhenAny(waits).WaitAsync(ct).ConfigureAwait(false);
             ct.ThrowIfCancellationRequested();
         }

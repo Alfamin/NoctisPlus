@@ -10,7 +10,7 @@ namespace Noctis.Tests;
 /// <summary>#200 automatic online word timing (lrc.red, Unison; Kugou left out, owner #208): source order, word-synced only, same length, failures vs misses. No network.</summary>
 public class OnlineWordTimingTests
 {
-    sealed class Source : ILrcRedLyricsService, IUnisonLyricsService
+    sealed class Source : ILrcRedLyricsService, IUnisonLyricsService, IKugouLyricsService
     {
         public Func<LrcLibResult?> Answer = () => null;
         public int Calls;
@@ -82,6 +82,34 @@ public class OnlineWordTimingTests
         Assert.Equal(2, started);        // nobody waited for the one before
         slow.SetResult(Word());
         Assert.Equal(WordTimingSource.LrcRed, (await find).Source);
+    }
+
+    [Fact]
+    public async Task ComparisonPrefersKugouButNormalOrderIsUnchanged()
+    {
+        Source red = new() { Answer = () => Word() }, unison = new() { Answer = () => Word() }, kugou = new() { Answer = () => Word() };
+        Assert.Equal(WordTimingSource.LrcRed, (await new OnlineWordTiming(red, unison, () => true, kugou).FindAsync("A", "B", 200, CancellationToken.None)).Source);
+        var comparison = new OnlineWordTiming(red, unison, () => true, kugou) { KugouFirst = true };
+        Assert.Equal(WordTimingSource.Kugou, (await comparison.FindAsync("A", "B", 200, CancellationToken.None)).Source);
+        kugou.Answer = () => null;
+        Assert.Equal(WordTimingSource.LrcRed, (await comparison.FindAsync("A", "B", 200, CancellationToken.None)).Source);
+        red.Answer = () => null;
+        Assert.Equal(WordTimingSource.Unison, (await comparison.FindAsync("A", "B", 200, CancellationToken.None)).Source);
+    }
+
+    [Fact]
+    public async Task LrcRedPacingDoesNotHoldOtherSources()
+    {
+        Source red = new(), unison = new(), kugou = new();
+        var pause = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var timing = new OnlineWordTiming(red, unison, () => true, kugou);
+        var find = timing.FindAsync("A", "B", 200, CancellationToken.None, ct => pause.Task.WaitAsync(ct));
+        Assert.Equal(0, red.Calls);
+        Assert.Equal(1, unison.Calls);
+        Assert.Equal(1, kugou.Calls);
+        pause.SetResult();
+        Assert.False((await find).Found);
+        Assert.Equal(1, red.Calls);
     }
 
     [Fact]
