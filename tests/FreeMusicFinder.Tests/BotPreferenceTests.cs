@@ -38,6 +38,7 @@ internal static class BotPreferenceTests
         await LegacySearchLimitAsync();
         await TwoFetchLanesAsync();
         await BusyRaceAsync();
+        await BusyRecoveryAsync();
     }
 
     private sealed class RaceSource(string id) : IRacingMusicSource
@@ -89,6 +90,57 @@ internal static class BotPreferenceTests
         using var third = new MemoryStream();
         await Check.ThrowsAsync<SourcesWaitingException>(() => new MusicSources(noHunters, silent, _ => { }, firstBot: () => BotSelections.Hunters).FetchAsync(new("Blessings", "Big Sean"), third, null, default),
             "both failing keeps the song for later (DeezLoad's silence is remembered), not lost");
+    }
+
+    private sealed class Stages : IDownloadProgress
+    {
+        public readonly List<string> Text = [];
+        public void Report(double value) { }
+        public void Stage(string text, Noctis.Services.Search.OnlineDownloadStep step) => Text.Add(text);
+    }
+
+    private static async Task BusyRecoveryAsync()
+    {
+        Check.Section("busy providers: bounded wait, explicit remote queue and cancellable recovery");
+        foreach (var text in new[] { "Your position in the queue is 35", "⏳ YOUR POSITION IN QUEUE: 35", "Queue position: #35" })
+            Check.Equal(35, BotText.QueuePosition(text) ?? 0, "queue position parsed: " + text);
+        foreach (var text in new string?[] { null, "1. Artist - Queue Position (3:35)", "Donate to improve your position in the queue: 35", "Queue position: 0", "Queue position: 999999999999" })
+            Check.True(BotText.QueuePosition(text) is null, "only an actual positive queue position is accepted");
+        Check.True(TelegramBotSource.FreeWait <= TimeSpan.FromSeconds(10), "busy recovery no longer stalls for two minutes");
+        var completed = new TL.Message { id = 42, message = "Download completed!" };
+        Check.True(ReferenceEquals(completed, await TelegramBotSource.WaitForFreeAsync(_ => Task.FromResult<TL.Message?>(completed), default)), "completion arrives without waiting out the budget");
+        var cancelledWait = false;
+        Check.True(await TelegramBotSource.WaitForFreeAsync(async token =>
+        {
+            try { await Task.Delay(Timeout.Infinite, token); return null; }
+            catch (OperationCanceledException) { cancelledWait = true; throw; }
+        }, default, TimeSpan.FromMilliseconds(20)) is null, "a missing completion returns for retry rather than claiming the bot is free");
+        await Check.UntilAsync(() => cancelledWait, "deadline cancels the polling work too");
+        using var stop = new CancellationTokenSource(); stop.Cancel();
+        await Check.ThrowsAsync<OperationCanceledException>(() => TelegramBotSource.WaitForFreeAsync(token => Task.FromCanceled<TL.Message?>(token), stop.Token), "skipping cancels recovery, not a new retry");
+
+        var release = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var hunters = new RaceSource(BotSelections.Hunters)
+        {
+            Fetch = (_, _) => throw new BotBusyException(BotSelections.Hunters, "busy", 77),
+            Answer = token => release.Task.WaitAsync(token)
+        };
+        var deez = new RaceSource("DeezLoad") { Answer = _ => throw new SourceLimitException("DeezLoad", "DeezLoad queue · #35", DateTimeOffset.UtcNow.AddMinutes(10)) };
+        var progress = new Stages();
+        using var output = new MemoryStream();
+        var fetch = new MusicSources(hunters, deez, _ => { }, firstBot: () => BotSelections.Hunters)
+            .FetchAsync(new("Song", "Artist"), output, progress, default);
+        await Check.UntilAsync(() => progress.Text.Any(t => t.Contains("#35") && t.Contains("waiting for Music Hunters")), "remote queue is shown while primary recovery continues");
+        release.SetResult();
+        Check.Equal("flac", await fetch, "busy primary can still supply the file after reserve queues it");
+        Check.Equal(1, deez.Requests, "reserve queue does not cause repeated Telegram requests");
+        var busyAgain = new RaceSource(BotSelections.Hunters) { Fetch = (_, _) => throw new BotBusyException(BotSelections.Hunters, "busy", 88) };
+        var coolingDeez = new RaceSource("DeezLoad") { Fetch = (_, _) => throw new SourceLimitException("DeezLoad", "DeezLoad queue · #35", DateTimeOffset.UtcNow.AddMinutes(10)) };
+        var router = new MusicSources(busyAgain, coolingDeez, _ => { }, firstBot: () => "DeezLoad");
+        using var held = new MemoryStream();
+        await Check.ThrowsAsync<SourcesWaitingException>(() => router.FetchAsync(new("Held", "Artist"), held, null, default), "both occupied keeps the chosen song waiting");
+        await Check.ThrowsAsync<SourcesWaitingException>(() => router.FetchAsync(new("Held", "Artist"), held, null, default), "persistently cooling reserve plus busy primary never turns into a missing recording");
+        Check.Equal(1, coolingDeez.Fetches, "a remotely queued provider is not spammed again during cooldown");
     }
 
     private static async Task LegacySearchLimitAsync()

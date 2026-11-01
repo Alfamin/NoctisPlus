@@ -90,7 +90,11 @@ internal sealed class HunterMusicSource : IRacingMusicSource, IQualityMusicSourc
         for (var attempt = 0; ; attempt++)
         {
             try { return await _bot.RequestLinkFileAsync(request with { Url = url }, afterBusyReply, ct).ConfigureAwait(false); }
-            catch (BotBusyException again) when (attempt < 2) { afterBusyReply = again.ReplyId; }
+            catch (BotBusyException again)
+            {
+                if (attempt >= 2) throw new SourceLimitException(Id, "Music Hunters is still busy; retrying shortly.", DateTimeOffset.UtcNow.AddSeconds(30));
+                afterBusyReply = again.ReplyId;
+            }
         }
     }
     private async Task<string?> ResolveLinkAsync(MusicRequest request, CancellationToken ct)
@@ -506,8 +510,14 @@ internal sealed class DeezLoadSource : IRacingMusicSource, IQualityMusicSource
             // is not working on it (owner #53: never sit and wait). The next songs go to the other bot meanwhile.
             if(!heard && DateTimeOffset.UtcNow-asked>=silent)
                 throw new SourceLimitException(Id,$"DeezLoad did not answer within {silent.TotalSeconds:0} seconds; the other bot takes the songs for the next 10 minutes.",DateTimeOffset.UtcNow.Add(SilentRest));
+            // An earlier queue notice must not hide the matching file delivered later in the same history page.
+            if (replies.FirstOrDefault(m => m.media is MessageMediaDocument { document: Document d } && Fits(request, d))
+                is { media: MessageMediaDocument { document: Document available } })
+            { BotPacing.Answered("deezload"); return available; }
             foreach(var m in replies)
             {
+                if (BotText.QueuePosition(m.message) is { } position)
+                    throw new SourceLimitException(Id, $"DeezLoad queue · #{position}", DateTimeOffset.UtcNow.AddMinutes(10));
                 if(BotLimits.Read(Id,m.message??"",DateTimeOffset.UtcNow) is {} limited) throw limited;
                 if(BotJoin.Links(m,Bot) is {Count:>0} channels) throw BotJoin.Gate(Id,Bot,channels);
                 // Joined in Telegram itself: the bot greets this first message instead of answering it.

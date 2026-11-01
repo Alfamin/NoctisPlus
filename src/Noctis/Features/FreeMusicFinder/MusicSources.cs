@@ -296,6 +296,13 @@ internal sealed class MusicSources
                         throw new TrackUnavailableException("FLAC was requested, but the first bot to answer returned " + ext + ".");
                     return ext;
                 }
+                catch (BotBusyException ex)
+                {
+                    // The reserve may already be cooling from its remote queue. Keep this request waiting,
+                    // rather than failing it and skipping the song the user explicitly chose.
+                    Block(new(source.Id, source.Id + " is busy; retrying shortly.", _now().AddSeconds(30)));
+                    errors.Add(ex.Message); skipped = true;
+                }
                 catch (AudioTransferStalledException ex)
                 {
                     Block(new(source.Id, source.Id + ": " + ex.Message, _now().AddMinutes(2)));
@@ -331,11 +338,9 @@ internal sealed class MusicSources
     {
         using var race = CancellationTokenSource.CreateLinkedTokenSource(ct);
         TransferProgress.Stage(progress, "Asking " + other.Id + " while " + busy.Id + " finishes another song…", Noctis.Services.Search.OnlineDownloadStep.Switching);
-        var pending = new List<Task<BotFile>>
-        {
-            other.RequestFileAsync(BotSelections.ForSource(request, other.Id), null, race.Token),
-            busy.RequestFileAsync(BotSelections.ForSource(request, busy.Id), busyReply, race.Token),
-        };
+        var reserve = other.RequestFileAsync(BotSelections.ForSource(request, other.Id), null, race.Token);
+        var recovery = busy.RequestFileAsync(BotSelections.ForSource(request, busy.Id), busyReply, race.Token);
+        var pending = new List<Task<BotFile>> { reserve, recovery };
         foreach (var ask in pending)
             _ = ask.ContinueWith(t => _ = t.Exception, CancellationToken.None, TaskContinuationOptions.OnlyOnFaulted | TaskContinuationOptions.ExecuteSynchronously, TaskScheduler.Default);
         var errors = new List<string>();
@@ -358,7 +363,12 @@ internal sealed class MusicSources
                 ct.ThrowIfCancellationRequested();
                 switch (done.Exception?.GetBaseException())
                 {
-                    case SourceLimitException limit: Block(limit); if (limit.Global) throw Waiting(); errors.Add(limit.Message); break;
+                    case SourceLimitException limit:
+                        Block(limit); if (limit.Global) throw Waiting(); errors.Add(limit.Message);
+                        if (pending.Count > 0)
+                            TransferProgress.Stage(progress, limit.Message + " · waiting for " + (ReferenceEquals(pending[0], recovery) ? busy.Id : other.Id), Noctis.Services.Search.OnlineDownloadStep.Asking);
+                        Trace($"fetch \"{request.Title}\": {limit.Message}");
+                        break;
                     case { } error: errors.Add(error.Message); break;
                 }
             }

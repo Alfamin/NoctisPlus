@@ -909,7 +909,7 @@ internal sealed class TelegramBotSource : IHunterBotSource
         => await (await RequestLinkFileAsync(request, null, ct).ConfigureAwait(false)).Transfer(output, progress, ct).ConfigureAwait(false);
 
     /// <summary>How long a busy Music Hunters is watched for "free again" before the link is simply sent once more.</summary>
-    internal static readonly TimeSpan FreeWait = TimeSpan.FromMinutes(2);
+    internal static readonly TimeSpan FreeWait = TimeSpan.FromSeconds(10);
 
     /// <summary>
     /// Sends the track link and returns the bot's matching file, not yet transferred. After a "please wait" answer
@@ -922,8 +922,14 @@ internal sealed class TelegramBotSource : IHunterBotSource
         if (afterBusyReply is { } busy)
         {
             var clock = System.Diagnostics.Stopwatch.StartNew();
-            await RunAsync((client, bot) => WaitForAsync(client, bot, busy, m => m.media is MessageMediaDocument || BotText.IsDownloadDone(m.message), FreeWait, ct, busyAnswers: false), ct).ConfigureAwait(false);
-            Noctis.Services.DebugLog.Write("Finder", $"Music Hunters: free again after {clock.Elapsed.TotalSeconds:0.0} s; sending the link again");
+            var released = await WaitForFreeAsync(token => RunAsync((client, bot) => WaitForAsync(client, bot, busy,
+                m => m.media is MessageMediaDocument || BotText.IsDownloadDone(m.message), FreeWait, token, busyAnswers: false), token), ct).ConfigureAwait(false);
+            if (released is not null && IsLinkFile(request, released))
+            {
+                Noctis.Services.DebugLog.Write("Finder", $"Music Hunters: the requested file arrived while busy after {clock.Elapsed.TotalSeconds:0.0} s");
+                return ReadyLinkFile((Document)((MessageMediaDocument)released.media).document);
+            }
+            Noctis.Services.DebugLog.Write("Finder", $"Music Hunters: {(released is null ? "no completion notice; retrying" : "finished the previous request; retrying")} after {clock.Elapsed.TotalSeconds:0.0} s");
         }
         Document document;
         await _searching.WaitAsync(ct).ConfigureAwait(false);
@@ -966,12 +972,23 @@ internal sealed class TelegramBotSource : IHunterBotSource
         }
         finally { _searching.Release(); }
         // Once a matched document is known, independent name searches need not wait for its bytes.
-        return new BotFile(BotSelections.Hunters, async (output, progress, token) =>
-        {
-            var transferClient = await _account.ConnectAsync(token).ConfigureAwait(false);
-            await AudioFileTransfer.DownloadAsync(_account, transferClient, document, output, progress, token).ConfigureAwait(false);
-            return Extension(document)!;
-        });
+        return ReadyLinkFile(document);
+    }
+
+    private BotFile ReadyLinkFile(Document document) => new(BotSelections.Hunters, async (output, progress, token) =>
+    {
+        var transferClient = await _account.ConnectAsync(token).ConfigureAwait(false);
+        await AudioFileTransfer.DownloadAsync(_account, transferClient, document, output, progress, token).ConfigureAwait(false);
+        return Extension(document)!;
+    });
+
+    // A bot may edit its earlier message instead of emitting a new "done" message. Never wait two minutes for it.
+    internal static async Task<Message?> WaitForFreeAsync(Func<CancellationToken, Task<Message?>> wait, CancellationToken ct, TimeSpan? budget = null)
+    {
+        using var deadline = CancellationTokenSource.CreateLinkedTokenSource(ct);
+        deadline.CancelAfter(budget ?? FreeWait);
+        try { return await wait(deadline.Token).WaitAsync(deadline.Token).ConfigureAwait(false); }
+        catch (OperationCanceledException) when (!ct.IsCancellationRequested) { return null; }
     }
 
     internal static async Task<Message?> WaitForLinkReplyAsync(Func<CancellationToken, Task<Message?>> wait, CancellationToken ct, TimeSpan? budget = null)

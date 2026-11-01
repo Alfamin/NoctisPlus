@@ -330,6 +330,24 @@ public class QueueStreamingTests
         Assert.False(player.PlayOnlinePage(source, [Song("a"), Song("b")], 0)); // plays alone instead
     }
 
+    [AvaloniaFact]
+    public async Task ForYouClickWhileWaiting_ReplacesOldQueueAndKeepsLatestSongFirst()
+    {
+        var source = new Source(); var (player, _) = NewPlayer();
+        player.QueueSettle = TimeSpan.FromHours(1); // no speculative work while both explicit clicks are pending
+        player.ReplaceQueueAndPlay(Enumerable.Range(0, 8).Select(i => Local("Old " + i)).ToList(), 0);
+        Assert.True(player.PlayOnlinePage(source, [Song("a"), Song("b"), Song("c")], 0)); Settle();
+        Assert.True(player.PlayOnlinePage(source, [Song("d"), Song("e"), Song("f")], 1)); Settle();
+        Assert.Equal(new[] { "f" }, Ahead(player));
+        Assert.Equal(new[] { ("a", false), ("e", false) }, source.Asked);
+        var latest = Local("Latest"); source.Pending["e"].SetResult(latest);
+        await Until(() => ReferenceEquals(player.CurrentTrack, latest));
+        source.Pending["a"].TrySetResult(Local("Stale")); Settle();
+        Assert.Same(latest, player.CurrentTrack);
+        Assert.DoesNotContain(player.UpNext, t => t.Title.StartsWith("Old ") || t.Title == "Online e");
+        player.ClearQueue();
+    }
+
     /// <summary>Owner #144: Not for me on the song playing goes on to the next one; a dismissed song to come leaves the queue.</summary>
     [AvaloniaFact]
     public async Task NotForMe_OnThePlayingSong_SkipsToTheNext_AndLeavesTheQueue()

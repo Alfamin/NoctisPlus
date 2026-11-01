@@ -81,6 +81,14 @@ internal static partial class BotText
     public static bool IsDownloadDone(string? text) => text is { Length: > 0 } && !IsBusy(text) &&
         Regex.IsMatch(text, @"^\s*[^\p{L}\p{N}]*(?:(?:the\s+)?(?:current\s+|previous\s+)?download\s+(?:is\s+|has\s+)?(?:been\s+)?(?:complete|completed|finished|done)\b|(?:completed|finished|done)\s*[.!]?\s*$)", RegexOptions.IgnoreCase);
 
+    /// <summary>A provider's actual queue reply, never an advertisement or a song title.</summary>
+    public static int? QueuePosition(string? text)
+    {
+        if (string.IsNullOrWhiteSpace(text)) return null;
+        var match = Regex.Match(text, @"^\s*[^\p{L}\p{N}]*(?:(?:your|current)\s+)?(?:position\s+in\s+(?:the\s+)?queue|queue\s+position)\s*(?:is\s*)?[:=-]?\s*#?\s*(\d+)\b", RegexOptions.IgnoreCase);
+        return match.Success && int.TryParse(match.Groups[1].Value, NumberStyles.None, CultureInfo.InvariantCulture, out var position) && position > 0 ? position : null;
+    }
+
     public static bool IsEmptySearch(string? text) => text is { Length: > 0 } &&
         Regex.IsMatch(text, @"^\s*[^\p{L}\p{N}]*(?:no (?:results|songs|tracks) (?:were )?found\b|nothing found\b|no results[.!]?\s*$)", RegexOptions.IgnoreCase);
 

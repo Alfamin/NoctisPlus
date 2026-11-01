@@ -213,6 +213,7 @@ public partial class PlayerViewModel
     internal bool PlayOnlinePage(IOnlineMusicSearch source, IReadOnlyList<OnlineSong> songs, int at)
     {
         if (at < 0 || at >= songs.Count || !StreamsPage(ForYouPage) || OnlinePlayingSongId == songs[at].Id) return false;
+        Services.DebugLog.Write("Queue", $"For you Play: \"{songs[at].Title}\" at page position {at + 1}/{songs.Count}; replacing {UpNext.Count} queued songs");
         PlayFromRow(songs.Select(s => StandIn(source, s, keep: false, ForYouPage)).ToList(), at);
         return true;
     }
