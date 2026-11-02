@@ -1,6 +1,16 @@
 {
   "releases": [
     {
+      "version": "2.6.1",
+      "added": [{ "icon": "PlayIcon", "title": "Busy-bot recovery", "line": "Shorter waits, with provider queue positions shown", "top": true }],
+      "fixed": [
+        "Shorter waits when Music Hunters is busy",
+        "DeezLoad's queue position appears while the other bot is tried",
+        "Busy bots keep the selected song waiting instead of treating it as missing",
+        "A file arriving after a queue notice is used without another request"
+      ]
+    },
+    {
       "version": "2.6.0",
       "added": [
         { "icon": "LyricsIcon", "title": "Choose your word timing", "line": "Tap the credit: online or WordLyrics, either way", "top": true },
