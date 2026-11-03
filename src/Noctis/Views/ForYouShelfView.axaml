@@ -204,7 +204,9 @@
                            Opacity="0.7" VerticalAlignment="Center" FontFeatures="+tnum" />
                 <!-- Owner #248: the heading's menu (remove or clear pages, reset), easy to find beside Refresh. -->
                 <Button Classes="corner-icon" Click="OnShelfMoreClick" ToolTip.Tip="More" AutomationProperties.Name="More">
-                    <Viewbox Width="14" Height="14"><Path Data="{StaticResource MoreDotsIcon}" Fill="{Binding $parent[Button].Foreground}" /></Viewbox>
+                    <!-- Stretch on the Path itself: it fits the dots' own bounds (a Viewbox kept the glyph's offset and sat off-centre). -->
+                    <Path Data="{StaticResource MoreDotsIcon}" Width="17" Height="17" Stretch="Uniform"
+                          Fill="{Binding $parent[Button].Foreground}" HorizontalAlignment="Center" VerticalAlignment="Center" />
                 </Button>
                 <Panel>
                     <Button Classes="corner-icon refresh" Command="{Binding RefreshCommand}" IsEnabled="{Binding !IsLoading}"
