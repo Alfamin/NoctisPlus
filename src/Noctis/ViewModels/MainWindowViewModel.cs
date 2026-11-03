@@ -734,6 +734,7 @@ public partial class MainWindowViewModel : ViewModelBase
         _favoritesVm = new FavoritesViewModel(Player, library, persistence, Sidebar, Settings);
         _queueVm = new QueueViewModel(Player);
         _lyricsVm = new LyricsViewModel(Player, lrcLib, netEase, metadata, persistence, library);
+        Helpers.LyricsReel.Opener = _lyricsVm.OpenReelAsync;
         _lyricsVm.WordTimingRequested = track =>
         {
             if (wordService.Enabled) wordService.Show(track: track);

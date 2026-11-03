@@ -44,6 +44,24 @@ public class PlaybackBarOptionsMenuTests
     private static IEnumerable<Control> Visible(MenuFlyout menu) =>
         menu.Items.OfType<Control>().Where(c => c.IsVisible);
 
+    [AvaloniaTheory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void MakeReel_PassesTheCurrentTrack_FromBothPlaybackBars(bool lyricsPage)
+    {
+        var (win, _, player, menu) = Open(lyricsPage, playing: true);
+        try
+        {
+            var reel = Assert.Single(menu.Items.OfType<MenuItem>(), i => Equals(i.Header, "Make a Reel"));
+            Assert.Same(Noctis.Helpers.LyricsReel.OpenForTrackCommand, reel.Command);
+            Assert.Same(player.CurrentTrack, reel.CommandParameter);
+            player.CurrentTrack = new Track { Title = "Another song" };
+            Dispatcher.UIThread.RunJobs();
+            Assert.Same(player.CurrentTrack, reel.CommandParameter);
+        }
+        finally { menu.Hide(); win.Close(); }
+    }
+
     [AvaloniaFact]
     public void Opens_WithTheFourQuickTilesOnTop()
     {

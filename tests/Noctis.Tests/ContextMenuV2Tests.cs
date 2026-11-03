@@ -63,6 +63,22 @@ public class ContextMenuV2Tests
 
     private static readonly string[] Required =
         { "play", "shuffle", "next", "queue", "playlist", "fav", "meta", "lyrics", "folder", "remove" };
+
+    [AvaloniaTheory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void MakeReel_PassesTheSelectedTrack_AndUpdatesWhenMenuIsReused(bool v2)
+    {
+        var builder = Build(v2);
+        var commands = new TrackCommands(Required);
+        var first = T();
+        BindAll(builder, first, commands, optional: false);
+        Assert.Same(LyricsReel.OpenForTrackCommand, builder.MakeReel.Command);
+        Assert.Same(first, builder.MakeReel.CommandParameter);
+        var other = T("Another artist");
+        BindAll(builder, other, commands, optional: false);
+        Assert.Same(other, builder.MakeReel.CommandParameter);
+    }
     private static readonly string[] Optional =
         { "convert", "rg", "radio", "snooze", "rate", "fetch", "studio", "rmlyrics", "send", "badge", "album", "artist" };
 
