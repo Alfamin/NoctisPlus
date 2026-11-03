@@ -94,6 +94,33 @@ public class DiscoverReliabilityTests : IDisposable
     }
 
     [Fact]
+    public async Task AnExpiredPage_IsKept_WhenTheNextIsBuilt_AndKeptPagesOutliveAWeek()
+    {
+        // Owner #248: a page past its expiry (Last.fm's data age shortens it) was replaced by the next build and lost,
+        // and pages more than a week old dropped off: four pages became two.
+        var p = DiscoverEvaluationTests.Make(_folder, "steady");
+        var plugin = Path.Combine(p.Folder, "plugin-data", "dev.moshi.freemusicfinder");
+        Directory.CreateDirectory(plugin);
+        var clock = Now;
+        ForYouSource Open() => new(() => throw new InvalidOperationException("no real catalog here"), null, _ => [], new Library(p.Library), p.Folder,
+            Path.Combine(plugin, "for-you-hidden.json"), now: () => clock, discover: () => new Switchable(new DiscoverEvaluationTests.World()),
+            unavailable: (songs, _) => Task.FromResult(new HashSet<string>()));
+        var batches = new List<string>();
+        using (var source = Open())
+            for (int i = 0; i < 3; i++) { clock = Now.AddMinutes(i); batches.Add((await source.BuildAsync(true, null, CancellationToken.None)).Batch); }
+        clock = Now.AddDays(10); // every page has expired and is over a week old
+        using (var later = Open())
+        {
+            Assert.Equal(Enumerable.Reverse(batches), later.Pages().Select(r => r.Batch));
+            Assert.Null(await later.SavedAsync(CancellationToken.None)); // none is served as the fresh page
+            batches.Add((await later.BuildAsync(false, null, CancellationToken.None)).Batch);
+            Assert.Equal(Enumerable.Reverse(batches), later.Pages().Select(r => r.Batch));
+        }
+        using (var restarted = Open())
+            Assert.Equal(Enumerable.Reverse(batches), restarted.Pages().Select(r => r.Batch));
+    }
+
+    [Fact]
     public async Task ANewPage_LeavesTheSongsOnKeptPagesToThem()
     {
         // Owner #139: "Dum, Dumb, and Dumber" in the same place on all five pages after quick refreshes (nothing on screen

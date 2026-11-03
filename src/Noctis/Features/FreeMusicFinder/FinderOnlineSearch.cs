@@ -323,6 +323,24 @@ internal sealed class FinderOnlineSearch : IOnlineMusicSearch
             : CachedArtwork(url) ?? (CatalogArtwork.ThumbUrl(url) is { } thumb ? CachedArtwork(thumb) : null);
     private string? CoverUrl(OnlineSong song) => song.ArtworkUrl.Length > 0 ? song.ArtworkUrl : _playlists()?.ArtworkFor(song.Id);
 
+    public async Task<string?> SharpCoverAsync(OnlineSong song, CancellationToken ct)
+    {
+        var url = CoverUrl(song);
+        if (url is null && _playlists() is { } imports) url = await imports.ArtworkForAsync(song.Id, ct).ConfigureAwait(false);
+        // Spotify's 640 px album cover is the largest it has; a listed 300 px one is taken at 640.
+        if (url is { Length: > 0 }) url = url.Replace("ab67616d00001e02", "ab67616d0000b273", StringComparison.Ordinal);
+        if (CatalogArtwork.LargeUrl(url) is not { } large || _catalog() is not { } catalog) return null;
+        try
+        {
+            if (catalog.SavedArtwork(large, highQuality: true) is { } saved) return saved;
+            var clock = System.Diagnostics.Stopwatch.StartNew();
+            var path = await catalog.ArtworkAsync(large, ct, highQuality: true).ConfigureAwait(false);
+            if (path is not null) Noctis.Services.DebugLog.Write("Queue", $"sharp cover of \"{song.Title}\" in {clock.ElapsedMilliseconds} ms ({new FileInfo(path).Length / 1024} KB)");
+            return path;
+        }
+        catch (Exception ex) when (ex is HttpRequestException or IOException or TimeoutException or InvalidDataException) { return null; }
+    }
+
     public async Task<string?> QueueCoverAsync(OnlineSong song, CancellationToken ct)
     {
         var clock = System.Diagnostics.Stopwatch.StartNew();

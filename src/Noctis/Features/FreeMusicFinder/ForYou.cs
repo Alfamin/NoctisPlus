@@ -1005,10 +1005,18 @@ internal sealed class ForYouSource(Func<ArtistCatalog> catalog, DiscoveryActions
         ct.ThrowIfCancellationRequested();
         lock (_sync)
         {
-            if (!_loaded) { _last = _cache.Read(_now()); _loaded = true; }
+            Load();
             return _last is { } page && page.Until > _now() ? Filter(page.Result) : null;
         }
     }, ct);
+
+    // Owner #248: the last page is read even when it has expired, so the next build keeps it as an earlier page (an expired
+    // page was overwritten and lost); it is served as the fresh one only until it expires.
+    private void Load()
+    {
+        if (!_loaded) { _last = _cache.Read(_now(), expired: true); _loaded = true; }
+        _earlier ??= _earlierFile.ReadEarlier(_now(), PagesKept - 1);
+    }
 
     /// <summary>The last saved page even when it has expired: what the shelf shows when a refresh
     /// cannot reach the catalog, instead of going blank.</summary>
@@ -1024,15 +1032,55 @@ internal sealed class ForYouSource(Func<ArtistCatalog> catalog, DiscoveryActions
     /// <summary>The current page, then the earlier ones, newest first (owner #139): what the shelf's page numbers show.</summary>
     public IReadOnlyList<DiscoverResult> Pages()
     {
+        lock (_sync) return [.. KeptPages().Select(p => Filter(p.Result))];
+    }
+
+    private static string PageKey(ForYouCache.Page page) => page.Result.Batch is { Length: > 0 } b ? b : Guid.NewGuid().ToString();
+
+    /// <summary>The pages <see cref="Pages"/> lists, in its order. Call under the lock.</summary>
+    private List<ForYouCache.Page> KeptPages()
+    {
+        Load();
+        var all = new List<ForYouCache.Page>();
+        if (_last is { } last) all.Add(last);
+        all.AddRange(_earlier!);
+        return [.. all.Where(p => p.Result.Songs.Count > 0).DistinctBy(PageKey).Take(PagesKept)];
+    }
+
+    /// <summary>Owner #248: takes the page at <paramref name="index"/> (as <see cref="Pages"/> lists them) off the shelf; the newest
+    /// one left becomes the current one. Its songs are not disliked. Returns it for Undo.</summary>
+    public ForYouCache.Page? RemovePage(int index)
+    {
         lock (_sync)
         {
-            if (!_loaded) { _last = _cache.Read(_now()); _loaded = true; }
-            _earlier ??= _earlierFile.ReadEarlier(_now(), PagesKept - 1);
-            var all = new List<ForYouCache.Page>();
-            if (_last is { } last) all.Add(last);
-            all.AddRange(_earlier);
-            return all.Select(p => p.Result).Where(r => r.Songs.Count > 0).DistinctBy(r => r.Batch is { Length: > 0 } b ? b : Guid.NewGuid().ToString()).Take(PagesKept).Select(Filter).ToList();
+            var kept = KeptPages();
+            if (index < 0 || index >= kept.Count) return null;
+            var page = kept[index];
+            Keep(kept.Where(p => !ReferenceEquals(p, page)));
+            return page;
         }
+    }
+
+    /// <summary>Owner #248: every page off the shelf (learning and dislikes stay). Returns them for Undo.</summary>
+    public List<ForYouCache.Page> ClearPages()
+    {
+        lock (_sync) { var kept = KeptPages(); Keep([]); return kept; }
+    }
+
+    /// <summary>Undo: removed pages go back among the kept ones, by when they were made.</summary>
+    public void RestorePages(IEnumerable<ForYouCache.Page> pages)
+    {
+        lock (_sync) Keep(KeptPages().Concat(pages).DistinctBy(PageKey).OrderByDescending(p => p.At));
+    }
+
+    // The newest page is the current one, the rest the earlier pages. Call under the lock.
+    private void Keep(IEnumerable<ForYouCache.Page> pages)
+    {
+        var all = pages.Take(PagesKept).ToList();
+        _last = all.FirstOrDefault();
+        if (_last is null) _cache.Delete(); else _cache.Write(_last);
+        _earlier = all.Skip(1).ToList();
+        if (_earlier.Count == 0) _earlierFile.Delete(); else _earlierFile.WriteEarlier(_earlier);
     }
 
     /// <summary>Recordings the listener now knows (listened to since a page was made): a page shown again leaves them out (owner #139).</summary>

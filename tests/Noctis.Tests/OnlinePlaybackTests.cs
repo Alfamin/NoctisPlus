@@ -36,6 +36,9 @@ public class OnlinePlaybackTests
         internal OnlineArtist? Opened;
         public void OpenArtist(OnlineArtist artist) => Opened = artist;
         public Task OpenAlbumAsync(OnlineAlbum album, CancellationToken ct) => Task.CompletedTask;
+        internal readonly Dictionary<string, TaskCompletionSource<string?>> Sharp = [];
+        public Task<string?> SharpCoverAsync(OnlineSong song, CancellationToken ct)
+            => Sharp.TryGetValue(song.Id, out var cover) ? cover.Task : Task.FromResult<string?>(null);
     }
     private sealed class EmptyQueue : IDownloadQueue
     {
@@ -131,6 +134,36 @@ public class OnlinePlaybackTests
         source.Pending["first"].SetResult(Track("First")); await first;
         Assert.Equal("Second", player.CurrentTrack?.Title); Assert.Single(audio.PlayedPaths);
         Assert.Same(next, Assert.Single(player.UpNext)); Assert.False(player.IsWaitingForAudio);
+        player.StopAndClear();
+    }
+
+    [AvaloniaFact]
+    public async Task AStreamedSongPlaying_GetsItsFullSizeCover_AndALateOneNeverLandsOnTheNextSong()
+    {
+        // Owner #247: a streamed song played with its row's small cover (120-320 px): blurry on the lyrics page.
+        using var data = new TestPersistenceService(); var source = new Source();
+        var player = new PlayerViewModel(new FakeAudioPlayer(), new FakeLibraryService(), data, new FakeAnimatedCoverService());
+        source.Sharp["first"] = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        source.Sharp["second"] = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        var play = player.PlayOnlineAsync(source, new("first", "First", "Synthetic"));
+        var first = Track("First"); first.AlbumArtworkPath = "first-small.jpg";
+        source.Pending["first"].SetResult(first); await play;
+        Assert.Equal("first-small.jpg", first.AlbumArtworkPath); // the small one shows until the sharp one is in
+        source.Sharp["first"].SetResult("first-large.jpg");
+        var until = DateTime.UtcNow.AddSeconds(3);
+        while (first.AlbumArtworkPath != "first-large.jpg" && DateTime.UtcNow < until) { await Task.Delay(15); Dispatcher.UIThread.RunJobs(); }
+        Assert.Equal("first-large.jpg", first.AlbumArtworkPath);
+
+        play = player.PlayOnlineAsync(source, new("second", "Second", "Synthetic"));
+        var second = Track("Second"); second.AlbumArtworkPath = "second-small.jpg";
+        source.Pending["second"].SetResult(second); await play;
+        var third = player.PlayOnlineAsync(source, new("third", "Third", "Synthetic"));
+        source.Pending["third"].SetResult(Track("Third")); await third;
+        source.Sharp["second"].SetResult("second-large.jpg"); // arrives after "Second" stopped playing
+        await Task.Delay(100); Dispatcher.UIThread.RunJobs();
+        Assert.Equal("second-small.jpg", second.AlbumArtworkPath);
+        Assert.Equal("Third", player.CurrentTrack?.Title);
+        Assert.NotEqual("second-large.jpg", player.CurrentTrack?.AlbumArtworkPath);
         player.StopAndClear();
     }
 

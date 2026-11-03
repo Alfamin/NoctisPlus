@@ -174,4 +174,57 @@ internal static class NativeForYouTests
         online.Detach();
         Dispatcher.UIThread.RunJobs();
     }
+
+    /// <summary>Owner #248: four pages vanished a week after they were made, and a page past its expiry was overwritten by the
+    /// next one. Pages now stay until the listener removes one (Remove this page) or all (Clear all pages), each with Undo.</summary>
+    internal static void RunRemovePages()
+    {
+        Check.Section("native For you shelf: pages stay past a week, Remove this page and Clear all pages undo");
+        var folder = Check.NewFolder("native-for-you-remove");
+        var library = new SpotifyPlaylistTests.Library();
+        var now = DateTimeOffset.UtcNow;
+        ForYouCache.Page Page(string batch, int first, int ageDays, int expiresInDays) => new(1, now.AddDays(-ageDays), now.AddDays(expiresInDays),
+            new(Enumerable.Range(first, 3).Select(i => new DiscoverSong(new(DiscoveryTests.Song("deezer:" + i, "Song " + i), DiscoveryTests.Orbit), 1, "Because you play North Star")).ToList(), [], "", Batch: batch));
+        // The newest page is three days old, the others eight and nine (expired).
+        new ForYouCache(Path.Combine(folder, "for-you-last.json")).Write(Page("page-new", 300, 3, 1));
+        new ForYouCache(Path.Combine(folder, "for-you-pages.json")).WriteEarlier([Page("page-mid", 200, 8, -2), Page("page-old", 100, 9, -3)]);
+        var http = new DiscoveryTests.Http { Offline = true };
+        using var catalog = DiscoveryTests.Catalog(Path.Combine(folder, "catalog"), http);
+        using var downloads = new Downloads(_ => { });
+        var actions = new DiscoveryActions(library, downloads, _ => throw new Exception("No transfer is allowed in this fixture"), () => folder, () => false);
+        using var pages = new CatalogPages(() => catalog, actions, _ => { }, () => true, library: () => null);
+        var online = new FinderOnlineSearch(() => catalog, actions, pages, () => true, () => { });
+        using var source = new ForYouSource(() => catalog, actions, _ => [], library, null, Path.Combine(folder, "hidden.json"));
+        Check.Equal("page-new,page-mid,page-old", string.Join(",", source.Pages().Select(p => p.Batch)), "pages over a week old are kept");
+        using var vm = new ForYouShelfViewModel(source, online, actions, TimeSpan.FromSeconds(30));
+        vm.SetActive(true);
+        Check.Until(() => !vm.IsLoading && vm.Picks.Count == 3 && vm.PageTabs.Count == 3, "three kept pages give three page numbers");
+        string Shown() => vm.Picks[0].Song.Online!.Id;
+        Check.True(vm.HasPages, "the heading's menu offers Remove this page and Clear all pages");
+        vm.ShowPageCommand.Execute(vm.PageTabs[1]);
+        Check.Until(() => Shown() == "deezer:200", "page 2 opens");
+        vm.RemovePageCommand.Execute(null);
+        Check.Until(() => vm.PageTabs.Count == 2 && Shown() == "deezer:100", "Remove this page shows the next page in its place");
+        Check.Equal("page-new,page-old", string.Join(",", source.Pages().Select(p => p.Batch)), "only that page left");
+        Check.True(vm.HasUndo && vm.UndoLabel == "Page removed", "Remove this page offers Undo");
+        vm.UndoCommand.Execute(null);
+        Check.Until(() => vm.PageTabs.Count == 3 && Shown() == "deezer:200", "Undo brings the page back where it was, on screen");
+        Check.Equal("page-new,page-mid,page-old", string.Join(",", source.Pages().Select(p => p.Batch)), "in its own place");
+        vm.ShowPageCommand.Execute(vm.PageTabs[0]);
+        Check.Until(() => Shown() == "deezer:300", "page 1 opens");
+        vm.RemovePageCommand.Execute(null);
+        Check.Until(() => vm.PageTabs.Count == 2 && Shown() == "deezer:200", "removing page 1 makes the next one page 1");
+        vm.UndoCommand.Execute(null);
+        Check.Until(() => vm.PageTabs.Count == 3 && Shown() == "deezer:300", "and Undo restores page 1");
+        vm.ClearPagesCommand.Execute(null);
+        Check.Until(() => !vm.IsLoading && vm.Picks.Count == 0 && !vm.HasPages, "Clear all pages leaves no page (offline: no new one could be found)");
+        Check.False(File.Exists(Path.Combine(folder, "for-you-pages.json")), "the kept pages' file is gone");
+        Check.True(vm.HasUndo && vm.UndoLabel == "Pages cleared", "Clear all pages offers Undo");
+        vm.UndoCommand.Execute(null);
+        Check.Until(() => vm.PageTabs.Count == 3 && Shown() == "deezer:300", "Undo brings every page back");
+        using (var restarted = new ForYouSource(() => catalog, actions, _ => [], library, null, Path.Combine(folder, "hidden.json")))
+            Check.Equal("page-new,page-mid,page-old", string.Join(",", restarted.Pages().Select(p => p.Batch)), "and they are saved again");
+        online.Detach();
+        Dispatcher.UIThread.RunJobs();
+    }
 }

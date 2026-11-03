@@ -79,7 +79,44 @@ public partial class PlayerViewModel
     /// queued stream, instead of failing and skipping on to the next song.</summary>
     private readonly System.Runtime.CompilerServices.ConditionalWeakTable<Models.Track, PendingStream> _streamOrigins = new();
 
-    private void RememberStreamOrigin(Models.Track track, PendingStream origin) => _streamOrigins.AddOrUpdate(track, origin);
+    private void RememberStreamOrigin(Models.Track track, PendingStream origin)
+    {
+        _streamOrigins.AddOrUpdate(track, origin);
+        if (ReferenceEquals(CurrentTrack, track)) SharpenCover(track, origin);
+    }
+
+    private CancellationTokenSource? _sharpCover;
+
+    /// <summary>Owner #247: a streamed song plays with the small cover its row or card listed (120-320 px), blurry on the lyrics
+    /// page. The song playing gets its full-size cover (one at a time, as it comes up), and the next song's is fetched ahead so
+    /// it is sharp from its start. A cover already on disk is shown at once.</summary>
+    private void SharpenCover(Models.Track track, PendingStream origin)
+    {
+        _sharpCover?.Cancel(); // not disposed: the fetch still running reads its token
+        var stop = _sharpCover = new();
+        void Show(string? path)
+        {
+            if (path is null || stop.IsCancellationRequested || !ReferenceEquals(CurrentTrack, track) || track.AlbumArtworkPath == path) return;
+            track.ShowArtwork(path);
+            LoadAlbumArt(track);
+        }
+        Task<string?> sharp;
+        try { sharp = origin.Source.SharpCoverAsync(origin.Song, stop.Token); }
+        catch (Exception ex) { Services.DebugLog.Write("Queue", "sharp cover skipped: " + ex.Message); return; }
+        if (sharp.IsCompletedSuccessfully) Show(sharp.Result);
+        var next = UpNext.FirstOrDefault()?.PendingStream as PendingStream;
+        _ = Task.Run(async () =>
+        {
+            try
+            {
+                var path = await sharp;
+                Avalonia.Threading.Dispatcher.UIThread.Post(() => Show(path));
+                if (next is not null && next.Song.Id != origin.Song.Id) await next.Source.SharpCoverAsync(next.Song, stop.Token);
+            }
+            catch (OperationCanceledException) { }
+            catch (Exception ex) { Services.DebugLog.Write("Queue", $"sharp cover of \"{origin.Song.Title}\" not loaded: {ex.Message}"); }
+        });
+    }
 
     /// <summary>The stream to fetch again for this track: it came from one, and nothing of it can be played now.</summary>
     private PendingStream? RefetchFor(Models.Track track)
@@ -203,8 +240,9 @@ public partial class PlayerViewModel
     /// <summary>Owner #87: the playing song was only streamed (stream cache, not in Songs): the bar offers Add to songs.</summary>
     [ObservableProperty, NotifyPropertyChangedFor(nameof(AddToSongsTip))] private bool _isStreamedTrack;
     partial void OnIsStreamedTrackChanged(bool value) => RefreshNotForMe();
-    /// <summary>File name of a hearted played-only song: its library copy is marked favorite once imported.</summary>
-    private string? _favoriteWhenImported;
+    /// <summary>File names of hearted played-only songs: each library copy is marked favorite once imported (owner #249:
+    /// one slot lost the first heart when a second song was hearted before the first was imported).</summary>
+    private readonly HashSet<string> _favoriteWhenImported = new(StringComparer.OrdinalIgnoreCase);
     /// <summary>Shown briefly after Add, in place of the button.</summary>
     [ObservableProperty] private bool _justAddedToSongs;
     /// <summary>Owner #178: the song the check mark belongs to. Skipping on within its 2.5 s to another streamed song

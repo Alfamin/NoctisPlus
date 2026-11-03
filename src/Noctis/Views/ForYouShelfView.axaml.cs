@@ -51,6 +51,17 @@ public partial class ForYouShelfView : UserControl
         }
     }
 
+    // Owner #248: the corner's dots open the heading's own menu (the right-click one).
+    private void OnShelfMoreClick(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
+    {
+        e.Handled = true;
+        if (sender is Control more && this.FindControl<Button>("ShelfHeader") is { ContextMenu: { } menu } header)
+        {
+            menu.PlacementTarget = more;
+            menu.Open(header);
+        }
+    }
+
     // Which cards the listener can actually see: told to the shelf after the change is laid out, at most once per pass.
     private void ViewChanged(object? sender, EventArgs e)
     {

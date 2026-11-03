@@ -1521,11 +1521,13 @@ public partial class PlayerViewModel : ViewModelBase
         // Songs; the library copy is marked favorite as soon as it is imported.
         if (newState && IsStreamedTrack && CurrentTrack.FilePath is { } streamedPath)
         {
-            _favoriteWhenImported = Path.GetFileName(streamedPath);
+            _favoriteWhenImported.Add(Path.GetFileName(streamedPath));
             CurrentTrack.IsFavorite = true;
             await AddToSongs();
             return;
         }
+        // Un-hearted before its copy was imported: that copy must not arrive as a favorite.
+        if (!newState && CurrentTrack.FilePath is { } unhearted) _favoriteWhenImported.Remove(Path.GetFileName(unhearted));
         CurrentTrack.IsFavorite = newState;
         // The queue can hold pre-reload Track instances; write through to the
         // library's instance so the change actually persists (SaveAsync saves
@@ -2929,6 +2931,7 @@ public partial class PlayerViewModel : ViewModelBase
         CanSeekCurrent = !Features.ProgressivePlayback.ProgressiveTransfer.IsAvailable(track.FilePath);
         SeekableFraction = CanSeekCurrent ? 1 : 0;
         LoadAlbumArt(track);
+        if (streamOrigin is not null) SharpenCover(track, streamOrigin); // owner #247: played again
         Duration = track.Duration;
         DurationText = FormatTime(track.Duration);
         RemainingTimeText = FormatTime(track.Duration);
@@ -4305,15 +4308,15 @@ public partial class PlayerViewModel : ViewModelBase
             // A progressive song becomes an ordinary library row after the saved-file
             // importer lands. Adopt that object without restarting the decoder/clock.
             // Owner #87: a played-only song that was hearted: its library copy is the favorite.
-            if (_favoriteWhenImported is { } wanted && _library.Tracks.FirstOrDefault(t => !t.IsExternal &&
-                    string.Equals(Path.GetFileName(t.FilePath), wanted, StringComparison.OrdinalIgnoreCase)) is { } imported)
+            if (_favoriteWhenImported.Count > 0)
             {
-                _favoriteWhenImported = null;
-                if (!imported.IsFavorite)
+                var hearted = _library.Tracks.Where(t => !t.IsExternal && _favoriteWhenImported.Remove(Path.GetFileName(t.FilePath))).ToList();
+                var newly = hearted.Where(t => !t.IsFavorite).ToList();
+                foreach (var t in newly) t.IsFavorite = true;
+                if (newly.Count > 0)
                 {
-                    imported.IsFavorite = true;
-                    _ = _library.SaveTrackUserStateAsync(new[] { imported });
-                    _library.NotifyFavoritesChanged(new[] { imported });
+                    _ = _library.SaveTrackUserStateAsync(newly);
+                    _library.NotifyFavoritesChanged(newly);
                 }
             }
 

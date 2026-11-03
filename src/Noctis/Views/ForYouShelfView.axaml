@@ -175,10 +175,14 @@
 
     <StackPanel>
         <Grid ColumnDefinitions="*,Auto">
-            <Button Classes="section-toggle" Classes.expanded="{Binding IsExpanded}" Command="{Binding ToggleExpandedCommand}"
+            <Button x:Name="ShelfHeader" Classes="section-toggle" Classes.expanded="{Binding IsExpanded}" Command="{Binding ToggleExpandedCommand}"
                     ToolTip.Tip="Hide or show this section">
                 <Button.ContextMenu>
                     <ContextMenu>
+                        <!-- Owner #248: pages stay until removed here (each with Undo). -->
+                        <MenuItem Header="Remove this page" Command="{Binding RemovePageCommand}" IsVisible="{Binding HasPages}" />
+                        <MenuItem Header="Clear all pages" Command="{Binding ClearPagesCommand}" IsVisible="{Binding HasPages}" />
+                        <Separator IsVisible="{Binding HasPages}" />
                         <MenuItem Header="Reset learned preferences" Command="{Binding ResetLearningCommand}" />
                         <!-- Owner #166: the artists blocked for recommendations; one click recommends them again. -->
                         <MenuItem Header="Recommend again" helpers:RecommendMenu.Entry="blocked" />
@@ -198,6 +202,10 @@
             <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
                 <TextBlock Text="{Binding LoadCount}" IsVisible="{Binding HasLoadCount}" FontSize="12" FontWeight="SemiBold"
                            Opacity="0.7" VerticalAlignment="Center" FontFeatures="+tnum" />
+                <!-- Owner #248: the heading's menu (remove or clear pages, reset), easy to find beside Refresh. -->
+                <Button Classes="corner-icon" Click="OnShelfMoreClick" ToolTip.Tip="More" AutomationProperties.Name="More">
+                    <Viewbox Width="14" Height="14"><Path Data="{StaticResource MoreDotsIcon}" Fill="{Binding $parent[Button].Foreground}" /></Viewbox>
+                </Button>
                 <Panel>
                     <Button Classes="corner-icon refresh" Command="{Binding RefreshCommand}" IsEnabled="{Binding !IsLoading}"
                             ToolTip.Tip="{Binding RefreshTip}" AutomationProperties.Name="Refresh">

@@ -22,15 +22,17 @@ internal sealed class ForYouCache(string path)
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or JsonException or ArgumentException) { return null; }
     }
 
+    // Owner #248: a page kept to go back to (expired) stays at any age, until the listener removes it or ten newer pages
+    // push it out; only a page served as the fresh one has a week.
     private static bool Valid(Page? page, DateTimeOffset now, bool expired) =>
         page is { Version: 1, Result.Songs: not null, Result.Artists: not null, Result.Notice: not null } &&
-        page.At <= now.AddMinutes(5) && page.At >= now.AddDays(-7) && (expired || page.Until > now) && page.Until <= page.At.AddDays(7) &&
+        page.At <= now.AddMinutes(5) && (expired || page.At >= now.AddDays(-7) && page.Until > now) && page.Until <= page.At.AddDays(7) &&
         page.Result.Songs.Count <= 100 && page.Result.Artists.Count <= 30 &&
         page.Result.Songs.All(s => s is { Track.Song.Artists: { Count: > 0 }, Track.Song.Id: not null, Track.Song.Title: not null, Because: not null } &&
             s.Track.Song.Artists.All(a => a is { Id: not null, Name: not null }) && double.IsFinite(s.Score)) &&
         page.Result.Artists.All(a => a is { Artist.Id: not null, Artist.Name: not null, Because: not null });
 
-    /// <summary>The earlier pages still worth going back to (a week at most), newest first. A bad entry drops alone.</summary>
+    /// <summary>The earlier pages to go back to, newest first. A bad entry drops alone.</summary>
     public List<Page> ReadEarlier(DateTimeOffset now, int keep)
     {
         try

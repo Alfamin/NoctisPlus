@@ -125,6 +125,34 @@ public class StreamedPlaylistAddTests
         finally { OnlineMusicSearch.Current = before; }
     }
 
+    /// <summary>Owner #249: two played-only songs hearted one after the other, before either copy was imported. One slot kept
+    /// only the last heart, so the first song arrived in Songs without it.</summary>
+    [Avalonia.Headless.XUnit.AvaloniaFact]
+    public async Task TwoPlayedSongsHearted_BeforeEitherIsImported_BothArriveAsFavorites()
+    {
+        using var persistence = new TestPersistenceService();
+        var library = new FakeLibraryService();
+        var player = new PlayerViewModel(new FakeAudioPlayer(), library, persistence, new FakeAnimatedCoverService());
+        var before = OnlineMusicSearch.Current;
+        OnlineMusicSearch.Current = new Source();
+        try
+        {
+            var first = Streamed("A.flac"); var second = Streamed("B.flac");
+            player.ReplaceQueueAndPlay([first, second], 0); Avalonia.Threading.Dispatcher.UIThread.RunJobs();
+            await player.ToggleCurrentTrackFavoriteCommand.ExecuteAsync(null);
+            player.NextCommand.Execute(null); Avalonia.Threading.Dispatcher.UIThread.RunJobs();
+            Assert.Same(second, player.CurrentTrack);
+            await player.ToggleCurrentTrackFavoriteCommand.ExecuteAsync(null);
+            var a = new Track { Id = Guid.NewGuid(), FilePath = Library + "A.flac", Title = "A" };
+            var b = new Track { Id = Guid.NewGuid(), FilePath = Library + "B.flac", Title = "B" };
+            library.TrackList.Add(a); library.TrackList.Add(b);
+            library.RaiseLibraryUpdated(); Avalonia.Threading.Dispatcher.UIThread.RunJobs();
+            Assert.True(a.IsFavorite, "the first hearted song lost its heart");
+            Assert.True(b.IsFavorite);
+        }
+        finally { OnlineMusicSearch.Current = before; }
+    }
+
     /// <summary>Owner #177: the lyrics page offers Not for me only while a For you song plays, and asks the shelf.</summary>
     [Avalonia.Headless.XUnit.AvaloniaFact]
     public void NotForMe_IsOfferedOnlyForAForYouSong_AndGoesToTheShelf()

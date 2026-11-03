@@ -21,6 +21,8 @@ public sealed partial class ForYouShelfViewModel : ObservableObject, IDisposable
     /// <summary>Owner #166: the artist just blocked from a card, and the cards that went with it (for Undo).</summary>
     private (string Artist, List<(ForYouPick Pick, int Index)> Removed, DiscoverResult? Page)? _blocked;
     private readonly List<ForYouPick> _artistRemoved = [];
+    /// <summary>Owner #248: the pages just removed (Remove this page, Clear all pages), for Undo, and the page number to go back to.</summary>
+    private (List<ForYouCache.Page> Pages, int Index, ForYouSource Source)? _removedPages;
     private long _generation;
     private bool _active, _disposed;
     internal Func<IOnlineMusicSearch, OnlineSong, Task>? PlayRequested { get; set; }
@@ -187,6 +189,8 @@ public sealed partial class ForYouShelfViewModel : ObservableObject, IDisposable
     private int _pageIndex;
     /// <summary>Numbers shown at most, gaps included: the first, the last, and the ones around the page on screen.</summary>
     internal const int PagerSlots = 7;
+    /// <summary>Owner #248: there is a kept page to remove (the menu's Remove this page and Clear all pages).</summary>
+    public bool HasPages => _pages.Count > 0;
     public bool CanPreviousPage => HasPageTabs && _pageIndex > 0;
     public bool CanNextPage => HasPageTabs && _pageIndex < _pages.Count - 1;
 
@@ -222,7 +226,57 @@ public sealed partial class ForYouShelfViewModel : ObservableObject, IDisposable
         if (_pages.Count > 1)
             foreach (var number in PagerNumbers(_pages.Count, _pageIndex + 1))
                 PageTabs.Add(new(number) { IsCurrent = number == _pageIndex + 1 });
-        OnPropertyChanged(nameof(HasPageTabs)); OnPropertyChanged(nameof(CanPreviousPage)); OnPropertyChanged(nameof(CanNextPage));
+        OnPropertyChanged(nameof(HasPageTabs)); OnPropertyChanged(nameof(HasPages)); OnPropertyChanged(nameof(CanPreviousPage)); OnPropertyChanged(nameof(CanNextPage));
+    }
+
+    /// <summary>Owner #248: the page on screen leaves the shelf (its songs are not disliked); the next one shows, with Undo.
+    /// With none left, a new page is found.</summary>
+    [RelayCommand]
+    private async Task RemovePage()
+    {
+        if (_disposed || _source is not { } source || _pageIndex >= _pages.Count) return;
+        // Only the kept page that is on screen: never a fresh page that was not kept (an empty or failed build).
+        if (_page is not { } shown || shown.Batch.Length > 0 && _pages[_pageIndex].Batch != shown.Batch) return;
+        int index = _pageIndex;
+        if (source.RemovePage(index) is not { } removed) return;
+        OfferPagesUndo([removed], index, source, "Page removed");
+        await ShowKeptPage(source, index);
+    }
+
+    /// <summary>Owner #248: every page leaves the shelf and a new one is found; what was learned and the dislikes stay. Undo brings them back.</summary>
+    [RelayCommand]
+    private async Task ClearPages()
+    {
+        if (_disposed || _source is not { } source) return;
+        var removed = source.ClearPages();
+        if (removed.Count == 0) return;
+        OfferPagesUndo(removed, 0, source, "Pages cleared");
+        await ShowKeptPage(source, 0);
+    }
+
+    private void OfferPagesUndo(List<ForYouCache.Page> pages, int index, ForYouSource source, string label)
+    {
+        _undo?.Cancel(); _undo?.Dispose();
+        var stop = _undo = new();
+        _dismissed = null; _blocked = null;
+        _removedPages = (pages, index, source);
+        UndoLabel = label;
+        HasUndo = true;
+        _ = ExpireUndo(stop);
+    }
+
+    // The kept page now at index (or the last one); with none left, a new page.
+    private async Task ShowKeptPage(ForYouSource source, int index)
+    {
+        _pages = source.Pages();
+        _page = null;
+        if (_pages.Count == 0)
+        {
+            Picks.Clear(); UpdatePageTabs(source);
+            await LoadAsync(true);
+            return;
+        }
+        await GoToPage(Math.Min(index, _pages.Count - 1));
     }
 
     /// <summary>The page numbers to show for <paramref name="count"/> pages with <paramref name="current"/> on screen; 0 is a gap (…).
@@ -374,7 +428,7 @@ public sealed partial class ForYouShelfViewModel : ObservableObject, IDisposable
         Record(pick, DiscoverAction.Dismiss);
         _undo?.Cancel(); _undo?.Dispose();
         var stop = _undo = new();
-        _dismissed = (pick, Picks.IndexOf(pick), _page, source); _blocked = null;
+        _dismissed = (pick, Picks.IndexOf(pick), _page, source); _blocked = null; _removedPages = null;
         Picks.Remove(pick);
         if (pick.Song.Online is { } song) DismissRequested?.Invoke(song);
         UndoLabel = "Hidden · " + pick.Song.Title;
@@ -408,7 +462,7 @@ public sealed partial class ForYouShelfViewModel : ObservableObject, IDisposable
         try
         {
             await Task.Delay(_undoDuration, stop.Token);
-            if (!_disposed && ReferenceEquals(stop, _undo)) { HasUndo = false; _dismissed = null; _blocked = null; }
+            if (!_disposed && ReferenceEquals(stop, _undo)) { HasUndo = false; _dismissed = null; _blocked = null; _removedPages = null; }
         }
         catch (OperationCanceledException) { }
     }
@@ -423,7 +477,7 @@ public sealed partial class ForYouShelfViewModel : ObservableObject, IDisposable
     {
         if (_disposed || string.IsNullOrWhiteSpace(artist) || _source is not { } source) return;
         _undo?.Cancel(); _undo?.Dispose();
-        _dismissed = null;
+        _dismissed = null; _removedPages = null;
         _blocked = (artist, [], _page);
         if (!source.Hidden.SetArtistBlocked(artist, true)) { _blocked = null; return; }
         RemoveBlockedCards();
@@ -461,6 +515,21 @@ public sealed partial class ForYouShelfViewModel : ObservableObject, IDisposable
     [RelayCommand]
     private void Undo()
     {
+        if (HasUndo && _removedPages is { } removed)
+        {
+            _undo?.Cancel();
+            _removedPages = null; HasUndo = false;
+            removed.Source.RestorePages(removed.Pages);
+            if (ReferenceEquals(removed.Source, _source))
+            {
+                _pages = removed.Source.Pages();
+                // Back to the page that was removed; a page found after Clear all pages stays as page 1.
+                var at = _pages.ToList().FindIndex(p => p.Batch.Length > 0 && p.Batch == removed.Pages[0].Result.Batch);
+                _page = null;
+                _ = GoToPage(at >= 0 ? at : Math.Min(removed.Index, _pages.Count - 1));
+            }
+            return;
+        }
         if (HasUndo && _blocked is { } block)
         {
             _undo?.Cancel();
@@ -492,13 +561,13 @@ public sealed partial class ForYouShelfViewModel : ObservableObject, IDisposable
     private async Task ResetLearning()
     {
         if (_disposed || _source is not { } source) return;
-        _undo?.Cancel(); HasUndo = false; _dismissed = null; _blocked = null;
+        _undo?.Cancel(); HasUndo = false; _dismissed = null; _blocked = null; _removedPages = null;
         IsExpanded = true; // Reset must show its confirmation and new picks even when the shelf was folded.
         source.ResetLearning();
         _artistRemoved.Clear();
         Noctis.Helpers.TransientStatus.Show("ForYouReset", v => ResetNotice = v, "For you was reset", TimeSpan.FromSeconds(5));
         _page = null; Picks.Clear(); _pages = []; PageTabs.Clear();
-        OnPropertyChanged(nameof(HasPageTabs)); OnPropertyChanged(nameof(CanPreviousPage)); OnPropertyChanged(nameof(CanNextPage));
+        OnPropertyChanged(nameof(HasPageTabs)); OnPropertyChanged(nameof(HasPages)); OnPropertyChanged(nameof(CanPreviousPage)); OnPropertyChanged(nameof(CanNextPage));
         Noctis.Services.DebugLog.Write("ForYou", "Reset learned feedback and shown picks; hidden songs and blocked artists kept");
         await LoadAsync(true);
     }

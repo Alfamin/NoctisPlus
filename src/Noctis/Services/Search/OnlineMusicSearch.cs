@@ -82,6 +82,9 @@ public interface IOnlineMusicSearch
     /// <summary>Owner #102: fetches that small cover (a few KB); null when there is none.</summary>
     Task<string?> QueueCoverAsync(OnlineSong song, CancellationToken ct)
         => song.ArtworkUrl.Length == 0 ? Task.FromResult<string?>(null) : ArtworkAsync(song.ArtworkUrl, ct);
+    /// <summary>Owner #247: the cover at full size (1000-1200 px) for the song playing, as the lyrics page shows it large;
+    /// null when there is none bigger than the one listed.</summary>
+    Task<string?> SharpCoverAsync(OnlineSong song, CancellationToken ct) => Task.FromResult<string?>(null);
 
     /// <summary>True when downloads can start right away (signed in to the download service).</summary>
     bool CanDownload { get; }
