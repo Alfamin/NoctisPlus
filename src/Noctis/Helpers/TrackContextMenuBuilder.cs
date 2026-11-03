@@ -67,6 +67,7 @@ public sealed class TrackContextMenuBuilder
     public MenuItem Badge { get; private set; } = null!;
     public MenuItem SendToFolder { get; private set; } = null!;
     public MenuItem LyricsBackground { get; private set; } = null!;
+    public MenuItem MakeReel { get; private set; } = null!;
     public MenuItem LyricsBackgroundChoose { get; private set; } = null!;
     public MenuItem LyricsBackgroundClear { get; private set; } = null!;
     public MenuItem DontScrobble { get; private set; } = null!;
@@ -238,6 +239,11 @@ public sealed class TrackContextMenuBuilder
         Lyrics.Items.Add(RemoveLyrics);
         items.Add(Lyrics);
 
+        // Owner #243: Make a Reel, its own entry between Lyrics and Lyrics Background Video.
+        MakeReel = new MenuItem { Header = "Make a Reel", Command = LyricsReel.OpenForTrackCommand };
+        MakeReel.Icon = CreatePngIcon("avares://Noctis.UI/Assets/Icons/Lyrics%20ICON.png");
+        items.Add(MakeReel);
+
         // Lyrics Background Video ▸ — this song's own clip behind the lyrics page (static
         // commands, so no per-view wiring; "Use default" shows only when the song has one).
         LyricsBackground = new MenuItem { Header = "Lyrics Background Video" };
@@ -363,6 +369,10 @@ public sealed class TrackContextMenuBuilder
         RemoveLyrics.Classes.Add("danger");
         Lyrics.Items.Add(RemoveLyrics);
         items.Add(Lyrics);
+        // Owner #243: Make a Reel, its own entry between Lyrics and Lyrics background video.
+        MakeReel = MenuV2.Row(host, "Make a Reel", "MenuLineCamera");
+        MakeReel.Command = LyricsReel.OpenForTrackCommand;
+        items.Add(MakeReel);
         LyricsBackground = MenuV2.Row(host, Loc.T("AlbumDetail.LyricsBackgroundVideo"), "MenuLineVideo");
         LyricsBackgroundChoose = new MenuItem { Header = Loc.T("Menu.ChooseSongVideo"), Command = LyricsBackgroundOverrides.ChooseForTrackCommand };
         LyricsBackground.Items.Add(LyricsBackgroundChoose);
@@ -521,6 +531,7 @@ public sealed class TrackContextMenuBuilder
         BindOptional(SendToFolder, sendToFolderCommand, track);
 
         LyricsBackgroundChoose.CommandParameter = track;
+        MakeReel.CommandParameter = track;
         LyricsBackgroundClear.CommandParameter = track;
         LyricsBackgroundClear.IsVisible = LyricsBackgroundOverrides.HasOverride(LyricsBackgroundOverrides.KeyForTrack(track));
 

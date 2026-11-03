@@ -211,7 +211,8 @@ internal sealed class LyricsVideoRenderer : IDisposable
 
     /// <summary>The lyrics page's flowing background into <paramref name="target"/>: the pre-blurred cover filling it (scaled
     /// 1.18 so its edges never show), two copies drifting and turning over it (<see cref="FlowingArtworkMotion"/>), the beat
-    /// breathing it and lifting a white glow, then the page's dark scrim.</summary>
+    /// breathing it, then the page's dark scrim. Owner #243: no white beat glow here — over a whole Reel it read as the
+    /// screen flashing brighter on every hit.</summary>
     private static void DrawFlow(SKSurface target, SKImage art, double t, double pulse, float scrim, bool vignette = false)
     {
         var canvas = target.Canvas;
@@ -237,11 +238,6 @@ internal sealed class LyricsVideoRenderer : IDisposable
         }
         canvas.Restore();
 
-        if (frame.GlowOpacity > 0.001)
-        {
-            using var glow = new SKPaint { Color = SKColors.White.WithAlpha(Alpha(frame.GlowOpacity)) };
-            canvas.DrawRect(0, 0, w, h, glow);
-        }
         using var dark = new SKPaint { Color = SKColors.Black.WithAlpha(Alpha(scrim)) };
         canvas.DrawRect(0, 0, w, h, dark);
         if (vignette)
@@ -576,11 +572,13 @@ internal sealed class LyricsVideoRenderer : IDisposable
         using (var paint = new SKPaint { Color = SKColors.White.WithAlpha(Alpha(opacity)) })
             canvas.DrawImage(shadow, SKRect.Create(rect.Left - pad, rect.Top - pad + 30, rect.Width + 2 * pad, rect.Height + 2 * pad), _smooth, paint);
 
-        // Below the panel, a frosted reflection: the page shrunk to an eighth (so it is pure colour, no readable text),
-        // mirrored and fading out.
+        // Below the panel, a frosted reflection: the page shrunk to a sixteenth (so it is pure colour, no readable text),
+        // mirrored with the panel's own rounded corners, fading out. Its strength is the user's (0 = none).
+        var reflection = _scene.Spec.Reflection;
         var rc = _reflection.Canvas;
         rc.Clear(SKColors.Transparent);
         rc.DrawImage(page, SKRect.Create(0, 0, rect.Width / 16, rect.Height / 16), _smooth);
+        if (reflection > 0.001)
         using (var small = _reflection.Snapshot())
         {
             var reflectH = rect.Height * 0.32f;
@@ -589,9 +587,11 @@ internal sealed class LyricsVideoRenderer : IDisposable
             canvas.Save();
             canvas.Translate(0, top * 2);
             canvas.Scale(1, -1);
-            using (var mirror = new SKPaint { Color = SKColors.White.WithAlpha(Alpha(0.22 * opacity)) })
-                canvas.DrawImage(small, SKRect.Create(0, 0, rect.Width / 16, rect.Height / 16),
-                    SKRect.Create(rect.Left, top - rect.Height, rect.Width, rect.Height), _smooth, mirror);
+            var mirrored = SKRect.Create(rect.Left, top - rect.Height, rect.Width, rect.Height);
+            using (var round = new SKRoundRect(mirrored, g.PageRadius))
+                canvas.ClipRoundRect(round, antialias: true);
+            using (var mirror = new SKPaint { Color = SKColors.White.WithAlpha(Alpha(reflection * opacity)) })
+                canvas.DrawImage(small, SKRect.Create(0, 0, rect.Width / 16, rect.Height / 16), mirrored, _smooth, mirror);
             canvas.Restore();
             using (var fade = new SKPaint { BlendMode = SKBlendMode.DstIn })
             {

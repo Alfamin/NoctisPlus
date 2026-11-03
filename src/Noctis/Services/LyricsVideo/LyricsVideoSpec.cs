@@ -80,6 +80,8 @@ public sealed record LyricsVideoSpec
     public LyricsVideoBackground Background { get; init; } = LyricsVideoBackground.FlowingCover;
     public bool Intro { get; init; } = true;
     public bool Outro { get; init; } = true;
+    /// <summary>Strength of the frosted reflection under the side-by-side panel (alpha, 0 = none).</summary>
+    public double Reflection { get; init; } = 0.22;
     /// <summary>Beats per minute for the background's pulse when no audio is analysed (0: none).</summary>
     public int Bpm { get; init; }
 

@@ -1349,15 +1349,6 @@ public partial class PlayerViewModel : ViewModelBase
     [RelayCommand]
     private void ShareCurrentTrackLyrics() => _shareLyrics?.Invoke();
 
-    /// <summary>Owner #243: the lyrics page's Reel maker (null off the lyrics page).</summary>
-    private Action? _makeLyricsReel;
-
-    /// <summary>Owner #243: the song has synced lyrics on the lyrics page, so a Reel can be made of them.</summary>
-    [ObservableProperty] private bool _canMakeLyricsReel;
-
-    [RelayCommand]
-    private void MakeLyricsReel() => _makeLyricsReel?.Invoke();
-
     [RelayCommand]
     private void SaveCurrentTrackLyrics() => _saveLyrics?.Invoke();
 
@@ -1381,12 +1372,8 @@ public partial class PlayerViewModel : ViewModelBase
         Action? saveLyrics = null,
         bool canSaveLyrics = false,
         Action? saveLyricsTtml = null,
-        bool canSaveLyricsTtml = false,
-        Action? makeReel = null,
-        bool canMakeReel = false)
+        bool canSaveLyricsTtml = false)
     {
-        _makeLyricsReel = makeReel;
-        CanMakeLyricsReel = canMakeReel && makeReel is not null;
         _selectLyricsSynced = selectSynced;
         _selectLyricsPlain = selectPlain;
         _openLyricsBackgroundColor = openBackgroundColor;
@@ -1415,8 +1402,6 @@ public partial class PlayerViewModel : ViewModelBase
         _shareLyrics = null;
         _saveLyrics = null;
         _saveLyricsTtml = null;
-        _makeLyricsReel = null;
-        CanMakeLyricsReel = false;
         IsLyricsPageActive = false;
         IsLyricsSyncedActive = false;
         IsLyricsPlainActive = false;
@@ -1431,7 +1416,7 @@ public partial class PlayerViewModel : ViewModelBase
     /// or synced-availability changes, to keep the menu's checkmarks accurate.
     /// </summary>
     public void UpdateLyricsPageState(bool isSyncedActive, bool isPlainActive, bool isSyncedAvailable, bool canShare, bool canSaveLyrics = false,
-        bool canSaveLyricsTtml = false, bool canMakeReel = false)
+        bool canSaveLyricsTtml = false)
     {
         IsLyricsSyncedActive = isSyncedActive;
         IsLyricsPlainActive = isPlainActive;
@@ -1439,7 +1424,6 @@ public partial class PlayerViewModel : ViewModelBase
         CanShareLyrics = canShare;
         CanSaveLyricsToFile = canSaveLyrics;
         CanSaveLyricsAsTtml = canSaveLyricsTtml;
-        CanMakeLyricsReel = canMakeReel && _makeLyricsReel is not null;
     }
 
     /// <summary>Sets the sidebar ViewModel for playlist access.</summary>

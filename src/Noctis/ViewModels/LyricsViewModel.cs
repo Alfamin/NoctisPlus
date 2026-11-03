@@ -3880,16 +3880,31 @@ public partial class LyricsViewModel : ViewModelBase, IDisposable
 
     /// <summary>Owner #243: opens the Lyrics Reel maker on the song playing, starting at the line being sung.</summary>
     [RelayCommand]
-    private async Task MakeReel()
+    private Task MakeReel() => _player.CurrentTrack is { } track ? OpenReelAsync(track) : Task.CompletedTask;
+
+    /// <summary>
+    /// Owner #243: the Lyrics Reel maker for <paramref name="track"/>. The song playing uses the lyrics on the page and
+    /// starts at the line being sung; any other song's synced lyrics are read from its own files (sidecars, tags).
+    /// </summary>
+    internal async Task OpenReelAsync(Track track)
     {
-        var track = _player.CurrentTrack;
-        if (track == null) return;
-        var lines = Services.LyricsVideo.LyricsVideoLine.From(LyricLines);
+        IReadOnlyList<Services.LyricsVideo.LyricsVideoLine> lines;
         var start = 0;
-        if (_timeline.ActiveLine is { Timestamp: { } at })
+        if (ReferenceEquals(track, _player.CurrentTrack) && LyricLines.Any(l => l.Timestamp.HasValue))
         {
-            for (var i = 0; i < lines.Count; i++)
-                if (Math.Abs(lines[i].Start - at.TotalSeconds) < 0.001) { start = i; break; }
+            lines = Services.LyricsVideo.LyricsVideoLine.From(LyricLines);
+            if (_timeline.ActiveLine is { Timestamp: { } at })
+            {
+                for (var i = 0; i < lines.Count; i++)
+                    if (Math.Abs(lines[i].Start - at.TotalSeconds) < 0.001) { start = i; break; }
+            }
+        }
+        else
+        {
+            var join = _player.LyricsJoinSplitWords;
+            var language = Localization.Loc.Instance.Culture.Name;
+            var probe = await Task.Run(() => ProbeLocalLyricSources(track, join, language));
+            lines = Services.LyricsVideo.LyricsVideoLine.From(probe.Lines ?? []);
         }
         // The audio for the clip: the song's own file, once it is all there (a streamed song still downloading is not).
         var audio = !string.IsNullOrEmpty(track.FilePath) && File.Exists(track.FilePath)

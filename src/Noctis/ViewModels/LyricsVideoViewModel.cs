@@ -35,6 +35,8 @@ public sealed partial class LyricsVideoViewModel : ObservableObject, IDisposable
     [ObservableProperty] private int _toIndex;
     [ObservableProperty] private bool _intro = true;
     [ObservableProperty] private bool _outro = true;
+    /// <summary>Owner #243: how strong the reflection under the page is, 0-100 (50 = the designed look).</summary>
+    [ObservableProperty] private int _reflection = 50;
     [ObservableProperty] private bool _isExporting;
     [ObservableProperty] private double _progress;
     [ObservableProperty] private string _status = "";
@@ -107,6 +109,7 @@ public sealed partial class LyricsVideoViewModel : ObservableObject, IDisposable
 
     partial void OnIntroChanged(bool value) => SpecChanged();
     partial void OnOutroChanged(bool value) => SpecChanged();
+    partial void OnReflectionChanged(int value) => SpecChanged();
 
     partial void OnIsExportingChanged(bool value) => OnPropertyChanged(nameof(CanExport));
 
@@ -142,6 +145,7 @@ public sealed partial class LyricsVideoViewModel : ObservableObject, IDisposable
             LastLine = Math.Clamp(Math.Max(FromIndex, ToIndex), 0, _lines.Count - 1),
             Intro = Intro,
             Outro = Outro,
+            Reflection = Math.Clamp(Reflection, 0, 100) / 100.0 * 0.44,
             Bpm = _bpm,
         };
     }

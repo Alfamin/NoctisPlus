@@ -84,6 +84,15 @@
                     </StackPanel>
                 </Border>
 
+                <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="14">
+                    <TextBlock Classes="lv-label" Text="Reflection" VerticalAlignment="Center" />
+                    <controls:SmoothSlider Grid.Column="1" Classes="accent-slider" Step="1" Minimum="0" Maximum="100"
+                                           SteppedValue="{Binding Reflection, Mode=TwoWay}" VerticalAlignment="Center"
+                                           IsEnabled="{Binding !IsExporting}" AutomationProperties.Name="Reflection" />
+                    <TextBlock Grid.Column="2" Text="{Binding Reflection, StringFormat='{}{0}%'}" FontSize="12" Opacity="0.7"
+                               MinWidth="36" TextAlignment="Right" VerticalAlignment="Center" />
+                </Grid>
+
                 <StackPanel Orientation="Horizontal" Spacing="8">
                     <TextBlock Classes="lv-label" Text="Length" VerticalAlignment="Center" />
                     <TextBlock Text="{Binding LengthText}" FontSize="13" FontWeight="SemiBold" VerticalAlignment="Center" />
