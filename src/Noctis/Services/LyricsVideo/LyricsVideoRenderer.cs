@@ -169,9 +169,13 @@ internal sealed class LyricsVideoRenderer : IDisposable
         var u = t - spec.LyricsEnd;          // time into the outro
 
         // The Reel's own background: the flowing cover, deeper and darker than the page's, vignette baked in.
-        DrawFlow(_outerFlow, _scene.Wash, t, pulse, scrim: 0.6f, vignette: true);
-        using (var snap = _outerFlow.Snapshot())
+        if (g.IsPanel)
+        {
+            DrawFlow(_outerFlow, _scene.Wash, t, pulse, scrim: 0.6f, vignette: true);
+            using var snap = _outerFlow.Snapshot();
             canvas.DrawImage(snap, new SKRect(0, 0, W, H), _smooth);
+        }
+        else canvas.Clear(SKColors.Black);
 
         // The page arrives (intro) and leaves (outro).
         double pageIn = 1, pageScale = 1, pageDy = 0, titleIn = 1, lyricsIn = 1, lyricsDy = 0;
@@ -185,6 +189,16 @@ internal sealed class LyricsVideoRenderer : IDisposable
             lyricsIn = LyricsVideoMotion.CubicInOut((v - 1.05) / 0.7);
             lyricsDy = 26 * (1 - LineMotion.Ease((v - 1.05) / 0.9));
         }
+        var headerDy = 0.0;
+        if (!g.IsPanel && spec.Intro)
+        {
+            pageScale = 1;
+            pageDy = 0;
+            headerDy = 32 * (1 - LineMotion.Ease((v - 0.15) / 1.0));
+            titleIn = LyricsVideoMotion.CubicInOut((v - 0.35) / 0.55);
+            lyricsIn = LyricsVideoMotion.CubicInOut((v - 0.7) / 0.8);
+            lyricsDy = 28 * (1 - LineMotion.Ease((v - 0.7) / 1.0));
+        }
         double coverMove = 0;
         if (spec.Outro && u > 0)
         {
@@ -192,8 +206,13 @@ internal sealed class LyricsVideoRenderer : IDisposable
             coverMove = LineMotion.Ease((u - 0.25) / 1.2);
         }
 
-        DrawPage(t, pulse, titleIn, lyricsIn, lyricsDy, coverMove, lyricsSamples);
-        DrawPanel(canvas, g, pageIn, pageScale, pageDy);
+        DrawPage(t, pulse, titleIn, lyricsIn, lyricsDy, coverMove, lyricsSamples, headerDy);
+        if (g.IsPanel) DrawPanel(canvas, g, pageIn, pageScale, pageDy);
+        else
+        {
+            using var page = _page.Snapshot();
+            canvas.DrawImage(page, 0, 0);
+        }
 
         // Fade from and to black: the Reel opens out of black and closes into it, so its loop reads as one.
         double black = spec.Intro
@@ -257,7 +276,7 @@ internal sealed class LyricsVideoRenderer : IDisposable
 
     // ── The page ──────────────────────────────────────────────────────────────────────────────
 
-    private void DrawPage(double t, double pulse, double titleIn, double lyricsIn, double lyricsDy, double coverMove, int lyricsSamples)
+    private void DrawPage(double t, double pulse, double titleIn, double lyricsIn, double lyricsDy, double coverMove, int lyricsSamples, double headerDy)
     {
         var g = _scene.Geometry;
         var canvas = _page.Canvas;
@@ -267,15 +286,19 @@ internal sealed class LyricsVideoRenderer : IDisposable
 
         // Outro: the cover glides to the middle of the page and grows a little, the title following under it.
         var cover = g.Cover;
+        cover.Offset(0, (float)headerDy);
         if (coverMove > 0)
         {
-            var size = cover.Width * (1 + 0.18f * (float)coverMove);
+            var size = g.IsPanel ? cover.Width * (1 + 0.18f * (float)coverMove) : Lerp(cover.Width, 560, coverMove);
             var cx = Lerp(cover.MidX, g.Page.Width / 2, coverMove);
-            var cy = Lerp(cover.MidY, g.Page.Height / 2 - 40, coverMove);
+            var cy = Lerp(cover.MidY, g.IsPanel ? g.Page.Height / 2 - 40 : 840, coverMove);
             cover = SKRect.Create(cx - size / 2, cy - size / 2, size, size);
         }
         DrawCover(canvas, cover);
-        DrawTitle(canvas, cover.MidX, cover.Bottom + (g.Title.Y - g.Cover.Bottom), titleIn);
+        if (g.IsPanel) DrawTitle(canvas, cover.MidX, cover.Bottom + (g.Title.Y - g.Cover.Bottom), titleIn);
+        else DrawTitle(canvas, Lerp(g.Title.X, 540, coverMove),
+            Lerp(g.Title.Y + (float)headerDy, 1180, coverMove), titleIn,
+            Lerp(g.TitleCentered ? 1 : 0, 1, coverMove), Lerp(g.TitleWidth, 840, coverMove));
 
         if (lyricsIn <= 0.001) return;
         var vp = g.Lyrics;
@@ -330,17 +353,17 @@ internal sealed class LyricsVideoRenderer : IDisposable
         canvas.Restore();
     }
 
-    private void DrawTitle(SKCanvas canvas, float centerX, float baseline, double opacity)
+    private void DrawTitle(SKCanvas canvas, float centerX, float baseline, double opacity, double alignment = 1, float? maxWidth = null)
     {
         if (opacity <= 0.001) return;
         var g = _scene.Geometry;
         var spec = _scene.Spec;
-        var maxW = g.Cover.Width + 100;
+        var maxW = maxWidth ?? g.Cover.Width + 100;
         var badge = spec.IsExplicit ? g.TitleSize * 0.62f : 0;
         var title = Ellipsize(spec.Title, maxW - (badge > 0 ? badge + 10 : 0), _title);
         var artist = Ellipsize(spec.Artist, maxW, _artist);
         var titleW = ShareCardRenderer.MeasureTextFallback(_title, title);
-        var x = centerX - (titleW + (badge > 0 ? badge + 10 : 0)) / 2;
+        var x = centerX - (float)(alignment * (titleW + (badge > 0 ? badge + 10 : 0)) / 2);
 
         _title.Color = SKColors.White.WithAlpha(Alpha(opacity));
         ShareCardRenderer.DrawTextFallback(canvas, title, x, baseline, _title);
@@ -356,7 +379,7 @@ internal sealed class LyricsVideoRenderer : IDisposable
 
         _artist.Color = SKColors.White.WithAlpha(Alpha(0.6 * opacity));
         var artistW = ShareCardRenderer.MeasureTextFallback(_artist, artist);
-        ShareCardRenderer.DrawTextFallback(canvas, artist, centerX - artistW / 2, baseline + g.ArtistSize * 1.45f, _artist);
+        ShareCardRenderer.DrawTextFallback(canvas, artist, centerX - (float)(alignment * artistW / 2), baseline + g.ArtistSize * 1.45f, _artist);
     }
 
     private static string Ellipsize(string text, float maxW, SKPaint paint)

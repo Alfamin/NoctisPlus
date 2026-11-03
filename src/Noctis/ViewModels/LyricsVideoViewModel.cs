@@ -30,6 +30,9 @@ public sealed partial class LyricsVideoViewModel : ObservableObject, IDisposable
 
     public IReadOnlyList<string> LineLabels { get; }
     public string Subtitle { get; }
+    public IReadOnlyList<string> LayoutLabels { get; } = ["Side by side", "Compact header"];
+    [ObservableProperty, NotifyPropertyChangedFor(nameof(ShowReflection))] private int _layoutIndex;
+    public bool ShowReflection => LayoutIndex == 0;
 
     [ObservableProperty] private int _fromIndex;
     [ObservableProperty] private int _toIndex;
@@ -110,6 +113,7 @@ public sealed partial class LyricsVideoViewModel : ObservableObject, IDisposable
     partial void OnIntroChanged(bool value) => SpecChanged();
     partial void OnOutroChanged(bool value) => SpecChanged();
     partial void OnReflectionChanged(int value) => SpecChanged();
+    partial void OnLayoutIndexChanged(int value) => SpecChanged();
 
     partial void OnIsExportingChanged(bool value) => OnPropertyChanged(nameof(CanExport));
 
@@ -146,6 +150,7 @@ public sealed partial class LyricsVideoViewModel : ObservableObject, IDisposable
             Intro = Intro,
             Outro = Outro,
             Reflection = Math.Clamp(Reflection, 0, 100) / 100.0 * 0.44,
+            Layout = (LyricsVideoLayout)Math.Clamp(LayoutIndex, 0, LayoutLabels.Count - 1),
             Bpm = _bpm,
         };
     }

@@ -162,6 +162,54 @@ public class LyricsVideoRendererTests
     }
 
     [AvaloniaFact]
+    public void CompactHeader_KeepsTheHeaderAndLyricsInsideTheSafeArea()
+    {
+        using var scene = new LyricsVideoScene(Spec() with { Layout = LyricsVideoLayout.CompactHeader });
+        var g = scene.Geometry;
+        Assert.False(g.IsPanel);
+        Assert.InRange(g.Cover.Top, 250, 1570);
+        Assert.True(g.Cover.Bottom < g.Lyrics.Top);
+        Assert.True(g.Lyrics.Bottom <= 1570 && g.Lyrics.Left >= 60 && g.Lyrics.Right <= 1020);
+        Assert.True(g.Title.X + g.TitleWidth <= 1020);
+        using var renderer = new LyricsVideoRenderer(scene);
+        Assert.True(Luma(Frame(renderer, 90), new SKRectI(0, 0, 1080, 1920)) > 5);
+    }
+
+    [AvaloniaFact]
+    public void LayoutChoice_UpdatesTheSpecAndRetainsTheReflectionChoice()
+    {
+        using var vm = new Noctis.ViewModels.LyricsVideoViewModel(LyricsVideoLine.From(SongLines()), 0,
+            "Title", "Artist", false, null, "audio.flac", "ffmpeg.exe", 0);
+        vm.Reflection = 78;
+        vm.LayoutIndex = 1;
+        Assert.False(vm.ShowReflection);
+        Assert.Equal(LyricsVideoLayout.CompactHeader, vm.Spec()!.Layout);
+        vm.LayoutIndex = 0;
+        Assert.True(vm.ShowReflection);
+        Assert.Equal(78, vm.Reflection);
+    }
+
+    [AvaloniaFact]
+    public void Shots_SaveBuiltLayouts()
+    {
+        var dir = Environment.GetEnvironmentVariable("NOCTIS_VIDEO_SHOTS");
+        if (string.IsNullOrEmpty(dir)) return;
+        Directory.CreateDirectory(dir);
+        foreach (var layout in new[] { LyricsVideoLayout.SideBySide, LyricsVideoLayout.CompactHeader })
+        {
+            var spec = Spec() with { Layout = layout };
+            using var scene = new LyricsVideoScene(spec);
+            using var renderer = new LyricsVideoRenderer(scene);
+            foreach (var seconds in new[] { 0.4, 1.3, 3.0, 8.0, spec.Duration - 1.1 })
+            {
+                using var frame = renderer.Snapshot(spec.ClipStart + seconds, 0.3, (int)(seconds * 30));
+                using var data = frame.Encode(SKEncodedImageFormat.Png, 90);
+                File.WriteAllBytes(Path.Combine(dir, $"{layout}-{seconds:00.0}.png"), data.ToArray());
+            }
+        }
+    }
+
+    [AvaloniaFact]
     public async Task Shots_SaveSampleFramesAndAReel()
     {
         var dir = Environment.GetEnvironmentVariable("NOCTIS_VIDEO_SHOTS");

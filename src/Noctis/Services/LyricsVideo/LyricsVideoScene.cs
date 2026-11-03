@@ -331,6 +331,7 @@ internal sealed class LyricsVideoScene : IDisposable
 /// <summary>Where things sit in the 1080×1920 Reel for one layout (owner #243). Rects are in Reel pixels unless noted.</summary>
 internal sealed record LyricsVideoGeometry
 {
+    public bool IsPanel { get; init; }
     /// <summary>The page panel (side by side) or the whole frame.</summary>
     public required SKRect Page { get; init; }
     public float PageRadius { get; init; }
@@ -342,6 +343,7 @@ internal sealed record LyricsVideoGeometry
     public bool TitleCentered { get; init; }
     public float TitleSize { get; init; }
     public float ArtistSize { get; init; }
+    public float TitleWidth { get; init; }
     /// <summary>The lyrics viewport inside <see cref="Page"/>.</summary>
     public required SKRect Lyrics { get; init; }
     public float LyricsWidth => Lyrics.Width;
@@ -355,8 +357,9 @@ internal sealed record LyricsVideoGeometry
     {
         // The desktop page as a wide panel, centred in the Reel's safe area (above Instagram's caption, below its
         // header): cover and title in the left column, lyrics in the right, the page's own proportions.
-        _ => new LyricsVideoGeometry
+        LyricsVideoLayout.SideBySide => new LyricsVideoGeometry
         {
+            IsPanel = true,
             Page = SKRect.Create(32, 600, 1016, 640),
             PageRadius = 36,
             Cover = SKRect.Create(80, 130, 280, 280),
@@ -370,6 +373,21 @@ internal sealed record LyricsVideoGeometry
             AnchorRatio = 0.32f,
             EdgeFade = 70,
         },
+        LyricsVideoLayout.CompactHeader => new LyricsVideoGeometry
+        {
+            Page = SKRect.Create(0, 0, 1080, 1920),
+            Cover = SKRect.Create(72, 290, 150, 150),
+            CoverRadius = 14,
+            Title = new SKPoint(254, 350),
+            TitleSize = 44,
+            ArtistSize = 30,
+            TitleWidth = 754,
+            Lyrics = SKRect.Create(72, 500, 936, 1060),
+            LyricSize = 66,
+            AnchorRatio = 0.3f,
+            EdgeFade = 90,
+        },
+        _ => throw new ArgumentOutOfRangeException(nameof(layout)),
     };
 }
 
