@@ -30,7 +30,7 @@ public sealed partial class LyricsVideoViewModel : ObservableObject, IDisposable
 
     public IReadOnlyList<string> LineLabels { get; }
     public string Subtitle { get; }
-    public IReadOnlyList<string> LayoutLabels { get; } = ["Side by side", "Compact header"];
+    public IReadOnlyList<string> LayoutLabels { get; } = ["Side by side", "Compact header", "Full page"];
     [ObservableProperty, NotifyPropertyChangedFor(nameof(ShowReflection))] private int _layoutIndex;
     public bool ShowReflection => LayoutIndex == 0;
 

@@ -161,16 +161,19 @@ public class LyricsVideoRendererTests
         Assert.True(Luma(frame, sung) > Luma(frame, unsung) + 8, $"sung {Luma(frame, sung):0} vs unsung {Luma(frame, unsung):0}");
     }
 
-    [AvaloniaFact]
-    public void CompactHeader_KeepsTheHeaderAndLyricsInsideTheSafeArea()
+    [AvaloniaTheory]
+    [InlineData(LyricsVideoLayout.CompactHeader)]
+    [InlineData(LyricsVideoLayout.FullPage)]
+    public void FullFrameLayouts_KeepTheHeaderAndLyricsInsideTheSafeArea(LyricsVideoLayout layout)
     {
-        using var scene = new LyricsVideoScene(Spec() with { Layout = LyricsVideoLayout.CompactHeader });
+        using var scene = new LyricsVideoScene(Spec() with { Layout = layout });
         var g = scene.Geometry;
         Assert.False(g.IsPanel);
         Assert.InRange(g.Cover.Top, 250, 1570);
         Assert.True(g.Cover.Bottom < g.Lyrics.Top);
         Assert.True(g.Lyrics.Bottom <= 1570 && g.Lyrics.Left >= 60 && g.Lyrics.Right <= 1020);
-        Assert.True(g.Title.X + g.TitleWidth <= 1020);
+        var titleLeft = g.Title.X - (g.TitleCentered ? g.TitleWidth / 2 : 0);
+        Assert.True(titleLeft >= 60 && titleLeft + g.TitleWidth <= 1020);
         using var renderer = new LyricsVideoRenderer(scene);
         Assert.True(Luma(Frame(renderer, 90), new SKRectI(0, 0, 1080, 1920)) > 5);
     }
@@ -195,7 +198,7 @@ public class LyricsVideoRendererTests
         var dir = Environment.GetEnvironmentVariable("NOCTIS_VIDEO_SHOTS");
         if (string.IsNullOrEmpty(dir)) return;
         Directory.CreateDirectory(dir);
-        foreach (var layout in new[] { LyricsVideoLayout.SideBySide, LyricsVideoLayout.CompactHeader })
+        foreach (var layout in Enum.GetValues<LyricsVideoLayout>())
         {
             var spec = Spec() with { Layout = layout };
             using var scene = new LyricsVideoScene(spec);

@@ -387,6 +387,21 @@ internal sealed record LyricsVideoGeometry
             AnchorRatio = 0.3f,
             EdgeFade = 90,
         },
+        LyricsVideoLayout.FullPage => new LyricsVideoGeometry
+        {
+            Page = SKRect.Create(0, 0, 1080, 1920),
+            Cover = SKRect.Create(280, 300, 520, 520),
+            CoverRadius = 24,
+            Title = new SKPoint(540, 886),
+            TitleCentered = true,
+            TitleSize = 46,
+            ArtistSize = 32,
+            TitleWidth = 936,
+            Lyrics = SKRect.Create(72, 1000, 936, 560),
+            LyricSize = 56,
+            AnchorRatio = 0.3f,
+            EdgeFade = 80,
+        },
         _ => throw new ArgumentOutOfRangeException(nameof(layout)),
     };
 }
