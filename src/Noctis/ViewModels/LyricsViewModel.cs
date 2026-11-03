@@ -3875,6 +3875,34 @@ public partial class LyricsViewModel : ViewModelBase, IDisposable
     /// <summary>Whether the lyric share-card entry point should be visible.</summary>
     public bool ShareAvailable => _player.CurrentTrack != null && !IsSearching && !ShowSearchButton;
 
+    /// <summary>Owner #243: a Reel needs synced lyrics.</summary>
+    public bool CanMakeReel => ShareAvailable && LyricLines.Any(l => l.Timestamp.HasValue && !l.IsIntroPlaceholder);
+
+    /// <summary>Owner #243: opens the Lyrics Reel maker on the song playing, starting at the line being sung.</summary>
+    [RelayCommand]
+    private async Task MakeReel()
+    {
+        var track = _player.CurrentTrack;
+        if (track == null) return;
+        var lines = Services.LyricsVideo.LyricsVideoLine.From(LyricLines);
+        var start = 0;
+        if (_timeline.ActiveLine is { Timestamp: { } at })
+        {
+            for (var i = 0; i < lines.Count; i++)
+                if (Math.Abs(lines[i].Start - at.TotalSeconds) < 0.001) { start = i; break; }
+        }
+        // The audio for the clip: the song's own file, once it is all there (a streamed song still downloading is not).
+        var audio = !string.IsNullOrEmpty(track.FilePath) && File.Exists(track.FilePath)
+                    && !Features.ProgressivePlayback.ProgressiveTransfer.IsDownloading(track.FilePath)
+            ? track.FilePath : null;
+        var ffmpeg = (App.Services?.GetService(typeof(IAudioConverterService)) as IAudioConverterService)?.GetFfmpegPath();
+        var cover = !string.IsNullOrEmpty(track.AlbumArtworkPath) && File.Exists(track.AlbumArtworkPath)
+            ? track.AlbumArtworkPath : _player.CurrentArtPath;
+        var vm = new LyricsVideoViewModel(lines, start, track.Title, track.ArtistDisplay, track.IsExplicit, cover, audio,
+            string.IsNullOrWhiteSpace(ffmpeg) ? null : ffmpeg, track.Bpm);
+        await Views.LyricsVideoDialog.ShowAsync(vm);
+    }
+
     /// <summary>Native entry from the lyrics page; opening the panel never starts a timing job.</summary>
     internal Action<Track>? WordTimingRequested { get; set; }
     internal Func<Track, Task>? WordTimingStartRequested { get; set; }

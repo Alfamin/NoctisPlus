@@ -3136,7 +3136,9 @@ public partial class MainWindowViewModel : ViewModelBase
             saveLyrics: () => _lyricsVm.SaveLyricsToFileCommand.Execute(null),
             canSaveLyrics: _lyricsVm.CanSaveToFile,
             saveLyricsTtml: () => _lyricsVm.SaveLyricsAsTtmlCommand.Execute(null),
-            canSaveLyricsTtml: _lyricsVm.CanSaveTtmlToFile);
+            canSaveLyricsTtml: _lyricsVm.CanSaveTtmlToFile,
+            makeReel: () => _lyricsVm.MakeReelCommand.Execute(null),
+            canMakeReel: _lyricsVm.CanMakeReel);
 
         _lyricsVm.PropertyChanged -= OnLyricsVmPropertyChanged;
         _lyricsVm.PropertyChanged += OnLyricsVmPropertyChanged;
@@ -3163,7 +3165,8 @@ public partial class MainWindowViewModel : ViewModelBase
                 isSyncedAvailable: _lyricsVm.HasSyncedLyricsAvailable,
                 canShare: _lyricsVm.ShareAvailable,
                 canSaveLyrics: _lyricsVm.CanSaveToFile,
-                canSaveLyricsTtml: _lyricsVm.CanSaveTtmlToFile);
+                canSaveLyricsTtml: _lyricsVm.CanSaveTtmlToFile,
+                canMakeReel: _lyricsVm.CanMakeReel);
         }
     }
 

@@ -1401,7 +1401,7 @@ public static class ShareCardRenderer
 
     /// <summary>Width of <paramref name="text"/> under <paramref name="paint"/> with
     /// font fallback — the sum of each run measured with its own typeface.</summary>
-    private static float MeasureTextFallback(SKPaint paint, string text)
+    internal static float MeasureTextFallback(SKPaint paint, string text)
     {
         var runs = SplitFallbackRuns(text, paint.Typeface!);
         if (runs.Count == 1 && ReferenceEquals(runs[0].Face, paint.Typeface))
@@ -1420,7 +1420,7 @@ public static class ShareCardRenderer
 
     /// <summary>Draws <paramref name="text"/> with font fallback, advancing x run by
     /// run — the drawing twin of <see cref="MeasureTextFallback"/>.</summary>
-    private static void DrawTextFallback(SKCanvas canvas, string text, float x, float y, SKPaint paint)
+    internal static void DrawTextFallback(SKCanvas canvas, string text, float x, float y, SKPaint paint)
     {
         var runs = SplitFallbackRuns(text, paint.Typeface!);
         if (runs.Count == 1 && ReferenceEquals(runs[0].Face, paint.Typeface))

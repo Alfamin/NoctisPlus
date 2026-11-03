@@ -1507,6 +1507,14 @@
                                             <controls:LineIcon Classes="mv2-icon" Data="{StaticResource MenuLineCamera}"/>
                                         </MenuItem.Icon>
                                     </MenuItem>
+                                    <!-- Owner #243: a Reel of the lyrics page (synced lyrics only). -->
+                                    <MenuItem Header="Make a Reel"
+                                              Command="{Binding MakeLyricsReelCommand}"
+                                              IsVisible="{Binding CanMakeLyricsReel}">
+                                        <MenuItem.Icon>
+                                            <controls:LineIcon Classes="mv2-icon" Data="{StaticResource MenuLineVideo}"/>
+                                        </MenuItem.Icon>
+                                    </MenuItem>
                                     <!-- Lyrics side-panel toggle (everywhere but the lyrics full view). -->
                                     <MenuItem Header="{loc:T PlaybackBar.LyricsPanel}"
                                               Click="OnLyricsPanelButtonClick"
