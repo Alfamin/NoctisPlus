@@ -349,7 +349,7 @@ public sealed class SyncLogTests
         var pinned = await w.Drive.GetPinnedAsync(w.Channel);
         var size = pinned!.Document!.Size;
 
-        Console.WriteLine($"[budget] decode+merge 20,000 items: {merge.TotalMilliseconds:F0} ms; snapshot build+post: {snapshot.TotalMilliseconds:F0} ms, {size / 1024.0:F0} KB gzip");
+        TestContext.Current.TestOutputHelper?.WriteLine($"[budget] decode+merge 20,000 items: {merge.TotalMilliseconds:F0} ms; snapshot build+post: {snapshot.TotalMilliseconds:F0} ms, {size / 1024.0:F0} KB gzip");
         Assert.Equal(20_000, pc.Ledger.Count);
         Assert.True(merge < TimeSpan.FromMilliseconds(1000), $"merge {merge.TotalMilliseconds} ms (budget 200 ms on PC; generous bound)");
         Assert.True(snapshot < TimeSpan.FromMilliseconds(2500), $"snapshot {snapshot.TotalMilliseconds} ms (budget 500 ms; generous bound)");
