@@ -26,6 +26,9 @@ public sealed class FakeTelegramDrive : ITelegramDrive
     /// <summary>The next N downloads fail with FLOOD_PREMIUM_WAIT of <see cref="FloodWait"/>.</summary>
     public int FailNextDownloads { get; set; }
     public int Posts { get; private set; }
+    /// <summary>The server's clock: a message's date comes from it, in whole seconds as Telegram's do.</summary>
+    public Func<DateTime> Clock { get; set; } = () => DateTime.UtcNow;
+    private DateTime ServerDate() { var t = Clock(); return new DateTime(t.Ticks - t.Ticks % TimeSpan.TicksPerSecond, DateTimeKind.Utc); }
     /// <summary>Runs while a post is in flight (before it lands); a test can record or flush from here.</summary>
     public Action? OnPost { get; set; }
     public Func<Task>? BeforePostAsync { get; set; }
@@ -63,7 +66,7 @@ public sealed class FakeTelegramDrive : ITelegramDrive
         lock (_gate)
         {
             var c = Ch(channel);
-            msg = new TgMessage(channel, _nextMessage++, caption, new TgDocument(_nextDocument++, fileName, ms.Length), DateTime.UtcNow);
+            msg = new TgMessage(channel, _nextMessage++, caption, new TgDocument(_nextDocument++, fileName, ms.Length), ServerDate());
             c.Messages.Add(new Stored(msg, ms.ToArray()));
             Posts++;
             progress?.Report(ms.Length);
@@ -156,7 +159,7 @@ public sealed class FakeTelegramDrive : ITelegramDrive
     {
         lock (_gate)
         {
-            var msg = new TgMessage(channel, _nextMessage++, string.Empty, new TgDocument(_nextDocument++, fileName, data.Length), DateTime.UtcNow);
+            var msg = new TgMessage(channel, _nextMessage++, string.Empty, new TgDocument(_nextDocument++, fileName, data.Length), ServerDate());
             Ch(channel).Messages.Add(new Stored(msg, data));
             return msg;
         }

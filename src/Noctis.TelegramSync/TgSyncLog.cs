@@ -72,7 +72,11 @@ public sealed class TgSyncLog
     private readonly SemaphoreSlim _ioGate = new(1, 1);
     private readonly object _stateGate = new();
     private SyncBatch? _inFlight;
-    private sealed record Checkpoint(TgSyncCursor Cursor, List<SyncItem> Ledger, List<BatchItem> Pending, SyncBatch? InFlight);
+    private sealed record Checkpoint(TgSyncCursor Cursor, List<SyncItem> Ledger, List<BatchItem> Pending, SyncBatch? InFlight,
+        bool Bootstrapped = false, Dictionary<string, PlayCounterState>? EarlyPlays = null);
+    // Review M7: plays heard before this device first read the log (its own counters unknown), as increments.
+    private readonly Dictionary<string, PlayCounterState> _earlyPlays = new(StringComparer.Ordinal);
+    private bool _bootstrapped;
 
     public TgSyncLog(ITelegramDrive drive, long channel, string device, TgLedger ledger, Func<DateTime>? now = null, string? cursorPath = null)
     {
@@ -90,6 +94,9 @@ public sealed class TgSyncLog
                 Ledger.Restore(checkpoint.Ledger);
                 _pending.AddRange(checkpoint.Pending);
                 _inFlight = checkpoint.InFlight;
+                // A checkpoint from before M7 that had read the log counts as read.
+                _bootstrapped = checkpoint.Bootstrapped || checkpoint.Cursor.LastMessageId > 0;
+                foreach (var (song, early) in checkpoint.EarlyPlays ?? []) _earlyPlays[song] = early;
             }
             else if (saved is not null)
             {
@@ -113,13 +120,65 @@ public sealed class TgSyncLog
     {
         lock (_stateGate)
         {
-            var stamp = updatedUtc ?? _now();
+            var now = _now();
+            // Posted exactly as stored, so the writer can recognise its own item when the post is read back.
+            var stamp = TgLedger.ClampStamp(updatedUtc ?? now, now);
             var old = Ledger.Get(kind, id);
-            if (old?.Device == Device && old.UpdatedUtc == stamp && old.Payload != payload)
-                stamp = stamp.AddTicks(1);
+            // This device's edits of one item are sequential: a later one never sorts before its own earlier one.
+            if (old?.Device == Device && old.UpdatedUtc >= stamp && old.Payload != payload)
+                stamp = old.UpdatedUtc.AddTicks(1);
             var item = new BatchItem(kind, id, payload, stamp);
-            Ledger.Apply(item, Device);
+            Ledger.Apply(item, Device, stamp);
+            // Only the newest unposted edit of an item is sent: two edits in one post would collapse onto the same
+            // bounded stamp at the readers when this clock runs fast, and then the earlier one would win the tie.
+            var posting = _inFlight?.Items.Count ?? 0;
+            var older = _pending.FindLastIndex(p => p.Kind == kind && p.Id == id);
+            if (older >= posting) _pending.RemoveAt(older);
             _pending.Add(item);
+        }
+    }
+
+    /// <summary>True once this device has read the log (a pull or the snapshot): its own counters are known.</summary>
+    public bool Bootstrapped { get { lock (_stateGate) return _bootstrapped; } }
+
+    /// <summary>
+    /// Review M7: one play of <paramref name="songId"/> on this device. Its counter is this device's own
+    /// (<c>song@device</c>) and the newest write wins, so writing <c>count = 1</c> before the log was read would
+    /// replace a count this device id already had. Until then the play is kept as an increment (saved with the
+    /// cursor) and added on top of the counter read from the log.
+    /// </summary>
+    public void RecordPlay(string songId, DateTime? playedUtc = null)
+    {
+        var played = playedUtc ?? _now();
+        lock (_stateGate)
+        {
+            if (!_bootstrapped)
+            {
+                var early = _earlyPlays.GetValueOrDefault(songId);
+                _earlyPlays[songId] = new PlayCounterState((early?.Count ?? 0) + 1, Later(early?.LastPlayed, played));
+            }
+            else WritePlays(songId, 1, played);
+        }
+        if (!Bootstrapped) Save();
+    }
+
+    private void WritePlays(string songId, int plays, DateTime? played)
+    {
+        var id = TgKinds.PlaysId(songId, Device);
+        var own = Ledger.Get(TgKinds.Plays, id) is { } item ? SyncJson.Deserialize<PlayCounterState>(item.Payload) : null;
+        Record(TgKinds.Plays, id, SyncJson.Serialize(new PlayCounterState((own?.Count ?? 0) + plays, Later(own?.LastPlayed, played))));
+    }
+
+    private static DateTime? Later(DateTime? a, DateTime? b) => a is null ? b : b is null ? a : a > b ? a : b;
+
+    /// <summary>The log was read: early plays join this device's counters now.</summary>
+    private void Bootstrap()
+    {
+        lock (_stateGate)
+        {
+            _bootstrapped = true;
+            foreach (var (song, early) in _earlyPlays) WritePlays(song, early.Count, early.LastPlayed);
+            _earlyPlays.Clear();
         }
     }
 
@@ -195,11 +254,18 @@ public sealed class TgSyncLog
                 if (msg.Document is not null && msg.Caption == BatchCaption)
                 {
                     var batch = await ReadBatchAsync(msg, ct).ConfigureAwait(false);
-                    if (batch is not null && !batch.Snapshot && !Cursor.Seen(batch.Device, batch.Seq))
+                    if (batch is not null && !batch.Snapshot)
                     {
-                        foreach (var item in batch.Items) Ledger.Apply(item, batch.Device);
-                        Cursor.Mark(batch.Device, batch.Seq);
-                        applied++;
+                        if (!Cursor.Seen(batch.Device, batch.Seq))
+                        {
+                            // Bounded by the server's date of this post: every reader stores the same stamp (M2).
+                            foreach (var item in batch.Items) Ledger.Apply(item, batch.Device, msg.DateUtc);
+                            Cursor.Mark(batch.Device, batch.Seq);
+                            applied++;
+                        }
+                        // This device's own post read back: take the stamps the others gave it.
+                        if (batch.Device == Device)
+                            foreach (var item in batch.Items) Ledger.AdoptPosted(item, Device, msg.DateUtc);
                     }
                 }
                 Cursor.LastMessageId = msg.Id;
@@ -207,6 +273,7 @@ public sealed class TgSyncLog
             if (page.Count < 100) break;
         }
         RaiseOwnSeq();
+        Bootstrap();
         Save();
         return applied;
     }
@@ -228,11 +295,12 @@ public sealed class TgSyncLog
         foreach (var item in snap.Items)
         {
             var (device, payloadItem) = SplitSnapshotItem(item);
-            Ledger.Apply(payloadItem, device);
+            Ledger.Apply(payloadItem, device, pinned.DateUtc);
         }
         if (snap.UpToMessageId > Cursor.LastMessageId) Cursor.LastMessageId = snap.UpToMessageId;
         foreach (var d in DeviceSeqs(snap)) Cursor.Raise(d.Key, d.Value);
         RaiseOwnSeq();
+        Bootstrap();
         Save();
         return true;
     }
@@ -301,7 +369,8 @@ public sealed class TgSyncLog
         if (_cursorPath is null) return;
         byte[] bytes;
         lock (_stateGate)
-            bytes = JsonSerializer.SerializeToUtf8Bytes(new Checkpoint(Cursor, Ledger.Everything.ToList(), _pending.ToList(), _inFlight), SyncJson.Options);
+            bytes = JsonSerializer.SerializeToUtf8Bytes(new Checkpoint(Cursor, Ledger.Everything.ToList(), _pending.ToList(), _inFlight,
+                _bootstrapped, new Dictionary<string, PlayCounterState>(_earlyPlays, StringComparer.Ordinal)), SyncJson.Options);
         TgStateFile.Write(_cursorPath, bytes);
     }
 }

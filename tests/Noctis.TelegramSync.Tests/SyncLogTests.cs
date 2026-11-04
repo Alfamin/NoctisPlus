@@ -15,7 +15,11 @@ public sealed class SyncLogTests
         public DateTime Now = T0;
         public FakeTelegramDrive Drive = new();
         public long Channel;
-        public World() => Channel = Drive.FindOrCreateChannelAsync(TgMarkers.Sync, "Noctis Plus Sync", TgMarkers.For(TgMarkers.Sync, Guid.NewGuid())).Result.Id;
+        public World()
+        {
+            Drive.Clock = () => Now;
+            Channel = Drive.FindOrCreateChannelAsync(TgMarkers.Sync, "Noctis Plus Sync", TgMarkers.For(TgMarkers.Sync, Guid.NewGuid())).Result.Id;
+        }
         public void Advance(int seconds) => Now = Now.AddSeconds(seconds);
 
         public TgSyncLog Device(string name, TimeSpan skew = default, string? cursorPath = null)
