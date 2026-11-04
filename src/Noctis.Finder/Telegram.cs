@@ -25,7 +25,9 @@ internal sealed class TelegramAccount : ITelegramSignIn, IDisposable
     {
         _store = new TelegramStore(storePath);
         DataFolder = Path.GetDirectoryName(Path.GetFullPath(storePath))!;
-        _defaults = TelegramDefaults.Read(defaultsPath ?? Path.Combine(Path.GetDirectoryName(storePath)!, DefaultsFile));
+        _defaults = defaultsPath is not null && Path.GetExtension(defaultsPath) == ".dat"
+            ? TelegramDefaults.ReadPacked(defaultsPath)
+            : TelegramDefaults.Read(defaultsPath ?? Path.Combine(Path.GetDirectoryName(storePath)!, DefaultsFile));
         // Owner #185: releases carry the Noctis Plus Telegram app beside Noctis.exe, so a new user only signs in.
         if (defaultsPath is null && !_defaults.Available && _defaults.Error.Length == 0)
             _defaults = TelegramDefaults.ReadPacked(Path.Combine(AppContext.BaseDirectory, TelegramDefaults.PackedFile));
@@ -408,9 +410,12 @@ internal sealed class TelegramAccount : ITelegramSignIn, IDisposable
     /// Sends the phone number. Returns what Telegram wants next ("verification_code",
     /// "password", …) for <see cref="ContinueLoginAsync"/>, or null when the login is complete.
     /// </summary>
-    public async Task<string?> StartLoginAsync(int apiId, string apiHash, string phone)
+    public Task<string?> StartLoginAsync(int apiId, string apiHash, string phone)
+        => StartLoginAsync(apiId, apiHash, phone, CancellationToken.None);
+
+    internal async Task<string?> StartLoginAsync(int apiId, string apiHash, string phone, CancellationToken ct)
     {
-        await _gate.WaitAsync().ConfigureAwait(false);
+        await _gate.WaitAsync(ct).ConfigureAwait(false);
         try
         {
             ObjectDisposedException.ThrowIf(_disposed, this);
@@ -418,7 +423,7 @@ internal sealed class TelegramAccount : ITelegramSignIn, IDisposable
             _client = null;
             _store.Begin(apiId, apiHash);
             _client = CreateClient();
-            return await StepAsync(_client, phone).ConfigureAwait(false);
+            return await StepAsync(_client, phone, ct).ConfigureAwait(false);
         }
         finally
         {
@@ -426,13 +431,15 @@ internal sealed class TelegramAccount : ITelegramSignIn, IDisposable
         }
     }
 
-    public async Task<string?> ContinueLoginAsync(string answer)
+    public Task<string?> ContinueLoginAsync(string answer) => ContinueLoginAsync(answer, CancellationToken.None);
+
+    internal async Task<string?> ContinueLoginAsync(string answer, CancellationToken ct)
     {
-        await _gate.WaitAsync().ConfigureAwait(false);
+        await _gate.WaitAsync(ct).ConfigureAwait(false);
         try
         {
             if (_client is null) throw new InvalidOperationException("Start the login again.");
-            return await StepAsync(_client, answer).ConfigureAwait(false);
+            return await StepAsync(_client, answer, ct).ConfigureAwait(false);
         }
         finally
         {
@@ -481,6 +488,13 @@ internal sealed class TelegramAccount : ITelegramSignIn, IDisposable
     }
     private volatile bool _disposed;
 
+    internal async Task ResetPendingLoginAsync(CancellationToken ct = default)
+    {
+        await _gate.WaitAsync(ct).ConfigureAwait(false);
+        try { if (!IsLoggedIn) Forget(); }
+        finally { _gate.Release(); }
+    }
+
     /// <summary>Owner #156: the current connection retired (the queue's stall watchdog), the login kept.</summary>
     internal Task RetireCurrentConnectionAsync() => _client is { } current ? RetireConnectionAsync(current) : Task.CompletedTask;
 
@@ -509,14 +523,14 @@ internal sealed class TelegramAccount : ITelegramSignIn, IDisposable
     /// <summary>How long one sign-in step may take before the dialog says Telegram could not be reached.</summary>
     internal TimeSpan LoginStepDeadline { get; init; } = TimeSpan.FromSeconds(60);
 
-    private async Task<string?> StepAsync(Client client, string answer)
+    private async Task<string?> StepAsync(Client client, string answer, CancellationToken ct = default)
     {
         var step = client.Login(answer);
         string? next;
         // A network that swallows packets must not leave the sign-in spinning for ever (audit, 2026-10-18).
         // This only happens during a login that is not finished, so no saved login is lost; it is started again.
-        try { next = await step.WaitAsync(LoginStepDeadline).ConfigureAwait(false); }
-        catch (TimeoutException)
+        try { next = await step.WaitAsync(LoginStepDeadline, ct).ConfigureAwait(false); }
+        catch (Exception ex) when (ex is TimeoutException or OperationCanceledException)
         {
             _ = step.ContinueWith(t => _ = t.Exception, TaskContinuationOptions.OnlyOnFaulted);
             if (ReferenceEquals(_client, client)) _client = null;

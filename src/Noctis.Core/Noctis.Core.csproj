@@ -17,6 +17,7 @@
 
   <ItemGroup>
     <InternalsVisibleTo Include="Noctis" />
+    <InternalsVisibleTo Include="Noctis.Finder" />
     <InternalsVisibleTo Include="Noctis.Tests" />
     <!-- #255 step 1: OnlineMusicSearch.FileSaved (internal) moved here; the Finder tests observe it. -->
     <InternalsVisibleTo Include="FreeMusicFinder.Tests" />

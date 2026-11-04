@@ -42,7 +42,7 @@ internal sealed class CatalogPages : IDisposable
         Func<ILibraryService?>? library = null, string? choicesPath = null)
     {
         _catalog = catalog; Actions = actions; _log = log; _enabled = enabled; _choicesPath = choicesPath;
-        _library = library ?? (() => Noctis.App.Services?.GetService(typeof(ILibraryService)) as ILibraryService);
+        _library = library ?? (() => null);
         try
         {
             if (choicesPath is not null && File.Exists(choicesPath) && new FileInfo(choicesPath).Length < 256 * 1024 && (File.GetAttributes(choicesPath) & FileAttributes.ReparsePoint) == 0)

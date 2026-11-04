@@ -30,6 +30,7 @@
   <ItemGroup>
     <ProjectReference Include="..\Noctis.Core\Noctis.Core.csproj" />
     <ProjectReference Include="..\Noctis.UI\Noctis.UI.csproj" />
+    <ProjectReference Include="..\Noctis.Finder\Noctis.Finder.csproj" />
   </ItemGroup>
 
 </Project>

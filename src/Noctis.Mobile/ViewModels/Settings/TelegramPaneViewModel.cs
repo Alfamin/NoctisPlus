@@ -34,7 +34,14 @@ public sealed partial class TelegramPaneViewModel : ObservableObject, IDisposabl
     [ObservableProperty] private string _proxySecret = "";
 
     public bool IsSignedIn => Step == TelegramStep.Done;
-    partial void OnStepChanged(TelegramStep value) => OnPropertyChanged(nameof(IsSignedIn));
+    public bool IsPhoneStep => Step == TelegramStep.Phone;
+    public bool IsCodeStep => Step == TelegramStep.Code;
+    public bool IsPasswordStep => Step == TelegramStep.Password;
+    partial void OnStepChanged(TelegramStep value)
+    {
+        OnPropertyChanged(nameof(IsSignedIn)); OnPropertyChanged(nameof(IsPhoneStep));
+        OnPropertyChanged(nameof(IsCodeStep)); OnPropertyChanged(nameof(IsPasswordStep));
+    }
 
     /// <summary>Do not guess a delivery's code length.</summary>
     partial void OnCodeChanged(string value)
@@ -134,6 +141,8 @@ public sealed partial class TelegramPaneViewModel : ObservableObject, IDisposabl
     public static string ShortError(Exception ex)
     {
         var m = ex.Message ?? "";
+        if (m.Contains("TELEGRAM_APP_MISSING")) return "Telegram setup is missing from this build";
+        if (ex is FormatException or UriFormatException) return "Check the proxy address";
         var flood = Regex.Match(m, @"FLOOD_WAIT_?(\d+)");
         if (flood.Success && int.TryParse(flood.Groups[1].Value, out var s))
             return s >= 60 ? $"Too many tries. Wait {(s + 59) / 60} min" : $"Too many tries. Wait {s} s";

@@ -441,7 +441,7 @@ internal sealed class FinderOnlineSearch : IOnlineMusicSearch
         var key = "restored:" + id;
         _restored[key] = d;
         var song = new OnlineSong(key, d.Track.Title, d.Track.Artist, Seconds: d.Track.Duration?.TotalSeconds);
-        var track = Noctis.ViewModels.PlayerViewModel.StandIn(this, song, keep: false);
+        var track = Noctis.Services.Search.OnlineStandIn.Create(this, song, keep: false);
         track.Id = id; track.FilePath = path; track.IsExternal = true;
         return track;
     }

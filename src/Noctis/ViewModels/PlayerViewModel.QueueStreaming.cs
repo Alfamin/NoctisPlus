@@ -4,11 +4,6 @@ using Noctis.Services.Search;
 
 namespace Noctis.ViewModels;
 
-/// <summary>What a stand-in in the queue is (owner #95): a playlist song not on this computer yet.</summary>
-/// <param name="Page">Owner #100: the page it was played from ("playlist:…", "album:…", "artist:…", "foryou"); its header toggle
-/// decides whether that page's songs you don't have play.</param>
-public sealed record PendingStream(IOnlineMusicSearch Source, OnlineSong Song, bool Keep, string? Page = null);
-
 /// <summary>
 /// Owner #95: playing a playlist plays the songs you don't have too, like a streaming app. Each one stands in the queue as a
 /// <see cref="Track"/> with <see cref="Track.PendingStream"/>; the next few are downloaded ahead in queue order (what was
@@ -57,16 +52,7 @@ public partial class PlayerViewModel
         if (fetching) { CancelOnlinePlayback(); IsPreparingOnlinePlayback = false; AdvanceQueue(QueueAdvanceReason.Error); }
     }
 
-    public static Track StandIn(IOnlineMusicSearch source, OnlineSong song, bool keep, string? page = null) => new()
-    {
-        Id = new Guid(System.Security.Cryptography.MD5.HashData(System.Text.Encoding.UTF8.GetBytes("stream:" + song.Id))),
-        Title = song.Title,
-        Artist = song.ArtistDisplay,
-        Album = song.Album,
-        Duration = TimeSpan.FromSeconds(song.Seconds is > 0 and <= 86400 ? song.Seconds.Value : 0),
-        IsExplicit = song.Explicit == true,
-        PendingStream = new PendingStream(source, song, keep, page),
-    };
+    public static Track StandIn(IOnlineMusicSearch source, OnlineSong song, bool keep, string? page = null) => OnlineStandIn.Create(source, song, keep, page);
 
     private void PlayStandIn(Track standIn, PendingStream pending)
     {

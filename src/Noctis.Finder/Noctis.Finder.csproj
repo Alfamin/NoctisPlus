@@ -1,0 +1,18 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <AssemblyName>Noctis.Finder</AssemblyName>
+    <RootNamespace>FreeMusicFinder</RootNamespace>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\Noctis.Core\Noctis.Core.csproj" />
+    <PackageReference Include="WTelegramClient" Version="4.4.9" />
+    <InternalsVisibleTo Include="Noctis" />
+    <InternalsVisibleTo Include="Noctis.Mobile" />
+    <InternalsVisibleTo Include="Noctis.Android" />
+    <InternalsVisibleTo Include="Noctis.Tests" />
+    <InternalsVisibleTo Include="FreeMusicFinder.Tests" />
+  </ItemGroup>
+</Project>

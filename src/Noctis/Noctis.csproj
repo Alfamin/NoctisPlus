@@ -234,6 +234,7 @@
   <ItemGroup>
     <!-- Free Music Finder: Telegram (MTProto) client for the music bots. -->
     <PackageReference Include="WTelegramClient" Version="4.4.9" />
+    <ProjectReference Include="..\Noctis.Finder\Noctis.Finder.csproj" />
   </ItemGroup>
   <ItemGroup>
     <!-- Shared assets (themes, styles, icons, fonts) live in Noctis.UI; only the

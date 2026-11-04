@@ -133,7 +133,7 @@ public sealed class FreeMusicPlugin : INoctisPlugin
         if (_lastFmKey.Length > 0 && !LastFmSimilar.ValidKey(_lastFmKey)) Announce("Last.fm API key not understood: paste the 32-character API key, not the secret. For you will use the other catalogs.");
         _discoveryActions = new DiscoveryActions(new PlaylistLibrary(), _downloads, _bot.Track,
             () => Downloader.Folder(host.Settings.GetString(DownloadFolderKey), host.DataDirectory), () => _telegram?.IsLoggedIn == true);
-        _artistPages = new CatalogPages(() => _catalog!, _discoveryActions, Log, () => _host?.Settings.GetBool("artistCatalogOnPages", true) == true, choicesPath: Path.Combine(host.DataDirectory, "artist-catalog", "artist-choices.json"));
+        _artistPages = new CatalogPages(() => _catalog!, _discoveryActions, Log, () => _host?.Settings.GetBool("artistCatalogOnPages", true) == true, library: () => Noctis.App.Services?.GetService(typeof(Noctis.Services.ILibraryService)) as Noctis.Services.ILibraryService, choicesPath: Path.Combine(host.DataDirectory, "artist-catalog", "artist-choices.json"));
         CheckThese.Load(Path.Combine(host.DataDirectory, "check-these.json"));
         _forYou = new ForYouSource(() => _catalog ?? throw new InvalidOperationException("Free Music Finder has stopped."), _discoveryActions,
             DiscoverAlbums, new PlaylistLibrary(), NoctisDataOf(host.DataDirectory), Path.Combine(host.DataDirectory, "for-you-hidden.json"), () => _similar, () => _lastFm);

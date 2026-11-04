@@ -1,0 +1,42 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:Noctis.Mobile.ViewModels.Settings"
+             x:Class="Noctis.Mobile.Views.TelegramPane" x:DataType="vm:TelegramPaneViewModel">
+  <UserControl.Styles><StyleInclude Source="avares://Noctis.Mobile/Views/GroupedStyles.axaml" /></UserControl.Styles>
+  <StackPanel Classes="grouped-content">
+    <StackPanel IsEnabled="{Binding !IsBusy}" Spacing="16">
+      <StackPanel IsVisible="{Binding IsPhoneStep}" Spacing="16">
+        <TextBlock Classes="group-footnote" Text="Sign in to find and download music." />
+        <TextBox Name="TelegramPhone" Watermark="Phone number, including country code" Text="{Binding Phone}" AutomationProperties.Name="Phone number" />
+        <Button Name="TelegramSendCode" Classes="accent-card" Content="Continue" Command="{Binding SendCodeCommand}" HorizontalAlignment="Stretch" />
+        <ToggleButton Content="Proxy" IsChecked="{Binding ShowAdvanced}" />
+        <StackPanel IsVisible="{Binding ShowAdvanced}" Spacing="12">
+          <ToggleButton Content="Use proxy" IsChecked="{Binding UseProxy}" />
+          <TextBox Text="{Binding ProxyServer}" Watermark="Server:port or proxy link" AutomationProperties.Name="Proxy server" />
+          <TextBox Text="{Binding ProxySecret}" Watermark="MTProto secret, if needed" PasswordChar="●" AutomationProperties.Name="Proxy secret" />
+        </StackPanel>
+      </StackPanel>
+      <StackPanel IsVisible="{Binding IsCodeStep}" Spacing="16">
+        <TextBlock Classes="group-footnote" Text="Enter the code Telegram sent you." />
+        <TextBox Name="TelegramCode" Text="{Binding Code}" Watermark="Code" AutomationProperties.Name="Telegram code" />
+        <Button Classes="accent-card" Content="Continue" Command="{Binding SubmitCodeCommand}" HorizontalAlignment="Stretch" />
+        <Button Content="Change number" Command="{Binding ChangeNumberCommand}" />
+      </StackPanel>
+      <StackPanel IsVisible="{Binding IsPasswordStep}" Spacing="16">
+        <TextBox Name="TelegramPassword" Text="{Binding Password}" Watermark="Two-step verification password" PasswordChar="●" AutomationProperties.Name="Telegram password" />
+        <Button Classes="accent-card" Content="Sign in" Command="{Binding SubmitPasswordCommand}" HorizontalAlignment="Stretch" />
+        <Button Content="Change number" Command="{Binding ChangeNumberCommand}" />
+      </StackPanel>
+      <StackPanel IsVisible="{Binding IsSignedIn}" Spacing="16">
+        <TextBlock Classes="row-label" Text="{Binding SignedInAs}" />
+        <Button Content="Sign out" Command="{Binding SignOutCommand}" />
+      </StackPanel>
+    </StackPanel>
+    <StackPanel IsVisible="{Binding IsBusy}" Spacing="12">
+      <ProgressBar IsIndeterminate="True" />
+      <TextBlock Text="{Binding StatusText}" Classes="group-footnote" />
+      <Button Content="Cancel" Command="{Binding CancelSignInCommand}" />
+    </StackPanel>
+    <TextBlock Name="TelegramError" Text="{Binding ErrorText}" Classes="group-footnote" TextWrapping="Wrap" />
+  </StackPanel>
+</UserControl>
