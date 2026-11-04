@@ -493,6 +493,18 @@
                                             <views:GridIcon Grid.Column="4" Classes="row-chevron" Data="{DynamicResource PhChevronRight}" />
                                         </Grid>
                                     </Button>
+                                    <StackPanel Name="TelegramGroup" IsVisible="{Binding HasTelegram}">
+                                        <Border Classes="row-separator chipped" />
+                                        <Button Name="TelegramRow" Classes="row" Command="{Binding OpenPaneCommand}"
+                                                CommandParameter="{x:Static vm:SettingsPane.Telegram}" AutomationProperties.Name="{Binding TelegramRowName}">
+                                            <Grid Classes="setting-row" ColumnDefinitions="Auto,*,Auto,Auto">
+                                                <Border Classes="row-chip"><views:GridIcon StrokeThickness="1.8" Data="{DynamicResource SetIconGlobe}" /></Border>
+                                                <TextBlock Grid.Column="1" Classes="row-label" Text="Telegram" />
+                                                <TextBlock Grid.Column="2" Name="TelegramValueLabel" Classes="row-value" Text="{Binding TelegramValue}" />
+                                                <views:GridIcon Grid.Column="3" Classes="row-chevron" Data="{DynamicResource PhChevronRight}" />
+                                            </Grid>
+                                        </Button>
+                                    </StackPanel>
                                     <StackPanel Name="DownloadsGroup" IsVisible="{Binding Shell.HasAccount}">
                                         <Border Classes="row-separator chipped" />
                                         <Button Name="DownloadsRow" Classes="row" Command="{Binding OpenPaneCommand}"
@@ -720,6 +732,9 @@
                         </Panel>
                         <Panel Name="ScrobblingHost" IsVisible="{Binding ShowsScrobblingPane}">
                             <views:ScrobblingPane Name="ScrobblingPane" DataContext="{Binding Scrobbling}" />
+                        </Panel>
+                        <Panel Name="TelegramHost" IsVisible="{Binding ShowsTelegramPane}">
+                            <views:TelegramPane Name="TelegramPane" DataContext="{Binding Telegram}" />
                         </Panel>
                         <Panel Name="HistoryHost" IsVisible="{Binding ShowsHistoryPane}">
                             <views:ListeningHistoryPane Name="HistoryPane" DataContext="{Binding History}" />

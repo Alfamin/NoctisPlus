@@ -95,3 +95,6 @@ dotnet
 # Owner #185: the built-in Telegram app pair is only ever added by the release build
 telegram-defaults.private.json
 telegram-app.dat
+
+# Private Android build inputs (Music Finder Telegram app pair)
+src/Noctis.Android/private/

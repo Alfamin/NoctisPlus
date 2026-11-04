@@ -34,6 +34,7 @@ public partial class AndroidApp : Avalonia.Application, IThemeHost
     private PlatformThemeVariant? _appliedSystem;
     private ShellViewModel? _shell;
     private Media3AudioPlayer? _player;
+    private Mobile.Services.Finder.PhoneFinderHost? _finder;
     private AndroidVolumeControl? _volume;
     private readonly object _accountGate = new();
 
@@ -125,11 +126,16 @@ public partial class AndroidApp : Avalonia.Application, IThemeHost
             // by title, artist and length only (Settings → Lyrics → Find Lyrics Online).
             Online = LrcLibOnlineLyricsSource.Create(persistence.DataDirectory, new HttpClient()),
         };
+        var libraryView = new LibraryViewModel(library, persistence, new AndroidFolderPicker(), history);
+        _finder = CreateFinder(context, library, libraryView);
         var shell = new ShellViewModel(
-            new LibraryViewModel(library, persistence, new AndroidFolderPicker(), history),
+            libraryView,
             nowPlaying,
             lyrics)
         {
+            // Music Finder: this phone's own Telegram sign-in, online Search and downloads.
+            TelegramSignIn = _finder?.SignIn,
+            OnlineSearch = _finder?.Search,
             Outputs = new AndroidOutputSwitcher(context),
             BatterySaver = new AndroidBatterySaver(context),
             Theme = this,
@@ -187,6 +193,50 @@ public partial class AndroidApp : Avalonia.Application, IThemeHost
         _ = StartAsync(persistence, library, history);
 
         base.OnFrameworkInitializationCompleted();
+    }
+
+    /// <summary>The build's packed Telegram app pair (Noctis.Android.csproj NoctisTelegramApp), never in source.</summary>
+    private const string TelegramAppAsset = "telegram-app.dat";
+
+    /// <summary>
+    /// The phone's one Music Finder. Its Telegram session, queue and caches live under NoBackupFilesDir
+    /// (never backed up, never shared with a desktop or test profile); saved songs go to a private folder
+    /// there and join the library one by one. A build without the packed app pair still starts: Settings →
+    /// Telegram then says the setup is missing. Null if it cannot be built; Search is then library only.
+    /// </summary>
+    private static Mobile.Services.Finder.PhoneFinderHost? CreateFinder(Context context, ILibraryService library, LibraryViewModel playlists)
+    {
+        try
+        {
+            var noBackup = context.NoBackupFilesDir!.AbsolutePath;
+            var data = Path.Combine(noBackup, "finder");
+            Directory.CreateDirectory(data);
+            var defaults = Path.Combine(data, TelegramAppAsset);
+            CopyTelegramApp(context, defaults);
+            return new Mobile.Services.Finder.PhoneFinderHost(data, Path.Combine(noBackup, "finder-music"), defaults, library, playlists,
+                work => Dispatcher.UIThread.InvokeAsync(work), line => DebugLog.Write("Finder", line));
+        }
+        catch (Exception ex)
+        {
+            DebugLog.Write("Finder", $"Music Finder unavailable: {ex.GetType().Name}");
+            return null;
+        }
+    }
+
+    /// <summary>Refreshes the private copy of the packed pair from this build (a newer build's pair applies);
+    /// a build without one removes an older build's copy. A pair the user entered is kept in the session store.</summary>
+    private static void CopyTelegramApp(Context context, string target)
+    {
+        try
+        {
+            using var asset = context.Assets!.Open(TelegramAppAsset);
+            using var file = File.Create(target);
+            asset.CopyTo(file);
+        }
+        catch (Java.IO.FileNotFoundException)
+        {
+            File.Delete(target);
+        }
     }
 
     /// <summary>

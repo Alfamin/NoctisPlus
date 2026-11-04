@@ -6,6 +6,7 @@ using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using Noctis.Localization;
 using Noctis.Mobile.Services;
+using Noctis.Mobile.ViewModels.Settings;
 using Noctis.Models;
 using Noctis.Services;
 
@@ -47,7 +48,7 @@ public sealed record SettingsFolder(string Root, string Name, bool AccessLost)
 public sealed record LicenseEntry(string Name, string License, string Detail);
 
 /// <summary>Settings is one sheet: its top level, or one of the pages pushed inside it.</summary>
-public enum SettingsPane { Main, Folders, Lyrics, Background, Scrobbling, History, Accent, PlayerBar, Downloads, WhatsNew, Licenses }
+public enum SettingsPane { Main, Folders, Lyrics, Background, Scrobbling, History, Accent, PlayerBar, Downloads, WhatsNew, Licenses, Telegram }
 
 /// <summary>
 /// Phone Settings. Changes apply at once (theme through the host, text size on the lyrics
@@ -88,6 +89,14 @@ public sealed partial class SettingsPageViewModel : MobilePage
         Background = new BackgroundSettingsViewModel(shell);
         Scrobbling = new ScrobblingSettingsViewModel(shell);
         History = new ListeningHistoryViewModel(shell);
+        if (shell.TelegramSignIn is { } signIn)
+        {
+            Telegram = new TelegramPaneViewModel(signIn)
+            {
+                Downloads = shell.OnlineSearch is { } online ? new FinderDownloadsViewModel(online.Downloads, shell.Marshal) : null,
+            };
+            Telegram.PropertyChanged += OnTelegramChanged;
+        }
         Shell.Library.Folders.CollectionChanged += OnFoldersChanged;
         Shell.Library.PropertyChanged += OnLibraryChanged;
         Shell.Lyrics.PropertyChanged += OnLyricsChanged;
@@ -108,6 +117,12 @@ public sealed partial class SettingsPageViewModel : MobilePage
     public ScrobblingSettingsViewModel Scrobbling { get; }
     public ListeningHistoryViewModel History { get; }
 
+    /// <summary>Settings → Telegram: this phone's own sign-in for Music Finder. Null without a sign-in service.</summary>
+    public TelegramPaneViewModel? Telegram { get; }
+    public bool HasTelegram => Telegram != null;
+    public string TelegramValue => Telegram?.Summary ?? "";
+    public string TelegramRowName => Named("Telegram", TelegramValue);
+
     /// <summary>The clock behind the profile row's "Synced 5 min ago"; tests pin it.</summary>
     internal Func<DateTime> UtcNow { get; init; } = () => DateTime.UtcNow;
 
@@ -126,7 +141,7 @@ public sealed partial class SettingsPageViewModel : MobilePage
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(ShowsFoldersPane), nameof(ShowsLyricsPane), nameof(ShowsBackgroundPane), nameof(ShowsScrobblingPane),
         nameof(ShowsHistoryPane), nameof(ShowsAccentPane), nameof(ShowsPlayerBarPane), nameof(ShowsDownloadsPane),
-        nameof(ShowsWhatsNewPane), nameof(ShowsLicensesPane))]
+        nameof(ShowsWhatsNewPane), nameof(ShowsLicensesPane), nameof(ShowsTelegramPane))]
     private SettingsPane _shownSubPane = SettingsPane.Folders;
 
     public bool IsMainPane => Pane == SettingsPane.Main;
@@ -141,6 +156,7 @@ public sealed partial class SettingsPageViewModel : MobilePage
     public bool ShowsDownloadsPane => ShownSubPane == SettingsPane.Downloads;
     public bool ShowsWhatsNewPane => ShownSubPane == SettingsPane.WhatsNew;
     public bool ShowsLicensesPane => ShownSubPane == SettingsPane.Licenses;
+    public bool ShowsTelegramPane => ShownSubPane == SettingsPane.Telegram;
 
     /// <summary>The header's title: "Settings", or the pushed page's name.</summary>
     public string HeaderTitle => Pane switch
@@ -155,6 +171,7 @@ public sealed partial class SettingsPageViewModel : MobilePage
         SettingsPane.Downloads => "Downloads",
         SettingsPane.WhatsNew => "What's New",
         SettingsPane.Licenses => "Open-Source Licenses",
+        SettingsPane.Telegram => "Telegram",
         _ => Title,
     };
 
@@ -865,6 +882,13 @@ public sealed partial class SettingsPageViewModel : MobilePage
     }
 
     /// <summary>A page's summary changed (the Background, Scrobbling and History view models): its row says the new value.</summary>
+    private void OnTelegramChanged(object? sender, PropertyChangedEventArgs e)
+    {
+        if (e.PropertyName != nameof(TelegramPaneViewModel.Summary)) return;
+        OnPropertyChanged(nameof(TelegramValue));
+        OnPropertyChanged(nameof(TelegramRowName));
+    }
+
     private void OnSubPageChanged(object? sender, PropertyChangedEventArgs e)
     {
         if (e.PropertyName != "Summary") return;
@@ -899,6 +923,7 @@ public sealed partial class SettingsPageViewModel : MobilePage
         Scrobbling.PropertyChanged -= OnSubPageChanged;
         Scrobbling.Detach();
         History.PropertyChanged -= OnSubPageChanged;
+        if (Telegram != null) { Telegram.PropertyChanged -= OnTelegramChanged; Telegram.Dispose(); }
         if (Shell.Account != null) Shell.Account.StateChanged -= OnAccountChanged;
     }
 }

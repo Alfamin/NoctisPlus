@@ -123,6 +123,13 @@ public sealed partial class ShellViewModel : ObservableObject
     /// build that carries a key); null without one, and the page shows the name.</summary>
     public IArtistLogoSource? ArtistLogos { get; init; }
 
+    /// <summary>This installation's own Telegram sign-in (Settings → Telegram). Null in a build or
+    /// host without Music Finder: Settings then shows no Telegram row.</summary>
+    public Noctis.Mobile.Services.Telegram.IPhoneTelegramSignIn? TelegramSignIn { get; init; }
+
+    /// <summary>Music Finder's online search and downloads (phone Search). Null: Search is library only.</summary>
+    public Noctis.Services.Search.IOnlineMusicSearch? OnlineSearch { get; init; }
+
     /// <summary>"Noctis 1.2.3" for Settings → About; the head reads the package version.</summary>
     public string VersionText { get; init; } = "Noctis";
 
@@ -1127,6 +1134,19 @@ public sealed partial class ShellViewModel : ObservableObject
         var page = new SettingsPageViewModel(this);
         Present(page);
         _ = page.LoadAsync();
+    }
+
+    /// <summary>Settings → Telegram (Search's Play/Download while signed out).</summary>
+    public void OpenTelegramSignIn()
+    {
+        if (TelegramSignIn is null) return;
+        if (Pages.OfType<SettingsPageViewModel>().FirstOrDefault() is not { } page)
+        {
+            page = new SettingsPageViewModel(this);
+            Present(page);
+            _ = page.LoadAsync();
+        }
+        page.OpenPaneCommand.Execute(SettingsPane.Telegram);
     }
 
     /// <summary>Settings → Account, pushed inside the Settings sheet.</summary>

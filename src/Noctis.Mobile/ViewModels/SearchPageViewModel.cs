@@ -45,7 +45,20 @@ public sealed partial class SearchPageViewModel : ObservableObject, ISortable
             new SortChoice("Title", SearchSort.Title),
         };
         shell.Library.Refreshed += (_, _) => Run();
+        if (shell.OnlineSearch is { } online)
+            Online = new OnlineResultsViewModel(online, shell.Marshal,
+                tracks => shell.Player.PlayTracks(tracks, 0, "Search"), shell.OpenTelegramSignIn);
+        if (Online != null)
+            Online.PropertyChanged += (_, e) =>
+            {
+                if (e.PropertyName is nameof(OnlineResultsViewModel.HasSongs) or nameof(OnlineResultsViewModel.IsSearching))
+                    OnPropertyChanged(nameof(ShowNoResults));
+            };
     }
+
+    /// <summary>Music Finder's results under the library's (null without Music Finder).</summary>
+    public OnlineResultsViewModel? Online { get; }
+    public bool HasOnline => Online != null;
 
     public ShellViewModel Shell { get; }
 
@@ -103,13 +116,14 @@ public sealed partial class SearchPageViewModel : ObservableObject, ISortable
 
     public bool HasQuery => !string.IsNullOrWhiteSpace(Query);
     public bool ShowPrompt => !HasQuery;
-    public bool ShowNoResults => HasQuery && !HasSongs && !HasAlbums && !HasArtists && !HasPlaylists && !HasFeatured;
+    public bool ShowNoResults => HasQuery && !HasSongs && !HasAlbums && !HasArtists && !HasPlaylists && !HasFeatured
+        && Online is not { HasSongs: true } and not { IsSearching: true };
 
     /// <summary>Albums as a horizontal row under All, as a two-column grid under the Albums chip.</summary>
     public bool ShowAlbumRow => HasAlbums && IsAllScope;
     public bool ShowAlbumGrid => HasAlbums && IsAlbumsScope;
 
-    partial void OnQueryChanged(string value) => Run();
+    partial void OnQueryChanged(string value) { Run(); Online?.Search(value); }
     partial void OnScopeChanged(SearchScope value) => Run();
     partial void OnSortChanged(SearchSort value) => Run();
 

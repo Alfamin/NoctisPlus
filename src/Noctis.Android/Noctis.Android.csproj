@@ -114,6 +114,16 @@
     <TransformFile Include="Libs\FfmpegMetadata.xml" />
   </ItemGroup>
 
+  <!-- Music Finder's Telegram app pair for this build (owner #186 packed format, telegram-app.dat). Never in
+       source: pass -p:NoctisTelegramApp=<path> or put it at private/telegram-app.dat (git-ignored). Without
+       one the app builds and Settings → Telegram explains that the setup is missing. -->
+  <PropertyGroup>
+    <NoctisTelegramApp Condition="'$(NoctisTelegramApp)' == ''">$(MSBuildThisFileDirectory)private/telegram-app.dat</NoctisTelegramApp>
+  </PropertyGroup>
+  <ItemGroup Condition="Exists('$(NoctisTelegramApp)')">
+    <AndroidAsset Include="$(NoctisTelegramApp)" Link="Assets/telegram-app.dat" />
+  </ItemGroup>
+
   <!-- Artist logos (ArtistLogoService): the API keys come from the build, never from the
        repository. Pass -p:NoctisFanartApiKey=... (fanart.tv project key, free at
        https://fanart.tv/get-an-api-key/), optionally -p:NoctisFanartClientKey=... (a personal

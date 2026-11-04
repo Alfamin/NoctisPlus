@@ -2,6 +2,7 @@ using System.Text.RegularExpressions;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using Noctis.Mobile.Services.Telegram;
+using Noctis.Mobile.ViewModels;
 
 namespace Noctis.Mobile.ViewModels.Settings;
 
@@ -34,12 +35,14 @@ public sealed partial class TelegramPaneViewModel : ObservableObject, IDisposabl
     [ObservableProperty] private string _proxySecret = "";
 
     public bool IsSignedIn => Step == TelegramStep.Done;
+    /// <summary>The Settings row's value.</summary>
+    public string Summary => IsSignedIn ? "On" : "Off";
     public bool IsPhoneStep => Step == TelegramStep.Phone;
     public bool IsCodeStep => Step == TelegramStep.Code;
     public bool IsPasswordStep => Step == TelegramStep.Password;
     partial void OnStepChanged(TelegramStep value)
     {
-        OnPropertyChanged(nameof(IsSignedIn)); OnPropertyChanged(nameof(IsPhoneStep));
+        OnPropertyChanged(nameof(IsSignedIn)); OnPropertyChanged(nameof(Summary)); OnPropertyChanged(nameof(IsPhoneStep));
         OnPropertyChanged(nameof(IsCodeStep)); OnPropertyChanged(nameof(IsPasswordStep));
     }
 
@@ -105,7 +108,11 @@ public sealed partial class TelegramPaneViewModel : ObservableObject, IDisposabl
     [RelayCommand]
     private void CancelSignIn() => _attempt?.Cancel();
 
-    public void Dispose() => CancelSignIn();
+    /// <summary>Music Finder's downloads, under the signed-in account (null without Music Finder).</summary>
+    public FinderDownloadsViewModel? Downloads { get; init; }
+    public bool HasDownloads => Downloads != null;
+
+    public void Dispose() { CancelSignIn(); Downloads?.Dispose(); }
 
     private async Task RunAsync(Func<CancellationToken, Task<string?>> call)
     {
@@ -132,7 +139,13 @@ public sealed partial class TelegramPaneViewModel : ObservableObject, IDisposabl
             };
             if (Step == TelegramStep.Done) { SignedInAs = _signIn.SignedInAs; Code = ""; Password = ""; }
         }
-        catch (OperationCanceledException) when (attempt.IsCancellationRequested) { }
+        catch (OperationCanceledException) when (attempt.IsCancellationRequested)
+        {
+            // The account dropped the half-finished login; start again from the number. A signed-in
+            // account is never touched by the reset.
+            try { await _signIn.ResetLoginAsync(); } catch (Exception ex) when (ex is not OutOfMemoryException) { }
+            Step = _signIn.IsLoggedIn ? TelegramStep.Done : TelegramStep.Phone; Code = ""; Password = "";
+        }
         catch (Exception ex) { ErrorText = ShortError(ex); }
         finally { _attempt = null; IsBusy = false; StatusText = null; }
     }

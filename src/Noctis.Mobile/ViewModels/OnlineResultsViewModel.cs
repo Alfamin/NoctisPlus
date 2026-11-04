@@ -1,0 +1,273 @@
+using System.Collections.ObjectModel;
+using CommunityToolkit.Mvvm.ComponentModel;
+using CommunityToolkit.Mvvm.Input;
+using Noctis.Models;
+using Noctis.Services.Search;
+
+namespace Noctis.Mobile.ViewModels;
+
+/// <summary>One online song row under the library results.</summary>
+public sealed partial class OnlineSongItem(OnlineSong song) : ObservableObject
+{
+    public OnlineSong Song { get; } = song;
+    public string Title => Song.Title;
+    public string Subtitle => Song.Album.Length > 0 ? $"{Song.ArtistDisplay} · {Song.Album}" : Song.ArtistDisplay;
+    [ObservableProperty] private string? _artworkPath;
+    [ObservableProperty] private string _status = "";
+    [ObservableProperty] private double _progress;
+    [ObservableProperty] private bool _isWorking;
+    /// <summary>Queued, downloading or saved: Download does nothing more.</summary>
+    [ObservableProperty] private bool _isRequested;
+}
+
+/// <summary>
+/// The online half of phone Search (Music Finder). Library results stay synchronous in
+/// <see cref="SearchPageViewModel"/>; this asks the online source after a short pause in typing, and
+/// only the latest query's answers are shown (each new query cancels the last). A song the library
+/// already has (the source's recording match, <see cref="OnlineSong.LocalTrackId"/>) is left to the
+/// library row. A tap on Play or Download for a song that is already being fetched or queued does
+/// nothing, so repeated taps never repeat a bot request.
+/// </summary>
+public sealed partial class OnlineResultsViewModel : ObservableObject, IDisposable
+{
+    internal const int SongCap = 10;
+    internal static readonly TimeSpan Debounce = TimeSpan.FromMilliseconds(450);
+
+    private readonly IOnlineMusicSearch _source;
+    private readonly Action<Action> _marshal;
+    private readonly Func<TimeSpan, CancellationToken, Task> _delay;
+    private readonly Action<IReadOnlyList<Track>> _play;
+    private readonly Action _signIn;
+    private CancellationTokenSource? _query;
+    private CancellationTokenSource? _playing;
+    private readonly HashSet<string> _inFlight = new(StringComparer.Ordinal);
+    private int _generation;
+
+    public OnlineResultsViewModel(IOnlineMusicSearch source, Action<Action> marshal, Action<IReadOnlyList<Track>> play,
+        Action signIn, Func<TimeSpan, CancellationToken, Task>? delay = null)
+    {
+        _source = source; _marshal = marshal; _play = play; _signIn = signIn;
+        _delay = delay ?? Task.Delay;
+        _source.DownloadsChanged += OnDownloadsChanged;
+    }
+
+    public ObservableCollection<OnlineSongItem> Songs { get; } = new();
+    [ObservableProperty] [NotifyPropertyChangedFor(nameof(HasSongs))] private int _songCount;
+    [ObservableProperty] private bool _isSearching;
+    [ObservableProperty] private string? _message;
+    public bool HasSongs => SongCount > 0;
+
+    /// <summary>The query changed. Empty clears at once; otherwise the online search starts after
+    /// <see cref="Debounce"/> unless another change comes first.</summary>
+    public void Search(string? text)
+    {
+        _query?.Cancel();
+        var generation = ++_generation;
+        var query = text?.Trim() ?? "";
+        Songs.Clear(); SongCount = 0; Message = null;
+        if (query.Length < 2) { IsSearching = false; return; }
+        var cts = _query = new CancellationTokenSource();
+        IsSearching = true;
+        _ = RunAsync(query, generation, cts.Token);
+    }
+
+    private async Task RunAsync(string query, int generation, CancellationToken ct)
+    {
+        try
+        {
+            await _delay(Debounce, ct).ConfigureAwait(false);
+            _source.WarmUp();
+            await foreach (var result in _source.SearchAsync(query, ct).ConfigureAwait(false))
+            {
+                ct.ThrowIfCancellationRequested();
+                // The source's recording match: the library row already stands for it.
+                var songs = result.Songs.Where(s => s.LocalTrackId is null).DistinctBy(s => s.Id).Take(SongCap).ToList();
+                _marshal(() => { if (generation == _generation) Show(songs, result.Warning); });
+                if (result.Complete) break;
+            }
+        }
+        catch (OperationCanceledException) when (ct.IsCancellationRequested) { return; }
+        catch (Exception ex) when (ex is not OutOfMemoryException)
+        {
+            _marshal(() => { if (generation == _generation) Message = "Online search failed. Try again"; });
+        }
+        finally
+        {
+            _marshal(() => { if (generation == _generation) IsSearching = false; });
+        }
+    }
+
+    private void Show(IReadOnlyList<OnlineSong> songs, string warning)
+    {
+        var known = Songs.ToDictionary(i => i.Song.Id);
+        Songs.Clear();
+        foreach (var song in songs)
+        {
+            var item = known.TryGetValue(song.Id, out var old) ? old : new OnlineSongItem(song);
+            Songs.Add(item);
+            Refresh(item);
+            if (item.ArtworkPath is null && song.ArtworkUrl.Length > 0)
+            {
+                item.ArtworkPath = _source.CachedArtwork(song.ArtworkUrl);
+                if (item.ArtworkPath is null) _ = FetchArtworkAsync(item, _query?.Token ?? default);
+            }
+        }
+        SongCount = Songs.Count;
+        Message = warning.Length > 0 ? warning : null;
+    }
+
+    private async Task FetchArtworkAsync(OnlineSongItem item, CancellationToken ct)
+    {
+        try
+        {
+            var path = await _source.ArtworkAsync(item.Song.ArtworkUrl, ct).ConfigureAwait(false);
+            if (path != null) _marshal(() => item.ArtworkPath = path);
+        }
+        catch (Exception ex) when (ex is not OutOfMemoryException) { }
+    }
+
+    /// <summary>Plays the song once its file is complete (the phone has no progressive reader yet).
+    /// The latest tapped song wins; a played song stays out of Songs (stream cache).</summary>
+    [RelayCommand]
+    private async Task PlayAsync(OnlineSongItem? item)
+    {
+        if (item is null) return;
+        if (!_source.CanDownload) { Message = "Sign in to Telegram to play online songs"; _signIn(); return; }
+        if (!_inFlight.Add(item.Song.Id)) return;
+        _playing?.Cancel();
+        using var cts = _playing = new CancellationTokenSource();
+        item.IsWorking = true; Message = null;
+        try
+        {
+            var track = await _source.PreparePlaybackAsync(item.Song, keep: false, cts.Token);
+            if (!cts.IsCancellationRequested) _play([track]);
+        }
+        catch (OperationCanceledException) when (cts.IsCancellationRequested) { }
+        catch (Exception ex) when (ex is not OutOfMemoryException) { Message = Short(ex); }
+        finally
+        {
+            _inFlight.Remove(item.Song.Id); item.IsWorking = false;
+            if (ReferenceEquals(_playing, cts)) _playing = null;
+            Refresh(item);
+        }
+    }
+
+    [RelayCommand]
+    private async Task DownloadAsync(OnlineSongItem? item)
+    {
+        if (item is null) return;
+        if (!_source.CanDownload) { Message = "Sign in to Telegram to download"; _signIn(); return; }
+        Refresh(item);
+        if (item.IsRequested || !_inFlight.Add("dl:" + item.Song.Id)) return;
+        try { Message = await _source.DownloadAsync([item.Song], now: false, CancellationToken.None); }
+        catch (Exception ex) when (ex is not OutOfMemoryException) { Message = Short(ex); }
+        finally { _inFlight.Remove("dl:" + item.Song.Id); Refresh(item); }
+    }
+
+    private void Refresh(OnlineSongItem item)
+    {
+        var status = _source.StatusOf(item.Song);
+        item.Progress = status.Progress;
+        item.IsRequested = status.State is OnlineDownloadState.Queued or OnlineDownloadState.Downloading or OnlineDownloadState.Saved;
+        item.Status = status.State switch
+        {
+            OnlineDownloadState.Queued => "Queued",
+            OnlineDownloadState.Downloading => $"{Math.Clamp(status.Progress, 0, 1):P0}",
+            OnlineDownloadState.Saved => "Saved",
+            OnlineDownloadState.Failed => status.Message.Length > 0 ? status.Message : "Failed",
+            _ => "",
+        };
+    }
+
+    private int _refreshQueued;
+    private void OnDownloadsChanged(object? sender, EventArgs e)
+    {
+        // Progress fires often and on any thread: one refresh pass at a time on the UI thread.
+        if (Interlocked.Exchange(ref _refreshQueued, 1) == 1) return;
+        _marshal(() => { Volatile.Write(ref _refreshQueued, 0); foreach (var item in Songs) Refresh(item); });
+    }
+
+    internal static string Short(Exception ex)
+    {
+        var m = ex.Message ?? "";
+        var colon = m.IndexOf(": ", StringComparison.Ordinal);
+        // Finder errors read "CODE: sentence"; show the sentence only.
+        var text = colon > 0 && m[..colon].All(c => char.IsUpper(c) || c == '_') ? m[(colon + 2)..] : m;
+        return text.Length is > 0 and <= 140 ? text : "Couldn't get this song. Try again";
+    }
+
+    public void Dispose()
+    {
+        _source.DownloadsChanged -= OnDownloadsChanged;
+        _query?.Cancel(); _playing?.Cancel();
+    }
+}
+
+/// <summary>Music Finder's download queue on the phone: progress, pause/resume, retry, remove, clear.</summary>
+public sealed partial class FinderDownloadsViewModel : ObservableObject, IDisposable
+{
+    private readonly IDownloadQueue _queue;
+    private readonly Action<Action> _marshal;
+    private int _refreshQueued;
+
+    public FinderDownloadsViewModel(IDownloadQueue queue, Action<Action> marshal)
+    {
+        _queue = queue; _marshal = marshal;
+        _queue.Changed += OnChanged;
+        Refresh();
+    }
+
+    public ObservableCollection<DownloadRow> Entries { get; } = new();
+    [ObservableProperty] [NotifyPropertyChangedFor(nameof(PauseLabel))] private bool _isPaused;
+    [ObservableProperty] private bool _hasEntries;
+    [ObservableProperty] private bool _hasFailed;
+    public string PauseLabel => IsPaused ? "Resume" : "Pause";
+
+    internal void Refresh()
+    {
+        var rows = _queue.Snapshot().Select(e => new DownloadRow(e)).ToList();
+        Entries.Clear();
+        foreach (var row in rows) Entries.Add(row);
+        IsPaused = _queue.IsPaused;
+        HasEntries = Entries.Count > 0;
+        HasFailed = rows.Any(r => r.Entry.State == OnlineDownloadState.Failed);
+    }
+
+    [RelayCommand] private void TogglePause() { _queue.SetPaused(!_queue.IsPaused); Refresh(); }
+    [RelayCommand] private void RetryFailed() { _queue.RetryFailed(); Refresh(); }
+    [RelayCommand] private void Clear() { Run(_queue.Clear); }
+    [RelayCommand] private void Remove(DownloadRow? row) { if (row != null) Run(() => _queue.Remove(row.Entry)); }
+    [ObservableProperty] private string? _errorText;
+
+    /// <summary>A storage failure (the queue file cannot be written) is shown, never swallowed: the request stays.</summary>
+    private void Run(Action change)
+    {
+        ErrorText = null;
+        try { change(); }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException) { ErrorText = "Couldn't save the download list. Check storage"; }
+        Refresh();
+    }
+
+    private void OnChanged(object? sender, EventArgs e)
+    {
+        if (Interlocked.Exchange(ref _refreshQueued, 1) == 1) return;
+        _marshal(() => { Volatile.Write(ref _refreshQueued, 0); Refresh(); });
+    }
+
+    public void Dispose() => _queue.Changed -= OnChanged;
+}
+
+public sealed record DownloadRow(DownloadEntry Entry)
+{
+    public string Title => Entry.Title;
+    public string Subtitle => Entry.State switch
+    {
+        OnlineDownloadState.Queued => Entry.IsHeld ? $"{Entry.Artist} · Waiting" : $"{Entry.Artist} · Queued",
+        OnlineDownloadState.Downloading => $"{Entry.Artist} · {Math.Clamp(Entry.Progress, 0, 1):P0}",
+        OnlineDownloadState.Saved => $"{Entry.Artist} · Saved",
+        OnlineDownloadState.Failed => Entry.Detail.Length > 0 ? $"{Entry.Artist} · {Entry.Detail}" : $"{Entry.Artist} · Failed",
+        _ => Entry.Artist,
+    };
+    public double Progress => Entry.Progress;
+    public bool IsRunning => Entry.State == OnlineDownloadState.Downloading;
+}

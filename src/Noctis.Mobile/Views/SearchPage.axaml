@@ -256,6 +256,50 @@
                         </ItemsControl.ItemTemplate>
                     </ItemsControl>
                 </StackPanel>
+
+                <!-- Music Finder: songs online, under the library's own. -->
+                <StackPanel Name="OnlineSection" Spacing="4" IsVisible="{Binding HasOnline}">
+                    <StackPanel DataContext="{Binding Online}" x:DataType="vm:OnlineResultsViewModel" Spacing="4">
+                        <TextBlock Classes="section" Text="Online" Margin="8,0" IsVisible="{Binding HasSongs}" />
+                        <ProgressBar Name="OnlineSearching" IsIndeterminate="True" Height="2" Margin="8,0" IsVisible="{Binding IsSearching}" />
+                        <TextBlock Name="OnlineMessage" Classes="row-sub" Margin="8,0" TextWrapping="Wrap" Text="{Binding Message}"
+                                   IsVisible="{Binding Message, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
+                        <ItemsControl Name="OnlineSongResults" ItemsSource="{Binding Songs}">
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate x:DataType="vm:OnlineSongItem">
+                                    <Grid ColumnDefinitions="*,Auto" Height="60" Margin="8,0">
+                                        <Button Classes="row" AutomationProperties.Name="{Binding Title}"
+                                                Command="{Binding $parent[views:SearchPage].((vm:SearchPageViewModel)DataContext).Online.PlayCommand}"
+                                                CommandParameter="{Binding}">
+                                            <Grid ColumnDefinitions="Auto,*">
+                                                <Border Classes="art" Width="44" Height="44">
+                                                    <Panel>
+                                                        <PathIcon Data="{DynamicResource ChipSongsIcon}" Width="18" Height="18" Opacity="0.5" />
+                                                        <controls:CachedImage SourcePath="{Binding ArtworkPath}" DecodeWidth="128" Stretch="UniformToFill" />
+                                                    </Panel>
+                                                </Border>
+                                                <StackPanel Grid.Column="1" Margin="12,0,8,0" VerticalAlignment="Center">
+                                                    <TextBlock Classes="row-title" Text="{Binding Title}" />
+                                                    <TextBlock Classes="row-sub" Text="{Binding Subtitle}" />
+                                                </StackPanel>
+                                            </Grid>
+                                        </Button>
+                                        <Panel Grid.Column="1" VerticalAlignment="Center">
+                                            <ProgressBar IsIndeterminate="True" Width="28" IsVisible="{Binding IsWorking}" />
+                                            <TextBlock Classes="row-sub" Text="{Binding Status}" VerticalAlignment="Center"
+                                                       IsVisible="{Binding IsRequested}" />
+                                            <Button Classes="row" Width="44" Height="44" AutomationProperties.Name="Download"
+                                                    Command="{Binding $parent[views:SearchPage].((vm:SearchPageViewModel)DataContext).Online.DownloadCommand}"
+                                                    CommandParameter="{Binding}" IsVisible="{Binding !IsRequested}">
+                                                <PathIcon Data="{DynamicResource SetIconDownload}" Width="18" Height="18" />
+                                            </Button>
+                                        </Panel>
+                                    </Grid>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                    </StackPanel>
+                </StackPanel>
             </StackPanel>
         </ScrollViewer>
     </Grid>

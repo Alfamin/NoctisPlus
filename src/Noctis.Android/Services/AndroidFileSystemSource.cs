@@ -35,8 +35,12 @@ public sealed class AndroidFileSystemSource : IFileSystemSource
         _resolver = context.ContentResolver ?? throw new InvalidOperationException("No ContentResolver");
     }
 
+    /// <summary>An ordinary directory (not a SAF tree) is walked as on the desktop.</summary>
+    private static readonly LocalFileSystemSource Paths = new();
+
     public bool RootExists(string root)
     {
+        if (PathTrackFileAccess.IsFilePath(root)) return Paths.RootExists(root);
         try
         {
             var tree = DocumentFile.FromTreeUri(_context, AUri.Parse(root)!);
@@ -55,6 +59,13 @@ public sealed class AndroidFileSystemSource : IFileSystemSource
         IReadOnlyCollection<string> excludedRoots,
         IReadOnlySet<string> ignoredFolderNames,
         Action<string> reportFailedDirectory)
+    {
+        if (PathTrackFileAccess.IsFilePath(root))
+            return Paths.EnumerateAudioFiles(root, excludedRoots, ignoredFolderNames, reportFailedDirectory);
+        return EnumerateTree(root, ignoredFolderNames, reportFailedDirectory);
+    }
+
+    private IEnumerable<ScanEntry> EnumerateTree(string root, IReadOnlySet<string> ignoredFolderNames, Action<string> reportFailedDirectory)
     {
         var treeUri = AUri.Parse(root)!;
         var stack = new Stack<string>();

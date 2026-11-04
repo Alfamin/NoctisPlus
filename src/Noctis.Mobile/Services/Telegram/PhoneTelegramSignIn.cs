@@ -15,8 +15,14 @@ internal sealed class PhoneTelegramSignIn(FinderSession finder) : IPhoneTelegram
         if (IsLoggedIn) return null;
         if (!finder.Telegram.HasCredentials) throw new InvalidOperationException("TELEGRAM_APP_MISSING");
         finder.SetProxy(proxyServer, proxySecret);
-        return await finder.Telegram.StartLoginAsync(finder.Telegram.ApiId, finder.Telegram.ApiHash, phone, ct).ConfigureAwait(false);
+        var (id, hash) = LoginPair(finder.Telegram.UsesBuiltInApi, finder.Telegram.ApiId, finder.Telegram.ApiHash);
+        return await finder.Telegram.StartLoginAsync(id, hash, phone, ct).ConfigureAwait(false);
     }
+
+    /// <summary>Owner #185 on the phone too: the build's packed pair is used but never saved as the user's own
+    /// (0/"" reads it at connect time, so a newer build's pair applies); a pair of the user's own stays theirs.</summary>
+    internal static (int Id, string Hash) LoginPair(bool usesBuiltIn, int id, string hash)
+        => usesBuiltIn ? (0, "") : (id, hash);
 
     public Task<string?> ContinueLoginAsync(string answer, CancellationToken ct = default)
         => finder.Telegram.ContinueLoginAsync(answer, ct);

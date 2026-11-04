@@ -333,17 +333,66 @@ public sealed partial class LibraryViewModel : ObservableObject
     /// </summary>
     private async Task EditPlaylistsAsync(Action<List<Playlist>> edit)
     {
+        await _playlistEdits.WaitAsync();
         try
         {
-            _playlists = await _persistence.LoadPlaylistsAsync();
+            try
+            {
+                _playlists = await _persistence.LoadPlaylistsAsync();
+            }
+            catch (Exception ex)
+            {
+                // Edit what this view model has, as before; better than losing the edit.
+                DebugLog.Write("Library", $"Playlist re-read failed: {ex.Message}");
+            }
+            edit(_playlists);
+            await SavePlaylistsAsync();
         }
-        catch (Exception ex)
+        finally { _playlistEdits.Release(); }
+    }
+
+    /// <summary>One playlist edit at a time: a Music Finder import landing between a user edit's
+    /// read and save would otherwise be lost (or the other way round).</summary>
+    private readonly SemaphoreSlim _playlistEdits = new(1, 1);
+
+    /// <summary>
+    /// Music Finder's playlist import on the phone (desktop parity: SidebarViewModel.ApplyImportedPlaylistAsync).
+    /// Same rules: a deleted import is not recreated, a playlist the user reordered or edited is left alone
+    /// (<paramref name="expected"/> is what the import last wrote), and a matched song that is gone stops the
+    /// change. Unlike the user's own edits, a failed read or save is thrown so the import does not record a
+    /// fill that never reached playlists.json.
+    /// </summary>
+    internal async Task ApplyImportedPlaylistAsync(Guid id, string name, string description,
+        IReadOnlyList<Guid> tracks, bool create, IReadOnlyList<Guid> expected, IReadOnlyList<Guid>? remappedExpected,
+        IReadOnlySet<Guid> available)
+    {
+        await _playlistEdits.WaitAsync();
+        try
         {
-            // Edit what this view model has, as before; better than losing the edit.
-            DebugLog.Write("Library", $"Playlist re-read failed: {ex.Message}");
+            var list = await _persistence.LoadPlaylistsAsync();
+            var playlist = list.FirstOrDefault(p => p.Id == id);
+            if (playlist is null && !create)
+                throw new InvalidOperationException("PLAYLIST_REMOVED: You deleted the imported Noctis playlist. It will not be recreated automatically.");
+            var added = playlist is null;
+            playlist ??= new Playlist { Id = id, Name = name, Description = description, SortMode = "Manual" };
+            if (playlist.IsSmartPlaylist)
+                throw new InvalidOperationException("PLAYLIST_EDITED: Automatic filling stopped because this became a smart playlist.");
+            var oldIds = playlist.TrackIds.ToList();
+            if (!added && oldIds.SequenceEqual(tracks)) { _playlists = list; return; }
+            if (!added && (playlist.Description != description || !oldIds.SequenceEqual(expected) &&
+                (remappedExpected is null || !oldIds.SequenceEqual(remappedExpected))))
+                throw new InvalidOperationException("PLAYLIST_EDITED: You changed this playlist or its order. Automatic filling stopped to preserve your edits.");
+            if (tracks.Any(t => !available.Contains(t) && !oldIds.Contains(t)))
+                throw new IOException("LIBRARY_CHANGED: A matched file moved or disappeared. Check the library again; no playlist changes were made.");
+            playlist.TrackIds = tracks.ToList();
+            playlist.ModifiedAt = DateTime.UtcNow;
+            if (added) list.Add(playlist);
+            await _persistence.SavePlaylistsAsync(list);
+            _playlists = list;
+            PlaylistCount = _playlists.Count;
+            AfterUserEdit();
         }
-        edit(_playlists);
-        await SavePlaylistsAsync();
+        finally { _playlistEdits.Release(); }
     }
 
     private async Task SavePlaylistsAsync()

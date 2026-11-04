@@ -22,7 +22,7 @@ internal sealed class FinderSession : IDisposable
     public event Action<string>? Notice;
 
     public FinderSession(string data, string music, IPlaylistLibrary library, Func<ILibraryService?> service,
-        Action<string> log, string? defaultsPath = null)
+        Action<string> log, string? defaultsPath = null, bool completeFilesOnly = false)
     {
         DataFolder = Path.GetFullPath(data); MusicFolder = Path.GetFullPath(music); _log = log;
         Directory.CreateDirectory(data); Directory.CreateDirectory(music);
@@ -53,7 +53,7 @@ internal sealed class FinderSession : IDisposable
         Playlists = new SpotifyPlaylists(Path.Combine(data, "spotify-playlists.json"), library, Downloads, _sources.Track,
             new PlaylistCatalog(PlaylistCatalog.MetadataHandler("", log)));
         Online = new FinderOnlineSearch(() => _catalog, _actions, Pages, () => Telegram.IsLoggedIn,
-            () => Say("Sign in to Telegram"), () => Playlists);
+            () => Say("Sign in to Telegram"), () => Playlists) { RequireCompleteFile = completeFilesOnly };
     }
 
     public void SetProxy(string? server, string? secret)

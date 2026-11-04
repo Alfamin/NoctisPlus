@@ -39,6 +39,8 @@ internal sealed class FinderOnlineSearch : IOnlineMusicSearch
 
     /// <summary>Owner #147: the "Download ahead" choice (0-4 songs).</summary>
     internal Func<int> DownloadAhead { get; init; } = () => StreamCache.DefaultAhead;
+    /// <summary>Play only a finished file, never the progressive buffer (hosts without a progressive reader).</summary>
+    internal bool RequireCompleteFile { get; init; }
     /// <summary>Owner #166: For you's list of artists never to recommend (null while For you is off).</summary>
     internal Func<DiscoverHidden?> ForYouHidden { get; init; } = () => null;
     public int DownloadAheadSongs => Math.Clamp(DownloadAhead(), 0, StreamCache.MaxAhead);
@@ -538,7 +540,9 @@ internal sealed class FinderOnlineSearch : IOnlineMusicSearch
                 if (_actions.Downloads.IsCached(download)) StreamCache.Touch(saved); // played again: its days start over
                 return Make(saved);
             }
-            if (!restored && download.Playback?.ReadyPath is { } ready) return Make(ready);
+            // A host without a progressive reader (the phone's Media3, for now) waits for the complete file:
+            // a growing path is not a stream it can read to the end.
+            if (!restored && !RequireCompleteFile && download.Playback?.ReadyPath is { } ready) return Make(ready);
             // A temporary outage/rate-limit wait must not be mistaken for a missing recording.
             // Stay on the same request; user skip/pause still cancels this wait immediately.
             if (download.State == DownloadState.Failed)

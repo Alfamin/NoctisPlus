@@ -31,11 +31,14 @@ public sealed class SafTrackFileAccess : ITrackFileAccess
     };
 
     private readonly ContentResolver _resolver;
+    private static readonly PathTrackFileAccess Files = new();
 
     public SafTrackFileAccess(Context context) => _resolver = context.ContentResolver!;
 
     public SidecarFile? ReadSidecar(string trackPath, IReadOnlyList<string> extensions)
     {
+        // Music Finder's private downloads are ordinary files: read their sidecars by path.
+        if (PathTrackFileAccess.IsFilePath(trackPath)) return Files.ReadSidecar(trackPath, extensions);
         try
         {
             if (!trackPath.StartsWith("content://", StringComparison.Ordinal)) return null;
@@ -83,7 +86,7 @@ public sealed class SafTrackFileAccess : ITrackFileAccess
         {
             return trackPath.StartsWith("content://", StringComparison.Ordinal)
                 ? AndroidFileSystemSource.OpenSeekable(_resolver, AUri.Parse(trackPath)!)
-                : null;
+                : Files.OpenAudio(trackPath);
         }
         catch (Exception ex)
         {
