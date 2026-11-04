@@ -150,6 +150,57 @@ keystore kept as a repo secret so updates install over each other.
 Each stage: full desktop gates (Noctis.Tests + FreeMusicFinder.Tests) green, Android head compiles,
 live check on the owner's phone or an emulator before DONE.
 
+## Performance budgets (owner: performance matters)
+
+Measure these with tests or benchmarks; a stage is not DONE if it misses one.
+- Sync never runs on the UI thread and adds no more than 50 ms to app start (it starts after the first frame).
+- Merging 10,000 songs + 10,000 track states: under 200 ms on the PC, under 1 s on a mid-range phone.
+- Snapshot of a 10,000-song library: under 2 MB gzip, built in under 500 ms.
+- Reading 100 new log posts: one history call per 100 posts; no per-item network calls.
+- Live updates: use WTelegramClient's update stream while the app is open (no tight polling);
+  when updates are not flowing, poll at most every 2 minutes in the foreground. On the phone in the
+  background: no polling at all except an Android WorkManager job (Wi-Fi, at most every 6 hours, off by default).
+- Transfers stream to disk in chunks (never a whole file in memory); one upload and one download
+  at a time; playback and the Finder's play requests always go before background sync transfers.
+- Battery/data on the phone: auto-download Wi-Fi only by default, optional "only while charging".
+- Telegram calls are paced and honour FLOOD_WAIT; never more than about 1 post per few seconds,
+  forwards at most about 1 per 2 s.
+
+## Edge cases to handle (each needs a test)
+
+Sync and identity
+- Same song added on both devices while apart (different document ids): one library entry
+  (recording-key match), the other copy is kept as an alternate source, not shown twice.
+- A song removed on one device while the other changes its heart or play count: removal wins for
+  membership, the state is kept (it comes back if the song is added again).
+- **Play counts must not be lost**: plays on two devices while apart must add up. Store play counts
+  per device (each device owns its own counter, total = sum) instead of last-writer-wins on one number.
+- **Playlists edited on both devices while apart**: merge additions and removals per song
+  (add/remove sets with timestamps) instead of replacing the whole playlist; order: last writer.
+- A device offline for months: snapshot + newer posts; posts older than the snapshot may be gone.
+- Posts read twice, out of order, or with gaps: idempotent apply by (device, seq).
+- Device clock wrong by hours: existing clamp rule.
+- The LAN sync (heartached's protocol) and Telegram sync both active: the same change must not be
+  applied twice or counted twice.
+
+Telegram
+- Sync or Library channel deleted or left by the user: detect, recreate from local state, tell the user once.
+- Phone and PC signed in to **different** Telegram accounts: detect by user id and refuse to sync, say why.
+- Telegram session revoked or signed out on one device: stop sync, show sign-in, keep local data.
+- Bot message deleted, bot chat cleared, expired file reference: re-read, else fall back to another
+  copy (Library channel), else mark the song "missing online" without deleting the local file.
+- FLOOD_WAIT storms and FLOOD_PREMIUM_WAIT: back off, keep the queue, show progress, never spin.
+- VPN or proxy drops mid-transfer: resume from the last finished part, no corrupt files.
+
+Files
+- Partial downloads: write to a temp file, verify size (and hash when known), then atomic rename.
+- Storage full on the phone; the music folder's Android (SAF) permission lost: pause, tell the user, no retry loop.
+- File name collisions and names invalid on the other OS; Persian/Arabic titles (Unicode
+  normalisation NFC, right-to-left text), very long names.
+- The user deletes a downloaded file by hand: the next scan notices; it is not re-downloaded
+  unless the song is still in the synced library and auto-download is on (then it is, once).
+- Same file already in the local library under another path: link it, don't download again.
+
 ## Research notes (2026-11-04)
 
 - Telegram API terms: https://core.telegram.org/api/terms
