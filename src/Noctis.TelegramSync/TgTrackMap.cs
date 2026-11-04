@@ -25,27 +25,41 @@ public sealed class TgTrackMap
 
     public void Set(long documentId, string trackId)
     {
-        if (_byDoc.TryGetValue(documentId, out var oldTrack)) _byTrack.Remove(oldTrack);
-        if (_byTrack.TryGetValue(trackId, out var oldDoc)) _byDoc.Remove(oldDoc);
+        ArgumentOutOfRangeException.ThrowIfNegativeOrZero(documentId);
+        ArgumentException.ThrowIfNullOrWhiteSpace(trackId);
+        if (_byDoc.TryGetValue(documentId, out var oldTrack) && oldTrack != trackId) Remove(documentId);
         _byDoc[documentId] = trackId;
-        _byTrack[trackId] = documentId;
+        _byTrack.TryAdd(trackId, documentId); // aliases keep the first usable home as the primary one
     }
 
     public bool Remove(long documentId)
     {
         if (!_byDoc.Remove(documentId, out var t)) return false;
-        _byTrack.Remove(t);
+        if (_byTrack.GetValueOrDefault(t) == documentId)
+        {
+            _byTrack.Remove(t);
+            foreach (var other in _byDoc)
+                if (other.Value == t) { _byTrack[t] = other.Key; break; }
+        }
         return true;
     }
 
     /// <summary>Already mapped, or a local file with the same size and recording key: map + return its track id. Null = download.</summary>
     public string? LinkOrNull(TgDocument doc, string recordingKey, IEnumerable<TgLocalFile> local)
     {
-        if (TrackFor(doc.DocumentId) is { } known) return known;
-        foreach (var f in local)
+        var files = local.ToList();
+        if (TrackFor(doc.DocumentId) is { } known)
+        {
+            if (files.Any(f => f.TrackId == known && File.Exists(f.Path))) return known;
+            Remove(doc.DocumentId); // A stale link must not prevent downloading the file again.
+        }
+        if (string.IsNullOrWhiteSpace(recordingKey) || doc.Size <= 0) return null;
+        foreach (var f in files)
         {
             if (f.Size != doc.Size || !string.Equals(f.RecordingKey, recordingKey, StringComparison.Ordinal)) continue;
-            if (_byTrack.ContainsKey(f.TrackId)) continue;
+            if (!File.Exists(f.Path)) continue;
+            // Another Telegram document may contain this exact local recording.
+            // LinkOrNull returns it without replacing its primary document mapping.
             Set(doc.DocumentId, f.TrackId);
             return f.TrackId;
         }
@@ -56,10 +70,8 @@ public sealed class TgTrackMap
     {
         var dir = Path.GetDirectoryName(Path.GetFullPath(_path))!;
         Directory.CreateDirectory(dir);
-        var tmp = _path + ".tmp";
         var data = _byDoc.ToDictionary(kv => kv.Key.ToString(System.Globalization.CultureInfo.InvariantCulture), kv => kv.Value);
-        File.WriteAllText(tmp, JsonSerializer.Serialize(new MapFile(1, data)));
-        File.Move(tmp, _path, overwrite: true);
+        TgStateFile.Write(_path, JsonSerializer.SerializeToUtf8Bytes(new MapFile(1, data)));
     }
 
     private void Load()
@@ -68,9 +80,9 @@ public sealed class TgTrackMap
         try
         {
             var f = JsonSerializer.Deserialize<MapFile>(File.ReadAllText(_path));
-            if (f?.Map is null) return;
+            if (f is not { V: 1, Map: not null }) return;
             foreach (var (k, v) in f.Map)
-                if (long.TryParse(k, System.Globalization.NumberStyles.Integer, System.Globalization.CultureInfo.InvariantCulture, out var id))
+                if (!string.IsNullOrWhiteSpace(v) && long.TryParse(k, System.Globalization.NumberStyles.Integer, System.Globalization.CultureInfo.InvariantCulture, out var id) && id > 0)
                     Set(id, v);
         }
         catch (JsonException) { /* corrupt file: start empty, files re-link by size + recording key */ }
@@ -84,7 +96,7 @@ public sealed record TgSnapshotRule(int Every = 200)
 {
     public bool SnapshotDue(long postsSinceSnapshot) => postsSinceSnapshot >= Every;
 
-    /// <summary>A post may be deleted once a later snapshot covers it (its id is below the snapshot's message id).</summary>
-    public bool CanDelete(long postMessageId, long? lastSnapshotMessageId) =>
-        lastSnapshotMessageId is { } s && postMessageId < s;
+    /// <summary>Only delete posts the snapshot actually contains, not posts merely older than its upload.</summary>
+    public bool CanDelete(long postMessageId, long? snapshotUpToMessageId) =>
+        postMessageId > 0 && snapshotUpToMessageId is { } covered && postMessageId <= covered;
 }

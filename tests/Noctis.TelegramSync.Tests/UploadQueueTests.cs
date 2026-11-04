@@ -30,7 +30,7 @@ public sealed class UploadQueueTests
         var (drive, ch, dir) = Setup();
         try
         {
-            var q = new TgUploadQueue(drive, ch);
+            var q = new TgUploadQueue(drive, ch) { MinGap = TimeSpan.Zero };
             q.Enqueue(Song(dir, "a.mp3"), Meta("One"));
             q.Enqueue(Song(dir, "b.mp3"), Meta("Two"));
             Assert.Equal(TgTransferResult.Done, await q.RunNextAsync());
@@ -75,7 +75,7 @@ public sealed class UploadQueueTests
         try
         {
             var allowed = false;
-            var q = new TgUploadQueue(drive, ch, () => allowed);
+            var q = new TgUploadQueue(drive, ch, () => allowed) { MinGap = TimeSpan.Zero };
             q.Enqueue(Song(dir, "a.mp3"), Meta("One"));
             Assert.Equal(TgTransferResult.Paused, await q.RunNextAsync());
             allowed = true;

@@ -28,6 +28,9 @@ public sealed class FakeTelegramDrive : ITelegramDrive
     public int Posts { get; private set; }
     /// <summary>Runs while a post is in flight (before it lands); a test can record or flush from here.</summary>
     public Action? OnPost { get; set; }
+    public Func<Task>? BeforePostAsync { get; set; }
+    public Action? AfterPost { get; set; }
+    public Action<long>? OnDownloadOffset { get; set; }
     public int HistoryCalls { get; private set; }
 
     public bool Revoked { get; set; }
@@ -53,17 +56,20 @@ public sealed class FakeTelegramDrive : ITelegramDrive
         ct.ThrowIfCancellationRequested();
         if (FailNextPosts > 0) { FailNextPosts--; throw new TelegramFloodWaitException(FloodWait); }
         OnPost?.Invoke();
+        if (BeforePostAsync is not null) await BeforePostAsync();
         using var ms = new MemoryStream();
         await content.CopyToAsync(ms, ct);
+        TgMessage msg;
         lock (_gate)
         {
             var c = Ch(channel);
-            var msg = new TgMessage(channel, _nextMessage++, caption, new TgDocument(_nextDocument++, fileName, ms.Length), DateTime.UtcNow);
+            msg = new TgMessage(channel, _nextMessage++, caption, new TgDocument(_nextDocument++, fileName, ms.Length), DateTime.UtcNow);
             c.Messages.Add(new Stored(msg, ms.ToArray()));
             Posts++;
             progress?.Report(ms.Length);
-            return msg;
         }
+        AfterPost?.Invoke();
+        return msg;
     }
 
     public Task<IReadOnlyList<TgMessage>> ReadHistoryAsync(long channel, long afterId, int limit = 100, CancellationToken ct = default)
@@ -116,6 +122,7 @@ public sealed class FakeTelegramDrive : ITelegramDrive
 
     public async Task DownloadAsync(TgMessage message, Stream destination, long offset = 0, IProgress<long>? progress = null, CancellationToken ct = default)
     {
+        OnDownloadOffset?.Invoke(offset);
         byte[] data;
         lock (_gate)
         {

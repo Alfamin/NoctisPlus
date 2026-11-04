@@ -62,6 +62,8 @@ public static class BatchCodec
 {
     public const int GzipAbove = 3 * 1024;
     public const int Version = 1;
+    public const int MaxWireBytes = 8 * 1024 * 1024;
+    public const int MaxJsonBytes = 32 * 1024 * 1024;
 
     public static byte[] Encode(SyncBatch batch)
     {
@@ -75,6 +77,7 @@ public static class BatchCodec
     /// <summary>Null for anything that is not a v1 batch (foreign posts in the channel are skipped, never thrown on).</summary>
     public static SyncBatch? Decode(ReadOnlySpan<byte> data)
     {
+        if (data.Length > MaxWireBytes) return null;
         try
         {
             byte[] json;
@@ -82,13 +85,41 @@ public static class BatchCodec
             {
                 using var gz = new GZipStream(new MemoryStream(data.ToArray()), CompressionMode.Decompress);
                 using var ms = new MemoryStream();
-                gz.CopyTo(ms);
+                var chunk = new byte[64 * 1024];
+                int count;
+                while ((count = gz.Read(chunk)) != 0)
+                {
+                    if (ms.Length + count > MaxJsonBytes) return null;
+                    ms.Write(chunk, 0, count);
+                }
                 json = ms.ToArray();
             }
             else json = data.ToArray();
             var b = JsonSerializer.Deserialize<SyncBatch>(json, SyncJson.Options);
-            return b is { V: Version, Device.Length: > 0, Items: not null } ? b : null;
+            if (b is not { V: Version, Device.Length: > 0, Items: not null } || b.Device.Contains('\u001f') || (!b.Snapshot && b.Seq <= 0)) return null;
+            b.Items.RemoveAll(i => i is null || string.IsNullOrWhiteSpace(i.Kind) || string.IsNullOrWhiteSpace(i.Id) || string.IsNullOrWhiteSpace(i.Payload));
+            return b;
         }
         catch (Exception e) when (e is JsonException or InvalidDataException) { return null; }
     }
+}
+
+internal sealed class CappedMemoryStream : MemoryStream
+{
+    private void Check(int count)
+    {
+        if (Position + count > BatchCodec.MaxWireBytes) throw new InvalidDataException("Sync post is too large");
+    }
+    public override void Write(byte[] buffer, int offset, int count) { Check(count); base.Write(buffer, offset, count); }
+    public override void WriteByte(byte value) { Check(1); base.WriteByte(value); }
+    public override void SetLength(long value)
+    {
+        if (value > BatchCodec.MaxWireBytes) throw new InvalidDataException("Sync post is too large");
+        base.SetLength(value);
+    }
+    public override void Write(ReadOnlySpan<byte> buffer) { Check(buffer.Length); base.Write(buffer); }
+    public override ValueTask WriteAsync(ReadOnlyMemory<byte> buffer, CancellationToken ct = default)
+    { Check(buffer.Length); return base.WriteAsync(buffer, ct); }
+    public override Task WriteAsync(byte[] buffer, int offset, int count, CancellationToken ct)
+    { Check(count); return base.WriteAsync(buffer, offset, count, ct); }
 }

@@ -40,16 +40,15 @@ public sealed class TgSyncCursor
     }
 
     public void Save(string path)
-    {
-        var tmp = path + ".tmp";
-        File.WriteAllText(tmp, JsonSerializer.Serialize(this, SyncJson.Options));
-        File.Move(tmp, path, overwrite: true);
-    }
+        => TgStateFile.Write(path, JsonSerializer.SerializeToUtf8Bytes(this, SyncJson.Options));
 
     public static TgSyncCursor Load(string path)
     {
-        try { return File.Exists(path) ? JsonSerializer.Deserialize<TgSyncCursor>(File.ReadAllText(path), SyncJson.Options) ?? new() : new(); }
-        catch (JsonException) { return new(); }
+        using var document = TgStateFile.Read(path);
+        if (document is null) return new();
+        var root = document.RootElement;
+        if (root.TryGetProperty("cursor", out var cursor)) root = cursor;
+        return root.Deserialize<TgSyncCursor>(SyncJson.Options) ?? new();
     }
 }
 
@@ -70,21 +69,41 @@ public sealed class TgSyncLog
     private readonly string? _cursorPath;
     private readonly List<BatchItem> _pending = new();
     private DateTime _nextPostUtc = DateTime.MinValue;
-    private readonly SemaphoreSlim _flushGate = new(1, 1);
+    private readonly SemaphoreSlim _ioGate = new(1, 1);
+    private readonly object _stateGate = new();
+    private SyncBatch? _inFlight;
+    private sealed record Checkpoint(TgSyncCursor Cursor, List<SyncItem> Ledger, List<BatchItem> Pending, SyncBatch? InFlight);
 
     public TgSyncLog(ITelegramDrive drive, long channel, string device, TgLedger ledger, Func<DateTime>? now = null, string? cursorPath = null)
     {
+        if (string.IsNullOrWhiteSpace(device) || device.Contains(SnapshotDeviceSeparator)) throw new ArgumentException("Invalid device id", nameof(device));
         _drive = drive; _channel = channel; Device = device; Ledger = ledger;
         _now = now ?? (() => DateTime.UtcNow);
         _cursorPath = cursorPath;
         Cursor = cursorPath is null ? new TgSyncCursor() : TgSyncCursor.Load(cursorPath);
+        if (cursorPath is not null)
+        {
+            using var saved = TgStateFile.Read(cursorPath);
+            if (saved?.RootElement.TryGetProperty("cursor", out _) == true)
+            {
+                var checkpoint = saved.RootElement.Deserialize<Checkpoint>(SyncJson.Options)!;
+                Ledger.Restore(checkpoint.Ledger);
+                _pending.AddRange(checkpoint.Pending);
+                _inFlight = checkpoint.InFlight;
+            }
+            else if (saved is not null)
+            {
+                // Old cursors were persisted without their ledger. Replay rather than silently skipping state.
+                Cursor.LastMessageId = 0; Cursor.Contiguous.Clear(); Cursor.Above.Clear();
+            }
+        }
     }
 
     public string Device { get; }
     public TgLedger Ledger { get; }
     public TgSyncCursor Cursor { get; }
     public TimeSpan MinPostInterval { get; init; } = TimeSpan.FromSeconds(5);
-    public int PendingCount => _pending.Count;
+    public int PendingCount { get { lock (_stateGate) return _pending.Count; } }
     public DateTime NextPostUtc => _nextPostUtc;
     /// <summary>History calls made by <see cref="PullAsync"/> (the budget: one per 100 posts).</summary>
     public int HistoryCalls { get; private set; }
@@ -92,9 +111,16 @@ public sealed class TgSyncLog
     /// <summary>A local change: applied to the ledger now, posted with the next flush.</summary>
     public void Record(string kind, string id, string payload, DateTime? updatedUtc = null)
     {
-        var item = new BatchItem(kind, id, payload, updatedUtc ?? _now());
-        Ledger.Apply(item, Device);
-        _pending.Add(item);
+        lock (_stateGate)
+        {
+            var stamp = updatedUtc ?? _now();
+            var old = Ledger.Get(kind, id);
+            if (old?.Device == Device && old.UpdatedUtc == stamp && old.Payload != payload)
+                stamp = stamp.AddTicks(1);
+            var item = new BatchItem(kind, id, payload, stamp);
+            Ledger.Apply(item, Device);
+            _pending.Add(item);
+        }
     }
 
     public void RecordJson<T>(string kind, string id, T state, DateTime? updatedUtc = null) =>
@@ -103,15 +129,19 @@ public sealed class TgSyncLog
     /// <summary>Posts the pending batch if pacing allows. Returns false when nothing was posted (empty, paced, or flood wait).</summary>
     public async Task<bool> FlushAsync(CancellationToken ct = default)
     {
-        if (_pending.Count == 0) return false;
-        if (!await _flushGate.WaitAsync(0, ct).ConfigureAwait(false)) return false; // one flush at a time
+        if (!await _ioGate.WaitAsync(0, ct).ConfigureAwait(false)) return false;
         try
         {
             var now = _now();
-            if (_pending.Count == 0 || now < _nextPostUtc) return false;
-            // Reserve the seq before posting: a crash or an ambiguous failure never reuses it.
-            var batch = new SyncBatch(BatchCodec.Version, Device, Cursor.OwnSeq + 1, _pending.ToList());
-            Cursor.OwnSeq = batch.Seq;
+            SyncBatch batch;
+            lock (_stateGate)
+            {
+                if (_pending.Count == 0 || now < _nextPostUtc) return false;
+                // Persist the exact reserved batch. Ambiguous failures retry its immutable payload
+                // under the same seq, so there are neither collisions nor permanent gaps.
+                batch = _inFlight ??= new SyncBatch(BatchCodec.Version, Device, Cursor.OwnSeq + 1, _pending.ToList());
+                Cursor.OwnSeq = Math.Max(Cursor.OwnSeq, batch.Seq);
+            }
             Save();
             try
             {
@@ -121,17 +151,17 @@ public sealed class TgSyncLog
             catch (TelegramFloodWaitException e)
             {
                 _nextPostUtc = now + e.RetryAfter;
-                // FLOOD_WAIT is a definite rejection (nothing landed), so the seq is free again: no gap for readers.
-                if (Cursor.OwnSeq == batch.Seq) { Cursor.OwnSeq = batch.Seq - 1; Save(); }
+                // A definite rejection can return the reservation; the pending prefix is unchanged.
+                if (Cursor.OwnSeq == batch.Seq) { Cursor.OwnSeq = batch.Seq - 1; _inFlight = null; Save(); }
                 return false;
             }
             Cursor.Mark(Device, batch.Seq);
-            _pending.RemoveRange(0, batch.Items.Count); // keep items recorded while the post was in flight
+            lock (_stateGate) { _pending.RemoveRange(0, batch.Items.Count); _inFlight = null; }
             _nextPostUtc = now + MinPostInterval;
             Save();
             return true;
         }
-        finally { _flushGate.Release(); }
+        finally { _ioGate.Release(); }
     }
 
     /// <summary>Own seq never goes below anything this device already posted (reinstall, lost cursor).</summary>
@@ -144,6 +174,13 @@ public sealed class TgSyncLog
 
     /// <summary>Reads every post after the cursor and merges it. Returns the number of batches applied.</summary>
     public async Task<int> PullAsync(CancellationToken ct = default)
+    {
+        await _ioGate.WaitAsync(ct).ConfigureAwait(false);
+        try { return await PullCoreAsync(ct).ConfigureAwait(false); }
+        finally { _ioGate.Release(); }
+    }
+
+    private async Task<int> PullCoreAsync(CancellationToken ct)
     {
         var applied = 0;
         while (true)
@@ -177,6 +214,13 @@ public sealed class TgSyncLog
     /// <summary>A new device (or one offline past the deleted posts): apply the pinned snapshot, then continue after it.</summary>
     public async Task<bool> LoadSnapshotAsync(CancellationToken ct = default)
     {
+        await _ioGate.WaitAsync(ct).ConfigureAwait(false);
+        try { return await LoadSnapshotCoreAsync(ct).ConfigureAwait(false); }
+        finally { _ioGate.Release(); }
+    }
+
+    private async Task<bool> LoadSnapshotCoreAsync(CancellationToken ct)
+    {
         var pinned = await _drive.GetPinnedAsync(_channel, ct).ConfigureAwait(false);
         if (pinned?.Document is null || pinned.Caption != SnapshotCaption) return false;
         var snap = await ReadBatchAsync(pinned, ct).ConfigureAwait(false);
@@ -196,10 +240,20 @@ public sealed class TgSyncLog
     /// <summary>Posts the whole ledger as one document and pins it. Call after a pull so it covers everything read.</summary>
     public async Task<TgMessage> PostSnapshotAsync(CancellationToken ct = default)
     {
+        await _ioGate.WaitAsync(ct).ConfigureAwait(false);
+        try { return await PostSnapshotCoreAsync(ct).ConfigureAwait(false); }
+        finally { _ioGate.Release(); }
+    }
+
+    private async Task<TgMessage> PostSnapshotCoreAsync(CancellationToken ct)
+    {
         var items = new List<BatchItem>(Ledger.Count + Cursor.Contiguous.Count);
         foreach (var i in Ledger.Everything)
             items.Add(new BatchItem(i.Kind, i.Id + SnapshotDeviceSeparator + i.Device, i.Payload, i.UpdatedUtc));
-        foreach (var (device, seq) in Cursor.Contiguous)
+        var seqs = new Dictionary<string, long>(Cursor.Contiguous);
+        foreach (var (device, above) in Cursor.Above)
+            if (above.Count > 0) seqs[device] = Math.Max(seqs.GetValueOrDefault(device), above.Max);
+        foreach (var (device, seq) in seqs)
             items.Add(new BatchItem(SnapshotSeqKind, device, seq.ToString(System.Globalization.CultureInfo.InvariantCulture), _now()));
         var snap = new SyncBatch(BatchCodec.Version, Device, 0, items, Snapshot: true, UpToMessageId: Cursor.LastMessageId);
         using var body = new MemoryStream(BatchCodec.Encode(snap));
@@ -225,7 +279,10 @@ public sealed class TgSyncLog
 
     private async Task<SyncBatch?> ReadBatchAsync(TgMessage msg, CancellationToken ct)
     {
-        using var ms = new MemoryStream();
+        if (msg.Document is not { Size: <= BatchCodec.MaxWireBytes }) return null;
+        using var ms = new CappedMemoryStream();
+        try
+        {
         try { await _drive.DownloadAsync(msg, ms, 0, null, ct).ConfigureAwait(false); }
         catch (TelegramFileReferenceExpiredException)
         {
@@ -235,7 +292,16 @@ public sealed class TgSyncLog
             await _drive.DownloadAsync(fresh, ms, 0, null, ct).ConfigureAwait(false);
         }
         return BatchCodec.Decode(ms.ToArray());
+        }
+        catch (InvalidDataException) { return null; }
     }
 
-    private void Save() { if (_cursorPath is not null) Cursor.Save(_cursorPath); }
+    private void Save()
+    {
+        if (_cursorPath is null) return;
+        byte[] bytes;
+        lock (_stateGate)
+            bytes = JsonSerializer.SerializeToUtf8Bytes(new Checkpoint(Cursor, Ledger.Everything.ToList(), _pending.ToList(), _inFlight), SyncJson.Options);
+        TgStateFile.Write(_cursorPath, bytes);
+    }
 }

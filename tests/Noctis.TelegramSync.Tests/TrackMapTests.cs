@@ -25,8 +25,12 @@ public sealed class TrackMapTests
     [Fact]
     public void Incoming_song_links_to_existing_local_file_by_size_and_key()
     {
-        var m = new TgTrackMap(TempFile());
-        var local = new[] { new TgLocalFile("t1", "x.mp3", 500, "k1"), new TgLocalFile("t2", "y.mp3", 900, "k2") };
+        var path = TempFile();
+        Directory.CreateDirectory(Path.GetDirectoryName(path)!);
+        var x = path + ".x.mp3"; var y = path + ".y.mp3";
+        File.WriteAllBytes(x, new byte[500]); File.WriteAllBytes(y, new byte[900]);
+        var m = new TgTrackMap(path);
+        var local = new[] { new TgLocalFile("t1", x, 500, "k1"), new TgLocalFile("t2", y, 900, "k2") };
         Assert.Equal("t2", m.LinkOrNull(new TgDocument(7, "y.mp3", 900), "k2", local));
         Assert.Equal(7, m.DocumentFor("t2"));
         Assert.Null(m.LinkOrNull(new TgDocument(8, "z.mp3", 901), "k2", local)); // size differs: download
@@ -50,6 +54,7 @@ public sealed class TrackMapTests
         Assert.True(r.SnapshotDue(3));
         Assert.False(r.CanDelete(5, null));
         Assert.True(r.CanDelete(5, 10));
-        Assert.False(r.CanDelete(10, 10));
+        Assert.True(r.CanDelete(10, 10));
+        Assert.False(r.CanDelete(11, 10)); // a newer snapshot post may not cover this concurrent edit
     }
 }

@@ -37,7 +37,7 @@ public sealed class TgSyncGuard(ITelegramDrive drive)
         try { self = await drive.GetSelfUserIdAsync(ct); }
         catch (TelegramSessionRevokedException) { return TgGuardStatus.SignedOut; }
         var creator = TgCreatorMarker.Creator(channel.Marker);
-        return creator is null || creator == self ? TgGuardStatus.Ok : TgGuardStatus.WrongAccount;
+        return creator is > 0 && creator == self ? TgGuardStatus.Ok : TgGuardStatus.WrongAccount;
     }
 
     /// <summary>
@@ -46,16 +46,30 @@ public sealed class TgSyncGuard(ITelegramDrive drive)
     /// </summary>
     public async Task<(TgGuardStatus Status, TgChannel Channel)> RunAsync(
         TgChannel channel, Func<TgChannel, Task> pass, Func<Task<TgChannel>> recreate, CancellationToken ct = default)
+        => await RunAsync(channel, (c, _) => pass(c), _ => recreate(), ct);
+
+    public async Task<(TgGuardStatus Status, TgChannel Channel)> RunAsync(
+        TgChannel channel, Func<TgChannel, CancellationToken, Task> pass,
+        Func<CancellationToken, Task<TgChannel>> recreate, CancellationToken ct = default)
     {
+        ct.ThrowIfCancellationRequested();
         var account = await CheckAccountAsync(channel, ct);
         if (account != TgGuardStatus.Ok) return (account, channel);
-        try { await pass(channel); return (TgGuardStatus.Ok, channel); }
+        try { await pass(channel, ct); return (TgGuardStatus.Ok, channel); }
         catch (TelegramSessionRevokedException) { return (TgGuardStatus.SignedOut, channel); }
-        catch (TelegramChannelGoneException) { }
-        TgChannel fresh;
-        try { fresh = await recreate(); await pass(fresh); }
-        catch (TelegramSessionRevokedException) { return (TgGuardStatus.SignedOut, channel); }
-        catch (TelegramChannelGoneException) { return (TgGuardStatus.ChannelGoneAgain, channel); }
+        catch (TelegramChannelGoneException e) when (e.Channel == channel.Id) { }
+        var fresh = channel;
+        try
+        {
+            ct.ThrowIfCancellationRequested();
+            fresh = await recreate(ct);
+            account = await CheckAccountAsync(fresh, ct);
+            if (account != TgGuardStatus.Ok) return (account, fresh);
+            ct.ThrowIfCancellationRequested();
+            await pass(fresh, ct);
+        }
+        catch (TelegramSessionRevokedException) { return (TgGuardStatus.SignedOut, fresh); }
+        catch (TelegramChannelGoneException e) when (e.Channel == fresh.Id) { return (TgGuardStatus.ChannelGoneAgain, fresh); }
         return (TgGuardStatus.ChannelRecreated, fresh);
     }
 }
