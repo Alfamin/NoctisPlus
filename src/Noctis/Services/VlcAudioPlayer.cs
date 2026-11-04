@@ -3183,8 +3183,12 @@ public class VlcAudioPlayer : IAudioPlayer, IOpenFileHolder
         return false;
     }
 
+    // A song still arriving (a streamed song's download, resumed or new) has no file on disk yet but plays from
+    // its transfer: it is not missing. Without this the missing-file check passed it over, which stopped its
+    // download, so a For you page left half-downloaded while offline skipped song after song.
     public bool SourceExists(string filePath) =>
-        !string.IsNullOrWhiteSpace(filePath) && (IsPathlessMedia(filePath) || File.Exists(filePath));
+        !string.IsNullOrWhiteSpace(filePath) && (IsPathlessMedia(filePath) || File.Exists(filePath)
+            || Features.ProgressivePlayback.ProgressiveTransfer.IsAvailable(filePath));
 
     public void Play(string filePath) => Play(filePath, null);
 

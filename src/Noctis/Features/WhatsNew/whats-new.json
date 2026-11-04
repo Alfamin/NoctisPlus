@@ -1,6 +1,13 @@
 {
   "releases": [
     {
+      "version": "2.7.1",
+      "added": [{ "icon": "PlayIcon", "title": "Downloads keep playing", "line": "Songs still arriving play instead of being skipped", "top": true }],
+      "fixed": [
+        "Songs still downloading play instead of being skipped as missing"
+      ]
+    },
+    {
       "version": "2.7.0",
       "added": [
         { "icon": "SyncIcon", "title": "Connect a phone", "line": "Scan the QR code with the Noctis phone app", "top": true },
