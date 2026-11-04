@@ -25,6 +25,8 @@
     <!-- The Android head is a host like the other two: it needs DebugLog.AttachSink to
          mirror the in-memory log to logcat, which is the only way to read it on a phone. -->
     <InternalsVisibleTo Include="Noctis.Android" />
+    <!-- #255: the phone app uses the True Shuffle engine (Features/TrueShuffle). -->
+    <InternalsVisibleTo Include="Noctis.Mobile" />
   </ItemGroup>
 
   <ItemGroup>
