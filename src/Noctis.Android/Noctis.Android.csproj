@@ -14,7 +14,14 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <RootNamespace>Noctis.Android</RootNamespace>
     <AssemblyName>Noctis.Android</AssemblyName>
-    <ApplicationId>com.heartached.noctis</ApplicationId>
+    <!-- Noctis Plus (#255): this fork builds its own app by default, so it installs next to
+         heartached's Noctis instead of over it. -p:NoctisPlus=false builds heartached's
+         original app (com.heartached.noctis, label "Noctis"). The label lives in
+         AppVariant.cs (NOCTIS_PLUS constant); the phone<->PC protocol is the same in both. -->
+    <NoctisPlus Condition="'$(NoctisPlus)' == ''">true</NoctisPlus>
+    <ApplicationId Condition="'$(NoctisPlus)' == 'true'">com.alfamin.noctisplus</ApplicationId>
+    <ApplicationId Condition="'$(NoctisPlus)' != 'true'">com.heartached.noctis</ApplicationId>
+    <DefineConstants Condition="'$(NoctisPlus)' == 'true'">$(DefineConstants);NOCTIS_PLUS</DefineConstants>
     <!-- Play versioning. ApplicationVersion is android:versionCode, an integer that must be
          higher on every upload to Play (a repeat is rejected); ApplicationDisplayVersion is
          android:versionName, the text users see. Bump both per release without editing this
