@@ -126,33 +126,44 @@ public sealed partial class OnlineResultsViewModel : ObservableObject, IDisposab
         catch (Exception ex) when (ex is not OutOfMemoryException) { }
     }
 
-    /// <summary>Plays the song once its file is complete (the phone has no progressive reader yet).
-    /// The latest tapped song wins; a played song stays out of Songs (stream cache).</summary>
-    [RelayCommand]
+    /// <summary>
+    /// Plays the song. Concurrent on purpose: a tap on B while A is still being fetched must reach here to
+    /// cancel A's wait (the toolkit's default refuses a second execution while the first runs). The latest tap
+    /// wins; a repeated tap on the song already being waited for does nothing; a superseded wait never plays,
+    /// even if it completes later. Cancelling the wait never cancels the shared download (the source keeps it).
+    /// </summary>
+    [RelayCommand(AllowConcurrentExecutions = true)]
     private async Task PlayAsync(OnlineSongItem? item)
     {
         if (item is null) return;
         if (!_source.CanDownload) { Message = "Sign in to Telegram to play online songs"; _signIn(); return; }
-        if (!_inFlight.Add(item.Song.Id)) return;
+        if (_playing is { } current && _playingItem == item && !current.IsCancellationRequested) return;
         _playing?.Cancel();
-        using var cts = _playing = new CancellationTokenSource();
+        var cts = _playing = new CancellationTokenSource();
+        var previous = _playingItem;
+        _playingItem = item;
+        if (previous != null && previous != item) previous.IsWorking = false;
         item.IsWorking = true; Message = null;
         try
         {
             var track = await _source.PreparePlaybackAsync(item.Song, keep: false, cts.Token);
-            if (!cts.IsCancellationRequested) _play([track]);
+            if (!cts.IsCancellationRequested && ReferenceEquals(_playing, cts)) _play([track]);
         }
         catch (OperationCanceledException) when (cts.IsCancellationRequested) { }
-        catch (Exception ex) when (ex is not OutOfMemoryException) { Message = Short(ex); }
+        catch (Exception ex) when (ex is not OutOfMemoryException)
+        {
+            if (ReferenceEquals(_playing, cts)) Message = Short(ex);
+        }
         finally
         {
-            _inFlight.Remove(item.Song.Id); item.IsWorking = false;
-            if (ReferenceEquals(_playing, cts)) _playing = null;
+            if (ReferenceEquals(_playing, cts)) { _playing = null; _playingItem = null; item.IsWorking = false; }
+            cts.Dispose();
             Refresh(item);
         }
     }
+    private OnlineSongItem? _playingItem;
 
-    [RelayCommand]
+    [RelayCommand(AllowConcurrentExecutions = true)]
     private async Task DownloadAsync(OnlineSongItem? item)
     {
         if (item is null) return;
@@ -199,7 +210,8 @@ public sealed partial class OnlineResultsViewModel : ObservableObject, IDisposab
     public void Dispose()
     {
         _source.DownloadsChanged -= OnDownloadsChanged;
-        _query?.Cancel(); _playing?.Cancel();
+        _query?.Cancel();
+        _playing?.Cancel();
     }
 }
 

@@ -195,28 +195,104 @@ public class PhoneFinderTests
         await Until(() => vm.Songs[1].ArtworkPath == "/art/remote.jpg");
     }
 
-    [Fact]
-    public async Task RepeatedPlayTaps_AskOnce_AndTheLastTappedSongWins()
+    /// <summary>A fake whose waits are held per call, and which (like a real slow transfer) may ignore cancellation.</summary>
+    private sealed class HeldOnline : IOnlineMusicSearch
     {
-        var source = new Online();
-        source.Answers["qq"] = (q, ct) => Results(q, ct, null, Song("a"), Song("b"));
+        public readonly List<(string Id, TaskCompletionSource<Track> Done, CancellationToken Ct)> Waits = new();
+        public bool HonourCancel = true;
+        public void WarmUp() { }
+        public void Retry() { }
+        public string Route => "";
+        public IAsyncEnumerable<OnlineSearchResult> SearchAsync(string query, CancellationToken ct) => Results(query, ct, null, Song("a"), Song("b"));
+        public string? CachedArtwork(string url) => null;
+        public Task<string?> ArtworkAsync(string url, CancellationToken ct) => Task.FromResult<string?>(null);
+        public bool CanDownload => true;
+        public void RequestSignIn() { }
+        public OnlineDownloadStatus StatusOf(OnlineSong song) => OnlineDownloadStatus.None;
+        public event EventHandler? DownloadsChanged { add { } remove { } }
+        public Task<string> DownloadAsync(IReadOnlyList<OnlineSong> songs, bool now, CancellationToken ct) => Task.FromResult("");
+        public IDownloadQueue Downloads => new Queue();
+        public void OpenArtist(OnlineArtist artist) { }
+        public Task OpenAlbumAsync(OnlineAlbum album, CancellationToken ct) => Task.CompletedTask;
+        public Task<Track> PreparePlaybackAsync(OnlineSong song, bool keep, CancellationToken ct)
+        {
+            var done = new TaskCompletionSource<Track>(TaskCreationOptions.RunContinuationsAsynchronously);
+            Waits.Add((song.Id, done, ct));
+            return HonourCancel ? done.Task.WaitAsync(ct) : done.Task;
+        }
+    }
+
+    private static async Task<(OnlineResultsViewModel Vm, HeldOnline Source, List<IReadOnlyList<Track>> Played)> HeldRig(bool honourCancel = true)
+    {
+        var source = new HeldOnline { HonourCancel = honourCancel };
         var played = new List<IReadOnlyList<Track>>();
-        var vm = NewOnline(source, played);
+        var vm = new OnlineResultsViewModel(source, a => a(), played.Add, () => { }, (_, ct) => Task.Delay(1, ct));
         vm.Search("qq");
         await Until(() => vm.SongCount == 2);
-        var a = vm.Songs[0]; var b = vm.Songs[1];
+        return (vm, source, played);
+    }
 
-        var first = vm.PlayCommand.ExecuteAsync(a);
-        _ = vm.PlayCommand.ExecuteAsync(a); // repeated tap while fetching: ignored (AsyncRelayCommand also refuses re-entry)
-        Assert.Equal(1, source.Prepares);
-        var aWait = source.Prepare!; source.Prepare = null;
-        // A tap on another song while the first is fetched: the first wait is dropped.
-        var second = vm.PlayCommand.ExecuteAsync(b);
-        await first;
-        aWait.TrySetResult(new Track { Title = "late a" });
-        source.Prepare!.SetResult(new Track { Title = "b" });
-        await second;
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)] // the source finishes the superseded wait late instead of observing the cancel
+    public async Task GeneratedPlayCommand_SecondSongCancelsTheFirstWait_AndALateFirstAnswerNeverPlays(bool honourCancel)
+    {
+        var (vm, source, played) = await HeldRig(honourCancel);
+        var a = vm.Songs[0]; var b = vm.Songs[1];
+        Assert.True(vm.PlayCommand.CanExecute(a));
+        vm.PlayCommand.Execute(a);
+        // What a Button checks: B (and A again) stay tappable while A is fetched. The toolkit's default
+        // (non-concurrent) command reports false here and the row buttons would be disabled.
+        Assert.True(vm.PlayCommand.IsRunning);
+        Assert.True(vm.PlayCommand.CanExecute(b));
+        Assert.True(vm.PlayCommand.CanExecute(a));
+        vm.PlayCommand.Execute(a);                 // repeated tap while A waits
+        Assert.Single(source.Waits);
+        vm.PlayCommand.Execute(b);
+        Assert.Equal(2, source.Waits.Count);
+        Assert.True(source.Waits[0].Ct.IsCancellationRequested);
+        Assert.False(source.Waits[1].Ct.IsCancellationRequested);
+        source.Waits[0].Done.TrySetResult(new Track { Title = "late a" });
+        source.Waits[1].Done.TrySetResult(new Track { Title = "b" });
+        await Until(() => played.Count == 1 && !b.IsWorking);
+        await Task.Delay(20);
         Assert.Equal(new[] { "b" }, played.Select(p => p.Single().Title));
+        Assert.False(a.IsWorking);
+    }
+
+    [Fact]
+    public async Task GeneratedPlayCommand_AThenBThenA_PlaysOnlyTheLastA()
+    {
+        var (vm, source, played) = await HeldRig(honourCancel: false);
+        var a = vm.Songs[0]; var b = vm.Songs[1];
+        vm.PlayCommand.Execute(a); vm.PlayCommand.Execute(b); vm.PlayCommand.Execute(a);
+        Assert.Equal(new[] { "a", "b", "a" }, source.Waits.Select(w => w.Id));
+        Assert.True(source.Waits[0].Ct.IsCancellationRequested && source.Waits[1].Ct.IsCancellationRequested);
+        source.Waits[2].Done.SetResult(new Track { Title = "a again" });
+        source.Waits[1].Done.SetResult(new Track { Title = "b" });
+        source.Waits[0].Done.SetResult(new Track { Title = "first a" });
+        await Until(() => played.Count == 1);
+        await Task.Delay(20);
+        Assert.Equal(new[] { "a again" }, played.Select(p => p.Single().Title));
+    }
+
+    [Fact]
+    public async Task GeneratedPlayCommand_ErrorOfASupersededWaitIsNotShown_AndDisposeCancelsTheCurrentWait()
+    {
+        var (vm, source, played) = await HeldRig(honourCancel: false);
+        var a = vm.Songs[0]; var b = vm.Songs[1];
+        vm.PlayCommand.Execute(a); vm.PlayCommand.Execute(b);
+        source.Waits[0].Done.SetException(new IOException("The download was removed or interrupted."));
+        await Task.Delay(20);
+        Assert.Null(vm.Message);
+        source.Waits[1].Done.SetException(new IOException("LIBRARY_SCANNING: Noctis is still scanning."));
+        await Until(() => vm.Message == "Noctis is still scanning.");
+        vm.PlayCommand.Execute(a);
+        vm.Dispose();
+        Assert.True(source.Waits[2].Ct.IsCancellationRequested);
+        source.Waits[2].Done.SetResult(new Track { Title = "after dispose" });
+        await Task.Delay(20);
+        Assert.Empty(played);
     }
 
     [Fact]
