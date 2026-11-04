@@ -82,3 +82,23 @@ Not run: `tests/Noctis.Tests` (told not to: too slow) and `FreeMusicFinder.Tests
 
 4b37e539 core, 7dbe1b84 fake + sync-log tests + sln, 04e2c32c transfer queue, then this handoff commit
 (download flood-wait test + this file).
+
+## Since then (22:15-22:30)
+
+Parallel branches on origin, each from `android-plus-stage1` (efcd8803):
+
+- `android-plus-stage1-map` (f87053f2): TgTrackMap (persisted documentId <-> track map, atomic JSON, links to an existing local file by size + recording key) + TgSnapshotRule (snapshot cadence). 27/27 tests green.
+- `android-plus-stage1-guards` (f0004e9b): TgSyncGuard: wrong account (creator-account check), deleted/left channel recreated once, signed out stops sync. 27/27 tests green.
+- `android-plus-stage1-upload` (7ed37f72): TgUploadQueue (one at a time, JSON caption, policy, flood wait, cancel keeps job) + TgForwardPacer (1 per 2 s). 28/28 tests green. Limits: resume restarts the whole file; no duplicate-post check.
+- `android-plus-stage1-ci` (d0bd3d1d): Linux CI workflow for the Telegram sync tests, green.
+- `android-plus-stage1-next`: merge of the above. Not on origin at 22:24; create it if missing.
+- `android-plus-stage1-review` (b9e51a75): review doc, TelegramSync findings ranked by severity.
+
+Still left:
+
+- Wire TgSyncGuard, TgTrackMap and TgSnapshotRule into TgSyncLog.
+- Part-level upload resume (today a resume restarts the file).
+- Duplicate-post detection before upload.
+- Hash check on downloaded/uploaded files.
+- Pause on storage full and on lost SAF folder permission.
+- Guard against LAN sync and Telegram sync applying the same change twice.
