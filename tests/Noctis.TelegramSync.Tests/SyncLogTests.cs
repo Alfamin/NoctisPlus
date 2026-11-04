@@ -366,4 +366,79 @@ public sealed class SyncLogTests
         Assert.Equal(250, await phone.PullAsync());
         Assert.Equal(3, phone.HistoryCalls);
     }
+
+    [Fact]
+    public async Task Item_recorded_while_a_flush_is_posting_is_kept_and_posted_next()
+    {
+        var w = new World();
+        var pc = w.Device("pc");
+        var phone = w.Device("phone");
+        pc.RecordJson(TgKinds.Song, TgKinds.SongId(1), Song(1, "One"));
+        var nested = true;
+        w.Drive.OnPost = () =>
+        {
+            w.Drive.OnPost = null;
+            pc.RecordJson(TgKinds.Song, TgKinds.SongId(2), Song(2, "Two"));
+            nested = pc.FlushAsync().GetAwaiter().GetResult(); // one flush at a time
+        };
+        Assert.True(await pc.FlushAsync());
+        Assert.False(nested);
+        Assert.Equal(1, pc.PendingCount);
+        w.Advance(10);
+        Assert.True(await pc.FlushAsync());
+        Assert.Equal(0, pc.PendingCount);
+        await phone.PullAsync();
+        Assert.Equal(new[] { "tg:1", "tg:2" }, TgLibraryView.Songs(phone.Ledger).Select(s => s.Id).OrderBy(x => x));
+    }
+
+    [Fact]
+    public async Task Reinstall_with_the_same_device_id_never_reuses_a_seq()
+    {
+        var w = new World();
+        var pc = w.Device("pc");
+        var phone = w.Device("phone");
+        pc.RecordJson(TgKinds.Song, TgKinds.SongId(1), Song(1, "One"));
+        await Sync(w, pc, phone);
+
+        var pc2 = w.Device("pc"); // fresh cursor, same id
+        await pc2.PullAsync();
+        pc2.RecordJson(TgKinds.Song, TgKinds.SongId(2), Song(2, "Two"));
+        w.Advance(10);
+        Assert.True(await pc2.FlushAsync());
+        Assert.Equal(2, pc2.Cursor.OwnSeq);
+        await phone.PullAsync();
+        Assert.Equal(new[] { "tg:1", "tg:2" }, TgLibraryView.Songs(phone.Ledger).Select(s => s.Id).OrderBy(x => x));
+    }
+
+    [Fact]
+    public async Task Seq_is_saved_before_the_post_so_a_crash_after_posting_does_not_reuse_it()
+    {
+        var w = new World();
+        var path = Path.Combine(Path.GetTempPath(), $"tgcur-{Guid.NewGuid():N}.json");
+        try
+        {
+            var pc = w.Device("pc", cursorPath: path);
+            pc.RecordJson(TgKinds.Song, TgKinds.SongId(1), Song(1, "One"));
+            long savedDuringPost = -1;
+            w.Drive.OnPost = () => { w.Drive.OnPost = null; savedDuringPost = TgSyncCursor.Load(path).OwnSeq; };
+            Assert.True(await pc.FlushAsync());
+            Assert.Equal(1, savedDuringPost);
+        }
+        finally { File.Delete(path); }
+    }
+
+    [Fact]
+    public async Task Failed_batch_download_is_read_again_on_the_next_pull()
+    {
+        var w = new World();
+        var pc = w.Device("pc");
+        var phone = w.Device("phone");
+        pc.RecordJson(TgKinds.Song, TgKinds.SongId(1), Song(1, "One"));
+        Assert.True(await pc.FlushAsync());
+        w.Drive.FailNextDownloads = 1;
+        await Assert.ThrowsAsync<TelegramFloodWaitException>(() => phone.PullAsync());
+        Assert.Equal(0, phone.Cursor.LastMessageId);
+        Assert.Equal(1, await phone.PullAsync());
+        Assert.Equal(new[] { "tg:1" }, TgLibraryView.Songs(phone.Ledger).Select(s => s.Id));
+    }
 }

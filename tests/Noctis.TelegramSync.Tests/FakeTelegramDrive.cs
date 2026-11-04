@@ -26,6 +26,8 @@ public sealed class FakeTelegramDrive : ITelegramDrive
     /// <summary>The next N downloads fail with FLOOD_PREMIUM_WAIT of <see cref="FloodWait"/>.</summary>
     public int FailNextDownloads { get; set; }
     public int Posts { get; private set; }
+    /// <summary>Runs while a post is in flight (before it lands); a test can record or flush from here.</summary>
+    public Action? OnPost { get; set; }
     public int HistoryCalls { get; private set; }
 
     public Task<long> GetSelfUserIdAsync(CancellationToken ct = default) => Task.FromResult(SelfUserId);
@@ -48,6 +50,7 @@ public sealed class FakeTelegramDrive : ITelegramDrive
     {
         ct.ThrowIfCancellationRequested();
         if (FailNextPosts > 0) { FailNextPosts--; throw new TelegramFloodWaitException(FloodWait); }
+        OnPost?.Invoke();
         using var ms = new MemoryStream();
         await content.CopyToAsync(ms, ct);
         lock (_gate)
