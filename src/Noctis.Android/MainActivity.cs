@@ -10,7 +10,7 @@ using Noctis.Services;
 namespace Noctis.Android;
 
 [Activity(
-    Label = "Noctis",
+    Label = AppVariant.Label,
     Theme = "@style/NoctisTheme.NoActionBar",
     Icon = "@mipmap/ic_launcher",
     RoundIcon = "@mipmap/ic_launcher_round",

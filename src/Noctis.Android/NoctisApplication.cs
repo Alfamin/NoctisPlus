@@ -6,7 +6,7 @@ using Avalonia.Android;
 namespace Noctis.Android;
 
 /// <summary>Android application object: owns the Avalonia app across activity restarts.</summary>
-[Application]
+[Application(Label = AppVariant.Label)]
 public class NoctisApplication : AvaloniaAndroidApplication<AndroidApp>
 {
     protected NoctisApplication(nint javaReference, JniHandleOwnership transfer)

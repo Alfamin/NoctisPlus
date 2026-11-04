@@ -1,0 +1,87 @@
+name: Noctis Plus Android
+
+# #255: builds the Noctis Plus phone app (com.alfamin.noctisplus, "Noctis Plus"), which
+# installs next to heartached's Noctis. Release APK (not the Play AAB), uploaded as an
+# artifact. Signed with the upload key when the four ANDROID_* secrets exist, otherwise with
+# the .NET Android debug key (fine for side-loading tests, rejected by Play).
+on:
+  workflow_dispatch:
+  push:
+    branches: ['android-plus*']
+
+permissions:
+  contents: read
+
+jobs:
+  android-plus:
+    name: Noctis Plus APK
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@67a3573c9a986a3f9c594539f4ab511d57bb3ce9 # v4.3.1
+        with:
+          dotnet-version: '10.0.x'
+
+      # Same as the android job in dotnet.yml: the image has the Android SDK and a JDK
+      # but not the .NET android workload.
+      - name: Restore workloads
+        run: dotnet workload restore src/Noctis.Android/Noctis.Android.csproj
+
+      # Secrets cannot be tested in an `if:`, so the shell decides. Passwords stay in env
+      # variables and reach the signer as env:NAME, never on a command line.
+      - name: Prepare signing
+        id: sign
+        shell: bash
+        env:
+          ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+        run: |
+          if [ -n "$ANDROID_KEYSTORE_BASE64" ] && [ -n "$ANDROID_KEYSTORE_PASSWORD" ] && [ -n "$ANDROID_KEY_ALIAS" ] && [ -n "$ANDROID_KEY_PASSWORD" ]; then
+            ks="$RUNNER_TEMP/noctisplus-upload.keystore"
+            printf '%s' "$ANDROID_KEYSTORE_BASE64" | base64 -d > "$ks"
+            {
+              echo "args=-p:AndroidKeyStore=true -p:AndroidSigningKeyStore=$ks -p:AndroidSigningKeyAlias=$ANDROID_KEY_ALIAS -p:AndroidSigningStorePass=env:ANDROID_KEYSTORE_PASSWORD -p:AndroidSigningKeyPass=env:ANDROID_KEY_PASSWORD"
+              echo "mode=upload"
+            } >> "$GITHUB_OUTPUT"
+            echo "Signed with the upload key from the ANDROID_* repository secrets." >> "$GITHUB_STEP_SUMMARY"
+          else
+            { echo "args="; echo "mode=debug"; } >> "$GITHUB_OUTPUT"
+            echo "**Signed with the DEBUG key**: the ANDROID_KEYSTORE_BASE64 / ANDROID_KEYSTORE_PASSWORD / ANDROID_KEY_ALIAS / ANDROID_KEY_PASSWORD secrets are not set. Fine for side-loading, rejected by Google Play, and a later upload-key build cannot update over it (uninstall first)." >> "$GITHUB_STEP_SUMMARY"
+          fi
+
+      # Release config defaults to an AAB only (csproj); the global properties switch this
+      # build to a single universal APK (arm64 + x64), installable by hand.
+      - name: Build Noctis Plus APK
+        shell: bash
+        env:
+          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+        run: >
+          dotnet publish src/Noctis.Android/Noctis.Android.csproj -c Release
+          -p:NoctisPlus=true
+          -p:AndroidPackageFormat=apk -p:AndroidPackageFormats=apk
+          -p:ApplicationVersion=${{ github.run_number }}
+          ${{ steps.sign.outputs.args }}
+          -o "$RUNNER_TEMP/out"
+
+      - name: Collect APK
+        shell: bash
+        run: |
+          mkdir -p dist
+          apk=$(find "$RUNNER_TEMP/out" src/Noctis.Android/bin/Release -name '*-Signed.apk' | head -n 1)
+          if [ -z "$apk" ]; then echo "No signed APK found"; find "$RUNNER_TEMP/out" src/Noctis.Android/bin -name '*.apk'; exit 1; fi
+          cp "$apk" "dist/NoctisPlus-${{ steps.sign.outputs.mode }}-${{ github.run_number }}.apk"
+          ls -l dist
+          echo "APK: \`$(basename dist/*.apk)\` ($(du -h dist/*.apk | cut -f1)), package com.alfamin.noctisplus" >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload APK
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: noctis-plus-android-apk
+          path: dist/*.apk
+          if-no-files-found: error
+          retention-days: 14
