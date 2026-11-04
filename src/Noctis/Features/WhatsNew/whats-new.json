@@ -1,6 +1,22 @@
 {
   "releases": [
     {
+      "version": "2.7.0",
+      "added": [
+        { "icon": "SyncIcon", "title": "Connect a phone", "line": "Scan the QR code with the Noctis phone app", "top": true },
+        { "icon": "LyricsIcon", "title": "Lyrics Reels", "line": "Make a lyric video from any song's menu", "top": true },
+        { "icon": "AlbumsIcon", "title": "New in Library", "line": "A Home row for recent albums, in the sizes you choose" },
+        { "icon": "SaveDiskIcon", "title": "Import play counts", "line": "From Last.fm or ListenBrainz" },
+        { "icon": "LyricsIcon", "title": "No lyrics mark", "line": "Mark a song as having no lyrics" }
+      ],
+      "fixed": [
+        "Streamed songs keep sharp covers",
+        "For you pages stay until you remove them",
+        "Every heart is kept",
+        "Based on Noctis 1.6.7"
+      ]
+    },
+    {
       "version": "2.6.1",
       "added": [{ "icon": "PlayIcon", "title": "Busy-bot recovery", "line": "Shorter waits, with provider queue positions shown", "top": true }],
       "fixed": [
