@@ -56,3 +56,8 @@ See CLEANUP-2026-11-04.md. About109GiB net recovered (95.20GiB free -> about204G
 ## Standing rules
 
 Log owner requests in the external LEAN-PLAN before work; DONE requires the relevant live check. D:\music read-only. Installed profile/session untouched. Never copy Telegram sessions. TEST profile stays in place. Stage named files only; no git add -A, force push, main merge, tag or release without owner go. PowerShell commands for owner. Native minimal UI, no new paid services/API keys/model downloads. No computer use/download/install while gaming. End computer-use helpers promptly. No new agents unless owner asks. No release implied by this recovery request.
+
+## Final checkpoint update
+- Final Android APK was reinstalled after the shared folder fix and launches (Status:ok). It asked for notification permission again after the earlier decline; saved android-recovery-final.xml confirms this. Earlier synthetic playback/pause/resume was checked before that final shared-control rebuild. Do not claim a second complete playback pass on the final APK. Treat notification re-prompting as a mobile UX follow-up, not a fixed feature.
+- Isolated emulator was shut down via adb emu kill; no NoctisPlusRecovery process remains. No Windows computer-use session was opened for this recovery. TEST remains staged and closed; installed Noctis was left running.
+- Docs checkpoint d53572d1 follows the four fix commits above. Check git log for the final documentation-only follow-up hash. Source worktree is clean.
