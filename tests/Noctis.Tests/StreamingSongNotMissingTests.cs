@@ -37,6 +37,15 @@ public class StreamingSongNotMissingTests
             Assert.False(File.Exists(target));
             Assert.True(ProgressiveTransfer.IsAvailable(target));
             Assert.True(player.SourceExists(target));
+
+            // VLC can still hold its reader after a download fails. Registry membership alone
+            // then says nothing about whether another play can acquire usable audio.
+            using var reader = ProgressiveTransfer.Acquire(target);
+            Assert.NotNull(reader);
+            transfer.End(null, new IOException("VPN disconnected"));
+            Assert.True(ProgressiveTransfer.IsAvailable(target));
+            Assert.False(ProgressiveTransfer.IsDownloading(target));
+            Assert.False(player.SourceExists(target));
         }
         finally
         {

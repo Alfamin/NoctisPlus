@@ -13,6 +13,46 @@ namespace Noctis.Tests;
 public class QueueStreamingTests
 {
     [AvaloniaFact]
+    public async Task FailedTransferHeldByAReader_IsFetchedAgainWhenReplayed()
+    {
+        using var data = new TestPersistenceService();
+        var source = new Source(); var (player, audio) = NewPlayer();
+        var transfer = new Noctis.Features.ProgressivePlayback.ProgressiveTransfer(data.DataDirectory, "retry", TimeSpan.FromMinutes(3));
+        var writer = transfer.Attach(new FileStream(Path.Combine(data.DataDirectory, "retry.part"), FileMode.Create, FileAccess.ReadWrite, FileShare.ReadWrite | FileShare.Delete, 1));
+        var protocol = (Noctis.Features.ProgressivePlayback.IProgressiveAudioWriter)writer;
+        protocol.SetFormatPolicy(_ => true); protocol.BeginAudio(1024 * 1024, "flac");
+        var bytes = new byte[1024 * 1024]; "fLaC"u8.CopyTo(bytes); writer.Write(bytes);
+        try
+        {
+            await Until(() => transfer.ReadyPath is not null); var path = transfer.ReadyPath!;
+            using var reader = Noctis.Features.ProgressivePlayback.ProgressiveTransfer.Acquire(path);
+            Assert.NotNull(reader);
+            player.ReplaceQueueAndPlay([StandIn(source, "retry")], 0); Settle();
+            var streamed = Local("retry"); streamed.FilePath = path;
+            source.Pending["retry"].SetResult(streamed); await Until(() => ReferenceEquals(player.CurrentTrack, streamed));
+            Assert.Same(streamed, player.CurrentTrack);
+            transfer.End(null, new IOException("disconnected")); audio.MissingPaths.Add(path);
+            player.PlayFrom(streamed, TimeSpan.Zero); await Until(() => source.Asked.Count == 2);
+            Assert.Equal(2, source.Asked.Count);
+        }
+        finally { transfer.End(null, new IOException("test ended")); player.ClearQueue(); }
+    }
+
+    [AvaloniaFact]
+    public async Task OfflineQueueStartsNoBackgroundRequests_AndResumesWhenAllowed()
+    {
+        var source = new Source(); var (player, _) = NewPlayer();
+        var online = false; player.MayStreamAhead = () => online;
+        var queue = new List<Track> { Local("Now"), StandIn(source, "one"), StandIn(source, "two"), StandIn(source, "three") };
+        player.ReplaceQueueAndPlay(queue, 0); Settle(); await Task.Delay(80); Settle();
+        Assert.Empty(source.Downloads_); Assert.Empty(source.AskedAhead);
+        online = true; player.ReplaceQueueAndPlay(queue, 0); Settle();
+        await Until(() => source.Downloads_.Count == 2);
+        Assert.Equal(2, source.Downloads_.Count);
+        player.ClearQueue();
+    }
+
+    [AvaloniaFact]
     public async Task MissingFileHandling_DoesNotSkipOrMarkOnlineQueueEntries()
     {
         var source = new Source();

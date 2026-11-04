@@ -124,7 +124,7 @@ public partial class PlayerViewModel
         if (!_streamOrigins.TryGetValue(track, out var origin) || string.IsNullOrWhiteSpace(track.FilePath)) return null;
         try
         {
-            if (File.Exists(track.FilePath) || Features.ProgressivePlayback.ProgressiveTransfer.IsAvailable(track.FilePath)) return null;
+            if (File.Exists(track.FilePath) || Features.ProgressivePlayback.ProgressiveTransfer.IsDownloading(track.FilePath)) return null;
         }
         catch (Exception e) when (e is IOException or UnauthorizedAccessException or ArgumentException) { return null; }
         Services.DebugLog.Write("Playback", $"\"{track.Title}\" was streamed and its file is gone (its download stopped when it was skipped): fetched again");

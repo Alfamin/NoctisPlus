@@ -3188,7 +3188,7 @@ public class VlcAudioPlayer : IAudioPlayer, IOpenFileHolder
     // download, so a For you page left half-downloaded while offline skipped song after song.
     public bool SourceExists(string filePath) =>
         !string.IsNullOrWhiteSpace(filePath) && (IsPathlessMedia(filePath) || File.Exists(filePath)
-            || Features.ProgressivePlayback.ProgressiveTransfer.IsAvailable(filePath));
+            || Features.ProgressivePlayback.ProgressiveTransfer.IsDownloading(filePath));
 
     public void Play(string filePath) => Play(filePath, null);
 

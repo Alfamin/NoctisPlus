@@ -264,7 +264,7 @@ internal sealed class TrueShuffleService : IDisposable
     private bool Keeps(Track t) => t.IsRemoteStream || Player.Streams(t);
 
     /// <summary>On disk, still downloading (progressive playback), or a pending stream: all belong in the shuffle (#272).</summary>
-    private static bool Playable(Track t) => t.IsPendingStream || !string.IsNullOrEmpty(t.FilePath) && (File.Exists(t.FilePath) || Features.ProgressivePlayback.ProgressiveTransfer.IsAvailable(t.FilePath));
+    private static bool Playable(Track t) => t.IsPendingStream || !string.IsNullOrEmpty(t.FilePath) && (File.Exists(t.FilePath) || Features.ProgressivePlayback.ProgressiveTransfer.IsDownloading(t.FilePath));
 
     internal void ScheduleRefill()
     {

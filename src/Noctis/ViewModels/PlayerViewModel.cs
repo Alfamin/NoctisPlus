@@ -3257,7 +3257,7 @@ public partial class PlayerViewModel : ViewModelBase
         }
 
         CurrentTrack = track;
-        CanSeekCurrent = !Features.ProgressivePlayback.ProgressiveTransfer.IsAvailable(track.FilePath);
+        CanSeekCurrent = !Features.ProgressivePlayback.ProgressiveTransfer.IsDownloading(track.FilePath);
         SeekableFraction = CanSeekCurrent ? 1 : 0;
         LoadAlbumArt(track);
         if (streamOrigin is not null) SharpenCover(track, streamOrigin); // owner #247: played again

@@ -20,6 +20,8 @@ public partial class PlayerViewModel
     /// <summary>Owner #116: the next four queue positions count, including owned songs; only the next two positions download
     /// (owner #147: the source's Download ahead choice, 0 to 4; two by default).</summary>
     internal const int StreamAheadPlaces = 4, StreamAheadSongs = 2, AskAheadSongs = 4;
+    internal Func<bool> MayStreamAhead { get; set; } = () =>
+        !Services.OnlineAccess.Shared.IsOffline && System.Net.NetworkInformation.NetworkInterface.GetIsNetworkAvailable();
 
     /// <summary>Settings → Playback, "Play songs you don't have". Off: only the songs you have are queued.</summary>
     [ObservableProperty] private bool _streamMissingSongs = true;
@@ -340,7 +342,7 @@ public partial class PlayerViewModel
         try { LoadQueueCovers(); }
         catch (Exception ex) { Services.DebugLog.Write("Queue", "queue covers skipped: " + ex.Message); }
         // #256: offline, asking/downloading ahead only starts and stops requests (one partial per song); wait for the network.
-        if (Services.OnlineAccess.Shared.IsOffline || !System.Net.NetworkInformation.NetworkInterface.GetIsNetworkAvailable()) return;
+        if (!MayStreamAhead()) return;
         var head = UpNext.Take(StreamAheadPlaces).ToList();
         // Count queue positions BEFORE filtering missing songs. Owned/cached songs never extend either window.
         var fetch = new List<(int At, PendingStream Song)>();
