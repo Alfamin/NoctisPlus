@@ -53,7 +53,18 @@ public sealed class TgTransferQueue(ITelegramDrive drive, Func<bool>? mayTransfe
                 File.Delete(part); // wrong size: start over next time, never keep a corrupt file
                 return TgTransferResult.Paused;
             }
-            File.Move(part, job.TargetPath, overwrite: false);
+            if (File.Exists(job.TargetPath))
+            {
+                var expected = job.Message.Document?.Size ?? 0;
+                if (expected <= 0 || new FileInfo(job.TargetPath).Length == expected)
+                {
+                    File.Delete(part); // already downloaded (or queued twice): keep the existing file
+                    _queue.Remove(node);
+                    return TgTransferResult.Done;
+                }
+                File.Move(part, UniquePath(job.TargetPath), overwrite: false); // a different file holds the name
+            }
+            else File.Move(part, job.TargetPath, overwrite: false);
             _queue.Remove(node);
             return TgTransferResult.Done;
         }
@@ -65,6 +76,18 @@ public sealed class TgTransferQueue(ITelegramDrive drive, Func<bool>? mayTransfe
         catch (OperationCanceledException)
         {
             return TgTransferResult.Cancelled; // the .part stays; the next run resumes from it
+        }
+    }
+
+    private static string UniquePath(string target)
+    {
+        var dir = Path.GetDirectoryName(target) ?? string.Empty;
+        var name = Path.GetFileNameWithoutExtension(target);
+        var ext = Path.GetExtension(target);
+        for (var i = 2; ; i++)
+        {
+            var p = Path.Combine(dir, $"{name} ({i}){ext}");
+            if (!File.Exists(p)) return p;
         }
     }
 }
