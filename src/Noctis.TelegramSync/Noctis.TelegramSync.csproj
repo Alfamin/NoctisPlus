@@ -1,0 +1,21 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <!-- Owner #255 stage 1: the Telegram sync core (shared drive + append-only sync log), UI-free
+         so the desktop app and the phone app can both use it. Nothing in here talks to real
+         Telegram: every network call goes through ITelegramDrive. -->
+    <TargetFramework>net10.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <RootNamespace>Noctis.TelegramSync</RootNamespace>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="Noctis.TelegramSync.Tests" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Noctis.Core\Noctis.Core.csproj" />
+  </ItemGroup>
+
+</Project>
