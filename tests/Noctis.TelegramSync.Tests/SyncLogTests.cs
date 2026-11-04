@@ -441,4 +441,21 @@ public sealed class SyncLogTests
         Assert.Equal(1, await phone.PullAsync());
         Assert.Equal(new[] { "tg:1" }, TgLibraryView.Songs(phone.Ledger).Select(s => s.Id));
     }
+
+    [Fact]
+    public async Task Flood_wait_rejection_gives_the_seq_back_so_readers_see_no_gap()
+    {
+        var w = new World();
+        var pc = w.Device("pc");
+        var phone = w.Device("phone");
+        pc.RecordJson(TgKinds.Song, TgKinds.SongId(1), Song(1, "One"));
+        w.Drive.FailNextPosts = 1;
+        Assert.False(await pc.FlushAsync());
+        Assert.Equal(0, pc.Cursor.OwnSeq);
+        w.Advance(60);
+        Assert.True(await pc.FlushAsync());
+        await phone.PullAsync();
+        Assert.Equal(1, phone.Cursor.Contiguous["pc"]);
+        Assert.False(phone.Cursor.Above.ContainsKey("pc"));
+    }
 }

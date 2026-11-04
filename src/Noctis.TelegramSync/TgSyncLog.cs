@@ -121,6 +121,8 @@ public sealed class TgSyncLog
             catch (TelegramFloodWaitException e)
             {
                 _nextPostUtc = now + e.RetryAfter;
+                // FLOOD_WAIT is a definite rejection (nothing landed), so the seq is free again: no gap for readers.
+                if (Cursor.OwnSeq == batch.Seq) { Cursor.OwnSeq = batch.Seq - 1; Save(); }
                 return false;
             }
             Cursor.Mark(Device, batch.Seq);
