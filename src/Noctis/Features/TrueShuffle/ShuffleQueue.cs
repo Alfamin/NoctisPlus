@@ -4,9 +4,6 @@ using Noctis.ViewModels;
 
 namespace Noctis.Features.TrueShuffle;
 
-/// <summary>The three places a shuffle can take its songs from.</summary>
-internal enum ShuffleScope { CurrentQueue, WholeLibrary, OpenPlaylist }
-
 /// <summary>
 /// True Shuffle's access to Noctis's own player and library, typed. Replaces the plugin's reflection QueueBridge with
 /// the same behaviour: nothing restarts the playing song, Noctis's weighted shuffle is never used for a custom order,
