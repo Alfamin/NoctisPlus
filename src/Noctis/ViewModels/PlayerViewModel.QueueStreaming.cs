@@ -339,6 +339,8 @@ public partial class PlayerViewModel
     {
         try { LoadQueueCovers(); }
         catch (Exception ex) { Services.DebugLog.Write("Queue", "queue covers skipped: " + ex.Message); }
+        // #256: offline, asking/downloading ahead only starts and stops requests (one partial per song); wait for the network.
+        if (Services.OnlineAccess.Shared.IsOffline || !System.Net.NetworkInformation.NetworkInterface.GetIsNetworkAvailable()) return;
         var head = UpNext.Take(StreamAheadPlaces).ToList();
         // Count queue positions BEFORE filtering missing songs. Owned/cached songs never extend either window.
         var fetch = new List<(int At, PendingStream Song)>();
