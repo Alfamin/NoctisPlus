@@ -131,10 +131,11 @@ public class ProgressiveReadSessionTests
         Assert.True(s.TrySeek(rig.Written - 10, Short));
         Assert.Null(s.TrySeek(rig.Written + 50_000, Short));  // not received yet: wait, never a fake EOF
         Assert.True(s.TrySeek(0, Short));                     // probe back to the start still works
-        var ahead = Task.Run(() => { bool? r; while ((r = s.TrySeek(rig.Written + 50_000, Short)) is null) { } return r; });
+        var target = rig.Written + 50_000L;
+        var ahead = Task.Run(() => { bool? r; while ((r = s.TrySeek(target, Short)) is null) { } return r; });
         rig.Write(100_000);
         Assert.True(await ahead.WaitAsync(TimeSpan.FromSeconds(5)));
-        Assert.Equal(rig.Written - 100_000 + 50_000, s.Position);
+        Assert.Equal(target, s.Position);
         rig.Write(rig.Audio.Length - rig.Written); rig.Transfer.End(null);
         Assert.False(s.TrySeek(rig.Audio.Length + 1, Short)); // past the end of the complete file
         Assert.True(s.TrySeek(rig.Audio.Length, Short));
