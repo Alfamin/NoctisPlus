@@ -242,7 +242,7 @@ internal sealed class TrueShuffleService : IDisposable
         var history = ShuffleEngine.UpgradeHistory(library.Select(t => ShuffleQueue.SongOf(t, identities)), known, last, lastPath);
         var current = playing is null ? null : ShuffleQueue.SongOf(playing, identities).Key;
         var waiting = manual.Select(t => ShuffleQueue.SongOf(t, identities).Key).ToHashSet(StringComparer.Ordinal);
-        var built = ShuffleEngine.Build(songs.Select(e => e.Song).Where(s => s.Remote || File.Exists(s.Path)), mode,
+        var built = ShuffleEngine.Build(songs.Where(e => e.Song.Remote || Playable(e.Track)).Select(e => e.Song), mode,
             history.Seen, current, history.Last, explicitAllowed, skipDisliked, upcoming: waiting, rank: taste is null ? null : Ranker(taste));
         ct.ThrowIfCancellationRequested();
         var byKey = songs.DistinctBy(e => e.Song.Key).ToDictionary(e => e.Song.Key);
@@ -262,6 +262,9 @@ internal sealed class TrueShuffleService : IDisposable
     /// <summary>A song not in the library that still belongs in the shuffle: a server stream, or (owner #95) a playlist song
     /// you don't have, while "Play songs you don't have" is on (the queue fetches it as it comes up).</summary>
     private bool Keeps(Track t) => t.IsRemoteStream || Player.Streams(t);
+
+    /// <summary>On disk, still downloading (progressive playback), or a pending stream: all belong in the shuffle (#272).</summary>
+    private static bool Playable(Track t) => t.IsPendingStream || !string.IsNullOrEmpty(t.FilePath) && (File.Exists(t.FilePath) || Features.ProgressivePlayback.ProgressiveTransfer.IsAvailable(t.FilePath));
 
     internal void ScheduleRefill()
     {
@@ -287,7 +290,7 @@ internal sealed class TrueShuffleService : IDisposable
                 {
                     var entry = roll.Plan[roll.Next++];
                     var t = library.GetValueOrDefault(entry.Track.Id) ?? (Keeps(entry.Track) ? entry.Track : null);
-                    if (t is null || !queued.Add(t.Id) || !ShuffleQueue.NoFile(t) && !File.Exists(t.FilePath)) continue;
+                    if (t is null || !queued.Add(t.Id) || !ShuffleQueue.NoFile(t) && !Playable(t)) continue;
                     if (!ShuffleEngine.StillWanted(ShuffleQueue.SongOf(t, roll.Identities), roll.Mode, _seen, _queue.ExplicitAllowed, roll.SkipDisliked, DateTime.UtcNow)) continue;
                     batch.Add(t);
                 }
