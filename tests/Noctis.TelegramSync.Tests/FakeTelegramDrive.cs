@@ -23,6 +23,8 @@ public sealed class FakeTelegramDrive : ITelegramDrive
     public bool DuplicateReads { get; set; }
     /// <summary>Messages whose next download fails with FILE_REFERENCE_EXPIRED (cleared by a re-read).</summary>
     public HashSet<long> ExpiredReferences { get; } = new();
+    /// <summary>The next N downloads fail with FLOOD_PREMIUM_WAIT of <see cref="FloodWait"/>.</summary>
+    public int FailNextDownloads { get; set; }
     public int Posts { get; private set; }
     public int HistoryCalls { get; private set; }
 
@@ -112,6 +114,7 @@ public sealed class FakeTelegramDrive : ITelegramDrive
         byte[] data;
         lock (_gate)
         {
+            if (FailNextDownloads > 0) { FailNextDownloads--; throw new TelegramFloodWaitException(FloodWait, premium: true); }
             if (ExpiredReferences.Contains(message.Id)) throw new TelegramFileReferenceExpiredException(message.Peer, message.Id);
             data = Find(message.Peer, message.Id)?.Data ?? throw new InvalidOperationException("MESSAGE_ID_INVALID");
         }

@@ -60,6 +60,29 @@ public sealed class TransferQueueTests
     }
 
     [Fact]
+    public async Task Flood_wait_during_download_keeps_the_job_and_waits_without_calling()
+    {
+        var (drive, msg, data, dir) = Setup();
+        try
+        {
+            var now = new DateTime(2026, 11, 4, 12, 0, 0, DateTimeKind.Utc);
+            drive.FailNextDownloads = 1;
+            drive.FloodWait = TimeSpan.FromSeconds(60);
+            var q = new TgTransferQueue(drive, now: () => now);
+            var target = Path.Combine(dir, "song.mp3");
+            q.Enqueue(msg, target);
+            Assert.Equal(TgTransferResult.Waiting, await q.RunNextAsync());
+            now = now.AddSeconds(30);
+            Assert.Equal(TgTransferResult.Waiting, await q.RunNextAsync());
+            Assert.Equal(1, q.Count);
+            now = now.AddSeconds(31);
+            Assert.Equal(TgTransferResult.Done, await q.RunNextAsync());
+            Assert.Equal(data, File.ReadAllBytes(target));
+        }
+        finally { Directory.Delete(dir, true); }
+    }
+
+    [Fact]
     public async Task Deleted_song_message_is_reported_missing_without_touching_files()
     {
         var (drive, msg, _, dir) = Setup();
