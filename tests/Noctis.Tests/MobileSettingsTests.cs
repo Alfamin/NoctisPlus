@@ -1128,7 +1128,7 @@ public class MobileSettingsTests
         page.ReportProblemCommand.Execute(null);
         page.OpenWebsiteCommand.Execute(null);
         page.OpenPrivacyPolicyCommand.Execute(null);
-        Assert.Equal(new[] { "https://github.com/heartached/Noctis/issues/new", "https://noctisapp.cc/", "https://noctisapp.cc/privacy/android" }, links.Opened);
+        Assert.Equal(new[] { SettingsPageViewModel.ReportProblemUrl, "https://noctisapp.cc/", "https://noctisapp.cc/privacy/android" }, links.Opened);
     }
 
     /// <summary>About: What's New and Open-Source Licenses have content; the licences name the

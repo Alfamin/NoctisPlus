@@ -9,9 +9,10 @@ public enum TelegramStep { Phone, Code, Password, Done }
 
 /// <summary>#255 part 1: Telegram sign-in on the phone. Phone -> code -> password (only if asked)
 /// -> done. Errors are one short line in <see cref="ErrorText"/>. Advanced holds an optional MTProto proxy.</summary>
-public sealed partial class TelegramPaneViewModel : ObservableObject
+public sealed partial class TelegramPaneViewModel : ObservableObject, IDisposable
 {
     private readonly IPhoneTelegramSignIn _signIn;
+    private CancellationTokenSource? _attempt;
 
     public TelegramPaneViewModel(IPhoneTelegramSignIn signIn)
     {
@@ -35,12 +36,15 @@ public sealed partial class TelegramPaneViewModel : ObservableObject
     public bool IsSignedIn => Step == TelegramStep.Done;
     partial void OnStepChanged(TelegramStep value) => OnPropertyChanged(nameof(IsSignedIn));
 
-    /// <summary>Code field auto-submits on 5 digits.</summary>
+    /// <summary>Do not guess a delivery's code length.</summary>
     partial void OnCodeChanged(string value)
     {
-        if (Step == TelegramStep.Code && !IsBusy && value.Count(char.IsDigit) == 5)
+        ErrorText = null;
+        if (Step == TelegramStep.Code && !IsBusy && _signIn.ExpectedCodeLength is > 0 and <= 12 and var length && value.Count(char.IsDigit) == length)
             _ = SubmitCodeAsync();
     }
+    partial void OnPhoneChanged(string value) => ErrorText = null;
+    partial void OnPasswordChanged(string value) => ErrorText = null;
 
     [RelayCommand]
     private async Task SendCodeAsync()
@@ -48,8 +52,8 @@ public sealed partial class TelegramPaneViewModel : ObservableObject
         var phone = new string(Phone.Where(c => char.IsDigit(c) || c == '+').ToArray());
         if (phone.Count(char.IsDigit) < 7) { ErrorText = "Enter your number"; return; }
         if (UseProxy && string.IsNullOrWhiteSpace(ProxyServer)) { ErrorText = "Enter the proxy server"; return; }
-        await RunAsync(() => _signIn.StartLoginAsync(phone,
-            UseProxy ? ProxyServer.Trim() : null, UseProxy ? ProxySecret.Trim() : null));
+        await RunAsync(ct => _signIn.StartLoginAsync(phone,
+            UseProxy ? ProxyServer.Trim() : null, UseProxy ? ProxySecret.Trim() : null, ct));
     }
 
     [RelayCommand]
@@ -57,38 +61,61 @@ public sealed partial class TelegramPaneViewModel : ObservableObject
     {
         var code = new string(Code.Where(char.IsDigit).ToArray());
         if (code.Length == 0) { ErrorText = "Enter the code"; return; }
-        await RunAsync(() => _signIn.ContinueLoginAsync(code));
+        await RunAsync(ct => _signIn.ContinueLoginAsync(code, ct));
     }
 
     [RelayCommand]
     private async Task SubmitPasswordAsync()
     {
         if (string.IsNullOrEmpty(Password)) { ErrorText = "Enter your password"; return; }
-        await RunAsync(() => _signIn.ContinueLoginAsync(Password));
+        await RunAsync(ct => _signIn.ContinueLoginAsync(Password, ct));
     }
 
     [RelayCommand]
-    private void ChangeNumber()
+    private async Task ChangeNumberAsync()
     {
-        Step = TelegramStep.Phone; Code = ""; Password = ""; ErrorText = null;
+        if (IsBusy) return;
+        IsBusy = true;
+        try
+        {
+            await _signIn.ResetLoginAsync();
+            Step = TelegramStep.Phone; Code = ""; Password = ""; ErrorText = null;
+        }
+        catch (Exception ex) { ErrorText = ShortError(ex); }
+        finally { IsBusy = false; }
     }
 
     [RelayCommand]
     private async Task SignOutAsync()
     {
+        if (IsBusy) return;
         IsBusy = true; ErrorText = null;
         try { await _signIn.LogOutAsync(); Step = TelegramStep.Phone; SignedInAs = null; Code = ""; Password = ""; }
         catch (Exception ex) { ErrorText = ShortError(ex); }
         finally { IsBusy = false; }
     }
 
-    private async Task RunAsync(Func<Task<string?>> call)
+    [RelayCommand]
+    private void CancelSignIn() => _attempt?.Cancel();
+
+    public void Dispose() => CancelSignIn();
+
+    private async Task RunAsync(Func<CancellationToken, Task<string?>> call)
     {
         if (IsBusy) return;
         IsBusy = true; ErrorText = null; StatusText = "Connecting…";
+        using var attempt = new CancellationTokenSource();
+        _attempt = attempt;
         try
         {
-            var next = await call();
+            var next = await call(attempt.Token).WaitAsync(attempt.Token);
+            if (next is not ("verification_code" or "password" or null))
+            {
+                await _signIn.ResetLoginAsync(attempt.Token);
+                Step = TelegramStep.Phone;
+                ErrorText = "Sign in in the Telegram app first";
+                return;
+            }
             Step = next switch
             {
                 "verification_code" => TelegramStep.Code,
@@ -98,8 +125,9 @@ public sealed partial class TelegramPaneViewModel : ObservableObject
             };
             if (Step == TelegramStep.Done) { SignedInAs = _signIn.SignedInAs; Code = ""; Password = ""; }
         }
+        catch (OperationCanceledException) when (attempt.IsCancellationRequested) { }
         catch (Exception ex) { ErrorText = ShortError(ex); }
-        finally { IsBusy = false; StatusText = null; }
+        finally { _attempt = null; IsBusy = false; StatusText = null; }
     }
 
     /// <summary>Maps Telegram errors to one short line.</summary>

@@ -57,6 +57,7 @@ param(
     [string]$Keystore = (Join-Path $env:USERPROFILE '.noctis\noctis-upload.jks'),
     [string]$KeyAlias = 'noctis-upload',
     [switch]$UseDebugKey,
+    [switch]$StockNoctis,
     [string]$DeviceSerial = 'emulator-5554',
     [string[]]$MsBuildArgs = @()
 )
@@ -74,7 +75,9 @@ $bundletool = Get-ChildItem 'C:\Program Files\dotnet\packs\Microsoft.Android.Sdk
     Sort-Object FullName -Descending | Select-Object -First 1 -ExpandProperty FullName
 $project = Join-Path $repo 'src\Noctis.Android\Noctis.Android.csproj'
 $outDir = Join-Path $repo 'src\Noctis.Android\bin\Release\net10.0-android'
-$signedAab = Join-Path $outDir 'com.heartached.noctis-Signed.aab'
+$plusBuild = -not $StockNoctis
+$applicationId = if ($StockNoctis) { 'com.heartached.noctis' } else { 'com.alfamin.noctisplus' }
+$signedAab = Join-Path $outDir "$applicationId-Signed.aab"
 $artifacts = Join-Path $repo 'artifacts\android'
 $passVar = 'NOCTIS_UPLOAD_STORE_PASS'
 
@@ -120,6 +123,7 @@ try {
         # which holds the keystore password.
         'build', $project, '-c', 'Release', '-nodeReuse:false', '-p:UseSharedCompilation=false', '-v:m',
         "-p:JavaSdkDirectory=$jbr", "-p:AndroidSdkDirectory=$sdk",
+        "-p:NoctisPlus=$($plusBuild.ToString().ToLowerInvariant())",
         '-p:AndroidKeyStore=true',
         "-p:AndroidSigningKeyStore=$Keystore",
         "-p:AndroidSigningKeyAlias=$KeyAlias",

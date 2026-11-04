@@ -27,7 +27,9 @@ internal static class PhoneShuffle
         _ => null,
     };
 
-    /// <summary>Returns the items in the plan's order, or null for Off / Noctis shuffle.</summary>
+    /// <summary>Returns distinct recordings in the plan's order (same identity policy as desktop).
+    /// Null means Off / stock shuffle. Empty means no eligible songs; the UI must not silently
+    /// fall back to songs the chosen mode excludes.</summary>
     public static List<T>? Order<T>(IReadOnlyList<T> items, Func<T, Song> toSong, PhoneShuffleMode mode,
         IEnumerable<string>? seen = null, string? current = null, string? last = null,
         Func<int, int>? draw = null)
