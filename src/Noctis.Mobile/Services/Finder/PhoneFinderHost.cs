@@ -30,7 +30,9 @@ internal sealed class PhoneFinderHost : IDisposable
     {
         _library = library;
         Session = new FinderSession(dataFolder, musicFolder, new PhonePlaylistLibrary(library, playlists, onUi), () => library,
-            log, defaultsPath, completeFilesOnly: true);
+            // The phone player reads a song still arriving through ProgressiveDataSource (Noctis.Android), so Play
+            // may start on the received bytes; MP3 and FLAC only, other formats wait for the complete file.
+            log, defaultsPath, completeFilesOnly: false);
         SignIn = new PhoneTelegramSignIn(Session);
         Session.Downloads.Changed += OnDownloadChanged;
         // Files saved while the app was closed (the queue resumes them): make sure each is in Songs.

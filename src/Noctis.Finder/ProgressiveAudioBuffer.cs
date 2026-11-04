@@ -97,9 +97,16 @@ internal sealed class ProgressiveAudioBuffer : IDisposable
     }
 
     private int Read(int generation, long position, Span<byte> target, CancellationToken ct)
+        => Read(generation, position, target, ct, Timeout.InfiniteTimeSpan, out var read) ? read : throw new InvalidOperationException();
+
+    /// <summary>Waits at most <paramref name="wait"/> for bytes at <paramref name="position"/>: false when none arrived
+    /// in time (an underflow, not the end). 0 bytes read is the genuine end of a complete transfer.</summary>
+    private bool Read(int generation, long position, Span<byte> target, CancellationToken ct, TimeSpan wait, out int read)
     {
-        if (target.Length == 0) return 0;
+        read = 0;
+        if (target.Length == 0) return true;
         using var wake = ct.Register(() => { lock (_gate) Monitor.PulseAll(_gate); });
+        var deadline = wait == Timeout.InfiniteTimeSpan ? long.MaxValue : Environment.TickCount64 + (long)wait.TotalMilliseconds;
         lock (_gate)
         {
             while (true)
@@ -108,10 +115,36 @@ internal sealed class ProgressiveAudioBuffer : IDisposable
                 if (generation != _generation) throw new IOException("A backup transfer replaced this audio. Wait for the complete download.");
                 var available = PrefixLocked - position;
                 if (available > 0)
-                    return RandomAccess.Read(_file.SafeFileHandle, target[..(int)Math.Min(available, target.Length)], position);
+                {
+                    read = RandomAccess.Read(_file.SafeFileHandle, target[..(int)Math.Min(available, target.Length)], position);
+                    return true;
+                }
                 if (_error is not null) throw new IOException("The audio transfer was interrupted.", _error);
-                if (_complete) return 0;
-                Monitor.Wait(_gate);
+                if (_complete) return true;
+                var left = deadline - Environment.TickCount64;
+                if (left <= 0) return false;
+                Monitor.Wait(_gate, deadline == long.MaxValue ? Timeout.Infinite : (int)Math.Min(left, int.MaxValue));
+            }
+        }
+    }
+
+    /// <summary>Waits at most <paramref name="wait"/> until <paramref name="position"/> is inside the received prefix (a seek
+    /// ahead of the transfer). Null: not yet. False: never (past the end of the complete file, or the transfer failed).</summary>
+    private bool? Reach(int generation, long position, CancellationToken ct, TimeSpan wait)
+    {
+        using var wake = ct.Register(() => { lock (_gate) Monitor.PulseAll(_gate); });
+        var deadline = Environment.TickCount64 + (long)wait.TotalMilliseconds;
+        lock (_gate)
+        {
+            while (true)
+            {
+                ct.ThrowIfCancellationRequested(); ThrowIfDisposed();
+                if (generation != _generation) return false;
+                if (position <= PrefixLocked) return true;
+                if (_error is not null || _complete) return false;
+                var left = deadline - Environment.TickCount64;
+                if (left <= 0) return null;
+                Monitor.Wait(_gate, (int)Math.Min(left, int.MaxValue));
             }
         }
     }
@@ -144,6 +177,14 @@ internal sealed class ProgressiveAudioBuffer : IDisposable
         internal long Position => _position;
         internal int Read(Span<byte> target)
         { var count = _owner.Read(_generation, _position, target, _token); _position += count; return count; }
+        /// <summary>Like <see cref="Read(Span{byte})"/>, but gives up after <paramref name="wait"/> (false) so a caller can check
+        /// its own stop signal (Media3 interrupts its loader thread, which does not wake a monitor).</summary>
+        internal bool TryRead(Span<byte> target, TimeSpan wait, out int read)
+        {
+            if (!_owner.Read(_generation, _position, target, _token, wait, out read)) return false;
+            _position += read; return true;
+        }
+        internal bool? Reach(long position, TimeSpan wait) => _owner.Reach(_generation, position, _token, wait);
         internal bool Seek(long position)
         {
             lock (_owner._gate)

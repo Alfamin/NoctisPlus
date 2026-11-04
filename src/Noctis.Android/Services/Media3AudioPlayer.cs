@@ -131,7 +131,9 @@ public sealed class Media3AudioPlayer : IAudioPlayer
         var renderers = new TappedRenderersFactory(context, _meterTap)
             .SetExtensionRendererMode(DefaultRenderersFactory.ExtensionRendererModeOn);
         _player = new ExoPlayerBuilder(context, renderers)
-            .SetMediaSourceFactory(new DefaultMediaSourceFactory(new DefaultDataSource.Factory(context, httpSources))
+            // Music Finder songs still arriving are read through the shared transfer (ProgressiveDataSource);
+            // every other source is the stock stack as before.
+            .SetMediaSourceFactory(new DefaultMediaSourceFactory(new ProgressiveDataSourceFactory(new DefaultDataSource.Factory(context, httpSources)))
                 .SetLoadErrorHandlingPolicy(new DefaultLoadErrorHandlingPolicy(StreamLoadRetries)))
             .SetAudioAttributes(attributes, true)     // true = Media3 handles audio focus (pause on loss, duck on transient)
             .SetHandleAudioBecomingNoisy(true)        // headphones unplugged → pause
