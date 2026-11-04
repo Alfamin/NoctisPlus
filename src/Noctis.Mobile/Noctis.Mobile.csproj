@@ -11,6 +11,10 @@
     <AssemblyName>Noctis.Mobile</AssemblyName>
     <AvaloniaUseCompiledBindingsByDefault>true</AvaloniaUseCompiledBindingsByDefault>
     <NoWarn>CS0067;MVVMTK0039;CA1416</NoWarn>
+    <!-- #255: same switch as Noctis.Android (default true; -p:NoctisPlus=false builds
+         heartached's original app). Picks the repo the "Report a problem" link opens. -->
+    <NoctisPlus Condition="'$(NoctisPlus)' == ''">true</NoctisPlus>
+    <DefineConstants Condition="'$(NoctisPlus)' == 'true'">$(DefineConstants);NOCTIS_PLUS</DefineConstants>
   </PropertyGroup>
 
   <ItemGroup>

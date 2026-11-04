@@ -518,7 +518,11 @@ public sealed partial class SettingsPageViewModel : MobilePage
 
     // ── Help ──
 
+#if NOCTIS_PLUS
+    internal const string ReportProblemUrl = "https://github.com/Alfamin/NoctisPlus/issues/new";
+#else
     internal const string ReportProblemUrl = "https://github.com/heartached/Noctis/issues/new";
+#endif
     internal const string WebsiteUrl = "https://noctisapp.cc/";
     /// <summary>The published copy of store/android/privacy-policy.md (the Play listing's link too).</summary>
     internal const string PrivacyPolicyUrl = "https://noctisapp.cc/privacy/android";

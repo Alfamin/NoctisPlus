@@ -3,6 +3,9 @@ using Noctis.Models;
 
 namespace Noctis.Features.TrueShuffle;
 
+/// <summary>The three places a shuffle can take its songs from.</summary>
+internal enum ShuffleScope { CurrentQueue, WholeLibrary, OpenPlaylist }
+
 /// <summary>A Noctis track with its shuffle view (the key decides history and duplicates).</summary>
 internal sealed record ShuffleEntry(Track Track, Song Song);
 

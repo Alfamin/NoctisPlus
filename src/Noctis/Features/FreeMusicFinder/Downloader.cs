@@ -25,6 +25,9 @@ internal static class Downloader
         return string.IsNullOrEmpty(configured) ? DefaultFolder(pluginDataDirectory) : Environment.ExpandEnvironmentVariables(configured);
     }
 
+    /// <summary>#255 step 2: a host without a Music folder (Android) sets the parent folder here. Null on desktop = unchanged.</summary>
+    internal static Func<string?>? DefaultRootOverride { get; set; }
+
     /// <summary>
     /// Where tracks go when no download folder is configured: inside the first Noctis library
     /// folder, where the app's folder watcher adds a file to the library as soon as it is
@@ -33,7 +36,8 @@ internal static class Downloader
     public static string DefaultFolder(string pluginDataDirectory)
     {
         var parent = FirstLibraryFolder(pluginDataDirectory);
-        if (parent is null)
+        if (parent is null) parent = DefaultRootOverride?.Invoke();
+        if (string.IsNullOrEmpty(parent))
         {
             parent = Environment.GetFolderPath(Environment.SpecialFolder.MyMusic);
             if (string.IsNullOrEmpty(parent)) parent = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);

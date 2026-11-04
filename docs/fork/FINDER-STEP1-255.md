@@ -33,3 +33,20 @@ Not run: FastGates, the full Noctis.Tests suite, the Android/server heads (they 
 3. Empty `src/Noctis.Finder` (net10.0, WTelegramClient 4.4.9, refs Core, InternalsVisibleTo Noctis/FreeMusicFinder.Tests/Noctis.Android).
    Note: `Noctis.Finder` will need Core's internals too (`PublishSavedFile`), so add `InternalsVisibleTo Noctis.Finder` to Core then.
 4. `git mv` the A files in batches (a)-(e). 5. `FinderSession`. 6. Mobile host.
+
+## Step 2 (first slice): Downloader default root injectable
+
+2026-11-04 22:24, branch `android-plus-finder2`. Smallest piece of map step 2 only.
+
+- `src/Noctis/Features/FreeMusicFinder/Downloader.cs`: new `internal static Func<string?>? DefaultRootOverride`.
+  `DefaultFolder` order is now: first library folder -> `DefaultRootOverride` (if set and non-empty) -> MyMusic -> UserProfile.
+  Nobody sets it on desktop, so desktop behaviour is identical. The Android host will set it (no MyMusic there).
+
+| Check | Result |
+|---|---|
+| `dotnet build src/Noctis/Noctis.csproj -c Release -v q` | 0 errors (188 warnings, as before) |
+| `dotnet build tests/FreeMusicFinder.Tests` (Release) | 0 errors |
+| `dotnet FreeMusicFinder.Tests.dll -noLogo` | **1760 ok, 0 wrong**, exit 0 |
+
+Still left in step 2: `CatalogPages` library required; `Downloads`/`FinderOnlineSearch` file-saved callback (`PlayerViewModel.StandIn`
+factory); `IPlaylistLibrary`; `StreamCache` without AppData fallback; `Telegram` packed-defaults path.
