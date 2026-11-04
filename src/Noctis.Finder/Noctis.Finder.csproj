@@ -8,6 +8,7 @@
   </PropertyGroup>
   <ItemGroup>
     <ProjectReference Include="..\Noctis.Core\Noctis.Core.csproj" />
+    <ProjectReference Include="..\Noctis.TelegramSync\Noctis.TelegramSync.csproj" />
     <PackageReference Include="WTelegramClient" Version="4.4.9" />
     <InternalsVisibleTo Include="Noctis" />
     <InternalsVisibleTo Include="Noctis.Mobile" />

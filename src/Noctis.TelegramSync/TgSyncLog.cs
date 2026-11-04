@@ -205,7 +205,8 @@ public sealed class TgSyncLog
             try
             {
                 using var body = new MemoryStream(BatchCodec.Encode(batch));
-                await _drive.PostDocumentAsync(_channel, BatchFileName, body, BatchCaption, null, ct).ConfigureAwait(false);
+                await _drive.PostDocumentAsync(_channel, BatchFileName, body, BatchCaption,
+                    TgRequestIds.For("batch:" + _channel, Device + "#" + batch.Seq), null, ct).ConfigureAwait(false);
             }
             catch (TelegramFloodWaitException e)
             {

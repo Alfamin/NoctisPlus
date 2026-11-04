@@ -79,7 +79,10 @@ public sealed class TgUploadQueue(ITelegramDrive drive, long libraryChannel, Fun
         try
         {
             await using var file = new FileStream(job.SourcePath, FileMode.Open, FileAccess.Read, FileShare.Read);
-            LastPosted = await drive.PostDocumentAsync(libraryChannel, job.FileName, file, caption, null, ct).ConfigureAwait(false);
+            // One id per song for this library channel: a retry after a lost reply or a restart is refused as a copy
+            // while Telegram remembers the id (not a guarantee; the upload itself restarts from the first byte).
+            LastPosted = await drive.PostDocumentAsync(libraryChannel, job.FileName, file, caption,
+                TgRequestIds.For("song:" + libraryChannel, job.Identity.Length > 0 ? job.Identity : job.FileName), null, ct).ConfigureAwait(false);
             Remove(node, keepKnown: true);
             return TgTransferResult.Done;
         }

@@ -10,6 +10,18 @@ public sealed record TgDocument(long DocumentId, string FileName, long Size);
 public sealed record TgMessage(long Peer, long Id, string Caption, TgDocument? Document, DateTime DateUtc);
 
 /// <summary>Channel markers: <c>noctis-plus:&lt;library|sync&gt;:v1:&lt;guid&gt;</c>.</summary>
+/// <summary>Request ids for posts: the same post retried (after a lost reply or a restart) keeps one id, so
+/// Telegram can refuse a second copy while it remembers that id. Not a guarantee of exactly-once.</summary>
+public static class TgRequestIds
+{
+    public static long For(string scope, string key)
+    {
+        var hash = System.Security.Cryptography.SHA256.HashData(System.Text.Encoding.UTF8.GetBytes(scope + "\u001f" + key));
+        var id = BitConverter.ToInt64(hash, 0);
+        return id == 0 ? 1 : id;
+    }
+}
+
 public static class TgMarkers
 {
     public const string Library = "library", Sync = "sync";
@@ -34,6 +46,12 @@ public interface ITelegramDrive
 
     /// <summary>Post <paramref name="content"/> as a document with a caption. Streams; never needs the whole file in memory.</summary>
     Task<TgMessage> PostDocumentAsync(long channel, string fileName, Stream content, string caption, IProgress<long>? progress = null, CancellationToken ct = default);
+
+    /// <summary>The same post with a request id that stays the same when this exact post is retried (a lost
+    /// reply, a restart), so the service can refuse a second copy. Default: no such protection.</summary>
+    Task<TgMessage> PostDocumentAsync(long channel, string fileName, Stream content, string caption, long requestId,
+        IProgress<long>? progress = null, CancellationToken ct = default)
+        => PostDocumentAsync(channel, fileName, content, caption, progress, ct);
 
     /// <summary>Messages with id greater than <paramref name="afterId"/>, oldest first, at most <paramref name="limit"/> (one history call).</summary>
     Task<IReadOnlyList<TgMessage>> ReadHistoryAsync(long channel, long afterId, int limit = 100, CancellationToken ct = default);

@@ -208,3 +208,47 @@ public sealed class ConvergenceTests
         finally { if (Directory.Exists(dir)) Directory.Delete(dir, true); }
     }
 }
+
+public sealed class RequestIdTests
+{
+    [Fact]
+    public async Task ARetriedBatch_IsPostedWithTheSameRequestId_AcrossARestart()
+    {
+        var path = Path.Combine(Path.GetTempPath(), $"tg-rid-{Guid.NewGuid():N}.json");
+        try
+        {
+            var drive = new RecordingDrive();
+            var channel = (await drive.FindOrCreateChannelAsync(TgMarkers.Sync, "s", TgMarkers.For(TgMarkers.Sync, Guid.NewGuid()))).Id;
+            var log = new TgSyncLog(drive, channel, "pc", new TgLedger(), cursorPath: path) { MinPostInterval = TimeSpan.Zero };
+            log.Record(TgKinds.Track, "tg:1", "{}");
+            drive.AfterPost = () => { drive.AfterPost = null; throw new TimeoutException("reply lost"); };
+            await Assert.ThrowsAsync<TimeoutException>(() => log.FlushAsync());
+            var restarted = new TgSyncLog(drive, channel, "pc", new TgLedger(), cursorPath: path) { MinPostInterval = TimeSpan.Zero };
+            Assert.True(await restarted.FlushAsync());
+            Assert.Equal(2, drive.Ids.Count);
+            Assert.Equal(drive.Ids[0], drive.Ids[1]);
+            Assert.NotEqual(TgRequestIds.For("batch:" + channel, "pc#1"), TgRequestIds.For("batch:" + channel, "pc#2"));
+        }
+        finally { File.Delete(path); if (File.Exists(path + ".bak")) File.Delete(path + ".bak"); }
+    }
+
+    private sealed class RecordingDrive : ITelegramDrive
+    {
+        private readonly FakeTelegramDrive _inner = new();
+        public List<long> Ids { get; } = new();
+        public Action? AfterPost { get => _inner.AfterPost; set => _inner.AfterPost = value; }
+        public Task<long> GetSelfUserIdAsync(CancellationToken ct = default) => _inner.GetSelfUserIdAsync(ct);
+        public Task<TgChannel> FindOrCreateChannelAsync(string role, string title, string markerIfNew, CancellationToken ct = default) => _inner.FindOrCreateChannelAsync(role, title, markerIfNew, ct);
+        public Task<TgMessage> PostDocumentAsync(long channel, string fileName, Stream content, string caption, IProgress<long>? progress = null, CancellationToken ct = default)
+            => throw new InvalidOperationException("posts must carry a request id");
+        public Task<TgMessage> PostDocumentAsync(long channel, string fileName, Stream content, string caption, long requestId, IProgress<long>? progress = null, CancellationToken ct = default)
+        { Ids.Add(requestId); return _inner.PostDocumentAsync(channel, fileName, content, caption, progress, ct); }
+        public Task<IReadOnlyList<TgMessage>> ReadHistoryAsync(long channel, long afterId, int limit = 100, CancellationToken ct = default) => _inner.ReadHistoryAsync(channel, afterId, limit, ct);
+        public Task<TgMessage?> GetMessageAsync(long peer, long id, CancellationToken ct = default) => _inner.GetMessageAsync(peer, id, ct);
+        public Task<TgMessage?> GetPinnedAsync(long channel, CancellationToken ct = default) => _inner.GetPinnedAsync(channel, ct);
+        public Task PinAsync(long channel, long id, CancellationToken ct = default) => _inner.PinAsync(channel, id, ct);
+        public Task DeleteMessagesAsync(long channel, IReadOnlyList<long> ids, CancellationToken ct = default) => _inner.DeleteMessagesAsync(channel, ids, ct);
+        public Task DownloadAsync(TgMessage message, Stream destination, long offset = 0, IProgress<long>? progress = null, CancellationToken ct = default) => _inner.DownloadAsync(message, destination, offset, progress, ct);
+        public Task<TgMessage> ForwardAsync(long fromPeer, long id, long toChannel, CancellationToken ct = default) => _inner.ForwardAsync(fromPeer, id, toChannel, ct);
+    }
+}
