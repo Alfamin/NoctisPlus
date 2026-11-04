@@ -41,6 +41,11 @@ public class AppSettings : IJsonOnDeserializing
     public bool PlaylistShowAddedColumn { get; set; } = true;
     public bool PlaylistShowFavoriteColumn { get; set; } = true;
 
+    /// <summary>The Featured Artists / Suggested rail on the right of a playlist page
+    /// (Discord, DendyAly 11-02). Off hides it and skips its artist pictures and the
+    /// suggestion scan; the track list takes the width.</summary>
+    public bool PlaylistShowSideRail { get; set; } = true;
+
     /// <summary>File paths explicitly removed from the library. Skipped during rescans.</summary>
     public List<string> ExcludedFilePaths { get; set; } = new();
 
@@ -69,6 +74,11 @@ public class AppSettings : IJsonOnDeserializing
     /// plugin host rewrites those to ids on load.</summary>
     public List<string> DisabledPlugins { get; set; } = new();
 
+    /// <summary>Plugin ids whose screens the user took off the sidebar (Settings → Plugins → the
+    /// plugin's "Show in sidebar", or the row's Hide from sidebar). Every other running plugin
+    /// that adds a screen gets a sidebar entry.</summary>
+    public List<string> SidebarHiddenPlugins { get; set; } = new();
+
     /// <summary>
     /// "Community plugins" switch (Settings → Plugins). False = restricted mode: no
     /// third-party plugin code is loaded. Null = never decided (a settings.json from before
@@ -84,6 +94,11 @@ public class AppSettings : IJsonOnDeserializing
 
     /// <summary>Plugin id → setting key → value (invariant text) for settings declared in plugin.json.</summary>
     public Dictionary<string, Dictionary<string, string>> PluginSettingValues { get; set; } = new();
+
+    /// <summary>Plugin id → "version|sha256" of an installed copy whose zip matched its official
+    /// listing (plugins/index.json, author Noctis) at install time. Only these show the verified
+    /// mark in Settings → Plugins; written by the plugin host on install, dropped on remove.</summary>
+    public Dictionary<string, string> VerifiedOfficialPlugins { get; set; } = new();
 
     /// <summary>
     /// Marker for the v2 theme migration. In v1, "Dark" denoted today's Gray colours.
@@ -114,12 +129,28 @@ public class AppSettings : IJsonOnDeserializing
     /// Off shows them in the plain text colour.</summary>
     public bool AccentTrackLinks { get; set; } = true;
 
+    /// <summary>Settings › Appearance › App Icon: id of the window/taskbar/tray icon
+    /// ("classic", "blush", "sky", ...). Unknown ids fall back to classic.</summary>
+    public string AppIcon { get; set; } = "classic";
+
     /// <summary>Phone: "System" (follow Android's dark/light), "Dark" (the dark theme in
     /// <see cref="Theme"/>) or "Light".</summary>
     public string MobileAppearance { get; set; } = "System";
 
     /// <summary>Phone: the lyrics page's text size on top of the system font scale (0.8-1.6).</summary>
     public double MobileLyricsTextScale { get; set; } = 1.0;
+
+    /// <summary>Phone, Settings › Listening History › Keep History: days of plays kept (older ones are
+    /// dropped when the app starts and when this changes). 0 keeps them forever.</summary>
+    public int MobileKeepHistoryDays { get; set; }
+
+    /// <summary>Phone, Settings › Listening History › Share with Computer: the plays of the computer's
+    /// songs are sent to it (as scrobbles, on the next sync). Off keeps them on the phone.</summary>
+    public bool MobileShareHistory { get; set; } = true;
+
+    /// <summary>Phone, Settings › Pick Up on Computer: the phone's queue and place are sent to the
+    /// computer, which offers to continue from them. Off by default.</summary>
+    public bool MobilePickUpOnComputer { get; set; }
 
     /// <summary>Phone, Settings › Appearance › Player Bar: the mini player's elapsed part filled in
     /// the cover's colour. Off (the default) leaves the capsule plain glass, as Apple's.</summary>
@@ -132,6 +163,33 @@ public class AppSettings : IJsonOnDeserializing
     /// <summary>Phone, Settings › Appearance › Album Colours: album and artist pages painted in a
     /// deep shade of the cover's colour. Off, they keep the theme's plain pages. On by default.</summary>
     public bool MobileArtworkPageColors { get; set; } = true;
+
+    /// <summary>Phone, Settings › Downloads › Download on Wi-Fi Only: the phone fetches songs from the
+    /// computer only on an unmetered network (Wi-Fi), never over mobile data. On by default.</summary>
+    public bool MobileDownloadWifiOnly { get; set; } = true;
+
+    /// <summary>Phone, Settings › Background: the page background. "Off" (the default, and what a
+    /// settings file without the field reads as) is the plain theme colour; "Artwork" a mesh of
+    /// the playing cover's colours; otherwise the id of a Neutral or Colour mesh ("ash", "ember").</summary>
+    public string MobileBackground { get; set; } = "Off";
+
+    /// <summary>Phone, Settings › Background › Slow Motion: the mesh's colours drift gently.
+    /// Off by default; it also stays still while Android's Battery Saver is on.</summary>
+    public bool MobileBackgroundMotion { get; set; }
+
+    /// <summary>Phone, Settings › Background › Strength: how strong the colour wash is, 0.2-1.</summary>
+    public double MobileBackgroundStrength { get; set; } = 0.6;
+
+    /// <summary>Phone scrobbling route: false = through the computer (plays queue for it on sync),
+    /// true = the phone sends plays to Last.fm / ListenBrainz itself. A play goes one way only,
+    /// decided when it is counted.</summary>
+    public bool MobileScrobbleFromPhone { get; set; } = false;
+
+    /// <summary>Phone, From This Phone: send plays to the connected services.</summary>
+    public bool MobileScrobbleSendPlays { get; set; } = true;
+
+    /// <summary>Phone, From This Phone: tell the connected services what is playing now.</summary>
+    public bool MobileScrobbleNowPlaying { get; set; } = true;
 
     /// <summary>User-defined custom themes selectable from the Themes row.</summary>
     public List<CustomThemeDefinition> CustomThemes { get; set; } = new();
@@ -252,6 +310,12 @@ public class AppSettings : IJsonOnDeserializing
     /// <summary>Windows only: WASAPI exclusive-mode output for bit-perfect playback.</summary>
     public bool ExclusiveAudioEnabled { get; set; }
 
+    /// <summary>Windows only: MMDevice endpoint id Noctis plays to (Settings → Output →
+    /// Output Device). Empty = follow the Windows default. Exclusive Mode opens this
+    /// endpoint directly, so bit-perfect output follows the in-app selection instead of
+    /// breaking when the system default changes.</summary>
+    public string AudioOutputDeviceId { get; set; } = "";
+
     /// <summary>Gapless playback: natural track changes hand off to a pre-decoded
     /// standby player instead of an audible stop/start. On by default.</summary>
     public bool GaplessPlaybackEnabled { get; set; } = true;
@@ -272,6 +336,23 @@ public class AppSettings : IJsonOnDeserializing
     /// <summary>Owner #100: pages ("playlist:…", "album:…", "artist:…") whose header toggle is off: their songs you don't
     /// have are left out of the queue.</summary>
     public List<string> StreamOffPages { get; set; } = [];
+    /// <summary>Missing Songs (GitHub #154): a queued song whose file is gone is taken off the
+    /// queue when playback passes over it; off (the default) keeps it there, marked missing.</summary>
+    public bool RemoveMissingFromQueue { get; set; }
+
+    /// <summary>Queue panel width in DIPs (GitHub #147): its left edge drags, Settings ▸ Player ▸
+    /// Queue has a slider. See <see cref="QueuePanelMetrics"/> for the range.</summary>
+    public double QueuePanelWidth { get; set; } = QueuePanelMetrics.Default;
+
+    /// <summary>What Queue panel rows show (GitHub #147), as <see cref="QueueRowField"/> names:
+    /// line 1 and line 2 each a field plus an optional extra one ("None"), and the right slot as a
+    /// <see cref="QueueRowSide"/> name. Read through <see cref="QueueRowLayout.FromSettings"/>;
+    /// the defaults are the rows from before the setting existed.</summary>
+    public string QueueRowLine1 { get; set; } = nameof(QueueRowField.Title);
+    public string QueueRowLine1Extra { get; set; } = nameof(QueueRowField.None);
+    public string QueueRowLine2 { get; set; } = nameof(QueueRowField.Artist);
+    public string QueueRowLine2Extra { get; set; } = nameof(QueueRowField.None);
+    public string QueueRowRight { get; set; } = nameof(QueueRowSide.Position);
 
     /// <summary>Whether long playback-bar track titles should scroll while playing.</summary>
     public bool TrackTitleMarqueeEnabled { get; set; } = true;
@@ -379,12 +460,40 @@ public class AppSettings : IJsonOnDeserializing
     /// instance option), so a change applies the next time Noctis starts.</summary>
     public bool HeadphoneSurround { get; set; }
 
+    /// <summary>Settings → Audio: Mono Audio, left and right averaged onto both channels (hearing
+    /// in one ear, a single earbud). Bypassed in Exclusive Mode.</summary>
+    public bool MonoAudio { get; set; }
+
+    /// <summary>Settings → Audio: left/right balance, -100 (left only) … 0 (centre) … +100 (right
+    /// only). Linear balance law, see ChannelMixProvider. Bypassed in Exclusive Mode.</summary>
+    public int AudioBalance { get; set; }
+
+    /// <summary>Settings → Player: the sleep timer fades playback out over its last N seconds
+    /// (and "stop after current track" over the end of the track). 0 = off; 10, 30 or 60.
+    /// 30 on a new install; a settings file from before the setting reads as off
+    /// (<see cref="OnDeserializing"/>).</summary>
+    public int SleepTimerFadeSeconds { get; set; } = 30;
+
+    /// <summary>The Fade Out choices; anything else snaps to the nearest.</summary>
+    public static int SnapSleepTimerFadeSeconds(int seconds)
+    {
+        int[] options = [0, 10, 30, 60];
+        var best = options[0];
+        foreach (var o in options)
+            if (Math.Abs(o - seconds) < Math.Abs(best - seconds)) best = o;
+        return best;
+    }
+
     // ── YouTube downloads ──
 
-    /// <summary>Where downloaded tracks land. Empty = "&lt;first music folder&gt;/YouTube".</summary>
+    /// <summary>Legacy (unused since 10-29): where "Add from YouTube" saved downloads before it became
+    /// the official plugin, which keeps its own folder choice. Kept so older settings.json files
+    /// load and round-trip unchanged.</summary>
     public string YouTubeDownloadFolder { get; set; } = string.Empty;
 
-    /// <summary>Override path to yt-dlp. Empty = the copy Noctis installs, then PATH.</summary>
+    /// <summary>Override path to yt-dlp for the lyrics background videos. Empty = the copy Noctis
+    /// installs, then PATH. No longer shown in Settings (10-08); the "Add from YouTube" plugin has
+    /// its own setting.</summary>
     public string YtDlpPath { get; set; } = string.Empty;
 
     // ── Lyrics Studio ──
@@ -413,6 +522,9 @@ public class AppSettings : IJsonOnDeserializing
     /// <summary>The Studio's live preview pane beside the review is open (10-14).</summary>
     public bool LyricsStudioLivePreview { get; set; } = true;
 
+    /// <summary>Experimental: run the speech model on the graphics card (Vulkan) where this build carries it. Off by default.</summary>
+    public bool LyricsStudioUseGpu { get; set; }
+
     // ── Songs page optional columns ──
     // All six were the original set, chosen from the column-header dropdown.
     public bool ShowArtworkColumn { get; set; } = true;
@@ -430,6 +542,23 @@ public class AppSettings : IJsonOnDeserializing
     public bool ShowAlbumColumn { get; set; } = true;
     public bool ShowFavoritesColumn { get; set; } = true;
     public bool ShowPlaysColumn { get; set; } = true;
+
+    // GitHub #151: more fields to pick from the header menu / View Options. Off by default.
+    public bool ShowYearColumn { get; set; }
+    public bool ShowAlbumArtistColumn { get; set; }
+    public bool ShowComposerColumn { get; set; }
+    public bool ShowFormatColumn { get; set; }
+    public bool ShowDateAddedColumn { get; set; }
+    // The file's REPLAYGAIN_TRACK_GAIN (Track.ReplayGainTrackDb). Off by default.
+    public bool ShowReplayGainColumn { get; set; }
+
+    /// <summary>Songs list column order (GitHub #151): column keys, comma-separated; empty =
+    /// the default order. Read through <c>ColumnLayout.Load</c>, which drops unknown keys.</summary>
+    public string SongsColumnOrder { get; set; } = string.Empty;
+
+    /// <summary>Songs list widths the user dragged (GitHub #151): "Key=width" pairs,
+    /// comma-separated. Columns not listed keep their automatic width.</summary>
+    public string SongsColumnWidths { get; set; } = string.Empty;
 
     // ── Songs page sort / filter ──
     // Previously view-model-only, so every launch reset the list to Date Added ▼
@@ -452,6 +581,23 @@ public class AppSettings : IJsonOnDeserializing
     /// "albumartist" or "year".</summary>
     public string AlbumSortMode { get; set; } = "default";
 
+    /// <summary>Albums page layout (GitHub #149): "grid" (tiles, the default) or "carousel"
+    /// (one album at a time, Cover Flow style).</summary>
+    public string AlbumViewMode { get; set; } = "grid";
+
+    /// <summary>Artist page Albums tab layout (GitHub #149): "grid" or "carousel". One
+    /// setting for every artist, like the release sort.</summary>
+    public string ArtistAlbumsViewMode { get; set; } = "grid";
+
+    /// <summary>How albums are dressed in the album carousel: "Cover" (default), "JewelCase",
+    /// "Vinyl" or "Cassette" (<see cref="AlbumCarouselStyles.Parse"/>). Shared by both carousels.</summary>
+    public string AlbumCarouselStyle { get; set; } = AlbumCarouselStyles.DefaultSetting;
+
+    /// <summary>Built-in feature switch (Settings › Plugins › Built-in Features): the album
+    /// carousel and its cases. Off shows the grid on the Albums page and the artist page and
+    /// hides the way to the carousel; <see cref="AlbumViewMode"/> is kept for when it returns.</summary>
+    public bool AlbumCarouselEnabled { get; set; } = true;
+
     /// <summary>Artists grid sort: "name", "songs" (track count), "albums" (album count),
     /// "time" (total length) or "genre".</summary>
     public string ArtistSortMode { get; set; } = "name";
@@ -462,6 +608,12 @@ public class AppSettings : IJsonOnDeserializing
     /// <summary>Artists page layout: "grid" (portrait tiles, the default) or "list" (rows
     /// with Albums / Songs / Time / Genre columns, like the Songs page).</summary>
     public string ArtistViewMode { get; set; } = "grid";
+
+    /// <summary>Artists list view columns (GitHub #151): order, dragged widths and hidden
+    /// columns, in the same comma-separated forms as <see cref="SongsColumnOrder"/>.</summary>
+    public string ArtistListColumnOrder { get; set; } = string.Empty;
+    public string ArtistListColumnWidths { get; set; } = string.Empty;
+    public string ArtistListHiddenColumns { get; set; } = string.Empty;
 
     /// <summary>Artist page Albums / Singles &amp; EPs tab order (GitHub #100): "newest"
     /// (release date), "oldest" (undated releases last) or "name" (A–Z). One setting for
@@ -524,6 +676,28 @@ public class AppSettings : IJsonOnDeserializing
     /// <summary>Settings toggle (Appearance): show the "Heavy rotation" row on Home at all.</summary>
     public bool HomeShowHeavyRotation { get; set; } = true;
 
+    // GitHub #159: how many albums Home's Albums (recently played) and New in Library rows
+    // show, and which of the two comes first. Defaults keep the Albums row as it was (six).
+
+    /// <summary>Albums shown in Home's recently played Albums row; one of <see cref="HomeAlbumCountChoices"/>.</summary>
+    public int HomeRecentAlbumsCount { get; set; } = 6;
+
+    /// <summary>Albums shown in Home's New in Library row (newest added first); one of <see cref="HomeAlbumCountChoices"/>.</summary>
+    public int HomeNewAlbumsCount { get; set; } = 10;
+
+    /// <summary>Whether Home's "New in Library" section shows its rows.</summary>
+    public bool HomeNewAlbumsExpanded { get; set; } = true;
+
+    /// <summary>Show New in Library above the recently played Albums row (default: below it).</summary>
+    public bool HomeNewAlbumsFirst { get; set; }
+
+    /// <summary>The counts the Home album rows offer (Settings picker and the row's own pill).</summary>
+    public static IReadOnlyList<int> HomeAlbumCountChoices { get; } = new[] { 6, 10, 20, 50, 100 };
+
+    /// <summary>The nearest of <see cref="HomeAlbumCountChoices"/>: a hand-edited value snaps.</summary>
+    public static int SnapHomeAlbumCount(int count) =>
+        HomeAlbumCountChoices.MinBy(c => Math.Abs((long)c - count));
+
     /// <summary>Opacity of the playback bar's glass fill (0 = fully transparent, 1 = solid).
     /// Controls only the background, not the bar's text/controls. Default 0.4 matches the
     /// original #66 alpha glass look. Shown as "Glass Opacity" (GitHub #104): with Liquid Glass
@@ -539,6 +713,18 @@ public class AppSettings : IJsonOnDeserializing
     public const double BackgroundBlurAmountDefault = 0.1;
     /// <summary>Below this the slider reads Off and no blur is drawn (the thumb at the far left).</summary>
     public const double BackgroundBlurOffBelow = 0.005;
+
+    /// <summary>Interface Size (GitHub #145): the whole UI drawn at this percent of normal, on
+    /// every platform (the OS text-size settings never reach the app). One of
+    /// <see cref="UiScaleChoices"/>; 100 = unchanged.</summary>
+    public int UiScalePercent { get; set; } = 100;
+
+    /// <summary>The Settings picker's choices for <see cref="UiScalePercent"/>.</summary>
+    public static IReadOnlyList<int> UiScaleChoices { get; } = new[] { 90, 100, 110, 125, 150, 175, 200 };
+
+    /// <summary>The nearest of <see cref="UiScaleChoices"/>: a hand-edited value snaps.</summary>
+    public static int SnapUiScale(int percent) =>
+        UiScaleChoices.MinBy(c => Math.Abs((long)c - percent));
 
     /// <summary>Opacity of the white track box (song info card) inside the playback bar
     /// (0 = no box, 1 = solid white). Default 0.07 is the reference LCD's soft lift.</summary>
@@ -588,6 +774,10 @@ public class AppSettings : IJsonOnDeserializing
     /// <summary>Mini player design: "Classic" (the size-morphing card), "Pill" or "Sleeve";
     /// see <see cref="MiniPlayerStyle"/>. Stored by name like the other style pickers.</summary>
     public string MiniPlayerStyle { get; set; } = MiniPlayerStyles.DefaultSetting;
+
+    /// <summary>Built-in feature switch: the mini player. Off closes it, hides its island
+    /// button and makes the album-art click and shortcut do nothing.</summary>
+    public bool MiniPlayerEnabled { get; set; } = true;
 
     /// <summary>Layout of the Albums → Cover Flow page: "Carousel" (default, the classic row),
     /// "Cascade" (tilted diagonal path with the track text beside it) or "Collage" (mosaic) —
@@ -884,6 +1074,11 @@ public class AppSettings : IJsonOnDeserializing
     /// (the Windows engines); elsewhere it rests flat. Ships off like the other extras.</summary>
     public bool LyricsVisualizerEnabled { get; set; }
 
+    /// <summary>Built-in feature switch: the audio visualizer. Off removes the Visualizer page
+    /// from the sidebar and stops the lyrics-page visualizer, whatever
+    /// <see cref="LyricsVisualizerEnabled"/> says (kept for when it returns).</summary>
+    public bool VisualizerEnabled { get; set; } = true;
+
     /// <summary>Visualizer look: a <see cref="VisualizerStyle"/> name ("Bars", "Mirror", "Wave").</summary>
     public string LyricsVisualizerStyle { get; set; } = VisualizerStyles.DefaultSetting;
 
@@ -912,6 +1107,10 @@ public class AppSettings : IJsonOnDeserializing
     /// <summary>A song with a music video plays the clip's own audio instead of the song file
     /// (decided at each song start; the song file is the fallback). Off by default.</summary>
     public bool MusicVideoUseVideoAudio { get; set; }
+
+    /// <summary>The music video fills the lyrics page behind the lyrics (muted, dimmed, in step
+    /// with the song) instead of replacing the cover. Off by default.</summary>
+    public bool MusicVideoAsBackground { get; set; }
 
     /// <summary>Opt-in fullscreen focus — dims everything but the active line and its
     /// closest neighbors while the lyrics page is fullscreen.</summary>
@@ -1018,6 +1217,11 @@ public class AppSettings : IJsonOnDeserializing
     /// <summary>Pre-amp in dB applied on top of the RG tag value.</summary>
     public double ReplayGainPreampDb { get; set; } = 0.0;
 
+    /// <summary>GitHub #148: measure new files (found by the folder watcher or a library scan)
+    /// and write ReplayGain tags into them once their album has finished copying. Off by
+    /// default: it rewrites the user's files.</summary>
+    public bool AutoReplayGainScanEnabled { get; set; } = false;
+
     // ── Audio analysis (BPM / key) ──
 
     /// <summary>Whether background BPM + musical-key analysis runs (scan-time + backfill).
@@ -1055,7 +1259,12 @@ public class AppSettings : IJsonOnDeserializing
         EqPreampDb = Math.Clamp(EqPreampDb, Services.ParametricEqMath.EqPreampMinDb, Services.ParametricEqMath.EqPreampMaxDb);
         CrossfadeDuration = Math.Clamp(CrossfadeDuration, 1, 12);
         PlayPauseFadeMs = Math.Clamp(PlayPauseFadeMs, 100, 2000);
+        AudioBalance = Math.Clamp(AudioBalance, -100, 100);
+        SleepTimerFadeSeconds = SnapSleepTimerFadeSeconds(SleepTimerFadeSeconds);
         PlayCountThresholdPercent = SnapPlayCountThreshold(PlayCountThresholdPercent);
+        UiScalePercent = SnapUiScale(UiScalePercent);
+        HomeRecentAlbumsCount = SnapHomeAlbumCount(HomeRecentAlbumsCount);
+        HomeNewAlbumsCount = SnapHomeAlbumCount(HomeNewAlbumsCount);
         PlaybackBarBackgroundOpacity = Math.Clamp(PlaybackBarBackgroundOpacity, 0, 1);
         BackgroundBlurAmount = double.IsFinite(BackgroundBlurAmount)
             ? Math.Clamp(BackgroundBlurAmount, 0, 1)
@@ -1084,6 +1293,7 @@ public class AppSettings : IJsonOnDeserializing
         // old default, so it follows the new one instead of leaving a stretched pill.
         if (PlaybackBarWidth == 626) PlaybackBarWidth = 536;
         PlaybackBarSkipSeconds = PlaybackBarSkipSeconds is 10 or 15 or 30 ? PlaybackBarSkipSeconds : 15;
+        QueuePanelWidth = QueuePanelMetrics.Clamp(QueuePanelWidth);
     }
 
     /// <summary>
@@ -1099,6 +1309,8 @@ public class AppSettings : IJsonOnDeserializing
         AlbumPageTintEnabled = false;
         PlayPauseFadeEnabled = false;
         IgnoreLeadingWordsInArtistSort = false;
+        // Sleep timer Fade Out (2026-10-29): the timer used to pause outright.
+        SleepTimerFadeSeconds = 0;
     }
 }
 

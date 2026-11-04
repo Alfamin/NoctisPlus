@@ -123,6 +123,34 @@
     </UserControl.Resources>
 
     <UserControl.Styles>
+        <Style Selector="Button.sync-pill">
+            <Setter Property="Padding" Value="18,9"/>
+            <Setter Property="FontSize" Value="14"/>
+            <Setter Property="FontWeight" Value="SemiBold"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="RenderTransform" Value="scale(1)"/>
+            <Setter Property="Transitions">
+                <Transitions>
+                    <TransformOperationsTransition Property="RenderTransform" Duration="0:0:0.12" Easing="CubicEaseOut"/>
+                </Transitions>
+            </Setter>
+        </Style>
+        <Style Selector="Button.sync-pill /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Background" Value="{DynamicResource LyricsBtnBgRes}"/>
+            <Setter Property="Foreground" Value="White"/>
+            <Setter Property="BorderThickness" Value="0"/>
+            <Setter Property="CornerRadius" Value="21"/>
+        </Style>
+        <Style Selector="Button.sync-pill:pointerover">
+            <Setter Property="RenderTransform" Value="scale(1.04)"/>
+        </Style>
+        <Style Selector="Button.sync-pill:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Background" Value="{DynamicResource LyricsBtnBgHoverRes}"/>
+            <Setter Property="Foreground" Value="White"/>
+        </Style>
+        <Style Selector="Button.sync-pill:pressed">
+            <Setter Property="RenderTransform" Value="scale(0.97)"/>
+        </Style>
         <!-- Explicit badge -->
         <Style Selector="Border.lyrics-explicit">
             <Setter Property="Background" Value="#88888888"/>
@@ -231,35 +259,34 @@
             <Setter Property="Background" Value="{DynamicResource LyricsBtnBgRes}"/>
         </Style>
 
-        <!-- "Sync" pill: the owner's reference shape (a roomy pill, sound bars, "Sync") in
-             the lyrics page's own adaptive pill colours. Same look in LyricsPanelView; keep in sync. -->
-        <Style Selector="Button.sync-pill">
-            <Setter Property="Padding" Value="18,9"/>
-            <Setter Property="FontSize" Value="14"/>
-            <Setter Property="FontWeight" Value="SemiBold"/>
-            <Setter Property="Cursor" Value="Hand"/>
-            <Setter Property="RenderTransform" Value="scale(1)"/>
-            <Setter Property="Transitions">
-                <Transitions>
-                    <TransformOperationsTransition Property="RenderTransform" Duration="0:0:0.12" Easing="CubicEaseOut"/>
-                </Transitions>
-            </Setter>
-        </Style>
-        <Style Selector="Button.sync-pill /template/ ContentPresenter#PART_ContentPresenter">
-            <Setter Property="Background" Value="{DynamicResource LyricsBtnBgRes}"/>
+        <!-- Audio / Video switch (music video): a two-segment frosted pill; the chosen side is
+             filled and full-strength, the other one recedes. -->
+        <Style Selector="Button.mv-seg">
+            <Setter Property="Background" Value="Transparent"/>
             <Setter Property="Foreground" Value="White"/>
             <Setter Property="BorderThickness" Value="0"/>
-            <Setter Property="CornerRadius" Value="21"/>
+            <Setter Property="Padding" Value="16,6"/>
+            <Setter Property="MinWidth" Value="64"/>
+            <Setter Property="CornerRadius" Value="999"/>
+            <Setter Property="FontSize" Value="12.5"/>
+            <Setter Property="FontWeight" Value="SemiBold"/>
+            <Setter Property="HorizontalContentAlignment" Value="Center"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="Opacity" Value="0.6"/>
         </Style>
-        <Style Selector="Button.sync-pill:pointerover">
-            <Setter Property="RenderTransform" Value="scale(1.04)"/>
+        <Style Selector="Button.mv-seg:pointerover">
+            <Setter Property="Opacity" Value="0.85"/>
         </Style>
-        <Style Selector="Button.sync-pill:pointerover /template/ ContentPresenter#PART_ContentPresenter">
-            <Setter Property="Background" Value="{DynamicResource LyricsBtnBgHoverRes}"/>
+        <Style Selector="Button.mv-seg:pointerover /template/ ContentPresenter">
+            <Setter Property="Background" Value="Transparent"/>
             <Setter Property="Foreground" Value="White"/>
         </Style>
-        <Style Selector="Button.sync-pill:pressed">
-            <Setter Property="RenderTransform" Value="scale(0.97)"/>
+        <Style Selector="Button.mv-seg.on">
+            <Setter Property="Opacity" Value="1"/>
+            <Setter Property="Background" Value="{DynamicResource LyricsBtnBgHoverRes}"/>
+        </Style>
+        <Style Selector="Button.mv-seg.on:pointerover /template/ ContentPresenter">
+            <Setter Property="Background" Value="{DynamicResource LyricsBtnBgHoverRes}"/>
         </Style>
 
         <!-- Color picker circle button -->
@@ -314,7 +341,7 @@
                          started. Duration is pinned to LineMotion.DurationMs by test. -->
                     <TransformOperationsTransition Property="RenderTransform" Duration="0:0:0.65">
                         <TransformOperationsTransition.Easing>
-                            <helpers:LineMotionEase/>
+                            <helpers:PlusLineMotionEase/>
                         </TransformOperationsTransition.Easing>
                     </TransformOperationsTransition>
                     <DoubleTransition Property="Opacity" Duration="0:0:0.5" Easing="CubicEaseInOut"/>
@@ -548,10 +575,31 @@
               ZIndex="-1"
               ClipToBounds="True"
               IsHitTestVisible="False"
-              IsVisible="{Binding Player.LyricsBackgroundMediaPath, Converter={x:Static StringConverters.IsNotNullOrEmpty}}">
+              IsVisible="{Binding Player.ShowsLyricsBackgroundMedia}">
             <controls:VideoBackdrop x:Name="MediaBackdrop"
                                     Source="{Binding Player.LyricsBackgroundMediaPath}"
                                     IsPaused="{Binding Player.LyricsBackgroundHoldsWhilePaused}"
+                                    IsActive="{Binding $self.IsVisible}" />
+            <Rectangle Fill="#8C000000"/>
+        </Grid>
+
+        <!-- Music video behind the lyrics (Settings → Lyrics Studio → Music videos → Behind
+             lyrics): the song's clip fills the page, muted, paused with the song and kept in
+             step with it (position, speed). Replaces the lyrics background video above while it
+             shows; code-behind parks the flowing layers below it. Decodes only while visible
+             and the window isn't minimized (VideoBackdrop). -->
+        <Grid x:Name="MusicVideoBackdropLayer"
+              Grid.ColumnSpan="2"
+              Grid.RowSpan="2"
+              ZIndex="-1"
+              ClipToBounds="True"
+              IsHitTestVisible="False"
+              IsVisible="{Binding Player.ShowsMusicVideoBackdrop}">
+            <controls:VideoBackdrop x:Name="MusicVideoBackdrop"
+                                    Source="{Binding Player.CurrentMusicVideoPath}"
+                                    SyncPosition="{Binding Player.MusicVideoSyncPosition}"
+                                    Rate="{Binding Player.PlaybackRate}"
+                                    IsPaused="{Binding !Player.IsPlaying}"
                                     IsActive="{Binding $self.IsVisible}" />
             <Rectangle Fill="#8C000000"/>
         </Grid>
@@ -609,7 +657,8 @@
                 Grid.Column="0"
                 Grid.RowSpan="2"
                 Background="Transparent"
-                Padding="48,42">
+                Padding="48,42"
+                IsVisible="{Binding !Player.ShowsMusicVideoFullSize}">
             <StackPanel x:Name="LeftContentStack" VerticalAlignment="Center"
                         HorizontalAlignment="Center"
                         ClipToBounds="False"
@@ -649,7 +698,7 @@
                             <!-- Also stays up for a clip with no video stream (an audio-only file). -->
                             <controls:MediaArtwork.IsVisible>
                                 <MultiBinding Converter="{x:Static BoolConverters.Or}">
-                                    <Binding Path="!Player.HasMusicVideo"/>
+                                    <Binding Path="!Player.ShowsMusicVideoInCover"/>
                                     <Binding ElementName="MusicVideo" Path="!HasVideoStream"/>
                                 </MultiBinding>
                             </controls:MediaArtwork.IsVisible>
@@ -661,10 +710,11 @@
                         <controls:VideoBackdrop x:Name="MusicVideo"
                                                 Source="{Binding Player.CurrentMusicVideoPath}"
                                                 SyncPosition="{Binding Player.MusicVideoSyncPosition}"
+                                                Rate="{Binding Player.PlaybackRate}"
                                                 IsPaused="{Binding !Player.IsPlaying}"
                                                 Stretch="Uniform"
                                                 CornerRadius="{Binding Player.MusicVideoCornerRadius}"
-                                                IsVisible="{Binding Player.HasMusicVideo}"
+                                                IsVisible="{Binding Player.ShowsMusicVideoInCover}"
                                                 IsActive="{Binding $self.IsVisible}" />
                     </Panel>
                 </Border>
@@ -1113,7 +1163,7 @@
         <!-- ══════════════════════════════════════════════════════ -->
         <!-- RIGHT PANEL: Lyrics Column                           -->
         <!-- ══════════════════════════════════════════════════════ -->
-        <Grid x:Name="RightPanel" Grid.Column="1" Grid.RowSpan="2"
+        <Grid x:Name="RightPanel" Grid.Column="1" Grid.RowSpan="2" IsVisible="{Binding !Player.ShowsMusicVideoFullSize}"
               RenderTransformOrigin="0.5,0.5">
             <!-- No RenderTransform transition: the wide-mode 1.1x scale is applied
                  by code-behind on attach/resize; a transition made it zoom in every
@@ -1340,10 +1390,10 @@
                                              or not, so the wrap geometry never changes on activation (the old
                                              TextBlock swap re-wrapped the line mid-song). Inactive lines show the
                                              base layer at full opacity — indistinguishable from plain line text. -->
-                                        <ItemsControl ItemsSource="{Binding Words}"
+                                        <ItemsControl ItemsSource="{Binding LiveWords}"
                                                       Classes="word-layer"
                                                       Classes.active="{Binding IsActive}"
-                                                      IsVisible="{Binding ShowWords}"
+                                                      IsVisible="{Binding ShowLiveWords}"
                                                       Opacity="{Binding LineOpacity}"
                                                       HorizontalAlignment="Left"
                                                       ClipToBounds="False"
@@ -1360,6 +1410,20 @@
                                                 </ItemsPanelTemplate>
                                             </ItemsControl.ItemsPanel>
                                         </ItemsControl>
+                                    <controls:KaraokeRestingWords Words="{Binding Words}"
+                                                                      RightToLeft="{Binding IsRightToLeft}"
+                                                                      IsVisible="{Binding ShowRestingWords}"
+                                                                      Opacity="{Binding LineOpacity}"
+                                                                      Foreground="{Binding $parent[UserControl].((vm:LyricsViewModel)DataContext).LyricsPrimaryFg}"
+                                                                      ItemsAlignment="{Binding Voice, Converter={StaticResource VoiceItemsAlign}}"
+                                                                      HorizontalAlignment="Left"
+                                                                      MaxWidth="{Binding $parent[ItemsControl].MaxWidth}">
+                                            <controls:KaraokeRestingWords.Transitions>
+                                                <Transitions>
+                                                    <DoubleTransition Property="Opacity" Duration="0:0:0.5" Easing="CubicEaseInOut"/>
+                                                </Transitions>
+                                            </controls:KaraokeRestingWords.Transitions>
+                                        </controls:KaraokeRestingWords>
                                         <!-- Intro dots. Left margin centers the first dot over the
                                              first letter of the lyric below. Each dot breathes on a
                                              sine wave (Alternate keeps it continuous, no hold-and-snap);
@@ -1565,9 +1629,7 @@
 
             <!-- (Source / Save / Alternate buttons moved to left panel bottom) -->
 
-            <!-- "Sync" pill (Noctis Plus, owner's reference: a solid white pill with sound bars).
-                 Shown while the current line is scrolled out of view; its bottom margin is set in
-                 code, as the wide-mode 1.1x scale of this column otherwise pushes it below the window. -->
+            <!-- Follow Button -->
             <Button x:Name="FollowPill"
                     Classes="sync-pill"
                     HorizontalAlignment="Center"
@@ -1584,5 +1646,57 @@
                 </StackPanel>
             </Button>
         </Grid>
+
+        <!-- Music video full size (the Audio / Video switch on Video): the clip letterboxed on
+             black over the whole page, muted and in step with the song like the other
+             placements; the cover and lyrics panels are hidden meanwhile (nothing renders
+             under it). The cover stands in for a clip with no video stream. The playback
+             island stays on top for transport. -->
+        <Grid x:Name="MusicVideoFullSizeLayer"
+              Grid.ColumnSpan="2"
+              Grid.RowSpan="2"
+              ZIndex="5"
+              Background="Black"
+              IsVisible="{Binding Player.ShowsMusicVideoFullSize}">
+            <Image Source="{Binding Player.AlbumArt}"
+                   Stretch="Uniform"
+                   Margin="48,72,48,110"
+                   IsVisible="{Binding !#MusicVideoFullSize.HasVideoStream}"/>
+            <controls:VideoBackdrop x:Name="MusicVideoFullSize"
+                                    Source="{Binding Player.CurrentMusicVideoPath}"
+                                    SyncPosition="{Binding Player.MusicVideoSyncPosition}"
+                                    Rate="{Binding Player.PlaybackRate}"
+                                    IsPaused="{Binding !Player.IsPlaying}"
+                                    Stretch="Uniform"
+                                    MaxDecodeSide="1920"
+                                    IsActive="{Binding $self.IsVisible}" />
+        </Grid>
+
+        <!-- Audio / Video switch: shown while the song has a music video (Settings → Lyrics
+             Studio → Music videos on). Video plays the clip full size; Audio is the normal
+             page. Sound never changes here: the song keeps the audio it started with. -->
+        <Border x:Name="MusicVideoSwitch"
+                Grid.ColumnSpan="2"
+                ZIndex="6"
+                HorizontalAlignment="Center"
+                VerticalAlignment="Top"
+                Margin="0,14,0,0"
+                Padding="3"
+                CornerRadius="999"
+                Background="{DynamicResource LyricsSecBtnBgRes}"
+                IsVisible="{Binding Player.HasMusicVideo}">
+            <StackPanel Orientation="Horizontal" Spacing="2">
+                <Button Classes="mv-seg"
+                        Classes.on="{Binding !Player.IsWatchingMusicVideo}"
+                        Command="{Binding Player.ShowMusicVideoAudioCommand}"
+                        Content="{loc:T Lyrics.MusicVideoAudioSide}"
+                        AutomationProperties.Name="{loc:T Lyrics.MusicVideoAudioSide}"/>
+                <Button Classes="mv-seg"
+                        Classes.on="{Binding Player.IsWatchingMusicVideo}"
+                        Command="{Binding Player.ShowMusicVideoFullSizeCommand}"
+                        Content="{loc:T Lyrics.MusicVideoVideoSide}"
+                        AutomationProperties.Name="{loc:T Lyrics.MusicVideoVideoSide}"/>
+            </StackPanel>
+        </Border>
     </Grid>
 </UserControl>

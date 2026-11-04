@@ -154,7 +154,7 @@ internal sealed class WordLyricsService(ILibraryService library, Func<AppSetting
         _folders = settings().MusicFolders.ToArray();
         // The first library publish is a baseline, not an instruction to time every old song.
         // Partial snapshots never erase IDs and cannot produce duplicate jobs on a rescan.
-        var paths = library.AllTracks.Where(t => !t.IsRemoteStream && !string.IsNullOrWhiteSpace(t.FilePath))
+        var paths = library.AllTracks.Where(t => !t.NoLyrics && !t.IsRemoteStream && !string.IsNullOrWhiteSpace(t.FilePath))
             .Select(t => t.FilePath).Where(_known.Add).ToArray();
         bool catchingUp = !_baseline && worker.HasCheckpoint;
         bool newSongs = _baseline;
@@ -167,6 +167,7 @@ internal sealed class WordLyricsService(ILibraryService library, Func<AppSetting
     private void DownloadSaved(object? sender, string path)
     {
         if (_disposed || _worker is not { } worker) return;
+        if (library.AllTracks.Any(t => t.NoLyrics && string.Equals(t.FilePath, path, StringComparison.OrdinalIgnoreCase))) return;
         // Owner #108: a song only played (the stream cache, also the songs fetched ahead) is not one of your songs: it is
         // timed only when it plays and "Time every song you play" is on. Added to Songs, its library copy comes here.
         if (OnlineMusicSearch.Current?.IsCachedFile(path) == true) return;
@@ -243,7 +244,7 @@ internal sealed class WordLyricsService(ILibraryService library, Func<AppSetting
             Volatile.Write(ref _playingPath, track is { IsRemoteStream: false, FilePath.Length: > 0 } ? track.FilePath : null);
         }
         if (_playingAsked || !playing || _disposed || _worker is not { } worker || !TimePlayed) return;
-        if (track is null || track.IsRemoteStream || string.IsNullOrWhiteSpace(track.FilePath)) return;
+        if (track is null || track.NoLyrics || track.IsRemoteStream || string.IsNullOrWhiteSpace(track.FilePath)) return;
         // Owned songs start now; streamed songs retain the five-second listening rule.
         if (OnlineMusicSearch.Current?.IsCachedFile(track.FilePath) == true && position < PlayedAfter) return;
         // A song still arriving is asked once its file is whole (the next position change after that).
@@ -279,7 +280,7 @@ internal sealed class WordLyricsService(ILibraryService library, Func<AppSetting
         if (_disposed || _worker is not { } worker) return;
         var current = Volatile.Read(ref _playingPath);
         var paths = TimePlayed && playing && _playingAsked
-            ? queue.Take(2).Select(t => t.PendingStream is PendingStream p ? p.Source.CompletedPlaybackPath(p.Song)
+            ? queue.Take(2).Where(t => !t.NoLyrics).Select(t => t.PendingStream is PendingStream p ? p.Source.CompletedPlaybackPath(p.Song)
                 : !t.IsRemoteStream ? t.FilePath : null).Where(p => !string.IsNullOrWhiteSpace(p)).Cast<string>().ToArray()
             : [];
         if (string.Equals(current, _aheadCurrent, StringComparison.OrdinalIgnoreCase) && paths.SequenceEqual(_aheadPaths, StringComparer.OrdinalIgnoreCase)) return;
@@ -333,6 +334,7 @@ internal sealed class WordLyricsService(ILibraryService library, Func<AppSetting
         if (_worker is not { } worker) return "Enable WordLyrics in Settings → Features.";
         var selected = paths.Distinct(StringComparer.OrdinalIgnoreCase).ToArray();
         if (action == TimingAction.Custom && selected.Length != 1) return "Custom lyrics apply to one selected song.";
+        if (selected.Length == 1) await UnmarkNoLyricsAsync(selected[0]);
         var data = DataDirectory;
         return await Task.Run(() =>
         {
@@ -368,6 +370,7 @@ internal sealed class WordLyricsService(ILibraryService library, Func<AppSetting
         {
             // The worker retains the request across setup/restarts; never call OpenSetup here.
             if (_worker is not { } worker) return;
+            await UnmarkNoLyricsAsync(track.FilePath, track);
             var result = await Task.Run(() =>
             {
                 var playing = SameSong(track.FilePath, Volatile.Read(ref _playingPath));
@@ -391,6 +394,25 @@ internal sealed class WordLyricsService(ILibraryService library, Func<AppSetting
             if (!result.Accepted || !BackendReady) Show(track: track);
         }
         catch (Exception ex) { Progress(new("Could not queue song", ex.Message, Error: true, Finished: true)); }
+    }
+
+    private async Task UnmarkNoLyricsAsync(string path, Track? playing = null)
+    {
+        // An explicit single-song repair overrides an instrumental mark, as it does Ignore WordLyrics.
+        if (ClearNoLyricsMark(path, playing, library.AllTracks)) await library.SaveAsync();
+    }
+
+    internal static bool ClearNoLyricsMark(string path, Track? playing, IEnumerable<Track> tracks)
+    {
+        var changed = playing?.NoLyrics == true;
+        if (playing is not null) playing.NoLyrics = false;
+        foreach (var track in tracks)
+            if (track.NoLyrics && string.Equals(track.FilePath, path, StringComparison.OrdinalIgnoreCase))
+            {
+                track.NoLyrics = false;
+                changed = true;
+            }
+        return changed;
     }
 
     private void Progress(ProgressState state)

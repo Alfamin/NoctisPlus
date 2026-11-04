@@ -1,8 +1,10 @@
 using System.Text;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
+using Noctis.Mobile.Services;
 using Noctis.Mobile.Services.Account;
 using Noctis.Services;
+using Noctis.Services.Server;
 
 namespace Noctis.Mobile.ViewModels;
 
@@ -13,7 +15,9 @@ namespace Noctis.Mobile.ViewModels;
 /// downloads and Sign out.
 /// Sign-in is two steps: the address is probed for the server certificate's fingerprint,
 /// which the user compares with the one on the computer, and only a confirmed fingerprint
-/// is signed in with (and pinned by the service). Every call goes through
+/// is signed in with (and pinned by the service). Or, with no typing at all, Scan QR Code reads
+/// the code the computer shows under Connect a phone: its addresses, its certificate pin and a
+/// one-time secret, which the service sends only to that pinned certificate. Every call goes through
 /// <see cref="INoctisAccountService"/>; its events arrive on any thread and are marshalled.
 /// </summary>
 public sealed partial class AccountPageViewModel : MobilePage
@@ -82,8 +86,17 @@ public sealed partial class AccountPageViewModel : MobilePage
 
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(IsIdle), nameof(CanSync), nameof(CanDownload), nameof(CanUpload), nameof(CanSignIn),
-        nameof(CanRemoveDownloads), nameof(ShowStatusLine))]
+        nameof(CanRemoveDownloads), nameof(ShowStatusLine), nameof(IsFormBusy))]
     private bool _isBusy;
+
+    /// <summary>A QR sign-in is running: the Scan button shows the spinner, not Sign In; its
+    /// errors are about the code, not the typed fields.</summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(IsFormBusy))]
+    private bool _isSigningInByQr;
+
+    /// <summary>The typed sign-in's own busy state (Sign In's spinner).</summary>
+    public bool IsFormBusy => IsBusy && !IsSigningInByQr;
 
     public bool IsIdle => !IsBusy;
 
@@ -167,7 +180,7 @@ public sealed partial class AccountPageViewModel : MobilePage
     public bool ShowInitials => !HasAvatar && Initials.Length > 0;
     public bool ShowPersonGlyph => !HasAvatar && Initials.Length == 0;
 
-    /// <summary>"Synced 5 min ago" (the desktop's own wording for a phone's last sync).</summary>
+    /// <summary>"Synced 5 min ago" (<see cref="SyncedText"/>, as Settings' profile card says it).</summary>
     [ObservableProperty] private string _lastSyncText = string.Empty;
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(CanSync), nameof(ShowSyncAction))]
@@ -258,6 +271,64 @@ public sealed partial class AccountPageViewModel : MobilePage
             PendingFingerprint = fingerprint;
         });
     }
+
+    /// <summary>Scan QR Code is offered: the phone has a scanner (Android: Google's code scanner).</summary>
+    public bool CanScanQr => Shell.QrScanner != null;
+
+    /// <summary>
+    /// Scan QR Code: no address, email, password or code to compare. The scanned text is
+    /// untrusted: only an exact Noctis pairing code is used (<see cref="PairingPayload.TryParse"/>),
+    /// and it is never logged. The service then sends its one-time secret only to the
+    /// certificate the code pins, then the phone syncs as after a typed sign-in.
+    /// </summary>
+    [RelayCommand]
+    private async Task ScanQrCodeAsync()
+    {
+        if (IsBusy || Shell.QrScanner is not { } scanner) return;
+        SetError(string.Empty);
+        QrScanResult scan;
+        try
+        {
+            scan = await scanner.ScanAsync();
+        }
+        catch (Exception ex)
+        {
+            DebugLog.Write("Account", $"QR scan failed: {ex.GetType().Name}");
+            scan = new QrScanResult(QrScanOutcome.Unavailable);
+        }
+        if (scan.Outcome == QrScanOutcome.Cancelled) return;
+        if (scan.Outcome == QrScanOutcome.Unavailable)
+        {
+            SetError(ScannerUnavailableText);
+            return;
+        }
+        if (!PairingPayload.TryParse(scan.Text, out var pairing) || pairing is null)
+        {
+            SetError(NotAPairingCodeText);
+            return;
+        }
+
+        IsSigningInByQr = true;
+        bool signedIn;
+        try
+        {
+            signedIn = await RunAsync("Signing in…", () => _account.SignInWithPairingAsync(pairing));
+        }
+        finally { IsSigningInByQr = false; }
+        if (!signedIn) return;
+        // Whatever was typed into the form is not needed any more.
+        PendingFingerprint = null;
+        _probedUrl = null;
+        Password = string.Empty;
+        Refresh();
+        await SyncCoreAsync();
+    }
+
+    internal const string ScannerUnavailableText =
+        "The scanner isn't ready on this phone. Try again in a minute, or sign in with your computer's address below.";
+
+    internal const string NotAPairingCodeText =
+        "That isn't a Noctis sign-in code. Scan the code under Connect a phone on your computer.";
 
     /// <summary>Step two: the user says the fingerprints match. Sign in with that fingerprint,
     /// then sync straight away so the desktop's library appears.</summary>
@@ -411,21 +482,47 @@ public sealed partial class AccountPageViewModel : MobilePage
         }
     }
 
-    /// <summary>One question at a time: asking to remove the downloads closes a pending sign-out
-    /// question (both cards stood open at once, each with its own red button).</summary>
+    // The question up now (the shell's glass prompt), so a confirm from elsewhere takes it down.
+    private PromptViewModel? _question;
+
+    private void Ask(PromptViewModel question)
+    {
+        _question = question;
+        Shell.ShowPrompt(question);
+    }
+
+    private void DropQuestion()
+    {
+        if (_question is { } q) Shell.ClosePrompt(q);
+        _question = null;
+    }
+
+    /// <summary>One question at a time, on the glass prompt (owner 10-20: no more cards inside
+    /// the page): asking to remove the downloads closes a pending sign-out question.</summary>
     [RelayCommand]
     private void AskRemoveDownloads()
     {
+        DropQuestion();   // the one before is cancelled first, so its reset cannot undo this one
         IsConfirmingSignOut = false;
         IsConfirmingRemoveDownloads = true;
+        Ask(new PromptViewModel(Shell, "Remove all downloads?",
+            $"{StorageValue} leave this phone. They stay on your computer and still stream.",
+            new[] { new PromptAction("Remove Downloads", _ => ConfirmRemoveDownloadsCommand.ExecuteAsync(null), isDestructive: true) },
+            cancelled: () => IsConfirmingRemoveDownloads = false));
     }
 
-    [RelayCommand] private void CancelRemoveDownloads() => IsConfirmingRemoveDownloads = false;
+    [RelayCommand]
+    private void CancelRemoveDownloads()
+    {
+        IsConfirmingRemoveDownloads = false;
+        DropQuestion();
+    }
 
     [RelayCommand]
     private async Task ConfirmRemoveDownloadsAsync()
     {
         IsConfirmingRemoveDownloads = false;
+        DropQuestion();
         await RunAsync("Removing downloads…", () => _account.RemoveAllDownloadsAsync());
         // The last download's report goes too: it put "Downloads finished" back under the
         // Download everything card over a phone that had just removed them all.
@@ -437,17 +534,35 @@ public sealed partial class AccountPageViewModel : MobilePage
     [RelayCommand]
     private void AskSignOut()
     {
+        DropQuestion();
         IsConfirmingRemoveDownloads = false;
         AlsoRemoveDownloads = false;
         IsConfirmingSignOut = true;
+        // Apple's way to ask "and the downloads too?": a second red action, only with something
+        // downloaded to remove (the switch row asked it with nothing on the phone).
+        var actions = new List<PromptAction> { new("Sign Out", _ => ConfirmSignOutCommand.ExecuteAsync(null), isDestructive: true) };
+        if (HasDownloads)
+            actions.Add(new PromptAction("Sign Out and Remove Downloads", _ =>
+            {
+                AlsoRemoveDownloads = true;
+                return ConfirmSignOutCommand.ExecuteAsync(null);
+            }, isDestructive: true));
+        Ask(new PromptViewModel(Shell, SignOutQuestion, "Its songs leave this phone's library. You can sign in again any time.",
+            actions, cancelled: () => IsConfirmingSignOut = false));
     }
 
-    [RelayCommand] private void CancelSignOut() => IsConfirmingSignOut = false;
+    [RelayCommand]
+    private void CancelSignOut()
+    {
+        IsConfirmingSignOut = false;
+        DropQuestion();
+    }
 
     [RelayCommand]
     private async Task ConfirmSignOutAsync()
     {
         IsConfirmingSignOut = false;
+        DropQuestion();
         var removeDownloads = AlsoRemoveDownloads;
         await RunAsync("Signing out…", () => _account.SignOutAsync(removeDownloads));
         SyncText = string.Empty;
@@ -487,9 +602,10 @@ public sealed partial class AccountPageViewModel : MobilePage
         DebugLog.Write("Account", $"{kind?.ToString() ?? ex.GetType().Name}: {ex.Message}");
         var signedIn = _account.IsSignedIn;
         if (kind == NoctisErrorKind.CertificateChanged && signedIn) IsCertificateChanged = true;
-        // Signing in, an error about the address or the password goes under that field.
-        SetError(kind is { } k ? Describe(k, signedIn) : "Something went wrong. Try again.",
-            kind is { } f && !signedIn ? FieldFor(f) : AccountField.None);
+        // Signing in, an error about the address or the password goes under that field; a QR
+        // sign-in typed neither, so its errors are the page's.
+        SetError(kind is { } k ? (IsSigningInByQr ? DescribeQr(k) : Describe(k, signedIn)) : "Something went wrong. Try again.",
+            kind is { } f && !signedIn && !IsSigningInByQr ? FieldFor(f) : AccountField.None);
         Refresh();
     }
 
@@ -522,7 +638,9 @@ public sealed partial class AccountPageViewModel : MobilePage
 
     private void OnDownloadProgress(object? sender, NoctisDownloadProgress progress) => _marshal(() =>
     {
-        _lastDownload = progress;
+        // Sign-out's last report (nothing running, signed out) is not a download that finished:
+        // kept, it put "Downloads finished" back on the page at the next sign-in.
+        _lastDownload = progress.Pending == 0 && !_account.IsSignedIn ? null : progress;
         RefreshDownloads();
     });
 
@@ -560,6 +678,7 @@ public sealed partial class AccountPageViewModel : MobilePage
             IsCertificateChanged = false;
             IsConfirmingSignOut = false;
             IsConfirmingRemoveDownloads = false;
+            DropQuestion();
         }
         RefreshDownloads();
     }
@@ -567,7 +686,7 @@ public sealed partial class AccountPageViewModel : MobilePage
     /// <summary>"Synced 5 min ago" goes stale while the page stays open: the page re-reads it
     /// once a minute (AccountPage's ticker), as the desktop's phone list does.</summary>
     public void RefreshSyncTime() =>
-        LastSyncText = _account.Account?.LastSyncUtc is { } synced ? $"Synced {Ago(synced, DateTime.UtcNow)}" : "Not synced yet";
+        LastSyncText = SyncedText(_account.Account?.LastSyncUtc, DateTime.UtcNow);
 
     private void RefreshDownloads()
     {
@@ -590,6 +709,11 @@ public sealed partial class AccountPageViewModel : MobilePage
 
     public override void OnClosed()
     {
+        // A sign-out or remove-downloads question does not outlive the page (DismissSheet does
+        // not close prompts).
+        IsConfirmingSignOut = false;
+        IsConfirmingRemoveDownloads = false;
+        DropQuestion();
         _account.StateChanged -= OnStateChanged;
         _account.SyncProgress -= OnSyncProgress;
         _account.DownloadProgress -= OnDownloadProgress;
@@ -622,7 +746,20 @@ public sealed partial class AccountPageViewModel : MobilePage
         NoctisErrorKind.UnknownHost =>
             "No computer answers to that name. Type the address shown under Connect a phone, like 192.168.1.20.",
         NoctisErrorKind.Outdated => "Noctis on your computer is too old to connect a phone. Update it, then try again.",
+        NoctisErrorKind.WifiRequired => "Downloads are set to Wi-Fi only. Connect to Wi-Fi, or change this in Settings, Downloads.",
         _ => "Your computer couldn't finish that. Try again in a moment.",
+    };
+
+    /// <summary>A failed QR sign-in: the code's own failures, else the usual wording.</summary>
+    internal static string DescribeQr(NoctisErrorKind kind) => kind switch
+    {
+        NoctisErrorKind.PairingExpired =>
+            "This code has expired or was already used. Scan the new code your computer shows now.",
+        NoctisErrorKind.CertificateChanged =>
+            "The computer at that address isn't the one showing the code, so nothing was sent. Check that your phone is on the same Wi-Fi, then scan again.",
+        NoctisErrorKind.Unreachable or NoctisErrorKind.NotNoctis or NoctisErrorKind.UnknownHost =>
+            "Can't reach your computer. Check that your phone is on the same Wi-Fi as your computer, then scan again.",
+        _ => Describe(kind, signedIn: false),
     };
 
     /// <summary>Which sign-in field an error is about: the address (it is wrong, or nothing
@@ -673,13 +810,8 @@ public sealed partial class AccountPageViewModel : MobilePage
         return $"https://{uri.Host}:{port}";
     }
 
-    /// <summary>"AB:CD:…" as lines of eight bytes; anything else as it came.</summary>
-    internal static string FormatFingerprint(string? fingerprint)
-    {
-        if (string.IsNullOrEmpty(fingerprint)) return string.Empty;
-        var bytes = fingerprint.Split(':');
-        return bytes.Length < 2 ? fingerprint : string.Join("\n", bytes.Chunk(8).Select(line => string.Join(":", line)));
-    }
+    /// <summary>The computer's security code, grouped exactly as the computer shows it (SecurityCode).</summary>
+    internal static string FormatFingerprint(string? fingerprint) => SecurityCode.Format(fingerprint);
 
     /// <summary>"Sending 3 of 40" (the song going out now); "Checking what your computer has…" before.</summary>
     internal static string DescribeUploadProgress(NoctisUploadProgress progress) =>
@@ -729,15 +861,21 @@ public sealed partial class AccountPageViewModel : MobilePage
     internal static string FormatBytes(long bytes) =>
         bytes >= 1L << 30 ? $"{bytes / (double)(1L << 30):0.0} GB" : $"{bytes / (double)(1L << 20):0} MB";
 
-    /// <summary>"just now", "5 min ago", "3 h ago", else "on 10/9/2026 2:05 PM": the desktop's
-    /// wording for a phone's last sync (SettingsViewModel.Ago), so both sides read alike.</summary>
-    internal static string Ago(DateTime utc, DateTime nowUtc)
+    /// <summary>The phone's one wording for the last sync, on this page and Settings' profile
+    /// card alike: "Synced just now", "Synced 5 min ago", "Synced 3 hr ago", "Synced yesterday",
+    /// "Synced 4 days ago", "Synced 2 Oct"; "Not synced yet" before the first sync.</summary>
+    internal static string SyncedText(DateTime? syncedUtc, DateTime nowUtc)
     {
-        var ago = nowUtc - utc;
-        if (ago < TimeSpan.FromMinutes(1)) return "just now";
-        if (ago < TimeSpan.FromHours(1)) return $"{(int)ago.TotalMinutes} min ago";
-        if (ago < TimeSpan.FromDays(1)) return $"{(int)ago.TotalHours} h ago";
-        return $"on {utc.ToLocalTime():g}";
+        if (syncedUtc is not { } synced) return "Not synced yet";
+        var ago = nowUtc - synced;
+        if (ago < TimeSpan.FromMinutes(1)) return "Synced just now";
+        if (ago < TimeSpan.FromHours(1)) return $"Synced {(int)ago.TotalMinutes} min ago";
+        var day = synced.ToLocalTime().Date;
+        var today = nowUtc.ToLocalTime().Date;
+        if (day == today) return $"Synced {(int)ago.TotalHours} hr ago";
+        if (day == today.AddDays(-1)) return "Synced yesterday";
+        if (day > today.AddDays(-7)) return $"Synced {(today - day).Days} days ago";
+        return $"Synced {day:d MMM}";
     }
 
     private static string Count(int n, string noun) => n == 1 ? $"1 {noun}" : $"{n} {noun}s";

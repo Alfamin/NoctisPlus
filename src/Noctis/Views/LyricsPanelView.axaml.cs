@@ -1,3 +1,4 @@
+using LineMotion = Noctis.Helpers.PlusLineMotion;
 using System;
 using System.Collections.Generic;
 using System.ComponentModel;

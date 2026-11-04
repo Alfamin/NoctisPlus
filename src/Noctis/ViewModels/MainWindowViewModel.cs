@@ -50,13 +50,10 @@ public partial class MainWindowViewModel : ViewModelBase
     [RelayCommand]
     private void OpenSettings()
     {
-        // Open immediately so the click feels instant. Everything the Statistics tab
-        // needs — the whole-library stats pass, the playlist count and the artwork
-        // directory walk — runs off the UI thread so none of it blocks the click.
+        // Open immediately so the click feels instant. Only the tab it opens on refreshes
+        // its figures (off the UI thread); the others do when they're shown.
         IsSettingsModalOpen = true;
-        _ = Settings.RefreshLibraryStatsAsync();
-        _ = Settings.RefreshPlaylistCountAsync();
-        _ = Settings.RefreshStorageInfoAsync();
+        Settings.RefreshShownTabData();
     }
 
     /// <summary>Closes the Settings modal popup.</summary>
@@ -72,6 +69,7 @@ public partial class MainWindowViewModel : ViewModelBase
         // Owner #183: the sidebar search pill lives in the overlay layer, so left open it drew over the Settings sheet.
         if (value) TopBar.IsSearchOpen = false;
         UpdateSectionActiveFlags();
+        if (!value) Settings.LeavePluginView();
     }
 
     /// <summary>
@@ -196,6 +194,8 @@ public partial class MainWindowViewModel : ViewModelBase
     public PlayerViewModel Player { get; }
     /// <summary>"Added to Queue" / "Playing Next" pill above the island (owner 10-08).</summary>
     public QueueToastViewModel QueueToast { get; } = new();
+    /// <summary>"Continue from your phone" pill (Pick Up on Computer).</summary>
+    public HandoffPromptViewModel HandoffPrompt { get; } = new();
     public SettingsViewModel Settings { get; }
     public LyricsViewModel Lyrics => _lyricsVm;
 
@@ -225,6 +225,7 @@ public partial class MainWindowViewModel : ViewModelBase
     /// <summary>
     /// The album page's tint while "Tint Whole Window" is on and a tinted album page is
     /// shown (Discord 1v1ctus): MainWindow paints it behind the sidebar and player islands.
+    /// The lyrics page lends its own background colour the same way (GitHub #142).
     /// Null otherwise, which leaves the theme's own window background.
     /// </summary>
     [ObservableProperty]
@@ -233,33 +234,46 @@ public partial class MainWindowViewModel : ViewModelBase
 
     public bool IsWindowTinted => WindowTintBrush != null;
 
-    private AlbumDetailViewModel? _tintSourcePage;
+    private ViewModelBase? _tintSourcePage;
 
     /// <summary>The window tint for <paramref name="view"/>: its page colour when it is a
-    /// tinted album page and the option is on, else null. Internal for tests.</summary>
+    /// tinted album page or the lyrics page (#142) and the option is on, else null.
+    /// Internal for tests.</summary>
     internal static IBrush? WindowTintFor(bool wholeWindow, ViewModelBase? view) =>
-        wholeWindow && view is AlbumDetailViewModel { HasTint: true } album ? album.BackgroundBrush : null;
+        !wholeWindow ? null : view switch
+        {
+            AlbumDetailViewModel { HasTint: true } album => album.BackgroundBrush,
+            LyricsViewModel lyrics => lyrics.PageTintBrush,
+            _ => null
+        };
+
+    /// <summary>"Tint Whole Window" sits under Album Page Colour in Settings and is hidden
+    /// while that is off, so both must be on (an album page has no tint without it).</summary>
+    private bool WholeWindowTintOn => Settings.AlbumPageTintWholeWindow && Settings.AlbumPageTintEnabled;
 
     private void UpdateWindowTint()
     {
-        var album = CurrentView as AlbumDetailViewModel;
-        if (!ReferenceEquals(album, _tintSourcePage))
+        var page = CurrentView is AlbumDetailViewModel or LyricsViewModel ? CurrentView : null;
+        if (!ReferenceEquals(page, _tintSourcePage))
         {
             if (_tintSourcePage != null) _tintSourcePage.PropertyChanged -= OnTintSourcePageChanged;
-            _tintSourcePage = album;
-            if (album != null) album.PropertyChanged += OnTintSourcePageChanged;
+            _tintSourcePage = page;
+            if (page != null) page.PropertyChanged += OnTintSourcePageChanged;
         }
-        WindowTintBrush = WindowTintFor(Settings.AlbumPageTintWholeWindow, CurrentView);
+        WindowTintBrush = WindowTintFor(WholeWindowTintOn, CurrentView);
     }
 
     private void OnTintSourcePageChanged(object? sender, System.ComponentModel.PropertyChangedEventArgs e)
     {
-        if (e.PropertyName is nameof(AlbumDetailViewModel.BackgroundBrush) or nameof(AlbumDetailViewModel.HasTint))
-            WindowTintBrush = WindowTintFor(Settings.AlbumPageTintWholeWindow, CurrentView);
+        if (e.PropertyName is nameof(AlbumDetailViewModel.BackgroundBrush) or nameof(AlbumDetailViewModel.HasTint)
+            or nameof(LyricsViewModel.PageTintBrush))
+            WindowTintBrush = WindowTintFor(WholeWindowTintOn, CurrentView);
     }
 
-    /// <summary>Whether the playback island bar should be visible (has content and not in lyrics view).</summary>
-    public bool IsPlaybackBarVisible => Player.HasContent && !IsLyricsViewActive;
+    /// <summary>Whether the playback island bar should be visible (has content and not in lyrics
+    /// view). The lyrics page's own controls are hidden while its music video plays full size,
+    /// so the island comes back over the video for transport.</summary>
+    public bool IsPlaybackBarVisible => Player.HasContent && (!IsLyricsViewActive || Player.ShowsMusicVideoFullSize);
 
     /// <summary>Whether the playback island should stay mounted in the visual tree.</summary>
     public bool IsPlaybackBarMounted => Player.HasContent;
@@ -404,6 +418,19 @@ public partial class MainWindowViewModel : ViewModelBase
         // Create long-lived ViewModels
         Player = new PlayerViewModel(audioPlayer, library, persistence, new AnimatedCoverService(persistence), metadata);
         QueueToast.Attach(Player);
+        if (App.Services?.GetService<PhoneHandoffInbox>() is { } handoffInbox)
+        {
+            HandoffPrompt.Attach(handoffInbox, Player.LoadPhoneHandoff, id => library.GetTrackById(id)?.Title,
+                () => Player.State == PlaybackState.Playing);
+            var wasPlaying = false;
+            Player.PropertyChanged += (_, e) =>
+            {
+                if (e.PropertyName != nameof(PlayerViewModel.State)) return;
+                var playing = Player.State == PlaybackState.Playing;
+                if (playing || wasPlaying) HandoffPrompt.NotePlaybackHere();
+                wasPlaying = playing;
+            };
+        }
         Sidebar = new SidebarViewModel(persistence, library);
         TopBar = new TopBarViewModel();
         Sidebar.TopBar = TopBar;
@@ -425,6 +452,8 @@ public partial class MainWindowViewModel : ViewModelBase
             tagWriter.InUsePath = () => Player.CurrentTrack?.FilePath;
         Settings.SettingsReset += async (_, _) =>
         {
+            // Loaded once by the Artists page; the reset deleted the file under it.
+            _artistsVm.ClearFavoriteArtists();
             // Guarded: an unhandled throw from an async-void handler crashes the app.
             try { await Sidebar.LoadPlaylistsAsync(); }
             catch (Exception ex) { DebugLogger.Error(DebugLogger.Category.Error, "SettingsReset.ReloadPlaylists", ex.Message); }
@@ -495,11 +524,42 @@ public partial class MainWindowViewModel : ViewModelBase
         if (App.Services?.GetService<System.Net.Http.HttpClient>() is { } pluginHttp)
             Settings.PluginCatalogClient = new PluginCatalogClient(pluginHttp);
         TrackContextMenuBuilder.PluginCommandSource = () => Plugins.TrackCommands;
+        TrackContextMenuBuilder.CreateMixCommand = CreateMixFromSongCommand;
+        // API 1.3: plugin views open in a window of their own; ShowAlbum opens the album page here.
+        Plugins.ViewPresenter = Views.PluginViewWindow.Present;
+        // The sidebar's Plugins section follows the running plugins' views (loads and unloads
+        // raise VisualLayersChanged; registrations and Show in sidebar raise ViewsChanged).
+        void SyncPluginSidebar() => Dispatcher.UIThread.Post(() => Sidebar.SyncPluginItems(Plugins.Views));
+        Plugins.VisualLayersChanged += (_, _) => SyncPluginSidebar();
+        Plugins.ViewsChanged += (_, _) => SyncPluginSidebar();
+        Sidebar.PluginSettingsRequested += (_, item) =>
+        {
+            if (Settings.OpenPluginPageFor(item.View.Plugin)) OpenSettings();
+        };
+        // API 1.4: plugins read the playlists the sidebar holds (copied by the adapter).
+        Plugins.PlaylistSource = () => Sidebar.Playlists.ToArray();
+        // API 1.6: plugins decode songs with the ffmpeg the converter and the BPM/key analysis use.
+        Plugins.FfmpegPathSource = () => App.Services?.GetService<IAudioConverterService>()?.GetFfmpegPath();
+        Plugins.AlbumOpener = albumId =>
+        {
+            if (_library.GetAlbumById(albumId) is not { } album) return false;
+            OpenAlbumDetail(album);
+            if (Avalonia.Application.Current?.ApplicationLifetime is Avalonia.Controls.ApplicationLifetimes.IClassicDesktopStyleApplicationLifetime { MainWindow: { } window })
+            {
+                if (window.WindowState == Avalonia.Controls.WindowState.Minimized) window.WindowState = Avalonia.Controls.WindowState.Normal;
+                if (!window.IsVisible) window.Show();
+                window.Activate();
+            }
+            return true;
+        };
         TrackContextMenuBuilder.ArtistPhotoSource = name => HomeViewModel.CachedArtistPhoto(name, _library, _artistImageService);
         // "Open" buttons in Settings → Features: the action's window or page shows in front, not behind Settings.
         Plugins.SettingActionInvoked += (_, _) => IsSettingsModalOpen = false;
         Plugins.NotificationRequested += (_, notice) =>
             TransientStatus.Show(nameof(PluginNotice), v => PluginNotice = v, notice.DisplayText, TimeSpan.FromSeconds(4));
+        // GitHub #154: songs passed over because their file is missing, in the same notice pill.
+        Player.MissingTracksNotice += (_, text) =>
+            TransientStatus.Show(nameof(PluginNotice), v => PluginNotice = v, text, TimeSpan.FromSeconds(4));
         // LoadAll walks the plugins folder, loads assemblies and reflects over their
         // types on the UI thread. Settings finish loading right after the window
         // shows, so running it inline there held the first frame hostage to however
@@ -593,6 +653,10 @@ public partial class MainWindowViewModel : ViewModelBase
                 TopBar.ReleaseTypeFilterLabel = _albumsVm.ReleaseTypeFilterLabel;
             else if (e.PropertyName == nameof(LibraryAlbumsViewModel.QualityFilterLabel))
                 TopBar.QualityFilterLabel = _albumsVm.QualityFilterLabel;
+            else if (e.PropertyName is nameof(LibraryAlbumsViewModel.AlbumViewMode) or nameof(LibraryAlbumsViewModel.IsCarouselView))
+                TopBar.IsAlbumCarouselView = _albumsVm.IsCarouselView;
+            else if (e.PropertyName == nameof(LibraryAlbumsViewModel.CarouselStyle))
+                TopBar.AlbumCarouselStyle = _albumsVm.CarouselStyle.ToString();
         };
         _artistsVm = new LibraryArtistsViewModel(library);
         _artistsVm.SetArtistImageService(artistImageService);
@@ -673,6 +737,26 @@ public partial class MainWindowViewModel : ViewModelBase
             if (ReferenceEquals(CurrentView, _inboxVm) && !Sidebar.IsInboxSectionVisible)
                 Navigate("home");
         });
+        // Built-in Features: the Visualizer entry follows the Audio Visualizer switch, and an open
+        // playlist page follows the Featured Artists & Suggestions one.
+        void SyncVisualizerSection()
+        {
+            TopBar.AlbumCarouselAvailable = Settings.AlbumCarouselEnabled;
+            Sidebar.SetVisualizerSectionVisible(Settings.VisualizerEnabled);
+            if (ReferenceEquals(CurrentView, _visualizerVm) && !Settings.VisualizerEnabled)
+                Navigate("home");
+        }
+        if (Settings.IsSettingsLoaded) SyncVisualizerSection();
+        else Settings.SettingsLoaded += (_, _) => Dispatcher.UIThread.Post(SyncVisualizerSection);
+        Settings.PropertyChanged += (_, e) =>
+        {
+            if (e.PropertyName == nameof(SettingsViewModel.VisualizerEnabled))
+                Dispatcher.UIThread.Post(SyncVisualizerSection);
+            else if (e.PropertyName == nameof(SettingsViewModel.AlbumCarouselEnabled))
+                TopBar.AlbumCarouselAvailable = Settings.AlbumCarouselEnabled;
+            else if (e.PropertyName == nameof(SettingsViewModel.PlaylistShowSideRail) && CurrentView is PlaylistViewModel openPlaylist)
+                openPlaylist.ShowSideRail = Settings.PlaylistShowSideRail;
+        };
         // Folders sort (GitHub #89): mirror into the top bar and persist, adopting the
         // saved choice once settings load — same shape as the Artists sort above.
         var adoptingFoldersSort = false;
@@ -987,7 +1071,8 @@ public partial class MainWindowViewModel : ViewModelBase
         {
             if (e.PropertyName == nameof(SettingsViewModel.CoverFlowLayout))
                 _coverFlowVm.Layout = Settings.CoverFlowLayoutMode;
-            else if (e.PropertyName == nameof(SettingsViewModel.AlbumPageTintWholeWindow))
+            else if (e.PropertyName is nameof(SettingsViewModel.AlbumPageTintWholeWindow)
+                     or nameof(SettingsViewModel.AlbumPageTintEnabled))
                 UpdateWindowTint();
         };
 
@@ -995,7 +1080,7 @@ public partial class MainWindowViewModel : ViewModelBase
         // and close lyrics panel when playback ends
         Player.PropertyChanged += (_, e) =>
         {
-            if (e.PropertyName == nameof(PlayerViewModel.HasContent))
+            if (e.PropertyName is nameof(PlayerViewModel.HasContent) or nameof(PlayerViewModel.ShowsMusicVideoFullSize))
             {
                 OnPropertyChanged(nameof(IsPlaybackBarVisible));
                 OnPropertyChanged(nameof(IsPlaybackBarMounted));
@@ -1068,6 +1153,7 @@ public partial class MainWindowViewModel : ViewModelBase
             try { await Player.RestoreQueueStateAsync(); }
             catch (Exception ex) { DebugLog.Write("Queue", $"Queue restore failed: {ex}"); }
         }
+        HandoffPrompt.Check();
 
         // Auto-scan if enabled
         if (Settings.GetSettings().ScanOnStartup && Settings.GetSettings().MusicFolders.Count > 0)
@@ -2010,6 +2096,8 @@ public partial class MainWindowViewModel : ViewModelBase
         // Artist pages kept in history stay subscribed to LibraryUpdated; only the shown
         // one rebuilds, the rest catch up when navigated back to.
         if (oldValue is ArtistDetailViewModel leftArtistPage) leftArtistPage.IsActive = false;
+        // Settings left: its Connect a phone panel folds, so no sign-in QR stays live off screen.
+        if (ReferenceEquals(oldValue, Settings) && !ReferenceEquals(newValue, Settings)) Settings.OnSettingsLeft();
         if (newValue is ArtistDetailViewModel artistPage) artistPage.IsActive = true;
 
         var enteringLyrics = ReferenceEquals(newValue, _lyricsVm);
@@ -2545,6 +2633,15 @@ public partial class MainWindowViewModel : ViewModelBase
         // Settings is a modal popup rather than a page — intercept and open the overlay,
         // then restore the sidebar selection to the actual current section so the highlight
         // doesn't lie about where the user is. Use Post so the click's selection has settled.
+        // A plugin's screen (sidebar Plugins section) opens in Settings in place of its page;
+        // like Settings, the row never takes the selection (SidebarView handles OpensSheet).
+        if (key.StartsWith(PluginNavItem.KeyPrefix, StringComparison.Ordinal))
+        {
+            if (Sidebar.PluginItems.FirstOrDefault(i => i.Key == key) is { } pluginItem
+                && Settings.ShowPluginViewFromSidebar(pluginItem.View))
+                OpenSettings();
+            return;
+        }
         if (key == "settings")
         {
             OpenSettings();
@@ -2563,6 +2660,8 @@ public partial class MainWindowViewModel : ViewModelBase
     [RelayCommand]
     private void Navigate(string key)
     {
+        // Audio Visualizer switched off (Built-in Features): its page is gone with its entry.
+        if (key == "visualizer" && !Settings.VisualizerEnabled) key = "home";
         var navigateStart = Stopwatch.GetTimestamp();
         DebugLogger.Info(DebugLogger.Category.UI, "Navigate", $"key={key}, from={GetCurrentViewKey()}, coverFlow={_isCoverFlowMode}");
         // Section switches join the browser-style history (instead of clearing it)
@@ -2674,7 +2773,8 @@ public partial class MainWindowViewModel : ViewModelBase
             SetupSongsTopBarActions();
         else if (key == "playlists")
             TopBar.ShowPlaylistActions(Sidebar.CreatePlaylistCommand, _playlistsVm.CreateSmartPlaylistCommand,
-                _playlistsVm.ImportPlaylistCommand, _playlistsVm.SetSortCommand, _playlistsVm.SortLabel);
+                _playlistsVm.ImportPlaylistCommand, _playlistsVm.SetSortCommand, _playlistsVm.SortLabel,
+                _playlistsVm.QuickPlaylistCommand);
         else if (key == "favorites")
             TopBar.ShowFavoritesActions(_favoritesVm.ShuffleAllCommand, _favoritesVm.PlayAllCommand);
         else if (key == "folders")
@@ -2791,12 +2891,9 @@ public partial class MainWindowViewModel : ViewModelBase
 
     private SettingsViewModel RefreshAndReturnSettings()
     {
-        Settings.RefreshLibraryStats();
-        // Off the UI thread, for the same reason OpenSettings does it: the storage
-        // figures need a recursive walk of the artwork cache (a stat per file, memoized
-        // for only 5s), and running that inline stalled the navigation it was reacting
-        // to — reported as Settings "lagging and getting stuck" on switch (issue #31).
-        _ = Settings.RefreshStorageInfoAsync();
+        // Same as OpenSettings: only the shown tab's figures, off the UI thread (the
+        // storage walk inline stalled this navigation, issue #31).
+        Settings.RefreshShownTabData();
         return Settings;
     }
 
@@ -2828,6 +2925,26 @@ public partial class MainWindowViewModel : ViewModelBase
         OpenArtistDiscography(Track.GetPrimaryArtist(artistName));
     }
 
+
+    /// <summary>Makes a playlist of <paramref name="tracks"/> and opens it (quick playlists and mixes).</summary>
+    public async Task CreatePlaylistAndOpenAsync(string name, IReadOnlyList<Track> tracks)
+    {
+        if (tracks.Count == 0) return;
+        var playlist = await Sidebar.CreatePlaylistFromTracksAsync(name, tracks);
+        Navigate($"playlist:{playlist.Id}");
+    }
+
+    /// <summary>
+    /// Song menu ▸ Create Mix from This Song (Discord, Cosmo 11-02): about 50 songs like it from
+    /// the library, built offline (<see cref="MixPlaylistBuilder"/>), saved as a playlist and opened.
+    /// </summary>
+    [RelayCommand]
+    private Task CreateMixFromSong(Track? song)
+    {
+        if (song is null) return Task.CompletedTask;
+        var seed = MixSeed.FromSong(song);
+        return CreatePlaylistAndOpenAsync(seed.PlaylistName, MixPlaylistBuilder.Build(seed, _library.Tracks));
+    }
 
     private void OnPlaylistOpened(object? sender, Playlist playlist) => ShowPlaylistDetail(playlist, pushHistory: true);
 
@@ -2870,7 +2987,9 @@ public partial class MainWindowViewModel : ViewModelBase
         _searchBoxBinding.SetPageText(string.Empty);
         TopBar.CurrentTabName = "Playlist";
 
-        var detail = new PlaylistViewModel(playlist, Player, _library, _persistence, Sidebar, _artistImageService);
+        var detail = new PlaylistViewModel(playlist, Player, _library, _persistence, Sidebar, _artistImageService,
+            Settings.PlaylistShowSideRail);
+        detail.SetSideRailAction(show => Settings.PlaylistShowSideRail = show);
         detail.BackRequested += (_, _) => GoBackInHistory();
         detail.ViewAlbumRequested += OnViewAlbumFromTrack;
         detail.SetSearchLyricsAction(SearchLyricsForTrack);
@@ -2989,7 +3108,9 @@ public partial class MainWindowViewModel : ViewModelBase
         var playlist = Sidebar.GetPlaylist(id);
         if (playlist == null) return _homeVm;
 
-        var playlistVm = new PlaylistViewModel(playlist, Player, _library, _persistence, Sidebar, _artistImageService);
+        var playlistVm = new PlaylistViewModel(playlist, Player, _library, _persistence, Sidebar, _artistImageService,
+            Settings.PlaylistShowSideRail);
+        playlistVm.SetSideRailAction(show => Settings.PlaylistShowSideRail = show);
         playlistVm.ViewAlbumRequested += OnViewAlbumFromTrack;
         playlistVm.BackRequested += (_, _) => Navigate("playlists");
         playlistVm.SetSearchLyricsAction(SearchLyricsForTrack);
@@ -3137,7 +3258,13 @@ public partial class MainWindowViewModel : ViewModelBase
             saveLyrics: () => _lyricsVm.SaveLyricsToFileCommand.Execute(null),
             canSaveLyrics: _lyricsVm.CanSaveToFile,
             saveLyricsTtml: () => _lyricsVm.SaveLyricsAsTtmlCommand.Execute(null),
-            canSaveLyricsTtml: _lyricsVm.CanSaveTtmlToFile);
+            canSaveLyricsTtml: _lyricsVm.CanSaveTtmlToFile,
+            setNoLyrics: marked =>
+            {
+                if (marked) _ = _lyricsVm.MarkNoLyricsCommand.ExecuteAsync(null);
+                else _lyricsVm.UnmarkNoLyricsCommand.Execute(null);
+            },
+            isMarkedNoLyrics: _lyricsVm.IsMarkedNoLyrics);
 
         _lyricsVm.PropertyChanged -= OnLyricsVmPropertyChanged;
         _lyricsVm.PropertyChanged += OnLyricsVmPropertyChanged;
@@ -3156,7 +3283,8 @@ public partial class MainWindowViewModel : ViewModelBase
             || e.PropertyName == nameof(LyricsViewModel.HasSyncedLyricsAvailable)
             || e.PropertyName == nameof(LyricsViewModel.ShareAvailable)
             || e.PropertyName == nameof(LyricsViewModel.CanSaveToFile)
-            || e.PropertyName == nameof(LyricsViewModel.CanSaveTtmlToFile))
+            || e.PropertyName == nameof(LyricsViewModel.CanSaveTtmlToFile)
+            || e.PropertyName == nameof(LyricsViewModel.IsMarkedNoLyrics))
         {
             Player.UpdateLyricsPageState(
                 isSyncedActive: _lyricsVm.IsSyncTabSelected,
@@ -3164,7 +3292,8 @@ public partial class MainWindowViewModel : ViewModelBase
                 isSyncedAvailable: _lyricsVm.HasSyncedLyricsAvailable,
                 canShare: _lyricsVm.ShareAvailable,
                 canSaveLyrics: _lyricsVm.CanSaveToFile,
-                canSaveLyricsTtml: _lyricsVm.CanSaveTtmlToFile);
+                canSaveLyricsTtml: _lyricsVm.CanSaveTtmlToFile,
+                isMarkedNoLyrics: _lyricsVm.IsMarkedNoLyrics);
         }
     }
 
@@ -3207,6 +3336,11 @@ public partial class MainWindowViewModel : ViewModelBase
             TopBar.AlbumSortNewestFirst = _albumsVm.AlbumSortNewestFirst;
             TopBar.ReleaseTypeFilterLabel = _albumsVm.ReleaseTypeFilterLabel;
             TopBar.QualityFilterLabel = _albumsVm.QualityFilterLabel;
+            TopBar.AlbumViewCommand = _albumsVm.SetAlbumViewCommand;
+            TopBar.AlbumCarouselStyleCommand = _albumsVm.SetCarouselStyleCommand;
+            TopBar.AlbumViewToggleCommand = _albumsVm.ToggleAlbumViewCommand;
+            TopBar.IsAlbumCarouselView = _albumsVm.IsCarouselView;
+            TopBar.AlbumCarouselStyle = _albumsVm.CarouselStyle.ToString();
         }
         else
         {
@@ -3282,7 +3416,8 @@ public partial class MainWindowViewModel : ViewModelBase
             SetupSongsTopBarActions();
         else if (ReferenceEquals(view, _playlistsVm))
             TopBar.ShowPlaylistActions(Sidebar.CreatePlaylistCommand, _playlistsVm.CreateSmartPlaylistCommand,
-                _playlistsVm.ImportPlaylistCommand, _playlistsVm.SetSortCommand, _playlistsVm.SortLabel);
+                _playlistsVm.ImportPlaylistCommand, _playlistsVm.SetSortCommand, _playlistsVm.SortLabel,
+                _playlistsVm.QuickPlaylistCommand);
         else if (ReferenceEquals(view, _favoritesVm))
             TopBar.ShowFavoritesActions(_favoritesVm.ShuffleAllCommand, _favoritesVm.PlayAllCommand);
         else if (ReferenceEquals(view, _lyricsVm))
@@ -3746,6 +3881,28 @@ public partial class MainWindowViewModel : ViewModelBase
         }
 
         _scrobbleTrack = null;
+    }
+
+    /// <summary>Whether a phone's plays go on to Last.fm and ListenBrainz from here (signed in and
+    /// turned on), for the phone's Scrobbling page.</summary>
+    public (bool LastFm, bool ListenBrainz) PhoneScrobbleServices =>
+        (_lastFm.IsAuthenticated && Settings.LastFmScrobblingEnabled, _listenBrainz.IsAuthenticated && Settings.ListenBrainzScrobblingEnabled);
+
+    /// <summary>
+    /// A play from a phone in Through Computer mode (the server's scrobble call): the phone already
+    /// applied the scrobble rule on its played time, and marks the plays it sent itself so they never
+    /// come here. This computer's own choices still decide: each service signed in and on, and its
+    /// "don't scrobble" songs, albums and artists. Sent with the phone's start time, as a desktop
+    /// play is. Plugins' OnTrackScrobbled is for this computer's own playback and is not raised.
+    /// </summary>
+    public Task ForwardPhoneScrobbleAsync(Track track, DateTime startedAtUtc)
+    {
+        if (Settings.IsScrobbleExcluded(track)) return Task.CompletedTask;
+        var (lastFmActive, listenBrainzActive) = PhoneScrobbleServices;
+        var pending = new List<Task>(2);
+        if (lastFmActive) pending.Add(_lastFm.ScrobbleAsync(track, startedAtUtc));
+        if (listenBrainzActive) pending.Add(_listenBrainz.ScrobbleAsync(track, startedAtUtc));
+        return pending.Count > 0 ? Task.WhenAll(pending) : Task.CompletedTask;
     }
 
     /// <summary>In-flight scrobble posts from the most recent track transition.</summary>

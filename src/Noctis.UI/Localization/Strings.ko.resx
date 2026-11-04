@@ -413,7 +413,7 @@
     <comment>Album page menu</comment>
   </data>
   <data name="AlbumDetail.ChooseAlbumVideo" xml:space="preserve">
-    <value>이 앨범의 영상 선택…</value>
+    <value>이 앨범의 영상 선택</value>
     <comment>Album page menu</comment>
   </data>
   <data name="AlbumDetail.UseDefaultVideo" xml:space="preserve">
@@ -487,6 +487,9 @@
   <data name="Settings.ComingSoon" xml:space="preserve">
     <value>곧 제공</value>
     <comment>Badge on parked Account &amp; Sync cards in SettingsView.axaml</comment>
+  </data>
+  <data name="Settings.BetaBadge" xml:space="preserve">
+    <value>베타</value>
   </data>
   <data name="Settings.SessionLogTroubleshootingShare" xml:space="preserve">
     <value>버그 신고용 세션 로그.</value>
@@ -1144,6 +1147,34 @@
     <value>끄면 직접 재생하지 않는 한 노골적 표현 곡을 건너뜁니다.</value>
     <comment>Text in SettingsView.axaml</comment>
   </data>
+  <data name="Settings.OutputDevice" xml:space="preserve">
+    <value>출력 장치</value>
+    <comment>Text in SettingsView.axaml</comment>
+  </data>
+  <data name="Settings.OutputDeviceDesc" xml:space="preserve">
+    <value>Noctis가 사운드를 출력하는 위치입니다. 배타 모드는 선택한 장치를 직접 열므로 비트퍼펙트 출력은 Windows 기본값이 아니라 이 설정을 따릅니다.</value>
+    <comment>Text in SettingsView.axaml</comment>
+  </data>
+  <data name="Settings.OutputDeviceDefault" xml:space="preserve">
+    <value>시스템 기본값</value>
+    <comment>Output Device picker: follow-the-Windows-default entry</comment>
+  </data>
+  <data name="Settings.OutputDeviceDefaultMarker" xml:space="preserve">
+    <value>기본</value>
+    <comment>Suffix marking the current Windows default endpoint</comment>
+  </data>
+  <data name="Settings.OutputDeviceMissingEntry" xml:space="preserve">
+    <value>선택한 장치</value>
+    <comment>Output Device picker: disconnected pinned endpoint</comment>
+  </data>
+  <data name="Settings.OutputDeviceDisconnected" xml:space="preserve">
+    <value>연결되지 않음</value>
+    <comment>Suffix for a disconnected endpoint in the picker</comment>
+  </data>
+  <data name="Settings.OutputDeviceMissingHint" xml:space="preserve">
+    <value>선택한 장치가 현재 연결되어 있지 않습니다. 다시 연결될 때까지 재생은 시스템 기본 장치를 사용합니다.</value>
+    <comment>Shown under Output Device when the pin is missing</comment>
+  </data>
   <data name="Settings.ExclusiveMode" xml:space="preserve">
     <value>독점 모드</value>
     <comment>Text in SettingsView.axaml</comment>
@@ -1254,6 +1285,14 @@
   </data>
   <data name="Settings.PreAmpDB" xml:space="preserve">
     <value>프리앰프 (dB)</value>
+    <comment>Text in SettingsView.axaml</comment>
+  </data>
+  <data name="Settings.ScanNewFilesReplayGain" xml:space="preserve">
+    <value>새 파일 자동 스캔</value>
+    <comment>Text in SettingsView.axaml</comment>
+  </data>
+  <data name="Settings.ScanNewFilesReplayGainDesc" xml:space="preserve">
+    <value>앨범 복사가 끝나면 새 곡에 ReplayGain 태그를 기록합니다.</value>
     <comment>Text in SettingsView.axaml</comment>
   </data>
   <data name="Settings.REMOTECONTROL" xml:space="preserve">
@@ -2828,46 +2867,6 @@
     <value>새 재생목록을 만들고 시작하세요</value>
     <comment>Text in LibraryPlaylistsView.axaml</comment>
   </data>
-  <data name="LibraryPlaylists.ImportFromStreaming" xml:space="preserve">
-    <value>Spotify 또는 Deezer에서 가져오기</value>
-    <comment>Text in LibraryPlaylistsView.axaml</comment>
-  </data>
-  <data name="LibraryPlaylists.ImportPitch" xml:space="preserve">
-    <value>내 노래와 자동으로 맞춰져요</value>
-    <comment>Text in LibraryPlaylistsView.axaml</comment>
-  </data>
-  <data name="LibraryPlaylists.PlaylistFilesToo" xml:space="preserve">
-    <value>.m3u, .m3u8 파일도 지원해요</value>
-    <comment>Text in LibraryPlaylistsView.axaml</comment>
-  </data>
-  <data name="Home.WelcomeTitle" xml:space="preserve">
-    <value>라이브러리를 채워 볼까요</value>
-    <comment>Text in HomeView.axaml</comment>
-  </data>
-  <data name="Home.WelcomeLine" xml:space="preserve">
-    <value>원하는 노래를 찾거나 가진 음악을 추가하세요</value>
-    <comment>Text in HomeView.axaml</comment>
-  </data>
-  <data name="Home.FindMusic" xml:space="preserve">
-    <value>음악 찾기</value>
-    <comment>Text in HomeView.axaml</comment>
-  </data>
-  <data name="Home.AddMusicFolder" xml:space="preserve">
-    <value>음악 폴더 추가</value>
-    <comment>Text in HomeView.axaml</comment>
-  </data>
-  <data name="Home.ImportPlaylists" xml:space="preserve">
-    <value>플레이리스트 가져오기</value>
-    <comment>Text in HomeView.axaml</comment>
-  </data>
-  <data name="Home.ConnectTelegram" xml:space="preserve">
-    <value>텔레그램 연결</value>
-    <comment>Text in HomeView.axaml</comment>
-  </data>
-  <data name="Home.SetUpWordLyrics" xml:space="preserve">
-    <value>단어별 가사 · 1.3GB</value>
-    <comment>Text in HomeView.axaml</comment>
-  </data>
   <data name="LibraryPlaylists.NoResults" xml:space="preserve">
     <value>결과 없음</value>
     <comment>Text in LibraryPlaylistsView.axaml</comment>
@@ -3145,7 +3144,6 @@
     <value>작사: </value>
     <comment>Text in LyricsView.axaml</comment>
   </data>
-  <data name="Lyrics.Sync" xml:space="preserve"><value>동기화</value><comment>Pill that brings the lyrics back to the current line</comment></data>
   <data name="Lyrics.Follow" xml:space="preserve">
     <value>따라가기</value>
     <comment>Text in LyricsView.axaml</comment>
@@ -3923,14 +3921,6 @@
   </data>
   <data name="Metadata.SearchAnimatedArtwork" xml:space="preserve">
     <value>움직이는 아트워크 검색</value>
-    <comment>Text in MetadataWindow.axaml</comment>
-  </data>
-  <data name="Metadata.AlbumNameAppleMusic" xml:space="preserve">
-    <value>앨범 이름 또는 Apple Music URL</value>
-    <comment>Watermark in MetadataWindow.axaml</comment>
-  </data>
-  <data name="Metadata.TypeAlbumNamePress" xml:space="preserve">
-    <value>앨범 이름을 입력하고 Enter를 누르거나 Apple Music 링크를 붙여넣으세요</value>
     <comment>Text in MetadataWindow.axaml</comment>
   </data>
   <data name="Metadata.ChooseAnimatedArtwork" xml:space="preserve">
@@ -5616,94 +5606,6 @@
     <value>닫기</value>
     <comment>Secondary button</comment>
   </data>
-  <data name="Main.AddFromYouTube" xml:space="preserve">
-    <value>YouTube에서 추가</value>
-    <comment>New/Add menu item</comment>
-  </data>
-  <data name="Main.AddFromYouTubeHint" xml:space="preserve">
-    <value>검색하거나 링크를 붙여넣으세요 — 라이브러리로 다운로드됩니다</value>
-    <comment>New/Add menu item subtitle</comment>
-  </data>
-  <data name="YouTube.Title" xml:space="preserve">
-    <value>YouTube에서 추가</value>
-    <comment>Dialog title</comment>
-  </data>
-  <data name="YouTube.Subtitle" xml:space="preserve">
-    <value>검색하거나 링크를 붙여넣으세요. 커버 아트와 함께 라이브러리에 저장됩니다.</value>
-    <comment>Dialog subtitle</comment>
-  </data>
-  <data name="YouTube.SearchHint" xml:space="preserve">
-    <value>YouTube 검색 또는 링크 붙여넣기…</value>
-    <comment>Search box watermark</comment>
-  </data>
-  <data name="YouTube.Search" xml:space="preserve">
-    <value>검색</value>
-    <comment>Search button</comment>
-  </data>
-  <data name="YouTube.SetupTitle" xml:space="preserve">
-    <value>최초 설정</value>
-    <comment>First-run card title</comment>
-  </data>
-  <data name="YouTube.SetupBody" xml:space="preserve">
-    <value>Noctis는 YouTube와 통신하기 위해 yt-dlp(무료, 오픈 소스)를 사용합니다. Noctis 전용 폴더에 한 번 다운로드되며 여기서 업데이트됩니다.</value>
-    <comment>First-run card body</comment>
-  </data>
-  <data name="YouTube.Install" xml:space="preserve">
-    <value>yt-dlp 설치</value>
-    <comment>First-run card button</comment>
-  </data>
-  <data name="YouTube.Download" xml:space="preserve">
-    <value>다운로드</value>
-    <comment>Per-result button</comment>
-  </data>
-  <data name="YouTube.SavesTo" xml:space="preserve">
-    <value>저장 위치</value>
-    <comment>Footer label before the folder</comment>
-  </data>
-  <data name="YouTube.EmptyHint" xml:space="preserve">
-    <value>결과가 여기에 표시됩니다. 다운로드는 태그와 커버 아트가 붙은 채 라이브러리 폴더에 저장됩니다.</value>
-    <comment>Empty state</comment>
-  </data>
-  <data name="YouTube.Close" xml:space="preserve">
-    <value>닫기</value>
-    <comment>Secondary button</comment>
-  </data>
-  <data name="YouTubeSettings.Section" xml:space="preserve">
-    <value>YOUTUBE 다운로드</value>
-    <comment>Library tab section title</comment>
-  </data>
-  <data name="YouTubeSettings.Title" xml:space="preserve">
-    <value>YouTube에서 곡 추가</value>
-    <comment>Card title</comment>
-  </data>
-  <data name="YouTubeSettings.Description" xml:space="preserve">
-    <value>검색하거나 링크를 붙여넣어 다운로드합니다.</value>
-    <comment>Card description</comment>
-  </data>
-  <data name="YouTubeSettings.Open" xml:space="preserve">
-    <value>다운로더 열기</value>
-    <comment>Card button</comment>
-  </data>
-  <data name="YouTubeSettings.Folder" xml:space="preserve">
-    <value>다운로드 폴더</value>
-    <comment>Row label</comment>
-  </data>
-  <data name="YouTubeSettings.FolderHint" xml:space="preserve">
-    <value>비워 두면 첫 번째 음악 폴더 안의 "YouTube" 폴더를 사용합니다.</value>
-    <comment>Row help</comment>
-  </data>
-  <data name="YouTubeSettings.Tool" xml:space="preserve">
-    <value>yt-dlp</value>
-    <comment>Row label</comment>
-  </data>
-  <data name="YouTubeSettings.InstallUpdate" xml:space="preserve">
-    <value>설치 / 업데이트</value>
-    <comment>Row button</comment>
-  </data>
-  <data name="YouTubeSettings.ToolPathHint" xml:space="preserve">
-    <value>yt-dlp 사용자 지정 경로 (선택 사항)</value>
-    <comment>Path watermark</comment>
-  </data>
   <data name="Upmix.Title" xml:space="preserve">
     <value>다채널 업믹스</value>
     <comment>Audio card title</comment>
@@ -5841,7 +5743,7 @@
     <comment>Sync card title</comment>
   </data>
   <data name="Sync.Description" xml:space="preserve">
-    <value>즐겨찾기, 평점, 재생 횟수, 재생목록이 휴대폰과 이 PC에서 똑같이 유지됩니다.</value>
+    <value>즐겨찾기, 평점, 재생 횟수, 이 PC의 재생목록이 휴대폰과 이 PC에서 똑같이 유지됩니다. 휴대폰에서 만든 재생목록은 휴대폰에만 남습니다.</value>
     <comment>Sync card description</comment>
   </data>
   <data name="Sync.DeviceName" xml:space="preserve">
@@ -6454,6 +6356,70 @@
     <value>휴대폰의 Noctis 앱에서 설정을 열고 계정으로 이동하세요. 이 주소를 입력하고 이메일 또는 사용자 이름과 비밀번호로 로그인하세요.</value>
     <comment>Pairing block help above the address and fingerprint</comment>
   </data>
+  <data name="AccountSync.PairQrCountdown" xml:space="preserve">
+    <value>{0} 후 새 코드</value>
+    <comment>Under the sign-in QR code; {0} = minutes:seconds until a new code replaces it, e.g. 1:42</comment>
+  </data>
+  <data name="AccountSync.PairQrWarning" xml:space="preserve">
+    <value>이 코드를 스캔하는 사람은 누구나 내 계정에 로그인할 수 있으니 내 휴대폰에만 보여 주세요. 한 번만 사용할 수 있으며 2분마다 바뀝니다.</value>
+    <comment>Under the sign-in QR code: who can use it and for how long</comment>
+  </data>
+  <data name="AccountSync.PairQrName" xml:space="preserve">
+    <value>로그인 QR 코드</value>
+    <comment>Screen-reader name of the sign-in QR code image</comment>
+  </data>
+  <data name="Pair.Subtitle" xml:space="preserve">
+    <value>몇 초 만에 휴대폰의 Noctis에 로그인하세요.</value>
+    <comment>Phone app card, Connect a phone row subtitle</comment>
+  </data>
+  <data name="Pair.ModeQr" xml:space="preserve">
+    <value>QR 코드 스캔</value>
+    <comment>Connect a phone: switch segment for the QR code way</comment>
+  </data>
+  <data name="Pair.ModeManual" xml:space="preserve">
+    <value>직접 입력</value>
+    <comment>Connect a phone: switch segment for typing the address and password</comment>
+  </data>
+  <data name="Pair.QrStep1" xml:space="preserve">
+    <value>휴대폰에서 Noctis를 엽니다.</value>
+    <comment>Connect a phone, QR way, step 1</comment>
+  </data>
+  <data name="Pair.QrStep2" xml:space="preserve">
+    <value>설정 › 계정으로 이동해 QR 코드 스캔을 탭합니다.</value>
+    <comment>Connect a phone, QR way, step 2 (names the phone app screens and button)</comment>
+  </data>
+  <data name="Pair.QrStep3" xml:space="preserve">
+    <value>카메라를 이 코드에 맞춥니다.</value>
+    <comment>Connect a phone, QR way, step 3</comment>
+  </data>
+  <data name="Pair.ManualStep1" xml:space="preserve">
+    <value>휴대폰에서 Noctis를 열고 설정 › 계정으로 이동합니다.</value>
+    <comment>Connect a phone, manual way, step 1</comment>
+  </data>
+  <data name="Pair.ManualStep2" xml:space="preserve">
+    <value>직접 입력에서 이 주소를 입력합니다:</value>
+    <comment>Connect a phone, manual way, step 2; the address follows below it</comment>
+  </data>
+  <data name="Pair.ManualStep3" xml:space="preserve">
+    <value>계정의 이메일과 비밀번호로 로그인합니다.</value>
+    <comment>Connect a phone, manual way, step 3</comment>
+  </data>
+  <data name="Pair.ManualStep4" xml:space="preserve">
+    <value>휴대폰에 이 보안 코드가 표시되는지 확인합니다:</value>
+    <comment>Connect a phone, manual way, step 4; the security code follows below it</comment>
+  </data>
+  <data name="Pair.NewCode" xml:space="preserve">
+    <value>새 코드</value>
+    <comment>Small link under the QR code: replace it with a new one now</comment>
+  </data>
+  <data name="Pair.QrUnavailable" xml:space="preserve">
+    <value>지금은 QR 코드를 표시할 수 없습니다. 위에서 계정을 만들거나 직접 입력을 사용하세요.</value>
+    <comment>Connect a phone, QR way, when no code can be shown</comment>
+  </data>
+  <data name="Phone.AdvancedDesc" xml:space="preserve">
+    <value>이 PC의 이름과 다른 음악 앱의 접근.</value>
+    <comment>Phone app card, Advanced row subtitle (folded by default)</comment>
+  </data>
   <data name="AccountSync.SignedInDevices" xml:space="preserve">
     <value>내 휴대폰</value>
     <comment>Account card list label</comment>
@@ -6764,6 +6730,251 @@
   <data name="Shortcuts.Action.GoArtists" xml:space="preserve">
     <value>아티스트로 이동</value>
     <comment>Settings › Shortcuts (GitHub #131)</comment>
+  </data>
+  <data name="ArtistDetail.SearchArtistInfo" xml:space="preserve">
+    <value>아티스트 정보 검색</value>
+    <comment>Header in ArtistDetailView.axaml (GitHub #141)</comment>
+  </data>
+  <data name="ArtistDetail.UseAutomaticArtistInfo" xml:space="preserve">
+    <value>아티스트 정보 자동으로</value>
+    <comment>Header in ArtistDetailView.axaml: forget the manual pick (GitHub #141)</comment>
+  </data>
+  <data name="ArtistInfoSearch.Title" xml:space="preserve">
+    <value>아티스트 정보 검색</value>
+    <comment>ArtistInfoSearchDialog.axaml title</comment>
+  </data>
+  <data name="ArtistInfoSearch.Subtitle" xml:space="preserve">
+    <value>올바른 아티스트를 선택하세요. 사진, 팬 수, 소개가 선택을 따릅니다.</value>
+    <comment>ArtistInfoSearchDialog.axaml subtitle</comment>
+  </data>
+  <data name="ArtistInfoSearch.Searching" xml:space="preserve">
+    <value>검색 중…</value>
+    <comment>Status in ArtistInfoSearchDialog.axaml</comment>
+  </data>
+  <data name="ArtistInfoSearch.NothingFound" xml:space="preserve">
+    <value>아티스트를 찾지 못했습니다.</value>
+    <comment>Status in ArtistInfoSearchDialog.axaml</comment>
+  </data>
+  <data name="ArtistInfoSearch.Failed" xml:space="preserve">
+    <value>검색 실패: {0}</value>
+    <comment>Status in ArtistInfoSearchDialog.axaml; {0} = error message</comment>
+  </data>
+  <data name="ArtistInfoSearch.Applying" xml:space="preserve">
+    <value>저장 중…</value>
+    <comment>Status in ArtistInfoSearchDialog.axaml while the pick is saved</comment>
+  </data>
+  <data name="ArtistInfoSearch.AlbumsCount" xml:space="preserve">
+    <value>앨범 {0}개</value>
+    <comment>Row detail in ArtistInfoSearchDialog.axaml; {0} = Deezer album count</comment>
+  </data>
+  <data name="ArtistInfoSearch.OneAlbum" xml:space="preserve">
+    <value>앨범 1개</value>
+    <comment>Row detail in ArtistInfoSearchDialog.axaml for an account with exactly one album (AlbumsCount otherwise)</comment>
+  </data>
+  <data name="ArtistInfoSearch.OneFan" xml:space="preserve">
+    <value>팬 1명</value>
+    <comment>Row detail in ArtistInfoSearchDialog.axaml for an account with exactly one fan (ArtistDetail.FansCount otherwise)</comment>
+  </data>
+  <data name="ArtistInfoSearch.Current" xml:space="preserve">
+    <value>현재</value>
+    <comment>Badge on the row the artist is pinned to</comment>
+  </data>
+  <data name="ArtistInfoSearch.Use" xml:space="preserve">
+    <value>이 아티스트 사용</value>
+    <comment>Primary button in ArtistInfoSearchDialog.axaml</comment>
+  </data>
+  <data name="Repeat.OffTip" xml:space="preserve">
+    <value>반복: 끔</value>
+    <comment>Tooltip/name of the Repeat buttons while Repeat is off (GitHub #144)</comment>
+  </data>
+  <data name="Repeat.AllTip" xml:space="preserve">
+    <value>전체 반복: 대기열 반복 재생</value>
+    <comment>Tooltip/name of the Repeat buttons in Repeat All: the queue loops forever (GitHub #144)</comment>
+  </data>
+  <data name="Repeat.OneTip" xml:space="preserve">
+    <value>한 곡 반복: 이 곡 반복 재생</value>
+    <comment>Tooltip/name of the Repeat buttons in Repeat One: the playing song loops forever (GitHub #144)</comment>
+  </data>
+  <data name="Queue.ShowPlayedTip" xml:space="preserve">
+    <value>재생한 곡 보기</value>
+    <comment>Queue popup header History button tooltip in MainWindow.axaml: toggles Keep Played Songs (played songs above Now Playing)</comment>
+  </data>
+  <data name="Settings.AppIcon" xml:space="preserve">
+    <value>앱 아이콘</value>
+    <comment>Title of the App Icon card in Settings &gt; Appearance (SettingsView.axaml)</comment>
+  </data>
+  <data name="Settings.AppIconDesc" xml:space="preserve">
+    <value>제목 표시줄, 작업 표시줄, 트레이의 아이콘을 바로 바꿉니다. 바탕 화면 바로 가기와 .exe는 클래식 아이콘을 유지합니다.</value>
+    <comment>Subtitle of the App Icon card in Settings &gt; Appearance: the pick applies live to windows/taskbar/tray; the exe icon cannot change</comment>
+  </data>
+  <data name="Settings.AppIcon.Classic" xml:space="preserve">
+    <value>클래식</value>
+    <comment>Name of an alternate app icon tile in Settings &gt; Appearance &gt; App Icon</comment>
+  </data>
+  <data name="Settings.AppIcon.Blush" xml:space="preserve">
+    <value>블러시</value>
+    <comment>Name of an alternate app icon tile in Settings &gt; Appearance &gt; App Icon</comment>
+  </data>
+  <data name="Settings.AppIcon.Sky" xml:space="preserve">
+    <value>스카이</value>
+    <comment>Name of an alternate app icon tile in Settings &gt; Appearance &gt; App Icon</comment>
+  </data>
+  <data name="Settings.AppIcon.Sunset" xml:space="preserve">
+    <value>선셋</value>
+    <comment>Name of an alternate app icon tile in Settings &gt; Appearance &gt; App Icon</comment>
+  </data>
+  <data name="Settings.AppIcon.Violet" xml:space="preserve">
+    <value>바이올렛</value>
+    <comment>Name of an alternate app icon tile in Settings &gt; Appearance &gt; App Icon</comment>
+  </data>
+  <data name="Settings.AppIcon.Aurora" xml:space="preserve">
+    <value>오로라</value>
+    <comment>Name of an alternate app icon tile in Settings &gt; Appearance &gt; App Icon</comment>
+  </data>
+  <data name="Settings.AppIcon.Midnight" xml:space="preserve">
+    <value>미드나잇</value>
+    <comment>Name of an alternate app icon tile in Settings &gt; Appearance &gt; App Icon</comment>
+  </data>
+  <data name="Settings.AppIcon.Ruby" xml:space="preserve">
+    <value>루비</value>
+    <comment>Name of an alternate app icon tile in Settings &gt; Appearance &gt; App Icon</comment>
+  </data>
+  <data name="LibraryPlaylists.ImportFromStreaming" xml:space="preserve">
+    <value>Spotify 또는 Deezer에서 가져오기</value>
+    <comment>Text in LibraryPlaylistsView.axaml</comment>
+  </data>
+  <data name="LibraryPlaylists.ImportPitch" xml:space="preserve">
+    <value>내 노래와 자동으로 맞춰져요</value>
+    <comment>Text in LibraryPlaylistsView.axaml</comment>
+  </data>
+  <data name="LibraryPlaylists.PlaylistFilesToo" xml:space="preserve">
+    <value>.m3u, .m3u8 파일도 지원해요</value>
+    <comment>Text in LibraryPlaylistsView.axaml</comment>
+  </data>
+  <data name="Home.WelcomeTitle" xml:space="preserve">
+    <value>라이브러리를 채워 볼까요</value>
+    <comment>Text in HomeView.axaml</comment>
+  </data>
+  <data name="Home.WelcomeLine" xml:space="preserve">
+    <value>원하는 노래를 찾거나 가진 음악을 추가하세요</value>
+    <comment>Text in HomeView.axaml</comment>
+  </data>
+  <data name="Home.FindMusic" xml:space="preserve">
+    <value>음악 찾기</value>
+    <comment>Text in HomeView.axaml</comment>
+  </data>
+  <data name="Home.AddMusicFolder" xml:space="preserve">
+    <value>음악 폴더 추가</value>
+    <comment>Text in HomeView.axaml</comment>
+  </data>
+  <data name="Home.ImportPlaylists" xml:space="preserve">
+    <value>플레이리스트 가져오기</value>
+    <comment>Text in HomeView.axaml</comment>
+  </data>
+  <data name="Home.ConnectTelegram" xml:space="preserve">
+    <value>텔레그램 연결</value>
+    <comment>Text in HomeView.axaml</comment>
+  </data>
+  <data name="Home.SetUpWordLyrics" xml:space="preserve">
+    <value>단어별 가사 · 1.3GB</value>
+    <comment>Text in HomeView.axaml</comment>
+  </data>
+  <data name="Lyrics.Sync" xml:space="preserve"><value>동기화</value><comment>Pill that brings the lyrics back to the current line</comment></data>
+  <data name="Metadata.AlbumNameAppleMusic" xml:space="preserve">
+    <value>앨범 이름 또는 Apple Music URL</value>
+    <comment>Watermark in MetadataWindow.axaml</comment>
+  </data>
+  <data name="Metadata.TypeAlbumNamePress" xml:space="preserve">
+    <value>앨범 이름을 입력하고 Enter를 누르거나 Apple Music 링크를 붙여넣으세요</value>
+    <comment>Text in MetadataWindow.axaml</comment>
+  </data>
+  <data name="Main.AddFromYouTube" xml:space="preserve">
+    <value>YouTube에서 추가</value>
+    <comment>New/Add menu item</comment>
+  </data>
+  <data name="Main.AddFromYouTubeHint" xml:space="preserve">
+    <value>검색하거나 링크를 붙여넣으세요 — 라이브러리로 다운로드됩니다</value>
+    <comment>New/Add menu item subtitle</comment>
+  </data>
+  <data name="YouTube.Title" xml:space="preserve">
+    <value>YouTube에서 추가</value>
+    <comment>Dialog title</comment>
+  </data>
+  <data name="YouTube.Subtitle" xml:space="preserve">
+    <value>검색하거나 링크를 붙여넣으세요. 커버 아트와 함께 라이브러리에 저장됩니다.</value>
+    <comment>Dialog subtitle</comment>
+  </data>
+  <data name="YouTube.SearchHint" xml:space="preserve">
+    <value>YouTube 검색 또는 링크 붙여넣기…</value>
+    <comment>Search box watermark</comment>
+  </data>
+  <data name="YouTube.Search" xml:space="preserve">
+    <value>검색</value>
+    <comment>Search button</comment>
+  </data>
+  <data name="YouTube.SetupTitle" xml:space="preserve">
+    <value>최초 설정</value>
+    <comment>First-run card title</comment>
+  </data>
+  <data name="YouTube.SetupBody" xml:space="preserve">
+    <value>Noctis는 YouTube와 통신하기 위해 yt-dlp(무료, 오픈 소스)를 사용합니다. Noctis 전용 폴더에 한 번 다운로드되며 여기서 업데이트됩니다.</value>
+    <comment>First-run card body</comment>
+  </data>
+  <data name="YouTube.Install" xml:space="preserve">
+    <value>yt-dlp 설치</value>
+    <comment>First-run card button</comment>
+  </data>
+  <data name="YouTube.Download" xml:space="preserve">
+    <value>다운로드</value>
+    <comment>Per-result button</comment>
+  </data>
+  <data name="YouTube.SavesTo" xml:space="preserve">
+    <value>저장 위치</value>
+    <comment>Footer label before the folder</comment>
+  </data>
+  <data name="YouTube.EmptyHint" xml:space="preserve">
+    <value>결과가 여기에 표시됩니다. 다운로드는 태그와 커버 아트가 붙은 채 라이브러리 폴더에 저장됩니다.</value>
+    <comment>Empty state</comment>
+  </data>
+  <data name="YouTube.Close" xml:space="preserve">
+    <value>닫기</value>
+    <comment>Secondary button</comment>
+  </data>
+  <data name="YouTubeSettings.Section" xml:space="preserve">
+    <value>YOUTUBE 다운로드</value>
+    <comment>Library tab section title</comment>
+  </data>
+  <data name="YouTubeSettings.Title" xml:space="preserve">
+    <value>YouTube에서 곡 추가</value>
+    <comment>Card title</comment>
+  </data>
+  <data name="YouTubeSettings.Description" xml:space="preserve">
+    <value>검색하거나 링크를 붙여넣어 다운로드합니다.</value>
+    <comment>Card description</comment>
+  </data>
+  <data name="YouTubeSettings.Open" xml:space="preserve">
+    <value>다운로더 열기</value>
+    <comment>Card button</comment>
+  </data>
+  <data name="YouTubeSettings.Folder" xml:space="preserve">
+    <value>다운로드 폴더</value>
+    <comment>Row label</comment>
+  </data>
+  <data name="YouTubeSettings.FolderHint" xml:space="preserve">
+    <value>비워 두면 첫 번째 음악 폴더 안의 "YouTube" 폴더를 사용합니다.</value>
+    <comment>Row help</comment>
+  </data>
+  <data name="YouTubeSettings.Tool" xml:space="preserve">
+    <value>yt-dlp</value>
+    <comment>Row label</comment>
+  </data>
+  <data name="YouTubeSettings.InstallUpdate" xml:space="preserve">
+    <value>설치 / 업데이트</value>
+    <comment>Row button</comment>
+  </data>
+  <data name="YouTubeSettings.ToolPathHint" xml:space="preserve">
+    <value>yt-dlp 사용자 지정 경로 (선택 사항)</value>
+    <comment>Path watermark</comment>
   </data>
   <data name="Lyrics.WordTiming" xml:space="preserve"><value>Word timing</value></data>
   <data name="Queue.ForYou" xml:space="preserve"><value>For you</value></data>

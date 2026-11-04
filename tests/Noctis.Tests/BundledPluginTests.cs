@@ -9,6 +9,23 @@ namespace Noctis.Tests;
 
 public class BundledPluginTests : IDisposable
 {
+    [AvaloniaTheory]
+    [InlineData("dev.moshi.lyricmotion", "dev.noctis.plugins.lyricmotion")]
+    [InlineData("dev.moshi.trueshuffle", "dev.noctis.plugins.trueshuffle")]
+    public void UpstreamEquivalent_DoesNotRunBesideTheNativeFeature(string nativeId, string upstreamId)
+    {
+        Install(Bundles, nativeId);
+        var host = Create();
+        Install(host.PluginsDirectory, upstreamId);
+        host.LoadAll();
+        var native = Assert.Single(host.Plugins);
+        Assert.Equal(nativeId, native.Id);
+        Assert.Equal(PluginStatus.Running, native.Status);
+        Assert.Same(native, host.FindBuiltInEquivalent(upstreamId));
+        host.SetCommunityPluginsEnabled(true);
+        host.SetCommunityPluginsEnabled(false);
+        Assert.Equal(PluginStatus.Running, native.Status);
+    }
     private readonly string _root = Path.Combine(Path.GetTempPath(), "NoctisPlus-bundles-" + Guid.NewGuid().ToString("N"));
     private readonly AppSettings _settings = new() { CommunityPluginsEnabled = false };
     private PluginHost? _host;

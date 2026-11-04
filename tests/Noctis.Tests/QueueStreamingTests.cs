@@ -12,6 +12,23 @@ namespace Noctis.Tests;
 /// about the queue (History, Previous, Pause, the song before ending) may go wrong because of them.</summary>
 public class QueueStreamingTests
 {
+    [AvaloniaFact]
+    public async Task MissingFileHandling_DoesNotSkipOrMarkOnlineQueueEntries()
+    {
+        var source = new Source();
+        var (player, audio) = NewPlayer();
+        var now = StandIn(source, "now");
+        var next = StandIn(source, "next");
+        audio.MissingPaths.Add(now.FilePath);
+        player.ReplaceQueueAndPlay([now, next], 0);
+        Settle();
+        Assert.Contains(source.Asked, r => r.Id == "now");
+        Assert.False(now.IsFileMissing);
+        await player.RefreshMissingMarksAsync();
+        Settle();
+        Assert.False(next.IsFileMissing);
+        player.ClearQueue();
+    }
     internal sealed class Source : IOnlineMusicSearch
     {
         internal readonly Dictionary<string, TaskCompletionSource<Track>> Pending = [];

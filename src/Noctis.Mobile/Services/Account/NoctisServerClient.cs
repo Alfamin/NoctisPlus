@@ -199,6 +199,28 @@ internal sealed partial class NoctisServerClient : IDisposable
             new("deviceName", deviceName),
         };
         var r = await PostFormAsync("noctisSignIn", form, signingIn: true, withKey: false, ct).ConfigureAwait(false);
+        return ReadSignIn(r);
+    }
+
+    /// <summary>noctisPairSignIn (form POST): the QR code's one-time secret, alone, for this
+    /// device's own key. Only ever called on a client pinned to the code's fingerprint.</summary>
+    public async Task<SignInResult> PairSignInAsync(string secret, string deviceId, string deviceName, CancellationToken ct)
+    {
+        var form = new List<KeyValuePair<string, string>>
+        {
+            new("code", secret),
+            new("deviceId", deviceId),
+            new("deviceName", deviceName),
+        };
+        var r = await PostFormAsync(PairSignInMethod, form, signingIn: true, withKey: false, ct).ConfigureAwait(false);
+        return ReadSignIn(r);
+    }
+
+    /// <summary>The QR sign-in endpoint (the desktop's NoctisServer.PairSignInMethod).</summary>
+    internal const string PairSignInMethod = "noctisPairSignIn";
+
+    private static SignInResult ReadSignIn(JsonElement r)
+    {
         if (!r.TryGetProperty("noctisSignIn", out var s) || s.ValueKind != JsonValueKind.Object)
             throw new NoctisServerException(NoctisErrorKind.Outdated, "This desktop's Noctis is too old to sign in phones. Update it.");
         var key = Str(s, "apiKey");
@@ -210,13 +232,17 @@ internal sealed partial class NoctisServerClient : IDisposable
 
     /// <summary>getNoctisSyncStatus: the desktop's profile name (null when it has none) and the
     /// computer's name as sign-in gave it (null when it gives none). Answers with sync on or off;
-    /// an older desktop without the profile name also gives null for it.</summary>
-    public async Task<(string? DisplayName, string? ServerName)> GetDisplayNameAsync(CancellationToken ct)
+    /// an older desktop without the profile name also gives null for it. Also where the computer
+    /// sends the phone's plays on to (null: a computer that does not forward them).</summary>
+    public async Task<(string? DisplayName, string? ServerName, ComputerScrobbling? Scrobbling)> GetDisplayNameAsync(CancellationToken ct)
     {
         var r = await GetJsonAsync("getNoctisSyncStatus", Array.Empty<KeyValuePair<string, string>>(), ct).ConfigureAwait(false);
-        if (!r.TryGetProperty("noctisSync", out var s) || s.ValueKind != JsonValueKind.Object) return (null, null);
+        if (!r.TryGetProperty("noctisSync", out var s) || s.ValueKind != JsonValueKind.Object) return (null, null, null);
         var server = Cap(Str(s, "name"), 100);
-        return (CleanDisplayName(Str(s, "displayName")), string.IsNullOrWhiteSpace(server) ? null : server);
+        var scrobbling = s.TryGetProperty("scrobbling", out var sc) && sc.ValueKind == JsonValueKind.Object
+            ? new ComputerScrobbling(Bool(sc, "lastFm"), Bool(sc, "listenBrainz"))
+            : null;
+        return (CleanDisplayName(Str(s, "displayName")), string.IsNullOrWhiteSpace(server) ? null : server, scrobbling);
     }
 
     /// <summary>A name from the desktop as shown in the header: control and format characters
@@ -497,14 +523,34 @@ internal sealed partial class NoctisServerClient : IDisposable
 
     /// <summary>scrobble (form POST, submission=true): each id paired with its play time in ms since the epoch.</summary>
     public Task ScrobbleAsync(IReadOnlyList<(Guid Id, long TimeMs)> plays, CancellationToken ct)
+        => ScrobbleAsync(plays.Select(p => (p.Id, p.TimeMs, (string?)null)).ToList(), ct);
+
+    /// <summary>As above, each with its scrobble verdict (noctisScrobble=, <see cref="PlayScrobbleWire"/>)
+    /// when any has one: paired by position, so then every id carries one ("no" for a play recorded
+    /// without). A computer that predates it ignores the field and only counts the plays.</summary>
+    public Task ScrobbleAsync(IReadOnlyList<(Guid Id, long TimeMs, string? Scrobble)> plays, CancellationToken ct)
     {
         var form = new List<KeyValuePair<string, string>> { new("submission", "true") };
-        foreach (var (id, time) in plays)
+        var verdicts = plays.Any(p => p.Scrobble != null);
+        foreach (var (id, time, scrobble) in plays)
         {
             form.Add(new("id", NoctisRemoteIds.ToServerTrackId(id)));
             form.Add(new("time", time.ToString(CultureInfo.InvariantCulture)));
+            if (verdicts) form.Add(new("noctisScrobble", scrobble ?? PlayScrobbleWire.Of(PlayScrobble.No)));
         }
         return PostFormAsync("scrobble", form, signingIn: false, withKey: true, ct);
+    }
+
+    /// <summary>savePlayQueue (form POST): the queue in order (id=, repeated), the playing song
+    /// (current=) and its place (position=, ms). A computer too old to know the call answers with an
+    /// error, which the caller ignores.</summary>
+    public Task SavePlayQueueAsync(PlayQueueShare share, CancellationToken ct)
+    {
+        var form = new List<KeyValuePair<string, string>>();
+        foreach (var id in share.Ids) form.Add(new("id", NoctisRemoteIds.ToServerTrackId(id)));
+        form.Add(new("current", NoctisRemoteIds.ToServerTrackId(share.Current)));
+        form.Add(new("position", Math.Max(0, share.PositionMs).ToString(CultureInfo.InvariantCulture)));
+        return PostFormAsync("savePlayQueue", form, signingIn: false, withKey: true, ct);
     }
 
     // ── The phone's songs → the computer ─────────────────────────────────
@@ -763,6 +809,9 @@ internal sealed partial class NoctisServerClient : IDisposable
     /// from the computer, which the Account page counts apart from other failures.</param>
     internal static NoctisServerException MapError(int code, bool signingIn, string? what = null) => code switch
     {
+        40 or 41 when signingIn && what == PairSignInMethod => new(NoctisErrorKind.PairingExpired, "This sign-in code is not valid any more."),
+        // A desktop from before QR sign-in answers "Unknown method" (0) to it.
+        0 when what == PairSignInMethod => new(NoctisErrorKind.Outdated, "This desktop's Noctis is too old to sign in by QR code. Update it."),
         40 or 41 when signingIn => new(NoctisErrorKind.BadCredentials, "Wrong user name or password."),
         70 when what == "download" => new(NoctisErrorKind.FileMissing, "This song's file is missing on your computer."),
         40 or 41 => new(NoctisErrorKind.SignedOut, "This phone was signed out on the desktop. Sign in again."),

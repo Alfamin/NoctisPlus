@@ -83,6 +83,14 @@
   <data name="Import.TidalSignIn" xml:space="preserve"><value>Войти в TIDAL</value></data>
   <data name="Import.PickerTitle" xml:space="preserve"><value>Выберите экспорт плейлиста</value></data>
   <data name="Import.PickerFilter" xml:space="preserve"><value>Экспорт плейлистов</value></data>
+  <data name="Import.AddSongWatermark" xml:space="preserve"><value>Добавить песню из медиатеки</value></data>
+  <data name="Import.RemoveAdded" xml:space="preserve"><value>Убрать</value></data>
+  <data name="Import.StatusAdded" xml:space="preserve"><value>добавлено: {0}</value><comment>{0} = songs added by hand from the library</comment></data>
+  <data name="Import.Change" xml:space="preserve"><value>Изменить</value></data>
+  <data name="Import.LeaveOut" xml:space="preserve"><value>Не включать в плейлист / вернуть</value></data>
+  <data name="Import.UseThisSong" xml:space="preserve"><value>Взять эту песню из медиатеки</value></data>
+  <data name="Import.SearchLibrary" xml:space="preserve"><value>Искать в медиатеке</value></data>
+  <data name="Import.SearchWatermark" xml:space="preserve"><value>Поиск в медиатеке</value></data>
   <data name="Common.Close" xml:space="preserve"><value>Закрыть</value></data>
   <data name="Common.Create" xml:space="preserve"><value>Создать</value></data>
   <data name="Common.Done" xml:space="preserve"><value>Готово</value></data>
@@ -175,7 +183,7 @@
   <data name="Settings.PauseVideoWithPlayback" xml:space="preserve"><value>Ставить видео на паузу вместе с музыкой</value><comment>Appearance toggle title</comment></data>
   <data name="Settings.PauseVideoWithPlaybackDesc" xml:space="preserve"><value>Фоновое видео замирает, пока песня на паузе.</value><comment>Appearance toggle description</comment></data>
   <data name="AlbumDetail.LyricsBackgroundVideo" xml:space="preserve"><value>Фоновое видео для текста</value><comment>Album page menu</comment></data>
-  <data name="AlbumDetail.ChooseAlbumVideo" xml:space="preserve"><value>Выбрать видео для этого альбома…</value><comment>Album page menu</comment></data>
+  <data name="AlbumDetail.ChooseAlbumVideo" xml:space="preserve"><value>Выбрать видео для этого альбома</value><comment>Album page menu</comment></data>
   <data name="AlbumDetail.UseDefaultVideo" xml:space="preserve"><value>Видео по умолчанию</value><comment>Album page menu</comment></data>
   <data name="Settings.StarGitHub" xml:space="preserve"><value>Звезда на GitHub</value><comment>Text in SettingsView.axaml</comment></data>
   <data name="Settings.JoinDiscord" xml:space="preserve"><value>Присоединиться к Discord</value><comment>Text in SettingsView.axaml</comment></data>
@@ -194,6 +202,7 @@
   <data name="Settings.Latest" xml:space="preserve"><value>Последняя</value><comment>Text in SettingsView.axaml</comment></data>
   <data name="Settings.Installed" xml:space="preserve"><value>Установлена</value><comment>Text in SettingsView.axaml</comment></data>
   <data name="Settings.ComingSoon" xml:space="preserve"><value>Скоро</value><comment>Badge on parked Account &amp; Sync cards in SettingsView.axaml</comment></data>
+  <data name="Settings.BetaBadge" xml:space="preserve"><value>Бета</value><comment>Badge on the Account and Phone app cards in SettingsView.axaml</comment></data>
   <data name="Settings.SessionLogTroubleshootingShare" xml:space="preserve"><value>Журнал сеанса для отчётов об ошибках.</value><comment>Text in SettingsView.axaml</comment></data>
   <data name="Settings.CopyLogs" xml:space="preserve"><value>Копировать журнал</value><comment>Text in SettingsView.axaml</comment></data>
   <data name="Settings.Clear" xml:space="preserve"><value>Очистить</value><comment>Text in SettingsView.axaml</comment></data>
@@ -243,6 +252,9 @@
   <data name="Settings.Cassette" xml:space="preserve"><value>Кассета</value><comment>Text in SettingsView.axaml</comment></data>
   <data name="Settings.CoverFlowLayout" xml:space="preserve"><value>Макет Cover Flow</value><comment>Text in SettingsView.axaml</comment></data>
   <data name="Settings.HowCoverFlowPage" xml:space="preserve"><value>Как страница Cover Flow располагает обложки из очереди.</value><comment>Text in SettingsView.axaml</comment></data>
+  <data name="Settings.AlbumsView" xml:space="preserve"><value>Вид альбомов</value><comment>Settings › Player card title</comment></data>
+  <data name="Settings.AlbumsViewDesc" xml:space="preserve"><value>Как страница «Альбомы» показывает альбомы и как карусель оформляет каждый из них.</value><comment>Settings › Player Albums View card subtitle</comment></data>
+  <data name="Settings.CarouselCase" xml:space="preserve"><value>Оформление карусели</value><comment>Settings › Player Albums View card: case style row label</comment></data>
   <data name="Settings.ClassicRowPlayingCoverTip" xml:space="preserve"><value>Playing cover between history and up next</value><comment>ToolTip.Tip in SettingsView.axaml</comment></data>
   <data name="Settings.Carousel" xml:space="preserve"><value>Карусель</value><comment>Text in SettingsView.axaml</comment></data>
   <data name="Settings.TiltedCoversDiagonalPathTip" xml:space="preserve"><value>Tilted covers with track details</value><comment>ToolTip.Tip in SettingsView.axaml</comment></data>
@@ -318,6 +330,10 @@
   <data name="PlaybackBar.MusicVideo" xml:space="preserve"><value>Клип</value><comment>Options menu toggle in PlaybackBarView.axaml</comment></data>
   <data name="PlaybackBar.MusicVideoAudio" xml:space="preserve"><value>Звук из клипа</value><comment>Options menu toggle in PlaybackBarView.axaml, under Music video</comment></data>
   <data name="Settings.MusicVideoAudioHint" xml:space="preserve"><value>Use video audio from the next song</value><comment>Music video audio toggle tooltip (Lyrics Studio card and options menu)</comment></data>
+  <data name="PlaybackBar.WatchMusicVideo" xml:space="preserve"><value>Смотреть клип</value><comment>Options menu toggle in PlaybackBarView.axaml: the lyrics page plays the clip full size</comment></data>
+  <data name="Settings.MusicVideoBehindLyricsHint" xml:space="preserve"><value>Показывать видео за текстом песни вместо обложки</value><comment>Behind lyrics toggle tooltip (Lyrics Studio card)</comment></data>
+  <data name="Lyrics.MusicVideoAudioSide" xml:space="preserve"><value>Аудио</value><comment>Lyrics page Audio / Video switch: the normal page (cover and lyrics)</comment></data>
+  <data name="Lyrics.MusicVideoVideoSide" xml:space="preserve"><value>Видео</value><comment>Lyrics page Audio / Video switch: the music video full size</comment></data>
   <data name="Settings.LyricsBackgroundVideo" xml:space="preserve"><value>Фоновое видео для текста</value><comment>Text in SettingsView.axaml</comment></data>
   <data name="Settings.LoopVideoGIFBehind" xml:space="preserve"><value>Зацикленное видео или GIF за текстом песни.</value><comment>Text in SettingsView.axaml</comment></data>
   <data name="Settings.Choose" xml:space="preserve"><value>Выбрать</value><comment>Content in SettingsView.axaml</comment></data>
@@ -379,10 +395,14 @@
   <data name="Settings.BackgroundBlur" xml:space="preserve"><value>Размытие фона</value><comment>Settings slider title: blur of the app behind pop-ups and Settings</comment></data>
   <data name="Settings.BackgroundBlurHint" xml:space="preserve"><value>Насколько размыто приложение за всплывающими окнами (например, редактором метаданных) и за настройками. Сдвиньте до упора влево, чтобы выключить.</value><comment>Settings slider description (Background Blur)</comment></data>
   <data name="Settings.BackgroundBlurOff" xml:space="preserve"><value>Выкл.</value><comment>Background Blur slider readout at 0 (blur turned off)</comment></data>
+  <data name="Settings.UiScale" xml:space="preserve"><value>Размер интерфейса</value><comment>Settings heading (Appearance): scale of the whole interface, GitHub #145</comment></data>
+  <data name="Settings.UiScaleHint" xml:space="preserve"><value>Увеличивает или уменьшает текст, кнопки и значки.</value><comment>Settings description (Interface Size)</comment></data>
+  <data name="Settings.UiScalePercent" xml:space="preserve"><value>{0}%</value><comment>Interface Size choice; {0} = percent of the normal size (SettingsViewModel)</comment></data>
+  <data name="Settings.UiScaleDefault" xml:space="preserve"><value>{0}% (по умолчанию)</value><comment>Interface Size choice for the normal size; {0} = 100 (SettingsViewModel)</comment></data>
   <data name="Settings.MiniPlayerOpacity" xml:space="preserve"><value>Непрозрачность мини-плеера</value><comment>Text in SettingsView.axaml</comment></data>
   <data name="Settings.HowMuchDesktopShows" xml:space="preserve"><value>Насколько плотным выглядит фон мини-плеера.</value><comment>Text in SettingsView.axaml</comment></data>
   <data name="Settings.MiniPlayerFrostedBackground" xml:space="preserve"><value>Матовый фон</value><comment>Text in SettingsView.axaml</comment></data>
-  <data name="Settings.BlurDesktopBehindMiniPlayer" xml:space="preserve"><value>Размывать рабочий стол за мини-плеером (классический дизайн).</value><comment>Text in SettingsView.axaml</comment></data>
+  <data name="Settings.BlurDesktopBehindMiniPlayer" xml:space="preserve"><value>Размывать рабочий стол за мини-плеером.</value><comment>Text in SettingsView.axaml</comment></data>
   <data name="Settings.PLAYBACK" xml:space="preserve"><value>ВОСПРОИЗВЕДЕНИЕ</value><comment>Text in SettingsView.axaml</comment></data>
   <data name="Settings.SongTransitions" xml:space="preserve"><value>Переходы между песнями</value><comment>Text in SettingsView.axaml</comment></data>
   <data name="Settings.SongsBlendSmoothlyInto" xml:space="preserve"><value>Песни плавно перетекают друг в друга. Альбомы играют без переходов.</value><comment>Text in SettingsView.axaml</comment></data>
@@ -409,10 +429,28 @@
   <data name="Settings.WhenQueueEndsKeep" xml:space="preserve"><value>Когда очередь закончится, продолжать похожими песнями.</value><comment>Text in SettingsView.axaml</comment></data>
   <data name="Settings.KeepPlayedInQueue" xml:space="preserve"><value>Сохранять прослушанные песни</value><comment>Text in SettingsView.axaml</comment></data>
   <data name="Settings.KeepPlayedInQueueHint" xml:space="preserve"><value>Прослушанные песни остаются в списке очереди над текущей, а последняя песня остаётся загруженной, когда очередь закончится.</value><comment>Text in SettingsView.axaml</comment></data>
+  <data name="Settings.MissingSongs" xml:space="preserve"><value>Отсутствующие песни</value><comment>Text in SettingsView.axaml</comment></data>
+  <data name="Settings.MissingSongsHint" xml:space="preserve"><value>Если файл песни в очереди перемещён или удалён, воспроизведение переходит к следующей песне, которую можно воспроизвести. Выберите, что делать с отсутствующей песней.</value><comment>Text in SettingsView.axaml</comment></data>
+  <data name="Settings.MissingSongsMark" xml:space="preserve"><value>Отмечать как отсутствующие</value><comment>Missing Songs picker option: keep the song in the queue, dimmed and marked</comment></data>
+  <data name="Settings.MissingSongsRemove" xml:space="preserve"><value>Удалять из очереди</value><comment>Missing Songs picker option: take the song off the queue</comment></data>
+  <data name="Queue.MissingBadge" xml:space="preserve"><value>Нет файла</value><comment>Badge on a queue row whose file can't be found</comment></data>
+  <data name="Queue.MissingTip" xml:space="preserve"><value>Файл не найден. Он перемещён или удалён, либо его диск не подключён.</value><comment>Tooltip on the queue row Missing badge</comment></data>
+  <data name="Queue.MissingSkippedOne" xml:space="preserve"><value>Пропущено «{0}»: файл не найден</value><comment>Notice when one missing song was skipped; {0} = song title</comment></data>
+  <data name="Queue.MissingSkippedMany" xml:space="preserve"><value>Пропущено песен без файлов: {0}</value><comment>Notice when several missing songs were skipped; {0} = count</comment></data>
+  <data name="Queue.MissingRemovedOne" xml:space="preserve"><value>«{0}» удалена из очереди: файл не найден</value><comment>Notice when one missing song was removed from the queue; {0} = song title</comment></data>
+  <data name="Queue.MissingRemovedMany" xml:space="preserve"><value>Удалено из очереди песен без файлов: {0}</value><comment>Notice when several missing songs were removed from the queue; {0} = count</comment></data>
+  <data name="Queue.MissingStopped" xml:space="preserve"><value>Воспроизведение остановлено: ни одна оставшаяся песня в очереди не найдена</value><comment>Notice when every remaining queued song is missing</comment></data>
   <data name="Queue.Played" xml:space="preserve"><value>Прослушано</value><comment>Text in MainWindow.axaml</comment></data>
   <data name="MiniPlayer.Played" xml:space="preserve"><value>Прослушано</value><comment>Text in MiniPlayerWindow.axaml</comment></data>
   <data name="Settings.ExplicitContent" xml:space="preserve"><value>Ненормативный контент</value><comment>Text in SettingsView.axaml</comment></data>
   <data name="Settings.AllowExplicitSongsWhen" xml:space="preserve"><value>Если выключено, песни с ненормативной лексикой пропускаются, если вы не включаете их сами.</value><comment>Text in SettingsView.axaml</comment></data>
+  <data name="Settings.OutputDevice" xml:space="preserve"><value>Устройство вывода</value><comment>Text in SettingsView.axaml</comment></data>
+  <data name="Settings.OutputDeviceDesc" xml:space="preserve"><value>Куда выводит звук Noctis. Монопольный режим открывает выбранное устройство напрямую, поэтому бит-в-бит вывод следует этой настройке, а не устройству Windows по умолчанию.</value><comment>Text in SettingsView.axaml</comment></data>
+  <data name="Settings.OutputDeviceDefault" xml:space="preserve"><value>Системное устройство по умолчанию</value><comment>Output Device picker: follow-the-Windows-default entry</comment></data>
+  <data name="Settings.OutputDeviceDefaultMarker" xml:space="preserve"><value>по умолчанию</value><comment>Suffix marking the current Windows default endpoint</comment></data>
+  <data name="Settings.OutputDeviceMissingEntry" xml:space="preserve"><value>Выбранное устройство</value><comment>Output Device picker: disconnected pinned endpoint</comment></data>
+  <data name="Settings.OutputDeviceDisconnected" xml:space="preserve"><value>не подключено</value><comment>Suffix for a disconnected endpoint in the picker</comment></data>
+  <data name="Settings.OutputDeviceMissingHint" xml:space="preserve"><value>Выбранное устройство сейчас не подключено. Пока оно не вернётся, воспроизведение идёт на системное устройство по умолчанию.</value><comment>Shown under Output Device when the pin is missing</comment></data>
   <data name="Settings.ExclusiveMode" xml:space="preserve"><value>Монопольный режим</value><comment>Text in SettingsView.axaml</comment></data>
   <data name="Settings.BitPerfectOutputBypasses" xml:space="preserve"><value>Бит-в-бит вывод в обход микшера Windows. Звук других приложений отключается, переходы выключены.</value><comment>Text in SettingsView.axaml</comment></data>
   <data name="Settings.AnalyzeTempoKey" xml:space="preserve"><value>Анализ темпа и тональности</value><comment>Text in SettingsView.axaml</comment></data>
@@ -422,8 +460,8 @@
   <data name="Settings.Equalizer" xml:space="preserve"><value>Эквалайзер</value><comment>Text in SettingsView.axaml</comment></data>
   <data name="Settings.ParametricEQTuneEach" xml:space="preserve"><value>Настройте частоту, усиление и ширину каждой полосы.</value><comment>Text in SettingsView.axaml</comment></data>
   <data name="Settings.Preamp" xml:space="preserve"><value>Предусиление</value><comment>Text in SettingsView.axaml</comment></data>
-  <data name="Settings.LevelBeforeEQLowerTip" xml:space="preserve"><value>Lower to prevent EQ distortion; double-tap to reset</value><comment>ToolTip.Tip in SettingsView.axaml</comment></data>
   <data name="Settings.EqPreset" xml:space="preserve"><value>Пресет эквалайзера</value><comment>Accessible name of the equalizer preset picker in SettingsView.axaml</comment></data>
+  <data name="Settings.LevelBeforeEQLowerTip" xml:space="preserve"><value>Lower to prevent EQ distortion; double-tap to reset</value><comment>ToolTip.Tip in SettingsView.axaml</comment></data>
   <data name="Settings.FREQUENCY" xml:space="preserve"><value>ЧАСТОТА</value><comment>Text in SettingsView.axaml</comment></data>
   <data name="Settings.GAIN" xml:space="preserve"><value>УСИЛЕНИЕ</value><comment>Text in SettingsView.axaml</comment></data>
   <data name="Settings.CenterFrequencyHzTypeTip" xml:space="preserve"><value>Центральная частота (Гц) — введите, прокрутите или используйте стрелки</value><comment>ToolTip.Tip in SettingsView.axaml</comment></data>
@@ -456,6 +494,8 @@
   <data name="Settings.AdjustVolumeUsingReplayGain" xml:space="preserve"><value>Регулировать громкость по тегам ReplayGain. Сканируйте треки через контекстное меню.</value><comment>Text in SettingsView.axaml</comment></data>
   <data name="Settings.Mode" xml:space="preserve"><value>Режим</value><comment>Text in SettingsView.axaml</comment></data>
   <data name="Settings.PreAmpDB" xml:space="preserve"><value>Предусиление (дБ)</value><comment>Text in SettingsView.axaml</comment></data>
+  <data name="Settings.ScanNewFilesReplayGain" xml:space="preserve"><value>Автоматически сканировать новые файлы</value><comment>Text in SettingsView.axaml</comment></data>
+  <data name="Settings.ScanNewFilesReplayGainDesc" xml:space="preserve"><value>Записывает теги ReplayGain в новые треки, когда альбом полностью скопирован.</value><comment>Text in SettingsView.axaml</comment></data>
   <data name="Settings.REMOTECONTROL" xml:space="preserve"><value>ДИСТАНЦИОННОЕ УПРАВЛЕНИЕ</value><comment>Text in SettingsView.axaml</comment></data>
   <data name="Settings.WebRemote" xml:space="preserve"><value>Веб-пульт</value><comment>Text in SettingsView.axaml</comment></data>
   <data name="Settings.ControlPlaybackFromPhone" xml:space="preserve"><value>Управляйте музыкой из браузера на телефоне. Приложение не нужно. Используйте только в надёжной сети Wi-Fi.</value><comment>Text in SettingsView.axaml</comment></data>
@@ -981,6 +1021,9 @@
   <data name="Home.Plays" xml:space="preserve"><value>прослуш.</value><comment>Text in HomeView.axaml</comment></data>
   <data name="Home.TopArtists" xml:space="preserve"><value>Топ исполнителей</value><comment>Text in HomeView.axaml</comment></data>
   <data name="Home.Albums" xml:space="preserve"><value>Альбомы</value><comment>Home right-hand rail header (last played album)</comment></data>
+  <data name="Home.NewInLibrary" xml:space="preserve"><value>Новое в медиатеке</value><comment>Home section header: newest albums by date added (GitHub #159)</comment></data>
+  <data name="Home.ShowCount" xml:space="preserve"><value>Показать</value><comment>Home album row size pill, followed by the number ("Show 10")</comment></data>
+  <data name="Home.AlbumCountTip" xml:space="preserve"><value>Сколько альбомов показывает этот ряд</value><comment>Home album row size pill tooltip / accessible name</comment></data>
   <data name="Home.PlayTip" xml:space="preserve"><value>Слушать</value><comment>ToolTip.Tip in HomeView.axaml</comment></data>
   <data name="Home.HeavyRotation" xml:space="preserve"><value>В активной ротации</value><comment>Text in HomeView.axaml</comment></data>
   <data name="Home.RepeatThesePastTwo" xml:space="preserve"><value>На повторе последние две недели</value><comment>Text in HomeView.axaml</comment></data>
@@ -1068,15 +1111,6 @@
   <data name="LibraryPlaylists.DeletePlaylist" xml:space="preserve"><value>Удалить плейлист</value><comment>Header in LibraryPlaylistsView.axaml</comment></data>
   <data name="LibraryPlaylists.NoPlaylistsYet" xml:space="preserve"><value>Плейлистов пока нет</value><comment>Text in LibraryPlaylistsView.axaml</comment></data>
   <data name="LibraryPlaylists.CreateNewPlaylistGet" xml:space="preserve"><value>Создайте плейлист, чтобы начать</value><comment>Text in LibraryPlaylistsView.axaml</comment></data>
-  <data name="LibraryPlaylists.ImportFromStreaming" xml:space="preserve"><value>Импорт из Spotify или Deezer</value><comment>Text in LibraryPlaylistsView.axaml</comment></data>
-  <data name="LibraryPlaylists.ImportPitch" xml:space="preserve"><value>Автоматически сопоставляются с вашими песнями</value><comment>Text in LibraryPlaylistsView.axaml</comment></data>
-  <data name="LibraryPlaylists.PlaylistFilesToo" xml:space="preserve"><value>Файлы .m3u и .m3u8 тоже подходят</value><comment>Text in LibraryPlaylistsView.axaml</comment></data>
-  <data name="Home.WelcomeTitle" xml:space="preserve"><value>Наполним вашу медиатеку</value><comment>Text in HomeView.axaml</comment></data>
-  <data name="Home.WelcomeLine" xml:space="preserve"><value>Найдите любую песню или добавьте свою музыку</value><comment>Text in HomeView.axaml</comment></data>
-  <data name="Home.FindMusic" xml:space="preserve"><value>Найти музыку</value><comment>Text in HomeView.axaml</comment></data>
-  <data name="Home.ImportPlaylists" xml:space="preserve"><value>Импорт плейлистов</value><comment>Text in HomeView.axaml</comment></data>
-  <data name="Home.ConnectTelegram" xml:space="preserve"><value>Подключить Telegram</value><comment>Text in HomeView.axaml</comment></data>
-  <data name="Home.SetUpWordLyrics" xml:space="preserve"><value>Текст по словам · 1,3 ГБ</value><comment>Text in HomeView.axaml</comment></data>
   <data name="LibraryPlaylists.NoResults" xml:space="preserve"><value>Ничего не найдено</value><comment>Text in LibraryPlaylistsView.axaml</comment></data>
   <data name="LibraryPlaylists.NoPlaylistsMatchSearch" xml:space="preserve"><value>Нет плейлистов по вашему запросу</value><comment>Text in LibraryPlaylistsView.axaml</comment></data>
 
@@ -1181,6 +1215,8 @@
   <data name="LyricsColor.ArtworkHint" xml:space="preserve"><value>Меняется вместе с обложкой песни. Движение фона настраивается в настройках, в разделе «Тексты песен».</value><comment>Artwork mode text in LyricsBackgroundColorDialog.axaml</comment></data>
   <data name="LyricsColor.VideoNote" xml:space="preserve"><value>Включено фоновое видео, и оно показывается поверх этого фона.</value><comment>Note in LyricsBackgroundColorDialog.axaml while a lyrics background video plays</comment></data>
   <data name="Lyrics.SearchLyrics" xml:space="preserve"><value>Найти текст</value><comment>Text in LyricsView.axaml</comment></data>
+  <data name="Lyrics.MarkedNoLyrics" xml:space="preserve"><value>Отмечено: без текста</value><comment>LyricsView.axaml / LyricsPanelView.axaml: the song is marked as having no lyrics (GitHub #162)</comment></data>
+  <data name="Lyrics.UndoNoLyrics" xml:space="preserve"><value>Отменить</value><comment>LyricsView.axaml: button taking the no-lyrics mark off</comment></data>
   <data name="Lyrics.SearchingLyrics" xml:space="preserve"><value>Поиск текста</value><comment>Text in LyricsView.axaml</comment></data>
   <data name="LyricsSearch.Title" xml:space="preserve"><value>Поиск текста</value><comment>LyricsSearchDialog.axaml title</comment></data>
   <data name="LyricsSearch.Hint" xml:space="preserve"><value>Search enabled sources; prefer word-synced lyrics</value><comment>Tooltip on the info icon and the source picker in LyricsSearchDialog.axaml</comment></data>
@@ -1190,6 +1226,8 @@
   <data name="LyricsSearch.TitleWatermark" xml:space="preserve"><value>Название</value><comment>Placeholder in LyricsSearchDialog.axaml</comment></data>
   <data name="LyricsSearch.Search" xml:space="preserve"><value>Найти</value><comment>Button in LyricsSearchDialog.axaml</comment></data>
   <data name="LyricsSearch.Use" xml:space="preserve"><value>Использовать текст</value><comment>Primary button in LyricsSearchDialog.axaml</comment></data>
+  <data name="LyricsSearch.MarkNoLyrics" xml:space="preserve"><value>Без текста</value><comment>LyricsSearchDialog.axaml footer: mark the song as having no lyrics</comment></data>
+  <data name="LyricsSearch.UnmarkNoLyrics" xml:space="preserve"><value>Есть текст</value><comment>LyricsSearchDialog.axaml footer: take the no-lyrics mark off</comment></data>
   <data name="LyricsSearch.Best" xml:space="preserve"><value>Лучший</value><comment>Badge on the Auto pick in LyricsSearchDialog.axaml</comment></data>
   <data name="LyricsSearch.SelectToPreview" xml:space="preserve"><value>Выберите источник, чтобы посмотреть его текст.</value><comment>Empty preview in LyricsSearchDialog.axaml</comment></data>
   <data name="LyricsSearch.Searching" xml:space="preserve"><value>Поиск…</value><comment>Status in LyricsSearchViewModel</comment></data>
@@ -1207,7 +1245,6 @@
   <data name="LyricsSearch.Instrumental" xml:space="preserve"><value>Инструментал</value><comment>Result in LyricsSearchViewModel</comment></data>
   <data name="LyricsSearch.ModelSynced" xml:space="preserve"><value>Синхронизировано по словам моделью lrc.red. Нажмите «Использовать текст», чтобы оставить его.</value><comment>Status in LyricsSearchViewModel after lrc.red's row was word-synced by its model</comment></data>
   <data name="Lyrics.WrittenBy" xml:space="preserve"><value>Авторы: </value><comment>Text in LyricsView.axaml</comment></data>
-  <data name="Lyrics.Sync" xml:space="preserve"><value>Синхронизировать</value><comment>Pill that brings the lyrics back to the current line</comment></data>
   <data name="Lyrics.Follow" xml:space="preserve"><value>Следовать</value><comment>Text in LyricsView.axaml</comment></data>
   <data name="Lyrics.PreviewUnsaved" xml:space="preserve"><value>Предпросмотр · текст не сохранён</value><comment>Text in LyricsView.axaml — Lyrics Studio preview indicator</comment></data>
   <data name="Lyrics.SaveReplaceOne" xml:space="preserve"><value>У «{0}» уже есть {1}.
@@ -1231,11 +1268,6 @@
   <data name="Lyrics.LrcRedSync" xml:space="preserve"><value>Синхронизировать по словам моделью lrc.red</value><comment>Lyrics page pill and lrc.red's row in Search Lyrics: has lrc.red's in-house model time every word of a song it has only line-synced</comment></data>
   <data name="Lyrics.LrcRedSyncWorking" xml:space="preserve"><value>Расставляем время каждого слова… несколько секунд</value><comment>Lyrics page pill / Search Lyrics row while lrc.red's model runs</comment></data>
   <data name="Lyrics.LrcRedSyncRetry" xml:space="preserve"><value>Попробовать снова</value><comment>Lyrics page pill / Search Lyrics row after lrc.red's model sync failed</comment></data>
-  <data name="Lyrics.OnlineTimingCredit" xml:space="preserve"><value>Тайминг слов: {0}</value><comment>Lyrics page credit under a song's automatic online word timing; {0} = lrc.red, Unison or Kugou</comment></data>
-  <data name="Lyrics.TimeWithWordLyrics" xml:space="preserve"><value>Time with WordLyrics</value><comment>Lyrics credit menu: times this song with WordLyrics now (the online timing stays until it is done)</comment></data>
-  <data name="Lyrics.FindOnlineTiming" xml:space="preserve"><value>Find online word timing</value><comment>Lyrics credit menu under WordLyrics' timing: looks the song up on lrc.red, Unison and Kugou; found = shown, WordLyrics' stays a choice</comment></data>
-  <data name="Lyrics.TimeWithWordLyricsAfterDownload" xml:space="preserve"><value>Time with WordLyrics once downloaded</value><comment>Lyrics credit menu while the song still downloads: WordLyrics starts by itself when it is whole</comment></data>
-  <data name="Lyrics.WaitingForDownload" xml:space="preserve"><value>Waiting for the download · {0}%</value><comment>Word timing pill: WordLyrics starts when the song has downloaded; {0} = percent downloaded</comment></data>
   <data name="Lyrics.LrcRedCredit" xml:space="preserve"><value>Текст с lrc.red</value><comment>Lyrics page credit under lyrics that came from lrc.red</comment></data>
   <data name="Lyrics.LrcRedModelCredit" xml:space="preserve"><value>Синхронизировано по словам моделью lrc.red</value><comment>Lyrics page credit, and the Search Lyrics row format, for lyrics lrc.red's model word-synced</comment></data>
   <data name="Lyrics.LrcRedSyncNetwork" xml:space="preserve"><value>Не удалось подключиться к lrc.red. Проверьте подключение к интернету.</value><comment>Lyrics page / Search Lyrics / Lyrics Studio: lrc.red model sync failed</comment></data>
@@ -1275,6 +1307,7 @@
   <data name="Main.Ascending" xml:space="preserve"><value>По возрастанию</value><comment>Header in MainWindow.axaml</comment></data>
   <data name="Main.NewestAlbumsFirst" xml:space="preserve"><value>Сначала новые альбомы</value><comment>Albums sort menu toggle in MainWindow.axaml (GitHub #106): under Album Artist sort, each artist's albums newest first</comment></data>
   <data name="Main.Descending" xml:space="preserve"><value>По убыванию</value><comment>Header in MainWindow.axaml</comment></data>
+  <data name="Main.ResetSortToDateAdded" xml:space="preserve"><value>Сбросить: по дате добавления</value><comment>Songs Sort menu: back to the default order, newest additions first; shown while the sort button has its dot (GitHub #156)</comment></data>
   <data name="Main.ShuffleTip" xml:space="preserve"><value>Перемешать</value><comment>ToolTip.Tip in MainWindow.axaml</comment></data>
   <data name="Main.OptionsTip" xml:space="preserve"><value>Параметры</value><comment>ToolTip.Tip in MainWindow.axaml</comment></data>
   <data name="Main.AllSongs" xml:space="preserve"><value>Все песни</value><comment>Header in MainWindow.axaml</comment></data>
@@ -1308,6 +1341,23 @@
   <data name="Main.PickTracksYourself" xml:space="preserve"><value>Выберите треки сами</value><comment>Text in MainWindow.axaml</comment></data>
   <data name="Main.NewSmartPlaylist" xml:space="preserve"><value>Новый умный плейлист</value><comment>Text in MainWindow.axaml</comment></data>
   <data name="Main.FillsItselfFromRules" xml:space="preserve"><value>Заполняется сам по заданным правилам</value><comment>Text in MainWindow.axaml</comment></data>
+  <data name="Main.QuickPlaylist" xml:space="preserve"><value>Плейлист по жанру или исполнителю</value><comment>Playlists page New menu</comment></data>
+  <data name="Main.QuickPlaylistSub" xml:space="preserve"><value>Все его песни или микс из вашей медиатеки</value><comment>Playlists page New menu</comment></data>
+  <data name="QuickPlaylist.Title" xml:space="preserve"><value>Плейлист по жанру или исполнителю</value></data>
+  <data name="QuickPlaylist.Subtitle" xml:space="preserve"><value>Все его песни или микс похожих песен из вашей медиатеки. Собирается на этом ПК, ничего никуда не отправляется.</value></data>
+  <data name="QuickPlaylist.Genres" xml:space="preserve"><value>Жанры</value></data>
+  <data name="QuickPlaylist.Artists" xml:space="preserve"><value>Исполнители</value></data>
+  <data name="QuickPlaylist.SearchGenres" xml:space="preserve"><value>Поиск жанров</value></data>
+  <data name="QuickPlaylist.SearchArtists" xml:space="preserve"><value>Поиск исполнителей</value></data>
+  <data name="QuickPlaylist.AllSongs" xml:space="preserve"><value>Все песни</value></data>
+  <data name="QuickPlaylist.AllSongsTip" xml:space="preserve"><value>Плейлист со всеми песнями</value></data>
+  <data name="QuickPlaylist.Mix" xml:space="preserve"><value>Микс</value></data>
+  <data name="QuickPlaylist.MixTip" xml:space="preserve"><value>Около 50 песен: эта музыка и похожие песни из медиатеки, сначала избранное и самое прослушиваемое</value></data>
+  <data name="QuickPlaylist.OneSong" xml:space="preserve"><value>1 песня</value></data>
+  <data name="QuickPlaylist.Songs" xml:space="preserve"><value>Песен: {0:N0}</value><comment>{0} = number of songs</comment></data>
+  <data name="QuickPlaylist.NoneFound" xml:space="preserve"><value>Ничего не найдено</value></data>
+  <data name="QuickPlaylist.Nothing" xml:space="preserve"><value>Нет песен для плейлиста.</value></data>
+  <data name="QuickPlaylist.Failed" xml:space="preserve"><value>Не удалось создать плейлист: {0}</value><comment>{0} = error message</comment></data>
   <data name="Main.ImportPlaylist" xml:space="preserve"><value>Импорт плейлиста</value><comment>Text in MainWindow.axaml</comment></data>
   <data name="Main.FromM3uM3u8File" xml:space="preserve"><value>Из файла .m3u / .m3u8</value><comment>Text in MainWindow.axaml</comment></data>
   <data name="Main.ShuffleAllTip" xml:space="preserve"><value>Перемешать все</value><comment>ToolTip.Tip in MainWindow.axaml</comment></data>
@@ -1390,6 +1440,11 @@
   <data name="MetadataFinder.NoMatch" xml:space="preserve"><value>Нет совпадений</value><comment>Row status in the Find Metadata tool (MetadataFinderViewModel)</comment></data>
   <data name="MetadataFinder.Applied" xml:space="preserve"><value>Применено</value><comment>Row status in the Find Metadata tool (MetadataFinderViewModel)</comment></data>
   <data name="MetadataFinder.WriteFailed" xml:space="preserve"><value>Ошибка записи</value><comment>Row status in the Find Metadata tool (MetadataFinderViewModel): the file could not be written</comment></data>
+  <data name="MetadataFinder.Progress" xml:space="preserve"><value>Определение {0} из {1}…</value><comment>Find Metadata tool (MetadataFinderViewModel) while Identify all runs; {0} = current row, {1} = total</comment></data>
+  <data name="MetadataFinder.Failed" xml:space="preserve"><value>Не удалось определить ({0})</value><comment>Row status in the Find Metadata tool (MetadataFinderViewModel): the lookup failed; {0} = reason</comment></data>
+  <data name="MetadataFinder.TimedOut" xml:space="preserve"><value>время ожидания истекло</value><comment>Find Metadata tool (MetadataFinderViewModel): failure reason in MetadataFinder.Failed</comment></data>
+  <data name="MetadataFinder.NetworkError" xml:space="preserve"><value>ошибка сети</value><comment>Find Metadata tool (MetadataFinderViewModel): failure reason in MetadataFinder.Failed</comment></data>
+  <data name="MetadataFinder.IdentifiedFailed" xml:space="preserve"><value>Определено {0} из {1}, с ошибкой: {2}</value><comment>Find Metadata tool (MetadataFinderViewModel); {0} = matched, {1} = total, {2} = failed lookups</comment></data>
 
   <!-- MetadataWindow.axaml (auto-migrated) -->
   <data name="Metadata.Metadata" xml:space="preserve"><value>Метаданные</value><comment>Title in MetadataWindow.axaml</comment></data>
@@ -1503,8 +1558,6 @@
   <data name="Metadata.NoArtwork" xml:space="preserve"><value>Нет обложки</value><comment>Text in MetadataWindow.axaml</comment></data>
   <data name="Metadata.AnimatedArtwork" xml:space="preserve"><value>Анимированная обложка</value><comment>Header in MetadataWindow.axaml</comment></data>
   <data name="Metadata.SearchAnimatedArtwork" xml:space="preserve"><value>Найти анимированную обложку</value><comment>Text in MetadataWindow.axaml</comment></data>
-  <data name="Metadata.AlbumNameAppleMusic" xml:space="preserve"><value>Название альбома или URL Apple Music</value><comment>Watermark in MetadataWindow.axaml</comment></data>
-  <data name="Metadata.TypeAlbumNamePress" xml:space="preserve"><value>введите название альбома и нажмите Enter или вставьте ссылку Apple Music</value><comment>Text in MetadataWindow.axaml</comment></data>
   <data name="Metadata.ChooseAnimatedArtwork" xml:space="preserve"><value>Выбрать анимированную обложку</value><comment>Text in MetadataWindow.axaml</comment></data>
   <data name="Metadata.NoAnimatedArtwork" xml:space="preserve"><value>Нет анимированной обложки</value><comment>Text in MetadataWindow.axaml</comment></data>
   <data name="Metadata.AnimSearchUnavailable" xml:space="preserve"><value>Служба поиска недоступна.</value><comment>Animated artwork chooser (MetadataWindow.axaml / MetadataViewModel)</comment></data>
@@ -1770,6 +1823,8 @@
   <data name="PlaybackBar.SearchLyrics" xml:space="preserve"><value>Найти текст</value><comment>Header in PlaybackBarView.axaml</comment></data>
   <data name="PlaybackBar.LyricsPanel" xml:space="preserve"><value>Панель текста</value><comment>Header in PlaybackBarView.axaml</comment></data>
   <data name="PlaybackBar.RemoveLyrics" xml:space="preserve"><value>Удалить текст</value><comment>Header in PlaybackBarView.axaml</comment></data>
+  <data name="PlaybackBar.MarkNoLyrics" xml:space="preserve"><value>Отметить: без текста</value><comment>Header in PlaybackBarView.axaml (Lyrics submenu)</comment></data>
+  <data name="PlaybackBar.UnmarkNoLyrics" xml:space="preserve"><value>Снять отметку «без текста»</value><comment>Header in PlaybackBarView.axaml (Lyrics submenu)</comment></data>
   <data name="PlaybackBar.ShowFolder" xml:space="preserve"><value>Показать папку</value><comment>Header in PlaybackBarView.axaml</comment></data>
   <data name="PlaybackBar.SleepTimer" xml:space="preserve"><value>Таймер сна</value><comment>Header in PlaybackBarView.axaml</comment></data>
   <data name="PlaybackBar.Chapters" xml:space="preserve"><value>Главы</value><comment>Submenu in the player bar's more menu (PlaybackBarView.axaml) listing the chapters of the playing audiobook (.m4b); a chapter jumps there</comment></data>
@@ -1822,8 +1877,6 @@
   <data name="Playlist.AddDescription" xml:space="preserve"><value>Добавить описание…</value><comment>Text in PlaylistView.axaml</comment></data>
   <data name="Playlist.PlayTip" xml:space="preserve"><value>Слушать</value><comment>ToolTip.Tip in PlaylistView.axaml</comment></data>
   <data name="Playlist.ShuffleTip" xml:space="preserve"><value>Перемешать</value><comment>ToolTip.Tip in PlaylistView.axaml</comment></data>
-  <data name="Playlist.SaveFound" xml:space="preserve"><value>Сохранить</value><comment>Save button on a found playlist (PlaylistView.axaml)</comment></data>
-  <data name="Playlist.SaveFoundTip" xml:space="preserve"><value>Добавить в ваши плейлисты</value><comment>ToolTip.Tip in PlaylistView.axaml</comment></data>
   <data name="Playlist.OptionsTip" xml:space="preserve"><value>Параметры</value><comment>ToolTip.Tip in PlaylistView.axaml</comment></data>
   <data name="Playlist.PlayNext" xml:space="preserve"><value>Играть следующим</value><comment>Header in PlaylistView.axaml</comment></data>
   <data name="Playlist.AddQueue" xml:space="preserve"><value>В очередь</value><comment>Header in PlaylistView.axaml</comment></data>
@@ -1921,6 +1974,7 @@
   <data name="ReplayGainScanner.Stop" xml:space="preserve"><value>Остановить</value><comment>Cancel button while a scan runs, ReplayGainScannerDialog</comment></data>
   <data name="ReplayGainScanner.NoFfmpeg" xml:space="preserve"><value>ffmpeg не найден — укажите путь в «Настройки → Дополнительно → Вспомогательные программы».</value><comment>Status in ReplayGainScannerViewModel</comment></data>
   <data name="ReplayGainScanner.TickOne" xml:space="preserve"><value>Отметьте хотя бы один трек для сканирования.</value><comment>Status in ReplayGainScannerViewModel</comment></data>
+  <data name="ReplayGainScanner.AllTagged" xml:space="preserve"><value>У всех треков здесь уже есть ReplayGain. Отметьте трек, чтобы просканировать его заново.</value><comment>Status in ReplayGainScannerViewModel</comment></data>
   <data name="ReplayGainScanner.Scanning" xml:space="preserve"><value>Сканирование…</value><comment>Status in ReplayGainScannerViewModel</comment></data>
   <data name="ReplayGainScanner.Finished" xml:space="preserve"><value>Готово · просканировано: {0}</value><comment>Status in ReplayGainScannerViewModel; {0} tracks tagged</comment></data>
   <data name="ReplayGainScanner.FinishedFailed" xml:space="preserve"><value>с ошибкой: {0}</value><comment>Status suffix in ReplayGainScannerViewModel; {0} tracks failed</comment></data>
@@ -1968,6 +2022,9 @@
 Фразы в кавычках: album:"ok computer" · Годы: year:1990-1999, year:&gt;2000</value><comment>Tooltip on the sidebar search box (GitHub #107 search syntax). Keep the tag names (title:, artist:, …) untranslated — they are typed literally.</comment></data>
   <data name="Sidebar.Text" xml:space="preserve"><value>✕</value><comment>Text in SidebarView.axaml</comment></data>
   <data name="Sidebar.PLAYLISTS" xml:space="preserve"><value>ПЛЕЙЛИСТЫ</value><comment>Text in SidebarView.axaml</comment></data>
+  <data name="Sidebar.PLUGINS" xml:space="preserve"><value>ПЛАГИНЫ</value><comment>Sidebar section header above the screens plugins add</comment></data>
+  <data name="Sidebar.HidePlugin" xml:space="preserve"><value>Скрыть из боковой панели</value><comment>Right-click menu of a plugin's sidebar entry</comment></data>
+  <data name="Sidebar.PluginSettings" xml:space="preserve"><value>Настройки плагина</value><comment>Right-click menu of a plugin's sidebar entry: opens its page in Settings</comment></data>
   <data name="Sidebar.RightClickNewPlaylistTip" xml:space="preserve"><value>Правый щелчок — новый плейлист</value><comment>ToolTip.Tip in SidebarView.axaml</comment></data>
   <data name="Sidebar.NewPlaylist" xml:space="preserve"><value>Новый плейлист…</value><comment>Header in SidebarView.axaml</comment></data>
   <data name="Sidebar.NewSmartPlaylist" xml:space="preserve"><value>Новый умный плейлист…</value><comment>Header in SidebarView.axaml</comment></data>
@@ -2190,12 +2247,13 @@
   <data name="Plugins.Reload" xml:space="preserve"><value>Перезагрузить плагины</value></data>
   <data name="Plugins.None" xml:space="preserve"><value>Плагины пока не установлены.</value></data>
   <data name="Plugins.CommunityTitle" xml:space="preserve"><value>Плагины сообщества</value></data>
-  <data name="Plugins.CommunityLine" xml:space="preserve"><value>Разрешает запуск установленных плагинов. Они могут всё, что может Noctis, поэтому используйте только те, которым доверяете.</value></data>
+  <data name="Plugins.CommunityLine" xml:space="preserve"><value>Разрешает запуск плагинов от других людей. Официальные плагины работают в любом случае.</value></data>
   <data name="Plugins.CustomTitle" xml:space="preserve"><value>Своя категория</value></data>
   <data name="Plugins.CustomNone" xml:space="preserve"><value>Здесь появятся плагины, добавленные из файла.</value></data>
   <data name="Plugins.InstallFromFile" xml:space="preserve"><value>Установить из файла</value></data>
   <data name="Plugins.InstallPickerTitle" xml:space="preserve"><value>Установка плагина Noctis (.zip)</value></data>
   <data name="Plugins.OpenPluginFolder" xml:space="preserve"><value>Открыть папку</value></data>
+  <data name="Plugins.OpenView" xml:space="preserve"><value>Открыть {0}</value></data>
   <data name="Plugins.Remove" xml:space="preserve"><value>Удалить</value></data>
   <data name="Plugins.Permissions" xml:space="preserve"><value>Разрешения</value></data>
   <data name="Plugins.NoPermissionsShort" xml:space="preserve"><value>Только просмотр того, что играет</value></data>
@@ -2232,23 +2290,27 @@
   <data name="Plugins.PermShort.MenuCommands" xml:space="preserve"><value>Меню трека</value></data>
   <data name="Plugins.PermShort.Notifications" xml:space="preserve"><value>Уведомления</value></data>
   <data name="Plugins.PermShort.LibraryWriteAnalysis" xml:space="preserve"><value>Запись BPM и тональности</value></data>
+  <data name="Plugins.PermShort.LibraryImport" xml:space="preserve"><value>Добавление в медиатеку</value></data>
+  <data name="Plugins.PermShort.AudioDecode" xml:space="preserve"><value>Анализ звука</value></data>
   <data name="Plugins.Perm.PlaybackControl" xml:space="preserve"><value>Управлять воспроизведением: запуск, пауза, переключение и перемотка</value></data>
-  <data name="Plugins.Perm.LibraryRead" xml:space="preserve"><value>Искать в медиатеке (названия, исполнители, альбомы, пути к файлам, число прослушиваний)</value></data>
+  <data name="Plugins.Perm.LibraryRead" xml:space="preserve"><value>Читать медиатеку и плейлисты (названия, исполнители, альбомы, пути к файлам, число прослушиваний)</value></data>
   <data name="Plugins.Perm.Network" xml:space="preserve"><value>Подключаться к интернету</value></data>
   <data name="Plugins.Perm.LyricsProvider" xml:space="preserve"><value>Служить источником для поиска текстов</value></data>
   <data name="Plugins.Perm.MenuCommands" xml:space="preserve"><value>Добавлять пункты в меню трека</value></data>
   <data name="Plugins.Perm.Notifications" xml:space="preserve"><value>Показывать короткие уведомления</value></data>
   <data name="Plugins.Perm.LibraryWriteAnalysis" xml:space="preserve"><value>Задавать BPM и тональность треков медиатеки (только в Noctis, никогда в ваших файлах)</value></data>
+  <data name="Plugins.Perm.LibraryImport" xml:space="preserve"><value>Добавлять в медиатеку аудиофайлы, которые он сохранил (например, загрузки)</value></data>
+  <data name="Plugins.Perm.AudioDecode" xml:space="preserve"><value>Декодировать песни, чтобы анализировать их звучание (ничего не меняется и никуда не отправляется)</value></data>
   <data name="Plugins.EnableTitle" xml:space="preserve"><value>Включить {0}?</value></data>
   <data name="Plugins.EnableBody" xml:space="preserve"><value>{0} {1} запрашивает разрешение:</value></data>
   <data name="Plugins.EnableBodyBy" xml:space="preserve"><value>{0} {1} от {2} запрашивает разрешение:</value></data>
   <data name="Plugins.EnableConfirm" xml:space="preserve"><value>Включить</value></data>
   <data name="Plugins.SafetyNote" xml:space="preserve"><value>Плагины .NET работают внутри Noctis с тем же доступом к вашим файлам, сети и компьютеру, что и само приложение. Разрешения ограничивают только то, что плагин может делать через Noctis; это не песочница. Включайте плагины только от тех, кому доверяете.</value></data>
   <data name="Plugins.TurnOnTitle" xml:space="preserve"><value>Включить плагины сообщества?</value></data>
-  <data name="Plugins.TurnOnBody" xml:space="preserve"><value>Noctis будет загружать плагины, которые вы включите. Каждый из них при первом запуске запросит ваше одобрение.</value></data>
+  <data name="Plugins.TurnOnBody" xml:space="preserve"><value>Плагины сообщества делают другие люди, а не Noctis. Плагин может делать на компьютере всё то же, что и Noctis, поэтому ставьте только плагины от тех, кому доверяете.</value></data>
   <data name="Plugins.TurnOnConfirm" xml:space="preserve"><value>Включить</value></data>
   <data name="Plugins.RemoveTitle" xml:space="preserve"><value>Удалить {0}?</value></data>
-  <data name="Plugins.RemoveBody" xml:space="preserve"><value>Папка плагина будет удалена. Его данные и настройки сохранятся, если не поставить флажок, — при переустановке плагин продолжит с того же места.</value></data>
+  <data name="Plugins.RemoveBody" xml:space="preserve"><value>Файлы плагина будут удалены. Его данные и настройки сохранятся, если не включить переключатель ниже. При повторной установке плагин продолжит с того же места.</value></data>
   <data name="Plugins.RemoveDeleteData" xml:space="preserve"><value>Также удалить его данные и настройки</value></data>
   <data name="Plugins.Removed" xml:space="preserve"><value>Плагин {0} удалён.</value></data>
   <data name="Plugins.RemoveFailed" xml:space="preserve"><value>Не удалось удалить некоторые файлы. Закройте Noctis и удалите {0} вручную.</value></data>
@@ -2275,7 +2337,68 @@
   <data name="Plugins.Get.DownloadFailed" xml:space="preserve"><value>Ошибка загрузки. Проверьте подключение и повторите попытку.</value></data>
   <data name="Plugins.Get.Mismatch" xml:space="preserve"><value>Загруженный файл не совпал с официальным списком, поэтому он не установлен.</value></data>
   <data name="Plugins.Get.NotAllowed" xml:space="preserve"><value>Эта ссылка для загрузки не разрешена, поэтому ничего не установлено.</value></data>
-  <data name="Plugins.Get.WrongPackage" xml:space="preserve"><value>Загруженный файл — не {0} {1}, поэтому он не установлен.</value></data>
+  <data name="Plugins.Get.WrongPackage" xml:space="preserve"><value>Загруженный файл не совпадает с {0} {1}, поэтому он не установлен.</value></data>
+  <data name="Plugins.Get.By" xml:space="preserve"><value>автор: {0}</value></data>
+  <data name="Plugins.Submit" xml:space="preserve"><value>Предложить плагин</value></data>
+  <!-- Settings → Plugins → Make your own plugin -->
+  <data name="Plugins.Make.Title" xml:space="preserve"><value>Создайте свой плагин</value></data>
+  <data name="Plugins.Make.Line" xml:space="preserve"><value>Сделайте что-нибудь для Noctis и поделитесь этим. Если плагин пройдёт нашу проверку, он появится в плагинах сообщества с вашим именем.</value></data>
+  <data name="Plugins.Make.Step1Title" xml:space="preserve"><value>Создайте</value></data>
+  <data name="Plugins.Make.Step1" xml:space="preserve"><value>Следуйте руководству. Нужны бесплатный .NET SDK и редактор кода.</value></data>
+  <data name="Plugins.Make.Step2Title" xml:space="preserve"><value>Отправьте</value></data>
+  <data name="Plugins.Make.Step2" xml:space="preserve"><value>Опубликуйте его на GitHub и пришлите нам ссылку через форму.</value></data>
+  <data name="Plugins.Make.Step3Title" xml:space="preserve"><value>Попадите в список</value></data>
+  <data name="Plugins.Make.Step3" xml:space="preserve"><value>Мы проверим, что он безопасен, и он появится здесь с вашим авторством.</value></data>
+  <data name="Plugins.Make.Guide" xml:space="preserve"><value>Читать руководство</value></data>
+  <data name="Plugins.OfficialSection" xml:space="preserve"><value>Официальные плагины Noctis</value></data>
+  <data name="Plugins.CommunitySection" xml:space="preserve"><value>Плагины сообщества</value></data>
+  <data name="Plugins.CommunityEmpty" xml:space="preserve"><value>Плагины от сообщества появятся здесь, когда вы установите хотя бы один. Нажмите «Установить из файла» или создайте свой ниже.</value></data>
+  <data name="Plugins.Search" xml:space="preserve"><value>Поиск плагинов</value></data>
+  <data name="Plugins.SearchEmpty" xml:space="preserve"><value>Нет плагинов по вашему запросу.</value></data>
+  <data name="Plugins.Refresh" xml:space="preserve"><value>Обновить плагины</value></data>
+  <data name="Plugins.ReloadedNone" xml:space="preserve"><value>Плагины не установлены</value></data>
+  <data name="Plugins.ReloadedOne" xml:space="preserve"><value>Обновлено · 1 плагин</value></data>
+  <data name="Plugins.ReloadedMany" xml:space="preserve"><value>Обновлено · плагинов: {0}</value></data>
+  <data name="Plugins.Get.Replace" xml:space="preserve"><value>Заменить официальным</value></data>
+  <data name="Plugins.Card.NoAuthor" xml:space="preserve"><value>Плагин сообщества</value></data>
+  <data name="Plugins.Card.Installing" xml:space="preserve"><value>Установка</value></data>
+  <data name="Plugins.Card.On" xml:space="preserve"><value>Вкл.</value></data>
+  <data name="Plugins.Card.Off" xml:space="preserve"><value>Выкл.</value></data>
+  <data name="Plugins.Card.Verified" xml:space="preserve"><value>Официальный плагин Noctis</value></data>
+  <data name="Plugins.Card.A11yOfficial" xml:space="preserve"><value>{0}, официальный плагин Noctis</value></data>
+  <data name="Plugins.Card.A11yCommunity" xml:space="preserve"><value>{0}, плагин сообщества, автор: {1}</value></data>
+  <data name="Plugins.Card.A11yCommunityNoAuthor" xml:space="preserve"><value>{0}, плагин сообщества</value></data>
+  <data name="Plugins.Detail.Back" xml:space="preserve"><value>Плагины</value></data>
+  <data name="Plugins.Detail.Version" xml:space="preserve"><value>v{0}</value></data>
+  <data name="Plugins.Detail.Homepage" xml:space="preserve"><value>Открыть сайт</value></data>
+  <data name="Plugins.Detail.Enabled" xml:space="preserve"><value>Включён</value></data>
+  <data name="Plugins.Detail.EnableLine" xml:space="preserve"><value>Выключите, чтобы остановить плагин, не удаляя его.</value></data>
+  <data name="Plugins.Detail.RestrictedLine" xml:space="preserve"><value>Включите плагины сообщества, чтобы им пользоваться.</value></data>
+  <data name="Plugins.Detail.Files" xml:space="preserve"><value>Файлы плагина</value></data>
+  <data name="Plugins.Detail.FilesLine" xml:space="preserve"><value>При удалении его настройки и данные сохраняются, если вы не выберете иное.</value></data>
+  <data name="Plugins.Detail.More" xml:space="preserve"><value>Ещё</value></data>
+  <data name="Plugins.View.Back" xml:space="preserve"><value>Назад к {0}</value></data>
+  <data name="Plugins.View.PopOut" xml:space="preserve"><value>Открыть в отдельном окне</value></data>
+  <data name="Plugins.Detail.RemoveRow" xml:space="preserve"><value>Удалить плагин</value></data>
+  <data name="Plugins.Detail.ShowInSidebar" xml:space="preserve"><value>Показывать в боковой панели</value><comment>Plugin page row: the plugin's screen gets a sidebar entry</comment></data>
+  <data name="Plugins.PermSummary" xml:space="preserve"><value>Может {0}</value></data>
+  <data name="Plugins.PermSummarySeparator" xml:space="preserve"><value>, </value></data>
+  <data name="Plugins.PermVerb.PlaybackControl" xml:space="preserve"><value>управлять воспроизведением</value></data>
+  <data name="Plugins.PermVerb.LibraryRead" xml:space="preserve"><value>читать вашу медиатеку</value></data>
+  <data name="Plugins.PermVerb.Network" xml:space="preserve"><value>выходить в интернет</value></data>
+  <data name="Plugins.PermVerb.LyricsProvider" xml:space="preserve"><value>давать тексты песен</value></data>
+  <data name="Plugins.PermVerb.MenuCommands" xml:space="preserve"><value>добавлять пункты в меню трека</value></data>
+  <data name="Plugins.PermVerb.Notifications" xml:space="preserve"><value>показывать уведомления</value></data>
+  <data name="Plugins.PermVerb.LibraryWriteAnalysis" xml:space="preserve"><value>задавать BPM и тональность</value></data>
+  <data name="Plugins.PermVerb.LibraryImport" xml:space="preserve"><value>добавлять файлы в медиатеку</value></data>
+  <data name="Plugins.PermVerb.AudioDecode" xml:space="preserve"><value>анализировать звучание ваших песен</value></data>
+  <data name="Plugins.Setting.Decrease" xml:space="preserve"><value>Уменьшить: {0}</value></data>
+  <data name="Plugins.Setting.Increase" xml:space="preserve"><value>Увеличить: {0}</value></data>
+
+  <!-- Settings → Integrations → More integrations (opens the Plugins page) -->
+  <data name="Integrations.More.Title" xml:space="preserve"><value>Другие интеграции</value></data>
+  <data name="Integrations.More.Line" xml:space="preserve"><value>Плагины могут добавлять в Noctis новые сервисы и функции.</value></data>
+  <data name="Integrations.More.Browse" xml:space="preserve"><value>Смотреть плагины</value></data>
 
   <!-- Settings → Integrations → Noctis Server -->
   <data name="Server.Title" xml:space="preserve"><value>Сервер Noctis</value></data>
@@ -2374,23 +2497,19 @@
 
   <data name="BulkLyrics.Title" xml:space="preserve"><value>Тексты песен</value><comment>Dialog title (window)</comment></data>
   <data name="BulkLyrics.Close" xml:space="preserve"><value>Закрыть</value><comment>Secondary button</comment></data>
+  <data name="BulkLyrics.Upgrade" xml:space="preserve"><value>Также улучшать обычный или построчный текст</value><comment>Checkbox in the bulk lyrics dialog</comment></data>
+  <data name="BulkLyrics.Recheck" xml:space="preserve"><value>Снова искать для песен, уже проверенных раньше</value><comment>Checkbox in the bulk lyrics dialog</comment></data>
+  <data name="BulkLyrics.OpenStudio" xml:space="preserve"><value>Открыть Lyrics Studio</value><comment>Button after a bulk lyrics run</comment></data>
+  <data name="BulkLyrics.Stop" xml:space="preserve"><value>Остановить</value><comment>Button: stops a bulk run</comment></data>
+  <data name="BulkArtwork.Title" xml:space="preserve"><value>Анимированные обложки</value><comment>Dialog title (window)</comment></data>
+  <data name="BulkArtwork.Subtitle" xml:space="preserve"><value>Добавляет анимированные обложки из Apple Music к альбомам без них. Сохраняются только точные совпадения.</value></data>
+  <data name="BulkArtwork.Recheck" xml:space="preserve"><value>Снова искать для альбомов, для которых раньше ничего не нашлось</value><comment>Checkbox</comment></data>
+  <data name="BulkArtwork.Find" xml:space="preserve"><value>Найти</value><comment>Button: starts the run</comment></data>
+  <data name="Settings.FindLibraryLyrics" xml:space="preserve"><value>Найти тексты</value><comment>Settings Tools row</comment></data>
+  <data name="Settings.FindLibraryLyricsSub" xml:space="preserve"><value>Искать тексты для всей медиатеки, сначала пословные, и улучшать обычные.</value><comment>Settings Tools row</comment></data>
+  <data name="Settings.FindLibraryArtwork" xml:space="preserve"><value>Найти анимированные обложки</value><comment>Settings Tools row</comment></data>
+  <data name="Settings.FindLibraryArtworkSub" xml:space="preserve"><value>Добавить альбомам анимированные обложки из Apple Music, только точные совпадения.</value><comment>Settings Tools row</comment></data>
 
-  <data name="Main.AddFromYouTube" xml:space="preserve"><value>Добавить с YouTube</value><comment>New/Add menu item</comment></data>
-  <data name="Main.AddFromYouTubeHint" xml:space="preserve"><value>Найдите или вставьте ссылку — загрузка в вашу медиатеку</value><comment>New/Add menu item subtitle</comment></data>
-
-  <data name="YouTube.Title" xml:space="preserve"><value>Добавить с YouTube</value><comment>Dialog title</comment></data>
-  <data name="YouTube.Subtitle" xml:space="preserve"><value>Найдите или вставьте ссылку. Сохраняется в медиатеку вместе с обложкой.</value><comment>Dialog subtitle</comment></data>
-  <data name="YouTube.SearchHint" xml:space="preserve"><value>Найдите или вставьте ссылку</value><comment>Search box watermark</comment></data>
-  <data name="YouTube.Search" xml:space="preserve"><value>Найти</value><comment>Search button</comment></data>
-  <data name="YouTube.SetupTitle" xml:space="preserve"><value>Однократная настройка</value><comment>First-run card title</comment></data>
-  <data name="YouTube.SetupBody" xml:space="preserve"><value>Для загрузки нужен yt-dlp. Noctis установит его один раз и будет обновлять.</value><comment>First-run card body</comment></data>
-  <data name="YouTube.Install" xml:space="preserve"><value>Установить yt-dlp</value><comment>First-run card button</comment></data>
-  <data name="YouTube.Download" xml:space="preserve"><value>Скачать</value><comment>Per-result button</comment></data>
-  <data name="YouTube.SavesTo" xml:space="preserve"><value>Сохраняется в</value><comment>Footer label before the folder</comment></data>
-  <data name="YouTube.EmptyHint" xml:space="preserve"><value>Найдите песню и скачайте её в свою медиатеку.</value><comment>Empty state</comment></data>
-  <data name="YouTube.Close" xml:space="preserve"><value>Закрыть</value><comment>Secondary button</comment></data>
-  <data name="YouTube.UpdateTool" xml:space="preserve"><value>Обновить</value><comment>Small footer button next to "yt-dlp 2026.07.04 · update available": installs Noctis's own up-to-date yt-dlp</comment></data>
-  <data name="YouTube.UpdateToolTip" xml:space="preserve"><value>Установить собственную актуальную копию yt-dlp для Noctis.</value><comment>Tooltip of the footer Update button</comment></data>
   <data name="Import.Hint.Spotify" xml:space="preserve"><value>Spotify это блокирует. Экспортируйте плейлист через Exportify, затем выберите CSV-файл.</value><comment>Import Playlist: a Spotify link was pasted</comment></data>
   <data name="Import.Hint.AppleMusic" xml:space="preserve"><value>Apple Music нельзя прочитать напрямую. Сконвертируйте плейлист через TuneMyMusic, затем выберите файл.</value><comment>Import Playlist: an Apple Music link was pasted</comment></data>
   <data name="Import.Hint.Tidal" xml:space="preserve"><value>Эту ссылку TIDAL пока нельзя прочитать здесь. Сконвертируйте плейлист через TuneMyMusic, затем выберите файл.</value><comment>Import Playlist: a TIDAL link in a build without TIDAL sign-in</comment></data>
@@ -2398,29 +2517,11 @@
   <data name="Import.Hint.AmazonMusic" xml:space="preserve"><value>Amazon Music нельзя прочитать напрямую. Сконвертируйте плейлист через TuneMyMusic, затем выберите файл.</value><comment>Import Playlist: an Amazon Music link was pasted</comment></data>
   <data name="Import.Hint.OpenExportify" xml:space="preserve"><value>Открыть Exportify</value><comment>Button: opens exportify.net (a product name, keep it)</comment></data>
   <data name="Import.Hint.OpenTuneMyMusic" xml:space="preserve"><value>Открыть TuneMyMusic</value><comment>Button: opens tunemymusic.com (a product name, keep it)</comment></data>
+  <!-- Lyrics background video picker (its yt-dlp install / update buttons). -->
   <data name="YouTube.Installing" xml:space="preserve"><value>Установка…</value><comment>Install button label while yt-dlp downloads</comment></data>
-  <data name="YouTube.Status.NoFolder" xml:space="preserve"><value>Сначала добавьте папку с музыкой в «Настройки → Медиатека».</value><comment>Footer status: no library folder to save into</comment></data>
-  <data name="YouTube.Status.InstallingTool" xml:space="preserve"><value>Загрузка yt-dlp…</value><comment>Footer status while yt-dlp installs</comment></data>
-  <data name="YouTube.Status.Ready" xml:space="preserve"><value>yt-dlp готов.</value><comment>Footer status after yt-dlp installed</comment></data>
-  <data name="YouTube.Status.InstallFailed" xml:space="preserve"><value>Не удалось установить yt-dlp — {0}</value><comment>Footer status; {0} = error message</comment></data>
-  <data name="YouTube.Status.InstallFirst" xml:space="preserve"><value>Сначала установите yt-dlp.</value><comment>Footer status: search pressed before setup</comment></data>
-  <data name="YouTube.Status.ReadingLink" xml:space="preserve"><value>Чтение ссылки…</value><comment>Footer status while a pasted link resolves</comment></data>
-  <data name="YouTube.Status.Searching" xml:space="preserve"><value>Поиск…</value><comment>Footer status while searching</comment></data>
-  <data name="YouTube.Status.NothingFound" xml:space="preserve"><value>Ничего не найдено.</value><comment>Footer status: search returned no results</comment></data>
-  <data name="YouTube.Status.SearchFailed" xml:space="preserve"><value>Ошибка поиска — {0}</value><comment>Footer status; {0} = error message</comment></data>
-  <data name="YouTube.Row.Starting" xml:space="preserve"><value>Запуск…</value><comment>Result card status when a download begins</comment></data>
-  <data name="YouTube.Row.InLibrary" xml:space="preserve"><value>В вашей медиатеке</value><comment>Result card status after the download was imported</comment></data>
-  <data name="YouTube.Row.SavedToFolder" xml:space="preserve"><value>Сохранено в папку</value><comment>Result card status: saved but not imported</comment></data>
+  <data name="YouTube.UpdateTool" xml:space="preserve"><value>Обновить</value><comment>Small footer button next to "yt-dlp 2026.07.04 · update available": installs Noctis's own up-to-date yt-dlp</comment></data>
+  <data name="YouTube.UpdateToolTip" xml:space="preserve"><value>Установить собственную актуальную копию yt-dlp для Noctis.</value><comment>Tooltip of the footer Update button</comment></data>
 
-  <data name="YouTubeSettings.Section" xml:space="preserve"><value>ЗАГРУЗКИ С YOUTUBE</value><comment>Library tab section title</comment></data>
-  <data name="YouTubeSettings.Title" xml:space="preserve"><value>Добавление песен с YouTube</value><comment>Card title</comment></data>
-  <data name="YouTubeSettings.Description" xml:space="preserve"><value>Найдите или вставьте ссылку для загрузки.</value><comment>Card description</comment></data>
-  <data name="YouTubeSettings.Open" xml:space="preserve"><value>Открыть загрузчик</value><comment>Card button</comment></data>
-  <data name="YouTubeSettings.Folder" xml:space="preserve"><value>Папка загрузок</value><comment>Row label</comment></data>
-  <data name="YouTubeSettings.FolderHint" xml:space="preserve"><value>Если пусто, используется папка «YouTube» внутри вашей первой папки с музыкой.</value><comment>Row help</comment></data>
-  <data name="YouTubeSettings.Tool" xml:space="preserve"><value>yt-dlp</value><comment>Row label</comment></data>
-  <data name="YouTubeSettings.InstallUpdate" xml:space="preserve"><value>Установить / обновить</value><comment>Row button</comment></data>
-  <data name="YouTubeSettings.ToolPathHint" xml:space="preserve"><value>Свой путь к yt-dlp (необязательно)</value><comment>Path watermark</comment></data>
   <data name="YtDlp.Version" xml:space="preserve"><value>yt-dlp {0}</value><comment>Small secondary text: the installed yt-dlp version ({0})</comment></data>
   <data name="YtDlp.UpdateAvailable" xml:space="preserve"><value>доступно обновление</value><comment>Appended after the yt-dlp version when a newer release exists</comment></data>
   <data name="YtDlp.UpdatingRetrying" xml:space="preserve"><value>Обновление yt-dlp и повторная попытка…</value><comment>Download status after YouTube blocked the first attempt</comment></data>
@@ -2450,6 +2551,7 @@
   <data name="AccountSync.Name" xml:space="preserve"><value>Имя</value><comment>Create form watermark</comment></data>
   <data name="AccountSync.Password" xml:space="preserve"><value>Пароль (не менее 8 символов)</value><comment>Create form watermark</comment></data>
   <data name="AccountSync.Create" xml:space="preserve"><value>Создать</value><comment>Create form button</comment></data>
+  <data name="AccountSync.Since" xml:space="preserve"><value>Создан: {0}</value><comment>Under the profile name: when the account was made; {0} = month and year</comment></data>
   <data name="AccountSync.PairDevice" xml:space="preserve"><value>Подключить телефон</value><comment>Account card button</comment></data>
   <data name="AccountSync.NewApiKey" xml:space="preserve"><value>Новый API-ключ</value><comment>Account card button</comment></data>
   <data name="AccountSync.ChangePassword" xml:space="preserve"><value>Сменить пароль</value><comment>Account card button</comment></data>
@@ -2464,11 +2566,27 @@
   <data name="AccountSync.OtherTitle" xml:space="preserve"><value>Семья и гости</value><comment>Other accounts card title</comment></data>
   <data name="AccountSync.OtherHelp" xml:space="preserve"><value>Дополнительные аккаунты, которые могут входить со своих устройств.</value><comment>Other accounts card help</comment></data>
   <data name="AccountSync.PairPhoneHint" xml:space="preserve"><value>В приложении Noctis на телефоне откройте «Настройки», затем «Аккаунт». Введите этот адрес и войдите, указав email или имя пользователя и пароль.</value><comment>Pairing block help above the address and fingerprint</comment></data>
+  <data name="AccountSync.PairQrCountdown" xml:space="preserve"><value>Новый код через {0}</value><comment>Under the sign-in QR code; {0} = minutes:seconds until a new code replaces it, e.g. 1:42</comment></data>
+  <data name="AccountSync.PairQrWarning" xml:space="preserve"><value>Любой, кто отсканирует этот код, сможет войти в ваш аккаунт, поэтому показывайте его только своему телефону. Код работает один раз и меняется каждые две минуты.</value><comment>Under the sign-in QR code: who can use it and for how long</comment></data>
+  <data name="AccountSync.PairQrName" xml:space="preserve"><value>QR-код для входа</value><comment>Screen-reader name of the sign-in QR code image</comment></data>
+  <data name="Pair.Subtitle" xml:space="preserve"><value>Войдите в Noctis на телефоне за пару секунд.</value><comment>Phone app card, Connect a phone row subtitle</comment></data>
+  <data name="Pair.ModeQr" xml:space="preserve"><value>Сканировать QR-код</value><comment>Connect a phone: switch segment for the QR code way</comment></data>
+  <data name="Pair.ModeManual" xml:space="preserve"><value>Ввести вручную</value><comment>Connect a phone: switch segment for typing the address and password</comment></data>
+  <data name="Pair.QrStep1" xml:space="preserve"><value>Откройте Noctis на телефоне.</value><comment>Connect a phone, QR way, step 1</comment></data>
+  <data name="Pair.QrStep2" xml:space="preserve"><value>Откройте «Настройки» › «Аккаунт» и нажмите «Сканировать QR-код».</value><comment>Connect a phone, QR way, step 2 (names the phone app screens and button)</comment></data>
+  <data name="Pair.QrStep3" xml:space="preserve"><value>Наведите камеру на этот код.</value><comment>Connect a phone, QR way, step 3</comment></data>
+  <data name="Pair.ManualStep1" xml:space="preserve"><value>На телефоне откройте Noctis и перейдите в «Настройки» › «Аккаунт».</value><comment>Connect a phone, manual way, step 1</comment></data>
+  <data name="Pair.ManualStep2" xml:space="preserve"><value>В разделе «Ввести вручную» введите этот адрес:</value><comment>Connect a phone, manual way, step 2; the address follows below it</comment></data>
+  <data name="Pair.ManualStep3" xml:space="preserve"><value>Войдите с адресом эл. почты и паролем вашего аккаунта.</value><comment>Connect a phone, manual way, step 3</comment></data>
+  <data name="Pair.ManualStep4" xml:space="preserve"><value>Убедитесь, что телефон показывает этот код безопасности:</value><comment>Connect a phone, manual way, step 4; the security code follows below it</comment></data>
+  <data name="Pair.NewCode" xml:space="preserve"><value>Новый код</value><comment>Small link under the QR code: replace it with a new one now</comment></data>
+  <data name="Pair.QrUnavailable" xml:space="preserve"><value>Сейчас QR-код показать нельзя. Создайте аккаунт выше или выберите «Ввести вручную».</value><comment>Connect a phone, QR way, when no code can be shown</comment></data>
+  <data name="Phone.AdvancedDesc" xml:space="preserve"><value>Имя этого компьютера и доступ для других музыкальных приложений.</value><comment>Phone app card, Advanced row subtitle (folded by default)</comment></data>
   <data name="AccountSync.SignedInDevices" xml:space="preserve"><value>ВАШИ ТЕЛЕФОНЫ</value><comment>Account card list label</comment></data>
   <data name="AccountSync.NoSignedInDevices" xml:space="preserve"><value>Телефоны пока не подключены.</value><comment>Account card list empty state</comment></data>
 
   <data name="Sync.Title" xml:space="preserve"><value>Синхронизация с телефоном</value><comment>Sync card title</comment></data>
-  <data name="Sync.Description" xml:space="preserve"><value>Избранное, оценки, счётчики прослушиваний и плейлисты одинаковы на телефоне и на этом ПК.</value><comment>Sync card description</comment></data>
+  <data name="Sync.Description" xml:space="preserve"><value>Избранное, оценки, счётчики прослушиваний и плейлисты этого ПК одинаковы на телефоне и на этом ПК. Плейлисты, созданные на телефоне, остаются на телефоне.</value><comment>Sync card description</comment></data>
   <data name="Sync.DeviceName" xml:space="preserve"><value>Имя этого ПК</value><comment>Sync card row label</comment></data>
   <data name="Sync.WhatSyncs" xml:space="preserve"><value>Музыкальные файлы остаются на месте. Нужен включённый сервер Noctis.</value><comment>Sync card footnote</comment></data>
 
@@ -2508,6 +2626,10 @@
   <data name="LyricsStudio.TranscribeOnlyTip" xml:space="preserve"><value>Transcribe every song; review the words before timing</value><comment>Footer checkbox tooltip "Lullaby" is the model's name: keep it untranslated.</comment></data>
   <data name="LyricsStudio.OnlineLyrics" xml:space="preserve"><value>Искать текст в интернете, если у песни его нет</value><comment>Footer checkbox</comment></data>
   <data name="LyricsStudio.OnlineLyricsTip" xml:space="preserve"><value>Fetch words from LRCLIB; paste your own if none are found</value><comment>Footer checkbox tooltip</comment></data>
+  <data name="LyricsStudio.UseGpu" xml:space="preserve"><value>Использовать видеокарту (GPU) · Эксперимент</value><comment>Footer checkbox (only in builds with the Vulkan runtime)</comment></data>
+  <data name="LyricsStudio.UseGpuTip" xml:space="preserve"><value>Модель распознавания работает на видеокарте через Vulkan, на современной видеокарте примерно в 5 раз быстрее, чем на процессоре. Если видеокарта не справляется, Studio остаётся на процессоре. Если запуск уже прошёл на процессоре, выбор вступит в силу после перезапуска Noctis.</value><comment>Footer checkbox tooltip</comment></data>
+  <data name="LyricsStudio.GpuRestart" xml:space="preserve"><value>Перезапустите Noctis, чтобы переключиться между процессором и видеокартой.</value><comment>Note under the GPU checkbox</comment></data>
+  <data name="LyricsStudio.GpuActive" xml:space="preserve"><value>Работает на видеокарте.</value><comment>Note under the GPU checkbox</comment></data>
   <data name="LyricsStudio.DownloadModel" xml:space="preserve"><value>Скачать модель</value><comment>Footer button</comment></data>
   <data name="LyricsStudio.Start" xml:space="preserve"><value>Начать</value><comment>Footer button</comment></data>
   <data name="LyricsStudio.Stop" xml:space="preserve"><value>Остановить</value><comment>Footer button</comment></data>
@@ -2571,6 +2693,7 @@
   <data name="LyricsStudio.ShowMusicVideos" xml:space="preserve"><value>Показывать клипы</value><comment>Music videos card: the on/off toggle label</comment></data>
   <data name="LyricsStudio.RoundedCorners" xml:space="preserve"><value>Скруглённые углы</value><comment>Music videos card: rounded video corners toggle label</comment></data>
   <data name="LyricsStudio.MusicVideoAudio" xml:space="preserve"><value>Звук из видео</value><comment>Music videos card: play the clip's own audio toggle label</comment></data>
+  <data name="LyricsStudio.MusicVideoBehindLyrics" xml:space="preserve"><value>За текстом</value><comment>Music videos card: play the clip behind the lyrics toggle label</comment></data>
   <data name="LyricsStudio.ComposeEmpty" xml:space="preserve"><value>Текста пока нет. Вставьте текст или прослушайте трек.</value><comment>Lyrics box empty state</comment></data>
   <data name="LyricsStudio.ComposeCheck" xml:space="preserve"><value>Проверьте текст ниже — по одной строке на каждую спетую строку, — затем нажмите «Выровнять текст».</value><comment>Lyrics box hint when text is present</comment></data>
   <data name="LyricsStudio.TranscriptBanner" xml:space="preserve"><value>Экспериментальная расшифровка. Пение часто распознаётся плохо, поэтому исправьте слова ниже, затем нажмите «Выровнять текст», чтобы расставить тайминг.</value><comment>Lyrics box banner after a transcription</comment></data>
@@ -2674,7 +2797,6 @@
   <data name="Settings.Desc.AccountDevices" xml:space="preserve"><value>Ваш аккаунт, телефон и удалённое управление.</value><comment>Settings page description</comment></data>
   <data name="Settings.Desc.Integrations" xml:space="preserve"><value>Discord, скробблинг, TIDAL и музыкальные серверы.</value><comment>Settings page description</comment></data>
   <data name="Settings.Desc.Plugins" xml:space="preserve"><value>Дополнительные возможности для Noctis.</value><comment>Settings page description</comment></data>
-  <data name="Settings.Desc.Features" xml:space="preserve"><value>Что добавляет Noctis Plus. Включайте, выключайте и настраивайте здесь.</value><comment>Settings page description</comment></data>
   <data name="Settings.Desc.Statistics" xml:space="preserve"><value>Краткий обзор медиатеки и прослушиваний.</value><comment>Settings page description</comment></data>
   <data name="Settings.Desc.About" xml:space="preserve"><value>Версия, обновления и ссылки.</value><comment>Settings page description</comment></data>
   <data name="Settings.Section.Language" xml:space="preserve"><value>Язык</value><comment>Settings section label</comment></data>
@@ -2687,6 +2809,12 @@
   <data name="Settings.Section.Artwork" xml:space="preserve"><value>Обложки</value><comment>Settings section label</comment></data>
   <data name="Settings.HomeHeavyRotation" xml:space="preserve"><value>В активной ротации</value><comment>Appearance › Home toggle</comment></data>
   <data name="Settings.HomeHeavyRotationDesc" xml:space="preserve"><value>Показывать на главной ряд «На повторе последние две недели».</value><comment>Appearance › Home toggle description</comment></data>
+  <data name="Settings.HomeRecentAlbumsCount" xml:space="preserve"><value>Недавно прослушанные альбомы</value><comment>Appearance › Home picker</comment></data>
+  <data name="Settings.HomeRecentAlbumsCountDesc" xml:space="preserve"><value>Сколько последних прослушанных альбомов показывает ряд «Альбомы».</value><comment>Appearance › Home picker description</comment></data>
+  <data name="Settings.HomeNewAlbumsCount" xml:space="preserve"><value>Новое в медиатеке</value><comment>Appearance › Home picker</comment></data>
+  <data name="Settings.HomeNewAlbumsCountDesc" xml:space="preserve"><value>Сколько самых новых альбомов по дате добавления показывать на главной, прослушанных или нет.</value><comment>Appearance › Home picker description</comment></data>
+  <data name="Settings.HomeNewAlbumsFirst" xml:space="preserve"><value>Сначала «Новое в медиатеке»</value><comment>Appearance › Home toggle</comment></data>
+  <data name="Settings.HomeNewAlbumsFirstDesc" xml:space="preserve"><value>Показывать «Новое в медиатеке» над недавно прослушанными альбомами.</value><comment>Appearance › Home toggle description</comment></data>
   <data name="Settings.Section.Taskbar" xml:space="preserve"><value>Панель задач</value><comment>Settings section label</comment></data>
   <data name="Settings.Section.PlayerIsland" xml:space="preserve"><value>Островок плеера</value><comment>Settings section label</comment></data>
   <data name="Settings.Section.MiniPlayer" xml:space="preserve"><value>Мини-плеер</value><comment>Settings section label</comment></data>
@@ -2750,7 +2878,6 @@
   <data name="Settings.Tab.AccountDevices" xml:space="preserve"><value>Аккаунт и устройства</value><comment>Settings rail</comment></data>
   <data name="Settings.Tab.Integrations" xml:space="preserve"><value>Интеграции</value><comment>Settings rail</comment></data>
   <data name="Settings.Tab.Plugins" xml:space="preserve"><value>Плагины</value><comment>Settings rail</comment></data>
-  <data name="Settings.Tab.Features" xml:space="preserve"><value>Функции</value><comment>Settings rail</comment></data>
   <data name="Settings.Tab.Statistics" xml:space="preserve"><value>Статистика</value><comment>Settings rail</comment></data>
   <data name="Settings.Tab.About" xml:space="preserve"><value>О программе</value><comment>Settings rail</comment></data>
   <data name="Settings.Group.App" xml:space="preserve"><value>Приложение</value><comment>Settings rail</comment></data>
@@ -2769,12 +2896,16 @@
   <data name="QueueToast.PlayingNext" xml:space="preserve"><value>Будет играть следующим</value><comment>Confirmation pill above the playback island after Play Next</comment></data>
   <data name="QueueToast.SongCount" xml:space="preserve"><value>Песен: {0}</value><comment>Confirmation pill detail line when several songs were queued; {0} = count</comment></data>
   <data name="QueueToast.OneSong" xml:space="preserve"><value>1 песня</value><comment>Confirmation pill detail line for one untitled song</comment></data>
+  <data name="Handoff.Headline" xml:space="preserve"><value>Продолжить с телефона</value><comment>Pill when the desktop opens: the phone has a newer queue (Pick Up on Computer); the song title is under it</comment></data>
+  <data name="Handoff.Continue" xml:space="preserve"><value>Продолжить</value><comment>Button on the Continue from your phone pill: loads the phone's queue, paused</comment></data>
+  <data name="Handoff.Dismiss" xml:space="preserve"><value>Закрыть</value><comment>Screen-reader name of the close button on the Continue from your phone pill</comment></data>
   <data name="A11y.ScrollLeft" xml:space="preserve"><value>Прокрутить влево</value><comment>Screen-reader name of the arrow that scrolls an album page tile row left</comment></data>
   <data name="A11y.ScrollRight" xml:space="preserve"><value>Прокрутить вправо</value><comment>Screen-reader name of the arrow that scrolls an album page tile row right</comment></data>
   <data name="Menu.FetchLyrics" xml:space="preserve"><value>Найти и сохранить текст</value><comment>v2 right-click menu, Lyrics submenu</comment></data>
-  <data name="Menu.LyricsStudio" xml:space="preserve"><value>Открыть в Студии текстов…</value><comment>v2 right-click menu, Lyrics submenu</comment></data>
-  <data name="Menu.ChooseSongVideo" xml:space="preserve"><value>Выбрать видео для этой песни…</value><comment>v2 right-click menu, Lyrics Background Video submenu</comment></data>
+  <data name="Menu.LyricsStudio" xml:space="preserve"><value>Открыть в Студии текстов</value><comment>v2 right-click menu, Lyrics submenu</comment></data>
+  <data name="Menu.ChooseSongVideo" xml:space="preserve"><value>Выбрать видео для этой песни</value><comment>v2 right-click menu, Lyrics Background Video submenu</comment></data>
   <data name="Menu.StartRadio" xml:space="preserve"><value>Запустить радио</value><comment>v2 right-click menu row</comment></data>
+  <data name="Menu.CreateMix" xml:space="preserve"><value>Создать микс из этой песни</value><comment>Song right-click menu, beside Start Radio</comment></data>
   <data name="Menu.Snooze" xml:space="preserve"><value>Отложить на месяц</value><comment>v2 right-click menu row: hide the song from suggestions for a month</comment></data>
   <data name="Menu.Badge" xml:space="preserve"><value>Значок</value><comment>v2 right-click menu submenu (colored song badges)</comment></data>
   <data name="Menu.NewBadge" xml:space="preserve"><value>Новый значок…</value><comment>v2 right-click menu, Badge submenu</comment></data>
@@ -2846,6 +2977,229 @@
   <data name="Shortcuts.Action.GoSongs" xml:space="preserve"><value>Перейти к песням</value><comment>Settings › Shortcuts (GitHub #131)</comment></data>
   <data name="Shortcuts.Action.GoAlbums" xml:space="preserve"><value>Перейти к альбомам</value><comment>Settings › Shortcuts (GitHub #131)</comment></data>
   <data name="Shortcuts.Action.GoArtists" xml:space="preserve"><value>Перейти к исполнителям</value><comment>Settings › Shortcuts (GitHub #131)</comment></data>
+  <data name="ArtistDetail.SearchArtistInfo" xml:space="preserve">
+    <value>Найти данные об исполнителе</value>
+    <comment>Header in ArtistDetailView.axaml (GitHub #141)</comment>
+  </data>
+  <data name="ArtistDetail.UseAutomaticArtistInfo" xml:space="preserve">
+    <value>Автоматические данные об исполнителе</value>
+    <comment>Header in ArtistDetailView.axaml: forget the manual pick (GitHub #141)</comment>
+  </data>
+  <data name="ArtistInfoSearch.Title" xml:space="preserve">
+    <value>Найти данные об исполнителе</value>
+    <comment>ArtistInfoSearchDialog.axaml title</comment>
+  </data>
+  <data name="ArtistInfoSearch.Subtitle" xml:space="preserve">
+    <value>Выберите нужного исполнителя. Фото, поклонники и раздел «Об исполнителе» следуют вашему выбору.</value>
+    <comment>ArtistInfoSearchDialog.axaml subtitle</comment>
+  </data>
+  <data name="ArtistInfoSearch.Searching" xml:space="preserve">
+    <value>Поиск…</value>
+    <comment>Status in ArtistInfoSearchDialog.axaml</comment>
+  </data>
+  <data name="ArtistInfoSearch.NothingFound" xml:space="preserve">
+    <value>Исполнители не найдены.</value>
+    <comment>Status in ArtistInfoSearchDialog.axaml</comment>
+  </data>
+  <data name="ArtistInfoSearch.Failed" xml:space="preserve">
+    <value>Ошибка поиска: {0}</value>
+    <comment>Status in ArtistInfoSearchDialog.axaml; {0} = error message</comment>
+  </data>
+  <data name="ArtistInfoSearch.Applying" xml:space="preserve">
+    <value>Сохранение…</value>
+    <comment>Status in ArtistInfoSearchDialog.axaml while the pick is saved</comment>
+  </data>
+  <data name="ArtistInfoSearch.AlbumsCount" xml:space="preserve">
+    <value>Альбомов: {0}</value>
+    <comment>Row detail in ArtistInfoSearchDialog.axaml; {0} = Deezer album count</comment>
+  </data>
+  <data name="ArtistInfoSearch.OneAlbum" xml:space="preserve">
+    <value>1 альбом</value>
+    <comment>Row detail in ArtistInfoSearchDialog.axaml for an account with exactly one album (AlbumsCount otherwise)</comment>
+  </data>
+  <data name="ArtistInfoSearch.OneFan" xml:space="preserve">
+    <value>1 поклонник</value>
+    <comment>Row detail in ArtistInfoSearchDialog.axaml for an account with exactly one fan (ArtistDetail.FansCount otherwise)</comment>
+  </data>
+  <data name="ArtistInfoSearch.Current" xml:space="preserve">
+    <value>Текущий</value>
+    <comment>Badge on the row the artist is pinned to</comment>
+  </data>
+  <data name="ArtistInfoSearch.Use" xml:space="preserve">
+    <value>Выбрать</value>
+    <comment>Primary button in ArtistInfoSearchDialog.axaml</comment>
+  </data>
+  <data name="Repeat.OffTip" xml:space="preserve"><value>Повтор: выкл.</value><comment>Tooltip/name of the Repeat buttons while Repeat is off (GitHub #144)</comment></data>
+  <data name="Repeat.AllTip" xml:space="preserve"><value>Повтор всех: очередь по кругу</value><comment>Tooltip/name of the Repeat buttons in Repeat All: the queue loops forever (GitHub #144)</comment></data>
+  <data name="Repeat.OneTip" xml:space="preserve"><value>Повтор одной: эта песня по кругу</value><comment>Tooltip/name of the Repeat buttons in Repeat One: the playing song loops forever (GitHub #144)</comment></data>
+  <data name="Queue.ShowPlayedTip" xml:space="preserve"><value>Показать прослушанные песни</value><comment>Queue popup header History button tooltip in MainWindow.axaml: toggles Keep Played Songs (played songs above Now Playing)</comment></data>
+  <data name="Settings.AppIcon" xml:space="preserve"><value>Значок приложения</value><comment>Title of the App Icon card in Settings &gt; Appearance (SettingsView.axaml)</comment></data>
+  <data name="Settings.AppIconDesc" xml:space="preserve"><value>Сразу меняет значок в заголовке окна, на панели задач и в трее. Ярлык на рабочем столе и .exe сохраняют классический значок.</value><comment>Subtitle of the App Icon card in Settings &gt; Appearance: the pick applies live to windows/taskbar/tray; the exe icon cannot change</comment></data>
+  <data name="Settings.AppIcon.Classic" xml:space="preserve"><value>Классический</value><comment>Name of an alternate app icon tile in Settings &gt; Appearance &gt; App Icon</comment></data>
+  <data name="Settings.AppIcon.Light" xml:space="preserve"><value>Светлый</value><comment>Name of an alternate app icon tile in Settings &gt; Appearance &gt; App Icon</comment></data>
+  <data name="Settings.AppIcon.Dark" xml:space="preserve"><value>Тёмный</value><comment>Name of an alternate app icon tile in Settings &gt; Appearance &gt; App Icon</comment></data>
+  <data name="Settings.AppIcon.Blush" xml:space="preserve"><value>Румянец</value><comment>Name of an alternate app icon tile in Settings &gt; Appearance &gt; App Icon</comment></data>
+  <data name="Settings.AppIcon.Sky" xml:space="preserve"><value>Небо</value><comment>Name of an alternate app icon tile in Settings &gt; Appearance &gt; App Icon</comment></data>
+  <data name="Settings.AppIcon.Sunset" xml:space="preserve"><value>Закат</value><comment>Name of an alternate app icon tile in Settings &gt; Appearance &gt; App Icon</comment></data>
+  <data name="Settings.AppIcon.Violet" xml:space="preserve"><value>Фиалка</value><comment>Name of an alternate app icon tile in Settings &gt; Appearance &gt; App Icon</comment></data>
+  <data name="Settings.AppIcon.Aurora" xml:space="preserve"><value>Аврора</value><comment>Name of an alternate app icon tile in Settings &gt; Appearance &gt; App Icon</comment></data>
+  <data name="Settings.AppIcon.Midnight" xml:space="preserve"><value>Полночь</value><comment>Name of an alternate app icon tile in Settings &gt; Appearance &gt; App Icon</comment></data>
+  <data name="Settings.AppIcon.Ruby" xml:space="preserve"><value>Рубин</value><comment>Name of an alternate app icon tile in Settings &gt; Appearance &gt; App Icon</comment></data>
+  <data name="Settings.MonoAudio" xml:space="preserve"><value>Моно</value><comment>Text in SettingsView.axaml</comment></data>
+  <data name="Settings.MonoAudioDesc" xml:space="preserve"><value>Левый и правый каналы звучат вместе в обоих ушах. Для тех, кто слышит одним ухом или слушает с одним наушником.</value><comment>Text in SettingsView.axaml</comment></data>
+  <data name="Settings.Balance" xml:space="preserve"><value>Баланс</value><comment>Text in SettingsView.axaml</comment></data>
+  <data name="Settings.BalanceDesc" xml:space="preserve"><value>Смещает звук к левому или правому уху. Притягивается к центру.</value><comment>Text in SettingsView.axaml</comment></data>
+  <data name="Settings.BalanceCenter" xml:space="preserve"><value>Центр</value><comment>Text in SettingsView.axaml</comment></data>
+  <data name="Settings.BalanceLeftFormat" xml:space="preserve"><value>Л {0}</value><comment>Text in SettingsView.axaml</comment></data>
+  <data name="Settings.BalanceRightFormat" xml:space="preserve"><value>П {0}</value><comment>Text in SettingsView.axaml</comment></data>
+  <data name="Settings.ChannelMixExclusiveNote" xml:space="preserve"><value>Не действует в монопольном режиме: он воспроизводит файлы без изменений.</value><comment>Text in SettingsView.axaml</comment></data>
+  <data name="Settings.ChannelMixUnavailableNote" xml:space="preserve"><value>Недоступно для текущего вывода звука. Перезапустите Noctis, чтобы вернуть.</value><comment>Text in SettingsView.axaml</comment></data>
+  <data name="Settings.SleepTimerFadeOut" xml:space="preserve"><value>Затухание таймера сна</value><comment>Text in SettingsView.axaml</comment></data>
+  <data name="Settings.SleepTimerFadeOutDesc" xml:space="preserve"><value>Музыка плавно затихает в последние секунды таймера сна и в конце трека при «Остановить после текущего трека». Громкость не меняется.</value><comment>Text in SettingsView.axaml</comment></data>
+  <data name="Settings.SleepFadeOff" xml:space="preserve"><value>Выкл.</value><comment>Text in SettingsView.axaml</comment></data>
+  <data name="Settings.SleepFade10" xml:space="preserve"><value>10 с</value><comment>Text in SettingsView.axaml</comment></data>
+  <data name="Settings.SleepFade30" xml:space="preserve"><value>30 с</value><comment>Text in SettingsView.axaml</comment></data>
+  <data name="Settings.SleepFade60" xml:space="preserve"><value>60 с</value><comment>Text in SettingsView.axaml</comment></data>
+  <data name="Settings.ExclusiveModePaused" xml:space="preserve"><value>Монопольный режим приостановлен: не удалось открыть устройство. Он попробует снова при следующем запуске или если выключить и снова включить его.</value><comment>Text in SettingsView.axaml</comment></data>
+  <data name="Settings.Section.Queue" xml:space="preserve"><value>Очередь</value><comment>Settings section label</comment></data>
+  <data name="Settings.QueueRows" xml:space="preserve"><value>Строки очереди</value><comment>Text in SettingsView.axaml</comment></data>
+  <data name="Settings.QueueRowsHint" xml:space="preserve"><value>Что показывает каждая песня в очереди. В строку можно добавить второе поле через точку.</value><comment>Text in SettingsView.axaml</comment></data>
+  <data name="Settings.QueueFirstLine" xml:space="preserve"><value>Первая строка</value><comment>Text in SettingsView.axaml</comment></data>
+  <data name="Settings.QueueFirstLineExtra" xml:space="preserve"><value>Первая строка, добавленное поле</value><comment>Accessible name of a picker in SettingsView.axaml</comment></data>
+  <data name="Settings.QueueSecondLine" xml:space="preserve"><value>Вторая строка</value><comment>Text in SettingsView.axaml</comment></data>
+  <data name="Settings.QueueSecondLineExtra" xml:space="preserve"><value>Вторая строка, добавленное поле</value><comment>Accessible name of a picker in SettingsView.axaml</comment></data>
+  <data name="Settings.QueueRightSide" xml:space="preserve"><value>Справа</value><comment>Text in SettingsView.axaml</comment></data>
+  <data name="Settings.QueueWidth" xml:space="preserve"><value>Ширина очереди</value><comment>Text in SettingsView.axaml</comment></data>
+  <data name="Settings.QueueWidthHint" xml:space="preserve"><value>Насколько широкой открывается очередь. Можно также потянуть её левый край. Двойной щелчок по ползунку или краю сбрасывает.</value><comment>Text in SettingsView.axaml</comment></data>
+  <data name="Settings.QueueField.None" xml:space="preserve"><value>Нет</value><comment>Queue row field choice (SettingsViewModel)</comment></data>
+  <data name="Settings.QueueField.Title" xml:space="preserve"><value>Название</value><comment>Queue row field choice (SettingsViewModel)</comment></data>
+  <data name="Settings.QueueField.Artist" xml:space="preserve"><value>Исполнитель</value><comment>Queue row field choice (SettingsViewModel)</comment></data>
+  <data name="Settings.QueueField.Album" xml:space="preserve"><value>Альбом</value><comment>Queue row field choice (SettingsViewModel)</comment></data>
+  <data name="Settings.QueueField.AlbumArtist" xml:space="preserve"><value>Исполнитель альбома</value><comment>Queue row field choice (SettingsViewModel)</comment></data>
+  <data name="Settings.QueueField.Composer" xml:space="preserve"><value>Композитор</value><comment>Queue row field choice (SettingsViewModel)</comment></data>
+  <data name="Settings.QueueField.Genre" xml:space="preserve"><value>Жанр</value><comment>Queue row field choice (SettingsViewModel)</comment></data>
+  <data name="Settings.QueueField.Year" xml:space="preserve"><value>Год</value><comment>Queue row field choice (SettingsViewModel)</comment></data>
+  <data name="Settings.QueueField.Duration" xml:space="preserve"><value>Длительность</value><comment>Queue row field choice (SettingsViewModel)</comment></data>
+  <data name="Settings.QueueField.Format" xml:space="preserve"><value>Формат</value><comment>Queue row field choice (SettingsViewModel)</comment></data>
+  <data name="Settings.QueueSide.Position" xml:space="preserve"><value>Номер в очереди</value><comment>Queue row right-side choice (SettingsViewModel)</comment></data>
+  <data name="Settings.QueueSide.Duration" xml:space="preserve"><value>Длительность</value><comment>Queue row right-side choice (SettingsViewModel)</comment></data>
+  <data name="Settings.QueueSide.None" xml:space="preserve"><value>Ничего</value><comment>Queue row right-side choice (SettingsViewModel)</comment></data>
+  <data name="AlbumCarousel.Name" xml:space="preserve"><value>Карусель альбомов</value><comment>Album carousel (GitHub #149): screen reader name</comment></data>
+  <data name="AlbumCarousel.Counter" xml:space="preserve"><value>{0} из {1}</value><comment>Album carousel: position under the centred album</comment></data>
+  <data name="Main.AlbumView" xml:space="preserve"><value>Вид</value><comment>Albums page top-right view menu tooltip</comment></data>
+  <data name="Main.AlbumGrid" xml:space="preserve"><value>Сетка</value><comment>Albums view menu: tile grid</comment></data>
+  <data name="Main.AlbumCarousel" xml:space="preserve"><value>Карусель</value><comment>Albums view menu: album carousel</comment></data>
+  <data name="Main.NowPlayingCoverFlow" xml:space="preserve"><value>Cover Flow: сейчас играет</value><comment>Albums view menu: opens the queue-driven Cover Flow page (GitHub #164)</comment></data>
+  <data name="Main.ViewList" xml:space="preserve"><value>Список</value><comment>Artists view menu: list rows</comment></data>
+  <data name="Main.CarouselCover" xml:space="preserve"><value>Обложка</value><comment>Albums view menu: carousel case style, plain cover</comment></data>
+  <data name="Main.CarouselJewelCase" xml:space="preserve"><value>Коробка CD</value><comment>Albums view menu: carousel case style</comment></data>
+  <data name="Main.CarouselVinyl" xml:space="preserve"><value>Винил</value><comment>Albums view menu: carousel case style</comment></data>
+  <data name="Main.CarouselCassette" xml:space="preserve"><value>Кассета</value><comment>Albums view menu: carousel case style</comment></data>
+  <data name="ArtistDetail.ShowCarousel" xml:space="preserve"><value>Показать каруселью</value><comment>Artist page Albums tab view toggle tooltip</comment></data>
+  <data name="ArtistDetail.ShowGrid" xml:space="preserve"><value>Показать сеткой</value><comment>Artist page Albums tab view toggle tooltip</comment></data>
+  <data name="LibrarySongs.Composer" xml:space="preserve"><value>Композитор</value><comment>Songs list column header (GitHub #151)</comment></data>
+  <data name="LibrarySongs.Format" xml:space="preserve"><value>Формат</value><comment>Songs list column header: short codec name (GitHub #151)</comment></data>
+  <data name="Columns.Reset" xml:space="preserve"><value>Сбросить столбцы</value><comment>List header right-click menu: column order and widths back to default (GitHub #151)</comment></data>
+  <data name="Columns.ResizeName" xml:space="preserve"><value>Изменить ширину столбца «{0}»</value><comment>Screen-reader name of a column divider; {0} is the column name (GitHub #151)</comment></data>
+  <data name="LibrarySongs.ReplayGain" xml:space="preserve"><value>ReplayGain</value><comment>Songs list column header, View Options and Sort menu: the file's ReplayGain track gain (GitHub #151)</comment></data>
+  <data name="Settings.PlayCountImport.Title" xml:space="preserve"><value>Импорт числа прослушиваний</value><comment>Settings › Integrations, under Last.fm / ListenBrainz (GitHub #160)</comment></data>
+  <data name="Settings.PlayCountImport.Line" xml:space="preserve"><value>Перенести число прослушиваний в Noctis. Ничего не отправляется обратно.</value><comment>Settings › Integrations: what Import Play Counts does</comment></data>
+  <data name="Settings.PlayCountImport.Button" xml:space="preserve"><value>Импорт</value><comment>Settings › Integrations: starts the play count import</comment></data>
+  <data name="Settings.PlayCountImport.Cancel" xml:space="preserve"><value>Отмена</value><comment>Settings › Integrations: stops a running play count import</comment></data>
+  <data name="Settings.PlayCountImport.ModeName" xml:space="preserve"><value>Если счётчики различаются</value><comment>Screen-reader name of the play count import mode list</comment></data>
+  <data name="Settings.PlayCountImport.Mode.KeepHigher" xml:space="preserve"><value>Оставить большее число</value><comment>Play count import mode (default): the higher of Noctis's and the imported count</comment></data>
+  <data name="Settings.PlayCountImport.Mode.Replace" xml:space="preserve"><value>Взять импортированное число</value><comment>Play count import mode: overwrite Noctis's count, even when lower</comment></data>
+  <data name="Settings.PlayCountImport.Starting" xml:space="preserve"><value>Запуск…</value><comment>Play count import status</comment></data>
+  <data name="Settings.PlayCountImport.Reading" xml:space="preserve"><value>Чтение истории прослушиваний… {0}</value><comment>Play count import progress; {0} = plays read so far</comment></data>
+  <data name="Settings.PlayCountImport.ReadingOf" xml:space="preserve"><value>Чтение истории прослушиваний… {0} из {1}</value><comment>Play count import progress; {0} = plays read, {1} = total</comment></data>
+  <data name="Settings.PlayCountImport.Matching" xml:space="preserve"><value>Сопоставление с песнями в медиатеке…</value><comment>Play count import status</comment></data>
+  <data name="Settings.PlayCountImport.Done" xml:space="preserve"><value>Готово. Обновлено песен: {0} · найдено: {1} · нет в медиатеке: {2}</value><comment>Play count import summary; {0} songs changed, {1} matched song entries, {2} entries with no library song</comment></data>
+  <data name="Settings.PlayCountImport.Cancelled" xml:space="preserve"><value>Импорт отменён. Ничего не изменено.</value><comment>Play count import status</comment></data>
+  <data name="Settings.PlayCountImport.NotConnected" xml:space="preserve"><value>Сначала подключите {0}.</value><comment>Play count import error; {0} = Last.fm or ListenBrainz</comment></data>
+  <data name="Settings.PlayCountImport.Error.UserNotFound" xml:space="preserve"><value>{0} не знает этот аккаунт.</value><comment>Play count import error; {0} = Last.fm or ListenBrainz</comment></data>
+  <data name="Settings.PlayCountImport.Error.PrivateHistory" xml:space="preserve"><value>История прослушиваний {0} скрыта.</value><comment>Play count import error; {0} = Last.fm or ListenBrainz</comment></data>
+  <data name="Settings.PlayCountImport.Error.Unreachable" xml:space="preserve"><value>Не удалось связаться с {0}. Попробуйте позже.</value><comment>Play count import error; {0} = Last.fm or ListenBrainz</comment></data>
+  <data name="Settings.PlayCountImport.Error.BadReply" xml:space="preserve"><value>{0} прислал непонятный ответ. Попробуйте позже.</value><comment>Play count import error; {0} = Last.fm or ListenBrainz</comment></data>
+  <data name="Features.Section" xml:space="preserve"><value>Встроенные функции</value></data>
+  <data name="Features.SectionLine" xml:space="preserve"><value>Часть Noctis, включены с самого начала — как плагины, которые можно отключить. После повторного включения всё возвращается как было.</value></data>
+  <data name="Features.MiniPlayer.Title" xml:space="preserve"><value>Мини-плеер</value></data>
+  <data name="Features.MiniPlayer.Line" xml:space="preserve"><value>Маленький плеер поверх окон: его кнопка, щелчок по обложке и сочетание клавиш.</value></data>
+  <data name="Features.AnimatedArtwork.Title" xml:space="preserve"><value>Анимированные обложки</value></data>
+  <data name="Features.AnimatedArtwork.Line" xml:space="preserve"><value>Движущиеся обложки на экранах «Сейчас играет», текста и альбома.</value></data>
+  <data name="Features.AlbumCarousel.Title" xml:space="preserve"><value>Карусель альбомов</value></data>
+  <data name="Features.AlbumCarousel.Line" xml:space="preserve"><value>Листайте альбомы по одному: обложки, коробки CD, винил или кассеты.</value></data>
+  <data name="Features.Visualizer.Title" xml:space="preserve"><value>Визуализатор</value></data>
+  <data name="Features.Visualizer.Line" xml:space="preserve"><value>Страница визуализатора и спектр за текстом песни.</value></data>
+  <data name="Features.NewBadge.Title" xml:space="preserve"><value>Значок NEW</value></data>
+  <data name="Features.NewBadge.Line" xml:space="preserve"><value>Отмечает песни, добавленные в плейлист за последние 7 дней.</value></data>
+  <data name="Features.Inbox.Title" xml:space="preserve"><value>Входящие для новой музыки</value></data>
+  <data name="Features.Inbox.Line" xml:space="preserve"><value>Новые песни ждут во «Входящих», пока вы не добавите их в медиатеку.</value></data>
+  <data name="Features.Discord.Title" xml:space="preserve"><value>Статус в Discord</value></data>
+  <data name="Features.Discord.Line" xml:space="preserve"><value>Показывать в профиле Discord, что вы слушаете.</value></data>
+  <data name="Features.Scrobbling.Title" xml:space="preserve"><value>Скробблинг</value></data>
+  <data name="Features.Scrobbling.Line" xml:space="preserve"><value>Отправлять прослушивания в Last.fm и ListenBrainz.</value></data>
+  <data name="Features.Scrobbling.NeedsAccount" xml:space="preserve"><value>Сначала подключите Last.fm или ListenBrainz в разделе «Интеграции».</value></data>
+  <data name="Features.PlaylistSideRail.Title" xml:space="preserve"><value>Исполнители и рекомендации</value></data>
+  <data name="Features.PlaylistSideRail.Line" xml:space="preserve"><value>Панель справа в плейлисте с его исполнителями и предложенными песнями.</value></data>
+  <data name="Settings.PlaylistSideRail" xml:space="preserve"><value>Исполнители и рекомендации</value></data>
+  <data name="Settings.PlaylistSideRailHint" xml:space="preserve"><value>Показывать справа панель с исполнителями плейлиста и предложенными песнями.</value></data>
+  <data name="Playlist.HideSideRail" xml:space="preserve"><value>Скрыть исполнителей и рекомендации</value></data>
+  <data name="Playlist.ShowSideRail" xml:space="preserve"><value>Показать исполнителей и рекомендации</value></data>
+  <data name="LibraryPlaylists.ImportFromStreaming" xml:space="preserve"><value>Импорт из Spotify или Deezer</value><comment>Text in LibraryPlaylistsView.axaml</comment></data>
+  <data name="LibraryPlaylists.ImportPitch" xml:space="preserve"><value>Автоматически сопоставляются с вашими песнями</value><comment>Text in LibraryPlaylistsView.axaml</comment></data>
+  <data name="LibraryPlaylists.PlaylistFilesToo" xml:space="preserve"><value>Файлы .m3u и .m3u8 тоже подходят</value><comment>Text in LibraryPlaylistsView.axaml</comment></data>
+  <data name="Home.WelcomeTitle" xml:space="preserve"><value>Наполним вашу медиатеку</value><comment>Text in HomeView.axaml</comment></data>
+  <data name="Home.WelcomeLine" xml:space="preserve"><value>Найдите любую песню или добавьте свою музыку</value><comment>Text in HomeView.axaml</comment></data>
+  <data name="Home.FindMusic" xml:space="preserve"><value>Найти музыку</value><comment>Text in HomeView.axaml</comment></data>
+  <data name="Home.ImportPlaylists" xml:space="preserve"><value>Импорт плейлистов</value><comment>Text in HomeView.axaml</comment></data>
+  <data name="Home.ConnectTelegram" xml:space="preserve"><value>Подключить Telegram</value><comment>Text in HomeView.axaml</comment></data>
+  <data name="Home.SetUpWordLyrics" xml:space="preserve"><value>Текст по словам · 1,3 ГБ</value><comment>Text in HomeView.axaml</comment></data>
+  <data name="Lyrics.Sync" xml:space="preserve"><value>Синхронизировать</value><comment>Pill that brings the lyrics back to the current line</comment></data>
+  <data name="Lyrics.OnlineTimingCredit" xml:space="preserve"><value>Тайминг слов: {0}</value><comment>Lyrics page credit under a song's automatic online word timing; {0} = lrc.red, Unison or Kugou</comment></data>
+  <data name="Lyrics.TimeWithWordLyrics" xml:space="preserve"><value>Time with WordLyrics</value><comment>Lyrics credit menu: times this song with WordLyrics now (the online timing stays until it is done)</comment></data>
+  <data name="Lyrics.FindOnlineTiming" xml:space="preserve"><value>Find online word timing</value><comment>Lyrics credit menu under WordLyrics' timing: looks the song up on lrc.red, Unison and Kugou; found = shown, WordLyrics' stays a choice</comment></data>
+  <data name="Lyrics.TimeWithWordLyricsAfterDownload" xml:space="preserve"><value>Time with WordLyrics once downloaded</value><comment>Lyrics credit menu while the song still downloads: WordLyrics starts by itself when it is whole</comment></data>
+  <data name="Lyrics.WaitingForDownload" xml:space="preserve"><value>Waiting for the download · {0}%</value><comment>Word timing pill: WordLyrics starts when the song has downloaded; {0} = percent downloaded</comment></data>
+  <data name="Metadata.AlbumNameAppleMusic" xml:space="preserve"><value>Название альбома или URL Apple Music</value><comment>Watermark in MetadataWindow.axaml</comment></data>
+  <data name="Metadata.TypeAlbumNamePress" xml:space="preserve"><value>введите название альбома и нажмите Enter или вставьте ссылку Apple Music</value><comment>Text in MetadataWindow.axaml</comment></data>
+  <data name="Playlist.SaveFound" xml:space="preserve"><value>Сохранить</value><comment>Save button on a found playlist (PlaylistView.axaml)</comment></data>
+  <data name="Playlist.SaveFoundTip" xml:space="preserve"><value>Добавить в ваши плейлисты</value><comment>ToolTip.Tip in PlaylistView.axaml</comment></data>
+  <data name="Main.AddFromYouTube" xml:space="preserve"><value>Добавить с YouTube</value><comment>New/Add menu item</comment></data>
+  <data name="Main.AddFromYouTubeHint" xml:space="preserve"><value>Найдите или вставьте ссылку — загрузка в вашу медиатеку</value><comment>New/Add menu item subtitle</comment></data>
+  <data name="YouTube.Title" xml:space="preserve"><value>Добавить с YouTube</value><comment>Dialog title</comment></data>
+  <data name="YouTube.Subtitle" xml:space="preserve"><value>Найдите или вставьте ссылку. Сохраняется в медиатеку вместе с обложкой.</value><comment>Dialog subtitle</comment></data>
+  <data name="YouTube.SearchHint" xml:space="preserve"><value>Найдите или вставьте ссылку</value><comment>Search box watermark</comment></data>
+  <data name="YouTube.Search" xml:space="preserve"><value>Найти</value><comment>Search button</comment></data>
+  <data name="YouTube.SetupTitle" xml:space="preserve"><value>Однократная настройка</value><comment>First-run card title</comment></data>
+  <data name="YouTube.SetupBody" xml:space="preserve"><value>Для загрузки нужен yt-dlp. Noctis установит его один раз и будет обновлять.</value><comment>First-run card body</comment></data>
+  <data name="YouTube.Install" xml:space="preserve"><value>Установить yt-dlp</value><comment>First-run card button</comment></data>
+  <data name="YouTube.Download" xml:space="preserve"><value>Скачать</value><comment>Per-result button</comment></data>
+  <data name="YouTube.SavesTo" xml:space="preserve"><value>Сохраняется в</value><comment>Footer label before the folder</comment></data>
+  <data name="YouTube.EmptyHint" xml:space="preserve"><value>Найдите песню и скачайте её в свою медиатеку.</value><comment>Empty state</comment></data>
+  <data name="YouTube.Close" xml:space="preserve"><value>Закрыть</value><comment>Secondary button</comment></data>
+  <data name="YouTube.Status.NoFolder" xml:space="preserve"><value>Сначала добавьте папку с музыкой в «Настройки → Медиатека».</value><comment>Footer status: no library folder to save into</comment></data>
+  <data name="YouTube.Status.InstallingTool" xml:space="preserve"><value>Загрузка yt-dlp…</value><comment>Footer status while yt-dlp installs</comment></data>
+  <data name="YouTube.Status.Ready" xml:space="preserve"><value>yt-dlp готов.</value><comment>Footer status after yt-dlp installed</comment></data>
+  <data name="YouTube.Status.InstallFailed" xml:space="preserve"><value>Не удалось установить yt-dlp — {0}</value><comment>Footer status; {0} = error message</comment></data>
+  <data name="YouTube.Status.InstallFirst" xml:space="preserve"><value>Сначала установите yt-dlp.</value><comment>Footer status: search pressed before setup</comment></data>
+  <data name="YouTube.Status.ReadingLink" xml:space="preserve"><value>Чтение ссылки…</value><comment>Footer status while a pasted link resolves</comment></data>
+  <data name="YouTube.Status.Searching" xml:space="preserve"><value>Поиск…</value><comment>Footer status while searching</comment></data>
+  <data name="YouTube.Status.NothingFound" xml:space="preserve"><value>Ничего не найдено.</value><comment>Footer status: search returned no results</comment></data>
+  <data name="YouTube.Status.SearchFailed" xml:space="preserve"><value>Ошибка поиска — {0}</value><comment>Footer status; {0} = error message</comment></data>
+  <data name="YouTube.Row.Starting" xml:space="preserve"><value>Запуск…</value><comment>Result card status when a download begins</comment></data>
+  <data name="YouTube.Row.InLibrary" xml:space="preserve"><value>В вашей медиатеке</value><comment>Result card status after the download was imported</comment></data>
+  <data name="YouTube.Row.SavedToFolder" xml:space="preserve"><value>Сохранено в папку</value><comment>Result card status: saved but not imported</comment></data>
+  <data name="YouTubeSettings.Section" xml:space="preserve"><value>ЗАГРУЗКИ С YOUTUBE</value><comment>Library tab section title</comment></data>
+  <data name="YouTubeSettings.Title" xml:space="preserve"><value>Добавление песен с YouTube</value><comment>Card title</comment></data>
+  <data name="YouTubeSettings.Description" xml:space="preserve"><value>Найдите или вставьте ссылку для загрузки.</value><comment>Card description</comment></data>
+  <data name="YouTubeSettings.Open" xml:space="preserve"><value>Открыть загрузчик</value><comment>Card button</comment></data>
+  <data name="YouTubeSettings.Folder" xml:space="preserve"><value>Папка загрузок</value><comment>Row label</comment></data>
+  <data name="YouTubeSettings.FolderHint" xml:space="preserve"><value>Если пусто, используется папка «YouTube» внутри вашей первой папки с музыкой.</value><comment>Row help</comment></data>
+  <data name="YouTubeSettings.Tool" xml:space="preserve"><value>yt-dlp</value><comment>Row label</comment></data>
+  <data name="YouTubeSettings.InstallUpdate" xml:space="preserve"><value>Установить / обновить</value><comment>Row button</comment></data>
+  <data name="YouTubeSettings.ToolPathHint" xml:space="preserve"><value>Свой путь к yt-dlp (необязательно)</value><comment>Path watermark</comment></data>
+  <data name="Settings.Desc.Features" xml:space="preserve"><value>Что добавляет Noctis Plus. Включайте, выключайте и настраивайте здесь.</value><comment>Settings page description</comment></data>
+  <data name="Settings.Tab.Features" xml:space="preserve"><value>Функции</value><comment>Settings rail</comment></data>
   <data name="Lyrics.WordTiming" xml:space="preserve"><value>Word timing</value></data>
   <data name="Queue.ForYou" xml:space="preserve"><value>For you</value></data>
   <data name="Queue.ForYouTip" xml:space="preserve"><value>Mix from your listening history</value></data>

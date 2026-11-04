@@ -11,7 +11,7 @@ public class LastFmService : ILastFmService
 {
     // Last.fm API credentials — register at https://www.last.fm/api/account/create
     private const string ApiKey = LastFmApi.ApiKey;
-    private const string ApiSecret = "ebf114b9e7d31e24c493bc55dac2184e";
+    private const string ApiSecret = LastFmApi.ApiSecret;
     private const string ApiBase = LastFmApi.ApiBase;
     private const string AuthBase = "https://www.last.fm/api/auth/";
 
@@ -184,6 +184,8 @@ public class LastFmService : ILastFmService
     /// <summary>Raised when a scrobble could not be delivered. Carries a display message.</summary>
     public event EventHandler<string>? ScrobbleFailed;
 
+    public event EventHandler<string>? UsernameResolved;
+
     /// <summary>Raised when Last.fm reports the stored session key is no longer valid.</summary>
     public event EventHandler? SessionExpired;
 
@@ -239,6 +241,8 @@ public class LastFmService : ILastFmService
     {
         return _albumDescriptions.SetOverrideAsync(artistName, albumName, description, ct);
     }
+
+    public Task ClearAlbumDescriptionsAsync() => _albumDescriptions.ClearAsync();
 
     public Task ClearAlbumDescriptionOverrideAsync(string artistName, string albumName, CancellationToken ct = default)
     {

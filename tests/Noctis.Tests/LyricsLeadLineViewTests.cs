@@ -137,7 +137,13 @@ public class LyricsLeadLineViewTests
         Assert.False(incoming.IsLeading);
         Assert.True(incoming.LineOpacity < 1);
         Assert.Equal(1, current.LineOpacity);
-        Assert.Empty(view.GetVisualDescendants().OfType<KaraokeWordText>());
+        // The long-document resting control keeps a zero-sized font measurer; it never paints words.
+        var stock = view.GetVisualDescendants().OfType<KaraokeWordText>().ToList();
+        Assert.All(stock, w =>
+        {
+            Assert.NotNull(w.FindAncestorOfType<KaraokeRestingWords>());
+            Assert.Equal(default(Size), w.Bounds.Size);
+        });
         var cells = view.GetVisualDescendants().OfType<MotionWordCell>().ToList();
         Assert.NotEmpty(cells);
         Assert.All(cells, c => Assert.NotNull(c.Word));

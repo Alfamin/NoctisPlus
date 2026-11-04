@@ -17,7 +17,7 @@ and True Shuffle built into the app.
 &nbsp;
 [![License](https://img.shields.io/badge/License-MIT-2EA043?style=for-the-badge&labelColor=2B2B2B)](LICENSE)
 &nbsp;
-[![Based on Noctis](https://img.shields.io/badge/Based%20on-Noctis%201.6.5-E74856?style=for-the-badge&labelColor=2B2B2B)](https://github.com/heartached/Noctis)
+[![Based on Noctis](https://img.shields.io/badge/Based%20on-Noctis%201.6.7-E74856?style=for-the-badge&labelColor=2B2B2B)](https://github.com/heartached/Noctis)
 
 <br/>
 
@@ -160,7 +160,7 @@ These started out as add-on plugins. Since **2.0** they're part of the app itsel
 
 ## 📋 Every difference from Noctis
 
-On top of Noctis 1.6.5, biggest first.
+On top of Noctis 1.6.7, biggest first.
 
 <details>
 <summary><b>Show all 179 changes</b></summary>
@@ -336,7 +336,7 @@ On top of Noctis 1.6.5, biggest first.
 149. What's new shows every update you missed, biggest changes first
 150. Every update's notes in Settings > About
 151. New text translated into all 10 Noctis languages
-152. The mini player and About page say Noctis Plus, and credit Noctis 1.6.5 and heartached
+152. The mini player and About page say Noctis Plus, and credit Noctis 1.6.7 and heartached
 153. Screen-reader names on many more buttons
 
 #### 📦 Install and updates
@@ -507,7 +507,7 @@ Options and client notes are in [docs/SELF-HOSTING.md](docs/SELF-HOSTING.md).
 - [x] Listening stats with a monthly and yearly Wrap
 - [x] Artist pages with Top Songs, About, Similar Artists and fan counts from Deezer
 - [x] Playlist and album import from TIDAL and Deezer links
-- [x] Add from YouTube, Send to Folder, and Open with Noctis file associations
+- [x] Send to Folder and Open with Noctis file associations; Add from YouTube as an official plugin
 - [x] Explicit content toggle, with an Explicit badge on albums
 - [x] Group Artists By with editable separators; drag and drop for playlists and the sidebar
 - [x] Rebindable keyboard shortcuts

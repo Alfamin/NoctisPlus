@@ -107,11 +107,11 @@ public partial class SidebarView : UserControl
     {
         // Right-click on a playlist row / folder header opens its context menu without
         // the ListBox also selecting (= navigating to) the row underneath the menu.
-        if (sender is ListBox rightList && ReferenceEquals(rightList, PlaylistList)
+        if (sender is ListBox rightList && (ReferenceEquals(rightList, PlaylistList) || ReferenceEquals(rightList, PluginList))
             && e.GetCurrentPoint(rightList).Properties.IsRightButtonPressed)
         {
             var target = (e.Source as Visual)?.FindAncestorOfType<ListBoxItem>();
-            if (target?.DataContext is PlaylistNavItem && target.ContextMenu is { } menu)
+            if (target?.DataContext is PlaylistNavItem or PluginNavItem && target.ContextMenu is { } menu)
             {
                 e.Handled = true;
                 menu.DataContext = target.DataContext;
@@ -735,7 +735,7 @@ public partial class SidebarView : UserControl
         return false;
     }
 
-    private ListBox[] GetNavLists() => new[] { NavList, FavoritesList, PlaylistList };
+    private ListBox[] GetNavLists() => new[] { NavList, FavoritesList, PluginList, PlaylistList };
 
     // ── Rail search capsule ──
     // A non-light-dismiss overlay Popup (it stays open while the user works with the
@@ -861,6 +861,16 @@ public partial class SidebarView : UserControl
         if (SearchIconHost.TranslatePoint(new Point(0, -10), this) is { } capsuleOrigin)
             SearchPopup.VerticalOffset = capsuleOrigin.Y - room.Top;
     }
+
+    /// <summary>
+    /// The open pill's bottom edge in <paramref name="relativeTo"/>'s coordinates (null before
+    /// layout). Same origin as EnsureSearchPopupPinned: the 48px host covers the button row and
+    /// the 40px pill is centred in it. The window reserves the page band above this so the
+    /// floating pill never covers a page's column headers or first row (Discord, HypnoTized 10-24).
+    /// </summary>
+    internal double? SearchCapsuleBottom(Visual relativeTo) =>
+        SearchIconHost.TranslatePoint(
+            new Point(0, -10 + (SearchCapsuleClosedSize + SearchCapsuleOpenHeight) / 2), relativeTo)?.Y;
 
     /// <summary>Every UI-side close: flips the view model, whose change plays the collapse
     /// (see SyncSearchPopupToViewModel). Without a view model, collapses directly.</summary>

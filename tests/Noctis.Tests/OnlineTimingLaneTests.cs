@@ -12,6 +12,19 @@ namespace Noctis.Tests;
 /// left alone. Temp folder, fake sources, fake fit check; no network, no ffmpeg.</summary>
 public sealed class OnlineTimingLaneTests : IDisposable
 {
+    [Fact]
+    public async Task InstrumentalMark_SuppressesAutomaticLocalAndStreamingLookups()
+    {
+        using var lane = Lane();
+        var track = Song("instrumental");
+        track.NoLyrics = true;
+        Assert.Equal(OnlineTimingLane.Outcome.Skipped, await lane.ProcessAsync(track, CancellationToken.None));
+        Assert.False(await lane.ShowWhileStreamingAsync(track, CancellationToken.None));
+        lane.SetPlaying(null, [track]);
+        await lane.StartLookAhead();
+        Assert.Equal(0, _lrcRed.Calls + _unison.Calls + _kugou.Calls);
+        Assert.False(File.Exists(Path.ChangeExtension(track.FilePath, ".ttml")));
+    }
     readonly string _dir = Path.Combine(Path.GetTempPath(), "noctis-lane-" + Guid.NewGuid().ToString("N"));
 
     sealed class Source : ILrcRedLyricsService, IUnisonLyricsService, IKugouLyricsService

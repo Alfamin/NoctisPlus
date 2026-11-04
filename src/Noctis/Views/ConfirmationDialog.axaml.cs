@@ -4,7 +4,7 @@ using Noctis.Helpers;
 
 namespace Noctis.Views;
 
-/// <summary>A richer confirmation: title, detail bullets, a quiet note and an optional checkbox.</summary>
+/// <summary>A richer confirmation: title, detail bullets, a quiet note and an optional switch row.</summary>
 public sealed record ConfirmationRequest(
     string Message,
     string? Title = null,
@@ -16,7 +16,7 @@ public sealed record ConfirmationRequest(
     double Width = 380,
     string? CancelText = null);
 
-/// <summary>What the user chose; <see cref="OptionChecked"/> is the checkbox state.</summary>
+/// <summary>What the user chose; <see cref="OptionChecked"/> is the option switch's state.</summary>
 public readonly record struct ConfirmationResult(bool Confirmed, bool OptionChecked);
 
 public partial class ConfirmationDialog : Window
@@ -44,10 +44,22 @@ public partial class ConfirmationDialog : Window
         if (!string.IsNullOrWhiteSpace(request.CancelText)) CancelButton.Content = request.CancelText;
         if (!string.IsNullOrWhiteSpace(request.OptionText))
         {
-            OptionCheck.Content = request.OptionText;
-            OptionCheck.IsChecked = request.OptionChecked;
-            OptionCheck.IsVisible = true;
+            OptionLabel.Text = request.OptionText;
+            OptionToggle.IsChecked = request.OptionChecked;
+            Avalonia.Automation.AutomationProperties.SetName(OptionToggle, request.OptionText);
+            OptionRow.IsVisible = true;
         }
+    }
+
+    /// <summary>The option switch's state (false when the request had no option).</summary>
+    public bool OptionChecked => OptionRow.IsVisible && OptionToggle.IsChecked;
+
+    // The row's label flips the switch, like a checkbox's text did.
+    private void OnOptionRowPressed(object? sender, Avalonia.Input.PointerPressedEventArgs e)
+    {
+        if (e.Handled || !e.GetCurrentPoint(OptionRow).Properties.IsLeftButtonPressed) return;
+        OptionToggle.IsChecked = !OptionToggle.IsChecked;
+        e.Handled = true;
     }
 
     /// <summary>Shows <paramref name="request"/> over the main window.</summary>
@@ -59,7 +71,7 @@ public partial class ConfirmationDialog : Window
         var dialog = new ConfirmationDialog(request);
         DialogHelper.SizeToOwner(dialog, owner);
         await dialog.ShowDialog(owner);
-        return new ConfirmationResult(dialog.Confirmed, dialog.OptionCheck.IsChecked == true);
+        return new ConfirmationResult(dialog.Confirmed, dialog.OptionChecked);
     }
 
     private void OnConfirmClick(object? sender, Avalonia.Interactivity.RoutedEventArgs e)

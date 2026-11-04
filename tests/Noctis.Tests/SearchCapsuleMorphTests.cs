@@ -117,7 +117,7 @@ public class SearchCapsuleMorphTests
         // Focus elsewhere: the ring goes clear, nothing outlines the pill.
         ((StackPanel)rig.Window.Content!).Children.OfType<TextBox>().Single().Focus();
         Assert.False(rig.Capsule.IsKeyboardFocusWithin);
-        await Pump(rig.Window, 300);
+        await PumpUntil(rig.Window, () => rig.Stroke.Opacity == 0);
         Assert.Equal(0, rig.Stroke.Opacity);
         rig.Window.Close();
     }

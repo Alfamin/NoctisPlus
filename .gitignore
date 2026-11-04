@@ -41,6 +41,10 @@ tools/*
 !tools/NoctisCoverProxy/
 tools/NoctisCoverProxy/bin/
 tools/NoctisCoverProxy/obj/
+!tools/Noctis.PluginCheck/
+tools/Noctis.PluginCheck/bin/
+tools/Noctis.PluginCheck/obj/
+__pycache__/
 
 ## Temp / build scratch
 build_tmp_verify/

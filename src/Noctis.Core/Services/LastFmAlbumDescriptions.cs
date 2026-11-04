@@ -10,6 +10,7 @@ namespace Noctis.Services;
 internal static class LastFmApi
 {
     internal const string ApiKey = "7b625c5a18197cf284aabf8b66505156";
+    internal const string ApiSecret = "ebf114b9e7d31e24c493bc55dac2184e";
     internal const string ApiBase = "https://ws.audioscrobbler.com/2.0/";
 }
 
@@ -204,6 +205,28 @@ public sealed class LastFmAlbumDescriptions
             }
 
             _cacheLoaded = true;
+        }
+        finally
+        {
+            _lock.Release();
+        }
+    }
+
+    /// <summary>
+    /// Forgets every description and user override and deletes the cache file (Settings ›
+    /// Reset Everything). Loaded once, the dictionary was otherwise written back whole by the
+    /// next lookup, overrides included.
+    /// </summary>
+    public async Task ClearAsync()
+    {
+        await _lock.WaitAsync();
+        try
+        {
+            _cache.Clear();
+            _cooldownUntil.Clear();
+            _cacheLoaded = true;
+            try { File.Delete(_cachePath); }
+            catch (Exception ex) { Debug.WriteLine($"[LastFm] Failed to delete album description cache: {ex.Message}"); }
         }
         finally
         {

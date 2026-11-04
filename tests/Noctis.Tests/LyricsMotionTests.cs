@@ -1,3 +1,4 @@
+using LineMotion = Noctis.Helpers.PlusLineMotion;
 using System.Text.RegularExpressions;
 using Noctis.Helpers;
 using Xunit;
@@ -70,6 +71,52 @@ public class LyricsMotionTests
         Assert.True(LineMotion.Ease(0.15) > 0.2);
     }
 
+    /// <summary>
+    /// Tempo: a line held under ~0.8 s (rap) glides on the stiff spring Apple used for its
+    /// 0.6 s Godzilla line (99% in ~290 ms measured), a line held 4 s or more on the soft
+    /// one, the base spring in between — and none of them drifts back visibly.
+    /// </summary>
+    [Fact]
+    public void ForHold_FastLinesLandQuickly_SlowLinesGlideSoftly_NoneOvershoots()
+    {
+        var fast = Noctis.Helpers.LineMotion.ForHold(600);
+        var mid = Noctis.Helpers.LineMotion.ForHold(2000);
+        var slow = Noctis.Helpers.LineMotion.ForHold(5000);
+        Assert.Equal(Noctis.Helpers.LineMotion.FastSpring, fast);
+        Assert.Equal(Noctis.Helpers.LineMotion.BaseSpring, mid);
+        Assert.Equal(Noctis.Helpers.LineMotion.SlowSpring, slow);
+        Assert.Equal(Noctis.Helpers.LineMotion.BaseSpring, Noctis.Helpers.LineMotion.ForHold(double.NaN));
+
+        Assert.InRange(fast.TimeToReachMs(0.99), 250, 360);
+        Assert.InRange(mid.TimeToReachMs(0.99), 420, 520);
+        Assert.InRange(slow.TimeToReachMs(0.99), 540, 650);
+
+        // Monotone in between: a longer hold never lands sooner.
+        var prev = 0.0;
+        for (var hold = 500; hold <= 6000; hold += 100)
+        {
+            var t99 = Noctis.Helpers.LineMotion.ForHold(hold).TimeToReachMs(0.99);
+            Assert.True(t99 >= prev, $"hold {hold}: 99% at {t99} ms, sooner than {prev} ms");
+            prev = t99;
+        }
+
+        foreach (var spring in new[] { fast, mid, slow, Noctis.Helpers.LineMotion.ForHold(1200), Noctis.Helpers.LineMotion.ForHold(3000) })
+        {
+            var peak = Enumerable.Range(0, 2000).Max(ms => spring.Step(ms / 1000.0));
+            Assert.True(peak < 1.006, $"ζ{spring.Zeta} ωn{spring.NaturalFrequency}: overshoot {(peak - 1) * 100:0.00}%");
+        }
+    }
+
+    /// <summary>The list leads the next line by ~0.7 s (Apple 680-750 ms measured) — long
+    /// enough for even the soft spring to have covered 90% before the voice.</summary>
+    [Fact]
+    public void ScrollLead_LetsTheLineLandBeforeTheVoice()
+    {
+        Assert.Equal(700, Noctis.Helpers.LineMotion.ScrollLeadMs);
+        Assert.True(Noctis.Helpers.LineMotion.SlowSpring.TimeToReachMs(0.95) < Noctis.Helpers.LineMotion.ScrollLeadMs);
+        Assert.True(Noctis.Helpers.LineMotion.BaseSpring.TimeToReachMs(0.99) < Noctis.Helpers.LineMotion.ScrollLeadMs);
+    }
+
     [Fact]
     public void Ease_AcceleratesAtOnce_ButDoesNotPop()
     {
@@ -94,7 +141,7 @@ public class LyricsMotionTests
         {
             var xaml = File.ReadAllText(Path.Combine(FindRepoRoot(), rel));
             var lineStyle = LineButtonStyle(xaml, rel);
-            Assert.Contains("helpers:LineMotionEase", lineStyle);
+            Assert.Contains("helpers:PlusLineMotionEase", lineStyle);
             Assert.Contains(expectedDuration, lineStyle);
             Assert.DoesNotContain("SpringEase", xaml);
         }

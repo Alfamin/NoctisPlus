@@ -413,7 +413,7 @@
     <comment>Album page menu</comment>
   </data>
   <data name="AlbumDetail.ChooseAlbumVideo" xml:space="preserve">
-    <value>选择此相册的视频…</value>
+    <value>选择此相册的视频</value>
     <comment>Album page menu</comment>
   </data>
   <data name="AlbumDetail.UseDefaultVideo" xml:space="preserve">
@@ -487,6 +487,9 @@
   <data name="Settings.ComingSoon" xml:space="preserve">
     <value>即将开始</value>
     <comment>Badge on parked Account &amp; Sync cards in SettingsView.axaml</comment>
+  </data>
+  <data name="Settings.BetaBadge" xml:space="preserve">
+    <value>测试版</value>
   </data>
   <data name="Settings.SessionLogTroubleshootingShare" xml:space="preserve">
     <value>错误报告的会话记录。</value>
@@ -1144,6 +1147,34 @@
     <value>除非您直接播放，否则将关闭直播歌曲。</value>
     <comment>Text in SettingsView.axaml</comment>
   </data>
+  <data name="Settings.OutputDevice" xml:space="preserve">
+    <value>输出设备</value>
+    <comment>Text in SettingsView.axaml</comment>
+  </data>
+  <data name="Settings.OutputDeviceDesc" xml:space="preserve">
+    <value>Noctis 播放声音的位置。独占模式会直接打开所选设备，因此比特完美输出跟随此设置，而非 Windows 默认设备。</value>
+    <comment>Text in SettingsView.axaml</comment>
+  </data>
+  <data name="Settings.OutputDeviceDefault" xml:space="preserve">
+    <value>系统默认</value>
+    <comment>Output Device picker: follow-the-Windows-default entry</comment>
+  </data>
+  <data name="Settings.OutputDeviceDefaultMarker" xml:space="preserve">
+    <value>默认</value>
+    <comment>Suffix marking the current Windows default endpoint</comment>
+  </data>
+  <data name="Settings.OutputDeviceMissingEntry" xml:space="preserve">
+    <value>已选设备</value>
+    <comment>Output Device picker: disconnected pinned endpoint</comment>
+  </data>
+  <data name="Settings.OutputDeviceDisconnected" xml:space="preserve">
+    <value>未连接</value>
+    <comment>Suffix for a disconnected endpoint in the picker</comment>
+  </data>
+  <data name="Settings.OutputDeviceMissingHint" xml:space="preserve">
+    <value>所选设备当前未连接。在它重新连接之前，播放将使用系统默认设备。</value>
+    <comment>Shown under Output Device when the pin is missing</comment>
+  </data>
   <data name="Settings.ExclusiveMode" xml:space="preserve">
     <value>独占模式</value>
     <comment>Text in SettingsView.axaml</comment>
@@ -1254,6 +1285,14 @@
   </data>
   <data name="Settings.PreAmpDB" xml:space="preserve">
     <value>前置增益 (dB)</value>
+    <comment>Text in SettingsView.axaml</comment>
+  </data>
+  <data name="Settings.ScanNewFilesReplayGain" xml:space="preserve">
+    <value>自动扫描新文件</value>
+    <comment>Text in SettingsView.axaml</comment>
+  </data>
+  <data name="Settings.ScanNewFilesReplayGainDesc" xml:space="preserve">
+    <value>专辑复制完成后，为新歌曲写入 ReplayGain 标签。</value>
     <comment>Text in SettingsView.axaml</comment>
   </data>
   <data name="Settings.REMOTECONTROL" xml:space="preserve">
@@ -2190,7 +2229,7 @@
     <comment>Text in ArtistDetailView.axaml</comment>
   </data>
   <data name="ArtistDetail.FansCount" xml:space="preserve">
-    <value>{0} 粉色</value>
+    <value>{0} 粉丝</value>
     <comment>Hero line under the artist name; {0} = Deezer fan count</comment>
   </data>
   <data name="ArtistDetail.FindingSimilar" xml:space="preserve">
@@ -2828,46 +2867,6 @@
     <value>新建一个播放列表即可开始</value>
     <comment>Text in LibraryPlaylistsView.axaml</comment>
   </data>
-  <data name="LibraryPlaylists.ImportFromStreaming" xml:space="preserve">
-    <value>从 Spotify 或 Deezer 导入</value>
-    <comment>Text in LibraryPlaylistsView.axaml</comment>
-  </data>
-  <data name="LibraryPlaylists.ImportPitch" xml:space="preserve">
-    <value>自动匹配你的歌曲</value>
-    <comment>Text in LibraryPlaylistsView.axaml</comment>
-  </data>
-  <data name="LibraryPlaylists.PlaylistFilesToo" xml:space="preserve">
-    <value>也支持 .m3u 和 .m3u8 文件</value>
-    <comment>Text in LibraryPlaylistsView.axaml</comment>
-  </data>
-  <data name="Home.WelcomeTitle" xml:space="preserve">
-    <value>开始建立你的音乐库</value>
-    <comment>Text in HomeView.axaml</comment>
-  </data>
-  <data name="Home.WelcomeLine" xml:space="preserve">
-    <value>搜索任意歌曲，或添加已有的音乐</value>
-    <comment>Text in HomeView.axaml</comment>
-  </data>
-  <data name="Home.FindMusic" xml:space="preserve">
-    <value>查找音乐</value>
-    <comment>Text in HomeView.axaml</comment>
-  </data>
-  <data name="Home.AddMusicFolder" xml:space="preserve">
-    <value>添加音乐文件夹</value>
-    <comment>Text in HomeView.axaml</comment>
-  </data>
-  <data name="Home.ImportPlaylists" xml:space="preserve">
-    <value>导入歌单</value>
-    <comment>Text in HomeView.axaml</comment>
-  </data>
-  <data name="Home.ConnectTelegram" xml:space="preserve">
-    <value>连接 Telegram</value>
-    <comment>Text in HomeView.axaml</comment>
-  </data>
-  <data name="Home.SetUpWordLyrics" xml:space="preserve">
-    <value>逐字歌词 · 1.3 GB</value>
-    <comment>Text in HomeView.axaml</comment>
-  </data>
   <data name="LibraryPlaylists.NoResults" xml:space="preserve">
     <value>无结果</value>
     <comment>Text in LibraryPlaylistsView.axaml</comment>
@@ -3145,7 +3144,6 @@
     <value>作词: </value>
     <comment>Text in LyricsView.axaml</comment>
   </data>
-  <data name="Lyrics.Sync" xml:space="preserve"><value>同步</value><comment>Pill that brings the lyrics back to the current line</comment></data>
   <data name="Lyrics.Follow" xml:space="preserve">
     <value>跟随</value>
     <comment>Text in LyricsView.axaml</comment>
@@ -3923,14 +3921,6 @@
   </data>
   <data name="Metadata.SearchAnimatedArtwork" xml:space="preserve">
     <value>搜索动态封面</value>
-    <comment>Text in MetadataWindow.axaml</comment>
-  </data>
-  <data name="Metadata.AlbumNameAppleMusic" xml:space="preserve">
-    <value>专辑名或 Apple Music 链接</value>
-    <comment>Watermark in MetadataWindow.axaml</comment>
-  </data>
-  <data name="Metadata.TypeAlbumNamePress" xml:space="preserve">
-    <value>输入专辑名后按 Enter,或粘贴 Apple Music 链接</value>
     <comment>Text in MetadataWindow.axaml</comment>
   </data>
   <data name="Metadata.ChooseAnimatedArtwork" xml:space="preserve">
@@ -5616,94 +5606,6 @@
     <value>关闭</value>
     <comment>Secondary button</comment>
   </data>
-  <data name="Main.AddFromYouTube" xml:space="preserve">
-    <value>从 YouTube 添加</value>
-    <comment>New/Add menu item</comment>
-  </data>
-  <data name="Main.AddFromYouTubeHint" xml:space="preserve">
-    <value>搜索或粘贴链接 — 下载到您的库</value>
-    <comment>New/Add menu item subtitle</comment>
-  </data>
-  <data name="YouTube.Title" xml:space="preserve">
-    <value>从 YouTube 添加</value>
-    <comment>Dialog title</comment>
-  </data>
-  <data name="YouTube.Subtitle" xml:space="preserve">
-    <value>搜索或粘贴链接。保存到带有封面艺术的书库中。</value>
-    <comment>Dialog subtitle</comment>
-  </data>
-  <data name="YouTube.SearchHint" xml:space="preserve">
-    <value>搜索YouTube或粘贴一个链接…</value>
-    <comment>Search box watermark</comment>
-  </data>
-  <data name="YouTube.Search" xml:space="preserve">
-    <value>搜索</value>
-    <comment>Search button</comment>
-  </data>
-  <data name="YouTube.SetupTitle" xml:space="preserve">
-    <value>一次性设置</value>
-    <comment>First-run card title</comment>
-  </data>
-  <data name="YouTube.SetupBody" xml:space="preserve">
-    <value>Noctis 使用 yt-dlp (免费, 开放源码) 与 YouTube 谈话。它下载一次到Noctis自己的文件夹并从这里更新。</value>
-    <comment>First-run card body</comment>
-  </data>
-  <data name="YouTube.Install" xml:space="preserve">
-    <value>安装 yt-dlp</value>
-    <comment>First-run card button</comment>
-  </data>
-  <data name="YouTube.Download" xml:space="preserve">
-    <value>下载</value>
-    <comment>Per-result button</comment>
-  </data>
-  <data name="YouTube.SavesTo" xml:space="preserve">
-    <value>保存到</value>
-    <comment>Footer label before the folder</comment>
-  </data>
-  <data name="YouTube.EmptyHint" xml:space="preserve">
-    <value>结果显示在这里。在您的库文件夹中下载，标记为带有封面色彩。</value>
-    <comment>Empty state</comment>
-  </data>
-  <data name="YouTube.Close" xml:space="preserve">
-    <value>关闭</value>
-    <comment>Secondary button</comment>
-  </data>
-  <data name="YouTubeSettings.Section" xml:space="preserve">
-    <value>您正在下载</value>
-    <comment>Library tab section title</comment>
-  </data>
-  <data name="YouTubeSettings.Title" xml:space="preserve">
-    <value>从 YouTube 添加歌曲</value>
-    <comment>Card title</comment>
-  </data>
-  <data name="YouTubeSettings.Description" xml:space="preserve">
-    <value>搜索或粘贴要下载的链接。</value>
-    <comment>Card description</comment>
-  </data>
-  <data name="YouTubeSettings.Open" xml:space="preserve">
-    <value>打开下载器</value>
-    <comment>Card button</comment>
-  </data>
-  <data name="YouTubeSettings.Folder" xml:space="preserve">
-    <value>下载文件夹</value>
-    <comment>Row label</comment>
-  </data>
-  <data name="YouTubeSettings.FolderHint" xml:space="preserve">
-    <value>空使用您第一个音乐文件夹中的 &quot;YouTube&quot; 文件夹。</value>
-    <comment>Row help</comment>
-  </data>
-  <data name="YouTubeSettings.Tool" xml:space="preserve">
-    <value>英寸-dlp</value>
-    <comment>Row label</comment>
-  </data>
-  <data name="YouTubeSettings.InstallUpdate" xml:space="preserve">
-    <value>安装/更新</value>
-    <comment>Row button</comment>
-  </data>
-  <data name="YouTubeSettings.ToolPathHint" xml:space="preserve">
-    <value>自定义路径 yt-dlp (可选)</value>
-    <comment>Path watermark</comment>
-  </data>
   <data name="Upmix.Title" xml:space="preserve">
     <value>多通道混和</value>
     <comment>Audio card title</comment>
@@ -5841,7 +5743,7 @@
     <comment>Sync card title</comment>
   </data>
   <data name="Sync.Description" xml:space="preserve">
-    <value>收藏、评分、播放次数和播放列表会在手机和这台电脑上保持一致。</value>
+    <value>收藏、评分、播放次数和这台电脑的播放列表会在手机和这台电脑上保持一致。在手机上创建的播放列表只保留在手机上。</value>
     <comment>Sync card description</comment>
   </data>
   <data name="Sync.DeviceName" xml:space="preserve">
@@ -6454,6 +6356,70 @@
     <value>在手机上的 Noctis 应用中，打开“设置”，再进入“账户”。输入这个地址，然后用您的邮箱或用户名和密码登录。</value>
     <comment>Pairing block help above the address and fingerprint</comment>
   </data>
+  <data name="AccountSync.PairQrCountdown" xml:space="preserve">
+    <value>{0} 后更新代码</value>
+    <comment>Under the sign-in QR code; {0} = minutes:seconds until a new code replaces it, e.g. 1:42</comment>
+  </data>
+  <data name="AccountSync.PairQrWarning" xml:space="preserve">
+    <value>任何扫描此代码的人都能登录你的账户，所以只给你自己的手机看。它只能使用一次，每两分钟更换一次。</value>
+    <comment>Under the sign-in QR code: who can use it and for how long</comment>
+  </data>
+  <data name="AccountSync.PairQrName" xml:space="preserve">
+    <value>登录二维码</value>
+    <comment>Screen-reader name of the sign-in QR code image</comment>
+  </data>
+  <data name="Pair.Subtitle" xml:space="preserve">
+    <value>几秒钟即可在手机上登录 Noctis。</value>
+    <comment>Phone app card, Connect a phone row subtitle</comment>
+  </data>
+  <data name="Pair.ModeQr" xml:space="preserve">
+    <value>扫描二维码</value>
+    <comment>Connect a phone: switch segment for the QR code way</comment>
+  </data>
+  <data name="Pair.ModeManual" xml:space="preserve">
+    <value>手动输入</value>
+    <comment>Connect a phone: switch segment for typing the address and password</comment>
+  </data>
+  <data name="Pair.QrStep1" xml:space="preserve">
+    <value>在手机上打开 Noctis。</value>
+    <comment>Connect a phone, QR way, step 1</comment>
+  </data>
+  <data name="Pair.QrStep2" xml:space="preserve">
+    <value>前往“设置”›“账户”，轻点“扫描二维码”。</value>
+    <comment>Connect a phone, QR way, step 2 (names the phone app screens and button)</comment>
+  </data>
+  <data name="Pair.QrStep3" xml:space="preserve">
+    <value>将相机对准此代码。</value>
+    <comment>Connect a phone, QR way, step 3</comment>
+  </data>
+  <data name="Pair.ManualStep1" xml:space="preserve">
+    <value>在手机上打开 Noctis，前往“设置”›“账户”。</value>
+    <comment>Connect a phone, manual way, step 1</comment>
+  </data>
+  <data name="Pair.ManualStep2" xml:space="preserve">
+    <value>在“手动输入”下，输入此地址：</value>
+    <comment>Connect a phone, manual way, step 2; the address follows below it</comment>
+  </data>
+  <data name="Pair.ManualStep3" xml:space="preserve">
+    <value>使用账户的电子邮件和密码登录。</value>
+    <comment>Connect a phone, manual way, step 3</comment>
+  </data>
+  <data name="Pair.ManualStep4" xml:space="preserve">
+    <value>确认手机显示的安全码与此一致：</value>
+    <comment>Connect a phone, manual way, step 4; the security code follows below it</comment>
+  </data>
+  <data name="Pair.NewCode" xml:space="preserve">
+    <value>新代码</value>
+    <comment>Small link under the QR code: replace it with a new one now</comment>
+  </data>
+  <data name="Pair.QrUnavailable" xml:space="preserve">
+    <value>暂时无法显示二维码。请先在上方创建账户，或使用“手动输入”。</value>
+    <comment>Connect a phone, QR way, when no code can be shown</comment>
+  </data>
+  <data name="Phone.AdvancedDesc" xml:space="preserve">
+    <value>此电脑的名称以及其他音乐应用的访问。</value>
+    <comment>Phone app card, Advanced row subtitle (folded by default)</comment>
+  </data>
   <data name="AccountSync.SignedInDevices" xml:space="preserve">
     <value>您的手机</value>
     <comment>Account card list label</comment>
@@ -6764,6 +6730,251 @@
   <data name="Shortcuts.Action.GoArtists" xml:space="preserve">
     <value>转到艺人</value>
     <comment>Settings › Shortcuts (GitHub #131)</comment>
+  </data>
+  <data name="ArtistDetail.SearchArtistInfo" xml:space="preserve">
+    <value>搜索艺人信息</value>
+    <comment>Header in ArtistDetailView.axaml (GitHub #141)</comment>
+  </data>
+  <data name="ArtistDetail.UseAutomaticArtistInfo" xml:space="preserve">
+    <value>使用自动艺人信息</value>
+    <comment>Header in ArtistDetailView.axaml: forget the manual pick (GitHub #141)</comment>
+  </data>
+  <data name="ArtistInfoSearch.Title" xml:space="preserve">
+    <value>搜索艺人信息</value>
+    <comment>ArtistInfoSearchDialog.axaml title</comment>
+  </data>
+  <data name="ArtistInfoSearch.Subtitle" xml:space="preserve">
+    <value>选择正确的艺人。图片、粉丝数和简介将随之更新。</value>
+    <comment>ArtistInfoSearchDialog.axaml subtitle</comment>
+  </data>
+  <data name="ArtistInfoSearch.Searching" xml:space="preserve">
+    <value>正在搜索…</value>
+    <comment>Status in ArtistInfoSearchDialog.axaml</comment>
+  </data>
+  <data name="ArtistInfoSearch.NothingFound" xml:space="preserve">
+    <value>未找到艺人。</value>
+    <comment>Status in ArtistInfoSearchDialog.axaml</comment>
+  </data>
+  <data name="ArtistInfoSearch.Failed" xml:space="preserve">
+    <value>搜索失败：{0}</value>
+    <comment>Status in ArtistInfoSearchDialog.axaml; {0} = error message</comment>
+  </data>
+  <data name="ArtistInfoSearch.Applying" xml:space="preserve">
+    <value>正在保存…</value>
+    <comment>Status in ArtistInfoSearchDialog.axaml while the pick is saved</comment>
+  </data>
+  <data name="ArtistInfoSearch.AlbumsCount" xml:space="preserve">
+    <value>{0} 张专辑</value>
+    <comment>Row detail in ArtistInfoSearchDialog.axaml; {0} = Deezer album count</comment>
+  </data>
+  <data name="ArtistInfoSearch.OneAlbum" xml:space="preserve">
+    <value>1 张专辑</value>
+    <comment>Row detail in ArtistInfoSearchDialog.axaml for an account with exactly one album (AlbumsCount otherwise)</comment>
+  </data>
+  <data name="ArtistInfoSearch.OneFan" xml:space="preserve">
+    <value>1 粉丝</value>
+    <comment>Row detail in ArtistInfoSearchDialog.axaml for an account with exactly one fan (ArtistDetail.FansCount otherwise)</comment>
+  </data>
+  <data name="ArtistInfoSearch.Current" xml:space="preserve">
+    <value>当前</value>
+    <comment>Badge on the row the artist is pinned to</comment>
+  </data>
+  <data name="ArtistInfoSearch.Use" xml:space="preserve">
+    <value>使用此艺人</value>
+    <comment>Primary button in ArtistInfoSearchDialog.axaml</comment>
+  </data>
+  <data name="Repeat.OffTip" xml:space="preserve">
+    <value>重复：关</value>
+    <comment>Tooltip/name of the Repeat buttons while Repeat is off (GitHub #144)</comment>
+  </data>
+  <data name="Repeat.AllTip" xml:space="preserve">
+    <value>全部重复：循环播放队列</value>
+    <comment>Tooltip/name of the Repeat buttons in Repeat All: the queue loops forever (GitHub #144)</comment>
+  </data>
+  <data name="Repeat.OneTip" xml:space="preserve">
+    <value>单曲重复：循环播放这首歌</value>
+    <comment>Tooltip/name of the Repeat buttons in Repeat One: the playing song loops forever (GitHub #144)</comment>
+  </data>
+  <data name="Queue.ShowPlayedTip" xml:space="preserve">
+    <value>显示已播放的歌曲</value>
+    <comment>Queue popup header History button tooltip in MainWindow.axaml: toggles Keep Played Songs (played songs above Now Playing)</comment>
+  </data>
+  <data name="Settings.AppIcon" xml:space="preserve">
+    <value>应用图标</value>
+    <comment>Title of the App Icon card in Settings &gt; Appearance (SettingsView.axaml)</comment>
+  </data>
+  <data name="Settings.AppIconDesc" xml:space="preserve">
+    <value>立即更改标题栏、任务栏和托盘中的图标。桌面快捷方式和 .exe 仍使用经典图标。</value>
+    <comment>Subtitle of the App Icon card in Settings &gt; Appearance: the pick applies live to windows/taskbar/tray; the exe icon cannot change</comment>
+  </data>
+  <data name="Settings.AppIcon.Classic" xml:space="preserve">
+    <value>经典</value>
+    <comment>Name of an alternate app icon tile in Settings &gt; Appearance &gt; App Icon</comment>
+  </data>
+  <data name="Settings.AppIcon.Blush" xml:space="preserve">
+    <value>腮红</value>
+    <comment>Name of an alternate app icon tile in Settings &gt; Appearance &gt; App Icon</comment>
+  </data>
+  <data name="Settings.AppIcon.Sky" xml:space="preserve">
+    <value>天空</value>
+    <comment>Name of an alternate app icon tile in Settings &gt; Appearance &gt; App Icon</comment>
+  </data>
+  <data name="Settings.AppIcon.Sunset" xml:space="preserve">
+    <value>日落</value>
+    <comment>Name of an alternate app icon tile in Settings &gt; Appearance &gt; App Icon</comment>
+  </data>
+  <data name="Settings.AppIcon.Violet" xml:space="preserve">
+    <value>紫罗兰</value>
+    <comment>Name of an alternate app icon tile in Settings &gt; Appearance &gt; App Icon</comment>
+  </data>
+  <data name="Settings.AppIcon.Aurora" xml:space="preserve">
+    <value>极光</value>
+    <comment>Name of an alternate app icon tile in Settings &gt; Appearance &gt; App Icon</comment>
+  </data>
+  <data name="Settings.AppIcon.Midnight" xml:space="preserve">
+    <value>午夜</value>
+    <comment>Name of an alternate app icon tile in Settings &gt; Appearance &gt; App Icon</comment>
+  </data>
+  <data name="Settings.AppIcon.Ruby" xml:space="preserve">
+    <value>红宝石</value>
+    <comment>Name of an alternate app icon tile in Settings &gt; Appearance &gt; App Icon</comment>
+  </data>
+  <data name="LibraryPlaylists.ImportFromStreaming" xml:space="preserve">
+    <value>从 Spotify 或 Deezer 导入</value>
+    <comment>Text in LibraryPlaylistsView.axaml</comment>
+  </data>
+  <data name="LibraryPlaylists.ImportPitch" xml:space="preserve">
+    <value>自动匹配你的歌曲</value>
+    <comment>Text in LibraryPlaylistsView.axaml</comment>
+  </data>
+  <data name="LibraryPlaylists.PlaylistFilesToo" xml:space="preserve">
+    <value>也支持 .m3u 和 .m3u8 文件</value>
+    <comment>Text in LibraryPlaylistsView.axaml</comment>
+  </data>
+  <data name="Home.WelcomeTitle" xml:space="preserve">
+    <value>开始建立你的音乐库</value>
+    <comment>Text in HomeView.axaml</comment>
+  </data>
+  <data name="Home.WelcomeLine" xml:space="preserve">
+    <value>搜索任意歌曲，或添加已有的音乐</value>
+    <comment>Text in HomeView.axaml</comment>
+  </data>
+  <data name="Home.FindMusic" xml:space="preserve">
+    <value>查找音乐</value>
+    <comment>Text in HomeView.axaml</comment>
+  </data>
+  <data name="Home.AddMusicFolder" xml:space="preserve">
+    <value>添加音乐文件夹</value>
+    <comment>Text in HomeView.axaml</comment>
+  </data>
+  <data name="Home.ImportPlaylists" xml:space="preserve">
+    <value>导入歌单</value>
+    <comment>Text in HomeView.axaml</comment>
+  </data>
+  <data name="Home.ConnectTelegram" xml:space="preserve">
+    <value>连接 Telegram</value>
+    <comment>Text in HomeView.axaml</comment>
+  </data>
+  <data name="Home.SetUpWordLyrics" xml:space="preserve">
+    <value>逐字歌词 · 1.3 GB</value>
+    <comment>Text in HomeView.axaml</comment>
+  </data>
+  <data name="Lyrics.Sync" xml:space="preserve"><value>同步</value><comment>Pill that brings the lyrics back to the current line</comment></data>
+  <data name="Metadata.AlbumNameAppleMusic" xml:space="preserve">
+    <value>专辑名或 Apple Music 链接</value>
+    <comment>Watermark in MetadataWindow.axaml</comment>
+  </data>
+  <data name="Metadata.TypeAlbumNamePress" xml:space="preserve">
+    <value>输入专辑名后按 Enter,或粘贴 Apple Music 链接</value>
+    <comment>Text in MetadataWindow.axaml</comment>
+  </data>
+  <data name="Main.AddFromYouTube" xml:space="preserve">
+    <value>从 YouTube 添加</value>
+    <comment>New/Add menu item</comment>
+  </data>
+  <data name="Main.AddFromYouTubeHint" xml:space="preserve">
+    <value>搜索或粘贴链接 — 下载到您的库</value>
+    <comment>New/Add menu item subtitle</comment>
+  </data>
+  <data name="YouTube.Title" xml:space="preserve">
+    <value>从 YouTube 添加</value>
+    <comment>Dialog title</comment>
+  </data>
+  <data name="YouTube.Subtitle" xml:space="preserve">
+    <value>搜索或粘贴链接。保存到带有封面艺术的书库中。</value>
+    <comment>Dialog subtitle</comment>
+  </data>
+  <data name="YouTube.SearchHint" xml:space="preserve">
+    <value>搜索YouTube或粘贴一个链接…</value>
+    <comment>Search box watermark</comment>
+  </data>
+  <data name="YouTube.Search" xml:space="preserve">
+    <value>搜索</value>
+    <comment>Search button</comment>
+  </data>
+  <data name="YouTube.SetupTitle" xml:space="preserve">
+    <value>一次性设置</value>
+    <comment>First-run card title</comment>
+  </data>
+  <data name="YouTube.SetupBody" xml:space="preserve">
+    <value>Noctis 使用 yt-dlp (免费, 开放源码) 与 YouTube 谈话。它下载一次到Noctis自己的文件夹并从这里更新。</value>
+    <comment>First-run card body</comment>
+  </data>
+  <data name="YouTube.Install" xml:space="preserve">
+    <value>安装 yt-dlp</value>
+    <comment>First-run card button</comment>
+  </data>
+  <data name="YouTube.Download" xml:space="preserve">
+    <value>下载</value>
+    <comment>Per-result button</comment>
+  </data>
+  <data name="YouTube.SavesTo" xml:space="preserve">
+    <value>保存到</value>
+    <comment>Footer label before the folder</comment>
+  </data>
+  <data name="YouTube.EmptyHint" xml:space="preserve">
+    <value>结果显示在这里。在您的库文件夹中下载，标记为带有封面色彩。</value>
+    <comment>Empty state</comment>
+  </data>
+  <data name="YouTube.Close" xml:space="preserve">
+    <value>关闭</value>
+    <comment>Secondary button</comment>
+  </data>
+  <data name="YouTubeSettings.Section" xml:space="preserve">
+    <value>您正在下载</value>
+    <comment>Library tab section title</comment>
+  </data>
+  <data name="YouTubeSettings.Title" xml:space="preserve">
+    <value>从 YouTube 添加歌曲</value>
+    <comment>Card title</comment>
+  </data>
+  <data name="YouTubeSettings.Description" xml:space="preserve">
+    <value>搜索或粘贴要下载的链接。</value>
+    <comment>Card description</comment>
+  </data>
+  <data name="YouTubeSettings.Open" xml:space="preserve">
+    <value>打开下载器</value>
+    <comment>Card button</comment>
+  </data>
+  <data name="YouTubeSettings.Folder" xml:space="preserve">
+    <value>下载文件夹</value>
+    <comment>Row label</comment>
+  </data>
+  <data name="YouTubeSettings.FolderHint" xml:space="preserve">
+    <value>空使用您第一个音乐文件夹中的 &quot;YouTube&quot; 文件夹。</value>
+    <comment>Row help</comment>
+  </data>
+  <data name="YouTubeSettings.Tool" xml:space="preserve">
+    <value>英寸-dlp</value>
+    <comment>Row label</comment>
+  </data>
+  <data name="YouTubeSettings.InstallUpdate" xml:space="preserve">
+    <value>安装/更新</value>
+    <comment>Row button</comment>
+  </data>
+  <data name="YouTubeSettings.ToolPathHint" xml:space="preserve">
+    <value>自定义路径 yt-dlp (可选)</value>
+    <comment>Path watermark</comment>
   </data>
   <data name="Lyrics.WordTiming" xml:space="preserve"><value>Word timing</value></data>
   <data name="Queue.ForYou" xml:space="preserve"><value>For you</value></data>

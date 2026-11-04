@@ -266,6 +266,7 @@ internal sealed class OnlineTimingLane : IDisposable
     /// <summary>One song, start to end. Everything but a failure marks it done for this run.</summary>
     internal async Task<Outcome> ProcessAsync(Track track, CancellationToken ct)
     {
+        if (track.NoLyrics) return Outcome.Skipped;
         var path = Local(track)!;
         StartedOn(path);
         SearchChanged?.Invoke(track, OnlineTimingSearchState.Searching);
@@ -329,7 +330,7 @@ internal sealed class OnlineTimingLane : IDisposable
             foreach (var track in _upNext.Take(2))
             {
                 var key = MetadataKey(track);
-                if (string.IsNullOrWhiteSpace(track.Title) || _aheadLookups.ContainsKey(key) || _misses.IsMiss(key, Now())) continue;
+                if (track.NoLyrics || string.IsNullOrWhiteSpace(track.Title) || _aheadLookups.ContainsKey(key) || _misses.IsMiss(key, Now())) continue;
                 // Existing timed files need no speculative traffic. Missing files still can
                 // be searched using catalog metadata; final recording length is rechecked.
                 if (Local(track) is { } path && (LyricsWriter.SidecarsOnDisk(path, ".ttml").Count > 0
@@ -398,7 +399,7 @@ internal sealed class OnlineTimingLane : IDisposable
     /// </summary>
     internal async Task<bool> ShowWhileStreamingAsync(Track track, CancellationToken ct)
     {
-        if (string.IsNullOrWhiteSpace(track.Title)) return false;
+        if (track.NoLyrics || string.IsNullOrWhiteSpace(track.Title)) return false;
         var seconds = OnlineTimingDuration.Seconds(track);
         var key = OnlineTimingMisses.Key(track.Artist ?? "", track.Title, seconds);
         OnlineWordTiming.Lookup? known;
@@ -530,7 +531,7 @@ internal sealed class OnlineTimingLane : IDisposable
         lock (_gate)
         {
             ct.ThrowIfCancellationRequested();
-            if (_repairs.Contains(path)) return Outcome.Kept;
+            if (track.NoLyrics || _repairs.Contains(path)) return Outcome.Kept;
             written = marked != null && _writer.WriteOnlineTiming(path, marked);
         }
         if (written) lock (_gate) _provisional.Remove(key);

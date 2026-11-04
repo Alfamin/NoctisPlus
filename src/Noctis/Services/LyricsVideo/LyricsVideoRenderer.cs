@@ -1,3 +1,4 @@
+using LineMotion = Noctis.Helpers.PlusLineMotion;
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 using System.Runtime.Intrinsics;

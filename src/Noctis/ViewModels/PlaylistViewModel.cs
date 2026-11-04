@@ -226,8 +226,9 @@ public partial class PlaylistViewModel : ViewModelBase, ILocalSearchable, IDispo
 
     public PlaylistViewModel(Playlist playlist, PlayerViewModel player,
         ILibraryService library, IPersistenceService persistence, SidebarViewModel sidebar,
-        ArtistImageService? artistImageService = null)
+        ArtistImageService? artistImageService = null, bool showSideRail = true)
     {
+        _showSideRail = showSideRail; // before LoadTracks: a hidden rail fetches nothing
         _player = player;
         _library = library;
         _persistence = persistence;
@@ -449,7 +450,7 @@ public partial class PlaylistViewModel : ViewModelBase, ILocalSearchable, IDispo
 
             // Smart-playlist eval and filter/sort are full-list passes; run them off the
             // UI thread like LibrarySongsViewModel.ApplyFilterAndSort does.
-            var (allResolvedTracks, sorted) = await Task.Run(() =>
+            var (allResolvedTracks, sorted, unfiltered) = await Task.Run(() =>
             {
                 IEnumerable<Track> resolved = isSmart
                     ? SmartPlaylistEvaluator.Evaluate(playlist, library.Tracks)
@@ -457,16 +458,17 @@ public partial class PlaylistViewModel : ViewModelBase, ILocalSearchable, IDispo
 
                 var all = resolved.ToList();
 
-                var filtered = string.IsNullOrWhiteSpace(filter)
-                    ? all
-                    : all.Where(Noctis.Helpers.SearchQuery.Parse(filter).Matches).ToList();
+                if (string.IsNullOrWhiteSpace(filter))
+                    return (all, SortTracks(all, sortMode, addedAt), (IReadOnlyList<Track>?)null);
 
-                return (all, SortTracks(filtered, sortMode, addedAt));
+                var filtered = all.Where(Noctis.Helpers.SearchQuery.Parse(filter).Matches).ToList();
+                return (all, SortTracks(filtered, sortMode, addedAt), SortTracks(all, sortMode, addedAt));
             });
 
             if (generation != _loadGeneration) return;
 
             TrackAddedAt = addedAt; // before the rows, so their Added / NEW read this load's dates
+            _unfilteredTracks = unfiltered;
             Tracks.ReplaceAll(sorted);
 
             TrackCount = Tracks.Count;
@@ -519,6 +521,8 @@ public partial class PlaylistViewModel : ViewModelBase, ILocalSearchable, IDispo
     private void RebuildSuggestions(bool force = false)
     {
         if (IsSmartPlaylist || IsPreview) return;
+        // Rail hidden: no scan. Forget the key so showing it again builds fresh picks.
+        if (!ShowSideRail) { _lastSuggestionKey = null; return; }
 
         var key = string.Join(",", _playlist.TrackIds);
         if (!force && key == _lastSuggestionKey) return;
@@ -574,6 +578,44 @@ public partial class PlaylistViewModel : ViewModelBase, ILocalSearchable, IDispo
     [RelayCommand]
     private void RefreshSuggestions() => RebuildSuggestions(force: true);
 
+    // ── Rail on/off (Discord, DendyAly 11-02) ──────────────────
+
+    /// <summary>The Featured Artists / Suggested rail shows (Settings PlaylistShowSideRail).
+    /// Hidden, the track list takes its width and neither list is built.</summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(SideRailMenuLabel))]
+    private bool _showSideRail = true;
+
+    /// <summary>The tracks the rail was last built from, so showing it again needs no reload.</summary>
+    private IReadOnlyList<Track> _railTracks = Array.Empty<Track>();
+
+    private Action<bool>? _sideRailAction;
+
+    /// <summary>The app's setter for the shared setting; the page follows it back through <see cref="ShowSideRail"/>.</summary>
+    public void SetSideRailAction(Action<bool> action) => _sideRailAction = action;
+
+    /// <summary>The playlist options menu entry: what a click does.</summary>
+    public string SideRailMenuLabel => Noctis.Localization.Loc.T(ShowSideRail ? "Playlist.HideSideRail" : "Playlist.ShowSideRail");
+
+    partial void OnShowSideRailChanged(bool value)
+    {
+        RebuildFeaturedArtists(_railTracks);
+        if (value) RebuildSuggestions(force: true);
+        else if (SuggestedTracks.Count > 0)
+        {
+            Interlocked.Increment(ref _suggestionGeneration); // drop a scan still running
+            SuggestedTracks.Clear();
+            OnPropertyChanged(nameof(HasSuggestions));
+        }
+    }
+
+    [RelayCommand]
+    private void ToggleSideRail()
+    {
+        if (_sideRailAction is { } action) action(!ShowSideRail);
+        else ShowSideRail = !ShowSideRail;
+    }
+
     [RelayCommand]
     private async Task AddSuggested(Track track)
     {
@@ -618,6 +660,17 @@ public partial class PlaylistViewModel : ViewModelBase, ILocalSearchable, IDispo
 
     private void RebuildFeaturedArtists(IReadOnlyList<Track> tracks)
     {
+        _railTracks = tracks;
+        // Rail hidden: no list and no artist-picture downloads until it is shown again.
+        if (!ShowSideRail)
+        {
+            if (FeaturedArtists.Count == 0) return;
+            FeaturedArtists.Clear();
+            OnPropertyChanged(nameof(HasFeaturedArtists));
+            OnPropertyChanged(nameof(FirstFeaturedArtistName));
+            OnPropertyChanged(nameof(TopFeaturedArtists));
+            return;
+        }
         var artistCounts = tracks
             .SelectMany(t => Track.ParseArtistTokens(t.Artist))
             .Where(name => !string.Equals(name, "Unknown Artist", StringComparison.OrdinalIgnoreCase))
@@ -686,6 +739,11 @@ public partial class PlaylistViewModel : ViewModelBase, ILocalSearchable, IDispo
         if (tracks.Count == 0) return;
         _player.ReplaceQueueAndPlay(tracks, 0);
     }
+
+    /// <summary>The whole playlist in the current sort while a search narrows <see cref="Tracks"/>;
+    /// null without a search. A song played from a search continues with the playlist after it
+    /// (as LibrarySongsViewModel.PlayContext), not with the other search results only.</summary>
+    private IReadOnlyList<Track>? _unfilteredTracks;
 
     [RelayCommand]
     private void PlayFrom(Track track)
@@ -777,6 +835,13 @@ public partial class PlaylistViewModel : ViewModelBase, ILocalSearchable, IDispo
                 Tracks.RemoveAt(displayIdx);
             _playlist.TrackIds.Remove(t.Id);
             if (!_playlist.TrackIds.Contains(t.Id)) _playlist.TrackAddedAt.Remove(t.Id);
+        }
+        // The whole-playlist list a search-play continues with must lose them too.
+        if (_unfilteredTracks != null)
+        {
+            var unfiltered = _unfilteredTracks.ToList();
+            foreach (var t in tracks) unfiltered.Remove(t);
+            _unfilteredTracks = unfiltered;
         }
         _playlist.ModifiedAt = DateTime.UtcNow;
         TrackCount = Tracks.Count;

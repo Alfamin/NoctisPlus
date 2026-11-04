@@ -90,11 +90,19 @@ public interface ILibraryService
     event EventHandler<List<string>>? MusicFoldersChanged;
 
     /// <summary>
-    /// Fires when a scan was abandoned because configured music folders were unavailable
-    /// (offline drive / unreachable share). Carries the missing root paths; the existing
-    /// library is left untouched.
+    /// Fires when a scan found configured music folders unavailable (offline drive /
+    /// unreachable share). Carries the missing root paths. The scan was abandoned and the
+    /// library left untouched, or (LibraryService.ScanPastUnavailableFolders, the phone) their
+    /// songs were kept as they were and the other folders applied.
     /// </summary>
     event EventHandler<string[]>? ScanAborted;
+
+    /// <summary>
+    /// Fires once a scan or import has published tracks for files the library did not know
+    /// before (re-read known files are not included). Raised on the scan's thread, after
+    /// <see cref="LibraryUpdated"/>. Drives the automatic ReplayGain scan (GitHub #148).
+    /// </summary>
+    event EventHandler<IReadOnlyList<Track>>? TracksAdded { add { } remove { } }
 
     /// <summary>
     /// Scans configured music folders for audio files.
@@ -234,4 +242,11 @@ public interface ILibraryService
     /// pass is running returns 0. Returns the number of albums that gained a cover.
     /// </summary>
     Task<int> BackfillMissingArtworkAsync(CancellationToken ct = default);
+
+    /// <summary>
+    /// Reads the ReplayGain tags of those of <paramref name="tracks"/> never read yet, now, on
+    /// a background thread, instead of when the startup pass reaches them (GitHub #158: the
+    /// Songs list's ReplayGain column asks for the rows on screen). No-op for the rest.
+    /// </summary>
+    void ReadReplayGainSoon(IEnumerable<Track> tracks) { }
 }

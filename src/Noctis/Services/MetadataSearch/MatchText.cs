@@ -69,12 +69,7 @@ public static partial class MatchText
     }
 
     /// <summary>Removes featured-artist credits from a title.</summary>
-    public static string StripFeaturing(string? title)
-    {
-        if (string.IsNullOrWhiteSpace(title)) return string.Empty;
-        var s = BracketFeaturing().Replace(title, string.Empty);
-        return TrailingFeaturing().Replace(s, string.Empty).Trim();
-    }
+    public static string StripFeaturing(string? title) => LyricsSearchSelector.StripFeaturing(title);
 
     /// <summary>
     /// Splits a title into its folded base and the "different recording" markers found in its

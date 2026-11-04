@@ -30,6 +30,7 @@ namespace Noctis.Tests;
 /// so it moves smoothly under the sheet and is never retaken; the snapshot remains the Liquid
 /// Glass fallback, and only changes that can repaint the app retake it.
 /// </summary>
+[Collection("Backdrop globals")]
 public class BlurredBackdropLiveTests
 {
     private static bool PumpUntil(Func<bool> condition, int budgetMs = 3000)
@@ -50,6 +51,8 @@ public class BlurredBackdropLiveTests
     /// moves) and the live backdrop as its sibling over it.</summary>
     private static (Window win, Panel layer, TranslateTransform move, BlurredBackdrop backdrop) Build()
     {
+        // Settings writes this process-wide value; each scenario starts from its stated default.
+        BackdropSnapshot.BlurRadius = BackdropSnapshot.DefaultBlurRadius;
         var line = new Border
         {
             Width = 120, Height = 40, Background = Brushes.White,

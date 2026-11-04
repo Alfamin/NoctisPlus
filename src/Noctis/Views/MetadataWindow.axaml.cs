@@ -38,6 +38,28 @@ public partial class MetadataWindow : Window
             genreCombo.DropDownClosed += OnGenreDropDownClosed;
         }
 
+        // Plain Lyrics scrolls as a page (PlainLyricsScroll), so the box's own ScrollViewer is
+        // Disabled and TextBox's PageUp/PageDown, which page that inner viewer, did nothing.
+        // Page the page instead, as the box did before (caret stays put).
+        PlainLyricsBox.AddHandler(KeyDownEvent, (_, e) =>
+        {
+            if (e.KeyModifiers != KeyModifiers.None) return;
+            if (e.Key == Key.PageDown) { PlainLyricsScroll.PageDown(); e.Handled = true; }
+            else if (e.Key == Key.PageUp) { PlainLyricsScroll.PageUp(); e.Handled = true; }
+        }, RoutingStrategies.Tunnel);
+        // Focusing the box (a click into the lyrics) asks to bring the WHOLE box into view,
+        // which scrolled the page so the box's top met the viewport's and the toolbar slid
+        // off. When the box is already on screen, skip that; the caret's own bring-into-view
+        // (TextPresenter) still scrolls whatever the caret needs.
+        PlainLyricsBox.AddHandler(RequestBringIntoViewEvent, (_, e) =>
+        {
+            if (!ReferenceEquals(e.TargetObject, PlainLyricsBox)) return;
+            var top = PlainLyricsBox.TranslatePoint(default, PlainLyricsScroll);
+            if (top is { } p && p.Y < PlainLyricsScroll.Viewport.Height
+                && p.Y + PlainLyricsBox.Bounds.Height > 0)
+                e.Handled = true;
+        });
+
         VolumeAdjustThumb.RenderTransform = _volumeAdjustThumbTransform;
         VolumeAdjustSlider.AddHandler(InputElement.PointerPressedEvent, OnVolumeAdjustPointerPressed, RoutingStrategies.Tunnel);
         VolumeAdjustSlider.AddHandler(InputElement.PointerMovedEvent, OnVolumeAdjustPointerMoved, RoutingStrategies.Tunnel);
@@ -149,6 +171,8 @@ public partial class MetadataWindow : Window
                 else
                     _artworkSearchMotion?.Hide();
             }
+            else return;
+            SetEditorBlurred(viewModel.IsArtworkSearchOpen || viewModel.IsAnimatedArtworkSearchOpen);
         };
         // Closing the editor with a search pop-up up: it plays its exit alongside the card's
         // (both CloseDuration on CloseEase), and is gone for good once the window is.
@@ -290,6 +314,25 @@ public partial class MetadataWindow : Window
         {
             if (DataContext is MetadataViewModel vm) vm.IsAnimatedArtworkSearchOpen = false;
         });
+    }
+
+    /// <summary>Owner 11-03: the editor card blurs behind an artwork search pop-up, like the
+    /// app does behind the card. A still blur (the card doesn't animate under it), eased in
+    /// and out with the pop-up's own timing.</summary>
+    internal static readonly double SearchBackdropBlurRadius = 14;
+
+    private void SetEditorBlurred(bool on)
+    {
+        if (EditorCard is null) return;
+        EditorCard.Transitions ??= new Avalonia.Animation.Transitions
+        {
+            new Avalonia.Animation.EffectTransition
+            {
+                Property = EffectProperty,
+                Duration = TimeSpan.FromMilliseconds(220),
+            },
+        };
+        EditorCard.Effect = new Avalonia.Media.BlurEffect { Radius = on ? SearchBackdropBlurRadius : 0 };
     }
 
     private void ShowArtworkSearchFlyout() => ArtworkSearchMotion?.Show();

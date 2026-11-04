@@ -96,9 +96,12 @@ public class LibraryService : ILibraryService
     /// <summary>
     /// Raised when a scan was abandoned because one or more configured music folders were
     /// unavailable (offline drive / unreachable share). Carries the missing root paths.
-    /// The existing library is left untouched.
+    /// The existing library is left untouched (with <see cref="ScanPastUnavailableFolders"/>:
+    /// only those folders' songs are, and the scan applies the rest).
     /// </summary>
     public event EventHandler<string[]>? ScanAborted;
+    /// <inheritdoc />
+    public event EventHandler<IReadOnlyList<Track>>? TracksAdded;
 
     public LibraryService(
         IMetadataService metadata,
@@ -126,6 +129,14 @@ public class LibraryService : ILibraryService
 
     /// <summary>Where scans enumerate and open files (desktop: directory walk; Android: SAF).</summary>
     private readonly IFileSystemSource _fileSystem;
+
+    /// <summary>
+    /// A scan that finds a music folder unavailable carries that folder's known songs forward
+    /// unchanged and applies the rest (the phone: a card taken out must not freeze the library).
+    /// Off, the scan is abandoned and the library kept as it was (the desktop's rule). Either way
+    /// <see cref="ScanAborted"/> names the unavailable folders.
+    /// </summary>
+    public bool ScanPastUnavailableFolders { get; init; }
 
     public async Task ScanAsync(IEnumerable<string> folders, CancellationToken ct = default)
     {
@@ -204,6 +215,8 @@ public class LibraryService : ILibraryService
         // Tracks re-read this scan: their embedded cover may have changed, so the
         // per-track cover pass after the scan re-decides their albums.
         var freshlyRead = new ConcurrentDictionary<Guid, byte>();
+        // Files the library did not know before this scan (TracksAdded, GitHub #148).
+        var firstSeen = new ConcurrentBag<Track>();
         var fileCount = 0;
         var unchangedCount = 0;
         var changedCount = 0;
@@ -365,6 +378,7 @@ public class LibraryService : ILibraryService
                             // Before the add below: a progressive publish must never show it
                             // in Songs first.
                             track.IsInInbox = IsUnderAnyRoot(filePath, inboxRoots);
+                            firstSeen.Add(track);
                         }
                         track.ArtworkHash = TrackArtwork.Fingerprint(embeddedArt);
                         freshlyRead.TryAdd(track.Id, 0);
@@ -512,7 +526,38 @@ public class LibraryService : ILibraryService
         {
             var strandedTracks = originalTracks.Count(t => unavailableRoots.Any(root => PathIsUnder(t.FilePath, root)));
 
-            if (strandedTracks > 0)
+            if (strandedTracks > 0 && ScanPastUnavailableFolders)
+            {
+                // The phone: a removed or added folder elsewhere used to wait for the card to come
+                // back (the abort below restored the old library). The unreachable folder's songs
+                // stay as they were (user state and all) and the reachable folders' changes apply.
+                var scannedIds = new HashSet<Guid>(newTracks.Select(t => t.Id));
+                var carried = originalTracks
+                    .Where(t => !IsServerTrack(t) && !scannedIds.Contains(t.Id)
+                                && unavailableRoots.Any(root => PathIsUnder(t.FilePath, root)))
+                    .ToList();
+                foreach (var t in carried) newTracks.Add(t);
+                walkedTrackCount += carried.Count;
+                unchangedCount += carried.Count;
+                var rootList = string.Join(", ", unavailableRoots);
+                DebugLog.Write("Library",
+                    $"Scan: {unavailableRoots.Count} music folder(s) unavailable ({rootList}); keeping their " +
+                    $"{carried.Count} track(s) as they were and applying the other folders.");
+                await _auditTrail.AppendAsync(new AuditEvent
+                {
+                    EventType = "scan.rootsUnavailable",
+                    EntityType = "library",
+                    EntityId = "local",
+                    Reason = "One or more music folders were unavailable; their tracks were kept",
+                    Details = new Dictionary<string, string>
+                    {
+                        ["unavailableRoots"] = rootList,
+                        ["tracksCarriedForward"] = carried.Count.ToString()
+                    }
+                }, ct);
+                ScanAborted?.Invoke(this, unavailableRoots.ToArray());
+            }
+            else if (strandedTracks > 0)
             {
                 RestoreOriginalLibrary();
                 var rootList = string.Join(", ", unavailableRoots);
@@ -734,6 +779,7 @@ public class LibraryService : ILibraryService
 
         DebugLog.Write("Scan", $"done ({_tracks.Count} tracks, t={Environment.TickCount64 - scanStarted}ms)");
         LibraryUpdated?.Invoke(this, EventArgs.Empty);
+        RaiseTracksAdded(firstSeen);
         // Tag reads and artwork extraction above leave large dead arrays behind;
         // every caller (startup, Settings rescan, folder watcher) gets the trim.
         MemoryTrim.RequestAfterIdle("scan");
@@ -750,6 +796,13 @@ public class LibraryService : ILibraryService
     /// AAC/ALAC file with Parallel.ForEach) after the user had asked the app to quit.
     /// </summary>
     private readonly CancellationTokenSource _shutdownCts = new();
+
+    /// <summary>
+    /// Cancelled (and replaced) by <see cref="ClearAsync"/>: the startup artwork heal and the tag
+    /// backfills walk a snapshot of the old library, so after Reset Everything they kept writing
+    /// covers into the emptied artwork folder and appending to a .progress file being deleted.
+    /// </summary>
+    private CancellationTokenSource _backfillStop = new();
 
     // Serializes "Merge Featured Artists" toggle passes: a newer flip cancels the
     // in-flight pass so rapid on/off flips can't interleave writes.
@@ -1245,6 +1298,8 @@ public class LibraryService : ILibraryService
         var originalAlbumIndex = _albumIndex;
         var didPublishPartial = false;
         var imported = new ConcurrentBag<Track>();
+        // Files the library did not know before this import (TracksAdded, GitHub #148).
+        var firstSeen = new ConcurrentBag<Track>();
         var unchangedKnown = new ConcurrentBag<Track>();
         // Same as the scan's: a file the tag read refused is named, not just left out.
         var skippedNote = new CappedBreadcrumb("Library", "import skipped, unreadable:", cap: 10, isEnabled: () => true);
@@ -1362,6 +1417,7 @@ public class LibraryService : ILibraryService
             {
                 track.SourceType = SourceType.Local;
                 track.IsInInbox = IsUnderAnyRoot(filePath, inboxRoots);
+                firstSeen.Add(track);
             }
             track.ArtworkHash = TrackArtwork.Fingerprint(embeddedArt);
 
@@ -1444,6 +1500,21 @@ public class LibraryService : ILibraryService
         // so a single file appearing in a watched folder rewrote all ~100k rows.
         await _sqliteIndex.UpsertTracksAsync(imported, ct);
         LibraryUpdated?.Invoke(this, EventArgs.Empty);
+        RaiseTracksAdded(firstSeen);
+    }
+
+    /// <summary>Raises <see cref="TracksAdded"/> for the new files that made it into the
+    /// published library. A subscriber's fault must not fail the scan or import.</summary>
+    private void RaiseTracksAdded(IEnumerable<Track> firstSeen)
+    {
+        var handler = TracksAdded;
+        if (handler == null) return;
+        var index = AllTrackIndex();
+        var added = firstSeen.Where(t => index.TryGetValue(t.Id, out var live) && ReferenceEquals(live, t))
+            .DistinctBy(t => t.Id).ToList();
+        if (added.Count == 0) return;
+        try { handler(this, added); }
+        catch (Exception ex) { DebugLog.Write("Library", $"TracksAdded handler failed: {ex.Message}"); }
     }
 
     /// <summary>
@@ -1976,7 +2047,7 @@ public class LibraryService : ILibraryService
     /// persisted settings, so tests await it before restoring them. Internal for tests.</summary>
     internal Task BackgroundInit { get; private set; } = Task.CompletedTask;
 
-    /// <summary>The v11 label pass and the v12 genre pass (<see cref="RunTagBackfillsAsync"/>), started at the end of
+    /// <summary>The v11 label pass, the v12 genre pass and the ReplayGain pass (<see cref="RunTagBackfillsAsync"/>), started at the end of
     /// <see cref="BackgroundInit"/> when it is pending. Internal for tests.</summary>
     internal Task LabelBackfill { get; private set; } = Task.CompletedTask;
 
@@ -2043,11 +2114,12 @@ public class LibraryService : ILibraryService
                     // any interruption or unreadable file left an album artless for
                     // good — rescans skip unchanged files by mtime and never retry.
                     // Cheap when every album already has art (one probe per album).
-                    await BackfillMissingArtworkAsync(_shutdownCts.Token);
+                    using (var heal = CancellationTokenSource.CreateLinkedTokenSource(_shutdownCts.Token, _backfillStop.Token))
+                        await BackfillMissingArtworkAsync(heal.Token);
 
                     // Last and on its own task: the v11 label and v12 genre passes can take many minutes on a
                     // hard disk and nothing above should wait for it.
-                    if (_labelBackfillPending || _genreBackfillPending)
+                    if (_labelBackfillPending || _genreBackfillPending || _tracks.Any(NeedsReplayGainRead))
                         LabelBackfill = Task.Run(RunTagBackfillsAsync);
                 }
                 catch (Exception ex)
@@ -2332,6 +2404,10 @@ public class LibraryService : ILibraryService
 
     public async Task ClearAsync()
     {
+        // Reset Everything: stop the passes over the old library first, so none writes after this.
+        Interlocked.Exchange(ref _backfillStop, new CancellationTokenSource()).Cancel();
+        try { await LabelBackfill.ConfigureAwait(false); } catch { /* it logs its own failure */ }
+
         // Copy-and-swap (see RemoveTrackAsync) — concurrent readers keep the old lists.
         _tracks = new List<Track>();
         _albums = new List<Album>();
@@ -2341,6 +2417,19 @@ public class LibraryService : ILibraryService
         lock (_albumsByArtistLock) { _albumsByArtistIndex = null; }
         await _persistence.SaveLibraryAsync(_tracks);
         await _sqliteIndex.ClearAsync();
+        // The ratings / favorites / play counts journal too: it outlives scans on purpose (a
+        // returning file gets its state back), so a rescan after the reset restored all of it.
+        await _sqliteIndex.ClearUserStateAsync();
+        // A stopped backfill's resume log (replaygain-, label-, genre-backfill.progress).
+        await Task.Run(() =>
+        {
+            try
+            {
+                foreach (var file in Directory.EnumerateFiles(_persistence.DataDirectory, "*-backfill.progress"))
+                    File.Delete(file);
+            }
+            catch (Exception ex) { DebugLog.Write("Library", $"Clear: backfill progress not deleted: {ex.Message}"); }
+        });
         LibraryUpdated?.Invoke(this, EventArgs.Empty);
     }
 
@@ -2561,6 +2650,7 @@ public class LibraryService : ILibraryService
         target.VolumeAdjust = source.VolumeAdjust;
         target.EqPreset = source.EqPreset;
         target.LyricsOffsetMs = source.LyricsOffsetMs;
+        target.NoLyrics = source.NoLyrics;
         target.SavedPositionMs = source.SavedPositionMs;
         target.DateAdded = source.DateAdded;
         target.AddedIndividually = source.AddedIndividually;
@@ -3021,16 +3111,36 @@ public class LibraryService : ILibraryService
     /// field, how to read it from a file (empty = nothing to apply) and how to apply it.
     /// <paramref name="MarkPhoneTracks"/>: tracks behind Android's document tree are marked for
     /// the next scan instead (they can't be opened by path here).
+    /// <paramref name="SchemaVersion"/>: stamped once every file is checked; null for a pass that
+    /// tracks its progress on the tracks themselves (ReplayGain: <see cref="Track.ReplayGainChecked"/>)
+    /// and simply runs again next launch for whatever is still unread.
     /// </summary>
     private sealed record TagBackfill(
-        string Name, int SchemaVersion, string ProgressFileName,
+        string Name, int? SchemaVersion, string ProgressFileName,
         Func<Track, bool> Needs, Func<string, string> Read, Action<Track, string> Apply,
         bool MarkPhoneTracks, bool Reindex);
 
-    /// <summary>The v11 label pass, then the v12 genre pass, each only when pending. The genre
-    /// pass waits for the label pass to finish: it stamps a later version.</summary>
+    /// <summary>The ReplayGain pass, then the v11 label pass, then the v12 genre pass, each only
+    /// when pending. The genre pass waits for the label pass to finish: it stamps a later version.</summary>
     private async Task RunTagBackfillsAsync()
     {
+        // GitHub #151: the Songs list's ReplayGain column. Tracks indexed before the field
+        // existed are read once for their REPLAYGAIN_* tags alone; a file without any is
+        // marked checked too ("|||"), so it is never re-read. Missing or offline files stay
+        // unchecked and are tried again next launch.
+        // GitHub #158: first, not last. Behind the label and genre passes (each a read of most
+        // of the library) the column stayed blank for most songs until both were done.
+        if (_tracks.Any(NeedsReplayGainRead))
+        {
+            var replayGain = new TagBackfill("replaygain", null, "replaygain-backfill.progress",
+                NeedsReplayGainRead,
+                path => _metadata.ReadReplayGain(path) is { } rg ? EncodeReplayGain(rg) : string.Empty,
+                (t, v) => t.ApplyReplayGain(DecodeReplayGain(v)),
+                MarkPhoneTracks: false, Reindex: false);
+            // Cancelled at shutdown: the passes below would stop at once anyway.
+            if (!await RunTagBackfillAsync(replayGain)) return;
+        }
+
         if (_labelBackfillPending)
         {
             var label = new TagBackfill("label", LabelSchemaVersion, "label-backfill.progress",
@@ -3053,6 +3163,68 @@ public class LibraryService : ILibraryService
                 MarkPhoneTracks: false, Reindex: true);
             await RunTagBackfillAsync(genre);
         }
+    }
+
+    /// <summary>A local file whose ReplayGain tags were never read (indexed before #151's column).</summary>
+    private static bool NeedsReplayGainRead(Track t) => !t.ReplayGainChecked && Track.IsFilesystemPath(t.FilePath);
+
+    // GitHub #158: songs on screen in the Songs list whose ReplayGain was never read, read now
+    // instead of whenever the background pass reaches their path. One reader at a time.
+    private readonly ConcurrentQueue<Track> _replayGainSoon = new();
+    private int _replayGainSoonRunning;
+
+    /// <inheritdoc />
+    public void ReadReplayGainSoon(IEnumerable<Track> tracks)
+    {
+        var queued = false;
+        foreach (var t in tracks)
+        {
+            if (!NeedsReplayGainRead(t)) continue;
+            _replayGainSoon.Enqueue(t);
+            queued = true;
+        }
+        if (queued && Interlocked.CompareExchange(ref _replayGainSoonRunning, 1, 0) == 0)
+            ReplayGainSoonTask = Task.Run(DrainReplayGainSoon);
+    }
+
+    /// <summary>The latest <see cref="ReadReplayGainSoon"/> reader. Internal for tests.</summary>
+    internal Task ReplayGainSoonTask { get; private set; } = Task.CompletedTask;
+
+    private void DrainReplayGainSoon()
+    {
+        while (true)
+        {
+            while (_replayGainSoon.TryDequeue(out var t))
+            {
+                // A row scrolled past twice is queued twice; the second finds it read.
+                if (_shutdownCts.IsCancellationRequested || !NeedsReplayGainRead(t)) continue;
+                // Null: unreadable now (offline, locked); the background pass retries it.
+                // The value lands in library.json with the next save (the pass saves when done).
+                if (_metadata.ReadReplayGain(t.FilePath) is { } rg)
+                    t.ApplyReplayGain(rg);
+            }
+            Volatile.Write(ref _replayGainSoonRunning, 0);
+            // A request queued after the last dequeue but before the flag dropped found the
+            // reader still running: pick it up here rather than leave it waiting.
+            if (_replayGainSoon.IsEmpty || Interlocked.CompareExchange(ref _replayGainSoonRunning, 1, 0) != 0)
+                return;
+        }
+    }
+
+    // The ReplayGain pass's progress-log value: "track|peak|album" (invariant, round-trip;
+    // empty = none). Never blank, so a file with no ReplayGain is logged as checked too.
+    internal static string EncodeReplayGain(ReplayGainValues v)
+    {
+        static string F(double? d) => d?.ToString("R", System.Globalization.CultureInfo.InvariantCulture) ?? string.Empty;
+        return $"{F(v.TrackGainDb)}|{F(v.TrackPeak)}|{F(v.AlbumGainDb)}|";
+    }
+
+    internal static ReplayGainValues DecodeReplayGain(string value)
+    {
+        var parts = value.Split('|');
+        double? P(int i) => i < parts.Length && double.TryParse(parts[i], System.Globalization.NumberStyles.Float,
+            System.Globalization.CultureInfo.InvariantCulture, out var d) ? d : null;
+        return new ReplayGainValues(P(0), P(1), P(2));
     }
 
     /// <summary>
@@ -3080,11 +3252,15 @@ public class LibraryService : ILibraryService
     /// </summary>
     private async Task<bool> RunTagBackfillAsync(TagBackfill pass)
     {
-        var token = _shutdownCts.Token;
+        using var stop = CancellationTokenSource.CreateLinkedTokenSource(_shutdownCts.Token, _backfillStop.Token);
+        var token = stop.Token;
         var progressPath = Path.Combine(_persistence.DataDirectory, pass.ProgressFileName);
         var started = System.Diagnostics.Stopwatch.GetTimestamp();
         var snapshot = _tracks;
         StreamWriter? progress = null;
+        // A disconnected drive or share: one probe per root rather than a (possibly slow)
+        // File.Exists per file. Its files are skipped like any missing file.
+        var rootOnline = new Dictionary<string, bool>(StringComparer.OrdinalIgnoreCase);
         try
         {
             var byId = new Dictionary<Guid, Track>(snapshot.Count);
@@ -3157,7 +3333,10 @@ public class LibraryService : ILibraryService
                 {
                     if (token.IsCancellationRequested) break;
 
-                    if (File.Exists(track.FilePath))
+                    // Read meanwhile (GitHub #158: a Songs list row on screen) or edited: no
+                    // second open. Still counts as checked, so the cursor moves past it.
+                    var stillNeeded = pass.Needs(track);
+                    if (stillNeeded && RootOnline(track.FilePath) && File.Exists(track.FilePath))
                     {
                         var value = pass.Read(track.FilePath);
                         if (!string.IsNullOrWhiteSpace(value))
@@ -3178,6 +3357,7 @@ public class LibraryService : ILibraryService
                             $"{pass.Name} backfill: {checkedCount:N0}/{pending.Count:N0} checked, {applied:N0} found");
                     }
 
+                    if (!stillNeeded) continue; // nothing opened: no pause owed
                     try { await Task.Delay(LabelBackfillPause, token); }
                     catch (OperationCanceledException) { break; }
                 }
@@ -3233,7 +3413,8 @@ public class LibraryService : ILibraryService
             var stamped = false;
             try
             {
-                await _persistence.UpdateSettingsAsync(s => s.MetadataSchemaVersion = Math.Max(s.MetadataSchemaVersion, pass.SchemaVersion));
+                if (pass.SchemaVersion is { } version)
+                    await _persistence.UpdateSettingsAsync(s => s.MetadataSchemaVersion = Math.Max(s.MetadataSchemaVersion, version));
                 stamped = true;
                 File.Delete(progressPath);
             }
@@ -3254,6 +3435,21 @@ public class LibraryService : ILibraryService
         {
             DebugLog.Write("Library", $"{pass.Name} backfill failed: {ex.Message}");
             return false;
+        }
+
+        bool RootOnline(string path)
+        {
+            string? root;
+            try { root = Path.GetPathRoot(path); }
+            catch { return true; }
+            if (string.IsNullOrEmpty(root)) return true;
+            if (!rootOnline.TryGetValue(root, out var online))
+            {
+                try { online = Directory.Exists(root); }
+                catch { online = false; }
+                rootOnline[root] = online;
+            }
+            return online;
         }
 
         // Appends one log line. After a failed write nothing more is logged: a later cursor

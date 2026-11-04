@@ -20,6 +20,10 @@ namespace Noctis.Tests;
 /// Settings sheet follows it live: it re-blurs the snapshot it already has as the thumb moves,
 /// and fades to the plain dim at Off and back.
 /// </summary>
+[CollectionDefinition("Backdrop globals", DisableParallelization = true)]
+public sealed class BackdropGlobalsCollection { }
+
+[Collection("Backdrop globals")]
 public class BackgroundBlurSettingTests : IDisposable
 {
     private readonly string _root =

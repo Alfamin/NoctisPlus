@@ -1,3 +1,4 @@
+using LineMotion = Noctis.Helpers.PlusLineMotion;
 using Noctis.Helpers;
 
 namespace Noctis.Services.LyricsVideo;

@@ -178,7 +178,7 @@ public partial class PlaylistViewModel
     /// stand-ins) when streaming is on, else only the songs you have, as before.</summary>
     internal List<Track> PlaybackList()
     {
-        if (!Streams) return Tracks.ToList();
+        if (!Streams) return (_unfilteredTracks ?? Tracks).ToList();
         var list = new List<Track>(Rows.Count);
         foreach (var row in Rows)
             if (row is Track track) list.Add(track);

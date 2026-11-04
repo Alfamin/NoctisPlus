@@ -1,4 +1,5 @@
-﻿using System;
+﻿using LineMotion = Noctis.Helpers.PlusLineMotion;
+using System;
 using System.Diagnostics;
 using Avalonia;
 using Avalonia.Animation;
@@ -650,7 +651,8 @@ public partial class LyricsView : UserControl
     private void UpdateFlowAnimationState(LyricsViewModel vm)
     {
         var flowing = vm.Player.LyricsFlowingLightEnabled
-                      && string.IsNullOrEmpty(vm.Player.LyricsBackgroundMediaPath);
+                      && string.IsNullOrEmpty(vm.Player.LyricsBackgroundMediaPath)
+                      && !vm.Player.ShowsMusicVideoBackdrop && !vm.Player.ShowsMusicVideoFullSize;
         var style = FlowingStyles.Normalize(vm.Player.LyricsFlowingStyle);
         var kawarp = flowing && vm.IsColorModeArtwork && FlowingStyles.IsKawarp(style);
         var plugin = flowing && vm.IsColorModeArtwork && !kawarp ? SelectedPluginLayer(vm) : null;
@@ -679,7 +681,9 @@ public partial class LyricsView : UserControl
         if (e.PropertyName is nameof(PlayerViewModel.LyricsFlowingLightEnabled)
                 or nameof(PlayerViewModel.LyricsFlowingStyle)
                 or nameof(PlayerViewModel.LyricsDriftMovement)
-                or nameof(PlayerViewModel.LyricsBackgroundMediaPath) &&
+                or nameof(PlayerViewModel.LyricsBackgroundMediaPath)
+                or nameof(PlayerViewModel.ShowsMusicVideoBackdrop)
+                or nameof(PlayerViewModel.ShowsMusicVideoFullSize) &&
             DataContext is LyricsViewModel vm)
             UpdateFlowAnimationState(vm);
         if (e.PropertyName is nameof(PlayerViewModel.SeekableFraction) or nameof(PlayerViewModel.WaveformSeekBarEnabled))
