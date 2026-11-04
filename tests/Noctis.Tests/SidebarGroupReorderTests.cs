@@ -236,6 +236,9 @@ public class SidebarGroupReorderTests
         // Opening: the inserted row starts shut and grows back to full height.
         s.Win.MouseDown(at, MouseButton.Left);
         s.Win.MouseUp(at, MouseButton.Left, RawInputModifiers.None);
+        // Realize the new rows before pumping Background jobs, as a real render/layout pass
+        // does. Otherwise the test clears the pending-unfold set before creating any container.
+        s.Win.UpdateLayout();
         Pump(6);
         var opening = Row(s.List, 1);
         Assert.InRange(opening.Bounds.Height, 0.5, full - 0.5);

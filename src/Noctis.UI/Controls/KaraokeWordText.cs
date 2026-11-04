@@ -380,33 +380,27 @@ public class KaraokeWordText : TextBlock
             // The effect's pose replaces Noctis's float and held-note letters. Drawn off the
             // pixel grid while the word moves (see Unsnapped); the glow layer (BaseOpacity 0)
             // takes the effect's glow strength on top of its own fade.
-            // Snapping is chosen from whether the effect actually moved a piece since the last
-            // frame, not from the Progress/Lift windows: a still word is drawn the same way on
-            // every frame (no ~0.6 px hop while a neighbour crosses the window), and a resting
-            // piece's offset sits on whole device pixels.
+            // Keep the same subpixel transform during motion AND rest. Switching raster modes
+            // on the first still frame moves a fractional resting pose by up to half a pixel.
             var count = _pieces.Count;
             if (_poses.Length < count) _poses = new LetterPose[Math.Max(count, _poses.Length * 2)];
-            if (_lastPoses.Length < count) { _lastPoses = new LetterPose[_poses.Length]; _lastPoseCount = -1; }
-            var moving = false;
             for (int i = 0; i < count; i++)
             {
                 _poses[i] = Pose(i);
-                if (_effect is null) return; // it threw: Noctis's own look from the next frame
-                if (_lastPoseCount != count || _poses[i] != _lastPoses[i]) moving |= _lastPoseCount == count;
+                if (_effect is null)
+                {
+                    _dirty = true;
+                    RenderTextLayout(context, origin); // paint native text now, never a blank failure frame
+                    return;
+                }
             }
-            Array.Copy(_poses, _lastPoses, count);
-            _lastPoseCount = count;
-            PoseMovingForTest = moving;
 
-            var at = Matrix.CreateTranslation(origin.X, origin.Y);
-            if (moving) at = Unsnapped * at;
+            var at = Unsnapped * Matrix.CreateTranslation(origin.X, origin.Y);
             using var placed = context.PushTransform(at);
             var glowLayer = BaseOpacity <= 0;
-            var scaling = VisualRoot is TopLevel { RenderScaling: > 0 and var s } ? s : 1.0;
             for (int i = 0; i < count; i++)
             {
                 var pose = _poses[i];
-                if (!moving) pose = RestOnPixels(pose, scaling);
                 using (context.PushTransform(PoseTransform(i, pose)))
                 {
                     if (glowLayer)
@@ -447,20 +441,6 @@ public class KaraokeWordText : TextBlock
     private static readonly Matrix Unsnapped = new(1, 1e-3, 0, 1, 0, 0);
 
     private LetterPose[] _poses = new LetterPose[8];
-    private LetterPose[] _lastPoses = new LetterPose[8];
-    private int _lastPoseCount = -1;
-
-    /// <summary>Test hook: whether the last posed frame was drawn as moving (unsnapped).</summary>
-    internal bool PoseMovingForTest { get; private set; }
-
-    /// <summary>A still pose with its offsets rounded to whole device pixels.</summary>
-    internal LetterPose RestOnPixels(LetterPose pose, double scaling)
-    {
-        var fs = FontSize;
-        if (fs <= 0 || scaling <= 0) return pose;
-        double Round(double em) => Math.Round(em * fs * scaling) / scaling / fs;
-        return pose with { OffsetXEm = Round(pose.OffsetXEm), OffsetYEm = Round(pose.OffsetYEm) };
-    }
 
     private bool IsMoving =>
         Lift is > 0 and < 1 || (_perLetter && !double.IsNaN(EmphasisMs));

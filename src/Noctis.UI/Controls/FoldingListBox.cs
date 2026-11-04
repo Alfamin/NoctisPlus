@@ -70,6 +70,7 @@ public class FoldingListBoxItem : ListBoxItem
     private TimeSpan? _start;
     private int _generation;
     private TaskCompletionSource? _done;
+    private TaskCompletionSource? _unfoldWhenAttached;
 
     /// <summary>Shuts the row at once; call before it first lays out, then <see cref="Unfold"/>.</summary>
     public void SnapShut()
@@ -80,7 +81,30 @@ public class FoldingListBoxItem : ListBoxItem
     }
 
     /// <summary>Eases the row open.</summary>
-    public Task Unfold() => Animate(1, FoldDuration, FoldEase);
+    public Task Unfold()
+    {
+        if (TopLevel.GetTopLevel(this) is not null) return Animate(1, FoldDuration, FoldEase);
+        // ContainerPrepared precedes visual attachment. Starting here used to take Animate's
+        // no-window fallback and reveal the whole row instantly.
+        _unfoldWhenAttached?.TrySetResult();
+        _unfoldWhenAttached = new();
+        BeginFold(); SetReveal(0);
+        return _unfoldWhenAttached.Task;
+    }
+
+    protected override void OnAttachedToVisualTree(VisualTreeAttachmentEventArgs e)
+    {
+        base.OnAttachedToVisualTree(e);
+        if (_unfoldWhenAttached is not { } waiting) return;
+        _unfoldWhenAttached = null;
+        _ = CompleteUnfoldAsync(Animate(1, FoldDuration, FoldEase), waiting);
+    }
+
+    private static async Task CompleteUnfoldAsync(Task animation, TaskCompletionSource waiting)
+    {
+        try { await animation; }
+        finally { waiting.TrySetResult(); }
+    }
 
     /// <summary>Eases the row shut; the task ends when it is, so the row can then be removed.</summary>
     public Task Fold() => Animate(0, FoldDuration, FoldEase);
@@ -88,6 +112,7 @@ public class FoldingListBoxItem : ListBoxItem
     /// <summary>Back to a plain row (container recycled, or the fold finished open).</summary>
     public void ResetFold()
     {
+        _unfoldWhenAttached?.TrySetResult(); _unfoldWhenAttached = null;
         _generation++;
         _done?.TrySetResult();
         _done = null;

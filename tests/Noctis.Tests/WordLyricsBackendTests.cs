@@ -395,10 +395,11 @@ public class WordLyricsBackendTests
         Assert.Contains(asked, p => string.Equals(p, Path.GetFullPath(rig.Song), StringComparison.OrdinalIgnoreCase));
         Assert.Equal(1, worker.WaitingCount);                                 // kept in line, not started
         Assert.Equal(SongTimingStatus.None, worker.StatusFor(rig.Song));     // and says nothing while the sources answer
-        asked.Clear();
+        lock (asked) asked.Clear();
         worker.Restart();
         worker.TickNow();
-        Assert.NotEmpty(asked);
+        // Restart schedules its own tick too; the explicit tick may meet that callback in flight.
+        Assert.True(SpinWait.SpinUntil(() => { lock (asked) return asked.Count > 0; }, 3000), "restart never asked the online sources");
         Assert.Equal(1, worker.WaitingCount);
     }
 
