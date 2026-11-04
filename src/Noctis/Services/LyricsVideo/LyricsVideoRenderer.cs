@@ -52,7 +52,7 @@ internal sealed class LyricsVideoRenderer : IDisposable
         _page = Surface((int)g.Page.Width, (int)g.Page.Height);
         _lyrics = Surface((int)g.Lyrics.Width + 2 * LyricsBleed, (int)g.Lyrics.Height);
         // The flowing backgrounds are pure blur: drawn at a quarter size and stretched, they look the same for a sixteenth of the work.
-        _outerFlow = Surface(W / 4, H / 4);
+        _outerFlow = Surface(g.IsPanel ? W / 4 : 1, g.IsPanel ? H / 4 : 1);
         _pageFlow = Surface((int)g.Page.Width / 4, (int)g.Page.Height / 4);
         _reflection = Surface((int)g.Page.Width / 16, (int)g.Page.Height / 16);
         _lyric = scene.LyricPaint();
@@ -171,7 +171,7 @@ internal sealed class LyricsVideoRenderer : IDisposable
         // The Reel's own background: the flowing cover, deeper and darker than the page's, vignette baked in.
         if (g.IsPanel)
         {
-            DrawFlow(_outerFlow, _scene.Wash, t, pulse, scrim: 0.6f, vignette: true);
+            DrawBackground(_outerFlow, _scene.Wash, t, pulse, scrim: 0.6f, vignette: true);
             using var snap = _outerFlow.Snapshot();
             canvas.DrawImage(snap, new SKRect(0, 0, W, H), _smooth);
         }
@@ -268,6 +268,13 @@ internal sealed class LyricsVideoRenderer : IDisposable
         }
     }
 
+    private void DrawBackground(SKSurface target, SKImage art, double t, double pulse, float scrim, bool vignette = false)
+    {
+        if (_scene.Spec.Background == LyricsVideoBackground.Aurora)
+            LyricsVideoAurora.Draw(target, _scene.AuroraPalette, t, pulse, scrim, vignette);
+        else DrawFlow(target, art, t, pulse, scrim, vignette);
+    }
+
     private static void DrawCentered(SKCanvas canvas, SKImage art, float size, float opacity, SKSamplingOptions sampling)
     {
         using var paint = new SKPaint { Color = SKColors.White.WithAlpha(Alpha(opacity)) };
@@ -280,7 +287,7 @@ internal sealed class LyricsVideoRenderer : IDisposable
     {
         var g = _scene.Geometry;
         var canvas = _page.Canvas;
-        DrawFlow(_pageFlow, _scene.Backdrop, t, pulse, scrim: 0.5f);
+        DrawBackground(_pageFlow, _scene.Backdrop, t, pulse, scrim: 0.5f);
         using (var snap = _pageFlow.Snapshot())
             canvas.DrawImage(snap, new SKRect(0, 0, g.Page.Width, g.Page.Height), _smooth);
 
@@ -296,9 +303,17 @@ internal sealed class LyricsVideoRenderer : IDisposable
         }
         DrawCover(canvas, cover);
         if (g.IsPanel) DrawTitle(canvas, cover.MidX, cover.Bottom + (g.Title.Y - g.Cover.Bottom), titleIn);
-        else DrawTitle(canvas, Lerp(g.Title.X, 540, coverMove),
-            Lerp(g.Title.Y + (float)headerDy, 1180, coverMove), titleIn,
-            Lerp(g.TitleCentered ? 1 : 0, 1, coverMove), Lerp(g.TitleWidth, 840, coverMove));
+        else
+        {
+            var outro = _scene.Spec.Outro ? Math.Max(0, t - _scene.Spec.LyricsEnd) : 0;
+            var headerAlpha = 1 - LyricsVideoMotion.CubicInOut(outro / 0.35);
+            DrawTitle(canvas, g.Title.X, g.Title.Y + (float)headerDy, titleIn * headerAlpha,
+                g.TitleCentered ? 1 : 0, g.TitleWidth);
+            // The compact title lives beside the cover; do not drag it through the growing artwork.
+            // Fade it out in place, then bring the outro title in under the centred cover.
+            if (outro > 0)
+                DrawTitle(canvas, 540, 1180, titleIn * LyricsVideoMotion.CubicInOut((outro - 0.95) / 0.6), 1, 840);
+        }
 
         if (lyricsIn <= 0.001) return;
         var vp = g.Lyrics;

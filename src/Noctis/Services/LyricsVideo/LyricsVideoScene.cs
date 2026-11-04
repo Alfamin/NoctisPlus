@@ -51,6 +51,7 @@ internal sealed class LyricsVideoScene : IDisposable
     public SKTypeface Bold { get; }
     public SKTypeface SemiBold { get; }
     public SKImage? Cover { get; }
+    public IReadOnlyList<LyricsVideoAurora.Lab> AuroraPalette { get; }
     /// <summary>The cover as the lyrics page's flowing background uses it: 128 px, blurred once (PreBlurredArtworkConverter).</summary>
     public SKImage Backdrop { get; }
     /// <summary>The same cover washed out further, for the Reel around the page (deeper than the page itself).</summary>
@@ -72,11 +73,13 @@ internal sealed class LyricsVideoScene : IDisposable
         Bold = LyricsVideoFonts.Load("Inter-Bold.ttf", SKFontStyleWeight.Bold);
         SemiBold = LyricsVideoFonts.Load("Inter-SemiBold.ttf", SKFontStyleWeight.SemiBold);
         Cover = LoadCover(spec.CoverPath, 1200);
+        AuroraPalette = spec.Background == LyricsVideoBackground.Aurora ? LyricsVideoAurora.Palette(Cover) : [];
         Backdrop = MakeBackdrop(Cover, 2.4f);
         Wash = MakeBackdrop(Cover, 6f);
         (GrainAdd, GrainSub) = MakeGrain();
         PanelShadowPad = 70;
-        PanelShadow = Shadow(Geometry.Page.Width, Geometry.Page.Height, Geometry.PageRadius, PanelShadowPad, 34, 0.62f);
+        PanelShadow = Shadow(Geometry.IsPanel ? Geometry.Page.Width : 1, Geometry.IsPanel ? Geometry.Page.Height : 1,
+            Geometry.PageRadius, Geometry.IsPanel ? PanelShadowPad : 0, Geometry.IsPanel ? 34 : 0, 0.62f);
         CoverShadowPad = Geometry.Cover.Width * 0.2f;
         CoverShadow = Shadow(Geometry.Cover.Width, Geometry.Cover.Height, Geometry.CoverRadius, CoverShadowPad, Geometry.Cover.Width * 0.06f, 0.5f);
 

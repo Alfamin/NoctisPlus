@@ -107,10 +107,12 @@ public class LyricsVideoRendererTests
         return sum / n;
     }
 
-    [AvaloniaFact]
-    public void AFrame_IsTheSameWhicheverOrderFramesAreDrawnIn()
+    [AvaloniaTheory]
+    [InlineData(LyricsVideoBackground.FlowingCover)]
+    [InlineData(LyricsVideoBackground.Aurora)]
+    public void AFrame_IsTheSameWhicheverOrderFramesAreDrawnIn(LyricsVideoBackground background)
     {
-        var spec = Spec();
+        var spec = Spec() with { Background = background };
         using var scene = new LyricsVideoScene(spec);
         using var a = new LyricsVideoRenderer(scene);
         using var b = new LyricsVideoRenderer(scene);
@@ -190,6 +192,37 @@ public class LyricsVideoRendererTests
         vm.LayoutIndex = 0;
         Assert.True(vm.ShowReflection);
         Assert.Equal(78, vm.Reflection);
+        vm.BackgroundIndex = 1;
+        Assert.Equal(LyricsVideoBackground.Aurora, vm.Spec()!.Background);
+    }
+
+    [AvaloniaTheory]
+    [InlineData(LyricsVideoBackground.FlowingCover)]
+    [InlineData(LyricsVideoBackground.Aurora)]
+    public void BeatBreathing_DoesNotAddAWhiteFlash(LyricsVideoBackground background)
+    {
+        using var scene = new LyricsVideoScene(Spec() with { Background = background, CoverPath = null });
+        using var renderer = new LyricsVideoRenderer(scene);
+        var quiet = renderer.RenderPixels(120, _ => 0).ToArray();
+        var beat = renderer.RenderPixels(120, _ => 1).ToArray();
+        var backgroundArea = new SKRectI(0, 0, 1080, 250);
+        Assert.True(Math.Abs(Luma(quiet, backgroundArea) - Luma(beat, backgroundArea)) < 3,
+            "A beat must breathe in scale, not brighten the whole frame");
+    }
+
+    [AvaloniaFact]
+    public void AuroraPalette_ComesFromTheCoverAndHandlesFlatOrMissingArtwork()
+    {
+        using var surface = SKSurface.Create(new SKImageInfo(32, 32));
+        surface.Canvas.Clear(SKColors.Red);
+        using var red = surface.Snapshot();
+        surface.Canvas.Clear(SKColors.Blue);
+        using var blue = surface.Snapshot();
+        var redPalette = LyricsVideoAurora.Palette(red);
+        Assert.Equal(redPalette.ToArray(), LyricsVideoAurora.Palette(red).ToArray());
+        Assert.NotEqual(redPalette[0], LyricsVideoAurora.Palette(blue)[0]);
+        Assert.Equal(4, redPalette.Count);
+        Assert.All(LyricsVideoAurora.Palette(null), c => Assert.True(double.IsFinite(c.L + c.A + c.B)));
     }
 
     [AvaloniaFact]
@@ -199,17 +232,47 @@ public class LyricsVideoRendererTests
         if (string.IsNullOrEmpty(dir)) return;
         Directory.CreateDirectory(dir);
         foreach (var layout in Enum.GetValues<LyricsVideoLayout>())
+        foreach (var background in Enum.GetValues<LyricsVideoBackground>())
         {
-            var spec = Spec() with { Layout = layout };
+            var spec = Spec() with { Layout = layout, Background = background };
             using var scene = new LyricsVideoScene(spec);
             using var renderer = new LyricsVideoRenderer(scene);
-            foreach (var seconds in new[] { 0.4, 1.3, 3.0, 8.0, spec.Duration - 1.1 })
+            foreach (var seconds in new[] { 0.4, 1.3, 3.0, 8.0, spec.Duration - 2.0, spec.Duration - 1.1 })
             {
                 using var frame = renderer.Snapshot(spec.ClipStart + seconds, 0.3, (int)(seconds * 30));
                 using var data = frame.Encode(SKEncodedImageFormat.Png, 90);
-                File.WriteAllBytes(Path.Combine(dir, $"{layout}-{seconds:00.0}.png"), data.ToArray());
+                File.WriteAllBytes(Path.Combine(dir, $"{layout}-{background}-{seconds:00.0}.png"), data.ToArray());
             }
         }
+    }
+
+    [AvaloniaFact]
+    public async Task Shots_CompareBuiltStyleExports()
+    {
+        var dir = Environment.GetEnvironmentVariable("NOCTIS_VIDEO_SHOTS");
+        var ffmpeg = Environment.GetEnvironmentVariable("NOCTIS_FFMPEG");
+        if (string.IsNullOrEmpty(dir) || string.IsNullOrEmpty(ffmpeg) || Environment.GetEnvironmentVariable("NOCTIS_VIDEO_BENCH") != "1") return;
+        Directory.CreateDirectory(dir);
+        var audio = Path.Combine(dir, "style-beat.wav");
+        var psi = new ProcessStartInfo(ffmpeg) { UseShellExecute = false, CreateNoWindow = true };
+        foreach (var arg in new[] { "-y", "-hide_banner", "-loglevel", "error", "-f", "lavfi", "-i",
+            "sine=frequency=220:sample_rate=44100:duration=60", audio }) psi.ArgumentList.Add(arg);
+        using var make = Process.Start(psi)!;
+        await make.WaitForExitAsync();
+        Assert.Equal(0, make.ExitCode);
+        var timings = new List<object>();
+        foreach (var layout in Enum.GetValues<LyricsVideoLayout>())
+        foreach (var background in Enum.GetValues<LyricsVideoBackground>())
+        {
+            var spec = Spec() with { Layout = layout, Background = background };
+            var clock = Stopwatch.StartNew();
+            var path = Path.Combine(dir, $"{layout}-{background}.mp4");
+            Assert.Null(await LyricsVideoExporter.ExportAsync(spec, audio, ffmpeg, path, null, CancellationToken.None));
+            var seconds = clock.Elapsed.TotalSeconds;
+            _o.WriteLine($"{layout}/{background}: {spec.Duration:0.0}s Reel in {seconds:0.00}s");
+            timings.Add(new { Layout = layout.ToString(), Background = background.ToString(), spec.Duration, Seconds = seconds });
+        }
+        File.WriteAllText(Path.Combine(dir, "export-times.json"), System.Text.Json.JsonSerializer.Serialize(timings));
     }
 
     [AvaloniaFact]
