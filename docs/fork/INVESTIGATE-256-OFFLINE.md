@@ -13,7 +13,7 @@ Status: investigation only (docs), no code changed. Written under a short deadli
 ## Cause
 1. The For you Play replaces the queue with the page (log line above; source: src/Noctis/ViewModels/PlayerViewModel.QueueStreaming.cs:216). That alone is fine.
 2. Offline, each stand-in fails or stalls; playback moves on, so the "next two" window in `StreamAhead` (src/Noctis/ViewModels/PlayerViewModel.QueueStreaming.cs:338) walks down the page. Every move starts new ahead downloads (`PrefetchAsync`, fast lanes) and stops the ones no longer in the window: `gone.Source.CancelQueued` at QueueStreaming.cs:385. Each stop saves a partial (src/Noctis/Features/FreeMusicFinder/PartialAudio.cs:85). Result: one request per page song, ~33 partials in two minutes.
-3. A failed ahead download is retried every 10 s (QueueStreaming.cs:408, `Task.Delay(10 s)` then `PostStreamAhead`), with no offline check, so the loop never backs off.
+3. (Risk, not seen in this log: 0 retry lines.) A failed ahead download is retried every 10 s (QueueStreaming.cs:408, `Task.Delay(10 s)` then `PostStreamAhead`), with no offline check, so the loop never backs off.
 4. Nothing in StreamAhead / AskAhead (QueueStreaming.cs:268) / Downloads.PostAskAhead (Features/FreeMusicFinder/Downloads.cs:475) checks whether the network is up.
 5. Partials: yes, offline stops leave partial files; when the queue is set again (22:11:36) the window's songs resume immediately and back-to-back (3 in 4 s). No cap on concurrent resumes beyond the two fast lanes, and every queue change re-triggers them.
 
