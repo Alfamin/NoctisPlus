@@ -97,4 +97,29 @@ public sealed class TransferQueueTests
         }
         finally { Directory.Delete(dir, true); }
     }
+
+    [Fact]
+    public async Task Existing_target_does_not_block_the_queue()
+    {
+        var (drive, msg, data, dir) = Setup();
+        try
+        {
+            var target = Path.Combine(dir, "song.mp3");
+            File.WriteAllBytes(target, data); // already downloaded
+            var other = drive.AddFile(msg.Peer, "other.mp3", data);
+            var otherTarget = Path.Combine(dir, "other.mp3");
+            File.WriteAllBytes(otherTarget, new byte[] { 1, 2, 3 }); // a different file holds the name
+            var q = new TgTransferQueue(drive);
+            q.Enqueue(msg, target);
+            q.Enqueue(other, otherTarget);
+            Assert.Equal(TgTransferResult.Done, await q.RunNextAsync());
+            Assert.Equal(TgTransferResult.Done, await q.RunNextAsync());
+            Assert.Equal(0, q.Count);
+            Assert.Equal(data, File.ReadAllBytes(target));
+            Assert.Equal(new byte[] { 1, 2, 3 }, File.ReadAllBytes(otherTarget));
+            Assert.Equal(data, File.ReadAllBytes(Path.Combine(dir, "other (2).mp3")));
+            Assert.Empty(Directory.GetFiles(dir, "*.part"));
+        }
+        finally { Directory.Delete(dir, true); }
+    }
 }

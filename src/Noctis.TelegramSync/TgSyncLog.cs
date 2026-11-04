@@ -70,6 +70,7 @@ public sealed class TgSyncLog
     private readonly string? _cursorPath;
     private readonly List<BatchItem> _pending = new();
     private DateTime _nextPostUtc = DateTime.MinValue;
+    private readonly SemaphoreSlim _flushGate = new(1, 1);
 
     public TgSyncLog(ITelegramDrive drive, long channel, string device, TgLedger ledger, Func<DateTime>? now = null, string? cursorPath = null)
     {
@@ -103,25 +104,42 @@ public sealed class TgSyncLog
     public async Task<bool> FlushAsync(CancellationToken ct = default)
     {
         if (_pending.Count == 0) return false;
-        var now = _now();
-        if (now < _nextPostUtc) return false;
-        var batch = new SyncBatch(BatchCodec.Version, Device, Cursor.OwnSeq + 1, _pending.ToList());
+        if (!await _flushGate.WaitAsync(0, ct).ConfigureAwait(false)) return false; // one flush at a time
         try
         {
-            using var body = new MemoryStream(BatchCodec.Encode(batch));
-            await _drive.PostDocumentAsync(_channel, BatchFileName, body, BatchCaption, null, ct).ConfigureAwait(false);
+            var now = _now();
+            if (_pending.Count == 0 || now < _nextPostUtc) return false;
+            // Reserve the seq before posting: a crash or an ambiguous failure never reuses it.
+            var batch = new SyncBatch(BatchCodec.Version, Device, Cursor.OwnSeq + 1, _pending.ToList());
+            Cursor.OwnSeq = batch.Seq;
+            Save();
+            try
+            {
+                using var body = new MemoryStream(BatchCodec.Encode(batch));
+                await _drive.PostDocumentAsync(_channel, BatchFileName, body, BatchCaption, null, ct).ConfigureAwait(false);
+            }
+            catch (TelegramFloodWaitException e)
+            {
+                _nextPostUtc = now + e.RetryAfter;
+                // FLOOD_WAIT is a definite rejection (nothing landed), so the seq is free again: no gap for readers.
+                if (Cursor.OwnSeq == batch.Seq) { Cursor.OwnSeq = batch.Seq - 1; Save(); }
+                return false;
+            }
+            Cursor.Mark(Device, batch.Seq);
+            _pending.RemoveRange(0, batch.Items.Count); // keep items recorded while the post was in flight
+            _nextPostUtc = now + MinPostInterval;
+            Save();
+            return true;
         }
-        catch (TelegramFloodWaitException e)
-        {
-            _nextPostUtc = now + e.RetryAfter;
-            return false;
-        }
-        Cursor.OwnSeq = batch.Seq;
-        Cursor.Mark(Device, batch.Seq);
-        _pending.Clear();
-        _nextPostUtc = now + MinPostInterval;
-        Save();
-        return true;
+        finally { _flushGate.Release(); }
+    }
+
+    /// <summary>Own seq never goes below anything this device already posted (reinstall, lost cursor).</summary>
+    private void RaiseOwnSeq()
+    {
+        var high = Cursor.Contiguous.GetValueOrDefault(Device);
+        if (Cursor.Above.TryGetValue(Device, out var a) && a.Count > 0) high = Math.Max(high, a.Max);
+        if (high > Cursor.OwnSeq) Cursor.OwnSeq = high;
     }
 
     /// <summary>Reads every post after the cursor and merges it. Returns the number of batches applied.</summary>
@@ -135,16 +153,23 @@ public sealed class TgSyncLog
             if (page.Count == 0) break;
             foreach (var msg in page.OrderBy(m => m.Id))
             {
-                if (msg.Id > Cursor.LastMessageId) Cursor.LastMessageId = msg.Id;
-                if (msg.Document is null || msg.Caption != BatchCaption) continue;
-                var batch = await ReadBatchAsync(msg, ct).ConfigureAwait(false);
-                if (batch is null || batch.Snapshot || Cursor.Seen(batch.Device, batch.Seq)) continue;
-                foreach (var item in batch.Items) Ledger.Apply(item, batch.Device);
-                Cursor.Mark(batch.Device, batch.Seq);
-                applied++;
+                if (msg.Id <= Cursor.LastMessageId) continue;
+                // The cursor moves only after the post is applied or deliberately skipped; a failed download throws first.
+                if (msg.Document is not null && msg.Caption == BatchCaption)
+                {
+                    var batch = await ReadBatchAsync(msg, ct).ConfigureAwait(false);
+                    if (batch is not null && !batch.Snapshot && !Cursor.Seen(batch.Device, batch.Seq))
+                    {
+                        foreach (var item in batch.Items) Ledger.Apply(item, batch.Device);
+                        Cursor.Mark(batch.Device, batch.Seq);
+                        applied++;
+                    }
+                }
+                Cursor.LastMessageId = msg.Id;
             }
             if (page.Count < 100) break;
         }
+        RaiseOwnSeq();
         Save();
         return applied;
     }
@@ -163,6 +188,7 @@ public sealed class TgSyncLog
         }
         if (snap.UpToMessageId > Cursor.LastMessageId) Cursor.LastMessageId = snap.UpToMessageId;
         foreach (var d in DeviceSeqs(snap)) Cursor.Raise(d.Key, d.Value);
+        RaiseOwnSeq();
         Save();
         return true;
     }

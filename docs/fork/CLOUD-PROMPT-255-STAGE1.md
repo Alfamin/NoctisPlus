@@ -1,3 +1,4 @@
+Start from branch `android-plus-stage1-next` if it exists on origin, else `android-plus-stage1`.
 Repo: Alfamin/NoctisPlus, branch `android-plus` (based on release 2.7.0). Work on a new branch `android-plus-stage1` from it and push that branch when done. Do not touch `main`, do not tag, do not release.
 
 Read `docs/fork/ANDROID-PLUS-PLAN.md` first, all of it. It is the agreed design (owner #255): Telegram, on the owner's own account, is the shared drive and the sync log between the Noctis Plus PC app and the Noctis Plus phone app. No server.
