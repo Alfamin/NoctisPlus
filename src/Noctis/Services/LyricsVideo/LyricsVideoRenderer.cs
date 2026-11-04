@@ -39,6 +39,7 @@ internal sealed class LyricsVideoRenderer : IDisposable
     private readonly SKPaint _lyric;
     private readonly SKPaint _title;
     private readonly SKPaint _artist;
+    private readonly Dictionary<SKTypeface, SKFont> _lyricFonts = new();
     private readonly SKSamplingOptions _smooth = new(SKFilterMode.Linear, SKMipmapMode.None);
     private readonly SKSamplingOptions _sharp = new(SKCubicResampler.Mitchell);
     private uint[]? _frameSum;
@@ -112,6 +113,13 @@ internal sealed class LyricsVideoRenderer : IDisposable
         var pixels = _frame.PeekPixels().GetPixelSpan();
         GrainOut(pixels, pixels, frameIndex);
         return _frame.Snapshot();
+    }
+
+    /// <summary>The transparent lyrics before compositing, for measuring motion without background or grain.</summary>
+    internal SKImage SnapshotLyrics(double trackTime)
+    {
+        DrawLyricsLayer(trackTime, 1, 0);
+        return _lyrics.Snapshot();
     }
 
     private bool PageMoves(double t)
@@ -541,7 +549,7 @@ internal sealed class LyricsVideoRenderer : IDisposable
         if (hi - lo < 0.5f)
         {
             _lyric.Color = hi <= x ? dim : lit;
-            ShareCardRenderer.DrawTextFallback(canvas, text, x, 0, _lyric);
+            DrawLyricText(canvas, text, x, 0, _lyric);
         }
         else
         {
@@ -549,10 +557,29 @@ internal sealed class LyricsVideoRenderer : IDisposable
             using var shader = SKShader.CreateLinearGradient(new SKPoint(lo, 0), new SKPoint(hi, 0), [lit, dim], null,
                 SKShaderTileMode.Clamp, local);
             _lyric.Shader = shader;
-            ShareCardRenderer.DrawTextFallback(canvas, text, x, 0, _lyric);
+            DrawLyricText(canvas, text, x, 0, _lyric);
             _lyric.Shader = null;
         }
         _lyric.Color = SKColors.White;
+    }
+
+    private void DrawLyricText(SKCanvas canvas, string text, float x, float y, SKPaint paint)
+    {
+        foreach (var (run, face) in ShareCardRenderer.SplitFallbackRuns(text, paint.Typeface!))
+        {
+            if (!_lyricFonts.TryGetValue(face, out var font))
+            {
+                font = paint.ToFont();
+                font.Typeface = face;
+                // The native page moves rasterized letters continuously. Snapping a freshly drawn
+                // Reel glyph's baseline to an integer pixel turned its gentle rise into 1px stairs.
+                font.BaselineSnap = false;
+                font.Subpixel = true;
+                _lyricFonts.Add(face, font);
+            }
+            canvas.DrawText(run, x, y, font, paint);
+            x += font.MeasureText(run);
+        }
     }
 
     /// <summary>A held-note letter's pose about its centre, in word space (KaraokeWordText.LetterTransform).</summary>
@@ -586,7 +613,7 @@ internal sealed class LyricsVideoRenderer : IDisposable
             var m = LetterMatrix(letters, i, emphasisMs, p, size);
             canvas.Save();
             canvas.Concat(in m);
-            ShareCardRenderer.DrawTextFallback(canvas, letters[i].Text, letters[i].X, 0, paint);
+            DrawLyricText(canvas, letters[i].Text, letters[i].X, 0, paint);
             canvas.Restore();
         }
         canvas.Restore();
@@ -672,6 +699,7 @@ internal sealed class LyricsVideoRenderer : IDisposable
         _lyric.Dispose();
         _title.Dispose();
         _artist.Dispose();
+        foreach (var font in _lyricFonts.Values) font.Dispose();
     }
 }
 

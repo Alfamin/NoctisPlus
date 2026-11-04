@@ -197,6 +197,48 @@ public class LyricsVideoRendererTests
     }
 
     [AvaloniaTheory]
+    [InlineData(LyricsVideoLayout.SideBySide)]
+    [InlineData(LyricsVideoLayout.CompactHeader)]
+    [InlineData(LyricsVideoLayout.FullPage)]
+    public void FullyLitWord_FloatsSmoothlyWithoutPixelRowJumps(LyricsVideoLayout layout)
+    {
+        // A short note has already lit completely, but its gentle float is still finishing.
+        // Keep its line active and settled so the measured movement can only come from the glyph rasterizer.
+        var word = new LyricsVideoWord("mmmm", 4, 4.1, false, false, false, 100, true, 4);
+        var spec = Spec(intro: false, outro: false) with
+        {
+            Layout = layout, FirstLine = 0, LastLine = 0,
+            Lines = [new LyricsVideoLine("mmmm", 4, 10, [word])],
+        };
+        using var scene = new LyricsVideoScene(spec);
+        using var renderer = new LyricsVideoRenderer(scene);
+        double previous = double.NaN, worst = 0, first = 0, last = 0, settledDrift = 0;
+        for (var frame = 0; frame < 45; frame++)
+        {
+            var time = 4.2 + frame / 30.0;
+            using var image = renderer.SnapshotLyrics(time);
+            using var bitmap = SKBitmap.FromImage(image);
+            double mass = 0, weightedY = 0;
+            for (var y = 0; y < bitmap.Height; y++)
+                for (var x = 0; x < bitmap.Width; x++)
+                {
+                    var alpha = bitmap.GetPixel(x, y).Alpha;
+                    mass += alpha; weightedY += alpha * y;
+                }
+            Assert.True(mass > 0);
+            var centroid = weightedY / mass;
+            if (frame == 0) first = centroid;
+            if (double.IsFinite(previous)) worst = Math.Max(worst, Math.Abs(centroid - previous));
+            if (time >= 5.3 && double.IsFinite(previous)) settledDrift += Math.Abs(centroid - previous);
+            previous = last = centroid;
+        }
+        _o.WriteLine($"{layout}: largest vertical step {worst:0.000}px, total rise {first - last:0.000}px");
+        Assert.True(first > last + 0.5, "Keep the intended gentle word float");
+        Assert.True(worst < 0.4, $"Glyphs jumped {worst:0.000}px between adjacent 30fps frames");
+        Assert.True(settledDrift < 0.01, "A fully settled word must stop moving");
+    }
+
+    [AvaloniaTheory]
     [InlineData(LyricsVideoBackground.FlowingCover)]
     [InlineData(LyricsVideoBackground.Aurora)]
     public void BeatBreathing_DoesNotAddAWhiteFlash(LyricsVideoBackground background)
