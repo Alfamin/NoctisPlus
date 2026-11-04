@@ -28,7 +28,9 @@ public sealed class FakeTelegramDrive : ITelegramDrive
     public int Posts { get; private set; }
     public int HistoryCalls { get; private set; }
 
-    public Task<long> GetSelfUserIdAsync(CancellationToken ct = default) => Task.FromResult(SelfUserId);
+    public bool Revoked { get; set; }
+    private Channel Ch(long id) { if (Revoked) throw new TelegramSessionRevokedException(); return _channels.TryGetValue(id, out var c) ? c : throw new TelegramChannelGoneException(id); }
+    public Task<long> GetSelfUserIdAsync(CancellationToken ct = default) => Revoked ? throw new TelegramSessionRevokedException() : Task.FromResult(SelfUserId);
 
     public Task<TgChannel> FindOrCreateChannelAsync(string role, string title, string markerIfNew, CancellationToken ct = default)
     {
@@ -52,7 +54,7 @@ public sealed class FakeTelegramDrive : ITelegramDrive
         await content.CopyToAsync(ms, ct);
         lock (_gate)
         {
-            var c = _channels[channel];
+            var c = Ch(channel);
             var msg = new TgMessage(channel, _nextMessage++, caption, new TgDocument(_nextDocument++, fileName, ms.Length), DateTime.UtcNow);
             c.Messages.Add(new Stored(msg, ms.ToArray()));
             Posts++;
@@ -66,7 +68,7 @@ public sealed class FakeTelegramDrive : ITelegramDrive
         lock (_gate)
         {
             HistoryCalls++;
-            var page = _channels[channel].Messages.Where(m => m.Message.Id > afterId).Take(limit).Select(m => m.Message).ToList();
+            var page = Ch(channel).Messages.Where(m => m.Message.Id > afterId).Take(limit).Select(m => m.Message).ToList();
             if (DuplicateReads && page.Count > 0 && page.Count < limit) page.Insert(page.Count, page[0]);
             return Task.FromResult<IReadOnlyList<TgMessage>>(page);
         }
@@ -85,25 +87,25 @@ public sealed class FakeTelegramDrive : ITelegramDrive
     {
         lock (_gate)
         {
-            var c = _channels[channel];
+            var c = Ch(channel);
             return Task.FromResult(c.Pinned is { } p ? Find(channel, p)?.Message : null);
         }
     }
 
     public Task PinAsync(long channel, long id, CancellationToken ct = default)
     {
-        lock (_gate) _channels[channel].Pinned = id;
+        lock (_gate) Ch(channel).Pinned = id;
         return Task.CompletedTask;
     }
 
     public Task DeleteMessagesAsync(long channel, IReadOnlyList<long> ids, CancellationToken ct = default)
     {
-        lock (_gate) _channels[channel].Messages.RemoveAll(m => ids.Contains(m.Message.Id));
+        lock (_gate) Ch(channel).Messages.RemoveAll(m => ids.Contains(m.Message.Id));
         return Task.CompletedTask;
     }
 
     /// <summary>Delete every message older than <paramref name="id"/> (old posts gone after a snapshot).</summary>
-    public void DeleteBefore(long channel, long id) { lock (_gate) _channels[channel].Messages.RemoveAll(m => m.Message.Id < id); }
+    public void DeleteBefore(long channel, long id) { lock (_gate) Ch(channel).Messages.RemoveAll(m => m.Message.Id < id); }
 
     /// <summary>Called after each chunk is written; a test can cancel mid-transfer.</summary>
     public Action<long>? OnChunk { get; set; }
@@ -145,7 +147,7 @@ public sealed class FakeTelegramDrive : ITelegramDrive
         lock (_gate)
         {
             var msg = new TgMessage(channel, _nextMessage++, string.Empty, new TgDocument(_nextDocument++, fileName, data.Length), DateTime.UtcNow);
-            _channels[channel].Messages.Add(new Stored(msg, data));
+            Ch(channel).Messages.Add(new Stored(msg, data));
             return msg;
         }
     }
