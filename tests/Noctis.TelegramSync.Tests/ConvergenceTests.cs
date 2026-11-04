@@ -252,3 +252,114 @@ public sealed class RequestIdTests
         public Task<TgMessage> ForwardAsync(long fromPeer, long id, long toChannel, CancellationToken ct = default) => _inner.ForwardAsync(fromPeer, id, toChannel, ct);
     }
 }
+
+/// <summary>Cloud #261: the M2 case #260 left open. A fast writer reads ANOTHER fast device's post (same server second)
+/// before reading its own back: its raw stamp beat that post, its bounded one ties with it and loses on device id.</summary>
+public sealed class SameSecondFastWritersTests
+{
+    private static readonly DateTime T0 = new(2026, 11, 5, 10, 0, 0, DateTimeKind.Utc);
+
+    private sealed class World
+    {
+        public DateTime Now = T0;
+        public readonly FakeTelegramDrive Drive = new();
+        public readonly long Channel;
+        public World()
+        {
+            Drive.Clock = () => Now;
+            Channel = Drive.FindOrCreateChannelAsync(TgMarkers.Sync, "s", TgMarkers.For(TgMarkers.Sync, Guid.NewGuid())).Result.Id;
+        }
+        public TgSyncLog Device(string name, TimeSpan skew = default, string? path = null)
+            => new(Drive, Channel, name, new TgLedger(() => Now + skew), () => Now + skew, path) { MinPostInterval = TimeSpan.Zero };
+    }
+
+    private static readonly TimeSpan Fast = TimeSpan.FromHours(1);
+    private static void Rate(TgSyncLog d, int stars) => d.RecordJson(TgKinds.Track, "tg:1", new TrackSyncState(false, stars, false, 0, null, null));
+    private static int Stars(TgSyncLog d) => SyncJson.Deserialize<TrackSyncState>(d.Ledger.Get(TgKinds.Track, "tg:1")!.Payload)!.Rating;
+
+    [Theory]
+    [InlineData("a", "b")] // the device that reads the other's post first has the LOWER id: its own edit must give way
+    [InlineData("b", "a")] // ...or the higher id: its own edit must stay
+    public async Task TheWriterThatReadsTheOtherPostFirst_EndsLikeEveryReader(string first, string second)
+    {
+        var w = new World();
+        var early = w.Device(second, Fast); // posts first
+        var late = w.Device(first, Fast);   // reads early's post before its own read-back
+        Rate(early, 2); Rate(late, 4);
+        Assert.True(await early.FlushAsync());
+        await late.PullAsync();             // early's item loses to late's raw stamp here
+        Assert.True(await late.FlushAsync()); // same server second: both bounded to T0 + 2 min
+        w.Now += TimeSpan.FromSeconds(5);
+        await late.PullAsync(); await early.PullAsync();
+        var reader = w.Device("c"); await reader.PullAsync();
+
+        var winner = string.CompareOrdinal(first, second) > 0 ? 4 : 2;
+        Assert.Equal(winner, Stars(reader));
+        Assert.Equal(reader.Ledger.Fingerprint(), late.Ledger.Fingerprint());
+        Assert.Equal(reader.Ledger.Fingerprint(), early.Ledger.Fingerprint());
+    }
+
+    [Fact]
+    public async Task HeldItemSurvivesARestart_BetweenThePullAndTheReadBack()
+    {
+        var path = Path.Combine(Path.GetTempPath(), $"tg-shadow-{Guid.NewGuid():N}.json");
+        try
+        {
+            var w = new World();
+            var b = w.Device("b", Fast);
+            var a = w.Device("a", Fast, path);
+            Rate(b, 2); Rate(a, 4);
+            await b.FlushAsync(); await a.PullAsync(); await a.FlushAsync();
+            var restarted = w.Device("a", Fast, path);
+            w.Now += TimeSpan.FromSeconds(5);
+            await restarted.PullAsync();
+            var reader = w.Device("c"); await reader.PullAsync();
+            Assert.Equal(2, Stars(restarted));
+            Assert.Equal(reader.Ledger.Fingerprint(), restarted.Ledger.Fingerprint());
+        }
+        finally { foreach (var f in new[] { path, path + ".bak", path + ".tmp" }) if (File.Exists(f)) File.Delete(f); }
+    }
+
+    [Fact]
+    public async Task LostReplyRetry_AndSnapshotPlusTail_AllConverge()
+    {
+        var w = new World();
+        var b = w.Device("b", Fast); var a = w.Device("a", Fast);
+        Rate(b, 2); Rate(a, 4);
+        await b.FlushAsync(); await a.PullAsync();
+        w.Drive.AfterPost = () => { w.Drive.AfterPost = null; throw new TimeoutException("reply lost after acceptance"); };
+        await Assert.ThrowsAsync<TimeoutException>(() => a.FlushAsync()); // accepted in the same second
+        w.Now += TimeSpan.FromMinutes(10);
+        Assert.True(await a.FlushAsync());                                  // duplicate copy, later date: ignored by all
+        var keeper = w.Device("k"); await keeper.PullAsync(); await keeper.PostSnapshotAsync();
+        Rate(b, 5); w.Now += TimeSpan.FromMinutes(1); await b.FlushAsync(); // a tail after the snapshot
+        w.Now += TimeSpan.FromSeconds(5);
+        var fresh = w.Device("fresh"); Assert.True(await fresh.LoadSnapshotAsync()); await fresh.PullAsync();
+        var replay = w.Device("replay"); await replay.PullAsync();
+        await a.PullAsync(); await b.PullAsync(); await keeper.PullAsync();
+        Assert.Equal(5, Stars(replay));
+        foreach (var d in new[] { fresh, a, b, keeper }) Assert.Equal(replay.Ledger.Fingerprint(), d.Ledger.Fingerprint());
+    }
+
+    [Fact]
+    public async Task AnUnpostedLaterEditIsKept_AndEarlyPlaysStillCount()
+    {
+        var w = new World();
+        var b = w.Device("b", Fast); var a = w.Device("a", Fast);
+        a.RecordPlay("tg:9");                    // before a's first pull (M7)
+        Rate(b, 2); Rate(a, 4);
+        await b.FlushAsync(); await a.PullAsync(); await a.FlushAsync();
+        Rate(a, 1);                              // a newer local edit, not posted yet
+        w.Now += TimeSpan.FromSeconds(5);
+        await a.PullAsync();                     // the read-back of the older edit must not undo the newer one
+        Assert.Equal(1, Stars(a));
+        Assert.Equal(1, TgLibraryView.PlayCount(a.Ledger, "tg:9"));
+        w.Now += TimeSpan.FromSeconds(5);
+        await a.FlushAsync(); w.Now += TimeSpan.FromSeconds(5);
+        await a.PullAsync(); await b.PullAsync();
+        var reader = w.Device("c"); await reader.PullAsync();
+        Assert.Equal(1, Stars(reader));
+        Assert.Equal(reader.Ledger.Fingerprint(), a.Ledger.Fingerprint());
+        Assert.Equal(reader.Ledger.Fingerprint(), b.Ledger.Fingerprint());
+    }
+}

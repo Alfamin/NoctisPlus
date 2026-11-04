@@ -73,7 +73,8 @@ public sealed class TgSyncLog
     private readonly object _stateGate = new();
     private SyncBatch? _inFlight;
     private sealed record Checkpoint(TgSyncCursor Cursor, List<SyncItem> Ledger, List<BatchItem> Pending, SyncBatch? InFlight,
-        bool Bootstrapped = false, Dictionary<string, PlayCounterState>? EarlyPlays = null);
+        bool Bootstrapped = false, Dictionary<string, PlayCounterState>? EarlyPlays = null,
+        List<string>? Provisional = null, List<SyncItem>? Shadowed = null);
     // Review M7: plays heard before this device first read the log (its own counters unknown), as increments.
     private readonly Dictionary<string, PlayCounterState> _earlyPlays = new(StringComparer.Ordinal);
     private bool _bootstrapped;
@@ -92,6 +93,8 @@ public sealed class TgSyncLog
             {
                 var checkpoint = saved.RootElement.Deserialize<Checkpoint>(SyncJson.Options)!;
                 Ledger.Restore(checkpoint.Ledger);
+                // Older checkpoints carry neither: their own edits are treated as already bounded (as before).
+                Ledger.RestorePending(checkpoint.Provisional, checkpoint.Shadowed);
                 _pending.AddRange(checkpoint.Pending);
                 _inFlight = checkpoint.InFlight;
                 // A checkpoint from before M7 that had read the log counts as read.
@@ -128,7 +131,7 @@ public sealed class TgSyncLog
             if (old?.Device == Device && old.UpdatedUtc >= stamp && old.Payload != payload)
                 stamp = old.UpdatedUtc.AddTicks(1);
             var item = new BatchItem(kind, id, payload, stamp);
-            Ledger.Apply(item, Device, stamp);
+            Ledger.ApplyOwn(item, Device, stamp);
             // Only the newest unposted edit of an item is sent: two edits in one post would collapse onto the same
             // bounded stamp at the readers when this clock runs fast, and then the earlier one would win the tie.
             var posting = _inFlight?.Items.Count ?? 0;
@@ -370,8 +373,12 @@ public sealed class TgSyncLog
         if (_cursorPath is null) return;
         byte[] bytes;
         lock (_stateGate)
+        {
+            var (provisional, shadowed) = Ledger.Pending();
             bytes = JsonSerializer.SerializeToUtf8Bytes(new Checkpoint(Cursor, Ledger.Everything.ToList(), _pending.ToList(), _inFlight,
-                _bootstrapped, new Dictionary<string, PlayCounterState>(_earlyPlays, StringComparer.Ordinal)), SyncJson.Options);
+                _bootstrapped, new Dictionary<string, PlayCounterState>(_earlyPlays, StringComparer.Ordinal),
+                provisional, shadowed), SyncJson.Options);
+        }
         TgStateFile.Write(_cursorPath, bytes);
     }
 }
