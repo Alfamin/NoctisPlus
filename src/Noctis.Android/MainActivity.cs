@@ -28,6 +28,10 @@ public class MainActivity : AvaloniaMainActivity
 
     private TaskCompletionSource<string?>? _pickFolder;
     private TaskCompletionSource<string?>? _createDocument;
+    private readonly Handler _refreshHandler = new(Looper.MainLooper!);
+    private long _lastInteraction;
+    private bool _displayFocused, _refreshBoosted, _refreshCheckQueued;
+    private const long RefreshIdleMs = 1600;
 
     protected override void OnCreate(Bundle? savedInstanceState)
     {
@@ -123,14 +127,79 @@ public class MainActivity : AvaloniaMainActivity
     public override void OnWindowFocusChanged(bool hasFocus)
     {
         base.OnWindowFocusChanged(hasFocus);
+        _displayFocused = hasFocus;
+        if (hasFocus) BoostInteractiveRefresh();
+        else { _refreshBoosted = false; PreferSmoothDisplay(false); }
         // Avalonia puts its theme's status bar icons back when its view becomes visible again;
         // a page that asked for its own (the album cover) gets them back on top.
         if (hasFocus) AndroidApp.Current?.ReassertStatusBarIcons();
     }
 
+    public override void OnUserInteraction()
+    {
+        base.OnUserInteraction();
+        if (_displayFocused) BoostInteractiveRefresh();
+    }
+
+    private void BoostInteractiveRefresh()
+    {
+        _lastInteraction = SystemClock.UptimeMillis();
+        if (!_refreshBoosted) { _refreshBoosted = true; PreferSmoothDisplay(true); }
+        if (_refreshCheckQueued) return;
+        _refreshCheckQueued = true;
+        _refreshHandler.PostDelayed(CheckRefreshIdle, RefreshIdleMs);
+    }
+
+    private void CheckRefreshIdle()
+    {
+        _refreshCheckQueued = false;
+        if (!_displayFocused) return;
+        var remaining = _lastInteraction + RefreshIdleMs - SystemClock.UptimeMillis();
+        if (remaining > 0)
+        {
+            _refreshCheckQueued = true;
+            _refreshHandler.PostDelayed(CheckRefreshIdle, remaining);
+            return;
+        }
+        _refreshBoosted = false;
+        PreferSmoothDisplay(false);
+    }
+
+    /// <summary>Request the display's high-refresh mode during interaction, without changing
+    /// resolution, forcing an unsupported 120Hz, or overriding Android's battery/thermal policy.
+    /// Rendering still follows vsync; this adds no timer or permanent background render loop.</summary>
+    private void PreferSmoothDisplay(bool focused)
+    {
+        try
+        {
+            if (Window is not { } window || window.Attributes is not { } attributes) return;
+            var rate = 0f;
+            using var power = GetSystemService(PowerService) as PowerManager;
+            if (focused && power?.IsPowerSaveMode != true && window.DecorView.Display is { } display && display.GetMode() is { } current)
+            {
+                rate = display.GetSupportedModes()
+                    .Where(m => m.PhysicalWidth == current.PhysicalWidth && m.PhysicalHeight == current.PhysicalHeight
+                        && m.RefreshRate <= 120.5f)
+                    .Select(m => m.RefreshRate).DefaultIfEmpty(current.RefreshRate).Max();
+            }
+            if (Math.Abs(attributes.PreferredRefreshRate - rate) < .1f) return;
+            attributes.PreferredRefreshRate = rate;
+            window.Attributes = attributes;
+            DebugLog.Write("Display", rate > 0 ? $"Foreground refresh preference: {rate:0.##} Hz" : "Refresh preference: system");
+        }
+        catch (Exception ex) when (ex is not OutOfMemoryException)
+        {
+            // Vendor display services differ; a refresh hint must never prevent opening the app.
+            DebugLog.Write("Display", $"Refresh preference unavailable: {ex.GetType().Name}");
+        }
+    }
+
     protected override void OnPause()
     {
         base.OnPause();
+        _displayFocused = false;
+        _refreshBoosted = false;
+        PreferSmoothDisplay(false);
         // Screen off / home / task switch: checkpoint the queue and position now, since
         // Android may kill the process without any further callback.
         AndroidApp.Current?.OnBackgrounded();
@@ -138,6 +207,7 @@ public class MainActivity : AvaloniaMainActivity
 
     protected override void OnDestroy()
     {
+        _refreshHandler.RemoveCallbacksAndMessages(null);
         // A config change or low-memory kill while the system picker is foreground (our
         // ConfigurationChanges covers orientation, screen size and layout, UI mode and font scale; a locale or
         // density change still recreates us) recreates the activity before
