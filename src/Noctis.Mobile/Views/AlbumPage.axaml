@@ -37,6 +37,23 @@
         <Style Selector="views|AlbumPage.tinted Button.round">
             <Setter Property="Background" Value="{DynamicResource AlbumWash}" />
         </Style>
+        <Style Selector="views|AlbumPage.tinted TextBox.search-field">
+            <Setter Property="Foreground" Value="{DynamicResource AlbumText}" />
+            <Setter Property="CaretBrush" Value="{DynamicResource AlbumText}" />
+            <Setter Property="Background" Value="{DynamicResource AlbumWash}" />
+            <Setter Property="InnerLeftContent">
+                <Template>
+                    <PathIcon Data="{DynamicResource PhSearch}" Width="19" Height="19" Margin="12,0,0,0"
+                              Foreground="{DynamicResource AlbumSubtleText}" />
+                </Template>
+            </Setter>
+        </Style>
+        <Style Selector="views|AlbumPage.tinted TextBox.search-field:pointerover /template/ Border#PART_BorderElement, views|AlbumPage.tinted TextBox.search-field:focus /template/ Border#PART_BorderElement">
+            <Setter Property="Background" Value="{DynamicResource AlbumWash}" />
+        </Style>
+        <Style Selector="views|AlbumPage.tinted TextBox.search-field /template/ TextBlock#PART_Placeholder, views|AlbumPage.tinted TextBox.search-field /template/ TextBlock#PART_FloatingPlaceholder">
+            <Setter Property="Foreground" Value="{DynamicResource AlbumSubtleText}" />
+        </Style>
         <Style Selector="views|AlbumPage TextBlock.album-subtle">
             <Setter Property="Foreground" Value="{DynamicResource SecondaryTextBrush}" />
         </Style>
@@ -240,10 +257,10 @@
                 <TextBox Name="TrackSearch" Classes="search-field" Margin="24,14,24,4" PlaceholderText="Search songs"
                          Text="{Binding SearchText, Mode=TwoWay}" />
                 <Grid ColumnDefinitions="Auto,*,Auto" Margin="18,0,18,0">
-                    <Button Classes="row" MinHeight="44" Padding="6,0" Foreground="{DynamicResource AccentTextBrush}" Content="Select" IsVisible="{Binding !IsSelecting}" Command="{Binding ToggleSelectionCommand}" />
-                    <Button Classes="row" MinHeight="44" Padding="6,0" Foreground="{DynamicResource AccentTextBrush}" Content="Done" IsVisible="{Binding IsSelecting}" Command="{Binding ToggleSelectionCommand}" />
+                    <Button Classes="row" MinHeight="44" Padding="6,0" Content="Select" IsVisible="{Binding !IsSelecting}" Command="{Binding ToggleSelectionCommand}" />
+                    <Button Classes="row" MinHeight="44" Padding="6,0" Content="Done" IsVisible="{Binding IsSelecting}" Command="{Binding ToggleSelectionCommand}" />
                     <Button Grid.Column="1" Classes="row" MinHeight="44" Padding="6,0" Content="Select all" HorizontalAlignment="Left" IsVisible="{Binding IsSelecting}" Command="{Binding SelectAllCommand}" />
-                    <Button Grid.Column="2" Classes="row" MinHeight="44" Padding="6,0" Foreground="{DynamicResource AccentTextBrush}" Content="{Binding SelectionLabel}" IsVisible="{Binding IsSelecting}"
+                    <Button Grid.Column="2" Classes="row" MinHeight="44" Padding="6,0" Content="{Binding SelectionLabel}" IsVisible="{Binding IsSelecting}"
                             IsEnabled="{Binding HasSelection}" Command="{Binding AddSelectionCommand}" />
                 </Grid>
                 <ItemsControl Name="TrackList" ItemsSource="{Binding Rows}" Margin="0,4,0,0">
@@ -272,9 +289,9 @@
                                     <views:PlayingBars Name="EqBars" HorizontalAlignment="Center" VerticalAlignment="Center"
                                                        IsPlaying="{Binding IsAnimating}" IsVisible="{Binding ShowsCurrent}" />
                                     <Border Width="22" Height="22" CornerRadius="11" BorderThickness="1"
-                                            BorderBrush="{DynamicResource SecondaryTextBrush}" IsVisible="{Binding IsSelectionMode}">
+                                            BorderBrush="{DynamicResource AlbumSubtleText}" IsVisible="{Binding IsSelectionMode}">
                                         <TextBlock Text="✓" HorizontalAlignment="Center" VerticalAlignment="Center"
-                                                   Foreground="{DynamicResource AccentTextBrush}" IsVisible="{Binding IsSelected}" />
+                                                   Foreground="{DynamicResource AlbumText}" IsVisible="{Binding IsSelected}" />
                                     </Border>
                                     <!-- Left-aligned, so the star column is the title's own width up to the
                                          room left, and the badge follows the title, not the row's end. -->
