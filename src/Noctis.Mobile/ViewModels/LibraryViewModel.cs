@@ -778,6 +778,9 @@ public sealed partial class LibraryViewModel : ObservableObject
         HasHomePlaylists = HomePlaylistsRail.Count > 0;
 
         var recent = MobileLibrary.RecentlyAddedAlbums(_library, RailSize).Select(RailItem.ForAlbum).ToList();
+        // A LAN library/partial scan may publish songs before its album records arrive.
+        // Keep Home useful then too; these are real additions, never invented play history.
+        if (recent.Count == 0) recent = RecentlyAdded().Take(RailSize).Select(RailItem.ForTrack).ToList();
         MobileLibrary.ReplaceIfChanged(RecentlyAddedRail, recent);
         HasRecentlyAdded = RecentlyAddedRail.Count > 0;
     }

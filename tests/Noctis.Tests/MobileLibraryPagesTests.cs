@@ -55,7 +55,8 @@ public class MobileLibraryPagesTests
         var window = MobileFixtures.Mount(rig.Shell, out var view);
 
         Assert.False(rig.Shell.Library.HasFolders);
-        Assert.True(MobileFixtures.Named<StackPanel>(view, "PinnedSection").IsVisible);
+        Assert.False(MobileFixtures.Named<StackPanel>(view, "PinnedSection").IsVisible);
+        Assert.True(rig.Shell.Library.HasRecentlyAdded); // useful real music, without requiring a pin or phone folder
         rig.Shell.SelectTabCommand.Execute(MobileTab.Library);
         window.UpdateLayout();
         var library = MobileFixtures.Find<LibraryPage>(view);
@@ -76,9 +77,11 @@ public class MobileLibraryPagesTests
         using var rig = MobileFixtures.MakeRig(new[] { a, b, c }, new[] { album }, WithFolder(mix));
         var window = MobileFixtures.Mount(rig.Shell, out var view);
 
-        Assert.True(MobileFixtures.Named<Border>(view, "PinnedHint").IsVisible);     // Home: nothing pinned yet
-        Assert.False(MobileFixtures.Named<PathIcon>(view, "PinnedChevron").IsVisible); // so no › into an empty page
-        Assert.False(MobileFixtures.Named<Button>(view, "PinnedHeader").IsHitTestVisible);
+        Assert.DoesNotContain(view.GetVisualDescendants().OfType<Border>(), b => b.Name == "PinnedHint"); // #265: useful shelves replace pin instructions
+        Assert.False(MobileFixtures.Named<StackPanel>(view, "PinnedSection").IsVisible);
+        Assert.True(rig.Shell.Library.HasHomePlaylists);
+        Assert.True(MobileFixtures.Named<StackPanel>(view, "HomeNewSection").IsVisible);
+        Assert.NotEmpty(MobileFixtures.Named<ItemsControl>(view, "HomeNewRail").Items);
         rig.Shell.SelectTabCommand.Execute(MobileTab.Library);
         window.UpdateLayout();
         Assert.True(MobileFixtures.Named<ItemsControl>(view, "LibraryRowList").IsVisible);
