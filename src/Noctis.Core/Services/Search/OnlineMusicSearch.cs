@@ -57,6 +57,7 @@ public sealed record OnlineDownloadStatus(OnlineDownloadState State, double Prog
 /// </summary>
 public interface IOnlineMusicSearch
 {
+    IOnlinePlaylistImports? PlaylistImports => null;
     /// <summary>Typed metadata access for hosts with native catalog pages; no desktop navigation events.</summary>
     IOnlineCatalog? Browser => null;
     /// <summary>Opens the network connection ahead of the first query (DNS, TCP, TLS through the

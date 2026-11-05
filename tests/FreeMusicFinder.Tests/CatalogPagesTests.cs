@@ -85,6 +85,7 @@ internal static class CatalogPagesTests
         }
         await NativeAlbumAsync();
         await NativeArtistAsync();
+        await NativePlaylistAsync();
         await PopularityAsync();
     }
 
@@ -155,6 +156,52 @@ internal static class CatalogPagesTests
             Check.Equal(calls, http.Calls.Count, "registered cached native artist browsing performs no new HTTP");
             Check.Equal(0, downloads.History.Count, "browsing never queues audio");
             Check.Equal(0, library.Saves, "browsing never writes playlists");
+        }
+        finally { online.Detach(); }
+    }
+
+    private static async Task NativePlaylistAsync()
+    {
+        Check.Section("native playlist: saved full metadata, duplicate positions, unavailable entries and explicit audio");
+        var folder = Check.NewFolder("native-import-data");
+        var library = new SpotifyPlaylistTests.Library(); var owned = library.Add(folder, "Owned", "North Star");
+        var job = new SpotifyPlaylist { Url = "https://www.deezer.com/playlist/12345", Created = true,
+            Matches = new() { [1] = owned.Id }, Applied = [owned.Id],
+            Manifest = new() { Url = "https://www.deezer.com/playlist/12345", Name = "Audit Mix", Total = 4, CompleteIds = true,
+                Entries = [new() { Position = 1, Uri = "deezer:track:101", Request = new("Owned", "North Star") },
+                    new() { Position = 2, Uri = "deezer:track:102", Request = new("Missing", "North Star"), Album = "Orbit" },
+                    new() { Position = 3, Uri = "deezer:track:102", Request = new("Missing", "North Star"), Album = "Orbit" },
+                    new() { Position = 4, Uri = "deezer:track:104", Issue = "Unavailable song" }] } };
+        var file = Path.Combine(folder, "imports.json");
+        File.WriteAllText(file, System.Text.Json.JsonSerializer.Serialize(new[] { job }));
+        var http = new DiscoveryTests.Http { Offline = true };
+        using var catalog = DiscoveryTests.Catalog(folder, http);
+        using var downloads = new Downloads(_ => { });
+        using var imports = new SpotifyPlaylists(file, library, downloads, _ => throw new Exception("Audio not authorized in metadata fixture"));
+        var actions = new DiscoveryActions(library, downloads, _ => throw new Exception("No audio"), () => folder, () => false);
+        using var pages = new CatalogPages(() => catalog, actions, _ => { }, () => true);
+        var online = new FinderOnlineSearch(() => catalog, actions, pages, () => false, () => { }, () => imports);
+        try
+        {
+            var api = ((Noctis.Services.Search.IOnlineMusicSearch)online).PlaylistImports!;
+            Check.True(ReferenceEquals(api, online.PlaylistImports), "one native adapter owns one change subscription");
+            var entry = api.Snapshot().Single();
+            Check.True(entry.HasMissing && entry.Found == 1 && entry.Total == 4, "native import reports full manifest count and strict matched count");
+            var list = api.Read(job.LibraryId)!;
+            Check.Equal("1,2,3,4", string.Join(",", list.Entries.Select(e => e.Position)), "all positions remain in playlist order");
+            Check.Equal(owned.Id, list.Entries[0].Song?.LocalTrackId, "owned entry keeps actual library ID");
+            Check.True(list.Entries[1].Song?.LocalTrackId is null && list.Entries[1].Song?.Album == "Orbit", "missing song retains its album without invented local ID");
+            Check.Equal(list.Entries[1].Song?.Id, list.Entries[2].Song?.Id, "duplicate recording occupies both original playlist positions");
+            Check.True(list.Entries[3].Song is null && list.Entries[3].Issue == "Unavailable song", "unavailable position stays visible as unavailable metadata");
+            Check.True(api.Read(Guid.NewGuid()) is null, "unknown import cannot alias another playlist");
+            await Check.ThrowsAsync<InvalidOperationException>(() => api.DownloadMissingAsync(job.LibraryId, default), "signed-out missing download refuses before touching bot queue");
+            await Check.ThrowsAsync<FormatException>(() => api.ImportAsync("https://untrusted.invalid/playlist", default), "native import retains allowlisted playlist URL validation");
+            Check.Equal(0, downloads.History.Count, "metadata browsing/import validation never queues audio");
+            Check.Equal(0, library.Saves, "native data reads never rewrite library playlists");
+            var changes = 0; api.Changed += () => changes++;
+            await api.RemoveAsync(job.LibraryId, default);
+            Check.True(changes > 0 && api.Read(job.LibraryId) is null, "unmanaging import raises change and stops its remote page without deleting music");
+            Check.Equal(0, library.Saves, "unmanaging import leaves native playlist untouched");
         }
         finally { online.Detach(); }
     }

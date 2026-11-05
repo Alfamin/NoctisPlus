@@ -35,7 +35,11 @@ internal sealed partial class FinderOnlineSearch : IOnlineMusicSearch, IOnlineCa
         _actions.Downloads.Changed += OnDownloadChanged;
     }
 
-    public void Detach() => _actions.Downloads.Changed -= OnDownloadChanged;
+    public void Detach()
+    {
+        _actions.Downloads.Changed -= OnDownloadChanged;
+        _nativeImports?.Dispose();
+    }
 
     /// <summary>Owner #147: the "Download ahead" choice (0-4 songs).</summary>
     internal Func<int> DownloadAhead { get; init; } = () => StreamCache.DefaultAhead;
