@@ -1,0 +1,28 @@
+# Phone automatic word timing — next after shared provider foundation680c325d
+
+This is an implementation note, not a completed feature. Owner #266: reuse useful Plus behavior natively; exact desktop renderer remains untouched. Native import metadata/UI is independently green276a. Respect current quota/watch/owner rules in LOCAL-CHECKPOINT.md.
+
+## Why this boundary
+Eight UI-free provider/interface/converter files now live in Noctis.Core/Services. Desktop namespaces/API and parsing/cache/cancellation/recording matching stay the same. No phone lookup order changed yet: AndroidApp.axaml.cs still injects LrcLibOnlineLyricsSource. No model download, new paid API, new model POST, native renderer swap or desktop lane change.
+
+Do not link duplicate copies of desktop service classes into Mobile: desktop tests reference both assemblies and would see ambiguous same-name types. Core owns the one implementation. Do not move the entire desktop lane into Core: its ProgressiveTransfer/ffmpeg/worker/file assumptions are Windows host policy.
+
+## Exact existing seams
+- Noctis.Core/Services/{ILrcRedLyricsService,IUnisonLyricsService,IKugouLyricsService,LrcRedLyricsService,UnisonLyricsService,KugouLyricsService}.cs; Lyrics/{OnlineTtml,KrcLyrics}.cs.
+- Mobile/Services/IOnlineLyricsSource.cs: existing cache-first/offline-safe LRCLIB wrapper, Failed/Instrumental result; cache under own data directory. AndroidApp.axaml.cs ~132 injects via InternetHttp(). Keep proxy/OnlineAccess behavior, never make a separate direct client.
+- Mobile/ViewModels/LyricsPageViewModel.cs: cancellation/generation/loader/timeline; existing sidecars and remote desktop lyrics first, current plain/synced handling. Add source/status succinctly, keep native controls/fonts. Do not replace an accepted online word-timed answer with later plain text or an automatic model job.
+- Desktop Services/Lyrics/OnlineWordTiming.cs: contains the WordTimingSource enum, online-only preference order and staggered request logic, OnlineTimingMisses and OnlineTimingSidecar. It is NOT independent yet: depends on OnlineTimingFit.WordsOf/MinWords, OnlineTimingUncensor, studio TTML builder. Extract a cohesive portable orchestration/document layer rather than copying a new, weaker chain into Android.
+- Desktop OnlineTimingLane: current-song/ahead priorities, provisional streaming answers, complete recording/audio fit, replacement rules, source attribution. Keep desktop behavior intact. OnlineTimingDuration reads desktop ProgressiveTransfer; do not import it into Mobile. OnlineTimingFit currently decodes through desktop ffmpeg; it is not an Android executable.
+
+## Bounded implementation order
+1. Extract pure timing-document conversion/word coverage/source identity/miss bookkeeping needed by OnlineWordTiming into Core, retaining current protocol/ordering/explicit-word restoration. Existing parser/provider/sidecar/lane tests must keep proving the same behavior. Preserve author/provider credits. No Musixmatch or auto remote model sync.
+2. Define a host seam for published audio duration/prefix and fit. Distinguish positive fit, known mismatch, and not enough audio/uncertain; unknown is NOT verified. Use the actual recording header/duration when available; catalog length is an estimate. Reuse pure signal analysis where possible, then Android's existing decode route for PCM. Do not shell out to a nonexistent Windows ffmpeg or download a model. Never describe metadata identity checking as audio-fit proof.
+3. Extend the existing native online source/cache path with ordered word timing lrc.red -> Unison -> Kugou -> current LRCLIB fallback, cancelable current selection, bounded deadlines, shared lookup/cache. A transient VPN/provider failure differs from definitive miss; avoid tight retry loops. Keep original background vocals/duets/translations and explicit text. Persist source and verified/provisional state alongside timing; cache reads work offline, don't touch user-authored sidecars on a miss.
+4. Wire native current song + EXACT next2 queue positions after those files are ready, using the same generation/priority horizon as download-ahead (not next2 missing songs). Stale queue work loses priority on skip/shuffle/clear. Current song outranks everything; no timing of incomplete audio with a local model. Online metadata lookup can start while streaming; later completed-file validation cannot silently overwrite accepted online timing with an unrelated route.
+5. Native state: Searching sources / Processing lyrics / Queued only while true, spinner actually animates on song switches; existing word timings hide the permanent action, repair lives in consistent menus. Per-song ignore and manual override/10day retry controls remain separate portable Plus work. Keep minimal labels, native templates, no plugin windows/hooks.
+
+## Prove before DONE
+- Mock HTTP/provider/identity/cancellation/word-count/metadata tests; malformed/wrong-recording/unknown-duration, explicit masks, concurrent callers, busy/transient/miss, cache restart, unchanged own lyrics.
+- Actual signed-out isolated app can prove UI/cached data; it CANNOT prove Telegram delivery. Never copy sessions to solve that. Phone own sign-in or synthetic public-audio fixtures for genuine Android decode/fit evidence.
+- Exact x64+ARM64 compile, full10shard gates/Finder checks. Real app current/next horizon, skip during lookup, offline->online, source status and accepted-online-not-replaced regression. Fresh public source checks are not blanket availability promises.
+- No desktop lyric renderer changes. Continue exact Plus Lyric Motion separately per LYRIC-MOTION-PHONE-255.md after timing pipeline is safe. No release/main/native merge; dedicated branch only.
