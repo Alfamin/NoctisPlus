@@ -49,6 +49,8 @@
         <ProgressBar IsIndeterminate="True" Height="2" Margin="20,0" IsVisible="{Binding IsLoading}" />
         <TextBlock Classes="row-sub" Text="{Binding Status}" TextWrapping="Wrap" Margin="20,0"
                    IsVisible="{Binding Status, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
+        <TextBlock Classes="row-sub" Text="{Binding Actions.Message}" TextWrapping="Wrap" MaxLines="2" Margin="20,0"
+                   IsVisible="{Binding Actions.Message, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
         <ItemsControl ItemsSource="{Binding Skeletons}" IsVisible="{Binding ShowSkeletons}">
             <ItemsControl.ItemTemplate>
                 <DataTemplate>

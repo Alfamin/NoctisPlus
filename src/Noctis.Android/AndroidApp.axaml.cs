@@ -63,6 +63,9 @@ public partial class AndroidApp : Avalonia.Application, IThemeHost
     {
         Current = this;
         var context = AApplication.Context;
+        // The shared metadata/Telegram stacks consult HttpClient.DefaultProxy. Android's
+        // ProxySelector is the authority for system HTTP proxies, PAC and exclusion lists.
+        HttpClient.DefaultProxy = new AndroidSystemProxy();
 
         // Every Core service files its data under AppPaths.DataRoot; on Android that is the
         // app's private files dir. DataRoot resolves lazily and permanently on first read and
@@ -210,7 +213,10 @@ public partial class AndroidApp : Avalonia.Application, IThemeHost
         try
         {
             var noBackup = context.NoBackupFilesDir!.AbsolutePath;
-            var data = Path.Combine(noBackup, "finder");
+            // Android exposes /data/user/0 as an alias. Resolve only the metadata/session
+            // directory so shared anti-redirection guards can inspect its real ancestors.
+            // Keep music paths unchanged: existing library track identities must not move.
+            var data = new Java.IO.File(Path.Combine(noBackup, "finder")).CanonicalPath;
             Directory.CreateDirectory(data);
             var defaults = Path.Combine(data, TelegramAppAsset);
             CopyTelegramApp(context, defaults);

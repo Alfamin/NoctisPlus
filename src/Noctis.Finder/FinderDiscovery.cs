@@ -48,7 +48,8 @@ internal sealed class FinderDiscovery(ForYouSource source, FinderOnlineSearch on
                     if (cards.Length == 0) continue;
                     result.Add(new(id, cards, page.Notice));
                 }
-                if (result.Count == 0) result.Add(new("", [], current?.Notice is { Length: > 0 } notice ? notice : "No new picks yet"));
+                if (result.Count == 0) result.Add(new("", [], current?.Unreachable == true
+                    ? "Can't reach the music catalog. Try again" : "No new picks yet"));
             }
             return (IReadOnlyList<RecommendationPage>)result;
         }, ct).ConfigureAwait(false);

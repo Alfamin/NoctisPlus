@@ -47,7 +47,8 @@ internal sealed class ForYouCache(string path)
     public void Write(Page page)
     {
         try { if (Safe() && JsonSerializer.SerializeToUtf8Bytes(page).Length <= PageBytes) AtomicJson.Write(path, page); }
-        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException) { }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        { Noctis.Services.DebugLog.Write("ForYou", $"Page cache unavailable: {ex.GetType().Name}"); }
     }
 
     public void WriteEarlier(IReadOnlyList<Page> pages)
@@ -66,7 +67,8 @@ internal sealed class ForYouCache(string path)
     private bool Safe()
     {
         for (var dir = new DirectoryInfo(Path.GetDirectoryName(Path.GetFullPath(path))!); dir is not null; dir = dir.Parent)
-            if (dir.Exists && (dir.Attributes & FileAttributes.ReparsePoint) != 0) return false;
+            if (dir.Exists && (dir.Attributes & FileAttributes.ReparsePoint) != 0)
+            { Noctis.Services.DebugLog.Write("ForYou", $"Redirected cache ancestor kept untouched: {dir.Name}"); return false; }
         return !File.Exists(path) || (File.GetAttributes(path) & FileAttributes.ReparsePoint) == 0;
     }
 }

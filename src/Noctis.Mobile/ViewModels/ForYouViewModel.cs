@@ -10,6 +10,7 @@ namespace Noctis.Mobile.ViewModels;
 public sealed partial class ForYouViewModel : MobilePage, IDisposable
 {
     private readonly IOnlineDiscovery _source;
+    private readonly IOnlineMusicSearch _online;
     private readonly Action<Action> _marshal;
     private readonly Func<TimeSpan, CancellationToken, Task> _delay;
     private IReadOnlyList<RecommendationPage> _pages = [];
@@ -17,12 +18,15 @@ public sealed partial class ForYouViewModel : MobilePage, IDisposable
     private string? _receipt;
     private int _generation, _page;
     private bool _disposed;
+    private bool _awaitingLibrary;
     private readonly HashSet<string> _shown = new(StringComparer.Ordinal);
     private (OnlineSong Song, Guid Track)? _played;
     public ForYouViewModel(ShellViewModel shell, IOnlineDiscovery source, IOnlineMusicSearch online,
         Action<Action>? marshal = null, Func<TimeSpan, CancellationToken, Task>? delay = null)
     {
-        Shell = shell; _source = source;
+        Shell = shell; _source = source; _online = online;
+        _awaitingLibrary = shell.Library.SongCount == 0;
+        shell.Library.Refreshed += LibraryReady;
         _marshal = marshal ?? (a => Avalonia.Threading.Dispatcher.UIThread.Post(a));
         _delay = delay ?? Task.Delay;
         Actions = new OnlineResultsViewModel(online, _marshal, tracks => shell.Player.PlayTracks(tracks, 0, "For You"), shell.OpenTelegramSignIn) { LazyArtwork = true };
@@ -48,6 +52,7 @@ public sealed partial class ForYouViewModel : MobilePage, IDisposable
 
     public async Task LoadAsync(bool refresh = false)
     {
+        var started = System.Diagnostics.Stopwatch.GetTimestamp();
         _load?.Cancel(); _load?.Dispose();
         var stop = _load = new(); var generation = ++_generation;
         IsLoading = true;
@@ -60,15 +65,25 @@ public sealed partial class ForYouViewModel : MobilePage, IDisposable
                 var selected = CurrentId;
                 _pages = pages; _page = refresh ? 0 : Math.Max(0, pages.ToList().FindIndex(p => p.Id == selected));
                 ShowPage();
+                DebugLog.Write("ForYou", $"Phone picks loaded: {pages.Sum(p => p.Songs.Count)} songs / {pages.Count} pages in {System.Diagnostics.Stopwatch.GetElapsedTime(started).TotalMilliseconds:0} ms");
             });
         }
         catch (OperationCanceledException) when (stop.IsCancellationRequested) { }
         catch (Exception ex) when (ex is not OutOfMemoryException)
         {
+            if (ex.Message.StartsWith("LIBRARY_SCANNING:", StringComparison.Ordinal)) _awaitingLibrary = true;
             _marshal(() => { if (!_disposed && generation == _generation) Status = HasSongs ? "Showing saved picks" : "Couldn't load picks. Try again"; });
             DebugLog.Write("ForYou", $"Phone lookup unavailable: {ex.GetType().Name}");
         }
-        finally { _marshal(() => { if (!_disposed && generation == _generation) IsLoading = false; }); }
+        finally { _marshal(() => { if (!_disposed && generation == _generation) { IsLoading = false; LibraryReady(null, EventArgs.Empty); } }); }
+    }
+
+    private void LibraryReady(object? sender, EventArgs e)
+    {
+        if (_disposed || !_awaitingLibrary || IsLoading || HasSongs || Shell.SelectedTab != MobileTab.Home
+            || Shell.Library.SongCount == 0 || Shell.Library.Service.IsScanning || Shell.Library.Service.IsPublishingPartial) return;
+        _awaitingLibrary = false; // one scan completion, not a network request on every play/progress event
+        _ = LoadAsync();
     }
 
     private void ShowPage()
@@ -89,7 +104,7 @@ public sealed partial class ForYouViewModel : MobilePage, IDisposable
         if (page.Length > 0 && _shown.Add(page + "\n" + songId))
             _ = Safely(() => _source.ShownAsync(page, [songId]));
     }
-    [RelayCommand(AllowConcurrentExecutions = true)] private Task RefreshAsync() => LoadAsync(true);
+    [RelayCommand(AllowConcurrentExecutions = true)] private Task RefreshAsync() { _online.Retry(); return LoadAsync(true); }
     [RelayCommand] private void PreviousPage() { if (_page > 0) { _page--; ShowPage(); } }
     [RelayCommand] private void NextPage() { if (_page + 1 < _pages.Count) { _page++; ShowPage(); } }
 
@@ -101,7 +116,7 @@ public sealed partial class ForYouViewModel : MobilePage, IDisposable
             new(Shell, "Download now", false, () => _ = Actions.DownloadNowCommand.ExecuteAsync(item)),
             new(Shell, "Add to downloads", false, () => _ = Actions.DownloadCommand.ExecuteAsync(item)),
             new(Shell, "Not for me", false, () => _ = HideAsync(item, false)),
-            new(Shell, "Don't recommend artist", false, () => _ = HideAsync(item, true)),
+            new(Shell, "Hide artist", false, () => _ = HideAsync(item, true)),
         ]));
     }
     internal async Task HideAsync(OnlineSongItem item, bool artist)
@@ -147,5 +162,5 @@ public sealed partial class ForYouViewModel : MobilePage, IDisposable
     private static async Task Safely(Func<Task> action)
     { try { await action(); } catch (Exception ex) when (ex is not OutOfMemoryException) { DebugLog.Write("ForYou", $"Feedback unavailable: {ex.GetType().Name}"); } }
     public void Dispose()
-    { _disposed = true; _generation++; _load?.Cancel(); _undo?.Cancel(); Actions.Dispose(); }
+    { _disposed = true; _generation++; _load?.Cancel(); _undo?.Cancel(); Shell.Library.Refreshed -= LibraryReady; Actions.Dispose(); }
 }
