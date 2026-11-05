@@ -6,6 +6,9 @@
              xmlns:views="using:Noctis.Mobile.Views"
              x:Class="Noctis.Mobile.Views.SongRow"
              x:DataType="models:Track">
+    <UserControl.Styles>
+        <Style Selector="StackPanel.online"><Setter Property="Opacity" Value="0.65" /></Style>
+    </UserControl.Styles>
     <!-- One song: cover, title, artist, explicit badge, then the overflow button. No heart on the
          row (owner 10-19, the album page's rule): Favorite is the first tile of the ⋯ menu, which
          shows whether the song is one. -->
@@ -16,7 +19,7 @@
                 <controls:CachedImage SourcePath="{Binding AlbumArtworkPath}" DecodeWidth="128" Stretch="UniformToFill" />
             </Panel>
         </Border>
-        <StackPanel Grid.Column="1" Margin="12,0,8,0" VerticalAlignment="Center">
+        <StackPanel Grid.Column="1" Margin="12,0,8,0" VerticalAlignment="Center" Classes.online="{Binding IsPendingStream}">
             <!-- Left-aligned, so the badge follows the title (the album rows' rule), not the row's end. -->
             <Grid ColumnDefinitions="*,Auto" HorizontalAlignment="Left">
                 <TextBlock Name="RowTitle" Classes="row-title" Text="{Binding Title}" MaxLines="1" TextTrimming="CharacterEllipsis" />
@@ -25,7 +28,10 @@
                     <TextBlock Text="E" Classes="explicit-badge-text compact" FontSize="8" Opacity="0.9" />
                 </Border>
             </Grid>
-            <TextBlock Classes="row-sub" Text="{Binding Artist}" />
+            <Grid ColumnDefinitions="*,Auto" HorizontalAlignment="Left">
+                <TextBlock Classes="row-sub" Text="{Binding Artist}" />
+                <PathIcon Grid.Column="1" Name="RemoteIndicator" Data="{DynamicResource SetIconDownload}" Width="12" Height="12" Margin="6,0,0,0" IsVisible="{Binding IsPendingStream}" />
+            </Grid>
         </StackPanel>
         <Button Grid.Column="2" Name="MoreButton" Classes="icon" Width="36" Height="36"
                 Command="{Binding $parent[views:SongRow].MenuCommand}"

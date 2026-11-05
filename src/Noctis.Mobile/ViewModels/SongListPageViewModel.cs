@@ -247,19 +247,27 @@ public sealed partial class SongListPageViewModel : MobilePage, ISortable
         if (track == null) return;
         var list = Songs.ToList();
         var index = list.IndexOf(track);
-        if (index >= 0) Shell.Player.PlayTracks(list, index, Title);
+        if (index >= 0 && CanPlayOnline([track])) Shell.Player.PlayTracks(list, index, Title);
     }
 
     [RelayCommand]
     private void PlayAll()
     {
-        if (Songs.Count > 0) Shell.Player.PlayTracks(Songs.ToList(), 0, Title);
+        if (Songs.Count > 0 && CanPlayOnline([Songs[0]])) Shell.Player.PlayTracks(Songs.ToList(), 0, Title);
     }
 
     [RelayCommand]
     private void ShuffleAll()
     {
-        if (Songs.Count > 0) Shell.Player.PlayShuffled(Songs.ToList(), source: Title);
+        if (Songs.Count > 0 && CanPlayOnline(Songs)) Shell.Player.PlayShuffled(Songs.ToList(), source: Title);
+    }
+
+    private bool CanPlayOnline(IEnumerable<Track> tracks)
+    {
+        if (tracks.Any(t => t.PendingStream is Noctis.ViewModels.PendingStream p && !p.Source.CanDownload &&
+            !(p.Source.CompletedPlaybackPath(p.Song) is { } path && File.Exists(path))))
+        { Shell.OpenTelegramSignIn(); return false; }
+        return true;
     }
 
     public override void OnClosed() => Shell.Library.Refreshed -= OnRefreshed;

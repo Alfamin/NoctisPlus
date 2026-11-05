@@ -48,7 +48,8 @@ public class MobileCatalogAlbumTests
         public Task<OnlineArtistPage?> FindLibraryArtistAsync(string name, IReadOnlyList<string> albums, IReadOnlyList<string> titles, CancellationToken ct) => ArtistMetadata;
         public int Reads, Searches, Prepares;
         public readonly List<(IReadOnlyList<OnlineSong> Songs, bool Now)> Saves = [];
-        public bool CanDownload => true;
+        public bool SignedIn = true;
+        public bool CanDownload => SignedIn;
         public string Route => "synthetic";
         public IDownloadQueue Downloads { get; } = new EmptyQueue();
         public event EventHandler? DownloadsChanged { add { } remove { } }
@@ -101,6 +102,7 @@ public class MobileCatalogAlbumTests
         var online = Assert.IsType<OnlineResultsViewModel>(rig.Shell.Search.Online);
         Assert.Same(rig.Shell.Search, rig.Shell.Search);
         rig.Shell.Search.Query = "Orbit"; await online.SearchWork;
+        Avalonia.Threading.Dispatcher.UIThread.RunJobs();
         var item = Assert.Single(online.Albums);
         online.OpenAlbumCommand.Execute(item);
         var page = Assert.IsType<AlbumPageViewModel>(rig.Shell.CurrentPage);

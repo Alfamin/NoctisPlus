@@ -67,6 +67,28 @@ public class MobileCatalogArtistTests
     }
 
     [AvaloniaFact]
+    public async Task SignedOutCatalogList_ShowsDownloadIndicator_AndDoesNotPrepareAnUnownedSong()
+    {
+        var source = new MobileCatalogAlbumTests.Source { SignedIn = false };
+        source.ArtistMetadata = Task.FromResult<OnlineArtistPage?>(new(new("deezer:42", "Artist"), [], [new("deezer:1", "One", "Artist")]));
+        using var rig = MobileFixtures.MakeRig(onlineSearch: source);
+        var page = new ArtistPageViewModel(rig.Shell, "Artist"); await page.CatalogLoad;
+        page.OpenAllSongsCommand.Execute(null);
+        var list = Assert.IsType<SongListPageViewModel>(rig.Shell.CurrentPage);
+        var window = MobileFixtures.Mount(rig.Shell, out var view);
+        try
+        {
+            MobileFixtures.Land(window);
+            var row = MobileFixtures.Find<SongRow>(view);
+            Assert.True(MobileFixtures.Named<PathIcon>(row, "RemoteIndicator").IsVisible);
+            list.PlayCommand.Execute(list.Songs[0]); list.PlayAllCommand.Execute(null); list.ShuffleAllCommand.Execute(null);
+            Assert.Null(rig.Shell.Player.CurrentTrack); Assert.Equal(0, source.Prepares); Assert.Empty(source.Saves);
+            Assert.False(new ArtistCard(ArtistCardKind.Featured, new Noctis.Models.Album()).HasSongsText);
+        }
+        finally { window.Close(); list.OnClosed(); page.OnClosed(); }
+    }
+
+    [AvaloniaFact]
     public async Task ArtistClosedBeforeMetadataArrives_DoesNotPublishLateRows_AndFailuresKeepLocalSongs()
     {
         var source = new MobileCatalogAlbumTests.Source(); var answer = new TaskCompletionSource<OnlineArtistPage?>(); source.ArtistMetadata = answer.Task;
