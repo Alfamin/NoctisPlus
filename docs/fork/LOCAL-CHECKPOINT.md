@@ -1,37 +1,18 @@
-# Noctis Plus Android — local checkpoint (2026-11-05)
+# Noctis Plus Android — active checkpoint, 2026-11-05 16:15 Tehran
 
-Read `HANDOFF-2026-11-05-ANDROID-265-269.md` completely, then `ANDROID-PLUS-PARITY-266.md` and external LEAN-PLAN #262 onward. This file supersedes the old quota/timing notes in prior handoffs.
+Read HANDOFF-2026-11-05-ANDROID-QUEUE-OFFLINE.md, ANDROID-PLUS-PARITY-266.md, external LEAN-PLAN #262 onward. This supersedes old265-269 redgate/quota-hold. Worktree C:\Users\Alfamine\nplus-codex-257, dedicated branch codex-android-262. Original checkout untouched.
 
-## Mandatory quota rules
+Rules: quota actual start/end blocks, <=5min apart; Start-QuotaWatch.ps1 and sanitized artifacts/plus/tools/quota-status.json. >=90% WRAP ONLY, no new builds/features/research. #268 last earned reset untouched until Nov5 evening (~19:00 Tehran or later) window nearly exhausted, save first and redeem service-eligible only; no purchase/subscription/UI automation/bypass. Latest direct81% primary/43% weekly at16:14,1resetavailable. Native Plus parity first, upstream beta later. Exact-file dedicated commits/pushes only, no main/native/tag/release. D:\music read-only, preserve profiles/logins, never copy sessions, phone owns login. No paid services/model downloads. Real evidence before DONE; end computer use immediately.
 
-Start `docs/fork/tools/Start-QuotaWatch.ps1`. Read actual usage and Asia/Tehran time first. Inspect sanitized `artifacts/plus/tools/quota-status.json` before each block; actual reads at most5minutes apart. **>=90% USED = WRAP-UP ONLY**, no new feature/build/research. Save named-file commits, blueprint and handoff; observe running checks only.
+## Saved local source, not yet pushed
+f14d1f61 test-window lifetime fix; production/assertions unchanged. Full270a9562/0failed/83skip, Finder1760/0, oldredresolved.
+d6db3262 native pending online queues +477d758b Android wiring/isolated diagnostic. Full271b9570/0failed/83skip, Finder1760/0, ARM64/x64 compile0errors; real queue rapidtap/Next/pause/clear/restoration checks passed. Search/ForYou preserve list, exact next4 positions/next2audio incl local, currentfirst, staleguard, pausewhileloading, durable provider metadata only; no explicit-save cancellation.
+85b9627e offline Settings/startup gate/internet HTTP clients/cache + recovery. Initialfocused15/0, real toggle keeps cached playback moving; restart retainsOFFLINE; newplay no PREPARE; OFF resumes withoutsecondtap. Full272a9575/1failed/83skip, Finder1760/0: solefailure oldseparatorcount16 vs new17; updated count/comment, geometryassertions unchanged.
+04143934 live-found duplicate recovery ahead requests fixed via request-start fingerprint, explicit cancelled-token check, player Dispose idempotent. Finalfocused272c54/0 including offline/queue/allMobileSettings. Sourceclean, docsdirty.
 
-Owner #268: LAST earned reset is reserved until Nov5 EVENING window (~19:00 Tehran or later) is nearly exhausted. Save checkpoint, then redeem through supported app-server earned-reset API only when eligible; verify actual usage afterwards. Do not wait until midnight, buy credits, alter subscription, bypass eligibility or automate Codex UI. Before evening use normal window resets. Last direct read10:07 Tehran:88% five-hour,29% weekly; one earned reset untouched.
+## Running / next
+Final x64 build android-272c-final-x64 may still run; inspect process/log before any otherMSBuild. Includes Debug NoctisOnlineQueueAudit + NoctisProgressiveProbe flags, isolated com.alfamin.noctisplus.auditqueue271. AVD emulator-5580 running HEADLESS, ownunsigned-in auditprofile, no sessioncopy. Install finalAPK only after build success; recheck offline recovery no duplicateASK, run production Media3 probes MP3/FLAC if quota permits, close emulator. Then final ordinary ARM64 build + full10shard/Finder gates under fresh codex-272b/c name (not yet started). No Windows CUA runtimeactive. No realTelegramdeliveryproof. Update this file with terminal results, commitnamed docs and push dedicatedbranch. Automation nowreadsnewhandoff.
 
-## Checkout and safety
-
-`C:\Users\Alfamine\nplus-codex-257`, branch `codex-android-262`; original `noctis-fork` untouched. Dedicated-branch commits/pushes allowed, never main/native merge, tag or release. Exact named staging only. D:\music read-only. Preserve profiles/logins; never copy Telegram sessions. Phone owns its own login. Audit app unsigned-in. No paid services or model downloads. End computer use immediately. #264/#266 native PLUS parity first; upstream beta work deferred. #265 useful default Home/For You is high priority. Every owner request logged before work; no DONE from headless tests alone.
-
-## Saved work and actual state
-
-- `423296b3`: native Home library/playlist shelves and shared Plus For You adapter/shelf/page.
-- `51e48730`: Android native proxy discovery and canonical private data path so cache/feedback persist; first-scan empty-shelf retry; full-page width fix; short menus/status; real offline-restart helper.
-- Also2b0f31ba (Home fallback),9e03c702 (renamed stream reopen),65266acb (explicit successful-save guard). Dedicated branch checkpoint push follows this save; inspect remote before continuing.
-- Old MobileLibraryPages expectations updated for #265; all now pass. Final codex-269c is terminal:9562 total,1 failed,83 skipped. The one desktop SidebarGroupReorder animation failure also FAILS alone currently (24 total/1failed); do not dismiss it as proven load-only flakiness or call the gate green. No assertions weakened.
-
-## Verification so far
-
-Latest Android x64/ARM64 Debug0 errors/38 warnings each (`android-269b-*`). Latest audit APK installed with profile preserved. Native Home real catalog/shelves, playlist navigation, song/artist dismissal + eight-second Undo, full-page Play/More and signed-out Play -> Telegram pane LIVE checked. No bot message/audio download on opening Home.
-
-Actual cache restart with dead proxy PASS:25 eligible picks from50 raw candidates,5741ms including framework startup; earlier internal load338ms. Canonical path fix preserves security guards and original music identities. PC proxy untouched; emulator proxy restored after each offline check. Real phone bot delivery and full queue context still unproven.
-
-Current269c:9562/1failed/83skipped; Finder1760/0; fresh sync71/0 fake. All phone/Home/ForYou/progressive checks passed; sole failure SidebarGroupReorderTests.ClickingAFolderHeader_FoldsItsRowsShutAndOpen_InsteadOfSnapping expects intermediate height0.5..47.5, got48 atline244. Same class failed alone, sidebar-269c-alone.log. Historical264c was green, but current full gate is NOT green; no DONE stamp.
-
-Computer-use Sky kernel RESET; emulator CLOSED after actual Android ADB screenshots/clicks. Audit profile/SAF/AuditMix preserved. Only one read-only D:\music file copied to audit Music; installed app/session untouched.
-
-## Next
-
-First diagnose the remaining desktop animation check without weakening it. Then fresh green gates before DONE. P0 collision-renamed reopen is built and real MP3/FLAC decoder tested; final portable unsaved-completion guard compiled/tested in269c, but that guard postdates the Android packages. Next follow parity map: queue/offline recovery, catalog/playlist context, online timing/Plus motion, opt-in sync host/jobs. Do not pretend all Android Plus features are complete. See detailed handoff for APK identity, logs and commands.
-## Quota hold — QUOTA-HOLD-1793874153
-Actual service read2026-11-05 10:10 Tehran:90%five-hour/30%weekly. WRAP-UP ONLY; no new work/build/research begun. Natural five-hour reset reported at 2026-11-05 13:52:33 +03:30. One earned reset untouched; #268 evening condition has not arrived. Source/docs checkpoint f3b34024 already pushed to origin/codex-android-262, clean tree, no active test/build/emulator process. Gate limitation remains9562/1failed/83skipped, Finder1760/0, Sync71/0. Quota watcher confirmed wrapUp=true. Later heartbeats in this same quota window should inspect the hold without creating duplicate checkpoint commits or retrying work. After actual service limits reset, resume from the documented unresolved animation check and parity map. No main/native/release or profile/session change.
-
+After validated slice: native account/LAN recovery remains separate; rich catalog/playlist/import, online timing, exact Plus Lyric Motion, opt-in sync/jobs next per paritymap. No fullAndroidparity/real120FPS claim. Read LYRIC-MOTION-PHONE-255.md before renderer work; desktop renderer untouched.
+## Final validation progress 16:20 Tehran
+04143934 focused54/0. Exact finalx64 Debug0errors/40warnings, ordinaryARM640errors/68warnings. LIVE corrected recovery onePREPARE2/FETCH3/4/ASK5/6, no duplicates; nativeplaying2. ExactfinalMedia3MP3+FLAC bothPASS firstaudio40%/pause/starvation/no-restartresume/completedseek/collision-renamedreopen. EmulatorCLOSED; no CUA active. Full codex-272c now STARTED (guard permits only if quota<90); inspect terminal counts before declaring DONE or pushing. Latestquota87%/44%,1earnedresetuntouched. If >=90 duringgate, wrap/save only and observe already-running tests; no newfeatures/builds. Latest documented source04143934; earlier272a red count assertion superseded only once272cgreen.
