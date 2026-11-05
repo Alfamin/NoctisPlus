@@ -7,6 +7,7 @@ using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Headless;
 using Avalonia.Headless.XUnit;
+using Avalonia.Input;
 using Avalonia.Media;
 using Avalonia.VisualTree;
 using Noctis.Mobile.Services;
@@ -22,6 +23,34 @@ namespace Noctis.Tests;
 /// <summary>The redesigned Now Playing page and the lyrics page carry-overs.</summary>
 public class MobileNowPlayingPageTests : IDisposable
 {
+    [AvaloniaFact]
+    public void ArtworkSwipesNavigateTracks_AndIgnoreVerticalMovementAndTaps()
+    {
+        var tracks = new[] { MobileFixtures.Song("One"), MobileFixtures.Song("Two"), MobileFixtures.Song("Three") };
+        using var rig = MobileFixtures.MakeRig(tracks);
+        rig.Shell.Player.PlayTracks(tracks, 1);
+        var page = new NowPlayingPage { DataContext = rig.Shell };
+        var window = new Window { Width = 412, Height = 860, Content = page };
+        window.Show();
+        try
+        {
+            var art = MobileFixtures.Named<Viewbox>(page, "ArtworkBox");
+            var center = art.TranslatePoint(new Point(art.Bounds.Width / 2, art.Bounds.Height / 2), window)!.Value;
+            void Swipe(double x, double y)
+            {
+                window.MouseDown(center, MouseButton.Left);
+                window.MouseMove(center + new Vector(x, y), RawInputModifiers.LeftMouseButton);
+                window.MouseUp(center + new Vector(x, y), MouseButton.Left);
+            }
+            Swipe(0, 80); Assert.Same(tracks[1], rig.Shell.Player.CurrentTrack);
+            Swipe(8, 0); Assert.Same(tracks[1], rig.Shell.Player.CurrentTrack);
+            Swipe(90, 0); Assert.Same(tracks[2], rig.Shell.Player.CurrentTrack);
+            rig.Player.Position = TimeSpan.Zero;
+            Swipe(-90, 0); Assert.Same(tracks[1], rig.Shell.Player.CurrentTrack);
+        }
+        finally { window.Close(); }
+    }
+
     private readonly string _root = Path.Combine(Path.GetTempPath(), "NoctisTests", Guid.NewGuid().ToString("N"));
     public void Dispose() { try { Directory.Delete(_root, recursive: true); } catch { } }
 

@@ -2,6 +2,7 @@ using System;
 using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Controls.Primitives;
+using Avalonia.Input;
 using Avalonia.Media;
 using Avalonia.Media.Imaging;
 using Avalonia.Platform;
@@ -69,6 +70,31 @@ public partial class NowPlayingPage : UserControl
         // The times follow the drag (PreviewSeek is a no-op unless a seek is held, so the
         // position pushes that move the bar between drags never come back through here).
         SeekBar.ValueChanged += OnSeekValueChanged;
+        // Artwork only: transport sliders and vertical sheet/lyrics gestures keep their own input.
+        ArtworkBox.PointerPressed += OnArtworkPressed;
+        ArtworkBox.PointerReleased += OnArtworkReleased;
+        ArtworkBox.PointerCaptureLost += (_, _) => _artworkPress = null;
+    }
+
+    private (IPointer Pointer, Point Position, long At)? _artworkPress;
+    private void OnArtworkPressed(object? sender, PointerPressedEventArgs e)
+    {
+        if (e.GetCurrentPoint(ArtworkBox).Properties.IsLeftButtonPressed)
+            _artworkPress = (e.Pointer, e.GetPosition(ArtworkBox), Environment.TickCount64);
+    }
+
+    private void OnArtworkReleased(object? sender, PointerReleasedEventArgs e)
+    {
+        var press = _artworkPress;
+        _artworkPress = null;
+        if (press is not { } start || start.Pointer != e.Pointer || DataContext is not ShellViewModel shell) return;
+        var delta = e.GetPosition(ArtworkBox) - start.Position;
+        if (Environment.TickCount64 - start.At > 900 || Math.Abs(delta.X) < 64 || Math.Abs(delta.X) < Math.Abs(delta.Y) * 1.5) return;
+        // Owner #263: left = previous, right = next.
+        var command = delta.X < 0 ? shell.Player.PreviousCommand : shell.Player.NextCommand;
+        if (!command.CanExecute(null)) return;
+        command.Execute(null);
+        e.Handled = true;
     }
 
     private bool? _landscape;
