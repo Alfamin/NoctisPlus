@@ -26,6 +26,8 @@ internal sealed class ProgressiveDataSource(IDataSource inner) : Java.Lang.Objec
     private AUri? _uri;
     private long _remaining;
     private bool _innerOpen;
+    private string? _originalPath;
+    private Func<string?>? _completedPath;
 
     public AUri? Uri => _session != null ? _uri : inner.Uri;
 
@@ -37,8 +39,14 @@ internal sealed class ProgressiveDataSource(IDataSource inner) : Java.Lang.Objec
     public long Open(DataSpec? dataSpec)
     {
         var spec = dataSpec ?? throw new Java.Lang.IllegalArgumentException("No data spec");
-        if (LocalPath(spec.Uri) is { } path && ProgressiveReadSession.TryOpen(path) is { } session)
+        var path = LocalPath(spec.Uri);
+        if (path != _originalPath) { _originalPath = null; _completedPath = null; }
+        if (path is not null && ProgressiveReadSession.TryOpen(path) is { } session)
         {
+            // Close releases the reader immediately, but a later seek may reopen after the
+            // producer has collision-renamed its file. Keep only this attempt's resolver,
+            // never an open reader or a process-wide alias map. Completion may follow Close.
+            _originalPath = path; _completedPath = () => session.CompletedPath;
             try
             {
                 while (true)
@@ -56,6 +64,12 @@ internal sealed class ProgressiveDataSource(IDataSource inner) : Java.Lang.Objec
             catch { session.Dispose(); throw; }
         }
         _innerOpen = true;
+        if (path is not null && path == _originalPath && _completedPath?.Invoke() is { } final)
+        {
+            using var file = new Java.IO.File(final);
+            using var redirected = spec.WithUri(AUri.FromFile(file)); // preserves position/length/headers
+            return inner.Open(redirected);
+        }
         return inner.Open(spec);
     }
 

@@ -143,6 +143,35 @@ public class ProgressiveReadSessionTests
     }
 
     [Fact]
+    public async Task CompletionAfterClose_ResolvesTheValidatedRenamedFile_WithoutRetainingAReader()
+    {
+        using var rig = await StartAsync("mp3");
+        var session = ProgressiveReadSession.TryOpen(rig.Path)!;
+        Assert.Null(session.CompletedPath);
+        session.Dispose(); // Media3 may close a load before the producer finishes
+        Assert.False(rig.Transfer.HasReaders);
+        rig.Write(rig.Audio.Length - rig.Written);
+        var saved = Path.Combine(rig.Data.DataDirectory, "song (2).mp3");
+        File.Move(Path.Combine(rig.Data.DataDirectory, "song.part"), saved);
+        rig.Transfer.End(saved);
+        Assert.Equal(saved, session.CompletedPath);
+        Assert.False(rig.Transfer.HasReaders);
+        Assert.False(ProgressiveTransfer.IsAvailable(rig.Path));
+        Assert.Equal(rig.Audio, File.ReadAllBytes(saved));
+    }
+
+    [Fact]
+    public async Task FailedCompletion_NeverRedirectsToAnUnvalidatedFile()
+    {
+        using var rig = await StartAsync("mp3");
+        var session = ProgressiveReadSession.TryOpen(rig.Path)!;
+        session.Dispose();
+        rig.Transfer.End(Path.Combine(rig.Data.DataDirectory, "other.mp3"), new IOException("failed"));
+        Assert.Null(session.CompletedPath);
+        Assert.False(rig.Transfer.HasReaders);
+    }
+
+    [Fact]
     public void NothingBeingWritten_MeansAnOrdinaryFile()
         => Assert.Null(ProgressiveReadSession.TryOpen(Path.Combine(Path.GetTempPath(), "not-a-transfer.flac")));
 }

@@ -44,7 +44,8 @@ public sealed class ProgressivePlaybackProbe : Activity
         var folder = FilesDir!.AbsolutePath;
         var input = Path.Combine(folder, "probe." + extension);
         var part = Path.Combine(folder, "probe-growing.part");
-        var final = Path.Combine(folder, "probe-growing." + extension);
+        var final = Path.Combine(folder, "probe-renamed (2)." + extension);
+        File.Delete(Path.Combine(folder, "probe-growing." + extension)); // only this probe's previous synthetic output
         var audio = await File.ReadAllBytesAsync(input, _stop.Token);
         var initial = (int)(audio.Length * .4);
         _transfer = new ProgressiveTransfer(folder, "probe-growing", TimeSpan.FromSeconds(40));
@@ -56,6 +57,14 @@ public sealed class ProgressivePlaybackProbe : Activity
         await writer.WriteAsync(audio.AsMemory(0, initial), _stop.Token);
         await Task.Delay(650, _stop.Token);
         var path = _transfer.ReadyPath ?? throw new IOException("Initial 40% did not become playable");
+        // Exercise a closed load whose transfer completes under a collision-renamed path.
+        // This must retain metadata only, not a reader lease that pins the writer forever.
+        var reopen = new ProgressiveDataSourceFactory(new DefaultDataSource.Factory(this)).CreateDataSource();
+        using var originalFile = new Java.IO.File(path);
+        using var originalUri = global::Android.Net.Uri.FromFile(originalFile);
+        using var firstSpec = new DataSpec(originalUri!);
+        reopen.Open(firstSpec); reopen.Close();
+        Require(!_transfer.HasReaders, "Closed load retained a reader");
         _player = new ExoPlayerBuilder(this)
             .SetMediaSourceFactory(new DefaultMediaSourceFactory(new ProgressiveDataSourceFactory(new DefaultDataSource.Factory(this))))
             .Build();
@@ -86,6 +95,13 @@ public sealed class ProgressivePlaybackProbe : Activity
         await writer.WriteAsync(audio.AsMemory(initial), _stop.Token);
         File.Move(part, final, overwrite: true);
         _transfer.End(final);
+        Require(!File.Exists(path), "Old probe output would mask a missing-path regression");
+        using var seekSpec = new DataSpec(originalUri!, 1000, 16);
+        Require(reopen.Open(seekSpec) == 16, "Reopen lost the requested byte range");
+        var check = new byte[16];
+        Require(reopen.Read(check, 0, check.Length) == 16 && check.AsSpan().SequenceEqual(audio.AsSpan(1000, 16)), "Reopen read the wrong file/offset");
+        reopen.Close();
+        Report("RENAMED_REOPEN passed=True closedBeforeCompletion=True");
         await UntilAsync(() => _player.CurrentPosition >= stalled + 250, 7000);
         Report($"RESUMED position={_player.CurrentPosition} noRestart=True");
 

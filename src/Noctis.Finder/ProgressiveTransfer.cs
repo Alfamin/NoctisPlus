@@ -141,6 +141,9 @@ internal sealed class ProgressiveTransfer(string folder, string fileName, TimeSp
         internal ProgressiveAudioBuffer Buffer => buffer;
         internal TimeSpan? Duration => owner.Duration;
         internal Exception? Error => owner.Error;
+        // Metadata remains readable after Dispose without keeping a reader/file lease alive.
+        internal string? CompletedPath
+        { get { lock (owner._gate) return owner._finished && owner._error is null ? owner._path : null; } }
 
         internal event Action? Ended { add => owner.Ended += value; remove => owner.Ended -= value; }
         internal Lease Retain()

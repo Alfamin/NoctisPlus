@@ -37,6 +37,7 @@ internal sealed class ProgressiveReadSession : IDisposable
     internal long Length => _lease.Buffer.Expected > 0 ? _lease.Buffer.Expected : -1;
     internal long Position => _reader.Position;
     internal bool IsClosed => Volatile.Read(ref _closed) != 0;
+    internal string? CompletedPath => _lease.CompletedPath;
 
     /// <summary>Moves to <paramref name="position"/>, waiting up to <paramref name="wait"/> for it to arrive.
     /// Null: still waiting (call again). False: unreachable (past the end, or the transfer failed).</summary>
