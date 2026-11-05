@@ -55,6 +55,8 @@ public class MobilePlaylistImportTests
             await prompt.Actions[0].RunCommand.ExecuteAsync(null);
             Assert.Equal(1, imports.ImportsCalled); Assert.Null(rig.Shell.Prompt);
             Assert.Equal("3 songs", Assert.Single(root.Rows).Subtitle); Assert.Equal("Playlists imported", root.ImportMessage);
+            Assert.Equal("3 songs", Assert.Single(rig.Shell.Library.HomePlaylistsRail).Subtitle);
+            Assert.Same(source, rig.Shell.Library.HomePlaylistsRail[0].CoverSource);
             Assert.Empty(rig.Library.TrackList); Assert.Empty(source.Saves); Assert.Equal(0, source.Prepares); Assert.Equal(0, imports.Downloads);
             rig.Shell.OpenPlaylistCommand.Execute(root.Playlists.Single());
             var page = Assert.IsType<SongListPageViewModel>(rig.Shell.CurrentPage);

@@ -9,7 +9,8 @@ public enum RailItemKind { Album, Playlist, Track, Artist }
 /// own caption and cover; <see cref="Payload"/> is what a tap opens or plays. A record, so an
 /// unchanged rail compares equal and is not rebuilt (no flicker on every refresh).
 /// </summary>
-public sealed record RailItem(RailItemKind Kind, string Title, string Subtitle, string? ArtworkPath, object Payload)
+public sealed record RailItem(RailItemKind Kind, string Title, string Subtitle, string? ArtworkPath, object Payload,
+    Noctis.Services.Search.IOnlineMusicSearch? CoverSource = null, string CoverUrl = "")
 {
     public static RailItem ForAlbum(Album album) => new(RailItemKind.Album, album.Name, album.Artist, album.ArtworkPath, album);
 
@@ -33,9 +34,9 @@ public sealed record RailItem(RailItemKind Kind, string Title, string Subtitle, 
     /// </summary>
     public bool Equals(RailItem? other) =>
         other is not null && Kind == other.Kind && Title == other.Title && Subtitle == other.Subtitle
-        && ArtworkPath == other.ArtworkPath && Equals(PayloadKey, other.PayloadKey);
+        && ArtworkPath == other.ArtworkPath && CoverUrl == other.CoverUrl && Equals(PayloadKey, other.PayloadKey);
 
-    public override int GetHashCode() => HashCode.Combine(Kind, Title, Subtitle, ArtworkPath, PayloadKey);
+    public override int GetHashCode() => HashCode.Combine(Kind, Title, Subtitle, ArtworkPath, CoverUrl, PayloadKey);
 
     private object PayloadKey => Payload switch
     {

@@ -130,7 +130,12 @@ public sealed partial class ShellViewModel : ObservableObject
     public Noctis.Mobile.Services.Telegram.IPhoneTelegramSignIn? TelegramSignIn { get; init; }
 
     /// <summary>Music Finder's online search and downloads (phone Search). Null: Search is library only.</summary>
-    public Noctis.Services.Search.IOnlineMusicSearch? OnlineSearch { get; init; }
+    private readonly Noctis.Services.Search.IOnlineMusicSearch? _onlineSearch;
+    public Noctis.Services.Search.IOnlineMusicSearch? OnlineSearch
+    {
+        get => _onlineSearch;
+        init { _onlineSearch = value; Library.SetOnlinePlaylists(value); }
+    }
     public Noctis.Services.Search.IOnlineDiscovery? Discovery { get; init; }
     private ForYouViewModel? _forYou;
     public bool HasForYou => Discovery is not null && OnlineSearch is not null;

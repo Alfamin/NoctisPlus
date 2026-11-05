@@ -19,12 +19,19 @@ public sealed class PlaylistCover : CachedImage
     private async void LoadCover()
     {
         _stop?.Cancel();
-        SourcePath = (DataContext as PlaylistRow)?.ArtworkPath;
-        if (SourcePath is not null || DataContext is not PlaylistRow { CoverSource: { } source, CoverUrl.Length: > 0 } row) return;
+        var row = DataContext;
+        var (local, source, url) = row switch
+        {
+            PlaylistRow playlist => (playlist.ArtworkPath, playlist.CoverSource, playlist.CoverUrl),
+            RailItem rail => (rail.ArtworkPath, rail.CoverSource, rail.CoverUrl),
+            _ => (null, null, ""),
+        };
+        SourcePath = local;
+        if (local is not null || source is null || url.Length == 0) return;
         var stop = _stop = new();
         try
         {
-            var path = source.CachedArtwork(row.CoverUrl) ?? await source.ArtworkAsync(row.CoverUrl, stop.Token);
+            var path = source.CachedArtwork(url) ?? await source.ArtworkAsync(url, stop.Token);
             if (!stop.IsCancellationRequested && ReferenceEquals(DataContext, row)) SourcePath = path;
         }
         catch (Exception ex) when (ex is not OutOfMemoryException) { }

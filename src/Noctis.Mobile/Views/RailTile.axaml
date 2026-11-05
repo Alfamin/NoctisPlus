@@ -13,7 +13,7 @@
             <Panel>
                 <PathIcon Data="{DynamicResource AlbumsIcon}" Width="30" Height="30" Opacity="0.4" />
                 <!-- Decoded at exactly the pixels it is drawn at: a bucketed decode was resampled again on draw. -->
-                <controls:CachedImage SourcePath="{Binding ArtworkPath}" DecodeWidth="768" PixelExact="True" Stretch="UniformToFill" />
+                <views:PlaylistCover DecodeWidth="768" PixelExact="True" Stretch="UniformToFill" />
             </Panel>
         </Border>
         <TextBlock Classes="row-title" FontSize="13" FontWeight="SemiBold" Text="{Binding Title}" />

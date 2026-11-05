@@ -60,6 +60,17 @@ public sealed partial class LibraryViewModel : ObservableObject
     /// null leaves their covers.</summary>
     public IArtistPhotoSource? ArtistPhotos { get; set; }
 
+    private Noctis.Services.Search.IOnlineMusicSearch? _onlineSource;
+    private Noctis.Services.Search.IOnlinePlaylistImports? _onlineImports;
+    internal void SetOnlinePlaylists(Noctis.Services.Search.IOnlineMusicSearch? source)
+    {
+        if (_onlineImports is not null) _onlineImports.Changed -= OnOnlineImportsChanged;
+        _onlineSource = source; _onlineImports = source?.PlaylistImports;
+        if (_onlineImports is not null) _onlineImports.Changed += OnOnlineImportsChanged;
+        RefreshRails();
+    }
+    private void OnOnlineImportsChanged() => _marshal(RefreshRails);
+
     /// <summary>Pinned artists whose photo was asked for this session: a lookup that found nothing
     /// (or failed) is not repeated on every refresh.</summary>
     private readonly HashSet<string> _pinnedPhotoAsked = new(StringComparer.OrdinalIgnoreCase);
@@ -755,6 +766,16 @@ public sealed partial class LibraryViewModel : ObservableObject
     /// <summary>Pinned and Recently Added: library structure and pins only.</summary>
     private void RefreshRails()
     {
+        var imported = (_onlineImports?.Snapshot() ?? []).Where(j => j.Complete && !j.Stopped).ToDictionary(j => j.Id);
+        RailItem PlaylistTile(Playlist playlist)
+        {
+            var tile = RailItem.ForPlaylist(playlist, playlist.CoverArtPath ?? PlaylistArtwork(playlist));
+            return imported.TryGetValue(playlist.Id, out var job) ? tile with
+            {
+                Subtitle = job.Total == 1 ? "1 song" : $"{job.Total} songs",
+                CoverSource = _onlineSource, CoverUrl = job.ArtworkUrl,
+            } : tile;
+        }
         // Albums, artists, playlists, then songs; pins whose item left the library are skipped.
         var artistArt = _pinnedArtistNames.Count > 0 ? MobileLibrary.ArtistArtwork(_library) : null;
         var pinnedArtistList = _pinnedArtistNames
@@ -767,13 +788,13 @@ public sealed partial class LibraryViewModel : ObservableObject
         foreach (var artist in pinnedArtistList) AskPinnedArtistPhoto(artist.Name);
         var pinned = _pinnedAlbumIds.Select(_library.GetAlbumById).OfType<Album>().Select(RailItem.ForAlbum)
             .Concat(pinnedArtists)
-            .Concat(_playlists.Where(p => p.IsPinned).Select(p => RailItem.ForPlaylist(p, PlaylistArtwork(p))))
+            .Concat(_playlists.Where(p => p.IsPinned).Select(PlaylistTile))
             .Concat(_pinnedTrackIds.Select(_library.GetTrackById).OfType<Track>().Select(RailItem.ForTrack))
             .ToList();
         MobileLibrary.ReplaceIfChanged(PinnedRail, pinned);
         HasPinned = PinnedRail.Count > 0;
 
-        var playlists = _playlists.Take(RailSize).Select(p => RailItem.ForPlaylist(p, PlaylistArtwork(p))).ToList();
+        var playlists = _playlists.Take(RailSize).Select(PlaylistTile).ToList();
         MobileLibrary.ReplaceIfChanged(HomePlaylistsRail, playlists);
         HasHomePlaylists = HomePlaylistsRail.Count > 0;
 
