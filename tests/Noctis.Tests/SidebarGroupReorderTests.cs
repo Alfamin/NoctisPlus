@@ -62,7 +62,10 @@ public class SidebarGroupReorderTests
         Dispatcher.UIThread.RunJobs();
     }
 
-    private sealed record Sidebar(SidebarViewModel Vm, PlaylistPersistence Persistence, SidebarView View, Window Win, ListBox List);
+    private sealed record Sidebar(SidebarViewModel Vm, PlaylistPersistence Persistence, SidebarView View, Window Win, ListBox List) : IDisposable
+    {
+        public void Dispose() => Win.Close();
+    }
 
     private static async Task<Sidebar> ShowSidebarAsync(PlaylistPersistence? persistence = null)
     {
@@ -101,7 +104,7 @@ public class SidebarGroupReorderTests
     [AvaloniaFact]
     public async Task DraggingAnOpenFolderDown_CarriesItsPlaylists_ThenCommitsAndSavesTheOrder()
     {
-        var s = await ShowSidebarAsync();
+        using var s = await ShowSidebarAsync();
         Assert.Equal(new[] { "Alpha", "A1", "A2", "Beta", "B1", "Gamma", "G1", "Loose" }, Labels(s.Vm));
         var header = Row(s.List, 0);
         var pitch = header.Bounds.Height + header.Margin.Top + header.Margin.Bottom;
@@ -153,7 +156,7 @@ public class SidebarGroupReorderTests
     [AvaloniaFact]
     public async Task DraggingAClosedFolderUp_OpensAOneRowGap_AndLandsInFront()
     {
-        var s = await ShowSidebarAsync();
+        using var s = await ShowSidebarAsync();
         s.Vm.ToggleFolderExpansion("Gamma");
         Pump(4);
         Assert.Equal(new[] { "Alpha", "A1", "A2", "Beta", "B1", "Gamma", "Loose" }, Labels(s.Vm));
@@ -186,7 +189,7 @@ public class SidebarGroupReorderTests
     [AvaloniaFact]
     public async Task ClickingAFolderHeader_StillTogglesIt_WithoutMovingAnything()
     {
-        var s = await ShowSidebarAsync();
+        using var s = await ShowSidebarAsync();
         var header = Row(s.List, 0);
         var at = Centre(header, s.Win);
 
@@ -217,7 +220,7 @@ public class SidebarGroupReorderTests
     [AvaloniaFact]
     public async Task ClickingAFolderHeader_FoldsItsRowsShutAndOpen_InsteadOfSnapping()
     {
-        var s = await ShowSidebarAsync();
+        using var s = await ShowSidebarAsync();
         var at = Centre(Row(s.List, 0), s.Win);
         var a1 = Row(s.List, 1);
         var full = a1.Bounds.Height;
@@ -249,7 +252,7 @@ public class SidebarGroupReorderTests
     [AvaloniaFact]
     public async Task DraggingAPlaylistOntoAFolderHeader_StillFilesItThere()
     {
-        var s = await ShowSidebarAsync();
+        using var s = await ShowSidebarAsync();
         var loose = Row(s.List, 7);
         var beta = Row(s.List, 3);
 
@@ -273,7 +276,7 @@ public class SidebarGroupReorderTests
     {
         // Discord Luwi (1.5.5): with nowhere to move it, the card lifted, left an empty gap at
         // its slot and floated over the other playlists. The pinned ones are no slot for it.
-        var s = await ShowSidebarAsync(new PlaylistPersistence
+        using var s = await ShowSidebarAsync(new PlaylistPersistence
         {
             Initial = new()
             {
@@ -330,7 +333,7 @@ public class SidebarGroupReorderTests
     {
         // Owner (09-27): "Just like how I can reorder the playlists I should be able to reorder
         // folders." One folder above two loose playlists used to be stuck on top.
-        var s = await ShowSidebarAsync(new PlaylistPersistence
+        using var s = await ShowSidebarAsync(new PlaylistPersistence
         {
             Initial = new()
             {
@@ -388,7 +391,7 @@ public class SidebarGroupReorderTests
     [AvaloniaFact]
     public async Task DraggingAFolderBelowTheLoosePlaylists_LandsAfterThem()
     {
-        var s = await ShowSidebarAsync();
+        using var s = await ShowSidebarAsync();
         var header = Row(s.List, 0);
         var pitch = header.Bounds.Height + header.Margin.Top + header.Margin.Bottom;
         var host = s.View.FindControl<Panel>("PlaylistListHost")!;
@@ -420,7 +423,7 @@ public class SidebarGroupReorderTests
     [AvaloniaFact]
     public async Task DraggingALoosePlaylistToTheTopEdgeOfAFolder_LandsAboveIt_NotInside()
     {
-        var s = await ShowSidebarAsync();
+        using var s = await ShowSidebarAsync();
         var loose = Row(s.List, 7);
         var beta = Row(s.List, 3);
         var pitch = beta.Bounds.Height + beta.Margin.Top + beta.Margin.Bottom;
@@ -446,7 +449,7 @@ public class SidebarGroupReorderTests
     [AvaloniaFact]
     public async Task DraggingAPlaylistOffTheBottomOfAnOpenFolder_LandsBelowIt_OutsideTheFolder()
     {
-        var s = await ShowSidebarAsync();
+        using var s = await ShowSidebarAsync();
         var a1 = Row(s.List, 1);
         var a2 = Row(s.List, 2);
         var pitch = a2.Bounds.Height + a2.Margin.Top + a2.Margin.Bottom;
