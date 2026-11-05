@@ -116,12 +116,13 @@ public sealed partial class NowPlayingViewModel
         while (true)
         {
             await _onlineAccess.WaitAsync(stop.Token);
+            stop.Token.ThrowIfCancellationRequested();
             if (!pending.Source.CanDownload) throw new InvalidOperationException("Sign in to Telegram to play this song");
             try
             {
                 var prepared = pending.Source.PreparePlaybackAsync(pending.Song, pending.Keep, stop.Token);
                 _onlineRequestStarted = true; // the current request precedes ahead work
-                _marshal(() => { if (ReferenceEquals(stop, _onlinePrepare)) { _onlineWindow = ""; UpdateOnlineWindow(); } });
+                _marshal(() => { if (ReferenceEquals(stop, _onlinePrepare)) UpdateOnlineWindow(); });
                 // A source may finish after a skip; observe late faults, without owning its download.
                 _ = prepared.ContinueWith(static t => { _ = t.Exception; }, CancellationToken.None,
                     TaskContinuationOptions.OnlyOnFaulted | TaskContinuationOptions.ExecuteSynchronously, TaskScheduler.Default);
@@ -161,7 +162,7 @@ public sealed partial class NowPlayingViewModel
         if (_onlineSources.Count == 0) return; // no extra work/subscriptions for ordinary local queues
         var key = string.Join("|", head.Prepend(_queue.Current).Select(t => t is null ? "" :
             t.Id + ":" + (t.PendingStream is Noctis.ViewModels.PendingStream p ? RuntimeHelpers.GetHashCode(p.Source) : 0)))
-            + ":" + _onlineAccess.IsOffline + ":" + _onlineSettleUntil.Ticks;
+            + ":" + _onlineAccess.IsOffline + ":" + _onlineRequestStarted + ":" + _onlineSettleUntil.Ticks;
         if (key == _onlineWindow) return;
         _onlineWindow = key;
         _onlineAhead?.Cancel();

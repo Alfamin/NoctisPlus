@@ -866,9 +866,10 @@ public sealed partial class NowPlayingViewModel : ObservableObject, IDisposable
 
     public void Dispose()
     {
+        if (_disposed) return;
+        _disposed = true;
         DisposeOnlineQueue();
         InvalidateShufflePlan();
-        _disposed = true;
         _player.PositionChanged -= OnPlayerPosition;
         _player.DurationResolved -= OnPlayerDuration;
         _player.TrackEnded -= OnPlayerTrackEnded;

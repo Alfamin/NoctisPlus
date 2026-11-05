@@ -172,6 +172,25 @@ public class MobileOnlineQueueTests
         Assert.DoesNotContain(saved!.MobileOnlineTracks!.Values, s => s.Song.Id == songs[1].Id);
     }
 
+    [Fact]
+    public async Task ReopeningGateAndQueuedCurrentStart_DoNotAskAheadTwice()
+    {
+        using var r = new Rig(); r.Source.Hold = true;
+        var posted = new List<Action>();
+        using var vm = new NowPlayingViewModel(r.Audio, r.Library, r.Data, marshal: a => posted.Add(a), onlineAccess: r.Network)
+        { OnlineDelay = (_, _) => Task.CompletedTask };
+        vm.PlayOnlineTracks(r.Source, Songs(), 0);
+        r.Network.SetOffline(true); r.Network.SetOffline(false);
+        // A recovery notification can arrive before the asynchronous current-start callback.
+        var work = posted.ToArray(); posted.Clear();
+        foreach (var action in work.Reverse()) action();
+        await vm.OnlineAheadWork;
+        Assert.Equal(new[] { "play:0", "fetch:1", "fetch:2", "ask:3", "ask:4" }, r.Source.Calls);
+        vm.Dispose();
+        await vm.OnlinePreparation;
+        foreach (var action in posted.ToArray()) action();
+    }
+
     [Theory]
     [InlineData(false)]
     [InlineData(true)]
