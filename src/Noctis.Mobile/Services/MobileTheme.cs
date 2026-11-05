@@ -16,7 +16,7 @@ namespace Noctis.Mobile.Services;
 public sealed class MobileTheme
 {
     public static IReadOnlyList<string> Appearances { get; } = new[] { "System", "Dark", "Light" };
-    public static IReadOnlyList<string> DarkThemes { get; } = new[] { "Ink", "Smoke", "Dark", "Midnight" };
+    public static IReadOnlyList<string> DarkThemes { get; } = new[] { "Ink", "Smoke", "Dark", "Midnight", "Forest", "Plum" };
     public const string DefaultAccent = "#E74856";
 
     private ResourceInclude? _overlay;
@@ -77,6 +77,8 @@ public sealed class MobileTheme
         {
             "Smoke" => Dark("#22242C", "#2A2D38", "#343844", "#3E4250", "#2A2D38", "#B3343844", "#9A9EAB", "#5E6270"),
             "Midnight" => Dark("#0E1322", "#161D31", "#1E2740", "#2A3552", "#1A2238", "#B31E2740", "#8A93AD", "#4A5372"),
+            "Forest" => Dark("#071C16", "#102D23", "#193C30", "#315748", "#15382B", "#B3193C30", "#A0B8AC", "#678B78"),
+            "Plum" => Dark("#1B1023", "#291B34", "#382643", "#55405F", "#302039", "#B3382643", "#B7A7C1", "#8A7199"),
             _ => Dark("#000000", "#1C1C1E", "#2C2C2E", "#38383A", "#1C1C1E", "#B32C2C2F", "#8D8D93", "#5A5A5E"),
         };
         return palette;
@@ -107,7 +109,7 @@ public sealed class MobileTheme
         {
             _overlay = new ResourceInclude(new Uri("avares://Noctis.UI/"))
             {
-                Source = new Uri($"avares://Noctis.UI/Assets/Themes/{themeName}.axaml"),
+                Source = new Uri($"avares://Noctis.UI/Assets/Themes/{(themeName is "Forest" or "Plum" ? "Ink" : themeName)}.axaml"),
             };
             app.Resources.MergedDictionaries.Add(_overlay);
         }

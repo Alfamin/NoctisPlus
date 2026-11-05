@@ -935,7 +935,7 @@ public class MobileSettingsTests
     /// <summary>The Theme row opens the glass pop menu: System, Light, Dark (the one in use exposed as
     /// selected), then the dark style, which steps to the next. A pick applies at once.</summary>
     [AvaloniaFact]
-    public async Task Settings_ThemeMenu_AppliesTheLook_AndStepsTheDarkStyle()
+    public async Task Settings_ThemeMenu_PicksEveryLookDirectly_AndKeepsTheSelectedName()
     {
         var host = new FakeThemeHost();
         using var rig = MobileFixtures.MakeRig(theme: host);
@@ -944,27 +944,32 @@ public class MobileSettingsTests
             var row = MobileFixtures.Named<Button>(page, "ThemeRow");
             row.Command!.Execute(row.CommandParameter);
             var menu = Assert.IsType<OptionsMenuViewModel>(rig.Shell.PopMenu);
-            Assert.Equal(new[] { "System", "Light", "Dark", "Dark style: Dark" }, menu.Items.Select(i => i.Label));
-            Assert.Equal(new[] { true, false, false, false }, menu.Items.Select(i => i.IsChecked));
+            Assert.Equal(new[] { "System", "Light", "Ink", "Smoke", "Dark", "Midnight", "Forest", "Plum" }, menu.Items.Select(i => i.Label));
+            Assert.Single(menu.Items.Where(i => i.IsChecked));
             Assert.Equal("System, selected", menu.Items[0].AccessibleName);
             Assert.Equal("Light", menu.Items[1].AccessibleName);
-            Assert.True(menu.Items[3].StartsGroup);
+            Assert.True(menu.Items[2].StartsGroup);
 
-            menu.Items[2].PickCommand.Execute(null);
+            menu.Items[4].PickCommand.Execute(null);
             Assert.Null(rig.Shell.PopMenu);                   // a pick closes the menu
             Assert.Equal(("Dark", "Dark", "#E74856"), host.Last);
             Assert.Equal("Theme, Dark", vm.ThemeRowName);
 
             row.Command!.Execute(row.CommandParameter);
             menu = Assert.IsType<OptionsMenuViewModel>(rig.Shell.PopMenu);
-            Assert.Equal(new[] { false, false, true, false }, menu.Items.Select(i => i.IsChecked));
-            menu.Items[3].PickCommand.Execute(null);          // Dark -> Midnight
+            Assert.True(menu.Items[4].IsChecked);
+            menu.Items[5].PickCommand.Execute(null);
             Assert.Equal(("Dark", "Midnight", "#E74856"), host.Last);
             row.Command!.Execute(row.CommandParameter);
             menu = Assert.IsType<OptionsMenuViewModel>(rig.Shell.PopMenu);
-            Assert.Equal("Dark style: Midnight", menu.Items[3].Label);
+            Assert.True(menu.Items[5].IsChecked);
+            Assert.Equal("Midnight", vm.ThemeValue);
+            menu.Items[6].PickCommand.Execute(null);
+            Assert.Equal(("Dark", "Forest", "#E74856"), host.Last);
+            row.Command!.Execute(row.CommandParameter);
+            menu = Assert.IsType<OptionsMenuViewModel>(rig.Shell.PopMenu);
             menu.Items[1].PickCommand.Execute(null);
-            Assert.Equal(("Light", "Midnight", "#E74856"), host.Last);
+            Assert.Equal(("Light", "Forest", "#E74856"), host.Last);
         });
         await ((SettingsPageViewModel)rig.Shell.CurrentPage!).PendingSave;
     }

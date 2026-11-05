@@ -29,7 +29,7 @@ public class MobileAppearanceTests
         public void ApplyTheme(string appearance, string darkTheme, string accentHex) => Last = (appearance, darkTheme, accentHex);
     }
 
-    private static readonly string[] Themes = { "Light", "Ink", "Smoke", "Dark", "Midnight" };
+    private static readonly string[] Themes = { "Light", "Ink", "Smoke", "Dark", "Midnight", "Forest", "Plum" };
 
     [Fact]
     public void Accents_AreNineDesktopPresets_CrimsonFirst_AndDistinct()

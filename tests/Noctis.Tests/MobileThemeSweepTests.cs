@@ -40,7 +40,7 @@ public class MobileThemeSweepTests
     private readonly ITestOutputHelper _o;
     public MobileThemeSweepTests(ITestOutputHelper o) => _o = o;
 
-    internal static readonly string[] Themes = { "Light", "Ink", "Smoke", "Dark", "Midnight" };
+    internal static readonly string[] Themes = { "Light", "Ink", "Smoke", "Dark", "Midnight", "Forest", "Plum" };
 
     /// <summary>The floor every label and glyph keeps (WCAG's 3:1 for large text and UI parts).</summary>
     private const double Floor = 3.0;
@@ -290,6 +290,7 @@ public class MobileThemeSweepTests
     private static readonly Dictionary<string, string> Accents = new()
     {
         ["Light"] = "#F4D24B", ["Ink"] = MobileTheme.DefaultAccent, ["Smoke"] = "#4338CA", ["Dark"] = "#FF8547", ["Midnight"] = "#12C76F",
+        ["Forest"] = "#4338CA", ["Plum"] = "#F4D24B",
     };
 
     [AvaloniaFact]

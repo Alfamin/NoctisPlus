@@ -320,7 +320,7 @@ public sealed partial class SettingsPageViewModel : MobilePage
     // ── Appearance ──
 
     /// <summary>The Theme row's value: System, Light or Dark.</summary>
-    public string ThemeValue => Appearance;
+    public string ThemeValue => Appearance == "Dark" ? DarkTheme : Appearance;
 
     /// <summary>A row as the screen reader says it: its label, then its value.</summary>
     private static string Named(string label, string? value) => string.IsNullOrEmpty(value) ? label : $"{label}, {value}";
@@ -349,19 +349,18 @@ public sealed partial class SettingsPageViewModel : MobilePage
 
     public string PlayerBarRowName => Named("Player Bar", PlayerBarValue);
 
-    /// <summary>The Theme row: System / Light / Dark on the glass pop menu (the one ticked is
-    /// exposed as selected), then the dark style, which a tap steps to the next.</summary>
+    /// <summary>Pick a complete look directly instead of cycling through invisible dark styles.</summary>
     [RelayCommand]
     private void ShowThemeMenu()
     {
         var items = new List<OptionsMenuItem>();
-        foreach (var look in new[] { "System", "Light", "Dark" })
+        foreach (var look in new[] { "System", "Light" })
             items.Add(new OptionsMenuItem(Shell, look, Appearance == look, () => Appearance = look));
-        items.Add(new OptionsMenuItem(Shell, $"Dark style: {DarkTheme}", false, NextDarkTheme) { StartsGroup = true });
+        foreach (var look in DarkThemes)
+            items.Add(new OptionsMenuItem(Shell, look, Appearance == "Dark" && DarkTheme == look,
+                () => { DarkTheme = look; Appearance = "Dark"; }) { StartsGroup = look == DarkThemes[0] });
         Shell.ShowOptions(OptionsMenuViewModel.ForItems(items));
     }
-
-    private void NextDarkTheme() => DarkTheme = DarkThemes[(DarkThemes.ToList().IndexOf(DarkTheme) + 1) % DarkThemes.Count];
 
     // ── Lyrics ──
 
@@ -633,7 +632,9 @@ public sealed partial class SettingsPageViewModel : MobilePage
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(ThemeValue), nameof(ThemeRowName))]
     private string _appearance = "System";
-    [ObservableProperty] private string _darkTheme = "Ink";
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(ThemeValue), nameof(ThemeRowName))]
+    private string _darkTheme = "Ink";
     [ObservableProperty] private AccentSwatch? _selectedAccent;
     [ObservableProperty] private double _lyricsTextScale = 1.0;
     [ObservableProperty]

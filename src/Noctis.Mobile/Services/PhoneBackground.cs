@@ -263,22 +263,35 @@ public sealed class PhoneBackground : ObservableObject
     /// (<see cref="BackgroundCatalog"/>), so the text on the glass keeps its contrast.</summary>
     private ResourceDictionary Layer()
     {
-        if (_layer != null) return _layer;
-        static SolidColorBrush B(string hex) => new(Color.Parse(hex));
+        Color Tint(string key, ThemeVariant variant, string fallback, byte alpha)
+        {
+            var color = Application.Current?.TryGetResource(key, variant, out var value) == true && value is ISolidColorBrush brush
+                ? brush.Color : Color.Parse(fallback);
+            return Color.FromArgb(alpha, color.R, color.G, color.B);
+        }
+        if (_layer != null)
+        {
+            // Attach removed our overlay before resolving these: read the selected theme, never our old tint.
+            ((SolidColorBrush)((ResourceDictionary)_layer.ThemeDictionaries[ThemeVariant.Dark])["PhoneGroupedBackgroundBrush"]!).Color = Tint("PhoneGroupedBackgroundBrush", ThemeVariant.Dark, "#1C1C1E", 0xB3);
+            ((SolidColorBrush)((ResourceDictionary)_layer.ThemeDictionaries[ThemeVariant.Dark])["PhoneCardBrush"]!).Color = Tint("PhoneCardBrush", ThemeVariant.Dark, "#2C2C2E", 0xE0);
+            ((SolidColorBrush)((ResourceDictionary)_layer.ThemeDictionaries[ThemeVariant.Light])["PhoneGroupedBackgroundBrush"]!).Color = Tint("PhoneGroupedBackgroundBrush", ThemeVariant.Light, "#FFFFFF", 0x99);
+            ((SolidColorBrush)((ResourceDictionary)_layer.ThemeDictionaries[ThemeVariant.Light])["PhoneCardBrush"]!).Color = Tint("PhoneCardBrush", ThemeVariant.Light, "#FFFFFF", 0xCC);
+            return _layer;
+        }
         _layer = new ResourceDictionary();
         _layer.ThemeDictionaries[ThemeVariant.Dark] = new ResourceDictionary
         {
             ["PhoneBackgroundBrush"] = _dark!.Brush,
             ["PhoneSheetBackgroundBrush"] = _dark.Brush,
-            ["PhoneGroupedBackgroundBrush"] = B("#B31C1C1E"),
-            ["PhoneCardBrush"] = B("#E02C2C2E"),
+            ["PhoneGroupedBackgroundBrush"] = new SolidColorBrush(Tint("PhoneGroupedBackgroundBrush", ThemeVariant.Dark, "#1C1C1E", 0xB3)),
+            ["PhoneCardBrush"] = new SolidColorBrush(Tint("PhoneCardBrush", ThemeVariant.Dark, "#2C2C2E", 0xE0)),
         };
         _layer.ThemeDictionaries[ThemeVariant.Light] = new ResourceDictionary
         {
             ["PhoneBackgroundBrush"] = _light!.Brush,
             ["PhoneSheetBackgroundBrush"] = _light.Brush,
-            ["PhoneGroupedBackgroundBrush"] = B("#99FFFFFF"),
-            ["PhoneCardBrush"] = B("#CCFFFFFF"),
+            ["PhoneGroupedBackgroundBrush"] = new SolidColorBrush(Tint("PhoneGroupedBackgroundBrush", ThemeVariant.Light, "#FFFFFF", 0x99)),
+            ["PhoneCardBrush"] = new SolidColorBrush(Tint("PhoneCardBrush", ThemeVariant.Light, "#FFFFFF", 0xCC)),
         };
         return _layer;
     }
@@ -286,8 +299,8 @@ public sealed class PhoneBackground : ObservableObject
     private void Attach()
     {
         if (Application.Current is not { } app) return;
+        if (_layer != null) app.Resources.MergedDictionaries.Remove(_layer);
         var layer = Layer();
-        app.Resources.MergedDictionaries.Remove(layer);
         app.Resources.MergedDictionaries.Add(layer);   // last: it must win over the theme's palette
     }
 

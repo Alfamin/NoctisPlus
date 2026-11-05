@@ -23,6 +23,30 @@ namespace Noctis.Tests;
 /// the app, the pane's view model, and the contrast of text over every mesh.</summary>
 public class MobileBackgroundTests
 {
+    [AvaloniaFact]
+    public async Task BackgroundCardsFollowTheSelectedTheme_WhenChangedWhileTheMeshIsOn()
+    {
+        using var rig = MobileFixtures.MakeRig();
+        using var stack = new MobileThemeSweepTests.PhoneStack();
+        var background = new PhoneBackground(rig.Persistence);
+        await background.LoadAsync();
+        try
+        {
+            background.Choice = "ash";
+            foreach (var name in new[] { "Smoke", "Forest", "Midnight", "Plum", "Ink" })
+            {
+                stack.Theme.Apply(Application.Current!, name, MobileTheme.DefaultAccent);
+                background.Reassert();
+                Application.Current!.TryGetResource("PhoneCardBrush", ThemeVariant.Dark, out var value);
+                var shown = Assert.IsAssignableFrom<ISolidColorBrush>(value).Color;
+                var expected = ((ISolidColorBrush)((ResourceDictionary)MobileTheme.BuildPalette(name).ThemeDictionaries[ThemeVariant.Dark])["PhoneCardBrush"]!).Color;
+                Assert.Equal(expected.R, shown.R); Assert.Equal(expected.G, shown.G); Assert.Equal(expected.B, shown.B);
+                Assert.Equal(0xE0, shown.A);
+            }
+        }
+        finally { background.Choice = PhoneBackground.Off; }
+    }
+
     private sealed class FakeSaver : IBatterySaver
     {
         public bool IsOn { get; set; }
