@@ -111,7 +111,10 @@ public class QueueStreamingTests
         internal readonly List<string> AskedAhead = [];
         internal TaskCompletionSource? HoldAsks; internal CancellationToken AskToken;
         public Task AskAheadAsync(OnlineSong song, CancellationToken ct)
-        { lock (AskedAhead) AskedAhead.Add(song.Id); AskToken = ct; return HoldAsks?.Task.WaitAsync(ct) ?? Task.CompletedTask; }
+        {
+            lock (AskedAhead) { AskToken = ct; AskedAhead.Add(song.Id); }
+            return HoldAsks?.Task.WaitAsync(ct) ?? Task.CompletedTask;
+        }
         public void OpenArtist(OnlineArtist artist) { }
         public Task OpenAlbumAsync(OnlineAlbum album, CancellationToken ct) => Task.CompletedTask;
     }
@@ -345,8 +348,13 @@ public class QueueStreamingTests
         player.ReplaceQueueAndPlay(list, 0); Settle();
         var end = DateTime.UtcNow.AddSeconds(3);
         while (source.AskedAhead.Count < 1 && DateTime.UtcNow < end) { Thread.Sleep(10); Settle(); }
-        var first = source.AskToken;
-        lock (source.AskedAhead) Assert.Equal(new[] { "s2" }, source.AskedAhead); // one at a time
+        CancellationToken first;
+        lock (source.AskedAhead)
+        {
+            Assert.Equal(new[] { "s2" }, source.AskedAhead); // one at a time
+            first = source.AskToken;
+        }
+        Assert.True(first.CanBeCanceled); // the published request and token are one observation
         for (int i = 0; i < 12; i++) player.UpNext.RemoveAt(0); // the next songs are now s12, s13, …
         Settle();
         end = DateTime.UtcNow.AddSeconds(3);
