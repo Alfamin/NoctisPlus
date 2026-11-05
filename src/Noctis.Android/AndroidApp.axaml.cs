@@ -131,6 +131,17 @@ public partial class AndroidApp : Avalonia.Application, IThemeHost
         };
         var libraryView = new LibraryViewModel(library, persistence, new AndroidFolderPicker(), history);
         _finder = CreateFinder(context, library, libraryView);
+        nowPlaying.OnlineSearch = _finder?.Search;
+        Noctis.Services.Search.IOnlineMusicSearch? onlineSearch = _finder?.Search;
+        Noctis.Services.Search.IOnlineDiscovery? discovery = _finder?.Discovery;
+#if DEBUG && NOCTIS_ONLINE_QUEUE_AUDIT
+        if (context.PackageName == "com.alfamin.noctisplus.auditqueue271")
+        {
+            var auditSource = new Diagnostics.OnlineQueueAudit(Path.Combine(context.FilesDir!.AbsolutePath, "probe.mp3"));
+            onlineSearch = auditSource; discovery = auditSource; nowPlaying.OnlineSearch = auditSource;
+            _player.Volume = 0;
+        }
+#endif
         var shell = new ShellViewModel(
             libraryView,
             nowPlaying,
@@ -138,8 +149,8 @@ public partial class AndroidApp : Avalonia.Application, IThemeHost
         {
             // Music Finder: this phone's own Telegram sign-in, online Search and downloads.
             TelegramSignIn = _finder?.SignIn,
-            OnlineSearch = _finder?.Search,
-            Discovery = _finder?.Discovery,
+            OnlineSearch = onlineSearch,
+            Discovery = discovery,
             Outputs = new AndroidOutputSwitcher(context),
             BatterySaver = new AndroidBatterySaver(context),
             Theme = this,
