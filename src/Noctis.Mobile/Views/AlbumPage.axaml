@@ -237,13 +237,13 @@
                 <!-- Virtualised like the other lists: a box set would otherwise realise every row at
                      page open. The panel still virtualises under the header, inside AlbumScroll,
                      because VirtualizingStackPanel works from the effective viewport. -->
-                <TextBox Name="TrackSearch" Classes="search" Margin="24,14,24,4" Watermark="Search songs"
+                <TextBox Name="TrackSearch" Classes="search-field" Margin="24,14,24,4" PlaceholderText="Search songs"
                          Text="{Binding SearchText, Mode=TwoWay}" />
                 <Grid ColumnDefinitions="Auto,*,Auto" Margin="18,0,18,0">
-                    <Button Classes="row" Content="Select" IsVisible="{Binding !IsSelecting}" Command="{Binding ToggleSelectionCommand}" />
-                    <Button Classes="row" Content="Done" IsVisible="{Binding IsSelecting}" Command="{Binding ToggleSelectionCommand}" />
-                    <Button Grid.Column="1" Classes="row" Content="Select all" HorizontalAlignment="Left" IsVisible="{Binding IsSelecting}" Command="{Binding SelectAllCommand}" />
-                    <Button Grid.Column="2" Classes="row" Content="{Binding SelectionLabel}" IsVisible="{Binding IsSelecting}"
+                    <Button Classes="row" MinHeight="44" Padding="6,0" Foreground="{DynamicResource AccentTextBrush}" Content="Select" IsVisible="{Binding !IsSelecting}" Command="{Binding ToggleSelectionCommand}" />
+                    <Button Classes="row" MinHeight="44" Padding="6,0" Foreground="{DynamicResource AccentTextBrush}" Content="Done" IsVisible="{Binding IsSelecting}" Command="{Binding ToggleSelectionCommand}" />
+                    <Button Grid.Column="1" Classes="row" MinHeight="44" Padding="6,0" Content="Select all" HorizontalAlignment="Left" IsVisible="{Binding IsSelecting}" Command="{Binding SelectAllCommand}" />
+                    <Button Grid.Column="2" Classes="row" MinHeight="44" Padding="6,0" Foreground="{DynamicResource AccentTextBrush}" Content="{Binding SelectionLabel}" IsVisible="{Binding IsSelecting}"
                             IsEnabled="{Binding HasSelection}" Command="{Binding AddSelectionCommand}" />
                 </Grid>
                 <ItemsControl Name="TrackList" ItemsSource="{Binding Rows}" Margin="0,4,0,0">

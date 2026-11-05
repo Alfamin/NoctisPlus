@@ -13,8 +13,8 @@
             <TextBlock Grid.Column="1" Classes="title" FontSize="26" Text="{Binding Title}" VerticalAlignment="Center" />
         </Grid>
 
-        <TextBox Grid.Row="1" Name="AlbumSearch" Classes="search" Margin="16,8,16,12"
-                 Text="{Binding SearchText, Mode=TwoWay}" Watermark="Search albums" />
+        <TextBox Grid.Row="1" Name="AlbumSearch" Classes="search-field" Margin="16,8,16,12"
+                 Text="{Binding SearchText, Mode=TwoWay}" PlaceholderText="Search albums" />
         <TextBlock Grid.Row="2" Classes="subtle" Text="No albums" HorizontalAlignment="Center"
                    Margin="0,40,0,0" IsVisible="{Binding !HasAlbums}" />
 
