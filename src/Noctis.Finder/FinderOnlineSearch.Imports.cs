@@ -19,7 +19,8 @@ internal sealed partial class FinderOnlineSearch
 
         private static OnlineImportJob Row(SpotifyPlaylist job) => new(job.LibraryId,
             job.Manifest?.Name is { Length: > 0 } name ? name : "Playlist", job.Url, job.Found, job.Total,
-            job.Status, job.Created && job.Manifest?.CompleteIds == true, job.FillingStopped);
+            job.Status, job.Created && job.Manifest?.CompleteIds == true, job.FillingStopped,
+            job.Manifest?.Entries.FirstOrDefault(e => ArtistCatalog.ArtworkUrl(e.Artwork))?.Artwork ?? "");
 
         public IReadOnlyList<OnlineImportJob> Snapshot() => _imports.Jobs.Select(Row).ToArray();
         public OnlineImportedPlaylist? Read(Guid playlistId)

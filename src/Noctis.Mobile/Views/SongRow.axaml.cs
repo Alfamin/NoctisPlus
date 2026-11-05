@@ -35,9 +35,9 @@ public partial class SongRow : UserControl
         var stop = _artStop = new();
         try
         {
-            var path = pending.Source.CachedArtwork(pending.Song.ArtworkUrl)
-                ?? await pending.Source.ArtworkAsync(pending.Song.ArtworkUrl, stop.Token);
-            if (!stop.IsCancellationRequested && ReferenceEquals(DataContext, track) && path is not null) track.AlbumArtworkPath = path;
+            var path = pending.Source.CachedQueueCover(pending.Song)
+                ?? await pending.Source.QueueCoverAsync(pending.Song, stop.Token);
+            if (!stop.IsCancellationRequested && ReferenceEquals(DataContext, track) && path is not null) track.ShowArtwork(path);
         }
         catch (Exception ex) when (ex is not OutOfMemoryException) { }
     }

@@ -65,6 +65,54 @@ public class MobilePlaylistImportTests
     }
 
     [AvaloniaFact]
+    public async Task ImportedPlaylistThumbnailArrivesWithoutReopening_AndCustomCoverWinsOnReuse()
+    {
+        var answer = new TaskCompletionSource<string?>(); var asks = 0;
+        var source = new MobileCatalogAlbumTests.Source { Artwork = (_, _) => { asks++; return answer.Task; } };
+        using var rig = MobileFixtures.MakeRig(onlineSearch: source);
+        var row = new PlaylistRow(new Playlist { Name = "Remote" }, null, 251, source, "https://example.invalid/cover.jpg");
+        var cover = new PlaylistCover { DataContext = row };
+        var window = new Window { Content = cover, Width = 100, Height = 100 }; window.Show();
+        try
+        {
+            MobileFixtures.Land(window); Assert.Equal(1, asks); Assert.Null(cover.SourcePath);
+            answer.SetResult("import-cover.jpg"); await Task.Yield(); Avalonia.Threading.Dispatcher.UIThread.RunJobs();
+            Assert.Equal("import-cover.jpg", cover.SourcePath);
+            cover.DataContext = row with { ArtworkPath = "custom.jpg" };
+            Assert.Equal("custom.jpg", cover.SourcePath); Assert.Equal(1, asks);
+            var late = new TaskCompletionSource<string?>(); source.Artwork = (_, _) => late.Task;
+            cover.DataContext = row;
+            cover.DataContext = row with { ArtworkPath = "custom2.jpg" };
+            late.SetResult("wrong-cover.jpg"); await Task.Yield(); Avalonia.Threading.Dispatcher.UIThread.RunJobs();
+            Assert.Equal("custom2.jpg", cover.SourcePath);
+        }
+        finally { window.Close(); }
+    }
+
+    [AvaloniaFact]
+    public async Task ColdOnlineArtwork_NotifiesAndUpdatesTheMountedRowWithoutNavigating()
+    {
+        var answer = new TaskCompletionSource<string?>();
+        var source = new MobileCatalogAlbumTests.Source { Artwork = (_, _) => answer.Task };
+        using var rig = MobileFixtures.MakeRig(onlineSearch: source);
+        var online = OnlineStandIn.Create(source, new("deezer:1", "Online", "Artist", ArtworkUrl: "https://example.invalid/cover.jpg"), false, "Test");
+        rig.Shell.Navigate(new SongListPageViewModel(rig.Shell, "Test", () => [online]));
+        var window = MobileFixtures.Mount(rig.Shell, out var view);
+        try
+        {
+            MobileFixtures.Land(window);
+            var row = MobileFixtures.Find<SongRow>(view);
+            var cover = MobileFixtures.Find<Noctis.Controls.CachedImage>(row);
+            Assert.Null(cover.SourcePath);
+            answer.SetResult("arrived-cover.jpg");
+            await Task.Yield(); Avalonia.Threading.Dispatcher.UIThread.RunJobs();
+            Assert.Equal("arrived-cover.jpg", online.AlbumArtworkPath);
+            Assert.Equal("arrived-cover.jpg", cover.SourcePath);
+        }
+        finally { window.Close(); rig.Shell.CurrentPage?.OnClosed(); }
+    }
+
+    [AvaloniaFact]
     public async Task LateOnlineRowArtwork_CannotChangeARecycledLocalRow()
     {
         var answer = new TaskCompletionSource<string?>();

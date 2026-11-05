@@ -71,7 +71,7 @@ public sealed partial class SongListPageViewModel
         if (HasMissingImported) items.Add(new(Shell, "Download missing", false, () => _ = DownloadMissingAsync()));
         items.Add(new(Shell, "Check library", false, () => _ = ImportAction(() => _playlistImports!.CheckLibraryAsync(_importStop.Token))));
         items.Add(new(Shell, "Stop managing import", false, () => Shell.ShowPrompt(new PromptViewModel(Shell,
-            "Stop managing import?", "Your playlist and music stay", [new PromptAction("Stop managing", _ => ImportAction(async () =>
+            "Stop managing import?", "Only saved songs will remain", [new PromptAction("Stop managing", _ => ImportAction(async () =>
             { await _playlistImports!.RemoveAsync(_playlist!.Id, _importStop.Token); }), true)]))));
         items.Add(new(Shell, "Playlist options", false, () => Shell.OpenPlaylistSheetCommand.Execute(Playlist)));
         Shell.ShowOptions(OptionsMenuViewModel.ForItems(items));

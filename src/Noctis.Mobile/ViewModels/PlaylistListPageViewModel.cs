@@ -137,7 +137,9 @@ public sealed partial class PlaylistListPageViewModel : MobilePage, ISortable
         // Only when something changed: a refresh of the same playlists must not Reset the list.
         MobileLibrary.ReplaceIfChanged(Playlists, sorted.ToList());
         var counts = imports.Where(j => j.Complete && !j.Stopped).ToDictionary(j => j.Id, j => j.Total);
-        MobileLibrary.ReplaceIfChanged(Rows, Playlists.Select(p => new PlaylistRow(p, Shell.Library.PlaylistArtwork(p), counts.TryGetValue(p.Id, out var total) ? total : null)).ToList());
+        var covers = imports.ToDictionary(j => j.Id, j => j.ArtworkUrl);
+        MobileLibrary.ReplaceIfChanged(Rows, Playlists.Select(p => new PlaylistRow(p, p.CoverArtPath ?? Shell.Library.PlaylistArtwork(p),
+            counts.TryGetValue(p.Id, out var total) ? total : null, Shell.OnlineSearch, covers.GetValueOrDefault(p.Id) ?? "")).ToList());
         OnPropertyChanged(nameof(ShowNoMatches));
     }
 
@@ -157,7 +159,8 @@ public sealed partial class PlaylistListPageViewModel : MobilePage, ISortable
 public enum PlaylistSort { Title, RecentlyUpdated, RecentlyAdded }
 
 /// <summary>A playlist row: its cover (the first of its songs that has one) and its song count.</summary>
-public sealed record PlaylistRow(Playlist Playlist, string? ArtworkPath, int? CatalogCount = null)
+public sealed record PlaylistRow(Playlist Playlist, string? ArtworkPath, int? CatalogCount = null,
+    Noctis.Services.Search.IOnlineMusicSearch? CoverSource = null, string CoverUrl = "")
 {
     public string Name => Playlist.Name;
     public string Subtitle => (CatalogCount ?? Playlist.TrackIds.Count) == 1 ? "1 song" : $"{CatalogCount ?? Playlist.TrackIds.Count} songs";

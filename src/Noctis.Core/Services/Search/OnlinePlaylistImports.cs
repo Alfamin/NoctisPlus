@@ -14,7 +14,7 @@ public interface IOnlinePlaylistImports
 }
 
 public sealed record OnlineImportJob(Guid Id, string Name, string Url, int Found, int Total, string Status,
-    bool Complete, bool Stopped)
+    bool Complete, bool Stopped, string ArtworkUrl = "")
 {
     public bool HasMissing => Complete && !Stopped && Found < Total;
 }

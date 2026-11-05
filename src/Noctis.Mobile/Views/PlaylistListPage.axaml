@@ -57,7 +57,7 @@
                                 <Border Classes="art" Width="56" Height="56">
                                     <Panel>
                                         <PathIcon Data="{DynamicResource PlaylistsIcon}" Width="22" Height="22" Opacity="0.5" />
-                                        <controls:CachedImage SourcePath="{Binding ArtworkPath}" DecodeWidth="168" Stretch="UniformToFill" />
+                                        <views:PlaylistCover DecodeWidth="168" Stretch="UniformToFill" />
                                     </Panel>
                                 </Border>
                                 <StackPanel Grid.Column="1" Margin="14,0,8,0" VerticalAlignment="Center" Spacing="1">

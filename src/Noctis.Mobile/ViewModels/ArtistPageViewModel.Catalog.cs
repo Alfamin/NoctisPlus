@@ -90,8 +90,8 @@ public sealed partial class ArtistPageViewModel
         if (track.PendingStream is not Noctis.ViewModels.PendingStream pending || pending.Song.ArtworkUrl.Length == 0) return;
         try
         {
-            var path = await pending.Source.ArtworkAsync(pending.Song.ArtworkUrl, _photoCts.Token);
-            if (!_photoCts.IsCancellationRequested) track.AlbumArtworkPath = path;
+            var path = await pending.Source.QueueCoverAsync(pending.Song, _photoCts.Token);
+            if (!_photoCts.IsCancellationRequested && path is not null) track.ShowArtwork(path);
         }
         catch (Exception ex) when (ex is not OutOfMemoryException) { }
     }
