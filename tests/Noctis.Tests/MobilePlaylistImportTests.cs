@@ -150,7 +150,8 @@ public class MobilePlaylistImportTests
         {
             Assert.True(page.IsImported); Assert.True(page.HasMissingImported); Assert.Equal(4, page.Songs.Count);
             Assert.Same(owned, page.Songs[0]); Assert.True(page.Songs[1].IsPendingStream); Assert.Equal(page.Songs[1].Id, page.Songs[2].Id);
-            Assert.True(page.Songs[3].IsFileMissing); Assert.Single(rig.Library.TrackList); Assert.Equal(0, source.Prepares);
+            Assert.True(page.Songs[3].IsFileMissing); Assert.Equal("Unavailable in this catalog", page.Songs[3].Artist);
+            Assert.Single(rig.Library.TrackList); Assert.Equal(0, source.Prepares);
             var stable = page.Songs[1]; imports.Publish(); Avalonia.Threading.Dispatcher.UIThread.RunJobs(); Assert.Same(stable, page.Songs[1]);
             page.PlayAllCommand.Execute(null);
             Assert.Same(owned, rig.Shell.Player.CurrentTrack); Assert.Equal(2, rig.Shell.Player.UpNext.Count);

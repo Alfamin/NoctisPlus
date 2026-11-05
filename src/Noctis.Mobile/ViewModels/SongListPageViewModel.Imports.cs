@@ -34,7 +34,7 @@ public sealed partial class SongListPageViewModel
                 : new Track
                 {
                     Id = new Guid(System.Security.Cryptography.MD5.HashData(System.Text.Encoding.UTF8.GetBytes($"unavailable:{_playlist!.Id}:{entry.Position}"))),
-                    Title = "Unavailable song", Artist = entry.Issue, IsFileMissing = true,
+                    Title = "Unavailable song", Artist = "Unavailable in this catalog", IsFileMissing = true,
                 };
             rows.Add(track); _importRows[entry.Position] = (entry, track);
         }
