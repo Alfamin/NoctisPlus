@@ -6,6 +6,49 @@ internal sealed partial class FinderOnlineSearch
 {
     public IOnlineCatalog Browser => this;
 
+    public OnlineAlbum? KnownAlbum(string id) => _albums.TryGetValue(id, out var release) ? AlbumRow(release) : null;
+
+    public async Task<OnlineArtistPage?> ReadArtistAsync(OnlineArtist artist, CancellationToken ct)
+    {
+        ct.ThrowIfCancellationRequested();
+        if (!_pages.Enabled) throw new InvalidOperationException("Online catalog is disabled");
+        if (!_artists.TryGetValue(artist.Id, out var known)) throw new InvalidOperationException("Search for this artist again");
+        var catalog = Catalog;
+        var profileTask = catalog.ArtistAsync(known, false, ct);
+        async Task<(List<CatalogSearchSong> Rows, string Warning)> ReadSongs()
+        {
+            try { return ((await catalog.ArtistSongsAsync(known, false, ct).ConfigureAwait(false)).Value, ""); }
+            catch (Exception ex) when (ex is not OutOfMemoryException && !ct.IsCancellationRequested)
+            { return ([], "Online songs unavailable"); }
+        }
+        var songsTask = ReadSongs();
+        await Task.WhenAll(profileTask, songsTask).ConfigureAwait(false);
+        var profile = await profileTask.ConfigureAwait(false);
+        var songs = await songsTask.ConfigureAwait(false);
+        ct.ThrowIfCancellationRequested();
+        var verified = songs.Rows.Where(s => s.Song.Artists.Any(a => a.Id == known.Id)).ToArray();
+        IReadOnlyDictionary<string, DiscoveryMatch> matches;
+        try { matches = await _actions.MatchAsync(verified.Select(s => s.Song).ToArray(), ct, reuse: true).ConfigureAwait(false); }
+        catch (Exception ex) when (ex is not OutOfMemoryException && !ct.IsCancellationRequested)
+        { matches = new Dictionary<string, DiscoveryMatch>(); }
+        foreach (var release in profile.Value.Releases) _albums[release.Id] = release;
+        var rows = verified.Select(s => Remember(s) with
+        { LocalTrackId = matches.TryGetValue(s.Song.Id, out var match) ? match.Local?.Id : null }).ToArray();
+        var actual = profile.Value.Artist; _artists[actual.Id] = actual;
+        return new(new(actual.Id, actual.Name, CatalogArtwork.LargeUrl(actual.Picture) ?? actual.Picture, actual.Genre), profile.Value.Releases.Select(AlbumRow).ToArray(), rows,
+            songs.Warning.Length > 0 ? songs.Warning : profile.Value.Notice);
+    }
+
+    public async Task<OnlineArtistPage?> FindLibraryArtistAsync(string name, IReadOnlyList<string> albums, IReadOnlyList<string> titles, CancellationToken ct)
+    {
+        ct.ThrowIfCancellationRequested();
+        if (!_pages.Enabled || string.IsNullOrWhiteSpace(name)) return null;
+        var (identity, _) = await _pages.IdentifyAsync(name, albums, titles, ct).ConfigureAwait(false);
+        if (identity is null) return null;
+        _artists[identity.Id] = identity;
+        return await ReadArtistAsync(new(identity.Id, identity.Name), ct).ConfigureAwait(false);
+    }
+
     public async Task<OnlineAlbumPage> ReadAlbumAsync(OnlineAlbum release, CancellationToken ct)
     {
         ct.ThrowIfCancellationRequested();

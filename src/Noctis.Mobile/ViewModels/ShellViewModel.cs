@@ -971,13 +971,35 @@ public sealed partial class ShellViewModel : ObservableObject
     [RelayCommand]
     private void OpenTrackSheet(Track? track)
     {
-        if (track != null) Sheet = ContextSheetViewModel.ForTrack(this, track);
+        if (track != null) OpenTrackMenu(track, null);
     }
 
     /// <summary>A song's menu on a list; <paramref name="inPlaylist"/> is the playlist whose page
     /// it is on, which adds Remove from Playlist.</summary>
-    public void OpenTrackMenu(Track track, Playlist? inPlaylist) =>
-        Sheet = ContextSheetViewModel.ForTrack(this, track, inPlaylist);
+    public void OpenTrackMenu(Track track, Playlist? inPlaylist)
+    {
+        if (track.PendingStream is Noctis.ViewModels.PendingStream pending)
+        {
+            ShowOptions(OptionsMenuViewModel.ForItems([
+                new(this, "Play", false, () =>
+                {
+                    if (!pending.Source.CanDownload && !(pending.Source.CompletedPlaybackPath(pending.Song) is { } path && File.Exists(path))) OpenTelegramSignIn();
+                    else Player.PlayTracks([track], 0, track.Album);
+                }),
+                new(this, "Download now", false, () => _ = SaveOnlineTrackAsync(pending, true)),
+                new(this, "Add to downloads", false, () => _ = SaveOnlineTrackAsync(pending, false)),
+            ]));
+        }
+        else Sheet = ContextSheetViewModel.ForTrack(this, track, inPlaylist);
+    }
+
+    private async Task SaveOnlineTrackAsync(Noctis.ViewModels.PendingStream pending, bool now)
+    {
+        if (!pending.Source.CanDownload) { OpenTelegramSignIn(); return; }
+        try { await pending.Source.DownloadAsync([pending.Song], now, CancellationToken.None); }
+        catch (Exception ex) when (ex is not OutOfMemoryException)
+        { ShowOptions(OptionsMenuViewModel.ForNote("Couldn't download", null, OnlineResultsViewModel.Short(ex))); }
+    }
 
     [RelayCommand]
     private void OpenAlbumSheet(Album? album)

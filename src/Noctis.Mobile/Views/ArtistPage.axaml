@@ -257,7 +257,7 @@
                                                         <TextBlock Text="E" Classes="explicit-badge-text compact" FontSize="8" Opacity="0.9" />
                                                     </Border>
                                                 </Grid>
-                                                <TextBlock Name="CardSongs" Classes="artist-subtle" Text="{Binding SongsText}" FontSize="13" />
+                                                <TextBlock Name="CardSongs" Classes="artist-subtle" Text="{Binding SongsText}" FontSize="13" IsVisible="{Binding HasSongsText}" />
                                             </StackPanel>
                                             <Button Grid.Column="2" Name="CardPlay" Classes="round card-play" VerticalAlignment="Center"
                                                     Command="{Binding $parent[views:ArtistPage].((vm:ArtistPageViewModel)DataContext).PlayCardCommand}"
@@ -278,6 +278,13 @@
                      they were the largest part of its first layout; now the column on screen and
                      the one peeking in. VirtualizingStackPanel has no Spacing, so each column
                      carries the gap as a right margin. -->
+                <StackPanel Margin="24,12,24,0" Spacing="8">
+                    <ProgressBar IsIndeterminate="True" Height="2" IsVisible="{Binding IsCatalogLoading}" />
+                    <Grid ColumnDefinitions="*,Auto" IsVisible="{Binding CatalogMessage, Converter={x:Static StringConverters.IsNotNullOrEmpty}}">
+                        <TextBlock Classes="artist-subtle" Text="{Binding CatalogMessage}" TextWrapping="Wrap" />
+                        <Button Grid.Column="1" Classes="row" Content="Retry" Command="{Binding RetryCatalogCommand}" IsVisible="{Binding HasCatalogError}" />
+                    </Grid>
+                </StackPanel>
                 <StackPanel Name="TopSongsSection" Margin="0,22,0,0" IsVisible="{Binding HasTopSongs}">
                     <Button Name="TopSongsHeader" Classes="row artist-section" Command="{Binding OpenAllSongsCommand}">
                         <StackPanel Orientation="Horizontal" Spacing="2">
@@ -318,7 +325,7 @@
                                                                 </Border>
                                                             </Panel>
                                                         </Border>
-                                                        <StackPanel Grid.Column="1" Margin="12,0,4,0" VerticalAlignment="Center">
+                                                        <StackPanel Grid.Column="1" Margin="12,0,4,0" VerticalAlignment="Center" Opacity="{Binding TextOpacity}">
                                                             <Grid ColumnDefinitions="*,Auto" HorizontalAlignment="Left">
                                                                 <TextBlock Name="TopSongTitle" Text="{Binding Track.Title}" FontSize="16" MaxLines="1"
                                                                            TextTrimming="CharacterEllipsis" VerticalAlignment="Center" />

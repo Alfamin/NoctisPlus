@@ -33,6 +33,14 @@ public sealed partial class OnlineSongItem(OnlineSong song) : ObservableObject
 }
 
 /// <summary>The native album tile's model, kept stable as progressive search answers arrive.</summary>
+public sealed partial class OnlineArtistItem(OnlineArtist artist) : ObservableObject
+{
+    public OnlineArtist Artist { get; internal set; } = artist;
+    public string Name => Artist.Name;
+    [ObservableProperty] private string? _artworkPath;
+    internal bool ArtworkPending;
+}
+
 public sealed class OnlineAlbumItem(OnlineAlbum release, IOnlineMusicSearch source)
 {
     public OnlineAlbum Release { get; private set; } = release;
@@ -95,17 +103,25 @@ public sealed partial class OnlineResultsViewModel : ObservableObject, IDisposab
 
     public ObservableCollection<OnlineSongItem> Songs { get; } = new();
     public ObservableCollection<OnlineAlbumItem> Albums { get; } = new();
+    public ObservableCollection<OnlineArtistItem> Artists { get; } = new();
     internal Action<OnlineAlbum>? OpenAlbumPage { get; init; }
+    internal Action<OnlineArtist>? OpenArtistPage { get; init; }
     private OnlineSearchResult? _lastResult;
     [ObservableProperty] private SearchScope _scope;
     partial void OnScopeChanged(SearchScope value) { if (_lastResult is { } result) ShowSearch(result); }
     [ObservableProperty] [NotifyPropertyChangedFor(nameof(HasSongs), nameof(HasResults))] private int _songCount;
     [ObservableProperty] [NotifyPropertyChangedFor(nameof(HasAlbums), nameof(HasResults))] private int _albumCount;
+    [ObservableProperty] [NotifyPropertyChangedFor(nameof(HasArtists), nameof(HasResults))] private int _artistCount;
+    [ObservableProperty, NotifyPropertyChangedFor(nameof(ArtistSectionOrder), nameof(AlbumSectionOrder), nameof(SongSectionOrder))] private string? _topKind;
+    public int ArtistSectionOrder => TopKind == "artist" ? 3 : TopKind == "album" ? 5 : 4;
+    public int AlbumSectionOrder => TopKind == "album" ? 3 : 5;
+    public int SongSectionOrder => TopKind is "artist" or "album" ? 4 : 3;
     [ObservableProperty] private bool _isSearching;
     [ObservableProperty] private string? _message;
     public bool HasSongs => SongCount > 0;
     public bool HasAlbums => AlbumCount > 0;
-    public bool HasResults => HasSongs || HasAlbums;
+    public bool HasArtists => ArtistCount > 0;
+    public bool HasResults => HasSongs || HasAlbums || HasArtists;
     internal event Action<OnlineSong, RecommendationAction>? Acted;
     internal bool LazyArtwork { get; init; }
     internal void ShowRecommendations(IReadOnlyList<OnlineSong> songs) => Show(songs, "");
@@ -129,6 +145,7 @@ public sealed partial class OnlineResultsViewModel : ObservableObject, IDisposab
         var query = text?.Trim() ?? "";
         Songs.Clear(); SongCount = 0; Message = null;
         Albums.Clear(); AlbumCount = 0; _lastResult = null;
+        Artists.Clear(); ArtistCount = 0; TopKind = null;
         if (query.Length < 2) { IsSearching = false; return; }
         var cts = _query = new CancellationTokenSource();
         IsSearching = true;
@@ -162,6 +179,7 @@ public sealed partial class OnlineResultsViewModel : ObservableObject, IDisposab
 
     private void ShowSearch(OnlineSearchResult result)
     {
+        TopKind = result.Top?.Kind;
         var songs = Scope is SearchScope.All or SearchScope.Songs
             ? result.Songs.Where(s => s.LocalTrackId is null).DistinctBy(s => s.Id).Take(SongCap).ToArray() : [];
         Show(songs, result.Warning);
@@ -173,7 +191,27 @@ public sealed partial class OnlineResultsViewModel : ObservableObject, IDisposab
         foreach (var item in Albums)
             if (item.Album.ArtworkPath is null && item.Release.ArtworkUrl.Length > 0 && !item.ArtworkPending)
                 _ = FetchAlbumArtworkAsync(item, _query?.Token ?? default);
+        var artists = (Scope is SearchScope.All or SearchScope.Artists) && OpenArtistPage is not null && _source.Browser is not null
+            ? result.Artists.DistinctBy(a => a.Id).Take(Scope == SearchScope.All ? 6 : 30).ToArray() : [];
+        var knownArtists = Artists.ToDictionary(a => a.Artist.Id);
+        StableRows.Update(Artists, artists.Select(a => knownArtists.GetValueOrDefault(a.Id) ?? new OnlineArtistItem(a)).ToList());
+        ArtistCount = Artists.Count;
+        foreach (var artist in Artists)
+            if (artist.ArtworkPath is null && artist.Artist.PictureUrl.Length > 0 && !artist.ArtworkPending) _ = FetchArtistArtworkAsync(artist, _query?.Token ?? default);
     }
+
+    private async Task FetchArtistArtworkAsync(OnlineArtistItem item, CancellationToken ct)
+    {
+        item.ArtworkPending = true;
+        try
+        {
+            var path = _source.CachedArtwork(item.Artist.PictureUrl) ?? await _source.ArtworkAsync(item.Artist.PictureUrl, ct).ConfigureAwait(false);
+            if (path is not null) _marshal(() => item.ArtworkPath = path);
+        }
+        catch (Exception ex) when (ex is not OutOfMemoryException) { }
+        finally { _marshal(() => item.ArtworkPending = false); }
+    }
+    [RelayCommand] private void OpenArtist(OnlineArtistItem? item) { if (item is not null) OpenArtistPage?.Invoke(item.Artist); }
 
     private async Task FetchAlbumArtworkAsync(OnlineAlbumItem item, CancellationToken ct)
     {

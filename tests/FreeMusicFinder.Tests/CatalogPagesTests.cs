@@ -84,6 +84,7 @@ internal static class CatalogPagesTests
                 "a same-name foreign artist's album is not accepted by the fallback");
         }
         await NativeAlbumAsync();
+        await NativeArtistAsync();
         await PopularityAsync();
     }
 
@@ -119,6 +120,41 @@ internal static class CatalogPagesTests
             Check.Equal(calls, http.Calls.Count, "invalid/cancelled navigation cannot contact arbitrary destinations");
             Check.Equal(0, downloads.History.Count, "native browsing never queues audio");
             Check.Equal(0, library.Saves, "native browsing never rewrites a playlist or library");
+        }
+        finally { online.Detach(); }
+    }
+
+    private static async Task NativeArtistAsync()
+    {
+        Check.Section("native artist: provider identity, offline cache, full songs and no audio");
+        var folder = Check.NewFolder("native-artist"); var http = new DiscoveryTests.Http { Offline = true };
+        var artist = DiscoveryTests.Star; var foreign = artist with { Id = "deezer:404" };
+        ArtistIdentityTests.Seed(folder, "search:NORTH STAR", new[] { artist });
+        ArtistIdentityTests.Seed(folder, "artist:" + artist.Id, new CatalogProfile(artist, [], [DiscoveryTests.Orbit, new("deezer:999", "Wrong artist", foreign, "2026", "album", 2)]));
+        ArtistIdentityTests.Seed(folder, "artist-songs:" + artist.Id, new List<CatalogSearchSong> {
+            new(DiscoveryTests.Song("deezer:101", "Owned"), DiscoveryTests.Orbit),
+            new(new("deezer:999", "Foreign", [foreign], 100, true), null, "") });
+        using var catalog = DiscoveryTests.Catalog(folder, http);
+        var library = new SpotifyPlaylistTests.Library(); var owned = library.Add(folder, "Owned", "North Star, Guest");
+        using var downloads = new Downloads(_ => { });
+        var actions = new DiscoveryActions(library, downloads, _ => throw new Exception("Browsing must not request audio"), () => folder, () => false);
+        using var pages = new CatalogPages(() => catalog, actions, _ => { }, () => true);
+        var online = new FinderOnlineSearch(() => catalog, actions, pages, () => false, () => { });
+        try
+        {
+            var result = await online.FindLibraryArtistAsync("North Star", ["Orbit"], [], default);
+            Check.Equal(artist.Id, result?.Artist.Id, "library evidence retains exact provider artist");
+            Check.Equal(1, result!.Releases.Count, "same-name foreign release is excluded at cache boundary");
+            Check.Equal(1, result.Songs.Count, "same-name foreign top song cannot leak from a cache");
+            Check.Equal(owned.Id, result.Songs[0].LocalTrackId, "native artist uses strict local recording match");
+            var calls = http.Calls.Count;
+            var again = await online.ReadArtistAsync(new(artist.Id, "Untrusted name", "file:///wrong"), default);
+            Check.Equal(artist.Name, again?.Artist.Name, "caller labels cannot change registered artist identity");
+            Check.Equal("Orbit", online.KnownAlbum(DiscoveryTests.Orbit.Id)?.Title, "artist albums are registered for native navigation");
+            await Check.ThrowsAsync<InvalidOperationException>(() => online.ReadArtistAsync(new("https://untrusted.invalid/artist", "Wrong"), default), "unknown artist rejected before HTTP");
+            Check.Equal(calls, http.Calls.Count, "registered cached native artist browsing performs no new HTTP");
+            Check.Equal(0, downloads.History.Count, "browsing never queues audio");
+            Check.Equal(0, library.Saves, "browsing never writes playlists");
         }
         finally { online.Detach(); }
     }

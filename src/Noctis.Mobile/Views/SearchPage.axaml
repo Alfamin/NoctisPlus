@@ -259,12 +259,12 @@
 
                 <!-- Music Finder: songs online, under the library's own. -->
                 <StackPanel Name="OnlineSection" Spacing="4" IsVisible="{Binding HasOnline}">
-                    <StackPanel DataContext="{Binding Online}" x:DataType="vm:OnlineResultsViewModel" Spacing="4">
+                    <Grid DataContext="{Binding Online}" x:DataType="vm:OnlineResultsViewModel" RowDefinitions="Auto,Auto,Auto,Auto,Auto,Auto" RowSpacing="4">
                         <TextBlock Classes="section" Text="Online" Margin="8,0" IsVisible="{Binding HasResults}" />
-                        <ProgressBar Name="OnlineSearching" IsIndeterminate="True" Height="2" Margin="8,0" IsVisible="{Binding IsSearching}" />
-                        <TextBlock Name="OnlineMessage" Classes="row-sub" Margin="8,0" TextWrapping="Wrap" Text="{Binding Message}"
+                        <ProgressBar Grid.Row="1" Name="OnlineSearching" IsIndeterminate="True" Height="2" Margin="8,0" IsVisible="{Binding IsSearching}" />
+                        <TextBlock Grid.Row="2" Name="OnlineMessage" Classes="row-sub" Margin="8,0" TextWrapping="Wrap" Text="{Binding Message}"
                                    IsVisible="{Binding Message, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
-                        <ItemsControl Name="OnlineSongResults" ItemsSource="{Binding Songs}">
+                        <ItemsControl Grid.Row="{Binding SongSectionOrder}" Name="OnlineSongResults" ItemsSource="{Binding Songs}">
                             <ItemsControl.ItemTemplate>
                                 <DataTemplate x:DataType="vm:OnlineSongItem">
                                     <Grid ColumnDefinitions="*,Auto" Height="60" Margin="8,0">
@@ -298,7 +298,28 @@
                                 </DataTemplate>
                             </ItemsControl.ItemTemplate>
                         </ItemsControl>
-                        <TextBlock Classes="section" Text="Albums" Margin="8,16,8,0" IsVisible="{Binding HasAlbums}" />
+                        <StackPanel Grid.Row="{Binding ArtistSectionOrder}" IsVisible="{Binding HasArtists}">
+                            <TextBlock Classes="section" Text="Artists" Margin="8,16,8,0" />
+                            <ItemsControl Name="OnlineArtistResults" ItemsSource="{Binding Artists}">
+                                <ItemsControl.ItemTemplate>
+                                    <DataTemplate x:DataType="vm:OnlineArtistItem">
+                                        <Button Classes="row" Command="{Binding $parent[views:SearchPage].((vm:SearchPageViewModel)DataContext).Online.OpenArtistCommand}" CommandParameter="{Binding}">
+                                            <Grid ColumnDefinitions="Auto,*" Height="60" Margin="8,0">
+                                                <Border Classes="art" Width="44" Height="44" CornerRadius="22">
+                                                    <Panel>
+                                                        <PathIcon Data="{DynamicResource ArtistsIcon}" Width="18" Height="18" Opacity="0.5" />
+                                                        <controls:CachedImage SourcePath="{Binding ArtworkPath}" DecodeWidth="128" Stretch="UniformToFill" />
+                                                    </Panel>
+                                                </Border>
+                                                <TextBlock Grid.Column="1" Classes="row-title" Margin="12,0,8,0" VerticalAlignment="Center" Text="{Binding Name}" />
+                                            </Grid>
+                                        </Button>
+                                    </DataTemplate>
+                                </ItemsControl.ItemTemplate>
+                            </ItemsControl>
+                        </StackPanel>
+                        <StackPanel Grid.Row="{Binding AlbumSectionOrder}" IsVisible="{Binding HasAlbums}">
+                        <TextBlock Classes="section" Text="Albums" Margin="8,16,8,0" />
                         <ItemsControl Name="OnlineAlbumResults" ItemsSource="{Binding Albums}" IsVisible="{Binding HasAlbums}" Margin="4,0">
                             <ItemsControl.ItemsPanel><ItemsPanelTemplate><UniformGrid Columns="2" /></ItemsPanelTemplate></ItemsControl.ItemsPanel>
                             <ItemsControl.ItemTemplate>
@@ -311,7 +332,8 @@
                                 </DataTemplate>
                             </ItemsControl.ItemTemplate>
                         </ItemsControl>
-                    </StackPanel>
+                        </StackPanel>
+                    </Grid>
                 </StackPanel>
             </StackPanel>
         </ScrollViewer>

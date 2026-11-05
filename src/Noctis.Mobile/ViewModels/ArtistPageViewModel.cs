@@ -20,6 +20,7 @@ public sealed partial class ArtistTopSong : ObservableObject
     }
 
     public Track Track { get; }
+    public double TextOpacity => Track.PendingStream is Noctis.ViewModels.PendingStream ? 0.65 : 1;
     public int Rank { get; }
 
     /// <summary>A hairline under the row: every row of a column but its last.</summary>
@@ -76,7 +77,8 @@ public sealed record ArtistCard(ArtistCardKind Kind, Album Album)
     /// <summary>The kicker: the label, then the date when there is one.</summary>
     public string Kicker => DateText.Length > 0 ? $"{Label} · {DateText}" : Label;
 
-    public string SongsText => Album.TrackCount == 1 ? "1 song" : $"{Album.TrackCount.ToString(CultureInfo.InvariantCulture)} songs";
+    public string SongsText => Album.TrackCount <= 0 ? "" : Album.TrackCount == 1 ? "1 song" : $"{Album.TrackCount.ToString(CultureInfo.InvariantCulture)} songs";
+    public bool HasSongsText => SongsText.Length > 0;
 
     public bool IsExplicit => Album.IsExplicit;
 }
@@ -103,7 +105,7 @@ public sealed partial class ArtistPageViewModel : MobilePage, ITintedPage
     private string? _photo;
     private string? _coverPath;
 
-    public ArtistPageViewModel(ShellViewModel shell, string name)
+    public ArtistPageViewModel(ShellViewModel shell, string name, Noctis.Services.Search.OnlineArtist? artist = null)
     {
         Shell = shell;
         Name = name;
@@ -111,14 +113,16 @@ public sealed partial class ArtistPageViewModel : MobilePage, ITintedPage
         Tint.HeroFade = true;
         Tint.Enabled = shell.ArtworkPageColors;
         _isFavourite = shell.FavoriteArtists.IsFavorite(name);
-        _photo = shell.ArtistPhotos?.CachedPhoto(name);
-        _logo = shell.ArtistLogos?.CachedLogo(name);
+        _photo = artist is null ? shell.ArtistPhotos?.CachedPhoto(name) : shell.OnlineSearch?.CachedArtwork(artist.PictureUrl);
+        _logo = artist is null ? shell.ArtistLogos?.CachedLogo(name) : null;
         Shell.Library.Refreshed += OnRefreshed;
         Shell.Player.PropertyChanged += OnPlayerChanged;
         Shell.PropertyChanged += OnShellChanged;
         Rebuild();
-        PhotoLoad = _photo == null ? LoadPhotoAsync(_photoCts.Token) : Task.CompletedTask;
-        LogoLoad = _logo == null ? LoadLogoAsync(_photoCts.Token) : Task.CompletedTask;
+        _requestedArtist = artist;
+        PhotoLoad = artist is null && _photo == null ? LoadPhotoAsync(_photoCts.Token) : Task.CompletedTask;
+        LogoLoad = artist is null && _logo == null ? LoadLogoAsync(_photoCts.Token) : Task.CompletedTask;
+        CatalogLoad = LoadArtistCatalogAsync();
     }
 
     public ShellViewModel Shell { get; }
@@ -219,6 +223,7 @@ public sealed partial class ArtistPageViewModel : MobilePage, ITintedPage
         _coverPath = Releases.Select(a => a.ArtworkPath).FirstOrDefault(p => !string.IsNullOrEmpty(p))
                      ?? Songs.Select(t => t.AlbumArtworkPath).FirstOrDefault(p => !string.IsNullOrEmpty(p));
         ApplyHero();
+        ApplyArtistCatalog();
     }
 
     /// <summary>The desktop artist page's split (ArtistDetailViewModel.FilterReleases): singles
@@ -308,7 +313,7 @@ public sealed partial class ArtistPageViewModel : MobilePage, ITintedPage
         try
         {
             var path = await photos.GetPhotoAsync(Name, ct);
-            if (path == null || ct.IsCancellationRequested) return;
+            if (path == null || ct.IsCancellationRequested || _catalogProfile is not null) return;
             _photo = path;
             ApplyHero();
         }
@@ -375,13 +380,13 @@ public sealed partial class ArtistPageViewModel : MobilePage, ITintedPage
     [RelayCommand]
     private void Play()
     {
-        if (Songs.Count > 0) Shell.Player.PlayTracks(Songs, 0, Name);
+        if (Songs.Count > 0 && CanPlayCatalog([Songs[0]])) Shell.Player.PlayTracks(Songs, 0, Name);
     }
 
     [RelayCommand]
     private void Shuffle()
     {
-        if (Songs.Count > 0) Shell.Player.PlayShuffled(Songs, source: Name);
+        if (Songs.Count > 0 && CanPlayCatalog(Songs)) Shell.Player.PlayShuffled(Songs, source: Name);
     }
 
     [RelayCommand]
@@ -398,21 +403,30 @@ public sealed partial class ArtistPageViewModel : MobilePage, ITintedPage
         if (row == null) return;
         var list = TopSongs.Select(s => s.Track).ToList();
         var index = list.IndexOf(row.Track);
-        if (index >= 0) Shell.Player.PlayTracks(list, index, Name);
+        if (index >= 0 && CanPlayCatalog([row.Track])) Shell.Player.PlayTracks(list, index, Name);
     }
 
     /// <summary>Top Songs' ›: every song by the artist, most played first, under the artist's name.</summary>
     [RelayCommand]
     private void OpenAllSongs() =>
-        Shell.Navigate(new SongListPageViewModel(Shell, Name, () => RankTopSongs(Songs, _plays)));
+        Shell.Navigate(new SongListPageViewModel(Shell, Name, () => _catalogProfile is null ? RankTopSongs(Songs, _plays) : Songs));
 
     [RelayCommand] private void OpenCard(ArtistCard? card) => Shell.OpenAlbumCommand.Execute(card?.Album);
 
     /// <summary>A card's round ▶ (where Apple has its download arrow): plays that release.</summary>
     [RelayCommand]
-    private void PlayCard(ArtistCard? card)
+    private async Task PlayCard(ArtistCard? card)
     {
-        if (card is { Album.Tracks.Count: > 0 }) Shell.Player.PlayTracks(card.Album.Tracks, 0, card.Album.Name);
+        if (card?.Album.CatalogReleaseId is { Length: > 0 })
+        {
+            Shell.OpenAlbumCommand.Execute(card.Album);
+            if (Shell.CurrentPage is AlbumPageViewModel album)
+            {
+                await album.CatalogLoad;
+                if (ReferenceEquals(Shell.CurrentPage, album)) album.PlayCommand.Execute(null);
+            }
+        }
+        else if (card is { Album.Tracks.Count: > 0 }) Shell.Player.PlayTracks(card.Album.Tracks, 0, card.Album.Name);
     }
 
     [RelayCommand] private void OpenAlbums() => OpenRail("Albums", () => Albums);

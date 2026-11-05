@@ -11,11 +11,41 @@ namespace Noctis.Tests;
 
 public class MobileCatalogAlbumTests
 {
+    [AvaloniaFact]
+    public async Task CatalogRows_LeaveSpaceBetweenDoubleDigitNumbersAndLongTitles()
+    {
+        var source = new Source();
+        source.Metadata = Task.FromResult(new OnlineAlbumPage(source.Release, [
+            new(new("deezer:13", "Pound Cake / Paris Morton Music 2", "Drake"), 1, 13),
+            new(new("deezer:16", "The Motion", "Drake"), 1, 16)]));
+        using var rig = MobileFixtures.MakeRig(onlineSearch: source);
+        var page = new AlbumPageViewModel(rig.Shell, AlbumPageViewModel.OnlinePlaceholder(source.Release, source), source.Release);
+        rig.Shell.Navigate(page); await page.CatalogLoad;
+        var window = MobileFixtures.Mount(rig.Shell, out var view, width: 360);
+        try
+        {
+            MobileFixtures.Land(window);
+            var album = MobileFixtures.Find<AlbumPage>(view);
+            foreach (var number in Avalonia.VisualTree.VisualExtensions.GetVisualDescendants(album).OfType<TextBlock>().Where(t => t.Name == "RowNumber"))
+            {
+                var row = (Avalonia.Controls.Grid)number.Parent!;
+                var title = row.Children.OfType<Grid>().Single(g => g.Name == "RowTitleCell");
+                Assert.True(title.Bounds.Left - number.Bounds.Right >= 6, $"Number {number.Text}: {number.Bounds} title {title.Bounds}");
+            }
+        }
+        finally { window.Close(); page.OnClosed(); }
+    }
+
     internal sealed class Source : IOnlineMusicSearch, IOnlineCatalog
     {
         public IOnlineCatalog Browser => this;
         public readonly OnlineAlbum Release = new("deezer:111", "Orbit", "Artist", "2026", TrackCount: 3);
         public Task<OnlineAlbumPage> Metadata = Task.FromResult(new OnlineAlbumPage(new("deezer:111", "Orbit", "Artist"), []));
+        public Task<OnlineArtistPage?> ArtistMetadata = Task.FromResult<OnlineArtistPage?>(null);
+        public OnlineSearchResult? SearchAnswer;
+        public OnlineAlbum? KnownAlbum(string id) => id == Release.Id ? Release : null;
+        public Task<OnlineArtistPage?> ReadArtistAsync(OnlineArtist artist, CancellationToken ct) => ArtistMetadata;
+        public Task<OnlineArtistPage?> FindLibraryArtistAsync(string name, IReadOnlyList<string> albums, IReadOnlyList<string> titles, CancellationToken ct) => ArtistMetadata;
         public int Reads, Searches, Prepares;
         public readonly List<(IReadOnlyList<OnlineSong> Songs, bool Now)> Saves = [];
         public bool CanDownload => true;
@@ -41,7 +71,7 @@ public class MobileCatalogAlbumTests
         public async IAsyncEnumerable<OnlineSearchResult> SearchAsync(string query, [EnumeratorCancellation] CancellationToken ct)
         {
             Searches++;
-            yield return new(query, [], [], [Release], Continue is null);
+            yield return SearchAnswer ?? new(query, [], [], [Release], Continue is null);
             if (Continue is not null)
             {
                 AfterFirst!.TrySetResult(); await Continue.Task;

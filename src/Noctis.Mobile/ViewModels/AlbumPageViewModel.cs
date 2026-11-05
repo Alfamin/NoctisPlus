@@ -66,7 +66,7 @@ public sealed partial class AlbumPageViewModel : MobilePage, ITintedPage
         Shell.PropertyChanged += OnShellChanged;
         Apply(album);
         DescriptionLoad = LoadDescriptionAsync(album.Artist, album.Name, _descriptionCts.Token);
-        _requestedRelease = release;
+        _requestedRelease = release ?? (album.CatalogReleaseId is { Length: > 0 } id ? shell.OnlineSearch?.Browser?.KnownAlbum(id) : null);
         CatalogLoad = LoadCatalogAsync();
     }
 

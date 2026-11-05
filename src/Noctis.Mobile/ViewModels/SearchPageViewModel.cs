@@ -48,7 +48,10 @@ public sealed partial class SearchPageViewModel : ObservableObject, ISortable
         if (shell.OnlineSearch is { } online)
             Online = new OnlineResultsViewModel(online, shell.Marshal,
                 tracks => shell.Player.PlayTracks(tracks, 0, "Search"), shell.OpenTelegramSignIn)
-            { OpenAlbumPage = release => shell.Navigate(new AlbumPageViewModel(shell, AlbumPageViewModel.OnlinePlaceholder(release, online), release)) };
+            {
+                OpenAlbumPage = release => shell.Navigate(new AlbumPageViewModel(shell, AlbumPageViewModel.OnlinePlaceholder(release, online), release)),
+                OpenArtistPage = artist => shell.Navigate(new ArtistPageViewModel(shell, artist.Name, artist)),
+            };
         if (Online != null)
         {
             Online.UseOnlineQueue(shell.Player, "Search");
