@@ -3,6 +3,7 @@
              xmlns:vm="using:Noctis.Mobile.ViewModels"
              xmlns:views="using:Noctis.Mobile.Views"
              xmlns:controls="using:Noctis.Controls"
+             xmlns:search="using:Noctis.Services.Search"
              x:Class="Noctis.Mobile.Views.PlaylistListPage"
              x:DataType="vm:PlaylistListPageViewModel">
     <Grid RowDefinitions="Auto,Auto,*">
@@ -15,14 +16,31 @@
             <views:PlaylistTools Grid.Column="2" Margin="8,0,0,0" VerticalAlignment="Center" />
         </Grid>
 
-        <TextBox Grid.Row="1" Name="PlaylistSearchBox" Classes="search-field" Margin="16,0,16,8" PlaceholderText="Search in playlists"
+        <StackPanel Grid.Row="1" Spacing="6">
+        <ProgressBar IsIndeterminate="True" Height="2" Margin="20,0" IsVisible="{Binding IsImporting}" />
+        <TextBlock Classes="subtle" Margin="20,0" Text="{Binding ImportMessage}" TextWrapping="Wrap" IsVisible="{Binding ImportMessage, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
+        <ItemsControl ItemsSource="{Binding ImportIssues}" Margin="20,0">
+            <ItemsControl.ItemTemplate>
+                <DataTemplate x:DataType="search:OnlineImportJob">
+                    <Button Classes="row" Command="{Binding $parent[views:PlaylistListPage].((vm:PlaylistListPageViewModel)DataContext).ShowImportIssueCommand}" CommandParameter="{Binding}">
+                        <StackPanel Margin="0,4">
+                            <TextBlock Classes="row-title" Text="{Binding Name}" />
+                            <TextBlock Classes="row-sub" Text="{Binding Status}" />
+                        </StackPanel>
+                    </Button>
+                </DataTemplate>
+            </ItemsControl.ItemTemplate>
+        </ItemsControl>
+        <TextBox Name="PlaylistSearchBox" Classes="search-field" Margin="16,0,16,8" PlaceholderText="Search in playlists"
                  Text="{Binding FilterText}" IsVisible="{Binding IsSearchOpen}" />
+        </StackPanel>
 
         <ScrollViewer Classes="page-scroll" Grid.Row="2" views:ScrollMemory.IsEnabled="True" HorizontalScrollBarVisibility="Disabled">
           <StackPanel Margin="0,0,0,16">
-            <TextBlock Name="EmptyText" Classes="subtle" TextWrapping="Wrap" TextAlignment="Center"
-                       Text="No playlists yet. Long-press a song to start one." HorizontalAlignment="Center"
-                       Margin="20,24,20,0" IsVisible="{Binding !HasPlaylists}" />
+            <StackPanel IsVisible="{Binding !HasPlaylists}" HorizontalAlignment="Center" Margin="20,24,20,0" Spacing="16">
+                <TextBlock Name="EmptyText" Classes="subtle" TextWrapping="Wrap" TextAlignment="Center" Text="No playlists yet" />
+                <Button Classes="pill-accent" Content="Import playlists" Command="{Binding ImportPlaylistsCommand}" IsVisible="{Binding CanImport}" IsEnabled="{Binding !IsImporting}" />
+            </StackPanel>
             <TextBlock Name="NoMatchesText" Classes="subtle" Text="No playlists match" HorizontalAlignment="Center"
                        Margin="20,24,20,0" IsVisible="{Binding ShowNoMatches}" />
             <!-- Apple's playlist list: a cover, the name and the song count, a hairline from the

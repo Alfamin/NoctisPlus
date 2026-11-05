@@ -91,7 +91,7 @@
                             <TextBlock Name="PromptMessage" Classes="prompt-message" Text="{Binding Message}" FontSize="14"
                                        TextAlignment="Center" TextWrapping="Wrap" Margin="8,-6,8,0" IsVisible="{Binding HasMessage}" />
                             <TextBox Name="PromptField" Classes="prompt-field" Text="{Binding FieldText}" Margin="0,6,0,0"
-                                     PlaceholderText="{Binding FieldPlaceholder}" IsVisible="{Binding HasField}"
+                                       PlaceholderText="{Binding FieldPlaceholder}" IsVisible="{Binding HasField}" AcceptsReturn="{Binding MultilineField}" MaxHeight="160"
                                      AutomationProperties.Name="{Binding FieldPlaceholder}" KeyDown="OnFieldKeyDown" />
                             <ItemsControl Name="PromptActions" ItemsSource="{Binding Actions}" Margin="0,8,0,0">
                                 <ItemsControl.ItemsPanel>

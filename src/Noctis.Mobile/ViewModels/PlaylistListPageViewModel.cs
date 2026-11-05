@@ -13,6 +13,8 @@ public sealed partial class PlaylistListPageViewModel : MobilePage, ISortable
     public PlaylistListPageViewModel(ShellViewModel shell)
     {
         Shell = shell;
+        _imports = shell.OnlineSearch?.PlaylistImports;
+        if (_imports is not null) _imports.Changed += OnImportsChanged;
         SortChoices = new[]
         {
             new SortChoice("Title", PlaylistSort.Title) { IsSelected = true },
@@ -34,10 +36,47 @@ public sealed partial class PlaylistListPageViewModel : MobilePage, ISortable
     public BulkObservableCollection<PlaylistRow> Rows { get; } = new();
 
     [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(HasPlaylists))]
+    [NotifyPropertyChangedFor(nameof(HasPlaylists), nameof(HasTools))]
     private int _playlistCount;
 
     public bool HasPlaylists => PlaylistCount > 0;
+    public bool CanImport => _imports is not null;
+    public bool HasTools => HasPlaylists || CanImport;
+    private readonly Noctis.Services.Search.IOnlinePlaylistImports? _imports;
+    private readonly CancellationTokenSource _importStop = new();
+    [ObservableProperty] private bool _isImporting;
+    [ObservableProperty] private string? _importMessage;
+
+    [RelayCommand]
+    private void ImportPlaylists()
+    {
+        if (_imports is null || IsImporting) return;
+        Shell.ShowPrompt(new PromptViewModel(Shell, "Import playlists", "Spotify or Deezer links", [
+            new PromptAction("Import", async prompt =>
+            {
+                IsImporting = true; ImportMessage = null;
+                try
+                {
+                    await _imports.ImportAsync(prompt.Entered, _importStop.Token);
+                    if (!_importStop.IsCancellationRequested)
+                    {
+                        Refresh();
+                        var jobs = _imports.Snapshot();
+                        ImportMessage = jobs.Any(j => !j.Complete || j.Stopped) ? "Some playlists need attention" : "Playlists imported";
+                    }
+                }
+                catch (OperationCanceledException) when (_importStop.IsCancellationRequested) { }
+                catch (Exception ex) when (ex is not OutOfMemoryException)
+                { if (!_importStop.IsCancellationRequested) ImportMessage = OnlineResultsViewModel.Short(ex); }
+                finally { if (!_importStop.IsCancellationRequested) IsImporting = false; }
+            }),
+        ]) { HasField = true, MultilineField = true, FieldPlaceholder = "Playlist links, one per line" });
+    }
+
+    private void OnImportsChanged() => Shell.Marshal(() => { if (!_importStop.IsCancellationRequested) Refresh(); });
+    public System.Collections.ObjectModel.ObservableCollection<Noctis.Services.Search.OnlineImportJob> ImportIssues { get; } = new();
+    [RelayCommand] private void ShowImportIssue(Noctis.Services.Search.OnlineImportJob? job)
+    { if (job is not null) Shell.ShowOptions(OptionsMenuViewModel.ForNote(job.Name, null, job.Status)); }
 
     /// <summary>The search found nothing (the tools stay up so it can be cleared).</summary>
     public bool ShowNoMatches => HasPlaylists && Playlists.Count == 0;
@@ -79,6 +118,8 @@ public sealed partial class PlaylistListPageViewModel : MobilePage, ISortable
 
     public void Refresh()
     {
+        var imports = _imports?.Snapshot() ?? [];
+        StableRows.Update(ImportIssues, imports.Where(j => !j.Complete || j.Stopped).ToList());
         IEnumerable<Playlist> list = Shell.Library.Playlists;
         PlaylistCount = Shell.Library.Playlists.Count;
         if (!string.IsNullOrWhiteSpace(FilterText))
@@ -95,7 +136,8 @@ public sealed partial class PlaylistListPageViewModel : MobilePage, ISortable
         };
         // Only when something changed: a refresh of the same playlists must not Reset the list.
         MobileLibrary.ReplaceIfChanged(Playlists, sorted.ToList());
-        MobileLibrary.ReplaceIfChanged(Rows, Playlists.Select(p => new PlaylistRow(p, Shell.Library.PlaylistArtwork(p))).ToList());
+        var counts = imports.Where(j => j.Complete && !j.Stopped).ToDictionary(j => j.Id, j => j.Total);
+        MobileLibrary.ReplaceIfChanged(Rows, Playlists.Select(p => new PlaylistRow(p, Shell.Library.PlaylistArtwork(p), counts.TryGetValue(p.Id, out var total) ? total : null)).ToList());
         OnPropertyChanged(nameof(ShowNoMatches));
     }
 
@@ -104,14 +146,19 @@ public sealed partial class PlaylistListPageViewModel : MobilePage, ISortable
 
     private void OnRefreshed(object? sender, EventArgs e) => Refresh();
 
-    public override void OnClosed() => Shell.Library.Refreshed -= OnRefreshed;
+    public override void OnClosed()
+    {
+        _importStop.Cancel();
+        Shell.Library.Refreshed -= OnRefreshed;
+        if (_imports is not null) _imports.Changed -= OnImportsChanged;
+    }
 }
 
 public enum PlaylistSort { Title, RecentlyUpdated, RecentlyAdded }
 
 /// <summary>A playlist row: its cover (the first of its songs that has one) and its song count.</summary>
-public sealed record PlaylistRow(Playlist Playlist, string? ArtworkPath)
+public sealed record PlaylistRow(Playlist Playlist, string? ArtworkPath, int? CatalogCount = null)
 {
     public string Name => Playlist.Name;
-    public string Subtitle => Playlist.TrackIds.Count == 1 ? "1 song" : $"{Playlist.TrackIds.Count} songs";
+    public string Subtitle => (CatalogCount ?? Playlist.TrackIds.Count) == 1 ? "1 song" : $"{CatalogCount ?? Playlist.TrackIds.Count} songs";
 }

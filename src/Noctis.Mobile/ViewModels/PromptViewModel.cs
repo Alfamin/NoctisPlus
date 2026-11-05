@@ -35,6 +35,7 @@ public sealed partial class PromptViewModel : ObservableObject
 
     /// <summary>A name to type (Rename): the field shows, and the actions wait for a name.</summary>
     public bool HasField { get; init; }
+    public bool MultilineField { get; init; }
     public string FieldPlaceholder { get; init; } = string.Empty;
 
     [ObservableProperty]

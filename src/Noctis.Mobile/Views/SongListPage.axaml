@@ -28,6 +28,7 @@
         <!-- Play and Shuffle play what the list shows (the title row's pill searches, sorts and
              filters it); the count says how much of the list that is. -->
         <StackPanel Grid.Row="1" IsVisible="{Binding HasSongs}">
+            <ProgressBar Height="2" Margin="20,0" IsIndeterminate="True" IsVisible="{Binding IsImportBusy}" />
             <StackPanel Orientation="Horizontal" Spacing="8" Margin="20,8,20,8">
                 <Button Classes="pill-accent" Command="{Binding PlayAllCommand}">
                     <StackPanel Orientation="Horizontal" Spacing="6">
@@ -41,11 +42,15 @@
                         <TextBlock Text="Shuffle" />
                     </StackPanel>
                 </Button>
+                <Button Classes="pill" Command="{Binding DownloadMissingCommand}" IsVisible="{Binding HasMissingImported}" IsEnabled="{Binding !IsImportBusy}" AutomationProperties.Name="Download missing">
+                    <PathIcon Data="{DynamicResource SetIconDownload}" Width="20" Height="20" />
+                </Button>
             </StackPanel>
             <TextBox Name="ListSearchBox" Classes="search-field" Margin="16,0,16,8" PlaceholderText="Search in this list"
                      Text="{Binding FilterText}" IsVisible="{Binding IsSearchOpen}" />
             <!-- Its own line: the toolbar has no room left for it on a phone. -->
             <TextBlock Name="CountLabel" Classes="subtle" FontSize="13" Margin="22,0,20,4" Text="{Binding CountText}" />
+            <TextBlock Classes="subtle" Margin="22,0,20,4" Text="{Binding ImportMessage}" TextWrapping="Wrap" IsVisible="{Binding ImportMessage, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
         </StackPanel>
 
         <TextBlock Grid.Row="2" Name="EmptyText" Classes="subtle" Text="{Binding EmptyText}" HorizontalAlignment="Center"

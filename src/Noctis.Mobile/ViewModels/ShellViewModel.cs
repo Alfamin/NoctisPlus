@@ -942,6 +942,15 @@ public sealed partial class ShellViewModel : ObservableObject
     public IEnumerable<Track> ResolvePlaylist(Playlist playlist) =>
         playlist.TrackIds.Select(Library.Service.GetTrackById).OfType<Track>();
 
+    internal IReadOnlyList<Track> PlaylistPlaybackTracks(Playlist playlist)
+    {
+        if (OnlineSearch is not { } source || source.PlaylistImports?.Read(playlist.Id) is not { } imported)
+            return ResolvePlaylist(CurrentPlaylist(playlist)).ToArray();
+        return imported.Entries.Where(e => e.Song is not null).Select(e =>
+            e.Song!.LocalTrackId is { } id && Library.Service.GetTrackById(id) is { IsFileMissing: false } owned
+                ? owned : Noctis.Services.Search.OnlineStandIn.Create(source, e.Song!, false, "playlist:" + playlist.Id)).ToArray();
+    }
+
     /// <summary>A rail tile: albums and playlists open, an On Repeat song plays that rail from it.</summary>
     [RelayCommand]
     private void OpenRailItem(RailItem? item)

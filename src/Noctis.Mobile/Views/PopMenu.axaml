@@ -115,7 +115,7 @@
                                                         <TextBlock Text="{Binding FavouriteTileLabel}" />
                                                     </StackPanel>
                                                 </Button>
-                                                <Button Name="MenuAddToPlaylist" Classes="row np-tile" Command="{Binding ShowPlaylistsCommand}">
+                                                <Button Name="MenuAddToPlaylist" Classes="row np-tile" Command="{Binding ShowPlaylistsCommand}" IsVisible="{Binding CanUseSavedSongs}">
                                                     <StackPanel>
                                                         <PathIcon Data="{DynamicResource PhAddToPlaylist}" />
                                                         <TextBlock Text="Add to Playlist" />
@@ -130,6 +130,12 @@
                                             </UniformGrid>
                                             <Border Classes="np-line" Margin="20,2,20,0" />
 
+                                            <Button Name="MenuDownloadImported" Classes="row np-row" Command="{Binding DownloadImportedCommand}" IsVisible="{Binding CanDownloadImported}">
+                                                <Grid ColumnDefinitions="56,*">
+                                                    <PathIcon Data="{DynamicResource SetIconDownload}" />
+                                                    <TextBlock Grid.Column="1" Classes="np-label" Text="Download missing" />
+                                                </Grid>
+                                            </Button>
                                             <Button Name="MenuAddToQueue" Classes="row np-row" Command="{Binding AddToQueueCommand}">
                                                 <Grid ColumnDefinitions="56,*">
                                                     <PathIcon Data="{DynamicResource PhAddToQueue}" />

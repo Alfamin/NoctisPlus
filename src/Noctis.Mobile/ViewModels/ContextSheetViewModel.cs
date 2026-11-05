@@ -41,8 +41,14 @@ public sealed partial class ContextSheetViewModel : ObservableObject
             MobileLibrary.SongsBy(shell.Library.Service, artist.Name)) { Artist = artist };
 
     public static ContextSheetViewModel ForPlaylist(ShellViewModel shell, Playlist playlist) =>
-        new(shell, playlist.Name, playlist.TrackIds.Count == 1 ? "1 song" : $"{playlist.TrackIds.Count} songs",
+        new(shell, playlist.Name, PlaylistSubtitle(shell, playlist),
             shell.Library.PlaylistArtwork(playlist), shell.ResolvePlaylist(playlist).ToList()) { Playlist = playlist };
+
+    private static string PlaylistSubtitle(ShellViewModel shell, Playlist playlist)
+    {
+        var count = shell.OnlineSearch?.PlaylistImports?.Snapshot().FirstOrDefault(j => j.Id == playlist.Id && j.Complete && !j.Stopped)?.Total ?? playlist.TrackIds.Count;
+        return count == 1 ? "1 song" : $"{count} songs";
+    }
 
     public string Title { get; }
     public string Subtitle { get; }
@@ -68,6 +74,22 @@ public sealed partial class ContextSheetViewModel : ObservableObject
 
     /// <summary>A playlist's menu: Rename and Delete Playlist.</summary>
     public bool CanEditPlaylist => Playlist != null;
+    public bool CanUseSavedSongs => Playlist is null || _shell.OnlineSearch?.PlaylistImports?.Snapshot().FirstOrDefault(j => j.Id == Playlist.Id)?.HasMissing != true;
+    public bool CanDownloadImported => Playlist is { } playlist && _shell.OnlineSearch?.PlaylistImports?.Snapshot().FirstOrDefault(j => j.Id == playlist.Id)?.HasMissing == true;
+
+    [RelayCommand]
+    private async Task DownloadImportedAsync()
+    {
+        _shell.CloseSheet();
+        if (Playlist is not { } playlist || _shell.OnlineSearch?.PlaylistImports is not { } imports) return;
+        if (!_shell.OnlineSearch.CanDownload) { _shell.OpenTelegramSignIn(); return; }
+        try
+        {
+            var count = await imports.DownloadMissingAsync(playlist.Id, CancellationToken.None);
+            _shell.Player.Notice = count > 0 ? $"{count} added to downloads" : "No downloadable songs missing";
+        }
+        catch (Exception ex) when (ex is not OutOfMemoryException) { _shell.Player.Notice = OnlineResultsViewModel.Short(ex); }
+    }
 
     [RelayCommand]
     private async Task RemoveFromPlaylistAsync()
@@ -90,7 +112,7 @@ public sealed partial class ContextSheetViewModel : ObservableObject
     }
 
     /// <summary>An artist sheet is about the artist (play, queue, pin), not a heart on every song.</summary>
-    public bool CanFavourite => Artist == null;
+    public bool CanFavourite => Artist == null && CanUseSavedSongs;
 
     /// <summary>Artists show a round cover in the sheet header.</summary>
     public bool IsArtist => Artist != null;
@@ -158,14 +180,14 @@ public sealed partial class ContextSheetViewModel : ObservableObject
     [RelayCommand]
     private void PlayNext()
     {
-        _shell.Player.PlayNext(Tracks, Album?.Name ?? Playlist?.Name);
+        _shell.Player.PlayNext(Playlist is { } playlist ? _shell.PlaylistPlaybackTracks(playlist) : Tracks, Album?.Name ?? Playlist?.Name);
         _shell.CloseSheet();
     }
 
     [RelayCommand]
     private void AddToQueue()
     {
-        _shell.Player.AddToQueue(Tracks, Album?.Name ?? Playlist?.Name);
+        _shell.Player.AddToQueue(Playlist is { } playlist ? _shell.PlaylistPlaybackTracks(playlist) : Tracks, Album?.Name ?? Playlist?.Name);
         _shell.CloseSheet();
     }
 
@@ -178,7 +200,7 @@ public sealed partial class ContextSheetViewModel : ObservableObject
 
     /// <summary>The menu's Add to Playlist: the menu closes and the bottom sheet opens on the
     /// playlist list (with its keyboard-aware New playlist box), for whatever the menu was on.</summary>
-    [RelayCommand] private void ShowPlaylists() => IsPickingPlaylist = true;
+    [RelayCommand] private void ShowPlaylists() { if (CanUseSavedSongs) IsPickingPlaylist = true; }
 
     /// <summary>Lyrics are the playing song's page: the row shows only on that song's menu, and
     /// not on the menu opened from the lyrics page itself (where it did nothing).</summary>
@@ -200,7 +222,7 @@ public sealed partial class ContextSheetViewModel : ObservableObject
     [RelayCommand]
     private async Task AddToPlaylistAsync(Playlist? playlist)
     {
-        if (playlist == null) return;
+        if (playlist == null || !CanUseSavedSongs) return;
         _shell.CloseSheet();
         var current = _shell.CurrentPlaylist(playlist);
         var already = Tracks.Count > 0 && Tracks.All(t => current.TrackIds.Contains(t.Id));
@@ -217,7 +239,7 @@ public sealed partial class ContextSheetViewModel : ObservableObject
     private async Task CreatePlaylistAsync()
     {
         var name = NewPlaylistName.Trim();
-        if (name.Length == 0) return;
+        if (name.Length == 0 || !CanUseSavedSongs) return;
         _shell.CloseSheet();
         var playlist = await _shell.Library.CreatePlaylistAsync(name);
         await _shell.Library.AddToPlaylistAsync(playlist, Tracks);

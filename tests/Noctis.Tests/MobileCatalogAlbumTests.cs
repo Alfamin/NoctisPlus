@@ -39,6 +39,7 @@ public class MobileCatalogAlbumTests
     internal sealed class Source : IOnlineMusicSearch, IOnlineCatalog
     {
         public IOnlineCatalog Browser => this;
+        public IOnlinePlaylistImports? PlaylistImports { get; set; }
         public readonly OnlineAlbum Release = new("deezer:111", "Orbit", "Artist", "2026", TrackCount: 3);
         public Task<OnlineAlbumPage> Metadata = Task.FromResult(new OnlineAlbumPage(new("deezer:111", "Orbit", "Artist"), []));
         public Task<OnlineArtistPage?> ArtistMetadata = Task.FromResult<OnlineArtistPage?>(null);
@@ -59,7 +60,8 @@ public class MobileCatalogAlbumTests
         public void OpenArtist(OnlineArtist artist) { }
         public Task OpenAlbumAsync(OnlineAlbum album, CancellationToken ct) => throw new Exception("Desktop navigation must not be used");
         public string? CachedArtwork(string url) => null;
-        public Task<string?> ArtworkAsync(string url, CancellationToken ct) => Task.FromResult<string?>(null);
+        public Func<string, CancellationToken, Task<string?>>? Artwork;
+        public Task<string?> ArtworkAsync(string url, CancellationToken ct) => Artwork?.Invoke(url, ct) ?? Task.FromResult<string?>(null);
         public OnlineDownloadStatus StatusOf(OnlineSong song) => OnlineDownloadStatus.None;
         public Task<string> DownloadAsync(IReadOnlyList<OnlineSong> songs, bool now, CancellationToken ct)
         { Saves.Add((songs, now)); return Task.FromResult("Queued"); }

@@ -140,7 +140,7 @@ public partial class PromptSheet : UserControl
     /// <summary>Enter on the keyboard does what the first action's pill does (Rename's Save).</summary>
     private void OnFieldKeyDown(object? sender, KeyEventArgs e)
     {
-        if (e.Key != Key.Enter || PromptBody.DataContext is not PromptViewModel prompt) return;
+        if (e.Key != Key.Enter || PromptBody.DataContext is not PromptViewModel prompt || prompt.MultilineField) return;
         e.Handled = true;
         if (prompt.CanConfirm) prompt.SubmitCommand.Execute(null);
     }

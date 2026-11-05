@@ -28,6 +28,8 @@ public sealed partial class SongListPageViewModel : MobilePage, ISortable
         _title = title;
         _source = source;
         _playlist = playlist;
+        _playlistImports = playlist is null ? null : shell.OnlineSearch?.PlaylistImports;
+        if (_playlistImports is not null) _playlistImports.Changed += OnImportedPlaylistChanged;
         SortChoices = new[]
         {
             new SortChoice(playlist != null ? "Playlist Order" : "Default Order", SongSort.Default) { IsSelected = true },
@@ -59,6 +61,7 @@ public sealed partial class SongListPageViewModel : MobilePage, ISortable
     [RelayCommand]
     private void ShowPlaylistMenu()
     {
+        if (IsImported) { ShowImportMenu(); return; }
         if (Playlist is { } playlist) Shell.OpenPlaylistSheetCommand.Execute(playlist);
     }
 
@@ -67,6 +70,8 @@ public sealed partial class SongListPageViewModel : MobilePage, ISortable
     [RelayCommand]
     private void OpenSongMenu(Track? track)
     {
+        if (track is { IsFileMissing: true, FilePath.Length: 0 })
+        { Shell.ShowOptions(OptionsMenuViewModel.ForNote("Unavailable song", null, track.Artist)); return; }
         if (track != null) Shell.OpenTrackMenu(track, Playlist);
     }
 
@@ -183,7 +188,7 @@ public sealed partial class SongListPageViewModel : MobilePage, ISortable
 
     public void Refresh()
     {
-        _all = _source().ToList();
+        _all = ImportedRows() ?? _source().ToList();
         TotalCount = _all.Count;
         if (_playlist != null) OnPropertyChanged(nameof(Title));   // renamed since
         OnPropertyChanged(nameof(HasFilters));   // signed in or out since
@@ -245,7 +250,7 @@ public sealed partial class SongListPageViewModel : MobilePage, ISortable
     private void Play(Track? track)
     {
         if (track == null) return;
-        var list = Songs.ToList();
+        var list = Songs.Where(Playable).ToList();
         var index = list.IndexOf(track);
         if (index >= 0 && CanPlayOnline([track])) Shell.Player.PlayTracks(list, index, Title);
     }
@@ -253,13 +258,15 @@ public sealed partial class SongListPageViewModel : MobilePage, ISortable
     [RelayCommand]
     private void PlayAll()
     {
-        if (Songs.Count > 0 && CanPlayOnline([Songs[0]])) Shell.Player.PlayTracks(Songs.ToList(), 0, Title);
+        var list = Songs.Where(Playable).ToList();
+        if (list.Count > 0 && CanPlayOnline([list[0]])) Shell.Player.PlayTracks(list, 0, Title);
     }
 
     [RelayCommand]
     private void ShuffleAll()
     {
-        if (Songs.Count > 0 && CanPlayOnline(Songs)) Shell.Player.PlayShuffled(Songs.ToList(), source: Title);
+        var list = Songs.Where(Playable).ToList();
+        if (list.Count > 0 && CanPlayOnline(list)) Shell.Player.PlayShuffled(list, source: Title);
     }
 
     private bool CanPlayOnline(IEnumerable<Track> tracks)
@@ -270,5 +277,10 @@ public sealed partial class SongListPageViewModel : MobilePage, ISortable
         return true;
     }
 
-    public override void OnClosed() => Shell.Library.Refreshed -= OnRefreshed;
+    public override void OnClosed()
+    {
+        _importStop.Cancel();
+        Shell.Library.Refreshed -= OnRefreshed;
+        if (_playlistImports is not null) _playlistImports.Changed -= OnImportedPlaylistChanged;
+    }
 }
