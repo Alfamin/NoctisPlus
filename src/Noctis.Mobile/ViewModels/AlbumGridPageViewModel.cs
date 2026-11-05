@@ -29,10 +29,14 @@ public sealed partial class AlbumGridPageViewModel : MobilePage
     private int _albumCount;
 
     public bool HasAlbums => AlbumCount > 0;
+    [ObservableProperty] private string _searchText = string.Empty;
+    partial void OnSearchTextChanged(string value) => Refresh();
 
     public void Refresh()
     {
+        var match = new MobileSearch.Matcher(SearchText);
         var albums = Shell.Library.Service.Albums
+            .Where(a => match.Hit(a.Name, a.SearchNameKey) || match.Hit(a.Artist, a.SearchArtistKey))
             .OrderBy(a => a.Name, StringComparer.CurrentCultureIgnoreCase)
             .ToList();
         AlbumCount = albums.Count;

@@ -237,7 +237,16 @@
                 <!-- Virtualised like the other lists: a box set would otherwise realise every row at
                      page open. The panel still virtualises under the header, inside AlbumScroll,
                      because VirtualizingStackPanel works from the effective viewport. -->
-                <ItemsControl Name="TrackList" ItemsSource="{Binding Rows}" Margin="0,14,0,0">
+                <TextBox Name="TrackSearch" Classes="search" Margin="24,14,24,4" Watermark="Search songs"
+                         Text="{Binding SearchText, Mode=TwoWay}" />
+                <Grid ColumnDefinitions="Auto,*,Auto" Margin="18,0,18,0">
+                    <Button Classes="row" Content="Select" IsVisible="{Binding !IsSelecting}" Command="{Binding ToggleSelectionCommand}" />
+                    <Button Classes="row" Content="Done" IsVisible="{Binding IsSelecting}" Command="{Binding ToggleSelectionCommand}" />
+                    <Button Grid.Column="1" Classes="row" Content="Select all" HorizontalAlignment="Left" IsVisible="{Binding IsSelecting}" Command="{Binding SelectAllCommand}" />
+                    <Button Grid.Column="2" Classes="row" Content="{Binding SelectionLabel}" IsVisible="{Binding IsSelecting}"
+                            IsEnabled="{Binding HasSelection}" Command="{Binding AddSelectionCommand}" />
+                </Grid>
+                <ItemsControl Name="TrackList" ItemsSource="{Binding Rows}" Margin="0,4,0,0">
                     <ItemsControl.ItemsPanel>
                         <ItemsPanelTemplate>
                             <VirtualizingStackPanel />
@@ -261,7 +270,12 @@
                                     <TextBlock Name="RowNumber" Classes="album-subtle" FontSize="15" Text="{Binding Number}"
                                                HorizontalAlignment="Center" VerticalAlignment="Center" IsVisible="{Binding ShowsNumber}" />
                                     <views:PlayingBars Name="EqBars" HorizontalAlignment="Center" VerticalAlignment="Center"
-                                                       IsPlaying="{Binding IsAnimating}" IsVisible="{Binding IsCurrent}" />
+                                                       IsPlaying="{Binding IsAnimating}" IsVisible="{Binding ShowsCurrent}" />
+                                    <Border Width="22" Height="22" CornerRadius="11" BorderThickness="1"
+                                            BorderBrush="{DynamicResource SecondaryTextBrush}" IsVisible="{Binding IsSelectionMode}">
+                                        <TextBlock Text="✓" HorizontalAlignment="Center" VerticalAlignment="Center"
+                                                   Foreground="{DynamicResource AccentTextBrush}" IsVisible="{Binding IsSelected}" />
+                                    </Border>
                                     <!-- Left-aligned, so the star column is the title's own width up to the
                                          room left, and the badge follows the title, not the row's end. -->
                                     <Grid Grid.Column="1" Name="RowTitleCell" ColumnDefinitions="*,Auto" HorizontalAlignment="Left"

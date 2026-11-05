@@ -22,13 +22,18 @@ public sealed partial class AlbumTrackRow : ObservableObject
     public int Number { get; }
 
     [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(ShowsNumber))]
+    [NotifyPropertyChangedFor(nameof(ShowsNumber), nameof(ShowsCurrent))]
     private bool _isCurrent;
 
     /// <summary>The bars move: this is the player's track, it is playing, and nothing covers the page.</summary>
     [ObservableProperty] private bool _isAnimating;
 
-    public bool ShowsNumber => !IsCurrent;
+    [ObservableProperty] private bool _isSelected;
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(ShowsNumber), nameof(ShowsCurrent))]
+    private bool _isSelectionMode;
+    public bool ShowsNumber => !IsCurrent && !IsSelectionMode;
+    public bool ShowsCurrent => IsCurrent && !IsSelectionMode;
 }
 
 /// <summary>A "Disc 2" line above a disc's rows, on albums with more than one disc (the
@@ -73,6 +78,20 @@ public sealed partial class AlbumPageViewModel : MobilePage, ITintedPage
     /// <summary>What the list shows: the track rows, with a <see cref="AlbumDiscHeader"/> before
     /// each disc when there is more than one.</summary>
     [ObservableProperty] private IReadOnlyList<object> _rows = Array.Empty<object>();
+    private readonly HashSet<Guid> _selected = new();
+    [ObservableProperty] private bool _isSelecting;
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(HasSelection), nameof(SelectionLabel))]
+    private int _selectionCount;
+    public bool HasSelection => SelectionCount > 0;
+    public string SelectionLabel => SelectionCount == 0 ? "Add to playlist" : $"Add {SelectionCount} to playlist";
+    [ObservableProperty] private string _searchText = string.Empty;
+    partial void OnSearchTextChanged(string value) => FilterRows();
+    private void FilterRows()
+    {
+        var match = new MobileSearch.Matcher(SearchText);
+        Rows = BuildRows(Tracks.Where(r => match.HitTrack(r.Track)).ToList());
+    }
 
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(HasMetaLine))]
@@ -159,7 +178,10 @@ public sealed partial class AlbumPageViewModel : MobilePage, ITintedPage
     {
         Album = album;
         Tracks = album.Tracks.Select((t, i) => new AlbumTrackRow(t, t.TrackNumber > 0 ? t.TrackNumber : i + 1)).ToList();
-        Rows = BuildRows(Tracks);
+        _selected.IntersectWith(Tracks.Select(r => r.Track.Id));
+        foreach (var row in Tracks) { row.IsSelectionMode = IsSelecting; row.IsSelected = _selected.Contains(row.Track.Id); }
+        SelectionCount = _selected.Count;
+        FilterRows();
         MetaLine = BuildMetaLine(album);
         QualityLine = BuildQualityLine(album);
         ReleaseDateText = album.ReleaseDateFormatted;
@@ -296,7 +318,39 @@ public sealed partial class AlbumPageViewModel : MobilePage, ITintedPage
     private void PlayTrack(AlbumTrackRow? row)
     {
         if (row == null) return;
+        if (IsSelecting)
+        {
+            row.IsSelected = !row.IsSelected;
+            if (row.IsSelected) _selected.Add(row.Track.Id); else _selected.Remove(row.Track.Id);
+            SelectionCount = _selected.Count;
+            return;
+        }
         PlayFrom(Tracks.ToList().IndexOf(row));
+    }
+
+    [RelayCommand]
+    private void ToggleSelection()
+    {
+        IsSelecting = !IsSelecting;
+        _selected.Clear(); SelectionCount = 0;
+        foreach (var row in Tracks) { row.IsSelectionMode = IsSelecting; row.IsSelected = false; }
+    }
+
+    [RelayCommand]
+    private void SelectAll()
+    {
+        foreach (var row in Rows.OfType<AlbumTrackRow>()) { row.IsSelected = true; _selected.Add(row.Track.Id); }
+        SelectionCount = _selected.Count;
+    }
+
+    [RelayCommand]
+    private void AddSelection()
+    {
+        var tracks = Tracks.Where(r => _selected.Contains(r.Track.Id)).Select(r => r.Track).ToList();
+        if (tracks.Count == 0) return;
+        Shell.Sheet = ContextSheetViewModel.ForTracks(Shell, tracks, Album.ArtworkPath);
+        Shell.Sheet.ShowPlaylistsCommand.Execute(null);
+        if (IsSelecting) ToggleSelection();
     }
 
     private void PlayFrom(int index)

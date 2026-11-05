@@ -17,6 +17,59 @@ namespace Noctis.Tests;
 /// <summary>The phone album page: header, meta line, rows, transport and the cover tint.</summary>
 public class MobileAlbumPageTests : IDisposable
 {
+    [AvaloniaFact]
+    public async Task AlbumSelection_AddsSeveralSongsInAlbumOrder_WithoutStartingPlayback()
+    {
+        var (album, tracks) = Sample();
+        var playlist = new Playlist { Id = Guid.NewGuid(), Name = "Chosen" };
+        using var rig = MobileFixtures.MakeRig(tracks, [album], seed: p => p.SavePlaylistsAsync([playlist]));
+        var page = new AlbumPageViewModel(rig.Shell, album);
+        try
+        {
+            page.ToggleSelectionCommand.Execute(null);
+            page.PlayTrackCommand.Execute(page.Tracks[1]);
+            page.PlayTrackCommand.Execute(page.Tracks[0]);
+            Assert.Equal(2, page.SelectionCount);
+            Assert.Null(rig.Shell.Player.CurrentTrack);
+            page.AddSelectionCommand.Execute(null);
+            var picker = Assert.IsType<ContextSheetViewModel>(rig.Shell.Sheet);
+            Assert.True(picker.IsPickingPlaylist);
+            Assert.Equal(tracks.Select(t => t.Id), picker.Tracks.Select(t => t.Id));
+            Assert.False(page.IsSelecting);
+            await picker.AddToPlaylistCommand.ExecuteAsync(playlist);
+            Assert.Equal(tracks.Select(t => t.Id), (await rig.Persistence.LoadPlaylistsAsync()).Single(p => p.Id == playlist.Id).TrackIds);
+        }
+        finally { page.OnClosed(); }
+    }
+
+    [AvaloniaFact]
+    public void AlbumSearch_FiltersLocally_AndSelectAllOnlyAddsTheVisibleMatches()
+    {
+        var (album, tracks) = Sample();
+        using var rig = MobileFixtures.MakeRig(tracks, [album]);
+        var page = new AlbumPageViewModel(rig.Shell, album);
+        try
+        {
+            page.SearchText = "LOUD";
+            Assert.Same(tracks[1], Assert.IsType<AlbumTrackRow>(Assert.Single(page.Rows)).Track);
+            page.ToggleSelectionCommand.Execute(null);
+            page.SelectAllCommand.Execute(null);
+            Assert.Equal(1, page.SelectionCount);
+            page.SearchText = "";
+            Assert.Equal(2, page.Rows.Count);
+            Assert.False(page.Tracks[0].IsSelected);
+            Assert.True(page.Tracks[1].IsSelected);
+            var grid = new AlbumGridPageViewModel(rig.Shell) { SearchText = "night" };
+            Assert.True(grid.HasAlbums);
+            grid.SearchText = "missing";
+            Assert.False(grid.HasAlbums);
+            grid.SearchText = "band";
+            Assert.True(grid.HasAlbums);
+            grid.OnClosed();
+        }
+        finally { page.OnClosed(); }
+    }
+
     private readonly List<string> _files = new();
     public void Dispose() { foreach (var f in _files) try { File.Delete(f); } catch { } }
 

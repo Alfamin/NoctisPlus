@@ -31,6 +31,9 @@ public sealed partial class ContextSheetViewModel : ObservableObject
     public static ContextSheetViewModel ForAlbum(ShellViewModel shell, Album album) =>
         new(shell, album.Name, album.Artist, album.ArtworkPath, album.Tracks.ToList()) { Album = album };
 
+    public static ContextSheetViewModel ForTracks(ShellViewModel shell, IReadOnlyList<Track> tracks, string? artworkPath) =>
+        new(shell, tracks.Count == 1 ? "1 song" : $"{tracks.Count} songs", string.Empty, artworkPath, tracks);
+
     /// <summary>An artist's sheet, headed by the artist's photo when the phone has one, else
     /// <paramref name="artworkPath"/> (the cover the row showed).</summary>
     public static ContextSheetViewModel ForArtist(ShellViewModel shell, Artist artist, string? artworkPath) =>
