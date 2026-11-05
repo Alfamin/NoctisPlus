@@ -20,7 +20,7 @@ internal sealed class ProgressiveTransfer(string folder, string fileName, TimeSp
     private readonly string _basePath = Path.Combine(folder, fileName);
     private ProgressiveAudioBuffer? _buffer;
     private Func<string, bool> _accepts = _ => false;
-    private string? _path, _registered;
+    private string? _path, _registered, _savedPath;
     private bool _eligible, _finished, _released;
     private Exception? _error;
     private int _readers;
@@ -64,7 +64,7 @@ internal sealed class ProgressiveTransfer(string folder, string fileName, TimeSp
         {
             if (_finished) return;
             _finished = true; _error = error;
-            if (savedPath is not null) _path = savedPath;
+            if (savedPath is not null) _path = _savedPath = savedPath;
             try
             {
                 _buffer?.Finish(error);
@@ -143,7 +143,7 @@ internal sealed class ProgressiveTransfer(string folder, string fileName, TimeSp
         internal Exception? Error => owner.Error;
         // Metadata remains readable after Dispose without keeping a reader/file lease alive.
         internal string? CompletedPath
-        { get { lock (owner._gate) return owner._finished && owner._error is null ? owner._path : null; } }
+        { get { lock (owner._gate) return owner._finished && owner._error is null ? owner._savedPath : null; } }
 
         internal event Action? Ended { add => owner.Ended += value; remove => owner.Ended -= value; }
         internal Lease Retain()

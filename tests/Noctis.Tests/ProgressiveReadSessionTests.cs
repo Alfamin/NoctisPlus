@@ -160,13 +160,20 @@ public class ProgressiveReadSessionTests
         Assert.Equal(rig.Audio, File.ReadAllBytes(saved));
     }
 
-    [Fact]
-    public async Task FailedCompletion_NeverRedirectsToAnUnvalidatedFile()
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task FailedOrUnsavedCompletion_NeverRedirectsToAnUnvalidatedFile(bool completeWithoutSaving)
     {
         using var rig = await StartAsync("mp3");
         var session = ProgressiveReadSession.TryOpen(rig.Path)!;
         session.Dispose();
-        rig.Transfer.End(Path.Combine(rig.Data.DataDirectory, "other.mp3"), new IOException("failed"));
+        if (completeWithoutSaving)
+        {
+            rig.Write(rig.Audio.Length - rig.Written);
+            rig.Transfer.End(null);
+        }
+        else rig.Transfer.End(Path.Combine(rig.Data.DataDirectory, "other.mp3"), new IOException("failed"));
         Assert.Null(session.CompletedPath);
         Assert.False(rig.Transfer.HasReaders);
     }
