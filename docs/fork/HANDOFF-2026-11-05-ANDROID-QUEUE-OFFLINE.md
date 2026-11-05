@@ -91,10 +91,23 @@ End emulator after checks. Preserve package/profile. Do not copy any session to 
 
 ## Remaining
 
-Finish duplicate-ahead focused regression, x64 live recheck, final ARM64/full gates, then named docs commit
-and dedicated push. Continue parity map: native recovery audit (real own-phone Telegram required), rich
+Duplicate-ahead regression/live recheck and final builds/gates are now complete; see terminal section below.
+Continue parity map: native recovery audit (real own-phone Telegram required), rich
 catalog/artist/album/playlist navigation/import, online timing and exact Plus Lyric Motion, opt-in sync
 controller/jobs. Read LYRIC-MOTION-PHONE-255.md before rendering changes; desktop renderer unchanged.
 Offline toggle covers internet Finder/metadata/lyrics/scrobbling, NOT a proven global block of LAN
 account Media3 playback; native account sync/recovery still needs separate audit. No full-parity claim.
 Physical120FPS/VRR, real phone bot delivery and paired-device sync remain unproven. No release.
+
+## Terminal result — 16:24 Tehran (supersedes pending notes)
+
+Source04143934: final **codex-272c GREEN: 9576 tests,0failed,83skipped**, both isolated frame groups
+19/0 and50/0; Finder1760/0. Full run286s including build. Final x64 Debug0errors/40warnings;
+ordinary ARM64 Debug0errors/68warnings. Focused54/0 and real native UI/recovery/MP3/FLAC evidence above.
+Earlier272a separator-count failure is superseded. No production assertions weakened.
+
+Owner#267 quota cutoff reached90%five-hour/45%weekly at16:22: WRAP-UP ONLY; no new work/build/research
+started after that read. Only observed already-running272c and saved results. Natural reset19:09:36 Tehran.
+One earned reset remains reserved; evening condition not reached. Emulator closed; no CUA active.
+Named docs commit and dedicated branch push follow this save; inspect git/remote to verify success.
+No native/main merge, tag, release, profile/session change or model download. Android Plus remains partial.
