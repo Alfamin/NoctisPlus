@@ -9,7 +9,7 @@ namespace Noctis.Mobile.ViewModels;
 /// <summary>One online song row under the library results.</summary>
 public sealed partial class OnlineSongItem(OnlineSong song) : ObservableObject
 {
-    public OnlineSong Song { get; } = song;
+    public OnlineSong Song { get; private set; } = song;
     public string Title => Song.Title;
     public string Subtitle => Song.Album.Length > 0 ? $"{Song.ArtistDisplay} · {Song.Album}" : Song.ArtistDisplay;
     [ObservableProperty] private string? _artworkPath;
@@ -18,6 +18,18 @@ public sealed partial class OnlineSongItem(OnlineSong song) : ObservableObject
     [ObservableProperty] private bool _isWorking;
     /// <summary>Queued, downloading or saved: Download does nothing more.</summary>
     [ObservableProperty] private bool _isRequested;
+
+    internal void Update(OnlineSong song)
+    {
+        if (Song == song) return;
+        var artworkChanged = Song.ArtworkUrl != song.ArtworkUrl;
+        Song = song;
+        OnPropertyChanged(nameof(Song));
+        OnPropertyChanged(nameof(Title));
+        OnPropertyChanged(nameof(Subtitle));
+        if (artworkChanged) ArtworkPath = null;
+    }
+    internal bool ArtworkPending;
 }
 
 /// <summary>
@@ -100,30 +112,35 @@ public sealed partial class OnlineResultsViewModel : ObservableObject, IDisposab
     private void Show(IReadOnlyList<OnlineSong> songs, string warning)
     {
         var known = Songs.ToDictionary(i => i.Song.Id);
-        Songs.Clear();
+        var next = new List<OnlineSongItem>(songs.Count);
         foreach (var song in songs)
         {
             var item = known.TryGetValue(song.Id, out var old) ? old : new OnlineSongItem(song);
-            Songs.Add(item);
+            item.Update(song);
+            next.Add(item);
             Refresh(item);
             if (item.ArtworkPath is null && song.ArtworkUrl.Length > 0)
             {
                 item.ArtworkPath = _source.CachedArtwork(song.ArtworkUrl);
-                if (item.ArtworkPath is null) _ = FetchArtworkAsync(item, _query?.Token ?? default);
+                if (item.ArtworkPath is null && !item.ArtworkPending) _ = FetchArtworkAsync(item, _query?.Token ?? default);
             }
         }
+        StableRows.Update(Songs, next);
         SongCount = Songs.Count;
         Message = warning.Length > 0 ? warning : null;
     }
 
     private async Task FetchArtworkAsync(OnlineSongItem item, CancellationToken ct)
     {
+        item.ArtworkPending = true;
+        var url = item.Song.ArtworkUrl;
         try
         {
-            var path = await _source.ArtworkAsync(item.Song.ArtworkUrl, ct).ConfigureAwait(false);
-            if (path != null) _marshal(() => item.ArtworkPath = path);
+            var path = await _source.ArtworkAsync(url, ct).ConfigureAwait(false);
+            if (path != null) _marshal(() => { if (item.Song.ArtworkUrl == url) item.ArtworkPath = path; });
         }
         catch (Exception ex) when (ex is not OutOfMemoryException) { }
+        finally { _marshal(() => item.ArtworkPending = false); }
     }
 
     /// <summary>
@@ -237,9 +254,14 @@ public sealed partial class FinderDownloadsViewModel : ObservableObject, IDispos
 
     internal void Refresh()
     {
-        var rows = _queue.Snapshot().Select(e => new DownloadRow(e)).ToList();
-        Entries.Clear();
-        foreach (var row in rows) Entries.Add(row);
+        var known = Entries.ToDictionary(r => r.Entry.Handle);
+        var rows = _queue.Snapshot().Select(e =>
+        {
+            var row = known.TryGetValue(e.Handle, out var current) ? current : new DownloadRow(e);
+            row.Update(e);
+            return row;
+        }).ToList();
+        StableRows.Update(Entries, rows);
         IsPaused = _queue.IsPaused;
         HasEntries = Entries.Count > 0;
         HasFailed = rows.Any(r => r.Entry.State == OnlineDownloadState.Failed);
@@ -269,8 +291,21 @@ public sealed partial class FinderDownloadsViewModel : ObservableObject, IDispos
     public void Dispose() => _queue.Changed -= OnChanged;
 }
 
-public sealed record DownloadRow(DownloadEntry Entry)
+public sealed class DownloadRow(DownloadEntry entry) : ObservableObject
 {
+    public DownloadEntry Entry { get; private set; } = entry;
+    internal void Update(DownloadEntry entry)
+    {
+        if (Entry == entry) return;
+        var old = Entry;
+        Entry = entry;
+        OnPropertyChanged(nameof(Entry));
+        if (old.Title != entry.Title) OnPropertyChanged(nameof(Title));
+        if (old.Artist != entry.Artist || old.State != entry.State || old.Progress != entry.Progress
+            || old.Detail != entry.Detail || old.IsHeld != entry.IsHeld) OnPropertyChanged(nameof(Subtitle));
+        if (old.Progress != entry.Progress) OnPropertyChanged(nameof(Progress));
+        if (old.State != entry.State) OnPropertyChanged(nameof(IsRunning));
+    }
     public string Title => Entry.Title;
     public string Subtitle => Entry.State switch
     {
@@ -282,4 +317,21 @@ public sealed record DownloadRow(DownloadEntry Entry)
     };
     public double Progress => Entry.Progress;
     public bool IsRunning => Entry.State == OnlineDownloadState.Downloading;
+}
+
+/// <summary>Keep row controls, selection and scroll anchors when only their progress/metadata changed.</summary>
+internal static class StableRows
+{
+    internal static void Update<T>(ObservableCollection<T> rows, IReadOnlyList<T> next) where T : class
+    {
+        var kept = next.ToHashSet();
+        for (var i = rows.Count - 1; i >= 0; i--) if (!kept.Contains(rows[i])) rows.RemoveAt(i);
+        for (var i = 0; i < next.Count; i++)
+        {
+            if (i < rows.Count && ReferenceEquals(rows[i], next[i])) continue;
+            var previous = rows.IndexOf(next[i]);
+            if (previous >= 0) rows.Move(previous, i);
+            else rows.Insert(i, next[i]);
+        }
+    }
 }

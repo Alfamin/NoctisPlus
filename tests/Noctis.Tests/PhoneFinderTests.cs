@@ -363,6 +363,51 @@ public class PhoneFinderTests
     // ── Private files ──
 
     [Fact]
+    public void DownloadProgress_KeepsRowsAndEmitsNoListChanges_For3000Updates()
+    {
+        var queue = new Queue();
+        for (var i = 0; i < 30; i++) queue.Items.Add(new DownloadEntry(i, "Song " + i, "Artist", OnlineDownloadState.Downloading, 0, "", true, false));
+        using var vm = new FinderDownloadsViewModel(queue, a => a());
+        var originals = vm.Entries.ToArray();
+        var changes = 0;
+        vm.Entries.CollectionChanged += (_, _) => changes++;
+        var baseline = new System.Collections.ObjectModel.ObservableCollection<DownloadRow>();
+        var baselineChanges = 0;
+        baseline.CollectionChanged += (_, _) => baselineChanges++;
+        for (var tick = 1; tick <= 100; tick++)
+        {
+            for (var i = 0; i < queue.Items.Count; i++) queue.Items[i] = queue.Items[i] with { Progress = tick / 100.0 };
+            baseline.Clear(); // measured former refresh algorithm on the same workload
+            foreach (var entry in queue.Snapshot()) baseline.Add(new DownloadRow(entry));
+            queue.Raise();
+        }
+        Assert.Equal(3100, baselineChanges);
+        Assert.Equal(0, changes);
+        for (var i = 0; i < originals.Length; i++) Assert.Same(originals[i], vm.Entries[i]);
+        Assert.All(vm.Entries, row => Assert.Equal(1, row.Progress));
+        queue.Items[0] = queue.Items[0] with { State = OnlineDownloadState.Saved };
+        queue.Raise();
+        Assert.Contains("Saved", originals[0].Subtitle);
+        Assert.False(originals[0].IsRunning);
+        vm.RemoveCommand.Execute(originals[0]);
+        Assert.DoesNotContain(queue.Items, row => Equals(row.Handle, 0)); // preserved row uses the latest entry
+    }
+
+    [Fact]
+    public void StableRows_ReordersAndRemovesWithoutResettingTheCollection()
+    {
+        var a = new object(); var b = new object(); var c = new object();
+        var rows = new System.Collections.ObjectModel.ObservableCollection<object>([a, b]);
+        var resets = 0;
+        rows.CollectionChanged += (_, e) => { if (e.Action == System.Collections.Specialized.NotifyCollectionChangedAction.Reset) resets++; };
+        StableRows.Update(rows, [b, c, a]);
+        Assert.Equal(new[] { b, c, a }, rows);
+        StableRows.Update(rows, [c, a]);
+        Assert.Equal(new[] { c, a }, rows);
+        Assert.Equal(0, resets);
+    }
+
+    [Fact]
     public void PrivateFiles_ReadSidecarsAndAudioByPath_IncludingPersianNames_AndRefuseOversizedOnes()
     {
         var dir = Path.Combine(Path.GetTempPath(), "NoctisTests", Guid.NewGuid().ToString("N"));
