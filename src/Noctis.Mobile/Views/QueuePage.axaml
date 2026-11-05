@@ -379,10 +379,11 @@
                                             <controls:TransportGlyph Kind="Next" />
                                         </Button>
                                         <Button Grid.Column="5" Name="QueueShuffleButton" Classes="icon pill-btn" Classes.on="{Binding Player.IsShuffleEnabled}"
-                                                Command="{Binding Player.ToggleShuffleCommand}" AutomationProperties.Name="Shuffle">
+                                                Command="{Binding ShowShuffleModesCommand}" AutomationProperties.Name="{Binding Player.ShuffleLabel}">
                                             <Panel>
                                                 <Border Classes="wash" />
-                                                <PathIcon Data="{DynamicResource PhShuffle}" />
+                                                <PathIcon Data="{DynamicResource PhShuffle}" IsVisible="{Binding !Player.IsShuffleBusy}" />
+                                                <ProgressBar IsIndeterminate="True" Width="18" Height="3" IsVisible="{Binding Player.IsShuffleBusy}" />
                                             </Panel>
                                         </Button>
                                         <Button Grid.Column="6" Name="QueueMoreButton" Classes="icon pill-btn"

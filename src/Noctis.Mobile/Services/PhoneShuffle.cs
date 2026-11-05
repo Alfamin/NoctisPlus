@@ -6,10 +6,10 @@ using Noctis.Features.TrueShuffle;
 namespace Noctis.Mobile.Services;
 
 /// <summary>Phone shuffle modes (#255). "For you" is hidden on the phone for now.</summary>
-internal enum PhoneShuffleMode { Off, NoctisShuffle, EqualChance, NoRepeats, Discovery, NeverPlayed }
+public enum PhoneShuffleMode { Off, NoctisShuffle, EqualChance, NoRepeats, Discovery, NeverPlayed }
 
 /// <summary>
-/// Builds a queue order from Noctis.Core's ShuffleEngine plan. Not wired into UI yet (#255 step 2).
+/// Builds a queue order from Noctis.Core's ShuffleEngine plan; the native player owns its mode/session.
 /// Off and Noctis shuffle return null: the caller keeps today's behaviour.
 /// </summary>
 internal static class PhoneShuffle

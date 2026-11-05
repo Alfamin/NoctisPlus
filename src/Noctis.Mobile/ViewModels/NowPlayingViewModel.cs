@@ -167,7 +167,8 @@ public sealed partial class NowPlayingViewModel : ObservableObject, IDisposable
     /// enabled is the cheap direction: an enabled button that stops is far milder than a
     /// hidden button for a skip that would have worked.
     /// </summary>
-    public bool HasNext => _queue.UpNext.Count > 0 || (RepeatMode == RepeatMode.All && CurrentTrack != null);
+    public bool HasNext => _queue.UpNext.Count > 0 || (RepeatMode == RepeatMode.All && CurrentTrack != null
+        && !_shuffleQueueCleared && TrueShuffleMode != PhoneShuffleMode.NeverPlayed);
 
     /// <summary>
     /// Whether <see cref="PreviousCommand"/> would do something, for the notification's
@@ -224,6 +225,11 @@ public sealed partial class NowPlayingViewModel : ObservableObject, IDisposable
         // without this guard tapping Play on an empty/filtered-to-nothing list would
         // restart the currently playing track from zero.
         if (tracks.Count == 0) return;
+        InvalidateShufflePlan();
+        _shuffleSource = tracks.ToArray();
+        TrueShuffleMode = PhoneShuffleMode.Off;
+        _manualShuffle.Clear();
+        _shuffleQueueCleared = false;
         var first = _queue.ReplaceAll(tracks, startIndex);
         SourceLabel = source;
         IsShuffleEnabled = _queue.IsShuffleEnabled;
@@ -245,6 +251,14 @@ public sealed partial class NowPlayingViewModel : ObservableObject, IDisposable
     public void PlayShuffled(IReadOnlyList<Track> tracks, Random? rng = null, string? source = null)
     {
         if (tracks.Count == 0) return;
+        if (PhoneShuffle.ToEngine(TrueShuffleMode) != null)
+        {
+            _ = ChooseShuffleAsync(TrueShuffleMode, Noctis.Features.TrueShuffle.ShuffleScope.OpenPlaylist, tracks, source);
+            return;
+        }
+        InvalidateShufflePlan();
+        _shuffleSource = tracks.ToArray();
+        TrueShuffleMode = PhoneShuffleMode.NoctisShuffle;
         rng ??= Random.Shared;
         var start = rng.Next(tracks.Count);
         var rotated = tracks.Skip(start).Concat(tracks.Take(start)).ToList();
@@ -292,6 +306,7 @@ public sealed partial class NowPlayingViewModel : ObservableObject, IDisposable
     [RelayCommand]
     private void Next()
     {
+        if (TryRefillTrueShuffle()) return;
         // A deliberate skip is a user action, not part of the automatic error cascade the
         // breaker bounds — clear the streak so an unrelated later failure gets its own count.
         _consecutiveErrors = 0;
@@ -308,6 +323,25 @@ public sealed partial class NowPlayingViewModel : ObservableObject, IDisposable
     /// queue still holds them for when the computer is back.
     /// </summary>
     private Track? AdvancePlayable(QueueAdvance reason, out bool heldBack)
+    {
+        var custom = PhoneShuffle.ToEngine(TrueShuffleMode);
+        if (custom is null) return AdvancePlayableCore(reason, out heldBack);
+        var repeat = _queue.RepeatMode;
+        if (reason == QueueAdvance.Natural && repeat == RepeatMode.One) return AdvancePlayableCore(reason, out heldBack);
+        _queue.RepeatMode = RepeatMode.Off; // custom modes refill through their engine, never the stock random repeat cycle
+        try
+        {
+            var next = AdvancePlayableCore(reason, out heldBack);
+            var seen = _shuffleCycle.Seen.ToHashSet(StringComparer.Ordinal);
+            while (next != null && !ConsumeManualShuffle(next) && !Noctis.Features.TrueShuffle.ShuffleEngine.StillWanted(ShuffleSong(next), custom.Value,
+                seen, explicitAllowed: true, skipDisliked: true, DateTime.UtcNow))
+                next = AdvancePlayableCore(QueueAdvance.UserSkip, out heldBack);
+            return next;
+        }
+        finally { _queue.RepeatMode = repeat; }
+    }
+
+    private Track? AdvancePlayableCore(QueueAdvance reason, out bool heldBack)
     {
         heldBack = false;
         if (!_computerUnreachable || NeedsComputer is not { } needs) return _queue.Advance(reason);
@@ -433,14 +467,22 @@ public sealed partial class NowPlayingViewModel : ObservableObject, IDisposable
     [RelayCommand]
     private void ToggleShuffle()
     {
+        _manualShuffle.Clear();
+        _shuffleQueueCleared = false;
         _queue.SetShuffle(!_queue.IsShuffleEnabled);
+        TrueShuffleMode = _queue.IsShuffleEnabled ? PhoneShuffleMode.NoctisShuffle : PhoneShuffleMode.Off;
         IsShuffleEnabled = _queue.IsShuffleEnabled;
         QueueChanged();
     }
 
-    public void PlayNext(Track track) { _queue.AddNext(track); QueueChanged(); }
-    public void AddToQueue(Track track) { _queue.Add(track); QueueChanged(); }
-    public void RemoveFromQueue(int upNextIndex) { _queue.RemoveAt(upNextIndex); QueueChanged(); }
+    public void PlayNext(Track track) { MarkManualShuffle(track); _queue.AddNext(track); QueueChanged(); }
+    public void AddToQueue(Track track) { MarkManualShuffle(track); if (PhoneShuffle.ToEngine(TrueShuffleMode) != null) _queue.AddNext(track); else _queue.Add(track); QueueChanged(); }
+    public void RemoveFromQueue(int upNextIndex)
+    {
+        if ((uint)upNextIndex < (uint)_queue.UpNext.Count) ConsumeManualShuffle(_queue.UpNext[upNextIndex]);
+        _queue.RemoveAt(upNextIndex);
+        QueueChanged();
+    }
 
     /// <summary>
     /// A signed-out desktop's songs leave the library, but the queue holds Track objects, so
@@ -467,6 +509,8 @@ public sealed partial class NowPlayingViewModel : ObservableObject, IDisposable
     /// </summary>
     public void DropTracks(Func<Track, bool> match)
     {
+        _shuffleSource = _shuffleSource.Where(t => !match(t)).ToArray();
+        foreach (var track in _queue.UpNext.Where(match)) _manualShuffle.Remove(track.Id);
         if (!_queue.RemoveWhere(match))
         {
             QueueChanged();
@@ -482,6 +526,13 @@ public sealed partial class NowPlayingViewModel : ObservableObject, IDisposable
     private void ClearUpNext()
     {
         _queue.Clear();
+        _manualShuffle.Clear();
+        if (PhoneShuffle.ToEngine(TrueShuffleMode) != null)
+        {
+            // Clear is explicit: do not refill a fresh library cycle behind the user's back.
+            // Keep their selected mode and repeat setting for the next deliberate source.
+            _shuffleQueueCleared = true;
+        }
         QueueChanged();
     }
 
@@ -492,7 +543,7 @@ public sealed partial class NowPlayingViewModel : ObservableObject, IDisposable
     {
         if (tracks.Count == 0) return;
         if (CurrentTrack == null) { PlayTracks(tracks, 0, source); return; }
-        for (var i = tracks.Count - 1; i >= 0; i--) _queue.AddNext(tracks[i]);
+        for (var i = tracks.Count - 1; i >= 0; i--) { MarkManualShuffle(tracks[i]); _queue.AddNext(tracks[i]); }
         QueueChanged();
     }
 
@@ -501,12 +552,15 @@ public sealed partial class NowPlayingViewModel : ObservableObject, IDisposable
     {
         if (tracks.Count == 0) return;
         if (CurrentTrack == null) { PlayTracks(tracks, 0, source); return; }
-        _queue.AddRange(tracks);
+        if (PhoneShuffle.ToEngine(TrueShuffleMode) != null)
+            for (var i = tracks.Count - 1; i >= 0; i--) { MarkManualShuffle(tracks[i]); _queue.AddNext(tracks[i]); }
+        else _queue.AddRange(tracks);
         QueueChanged();
     }
 
     private void QueueChanged()
     {
+        InvalidateShufflePlan();
         SyncUpNext();
         PrepareUpcoming();
         SaveStateNow();
@@ -514,6 +568,7 @@ public sealed partial class NowPlayingViewModel : ObservableObject, IDisposable
 
     private void StartTrack(Track track, TimeSpan? fromPosition)
     {
+        InvalidateShufflePlan();
         // Not recorded yet: a file that fails to load (broken.mp3, a revoked grant) must not
         // land in Last Played / On Repeat. The first tick that proves audio is moving records it.
         _unrecordedPlay = track;
@@ -543,8 +598,8 @@ public sealed partial class NowPlayingViewModel : ObservableObject, IDisposable
         // While the computer is unreachable the next song is the first that plays without it,
         // the one AdvancePlayable will land on, so the gapless handoff still matches.
         var upcoming = _computerUnreachable && NeedsComputer is { } needs
-            ? _queue.UpNext.FirstOrDefault(t => !needs(t))
-            : _queue.UpNext.FirstOrDefault();
+            ? _queue.UpNext.FirstOrDefault(t => !needs(t) && WantedByShuffle(t))
+            : _queue.UpNext.FirstOrDefault(WantedByShuffle);
         if (RepeatMode == RepeatMode.One || upcoming == null || CurrentTrack == null)
         {
             _player.CancelPreparedNext();
@@ -630,6 +685,7 @@ public sealed partial class NowPlayingViewModel : ObservableObject, IDisposable
     {
         var track = _unrecordedPlay!;
         _unrecordedPlay = null;
+        _ = RememberShufflePlayAsync(track);
         _history?.RecordPlay(track);
         PlayRecorded?.Invoke(this, EventArgs.Empty);
     }
@@ -643,6 +699,7 @@ public sealed partial class NowPlayingViewModel : ObservableObject, IDisposable
     private void OnPlayerTrackEnded(object? sender, EventArgs e) => _marshal(() =>
     {
         if (_disposed) return;
+        if (TryRefillTrueShuffle()) return;
         var next = AdvancePlayable(QueueAdvance.Natural, out var heldBack);
         if (next != null)
         {
@@ -716,6 +773,10 @@ public sealed partial class NowPlayingViewModel : ObservableObject, IDisposable
             RepeatCycleIds = snapshot.RepeatCycleIds.ToList(),
             RepeatMode = snapshot.RepeatMode,
             IsShuffleEnabled = snapshot.IsShuffleEnabled,
+            MobileShuffleMode = TrueShuffleMode.ToString(),
+            MobileShuffleScope = TrueShuffleScope.ToString(),
+            MobileShuffleManualIds = _manualShuffle.SelectMany(p => Enumerable.Repeat(p.Key, p.Value)).ToList(),
+            MobileShuffleQueueCleared = _shuffleQueueCleared,
             IsMuted = _player.IsMuted,
             OriginalOrderIds = snapshot.OriginalOrderIds.ToList(),
             SourceLabel = SourceLabel,
@@ -765,6 +826,15 @@ public sealed partial class NowPlayingViewModel : ObservableObject, IDisposable
         SourceLabel = state.SourceLabel;
         RepeatMode = state.RepeatMode;
         IsShuffleEnabled = state.IsShuffleEnabled;
+        TrueShuffleMode = state.IsShuffleEnabled && Enum.TryParse<PhoneShuffleMode>(state.MobileShuffleMode, out var savedMode)
+            && Enum.IsDefined(savedMode) && savedMode != PhoneShuffleMode.Off ? savedMode
+            : state.IsShuffleEnabled ? PhoneShuffleMode.NoctisShuffle : PhoneShuffleMode.Off;
+        if (Enum.TryParse<Noctis.Features.TrueShuffle.ShuffleScope>(state.MobileShuffleScope, out var savedScope) && Enum.IsDefined(savedScope)) TrueShuffleScope = savedScope;
+        _shuffleSource = state.RepeatCycleIds.Select(_library.GetTrackById).OfType<Track>().ToArray();
+        _manualShuffle.Clear();
+        _shuffleQueueCleared = state.MobileShuffleQueueCleared;
+        foreach (var id in state.MobileShuffleManualIds.Where(id => _queue.UpNext.Any(t => t.Id == id)))
+            _manualShuffle[id] = _manualShuffle.GetValueOrDefault(id) + 1;
         CurrentTrack = _queue.Current;
         Duration = _queue.Current?.Duration ?? TimeSpan.Zero;
         Position = _queue.Current != null ? TimeSpan.FromSeconds(Math.Max(0, state.PositionSeconds)) : TimeSpan.Zero;
@@ -774,6 +844,7 @@ public sealed partial class NowPlayingViewModel : ObservableObject, IDisposable
 
     public void Dispose()
     {
+        InvalidateShufflePlan();
         _disposed = true;
         _player.PositionChanged -= OnPlayerPosition;
         _player.DurationResolved -= OnPlayerDuration;

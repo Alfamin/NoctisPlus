@@ -337,6 +337,7 @@ public partial class ShellView : UserControl
         MiniBar.Height = MiniHeight;
         MiniBar.Margin = folded ? new Thickness(Bubble + FoldGap, 0, searchBubble ? Bubble + FoldGap : 0, 0) : new Thickness(0, 0, 0, TabHeight + Gap);
         MiniNextButton.IsVisible = !folded;
+        MiniShuffleButton.IsVisible = !folded;
 
         var index = TabIndex(vm.SelectedTab);
         var pillWidth = SelectionPillWidth(width);

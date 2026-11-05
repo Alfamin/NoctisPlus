@@ -202,7 +202,7 @@ public class MobileQueueSheetTests
         Assert.Same(player.PreviousCommand, B("QueuePreviousButton").Command);
         Assert.Same(player.TogglePlayPauseCommand, B("QueuePlayPauseButton").Command);
         Assert.Same(player.NextCommand, B("QueueNextButton").Command);
-        Assert.Same(player.ToggleShuffleCommand, B("QueueShuffleButton").Command);
+        Assert.Same(rig.Shell.ShowShuffleModesCommand, B("QueueShuffleButton").Command);
         Assert.Same(shell.OpenCurrentTrackSheetCommand, B("QueueMoreButton").Command);
 
         B("QueueMoreButton").Command!.Execute(null);

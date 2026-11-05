@@ -1075,6 +1075,24 @@ public sealed partial class ShellViewModel : ObservableObject
         if (Player.CurrentTrack is { } track) Sheet = ContextSheetViewModel.ForTrack(this, track);
     }
 
+    [RelayCommand]
+    private void ShowShuffleModes()
+    {
+        var items = new List<OptionsMenuItem>();
+        foreach (var mode in PhoneShuffle.Visible)
+            items.Add(new OptionsMenuItem(this, NowPlayingViewModel.ModeName(mode), Player.TrueShuffleMode == mode,
+                () => _ = Player.ChooseShuffleAsync(mode)));
+        foreach (var (scope, label) in new[]
+        {
+            (Noctis.Features.TrueShuffle.ShuffleScope.CurrentQueue, "Queue"),
+            (Noctis.Features.TrueShuffle.ShuffleScope.WholeLibrary, "Library"),
+            (Noctis.Features.TrueShuffle.ShuffleScope.OpenPlaylist, "Source"),
+        })
+            items.Add(new OptionsMenuItem(this, label, Player.TrueShuffleScope == scope,
+                () => _ = Player.ChooseShuffleAsync(Player.TrueShuffleMode, scope)) { StartsGroup = label == "Queue" });
+        ShowOptions(OptionsMenuViewModel.ForItems(items));
+    }
+
     /// <summary>The Library tab's ⋯: Add Folder…, Rescan Library and Settings on the glass menu.</summary>
     [RelayCommand]
     private void OpenLibraryMenu()

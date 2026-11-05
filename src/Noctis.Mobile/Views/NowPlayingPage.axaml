@@ -194,6 +194,14 @@
                      player bar's 18 and 20, here 44 and 48 (the Queue pill: 30 and 33).
                      Shuffle and Repeat are on the Queue page (Apple's). -->
                 <Grid Grid.Row="4" ColumnDefinitions="*,Auto,Auto,Auto,*" Margin="0,14">
+                    <Button Grid.Column="0" Name="NowPlayingShuffle" Classes="icon bottom" HorizontalAlignment="Center"
+                            Command="{Binding ShowShuffleModesCommand}" AutomationProperties.Name="{Binding Player.ShuffleLabel}">
+                        <Panel>
+                            <PathIcon Data="{DynamicResource PhShuffle}" Opacity="0.55" IsVisible="{Binding !Player.IsShuffleEnabled}" />
+                            <PathIcon Data="{DynamicResource PhShuffle}" Foreground="{DynamicResource AccentTextBrush}" IsVisible="{Binding Player.IsShuffleEnabled}" />
+                            <ProgressBar IsIndeterminate="True" Width="18" Height="3" IsVisible="{Binding Player.IsShuffleBusy}" />
+                        </Panel>
+                    </Button>
                     <Button Grid.Column="1" Name="PreviousButton" Classes="icon transport tx"
                             Command="{Binding Player.PreviousCommand}" AutomationProperties.Name="Previous">
                         <controls:TransportGlyph Kind="Previous" Width="44" Height="44" />

@@ -132,6 +132,16 @@ public sealed class PlaybackQueue
     /// <summary>Clears UpNext only; Current keeps playing.</summary>
     public void Clear() => _upNext.Clear();
 
+    /// <summary>A typed shuffle plan replaces only upcoming tracks. Keep the loaded song, history,
+    /// and original order so switching the mode never restarts playback and Off restores the queue.</summary>
+    public void SetShuffleOrder(IReadOnlyList<Track> ordered)
+    {
+        if (!IsShuffleEnabled) _originalOrder = _upNext.ToList();
+        IsShuffleEnabled = true;
+        _upNext.Clear();
+        _upNext.AddRange(ordered);
+    }
+
     /// <summary>
     /// Drops every track matching <paramref name="match"/> from UpNext, History, the repeat
     /// cycle and the pre-shuffle order (tracks that left the library, e.g. a signed-out

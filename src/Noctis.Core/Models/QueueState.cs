@@ -25,6 +25,12 @@ public class QueueState
 
     /// <summary>Whether shuffle was on when the app closed.</summary>
     public bool IsShuffleEnabled { get; set; }
+    /// <summary>Native phone True Shuffle selection; absent in older desktop/phone queues.</summary>
+    public string? MobileShuffleMode { get; set; }
+    public string? MobileShuffleScope { get; set; }
+    /// <summary>Explicitly queued requests bypass automatic shuffle exclusions, including after restart.</summary>
+    public List<Guid> MobileShuffleManualIds { get; set; } = new();
+    public bool MobileShuffleQueueCleared { get; set; }
 
     /// <summary>Whether output was muted when the app closed.</summary>
     public bool IsMuted { get; set; }
