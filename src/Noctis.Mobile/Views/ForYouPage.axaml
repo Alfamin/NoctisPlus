@@ -1,0 +1,18 @@
+<UserControl xmlns="https://github.com/avaloniaui" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:Noctis.Mobile.ViewModels" xmlns:views="using:Noctis.Mobile.Views"
+             x:Class="Noctis.Mobile.Views.ForYouPage" x:DataType="vm:ForYouViewModel">
+    <Grid RowDefinitions="Auto,*">
+        <Grid ColumnDefinitions="Auto,*,Auto" Margin="8,4,20,4">
+            <Button Classes="icon" Command="{Binding Shell.NavigateBackCommand}" AutomationProperties.Name="Back">
+                <PathIcon Data="{DynamicResource PhBack}" />
+            </Button>
+            <TextBlock Grid.Column="1" Classes="title" FontSize="26" VerticalAlignment="Center" Text="For You" />
+            <Button Grid.Column="2" Classes="icon" Command="{Binding RefreshCommand}" AutomationProperties.Name="Refresh picks">
+                <PathIcon Data="{DynamicResource PhRescan}" />
+            </Button>
+        </Grid>
+        <ScrollViewer Grid.Row="1" Classes="page-scroll">
+            <views:ForYouView Margin="0,8,0,24" />
+        </ScrollViewer>
+    </Grid>
+</UserControl>

@@ -120,6 +120,7 @@ public sealed partial class LibraryViewModel : ObservableObject
     [ObservableProperty] private bool _hasPinned;
     [ObservableProperty] private bool _hasRecentlyAdded;
     [ObservableProperty] private bool _hasOnRepeat;
+    [ObservableProperty] private bool _hasHomePlaylists;
 
     /// <summary>The Shelf as a horizontal rail of covers (true) or a vertical list (false).</summary>
     [ObservableProperty] private bool _isShelfGrid = true;
@@ -158,6 +159,7 @@ public sealed partial class LibraryViewModel : ObservableObject
     public BulkObservableCollection<RailItem> PinnedRail { get; } = new();
     public BulkObservableCollection<RailItem> RecentlyAddedRail { get; } = new();
     public BulkObservableCollection<RailItem> OnRepeatRail { get; } = new();
+    public BulkObservableCollection<RailItem> HomePlaylistsRail { get; } = new();
 
     /// <summary>The Shelf's albums as rail tiles: Library → Recently Played.</summary>
     public BulkObservableCollection<RailItem> RecentlyPlayedRail { get; } = new();
@@ -770,6 +772,10 @@ public sealed partial class LibraryViewModel : ObservableObject
             .ToList();
         MobileLibrary.ReplaceIfChanged(PinnedRail, pinned);
         HasPinned = PinnedRail.Count > 0;
+
+        var playlists = _playlists.Take(RailSize).Select(p => RailItem.ForPlaylist(p, PlaylistArtwork(p))).ToList();
+        MobileLibrary.ReplaceIfChanged(HomePlaylistsRail, playlists);
+        HasHomePlaylists = HomePlaylistsRail.Count > 0;
 
         var recent = MobileLibrary.RecentlyAddedAlbums(_library, RailSize).Select(RailItem.ForAlbum).ToList();
         MobileLibrary.ReplaceIfChanged(RecentlyAddedRail, recent);

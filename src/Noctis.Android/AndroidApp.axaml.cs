@@ -136,6 +136,7 @@ public partial class AndroidApp : Avalonia.Application, IThemeHost
             // Music Finder: this phone's own Telegram sign-in, online Search and downloads.
             TelegramSignIn = _finder?.SignIn,
             OnlineSearch = _finder?.Search,
+            Discovery = _finder?.Discovery,
             Outputs = new AndroidOutputSwitcher(context),
             BatterySaver = new AndroidBatterySaver(context),
             Theme = this,

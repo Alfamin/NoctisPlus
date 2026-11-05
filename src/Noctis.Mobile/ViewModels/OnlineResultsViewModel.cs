@@ -68,6 +68,18 @@ public sealed partial class OnlineResultsViewModel : ObservableObject, IDisposab
     [ObservableProperty] private bool _isSearching;
     [ObservableProperty] private string? _message;
     public bool HasSongs => SongCount > 0;
+    internal event Action<OnlineSong, RecommendationAction>? Acted;
+    internal bool LazyArtwork { get; init; }
+    internal void ShowRecommendations(IReadOnlyList<OnlineSong> songs) => Show(songs, "");
+    internal void CancelPlay(string songId)
+    {
+        if (_playingItem?.Song.Id == songId) _playing?.Cancel();
+    }
+    internal void EnsureArtwork(OnlineSongItem item)
+    {
+        if (item.ArtworkPath is null && item.Song.ArtworkUrl.Length > 0 && !item.ArtworkPending)
+            _ = FetchArtworkAsync(item, _query?.Token ?? default);
+    }
 
     /// <summary>The query changed. Empty clears at once; otherwise the online search starts after
     /// <see cref="Debounce"/> unless another change comes first.</summary>
@@ -122,7 +134,7 @@ public sealed partial class OnlineResultsViewModel : ObservableObject, IDisposab
             if (item.ArtworkPath is null && song.ArtworkUrl.Length > 0)
             {
                 item.ArtworkPath = _source.CachedArtwork(song.ArtworkUrl);
-                if (item.ArtworkPath is null && !item.ArtworkPending) _ = FetchArtworkAsync(item, _query?.Token ?? default);
+                if (!LazyArtwork) EnsureArtwork(item);
             }
         }
         StableRows.Update(Songs, next);
@@ -164,7 +176,11 @@ public sealed partial class OnlineResultsViewModel : ObservableObject, IDisposab
         try
         {
             var track = await _source.PreparePlaybackAsync(item.Song, keep: false, cts.Token);
-            if (!cts.IsCancellationRequested && ReferenceEquals(_playing, cts)) _play([track]);
+            if (!cts.IsCancellationRequested && ReferenceEquals(_playing, cts))
+            {
+                _play([track]);
+                Acted?.Invoke(item.Song, RecommendationAction.Play);
+            }
         }
         catch (OperationCanceledException) when (cts.IsCancellationRequested) { }
         catch (Exception ex) when (ex is not OutOfMemoryException)
@@ -181,13 +197,22 @@ public sealed partial class OnlineResultsViewModel : ObservableObject, IDisposab
     private OnlineSongItem? _playingItem;
 
     [RelayCommand(AllowConcurrentExecutions = true)]
-    private async Task DownloadAsync(OnlineSongItem? item)
+    private Task DownloadAsync(OnlineSongItem? item) => DownloadAsync(item, false);
+
+    [RelayCommand(AllowConcurrentExecutions = true)]
+    private Task DownloadNowAsync(OnlineSongItem? item) => DownloadAsync(item, true);
+
+    private async Task DownloadAsync(OnlineSongItem? item, bool now)
     {
         if (item is null) return;
         if (!_source.CanDownload) { Message = "Sign in to Telegram to download"; _signIn(); return; }
         Refresh(item);
         if (item.IsRequested || !_inFlight.Add("dl:" + item.Song.Id)) return;
-        try { Message = await _source.DownloadAsync([item.Song], now: false, CancellationToken.None); }
+        try
+        {
+            Message = await _source.DownloadAsync([item.Song], now, CancellationToken.None);
+            Acted?.Invoke(item.Song, now ? RecommendationAction.Download : RecommendationAction.Queue);
+        }
         catch (Exception ex) when (ex is not OutOfMemoryException) { Message = Short(ex); }
         finally { _inFlight.Remove("dl:" + item.Song.Id); Refresh(item); }
     }

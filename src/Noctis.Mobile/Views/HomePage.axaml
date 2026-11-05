@@ -36,9 +36,23 @@
             <StackPanel Name="HomeContent" Margin="0,0,0,24" Spacing="22">
                 <!-- The start tab: a new phone lands here, so the first-run card shows here too. -->
                 <views:LibraryNotices IsVisible="{Binding Library.HasNotice}" />
+                <StackPanel Spacing="10" IsVisible="{Binding HasForYou}">
+                    <Grid ColumnDefinitions="*,Auto">
+                        <Button Classes="row section-header" Command="{Binding OpenForYouCommand}">
+                            <StackPanel Orientation="Horizontal">
+                                <TextBlock Classes="section" Text="For You" />
+                                <PathIcon Classes="chevron" Data="{DynamicResource LibChevronIcon}" />
+                            </StackPanel>
+                        </Button>
+                        <Button Grid.Column="1" Classes="icon" Margin="0,0,20,0" Command="{Binding ForYou.RefreshCommand}" AutomationProperties.Name="Refresh picks">
+                            <PathIcon Data="{DynamicResource PhRescan}" />
+                        </Button>
+                    </Grid>
+                    <views:ForYouView DataContext="{Binding ForYou}" PreviewOnly="True" />
+                </StackPanel>
 
-                <!-- Pinned: always shown once there is music, so the pin system is discoverable. -->
-                <StackPanel Name="PinnedSection" Spacing="10" IsVisible="{Binding Library.ShowSections}">
+                <!-- Pins are an optional shelf, never the only content on a fresh library. -->
+                <StackPanel Name="PinnedSection" Spacing="10" IsVisible="{Binding Library.HasPinned}">
                     <!-- Nothing pinned: no ›, and no tap into an empty page; the hint card says how. -->
                     <Button Name="PinnedHeader" Classes="row section-header" Command="{Binding OpenPinnedCommand}"
                             IsHitTestVisible="{Binding Library.HasPinned}">
@@ -52,10 +66,6 @@
                         <ItemsControl Name="PinnedRail" Margin="20,0" ItemsSource="{Binding Library.PinnedRail}"
                                       ItemTemplate="{StaticResource RailTileTemplate}" ItemsPanel="{StaticResource RailPanel}" />
                     </ScrollViewer>
-                    <Border Name="PinnedHint" Classes="card" Margin="20,0" Padding="16,14" IsVisible="{Binding !Library.HasPinned}">
-                        <TextBlock Classes="subtle" TextWrapping="Wrap"
-                                   Text="Long-press an album, artist, playlist or song and choose Pin to keep it here." />
-                    </Border>
                 </StackPanel>
 
                 <StackPanel Name="RecentlyPlayedSection" Spacing="10" IsVisible="{Binding Library.HasShelf}">
@@ -82,6 +92,34 @@
                     </Button>
                     <ScrollViewer HorizontalScrollBarVisibility="Hidden" VerticalScrollBarVisibility="Disabled">
                         <ItemsControl Name="OnRepeatRail" Margin="20,0" ItemsSource="{Binding Library.OnRepeatRail}"
+                                      ItemTemplate="{StaticResource RailTileTemplate}" ItemsPanel="{StaticResource RailPanel}" />
+                    </ScrollViewer>
+                </StackPanel>
+
+                <StackPanel Name="HomePlaylistsSection" Spacing="10" IsVisible="{Binding Library.HasHomePlaylists}">
+                    <Button Classes="row section-header" Command="{Binding OpenHomePlaylistsCommand}">
+                        <StackPanel Orientation="Horizontal">
+                            <PathIcon Data="{DynamicResource ChipPlaylistsIcon}" />
+                            <TextBlock Classes="section" Text="Your Playlists" />
+                            <PathIcon Classes="chevron" Data="{DynamicResource LibChevronIcon}" />
+                        </StackPanel>
+                    </Button>
+                    <ScrollViewer HorizontalScrollBarVisibility="Hidden" VerticalScrollBarVisibility="Disabled">
+                        <ItemsControl Name="HomePlaylistsRail" Margin="20,0" ItemsSource="{Binding Library.HomePlaylistsRail}"
+                                      ItemTemplate="{StaticResource RailTileTemplate}" ItemsPanel="{StaticResource RailPanel}" />
+                    </ScrollViewer>
+                </StackPanel>
+
+                <StackPanel Name="HomeNewSection" Spacing="10" IsVisible="{Binding Library.HasRecentlyAdded}">
+                    <Button Classes="row section-header" Command="{Binding OpenRecentlyAddedCommand}">
+                        <StackPanel Orientation="Horizontal">
+                            <PathIcon Data="{DynamicResource LibRecentlyAddedIcon}" />
+                            <TextBlock Classes="section" Text="New in Library" />
+                            <PathIcon Classes="chevron" Data="{DynamicResource LibChevronIcon}" />
+                        </StackPanel>
+                    </Button>
+                    <ScrollViewer HorizontalScrollBarVisibility="Hidden" VerticalScrollBarVisibility="Disabled">
+                        <ItemsControl Name="HomeNewRail" Margin="20,0" ItemsSource="{Binding Library.RecentlyAddedRail}"
                                       ItemTemplate="{StaticResource RailTileTemplate}" ItemsPanel="{StaticResource RailPanel}" />
                     </ScrollViewer>
                 </StackPanel>

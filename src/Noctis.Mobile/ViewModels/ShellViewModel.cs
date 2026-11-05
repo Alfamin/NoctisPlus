@@ -129,6 +129,10 @@ public sealed partial class ShellViewModel : ObservableObject
 
     /// <summary>Music Finder's online search and downloads (phone Search). Null: Search is library only.</summary>
     public Noctis.Services.Search.IOnlineMusicSearch? OnlineSearch { get; init; }
+    public Noctis.Services.Search.IOnlineDiscovery? Discovery { get; init; }
+    private ForYouViewModel? _forYou;
+    public bool HasForYou => Discovery is not null && OnlineSearch is not null;
+    public ForYouViewModel? ForYou => _forYou ??= HasForYou ? new(this, Discovery!, OnlineSearch!) : null;
 
     /// <summary>"Noctis 1.2.3" for Settings → About; the head reads the package version.</summary>
     public string VersionText { get; init; } = "Noctis";
@@ -716,6 +720,8 @@ public sealed partial class ShellViewModel : ObservableObject
         CloseNowPlaying();
         PopToRoot();
         SelectedTab = tab;
+        if (tab != MobileTab.Home) _forYou?.Suspend(); // foreground Search/catalog gets the network first
+        else if (_forYou is { HasSongs: false } page && !page.IsLoading) _ = page.LoadAsync();
     }
 
     [RelayCommand] private void OpenNowPlaying() => IsNowPlayingOpen = true;
@@ -803,6 +809,8 @@ public sealed partial class ShellViewModel : ObservableObject
     [RelayCommand] private void OpenFavourites() => Navigate(new SongListPageViewModel(this, Loc.T("Nav.Favorites"), Library.Favourites) { OffersFavouritesFilter = false });
 
     [RelayCommand] private void OpenRecentlyAdded() => Navigate(new SongListPageViewModel(this, "Recently Added", Library.RecentlyAdded));
+    [RelayCommand] private void OpenHomePlaylists() => SelectTab(MobileTab.Playlists);
+    [RelayCommand] private void OpenForYou() { if (ForYou is { } page) Navigate(page); }
 
     [RelayCommand] private void OpenAlbums() => Navigate(new AlbumGridPageViewModel(this));
 
@@ -1199,6 +1207,7 @@ public sealed partial class ShellViewModel : ObservableObject
     public async Task InitializeAsync()
     {
         await Library.InitializeAsync();
+        if (ForYou is { } recommendations) _ = recommendations.LoadAsync(); // metadata only; never holds up first frame
         await LoadPlayerBarSettingsAsync();
         await Background.LoadAsync();
         await LoadHistoryPrefsAsync();

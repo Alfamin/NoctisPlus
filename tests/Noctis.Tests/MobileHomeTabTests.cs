@@ -64,13 +64,14 @@ public class MobileHomeTabTests
         Assert.True(home.IsEffectivelyVisible);
         Assert.False(library.IsEffectivelyVisible);
 
-        foreach (var section in new[] { "PinnedSection", "RecentlyPlayedSection", "OnRepeatSection" })
+        Assert.False(MobileFixtures.Named<StackPanel>(home, "PinnedSection").IsEffectivelyVisible);
+        foreach (var section in new[] { "RecentlyPlayedSection", "OnRepeatSection", "HomeNewSection" })
         {
             Assert.True(MobileFixtures.Named<StackPanel>(home, section).IsEffectivelyVisible, section);
             Assert.False(Holds(library, section), $"{section} is still on Library");
         }
-        // Apple's Home order: Pinned, then Recently Played, then On Repeat.
-        var ys = new[] { "PinnedSection", "RecentlyPlayedSection", "OnRepeatSection" }
+        // Listening first; real library content is useful before anything is pinned.
+        var ys = new[] { "RecentlyPlayedSection", "OnRepeatSection", "HomeNewSection" }
             .Select(n => MobileFixtures.Named<StackPanel>(home, n).TranslatePoint(default, home)!.Value.Y).ToArray();
         Assert.Equal(ys.OrderBy(y => y), ys);
         Assert.Equal("Home", MobileFixtures.Named<TextBlock>(home, "HomeTitle").Text);
@@ -95,7 +96,7 @@ public class MobileHomeTabTests
         var window = MobileFixtures.Mount(rig.Shell, out var view);
         var home = MobileFixtures.Find<HomePage>(view);
         Assert.False(rig.Shell.Library.HasNotice);
-        Assert.Equal(0, MobileFixtures.Named<StackPanel>(home, "PinnedSection")
+        Assert.Equal(0, MobileFixtures.Named<StackPanel>(home, "RecentlyPlayedSection")
             .TranslatePoint(default, MobileFixtures.Named<StackPanel>(home, "HomeContent"))!.Value.Y, 1);
 
         rig.Shell.SelectTabCommand.Execute(MobileTab.Library);
@@ -115,6 +116,53 @@ public class MobileHomeTabTests
         var home = MobileFixtures.Find<HomePage>(view);
         Assert.True(MobileFixtures.Named<Border>(home, "ConnectCard").IsEffectivelyVisible);
         Assert.False(MobileFixtures.Named<StackPanel>(home, "PinnedSection").IsVisible);
+        window.Close();
+    }
+
+    [AvaloniaFact]
+    public void FreshLibraryHasUsefulHomeContent_WithoutPinsOrInventedListeningHistory()
+    {
+        var song = MobileFixtures.Song("First", daysAgo: 90);
+        var album = MobileFixtures.MakeAlbum("An Album", "An Artist", song);
+        using var rig = MobileFixtures.MakeRig([song], [album], WithFolder());
+        var window = MobileFixtures.Mount(rig.Shell, out var view);
+        var home = MobileFixtures.Find<HomePage>(view);
+        Assert.False(MobileFixtures.Named<StackPanel>(home, "PinnedSection").IsVisible);
+        Assert.False(MobileFixtures.Named<StackPanel>(home, "RecentlyPlayedSection").IsVisible);
+        Assert.False(MobileFixtures.Named<StackPanel>(home, "OnRepeatSection").IsVisible);
+        Assert.True(MobileFixtures.Named<StackPanel>(home, "HomeNewSection").IsEffectivelyVisible);
+        var tile = Assert.Single(rig.Shell.Library.RecentlyAddedRail);
+        rig.Shell.OpenRailItemCommand.Execute(tile);
+        Assert.IsType<AlbumPageViewModel>(rig.Shell.CurrentPage);
+        Assert.Empty(rig.Player.PlayedPaths); // browsing a recommendation/album must not play or download
+        window.Close();
+    }
+
+    [AvaloniaFact]
+    public async Task HomePlaylistsAppearWithoutPinning_OpenInPlace_AndRefreshOnlyWhenChanged()
+    {
+        using var rig = MakeRig();
+        var window = MobileFixtures.Mount(rig.Shell, out var view);
+        var home = MobileFixtures.Find<HomePage>(view);
+        Assert.False(MobileFixtures.Named<StackPanel>(home, "HomePlaylistsSection").IsVisible);
+        var playlist = await rig.Shell.Library.CreatePlaylistAsync("Gym");
+        await rig.Shell.Library.AddToPlaylistAsync(playlist, rig.Library.TrackList);
+        window.UpdateLayout();
+        Assert.True(MobileFixtures.Named<StackPanel>(home, "HomePlaylistsSection").IsEffectivelyVisible);
+        var item = Assert.Single(rig.Shell.Library.HomePlaylistsRail);
+        Assert.Equal("2 songs", item.Subtitle);
+        var resets = 0;
+        rig.Shell.Library.HomePlaylistsRail.CollectionChanged += (_, _) => resets++;
+        rig.Library.RaiseLibraryUpdated();
+        Assert.Equal(0, resets);
+        Assert.Same(item, Assert.Single(rig.Shell.Library.HomePlaylistsRail));
+        rig.Shell.OpenRailItemCommand.Execute(item);
+        Assert.Equal(playlist.Id, Assert.IsType<SongListPageViewModel>(rig.Shell.CurrentPage).Playlist!.Id);
+        Assert.Empty(rig.Player.PlayedPaths);
+        rig.Shell.OpenHomePlaylistsCommand.Execute(null);
+        Assert.Equal(MobileTab.Playlists, rig.Shell.SelectedTab);
+        await rig.Shell.Library.DeletePlaylistAsync(playlist);
+        Assert.False(rig.Shell.Library.HasHomePlaylists);
         window.Close();
     }
 

@@ -10,6 +10,9 @@ internal sealed class FinderSession : IDisposable
     private readonly DiscoveryActions _actions;
     private readonly Action<string> _log;
     private string _proxy = "";
+    private ForYouSource? _forYou;
+    private SimilarArtists? _similar;
+    public Noctis.Services.Search.IOnlineDiscovery? Discovery { get; }
     public AudioQuality Quality { get; set; } = AudioQuality.FLAC;
     public string FirstBot { get; set; } = BotSelections.Hunters;
     public TelegramAccount Telegram { get; }
@@ -22,7 +25,7 @@ internal sealed class FinderSession : IDisposable
     public event Action<string>? Notice;
 
     public FinderSession(string data, string music, IPlaylistLibrary library, Func<ILibraryService?> service,
-        Action<string> log, string? defaultsPath = null, bool completeFilesOnly = false)
+        Action<string> log, string? defaultsPath = null, bool completeFilesOnly = false, string? profileData = null)
     {
         DataFolder = Path.GetFullPath(data); MusicFolder = Path.GetFullPath(music); _log = log;
         Directory.CreateDirectory(data); Directory.CreateDirectory(music);
@@ -53,7 +56,16 @@ internal sealed class FinderSession : IDisposable
         Playlists = new SpotifyPlaylists(Path.Combine(data, "spotify-playlists.json"), library, Downloads, _sources.Track,
             new PlaylistCatalog(PlaylistCatalog.MetadataHandler("", log)));
         Online = new FinderOnlineSearch(() => _catalog, _actions, Pages, () => Telegram.IsLoggedIn,
-            () => Say("Sign in to Telegram"), () => Playlists) { RequireCompleteFile = completeFilesOnly };
+            () => Say("Sign in to Telegram"), () => Playlists)
+            { RequireCompleteFile = completeFilesOnly, ForYouHidden = () => _forYou?.Hidden };
+        if (profileData is not null)
+        {
+            _similar = new SimilarArtists(data, PlaylistCatalog.MetadataHandler("", log));
+            _forYou = new ForYouSource(() => _catalog, _actions,
+                artist => service()?.Albums.Where(a => string.Equals(a.Artist, artist, StringComparison.OrdinalIgnoreCase))
+                    .Select(a => a.Name).ToArray() ?? [], library, profileData, Path.Combine(data, "for-you-hidden.json"), () => _similar);
+            Discovery = new FinderDiscovery(_forYou, Online, library);
+        }
     }
 
     public void SetProxy(string? server, string? secret)
@@ -72,6 +84,7 @@ internal sealed class FinderSession : IDisposable
     private void Say(string text) { _log(text); Notice?.Invoke(text); }
     public void Dispose()
     {
+        _forYou?.Dispose(); _similar?.Dispose();
         Online.Detach(); Playlists.Dispose(); Pages.Dispose(); Downloads.Dispose(); _catalog.Dispose(); Telegram.Dispose();
     }
 }
