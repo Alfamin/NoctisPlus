@@ -446,6 +446,28 @@ public class PhoneFinderTests
     // ── Playlist import ──
 
     [AvaloniaFact]
+    public async Task PhoneFolderSongs_MatchThroughTheHostGrant_AndRevocationStopsPlaylistWrites()
+    {
+        var track = new Track { Id = Guid.NewGuid(), Title = "A", Artist = "X", Duration = TimeSpan.FromSeconds(180),
+            FilePath = "content://com.android.externalstorage.documents/tree/primary%3AMusic/document/primary%3AMusic%2Fa.flac" };
+        using var rig = MobileFixtures.MakeRig([track]);
+        var granted = true;
+        var lib = new PhonePlaylistLibrary(rig.Library, rig.Shell.Library, work => work(), path => granted && path == track.FilePath);
+        var snapshot = await lib.SnapshotAsync();
+        Assert.Single(snapshot);
+        var request = new FreeMusicFinder.MusicRequest("A", "X", 180);
+        Assert.Null(new FreeMusicFinder.PlaylistMatcher(snapshot).Find(request)); // default desktop rule stays filesystem-only
+        Assert.Equal(track.Id, new FreeMusicFinder.PlaylistMatcher(snapshot, lib.Exists).Find(request)?.Id);
+        Assert.Null(new FreeMusicFinder.PlaylistMatcher(snapshot, lib.Exists).Find(request with { Title = "A (Live)" }));
+        Assert.Null(new FreeMusicFinder.PlaylistMatcher(snapshot, lib.Exists).Find(request with { Seconds = 240 }));
+        await lib.ApplyAsync(Guid.NewGuid(), "Phone mix", "https://open.spotify.com/playlist/abc", [track.Id], true, []);
+        granted = false;
+        Assert.Null(new FreeMusicFinder.PlaylistMatcher(await lib.SnapshotAsync(), lib.Exists).Find(request));
+        var error = await Assert.ThrowsAsync<IOException>(() => lib.ApplyAsync(Guid.NewGuid(), "Unavailable", "https://open.spotify.com/playlist/abc", [track.Id], true, []));
+        Assert.StartsWith("LIBRARY_CHANGED", error.Message);
+    }
+
+    [AvaloniaFact]
     public async Task PlaylistImport_FillsOnce_KeepsUserEdits_AndDoesNotRecreateADeletedPlaylist()
     {
         var dir = Path.Combine(Path.GetTempPath(), "NoctisTests", Guid.NewGuid().ToString("N"));

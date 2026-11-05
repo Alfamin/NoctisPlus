@@ -26,10 +26,10 @@ internal sealed class PhoneFinderHost : IDisposable
     /// <param name="musicFolder">Private folder downloads are saved in.</param>
     /// <param name="defaultsPath">The build's packed deployment pair, or a path that does not exist.</param>
     public PhoneFinderHost(string dataFolder, string musicFolder, string defaultsPath, ILibraryService library,
-        LibraryViewModel playlists, Func<Func<Task>, Task> onUi, Action<string> log)
+        LibraryViewModel playlists, Func<Func<Task>, Task> onUi, Action<string> log, Func<string, bool>? localExists = null)
     {
         _library = library;
-        Session = new FinderSession(dataFolder, musicFolder, new PhonePlaylistLibrary(library, playlists, onUi), () => library,
+        Session = new FinderSession(dataFolder, musicFolder, new PhonePlaylistLibrary(library, playlists, onUi, localExists), () => library,
             // The phone player reads a song still arriving through ProgressiveDataSource (Noctis.Android), so Play
             // may start on the received bytes; MP3 and FLAC only, other formats wait for the complete file.
             log, defaultsPath, completeFilesOnly: false);

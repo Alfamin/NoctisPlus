@@ -214,7 +214,7 @@ public partial class AndroidApp : Avalonia.Application, IThemeHost
             var defaults = Path.Combine(data, TelegramAppAsset);
             CopyTelegramApp(context, defaults);
             return new Mobile.Services.Finder.PhoneFinderHost(data, Path.Combine(noBackup, "finder-music"), defaults, library, playlists,
-                work => Dispatcher.UIThread.InvokeAsync(work), line => DebugLog.Write("Finder", line));
+                work => Dispatcher.UIThread.InvokeAsync(work), line => DebugLog.Write("Finder", line), new SafTrackFileAccess(context).Exists);
         }
         catch (Exception ex)
         {

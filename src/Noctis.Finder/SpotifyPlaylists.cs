@@ -233,7 +233,7 @@ internal sealed class SpotifyPlaylists : IDisposable
             if (!Valid(manifest)) throw new InvalidDataException("METADATA_INCOMPLETE: Spotify returned only part of this playlist. Try again.");
             lock (_gate) { if (_previews.Count >= 20) _previews.Clear(); _previews[link.Url] = manifest; }
         }
-        var matcher = new PlaylistMatcher(await _library.SnapshotAsync().ConfigureAwait(false));
+        var matcher = new PlaylistMatcher(await _library.SnapshotAsync().ConfigureAwait(false), _library.Exists);
         return (manifest, manifest.Entries.OrderBy(e => e.Position).Select(e => new ImportedPlaylistEntry(
             e.Position, e.Request is null ? null : Song(e), e.Request is { } r ? matcher.Find(r)?.Id : null, e.Issue,
             ArtistCatalog.ArtworkUrl(e.Artwork) ? e.Artwork : "", e.Album ?? "")).ToArray());
@@ -297,7 +297,7 @@ internal sealed class SpotifyPlaylists : IDisposable
                             m => { job.Manifest = m; Save(); }, p => { job.Status = p; Publish(); }, ct).ConfigureAwait(false);
                         if (!Valid(job.Manifest)) throw new InvalidDataException("METADATA_INCOMPLETE: No playlist was created from a partial preview.");
                     }
-                    await Reconcile(job, new PlaylistMatcher(await _library.SnapshotAsync().ConfigureAwait(false))).ConfigureAwait(false);
+                    await Reconcile(job, new PlaylistMatcher(await _library.SnapshotAsync().ConfigureAwait(false), _library.Exists)).ConfigureAwait(false);
                 }
                 catch (OperationCanceledException) { throw; }
                 catch (SourcesWaitingException ex)
@@ -325,7 +325,7 @@ internal sealed class SpotifyPlaylists : IDisposable
     private async Task CheckCore(CancellationToken ct, IReadOnlyList<LocalSong>? snapshot = null)
     {
         var songs = snapshot ?? await _library.SnapshotAsync().ConfigureAwait(false);
-        var matcher = new PlaylistMatcher(songs);
+        var matcher = new PlaylistMatcher(songs, _library.Exists);
         foreach (var job in Jobs.Where(j => j.Manifest is { CompleteIds: true } && !j.FillingStopped))
         {
             ct.ThrowIfCancellationRequested();

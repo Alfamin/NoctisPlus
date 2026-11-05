@@ -6,6 +6,7 @@ internal sealed record LocalSong(Guid Id, string Artist, string Title, string Pa
 internal interface IPlaylistLibrary
 {
     Task<IReadOnlyList<LocalSong>> SnapshotAsync();
+    bool Exists(string path) => File.Exists(path);
     Task ApplyAsync(Guid id, string name, string url, IReadOnlyList<Guid> tracks, bool create, IReadOnlyList<Guid> expected, IReadOnlyList<Guid>? remappedExpected = null);
 }
 
@@ -13,9 +14,10 @@ internal sealed class PlaylistMatcher
 {
     private readonly ILookup<string, LocalSong> _titles;
     private readonly LocalSong[] _songs, _starred;
-    public PlaylistMatcher(IEnumerable<LocalSong> songs)
+    public PlaylistMatcher(IEnumerable<LocalSong> songs, Func<string, bool>? exists = null)
     {
-        _songs = songs.Where(s => File.Exists(s.Path)).OrderBy(s => s.Path, StringComparer.OrdinalIgnoreCase).ToArray();
+        exists ??= File.Exists;
+        _songs = songs.Where(s => exists(s.Path)).OrderBy(s => s.Path, StringComparer.OrdinalIgnoreCase).ToArray();
         _starred = _songs.Where(s => s.Title.Contains('*')).ToArray();
         _titles = _songs.SelectMany(s => Keys(s.Title).Select(key => (key, s))).ToLookup(pair => pair.key, pair => pair.s);
     }

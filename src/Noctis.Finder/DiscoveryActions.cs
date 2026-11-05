@@ -26,7 +26,7 @@ internal sealed class DiscoveryActions(IPlaylistLibrary library, Downloads downl
         foreach (var s in snapshot) key = key * 31 + s.Id.GetHashCode() + StringComparer.OrdinalIgnoreCase.GetHashCode(s.Path);
         var now = DateTimeOffset.UtcNow;
         if (_matcher is { } cached && cached.Key == key && now - cached.At < TimeSpan.FromMinutes(2)) return cached.Matcher;
-        var matcher = new PlaylistMatcher(snapshot);
+        var matcher = new PlaylistMatcher(snapshot, library.Exists);
         _matcher = (key, now, matcher);
         return matcher;
     }
@@ -39,7 +39,7 @@ internal sealed class DiscoveryActions(IPlaylistLibrary library, Downloads downl
         var rows = songs.ToArray(); var snapshot = await library.SnapshotAsync(); ct.ThrowIfCancellationRequested();
         return await Task.Run(() =>
         {
-            var matcher = reuse ? Matcher(snapshot) : new PlaylistMatcher(snapshot); var history = downloads.History;
+            var matcher = reuse ? Matcher(snapshot) : new PlaylistMatcher(snapshot, library.Exists); var history = downloads.History;
             return rows.DistinctBy(s => s.Id).ToDictionary(s => s.Id, s =>
             {
                 var local = anySong ? matcher.FindSong(s.Request) : matcher.Find(s.Request);

@@ -35,6 +35,20 @@ public sealed class SafTrackFileAccess : ITrackFileAccess
 
     public SafTrackFileAccess(Context context) => _resolver = context.ContentResolver!;
 
+    /// <summary>Check a document through its provider, not File.Exists(content://...). Missing or
+    /// revoked grants are unavailable. The query does not decode or copy the audio.</summary>
+    public bool Exists(string trackPath)
+    {
+        if (PathTrackFileAccess.IsFilePath(trackPath)) return File.Exists(trackPath);
+        if (!trackPath.StartsWith("content://", StringComparison.Ordinal)) return false;
+        try
+        {
+            using var cursor = _resolver.Query(AUri.Parse(trackPath)!, [DocumentsContract.Document.ColumnDocumentId], null, null, null);
+            return cursor?.MoveToFirst() == true;
+        }
+        catch (Exception ex) when (ex is not OutOfMemoryException) { return false; }
+    }
+
     public SidecarFile? ReadSidecar(string trackPath, IReadOnlyList<string> extensions)
     {
         // Music Finder's private downloads are ordinary files: read their sidecars by path.

@@ -5,13 +5,12 @@ using Noctis.Services;
 namespace Noctis.Mobile.Services.Finder;
 
 /// <summary>
-/// Music Finder's view of the phone library and playlists. Only songs with an ordinary file path
-/// (Music Finder's own private downloads) are offered to the matcher: a song read through a SAF
-/// grant has a content:// address the shared matcher cannot check, so it is not counted as already
-/// present (a known limitation: a playlist import may download a song a selected folder also has).
+/// Music Finder's view of the phone library and playlists. The host checks access to ordinary files
+/// and granted content:// documents; a revoked folder grant must not count as an owned recording.
 /// Playlist changes go through the phone library's single, serialized playlist writer.
 /// </summary>
-internal sealed class PhonePlaylistLibrary(ILibraryService library, LibraryViewModel playlists, Func<Func<Task>, Task> onUi)
+internal sealed class PhonePlaylistLibrary(ILibraryService library, LibraryViewModel playlists, Func<Func<Task>, Task> onUi,
+    Func<string, bool>? accessible = null)
     : IPlaylistLibrary
 {
     public Task<IReadOnlyList<LocalSong>> SnapshotAsync()
@@ -30,11 +29,14 @@ internal sealed class PhonePlaylistLibrary(ILibraryService library, LibraryViewM
     {
         if (library.IsScanning || library.IsPublishingPartial)
             throw new IOException("LIBRARY_SCANNING: Noctis is still scanning. Wait for it to finish, then check the library again.");
-        var available = library.AllTracks.Where(t => IsLocalFile(t) && File.Exists(t.FilePath)).Select(t => t.Id).ToHashSet();
+        var available = library.AllTracks.Where(t => IsLocalFile(t) && Exists(t.FilePath)).Select(t => t.Id).ToHashSet();
         return onUi(() => playlists.ApplyImportedPlaylistAsync(id, name, Description(url), tracks, create, expected, remappedExpected, available));
     }
 
-    private static bool IsLocalFile(Noctis.Models.Track t) => !t.IsRemoteStream && Path.IsPathFullyQualified(t.FilePath);
+    public bool Exists(string path) => accessible?.Invoke(path) ?? File.Exists(path);
+
+    private static bool IsLocalFile(Noctis.Models.Track t) => !t.IsRemoteStream &&
+        (Path.IsPathFullyQualified(t.FilePath) || t.FilePath.StartsWith("content://", StringComparison.Ordinal));
 
     /// <summary>Same text as the desktop's (PlaylistLibrary.ImportDescription), so a shared playlists.json
     /// reads the same on both and the edit check compares like with like.</summary>
