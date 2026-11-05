@@ -142,6 +142,26 @@ public class MobileCatalogAlbumTests
         Assert.Empty(page.Tracks); Assert.Equal(2, source.Reads); Assert.Empty(source.Saves);
     }
 
+    [AvaloniaFact]
+    public async Task IncompleteProviderAlbum_ExplainsTheCount_AndOffersOnlyExplicitIndividualDownloads()
+    {
+        var source = new Source();
+        source.Metadata = Task.FromResult(new OnlineAlbumPage(source.Release, [new(new("deezer:1", "Available", "Artist"))]));
+        using var rig = MobileFixtures.MakeRig(onlineSearch: source);
+        var page = new AlbumPageViewModel(rig.Shell, AlbumPageViewModel.OnlinePlaceholder(source.Release, source), source.Release);
+        try
+        {
+            await page.CatalogLoad;
+            Assert.Equal("1 of 3 songs", page.SongsLine); Assert.Equal("Some songs unavailable", page.CatalogMessage);
+            page.MoreCommand.Execute(null);
+            Assert.DoesNotContain(rig.Shell.OptionsMenu!.Items, i => i.Label.Contains("missing"));
+            page.ShowTrackMenuCommand.Execute(Assert.Single(page.Tracks));
+            Assert.Contains(rig.Shell.OptionsMenu!.Items, i => i.Label == "Download now");
+            Assert.Empty(source.Saves);
+        }
+        finally { page.OnClosed(); }
+    }
+
     [Fact]
     public async Task ProgressiveSearchKeepsAlbumTileIdentity_AndScopeChangesNeverRepeatMetadataSearch()
     {

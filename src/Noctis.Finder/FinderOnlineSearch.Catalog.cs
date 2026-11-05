@@ -9,6 +9,7 @@ internal sealed partial class FinderOnlineSearch
     public async Task<OnlineAlbumPage> ReadAlbumAsync(OnlineAlbum release, CancellationToken ct)
     {
         ct.ThrowIfCancellationRequested();
+        if (!_pages.Enabled) throw new InvalidOperationException("Online catalog is disabled");
         // Only identities registered by Search or the existing library/artist resolver.
         // Caller-supplied artwork URLs and titles never become catalog request destinations.
         if (!_albums.TryGetValue(release.Id, out var known)) throw new InvalidOperationException("Search for this album again");

@@ -82,6 +82,11 @@ public sealed partial class AlbumPageViewModel
         OnPropertyChanged(nameof(SelectionLabel));
         OnPropertyChanged(nameof(ShowCatalogSkeleton));
         FilterRows(); SyncNowPlaying();
+        if (!page.IsComplete)
+        {
+            SongsLine = $"{rows.Count} of {page.Release.TrackCount} songs";
+            CatalogMessage = "Some songs unavailable";
+        }
         if (DateTime.TryParse(page.ReleaseDate, out var date)) ReleaseDateText = date.ToString("MMMM d, yyyy");
     }
 
@@ -129,7 +134,7 @@ public sealed partial class AlbumPageViewModel
             new(Shell, "Play", false, () => PlayFrom(0)),
             new(Shell, "Shuffle", false, Shuffle),
         };
-        if (Tracks.Any(r => r.IsRemote))
+        if (_catalogPage?.IsComplete == true && Tracks.Any(r => r.IsRemote))
         {
             items.Add(new(Shell, "Download missing", false, () => _ = DownloadCatalogAsync(Tracks, true)));
             items.Add(new(Shell, "Add missing to downloads", false, () => _ = DownloadCatalogAsync(Tracks, false)));

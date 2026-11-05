@@ -8,4 +8,8 @@ public interface IOnlineCatalog
 }
 
 public sealed record OnlineAlbumSong(OnlineSong Song, int Disc = 1, int Number = 0);
-public sealed record OnlineAlbumPage(OnlineAlbum Release, IReadOnlyList<OnlineAlbumSong> Songs, string ReleaseDate = "", string Warning = "");
+public sealed record OnlineAlbumPage(OnlineAlbum Release, IReadOnlyList<OnlineAlbumSong> Songs, string ReleaseDate = "", string Warning = "")
+{
+    /// <summary>Provider count mismatch must not masquerade as a complete album or a Download all action.</summary>
+    public bool IsComplete => Release.TrackCount <= 0 || Release.TrackCount == Songs.Count;
+}
