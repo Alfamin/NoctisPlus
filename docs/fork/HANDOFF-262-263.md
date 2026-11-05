@@ -2,6 +2,8 @@
 
 This is a checkpoint DURING ongoing autonomous work, not a completion report. Read `LOCAL-CHECKPOINT.md` for current processes/evidence and the external LEAN-PLAN #262/#263 for all owner requests.
 
+**Owner #264 supersedes prior beta priorities:** focus on native Android Noctis PLUS feature parity, polish and consistent entry points FIRST. Upstream beta feedback/M3U/animated art/CoverFlow waits until Plus integration is finished. Preserve completed isolated commits. Next implementation target is the unwired native True Shuffle phone integration (engine/helper already shared), followed by Plus lyrics/Finder catalog/sync gaps according to measured dependencies. Read external #264 before acting.
+
 ## Resume safely
 
 Worktree `C:\Users\Alfamine\nplus-codex-257`, dedicated branch `codex-android-262`, based on Claude `c053b421`. Do not reset dirty files. Never merge/push main/native, tag/release or change installed profiles. D:\music read-only. TEST Telegram session used only in place, never copied to a phone. Audit Android app `com.alfamin.noctisplus.audit262` has its OWN empty profile, no login; original emulator app retained because signing key differs. Preserve both.
