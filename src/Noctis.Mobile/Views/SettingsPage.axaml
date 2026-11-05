@@ -493,6 +493,14 @@
                                             <views:GridIcon Grid.Column="4" Classes="row-chevron" Data="{DynamicResource PhChevronRight}" />
                                         </Grid>
                                     </Button>
+                                    <Border Classes="row-separator plain" />
+                                    <ToggleButton Name="OfflineModeSwitch" Classes="switch-row" IsChecked="{Binding OfflineMode}"
+                                                  AutomationProperties.Name="Offline mode, Use saved music">
+                                        <StackPanel VerticalAlignment="Center" Margin="16,8">
+                                            <TextBlock Classes="row-label" Text="Offline mode" />
+                                            <TextBlock Classes="row-sub" Text="Use saved music" />
+                                        </StackPanel>
+                                    </ToggleButton>
                                     <StackPanel Name="TelegramGroup" IsVisible="{Binding HasTelegram}">
                                         <Border Classes="row-separator chipped" />
                                         <Button Name="TelegramRow" Classes="row" Command="{Binding OpenPaneCommand}"

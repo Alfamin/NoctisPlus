@@ -637,6 +637,7 @@ public sealed partial class SettingsPageViewModel : MobilePage
     private string _darkTheme = "Ink";
     [ObservableProperty] private AccentSwatch? _selectedAccent;
     [ObservableProperty] private double _lyricsTextScale = 1.0;
+    [ObservableProperty] private bool _offlineMode;
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(ExportSubtitle), nameof(ExportRowName))]
     private string _exportStatus = string.Empty;
@@ -694,6 +695,8 @@ public sealed partial class SettingsPageViewModel : MobilePage
                 }
                 if (!kept.HasFlag(SavedFields.TextScale))
                     LyricsTextScale = Math.Clamp(settings.MobileLyricsTextScale, 0.8, 1.6);
+                if (!kept.HasFlag(SavedFields.Offline)) OfflineMode = settings.OfflineMode;
+                Shell.Player.NetworkAccess.SetOffline(OfflineMode);
             }
             finally
             {
@@ -703,12 +706,21 @@ public sealed partial class SettingsPageViewModel : MobilePage
         _loaded = true;
         if (_setBeforeLoad == SavedFields.None) return;
         // The early change re-themed over the defaults: once more with the loaded rest.
-        if ((_setBeforeLoad & ~SavedFields.TextScale) != SavedFields.None) Shell.Theme?.ApplyTheme(Appearance, DarkTheme, _accentHex);
+        if ((_setBeforeLoad & (SavedFields.Appearance | SavedFields.DarkTheme | SavedFields.Accent)) != SavedFields.None)
+            Shell.Theme?.ApplyTheme(Appearance, DarkTheme, _accentHex);
         QueueSave(_setBeforeLoad);
     }
 
     partial void OnAppearanceChanged(string value) => ThemeChanged(SavedFields.Appearance);
     partial void OnDarkThemeChanged(string value) => ThemeChanged(SavedFields.DarkTheme);
+
+    partial void OnOfflineModeChanged(bool value)
+    {
+        if (_loading) return;
+        Shell.Player.NetworkAccess.SetOffline(value);
+        if (!_loaded) _setBeforeLoad |= SavedFields.Offline;
+        else QueueSave(SavedFields.Offline);
+    }
 
     partial void OnSelectedAccentChanged(AccentSwatch? value)
     {
@@ -756,7 +768,7 @@ public sealed partial class SettingsPageViewModel : MobilePage
 
     /// <summary>The settings.json fields a save writes: only those the user changed.</summary>
     [Flags]
-    private enum SavedFields { None = 0, Appearance = 1, DarkTheme = 2, Accent = 4, TextScale = 8 }
+    private enum SavedFields { None = 0, Appearance = 1, DarkTheme = 2, Accent = 4, TextScale = 8, Offline = 16 }
 
     /// <summary>Saves one after another. Its own chain, not <see cref="PendingSave"/>: a slider's
     /// delayed save is PendingSave while it waits, and must not queue behind itself.</summary>
@@ -785,6 +797,7 @@ public sealed partial class SettingsPageViewModel : MobilePage
                     settings.AccentPresetName = AccentName;
                 }
                 if (fields.HasFlag(SavedFields.TextScale)) settings.MobileLyricsTextScale = LyricsTextScale;
+                if (fields.HasFlag(SavedFields.Offline)) settings.OfflineMode = OfflineMode;
             });
             Interlocked.Increment(ref SaveCount);
         }

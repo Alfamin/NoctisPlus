@@ -37,6 +37,7 @@ public sealed partial class NowPlayingViewModel : ObservableObject, IDisposable
     private readonly IPlayHistoryService? _history;
     private readonly Action<Action> _marshal;
     private readonly OnlineAccess _onlineAccess;
+    internal OnlineAccess NetworkAccess => _onlineAccess;
 
     private PlaybackQueue _queue = new();
     private DateTime _lastSaveUtc = DateTime.MinValue;

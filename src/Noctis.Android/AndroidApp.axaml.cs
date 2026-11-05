@@ -73,6 +73,8 @@ public partial class AndroidApp : Avalonia.Application, IThemeHost
         // service construction — nothing above may touch PersistenceService, PlayHistoryService
         // or AppWrittenSidecarRegistry.
         AppPaths.OverrideDataRoot(context.FilesDir!.AbsolutePath);
+        // Keep startup services quiet until StartAsync has read the saved offline choice.
+        OnlineAccess.Shared.SetOffline(true);
 
         // What the desktop App wires at the same point. Without the first, a cover the scan
         // replaced (a re-tagged album) kept showing its old picture in every list until a
@@ -127,7 +129,7 @@ public partial class AndroidApp : Avalonia.Application, IThemeHost
             PrepareTrack = remoteLyrics is null ? null : remoteLyrics.ForLoad,
             // The desktop's automatic lookup for a song with no lyrics of its own: LRCLIB, asked
             // by title, artist and length only (Settings → Lyrics → Find Lyrics Online).
-            Online = LrcLibOnlineLyricsSource.Create(persistence.DataDirectory, new HttpClient()),
+            Online = LrcLibOnlineLyricsSource.Create(persistence.DataDirectory, InternetHttp()),
         };
         var libraryView = new LibraryViewModel(library, persistence, new AndroidFolderPicker(), history);
         _finder = CreateFinder(context, library, libraryView);
@@ -162,18 +164,18 @@ public partial class AndroidApp : Avalonia.Application, IThemeHost
             Account = account,
             // Plays sent from the phone itself to Last.fm / ListenBrainz (Settings → Scrobbling).
             // Without an account there is no computer to send plays through: the phone sends them.
-            Scrobbler = new PhoneScrobbler(persistence, new HttpClient()) { HasComputerRoute = account != null },
+            Scrobbler = new PhoneScrobbler(persistence, InternetHttp()) { HasComputerRoute = account != null },
             // The desktop's album descriptions: Last.fm, asked by artist and album name only
             // when an album page opens (Settings → About says so).
-            AlbumDescriptions = LastFmAlbumDescriptionSource.Create(persistence.DataDirectory, new HttpClient()),
+            AlbumDescriptions = LastFmAlbumDescriptionSource.Create(persistence.DataDirectory, InternetHttp()),
             // The desktop's artist photos: Deezer, asked by artist name only when an artist page
             // opens or artist circles come into view (Settings → About says so).
-            ArtistPhotos = DeezerArtistPhotoSource.Create(persistence.DataDirectory, new HttpClient(), library),
+            ArtistPhotos = DeezerArtistPhotoSource.Create(persistence.DataDirectory, InternetHttp(), library),
             // Artists' own logos on the artist page (MusicBrainz for the artist, then fanart.tv /
             // TheAudioDB), asked by name only when an artist page opens; only in a build that
             // carries a key (Noctis.Android.csproj), else the page shows the name.
             ArtistLogos = ArtistLogoKeys.FromAssembly(typeof(AndroidApp).Assembly) is { IsEmpty: false } logoKeys
-                ? ArtistLogoSource.Create(persistence.DataDirectory, new HttpClient(), library, logoKeys)
+                ? ArtistLogoSource.Create(persistence.DataDirectory, InternetHttp(), library, logoKeys)
                 : null,
         };
         _shell = shell;
@@ -352,11 +354,14 @@ public partial class AndroidApp : Avalonia.Application, IThemeHost
 
     /// <summary>Settings → language/theme, then the library and the saved queue. The shell is
     /// already on screen; it fills in as these land.</summary>
+    private static HttpClient InternetHttp() => new(new OnlineAccessHandler(new HttpClientHandler()));
+
     private async Task StartAsync(IPersistenceService persistence, ILibraryService library, IPlayHistoryService history)
     {
         try
         {
             var settings = await persistence.LoadSettingsAsync();
+            OnlineAccess.Shared.SetOffline(settings.OfflineMode);
             Loc.Instance.SetCulture(settings.Language);
             ApplyTheme(settings.MobileAppearance, settings.Theme, settings.AccentColorHex);
             // Settings › Background, before the first page paints rather than after the library loads.

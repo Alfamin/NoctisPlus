@@ -44,12 +44,14 @@ public sealed class LrcLibOnlineLyricsSource : IOnlineLyricsSource
     private readonly ILrcLibService _lrcLib;
     private readonly string _cacheDirectory;
     private readonly TimeSpan _timeout;
+    private readonly OnlineAccess _access;
 
-    public LrcLibOnlineLyricsSource(ILrcLibService lrcLib, string cacheDirectory, TimeSpan? timeout = null)
+    public LrcLibOnlineLyricsSource(ILrcLibService lrcLib, string cacheDirectory, TimeSpan? timeout = null, OnlineAccess? access = null)
     {
         _lrcLib = lrcLib;
         _cacheDirectory = cacheDirectory;
         _timeout = timeout ?? DefaultTimeout;
+        _access = access ?? OnlineAccess.Shared;
     }
 
     /// <summary>The source over the phone's own cache, lyrics_cache under <paramref name="dataDirectory"/>.</summary>
@@ -77,6 +79,7 @@ public sealed class LrcLibOnlineLyricsSource : IOnlineLyricsSource
                     if (!string.IsNullOrWhiteSpace(text)) return new OnlineLyrics(text, Instrumental: false);
                 }
 
+                if (_access.IsOffline) return null; // cached lyrics above still work; no deliberate-offline error
                 var result = await LrcLibLookup.FetchAsync(_lrcLib, track.Artist ?? string.Empty, track.Title,
                     track.Duration.TotalSeconds, timeout.Token);
                 if (result is { Instrumental: true })
@@ -94,11 +97,13 @@ public sealed class LrcLibOnlineLyricsSource : IOnlineLyricsSource
         }
         catch (OperationCanceledException) when (!ct.IsCancellationRequested)
         {
+            if (_access.IsOffline) return null;
             DebugLog.Write("Lyrics", "Online lookup timed out");
             return OnlineLyrics.Unreachable;
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
         {
+            if (_access.IsOffline) return null;
             DebugLog.Write("Lyrics", $"Online lookup failed: {ex.GetType().Name}: {ex.Message}");
             return OnlineLyrics.Unreachable;
         }

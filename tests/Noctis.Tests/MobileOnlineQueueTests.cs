@@ -27,6 +27,7 @@ public class MobileOnlineQueueTests
         public readonly Dictionary<string, string> Cached = [];
         public string[] Window = [];
         public bool Hold;
+        public Action? RequestAdded;
         public bool CanDownload { get; set; } = true;
         public string Route => "test";
         public IDownloadQueue Downloads { get; } = new Downloads();
@@ -53,6 +54,7 @@ public class MobileOnlineQueueTests
             Assert.False(keep); Calls.Add("play:" + song.Id);
             var reply = new TaskCompletionSource<Track>(TaskCreationOptions.RunContinuationsAsynchronously);
             Requests.Add((song, reply));
+            RequestAdded?.Invoke();
             if (!Hold) reply.SetResult(Ready(song));
             return reply.Task; // deliberately ignores cancellation: stale answers must remain harmless
         }
@@ -168,6 +170,32 @@ public class MobileOnlineQueueTests
         await r.Vm.SaveStateAsync();
         var saved = await r.Data.LoadQueueStateAsync();
         Assert.DoesNotContain(saved!.MobileOnlineTracks!.Values, s => s.Song.Id == songs[1].Id);
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task OfflineDuringPreparation_KeepsSelectionAndPauseIntent_ThenResumes(bool quickReturn)
+    {
+        using var r = new Rig(); r.Source.Hold = true; var songs = Songs(1);
+        r.Vm.PlayOnlineTracks(r.Source, songs, 0);
+        r.Vm.TogglePlayPauseCommand.Execute(null);
+        var retried = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        r.Source.RequestAdded = () => retried.TrySetResult();
+        r.Network.SetOffline(true);
+        if (quickReturn) r.Network.SetOffline(false);
+        r.Source.Requests[0].Reply.SetException(new OfflineModeException());
+        if (!quickReturn) r.Network.SetOffline(false);
+        await retried.Task.WaitAsync(TimeSpan.FromSeconds(5));
+        Assert.Equal("Pick 0", r.Vm.CurrentTrack!.Title);
+        Assert.Equal("", r.Vm.ErrorText);
+        r.Source.Requests[1].Reply.SetResult(r.Source.Ready(songs[0]));
+        await r.Vm.OnlinePreparation;
+        Assert.Empty(r.Audio.PlayedPaths);
+        Assert.False(r.Vm.IsPlaying);
+        Assert.Equal(TimeSpan.Zero, r.Vm.Position);
+        r.Vm.TogglePlayPauseCommand.Execute(null);
+        Assert.Single(r.Audio.PlayedPaths);
     }
 
     [Fact]

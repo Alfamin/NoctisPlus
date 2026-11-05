@@ -81,16 +81,7 @@ public sealed partial class NowPlayingViewModel
     {
         try
         {
-            await _onlineAccess.WaitAsync(stop.Token);
-            if (!pending.Source.CanDownload) throw new InvalidOperationException("Sign in to Telegram to play this song");
-            var prepared = pending.Source.PreparePlaybackAsync(pending.Song, pending.Keep, stop.Token);
-            _onlineRequestStarted = true; // enqueue the current request BEFORE starting ahead work
-            _marshal(() => { if (ReferenceEquals(stop, _onlinePrepare)) { _onlineWindow = ""; UpdateOnlineWindow(); } });
-            // A source may finish after a skip. Stop our wait promptly, without owning its
-            // durable download; observe a late fault without surfacing it over the new song.
-            _ = prepared.ContinueWith(static t => { _ = t.Exception; }, CancellationToken.None,
-                TaskContinuationOptions.OnlyOnFaulted | TaskContinuationOptions.ExecuteSynchronously, TaskScheduler.Default);
-            var ready = await prepared.WaitAsync(stop.Token);
+            var ready = await PrepareWithRecoveryAsync(pending, stop);
             _marshal(() =>
             {
                 if (_disposed || stop.IsCancellationRequested || !ReferenceEquals(stop, _onlinePrepare)
@@ -117,6 +108,33 @@ public sealed partial class NowPlayingViewModel
         finally
         {
             _marshal(() => { if (ReferenceEquals(_onlinePrepare, stop)) _onlinePrepare = null; stop.Dispose(); });
+        }
+    }
+
+    private async Task<Track> PrepareWithRecoveryAsync(Noctis.ViewModels.PendingStream pending, CancellationTokenSource stop)
+    {
+        while (true)
+        {
+            await _onlineAccess.WaitAsync(stop.Token);
+            if (!pending.Source.CanDownload) throw new InvalidOperationException("Sign in to Telegram to play this song");
+            try
+            {
+                var prepared = pending.Source.PreparePlaybackAsync(pending.Song, pending.Keep, stop.Token);
+                _onlineRequestStarted = true; // the current request precedes ahead work
+                _marshal(() => { if (ReferenceEquals(stop, _onlinePrepare)) { _onlineWindow = ""; UpdateOnlineWindow(); } });
+                // A source may finish after a skip; observe late faults, without owning its download.
+                _ = prepared.ContinueWith(static t => { _ = t.Exception; }, CancellationToken.None,
+                    TaskContinuationOptions.OnlyOnFaulted | TaskContinuationOptions.ExecuteSynchronously, TaskScheduler.Default);
+                return await prepared.WaitAsync(stop.Token);
+            }
+            catch (OperationCanceledException ex) when (!stop.IsCancellationRequested &&
+                (ex is OfflineModeException || _onlineAccess.IsOffline))
+            {
+                _onlineRequestStarted = false;
+                // Keep the selected track and pause intent. A quick off/on can finish before
+                // cancellation arrives, so wait briefly if the gate has already reopened.
+                if (!_onlineAccess.IsOffline) await Task.Delay(250, stop.Token);
+            }
         }
     }
 

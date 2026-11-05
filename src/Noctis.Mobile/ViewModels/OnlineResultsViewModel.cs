@@ -270,6 +270,7 @@ public sealed partial class OnlineResultsViewModel : ObservableObject, IDisposab
 
     internal static string Short(Exception ex)
     {
+        if (ex is Noctis.Services.OfflineModeException) return "Offline mode";
         var m = ex.Message ?? "";
         var colon = m.IndexOf(": ", StringComparison.Ordinal);
         // Finder errors read "CODE: sentence"; show the sentence only.
