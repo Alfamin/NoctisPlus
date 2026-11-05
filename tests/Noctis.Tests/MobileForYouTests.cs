@@ -95,7 +95,7 @@ public class MobileForYouTests
         await vm.Actions.PlayCommand.ExecuteAsync(row);
         Assert.True(rig.Shell.Player.IsPlaying);
         await vm.HideAsync(row, false);
-        Assert.False(rig.Shell.Player.IsPlaying);
+        Assert.NotEqual(row.Song.Title, rig.Shell.Player.CurrentTrack?.Title); // the native list continues, never the rejected pick
         Assert.DoesNotContain(vm.Actions.Songs, s => s.Song.Id == row.Song.Id);
         await vm.RefreshCommand.ExecuteAsync(null);
         Assert.DoesNotContain(vm.Actions.Songs, s => s.Song.Id == row.Song.Id);

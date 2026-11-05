@@ -30,6 +30,7 @@ public sealed partial class ForYouViewModel : MobilePage, IDisposable
         _marshal = marshal ?? (a => Avalonia.Threading.Dispatcher.UIThread.Post(a));
         _delay = delay ?? Task.Delay;
         Actions = new OnlineResultsViewModel(online, _marshal, tracks => shell.Player.PlayTracks(tracks, 0, "For You"), shell.OpenTelegramSignIn) { LazyArtwork = true };
+        Actions.UseOnlineQueue(shell.Player, "For You");
         Actions.Acted += (song, action) =>
         {
             if (action == RecommendationAction.Play && shell.Player.CurrentTrack is { } track) _played = (song, track.Id);
@@ -125,6 +126,7 @@ public sealed partial class ForYouViewModel : MobilePage, IDisposable
         {
             var receipt = await _source.HideAsync(CurrentId, item.Song, artist);
             if (receipt is null) return;
+            Shell.Player.RemoveOnlineRecommendation(_online, item.Song, artist);
             foreach (var row in Actions.Songs.Where(s => artist
                 ? string.Equals(s.Song.ArtistDisplay, item.Song.ArtistDisplay, StringComparison.OrdinalIgnoreCase)
                 : s.Song.Id == item.Song.Id)) Actions.CancelPlay(row.Song.Id);

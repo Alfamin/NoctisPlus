@@ -55,6 +55,9 @@ public class QueueState
     /// </summary>
     public Dictionary<Guid, string>? ExternalTrackPaths { get; set; }
 
+    /// <summary>Phone online queue metadata, including songs not fetched yet. No session or credentials.</summary>
+    public Dictionary<Guid, MobileOnlineQueueSong>? MobileOnlineTracks { get; set; }
+
     /// <summary>
     /// What the queue was started from, as the phone's Queue sheet shows it ("Playing from
     /// Abbey Road"): an album, playlist or artist name, "Songs", "Search"... Null when unknown,
@@ -68,6 +71,8 @@ public class QueueState
     /// </summary>
     public int? PlayedInQueue { get; set; }
 }
+
+public sealed record MobileOnlineQueueSong(Noctis.Services.Search.OnlineSong Song, bool Keep, string? Page);
 
 /// <summary>
 /// "Where playback is", split out of <see cref="QueueState"/> so a periodic position

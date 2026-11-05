@@ -82,7 +82,7 @@ internal static class MobileFixtures
         public required PersistenceService Persistence { get; init; }
         public required FakeHistoryLog History { get; init; }
         public required string Root { get; init; }
-        public void Dispose() { try { Directory.Delete(Root, recursive: true); } catch { } }
+        public void Dispose() { Shell.Player.Dispose(); try { Directory.Delete(Root, recursive: true); } catch { } }
     }
 
     /// <summary>A shell over the fakes, with the library already initialised. <paramref name="seed"/>

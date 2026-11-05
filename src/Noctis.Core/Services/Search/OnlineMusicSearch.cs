@@ -107,6 +107,8 @@ public interface IOnlineMusicSearch
     int DownloadAheadSongs => 2;
     /// <summary>Restore an interrupted cached recording as a paused, fetchable track, without starting network work.</summary>
     Noctis.Models.Track? RestorePlaybackTrack(string path, Guid id) => null;
+    /// <summary>Restore trusted catalog metadata from a saved queue, without network or audio work.</summary>
+    bool RestoreQueueSong(OnlineSong song) => false;
     /// <summary>Owner #100: the bot is asked for the song so it is ready in the chat; nothing is downloaded. A later download
     /// starts from there without asking again.</summary>
     Task AskAheadAsync(OnlineSong song, CancellationToken ct) => Task.CompletedTask;

@@ -6,6 +6,7 @@ using Noctis.Helpers;
 using Noctis.Mobile.Services;
 using Noctis.Models;
 using Noctis.Services;
+using Noctis.Services.Search;
 
 namespace Noctis.Mobile.ViewModels;
 
@@ -35,6 +36,7 @@ public sealed partial class NowPlayingViewModel : ObservableObject, IDisposable
     private readonly IPersistenceService _persistence;
     private readonly IPlayHistoryService? _history;
     private readonly Action<Action> _marshal;
+    private readonly OnlineAccess _onlineAccess;
 
     private PlaybackQueue _queue = new();
     private DateTime _lastSaveUtc = DateTime.MinValue;
@@ -55,13 +57,14 @@ public sealed partial class NowPlayingViewModel : ObservableObject, IDisposable
     private bool _syncingVolume;
 
     public NowPlayingViewModel(IAudioPlayer player, ILibraryService library, IPersistenceService persistence,
-        IPlayHistoryService? history = null, Action<Action>? marshal = null, IVolumeControl? volume = null)
+        IPlayHistoryService? history = null, Action<Action>? marshal = null, IVolumeControl? volume = null, OnlineAccess? onlineAccess = null)
     {
         _player = player;
         _library = library;
         _persistence = persistence;
         _history = history;
         _marshal = marshal ?? (a => Avalonia.Threading.Dispatcher.UIThread.Post(a));
+        _onlineAccess = onlineAccess ?? OnlineAccess.Shared;
 
         _player.PositionChanged += OnPlayerPosition;
         _player.DurationResolved += OnPlayerDuration;
@@ -91,7 +94,7 @@ public sealed partial class NowPlayingViewModel : ObservableObject, IDisposable
 
     public bool HasQuality => Quality != null;
 
-    [ObservableProperty] private bool _isPlaying;
+    [ObservableProperty, NotifyPropertyChangedFor(nameof(ShowPause))] private bool _isPlaying;
 
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(ProgressFraction), nameof(ElapsedText), nameof(RemainingText))]
@@ -225,6 +228,7 @@ public sealed partial class NowPlayingViewModel : ObservableObject, IDisposable
         // without this guard tapping Play on an empty/filtered-to-nothing list would
         // restart the currently playing track from zero.
         if (tracks.Count == 0) return;
+        SettleOnlineQueue();
         InvalidateShufflePlan();
         _shuffleSource = tracks.ToArray();
         TrueShuffleMode = PhoneShuffleMode.Off;
@@ -276,6 +280,7 @@ public sealed partial class NowPlayingViewModel : ObservableObject, IDisposable
     private void TogglePlayPause()
     {
         if (CurrentTrack == null) return;
+        if (IsPreparingOnline) { _onlinePlayWhenReady = !_onlinePlayWhenReady; OnPropertyChanged(nameof(ShowPause)); return; }
         switch (_player.State)
         {
             case PlaybackState.Playing:
@@ -560,13 +565,14 @@ public sealed partial class NowPlayingViewModel : ObservableObject, IDisposable
 
     private void QueueChanged()
     {
+        SettleOnlineQueue();
         InvalidateShufflePlan();
         SyncUpNext();
         PrepareUpcoming();
         SaveStateNow();
     }
 
-    private void StartTrack(Track track, TimeSpan? fromPosition)
+    private void StartResolvedTrack(Track track, TimeSpan? fromPosition)
     {
         InvalidateShufflePlan();
         // Not recorded yet: a file that fails to load (broken.mp3, a revoked grant) must not
@@ -575,6 +581,7 @@ public sealed partial class NowPlayingViewModel : ObservableObject, IDisposable
         _unrecordedFrom = fromPosition ?? TimeSpan.Zero;
         _startedFrom = _unrecordedFrom;
         CurrentTrack = track;
+        if (track.PendingStream is not null) OnPropertyChanged(nameof(CurrentTrack));
         Position = fromPosition ?? TimeSpan.Zero;
         Duration = track.Duration;
         ErrorText = string.Empty;
@@ -589,6 +596,7 @@ public sealed partial class NowPlayingViewModel : ObservableObject, IDisposable
 
     private void PrepareUpcoming()
     {
+        if (IsPreparingOnline) { _player.CancelPreparedNext(); return; }
         // Repeat-one: the current track is its own successor (PlaybackQueue.Advance returns
         // Current for RepeatMode.One + Natural), so ExoPlayer must not chain past it. Without
         // this, PrepareUpcoming would gaplessly queue UpNext[0] behind the looping track; on
@@ -605,11 +613,15 @@ public sealed partial class NowPlayingViewModel : ObservableObject, IDisposable
             _player.CancelPreparedNext();
             return;
         }
-        _player.PrepareNext(upcoming.FilePath);
+        var path = upcoming.PendingStream is Noctis.ViewModels.PendingStream pending ? CompletedOnlinePath(pending) : upcoming.FilePath;
+        if (string.IsNullOrEmpty(path)) { _player.CancelPreparedNext(); return; }
+        _player.PrepareNext(path);
     }
 
     private void StopPlayback()
     {
+        CancelOnlinePrepare();
+        _onlineSessionActivated = false;
         _player.Stop();
         IsPlaying = false;
         Position = TimeSpan.Zero;
@@ -627,11 +639,13 @@ public sealed partial class NowPlayingViewModel : ObservableObject, IDisposable
         QueuePositionText = _queue.Current != null && _queue.PlayedInQueue is { } played
             ? $"Track {played + 1} of {played + 1 + _queue.UpNext.Count}"
             : string.Empty;
+        UpdateOnlineWindow();
     }
 
     private void OnPlayerPosition(object? sender, TimeSpan position) => _marshal(() =>
     {
         if (_disposed) return;
+        if (IsPreparingOnline || _onlineReadyPaused) return;
         // Lock-screen pause, audio-focus loss and headphone unplug pause the engine
         // without going through TogglePlayPause; the tick is where the UI catches up.
         var playing = _player.State == PlaybackState.Playing;
@@ -698,7 +712,7 @@ public sealed partial class NowPlayingViewModel : ObservableObject, IDisposable
 
     private void OnPlayerTrackEnded(object? sender, EventArgs e) => _marshal(() =>
     {
-        if (_disposed) return;
+        if (_disposed || IsPreparingOnline) return;
         if (TryRefillTrueShuffle()) return;
         var next = AdvancePlayable(QueueAdvance.Natural, out var heldBack);
         if (next != null)
@@ -712,7 +726,7 @@ public sealed partial class NowPlayingViewModel : ObservableObject, IDisposable
 
     private void OnPlayerError(object? sender, string message) => _marshal(() =>
     {
-        if (_disposed) return;
+        if (_disposed || IsPreparingOnline) return;
         DebugLog.Write("Audio", $"Playback error: {message} — track: {CurrentTrack?.Title ?? "(none)"}");
         if (CurrentTrack is { } failed && NeedsComputer?.Invoke(failed) == true && IsConnectionError(message))
         {
@@ -779,6 +793,7 @@ public sealed partial class NowPlayingViewModel : ObservableObject, IDisposable
             MobileShuffleQueueCleared = _shuffleQueueCleared,
             IsMuted = _player.IsMuted,
             OriginalOrderIds = snapshot.OriginalOrderIds.ToList(),
+            MobileOnlineTracks = OnlineSnapshot(),
             SourceLabel = SourceLabel,
             PlayedInQueue = snapshot.PlayedInQueue,
         };
@@ -819,10 +834,16 @@ public sealed partial class NowPlayingViewModel : ObservableObject, IDisposable
         // already plays: the saved queue must not replace it under the running engine.
         if (state == null || CurrentTrack != null) return;
 
+        var online = new Dictionary<Guid, Track>();
+        if (OnlineSearch is { } source && state.MobileOnlineTracks is { } savedOnline)
+            foreach (var (id, entry) in savedOnline)
+                if (entry?.Song is { } song && source.RestoreQueueSong(song))
+                { var track = OnlineStandIn.Create(source, song, entry.Keep, entry.Page); track.Id = id; online[id] = track; }
+        Track? Resolve(Guid id) => _library.GetTrackById(id) ?? online.GetValueOrDefault(id);
         _queue = PlaybackQueue.Restore(
             new PlaybackQueueState(state.CurrentTrackId, state.UpNextIds, state.HistoryIds, state.RepeatCycleIds,
                 state.RepeatMode, state.IsShuffleEnabled, state.OriginalOrderIds, state.PlayedInQueue),
-            id => _library.GetTrackById(id));
+            Resolve);
         SourceLabel = state.SourceLabel;
         RepeatMode = state.RepeatMode;
         IsShuffleEnabled = state.IsShuffleEnabled;
@@ -830,7 +851,7 @@ public sealed partial class NowPlayingViewModel : ObservableObject, IDisposable
             && Enum.IsDefined(savedMode) && savedMode != PhoneShuffleMode.Off ? savedMode
             : state.IsShuffleEnabled ? PhoneShuffleMode.NoctisShuffle : PhoneShuffleMode.Off;
         if (Enum.TryParse<Noctis.Features.TrueShuffle.ShuffleScope>(state.MobileShuffleScope, out var savedScope) && Enum.IsDefined(savedScope)) TrueShuffleScope = savedScope;
-        _shuffleSource = state.RepeatCycleIds.Select(_library.GetTrackById).OfType<Track>().ToArray();
+        _shuffleSource = state.RepeatCycleIds.Select(Resolve).OfType<Track>().ToArray();
         _manualShuffle.Clear();
         _shuffleQueueCleared = state.MobileShuffleQueueCleared;
         foreach (var id in state.MobileShuffleManualIds.Where(id => _queue.UpNext.Any(t => t.Id == id)))
@@ -844,6 +865,7 @@ public sealed partial class NowPlayingViewModel : ObservableObject, IDisposable
 
     public void Dispose()
     {
+        DisposeOnlineQueue();
         InvalidateShufflePlan();
         _disposed = true;
         _player.PositionChanged -= OnPlayerPosition;

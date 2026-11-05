@@ -49,11 +49,14 @@ public sealed partial class SearchPageViewModel : ObservableObject, ISortable
             Online = new OnlineResultsViewModel(online, shell.Marshal,
                 tracks => shell.Player.PlayTracks(tracks, 0, "Search"), shell.OpenTelegramSignIn);
         if (Online != null)
+        {
+            Online.UseOnlineQueue(shell.Player, "Search");
             Online.PropertyChanged += (_, e) =>
             {
                 if (e.PropertyName is nameof(OnlineResultsViewModel.HasSongs) or nameof(OnlineResultsViewModel.IsSearching))
                     OnPropertyChanged(nameof(ShowNoResults));
             };
+        }
     }
 
     /// <summary>Music Finder's results under the library's (null without Music Finder).</summary>

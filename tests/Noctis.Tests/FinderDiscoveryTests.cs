@@ -8,6 +8,16 @@ namespace Noctis.Tests;
 /// Metadata-only fixture: any unexpected catalog access throws, no Telegram or audio fetch.</summary>
 public class FinderDiscoveryTests
 {
+    [Fact]
+    public void RestoringQueueMetadataAcceptsCatalogIdentitiesWithoutNetworkOrAudio()
+    {
+        using var rig = new Rig();
+        Assert.True(rig.Online.RestoreQueueSong(new("deezer:991", "Song", "Artist", Seconds: 180)));
+        Assert.Equal(OnlineDownloadStatus.None, rig.Online.StatusOf(new("deezer:991", "Song", "Artist")));
+        Assert.False(rig.Online.RestoreQueueSong(new("https://example.test/audio", "Song", "Artist")));
+        Assert.False(rig.Online.RestoreQueueSong(new("apple:22", "", "Artist")));
+        Assert.Empty(rig.Downloads.History);
+    }
     private sealed class Library : IPlaylistLibrary
     {
         public List<LocalSong> Songs = [];

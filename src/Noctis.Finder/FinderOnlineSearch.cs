@@ -448,6 +448,18 @@ internal sealed class FinderOnlineSearch : IOnlineMusicSearch
         return track;
     }
 
+    public bool RestoreQueueSong(OnlineSong song)
+    {
+        if (!System.Text.RegularExpressions.Regex.IsMatch(song.Id, @"^(apple|deezer):[1-9][0-9]{0,17}$")
+            || string.IsNullOrWhiteSpace(song.Title) || string.IsNullOrWhiteSpace(song.ArtistDisplay)
+            || song.Title.Length > 1000 || song.ArtistDisplay.Length > 1000) return false;
+        // Only the catalog identity and text needed to reconstruct a recording request.
+        // Never accept a saved URL, session, or local path as a download destination.
+        _songs.TryAdd(song.Id, new CatalogSong(song.Id, song.Title, [new("", song.ArtistDisplay)],
+            song.Seconds is > 0 and <= 86400 ? song.Seconds : null, song.Explicit));
+        return true;
+    }
+
     public async Task PrefetchAsync(OnlineSong song, bool keep, CancellationToken ct)
     {
         if (!_songs.TryGetValue(song.Id, out var catalogSong)) return;

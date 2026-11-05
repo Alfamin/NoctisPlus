@@ -54,6 +54,20 @@ public sealed partial class OnlineResultsViewModel : ObservableObject, IDisposab
     private CancellationTokenSource? _playing;
     private readonly HashSet<string> _inFlight = new(StringComparer.Ordinal);
     private int _generation;
+    private NowPlayingViewModel? _queuePlayer;
+    private string? _queueLabel;
+
+    internal void UseOnlineQueue(NowPlayingViewModel player, string label)
+    {
+        if (_queuePlayer is not null) _queuePlayer.PropertyChanged -= OnQueuePlaybackChanged;
+        _queuePlayer = player; _queueLabel = label;
+        player.PropertyChanged += OnQueuePlaybackChanged;
+    }
+    private void OnQueuePlaybackChanged(object? sender, System.ComponentModel.PropertyChangedEventArgs e)
+    {
+        if (e.PropertyName is not (nameof(NowPlayingViewModel.IsPreparingOnline) or nameof(NowPlayingViewModel.CurrentTrack))) return;
+        foreach (var row in Songs) row.IsWorking = _queuePlayer?.IsPreparingOnlineSong(_source, row.Song.Id) == true;
+    }
 
     public OnlineResultsViewModel(IOnlineMusicSearch source, Action<Action> marshal, Action<IReadOnlyList<Track>> play,
         Action signIn, Func<TimeSpan, CancellationToken, Task>? delay = null)
@@ -74,6 +88,7 @@ public sealed partial class OnlineResultsViewModel : ObservableObject, IDisposab
     internal void CancelPlay(string songId)
     {
         if (_playingItem?.Song.Id == songId) _playing?.Cancel();
+        _queuePlayer?.CancelOnlineSong(_source, songId);
     }
     internal void EnsureArtwork(OnlineSongItem item)
     {
@@ -165,7 +180,19 @@ public sealed partial class OnlineResultsViewModel : ObservableObject, IDisposab
     private async Task PlayAsync(OnlineSongItem? item)
     {
         if (item is null) return;
-        if (!_source.CanDownload) { Message = "Sign in to Telegram to play online songs"; _signIn(); return; }
+        var completed = _source.CompletedPlaybackPath(item.Song);
+        if (!_source.CanDownload && item.Song.LocalTrackId is null && !(completed is not null && File.Exists(completed)))
+        { Message = "Sign in to Telegram to play online songs"; _signIn(); return; }
+        if (_queuePlayer is { } queue)
+        {
+            var index = Songs.IndexOf(item);
+            if (index < 0) return;
+            if (queue.IsPreparingOnlineSong(_source, item.Song.Id)) return;
+            Message = null;
+            queue.PlayOnlineTracks(_source, Songs.Select(r => r.Song).ToArray(), index, _queueLabel);
+            Acted?.Invoke(item.Song, RecommendationAction.Play);
+            return;
+        }
         if (_playing is { } current && _playingItem == item && !current.IsCancellationRequested) return;
         _playing?.Cancel();
         var cts = _playing = new CancellationTokenSource();
@@ -219,6 +246,7 @@ public sealed partial class OnlineResultsViewModel : ObservableObject, IDisposab
 
     private void Refresh(OnlineSongItem item)
     {
+        if (_queuePlayer is not null) item.IsWorking = _queuePlayer.IsPreparingOnlineSong(_source, item.Song.Id);
         var status = _source.StatusOf(item.Song);
         item.Progress = status.Progress;
         item.IsRequested = status.State is OnlineDownloadState.Queued or OnlineDownloadState.Downloading or OnlineDownloadState.Saved;
@@ -251,6 +279,7 @@ public sealed partial class OnlineResultsViewModel : ObservableObject, IDisposab
 
     public void Dispose()
     {
+        if (_queuePlayer is not null) _queuePlayer.PropertyChanged -= OnQueuePlaybackChanged;
         _source.DownloadsChanged -= OnDownloadsChanged;
         _query?.Cancel();
         _playing?.Cancel();
