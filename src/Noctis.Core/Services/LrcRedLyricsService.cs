@@ -476,7 +476,7 @@ public partial class LrcRedLyricsService : ILrcRedLyricsService
 
             var timing = Str(r, "timing_type") is "word" or "line" ? Str(r, "timing_type")! : "none";
             var key = (
-                Exact: Same(candidate.TrackName!, trackName) || Same(candidate.TrackName!, MetadataSearch.MatchText.StripFeaturing(trackName)) ? 1 : 0,
+                Exact: Same(candidate.TrackName!, trackName) || Same(candidate.TrackName!, LyricsSearchSelector.StripFeaturing(trackName)) ? 1 : 0,
                 Timing: timing switch { "word" => 2, "line" => 1, _ => 0 },
                 Delta: durationSeconds > 0 && candidate.Duration > 0 ? Math.Abs(candidate.Duration - durationSeconds) : 0);
             if (best != null && !IsBetter(key, bestKey)) continue;

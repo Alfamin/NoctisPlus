@@ -2,7 +2,6 @@ using System.Globalization;
 using System.IO.Compression;
 using System.Text;
 using System.Text.RegularExpressions;
-using Noctis.Services.LyricsStudio;
 
 namespace Noctis.Services.Lyrics;
 
@@ -85,7 +84,7 @@ public static partial class KrcLyrics
             }
 
             sawLine = true;
-            output.Add($"[{TimedLyricsBuilder.FormatTimestamp(lineStart)}]{body}");
+            output.Add($"[{FormatTimestamp(lineStart)}]{body}");
             texts.Add(text);
         }
 
@@ -130,9 +129,9 @@ public static partial class KrcLyrics
 
         var sb = new StringBuilder();
         foreach (var (text, start, _) in words)
-            sb.Append('<').Append(TimedLyricsBuilder.FormatTimestamp(start)).Append('>').Append(text);
+            sb.Append('<').Append(FormatTimestamp(start)).Append('>').Append(text);
         var trimmed = sb.ToString().TrimEnd();
-        var body = trimmed + "<" + TimedLyricsBuilder.FormatTimestamp(words[^1].End) + ">";
+        var body = trimmed + "<" + FormatTimestamp(words[^1].End) + ">";
         return (string.Concat(words.Select(w => w.Text)).Trim(), body);
     }
 
@@ -164,6 +163,13 @@ public static partial class KrcLyrics
         var colon = line.IndexOf(':');
         var close = line.LastIndexOf(']');
         return colon >= 0 && close > colon ? line[(colon + 1)..close].Trim() : string.Empty;
+    }
+
+    // Same centisecond format as the desktop studio, without depending on its editor model.
+    private static string FormatTimestamp(TimeSpan time)
+    {
+        if (time < TimeSpan.Zero) time = TimeSpan.Zero;
+        return $"{(int)time.TotalMinutes:00}:{time.Seconds:00}.{time.Milliseconds / 10:00}";
     }
 
     private static TimeSpan Ms(string value) =>
