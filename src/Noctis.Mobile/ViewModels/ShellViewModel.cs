@@ -26,13 +26,15 @@ public sealed partial class ShellViewModel : ObservableObject
         Lyrics = lyrics;
         Player.PropertyChanged += OnPlayerChanged;
         Player.PlayRecorded += OnPlayRecorded;
-        Search = new SearchPageViewModel(this);
     }
 
     public LibraryViewModel Library { get; }
     public NowPlayingViewModel Player { get; }
     public LyricsPageViewModel Lyrics { get; }
-    public SearchPageViewModel Search { get; }
+    // Host services are supplied by the object initializer after this constructor.
+    // Build Search once, when the view first needs it, so it sees the real online source.
+    public SearchPageViewModel Search => _search ??= new SearchPageViewModel(this);
+    private SearchPageViewModel? _search;
 
     /// <summary>Makes the cover tint for album and artist pages; tests inject a synchronous one.</summary>
     public Func<PageTint> TintFactory { get; init; } = () => new PageTint();

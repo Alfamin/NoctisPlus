@@ -12,14 +12,18 @@ namespace Noctis.Mobile.ViewModels;
 /// whether it is the player's track, which shows equalizer bars in place of the number.</summary>
 public sealed partial class AlbumTrackRow : ObservableObject
 {
-    public AlbumTrackRow(Track track, int number)
+    public AlbumTrackRow(Track track, int number, int? disc = null)
     {
         Track = track;
         Number = number;
+        Disc = disc ?? track.DiscNumber;
     }
 
     public Track Track { get; }
     public int Number { get; }
+    public int Disc { get; }
+    public bool IsRemote => Track.PendingStream is Noctis.ViewModels.PendingStream;
+    public double TextOpacity => IsRemote ? 0.65 : 1;
 
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(ShowsNumber), nameof(ShowsCurrent))]
@@ -50,7 +54,7 @@ public sealed record AlbumDiscHeader(int Disc)
 /// </summary>
 public sealed partial class AlbumPageViewModel : MobilePage, ITintedPage
 {
-    public AlbumPageViewModel(ShellViewModel shell, Album album)
+    public AlbumPageViewModel(ShellViewModel shell, Album album, Noctis.Services.Search.OnlineAlbum? release = null)
     {
         Shell = shell;
         AlbumId = album.Id;
@@ -62,6 +66,8 @@ public sealed partial class AlbumPageViewModel : MobilePage, ITintedPage
         Shell.PropertyChanged += OnShellChanged;
         Apply(album);
         DescriptionLoad = LoadDescriptionAsync(album.Artist, album.Name, _descriptionCts.Token);
+        _requestedRelease = release;
+        CatalogLoad = LoadCatalogAsync();
     }
 
     public ShellViewModel Shell { get; }
@@ -70,10 +76,14 @@ public sealed partial class AlbumPageViewModel : MobilePage, ITintedPage
 
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(Title), nameof(HasArtwork), nameof(QualityBadge), nameof(HasQualityBadge),
-        nameof(QualityDetail), nameof(QualityDescription))]
+        nameof(QualityDetail), nameof(QualityDescription), nameof(HasOwnedTracks))]
     private Album _album = null!;
 
     [ObservableProperty] private IReadOnlyList<AlbumTrackRow> _tracks = Array.Empty<AlbumTrackRow>();
+    partial void OnTracksChanged(IReadOnlyList<AlbumTrackRow> value)
+    { OnPropertyChanged(nameof(HasPlayableRows)); OnPropertyChanged(nameof(ShowCatalogSkeleton)); }
+    public bool HasPlayableRows => Tracks.Count > 0;
+    public bool HasOwnedTracks => Album.Tracks.Count > 0;
 
     /// <summary>What the list shows: the track rows, with a <see cref="AlbumDiscHeader"/> before
     /// each disc when there is more than one.</summary>
@@ -84,7 +94,8 @@ public sealed partial class AlbumPageViewModel : MobilePage, ITintedPage
     [NotifyPropertyChangedFor(nameof(HasSelection), nameof(SelectionLabel))]
     private int _selectionCount;
     public bool HasSelection => SelectionCount > 0;
-    public string SelectionLabel => SelectionCount == 0 ? "Add to playlist" : $"Add {SelectionCount} to playlist";
+    public string SelectionLabel => Tracks.Any(r => r.IsSelected && r.IsRemote) ? "Download selected"
+        : SelectionCount == 0 ? "Add to playlist" : $"Add {SelectionCount} to playlist";
     [ObservableProperty] private string _searchText = string.Empty;
     partial void OnSearchTextChanged(string value) => FilterRows();
     private void FilterRows()
@@ -254,15 +265,15 @@ public sealed partial class AlbumPageViewModel : MobilePage, ITintedPage
 
     private static IReadOnlyList<object> BuildRows(IReadOnlyList<AlbumTrackRow> tracks)
     {
-        if (tracks.Select(r => r.Track.DiscNumber).Distinct().Count() < 2) return tracks.Cast<object>().ToList();
+        if (tracks.Select(r => r.Disc).Distinct().Count() < 2) return tracks.Cast<object>().ToList();
         var rows = new List<object>();
         int? disc = null;
         foreach (var row in tracks)
         {
-            if (row.Track.DiscNumber != disc)
+            if (row.Disc != disc)
             {
-                disc = row.Track.DiscNumber;
-                rows.Add(new AlbumDiscHeader(row.Track.DiscNumber));
+                disc = row.Disc;
+                rows.Add(new AlbumDiscHeader(row.Disc));
             }
             rows.Add(row);
         }
@@ -271,6 +282,7 @@ public sealed partial class AlbumPageViewModel : MobilePage, ITintedPage
 
     private void OnRefreshed(object? sender, EventArgs e)
     {
+        if (_catalogPage is not null) { if (!IsCatalogLoading) CatalogLoad = LoadCatalogAsync(); return; }
         var fresh = Shell.Library.Service.GetAlbumById(AlbumId);
         if (fresh != null && !ReferenceEquals(fresh, Album)) Apply(fresh);
         else IsFavourite = Album.IsAllTracksFavorite;   // a favourite toggled here or elsewhere
@@ -311,7 +323,8 @@ public sealed partial class AlbumPageViewModel : MobilePage, ITintedPage
     [RelayCommand]
     private void Shuffle()
     {
-        if (Album.Tracks.Count > 0) Shell.Player.PlayShuffled(Album.Tracks, source: Album.Name);
+        var tracks = Tracks.Select(r => r.Track).ToList();
+        if (tracks.Count > 0 && CanPlayCatalog(tracks)) Shell.Player.PlayShuffled(tracks, source: Album.Name);
     }
 
     [RelayCommand]
@@ -346,6 +359,7 @@ public sealed partial class AlbumPageViewModel : MobilePage, ITintedPage
     [RelayCommand]
     private void AddSelection()
     {
+        if (Tracks.Any(r => r.IsSelected && r.IsRemote)) { _ = DownloadCatalogAsync(Tracks.Where(r => r.IsSelected), true); return; }
         var tracks = Tracks.Where(r => _selected.Contains(r.Track.Id)).Select(r => r.Track).ToList();
         if (tracks.Count == 0) return;
         Shell.Sheet = ContextSheetViewModel.ForTracks(Shell, tracks, Album.ArtworkPath);
@@ -355,8 +369,8 @@ public sealed partial class AlbumPageViewModel : MobilePage, ITintedPage
 
     private void PlayFrom(int index)
     {
-        if (Album.Tracks.Count == 0 || index < 0) return;
-        Shell.Player.PlayTracks(Album.Tracks, index, Album.Name);
+        if (Tracks.Count == 0 || index < 0 || index >= Tracks.Count || !CanPlayCatalog([Tracks[index].Track])) return;
+        Shell.Player.PlayTracks(Tracks.Select(r => r.Track).ToList(), index, Album.Name);
     }
 
     /// <summary>The heart: favourites every track on the album, or, when all already are,
@@ -371,10 +385,16 @@ public sealed partial class AlbumPageViewModel : MobilePage, ITintedPage
 
     [RelayCommand] private void OpenArtist() => Shell.OpenArtistCommand.Execute(Album.Artist);
 
-    [RelayCommand] private void More() => Shell.OpenAlbumSheetCommand.Execute(Album);
+    [RelayCommand] private void More()
+    {
+        if (_catalogPage is null) Shell.OpenAlbumSheetCommand.Execute(Album);
+        else ShowCatalogAlbumMenu();
+    }
 
     public override void OnClosed()
     {
+        _catalogClosed = true;
+        _catalogStop.Cancel();
         _descriptionCts.Cancel();
         Shell.Library.Refreshed -= OnRefreshed;
         Shell.Player.PropertyChanged -= OnPlayerChanged;

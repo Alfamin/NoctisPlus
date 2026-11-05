@@ -47,13 +47,14 @@ public sealed partial class SearchPageViewModel : ObservableObject, ISortable
         shell.Library.Refreshed += (_, _) => Run();
         if (shell.OnlineSearch is { } online)
             Online = new OnlineResultsViewModel(online, shell.Marshal,
-                tracks => shell.Player.PlayTracks(tracks, 0, "Search"), shell.OpenTelegramSignIn);
+                tracks => shell.Player.PlayTracks(tracks, 0, "Search"), shell.OpenTelegramSignIn)
+            { OpenAlbumPage = release => shell.Navigate(new AlbumPageViewModel(shell, AlbumPageViewModel.OnlinePlaceholder(release, online), release)) };
         if (Online != null)
         {
             Online.UseOnlineQueue(shell.Player, "Search");
             Online.PropertyChanged += (_, e) =>
             {
-                if (e.PropertyName is nameof(OnlineResultsViewModel.HasSongs) or nameof(OnlineResultsViewModel.IsSearching))
+                if (e.PropertyName is nameof(OnlineResultsViewModel.HasResults) or nameof(OnlineResultsViewModel.IsSearching))
                     OnPropertyChanged(nameof(ShowNoResults));
             };
         }
@@ -120,14 +121,14 @@ public sealed partial class SearchPageViewModel : ObservableObject, ISortable
     public bool HasQuery => !string.IsNullOrWhiteSpace(Query);
     public bool ShowPrompt => !HasQuery;
     public bool ShowNoResults => HasQuery && !HasSongs && !HasAlbums && !HasArtists && !HasPlaylists && !HasFeatured
-        && Online is not { HasSongs: true } and not { IsSearching: true };
+        && Online is not { HasResults: true } and not { IsSearching: true };
 
     /// <summary>Albums as a horizontal row under All, as a two-column grid under the Albums chip.</summary>
     public bool ShowAlbumRow => HasAlbums && IsAllScope;
     public bool ShowAlbumGrid => HasAlbums && IsAlbumsScope;
 
     partial void OnQueryChanged(string value) { Run(); Online?.Search(value); }
-    partial void OnScopeChanged(SearchScope value) => Run();
+    partial void OnScopeChanged(SearchScope value) { Run(); if (Online is not null) Online.Scope = value; }
     partial void OnSortChanged(SearchSort value) => Run();
 
     internal void Run()

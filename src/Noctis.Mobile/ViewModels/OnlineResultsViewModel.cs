@@ -32,6 +32,21 @@ public sealed partial class OnlineSongItem(OnlineSong song) : ObservableObject
     internal bool ArtworkPending;
 }
 
+/// <summary>The native album tile's model, kept stable as progressive search answers arrive.</summary>
+public sealed class OnlineAlbumItem(OnlineAlbum release, IOnlineMusicSearch source)
+{
+    public OnlineAlbum Release { get; private set; } = release;
+    public Album Album { get; } = AlbumPageViewModel.OnlinePlaceholder(release, source);
+    internal bool ArtworkPending;
+    internal void Update(OnlineAlbum value)
+    {
+        if (Release.ArtworkUrl != value.ArtworkUrl) Album.ArtworkPath = source.CachedArtwork(value.ArtworkUrl);
+        Release = value;
+        Album.Name = value.Title; Album.Artist = value.ArtistName; Album.TrackCount = value.TrackCount;
+        Album.Year = int.TryParse(value.Year, out var year) ? year : 0;
+    }
+}
+
 /// <summary>
 /// The online half of phone Search (Music Finder). Library results stay synchronous in
 /// <see cref="SearchPageViewModel"/>; this asks the online source after a short pause in typing, and
@@ -54,6 +69,7 @@ public sealed partial class OnlineResultsViewModel : ObservableObject, IDisposab
     private CancellationTokenSource? _playing;
     private readonly HashSet<string> _inFlight = new(StringComparer.Ordinal);
     private int _generation;
+    internal Task SearchWork { get; private set; } = Task.CompletedTask;
     private NowPlayingViewModel? _queuePlayer;
     private string? _queueLabel;
 
@@ -78,10 +94,18 @@ public sealed partial class OnlineResultsViewModel : ObservableObject, IDisposab
     }
 
     public ObservableCollection<OnlineSongItem> Songs { get; } = new();
-    [ObservableProperty] [NotifyPropertyChangedFor(nameof(HasSongs))] private int _songCount;
+    public ObservableCollection<OnlineAlbumItem> Albums { get; } = new();
+    internal Action<OnlineAlbum>? OpenAlbumPage { get; init; }
+    private OnlineSearchResult? _lastResult;
+    [ObservableProperty] private SearchScope _scope;
+    partial void OnScopeChanged(SearchScope value) { if (_lastResult is { } result) ShowSearch(result); }
+    [ObservableProperty] [NotifyPropertyChangedFor(nameof(HasSongs), nameof(HasResults))] private int _songCount;
+    [ObservableProperty] [NotifyPropertyChangedFor(nameof(HasAlbums), nameof(HasResults))] private int _albumCount;
     [ObservableProperty] private bool _isSearching;
     [ObservableProperty] private string? _message;
     public bool HasSongs => SongCount > 0;
+    public bool HasAlbums => AlbumCount > 0;
+    public bool HasResults => HasSongs || HasAlbums;
     internal event Action<OnlineSong, RecommendationAction>? Acted;
     internal bool LazyArtwork { get; init; }
     internal void ShowRecommendations(IReadOnlyList<OnlineSong> songs) => Show(songs, "");
@@ -104,10 +128,11 @@ public sealed partial class OnlineResultsViewModel : ObservableObject, IDisposab
         var generation = ++_generation;
         var query = text?.Trim() ?? "";
         Songs.Clear(); SongCount = 0; Message = null;
+        Albums.Clear(); AlbumCount = 0; _lastResult = null;
         if (query.Length < 2) { IsSearching = false; return; }
         var cts = _query = new CancellationTokenSource();
         IsSearching = true;
-        _ = RunAsync(query, generation, cts.Token);
+        SearchWork = RunAsync(query, generation, cts.Token);
     }
 
     private async Task RunAsync(string query, int generation, CancellationToken ct)
@@ -120,21 +145,49 @@ public sealed partial class OnlineResultsViewModel : ObservableObject, IDisposab
             {
                 ct.ThrowIfCancellationRequested();
                 // The source's recording match: the library row already stands for it.
-                var songs = result.Songs.Where(s => s.LocalTrackId is null).DistinctBy(s => s.Id).Take(SongCap).ToList();
-                _marshal(() => { if (generation == _generation) Show(songs, result.Warning); });
+                _marshal(() => { if (generation == _generation) { _lastResult = result; ShowSearch(result); } });
                 if (result.Complete) break;
             }
         }
         catch (OperationCanceledException) when (ct.IsCancellationRequested) { return; }
         catch (Exception ex) when (ex is not OutOfMemoryException)
         {
-            _marshal(() => { if (generation == _generation) Message = "Online search failed. Try again"; });
+            _marshal(() => { if (generation == _generation) Message = ex is Noctis.Services.OfflineModeException ? "Offline mode" : "Online search failed. Try again"; });
         }
         finally
         {
             _marshal(() => { if (generation == _generation) IsSearching = false; });
         }
     }
+
+    private void ShowSearch(OnlineSearchResult result)
+    {
+        var songs = Scope is SearchScope.All or SearchScope.Songs
+            ? result.Songs.Where(s => s.LocalTrackId is null).DistinctBy(s => s.Id).Take(SongCap).ToArray() : [];
+        Show(songs, result.Warning);
+        var releases = (Scope is SearchScope.All or SearchScope.Albums) && OpenAlbumPage is not null && _source.Browser is not null
+            ? result.Albums.DistinctBy(a => a.Id).Take(Scope == SearchScope.All ? 12 : 40).ToArray() : [];
+        var known = Albums.ToDictionary(a => a.Release.Id);
+        var next = releases.Select(a => { var row = known.GetValueOrDefault(a.Id) ?? new OnlineAlbumItem(a, _source); row.Update(a); return row; }).ToList();
+        StableRows.Update(Albums, next); AlbumCount = Albums.Count;
+        foreach (var item in Albums)
+            if (item.Album.ArtworkPath is null && item.Release.ArtworkUrl.Length > 0 && !item.ArtworkPending)
+                _ = FetchAlbumArtworkAsync(item, _query?.Token ?? default);
+    }
+
+    private async Task FetchAlbumArtworkAsync(OnlineAlbumItem item, CancellationToken ct)
+    {
+        item.ArtworkPending = true; var url = item.Release.ArtworkUrl;
+        try
+        {
+            var path = await _source.ArtworkAsync(url, ct).ConfigureAwait(false);
+            if (path is not null) _marshal(() => { if (item.Release.ArtworkUrl == url) item.Album.ArtworkPath = path; });
+        }
+        catch (Exception ex) when (ex is not OutOfMemoryException) { }
+        finally { _marshal(() => item.ArtworkPending = false); }
+    }
+
+    [RelayCommand] private void OpenAlbum(OnlineAlbumItem? item) { if (item is not null) OpenAlbumPage?.Invoke(item.Release); }
 
     private void Show(IReadOnlyList<OnlineSong> songs, string warning)
     {

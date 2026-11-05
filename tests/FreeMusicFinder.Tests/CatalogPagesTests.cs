@@ -83,7 +83,44 @@ internal static class CatalogPagesTests
             Check.True(await incompletePages.FindLibraryReleaseAsync(new("deezer:404", "North Star"), "Orbit", default) is null,
                 "a same-name foreign artist's album is not accepted by the fallback");
         }
+        await NativeAlbumAsync();
         await PopularityAsync();
+    }
+
+    private static async Task NativeAlbumAsync()
+    {
+        Check.Section("native phone catalog: metadata, ownership, identity and offline cache without page events");
+        var folder = Check.NewFolder("native-album"); var http = new DiscoveryTests.Http();
+        using var catalog = DiscoveryTests.Catalog(folder, http);
+        var library = new SpotifyPlaylistTests.Library();
+        var owned = library.Add(folder, "Owned", "North Star, Guest");
+        using var downloads = new Downloads(_ => { });
+        var actions = new DiscoveryActions(library, downloads, _ => throw new Exception("Browsing must never request audio"), () => folder, () => false);
+        using var pages = new CatalogPages(() => catalog, actions, _ => { }, () => true);
+        var online = new FinderOnlineSearch(() => catalog, actions, pages, () => false, () => { });
+        try
+        {
+            online.Remember(new(DiscoveryTests.Song("deezer:101", "Owned"), DiscoveryTests.Orbit));
+            Noctis.Services.Search.IOnlineMusicSearch source = online;
+            var input = new Noctis.Services.Search.OnlineAlbum("deezer:111", "Untrusted title", "Wrong artist", ArtworkUrl: "file:///not-an-art-source");
+            var result = await source.Browser!.ReadAlbumAsync(input, default);
+            Check.Equal("Orbit", result.Release.Title, "native data uses the registered provider identity, not caller labels");
+            Check.Equal("deezer:101,deezer:102,deezer:103", string.Join(",", result.Songs.Select(s => s.Song.Id)), "native album retains complete provider order");
+            Check.Equal(owned.Id, result.Songs[0].Song.LocalTrackId, "strict recording match identifies the real owned file");
+            Check.True(result.Songs.Skip(1).All(s => s.Song.LocalTrackId is null), "missing songs remain metadata, not fabricated library files");
+            Check.True(result.Songs.All(s => s.Song.Explicit == true) && result.Songs.Select(s => s.Number).SequenceEqual(new[] { 1, 2, 3 }), "explicit text and track numbers survive the typed adapter");
+            var calls = http.Calls.Count; http.Offline = true;
+            var cached = await source.Browser.ReadAlbumAsync(input, default);
+            Check.Equal(3, cached.Songs.Count, "native album cache stays browsable offline");
+            Check.Equal(calls, http.Calls.Count, "opening a cached album performs no network request");
+            await Check.ThrowsAsync<InvalidOperationException>(() => source.Browser.ReadAlbumAsync(input with { Id = "https://untrusted.invalid/album" }, default), "unregistered catalog identities are rejected before requests");
+            using var cancelled = new CancellationTokenSource(); cancelled.Cancel();
+            await Check.ThrowsAsync<OperationCanceledException>(() => source.Browser.ReadAlbumAsync(input, cancelled.Token), "cancelled navigation never starts a lookup");
+            Check.Equal(calls, http.Calls.Count, "invalid/cancelled navigation cannot contact arbitrary destinations");
+            Check.Equal(0, downloads.History.Count, "native browsing never queues audio");
+            Check.Equal(0, library.Saves, "native browsing never rewrites a playlist or library");
+        }
+        finally { online.Detach(); }
     }
 
     private static async Task PopularityAsync()

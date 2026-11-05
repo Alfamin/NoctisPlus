@@ -205,16 +205,16 @@
 
                 <!-- Apple's row: shuffle, the Play pill and the album heart as one tight centred group. -->
                 <StackPanel Name="ButtonRow" Orientation="Horizontal" HorizontalAlignment="Center" Spacing="14" Margin="0,18,0,0">
-                    <Button Name="ShuffleButton" Classes="round album-round" Command="{Binding ShuffleCommand}">
+                    <Button Name="ShuffleButton" Classes="round album-round" Command="{Binding ShuffleCommand}" IsEnabled="{Binding HasPlayableRows}">
                         <PathIcon Data="{DynamicResource PhShuffle}" />
                     </Button>
-                    <Button Name="PlayButton" Classes="album-play" Command="{Binding PlayCommand}">
+                    <Button Name="PlayButton" Classes="album-play" Command="{Binding PlayCommand}" IsEnabled="{Binding HasPlayableRows}">
                         <StackPanel Orientation="Horizontal" Spacing="4">
                             <PathIcon Data="{DynamicResource PhPlayFill}" Width="20" Height="20" VerticalAlignment="Center" />
                             <TextBlock Text="Play" FontSize="16" FontWeight="SemiBold" VerticalAlignment="Center" />
                         </StackPanel>
                     </Button>
-                    <Button Name="FavouriteButton" Classes="round album-round" Command="{Binding ToggleFavouriteCommand}">
+                    <Button Name="FavouriteButton" Classes="round album-round" Command="{Binding ToggleFavouriteCommand}" IsVisible="{Binding HasOwnedTracks}">
                         <Panel>
                             <PathIcon Name="HeartOutline" Data="{DynamicResource PhHeart}" IsVisible="{Binding !IsFavourite}" />
                             <PathIcon Name="HeartFilled" Data="{DynamicResource PhHeartFill}" IsVisible="{Binding IsFavourite}" />
@@ -263,6 +263,24 @@
                     <Button Grid.Column="2" Classes="row" MinHeight="44" Padding="6,0" Content="{Binding SelectionLabel}" IsVisible="{Binding IsSelecting}"
                             IsEnabled="{Binding HasSelection}" Command="{Binding AddSelectionCommand}" />
                 </Grid>
+                <StackPanel Margin="24,12" Spacing="8" IsVisible="{Binding HasCatalogStatus}">
+                    <ProgressBar Name="CatalogLoading" IsIndeterminate="True" Height="2" IsVisible="{Binding IsCatalogLoading}" />
+                    <ItemsControl Name="CatalogSkeleton" ItemsSource="{Binding SkeletonRows}" IsVisible="{Binding ShowCatalogSkeleton}">
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate>
+                                <Grid ColumnDefinitions="30,*" Height="50">
+                                    <Border Width="16" Height="16" CornerRadius="4" Background="{DynamicResource PhoneFillBrush}" />
+                                    <Border Grid.Column="1" Height="16" CornerRadius="4" Background="{DynamicResource PhoneFillBrush}"
+                                            HorizontalAlignment="Left" Width="170" Margin="4,0" />
+                                </Grid>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                    <Grid ColumnDefinitions="*,Auto" IsVisible="{Binding CatalogMessage, Converter={x:Static StringConverters.IsNotNullOrEmpty}}">
+                        <TextBlock Classes="album-subtle" Text="{Binding CatalogMessage}" TextWrapping="Wrap" VerticalAlignment="Center" />
+                        <Button Grid.Column="1" Classes="row" Content="Retry" Command="{Binding RetryCatalogCommand}" IsVisible="{Binding HasCatalogError}" />
+                    </Grid>
+                </StackPanel>
                 <ItemsControl Name="TrackList" ItemsSource="{Binding Rows}" Margin="0,4,0,0">
                     <ItemsControl.ItemsPanel>
                         <ItemsPanelTemplate>
@@ -281,8 +299,8 @@
                             <Button Classes="row"
                                     Command="{Binding $parent[views:AlbumPage].((vm:AlbumPageViewModel)DataContext).PlayTrackCommand}"
                                     CommandParameter="{Binding}"
-                                    views:LongPress.Command="{Binding $parent[views:ShellView].((vm:ShellViewModel)DataContext).OpenTrackSheetCommand}"
-                                    views:LongPress.CommandParameter="{Binding Track}">
+                                    views:LongPress.Command="{Binding $parent[views:AlbumPage].((vm:AlbumPageViewModel)DataContext).ShowTrackMenuCommand}"
+                                    views:LongPress.CommandParameter="{Binding}">
                                 <Grid ColumnDefinitions="30,*,Auto" Height="50" Margin="14,0,8,0">
                                     <TextBlock Name="RowNumber" Classes="album-subtle" FontSize="15" Text="{Binding Number}"
                                                HorizontalAlignment="Center" VerticalAlignment="Center" IsVisible="{Binding ShowsNumber}" />
@@ -295,18 +313,20 @@
                                     </Border>
                                     <!-- Left-aligned, so the star column is the title's own width up to the
                                          room left, and the badge follows the title, not the row's end. -->
-                                    <Grid Grid.Column="1" Name="RowTitleCell" ColumnDefinitions="*,Auto" HorizontalAlignment="Left"
-                                          VerticalAlignment="Center" Margin="4,0,8,0">
+                                    <Grid Grid.Column="1" Name="RowTitleCell" ColumnDefinitions="*,Auto,Auto" HorizontalAlignment="Left"
+                                          VerticalAlignment="Center" Margin="4,0,8,0" Opacity="{Binding TextOpacity}">
                                         <TextBlock Name="RowTitle" FontSize="16" Text="{Binding Track.Title}" MaxLines="1"
                                                    TextTrimming="CharacterEllipsis" VerticalAlignment="Center" />
                                         <Border Grid.Column="1" Name="RowExplicit" Classes="explicit-badge compact" Margin="6,0,0,0"
                                                 IsVisible="{Binding Track.IsExplicit}">
                                             <TextBlock Text="E" Classes="explicit-badge-text compact" FontSize="8" Opacity="0.9" />
                                         </Border>
+                                        <PathIcon Grid.Column="2" Data="{DynamicResource SetIconDownload}" Width="12" Height="12" Margin="6,0,0,0"
+                                                  IsVisible="{Binding IsRemote}" />
                                     </Grid>
                                     <Button Grid.Column="2" Name="RowMore" Classes="icon" Width="40" Height="40"
-                                            Command="{Binding $parent[views:ShellView].((vm:ShellViewModel)DataContext).OpenTrackSheetCommand}"
-                                            CommandParameter="{Binding Track}">
+                                            Command="{Binding $parent[views:AlbumPage].((vm:AlbumPageViewModel)DataContext).ShowTrackMenuCommand}"
+                                            CommandParameter="{Binding}">
                                         <PathIcon Data="{DynamicResource PhMore}" />
                                     </Button>
                                     <Border Grid.Column="1" Grid.ColumnSpan="2" Classes="rule" Height="0.5" Margin="4,0,0,0"

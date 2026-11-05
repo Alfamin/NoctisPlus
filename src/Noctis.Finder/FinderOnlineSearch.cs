@@ -9,7 +9,7 @@ namespace FreeMusicFinder;
 /// fallback; Finder's ranking, namesake and edition rules) and the same download queue, without
 /// Finder's window. Results stream in as each catalog answers.
 /// </summary>
-internal sealed class FinderOnlineSearch : IOnlineMusicSearch
+internal sealed partial class FinderOnlineSearch : IOnlineMusicSearch, IOnlineCatalog
 {
     /// <summary>Row covers (40 px, sharp at 2x and above) and card covers (up to ~180 px at 1.5x).</summary>
     internal const int RowArtwork = 160, CardArtwork = 320;

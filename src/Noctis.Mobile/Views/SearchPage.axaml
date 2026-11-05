@@ -260,7 +260,7 @@
                 <!-- Music Finder: songs online, under the library's own. -->
                 <StackPanel Name="OnlineSection" Spacing="4" IsVisible="{Binding HasOnline}">
                     <StackPanel DataContext="{Binding Online}" x:DataType="vm:OnlineResultsViewModel" Spacing="4">
-                        <TextBlock Classes="section" Text="Online" Margin="8,0" IsVisible="{Binding HasSongs}" />
+                        <TextBlock Classes="section" Text="Online" Margin="8,0" IsVisible="{Binding HasResults}" />
                         <ProgressBar Name="OnlineSearching" IsIndeterminate="True" Height="2" Margin="8,0" IsVisible="{Binding IsSearching}" />
                         <TextBlock Name="OnlineMessage" Classes="row-sub" Margin="8,0" TextWrapping="Wrap" Text="{Binding Message}"
                                    IsVisible="{Binding Message, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
@@ -295,6 +295,19 @@
                                             </Button>
                                         </Panel>
                                     </Grid>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                        <TextBlock Classes="section" Text="Albums" Margin="8,16,8,0" IsVisible="{Binding HasAlbums}" />
+                        <ItemsControl Name="OnlineAlbumResults" ItemsSource="{Binding Albums}" IsVisible="{Binding HasAlbums}" Margin="4,0">
+                            <ItemsControl.ItemsPanel><ItemsPanelTemplate><UniformGrid Columns="2" /></ItemsPanelTemplate></ItemsControl.ItemsPanel>
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate x:DataType="vm:OnlineAlbumItem">
+                                    <Button Classes="row" Margin="4,0,4,12"
+                                            Command="{Binding $parent[views:SearchPage].((vm:SearchPageViewModel)DataContext).Online.OpenAlbumCommand}"
+                                            CommandParameter="{Binding}">
+                                        <views:AlbumTile DataContext="{Binding Album}" />
+                                    </Button>
                                 </DataTemplate>
                             </ItemsControl.ItemTemplate>
                         </ItemsControl>
