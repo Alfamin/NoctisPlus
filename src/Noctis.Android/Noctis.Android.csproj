@@ -50,6 +50,9 @@
   </PropertyGroup>
 
   <!-- Debug: an APK, installed with adb in the dev loop. -->
+  <PropertyGroup Condition="'$(Configuration)' == 'Debug' and '$(NoctisProgressiveProbe)' == 'true'">
+    <DefineConstants>$(DefineConstants);NOCTIS_PROGRESSIVE_PROBE</DefineConstants>
+  </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)' != 'Release'">
     <AndroidPackageFormat>apk</AndroidPackageFormat>
   </PropertyGroup>
