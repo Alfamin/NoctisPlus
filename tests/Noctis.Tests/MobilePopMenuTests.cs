@@ -620,7 +620,7 @@ public class MobilePopMenuTests(ITestOutputHelper output)
         Pump(30);                                                        // the page settles (push, hero)
         MobileFixtures.Land(window);
         var albumPage = MobileFixtures.Find<AlbumPage>(view);
-        var rowMore = albumPage.GetVisualDescendants().OfType<Button>().First(b => b.Command == rig.Shell.OpenTrackSheetCommand);
+        var rowMore = albumPage.GetVisualDescendants().OfType<Button>().First(b => b.Name == "RowMore");
         Check(rowMore, "album track row", "MenuGoToArtist");   // no Go to Album on its own page
         Check(MobileFixtures.Named<Button>(albumPage, "MoreButton"), "album header", "MenuAddToQueue");
 
@@ -658,7 +658,7 @@ public class MobilePopMenuTests(ITestOutputHelper output)
         // The lowest ⋯ still above the mini player.
         var page = MobileFixtures.Find<AlbumPage>(view);
         var low = page.GetVisualDescendants().OfType<Button>()
-            .Where(b => b.Command == rig.Shell.OpenTrackSheetCommand && b.IsEffectivelyVisible)
+            .Where(b => b.Name == "RowMore" && b.IsEffectivelyVisible)
             .Select(b => (button: b, box: BoxIn(b, view)))
             .Where(x => x.box.Bottom < chromeTop - 4)
             .OrderBy(x => x.box.Top).Last();

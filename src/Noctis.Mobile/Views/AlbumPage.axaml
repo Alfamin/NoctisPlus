@@ -314,7 +314,7 @@
                                     <!-- Left-aligned, so the star column is the title's own width up to the
                                          room left, and the badge follows the title, not the row's end. -->
                                     <Grid Grid.Column="1" Name="RowTitleCell" ColumnDefinitions="*,Auto,Auto" HorizontalAlignment="Left"
-                                          VerticalAlignment="Center" Margin="4,0,8,0" Opacity="{Binding TextOpacity}">
+                                          VerticalAlignment="Center" Margin="8,0,8,0" Opacity="{Binding TextOpacity}">
                                         <TextBlock Name="RowTitle" FontSize="16" Text="{Binding Track.Title}" MaxLines="1"
                                                    TextTrimming="CharacterEllipsis" VerticalAlignment="Center" />
                                         <Border Grid.Column="1" Name="RowExplicit" Classes="explicit-badge compact" Margin="6,0,0,0"
