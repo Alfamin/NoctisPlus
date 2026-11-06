@@ -41,7 +41,7 @@ public sealed partial class PlaylistListPageViewModel : MobilePage, ISortable
     public BulkObservableCollection<PlaylistRow> Rows { get; } = new();
 
     [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(HasPlaylists), nameof(HasTools))]
+    [NotifyPropertyChangedFor(nameof(HasPlaylists))]
     private int _playlistCount;
 
     public bool HasPlaylists => PlaylistCount > 0;
