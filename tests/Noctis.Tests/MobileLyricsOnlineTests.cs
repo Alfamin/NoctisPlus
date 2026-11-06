@@ -110,6 +110,24 @@ public class MobileLyricsOnlineTests : IDisposable
     }
 
     [Fact]
+    public async Task WordTimingProviderIsCredited_AndUnverifiedAudioFitIsExplicit()
+    {
+        var online = new FakeOnline
+        {
+            Answer = _ => Task.FromResult<OnlineLyrics?>(new OnlineLyrics(SyncedLrc, false)
+            {
+                Provider = "Kugou", AudioFitVerified = false,
+            }),
+        };
+        var (vm, np, _, _, _) = Make(online);
+
+        np.PlayTracks(new[] { NewTrack("a") }, 0);
+        await WaitForAsync(() => vm.HasLyrics);
+
+        Assert.Equal("Lyrics from Kugou · audio match pending", vm.SourceCredit);
+    }
+
+    [Fact]
     public async Task OwnSidecar_IsNeverLookedUpOnline()
     {
         var online = new FakeOnline();

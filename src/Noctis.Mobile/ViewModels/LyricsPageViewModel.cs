@@ -118,6 +118,8 @@ public sealed partial class LyricsPageViewModel : ObservableObject, IDisposable
 
     /// <summary>Where the shown lyrics came from (online ones get a credit under the last line).</summary>
     [ObservableProperty, NotifyPropertyChangedFor(nameof(SourceCredit))] private LyricsSource _source;
+    [ObservableProperty, NotifyPropertyChangedFor(nameof(SourceCredit))] private string? _onlineProvider;
+    [ObservableProperty, NotifyPropertyChangedFor(nameof(SourceCredit))] private bool _onlineAudioFitVerified;
 
     /// <summary>The desktop's Glow and Lift: sung words float up and held notes swell and glow.</summary>
     [ObservableProperty] private bool _wordMotion = true;
@@ -168,7 +170,10 @@ public sealed partial class LyricsPageViewModel : ObservableObject, IDisposable
     public bool ShowsEmptyState => !HasLyrics && (!IsLoading || IsSearchingOnline);
 
     /// <summary>Credit under the last line for lyrics fetched online.</summary>
-    public string SourceCredit => Source == LyricsSource.Online ? "Lyrics from LRCLIB" : string.Empty;
+    public string SourceCredit => Source != LyricsSource.Online ? string.Empty
+        : OnlineProvider is null or "LRCLIB" ? "Lyrics from LRCLIB"
+        : OnlineAudioFitVerified ? $"Lyrics from {OnlineProvider}"
+        : $"Lyrics from {OnlineProvider} · audio match pending";
 
     public static double NowMs() => Stopwatch.GetTimestamp() * 1000.0 / Stopwatch.Frequency;
 
@@ -341,6 +346,8 @@ public sealed partial class LyricsPageViewModel : ObservableObject, IDisposable
         IsSearchingOnline = false;
         IsInstrumental = false;
         OnlineLookupFailed = false;
+        OnlineProvider = null;
+        OnlineAudioFitVerified = false;
         Source = LyricsSource.None;
         if (track == null)
         {
@@ -396,6 +403,11 @@ public sealed partial class LyricsPageViewModel : ObservableObject, IDisposable
                         DebugLog.Write("Lyrics", $"Online lyrics parse failed for {track.Title}: {ex.Message}");
                     }
                     if (generation != _generation || _disposed) return;
+                    if (result.Lines.Count > 0)
+                    {
+                        OnlineProvider = found.Provider ?? "LRCLIB";
+                        OnlineAudioFitVerified = found.AudioFitVerified;
+                    }
                 }
             }
             finally

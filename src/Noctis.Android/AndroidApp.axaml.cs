@@ -133,9 +133,9 @@ public partial class AndroidApp : Avalonia.Application, IThemeHost
             // Avalonia sizes by density only; the lyrics page applies the system font scale itself.
             FontScale = context.Resources?.Configuration?.FontScale ?? 1f,
             PrepareTrack = remoteLyrics is null ? null : remoteLyrics.ForLoad,
-            // The desktop's automatic lookup for a song with no lyrics of its own: LRCLIB, asked
-            // by title, artist and length only (Settings → Lyrics → Find Lyrics Online).
-            Online = LrcLibOnlineLyricsSource.Create(persistence.DataDirectory, InternetHttp()),
+            // Plus phone timing uses the shared lrc.red → Unison → Kugou clients, then the existing
+            // LRCLIB fallback. Every request uses the same system-proxy-aware HTTP handler.
+            Online = PlusOnlineLyricsSource.Create(persistence.DataDirectory, InternetHttp()),
         };
         var libraryView = new LibraryViewModel(library, persistence, new AndroidFolderPicker(), history);
         _finder = CreateFinder(context, library, libraryView);

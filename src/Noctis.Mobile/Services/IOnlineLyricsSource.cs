@@ -11,6 +11,12 @@ public sealed record OnlineLyrics(string Text, bool Instrumental)
     /// to a miss: the page must not say none were found.</summary>
     public bool Failed { get; init; }
 
+    /// <summary>The provider that supplied this result. Null preserves legacy LRCLIB behavior.</summary>
+    public string? Provider { get; init; }
+
+    /// <summary>True only when timing was checked against the actual recording audio.</summary>
+    public bool AudioFitVerified { get; init; }
+
     public static OnlineLyrics Unreachable { get; } = new(string.Empty, false) { Failed = true };
 }
 
