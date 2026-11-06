@@ -127,7 +127,7 @@
     <NoctisTelegramApp Condition="'$(NoctisTelegramApp)' == ''">$(MSBuildThisFileDirectory)private/telegram-app.dat</NoctisTelegramApp>
   </PropertyGroup>
   <ItemGroup Condition="Exists('$(NoctisTelegramApp)')">
-    <AndroidAsset Include="$(NoctisTelegramApp)" Link="Assets/telegram-app.dat" />
+    <AndroidAsset Include="$(NoctisTelegramApp)" Link="telegram-app.dat" /><!-- #281: Link is the path under assets/; Assets/... landed in assets/Assets/ and was never found. -->
   </ItemGroup>
 
   <!-- Artist logos (ArtistLogoService): the API keys come from the build, never from the

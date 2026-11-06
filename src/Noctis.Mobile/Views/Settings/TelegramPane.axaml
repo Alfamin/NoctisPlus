@@ -9,23 +9,17 @@
       <StackPanel IsVisible="{Binding IsPhoneStep}" Spacing="16">
         <TextBlock Classes="group-footnote" Text="Sign in to find and download music." />
         <Border Classes="group-card"><TextBox Classes="inline-field" Margin="16,10" Name="TelegramPhone" PlaceholderText="Phone number, including country code" Text="{Binding Phone}" AutomationProperties.Name="Phone number" /></Border>
-        <Button Name="TelegramSendCode" Classes="pill-accent" Content="Continue" Command="{Binding SendCodeCommand}" HorizontalAlignment="Stretch" />
-        <ToggleButton Classes="switch-row" Content="Proxy" IsChecked="{Binding ShowAdvanced}" />
-        <StackPanel IsVisible="{Binding ShowAdvanced}" Spacing="12">
-          <ToggleButton Classes="switch-row" Content="Use proxy" IsChecked="{Binding UseProxy}" />
-          <Border Classes="group-card"><TextBox Classes="inline-field" Margin="16,10" Text="{Binding ProxyServer}" PlaceholderText="Server:port or proxy link" AutomationProperties.Name="Proxy server" /></Border>
-          <Border Classes="group-card"><TextBox Classes="inline-field" Margin="16,10" Text="{Binding ProxySecret}" PlaceholderText="MTProto secret, if needed" PasswordChar="●" AutomationProperties.Name="Proxy secret" /></Border>
-        </StackPanel>
+        <Button Name="TelegramSendCode" Classes="pill-accent" Content="Continue" Command="{Binding SendCodeCommand}" HorizontalAlignment="Stretch" Click="OnSubmitClick" />
       </StackPanel>
       <StackPanel IsVisible="{Binding IsCodeStep}" Spacing="16">
         <TextBlock Classes="group-footnote" Text="Enter the code Telegram sent you." />
         <Border Classes="group-card"><TextBox Classes="inline-field" Margin="16,10" Name="TelegramCode" Text="{Binding Code}" PlaceholderText="Code" AutomationProperties.Name="Telegram code" /></Border>
-        <Button Classes="pill-accent" Content="Continue" Command="{Binding SubmitCodeCommand}" HorizontalAlignment="Stretch" />
+        <Button Classes="pill-accent" Content="Continue" Command="{Binding SubmitCodeCommand}" HorizontalAlignment="Stretch" Click="OnSubmitClick" />
         <Button Classes="pill" Content="Change number" Command="{Binding ChangeNumberCommand}" />
       </StackPanel>
       <StackPanel IsVisible="{Binding IsPasswordStep}" Spacing="16">
         <Border Classes="group-card"><TextBox Classes="inline-field" Margin="16,10" Name="TelegramPassword" Text="{Binding Password}" PlaceholderText="Two-step verification password" PasswordChar="●" AutomationProperties.Name="Telegram password" /></Border>
-        <Button Classes="pill-accent" Content="Sign in" Command="{Binding SubmitPasswordCommand}" HorizontalAlignment="Stretch" />
+        <Button Classes="pill-accent" Content="Sign in" Command="{Binding SubmitPasswordCommand}" HorizontalAlignment="Stretch" Click="OnSubmitClick" />
         <Button Classes="pill" Content="Change number" Command="{Binding ChangeNumberCommand}" />
       </StackPanel>
       <StackPanel IsVisible="{Binding IsSignedIn}" Spacing="16">
@@ -61,11 +55,20 @@
         </StackPanel>
       </StackPanel>
     </StackPanel>
+    <!-- #281: progress and errors sit right under the button, above Proxy, so the keyboard never hides them. -->
     <StackPanel IsVisible="{Binding IsBusy}" Spacing="12">
       <ProgressBar IsIndeterminate="True" />
       <TextBlock Text="{Binding StatusText}" Classes="group-footnote" />
       <Button Classes="pill" Content="Cancel" Command="{Binding CancelSignInCommand}" />
     </StackPanel>
     <TextBlock Name="TelegramError" Text="{Binding ErrorText}" Classes="group-footnote" TextWrapping="Wrap" />
+    <StackPanel IsVisible="{Binding IsPhoneStep}" IsEnabled="{Binding !IsBusy}" Spacing="12">
+      <ToggleButton Classes="switch-row" Content="Proxy" IsChecked="{Binding ShowAdvanced}" />
+      <StackPanel IsVisible="{Binding ShowAdvanced}" Spacing="12">
+        <ToggleButton Classes="switch-row" Content="Use proxy" IsChecked="{Binding UseProxy}" />
+        <Border Classes="group-card"><TextBox Classes="inline-field" Margin="16,10" Text="{Binding ProxyServer}" PlaceholderText="Server:port or proxy link" AutomationProperties.Name="Proxy server" /></Border>
+        <Border Classes="group-card"><TextBox Classes="inline-field" Margin="16,10" Text="{Binding ProxySecret}" PlaceholderText="MTProto secret, if needed" PasswordChar="●" AutomationProperties.Name="Proxy secret" /></Border>
+      </StackPanel>
+    </StackPanel>
   </StackPanel>
 </UserControl>
