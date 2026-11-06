@@ -267,7 +267,10 @@ public partial class LyricLine : ObservableObject
         BackgroundWords = timed.BackgroundWords;
         TransliterationWords = timed.TransliterationWords;
         CurrentWordIndex = BackgroundWordIndex = TransliterationWordIndex = -1;
-        foreach (var name in new[] { nameof(Words), nameof(HasWords), nameof(ShowWords), nameof(ShowLineText), nameof(BackgroundWords),
+        // Owner #285: LiveWords/ShowLiveWords/ShowRestingWords are what the views bind for the main line's word layer;
+        // left out, only the background row lit up word by word until the song was opened again.
+        foreach (var name in new[] { nameof(Words), nameof(HasWords), nameof(ShowWords), nameof(LiveWords), nameof(ShowLiveWords),
+                     nameof(ShowRestingWords), nameof(ShowLineText), nameof(BackgroundWords),
                      nameof(HasBackgroundWords), nameof(ShowBackgroundWords), nameof(TransliterationWords), nameof(HasTransliterationWords),
                      nameof(HasTransliteration), nameof(ShowTransliterationWords), nameof(ShowTransliterationText) })
             OnPropertyChanged(name);
