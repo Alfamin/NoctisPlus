@@ -17,9 +17,9 @@ public sealed partial class PlaylistListPageViewModel : MobilePage, ISortable
         if (_imports is not null) _imports.Changed += OnImportsChanged;
         SortChoices = new[]
         {
-            new SortChoice("Title", PlaylistSort.Title) { IsSelected = true },
-            new SortChoice("Recently Updated", PlaylistSort.RecentlyUpdated),
-            new SortChoice("Recently Added", PlaylistSort.RecentlyAdded),
+            new SortChoice("Mobile.Sort.Title", PlaylistSort.Title) { IsSelected = true },
+            new SortChoice("Mobile.Sort.RecentlyUpdated", PlaylistSort.RecentlyUpdated),
+            new SortChoice("Mobile.RecentlyAdded", PlaylistSort.RecentlyAdded),
         };
         Shell.Library.Refreshed += OnRefreshed;
         Refresh();
@@ -41,7 +41,7 @@ public sealed partial class PlaylistListPageViewModel : MobilePage, ISortable
 
     public bool HasPlaylists => PlaylistCount > 0;
     public bool CanImport => _imports is not null;
-    public bool HasTools => HasPlaylists || CanImport;
+    public bool HasTools => HasPlaylists || CanImport || Shell.CanImportPlaylists;
     private readonly Noctis.Services.Search.IOnlinePlaylistImports? _imports;
     private readonly CancellationTokenSource _importStop = new();
     [ObservableProperty] private bool _isImporting;
@@ -77,6 +77,7 @@ public sealed partial class PlaylistListPageViewModel : MobilePage, ISortable
     public System.Collections.ObjectModel.ObservableCollection<Noctis.Services.Search.OnlineImportJob> ImportIssues { get; } = new();
     [RelayCommand] private void ShowImportIssue(Noctis.Services.Search.OnlineImportJob? job)
     { if (job is not null) Shell.ShowOptions(OptionsMenuViewModel.ForNote(job.Name, null, job.Status)); }
+
 
     /// <summary>The search found nothing (the tools stay up so it can be cleared).</summary>
     public bool ShowNoMatches => HasPlaylists && Playlists.Count == 0;
@@ -163,5 +164,5 @@ public sealed record PlaylistRow(Playlist Playlist, string? ArtworkPath, int? Ca
     Noctis.Services.Search.IOnlineMusicSearch? CoverSource = null, string CoverUrl = "")
 {
     public string Name => Playlist.Name;
-    public string Subtitle => (CatalogCount ?? Playlist.TrackIds.Count) == 1 ? "1 song" : $"{CatalogCount ?? Playlist.TrackIds.Count} songs";
+    public string Subtitle => Loc.Plural("Mobile.Count.Songs", CatalogCount ?? Playlist.TrackIds.Count);
 }

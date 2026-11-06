@@ -18,32 +18,25 @@ namespace Noctis.Tests;
 public class MobileAlbumPageTests : IDisposable
 {
     [AvaloniaFact]
-    public async Task AlbumSelection_AddsSeveralSongsInAlbumOrder_WithoutStartingPlayback()
+    public void AlbumSelection_TicksSeveralSongsInAlbumOrder_WithoutStartingPlayback()
     {
         var (album, tracks) = Sample();
-        var playlist = new Playlist { Id = Guid.NewGuid(), Name = "Chosen" };
-        using var rig = MobileFixtures.MakeRig(tracks, [album], seed: p => p.SavePlaylistsAsync([playlist]));
+        using var rig = MobileFixtures.MakeRig(tracks, [album]);
         var page = new AlbumPageViewModel(rig.Shell, album);
         try
         {
-            page.ToggleSelectionCommand.Execute(null);
+            page.BeginSelectCommand.Execute(null);
             page.PlayTrackCommand.Execute(page.Tracks[1]);
             page.PlayTrackCommand.Execute(page.Tracks[0]);
-            Assert.Equal(2, page.SelectionCount);
+            Assert.Equal(2, page.Selection.Count);
             Assert.Null(rig.Shell.Player.CurrentTrack);
-            page.AddSelectionCommand.Execute(null);
-            var picker = Assert.IsType<ContextSheetViewModel>(rig.Shell.Sheet);
-            Assert.True(picker.IsPickingPlaylist);
-            Assert.Equal(tracks.Select(t => t.Id), picker.Tracks.Select(t => t.Id));
-            Assert.False(page.IsSelecting);
-            await picker.AddToPlaylistCommand.ExecuteAsync(playlist);
-            Assert.Equal(tracks.Select(t => t.Id), (await rig.Persistence.LoadPlaylistsAsync()).Single(p => p.Id == playlist.Id).TrackIds);
+            Assert.Equal(tracks.Select(t => t.Id), page.Selection.SelectedTracks.Select(t => t.Id));
         }
         finally { page.OnClosed(); }
     }
 
     [AvaloniaFact]
-    public void AlbumSearch_FiltersLocally_AndSelectAllOnlyAddsTheVisibleMatches()
+    public void AlbumSearch_FiltersLocally_AndSelectAllOnlyTicksTheVisibleMatches()
     {
         var (album, tracks) = Sample();
         using var rig = MobileFixtures.MakeRig(tracks, [album]);
@@ -52,19 +45,20 @@ public class MobileAlbumPageTests : IDisposable
         {
             page.SearchText = "LOUD";
             Assert.Same(tracks[1], Assert.IsType<AlbumTrackRow>(Assert.Single(page.Rows)).Track);
-            page.ToggleSelectionCommand.Execute(null);
-            page.SelectAllCommand.Execute(null);
-            Assert.Equal(1, page.SelectionCount);
+            page.BeginSelectCommand.Execute(null);
+            page.Selection.ToggleAllCommand.Execute(null);
+            Assert.Equal(1, page.Selection.Count);
+            Assert.Same(tracks[1], Assert.Single(page.Selection.SelectedTracks));
             page.SearchText = "";
             Assert.Equal(2, page.Rows.Count);
-            Assert.False(page.Tracks[0].IsSelected);
-            Assert.True(page.Tracks[1].IsSelected);
-            var grid = new AlbumGridPageViewModel(rig.Shell) { SearchText = "night" };
-            Assert.True(grid.HasAlbums);
-            grid.SearchText = "missing";
-            Assert.False(grid.HasAlbums);
-            grid.SearchText = "band";
-            Assert.True(grid.HasAlbums);
+            Assert.True(page.Selection.IsSelected(tracks[1]));
+            Assert.False(page.Selection.IsSelected(tracks[0]));
+            var grid = new AlbumGridPageViewModel(rig.Shell) { Query = "night" };
+            Assert.Equal(1, grid.ResultCount);
+            grid.Query = "missing";
+            Assert.True(grid.ShowNoResults);
+            grid.Query = "band";
+            Assert.Equal(1, grid.ResultCount);
             grid.OnClosed();
         }
         finally { page.OnClosed(); }

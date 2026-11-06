@@ -13,8 +13,9 @@ public static class SingleInstanceGuard
 {
     // Mutex default namespace is per-session on Windows; the pipe namespace is
     // machine-global, so the user name keeps two logged-in users independent.
-    // Include the profile so release, Debug and explicit test profiles can coexist.
-    private static readonly string ProfileKey = ProfileIdentity(AppPaths.DataRoot);
+    // Include the profile so release, Debug and explicit test profiles can coexist. Keyed by the HOME
+    // root, not the data root: a profile whose data the user moved (GitHub #165) is still the same app.
+    private static readonly string ProfileKey = ProfileIdentity(AppPaths.HomeRoot);
     private static readonly string MutexName = $"{ProductIdentity.Key}-SingleInstance-{Environment.UserName}-{ProfileKey}";
     private static readonly string PipeName = $"{ProductIdentity.Key}-Activate-{Environment.UserName}-{ProfileKey}";
 
@@ -89,8 +90,9 @@ public static class SingleInstanceGuard
     {
         try
         {
-            Directory.CreateDirectory(AppPaths.DataRoot);
-            var path = Path.Combine(AppPaths.DataRoot, ".instance.lock");
+            // The home root (see InstanceKey): it stays put when the data moves.
+            Directory.CreateDirectory(AppPaths.HomeRoot);
+            var path = Path.Combine(AppPaths.HomeRoot, ".instance.lock");
             _unixLock = new FileStream(
                 path, FileMode.OpenOrCreate, FileAccess.ReadWrite, FileShare.None);
         }

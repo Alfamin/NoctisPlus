@@ -578,13 +578,13 @@ public class MobileSettingsTests
             Assert.Equal("2", MobileFixtures.Named<TextBlock>(page, "FoldersValueLabel").Text);
             Assert.True(MobileFixtures.Named<Avalonia.Controls.Shapes.Ellipse>(page, "FolderWarningDot").IsEffectivelyVisible);
             Assert.Equal("Music Folders, 2, a folder lost its access or can't be reached", NameOf("FoldersRow"));
-            Assert.Equal("System", MobileFixtures.Named<TextBlock>(page, "ThemeValueLabel").Text);
+            Assert.Equal("System, Dark", MobileFixtures.Named<TextBlock>(page, "ThemeValueLabel").Text);
             Assert.Equal("Crimson", MobileFixtures.Named<TextBlock>(page, "AccentValueLabel").Text);
             Assert.Equal("Plain", MobileFixtures.Named<TextBlock>(page, "PlayerBarValueLabel").Text);
             Assert.Equal("Off", MobileFixtures.Named<TextBlock>(page, "BackgroundValueLabel").Text);
             Assert.Equal("Off", MobileFixtures.Named<TextBlock>(page, "ScrobblingValueLabel").Text);
             Assert.Equal("Both on", MobileFixtures.Named<TextBlock>(page, "LyricsValueLabel").Text);
-            Assert.Equal("Theme, System", NameOf("ThemeRow"));
+            Assert.Equal("Theme, System, Dark", NameOf("ThemeRow"));
             Assert.Equal("Accent, Crimson", NameOf("AccentRow"));
             Assert.Equal("Player Bar, Plain", NameOf("PlayerBarRow"));
             Assert.Equal("Background, Off", NameOf("BackgroundRow"));
@@ -726,11 +726,11 @@ public class MobileSettingsTests
                 Settle(window);
                 lines.AddRange(page.GetVisualDescendants().OfType<Border>().Where(b => b.Classes.Contains("row-separator") && b.IsEffectivelyVisible));
             }
-            // 12 on the top level (3 Appearance, 2 Library including Offline with Downloads away, 2 Listening, 3 Help,
-            // 2 About), 1 between two folders, none on Accent, 1 between the Player Bar's two
-            // switches, 3 in Lyrics (two between its three switches, one between its two
-            // sliders): none above a list's first row.
-            Assert.Equal(17, lines.Count);
+            // 15 on the top level (6 Appearance with Now Playing Artwork, Language and Smooth Motion, 2 Library including Offline with
+            // Downloads away, 2 Listening, 3 Help, 2 About), 1 between two folders, none on Accent,
+            // 1 between the Player Bar's two switches, 3 in Lyrics (two between its three switches,
+            // one between its two sliders): none above a list's first row.
+            Assert.Equal(20, lines.Count);
             Assert.All(lines, line =>
             {
                 var card = line.GetVisualAncestors().OfType<Border>().First(b => b.Classes.Contains("group-card"));
@@ -932,10 +932,11 @@ public class MobileSettingsTests
         });
     }
 
-    /// <summary>The Theme row opens the glass pop menu: System, Light, Dark (the one in use exposed as
-    /// selected), then the dark style, which steps to the next. A pick applies at once.</summary>
+    /// <summary>The Theme row opens Settings › Theme inside the sheet (beta feedback 11-04): Match
+    /// Device, then Light and the four dark styles, then the colour themes, the one in use ticked.
+    /// A tap applies at once; Light turns Match Device off, a dark theme becomes the dark side.</summary>
     [AvaloniaFact]
-    public async Task Settings_ThemeMenu_PicksEveryLookDirectly_AndKeepsTheSelectedName()
+    public async Task Settings_ThemePage_AppliesTheLook_AndTicksTheThemeInUse()
     {
         var host = new FakeThemeHost();
         using var rig = MobileFixtures.MakeRig(theme: host);
@@ -943,35 +944,40 @@ public class MobileSettingsTests
         {
             var row = MobileFixtures.Named<Button>(page, "ThemeRow");
             row.Command!.Execute(row.CommandParameter);
-            var menu = Assert.IsType<OptionsMenuViewModel>(rig.Shell.PopMenu);
-            Assert.Equal(new[] { "System", "Light", "Ink", "Smoke", "Dark", "Midnight", "Forest", "Plum" }, menu.Items.Select(i => i.Label));
-            Assert.Single(menu.Items.Where(i => i.IsChecked));
-            Assert.Equal("System, selected", menu.Items[0].AccessibleName);
-            Assert.Equal("Light", menu.Items[1].AccessibleName);
-            Assert.True(menu.Items[2].StartsGroup);
+            window.UpdateLayout();
+            Assert.Equal(SettingsPane.Theme, vm.Pane);
+            Assert.Equal("Theme", vm.HeaderTitle);
+            Assert.True(MobileFixtures.Named<Avalonia.Controls.Primitives.ToggleButton>(page, "MatchDeviceSwitch").IsChecked);
+            Assert.Equal(new[] { "Light", "Ink", "Smoke", "Dark", "Midnight" }, vm.StandardThemes.Select(t => t.Name));
+            Assert.Equal(12, vm.ColourThemes.Count);
+            Assert.Contains(vm.ColourThemes, t => t.Name == "Forest" && t.HasAccent);
+            // Noctis Plus: the desktop's Dark default (AppSettings.DefaultTheme) maps to the phone's Dark style.
+            Assert.Equal(new[] { "Dark" }, vm.StandardThemes.Concat(vm.ColourThemes).Where(t => t.IsSelected).Select(t => t.Id));
+            var list = MobileFixtures.Named<ItemsControl>(page, "ColourThemeList");
+            Assert.Equal(12, list.GetVisualDescendants().OfType<Button>().Count(b => b.Classes.Contains("row")));
 
-            menu.Items[4].PickCommand.Execute(null);
-            Assert.Null(rig.Shell.PopMenu);                   // a pick closes the menu
-            Assert.Equal(("Dark", "Dark", "#E74856"), host.Last);
-            Assert.Equal("Theme, Dark", vm.ThemeRowName);
+            vm.ChooseThemeCommand.Execute(vm.StandardThemes[0]);          // Light
+            Assert.Equal(("Light", "Dark", "#E74856"), host.Last);
+            Assert.False(vm.MatchDevice);
+            Assert.Equal("Theme, Light", vm.ThemeRowName);
+            Assert.Equal(new[] { "Light" }, vm.StandardThemes.Concat(vm.ColourThemes).Where(t => t.IsSelected).Select(t => t.Id));
 
-            row.Command!.Execute(row.CommandParameter);
-            menu = Assert.IsType<OptionsMenuViewModel>(rig.Shell.PopMenu);
-            Assert.True(menu.Items[4].IsChecked);
-            menu.Items[5].PickCommand.Execute(null);
-            Assert.Equal(("Dark", "Midnight", "#E74856"), host.Last);
-            row.Command!.Execute(row.CommandParameter);
-            menu = Assert.IsType<OptionsMenuViewModel>(rig.Shell.PopMenu);
-            Assert.True(menu.Items[5].IsChecked);
-            Assert.Equal("Midnight", vm.ThemeValue);
-            menu.Items[6].PickCommand.Execute(null);
-            Assert.Equal(("Dark", "Forest", "#E74856"), host.Last);
-            row.Command!.Execute(row.CommandParameter);
-            menu = Assert.IsType<OptionsMenuViewModel>(rig.Shell.PopMenu);
-            menu.Items[1].PickCommand.Execute(null);
-            Assert.Equal(("Light", "Forest", "#E74856"), host.Last);
+            var forest = vm.ColourThemes.Single(t => t.Id == "forest");
+            vm.ChooseThemeCommand.Execute(forest);                        // a dark theme: shows now
+            Assert.Equal(("Dark", "forest", "#E74856"), host.Last);
+            Assert.Equal("Theme, Forest", vm.ThemeRowName);
+            Assert.True(forest.IsSelected);
+            Assert.Equal("Match Theme", vm.AccentName);                   // a colour theme's accent, Match Theme on by default
+
+            vm.MatchDevice = true;
+            Assert.Equal(("System", "forest", "#E74856"), host.Last);
+            Assert.Equal("Theme, System, Forest", vm.ThemeRowName);
+            Assert.True(forest.IsSelected);
         });
         await ((SettingsPageViewModel)rig.Shell.CurrentPage!).PendingSave;
+        var saved = await rig.Persistence.LoadSettingsAsync();
+        Assert.Equal("System", saved.MobileAppearance);
+        Assert.Equal("forest", saved.MobileThemeName);
     }
 
     /// <summary>The profile card's grey line says when the phone last synced, in words.</summary>

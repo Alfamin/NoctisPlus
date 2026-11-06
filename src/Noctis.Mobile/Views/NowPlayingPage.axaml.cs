@@ -70,31 +70,42 @@ public partial class NowPlayingPage : UserControl
         // The times follow the drag (PreviewSeek is a no-op unless a seek is held, so the
         // position pushes that move the bar between drags never come back through here).
         SeekBar.ValueChanged += OnSeekValueChanged;
-        // Artwork only: transport sliders and vertical sheet/lyrics gestures keep their own input.
-        ArtworkBox.PointerPressed += OnArtworkPressed;
-        ArtworkBox.PointerReleased += OnArtworkReleased;
-        ArtworkBox.PointerCaptureLost += (_, _) => _artworkPress = null;
+        // Swipe the cover (or the record, the CD) sideways for the next or previous song.
+        ArtworkSwipe = new TrackSwipeGesture(ArtworkBox, ArtworkBox, ArtworkGhostBox, GhostArtwork, this, gap: 24,
+            () => _shell?.Player,
+            () => _shell is { IsNowPlayingOpen: true, IsLyricsOpen: false, IsQueueOpen: false, IsMenuOpen: false });
     }
 
-    private (IPointer Pointer, Point Position, long At)? _artworkPress;
-    private void OnArtworkPressed(object? sender, PointerPressedEventArgs e)
+    /// <summary>The cover's sideways swipe (internal for tests).</summary>
+    internal TrackSwipeGesture ArtworkSwipe { get; }
+
+    private ShellViewModel? _shell;
+
+    // The disc turns only while someone can see it: the page open (not closed, not under the
+    // lyrics) and the app in front (ShellViewModel.IsSuspended: home, task switch, screen off).
+    protected override void OnDataContextChanged(EventArgs e)
     {
-        if (e.GetCurrentPoint(ArtworkBox).Properties.IsLeftButtonPressed)
-            _artworkPress = (e.Pointer, e.GetPosition(ArtworkBox), Environment.TickCount64);
+        base.OnDataContextChanged(e);
+        if (_shell != null) _shell.PropertyChanged -= OnShellChanged;
+        _shell = DataContext as ShellViewModel;
+        if (_shell != null) _shell.PropertyChanged += OnShellChanged;
+        UpdateDiscActive();
     }
 
-    private void OnArtworkReleased(object? sender, PointerReleasedEventArgs e)
+    private void OnShellChanged(object? sender, System.ComponentModel.PropertyChangedEventArgs e)
     {
-        var press = _artworkPress;
-        _artworkPress = null;
-        if (press is not { } start || start.Pointer != e.Pointer || DataContext is not ShellViewModel shell) return;
-        var delta = e.GetPosition(ArtworkBox) - start.Position;
-        if (Environment.TickCount64 - start.At > 900 || Math.Abs(delta.X) < 64 || Math.Abs(delta.X) < Math.Abs(delta.Y) * 1.5) return;
-        // Owner #263: left = previous, right = next.
-        var command = delta.X < 0 ? shell.Player.PreviousCommand : shell.Player.NextCommand;
-        if (!command.CanExecute(null)) return;
-        command.Execute(null);
-        e.Handled = true;
+        if (e.PropertyName == nameof(ShellViewModel.IsSuspended)) UpdateDiscActive();
+    }
+
+    protected override void OnPropertyChanged(AvaloniaPropertyChangedEventArgs change)
+    {
+        base.OnPropertyChanged(change);
+        if (change.Property == IsVisibleProperty) UpdateDiscActive();
+    }
+
+    private void UpdateDiscActive()
+    {
+        if (Disc is { } disc) disc.IsActive = IsVisible && _shell is not { IsSuspended: true };
     }
 
     private bool? _landscape;
@@ -117,10 +128,14 @@ public partial class NowPlayingPage : UserControl
         _landscape = landscape;
         Layout.ColumnDefinitions = landscape ? new ColumnDefinitions("5*,6*") : new ColumnDefinitions("*");
         foreach (var child in Layout.Children)
-            if (child != ArtworkBox) Grid.SetColumn(child, landscape ? 1 : 0);
-        Grid.SetRow(ArtworkBox, landscape ? 0 : 1);
-        Grid.SetRowSpan(ArtworkBox, landscape ? Layout.RowDefinitions.Count : 1);
-        ArtworkBox.Margin = landscape ? new Thickness(0, 0, 24, 0) : new Thickness(0, 8);
+            if (child != ArtworkBox && child != ArtworkGhostBox) Grid.SetColumn(child, landscape ? 1 : 0);
+        // The swipe's incoming cover stands exactly where the cover does.
+        foreach (var box in new Control[] { ArtworkBox, ArtworkGhostBox })
+        {
+            Grid.SetRow(box, landscape ? 0 : 1);
+            Grid.SetRowSpan(box, landscape ? Layout.RowDefinitions.Count : 1);
+            box.Margin = landscape ? new Thickness(0, 0, 24, 0) : new Thickness(0, 8);
+        }
     }
 
     // Seek on release only: seeking per pixel during a drag stutters the decoder. Held

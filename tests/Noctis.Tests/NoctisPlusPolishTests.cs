@@ -54,8 +54,11 @@ public class NoctisPlusPolishTests
         // Owner 10-18, app-wide: a label plus at most one short line, in every language.
         foreach (var resx in Directory.GetFiles(Path.Combine(dir!, "src", "Noctis.UI", "Localization"), "Strings*.resx"))
         {
-            var pitch = System.Xml.Linq.XDocument.Load(resx).Root!.Elements("data")
-                .Single(d => (string?)d.Attribute("name") == "LibraryPlaylists.ImportPitch").Element("value")!.Value;
+            // A language without the Plus line (upstream's German, 1.6.8) shows the English one.
+            var entry = System.Xml.Linq.XDocument.Load(resx).Root!.Elements("data")
+                .SingleOrDefault(d => (string?)d.Attribute("name") == "LibraryPlaylists.ImportPitch");
+            if (entry is null) continue;
+            var pitch = entry.Element("value")!.Value;
             Assert.True(pitch.Length is > 0 and <= 48, $"{Path.GetFileName(resx)}: \"{pitch}\"");
         }
     }

@@ -3,6 +3,7 @@ using CommunityToolkit.Mvvm.Input;
 using Noctis.Models;
 using Noctis.Services;
 using Noctis.Services.Search;
+using Noctis.Localization;
 
 namespace Noctis.Mobile.ViewModels;
 
@@ -72,16 +73,11 @@ public sealed partial class AlbumPageViewModel
         display.Tracks = rows.Where(r => !r.IsRemote).Select(r => r.Track).ToList();
         display.TrackCount = rows.Count;
         display.TotalDuration = TimeSpan.FromSeconds(page.Songs.Sum(s => s.Song.Seconds is > 0 and <= 86400 ? s.Song.Seconds.Value : 0));
-        var selected = _selected.ToArray();
         Apply(display);
-        _selected.UnionWith(selected);
         Tracks = rows;
-        _selected.IntersectWith(rows.Select(r => r.Track.Id));
-        foreach (var row in rows) { row.IsSelectionMode = IsSelecting; row.IsSelected = _selected.Contains(row.Track.Id); }
-        SelectionCount = _selected.Count;
-        OnPropertyChanged(nameof(SelectionLabel));
         OnPropertyChanged(nameof(ShowCatalogSkeleton));
         FilterRows(); SyncNowPlaying();
+        Selection.Prune();
         if (!page.IsComplete)
         {
             SongsLine = $"{rows.Count} of {page.Release.TrackCount} songs";
@@ -133,13 +129,14 @@ public sealed partial class AlbumPageViewModel
         {
             new(Shell, "Play", false, () => PlayFrom(0)),
             new(Shell, "Shuffle", false, Shuffle),
+            new(Shell, Loc.T("Mobile.Select"), false, () => Selection.Begin()),
         };
         if (_catalogPage?.IsComplete == true && Tracks.Any(r => r.IsRemote))
         {
             items.Add(new(Shell, "Download missing", false, () => _ = DownloadCatalogAsync(Tracks, true)));
             items.Add(new(Shell, "Add missing to downloads", false, () => _ = DownloadCatalogAsync(Tracks, false)));
         }
-        if (Album.Tracks.Count > 0) items.Add(new(Shell, "Album options", false, () => Shell.OpenAlbumSheetCommand.Execute(Album)));
+        if (Album.Tracks.Count > 0) items.Add(new(Shell, "Album options", false, () => Shell.OpenAlbumMenu(Album, Selection)));
         Shell.ShowOptions(OptionsMenuViewModel.ForItems(items));
     }
 

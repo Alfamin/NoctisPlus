@@ -586,7 +586,8 @@ public partial class MainWindowViewModel : ViewModelBase
                 Navigate("home");
         });
         audioCd.StartWatching();
-        _homeVm = new HomeViewModel(Player, library, Sidebar, artistImageService, playHistory, Settings);
+        _homeVm = new HomeViewModel(Player, library, Sidebar, artistImageService, playHistory, Settings,
+            App.Services?.GetService<LastFmTasteService>());
         _songsVm = new LibrarySongsViewModel(library, Player, Sidebar, persistence, Settings);
         // Noctis Plus Search: library + online catalog in one page (the rail's Search button).
         _searchVm = new SearchViewModel(library, Player, name => ViewArtistByName(name), album => OpenAlbumDetail(album));
@@ -1601,7 +1602,7 @@ public partial class MainWindowViewModel : ViewModelBase
             _dropResultVersion++; // an earlier drop's result pill must not hide this one
             DropImportDone = false;
             IsDropImporting = true;
-            DropImportStatus = "Preparing import…";
+            DropImportStatus = Loc.T("Main.DropPreparingImport");
 
             var folders = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
             var files = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
@@ -1653,7 +1654,7 @@ public partial class MainWindowViewModel : ViewModelBase
             // or pull in unrelated media from other roots.
             // Enumeration is file I/O; run it off the UI thread (large folder trees).
             if (folders.Count > 0)
-                DropImportStatus = "Scanning dropped folders…";
+                DropImportStatus = Loc.T("Main.DropScanningFolders");
             await Task.Run(() =>
             {
             foreach (var folder in folders)
@@ -1690,7 +1691,7 @@ public partial class MainWindowViewModel : ViewModelBase
                 // Nothing playable in the drop (e.g. an album folder whose audio was
                 // removed earlier and only cover art / .lrc remain). Silently doing
                 // nothing here reads as a failed import — say so briefly instead.
-                DropImportStatus = "No audio files found in the dropped items";
+                DropImportStatus = Loc.T("Main.DropNoAudio");
                 try { await Task.Delay(2500, ct); } catch (OperationCanceledException) { }
                 return;
             }
@@ -1722,7 +1723,7 @@ public partial class MainWindowViewModel : ViewModelBase
                 foreach (var file in files)
                 {
                     ct.ThrowIfCancellationRequested();
-                    DropImportStatus = $"Importing files {++copyProcessed} of {files.Count}";
+                    DropImportStatus = Loc.T("Main.DropImportingFiles", ++copyProcessed, files.Count);
 
                     // Files already inside configured library roots can be imported as-is.
                     if (libraryRoots.Any(root => IsPathUnderRoot(file, root)))
@@ -1753,7 +1754,7 @@ public partial class MainWindowViewModel : ViewModelBase
                     // Progress<T> posts back to the UI thread it was created on.
                     var importTotal = importTargets.Count;
                     var importProgress = new Progress<int>(n =>
-                        DropImportStatus = $"Adding songs {Math.Min(n, importTotal)} of {importTotal}");
+                        DropImportStatus = Loc.T("Main.DropAddingSongs", Math.Min(n, importTotal), importTotal));
                     await _library.ImportFilesAsync(importTargets, ct, importProgress);
                     System.Diagnostics.Debug.WriteLine($"[DropImport] afterCount={_library.Tracks.Count}");
 
@@ -1761,7 +1762,7 @@ public partial class MainWindowViewModel : ViewModelBase
                     if (_library.Tracks.Count == beforeCount && libraryRoots.Count > 0)
                     {
                         System.Diagnostics.Debug.WriteLine($"[DropImport] No new tracks, falling back to rescan");
-                        DropImportStatus = "Refreshing library…";
+                        DropImportStatus = Loc.T("Main.DropRefreshingLibrary");
                         await _library.ScanAsync(libraryRoots, ct);
                         System.Diagnostics.Debug.WriteLine($"[DropImport] Rescan done, count={_library.Tracks.Count}");
                     }
@@ -1791,8 +1792,8 @@ public partial class MainWindowViewModel : ViewModelBase
             {
                 var destFolder = Path.GetFileName(Path.GetDirectoryName(moved[0].Value));
                 DropImportStatus = moved.Count == 1
-                    ? $"Moved 1 file to {destFolder}"
-                    : $"Moved {moved.Count} files to {destFolder}";
+                    ? Loc.T("Main.DropMovedOne", destFolder ?? string.Empty)
+                    : Loc.T("Main.DropMovedMany", moved.Count, destFolder ?? string.Empty);
                 try { await Task.Delay(2500, ct); } catch (OperationCanceledException) { }
             }
 
@@ -2073,8 +2074,7 @@ public partial class MainWindowViewModel : ViewModelBase
             if (Sidebar.ManualPlaylistExists(name)) continue;
 
             var confirmed = await Views.ConfirmationDialog.ShowAsync(
-                $"\"{name}\" contains {tracks.Count} tracks from {distinctAlbums} different albums.\n\n" +
-                $"Create a playlist named \"{name}\" with these tracks?");
+                Loc.T("Main.DropCreatePlaylistConfirm", name, tracks.Count, distinctAlbums));
             if (!confirmed) continue;
 
             await Sidebar.CreatePlaylistFromTracksAsync(name, tracks);
@@ -2099,6 +2099,9 @@ public partial class MainWindowViewModel : ViewModelBase
         // Settings left: its Connect a phone panel folds, so no sign-in QR stays live off screen.
         if (ReferenceEquals(oldValue, Settings) && !ReferenceEquals(newValue, Settings)) Settings.OnSettingsLeft();
         if (newValue is ArtistDetailViewModel artistPage) artistPage.IsActive = true;
+        // GitHub #167: an album page fetches its animated cover only while it is on screen.
+        if (oldValue is AlbumDetailViewModel leftAlbumPage && !ReferenceEquals(oldValue, newValue)) leftAlbumPage.StopAutoFetch();
+        if (newValue is AlbumDetailViewModel albumPage) albumPage.StartAutoFetch();
 
         var enteringLyrics = ReferenceEquals(newValue, _lyricsVm);
         var leavingLyrics = ReferenceEquals(oldValue, _lyricsVm) && !enteringLyrics;

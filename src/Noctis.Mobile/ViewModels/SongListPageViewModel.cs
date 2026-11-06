@@ -2,6 +2,7 @@ using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using Noctis.Helpers;
 using Noctis.Models;
+using Noctis.Localization;
 
 namespace Noctis.Mobile.ViewModels;
 
@@ -32,24 +33,32 @@ public sealed partial class SongListPageViewModel : MobilePage, ISortable
         if (_playlistImports is not null) _playlistImports.Changed += OnImportedPlaylistChanged;
         SortChoices = new[]
         {
-            new SortChoice(playlist != null ? "Playlist Order" : "Default Order", SongSort.Default) { IsSelected = true },
-            new SortChoice("Title", SongSort.Title),
-            new SortChoice("Artist", SongSort.Artist),
-            new SortChoice("Album", SongSort.Album),
-            new SortChoice("Date Added", SongSort.DateAdded),
-            new SortChoice("Release Year", SongSort.Year),
-            new SortChoice("Time", SongSort.Duration),
-            new SortChoice("Most Played", SongSort.MostPlayed),
-            new SortChoice("Recently Played", SongSort.RecentlyPlayed),
+            new SortChoice(playlist != null ? "Mobile.Sort.PlaylistOrder" : "Mobile.Sort.DefaultOrder", SongSort.Default) { IsSelected = true },
+            new SortChoice("Mobile.Sort.Title", SongSort.Title),
+            new SortChoice("Mobile.Sort.Artist", SongSort.Artist),
+            new SortChoice("Mobile.Sort.Album", SongSort.Album),
+            new SortChoice("Mobile.Sort.DateAdded", SongSort.DateAdded),
+            new SortChoice("Mobile.Sort.ReleaseYear", SongSort.Year),
+            new SortChoice("Mobile.Sort.Time", SongSort.Duration),
+            new SortChoice("Mobile.Sort.MostPlayed", SongSort.MostPlayed),
+            new SortChoice("Mobile.RecentlyPlayed", SongSort.RecentlyPlayed),
         };
+        Selection = new TrackSelection(shell, () => Songs, () => Title, () => Playlist);
         Shell.Library.Refreshed += OnRefreshed;
         Refresh();
     }
 
     public ShellViewModel Shell { get; }
 
+    /// <summary>Select mode: ticks, the "N Selected" bar and the shell's action bar.</summary>
+    public TrackSelection Selection { get; }
+
+    /// <summary>The tools' Select button: Select mode with nothing ticked yet.</summary>
+    [RelayCommand]
+    private void BeginSelect() => Selection.Begin();
+
     /// <summary>A playlist's page reads the name the library holds now (a rename shows at once).</summary>
-    public override string Title => Playlist?.Name ?? _title;
+    public override string Title => Playlist?.Name ?? Localized(_title);
 
     /// <summary>The playlist this page shows, as the library holds it now; null for other lists.</summary>
     public Playlist? Playlist => _playlist == null ? null : Shell.CurrentPlaylist(_playlist);
@@ -70,9 +79,10 @@ public sealed partial class SongListPageViewModel : MobilePage, ISortable
     [RelayCommand]
     private void OpenSongMenu(Track? track)
     {
-        if (track is { IsFileMissing: true, FilePath.Length: 0 })
-        { Shell.ShowOptions(OptionsMenuViewModel.ForNote("Unavailable song", null, track.Artist)); return; }
-        if (track != null) Shell.OpenTrackMenu(track, Playlist);
+        if (track == null) return;
+        if (Selection.IsActive) Selection.Toggle(track);   // a long press in Select mode ticks, as a tap does
+        else if (track is { IsFileMissing: true, FilePath.Length: 0 }) Shell.ShowOptions(OptionsMenuViewModel.ForNote("Unavailable song", null, track.Artist));
+        else Shell.OpenTrackMenu(track, Playlist, Selection);
     }
 
     /// <summary>The rows shown: the source, filtered and sorted.</summary>
@@ -91,25 +101,17 @@ public sealed partial class SongListPageViewModel : MobilePage, ISortable
 
     public bool ShowEmpty => SongCount == 0;
 
-    public string EmptyText => TotalCount == 0 ? "No songs" : "No matching songs";
+    public string EmptyText => TotalCount == 0 ? Loc.T("Mobile.SongList.NoSongs") : Loc.T("Mobile.SongList.NoMatch");
 
     public string CountText => SongCount == TotalCount
-        ? (SongCount == 1 ? "1 song" : $"{SongCount} songs")
-        : $"{SongCount} of {TotalCount}";
+        ? Loc.Plural("Mobile.Count.Songs", SongCount)
+        : Loc.T("Mobile.SongList.CountOf", SongCount, TotalCount);
 
-    // ── Search in the list ──
+    // ── Search in the list (the page's FindField, as the Artists page's) ──
 
-    [ObservableProperty] private bool _isSearchOpen;
     [ObservableProperty] private string _filterText = string.Empty;
 
     partial void OnFilterTextChanged(string value) => Apply();
-
-    [RelayCommand]
-    private void ToggleSearch()
-    {
-        IsSearchOpen = !IsSearchOpen;
-        if (!IsSearchOpen) FilterText = string.Empty;
-    }
 
     // ── Filters ──
 
@@ -217,6 +219,7 @@ public sealed partial class SongListPageViewModel : MobilePage, ISortable
         // this, and a Reset on an unchanged list tore down and re-realised every row on screen.
         MobileLibrary.ReplaceIfChanged(Songs, Order(rows).ToList());
         SongCount = Songs.Count;
+        Selection.Prune();
     }
 
     private IEnumerable<Track> Order(IEnumerable<Track> rows)
@@ -250,6 +253,11 @@ public sealed partial class SongListPageViewModel : MobilePage, ISortable
     private void Play(Track? track)
     {
         if (track == null) return;
+        if (Selection.IsActive)
+        {
+            Selection.Toggle(track);
+            return;
+        }
         var list = Songs.Where(Playable).ToList();
         var index = list.IndexOf(track);
         if (index >= 0 && CanPlayOnline([track])) Shell.Player.PlayTracks(list, index, Title);
@@ -279,6 +287,7 @@ public sealed partial class SongListPageViewModel : MobilePage, ISortable
 
     public override void OnClosed()
     {
+        Selection.End();
         _importStop.Cancel();
         Shell.Library.Refreshed -= OnRefreshed;
         if (_playlistImports is not null) _playlistImports.Changed -= OnImportedPlaylistChanged;

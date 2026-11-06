@@ -1,3 +1,5 @@
+using System.Text.Json.Serialization;
+
 namespace Noctis.Models;
 
 /// <summary>
@@ -18,4 +20,12 @@ public class PlayHistoryEvent
     /// every streamed play counted as a 3:30 song in Statistics and the Wrap. Absent in older logs.</summary>
     [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull)]
     public double? Seconds { get; set; }
+    /// <summary>
+    /// How long the song was actually heard in this play, in milliseconds (the phone logs it;
+    /// see <see cref="Noctis.Services.PlayHistoryService.SetListened"/>). Null on events logged
+    /// before it existed, and on plays the desktop logged: <see cref="Noctis.Services.PlayListening"/>
+    /// estimates those.
+    /// </summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public long? ListenedMs { get; set; }
 }

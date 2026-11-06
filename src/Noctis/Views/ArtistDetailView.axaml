@@ -936,7 +936,7 @@
                                         </MenuItem>
                                         <MenuItem Header="{loc:T ArtistDetail.AddQueue}" Command="{Binding AddAllToQueueCommand}">
                                             <MenuItem.Icon>
-                                                <ctrl:LineIcon Classes="mv2-icon" Data="{StaticResource MenuLineQueue}"/>
+                                                <ctrl:LineIcon Classes="mv2-icon" Data="{StaticResource MenuLineAddToQueue}"/>
                                             </MenuItem.Icon>
                                         </MenuItem>
                                         <MenuItem Header="{loc:T ArtistDetail.ShufflePopular}" Command="{Binding ShufflePopularCommand}">
@@ -1418,8 +1418,10 @@
                             VerticalAlignment="Center"
                             Cursor="Hand">
                         <StackPanel Orientation="Horizontal" Spacing="6">
-                            <TextBlock Text="{Binding ReleaseSortLabel, StringFormat='Sort: {0}'}"
-                                       FontSize="12" FontWeight="SemiBold" VerticalAlignment="Center" />
+                            <TextBlock
+                                       FontSize="12" FontWeight="SemiBold" VerticalAlignment="Center">
+                                <TextBlock.Text><MultiBinding StringFormat="{}{0} {1}"><Binding Source="{x:Static loc:Loc.Instance}" Path="[Main.Sort]" /><Binding Path="ReleaseSortLabel" /></MultiBinding></TextBlock.Text>
+                            </TextBlock>
                             <!-- Vector chevron: the old Segoe Fluent glyph exists only on Windows (blank box on macOS/Linux). -->
                             <PathIcon Data="{StaticResource ChevronDownThinIcon}"
                                       Width="9" Height="9" Opacity="0.6" VerticalAlignment="Center" />
@@ -1485,8 +1487,10 @@
                             VerticalAlignment="Center"
                             Cursor="Hand">
                         <StackPanel Orientation="Horizontal" Spacing="6">
-                            <TextBlock Text="{Binding ReleaseSortLabel, StringFormat='Sort: {0}'}"
-                                       FontSize="12" FontWeight="SemiBold" VerticalAlignment="Center" />
+                            <TextBlock
+                                       FontSize="12" FontWeight="SemiBold" VerticalAlignment="Center">
+                                <TextBlock.Text><MultiBinding StringFormat="{}{0} {1}"><Binding Source="{x:Static loc:Loc.Instance}" Path="[Main.Sort]" /><Binding Path="ReleaseSortLabel" /></MultiBinding></TextBlock.Text>
+                            </TextBlock>
                             <!-- Vector chevron: the old Segoe Fluent glyph exists only on Windows (blank box on macOS/Linux). -->
                             <PathIcon Data="{StaticResource ChevronDownThinIcon}"
                                       Width="9" Height="9" Opacity="0.6" VerticalAlignment="Center" />
@@ -1525,8 +1529,10 @@
                             VerticalAlignment="Center"
                             Cursor="Hand">
                         <StackPanel Orientation="Horizontal" Spacing="6">
-                            <TextBlock Text="{Binding ReleaseSortLabel, StringFormat='Sort: {0}'}"
-                                       FontSize="12" FontWeight="SemiBold" VerticalAlignment="Center" />
+                            <TextBlock
+                                       FontSize="12" FontWeight="SemiBold" VerticalAlignment="Center">
+                                <TextBlock.Text><MultiBinding StringFormat="{}{0} {1}"><Binding Source="{x:Static loc:Loc.Instance}" Path="[Main.Sort]" /><Binding Path="ReleaseSortLabel" /></MultiBinding></TextBlock.Text>
+                            </TextBlock>
                             <PathIcon Data="{StaticResource ChevronDownThinIcon}"
                                       Width="9" Height="9" Opacity="0.6" VerticalAlignment="Center" />
                         </StackPanel>
@@ -1564,8 +1570,10 @@
                             VerticalAlignment="Center"
                             Cursor="Hand">
                         <StackPanel Orientation="Horizontal" Spacing="6">
-                            <TextBlock Text="{Binding ReleaseSortLabel, StringFormat='Sort: {0}'}"
-                                       FontSize="12" FontWeight="SemiBold" VerticalAlignment="Center" />
+                            <TextBlock
+                                       FontSize="12" FontWeight="SemiBold" VerticalAlignment="Center">
+                                <TextBlock.Text><MultiBinding StringFormat="{}{0} {1}"><Binding Source="{x:Static loc:Loc.Instance}" Path="[Main.Sort]" /><Binding Path="ReleaseSortLabel" /></MultiBinding></TextBlock.Text>
+                            </TextBlock>
                             <PathIcon Data="{StaticResource ChevronDownThinIcon}"
                                       Width="9" Height="9" Opacity="0.6" VerticalAlignment="Center" />
                         </StackPanel>

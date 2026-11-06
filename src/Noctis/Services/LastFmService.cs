@@ -47,6 +47,9 @@ public class LastFmService : ILastFmService
         }
     }
 
+    /// <summary>The session check <see cref="Configure"/> started (tests await it).</summary>
+    internal Task? SessionCheck => SessionVerification;
+
     public async Task<string> GetAuthUrlAsync()
     {
         // Step 1: get a request token
@@ -317,15 +320,32 @@ public class LastFmService : ILastFmService
             if (doc.RootElement.TryGetProperty("user", out var user) &&
                 user.TryGetProperty("name", out var name) && name.ValueKind == JsonValueKind.String)
             {
+                string? resolved = null;
                 lock (_sessionGate)
                     if (generation == _sessionGeneration && sessionKey == _sessionKey)
-                        Username = name.GetString();
+                        Username = resolved = name.GetString();
+                if (!string.IsNullOrEmpty(resolved)) UsernameResolved?.Invoke(this, resolved);
             }
         }
         catch (Exception ex)
         {
             // Exception messages can contain the request URL/session. Log the type only.
             DebugLog.Write("LastFm", $"Session verification unavailable ({ex.GetType().Name}); keeping login.");
+        }
+    }
+
+    /// <summary>Last.fm error 9, "Invalid session key - Please re-authenticate".</summary>
+    internal static bool IsDeadSessionReply(string? body)
+    {
+        if (string.IsNullOrWhiteSpace(body)) return false;
+        try
+        {
+            using var doc = JsonDocument.Parse(body);
+            return IsInvalidSession(doc.RootElement);
+        }
+        catch (JsonException)
+        {
+            return false;
         }
     }
 

@@ -5,6 +5,7 @@ using CommunityToolkit.Mvvm.Input;
 using Noctis.Mobile.Services;
 using Noctis.Models;
 using Noctis.Services;
+using Noctis.Localization;
 
 namespace Noctis.Mobile.ViewModels;
 
@@ -32,19 +33,15 @@ public sealed partial class AlbumTrackRow : ObservableObject
     /// <summary>The bars move: this is the player's track, it is playing, and nothing covers the page.</summary>
     [ObservableProperty] private bool _isAnimating;
 
-    [ObservableProperty] private bool _isSelected;
-    [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(ShowsNumber), nameof(ShowsCurrent))]
-    private bool _isSelectionMode;
-    public bool ShowsNumber => !IsCurrent && !IsSelectionMode;
-    public bool ShowsCurrent => IsCurrent && !IsSelectionMode;
+    public bool ShowsNumber => !IsCurrent;
+    public bool ShowsCurrent => IsCurrent;
 }
 
 /// <summary>A "Disc 2" line above a disc's rows, on albums with more than one disc (the
 /// desktop album page's DiscGroup header).</summary>
 public sealed record AlbumDiscHeader(int Disc)
 {
-    public string Label => $"Disc {Disc}";
+    public string Label => Loc.T("Mobile.Album.Disc", Disc);
 }
 
 /// <summary>
@@ -61,6 +58,11 @@ public sealed partial class AlbumPageViewModel : MobilePage, ITintedPage
         Tint = shell.TintFactory();
         Tint.HeroFade = true;
         Tint.Enabled = shell.ArtworkPageColors;
+        // The rows shown (a search narrows them). Plus: they include a catalog album's missing songs, which Download fetches.
+        Selection = new TrackSelection(shell, () => Rows.OfType<AlbumTrackRow>().Select(r => r.Track).ToList(), () => Album.Name)
+        {
+            DownloadMissing = tracks => DownloadCatalogAsync(Tracks.Where(r => tracks.Contains(r.Track)), true),
+        };
         Shell.Library.Refreshed += OnRefreshed;
         Shell.Player.PropertyChanged += OnPlayerChanged;
         Shell.PropertyChanged += OnShellChanged;
@@ -72,6 +74,22 @@ public sealed partial class AlbumPageViewModel : MobilePage, ITintedPage
 
     public ShellViewModel Shell { get; }
     public Guid AlbumId { get; }
+
+    /// <summary>Select mode on the track list (a song's menu › Select, or the album's ⋯ › Select).</summary>
+    public TrackSelection Selection { get; }
+
+    [RelayCommand]
+    private void BeginSelect() => Selection.Begin();
+
+    /// <summary>A row's ⋯ or long press: the song's menu (with Select); in Select mode it ticks.</summary>
+    [RelayCommand]
+    private void OpenSongMenu(Track? track)
+    {
+        if (track == null) return;
+        if (Selection.IsActive) Selection.Toggle(track);
+        else if (Tracks.FirstOrDefault(r => r.Track == track) is { IsRemote: true } row) ShowTrackMenu(row);
+        else Shell.OpenTrackMenu(track, null, Selection);
+    }
     public PageTint Tint { get; }
 
     [ObservableProperty]
@@ -88,20 +106,13 @@ public sealed partial class AlbumPageViewModel : MobilePage, ITintedPage
     /// <summary>What the list shows: the track rows, with a <see cref="AlbumDiscHeader"/> before
     /// each disc when there is more than one.</summary>
     [ObservableProperty] private IReadOnlyList<object> _rows = Array.Empty<object>();
-    private readonly HashSet<Guid> _selected = new();
-    [ObservableProperty] private bool _isSelecting;
-    [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(HasSelection), nameof(SelectionLabel))]
-    private int _selectionCount;
-    public bool HasSelection => SelectionCount > 0;
-    public string SelectionLabel => Tracks.Any(r => r.IsSelected && r.IsRemote) ? "Download selected"
-        : SelectionCount == 0 ? "Add to playlist" : $"Add {SelectionCount} to playlist";
     [ObservableProperty] private string _searchText = string.Empty;
     partial void OnSearchTextChanged(string value) => FilterRows();
     private void FilterRows()
     {
         var match = new MobileSearch.Matcher(SearchText);
         Rows = BuildRows(Tracks.Where(r => match.HitTrack(r.Track)).ToList());
+        Selection.Prune();
     }
 
     [ObservableProperty]
@@ -189,9 +200,6 @@ public sealed partial class AlbumPageViewModel : MobilePage, ITintedPage
     {
         Album = album;
         Tracks = album.Tracks.Select((t, i) => new AlbumTrackRow(t, t.TrackNumber > 0 ? t.TrackNumber : i + 1)).ToList();
-        _selected.IntersectWith(Tracks.Select(r => r.Track.Id));
-        foreach (var row in Tracks) { row.IsSelectionMode = IsSelecting; row.IsSelected = _selected.Contains(row.Track.Id); }
-        SelectionCount = _selected.Count;
         FilterRows();
         MetaLine = BuildMetaLine(album);
         QualityLine = BuildQualityLine(album);
@@ -224,16 +232,17 @@ public sealed partial class AlbumPageViewModel : MobilePage, ITintedPage
     /// the songs alone when no length is known.</summary>
     public static string BuildSongsLine(Album album)
     {
-        static string Count(int n, string unit) => n == 1 ? $"1 {unit}" : $"{n} {unit}s";
-        var songs = Count(album.TrackCount, "song");
+        var songs = Loc.Plural("Mobile.Count.Songs", album.TrackCount);
         var total = album.TotalDuration;
         var hours = (int)total.TotalHours;
         var length = hours > 0
-            ? total.Minutes > 0 ? $"{Count(hours, "hour")}, {Count(total.Minutes, "minute")}" : Count(hours, "hour")
-            : total.TotalMinutes >= 1 ? Count((int)total.TotalMinutes, "minute")
-            : (int)total.TotalSeconds > 0 ? Count((int)total.TotalSeconds, "second")
+            ? total.Minutes > 0
+                ? Loc.T("Mobile.Album.ListJoin", Loc.Plural("Mobile.Count.Hours", hours), Loc.Plural("Mobile.Count.Minutes", total.Minutes))
+                : Loc.Plural("Mobile.Count.Hours", hours)
+            : total.TotalMinutes >= 1 ? Loc.Plural("Mobile.Count.Minutes", (int)total.TotalMinutes)
+            : (int)total.TotalSeconds > 0 ? Loc.Plural("Mobile.Count.Seconds", (int)total.TotalSeconds)
             : null;
-        return length == null ? songs : $"{songs}, {length}";
+        return length == null ? songs : Loc.T("Mobile.Album.ListJoin", songs, length);
     }
 
     private async Task LoadDescriptionAsync(string artist, string album, CancellationToken ct)
@@ -286,6 +295,7 @@ public sealed partial class AlbumPageViewModel : MobilePage, ITintedPage
         var fresh = Shell.Library.Service.GetAlbumById(AlbumId);
         if (fresh != null && !ReferenceEquals(fresh, Album)) Apply(fresh);
         else IsFavourite = Album.IsAllTracksFavorite;   // a favourite toggled here or elsewhere
+        Selection.Prune();
     }
 
     private void OnPlayerChanged(object? sender, PropertyChangedEventArgs e)
@@ -331,40 +341,12 @@ public sealed partial class AlbumPageViewModel : MobilePage, ITintedPage
     private void PlayTrack(AlbumTrackRow? row)
     {
         if (row == null) return;
-        if (IsSelecting)
+        if (Selection.IsActive)
         {
-            row.IsSelected = !row.IsSelected;
-            if (row.IsSelected) _selected.Add(row.Track.Id); else _selected.Remove(row.Track.Id);
-            SelectionCount = _selected.Count;
+            Selection.Toggle(row.Track);
             return;
         }
         PlayFrom(Tracks.ToList().IndexOf(row));
-    }
-
-    [RelayCommand]
-    private void ToggleSelection()
-    {
-        IsSelecting = !IsSelecting;
-        _selected.Clear(); SelectionCount = 0;
-        foreach (var row in Tracks) { row.IsSelectionMode = IsSelecting; row.IsSelected = false; }
-    }
-
-    [RelayCommand]
-    private void SelectAll()
-    {
-        foreach (var row in Rows.OfType<AlbumTrackRow>()) { row.IsSelected = true; _selected.Add(row.Track.Id); }
-        SelectionCount = _selected.Count;
-    }
-
-    [RelayCommand]
-    private void AddSelection()
-    {
-        if (Tracks.Any(r => r.IsSelected && r.IsRemote)) { _ = DownloadCatalogAsync(Tracks.Where(r => r.IsSelected), true); return; }
-        var tracks = Tracks.Where(r => _selected.Contains(r.Track.Id)).Select(r => r.Track).ToList();
-        if (tracks.Count == 0) return;
-        Shell.Sheet = ContextSheetViewModel.ForTracks(Shell, tracks, Album.ArtworkPath);
-        Shell.Sheet.ShowPlaylistsCommand.Execute(null);
-        if (IsSelecting) ToggleSelection();
     }
 
     private void PlayFrom(int index)
@@ -387,7 +369,7 @@ public sealed partial class AlbumPageViewModel : MobilePage, ITintedPage
 
     [RelayCommand] private void More()
     {
-        if (_catalogPage is null) Shell.OpenAlbumSheetCommand.Execute(Album);
+        if (_catalogPage is null) Shell.OpenAlbumMenu(Album, Selection);
         else ShowCatalogAlbumMenu();
     }
 
@@ -395,6 +377,7 @@ public sealed partial class AlbumPageViewModel : MobilePage, ITintedPage
     {
         _catalogClosed = true;
         _catalogStop.Cancel();
+        Selection.End();
         _descriptionCts.Cancel();
         Shell.Library.Refreshed -= OnRefreshed;
         Shell.Player.PropertyChanged -= OnPlayerChanged;

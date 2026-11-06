@@ -1,5 +1,6 @@
 <UserControl xmlns="https://github.com/avaloniaui"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:loc="using:Noctis.Localization"
              xmlns:vm="using:Noctis.Mobile.ViewModels"
              xmlns:views="using:Noctis.Mobile.Views"
              xmlns:controls="using:Noctis.Controls"
@@ -211,7 +212,7 @@
                     <Button Name="PlayButton" Classes="album-play" Command="{Binding PlayCommand}" IsEnabled="{Binding HasPlayableRows}">
                         <StackPanel Orientation="Horizontal" Spacing="4">
                             <PathIcon Data="{DynamicResource PhPlayFill}" Width="20" Height="20" VerticalAlignment="Center" />
-                            <TextBlock Text="Play" FontSize="16" FontWeight="SemiBold" VerticalAlignment="Center" />
+                            <TextBlock Text="{loc:T Mobile.Play}" FontSize="16" FontWeight="SemiBold" VerticalAlignment="Center" />
                         </StackPanel>
                     </Button>
                     <Button Name="FavouriteButton" Classes="round album-round" Command="{Binding ToggleFavouriteCommand}" IsVisible="{Binding HasOwnedTracks}">
@@ -246,7 +247,7 @@
                         </Border>
                         <Border Name="DescriptionMore" HorizontalAlignment="Right" VerticalAlignment="Bottom" Padding="36,0,0,0"
                                 IsHitTestVisible="False">
-                            <TextBlock Classes="album-more" Text="MORE" />
+                            <TextBlock Classes="album-more" Text="{loc:T Mobile.Album.More}" />
                         </Border>
                     </Panel>
                 </Button>
@@ -256,13 +257,6 @@
                      because VirtualizingStackPanel works from the effective viewport. -->
                 <TextBox Name="TrackSearch" Classes="search-field" Margin="24,14,24,4" PlaceholderText="Search songs"
                          Text="{Binding SearchText, Mode=TwoWay}" />
-                <Grid ColumnDefinitions="Auto,*,Auto" Margin="18,0,18,0">
-                    <Button Classes="row" MinHeight="44" Padding="6,0" Content="Select" IsVisible="{Binding !IsSelecting}" Command="{Binding ToggleSelectionCommand}" />
-                    <Button Classes="row" MinHeight="44" Padding="6,0" Content="Done" IsVisible="{Binding IsSelecting}" Command="{Binding ToggleSelectionCommand}" />
-                    <Button Grid.Column="1" Classes="row" MinHeight="44" Padding="6,0" Content="Select all" HorizontalAlignment="Left" IsVisible="{Binding IsSelecting}" Command="{Binding SelectAllCommand}" />
-                    <Button Grid.Column="2" Classes="row" MinHeight="44" Padding="6,0" Content="{Binding SelectionLabel}" IsVisible="{Binding IsSelecting}"
-                            IsEnabled="{Binding HasSelection}" Command="{Binding AddSelectionCommand}" />
-                </Grid>
                 <StackPanel Margin="24,12" Spacing="8" IsVisible="{Binding HasCatalogStatus}">
                     <ProgressBar Name="CatalogLoading" IsIndeterminate="True" Height="2" IsVisible="{Binding IsCatalogLoading}" />
                     <ItemsControl Name="CatalogSkeleton" ItemsSource="{Binding SkeletonRows}" IsVisible="{Binding ShowCatalogSkeleton}">
@@ -296,24 +290,22 @@
                             <!-- Apple's row: a narrow number column with the title right after it, the
                                  explicit badge straight after the title (the desktop's compact badge), and
                                  only ⋯ at the end: favouriting is in its menu (owner 10-19, no row heart). -->
+                            <!-- In Select mode the check circle leads the row, a tap ticks it and ⋯ steps aside. -->
                             <Button Classes="row"
                                     Command="{Binding $parent[views:AlbumPage].((vm:AlbumPageViewModel)DataContext).PlayTrackCommand}"
                                     CommandParameter="{Binding}"
-                                    views:LongPress.Command="{Binding $parent[views:AlbumPage].((vm:AlbumPageViewModel)DataContext).ShowTrackMenuCommand}"
-                                    views:LongPress.CommandParameter="{Binding}">
-                                <Grid ColumnDefinitions="30,*,Auto" Height="50" Margin="14,0,8,0">
-                                    <TextBlock Name="RowNumber" Classes="album-subtle" FontSize="15" Text="{Binding Number}"
+                                    views:LongPress.Command="{Binding $parent[views:AlbumPage].((vm:AlbumPageViewModel)DataContext).OpenSongMenuCommand}"
+                                    views:LongPress.CommandParameter="{Binding Track}">
+                                <Grid ColumnDefinitions="Auto,30,*,Auto,Auto" Height="50" Margin="14,0,8,0">
+                                    <views:SelectCheck Name="RowCheck" Track="{Binding Track}" Margin="4,0,-4,0"
+                                                       Selection="{Binding $parent[views:AlbumPage].((vm:AlbumPageViewModel)DataContext).Selection}" />
+                                    <TextBlock Grid.Column="1" Name="RowNumber" Classes="album-subtle" FontSize="15" Text="{Binding Number}"
                                                HorizontalAlignment="Center" VerticalAlignment="Center" IsVisible="{Binding ShowsNumber}" />
-                                    <views:PlayingBars Name="EqBars" HorizontalAlignment="Center" VerticalAlignment="Center"
-                                                       IsPlaying="{Binding IsAnimating}" IsVisible="{Binding ShowsCurrent}" />
-                                    <Border Width="22" Height="22" CornerRadius="11" BorderThickness="1"
-                                            BorderBrush="{DynamicResource AlbumSubtleText}" IsVisible="{Binding IsSelectionMode}">
-                                        <TextBlock Text="✓" HorizontalAlignment="Center" VerticalAlignment="Center"
-                                                   Foreground="{DynamicResource AlbumText}" IsVisible="{Binding IsSelected}" />
-                                    </Border>
+                                    <views:PlayingBars Grid.Column="1" Name="EqBars" HorizontalAlignment="Center" VerticalAlignment="Center"
+                                                       IsPlaying="{Binding IsAnimating}" IsVisible="{Binding IsCurrent}" />
                                     <!-- Left-aligned, so the star column is the title's own width up to the
                                          room left, and the badge follows the title, not the row's end. -->
-                                    <Grid Grid.Column="1" Name="RowTitleCell" ColumnDefinitions="*,Auto,Auto" HorizontalAlignment="Left"
+                                    <Grid Grid.Column="2" Name="RowTitleCell" ColumnDefinitions="*,Auto,Auto" HorizontalAlignment="Left"
                                           VerticalAlignment="Center" Margin="8,0,8,0" Opacity="{Binding TextOpacity}">
                                         <TextBlock Name="RowTitle" FontSize="16" Text="{Binding Track.Title}" MaxLines="1"
                                                    TextTrimming="CharacterEllipsis" VerticalAlignment="Center" />
@@ -324,12 +316,15 @@
                                         <PathIcon Grid.Column="2" Data="{DynamicResource SetIconDownload}" Width="12" Height="12" Margin="6,0,0,0"
                                                   IsVisible="{Binding IsRemote}" />
                                     </Grid>
-                                    <Button Grid.Column="2" Name="RowMore" Classes="icon" Width="40" Height="40"
-                                            Command="{Binding $parent[views:AlbumPage].((vm:AlbumPageViewModel)DataContext).ShowTrackMenuCommand}"
-                                            CommandParameter="{Binding}">
+                                    <!-- The song's stars or heart (Settings › Library › Show in Song Rows), right-aligned before ⋯. -->
+                                    <views:RowMark Grid.Column="3" Name="RowMark" DataContext="{Binding Track}" Margin="0,0,4,0" />
+                                    <Button Grid.Column="4" Name="RowMore" Classes="icon" Width="40" Height="40"
+                                            Command="{Binding $parent[views:AlbumPage].((vm:AlbumPageViewModel)DataContext).OpenSongMenuCommand}"
+                                            CommandParameter="{Binding Track}"
+                                            IsVisible="{Binding !$parent[views:AlbumPage].((vm:AlbumPageViewModel)DataContext).Selection.IsActive}">
                                         <PathIcon Data="{DynamicResource PhMore}" />
                                     </Button>
-                                    <Border Grid.Column="1" Grid.ColumnSpan="2" Classes="rule" Height="0.5" Margin="4,0,0,0"
+                                    <Border Grid.Column="2" Grid.ColumnSpan="3" Classes="rule" Height="0.5" Margin="4,0,0,0"
                                             VerticalAlignment="Bottom" IsHitTestVisible="False" />
                                 </Grid>
                             </Button>
@@ -355,7 +350,7 @@
                     <TextBlock Name="FooterCopyright" Classes="album-subtle" FontSize="14" LineHeight="19" TextWrapping="Wrap"
                                Text="{Binding CopyrightText}" IsVisible="{Binding HasCopyright}" />
                     <StackPanel Name="FooterLabel" Margin="0,16,0,0" Spacing="1" IsVisible="{Binding HasRecordLabel}">
-                        <TextBlock Classes="album-subtle" Text="RECORD LABEL" FontSize="12" FontWeight="SemiBold" />
+                        <TextBlock Classes="album-subtle" Text="{loc:T Mobile.Album.RecordLabel}" FontSize="12" FontWeight="SemiBold" />
                         <TextBlock Name="FooterLabelName" FontSize="15" TextWrapping="Wrap" Text="{Binding RecordLabel}" />
                     </StackPanel>
                 </StackPanel>
@@ -374,7 +369,8 @@
 
         <!-- Round Liquid Glass buttons floating over the cover: back and the album's sheet, with the
              album's name between them once its big title has gone under them. -->
-        <Grid Name="TopBar" VerticalAlignment="Top" ColumnDefinitions="Auto,*,Auto" Margin="16,6,16,0">
+        <Grid Name="TopBar" VerticalAlignment="Top" ColumnDefinitions="Auto,*,Auto" Margin="16,6,16,0"
+              IsVisible="{Binding !Selection.IsActive}">
             <controls:GlassPanel Classes="header-glass">
                 <Button Name="BackButton" Classes="glass-round" Command="{Binding Shell.NavigateBackCommand}">
                     <PathIcon Data="{DynamicResource PhBack}" />
@@ -389,5 +385,8 @@
                 </Button>
             </controls:GlassPanel>
         </Grid>
+
+        <!-- Select mode's bar (Select All, "3 Selected", Done) in the buttons' place. -->
+        <views:SelectionHeader Name="SelectBar" VerticalAlignment="Top" Margin="16,6,16,0" DataContext="{Binding Selection}" />
     </Panel>
 </UserControl>

@@ -29,12 +29,16 @@
                     <TextBlock Text="E" Classes="explicit-badge-text compact" FontSize="8" Opacity="0.9" />
                 </Border>
             </Grid>
-            <Grid ColumnDefinitions="*,Auto" HorizontalAlignment="Left">
+            <!-- The artist, and at the line's end the song's stars or heart (Settings › Library ›
+                 Show in Song Rows); without one the mark takes no room. -->
+            <Grid ColumnDefinitions="*,Auto,Auto">
                 <TextBlock Classes="row-sub" Text="{Binding Artist}" />
-                <PathIcon Grid.Column="1" Name="RemoteIndicator" Data="{DynamicResource SetIconDownload}" Width="12" Height="12" Margin="6,0,0,0" IsVisible="{Binding IsPendingStream}" />
+                <views:RowMark Grid.Column="1" Name="RowMark" Margin="6,0,0,0" />
+                <PathIcon Grid.Column="2" Name="RemoteIndicator" Data="{DynamicResource SetIconDownload}" Width="12" Height="12" Margin="6,0,0,0" IsVisible="{Binding IsPendingStream}" />
             </Grid>
         </StackPanel>
         <Button Grid.Column="2" Name="MoreButton" Classes="icon" Width="36" Height="36"
+                IsVisible="{Binding $parent[views:SongRow].IsMenuVisible}"
                 Command="{Binding $parent[views:SongRow].MenuCommand}"
                 CommandParameter="{Binding}">
             <!-- Button.icon's 24 box, as every other row's ⋯ (album, artist, queue). -->

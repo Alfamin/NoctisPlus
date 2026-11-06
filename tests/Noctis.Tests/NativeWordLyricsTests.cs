@@ -230,6 +230,9 @@ public class NativeWordLyricsTests
         var window = new Window { Content = bar, Width = 1000, Height = 700 };
         window.Show(); Dispatcher.UIThread.RunJobs();
         var menu = Assert.IsType<MenuFlyout>(bar.FindControl<Button>("OptionsButton")!.Flyout);
+        // Upstream 1.6.8 animates this flyout's own close on a timer the headless run never fires; the test
+        // is about what the menu points at, so it closes at once.
+        Noctis.Helpers.MenuOpenAnimation.SetEnableFlyoutClose(menu, false);
         Track? repaired = null; rig.Service.Presenter = (_, song) => repaired = song;
         try
         {

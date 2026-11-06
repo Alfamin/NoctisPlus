@@ -78,6 +78,7 @@ public partial class ArtistDetailViewModel : ViewModelBase, ISearchable, IDispos
     private int _liveGeneration;
     private int _compilationsGeneration;
     private bool _similarRequested;
+    private int _similarGeneration;
 
     // Unfiltered results; the observable collections below hold the searched/filtered view.
     private List<Album> _allReleases = new();
@@ -332,7 +333,7 @@ public partial class ArtistDetailViewModel : ViewModelBase, ISearchable, IDispos
         // An online release's count is unknown (0) until its tracklist arrives: say nothing, never "0 songs"
         // (owner 10-18: JPEGMafia's 25-song album read "0 songs").
         if (a.TrackCount <= 0) return "";
-        var count = a.TrackCount == 1 ? "1 song" : $"{a.TrackCount} songs";
+        var count = Noctis.Localization.Loc.Plural("Count.Songs", a.TrackCount);
         var total = a.TotalDuration > TimeSpan.Zero
             ? a.TotalDuration
             : TimeSpan.FromTicks(a.Tracks?.Sum(t => t.Duration.Ticks) ?? 0);
@@ -985,13 +986,16 @@ public partial class ArtistDetailViewModel : ViewModelBase, ISearchable, IDispos
         if (_similarRequested) return;
         _similarRequested = true;
         if (_similar == null) { SimilarLoaded = true; return; }
+        var generation = ++_similarGeneration;
         IsSimilarLoading = true;
         try
         {
-            var related = await _similar.GetAsync(Artist.Id, ArtistName, _cts.Token).ConfigureAwait(false);
+            var related = await _similar.GetAsync(Artist.Id, ArtistName, _images?.GetPinnedDeezerId(Artist.Id), _cts.Token).ConfigureAwait(false);
             if (_cts.IsCancellationRequested) return;
             await Dispatcher.UIThread.InvokeAsync(() =>
             {
+                // A newer pick started its own fetch: this list is for the old account.
+                if (generation != _similarGeneration) return;
                 SimilarArtists.Clear();
                 OverviewSimilar.Clear();
                 foreach (var row in BuildSimilarRows(related, _library.Artists, _images))
@@ -1013,8 +1017,18 @@ public partial class ArtistDetailViewModel : ViewModelBase, ISearchable, IDispos
         }
         finally
         {
-            IsSimilarLoading = false;
+            if (generation == _similarGeneration) IsSimilarLoading = false;
         }
+    }
+
+    /// <summary>The artist's Deezer account changed (a pick or a reset, GitHub #170): fetch the
+    /// list again if it was already shown. The old tiles stay until the new list replaces them;
+    /// a section nobody opened yet fetches for the new account when it opens.</summary>
+    private void ReloadSimilar()
+    {
+        if (!_similarRequested) return;
+        _similarRequested = false;
+        _ = LoadSimilarAsync();
     }
 
     /// <summary>Pure: Deezer's related artists joined to the library by name. An artist in
@@ -1282,13 +1296,27 @@ public partial class ArtistDetailViewModel : ViewModelBase, ISearchable, IDispos
         HasArtistInfoPick = true;
         FanCount = pick.Fans;
         ShowPortrait(old, path);
+        ReloadSimilar();
 
         if (_info == null) return;
         string? mbid = null;
         try { mbid = await _info.FindMusicBrainzIdForDeezerAsync(pick.Id, _cts.Token); }
         catch (OperationCanceledException) { return; }
-        catch (Exception ex) { DebugLogger.Warn(DebugLogger.Category.UI, "Artist.Pick", ex.Message); }
-        if (mbid == null) return;
+        catch (Exception ex)
+        {
+            DebugLogger.Warn(DebugLogger.Category.UI, "Artist.Pick", ex.Message);
+            return; // offline: keep whatever About shows rather than guess
+        }
+        if (mbid == null)
+        {
+            // No MusicBrainz link for this account: an earlier pick's facts must not stay
+            // pinned under the new account, so About goes back to the name lookup.
+            if (_info.GetPinnedMusicBrainzId(Artist.Id) == null) return;
+            _info.SetPinnedMusicBrainzId(Artist.Id, null);
+            About = null;
+            _ = LoadAboutAsync();
+            return;
+        }
         _info.SetPinnedMusicBrainzId(Artist.Id, mbid);
         About = null;
         _ = LoadAboutAsync();
@@ -1305,6 +1333,7 @@ public partial class ArtistDetailViewModel : ViewModelBase, ISearchable, IDispos
         HasArtistInfoPick = false;
         if (path != null) ShowPortrait(old, path);
         _ = LoadFansAsync();
+        ReloadSimilar();
         if (pinnedFacts)
         {
             About = null;
