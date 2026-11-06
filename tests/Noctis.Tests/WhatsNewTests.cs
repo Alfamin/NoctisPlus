@@ -78,8 +78,17 @@ public class WhatsNewTests : IDisposable
         Assert.Equal(WhatsNewGate.Short(Noctis.Services.UpdateService.CurrentVersion), WhatsNewGate.Short(releases[0].Version));
         for (int i = 1; i < releases.Count; i++)
             Assert.True(WhatsNewGate.Parse(releases[i - 1].Version) > WhatsNewGate.Parse(releases[i].Version), releases[i].Version);
-        Assert.All(releases, r => Assert.NotEmpty(r.Added));
+        Assert.All(releases, r => Assert.True(r.Added.Count + r.Fixed.Count > 0, r.Version)); // owner #285: a fixes-only update has no "new" card
         Assert.Equal(releases.Count, WhatsNewNotes.Load()!.Updates); // Settings → About shows them all
+    }
+
+    [Fact]
+    public void AnUpdateOfFixesOnly_SaysWhatsFixed_AndShowsNothingAsNew()
+    {
+        var fixesOnly = new WhatsNewViewModel(new WhatsNewNotes("2.7.3", [], ["a fix"]), () => { });
+        Assert.Equal("What's fixed", fixesOnly.Heading);
+        Assert.False(fixesOnly.HasAdded);
+        Assert.Equal("What's new", new WhatsNewViewModel(Notes("2.2.0"), () => { }).Heading);
     }
 
     [Fact]
