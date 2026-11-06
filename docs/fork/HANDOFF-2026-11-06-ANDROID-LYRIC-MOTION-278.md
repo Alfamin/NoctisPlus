@@ -1,0 +1,15 @@
+# Android Lyric Motion #278 checkpoint — 2026-11-06 18:23 Tehran
+
+Worktree `C:\Users\Alfamine\nplus-codex-257`, branch `codex-android-262`. This is a BUILT implementation checkpoint, NOT DONE: the actual lyrics animation still needs a real-app visual check with synthetic word-timed lyrics.
+
+Implemented natively on the phone with the existing `KaraokeWordText` posed drawing path. New `PlusLyricMotionEffect` copies the smooth Plus motion values as pure math (source attribution retained in code), and `PlusMotionCurves` provides allocation-free easing. Android Plus installs the effect at app startup; stock Android and desktop remain untouched. The phone lyrics list uses `WordSurface.Page`; its active-line transition now matches the Plus 650 ms curve. The Inter font is already supplied by the Android app's existing `WithInterFont` and mobile text styles. The posed-path baseline snap fix described by the plan was already present before this slice; existing `KaraokePoseRestTests` cover it, so that renderer file was not changed.
+
+Verification:
+- `PlusLyricMotionEffectTests`: 3 passed, 0 failed, including RTL/quick/long-word mode selection, ordered rise/rest poses, deterministic output and zero allocations over 10,000 calls.
+- Android Debug x64 and ARM64 builds: 0 errors (38 existing warnings each).
+- Full ten-shard gate `codex-lyric-motion-286b`: 9,595 tests, 0 failed, 83 skipped; frame groups 19/0 and 50/0; Finder 1,796 OK, 0 wrong. An earlier run had one frame-only `SidebarGroupReorder` failure at 48 ms; it passed alone (24/0) and in the final full rerun.
+- The x64 APK was verified as `com.alfamin.noctisplus.auditlyrics279`, installed with `adb install --no-incremental -r`, and opened the existing synthetic audit profile without clearing data. Home/library/player navigation worked. The lyrics page showed the existing “No Lyrics” state even after a synthetic `.elrc` was placed beside Audit A, so there was no live animation to inspect. No live motion result is claimed.
+
+AVD is closed. The test touched only `NoctisPlusRecovery` and the signed-out synthetic audit package; no Telegram/login/session or real app profile was used. Android asked for notifications on the fresh install and “Don't allow” was selected; its permission flags were not restored before the AVD shut down. A synthetic `Noctis-Audit-A.elrc` may remain in `/sdcard/Music/NoctisAudit279`; it was created solely for this test. Restore the notification prompt state and remove that exact synthetic sidecar on the next AVD run before preserving/handing off the profile. Do not clear app data.
+
+Next: get a supported synthetic word-timed lyric into the existing AVD profile (verify the SAF sidecar is visible or use an in-app/import route), then visually confirm smooth Latin letter rise, a held word, and Persian/RTL whole-word rendering. Inspect raster/frame behavior and `dumpsys gfxinfo`; if the look or performance regresses, adjust or back out. Only then mark this native Lyric Motion slice done. The online lookup cancellation and Android multi-provider timing pipeline remain separate open work.

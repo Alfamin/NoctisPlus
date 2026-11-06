@@ -7,6 +7,7 @@ using Avalonia.Markup.Xaml;
 using Avalonia.Platform;
 using Avalonia.Styling;
 using Avalonia.Threading;
+using Noctis.Controls;
 using Noctis.Android.Services;
 using Noctis.Helpers;
 using Noctis.Localization;
@@ -62,6 +63,11 @@ public partial class AndroidApp : Avalonia.Application, IThemeHost
     public override void OnFrameworkInitializationCompleted()
     {
         Current = this;
+#if NOCTIS_PLUS
+        // Native Plus motion reuses the shared posed karaoke renderer on the phone only.
+        // The desktop renderer and stock Noctis Android build remain untouched.
+        LyricsWordEffect.Set(new PlusLyricMotionEffect());
+#endif
         var context = AApplication.Context;
         // The shared metadata/Telegram stacks consult HttpClient.DefaultProxy. Android's
         // ProxySelector is the authority for system HTTP proxies, PAC and exclusion lists.

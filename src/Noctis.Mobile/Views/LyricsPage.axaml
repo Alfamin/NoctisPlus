@@ -98,9 +98,9 @@
             <Setter Property="ClipToBounds" Value="False" />
             <Setter Property="Transitions">
                 <Transitions>
-                    <TransformOperationsTransition Property="RenderTransform" Duration="0:0:1">
+                    <TransformOperationsTransition Property="RenderTransform" Duration="0:0:0.65">
                         <TransformOperationsTransition.Easing>
-                            <helpers:LineMotionEase />
+                            <helpers:PlusLineMotionEase />
                         </TransformOperationsTransition.Easing>
                     </TransformOperationsTransition>
                     <DoubleTransition Property="Opacity" Duration="0:0:0.5" Easing="CubicEaseInOut" />
@@ -287,6 +287,7 @@
             <ScrollViewer Grid.Row="3" Name="LyricsScroll" HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Auto"
                           IsVisible="{Binding Lyrics.HasLyrics}">
                 <ItemsControl Name="LyricsList" ItemsSource="{Binding Lyrics.Lines}" FontSize="{Binding Lyrics.LineFontSize}"
+                              controls:LyricsWordEffect.Surface="Page"
                               ClipToBounds="False">
                     <ItemsControl.ItemsPanel>
                         <ItemsPanelTemplate>
