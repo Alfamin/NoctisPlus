@@ -56,3 +56,5 @@ already committed remain, but further upstream-only features are deferred.
 Each slice gets focused meaningful checks, full gates at integration boundaries, Android x64/ARM64
 compile, and real synthetic-profile emulator checks where possible. No DONE on headless checks alone.
 Real account/physical-phone constraints stay explicit. No releases or main/native merges.
+
+Gate update 2026-11-06: after the earlier incomplete frame run, `codex-online-doc-279c` completed the full gate at 9,592/0 failed/83 skipped, frame groups 19/0 and 50/0, Finder 1,796/0 wrong. The Core document helper is pushed as `9a78d3e8`. Android x64/ARM64 builds reported 0 errors. Live app verification remains required; do not mark automatic phone timing or this slice DONE.
