@@ -369,26 +369,31 @@ internal sealed class TelegramBotChats(TelegramAccount account) : IBotChats
 {
     public bool Ready => account.IsLoggedIn;
 
-    public async Task<IReadOnlyList<Message>> SongsAsync(string bot, int olderThan, CancellationToken ct)
+    // Owner #279: the two reads go again on a fresh connection when the session broke (TelegramAccount.OnSessionAsync).
+    public Task<IReadOnlyList<Message>> SongsAsync(string bot, int olderThan, CancellationToken ct) => account.OnSessionAsync<IReadOnlyList<Message>>(async client =>
     {
-        var client = await account.ConnectAsync(ct).ConfigureAwait(false);
         var peer = await account.BotAsync(client, bot, ct).ConfigureAwait(false);
         var found = await client.Messages_Search(peer, null, new InputMessagesFilterMusic(), offset_id: olderThan, limit: 100)
             .WaitAsync(TimeSpan.FromSeconds(25), ct).ConfigureAwait(false);
         return found.Messages.OfType<Message>().ToArray();
-    }
+    }, ct);
 
-    public async Task<Message?> MessageAsync(string bot, int id, CancellationToken ct)
+    public Task<Message?> MessageAsync(string bot, int id, CancellationToken ct) => account.OnSessionAsync(async client =>
     {
-        var client = await account.ConnectAsync(ct).ConfigureAwait(false);
         var peer = await account.BotAsync(client, bot, ct).ConfigureAwait(false);
         var page = await client.Messages_GetHistory(peer, offset_id: id + 1, limit: 1).WaitAsync(TimeSpan.FromSeconds(25), ct).ConfigureAwait(false);
         return page.Messages.OfType<Message>().FirstOrDefault(m => m.id == id);
-    }
+    }, ct);
 
     public async Task DownloadAsync(Document document, Stream output, IProgress<double>? progress, CancellationToken ct)
     {
         var client = await account.ConnectAsync(ct).ConfigureAwait(false);
-        await AudioFileTransfer.DownloadAsync(account, client, document, output, progress, ct).ConfigureAwait(false);
+        try { await AudioFileTransfer.DownloadAsync(account, client, document, output, progress, ct).ConfigureAwait(false); }
+        catch (Exception ex) when (TelegramAccount.IsBrokenSession(ex))
+        {
+            // Bytes may already be in the output, so not repeated here: the download is retried (Downloads), on a new connection.
+            await account.RetireConnectionAsync(client).ConfigureAwait(false);
+            throw;
+        }
     }
 }
