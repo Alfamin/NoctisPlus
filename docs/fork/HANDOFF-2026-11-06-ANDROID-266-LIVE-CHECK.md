@@ -26,3 +26,6 @@ The temporary proxy was stopped and emulator state restored: system proxy `10.0.
 4. Continue `PHONE-WORD-TIMING-NEXT-277.md` only after the cancellation check, keeping the LRCLIB fallback and current-track priority.
 
 No release, merge, tag, build, install, or account action was performed in this checkpoint.
+
+## Follow-up emulator state audit — 2026-11-06 16:58 Tehran
+A cold-booted `NoctisPlusRecovery` test profile confirmed `OfflineMode=false` and `LrcLibEnabled=true`; the same synthetic track still showed final “No Lyrics” too quickly to capture a pending request. The AVD’s global proxy unexpectedly came back as `10.0.2.2:18080` after a prior in-session restore to `10.0.2.2:10808`; this indicates proxy restoration did not survive cold boot. I corrected the running AVD to `10.0.2.2:10808`, delay 0 ms, full speed, Wi-Fi/mobile enabled, then closed the AVD. Cold-boot persistence is unverified; verify the proxy before the next test. Two 3-minute synthetic MP3s were created in the isolated Temp audit folder but were not copied into the AVD. No user profile or app data was cleared and no account was used. Cancellation remains headless-only.
