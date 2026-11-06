@@ -8,6 +8,14 @@ Focused `MobileLyricsOnlineTests`: 11 passed, 0 failed. Full `codex-online-cance
 
 Exact source changes: `src/Noctis.Mobile/ViewModels/LyricsPageViewModel.cs` and `tests/Noctis.Tests/MobileLyricsOnlineTests.cs`. The next required proof is a live isolated Android check that changing tracks cancels the old lyrics lookup without displaying a false failure. Then continue the native online timing pipeline in `PHONE-WORD-TIMING-NEXT-277.md`; Android still uses LRCLIB only, and has no native lrc.red/Unison/Kugou orchestration or audio-fit check.
 
+## Timing document extraction — 2026-11-06 15:30 Tehran
+
+After pushed `b5102a36`, the current local work moves pure timing-document logic into `Noctis.Core/Services/Lyrics/OnlineTimingDocument.cs`: the shared source enum/labels, main-vocal word counting, 30-word eligibility threshold, TTML provenance marker and fit-uncertainty marker. Desktop `OnlineTimingFit` and `OnlineTimingSidecar` delegate to it; desktop ffmpeg/audio-fit and sidecar file operations are unchanged. This is groundwork for the phone and does not yet change phone lookup behavior.
+
+Evidence: focused timing/provider and mobile online lyric tests 40 passed/0 failed; Android Debug x64 and ARM64 both built with 0 errors. Gate `codex-online-doc-279`: all 10 shards completed, 9,523 tests, 0 failed, 83 skipped; Finder 1,796 OK/0 wrong. The gate wrapper then remained waiting before isolated frame groups. A separate `Noctis.Tests.exe` from `C:\Users\Alfamine\nplus-merge-168` was actively consuming CPU; it was not stopped. Our wrapper was interrupted, so isolated frame groups are NOT verified and this is NOT a full green gate. No Android APK was installed, and no live app check was made. Do not call this slice DONE.
+
+Next: when the independent test run is idle, run the two isolated frame groups and close out a fresh full gate. Then update/install a fresh x64 Android Debug APK into the isolated signed-out audit profile and live-check the cancellation behavior. Keep the previous owner-facing emulator profile and its playlist data intact. Continue with `PHONE-WORD-TIMING-NEXT-277.md`; Android is still LRCLIB-only.
+
 Worktree C:\Users\Alfamine\nplus-codex-257; dedicated branch codex-android-262; source HEAD680c325d. Original noctis-fork untouched. Read HANDOFF-2026-11-05-ANDROID-PLAYLISTS-275-276.md, ANDROID-PLUS-PARITY-266.md, external LEAN-PLAN #262 onward. Inspect actual git/process state; don't duplicate builds.
 
 FIRST actual get_usage_limits + Asia/Tehran time. #267 >=90% used = WRAP-UP ONLY; no new feature/build/research. Start docs/fork/tools/Start-QuotaWatch.ps1; check artifacts/plus/tools/quota-status.json before blocks; actual reads <=5min apart. Latest direct18:31:13UTC83%primary/13%weekly. Watcheractive. Read actual now, don't infer.

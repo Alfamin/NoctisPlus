@@ -23,11 +23,18 @@ Files: `src/Noctis.Mobile/ViewModels/LyricsPageViewModel.cs`, `tests/Noctis.Test
 
 This is validated code, not a completed user-facing parity item. Do not mark DONE until the isolated real-app check passes.
 
+## Follow-up: portable timing document foundation
+
+Commit `b5102a36` was pushed to `origin/codex-android-262`. A second local slice now extracts the existing desktop word-coverage threshold, TTML source label/provenance and fit-uncertainty marker into `src/Noctis.Core/Services/Lyrics/OnlineTimingDocument.cs`; desktop adapters delegate to it. No phone source order, audio fit, cache behavior or renderer changed.
+
+Focused timing/provider/mobile checks: 40/0. Android Debug x64 and ARM64 builds: 0 errors. The ten shards passed 9,523/0 failed/83 skipped and Finder was 1,796/0 wrong. The gate wrapper hung before frame sampling; a separate test run in `C:\Users\Alfamine\nplus-merge-168` was actively using CPU and was not touched. Frame groups and live app verification remain pending, so the extraction is not yet fully gated or DONE. No APK/profile was replaced.
+
 ## Next
 
-1. Run the live isolated Android check: begin an online lyric lookup on one track, change tracks, confirm the first request cancels, the new track owns the lyrics view, and cancellation does not display a network-failure state. Preserve the audit profile; do not copy any session.
-2. Continue the ordered work in `PHONE-WORD-TIMING-NEXT-277.md`: portable word-timing document/coverage/attribution, bounded ordered lrc.red → Unison → Kugou lookup with LRCLIB fallback, cache/offline/transient-miss semantics, then audio-fit seam and current/next-two priority. Do not treat catalog metadata as audio-fit proof, download a local model, or replace the desktop renderer.
-3. Keep full gates, Android x64/ARM64 builds, and live isolated-app evidence before marking each integrated slice done.
+1. After the independent suite in `nplus-merge-168` is idle, complete the isolated frame groups and full gate for the Core extraction. Do not kill that other test process.
+2. Run the live isolated Android check: begin an online lyric lookup on one track, change tracks, confirm the first request cancels, the new track owns the lyrics view, and cancellation does not display a network-failure state. Preserve the audit profile; do not copy any session.
+3. Continue the ordered work in `PHONE-WORD-TIMING-NEXT-277.md`: bounded ordered lrc.red → Unison → Kugou lookup with LRCLIB fallback, cache/offline/transient-miss semantics, then audio-fit seam and current/next-two priority. Do not treat catalog metadata as audio-fit proof, download a local model, or replace the desktop renderer.
+4. Keep full gates, Android x64/ARM64 builds, and live isolated-app evidence before marking each integrated slice done.
 
 ## Rules
 

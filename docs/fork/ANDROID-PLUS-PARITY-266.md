@@ -39,6 +39,8 @@ complaints remain behind useful Plus parity. Do not rewrite desktop behavior mer
 
 First bounded timing-readiness fix: the native lyrics page now passes a cancellation token to its online lookup and cancels the previous request on track change or page disposal. Cancellation does not become a false network failure; existing generation checks still discard late answers from providers that ignore cancellation. The 11 phone online-lyrics tests pass; full 10-shard gate is 9,592/0 failed/83 skipped, frame checks 19/0 and 50/0, Finder 1,796/0 wrong; Android x64 and ARM64 compile with 0 errors. No live app check yet, so this does not close the parity item. The phone still uses LRCLIB only. Continue with the portable document/word-coverage/orchestration plan in `PHONE-WORD-TIMING-NEXT-277.md`.
 
+Shared-document follow-up: pure word coverage, minimum word count, source labeling and TTML provenance now live in Core and the desktop fit/sidecar adapters delegate to those same helpers. Focused checks: 40/0; x64/ARM64 builds: 0 errors. For `codex-online-doc-279`, all 10 test shards passed (9,523 tests, 0 failed, 83 skipped) and Finder reported 1,796/0 wrong, but the isolated frame groups did not complete because the wrapper stalled while an independent test run in `nplus-merge-168` was active. No APK/live check. Not DONE; repeat the frame groups/full gate and live-check before closing this slice.
+
 Existing upstream phone functionality (local library, album/artist pages, LAN account, EQ, scrobbling,
 plain/synced lyrics, themes) is reused, not counted as a newly completed Plus port. #263 additions
 already committed remain, but further upstream-only features are deferred.

@@ -25,7 +25,7 @@ internal static class OnlineTimingFit
 
     internal const int Rate = 16000, Hop = 160, Size = 1024, MaxLag = 100;
     internal const double MinSharpness = 0.10, BigShift = 0.12, Agree = 0.08, Ignore = 0.05, Edge = 0.95;
-    internal const int MinWords = 30, Rolls = 16;
+    internal const int MinWords = OnlineTimingDocument.MinWords, Rolls = 16;
     internal const double MinSignificance = 2.0;
     const int MaxSeconds = 900;
     static readonly int LowBin = (int)Math.Ceiling(300.0 * Size / Rate), HighBin = (int)Math.Floor(3400.0 * Size / Rate);
@@ -34,20 +34,9 @@ internal static class OnlineTimingFit
     /// <summary>Main-voice word onsets (split syllables joined, background vocals left out); empty when untimed.</summary>
     public static IReadOnlyList<Word> WordsOf(string? ttml)
     {
-        var (lines, _) = TtmlParser.Parse(ttml, joinSplitWords: true);
-        var words = new List<Word>();
-        foreach (var line in lines ?? [])
-        {
-            if (line.IsBackgroundOnly || line.Words is not { Count: > 0 } row) continue;
-            var first = true;
-            foreach (var w in row)
-            {
-                if (string.IsNullOrWhiteSpace(w.Text)) continue;
-                words.Add(new Word(w.Start.TotalSeconds, (w.End ?? w.Start).TotalSeconds, first));
-                first = false;
-            }
-        }
-        return words;
+        return OnlineTimingDocument.WordsOf(ttml)
+            .Select(word => new Word(word.Start, word.End, word.First))
+            .ToArray();
     }
 
     /// <summary>Decodes the file with ffmpeg and measures; null when ffmpeg is missing or fails (= no fit).</summary>
