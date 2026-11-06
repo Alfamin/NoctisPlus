@@ -27,6 +27,28 @@ public class MobileLyricsOnlineTests : IDisposable
         }
     }
 
+    private sealed class CancellableOnline : IOnlineLyricsSource
+    {
+        public TaskCompletionSource<string> Started { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        public TaskCompletionSource<string> Cancelled { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
+
+        public async Task<OnlineLyrics?> FindAsync(Track track, CancellationToken ct)
+        {
+            if (track.Title != "a") return new OnlineLyrics("[00:01.00]song b", false);
+            Started.TrySetResult(track.Title);
+            try
+            {
+                await Task.Delay(Timeout.InfiniteTimeSpan, ct);
+                return null;
+            }
+            catch (OperationCanceledException) when (ct.IsCancellationRequested)
+            {
+                Cancelled.TrySetResult(track.Title);
+                return null;
+            }
+        }
+    }
+
     private sealed class FakeLrcLib : ILrcLibService
     {
         public LrcLibResult? Get { get; set; }
@@ -171,6 +193,23 @@ public class MobileLyricsOnlineTests : IDisposable
 
         Assert.Equal("song b", Assert.Single(vm.Lines).Text);
         Assert.False(vm.IsSearchingOnline);
+    }
+
+    [Fact]
+    public async Task ChangingSongs_CancelsOldOnlineLookup_AndLoadsTheNewSongsLyrics()
+    {
+        var online = new CancellableOnline();
+        var (vm, np, _, _, _) = Make(online);
+
+        np.PlayTracks(new[] { NewTrack("a"), NewTrack("b") }, 0);
+        Assert.Equal("a", await online.Started.Task.WaitAsync(TimeSpan.FromSeconds(2)));
+
+        np.NextCommand.Execute(null);
+
+        Assert.Equal("a", await online.Cancelled.Task.WaitAsync(TimeSpan.FromSeconds(2)));
+        await WaitForAsync(() => vm.HasLyrics && !vm.IsSearchingOnline);
+        Assert.Equal("song b", Assert.Single(vm.Lines).Text);
+        Assert.False(vm.OnlineLookupFailed);
     }
 
     [Fact]

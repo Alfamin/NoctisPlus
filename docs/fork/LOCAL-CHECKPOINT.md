@@ -1,5 +1,13 @@
 # Noctis Plus Android — saved green checkpoint, 2026-11-05 22:01 Tehran
 
+## Latest continuation — 2026-11-06 15:10 Tehran
+
+Worktree `C:\Users\Alfamine\nplus-codex-257`, branch `codex-android-262`; original `noctis-fork` untouched. Latest usage read: 6% used in the currently reported 30-day window, no secondary window, no earned reset credits; watcher is active and below wrap-up. Do not infer resets or redeem anything. Android lyrics page now cancels the prior online lookup when the selected song changes or the page is disposed, while retaining the generation guard so a provider that ignores cancellation still cannot replace the new song. Cancellation is not shown as a lyrics-service error.
+
+Focused `MobileLyricsOnlineTests`: 11 passed, 0 failed. Full `codex-online-cancel-278` gates: 9,592 total, 0 failed, 83 skipped; isolated frame groups 19/0 and 50/0; Finder 1,796 OK, 0 wrong. Android Debug x64 and ARM64 both built with 0 errors. The emulator was not running during gate checks; no TEST profile or APK was changed, and no real-app live check has been made for this slice. This is BUILT/VALIDATED headlessly, NOT DONE. Preserve this distinction in handoffs.
+
+Exact source changes: `src/Noctis.Mobile/ViewModels/LyricsPageViewModel.cs` and `tests/Noctis.Tests/MobileLyricsOnlineTests.cs`. The next required proof is a live isolated Android check that changing tracks cancels the old lyrics lookup without displaying a false failure. Then continue the native online timing pipeline in `PHONE-WORD-TIMING-NEXT-277.md`; Android still uses LRCLIB only, and has no native lrc.red/Unison/Kugou orchestration or audio-fit check.
+
 Worktree C:\Users\Alfamine\nplus-codex-257; dedicated branch codex-android-262; source HEAD680c325d. Original noctis-fork untouched. Read HANDOFF-2026-11-05-ANDROID-PLAYLISTS-275-276.md, ANDROID-PLUS-PARITY-266.md, external LEAN-PLAN #262 onward. Inspect actual git/process state; don't duplicate builds.
 
 FIRST actual get_usage_limits + Asia/Tehran time. #267 >=90% used = WRAP-UP ONLY; no new feature/build/research. Start docs/fork/tools/Start-QuotaWatch.ps1; check artifacts/plus/tools/quota-status.json before blocks; actual reads <=5min apart. Latest direct18:31:13UTC83%primary/13%weekly. Watcheractive. Read actual now, don't infer.

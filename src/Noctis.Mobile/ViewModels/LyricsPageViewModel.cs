@@ -44,6 +44,7 @@ public sealed partial class LyricsPageViewModel : ObservableObject, IDisposable
     private readonly LyricsTimeline _timeline;
     private readonly LyricsPlaybackClock _clock = new();
     private int _generation;
+    private CancellationTokenSource? _onlineLookupStop;
     private bool _settingsLoaded;
     // Settings changed by the user before InitializeAsync read the saved ones (Settings opens
     // while a cold start still loads the library): the load keeps these and saves them.
@@ -327,6 +328,7 @@ public sealed partial class LyricsPageViewModel : ObservableObject, IDisposable
     private async Task LoadAsync(Track? track)
     {
         var generation = ++_generation;
+        Interlocked.Exchange(ref _onlineLookupStop, null)?.Cancel();
         _timeline.Reset();
         _clock.Reset();
         ActiveLineIndex = -1;
@@ -367,28 +369,38 @@ public sealed partial class LyricsPageViewModel : ObservableObject, IDisposable
         if (result.Lines.Count == 0 && FindLyricsOnline && Online is { } online)
         {
             IsSearchingOnline = true;
-            var found = await FindOnlineAsync(online, track);
-            if (generation != _generation || _disposed) return;
-            IsSearchingOnline = false;
-            if (found is { Failed: true })
+            using var lookupStop = new CancellationTokenSource();
+            var priorLookup = Interlocked.Exchange(ref _onlineLookupStop, lookupStop);
+            priorLookup?.Cancel();
+            try
             {
-                OnlineLookupFailed = true;
-            }
-            else if (found is { Instrumental: true })
-            {
-                IsInstrumental = true;
-            }
-            else if (found != null)
-            {
-                try
-                {
-                    result = await _runBackground(() => LyricsLoader.FromOnlineText(found.Text) ?? LoadedLyrics.None);
-                }
-                catch (Exception ex)
-                {
-                    DebugLog.Write("Lyrics", $"Online lyrics parse failed for {track.Title}: {ex.Message}");
-                }
+                var found = await FindOnlineAsync(online, track, lookupStop.Token);
                 if (generation != _generation || _disposed) return;
+                IsSearchingOnline = false;
+                if (found is { Failed: true })
+                {
+                    OnlineLookupFailed = true;
+                }
+                else if (found is { Instrumental: true })
+                {
+                    IsInstrumental = true;
+                }
+                else if (found != null)
+                {
+                    try
+                    {
+                        result = await _runBackground(() => LyricsLoader.FromOnlineText(found.Text) ?? LoadedLyrics.None);
+                    }
+                    catch (Exception ex)
+                    {
+                        DebugLog.Write("Lyrics", $"Online lyrics parse failed for {track.Title}: {ex.Message}");
+                    }
+                    if (generation != _generation || _disposed) return;
+                }
+            }
+            finally
+            {
+                Interlocked.CompareExchange(ref _onlineLookupStop, null, lookupStop);
             }
         }
 
@@ -407,11 +419,15 @@ public sealed partial class LyricsPageViewModel : ObservableObject, IDisposable
         }
     }
 
-    private static async Task<OnlineLyrics?> FindOnlineAsync(IOnlineLyricsSource online, Track track)
+    private static async Task<OnlineLyrics?> FindOnlineAsync(IOnlineLyricsSource online, Track track, CancellationToken ct)
     {
         try
         {
-            return await online.FindAsync(track, CancellationToken.None);
+            return await online.FindAsync(track, ct);
+        }
+        catch (OperationCanceledException) when (ct.IsCancellationRequested)
+        {
+            return null;
         }
         catch (Exception ex)
         {
@@ -508,6 +524,7 @@ public sealed partial class LyricsPageViewModel : ObservableObject, IDisposable
     public void Dispose()
     {
         _disposed = true;
+        Interlocked.Exchange(ref _onlineLookupStop, null)?.Cancel();
         _nowPlaying.PropertyChanged -= OnNowPlayingChanged;
     }
 }

@@ -35,6 +35,10 @@ complaints remain behind useful Plus parity. Do not rewrite desktop behavior mer
 | P2 Plus defaults/identity/update channels/licenses | Core ProductIdentity/AppSettings, Android AppVariant, desktop update policy | Android Plus identity/side-by-side package exists. Stable signing/release pipeline still requires owner release authorization/key. Only apply meaningful phone defaults; retain license/provenance. |
 | Desktop implementation only | PowerShell installs/UAC/desktop hotkeys/VLC/Windows tray/DWM/CLI editing | Do not port these OS mechanisms. Port their useful user outcomes through Android equivalents where needed, including file grants, controls and sharing. |
 
+## Android lyrics timing continuation — 2026-11-06
+
+First bounded timing-readiness fix: the native lyrics page now passes a cancellation token to its online lookup and cancels the previous request on track change or page disposal. Cancellation does not become a false network failure; existing generation checks still discard late answers from providers that ignore cancellation. The 11 phone online-lyrics tests pass; full 10-shard gate is 9,592/0 failed/83 skipped, frame checks 19/0 and 50/0, Finder 1,796/0 wrong; Android x64 and ARM64 compile with 0 errors. No live app check yet, so this does not close the parity item. The phone still uses LRCLIB only. Continue with the portable document/word-coverage/orchestration plan in `PHONE-WORD-TIMING-NEXT-277.md`.
+
 Existing upstream phone functionality (local library, album/artist pages, LAN account, EQ, scrobbling,
 plain/synced lyrics, themes) is reused, not counted as a newly completed Plus port. #263 additions
 already committed remain, but further upstream-only features are deferred.
