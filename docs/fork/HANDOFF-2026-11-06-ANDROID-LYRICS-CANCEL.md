@@ -39,3 +39,6 @@ Focused timing/provider/mobile checks: 40/0. Android Debug x64 and ARM64 builds:
 ## Rules
 
 Log any new owner request in the external LEAN-PLAN before work. Preserve profiles/logins; `D:\music` is read-only; never copy Telegram sessions. Commit exact file names on `codex-android-262`; no main/native merge, tag, or release. No reset redemption or paid/model downloads.
+
+## Checkpoint update — 2026-11-06 15:36 Tehran
+The shared timing-document helper and docs are now commit `9a78d3e8`, pushed to `origin/codex-android-262`. Focused 40/0 and Android x64/ARM64 0-error builds remain the evidence. The previous full gate completed all test shards (9,523/0 failed/83 skipped) and Finder (1,796/0 wrong), but did not complete frame groups; no live app check. Do not call this done. Another suite/build in the separate `nplus-merge-168` worktree was active, so it was left untouched. Next: once it is idle, run full gate including both frame groups; then install/check the exact source in the isolated signed-out Android audit profile and close the emulator.
