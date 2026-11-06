@@ -1,6 +1,6 @@
 # Android Lyric Motion #278 checkpoint — 2026-11-06 18:23 Tehran
 
-Worktree `C:\Users\Alfamine\nplus-codex-257`, branch `codex-android-262`. This is a BUILT implementation checkpoint, NOT DONE: the actual lyrics animation still needs a real-app visual check with synthetic word-timed lyrics.
+Worktree `C:\Users\Alfamine\nplus-codex-257`, branch `codex-android-262`. The implementation and isolated synthetic real-app visual check are complete; see the final verification below.
 
 Implemented natively on the phone with the existing `KaraokeWordText` posed drawing path. New `PlusLyricMotionEffect` copies the smooth Plus motion values as pure math (source attribution retained in code), and `PlusMotionCurves` provides allocation-free easing. Android Plus installs the effect at app startup; stock Android and desktop remain untouched. The phone lyrics list uses `WordSurface.Page`; its active-line transition now matches the Plus 650 ms curve. The Inter font is already supplied by the Android app's existing `WithInterFont` and mobile text styles. The posed-path baseline snap fix described by the plan was already present before this slice; existing `KaraokePoseRestTests` cover it, so that renderer file was not changed.
 
