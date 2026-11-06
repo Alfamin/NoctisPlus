@@ -21,9 +21,14 @@ public sealed partial class PlaylistListPageViewModel : MobilePage, ISortable
             new SortChoice("Mobile.Sort.RecentlyUpdated", PlaylistSort.RecentlyUpdated),
             new SortChoice("Mobile.RecentlyAdded", PlaylistSort.RecentlyAdded),
         };
+        ApplySavedSort();
+        Shell.ListSortChanged += OnListSortChanged;
         Shell.Library.Refreshed += OnRefreshed;
         Refresh();
     }
+
+    /// <summary>The key the list's sort is saved under (the tab's list and Library's Playlists page share it).</summary>
+    internal const string SortKey = "Nav.Playlists";
 
     public ShellViewModel Shell { get; }
 
@@ -115,6 +120,22 @@ public sealed partial class PlaylistListPageViewModel : MobilePage, ISortable
         foreach (var c in SortChoices) c.IsSelected = ReferenceEquals(c, choice);
         Sort = (PlaylistSort)choice.Key;
         Refresh();
+        Shell.SaveListSort(SortKey, Sort, false, PlaylistSort.Title);
+    }
+
+    /// <summary>Puts the list in its saved sort (by name when none is saved); true when that changed it.</summary>
+    private bool ApplySavedSort()
+    {
+        if (!Shell.TryGetListSort<PlaylistSort>(SortKey, out var sort, out _)) sort = PlaylistSort.Title;
+        if (sort == Sort) return false;
+        foreach (var c in SortChoices) c.IsSelected = Equals(c.Key, sort);
+        Sort = sort;
+        return true;
+    }
+
+    private void OnListSortChanged(object? sender, string? key)
+    {
+        if ((key == null || key == SortKey) && ApplySavedSort()) Refresh();
     }
 
     public void Refresh()
@@ -154,6 +175,8 @@ public sealed partial class PlaylistListPageViewModel : MobilePage, ISortable
         _importStop.Cancel();
         Shell.Library.Refreshed -= OnRefreshed;
         if (_imports is not null) _imports.Changed -= OnImportsChanged;
+        Shell.Library.Refreshed -= OnRefreshed;
+        Shell.ListSortChanged -= OnListSortChanged;
     }
 }
 

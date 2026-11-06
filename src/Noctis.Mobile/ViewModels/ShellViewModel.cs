@@ -429,7 +429,7 @@ public sealed partial class ShellViewModel : ObservableObject
 
     /// <summary>The Favorites tab's root: the favourite songs, embedded under the tab's title.</summary>
     public SongListPageViewModel FavoritesRoot =>
-        _favoritesRoot ??= new SongListPageViewModel(this, "Nav.Favorites", Library.Favourites) { IsEmbedded = true, OffersFavouritesFilter = false };
+        _favoritesRoot ??= new SongListPageViewModel(this, "Nav.Favorites", Library.Favourites, sortKey: "Nav.Favorites") { IsEmbedded = true, OffersFavouritesFilter = false };
 
     // The sides too: in landscape the 3-button navigation bar or a side cutout sits left or
     // right, and without them the content drew under it.
@@ -888,13 +888,13 @@ public sealed partial class ShellViewModel : ObservableObject
         Player.PlayTracks(songs, index, Loc.T("Nav.Songs"));
     }
 
-    [RelayCommand] private void OpenSongs() => Navigate(new SongListPageViewModel(this, "Nav.Songs", () => Library.Songs));
+    [RelayCommand] private void OpenSongs() => Navigate(new SongListPageViewModel(this, "Nav.Songs", () => Library.Songs, sortKey: "Nav.Songs"));
 
-    [RelayCommand] private void OpenFavourites() => Navigate(new SongListPageViewModel(this, "Nav.Favorites", Library.Favourites) { OffersFavouritesFilter = false });
+    [RelayCommand] private void OpenFavourites() => Navigate(new SongListPageViewModel(this, "Nav.Favorites", Library.Favourites, sortKey: "Nav.Favorites") { OffersFavouritesFilter = false });
 
-    [RelayCommand] private void OpenRecentlyAdded() => Navigate(new SongListPageViewModel(this, "Mobile.RecentlyAdded", Library.RecentlyAdded));
     [RelayCommand] private void OpenHomePlaylists() => SelectTab(MobileTab.Playlists);
     [RelayCommand] private void OpenForYou() { if (ForYou is { } page) Navigate(page); }
+    [RelayCommand] private void OpenRecentlyAdded() => Navigate(new SongListPageViewModel(this, "Mobile.RecentlyAdded", Library.RecentlyAdded, sortKey: "Mobile.RecentlyAdded"));
 
     [RelayCommand] private void OpenAlbums() => Navigate(new AlbumGridPageViewModel(this));
 
@@ -905,7 +905,7 @@ public sealed partial class ShellViewModel : ObservableObject
     // Library sections' › headers.
     [RelayCommand] private void OpenPinned() => Navigate(new RailGridPageViewModel(this, "Mobile.Pinned", () => Library.PinnedRail));
 
-    [RelayCommand] private void OpenOnRepeat() => Navigate(new SongListPageViewModel(this, "Mobile.OnRepeat", Library.OnRepeatTracks));
+    [RelayCommand] private void OpenOnRepeat() => Navigate(new SongListPageViewModel(this, "Mobile.OnRepeat", Library.OnRepeatTracks, sortKey: "Mobile.OnRepeat"));
 
     [RelayCommand] private void OpenRecentlyPlayed() => Navigate(new RailGridPageViewModel(this, "Mobile.RecentlyPlayed", () => Library.RecentlyPlayedRail));
 
@@ -1355,6 +1355,7 @@ public sealed partial class ShellViewModel : ObservableObject
         await Library.InitializeAsync();
         if (ForYou is { } recommendations) _ = recommendations.LoadAsync(); // metadata only; never holds up first frame
         await LoadPlayerBarSettingsAsync();
+        await LoadListSortsAsync();
         await Background.LoadAsync();
         await LoadHistoryPrefsAsync();
         // Lyrics settings before the queue restore: restoring sets CurrentTrack, which loads
