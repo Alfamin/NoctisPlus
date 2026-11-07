@@ -69,7 +69,9 @@ public sealed class PlusOnlineLyricsSource : IOnlineLyricsSource
             {
                 var result = await provider.Find(track, timeout.Token).ConfigureAwait(false);
                 if (result == null || result.Instrumental || !IsMatchingRecording(result, track)) continue;
-                var text = result.OriginalTtml ?? result.SyncedLyrics;
+                // Core providers expose TTML as provenance while SyncedLyrics is their
+                // converted ELRC/LRC payload. LyricsLoader parses the converted form.
+                var text = result.SyncedLyrics;
                 if (!HasWordLevelTiming(text)) continue;
 
                 var found = new OnlineLyrics(text!, false)

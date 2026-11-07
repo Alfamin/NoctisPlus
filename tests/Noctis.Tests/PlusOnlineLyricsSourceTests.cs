@@ -32,6 +32,22 @@ public sealed class PlusOnlineLyricsSourceTests : IDisposable
     }
 
     [Fact]
+    public async Task ConvertedWordLyricsWinOverRawTtmlProvenance()
+    {
+        var provider = new PlusOnlineLyricsSource.Provider("lrc.red", (_, _) =>
+            Task.FromResult<LrcLibResult?>(WordResult(WordLrc) with
+            {
+                OriginalTtml = "<tt><body><div><p begin=\"1s\">raw provider TTML</p></div></body></tt>",
+            }));
+
+        var result = await MakeSource(new[] { provider }).FindAsync(Track(), CancellationToken.None);
+
+        Assert.NotNull(result);
+        Assert.Equal(WordLrc, result.Text);
+        Assert.True(LyricsLoader.FromOnlineText(result.Text)!.Lines.Any(line => line.Words?.Count >= 2));
+    }
+
+    [Fact]
     public async Task FailureFallsThroughButAllFailuresAreNotReportedAsDefinitiveMiss()
     {
         var order = new List<string>();
