@@ -53,7 +53,7 @@ public sealed record SettingsFolder(string Root, string Name, bool AccessLost)
 public sealed record LicenseEntry(string Name, string License, string Detail);
 
 /// <summary>Settings is one sheet: its top level, or one of the pages pushed inside it.</summary>
-public enum SettingsPane { Main, Folders, Lyrics, Background, Scrobbling, History, Accent, PlayerBar, Downloads, WhatsNew, Licenses, Language, Theme, Telegram }
+public enum SettingsPane { Main, Folders, Lyrics, Background, Scrobbling, History, Accent, PlayerBar, Downloads, WhatsNew, Licenses, Language, Theme, Telegram, Hidden }
 
 /// <summary>One line of Settings › Theme: a small preview of the theme (its page, a card and the
 /// chrome glass on it, its accent when it has one), its name, and a tick on the one in use.</summary>
@@ -151,6 +151,7 @@ public sealed partial class SettingsPageViewModel : MobilePage
         }
         Shell.Library.Folders.CollectionChanged += OnFoldersChanged;
         Shell.Library.PropertyChanged += OnLibraryChanged;
+        Shell.Library.Refreshed += OnLibraryRefreshed;
         Shell.Lyrics.PropertyChanged += OnLyricsChanged;
         Shell.PropertyChanged += OnShellChanged;
         Background.PropertyChanged += OnSubPageChanged;
@@ -194,7 +195,7 @@ public sealed partial class SettingsPageViewModel : MobilePage
     [NotifyPropertyChangedFor(nameof(ShowsFoldersPane), nameof(ShowsLyricsPane), nameof(ShowsBackgroundPane), nameof(ShowsScrobblingPane),
         nameof(ShowsHistoryPane), nameof(ShowsAccentPane), nameof(ShowsPlayerBarPane), nameof(ShowsDownloadsPane),
         nameof(ShowsWhatsNewPane), nameof(ShowsLicensesPane), nameof(ShowsLanguagePane), nameof(ShowsThemePane), nameof(ShowsTelegramPane),
-        nameof(LanguageListSource))]
+        nameof(ShowsHiddenPane), nameof(LanguageListSource))]
     private SettingsPane _shownSubPane = SettingsPane.Folders;
 
     public bool IsMainPane => Pane == SettingsPane.Main;
@@ -229,6 +230,7 @@ public sealed partial class SettingsPageViewModel : MobilePage
         SettingsPane.Language => Loc.T("Settings.Language.Title"),
         SettingsPane.Theme => Loc.T("Mobile.Settings.Theme"),
         SettingsPane.Telegram => "Telegram",
+        SettingsPane.Hidden => Loc.T("Mobile.Settings.Hidden"),
         _ => Title,
     };
 
@@ -1299,6 +1301,7 @@ public sealed partial class SettingsPageViewModel : MobilePage
         DropQuestion();
         Shell.Library.Folders.CollectionChanged -= OnFoldersChanged;
         Shell.Library.PropertyChanged -= OnLibraryChanged;
+        Shell.Library.Refreshed -= OnLibraryRefreshed;
         Shell.Lyrics.PropertyChanged -= OnLyricsChanged;
         Shell.PropertyChanged -= OnShellChanged;
         Background.PropertyChanged -= OnSubPageChanged;
