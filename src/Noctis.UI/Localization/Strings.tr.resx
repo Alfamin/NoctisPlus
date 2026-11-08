@@ -2808,4 +2808,8 @@ Bu parçalarla "{0}" adlı bir çalma listesi oluşturulsun mu?</value><comment>
   <data name="Mobile.LastFm.OpenOnLastFm" xml:space="preserve"><value>{0} öğesini Last.fm’de aç</value></data>
   <data name="Mobile.Scrobbling.Taste" xml:space="preserve"><value>Miksler ve Öneriler</value></data>
   <data name="Mobile.Scrobbling.TasteFootnote" xml:space="preserve"><value>Ana sayfa, Last.fm listelerinden şarkılarının mikslerini ve keşfedilecek sanatçıları gösterir. Yalnızca hesap adın kullanılır; hiçbir şey geri gönderilmez.</value></data>
+  <data name="Mobile.SnoozeForMonth" xml:space="preserve"><value>Bir ay ertele</value></data>
+  <data name="Mobile.Unsnooze" xml:space="preserve"><value>Ertelemeyi kaldır</value></data>
+  <data name="Mobile.SnoozedNotice" xml:space="preserve"><value>Bir ay ertelendi</value></data>
+  <data name="Mobile.UnsnoozedNotice" xml:space="preserve"><value>Erteleme kaldırıldı</value></data>
 </root>

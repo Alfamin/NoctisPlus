@@ -7826,4 +7826,8 @@
   <data name="Mobile.LastFm.OpenOnLastFm" xml:space="preserve"><value>فتح {0} على Last.fm</value></data>
   <data name="Mobile.Scrobbling.Taste" xml:space="preserve"><value>مزيجات وتوصيات</value></data>
   <data name="Mobile.Scrobbling.TasteFootnote" xml:space="preserve"><value>تعرض الصفحة الرئيسية مزيجات من أغانيك وفنانين لاكتشافهم من قوائم Last.fm الخاصة بك. يُستخدم اسم حسابك فقط؛ ولا يُرسل أي شيء.</value></data>
+  <data name="Mobile.SnoozeForMonth" xml:space="preserve"><value>تأجيل لمدة شهر</value></data>
+  <data name="Mobile.Unsnooze" xml:space="preserve"><value>إلغاء التأجيل</value></data>
+  <data name="Mobile.SnoozedNotice" xml:space="preserve"><value>تم التأجيل لمدة شهر</value></data>
+  <data name="Mobile.UnsnoozedNotice" xml:space="preserve"><value>تم إلغاء التأجيل</value></data>
 </root>

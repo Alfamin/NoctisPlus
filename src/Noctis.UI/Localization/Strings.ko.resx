@@ -7826,4 +7826,8 @@
   <data name="Mobile.LastFm.OpenOnLastFm" xml:space="preserve"><value>Last.fm에서 {0} 열기</value></data>
   <data name="Mobile.Scrobbling.Taste" xml:space="preserve"><value>믹스 및 추천</value></data>
   <data name="Mobile.Scrobbling.TasteFootnote" xml:space="preserve"><value>홈에 Last.fm 차트로 만든 내 곡 믹스와 새로 발견할 아티스트가 표시됩니다. 계정 이름만 사용하며 아무것도 보내지 않습니다.</value></data>
+  <data name="Mobile.SnoozeForMonth" xml:space="preserve"><value>한 달 동안 스누즈</value></data>
+  <data name="Mobile.Unsnooze" xml:space="preserve"><value>스누즈 해제</value></data>
+  <data name="Mobile.SnoozedNotice" xml:space="preserve"><value>한 달 동안 스누즈됨</value></data>
+  <data name="Mobile.UnsnoozedNotice" xml:space="preserve"><value>스누즈 해제됨</value></data>
 </root>

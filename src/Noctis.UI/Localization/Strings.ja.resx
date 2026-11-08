@@ -7826,4 +7826,8 @@
   <data name="Mobile.LastFm.OpenOnLastFm" xml:space="preserve"><value>{0}をLast.fmで開く</value></data>
   <data name="Mobile.Scrobbling.Taste" xml:space="preserve"><value>ミックスとおすすめ</value></data>
   <data name="Mobile.Scrobbling.TasteFootnote" xml:space="preserve"><value>ホームに、Last.fmのチャートから作ったあなたの曲のミックスと新しいアーティストを表示します。使うのはアカウント名だけで、何も送信しません。</value></data>
+  <data name="Mobile.SnoozeForMonth" xml:space="preserve"><value>1か月スヌーズ</value></data>
+  <data name="Mobile.Unsnooze" xml:space="preserve"><value>スヌーズを解除</value></data>
+  <data name="Mobile.SnoozedNotice" xml:space="preserve"><value>1か月スヌーズしました</value></data>
+  <data name="Mobile.UnsnoozedNotice" xml:space="preserve"><value>スヌーズを解除しました</value></data>
 </root>

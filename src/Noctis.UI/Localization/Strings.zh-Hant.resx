@@ -7826,4 +7826,8 @@
   <data name="Mobile.LastFm.OpenOnLastFm" xml:space="preserve"><value>在 Last.fm 上開啟{0}</value></data>
   <data name="Mobile.Scrobbling.Taste" xml:space="preserve"><value>混音與推薦</value></data>
   <data name="Mobile.Scrobbling.TasteFootnote" xml:space="preserve"><value>主頁根據你的 Last.fm 排行顯示你的歌曲混音和可探索的藝人。僅使用你的帳號名稱，不會回傳任何內容。</value></data>
+  <data name="Mobile.SnoozeForMonth" xml:space="preserve"><value>暫停推薦一個月</value></data>
+  <data name="Mobile.Unsnooze" xml:space="preserve"><value>取消暫停推薦</value></data>
+  <data name="Mobile.SnoozedNotice" xml:space="preserve"><value>已暫停推薦一個月</value></data>
+  <data name="Mobile.UnsnoozedNotice" xml:space="preserve"><value>已取消暫停推薦</value></data>
 </root>

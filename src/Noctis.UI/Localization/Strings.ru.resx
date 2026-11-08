@@ -4057,4 +4057,8 @@
   <data name="GroupAlbums.Confirm" xml:space="preserve"><value>Объединить</value><comment>Confirm button</comment></data>
   <data name="GroupAlbums.SelectHint" xml:space="preserve"><value>Других альбомов с таким названием нет. В сетке альбомов выделите нужные альбомы щелчком с Ctrl, затем щёлкните правой кнопкой по одному из них.</value><comment>Shown when only one album is chosen</comment></data>
   <data name="GroupAlbums.NotWritten" xml:space="preserve"><value>Объединено в Noctis, но не удалось сохранить файлов: {0} (только для чтения или открыты в другом приложении). Если такой файл изменится, при следующем сканировании он вернётся в прежний альбом.</value><comment>{0} file count; list of file names follows</comment></data>
+  <data name="Mobile.SnoozeForMonth" xml:space="preserve"><value>Отложить на месяц</value></data>
+  <data name="Mobile.Unsnooze" xml:space="preserve"><value>Вернуть</value></data>
+  <data name="Mobile.SnoozedNotice" xml:space="preserve"><value>Отложено на месяц</value></data>
+  <data name="Mobile.UnsnoozedNotice" xml:space="preserve"><value>Откладывание отменено</value></data>
 </root>

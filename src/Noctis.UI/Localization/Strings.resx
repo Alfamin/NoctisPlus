@@ -4057,4 +4057,8 @@ Create a playlist named "{0}" with these tracks?</value><comment>Drag-and-drop i
   <data name="GroupAlbums.Confirm" xml:space="preserve"><value>Group</value><comment>Confirm button</comment></data>
   <data name="GroupAlbums.SelectHint" xml:space="preserve"><value>No other album has this name. Ctrl-click the albums that belong together in the Albums grid, then right-click one of them.</value><comment>Shown when only one album is chosen</comment></data>
   <data name="GroupAlbums.NotWritten" xml:space="preserve"><value>Grouped in Noctis, but {0} file(s) could not be saved (read-only or open in another app). If such a file changes, it goes back to its old album on the next scan.</value><comment>{0} file count; list of file names follows</comment></data>
+  <data name="Mobile.SnoozeForMonth" xml:space="preserve"><value>Snooze for a Month</value><comment>Song menu row: Shuffle and mixes skip the song for 30 days (the desktop's Snooze for a Month)</comment></data>
+  <data name="Mobile.Unsnooze" xml:space="preserve"><value>Unsnooze</value><comment>Song menu row on a snoozed song: ends the snooze now</comment></data>
+  <data name="Mobile.SnoozedNotice" xml:space="preserve"><value>Snoozed for a month</value><comment>Banner after Snooze for a Month</comment></data>
+  <data name="Mobile.UnsnoozedNotice" xml:space="preserve"><value>Snooze removed</value><comment>Banner after Unsnooze</comment></data>
 </root>
