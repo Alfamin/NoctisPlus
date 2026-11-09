@@ -7839,7 +7839,6 @@ Créer une playlist nommée « {0} » avec ces titres ?</value><comment>Drag-and
   <data name="Mobile.LastFm.ArtistYouPlay" xml:space="preserve"><value>Dans vos artistes phares</value></data>
   <data name="Mobile.LastFm.OpenOnLastFm" xml:space="preserve"><value>Ouvrir {0} sur Last.fm</value></data>
   <data name="Mobile.Scrobbling.Taste" xml:space="preserve"><value>Mix et recommandations</value></data>
-  <data name="Mobile.Scrobbling.TasteFootnote" xml:space="preserve"><value>L’accueil affiche des mix de vos titres et des artistes à découvrir, d’après vos classements Last.fm. Seul le nom de votre compte est utilisé ; rien n’est renvoyé.</value></data>
   <data name="Mobile.Scrobbling.TasteFootnote" xml:space="preserve"><value>L’accueil reçoit des mix tirés de vos classements Last.fm et rien n’est renvoyé</value></data>
   <data name="Mobile.SnoozeForMonth" xml:space="preserve"><value>Mettre en veille un mois</value></data>
   <data name="Mobile.Unsnooze" xml:space="preserve"><value>Annuler la mise en veille</value></data>

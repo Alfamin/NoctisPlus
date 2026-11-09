@@ -7839,7 +7839,6 @@
   <data name="Mobile.LastFm.ArtistYouPlay" xml:space="preserve"><value>En tus artistas top</value></data>
   <data name="Mobile.LastFm.OpenOnLastFm" xml:space="preserve"><value>Abrir {0} en Last.fm</value></data>
   <data name="Mobile.Scrobbling.Taste" xml:space="preserve"><value>Mezclas y recomendaciones</value></data>
-  <data name="Mobile.Scrobbling.TasteFootnote" xml:space="preserve"><value>Inicio muestra mezclas de tus canciones y artistas por descubrir, a partir de tus listas de Last.fm. Solo se usa el nombre de tu cuenta; no se envía nada.</value></data>
   <data name="Mobile.Scrobbling.TasteFootnote" xml:space="preserve"><value>Inicio recibe mezclas de tus listas de Last.fm y no se envía nada de vuelta</value></data>
   <data name="Mobile.SnoozeForMonth" xml:space="preserve"><value>Posponer un mes</value></data>
   <data name="Mobile.Unsnooze" xml:space="preserve"><value>Quitar posposición</value></data>
