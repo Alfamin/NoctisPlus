@@ -199,6 +199,17 @@ internal sealed class MusicSources
         }
     }
 
+    /// <summary>Owner #279: a file a bot's chat already holds stopped coming in on a connection error; the download waits a
+    /// moment and takes it again (Downloads), no bot is asked.</summary>
+    internal sealed class ChatCopyInterruptedException(Exception inner)
+        : Exception("Connection interrupted while taking the file from the bot's chat: " + inner.Message, inner);
+
+    /// <summary>Owner #279: the connection failed (not the song): a broken Telegram session, a timeout, a dropped socket or
+    /// stream. Asking a bot again would not help; the same download tried again would.</summary>
+    internal static bool IsConnectionTrouble(Exception? ex) => ex is not null && (TelegramAccount.IsBrokenSession(ex)
+        || ex is IOException or System.Net.Sockets.SocketException or TimeoutException or System.Net.Http.HttpRequestException
+        || IsConnectionTrouble(ex.InnerException));
+
     private async Task<string> FetchOnceAsync(MusicRequest request, Stream output, IProgress<double>? progress, CancellationToken ct)
     {
         // Owner 10-18: a click took about a minute before any bot saw a message; these lines (always in
@@ -218,6 +229,14 @@ internal sealed class MusicSources
                 var wanted = preferred is null ? request : request with { Quality = preferred };
                 if (await chats.FetchAsync(wanted, ext => ext == "flac" ? preferred != AudioQuality.MP3 : ext == "mp3" && (preferred == AudioQuality.MP3 || allowMp3 && !preferFlac),
                     output, progress, ct).ConfigureAwait(false) is { } found) return found;
+            }
+            // Owner #279: a song the chat already holds is never asked for again because the connection failed while it was
+            // being taken (a broken session, a timeout, a dropped socket): the download is retried and takes the chat's copy.
+            catch (Exception ex) when (!ct.IsCancellationRequested && ex is not OperationCanceledException && IsConnectionTrouble(ex))
+            {
+                Trace($"fetch \"{request.Title}\": the chats' copy was interrupted ({ex.Message}); not asking the bots again");
+                if (TelegramAccount.IsBrokenSession(ex)) throw;
+                throw new ChatCopyInterruptedException(ex);
             }
             catch (Exception ex) when (!ct.IsCancellationRequested && ex is not OperationCanceledException)
             { Trace($"fetch \"{request.Title}\": the chats' copy failed ({ex.Message}); asking the bots"); }

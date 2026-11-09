@@ -13,6 +13,8 @@ internal static class BotLibraryTests
         public readonly Dictionary<string, List<Message>> History = new() { [TelegramBotSource.Bot] = [], [DeezLoadSource.Bot] = [] };
         public int Pages, Reads, Downloads;
         public bool ReferenceExpired;
+        /// <summary>Owner #279: thrown by the next download (a broken session, a timeout).</summary>
+        public Exception? DownloadFails;
         public Task<IReadOnlyList<Message>> SongsAsync(string bot, int olderThan, CancellationToken ct)
         {
             Pages++;
@@ -24,6 +26,7 @@ internal static class BotLibraryTests
         public async Task DownloadAsync(Document document, Stream output, IProgress<double>? progress, CancellationToken ct)
         {
             Downloads++;
+            if (DownloadFails is { } fails) { DownloadFails = null; throw fails; }
             if (ReferenceExpired && document.file_reference is [1]) throw new RpcException(400, "FILE_REFERENCE_EXPIRED");
             await output.WriteAsync(Encoding.ASCII.GetBytes("fLaC file " + document.id), ct);
         }
@@ -150,6 +153,25 @@ internal static class BotLibraryTests
         var asked = new AskOnlyStream();
         await sources.FetchAsync(new MusicRequest("N95", "Kendrick Lamar", 195), asked, null, default);
         Check.True(asked.Found is not null && hunters.Calls + deezLoad.Calls == 1, "an ask ahead for a song in a chat sends nothing");
+        // Owner #279: the chat's copy interrupted by the connection: the bots are not asked again, the download fails to
+        // be retried, and the next try takes the chat's copy.
+        foreach (var trouble in new Exception[] { new RpcException(-503, "BadMsgNotification 48"), new TimeoutException("slow"),
+                     new ObjectDisposedException("WTelegram.Client was disposed") })
+        {
+            chats.DownloadFails = trouble;
+            using var broken = new MemoryStream();
+            Exception? thrown = null;
+            try { await sources.FetchAsync(new MusicRequest("Saturn", "SZA", 186), broken, null, default); }
+            catch (Exception ex) { thrown = ex; }
+            Check.True(thrown is not null && hunters.Calls + deezLoad.Calls == 1, $"{trouble.GetType().Name} while taking the chat's copy: no bot asked again");
+            using var again = new MemoryStream();
+            Check.Equal("flac", await sources.FetchAsync(new MusicRequest("Saturn", "SZA", 186), again, null, default), "the retry takes the chat's copy");
+            Check.Equal(1, hunters.Calls + deezLoad.Calls, "still without asking a bot");
+        }
+        Check.True(TelegramAccount.IsBrokenSession(new RpcException(-503, "BadMsgNotification 48")), "bad_msg_notification is a broken session");
+        Check.True(TelegramAccount.IsBrokenSession(new AggregateException(new ObjectDisposedException("WTelegram.Client was disposed"))), "so is a disposed client, wrapped");
+        Check.True(!TelegramAccount.IsBrokenSession(new RpcException(420, "FLOOD_WAIT_X", 30)), "a flood wait is not");
+        Check.True(!TelegramAccount.IsBrokenSession(new ObjectDisposedException("MemoryStream")), "nor a disposed stream");
         chats.Ready = false;
         using (var offline = new MemoryStream())
             await sources.FetchAsync(new MusicRequest("Saturn", "SZA", 186), offline, null, default);

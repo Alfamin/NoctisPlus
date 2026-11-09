@@ -498,6 +498,35 @@ internal sealed class TelegramAccount : ITelegramSignIn, IDisposable
     /// <summary>Owner #156: the current connection retired (the queue's stall watchdog), the login kept.</summary>
     internal Task RetireCurrentConnectionAsync() => _client is { } current ? RetireConnectionAsync(current) : Task.CompletedTask;
 
+    /// <summary>
+    /// Owner #279: the session itself is broken, not the network. Telegram rejected our messages (bad_msg_notification,
+    /// e.g. 48 after a VPN drop) or the client was disposed under the call. The connection still reads as up, so every
+    /// later call fails the same way until a fresh connection is made.
+    /// </summary>
+    internal static bool IsBrokenSession(Exception? ex) => ex switch
+    {
+        null => false,
+        ObjectDisposedException disposed => disposed.ObjectName?.Contains("WTelegram", StringComparison.Ordinal) == true
+            || disposed.Message.Contains("WTelegram.Client", StringComparison.Ordinal),
+        RpcException rpc => rpc.Message.StartsWith("BadMsgNotification", StringComparison.Ordinal),
+        AggregateException all => all.InnerExceptions.Any(IsBrokenSession),
+        _ => IsBrokenSession(ex.InnerException),
+    };
+
+    /// <summary>Runs <paramref name="call"/> on the connection, and once more on a fresh one when the session was broken
+    /// (<see cref="IsBrokenSession"/>). Only for calls that can simply be repeated (reads, no partial output).</summary>
+    internal async Task<T> OnSessionAsync<T>(Func<Client, Task<T>> call, CancellationToken ct)
+    {
+        var client = await ConnectAsync(ct).ConfigureAwait(false);
+        try { return await call(client).ConfigureAwait(false); }
+        catch (Exception ex) when (IsBrokenSession(ex) && !ct.IsCancellationRequested && !_disposed)
+        {
+            _log?.Invoke("Telegram session broken (" + ex.GetBaseException().Message + "); reconnecting.");
+            await RetireConnectionAsync(client).ConfigureAwait(false);
+            return await call(await ConnectAsync(ct).ConfigureAwait(false)).ConfigureAwait(false);
+        }
+    }
+
     /// <summary>Abort stalled transport/RPCs, keeping the saved login for the next connection.</summary>
     internal async Task RetireConnectionAsync(Client expected)
     {

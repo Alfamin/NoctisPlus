@@ -21,6 +21,7 @@ internal static class QueueManagementTests
         await WorkerSurvivesSaveFailure(); await ReportWhileHeld();
         await SavedHistoryPaths();
         await StallWatchdog();
+        await BrokenSessionGoesAgain();
         await AskAheadForTheBacklog();
     }
     private static async Task SavedHistoryPaths()
@@ -382,6 +383,39 @@ internal static class QueueManagementTests
             Check.Equal(8, slow, "it ran once, start to finish");
         }
         finally { (Downloads.StallLimit, Downloads.StallRetry) = (limit, retry); }
+    }
+
+    /// <summary>Owner #279: a song cut off by a broken Telegram session (BadMsgNotification after a VPN drop) resets the
+    /// connection and goes again by itself; one that keeps breaking fails after a few tries, and Retry starts it afresh.</summary>
+    private static async Task BrokenSessionGoesAgain()
+    {
+        Check.Section("a download cut off by a broken Telegram session reconnects and goes again by itself");
+        var root = Check.NewFolder("queue-broken-session");
+        var wait = Downloads.BrokenSessionRetry;
+        Downloads.BrokenSessionRetry = TimeSpan.FromMilliseconds(50);
+        try
+        {
+            var resets = 0; var tries = 0; var breaks = 1;
+            BotTrack Song(string title) => new(title, "Artist", null, "Artist - " + title, async (output, _, ct) =>
+            {
+                Interlocked.Increment(ref tries);
+                if (Volatile.Read(ref breaks) > 0) { Interlocked.Decrement(ref breaks); throw new TL.RpcException(-503, "BadMsgNotification 48"); }
+                await output.WriteAsync(Encoding.ASCII.GetBytes("fLaC " + title), ct); return "flac";
+            }) { Request = new(title, "Artist") };
+            using var queue = new Downloads(_ => { }) { ResetConnection = () => { Interlocked.Increment(ref resets); return Task.CompletedTask; } };
+            var once = queue.Start(Song("Once"), root);
+            await Check.UntilAsync(() => once.State == DownloadState.Saved, "one broken session: the song is saved on the next try");
+            Check.True(resets == 1 && tries == 2, "after one connection reset and one more try");
+
+            Volatile.Write(ref breaks, 100); tries = 0;
+            var always = queue.Start(Song("Always"), root);
+            await Check.UntilAsync(() => always.State == DownloadState.Failed, "a session that keeps breaking fails the song");
+            Check.Equal(Downloads.ConnectionRetryLimit + 1, tries, "after a few tries, not for ever");
+            Volatile.Write(ref breaks, 0);
+            queue.RetryFailed();
+            await Check.UntilAsync(() => always.State == DownloadState.Saved, "Retry starts it afresh");
+        }
+        finally { Downloads.BrokenSessionRetry = wait; }
     }
 
     /// <summary>Owner #160: while the backlog downloads one song the bots are asked for the next two (their files wait in the

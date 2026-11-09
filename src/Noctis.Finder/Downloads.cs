@@ -32,6 +32,9 @@ internal sealed class Download(BotTrack track, string folder)
     internal DateTimeOffset LastActivity { get; set; }
     /// <summary>Stopped by the stall watchdog; it goes back to the queue. <see cref="Stalls"/> counts this session's stops.</summary>
     internal bool Stalled { get; set; }
+    /// <summary>Owner #279: tries in a row that ended on the connection (a broken session, a timeout); a few go again by
+    /// themselves, then the song fails so Retry stays the user's.</summary>
+    internal int ConnectionRetries { get; set; }
     internal int Stalls { get; set; }
     /// <summary>Cancelled by the watchdog alone: only then is a transfer that ignores its cancel left behind.</summary>
     internal CancellationTokenSource? StallStop { get; set; }
@@ -74,6 +77,8 @@ internal sealed class Downloads : IDisposable
     internal const int MaxStalls = 3;
     /// <summary>How soon a stalled song is tried again.</summary>
     internal static TimeSpan StallRetry = TimeSpan.FromSeconds(10);
+    /// <summary>Owner #279: how soon a song cut off by a broken Telegram session goes again (tests shorten it).</summary>
+    internal static TimeSpan BrokenSessionRetry = TimeSpan.FromSeconds(5);
     /// <summary>Drops the Telegram connection (the login is kept), so a request that hangs on it ends and frees its lane.</summary>
     internal Func<Task>? ResetConnection { get; set; }
     /// <summary>Owner #160: while the backlog downloads one song, the bots are asked for the next ones (as for streaming): their
@@ -210,7 +215,7 @@ internal sealed class Downloads : IDisposable
         lock (_gate)
         {
             retry = _known.Where(d => d.State == DownloadState.Failed).ToArray();
-            foreach (var item in retry) { item.State = DownloadState.Queued; Insert(item); }
+            foreach (var item in retry) { item.State = DownloadState.Queued; item.ConnectionRetries = 0; Insert(item); }
             try { Save(); } catch { foreach (var item in retry) { item.State = DownloadState.Failed; _active.Remove(item); } throw; }
         }
         Wake(); foreach (var item in retry) Raise(item);
@@ -639,14 +644,34 @@ internal sealed class Downloads : IDisposable
         catch (IOException ex) { SetOutcome(download, DownloadState.Waiting, "Connection or storage interrupted: " + ex.Message, DateTimeOffset.UtcNow.AddMinutes(10)); }
         catch (System.Net.Sockets.SocketException ex) { Noctis.Services.OnlineAccess.Shared.Failed(); SetOutcome(download, DownloadState.Waiting, "TELEGRAM_CONNECTION_FAILED: " + ex.Message, DateTimeOffset.UtcNow.AddSeconds(5)); }
         catch (OperationCanceledException) when (ct.IsCancellationRequested) { SetOutcome(download, DownloadState.Cancelled, ""); }
+        // Owner #279: the Telegram session broke (BadMsgNotification after a VPN drop, a disposed client). A new connection
+        // fixes it, so the song waits a moment and goes again by itself instead of failing.
+        catch (Exception ex) when (TelegramAccount.IsBrokenSession(ex) && ++download.ConnectionRetries <= ConnectionRetryLimit)
+        {
+            _log($"\"{download.Track.Title}\": Telegram session broken ({ex.GetBaseException().Message}); reconnecting and trying again.");
+            if (ResetConnection is { } reset)
+            {
+                try { await reset().ConfigureAwait(false); }
+                catch (Exception resetError) { _log("Telegram connection reset failed: " + resetError.Message); }
+            }
+            SetOutcome(download, DownloadState.Waiting, "Reconnecting to Telegram…", DateTimeOffset.UtcNow + BrokenSessionRetry);
+        }
+        // A file the chat holds that stopped coming in (MusicSources no longer asks a bot for it): again shortly.
+        catch (MusicSources.ChatCopyInterruptedException ex) when (++download.ConnectionRetries <= ConnectionRetryLimit)
+        {
+            SetOutcome(download, DownloadState.Waiting, "Connection slow · trying again", DateTimeOffset.UtcNow.AddSeconds(30));
+            _log($"\"{download.Track.Title}\": {ex.Message}; trying again in 30 s.");
+        }
         catch (Exception ex)
         {
             SetOutcome(download, DownloadState.Failed, ex is OperationCanceledException ? "The download was interrupted." : ex.Message);
             if (download.State == DownloadState.Failed) _log($"download of \"{download.Track.Title}\" failed: {download.Error}");
         }
     }
+    internal const int ConnectionRetryLimit = 3;
+
     private void SetOutcome(Download d, DownloadState state, string error, DateTimeOffset? retry = null)
-    { lock (_gate) { if (d.State == DownloadState.Removed || d.State == DownloadState.Cancelled && !_active.Contains(d)) return; d.State = state; d.Error = error; d.RetryAt = retry; d.Step = Noctis.Services.Search.OnlineDownloadStep.None; d.FailedAt = state == DownloadState.Failed ? DateTimeOffset.UtcNow : null; } }
+    { lock (_gate) { if (state is DownloadState.Saved or DownloadState.AlreadyThere) d.ConnectionRetries = 0; if (d.State == DownloadState.Removed || d.State == DownloadState.Cancelled && !_active.Contains(d)) return; d.State = state; d.Error = error; d.RetryAt = retry; d.Step = Noctis.Services.Search.OnlineDownloadStep.None; d.FailedAt = state == DownloadState.Failed ? DateTimeOffset.UtcNow : null; } }
     private string? Summary()
     {
         if (_last is null) return null;

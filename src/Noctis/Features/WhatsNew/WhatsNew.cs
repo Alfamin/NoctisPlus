@@ -124,7 +124,8 @@ public static class WhatsNewGate
 /// <summary>The update sheet, its dismissal and the optional word timing settings shortcut.</summary>
 public sealed partial class WhatsNewViewModel(WhatsNewNotes notes, Action close, Action? openWordTimingSettings = null, Action<string>? openSetting = null) : ObservableObject
 {
-    public string Heading => "What's new";
+    /// <summary>Owner #285: a bug fix is never shown as something new; an update of fixes only says so.</summary>
+    public string Heading => HasAdded ? "What's new" : "What's fixed";
     public string VersionLabel => "Version " + WhatsNewGate.Short(notes.Version) + (notes.Updates > 1 ? $" · {notes.Updates} updates" : "");
     public IReadOnlyList<WhatsNewItem> Added => notes.Added;
     public IReadOnlyList<string> Fixed => notes.Fixed;

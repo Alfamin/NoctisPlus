@@ -1,8 +1,22 @@
 {
   "releases": [
     {
+      "version": "2.7.3",
+      "fixed": [
+        "Lyrics whose word timing finishes while the song plays fill word by word again, not only the background vocals"
+      ]
+    },
+    {
+      "version": "2.7.2",
+      "fixed": [
+        "Songs the bot already sent are taken from its chat instead of being asked for again",
+        "Downloads no longer stay stuck on \"BadMsgNotification\" after a VPN or network drop",
+        "Offline, For you no longer starts and stops a download for every song on the page",
+        "Shuffle keeps songs that are still downloading"
+      ]
+    },
+    {
       "version": "2.7.1",
-      "added": [{ "icon": "PlayIcon", "title": "Downloads keep playing", "line": "Songs still arriving play instead of being skipped", "top": true }],
       "fixed": [
         "Songs still downloading play instead of being skipped as missing"
       ]
@@ -25,7 +39,6 @@
     },
     {
       "version": "2.6.1",
-      "added": [{ "icon": "PlayIcon", "title": "Busy-bot recovery", "line": "Shorter waits, with provider queue positions shown", "top": true }],
       "fixed": [
         "Shorter waits when Music Hunters is busy",
         "DeezLoad's queue position appears while the other bot is tried",
