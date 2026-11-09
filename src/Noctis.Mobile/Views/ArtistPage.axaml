@@ -360,6 +360,33 @@
                      the name; › opens the whole set as a grid. Virtualised sideways (a prolific
                      artist would otherwise realise every tile at page open); VirtualizingStackPanel
                      has no Spacing, so each tile carries the gap as a right margin. -->
+                <!-- Owner #282: releases still coming: placeholder tiles that pulse, instead of nothing. -->
+                <StackPanel Name="ReleasePlaceholders" Margin="0,22,0,0" IsVisible="{Binding ShowsReleasePlaceholders}">
+                    <TextBlock Margin="20,0,20,6" Text="{loc:T Nav.Albums}" FontSize="21" FontWeight="Bold" />
+                    <StackPanel Orientation="Horizontal" Margin="20,0,0,0" ClipToBounds="False">
+                            <Border Classes="art" Width="150" Height="150" CornerRadius="10" Margin="0,0,12,0">
+                                <PathIcon Classes="stream-step" Classes.live="{Binding ShowsReleasePlaceholders}" Data="{DynamicResource AlbumsIcon}" Width="40" Height="40" Opacity="0.4" />
+                            </Border>
+                            <Border Classes="art" Width="150" Height="150" CornerRadius="10" Margin="0,0,12,0">
+                                <PathIcon Classes="stream-step" Classes.live="{Binding ShowsReleasePlaceholders}" Data="{DynamicResource AlbumsIcon}" Width="40" Height="40" Opacity="0.4" />
+                            </Border>
+                            <Border Classes="art" Width="150" Height="150" CornerRadius="10" Margin="0,0,12,0">
+                                <PathIcon Classes="stream-step" Classes.live="{Binding ShowsReleasePlaceholders}" Data="{DynamicResource AlbumsIcon}" Width="40" Height="40" Opacity="0.4" />
+                            </Border>
+                    </StackPanel>
+                    <TextBlock Margin="20,18,20,6" Text="{loc:T Mobile.Artist.SinglesEps}" FontSize="21" FontWeight="Bold" />
+                    <StackPanel Orientation="Horizontal" Margin="20,0,0,0" ClipToBounds="False">
+                            <Border Classes="art" Width="150" Height="150" CornerRadius="10" Margin="0,0,12,0">
+                                <PathIcon Classes="stream-step" Classes.live="{Binding ShowsReleasePlaceholders}" Data="{DynamicResource AlbumsIcon}" Width="40" Height="40" Opacity="0.4" />
+                            </Border>
+                            <Border Classes="art" Width="150" Height="150" CornerRadius="10" Margin="0,0,12,0">
+                                <PathIcon Classes="stream-step" Classes.live="{Binding ShowsReleasePlaceholders}" Data="{DynamicResource AlbumsIcon}" Width="40" Height="40" Opacity="0.4" />
+                            </Border>
+                            <Border Classes="art" Width="150" Height="150" CornerRadius="10" Margin="0,0,12,0">
+                                <PathIcon Classes="stream-step" Classes.live="{Binding ShowsReleasePlaceholders}" Data="{DynamicResource AlbumsIcon}" Width="40" Height="40" Opacity="0.4" />
+                            </Border>
+                    </StackPanel>
+                </StackPanel>
                 <StackPanel Name="AlbumsSection" Margin="0,22,0,0" IsVisible="{Binding HasAlbums}">
                     <Button Name="AlbumsHeader" Classes="row artist-section" Command="{Binding OpenAlbumsCommand}">
                         <StackPanel Orientation="Horizontal" Spacing="2">

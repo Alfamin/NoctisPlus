@@ -322,6 +322,23 @@ internal sealed partial class FinderOnlineSearch : IOnlineMusicSearch, IOnlineCa
         catch (Exception ex) when (ex is HttpRequestException or IOException or TimeoutException or InvalidDataException) { return null; }
     }
 
+    /// <summary>Owner #282: phone rows and tiles take a ~300 px cover (a few KB, the quick lane), not the 1000 px one: covers
+    /// came slowly or not at all on a phone with a page of them. The cover as listed when there is no small one.</summary>
+    internal const int RowCoverSize = 300;
+    public async Task<string?> RowArtworkAsync(string url, CancellationToken ct)
+    {
+        if (url.Length == 0 || _catalog() is not { } catalog) return null;
+        try
+        {
+            if (CatalogArtwork.ThumbUrl(url, RowCoverSize) is { } small && small != url
+                && await catalog.ArtworkAsync(small, ct, quick: true).ConfigureAwait(false) is { } path) return path;
+            return await catalog.ArtworkAsync(url, ct, quick: true).ConfigureAwait(false);
+        }
+        catch (Exception ex) when (ex is HttpRequestException or IOException or TimeoutException or InvalidDataException) { return null; }
+    }
+    public string? CachedRowArtwork(string url)
+        => url.Length == 0 ? null : (CatalogArtwork.ThumbUrl(url, RowCoverSize) is { } small ? CachedArtwork(small) : null) ?? CachedArtwork(url);
+
     // Owner #102: a queue row's cover. One the page already showed (any size) is used at once; else the small one.
     // Owner #104: a song of an imported playlist saved without covers takes the one filled in since.
     public string? CachedQueueCover(OnlineSong song)

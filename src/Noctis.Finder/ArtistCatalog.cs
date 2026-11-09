@@ -508,9 +508,15 @@ internal sealed partial class ArtistCatalog : IDisposable
             var path = SafeFile("art-" + Key(url)[..64] + ".img")!;
             using var timeout = CancellationTokenSource.CreateLinkedTokenSource(ct); timeout.CancelAfter(TimeSpan.FromSeconds(25));
             using var response = await _http.GetAsync(url, HttpCompletionOption.ResponseHeadersRead, timeout.Token).ConfigureAwait(false);
-            if (!response.IsSuccessStatusCode || response.Content.Headers.ContentLength > limit || response.Content.Headers.ContentType?.MediaType is not ("image/jpeg" or "image/png" or "image/webp")) return null;
+            if (!response.IsSuccessStatusCode || response.Content.Headers.ContentLength > limit || response.Content.Headers.ContentType?.MediaType is not ("image/jpeg" or "image/png" or "image/webp"))
+            {
+                ArtworkRefused(url, !response.IsSuccessStatusCode ? "HTTP " + (int)response.StatusCode
+                    : response.Content.Headers.ContentLength > limit ? $"{response.Content.Headers.ContentLength / 1024} KB, over {limit / 1024} KB"
+                    : "type " + response.Content.Headers.ContentType?.MediaType);
+                return null;
+            }
             await using var input = await response.Content.ReadAsStreamAsync(timeout.Token).ConfigureAwait(false); using var data = new MemoryStream(); var bytes = new byte[16384];
-            while (true) { var n = await input.ReadAsync(bytes, timeout.Token).ConfigureAwait(false); if (n == 0) break; if (data.Length + n > limit) return null; data.Write(bytes, 0, n); }
+            while (true) { var n = await input.ReadAsync(bytes, timeout.Token).ConfigureAwait(false); if (n == 0) break; if (data.Length + n > limit) { ArtworkRefused(url, $"over {limit / 1024} KB"); return null; } data.Write(bytes, 0, n); }
             var dimensions = CatalogArtwork.Dimensions(data.ToArray());
             if (dimensions.Width is < 1 or > 8192 || dimensions.Height is < 1 or > 8192 || (long)dimensions.Width * dimensions.Height > 32 * 1024 * 1024) return null;
             Directory.CreateDirectory(_folder); var temp = path + "." + Guid.NewGuid().ToString("N") + ".tmp";
@@ -522,4 +528,12 @@ internal sealed partial class ArtistCatalog : IDisposable
         finally { gate.Release(); }
     }
     public void Dispose() => _http.Dispose();
+
+    /// <summary>Owner #282: covers missing on the phone left no trace. The first few refusals say why (host and reason).</summary>
+    private static int _artworkRefusals;
+    private static void ArtworkRefused(string url, string reason)
+    {
+        if (Interlocked.Increment(ref _artworkRefusals) > 20) return;
+        try { Noctis.Services.DebugLog.Write("Artwork", $"cover not loaded from {new Uri(url).Host}: {reason}"); } catch { }
+    }
 }

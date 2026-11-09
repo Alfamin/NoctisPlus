@@ -80,6 +80,11 @@ public interface IOnlineMusicSearch
 
     /// <summary>Fetches artwork into the local cache; the file path, or null when it cannot be had.</summary>
     Task<string?> ArtworkAsync(string url, CancellationToken ct);
+    /// <summary>Owner #282: a cover for a row or tile on a phone (~300 px, a few KB): a small version where the catalog has
+    /// one, else the cover as listed. Null when it cannot be had.</summary>
+    Task<string?> RowArtworkAsync(string url, CancellationToken ct) => ArtworkAsync(url, ct);
+    /// <summary>A row cover already on disk (the small one or the cover as listed), else null (no network).</summary>
+    string? CachedRowArtwork(string url) => CachedArtwork(url);
     /// <summary>Owner #102: a small cover (~120 px) for a queue row: one already on disk, else null.</summary>
     string? CachedQueueCover(OnlineSong song) => song.ArtworkUrl.Length == 0 ? null : CachedArtwork(song.ArtworkUrl);
     /// <summary>Owner #102: fetches that small cover (a few KB); null when there is none.</summary>

@@ -218,8 +218,13 @@ public sealed partial class OnlineResultsViewModel : ObservableObject, IDisposab
         item.ArtworkPending = true; var url = item.Release.ArtworkUrl;
         try
         {
-            var path = await _source.ArtworkAsync(url, ct).ConfigureAwait(false);
-            if (path is not null) _marshal(() => { if (item.Release.ArtworkUrl == url) item.Album.ArtworkPath = path; });
+            var path = _source.CachedRowArtwork(url) ?? await _source.RowArtworkAsync(url, ct).ConfigureAwait(false);
+            if (path is not null) _marshal(() =>
+            {
+                if (item.Release.ArtworkUrl != url) return;
+                item.Album.ArtworkPath = path;
+                ShareCover(AlbumKey(item.Release.Id, item.Release.ArtistName, item.Release.Title), path);
+            });
         }
         catch (Exception ex) when (ex is not OutOfMemoryException) { }
         finally { _marshal(() => item.ArtworkPending = false); }
@@ -239,7 +244,7 @@ public sealed partial class OnlineResultsViewModel : ObservableObject, IDisposab
             Refresh(item);
             if (item.ArtworkPath is null && song.ArtworkUrl.Length > 0)
             {
-                item.ArtworkPath = _source.CachedArtwork(song.ArtworkUrl);
+                item.ArtworkPath = _covers.GetValueOrDefault(AlbumKey(song)) ?? _source.CachedRowArtwork(song.ArtworkUrl);
                 if (!LazyArtwork) EnsureArtwork(item);
             }
         }
@@ -248,14 +253,29 @@ public sealed partial class OnlineResultsViewModel : ObservableObject, IDisposab
         Message = warning.Length > 0 ? warning : null;
     }
 
+    /// <summary>Owner #282: one cover per album. Songs of the same album (and the album's own tile) share the first cover
+    /// that arrives, instead of each fetching it again.</summary>
+    private readonly Dictionary<string, string> _covers = new(StringComparer.Ordinal);
+    internal static string AlbumKey(OnlineSong song) => AlbumKey(song.AlbumId, song.ArtistDisplay, song.Album);
+    internal static string AlbumKey(string albumId, string artist, string album)
+        => albumId.Length > 0 ? "id:" + albumId : album.Length == 0 ? "" : (artist.Split(',')[0].Trim() + "|" + album).ToLowerInvariant();
+    private void ShareCover(string key, string path)
+    {
+        if (key.Length == 0) return;
+        _covers[key] = path;
+        foreach (var row in Songs) if (row.ArtworkPath is null && AlbumKey(row.Song) == key) row.ArtworkPath = path;
+    }
+
     private async Task FetchArtworkAsync(OnlineSongItem item, CancellationToken ct)
     {
+        var key = AlbumKey(item.Song);
+        if (key.Length > 0 && _covers.TryGetValue(key, out var shared)) { item.ArtworkPath = shared; return; }
         item.ArtworkPending = true;
         var url = item.Song.ArtworkUrl;
         try
         {
-            var path = await _source.ArtworkAsync(url, ct).ConfigureAwait(false);
-            if (path != null) _marshal(() => { if (item.Song.ArtworkUrl == url) item.ArtworkPath = path; });
+            var path = await _source.RowArtworkAsync(url, ct).ConfigureAwait(false);
+            if (path != null) _marshal(() => { if (item.Song.ArtworkUrl == url) { item.ArtworkPath = path; ShareCover(key, path); } });
         }
         catch (Exception ex) when (ex is not OutOfMemoryException) { }
         finally { _marshal(() => item.ArtworkPending = false); }
