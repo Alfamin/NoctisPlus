@@ -31,7 +31,10 @@ public class MobileOnlineQueueTests
         public bool CanDownload { get; set; } = true;
         public string Route => "test";
         public IDownloadQueue Downloads { get; } = new Downloads();
-        public event EventHandler? DownloadsChanged { add { } remove { } }
+        public event EventHandler? DownloadsChanged;
+        /// <summary>#284: what every song's download reports (None unless a test sets it).</summary>
+        public OnlineDownloadStatus Status = OnlineDownloadStatus.None;
+        public void Report(OnlineDownloadStatus status) { Status = status; DownloadsChanged?.Invoke(this, EventArgs.Empty); }
         public void WarmUp() { }
         public void Retry() { }
         public void RequestSignIn() { }
@@ -39,7 +42,7 @@ public class MobileOnlineQueueTests
         public Task OpenAlbumAsync(OnlineAlbum album, CancellationToken ct) => Task.CompletedTask;
         public string? CachedArtwork(string url) => null;
         public Task<string?> ArtworkAsync(string url, CancellationToken ct) => Task.FromResult<string?>(null);
-        public OnlineDownloadStatus StatusOf(OnlineSong song) => OnlineDownloadStatus.None;
+        public OnlineDownloadStatus StatusOf(OnlineSong song) => Status;
         public Task<string> DownloadAsync(IReadOnlyList<OnlineSong> songs, bool now, CancellationToken ct) => Task.FromResult("Queued");
         public async IAsyncEnumerable<OnlineSearchResult> SearchAsync(string query, [System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken ct)
         { await Task.CompletedTask; yield break; }
@@ -96,6 +99,33 @@ public class MobileOnlineQueueTests
         Assert.Equal(new[] { "play:1", "fetch:2", "fetch:3", "ask:4", "ask:5" }, r.Source.Calls);
         Assert.Equal(new[] { "1", "2", "3" }, r.Source.Window);
         Assert.All(r.Audio.PlayedPaths.Concat(r.Audio.PreparedPaths), p => Assert.False(string.IsNullOrEmpty(p)));
+    }
+
+    /// <summary>Owner #284, the PC's status on the phone: while a song is found, its step (the magnifier) stands in Play's
+    /// place; once it plays, how much has arrived is the progress line's lighter part, until all of it is here.</summary>
+    [Fact]
+    public async Task AStreamedSong_ShowsItsStep_ThenHowMuchHasArrived()
+    {
+        using var r = new Rig(); r.Source.Hold = true; var songs = Songs(2);
+        r.Vm.PlayOnlineTracks(r.Source, songs, 0);
+        Assert.True(r.Vm.IsPreparingOnline);
+        Assert.Equal(OnlineDownloadStep.Asking, r.Vm.OnlineStep);           // the magnifier
+        Assert.Equal(0, r.Vm.DownloadedFraction);
+        r.Source.Report(new(OnlineDownloadState.Downloading, 0, Step: OnlineDownloadStep.Switching));
+        Assert.Equal(OnlineDownloadStep.Switching, r.Vm.OnlineStep);
+        r.Source.Report(new(OnlineDownloadState.Downloading, 0.3, Step: OnlineDownloadStep.Receiving));
+        r.Source.Requests[0].Reply.SetResult(r.Source.Ready(songs[0])); await r.Vm.OnlinePreparation;
+        Assert.False(r.Vm.IsPreparingOnline);
+        Assert.Equal(OnlineDownloadStep.None, r.Vm.OnlineStep);             // Play is back
+        Assert.Equal(0.3, r.Vm.DownloadedFraction, 3);
+        Assert.True(r.Vm.IsStreamArriving);
+        r.Source.Report(new(OnlineDownloadState.Downloading, 0.8, Step: OnlineDownloadStep.Receiving));
+        Assert.Equal(0.8, r.Vm.DownloadedFraction, 3);
+        r.Source.Report(new(OnlineDownloadState.Streamed, 1));
+        Assert.Equal(1, r.Vm.DownloadedFraction);
+        Assert.False(r.Vm.IsStreamArriving);
+        r.Source.Report(new(OnlineDownloadState.Downloading, 0.1, Step: OnlineDownloadStep.Receiving));
+        Assert.Equal(1, r.Vm.DownloadedFraction);                           // arrived: no longer followed
     }
 
     [Fact]

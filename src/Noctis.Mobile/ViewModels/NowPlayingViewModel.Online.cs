@@ -60,10 +60,52 @@ public sealed partial class NowPlayingViewModel
     private void SettleOnlineQueue()
     { _onlineSettleUntil = DateTime.UtcNow.AddSeconds(10); _onlineWindow = ""; }
 
+    /// <summary>Owner #284 (the PC's status on the phone): what the song being fetched is doing (the magnifier while a bot
+    /// is asked), shown in Play's place until it can play.</summary>
+    [ObservableProperty] private OnlineDownloadStep _onlineStep;
+
+    /// <summary>Owner #284: how much of the streamed song playing has arrived (the progress line's lighter part, as the PC's
+    /// seek bar); 1 for a song on the phone or one fully arrived.</summary>
+    [ObservableProperty, NotifyPropertyChangedFor(nameof(IsStreamArriving))] private double _downloadedFraction = 1;
+    public bool IsStreamArriving => DownloadedFraction < 1;
+
+    private Noctis.ViewModels.PendingStream? _watchedDownload;
+
+    /// <summary>Follows the download of the song playing (or being fetched) until it has fully arrived.</summary>
+    private void WatchDownload(Noctis.ViewModels.PendingStream? pending)
+    {
+        if (ReferenceEquals(_watchedDownload, pending)) { RefreshDownload(); return; }
+        if (_watchedDownload is { } old) old.Source.DownloadsChanged -= OnWatchedDownloadChanged;
+        _watchedDownload = pending;
+        if (pending is not null) pending.Source.DownloadsChanged += OnWatchedDownloadChanged;
+        RefreshDownload();
+    }
+
+    private void OnWatchedDownloadChanged(object? sender, EventArgs e) => _marshal(RefreshDownload);
+
+    private void RefreshDownload()
+    {
+        if (_disposed || _watchedDownload is not { } pending) { OnlineStep = OnlineDownloadStep.None; DownloadedFraction = 1; return; }
+        OnlineDownloadStatus status;
+        try { status = pending.Source.StatusOf(pending.Song); }
+        catch (Exception ex) when (ex is not OutOfMemoryException) { status = OnlineDownloadStatus.None; }
+        var running = status.State is OnlineDownloadState.Downloading or OnlineDownloadState.Queued;
+        OnlineStep = !IsPreparingOnline ? OnlineDownloadStep.None
+            : running && status.Step != OnlineDownloadStep.None ? status.Step : OnlineDownloadStep.Asking;
+        DownloadedFraction = status.State == OnlineDownloadState.Downloading && status.Step == OnlineDownloadStep.Receiving
+            ? Math.Clamp(status.Progress, 0, 0.999)
+            : IsPreparingOnline || running ? 0 : 1;
+        // Arrived (or given up): nothing more to show for it.
+        if (!IsPreparingOnline && !running) WatchDownload(null);
+    }
+
+    partial void OnIsPreparingOnlineChanged(bool value) => RefreshDownload();
+
     private void StartTrack(Track track, TimeSpan? fromPosition)
     {
         CancelOnlinePrepare();
         _onlineSessionActivated = true; _onlineReadyPaused = false;
+        WatchDownload(null); // a song on the phone, or one already arrived: nothing to follow
         if (track.PendingStream is not Noctis.ViewModels.PendingStream pending) { StartResolvedTrack(track, fromPosition); return; }
         if (CompletedOnlinePath(pending) is { } saved)
         { track.FilePath = saved; track.IsExternal = true; StartResolvedTrack(track, fromPosition); return; }
@@ -72,6 +114,7 @@ public sealed partial class NowPlayingViewModel
         _unrecordedPlay = null;
         CurrentTrack = track; Duration = track.Duration; Position = fromPosition ?? TimeSpan.Zero;
         ErrorText = ""; IsPlaying = false; IsPreparingOnline = true; _onlinePlayWhenReady = true;
+        WatchDownload(pending); // after IsPreparingOnline: its step shows until it plays, then how much has arrived
         var stop = _onlinePrepare = new();
         SyncUpNext(); PrepareUpcoming(); SaveStateNow();
         OnlinePreparation = PrepareOnlineAsync(track, pending, fromPosition, stop);

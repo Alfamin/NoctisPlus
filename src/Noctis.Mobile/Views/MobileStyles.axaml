@@ -641,4 +641,15 @@
         <Setter Property="Opacity" Value="1" />
         <Setter Property="RenderTransform" Value="scale(1)" />
     </Style>
+
+    <!-- Owner #284, the PC's status on the phone: while a song you don't have is found, a pulsing magnifier stands in
+         Play's place (it animates only while shown: .live). -->
+    <Style Selector="PathIcon.stream-step.live">
+        <Style.Animations>
+            <Animation Duration="0:0:0.9" IterationCount="INFINITE" PlaybackDirection="Alternate" Easing="SineEaseInOut">
+                <KeyFrame Cue="0%"><Setter Property="Opacity" Value="1" /></KeyFrame>
+                <KeyFrame Cue="100%"><Setter Property="Opacity" Value="0.35" /></KeyFrame>
+            </Animation>
+        </Style.Animations>
+    </Style>
 </Styles>

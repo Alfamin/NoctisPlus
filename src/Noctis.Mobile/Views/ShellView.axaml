@@ -261,15 +261,23 @@
                         <Panel>
                             <!-- The elapsed part of the song, filled in the cover's colour with a bright
                                  edge along the bottom: progress at a glance, as the full player shows it.
-                                 Each is a Settings › Appearance › Player Bar switch, both off by default:
-                                 then the capsule is plain glass, as Apple's. -->
+                                 Each is a Settings › Appearance › Player Bar switch: the line on by default
+                                 (owner #284, it also shows a streamed song's download), the fill off. -->
                             <Border Name="MiniProgress" CornerRadius="26" ClipToBounds="True" IsHitTestVisible="False"
                                     IsVisible="{Binding ShowsMiniProgress}">
+                                <Panel>
+                                <!-- Owner #284: a streamed song's part already arrived, a fainter line under the played one
+                                     (the PC's seek bar shows its download the same way). -->
+                                <views:FractionPanel Name="MiniArrived" Fraction="{Binding Player.DownloadedFraction}" IsVisible="{Binding Player.IsStreamArriving}">
+                                    <Border Background="{Binding MiniProgressLine}" Opacity="0.4" Height="2"
+                                            VerticalAlignment="Bottom" IsVisible="{Binding ShowMiniProgressLine}" />
+                                </views:FractionPanel>
                                 <views:FractionPanel Fraction="{Binding Player.ProgressFraction}">
                                     <Border Name="MiniProgressFill" Background="{Binding MiniProgressFill}" IsVisible="{Binding ShowMiniProgressFill}" />
                                     <Border Name="MiniProgressLine" Background="{Binding MiniProgressLine}" Height="2"
                                             VerticalAlignment="Bottom" IsVisible="{Binding ShowMiniProgressLine}" />
                                 </views:FractionPanel>
+                                </Panel>
                             </Border>
                             <Border Background="{DynamicResource GlassBarSheen}" CornerRadius="26" IsHitTestVisible="False" />
                             <Grid ColumnDefinitions="*,Auto,Auto,Auto" Margin="10,0,6,0">
@@ -334,9 +342,11 @@
                                 </Panel>
                                 <Button Grid.Column="1" Name="MiniPlayButton" Classes="icon mini tx" Command="{Binding Player.TogglePlayPauseCommand}">
                                     <Panel>
-                                        <controls:TransportGlyph Name="MiniPlayGlyph" Kind="PlayPause" IsPlaying="{Binding Player.ShowPause}" />
-                                        <ProgressBar IsIndeterminate="True" Height="2" Width="20" VerticalAlignment="Bottom"
-                                                     IsVisible="{Binding Player.IsPreparingOnline}" />
+                                        <controls:TransportGlyph Name="MiniPlayGlyph" Kind="PlayPause" IsPlaying="{Binding Player.ShowPause}"
+                                                                 IsVisible="{Binding !Player.IsPreparingOnline}" />
+                                        <PathIcon Name="MiniStreamStep" Classes="stream-step" Classes.live="{Binding Player.IsPreparingOnline}"
+                                                  Data="{DynamicResource PhSearch}" Width="18" Height="18"
+                                                  IsVisible="{Binding Player.IsPreparingOnline}" AutomationProperties.Name="Finding the song" />
                                     </Panel>
                                 </Button>
                                 <!-- Expanded only, like Apple's: the folded row has room for Play alone.

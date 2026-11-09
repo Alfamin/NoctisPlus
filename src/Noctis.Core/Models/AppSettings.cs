@@ -176,8 +176,12 @@ public class AppSettings : IJsonOnDeserializing
     public bool MobilePlayerBarProgressFill { get; set; }
 
     /// <summary>Phone, Settings › Appearance › Player Bar: the bright progress line along the mini
-    /// player's bottom edge. Off by default.</summary>
-    public bool MobilePlayerBarProgressLine { get; set; }
+    /// player's bottom edge. Noctis Plus: on by default (owner #284); it also shows a streamed song's download.</summary>
+    public bool MobilePlayerBarProgressLine { get; set; } = true;
+
+    /// <summary>Phone: Noctis Plus defaults applied once to phones set up before them (1: the Player Bar's progress
+    /// line on, #284). Later choices are kept: it runs only while this is below the current level.</summary>
+    public int MobilePlusDefaultsLevel { get; set; }
 
     /// <summary>Phone, Settings › Appearance › Album Colours: album and artist pages painted in a
     /// deep shade of the cover's colour. Off, they keep the theme's plain pages. On by default.</summary>

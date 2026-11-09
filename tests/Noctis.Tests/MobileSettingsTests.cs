@@ -437,7 +437,9 @@ public class MobileSettingsTests
             var colour = MobileFixtures.Named<Avalonia.Controls.Primitives.ToggleButton>(page, "ProgressColourSwitch");
             var line = MobileFixtures.Named<Avalonia.Controls.Primitives.ToggleButton>(page, "ProgressLineSwitch");
             Assert.False(colour.IsChecked);
-            Assert.False(line.IsChecked);
+            Assert.True(line.IsChecked);   // owner #284: the line is on by default
+            line.IsChecked = false;
+            Assert.False(rig.Shell.ShowMiniProgressLine);
 
             colour.IsChecked = true;
             Assert.True(rig.Shell.ShowMiniProgressFill);
@@ -580,13 +582,13 @@ public class MobileSettingsTests
             Assert.Equal("Music Folders, 2, a folder lost its access or can't be reached", NameOf("FoldersRow"));
             Assert.Equal("System, Dark", MobileFixtures.Named<TextBlock>(page, "ThemeValueLabel").Text);
             Assert.Equal("Crimson", MobileFixtures.Named<TextBlock>(page, "AccentValueLabel").Text);
-            Assert.Equal("Plain", MobileFixtures.Named<TextBlock>(page, "PlayerBarValueLabel").Text);
+            Assert.Equal("Progress Line", MobileFixtures.Named<TextBlock>(page, "PlayerBarValueLabel").Text); // on by default (#284)
             Assert.Equal("Off", MobileFixtures.Named<TextBlock>(page, "BackgroundValueLabel").Text);
             Assert.Equal("Off", MobileFixtures.Named<TextBlock>(page, "ScrobblingValueLabel").Text);
             Assert.Equal("Both on", MobileFixtures.Named<TextBlock>(page, "LyricsValueLabel").Text);
             Assert.Equal("Theme, System, Dark", NameOf("ThemeRow"));
             Assert.Equal("Accent, Crimson", NameOf("AccentRow"));
-            Assert.Equal("Player Bar, Plain", NameOf("PlayerBarRow"));
+            Assert.Equal("Player Bar, Progress Line", NameOf("PlayerBarRow"));
             Assert.Equal("Background, Off", NameOf("BackgroundRow"));
             Assert.Equal("Scrobbling, Off", NameOf("ScrobblingRow"));
             Assert.Equal("Listening History", NameOf("HistoryRow"));               // no summary, no comma

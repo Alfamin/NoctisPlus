@@ -285,14 +285,17 @@ public class MobileHomeTabTests
         window.Close();
     }
 
-    /// <summary>Default: no fill, no line, the capsule is plain glass (Apple's).</summary>
+    /// <summary>Owner #284: by default the progress line shows (it also carries a streamed song's download), the fill does
+    /// not.</summary>
     [AvaloniaFact]
-    public void MiniPlayer_IsPlainGlass_ByDefault()
+    public void MiniPlayer_ShowsTheProgressLine_ByDefault()
     {
         using var rig = PlayingRig(out var window, out var view);
         Assert.False(rig.Shell.ShowMiniProgressFill);
-        Assert.False(rig.Shell.ShowMiniProgressLine);
-        Assert.False(view.FindControl<Border>("MiniProgress")!.IsEffectivelyVisible);
+        Assert.True(rig.Shell.ShowMiniProgressLine);
+        Assert.True(view.FindControl<Border>("MiniProgress")!.IsEffectivelyVisible);
+        Assert.True(view.FindControl<Border>("MiniProgressLine")!.IsEffectivelyVisible);
+        Assert.False(view.FindControl<Border>("MiniProgressFill")!.IsEffectivelyVisible);
         window.Close();
     }
 
@@ -303,6 +306,7 @@ public class MobileHomeTabTests
         using var rig = PlayingRig(out var window, out var view);
         var fill = view.FindControl<Border>("MiniProgressFill")!;
         var line = view.FindControl<Border>("MiniProgressLine")!;
+        rig.Shell.ShowMiniProgressLine = false; // on by default (#284): each switch on its own below
 
         rig.Shell.ShowMiniProgressFill = true;
         window.UpdateLayout();

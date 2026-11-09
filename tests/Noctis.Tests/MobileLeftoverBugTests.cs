@@ -145,6 +145,28 @@ public class MobileLeftoverBugTests
         Assert.Equal(35, saved.LyricsMinLineOpacity);
     }
 
+    /// <summary>Owner #284: a phone set up before the progress line was on by default gets it once, and that is saved;
+    /// one that turned it off afterwards keeps it off and saves nothing.</summary>
+    [Fact]
+    public async Task ProgressLine_TurnsOnOnce_ForPhonesSetUpBefore_ThenStaysTheUsersChoice()
+    {
+        var before = new HeldSettingsPersistence(new AppSettings { MobilePlayerBarProgressLine = false, MobilePlusDefaultsLevel = 0 });
+        var shell = MakeShell(before);
+        await shell.InitializeAsync().WaitAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken);
+        await shell.PendingPlayerBarSave;
+        Assert.True(shell.ShowMiniProgressLine);
+        var saved = await before.LoadSettingsAsync();
+        Assert.True(saved.MobilePlayerBarProgressLine);
+        Assert.Equal(ShellViewModel.PlusDefaultsCurrent, saved.MobilePlusDefaultsLevel);
+
+        var chosen = new HeldSettingsPersistence(new AppSettings { MobilePlayerBarProgressLine = false, MobilePlusDefaultsLevel = ShellViewModel.PlusDefaultsCurrent });
+        var again = MakeShell(chosen);
+        await again.InitializeAsync().WaitAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken);
+        await again.PendingPlayerBarSave;
+        Assert.False(again.ShowMiniProgressLine);
+        Assert.Equal(0, chosen.Saves);
+    }
+
     /// <summary>Nothing flipped: the start applies the saved values and writes nothing back.</summary>
     [Fact]
     public async Task ColdStartWithNoFlip_AppliesTheSavedValues_AndSavesNothing()

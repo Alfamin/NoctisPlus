@@ -340,7 +340,8 @@ public class MobileRedesignTests
         rig.Shell.Player.PlayTracks(songs, 0);
         window.UpdateLayout();
 
-        var fill = view.GetVisualDescendants().OfType<FractionPanel>().Single();
+        // The played part's panel; #284 put a streamed song's arrived part (MiniArrived) under it.
+        var fill = view.GetVisualDescendants().OfType<FractionPanel>().Single(p => p.Name != "MiniArrived");
         Assert.Equal(rig.Shell.Player.ProgressFraction, fill.Fraction);
         Assert.NotNull(rig.Shell.MiniProgressFill);
         window.Close();

@@ -1040,6 +1040,7 @@ public sealed partial class NowPlayingViewModel : ObservableObject, IDisposable
         if (_disposed) return;
         _disposed = true;
         DisposeOnlineQueue();
+        if (_watchedDownload is { } watched) { watched.Source.DownloadsChanged -= OnWatchedDownloadChanged; _watchedDownload = null; }
         InvalidateShufflePlan();
         StopSleepTicker();
         _player.PositionChanged -= OnPlayerPosition;

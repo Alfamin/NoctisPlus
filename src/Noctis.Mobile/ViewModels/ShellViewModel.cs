@@ -650,7 +650,7 @@ public sealed partial class ShellViewModel : ObservableObject
     /// <summary>The bright line along the capsule's bottom edge (<see cref="MiniProgressLine"/>).</summary>
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(ShowsMiniProgress))]
-    private bool _showMiniProgressLine;
+    private bool _showMiniProgressLine = true; // owner #284: on by default
 
     /// <summary>Album Colours: album and artist pages painted in a deep shade of the cover's
     /// colour (<see cref="PageTint.Enabled"/>, which the open pages follow); off, they keep the
@@ -750,6 +750,9 @@ public sealed partial class ShellViewModel : ObservableObject
 
     [RelayCommand] private void ToggleQueueHistoryCollapsed() => IsQueueHistoryCollapsed = !IsQueueHistoryCollapsed;
 
+    /// <summary>Owner #284: the phone's Noctis Plus defaults level (see AppSettings.MobilePlusDefaultsLevel).</summary>
+    internal const int PlusDefaultsCurrent = 1;
+
     private async Task LoadPlayerBarSettingsAsync()
     {
         try
@@ -761,7 +764,16 @@ public sealed partial class ShellViewModel : ObservableObject
             try
             {
                 if (!_playerBarSetBeforeLoad.Contains(nameof(ShowMiniProgressFill))) ShowMiniProgressFill = settings.MobilePlayerBarProgressFill;
-                if (!_playerBarSetBeforeLoad.Contains(nameof(ShowMiniProgressLine))) ShowMiniProgressLine = settings.MobilePlayerBarProgressLine;
+                if (!_playerBarSetBeforeLoad.Contains(nameof(ShowMiniProgressLine)))
+                {
+                    ShowMiniProgressLine = settings.MobilePlayerBarProgressLine;
+                    // Owner #284: a phone set up before the line was on by default gets it once; turned off later, it stays off.
+                    if (settings.MobilePlusDefaultsLevel < PlusDefaultsCurrent && !ShowMiniProgressLine)
+                    {
+                        ShowMiniProgressLine = true;
+                        _playerBarSetBeforeLoad.Add(nameof(ShowMiniProgressLine));
+                    }
+                }
                 if (!_playerBarSetBeforeLoad.Contains(nameof(ArtworkPageColors))) ArtworkPageColors = settings.MobileArtworkPageColors;
                 if (!_playerBarSetBeforeLoad.Contains(nameof(SongRowMark)))
                     SongRowMark = Enum.TryParse<SongRowMark>(settings.MobileSongRowMark, ignoreCase: true, out var mark) && Enum.IsDefined(mark)
@@ -808,6 +820,7 @@ public sealed partial class ShellViewModel : ObservableObject
                 {
                     settings.MobilePlayerBarProgressFill = fill;
                     settings.MobilePlayerBarProgressLine = line;
+                    settings.MobilePlusDefaultsLevel = Math.Max(settings.MobilePlusDefaultsLevel, PlusDefaultsCurrent);
                     settings.MobileArtworkPageColors = pages;
                     settings.MobileSongRowMark = mark;
                     settings.MobileNowPlayingArtwork = artwork;

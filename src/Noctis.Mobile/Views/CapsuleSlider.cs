@@ -31,6 +31,11 @@ public sealed class CapsuleSlider : RangeBase
     public static readonly StyledProperty<double> ExpansionProperty =
         AvaloniaProperty.Register<CapsuleSlider, double>(nameof(Expansion));
 
+    /// <summary>Owner #284: how much of a streamed song has arrived (0-1). Below 1 the part still to come is dimmer, as the
+    /// PC's seek bar shows its download; 1 (the default) draws the bar as before.</summary>
+    public static readonly StyledProperty<double> ArrivedFractionProperty =
+        AvaloniaProperty.Register<CapsuleSlider, double>(nameof(ArrivedFraction), 1);
+
     public static readonly DirectProperty<CapsuleSlider, bool> IsScrubbingProperty =
         AvaloniaProperty.RegisterDirect<CapsuleSlider, bool>(nameof(IsScrubbing), s => s.IsScrubbing);
 
@@ -38,11 +43,13 @@ public sealed class CapsuleSlider : RangeBase
     // a step brighter while held (Apple's).
     internal const double TrackAlpha = 0.2, PressedTrackAlpha = 0.28;
     internal const double FillAlpha = 0.62, PressedFillAlpha = 0.95;
+    /// <summary>The not-yet-arrived part of a streamed song, against the arrived part's track (#284).</summary>
+    internal const double ArrivingAlpha = 0.45;
 
     static CapsuleSlider()
     {
         AffectsRender<CapsuleSlider>(ValueProperty, MinimumProperty, MaximumProperty, ExpansionProperty,
-            TrackHeightProperty, PressedTrackHeightProperty);
+            TrackHeightProperty, PressedTrackHeightProperty, ArrivedFractionProperty);
         FocusableProperty.OverrideDefaultValue<CapsuleSlider>(false);
     }
 
@@ -57,6 +64,7 @@ public sealed class CapsuleSlider : RangeBase
     public double TrackHeight { get => GetValue(TrackHeightProperty); set => SetValue(TrackHeightProperty, value); }
     public double PressedTrackHeight { get => GetValue(PressedTrackHeightProperty); set => SetValue(PressedTrackHeightProperty, value); }
     public double Expansion { get => GetValue(ExpansionProperty); set => SetValue(ExpansionProperty, value); }
+    public double ArrivedFraction { get => GetValue(ArrivedFractionProperty); set => SetValue(ArrivedFractionProperty, value); }
 
     private bool _isScrubbing;
     public bool IsScrubbing { get => _isScrubbing; private set => SetAndRaise(IsScrubbingProperty, ref _isScrubbing, value); }
@@ -131,7 +139,16 @@ public sealed class CapsuleSlider : RangeBase
         var grow = Math.Clamp(Expansion, 0, 1);
         var height = TrackHeight + (PressedTrackHeight - TrackHeight) * grow;
         var capsule = new RoundedRect(new Rect(0, (Bounds.Height - height) / 2, width, height), height / 2);
-        context.DrawRectangle(White(TrackAlpha + (PressedTrackAlpha - TrackAlpha) * grow), null, capsule);
+        var trackAlpha = TrackAlpha + (PressedTrackAlpha - TrackAlpha) * grow;
+        var arrived = double.IsNaN(ArrivedFraction) ? 1 : Math.Clamp(ArrivedFraction, 0, 1);
+        if (arrived >= 1) context.DrawRectangle(White(trackAlpha), null, capsule);
+        else
+        {
+            // Still arriving: the rest of the song a shade dimmer than the part already here.
+            context.DrawRectangle(White(trackAlpha * ArrivingAlpha), null, capsule);
+            using (context.PushClip(capsule))
+                context.DrawRectangle(White(trackAlpha), null, new Rect(0, capsule.Rect.Y, width * arrived, height));
+        }
 
         var range = Maximum - Minimum;
         var fraction = range > 0 ? Math.Clamp((Value - Minimum) / range, 0, 1) : 0;
