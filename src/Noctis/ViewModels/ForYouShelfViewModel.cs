@@ -194,6 +194,35 @@ public sealed partial class ForYouShelfViewModel : ObservableObject, IDisposable
     public bool CanPreviousPage => HasPageTabs && _pageIndex > 0;
     public bool CanNextPage => HasPageTabs && _pageIndex < _pages.Count - 1;
 
+    /// <summary>Owner #286: the page playing ran out (its last song ended or was Not for me): the next page plays from its
+    /// first song, the next kept one (as ›), or a fresh page when none is left. False when nothing can play.</summary>
+    internal bool PlayNextPage()
+    {
+        if (_disposed || _source is not { } source || _online is not { } online || !online.CanDownload || PlayPageRequested is null) return false;
+        _ = PlayNextPageAsync(source, online);
+        return true;
+    }
+
+    private async Task PlayNextPageAsync(ForYouSource source, FinderOnlineSearch online)
+    {
+        try
+        {
+            // After the player's own end-of-queue stop (the caller), never inside it: that stop would clear the new page.
+            await Task.Yield();
+            var played = _page;
+            _pages = source.Pages();
+            if (_pageIndex + 1 < _pages.Count) await GoToPage(_pageIndex + 1);
+            else await LoadAsync(true);
+            // A fresh page that could not be built leaves the old page on screen: it is not played again.
+            if (_disposed || !ReferenceEquals(source, _source) || ReferenceEquals(_page, played)) return;
+            var page = Picks.Select(p => p.Song.Online).OfType<OnlineSong>().ToList();
+            if (page.Count == 0) return;
+            Services.DebugLog.Write("Queue", $"For you: next page plays ({page.Count} songs)");
+            PlayPageRequested?.Invoke(online, page, 0);
+        }
+        catch (Exception ex) when (ex is not OutOfMemoryException) { Services.DebugLog.Write("Queue", "For you next page not played: " + ex.Message); }
+    }
+
     [RelayCommand] private Task ShowPage(ForYouPageTab? tab) => tab is { IsGap: false } ? GoToPage(tab.Number - 1) : Task.CompletedTask;
     [RelayCommand] private Task PreviousPage() => GoToPage(_pageIndex - 1);
     [RelayCommand] private Task NextPage() => GoToPage(_pageIndex + 1);

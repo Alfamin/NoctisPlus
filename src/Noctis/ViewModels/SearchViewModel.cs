@@ -43,6 +43,7 @@ public sealed partial class SearchViewModel : ViewModelBase, ISearchable, IDispo
         ForYou.PlayRequested = (source, song) => player.PlayOnlineAsync(source, song);
         ForYou.PlayPageRequested = player.PlayOnlinePage;
         ForYou.DismissRequested = player.SkipDismissed;
+        player.ContinueForYouPage = ForYou.PlayNextPage; // owner #286
         player.IsForYouSong = ForYou.HasSong;
         player.DismissForYouSong = ForYou.DismissSong;
         ForYou.Picks.CollectionChanged += (_, _) => player.RefreshNotForMe();

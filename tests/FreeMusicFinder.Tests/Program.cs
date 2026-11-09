@@ -157,6 +157,7 @@ try
     StreamingPlaylistImportTests.Run();
     NativeForYouTests.Run();
     NativeForYouTests.RunPager();
+    NativeForYouTests.RunNextPagePlays();
     NativeForYouTests.RunRemovePages();
     DiscoverReplayChecks.Run();
     WindowTests.Run(string.IsNullOrEmpty(pictures) ? null : pictures);
