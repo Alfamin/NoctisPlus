@@ -193,7 +193,7 @@
   <data name="Settings.About.WebsiteCaption" xml:space="preserve"><value>Документация и загрузки</value><comment>About tile caption in SettingsView.axaml</comment></data>
   <data name="Settings.IncludePreReleaseUpdates" xml:space="preserve"><value>Получать предварительные версии</value><comment>Text in SettingsView.axaml</comment></data>
   <data name="Settings.OfferBetaBuildsUpdater" xml:space="preserve"><value>Предлагать бета-сборки при обновлении.</value><comment>Text in SettingsView.axaml</comment></data>
-  <data name="Settings.YoursTrulyHeartached" xml:space="preserve"><value>Искренне ваш, heartached.</value><comment>Text in SettingsView.axaml</comment></data>
+  <data name="Settings.YoursTrulyHeartached" xml:space="preserve"><value>Искренне ваш, Alfamin.</value><comment>Text in SettingsView.axaml</comment></data>
   <data name="Settings.DeveloperMode" xml:space="preserve"><value>Режим разработчика</value><comment>Text in SettingsView.axaml</comment></data>
   <data name="Settings.ShowVersionManagerDebug" xml:space="preserve"><value>Показывать менеджер версий и журналы отладки.</value><comment>Text in SettingsView.axaml</comment></data>
   <data name="Settings.DownloadInstallAnyRelease" xml:space="preserve"><value>Можно установить любой выпуск с GitHub. Установка закроет приложение.</value><comment>Text in SettingsView.axaml</comment></data>

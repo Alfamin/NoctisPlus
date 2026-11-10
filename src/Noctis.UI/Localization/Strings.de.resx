@@ -194,7 +194,7 @@ Deezer und TIDAL: Füge den Link ein.</value></data>
   <data name="Settings.About.WebsiteCaption" xml:space="preserve"><value>Doku &amp; Downloads</value><comment>About tile caption in SettingsView.axaml</comment></data>
   <data name="Settings.IncludePreReleaseUpdates" xml:space="preserve"><value>Vorabversionen einschließen</value><comment>Text in SettingsView.axaml</comment></data>
   <data name="Settings.OfferBetaBuildsUpdater" xml:space="preserve"><value>Beta-Builds im Updater anbieten.</value><comment>Text in SettingsView.axaml</comment></data>
-  <data name="Settings.YoursTrulyHeartached" xml:space="preserve"><value>Dein heartached.</value><comment>Text in SettingsView.axaml</comment></data>
+  <data name="Settings.YoursTrulyHeartached" xml:space="preserve"><value>Dein Alfamin.</value><comment>Text in SettingsView.axaml</comment></data>
   <data name="Settings.DeveloperMode" xml:space="preserve"><value>Entwicklermodus</value><comment>Text in SettingsView.axaml</comment></data>
   <data name="Settings.ShowVersionManagerDebug" xml:space="preserve"><value>Versionsverwaltung und Debug-Protokolle anzeigen.</value><comment>Text in SettingsView.axaml</comment></data>
   <data name="Settings.DownloadInstallAnyRelease" xml:space="preserve"><value>Jede Version von GitHub installieren. Beim Installieren wird die App geschlossen.</value><comment>Text in SettingsView.axaml</comment></data>
