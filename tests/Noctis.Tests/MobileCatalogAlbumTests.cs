@@ -160,6 +160,30 @@ public class MobileCatalogAlbumTests
         finally { page.OnClosed(); }
     }
 
+    /// <summary>Owner #290: a song you don't have on an album page shows the album's cover (it showed none once tapped).</summary>
+    [AvaloniaFact]
+    public async Task AlbumSongsYouDontHave_TakeTheAlbumsCover_WithNoFetchOfTheirOwn()
+    {
+        var owned = MobileFixtures.Song("Owned");
+        var source = new Source();
+        var release = source.Release with { ArtworkUrl = "https://covers.example/orbit.jpg" };
+        var asked = new List<string>();
+        source.Artwork = (url, _) => { asked.Add(url); return Task.FromResult<string?>("C:/covers/orbit.jpg"); };
+        source.Metadata = Task.FromResult(new OnlineAlbumPage(release, [
+            new(new("deezer:1", "First", "Artist", Seconds: 90), 1, 1),
+            new(new("deezer:2", "Owned", "Artist", Seconds: 90, LocalTrackId: owned.Id), 2, 1)]));
+        using var rig = MobileFixtures.MakeRig(tracks: [owned], onlineSearch: source);
+        var page = new AlbumPageViewModel(rig.Shell, AlbumPageViewModel.OnlinePlaceholder(release, source), release);
+        try
+        {
+            await page.CatalogLoad; await page.CatalogArtworkLoad;
+            Assert.Equal("C:/covers/orbit.jpg", page.Tracks[0].Track.AlbumArtworkPath);
+            Assert.Null(owned.AlbumArtworkPath);   // a song you have keeps its own cover
+            Assert.Equal(new[] { release.ArtworkUrl }, asked);
+        }
+        finally { page.OnClosed(); }
+    }
+
     [AvaloniaFact]
     public async Task FailedAlbumCanRetry_AndAnAnswerAfterBackCannotResurrectItsRows()
     {

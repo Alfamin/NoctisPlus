@@ -63,6 +63,8 @@ public sealed partial class AlbumPageViewModel
         {
             var owned = entry.Song.LocalTrackId is { } id ? Shell.Library.Service.GetTrackById(id) : null;
             var track = owned is { IsFileMissing: false } ? owned : OnlineStandIn.Create(source, entry.Song, false, page.Release.Title);
+            // Owner #290: a song of this album shows the album's cover (it showed none once tapped).
+            if (track.PendingStream is not null && Album.ArtworkPath is { } cover) track.ShowArtwork(cover);
             return new AlbumTrackRow(track, entry.Number > 0 ? entry.Number : index + 1, entry.Disc);
         }).ToList();
         var display = OnlinePlaceholder(page.Release, source);
@@ -98,7 +100,12 @@ public sealed partial class AlbumPageViewModel
         }
         catch (OperationCanceledException) { }
         catch (Exception ex) when (ex is not OutOfMemoryException) { DebugLog.Write("Album", "Cover unavailable: " + ex.GetType().Name); }
-        void SetArt(string path) { Album.ArtworkPath = path; OnPropertyChanged(nameof(HasArtwork)); Tint.Load(path); }
+        void SetArt(string path)
+        {
+            Album.ArtworkPath = path; OnPropertyChanged(nameof(HasArtwork)); Tint.Load(path);
+            // Owner #290: one cover per album: the album's songs you don't have take it too (no fetch of their own).
+            foreach (var row in Tracks) if (row.Track.PendingStream is not null) row.Track.ShowArtwork(path);
+        }
     }
 
     [RelayCommand] private void RetryCatalog() { if (!IsCatalogLoading && !_catalogClosed) CatalogLoad = LoadCatalogAsync(); }

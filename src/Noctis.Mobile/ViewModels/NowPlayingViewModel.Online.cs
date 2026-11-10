@@ -101,6 +101,20 @@ public sealed partial class NowPlayingViewModel
 
     partial void OnIsPreparingOnlineChanged(bool value) => RefreshDownload();
 
+    /// <summary>Owner #290: a streamed song with no cover (none on disk when it was queued) fetches one as it starts: the
+    /// full-size cover for Now Playing, else the small one, as the PC's player does (#247).</summary>
+    private async Task LoadStreamCoverAsync(Track track, Noctis.ViewModels.PendingStream pending)
+    {
+        if (!string.IsNullOrEmpty(track.AlbumArtworkPath) || pending.Song.ArtworkUrl.Length == 0) return;
+        try
+        {
+            var path = await pending.Source.SharpCoverAsync(pending.Song, CancellationToken.None).ConfigureAwait(false)
+                ?? await pending.Source.QueueCoverAsync(pending.Song, CancellationToken.None).ConfigureAwait(false);
+            if (path is not null) _marshal(() => { if (string.IsNullOrEmpty(track.AlbumArtworkPath)) { track.ShowArtwork(path); if (ReferenceEquals(track, CurrentTrack)) OnPropertyChanged(nameof(CurrentTrack)); } });
+        }
+        catch (Exception ex) when (ex is not OutOfMemoryException) { DebugLog.Write("Artwork", "stream cover not loaded: " + ex.GetType().Name); }
+    }
+
     private void StartTrack(Track track, TimeSpan? fromPosition)
     {
         CancelOnlinePrepare();
@@ -115,6 +129,7 @@ public sealed partial class NowPlayingViewModel
         CurrentTrack = track; Duration = track.Duration; Position = fromPosition ?? TimeSpan.Zero;
         ErrorText = ""; IsPlaying = false; IsPreparingOnline = true; _onlinePlayWhenReady = true;
         WatchDownload(pending); // after IsPreparingOnline: its step shows until it plays, then how much has arrived
+        _ = LoadStreamCoverAsync(track, pending);
         var stop = _onlinePrepare = new();
         SyncUpNext(); PrepareUpcoming(); SaveStateNow();
         OnlinePreparation = PrepareOnlineAsync(track, pending, fromPosition, stop);

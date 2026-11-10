@@ -12,5 +12,13 @@ public static class OnlineStandIn
         Duration = TimeSpan.FromSeconds(song.Seconds is > 0 and <= 86400 ? song.Seconds.Value : 0),
         IsExplicit = song.Explicit == true,
         PendingStream = new Noctis.ViewModels.PendingStream(source, song, keep, page),
+        // Owner #290: a cover already on disk for the song shows from the start (queue rows, mini player, Now Playing).
+        AlbumArtworkPath = CachedCover(source, song),
     };
+
+    private static string? CachedCover(IOnlineMusicSearch source, OnlineSong song)
+    {
+        try { return source.CachedQueueCover(song); }
+        catch (Exception ex) when (ex is not OutOfMemoryException) { return null; }
+    }
 }
