@@ -7,6 +7,7 @@ using Avalonia.Markup.Xaml;
 using Avalonia.Platform;
 using Avalonia.Styling;
 using Avalonia.Threading;
+using Noctis.Controls;
 using Noctis.Android.Services;
 using Noctis.Helpers;
 using Noctis.Localization;
@@ -66,6 +67,11 @@ public partial class AndroidApp : Avalonia.Application, IThemeHost
     public override void OnFrameworkInitializationCompleted()
     {
         Current = this;
+#if NOCTIS_PLUS
+        // Native Plus motion reuses the shared posed karaoke renderer on the phone only.
+        // The desktop renderer and stock Noctis Android build remain untouched.
+        LyricsWordEffect.Set(new PlusLyricMotionEffect());
+#endif
         var context = AApplication.Context;
         // The shared metadata/Telegram stacks consult HttpClient.DefaultProxy. Android's
         // ProxySelector is the authority for system HTTP proxies, PAC and exclusion lists.
@@ -137,9 +143,9 @@ public partial class AndroidApp : Avalonia.Application, IThemeHost
             // Avalonia sizes by density only; the lyrics page applies the system font scale itself.
             FontScale = context.Resources?.Configuration?.FontScale ?? 1f,
             PrepareTrack = remoteLyrics is null ? null : remoteLyrics.ForLoad,
-            // The desktop's automatic lookup for a song with no lyrics of its own: LRCLIB, asked
-            // by title, artist and length only (Settings → Lyrics → Find Lyrics Online).
-            Online = LrcLibOnlineLyricsSource.Create(persistence.DataDirectory, InternetHttp()),
+            // Plus phone timing uses the shared lrc.red → Unison → Kugou clients, then the existing
+            // LRCLIB fallback. Every request uses the same system-proxy-aware HTTP handler.
+            Online = PlusOnlineLyricsSource.Create(persistence.DataDirectory, InternetHttp()),
         };
         // Settings › Music Folders › Find All Music Automatically (MediaStore, opt-in).
         var libraryView = new LibraryViewModel(library, persistence, new AndroidFolderPicker(), history) { DeviceMusic = AndroidDeviceMusic.Create(context) };

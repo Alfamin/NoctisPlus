@@ -1,13 +1,8 @@
-using System.Globalization;
-using System.Text.RegularExpressions;
 using Noctis.Models;
 using System.Text.Json;
 using Noctis.Services.LyricsStudio;
 
 namespace Noctis.Services.Lyrics;
-
-/// <summary>Where a song's word timing came from (#200): shown on the lyrics page and in the word timing window.</summary>
-internal enum WordTimingSource { WordLyrics, LrcRed, Unison, Kugou }
 
 /// <summary>
 /// One song's automatic online word timing (#200): lrc.red, then Unison, then Kugou (owner #209), word-synced only, the same recording
@@ -245,36 +240,18 @@ internal sealed class OnlineTimingMisses
 /// </summary>
 internal static class OnlineTimingSidecar
 {
-    public const string Namespace = "urn:noctisplus:online-timing";
+    public const string Namespace = OnlineTimingDocument.Namespace;
 
-    static readonly Regex Root = new(@"<tt\b", RegexOptions.CultureInvariant);
-    static readonly Regex Source = new(@"\splus:source\s*=\s*""([^""]*)""", RegexOptions.CultureInvariant);
-
-    public static string Name(WordTimingSource source) => source switch
-    {
-        WordTimingSource.LrcRed => "lrc.red",
-        WordTimingSource.Unison => "Unison",
-        WordTimingSource.Kugou => "Kugou",
-        _ => "WordLyrics",
-    };
+    public static string Name(WordTimingSource source) => OnlineTimingDocument.Name(source);
 
     /// <summary>The document with the mark on its root; null when it has no &lt;tt&gt; root or is marked already.</summary>
     /// <param name="unverified">Owner #215: the fit check was not sure of it: shown until WordLyrics' timing replaces it.</param>
-    public static string? Mark(string ttml, WordTimingSource source, double shift, bool unverified = false)
-    {
-        if (SourceOf(ttml) != null) return null;
-        var root = Root.Match(ttml);
-        if (!root.Success) return null;
-        var mark = $" xmlns:plus=\"{Namespace}\" plus:source=\"{Name(source)}\" plus:shift=\"{shift.ToString("0.00", CultureInfo.InvariantCulture)}\"" +
-                   (unverified ? $" {UnverifiedMark}" : "");
-        return ttml.Insert(root.Index + root.Length, mark);
-    }
-
-    const string UnverifiedMark = "plus:fit=\"unsure\"";
+    public static string? Mark(string ttml, WordTimingSource source, double shift, bool unverified = false) =>
+        OnlineTimingDocument.Mark(ttml, source, shift, unverified);
 
     /// <summary>Audio fit confidence only. Owner #226: unsure timing still covers the song;
     /// it never grants permission for automatic WordLyrics replacement.</summary>
-    public static bool Unverified(string? ttml) => SourceOf(ttml) != null && ttml!.Contains(UnverifiedMark, StringComparison.Ordinal);
+    public static bool Unverified(string? ttml) => OnlineTimingDocument.Unverified(ttml);
 
     /// <summary>A song whose .ttml is such an unverified online timing.</summary>
     public static bool HasUnverified(string audioPath)
@@ -286,15 +263,7 @@ internal static class OnlineTimingSidecar
     }
 
     /// <summary>The source an online timing names, or null for any other TTML (the user's own, Lyrics Studio's).</summary>
-    public static WordTimingSource? SourceOf(string? ttml)
-    {
-        if (ttml == null || !ttml.Contains(Namespace, StringComparison.Ordinal)) return null;
-        var m = Source.Match(ttml);
-        if (!m.Success) return null;
-        foreach (var s in new[] { WordTimingSource.LrcRed, WordTimingSource.Unison, WordTimingSource.Kugou })
-            if (m.Groups[1].Value == Name(s)) return s;
-        return null;
-    }
+    public static WordTimingSource? SourceOf(string? ttml) => OnlineTimingDocument.SourceOf(ttml);
 
     /// <summary>
     /// The song's online timing makes way so the timing just written beside it shows — a .ttml out-ranks the .elrc.
