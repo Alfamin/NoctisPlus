@@ -193,7 +193,7 @@
   <data name="Settings.About.WebsiteCaption" xml:space="preserve"><value>Docs &amp; downloads</value><comment>About tile caption in SettingsView.axaml</comment></data>
   <data name="Settings.IncludePreReleaseUpdates" xml:space="preserve"><value>Include pre-release updates</value><comment>Text in SettingsView.axaml</comment></data>
   <data name="Settings.OfferBetaBuildsUpdater" xml:space="preserve"><value>Offer beta builds in the updater.</value><comment>Text in SettingsView.axaml</comment></data>
-  <data name="Settings.YoursTrulyHeartached" xml:space="preserve"><value>Yours Truly, heartached.</value><comment>Text in SettingsView.axaml</comment></data>
+  <data name="Settings.YoursTrulyHeartached" xml:space="preserve"><value>Yours Truly, Alfamin.</value><comment>Text in SettingsView.axaml</comment></data>
   <data name="Settings.DeveloperMode" xml:space="preserve"><value>Developer Mode</value><comment>Text in SettingsView.axaml</comment></data>
   <data name="Settings.ShowVersionManagerDebug" xml:space="preserve"><value>Show the version manager and debug logs.</value><comment>Text in SettingsView.axaml</comment></data>
   <data name="Settings.DownloadInstallAnyRelease" xml:space="preserve"><value>Install any release from GitHub. Installing closes the app.</value><comment>Text in SettingsView.axaml</comment></data>

@@ -144,7 +144,7 @@
   <data name="Settings.About.WebsiteCaption" xml:space="preserve"><value>Belgeler ve indirmeler</value><comment>About tile caption in SettingsView.axaml</comment></data>
   <data name="Settings.IncludePreReleaseUpdates" xml:space="preserve"><value>Ön sürüm güncellemelerini dahil et</value><comment>Text in SettingsView.axaml</comment></data>
   <data name="Settings.OfferBetaBuildsUpdater" xml:space="preserve"><value>Güncelleyicide beta sürümleri sun.</value><comment>Text in SettingsView.axaml</comment></data>
-  <data name="Settings.YoursTrulyHeartached" xml:space="preserve"><value>Saygılarımla, heartached.</value><comment>Text in SettingsView.axaml</comment></data>
+  <data name="Settings.YoursTrulyHeartached" xml:space="preserve"><value>Saygılarımla, Alfamin.</value><comment>Text in SettingsView.axaml</comment></data>
   <data name="Settings.DeveloperMode" xml:space="preserve"><value>Geliştirici Modu</value><comment>Text in SettingsView.axaml</comment></data>
   <data name="Settings.ShowVersionManagerDebug" xml:space="preserve"><value>Sürüm yöneticisini ve hata ayıklama günlüklerini göster.</value><comment>Text in SettingsView.axaml</comment></data>
   <data name="Settings.DownloadInstallAnyRelease" xml:space="preserve"><value>GitHub'dan herhangi bir sürümü kur. Kurulum uygulamayı kapatır.</value><comment>Text in SettingsView.axaml</comment></data>
