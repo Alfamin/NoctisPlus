@@ -157,6 +157,7 @@ try
     StreamingPlaylistImportTests.Run();
     NativeForYouTests.Run();
     NativeForYouTests.RunPager();
+    NativeForYouTests.RunNextPagePlays();
     NativeForYouTests.RunRemovePages();
     PhoneForYouRouteTests.Run();
     DiscoverReplayChecks.Run();

@@ -3656,7 +3656,10 @@ public partial class PlayerViewModel : ViewModelBase
         }
         else
         {
-            if (TryContinueWithAutoplay(reason))
+            // Owner #286: a For you page ran out (its last song ended, or could not be fetched): the queue stops as
+            // usual and the For you shelf plays its next page instead of autoplay's picks.
+            if (ContinueForYouAfter(_preparingStandIn ?? CurrentTrack)) { }
+            else if (TryContinueWithAutoplay(reason))
                 return;
 
             DebugLogger.Info(

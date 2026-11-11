@@ -81,10 +81,13 @@ public partial class PlayerViewModel
         ShowStep();
         pending.Source.DownloadsChanged += StepChanged;
         using var wait = CancellationTokenSource.CreateLinkedTokenSource(stop.Token);
+        // Owner #286: a song no bot sends (a bot that never answers) held the queue forever. It now gives way after
+        // StandInWait of time online; time offline does not count, so a network drop still waits for the network (10-21).
+        _ = GiveUpOnStandInAsync(wait);
         try
         {
             if (!pending.Source.CanDownload) throw new InvalidOperationException("not signed in to the download service");
-            var track = await pending.Source.PreparePlaybackAsync(pending.Song, pending.Keep, wait.Token);
+            var track = await StopWaitingOn(pending.Source.PreparePlaybackAsync(pending.Song, pending.Keep, wait.Token), wait.Token);
             if (stop.IsCancellationRequested || !ReferenceEquals(_onlinePlay, stop)) return;
             _onlinePlay = null;
             _streamFailures = 0;
@@ -141,8 +144,35 @@ public partial class PlayerViewModel
         }
     }
 
-    /// <summary>The longest a song still to be fetched holds the queue before the next song plays instead.</summary>
-    internal static TimeSpan StandInWait = TimeSpan.FromSeconds(60);
+    /// <summary>The longest a song still to be fetched holds the queue before the next song plays instead (time online).</summary>
+    internal TimeSpan StandInWait { get; set; } = TimeSpan.FromSeconds(60);
+    internal TimeSpan StandInWaitStep { get; set; } = TimeSpan.FromSeconds(1);
+
+    /// <summary>Owner #286: the queue stops waiting even when a source does not answer its token (a stuck bot step). A cancel
+    /// (Next, Previous, the wait running out) is answered on a later dispatcher turn, never inside the command that cancelled:
+    /// run inside Next, the cleanup cleared the stand-in mark mid-skip and the song before went into History twice.</summary>
+    private static async Task<T> StopWaitingOn<T>(Task<T> work, CancellationToken ct)
+    {
+        try { return await work.WaitAsync(ct); }
+        catch (OperationCanceledException) { await Task.Yield(); throw; }
+    }
+
+    private async Task GiveUpOnStandInAsync(CancellationTokenSource wait)
+    {
+        try
+        {
+            var left = StandInWait;
+            while (left > TimeSpan.Zero)
+            {
+                await Task.Delay(StandInWaitStep, wait.Token).ConfigureAwait(false);
+                if (MayStreamAhead()) left -= StandInWaitStep;
+            }
+            Services.DebugLog.Write("Queue", $"a song to fetch got nothing in {StandInWait.TotalSeconds:0} s online: the queue goes on");
+            wait.Cancel();
+        }
+        catch (OperationCanceledException) { }
+        catch (ObjectDisposedException) { }
+    }
     private int _streamFailures;
     private bool _askedSignIn;
 
@@ -219,8 +249,32 @@ public partial class PlayerViewModel
         var fetching = _onlinePreparingSongId == song.Id;
         if (OnlinePlayingSongId != song.Id && !fetching) return;
         if (CanGoNext()) { NextCommand.Execute(null); return; }
+        // Owner #286: Not for me on the last song of a For you page goes on to the next page.
+        var forYou = ContinueForYouAfter(fetching ? _preparingStandIn : CurrentTrack);
         if (fetching) { CancelOnlinePlayback(); IsPreparingOnlinePlayback = false; return; }
+        if (forYou) { StopAndClear("for you page ended", keepHistory: true); return; }
         if (State == PlaybackState.Playing) { _audioPlayer.Pause(); State = PlaybackState.Paused; }
+    }
+
+    /// <summary>Owner #286: the For you shelf plays its next page (the next kept one, or a fresh page). Set by Search;
+    /// true when it will start one.</summary>
+    internal Func<bool>? ContinueForYouPage { get; set; }
+
+    /// <summary>The queue ran out on a song from the For you page (played or being fetched): the next page plays. True when
+    /// the shelf takes over; the caller then stops the queue as usual (the new page replaces it a moment later).</summary>
+    private bool ContinueForYouAfter(Track? last)
+    {
+        if (last is null || ContinueForYouPage is not { } next || UpNext.Count > 0 || !StreamsPage(ForYouPage)) return false;
+        var fromForYou = (last.PendingStream as PendingStream)?.Page == ForYouPage
+            || _streamOrigins.TryGetValue(last, out var origin) && origin.Page == ForYouPage;
+        if (!fromForYou) return false;
+        try
+        {
+            if (!next()) return false;
+            Services.DebugLog.Write("Queue", $"For you page ended after \"{last.Title}\": the next page plays");
+            return true;
+        }
+        catch (Exception ex) { Services.DebugLog.Write("Queue", "For you next page skipped: " + ex.Message); return false; }
     }
 
     private void WireQueueStreaming()

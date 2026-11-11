@@ -175,6 +175,43 @@ internal static class NativeForYouTests
         Dispatcher.UIThread.RunJobs();
     }
 
+    /// <summary>Owner #286: the page playing ran out (its last song ended, or Not for me on it): the next kept page plays from
+    /// its first song; with none left a fresh page is found, and one that cannot be built never replays the old page.</summary>
+    internal static void RunNextPagePlays()
+    {
+        Check.Section("native For you shelf: the next page plays when a page ends");
+        var folder = Check.NewFolder("native-for-you-next-page");
+        var library = new SpotifyPlaylistTests.Library();
+        var now = DateTimeOffset.UtcNow;
+        ForYouCache.Page Page(string batch, int first, int ageHours) => new(1, now.AddHours(-ageHours), now.AddDays(1),
+            new(Enumerable.Range(first, 3).Select(i => new DiscoverSong(new(DiscoveryTests.Song("deezer:" + i, "Song " + i), DiscoveryTests.Orbit), 1, "Because you play North Star")).ToList(), [], "", Batch: batch));
+        new ForYouCache(Path.Combine(folder, "for-you-last.json")).Write(Page("page-new", 300, 0));
+        new ForYouCache(Path.Combine(folder, "for-you-pages.json")).WriteEarlier([Page("page-old", 200, 1)]);
+        var http = new DiscoveryTests.Http { Offline = true };
+        using var catalog = DiscoveryTests.Catalog(Path.Combine(folder, "catalog"), http);
+        using var downloads = new Downloads(_ => { });
+        var actions = new DiscoveryActions(library, downloads, _ => throw new Exception("No transfer is allowed in this fixture"), () => folder, () => false);
+        using var pages = new CatalogPages(() => catalog, actions, _ => { }, () => true, library: () => null);
+        var online = new FinderOnlineSearch(() => catalog, actions, pages, () => true, () => { });
+        using var source = new ForYouSource(() => catalog, actions, _ => [], library, null, Path.Combine(folder, "hidden.json"));
+        using var vm = new ForYouShelfViewModel(source, online, actions);
+        var played = new List<(string First, int At)>();
+        vm.PlayPageRequested = (_, songs, at) => { played.Add((songs[at].Id, at)); return true; };
+        vm.SetActive(true);
+        Check.Until(() => !vm.IsLoading && vm.Picks.Count == 3 && vm.PageTabs.Count == 2, "two kept pages");
+        Check.True(vm.PlayNextPage(), "the shelf takes over when the page playing ends");
+        Check.Until(() => played.Count == 1, "the next page starts playing");
+        Check.Equal("deezer:200", played[0].First, "the next kept page plays (as the › arrow)");
+        Check.Equal(0, played[0].At, "from its first song");
+        Check.Equal("deezer:200", vm.Picks[0].Song.Online!.Id, "and it is the page on screen");
+        Check.True(vm.PlayNextPage(), "the oldest page ending asks for a fresh page");
+        Check.Until(() => !vm.IsLoading, "the fresh page's build finishes (no catalog reachable here)");
+        Dispatcher.UIThread.RunJobs();
+        Check.Equal(1, played.Count, "a fresh page that could not be built never replays the page that just ended");
+        online.Detach();
+        Dispatcher.UIThread.RunJobs();
+    }
+
     /// <summary>Owner #248: four pages vanished a week after they were made, and a page past its expiry was overwritten by the
     /// next one. Pages now stay until the listener removes one (Remove this page) or all (Clear all pages), each with Undo.</summary>
     internal static void RunRemovePages()
