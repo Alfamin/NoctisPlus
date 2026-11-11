@@ -9,6 +9,23 @@ internal sealed class FinderDiscovery(ForYouSource source, FinderOnlineSearch on
     private readonly object _gate = new();
     private readonly Dictionary<(string Page, string Song), DiscoverSong> _picks = new();
     private (string Receipt, string Batch, CatalogSong Song, bool Artist, DateTime Until)? _undo;
+    private (string Receipt, List<ForYouCache.Page> Pages, DateTime Until)? _pagesUndo;
+
+    public Task<string?> RemovePageAsync(string page) => Task.Run(() =>
+    {
+        var index = source.Pages().ToList().FindIndex(p => p.Batch.Length > 0 && p.Batch == page);
+        if (index < 0 && page.StartsWith("saved-", StringComparison.Ordinal) && int.TryParse(page.AsSpan(6), out var saved)) index = saved;
+        return source.RemovePage(index) is { } removed ? PagesUndo([removed]) : null;
+    });
+
+    public Task<string?> ClearPagesAsync() => Task.Run(() => source.ClearPages() is { Count: > 0 } removed ? PagesUndo(removed) : null);
+
+    private string PagesUndo(List<ForYouCache.Page> pages)
+    {
+        var receipt = Guid.NewGuid().ToString("N");
+        lock (_gate) _pagesUndo = (receipt, pages, DateTime.UtcNow.AddSeconds(8));
+        return receipt;
+    }
 
     public async Task<IReadOnlyList<RecommendationPage>> LoadAsync(bool refresh, CancellationToken ct)
     {
@@ -100,6 +117,13 @@ internal sealed class FinderDiscovery(ForYouSource source, FinderOnlineSearch on
     {
         lock (_gate)
         {
+            if (_pagesUndo is { } pages && pages.Receipt == receipt)
+            {
+                _pagesUndo = null;
+                if (pages.Until < DateTime.UtcNow) return false;
+                source.RestorePages(pages.Pages);
+                return true;
+            }
             if (_undo is not { } undo || undo.Receipt != receipt || undo.Until < DateTime.UtcNow) return false;
             _undo = null;
             if (undo.Artist) source.Hidden.SetArtistBlocked(undo.Song.Artists.FirstOrDefault()?.Name ?? "", false);

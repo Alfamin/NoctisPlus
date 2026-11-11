@@ -12,6 +12,8 @@ internal sealed class FinderSession : IDisposable
     private string _proxy = "";
     private ForYouSource? _forYou;
     private SimilarArtists? _similar;
+    private LastFmSimilar? _lastFm;
+    private LastFmListens? _listens;
     public Noctis.Services.Search.IOnlineDiscovery? Discovery { get; }
     public AudioQuality Quality { get; set; } = AudioQuality.FLAC;
     public string FirstBot { get; set; } = BotSelections.Hunters;
@@ -25,7 +27,7 @@ internal sealed class FinderSession : IDisposable
     public event Action<string>? Notice;
 
     public FinderSession(string data, string music, IPlaylistLibrary library, Func<ILibraryService?> service,
-        Action<string> log, string? defaultsPath = null, bool completeFilesOnly = false, string? profileData = null)
+        Action<string> log, string? defaultsPath = null, bool completeFilesOnly = false, string? profileData = null, Func<string>? lastFmUser = null)
     {
         DataFolder = Path.GetFullPath(data); MusicFolder = Path.GetFullPath(music); _log = log;
         Directory.CreateDirectory(data); Directory.CreateDirectory(music);
@@ -61,9 +63,17 @@ internal sealed class FinderSession : IDisposable
         if (profileData is not null)
         {
             _similar = new SimilarArtists(data, PlaylistCatalog.MetadataHandler("", log));
+            if (lastFmUser is not null)
+            {
+                // Owner #283: the computer's route: Last.fm's similar artists (with the app's own key: nobody brings one), and the
+                // plays logged to the connected Last.fm account from the computer and the phone.
+                _lastFm = new LastFmSimilar(Path.Combine(data, "artist-catalog"), PlaylistCatalog.MetadataHandler("", log), () => Noctis.Services.LastFmApi.ApiKey);
+                _listens = new LastFmListens(data, PlaylistCatalog.MetadataHandler("", log), lastFmUser, () => Noctis.Services.LastFmApi.ApiKey);
+            }
             _forYou = new ForYouSource(() => _catalog, _actions,
                 artist => service()?.Albums.Where(a => string.Equals(a.Artist, artist, StringComparison.OrdinalIgnoreCase))
-                    .Select(a => a.Name).ToArray() ?? [], library, profileData, Path.Combine(data, "for-you-hidden.json"), () => _similar);
+                    .Select(a => a.Name).ToArray() ?? [], library, profileData, Path.Combine(data, "for-you-hidden.json"), () => _similar,
+                _lastFm is null ? null : () => _lastFm, logged: _listens is null ? null : _listens.PlaysAsync);
             Discovery = new FinderDiscovery(_forYou, Online, library);
         }
     }
@@ -84,7 +94,7 @@ internal sealed class FinderSession : IDisposable
     private void Say(string text) { _log(text); Notice?.Invoke(text); }
     public void Dispose()
     {
-        _forYou?.Dispose(); _similar?.Dispose();
+        _forYou?.Dispose(); _similar?.Dispose(); _lastFm?.Dispose(); _listens?.Dispose();
         Online.Detach(); Playlists.Dispose(); Pages.Dispose(); Downloads.Dispose(); _catalog.Dispose(); Telegram.Dispose();
     }
 }

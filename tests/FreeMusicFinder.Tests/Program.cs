@@ -158,6 +158,7 @@ try
     NativeForYouTests.Run();
     NativeForYouTests.RunPager();
     NativeForYouTests.RunRemovePages();
+    PhoneForYouRouteTests.Run();
     DiscoverReplayChecks.Run();
     WindowTests.Run(string.IsNullOrEmpty(pictures) ? null : pictures);
     PlaylistWindowTests.Run(pictures);

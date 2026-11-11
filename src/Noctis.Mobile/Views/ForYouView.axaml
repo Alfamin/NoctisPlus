@@ -37,13 +37,16 @@
         </DataTemplate>
     </UserControl.Resources>
     <StackPanel Spacing="8">
-        <Grid ColumnDefinitions="*,Auto,Auto" Margin="20,0" IsVisible="{Binding HasPages}">
+        <Grid ColumnDefinitions="*,Auto,Auto,Auto" Margin="20,0" IsVisible="{Binding HasSongs}">
             <TextBlock Classes="row-sub" Text="{Binding PageLabel}" VerticalAlignment="Center" />
             <Button Grid.Column="1" Classes="icon" Command="{Binding PreviousPageCommand}" IsVisible="{Binding HasPages}" AutomationProperties.Name="Previous picks">
                 <PathIcon Data="{DynamicResource PhBack}" />
             </Button>
             <Button Grid.Column="2" Classes="icon" Command="{Binding NextPageCommand}" IsVisible="{Binding HasPages}" AutomationProperties.Name="Next picks">
                 <PathIcon Data="{DynamicResource PhChevronRight}" />
+            </Button>
+            <Button Grid.Column="3" Classes="icon" Command="{Binding PageOptionsCommand}" AutomationProperties.Name="Page options">
+                <PathIcon Data="{DynamicResource PhMore}" />
             </Button>
         </Grid>
         <ProgressBar IsIndeterminate="True" Height="2" Margin="20,0" IsVisible="{Binding IsLoading}" />

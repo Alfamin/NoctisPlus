@@ -195,6 +195,23 @@ internal static class TasteSources
         return Distinct(NoctisHistory(Path.Combine(noctisData, "play_history.json"), since).Concat(listens));
     }
 
+    /// <summary>Owner #283: plays logged elsewhere (the Last.fm account's scrobbles) joined to this device's own. A scrobble of a
+    /// play this device already has (the same recording within <see cref="SamePlay"/>) is that play, not a second one.</summary>
+    public static List<TastePlay> WithLogged(List<TastePlay> local, IReadOnlyList<TastePlay> logged)
+    {
+        if (logged.Count == 0) return local;
+        var times = local.GroupBy(KeyOf).ToDictionary(g => g.Key, g => g.Select(p => p.At).ToList(), StringComparer.Ordinal);
+        var result = new List<TastePlay>(local);
+        foreach (var play in logged)
+            if (!(times.TryGetValue(KeyOf(play), out var at) && at.Any(t => (t - play.At).Duration() <= SamePlay))) result.Add(play);
+        return result;
+    }
+
+    /// <summary>How far apart this device's record of a play and its scrobble can be (a scrobble is stamped when the song started).</summary>
+    public static readonly TimeSpan SamePlay = TimeSpan.FromMinutes(10);
+
+    private static string KeyOf(TastePlay p) => DiscoverIdentity.Key(p.Title, p.Artist) is { Length: > 0 } k ? k : BotText.Key(p.Artist);
+
     /// <summary>One play once: the same recording starting within the same two seconds is one event written twice.</summary>
     public static List<TastePlay> Distinct(IEnumerable<TastePlay> plays)
     {
@@ -979,7 +996,8 @@ internal sealed class DiscoverHidden
 internal sealed class ForYouSource(Func<ArtistCatalog> catalog, DiscoveryActions? actions, Func<string, IReadOnlyList<string>> localAlbums,
     IPlaylistLibrary library, string? noctisData, string hiddenPath, Func<SimilarArtists?>? similar = null,
     Func<LastFmSimilar?>? lastFm = null, Func<DateTimeOffset>? now = null, Func<IDiscoverCatalog>? discover = null,
-    Func<IReadOnlyList<CatalogSong>, CancellationToken, Task<HashSet<string>>>? unavailable = null) : IDisposable
+    Func<IReadOnlyList<CatalogSong>, CancellationToken, Task<HashSet<string>>>? unavailable = null,
+    Func<CancellationToken, Task<List<TastePlay>>>? logged = null) : IDisposable
 {
     private readonly Func<DateTimeOffset> _now = now ?? (() => DateTimeOffset.UtcNow);
     private readonly ForYouCache _cache = new(Path.Combine(Path.GetDirectoryName(Path.GetFullPath(hiddenPath))!, "for-you-last.json"));
@@ -1084,8 +1102,21 @@ internal sealed class ForYouSource(Func<ArtistCatalog> catalog, DiscoveryActions
     }
 
     /// <summary>Recordings the listener now knows (listened to since a page was made): a page shown again leaves them out (owner #139).</summary>
-    public Task<HashSet<string>> FamiliarAsync(CancellationToken ct) =>
-        Task.Run(() => TasteSources.Familiar(TasteSources.Load(noctisData), _now().UtcDateTime), ct);
+    public async Task<HashSet<string>> FamiliarAsync(CancellationToken ct)
+    {
+        var plays = await PlaysAsync(ct).ConfigureAwait(false);
+        return await Task.Run(() => TasteSources.Familiar(plays, _now().UtcDateTime), ct).ConfigureAwait(false);
+    }
+
+    /// <summary>The listener's plays: this device's history, and (owner #283, the phone) the plays logged to their Last.fm account
+    /// from anywhere. Last.fm failing leaves this device's own.</summary>
+    private async Task<List<TastePlay>> PlaysAsync(CancellationToken ct)
+    {
+        var local = await Task.Run(() => TasteSources.Load(noctisData), ct).ConfigureAwait(false);
+        if (logged is null) return local;
+        try { return TasteSources.WithLogged(local, await logged(ct).ConfigureAwait(false)); }
+        catch (Exception ex) when (ex is not OperationCanceledException and not OutOfMemoryException) { return local; }
+    }
 
     private DiscoverResult Filter(DiscoverResult result) => result with
     {
@@ -1116,9 +1147,10 @@ internal sealed class ForYouSource(Func<ArtistCatalog> catalog, DiscoveryActions
                 onPages = kept.SelectMany(p => p.Result.Songs.Take(Discover.Shelf)).Select(s => DiscoverIdentity.Key(s.Track.Song)).ToHashSet(StringComparer.Ordinal);
             }
             var songs = await library.SnapshotAsync();
+            var plays = await PlaysAsync(ct);
             // Reading the history, learning, taste and ranking are seconds of work on a large profile: none of it on the UI
             // thread (awaiting there would bring every step after the first lookup back to it).
-            var result = await Task.Run(() => Discover.ForListenerAsync(TasteSources.Load(noctisData), songs, TasteSources.Playlists(noctisData), Feedback, Hidden,
+            var result = await Task.Run(() => Discover.ForListenerAsync(plays, songs, TasteSources.Playlists(noctisData), Feedback, Hidden,
                 discover?.Invoke() ?? new CatalogForDiscover(catalog, localAlbums, similar ?? (() => null), lastFm), unavailable ?? Unavailable, progress, _now(), ct, onPages: onPages), ct);
             ct.ThrowIfCancellationRequested();
             lock (_sync)

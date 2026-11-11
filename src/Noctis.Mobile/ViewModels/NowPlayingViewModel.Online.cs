@@ -32,6 +32,14 @@ public sealed partial class NowPlayingViewModel
         PlayTracks(tracks, index, label);
     }
 
+    /// <summary>Owner #283 (the computer's #286): For You's next page, played when the page playing runs out. True when it will play.</summary>
+    public Func<bool>? ContinueForYouPage { get; set; }
+
+    /// <summary>The queue ran out on <paramref name="last"/>: a For You page goes on with the next page (it starts after this
+    /// stop, never inside it). Any other queue just stops.</summary>
+    private bool ContinueForYouAfter(Track? last) =>
+        last?.PendingStream is Noctis.ViewModels.PendingStream { Page: "For You" } && ContinueForYouPage?.Invoke() == true;
+
     internal bool IsPreparingOnlineSong(IOnlineMusicSearch source, string id) => IsPreparingOnline
         && CurrentTrack?.PendingStream is Noctis.ViewModels.PendingStream p && ReferenceEquals(p.Source, source) && p.Song.Id == id;
 

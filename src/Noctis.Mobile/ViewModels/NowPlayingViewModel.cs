@@ -354,7 +354,7 @@ public sealed partial class NowPlayingViewModel : ObservableObject, IDisposable
         var next = AdvancePlayable(QueueAdvance.UserSkip, out var heldBack);
         if (next != null) StartTrack(next, null);
         else if (heldBack) Notice = ComputerUnreachableStopped;   // the song playing keeps playing
-        else StopPlayback();
+        else { ContinueForYouAfter(CurrentTrack); StopPlayback(); }
     }
 
     /// <summary>
@@ -892,6 +892,7 @@ public sealed partial class NowPlayingViewModel : ObservableObject, IDisposable
             StartTrack(next, null);
             return;
         }
+        if (!heldBack) ContinueForYouAfter(CurrentTrack);
         StopPlayback();
         if (heldBack) ShowProblem(ComputerUnreachableStopped);
     });

@@ -27,7 +27,92 @@ public class MobileForYouTests
         public Task RecordAsync(string page, OnlineSong song, RecommendationAction action) => Task.CompletedTask;
         public Task ShownAsync(string page, IReadOnlyList<string> ids) { Shown.AddRange(ids); return Task.CompletedTask; }
         public Task<string?> HideAsync(string page, OnlineSong song, bool artist = false) { Hidden.Add(song.Id); return Task.FromResult<string?>(song.Id); }
-        public Task<bool> UndoAsync(string receipt) => Task.FromResult(Hidden.Remove(receipt));
+        public Task<bool> UndoAsync(string receipt)
+        {
+            if (receipt == "pages" && Before is { } before) { Pages = before; Before = null; return Task.FromResult(true); }
+            return Task.FromResult(Hidden.Remove(receipt));
+        }
+        public IReadOnlyList<RecommendationPage>? Before;
+        public Task<string?> RemovePageAsync(string page) { Before = Pages; Pages = Pages.Where(p => p.Id != page).ToArray(); return Task.FromResult<string?>("pages"); }
+        public Task<string?> ClearPagesAsync() { Before = Pages; Pages = []; return Task.FromResult<string?>("pages"); }
+    }
+
+    private static RecommendationPage PageOf(string id, string name) =>
+        new(id, [new(id + "1", name + " 1", name + " artist"), new(id + "2", name + " 2", name + " artist")]);
+
+    private static async Task Until(Func<bool> done) { for (var i = 0; i < 200 && !done(); i++) await Task.Delay(10); }
+
+    /// <summary>Owner #283 (the computer's #286): a For You page that runs out goes on with the next page, from its first song;
+    /// with no next page a fresh one plays. Any other queue running out just stops.</summary>
+    [Fact]
+    public async Task ThePageRunningOut_PlaysTheNextPage_ThenAFreshOne_OtherQueuesJustStop()
+    {
+        using var rig = MobileFixtures.MakeRig();
+        var source = new Picks { Pages = [PageOf("first", "First"), PageOf("second", "Second")] }; var online = new Online();
+        using var vm = new ForYouViewModel(rig.Shell, source, online, a => a());
+        var player = rig.Shell.Player;
+        await vm.LoadAsync();
+        await vm.Actions.PlayCommand.ExecuteAsync(vm.Actions.Songs[1]); await player.OnlinePreparation;
+        Assert.Equal("First 2", player.CurrentTrack?.Title);
+        player.NextCommand.Execute(null);
+        await Until(() => player.CurrentTrack?.Title == "Second 1"); await player.OnlinePreparation;
+        Assert.Equal("Second 1", player.CurrentTrack?.Title);
+        Assert.Equal(new[] { "Second 2" }, player.UpNext.Select(t => t.Title));
+        Assert.Equal("2 / 2", vm.PageLabel);
+
+        source.Load = (refresh, _) => Task.FromResult<IReadOnlyList<RecommendationPage>>(refresh ? [PageOf("fresh", "Fresh"), .. source.Pages] : source.Pages);
+        player.NextCommand.Execute(null); await player.OnlinePreparation;   // Second 2
+        player.NextCommand.Execute(null);
+        await Until(() => player.CurrentTrack?.Title == "Fresh 1"); await player.OnlinePreparation;
+        Assert.Equal("Fresh 1", player.CurrentTrack?.Title);   // no kept page after it: a fresh page
+
+        var loads = source.Loads;
+        var song = MobileFixtures.Song("Library song"); rig.Library.TrackList.Add(song);
+        player.PlayTracks([song], 0, "Songs");
+        player.NextCommand.Execute(null);
+        await Task.Delay(50);
+        Assert.Equal(loads, source.Loads);
+        Assert.False(player.IsPlaying);
+    }
+
+    /// <summary>Owner #283: a fresh page that could not be built is not the same page played again.</summary>
+    [Fact]
+    public async Task TheLastPageRunningOut_WithNoNewPage_DoesNotReplayIt()
+    {
+        using var rig = MobileFixtures.MakeRig();
+        var source = new Picks { Pages = [PageOf("only", "Only")] }; var online = new Online();
+        using var vm = new ForYouViewModel(rig.Shell, source, online, a => a());
+        var player = rig.Shell.Player;
+        await vm.LoadAsync();
+        await vm.Actions.PlayCommand.ExecuteAsync(vm.Actions.Songs[1]); await player.OnlinePreparation;
+        var loads = source.Loads;
+        player.NextCommand.Execute(null);
+        await Until(() => source.Loads > loads); await Task.Delay(50);
+        Assert.False(player.IsPlaying);
+        Assert.Equal(1, online.Audio);
+    }
+
+    /// <summary>Owner #283 (the computer's #248): Remove this page and Clear all pages, each with Undo.</summary>
+    [Fact]
+    public async Task RemoveThisPage_AndClearAllPages_EachUndo()
+    {
+        using var rig = MobileFixtures.MakeRig();
+        var source = new Picks { Pages = [PageOf("first", "First"), PageOf("second", "Second")] };
+        using var vm = new ForYouViewModel(rig.Shell, source, new Online(), a => a());
+        await vm.LoadAsync();
+        vm.NextPageCommand.Execute(null);
+        Assert.Equal("Second 1", vm.Actions.Songs[0].Title);
+        vm.PageOptionsCommand.Execute(null);
+        Assert.Equal(new[] { "Remove this page", "Clear all pages" }, rig.Shell.OptionsMenu!.Items.Select(i => i.Label));
+        await vm.RemovePagesAsync(all: false);
+        Assert.Equal("First 1", vm.Actions.Songs[0].Title);
+        Assert.False(vm.HasPages); Assert.True(vm.HasUndo);
+        await vm.UndoCommand.ExecuteAsync(null);
+        Assert.True(vm.HasPages); Assert.False(vm.HasUndo);
+        await vm.RemovePagesAsync(all: true);
+        Assert.False(vm.HasSongs); Assert.True(vm.HasUndo);
+        await vm.UndoCommand.ExecuteAsync(null);
+        Assert.True(vm.HasSongs); Assert.Equal("1 / 2", vm.PageLabel);
     }
     private sealed class Queue : IDownloadQueue
     {

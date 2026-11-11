@@ -31,6 +31,7 @@ public sealed partial class ForYouViewModel : MobilePage, IDisposable
         _delay = delay ?? Task.Delay;
         Actions = new OnlineResultsViewModel(online, _marshal, tracks => shell.Player.PlayTracks(tracks, 0, "For You"), shell.OpenTelegramSignIn) { LazyArtwork = true };
         Actions.UseOnlineQueue(shell.Player, "For You");
+        shell.Player.ContinueForYouPage = PlayNextPage;
         Actions.Acted += (song, action) =>
         {
             if (action == RecommendationAction.Play && shell.Player.CurrentTrack is { } track) _played = (song, track.Id);
@@ -133,9 +134,7 @@ public sealed partial class ForYouViewModel : MobilePage, IDisposable
             if (_played is { } playing && playing.Track == Shell.Player.CurrentTrack?.Id
                 && (playing.Song.Id == item.Song.Id || artist && playing.Song.ArtistDisplay == item.Song.ArtistDisplay))
                 Shell.Player.NextCommand.Execute(null);
-            _undo?.Cancel(); _undo?.Dispose();
-            var stop = _undo = new(); _receipt = receipt; HasUndo = true;
-            _ = ExpireAsync(stop);
+            ShowUndo(receipt);
             // Feedback is visible immediately; a slow metadata refresh must not leave the rejected card in place.
             _pages = _pages.Select(p => p with { Songs = p.Songs.Where(s => artist
                 ? !string.Equals(s.ArtistDisplay, item.Song.ArtistDisplay, StringComparison.OrdinalIgnoreCase)
@@ -145,6 +144,36 @@ public sealed partial class ForYouViewModel : MobilePage, IDisposable
         }
         catch (Exception ex) when (ex is not OutOfMemoryException) { Status = "Couldn't save that choice. Try again"; }
     }
+    private void ShowUndo(string receipt)
+    {
+        _undo?.Cancel(); _undo?.Dispose();
+        var stop = _undo = new(); _receipt = receipt; HasUndo = true;
+        _ = ExpireAsync(stop);
+    }
+
+    /// <summary>Owner #283: the computer's page choices (#248): this page, or every page, off the shelf, with Undo.</summary>
+    [RelayCommand]
+    private void PageOptions() => Shell.ShowOptions(OptionsMenuViewModel.ForItems([
+        new(Shell, "Remove this page", false, () => _ = RemovePagesAsync(all: false)),
+        new(Shell, "Clear all pages", false, () => _ = RemovePagesAsync(all: true)),
+    ]));
+
+    internal async Task RemovePagesAsync(bool all)
+    {
+        try
+        {
+            var receipt = all ? await _source.ClearPagesAsync() : await _source.RemovePageAsync(CurrentId);
+            if (receipt is null) return;
+            ShowUndo(receipt);
+            if (all) _pages = [];
+            else _pages = _pages.Where((_, i) => i != _page).ToArray();
+            _page = Math.Clamp(_page, 0, Math.Max(0, _pages.Count - 1));
+            ShowPage();
+            await LoadAsync();
+        }
+        catch (Exception ex) when (ex is not OutOfMemoryException) { Status = "Couldn't remove. Try again"; }
+    }
+
     private async Task ExpireAsync(CancellationTokenSource stop)
     {
         try { await _delay(TimeSpan.FromSeconds(8), stop.Token); _marshal(() => { if (!_disposed && ReferenceEquals(stop, _undo)) { HasUndo = false; _receipt = null; } }); }
@@ -161,8 +190,45 @@ public sealed partial class ForYouViewModel : MobilePage, IDisposable
         }
         catch (Exception ex) when (ex is not OutOfMemoryException) { Status = "Couldn't undo. Try again"; }
     }
+    /// <summary>Owner #283 (the computer's #286): the page playing ran out (its last song ended, was skipped or was Not for me):
+    /// the next kept page plays from its first song, or a fresh page when none is left. False when nothing can play.</summary>
+    internal bool PlayNextPage()
+    {
+        if (_disposed || !_online.CanDownload) return false;
+        _ = PlayNextPageAsync();
+        return true;
+    }
+
+    private async Task PlayNextPageAsync()
+    {
+        try
+        {
+            // After the player's own end-of-queue stop (the caller), never inside it: that stop would clear the new page.
+            await Task.Yield();
+            var played = CurrentId;
+            if (_page + 1 < _pages.Count) { _page++; ShowPage(); }
+            else
+            {
+                await LoadAsync(true);
+                var shown = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+                _marshal(() => shown.TrySetResult()); // after the page LoadAsync put on screen
+                await shown.Task;
+            }
+            // A fresh page that could not be built leaves the old page on screen: it is not played again.
+            if (_disposed || CurrentId.Length == 0 || CurrentId == played) return;
+            var songs = Actions.Songs.Select(r => r.Song).ToArray();
+            if (songs.Length == 0) return;
+            DebugLog.Write("Queue", $"For You: next page plays ({songs.Length} songs)");
+            Shell.Player.PlayOnlineTracks(_online, songs, 0, "For You");
+        }
+        catch (Exception ex) when (ex is not OutOfMemoryException) { DebugLog.Write("Queue", "For You next page not played: " + ex.GetType().Name); }
+    }
+
     private static async Task Safely(Func<Task> action)
     { try { await action(); } catch (Exception ex) when (ex is not OutOfMemoryException) { DebugLog.Write("ForYou", $"Feedback unavailable: {ex.GetType().Name}"); } }
     public void Dispose()
-    { _disposed = true; _generation++; _load?.Cancel(); _undo?.Cancel(); Shell.Library.Refreshed -= LibraryReady; Actions.Dispose(); }
+    {
+        _disposed = true; _generation++; _load?.Cancel(); _undo?.Cancel(); Shell.Library.Refreshed -= LibraryReady; Actions.Dispose();
+        if (Shell.Player.ContinueForYouPage == PlayNextPage) Shell.Player.ContinueForYouPage = null;
+    }
 }
