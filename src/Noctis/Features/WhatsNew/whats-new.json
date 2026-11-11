@@ -1,6 +1,21 @@
 {
   "releases": [
     {
+      "version": "2.8.0",
+      "added": [
+        { "icon": "SearchIcon", "title": "Search by lyrics", "line": "Find a song by a line of its lyrics", "top": true },
+        { "icon": "AlbumsIcon", "title": "Other Versions", "line": "Switch to a song's live or remastered version", "top": true },
+        { "icon": "LyricsIcon", "title": "Word timing choices", "line": "Click the lyrics credit to pick a timing or search" },
+        { "icon": "LyricsIcon", "title": "Better lyrics, by themselves", "line": "Synced lyrics replace plain ones when found" },
+        { "icon": "GridViewIcon", "title": "Your sidebar", "line": "Hide or reorder pages, pick a start page" },
+        { "icon": "PlayIcon", "title": "Multichannel output", "line": "5.1 and 7.1 songs on every speaker" }
+      ],
+      "fixed": [
+        "The end of a For you page plays the next page, also after Not for me on its last song",
+        "Based on Noctis 1.6.9"
+      ]
+    },
+    {
       "version": "2.7.3",
       "fixed": [
         "Lyrics whose word timing finishes while the song plays fill word by word again, not only the background vocals"
