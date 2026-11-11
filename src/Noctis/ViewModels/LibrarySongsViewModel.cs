@@ -24,6 +24,10 @@ public partial class LibrarySongsViewModel : ViewModelBase, ILocalSearchable, ID
     private List<Track> _allTracks = new();
     private string _currentFilter = string.Empty;
     private int _filterGeneration;
+    /// <summary>The newest request's lyric-index wait. A newer request cancels the older one's,
+    /// which otherwise held a thread-pool thread on the index gate for the whole first build and
+    /// then filtered a result that was thrown away (one per search change while it indexed).</summary>
+    private CancellationTokenSource? _lyricsRefreshCts;
     private DispatcherTimer? _searchDebounce;
     private EventHandler? _libraryUpdatedHandler;
     private EventHandler? _viewStateLoadedHandler;
@@ -43,6 +47,16 @@ public partial class LibrarySongsViewModel : ViewModelBase, ILocalSearchable, ID
     /// <summary>Quality filter for the top-bar chips: "All", "Lossless" or "HiRes".</summary>
     [ObservableProperty] private string _qualityFilter = "All";
 
+    /// <summary>Search the lyrics too, or only them (Discord, Cosmo 11-08); set from the search
+    /// pill's lyrics button. Session-only, like the search text.</summary>
+    [ObservableProperty] private LyricsSearchMode _lyricsSearchMode = LyricsSearchMode.Off;
+
+    /// <summary>Tests point this at their own index; the app uses <see cref="LyricsSearchIndex.Shared"/>.</summary>
+    internal LyricsSearchIndex? LyricsIndexOverride { get; set; }
+
+    /// <summary>Rows showing a lyric snippet now, cleared when the next result lands.</summary>
+    private readonly List<Track> _snippetTracks = new();
+
     /// <summary>"2,144 songs · 138 hours" line for the top bar; reflects the current filters.</summary>
     [ObservableProperty] private string _summaryText = string.Empty;
 
@@ -57,7 +71,7 @@ public partial class LibrarySongsViewModel : ViewModelBase, ILocalSearchable, ID
     /// runs ahead of it by the debounce) plus the quality/favorites narrowing. The view resets
     /// its scroll only when this changes, so a library reload of the same results keeps its place.
     /// </summary>
-    internal string FilterKey => $"{_currentFilter}\n{QualityFilter}\n{ShowOnlyFavorites}";
+    internal string FilterKey => $"{_currentFilter}\n{QualityFilter}\n{ShowOnlyFavorites}\n{LyricsSearchMode}";
 
     /// <summary>Saved scroll offset for restoring position after navigation.</summary>
     public double SavedScrollOffset { get; set; }
@@ -180,6 +194,13 @@ public partial class LibrarySongsViewModel : ViewModelBase, ILocalSearchable, ID
 
         _searchDebounce.Stop();
         _searchDebounce.Start();
+    }
+
+    partial void OnLyricsSearchModeChanged(LyricsSearchMode value)
+    {
+        // Without a query the mode changes nothing on screen; the next search uses it.
+        if (!string.IsNullOrWhiteSpace(_currentFilter))
+            ApplyFilterAndSort();
     }
 
     [RelayCommand]
@@ -631,6 +652,13 @@ public partial class LibrarySongsViewModel : ViewModelBase, ILocalSearchable, ID
             var quality = QualityFilter;
             var tracks = _allTracks;
             var library = refreshFromLibrary ? _library : null;
+            var lyricsMode = LyricsSearchMode;
+            var lyricsIndex = lyricsMode != LyricsSearchMode.Off && LyricsSearchIndex.QueryKey(filter).Length > 0
+                ? LyricsIndexOverride ?? LyricsSearchIndex.Shared
+                : null;
+            var snippets = lyricsIndex != null ? new Dictionary<Track, string>() : null;
+            _lyricsRefreshCts?.Cancel();
+            var lyricsCancel = (_lyricsRefreshCts = new CancellationTokenSource()).Token;
 
             // Run the heavy filter/sort work on a background thread
             var result = await Task.Run(() =>
@@ -639,7 +667,17 @@ public partial class LibrarySongsViewModel : ViewModelBase, ILocalSearchable, ID
                 if (library != null)
                     tracks = library.Tracks.ToList();
 
-                return BuildFilteredAndSortedTracks(tracks, filter, sortCol, sortAsc, favOnly, quality);
+                // Lyric search: the first one reads every song's lyrics once; later ones only
+                // the songs whose lyrics changed (LyricsSearchIndex).
+                // Songs indexed before a cancel stay indexed; the newer request goes on from there.
+                if (lyricsIndex != null)
+                {
+                    try { lyricsIndex.Refresh(tracks, lyricsCancel); }
+                    catch (OperationCanceledException) { return new List<Track>(); } // superseded: dropped below
+                }
+
+                return BuildFilteredAndSortedTracks(tracks, filter, sortCol, sortAsc, favOnly, quality,
+                    lyricsMode, lyricsIndex, snippets);
             });
 
             // Discard stale results if a newer filter/sort has been requested. A
@@ -664,6 +702,8 @@ public partial class LibrarySongsViewModel : ViewModelBase, ILocalSearchable, ID
                 _reloadPending = false;
             }
 
+            ApplyLyricsSnippets(snippets);
+
             if (reRanked != null && !refreshFromLibrary && TryMoveIntoPlace(result, reRanked))
                 return;
             FilteredTracks.ReplaceAll(result);
@@ -673,6 +713,23 @@ public partial class LibrarySongsViewModel : ViewModelBase, ILocalSearchable, ID
         {
             System.Diagnostics.Debug.WriteLine($"[SongsVM] Filter/sort failed: {ex.Message}");
             Noctis.Services.DebugLog.Write("Songs", ex);
+        }
+    }
+
+    /// <summary>Shows each lyric match's line under its title; clears the previous result's.</summary>
+    private void ApplyLyricsSnippets(Dictionary<Track, string>? snippets)
+    {
+        foreach (var track in _snippetTracks)
+        {
+            if (snippets == null || !snippets.ContainsKey(track))
+                track.LyricsSearchSnippet = null;
+        }
+        _snippetTracks.Clear();
+        if (snippets == null) return;
+        foreach (var (track, snippet) in snippets)
+        {
+            track.LyricsSearchSnippet = snippet;
+            _snippetTracks.Add(track);
         }
     }
 
@@ -701,8 +758,14 @@ public partial class LibrarySongsViewModel : ViewModelBase, ILocalSearchable, ID
     }
 
     /// <remarks>Internal for tests (InternalsVisibleTo Noctis.Tests).</remarks>
+    /// <param name="lyricsMode">Search the lyrics too / only (needs <paramref name="lyricsIndex"/>,
+    /// already refreshed for <paramref name="tracks"/>).</param>
+    /// <param name="snippets">Receives the matched lyric line of each song found by its lyrics
+    /// (in "Include lyrics", only songs whose tags don't match get here).</param>
     internal static List<Track> BuildFilteredAndSortedTracks(
-        List<Track> tracks, string filter, string sortCol, bool sortAsc, bool favOnly, string qualityFilter)
+        List<Track> tracks, string filter, string sortCol, bool sortAsc, bool favOnly, string qualityFilter,
+        LyricsSearchMode lyricsMode = LyricsSearchMode.Off, LyricsSearchIndex? lyricsIndex = null,
+        Dictionary<Track, string>? snippets = null)
     {
         var filtered = tracks.AsEnumerable();
 
@@ -728,7 +791,28 @@ public partial class LibrarySongsViewModel : ViewModelBase, ILocalSearchable, ID
             // GitHub #107: words may land in different fields ("artist album", "genre year")
             // and field tags narrow them ("artist:madonna remix").
             var parsed = Noctis.Helpers.SearchQuery.Parse(q);
-            filtered = filtered.Where(parsed.Matches);
+            var lyricsKey = lyricsIndex != null && lyricsMode != LyricsSearchMode.Off
+                ? LyricsSearchIndex.QueryKey(q)
+                : string.Empty;
+            if (lyricsKey.Length > 0)
+            {
+                var onlyLyrics = lyricsMode == LyricsSearchMode.Only;
+                filtered = filtered.Where(t =>
+                {
+                    if (!onlyLyrics && parsed.Matches(t)) return true;
+                    if (!lyricsIndex!.TryMatch(t, lyricsKey, out var snippet)) return false;
+                    if (snippets != null && snippet != null) snippets[t] = snippet;
+                    return true;
+                });
+            }
+            else
+            {
+                // Lyric search needs three letters (LyricsSearchIndex.MinQueryLength); until
+                // then a "Lyrics only" search lists nothing rather than every tag match.
+                filtered = lyricsMode == LyricsSearchMode.Only
+                    ? Enumerable.Empty<Track>()
+                    : filtered.Where(parsed.Matches);
+            }
         }
 
         var ranked = filtered

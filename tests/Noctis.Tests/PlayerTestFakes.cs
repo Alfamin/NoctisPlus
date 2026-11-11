@@ -93,6 +93,7 @@ internal sealed class FakeAudioPlayer : IAudioPlayer
     public string UpmixMode { get; private set; } = "Off";
     public void SetUpmixMode(string mode) => UpmixMode = mode;
     public bool HeadphoneSurroundActive { get; set; }
+    public bool MultichannelOutputActive { get; set; }
     public (bool Mono, double Balance) ChannelMix { get; private set; }
     public void SetChannelMix(bool mono, double balance) => ChannelMix = (mono, balance);
     public bool ChannelMixAvailable { get; set; } = true;
@@ -207,7 +208,13 @@ internal sealed class FakeLibraryService : ILibraryService
     public List<Album> ArtistAlbums { get; } = new();
     public IReadOnlyList<Album> GetAlbumsByArtist(string artistName) =>
         ArtistAlbums.Where(a => string.Equals(a.Artist, artistName, StringComparison.OrdinalIgnoreCase)).ToList();
-    public Task RemoveTrackAsync(Guid id) => Task.CompletedTask;
+    /// <summary>Every RemoveTrackAsync id, in order.</summary>
+    public List<Guid> RemovedTrackIds { get; } = new();
+    public Task RemoveTrackAsync(Guid id)
+    {
+        RemovedTrackIds.Add(id);
+        return Task.CompletedTask;
+    }
     public Task RemoveTracksAsync(IEnumerable<Guid> ids) => Task.CompletedTask;
     /// <summary>Old id → new id that RelocateTracksAsync reports (empty by default).</summary>
     public Dictionary<Guid, Guid> RelocateRemap { get; } = new();
@@ -258,6 +265,24 @@ internal sealed class FakeLibraryService : ILibraryService
         GroupCalls.Add((tracks, album, albumArtist));
         return Task.FromResult(GroupResult);
     }
+
+    /// <summary>What Settings asked of the album grouping (GitHub #193 / #190).</summary>
+    public List<bool> AlbumGroupingCalls { get; } = new();
+    public List<bool> AlbumGroupingWriteTagsCalls { get; } = new();
+    public int AlbumGroupingMoved { get; set; }
+    public AlbumGroupResult AlbumGroupingWriteResult { get; set; } = new(Guid.Empty, 0, Array.Empty<string>());
+    public Task<int> SetAlbumGroupingAsync(bool enabled, CancellationToken ct = default)
+    {
+        AlbumGroupingCalls.Add(enabled);
+        return Task.FromResult(AlbumGroupingMoved);
+    }
+    public Task<AlbumGroupResult> SetAlbumGroupingWriteTagsAsync(bool enabled, CancellationToken ct = default)
+    {
+        AlbumGroupingWriteTagsCalls.Add(enabled);
+        return Task.FromResult(AlbumGroupingWriteResult);
+    }
+    public event EventHandler<AlbumGroupResult>? AlbumGroupingWritten;
+    public void RaiseAlbumGroupingWritten(AlbumGroupResult result) => AlbumGroupingWritten?.Invoke(this, result);
     public Task<int> ApplyMergeFeaturedFromTitlesAsync(bool enabled, CancellationToken ct = default) => Task.FromResult(0);
     public Task<int> ApplyArtistCreditJoinAsync(CancellationToken ct = default) => Task.FromResult(0);
     public Task<int> BackfillMissingArtworkAsync(CancellationToken ct = default) => Task.FromResult(0);

@@ -227,6 +227,12 @@ public class LocalizationTests
         }
     }
 
+    [Theory]
+    [InlineData("LyricShare.LyricsPage")]
+    [InlineData("ShareLyrics.PageRangeSummary")]
+    [InlineData("LyricShare.SafeZones")]
+    public void LyricsPageKeys_ExistInEnglish(string key)
+        => Assert.True(ReadValues(Path.Combine(FindRepoRoot(), "src", "Noctis.UI", "Localization", "Strings.resx")).ContainsKey(key));
 
     private static Dictionary<string, string> ReadValues(string resxPath)
         => XDocument.Load(resxPath).Root!
