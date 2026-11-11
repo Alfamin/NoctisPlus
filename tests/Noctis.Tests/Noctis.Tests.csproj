@@ -11,7 +11,7 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <PackageReference Include="Microsoft.NET.Test.Sdk" Version="18.10.1" />
+    <PackageReference Include="Microsoft.NET.Test.Sdk" Version="18.11.1" />
     <!-- Built-in Free Music Finder (src/Noctis/Features) needs it at run time; tests that scan
          the app's types load every type. -->
     <PackageReference Include="WTelegramClient" Version="4.4.9" />
