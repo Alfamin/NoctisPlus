@@ -699,23 +699,11 @@
                                                         IsVisible="{Binding IsPreparingOnlinePlayback}"
                                                         Step="{Binding OnlinePreparingStep}"
                                                         Progress="{Binding OnlinePreparingProgress}" />
-                            <Panel IsVisible="{Binding !IsPreparingOnlinePlayback}">
-                            <Viewbox Width="20" Height="20"
-                                     IsVisible="{Binding State, Converter={x:Static ObjectConverters.NotEqual}, ConverterParameter={x:Static m:PlaybackState.Playing}}">
-                                <Canvas Width="24" Height="24">
-                                    <Path Fill="{DynamicResource IslandIconFill}"
-                                          Data="{StaticResource PlayIcon}" />
-                                </Canvas>
-                            </Viewbox>
-                            <!-- Pause icon (shown when playing) -->
-                            <Viewbox Width="20" Height="20"
-                                     IsVisible="{Binding State, Converter={x:Static ObjectConverters.Equal}, ConverterParameter={x:Static m:PlaybackState.Playing}}">
-                                <Canvas Width="24" Height="24">
-                                    <Path Fill="{DynamicResource IslandIconFill}"
-                                          Data="{StaticResource PauseIcon}" />
-                                </Canvas>
-                            </Viewbox>
-                            </Panel>
+                            <!-- Play when not playing, Pause while playing; morphs between them (upstream 1.6.8). -->
+                            <controls:TransportGlyph Kind="PlayPause" Width="20" Height="20"
+                                                     IsVisible="{Binding !IsPreparingOnlinePlayback}"
+                                                     Foreground="{DynamicResource IslandIconFill}"
+                                                     IsPlaying="{Binding State, Converter={x:Static ObjectConverters.Equal}, ConverterParameter={x:Static m:PlaybackState.Playing}}" />
                         </Panel>
                     </Button>
 
