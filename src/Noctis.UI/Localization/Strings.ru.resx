@@ -4198,4 +4198,5 @@
   <data name="Search.LyricsOff" xml:space="preserve"><value>Не искать в текстах</value></data>
   <data name="Search.LyricsInclude" xml:space="preserve"><value>Включая тексты песен</value></data>
   <data name="Search.LyricsOnly" xml:space="preserve"><value>Только тексты песен</value></data>
+  <data name="LyricsSearch.WordTiming" xml:space="preserve"><value>Word timing</value><comment>Search Lyrics window, opened from the lyrics credit: caption above the word timing choices (Noctis Plus)</comment></data>
 </root>

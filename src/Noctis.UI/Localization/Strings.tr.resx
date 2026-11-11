@@ -2860,4 +2860,5 @@ Bu parçalarla "{0}" adlı bir çalma listesi oluşturulsun mu?</value><comment>
   <data name="Mobile.Hidden.UnhideName" xml:space="preserve"><value>{0} göster</value></data>
   <data name="Mobile.Hidden.Folder" xml:space="preserve"><value>Klasör</value></data>
   <data name="Mobile.Hidden.NotFound" xml:space="preserve"><value>Şu an bu telefonda yok</value></data>
+  <data name="LyricsSearch.WordTiming" xml:space="preserve"><value>Word timing</value><comment>Search Lyrics window, opened from the lyrics credit: caption above the word timing choices (Noctis Plus)</comment></data>
 </root>

@@ -55,6 +55,7 @@ public partial class LyricsSearchViewModel : ViewModelBase
         _artist = LyricsSearchSelector.IsUnknownArtist(track.Artist) ? string.Empty : track.Artist ?? string.Empty;
         _title = track.Title ?? string.Empty;
         IsMarkedNoLyrics = track.NoLyrics;
+        TimingChoices.CollectionChanged += (_, _) => OnPropertyChanged(nameof(HasTimingChoices));
     }
 
     /// <summary>GitHub #162: marks (true) or unmarks the song as having no lyrics; set by the
@@ -83,6 +84,21 @@ public partial class LyricsSearchViewModel : ViewModelBase
 
 
     public ObservableCollection<LyricsSearchResultRow> Results { get; } = new();
+
+    /// <summary>Owner #294 (Noctis Plus): the lyrics credit's word timing choices, above the sources; empty when the
+    /// window opens from anywhere else.</summary>
+    public ObservableCollection<LyricsTimingChoice> TimingChoices { get; } = new();
+
+    public bool HasTimingChoices => TimingChoices.Count > 0;
+
+    /// <summary>A word timing row picked: it does what the credit's menu did, then the window closes.</summary>
+    [RelayCommand]
+    private void PickTimingChoice(LyricsTimingChoice? choice)
+    {
+        if (choice is not { IsEnabled: true }) return;
+        choice.Pick();
+        Close();
+    }
 
     [ObservableProperty] private string _selectedSource;
     [ObservableProperty] private string _artist;
@@ -253,6 +269,10 @@ public partial class LyricsSearchViewModel : ViewModelBase
         _modelSyncCts?.Cancel();
     }
 }
+
+/// <summary>Owner #294: one word timing row of the lyrics credit (Kugou's or WordLyrics' timing, time with WordLyrics,
+/// find online timing). <paramref name="IsCurrent"/>: the timing on screen now.</summary>
+public sealed record LyricsTimingChoice(string Label, bool IsCurrent, bool IsEnabled, Action Pick);
 
 /// <summary>One source's answer in the Search Lyrics list.</summary>
 public sealed partial class LyricsSearchResultRow : ObservableObject

@@ -68,6 +68,27 @@
             <Setter Property="BorderBrush" Value="{DynamicResource AccentColorBrush}" />
         </Style>
 
+        <!-- Owner #294: the lyrics credit's word timing rows, the same cards as the sources; the timing on screen
+             wears the accent ring. -->
+        <Style Selector="Button.ls-choice">
+            <Setter Property="Background" Value="Transparent" />
+            <Setter Property="BorderThickness" Value="0" />
+            <Setter Property="Padding" Value="0" />
+            <Setter Property="Margin" Value="0,0,14,8" />
+            <Setter Property="HorizontalAlignment" Value="Stretch" />
+            <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+            <Setter Property="Cursor" Value="Hand" />
+        </Style>
+        <Style Selector="Button.ls-choice:disabled">
+            <Setter Property="Opacity" Value="0.45" />
+        </Style>
+        <Style Selector="Button.ls-choice /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Background" Value="Transparent" />
+        </Style>
+        <Style Selector="Border.ls-row.current">
+            <Setter Property="BorderBrush" Value="{DynamicResource AccentColorBrush}" />
+        </Style>
+
         <!-- Footer status, as the editor's change summary. -->
         <Style Selector="TextBlock.ls-status">
             <Setter Property="FontSize" Value="12.5" />
@@ -146,7 +167,31 @@
         <!-- One row per source on the left (rows that found nothing are dimmed);
              the selected answer's match and lyrics on the right. -->
         <Grid Grid.Row="2" ColumnDefinitions="200,16,*" Margin="28,0,28,18">
-            <ListBox Grid.Column="0" Classes="ls-results"
+            <DockPanel Grid.Column="0">
+            <StackPanel DockPanel.Dock="Top" IsVisible="{Binding HasTimingChoices}" Margin="0,0,0,6">
+                <TextBlock Text="{loc:T LyricsSearch.WordTiming}" FontSize="11.5" Opacity="0.55" Margin="4,0,0,6" />
+                <ItemsControl ItemsSource="{Binding TimingChoices}">
+                    <ItemsControl.ItemTemplate>
+                        <DataTemplate x:DataType="vm:LyricsTimingChoice">
+                            <Button Classes="ls-choice" IsEnabled="{Binding IsEnabled}"
+                                    Command="{Binding $parent[ItemsControl].((vm:LyricsSearchViewModel)DataContext).PickTimingChoiceCommand}"
+                                    CommandParameter="{Binding}"
+                                    AutomationProperties.Name="{Binding Label}">
+                                <Border Classes="pill-well ls-row" Classes.current="{Binding IsCurrent}" CornerRadius="16" Padding="14,10">
+                                    <Grid ColumnDefinitions="*,Auto">
+                                        <TextBlock Text="{Binding Label}" FontSize="13" FontWeight="SemiBold" TextWrapping="Wrap"
+                                                   VerticalAlignment="Center" />
+                                        <controls:LineIcon Grid.Column="1" Data="{StaticResource MenuLineCheck}" Width="14" Height="14"
+                                                           Margin="6,0,0,0" VerticalAlignment="Center"
+                                                           Foreground="{DynamicResource AccentColorBrush}" IsVisible="{Binding IsCurrent}" />
+                                    </Grid>
+                                </Border>
+                            </Button>
+                        </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                </ItemsControl>
+            </StackPanel>
+            <ListBox Classes="ls-results"
                      ItemsSource="{Binding Results}"
                      SelectedItem="{Binding SelectedResult}">
                 <ListBox.ItemTemplate>
@@ -182,6 +227,7 @@
                     </DataTemplate>
                 </ListBox.ItemTemplate>
             </ListBox>
+            </DockPanel>
 
             <Border Grid.Column="2" Classes="pill-well" CornerRadius="20">
                 <Panel>

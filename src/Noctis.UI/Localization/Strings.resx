@@ -4198,4 +4198,5 @@ Create a playlist named "{0}" with these tracks?</value><comment>Drag-and-drop i
   <data name="Search.LyricsOff" xml:space="preserve"><value>Don't Search Lyrics</value><comment>Search box lyrics button menu: search titles, artists, albums only</comment></data>
   <data name="Search.LyricsInclude" xml:space="preserve"><value>Include Lyrics</value><comment>Search box lyrics button menu: also find songs whose lyrics contain the words</comment></data>
   <data name="Search.LyricsOnly" xml:space="preserve"><value>Lyrics Only</value><comment>Search box lyrics button menu: find songs by their lyrics only</comment></data>
+  <data name="LyricsSearch.WordTiming" xml:space="preserve"><value>Word timing</value><comment>Search Lyrics window, opened from the lyrics credit: caption above the word timing choices (Noctis Plus)</comment></data>
 </root>

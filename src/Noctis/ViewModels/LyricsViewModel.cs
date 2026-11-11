@@ -573,8 +573,17 @@ public partial class LyricsViewModel : ViewModelBase, IDisposable
         // A song marked as having none has nothing to share (ShareLyrics returns on zero lines).
         OnPropertyChanged(nameof(ShareAvailable));
         OnPropertyChanged(nameof(NoLyricsSearchTip));
+        OnPropertyChanged(nameof(NoLyricsStatus));
         UpdateNoLyricsCentered();
     }
+
+    /// <summary>Owner #294 (Noctis Plus): the centred no-lyrics page says under the player what is happening (upstream
+    /// put it only in the Search Lyrics button's tooltip): searching, WordLyrics' or the online timing's state, then why
+    /// there are none.</summary>
+    public string NoLyricsStatus => IsSearching ? Localization.Loc.T("Lyrics.SearchingLyrics")
+        : HasPendingWordTiming ? WordTimingStatusText
+        : IsMarkedNoLyrics ? Localization.Loc.T("Lyrics.MarkedNoLyrics")
+        : SearchFailedMessage ?? string.Empty;
 
     /// <summary>
     /// Tooltip of the Search Lyrics button the player island carries while the page is
@@ -592,7 +601,11 @@ public partial class LyricsViewModel : ViewModelBase, IDisposable
         }
     }
 
-    partial void OnSearchFailedMessageChanged(string value) => OnPropertyChanged(nameof(NoLyricsSearchTip));
+    partial void OnSearchFailedMessageChanged(string value)
+    {
+        OnPropertyChanged(nameof(NoLyricsSearchTip));
+        OnPropertyChanged(nameof(NoLyricsStatus));
+    }
 
     /// <summary>
     /// The lyrics page centres the player (cover, track info, controls) instead of the
@@ -1669,6 +1682,32 @@ public partial class LyricsViewModel : ViewModelBase, IDisposable
         // Auto runs straight away, so the dialog opens on results rather than an empty list.
         _ = search.SearchAsync();
         await ShowLyricsSearchDialog(search);
+    }
+
+    /// <summary>Owner #294: the lyrics credit opens the Search Lyrics window, its word timing choices (online timing,
+    /// WordLyrics, time with WordLyrics, find online timing) above the sources.</summary>
+    [RelayCommand]
+    private async Task OpenCreditChoices()
+    {
+        if (_currentTrack == null || ShowLyricsSearchDialog == null) return;
+        var search = CreateLyricsSearchViewModel(_currentTrack);
+        foreach (var choice in CreditChoices()) search.TimingChoices.Add(choice);
+        _ = search.SearchAsync();
+        await ShowLyricsSearchDialog(search);
+    }
+
+    /// <summary>What the credit's old menu offered, as the Search Lyrics window's word timing rows.</summary>
+    internal IEnumerable<LyricsTimingChoice> CreditChoices()
+    {
+        if (HasCreditOnline)
+            yield return new(CreditOnlineLabel, IsCurrent: CreditShowsOnline, IsEnabled: true, () => UseOnlineTimingCommand.Execute(null));
+        if (CreditHasWordLyrics)
+            yield return new(CreditWordLyricsLabel, IsCurrent: !CreditShowsOnline, IsEnabled: true, () => UseWordLyricsTimingCommand.Execute(null));
+        if (CreditCanTimeWithWordLyrics)
+            yield return new(CreditTimeLabel, IsCurrent: false, IsEnabled: !HasPendingWordTiming, () => _ = TimeWithWordLyricsCommand.ExecuteAsync(null));
+        if (CreditCanFindOnline)
+            yield return new(Localization.Loc.T("Lyrics.FindOnlineTiming"), IsCurrent: false, IsEnabled: !IsFindingOnlineTiming,
+                () => _ = FindOnlineTimingCommand.ExecuteAsync(null));
     }
 
     /// <summary>The source picker for <paramref name="track"/>, searching through this page's providers.</summary>
@@ -4180,6 +4219,7 @@ public partial class LyricsViewModel : ViewModelBase, IDisposable
         OnPropertyChanged(nameof(IsOnlineTimingSearching));
         OnPropertyChanged(nameof(OnlineTimingHint));
         OnPropertyChanged(nameof(LyricsEmptyStatus));
+        OnPropertyChanged(nameof(NoLyricsStatus));
         OnPropertyChanged(nameof(CanStartWordTiming));
         OnPropertyChanged(nameof(CanTimeCurrentWords));
         OpenWordTimingCommand.NotifyCanExecuteChanged();
@@ -4263,6 +4303,7 @@ public partial class LyricsViewModel : ViewModelBase, IDisposable
     {
         OnPropertyChanged(nameof(ShareAvailable));
         OnPropertyChanged(nameof(NoLyricsSearchTip));
+        OnPropertyChanged(nameof(NoLyricsStatus));
     }
 
     /// <summary>

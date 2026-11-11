@@ -7878,4 +7878,5 @@
   <data name="Mobile.Hidden.UnhideName" xml:space="preserve"><value>Mostrar {0}</value></data>
   <data name="Mobile.Hidden.Folder" xml:space="preserve"><value>Carpeta</value></data>
   <data name="Mobile.Hidden.NotFound" xml:space="preserve"><value>Ya no está en este teléfono</value></data>
+  <data name="LyricsSearch.WordTiming" xml:space="preserve"><value>Word timing</value><comment>Search Lyrics window, opened from the lyrics credit: caption above the word timing choices (Noctis Plus)</comment></data>
 </root>
