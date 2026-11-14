@@ -112,6 +112,17 @@ public sealed partial class ContextSheetViewModel : ObservableObject
         catch (Exception ex) when (ex is not OutOfMemoryException) { _shell.Player.Notice = OnlineResultsViewModel.Short(ex); }
     }
 
+    /// <summary>A playlist's menu: Add Songs, for a playlist the phone edits (not a smart one).</summary>
+    public bool CanAddSongs => Playlist != null && AddSongsPageViewModel.CanAddTo(_shell.CurrentPlaylist(Playlist));
+
+    [RelayCommand]
+    private void AddSongs()
+    {
+        var playlist = Playlist;
+        _shell.CloseSheet();
+        if (playlist != null) _shell.OpenAddSongs(playlist);
+    }
+
     [RelayCommand]
     private async Task RemoveFromPlaylistAsync()
     {
