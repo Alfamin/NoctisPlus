@@ -144,7 +144,7 @@ public partial class AndroidApp : Avalonia.Application, IThemeHost
             Online = PlusOnlineLyricsSource.Create(persistence.DataDirectory, InternetHttp()),
         };
         // Settings › Music Folders › Find All Music Automatically (MediaStore, opt-in).
-        var libraryView = new LibraryViewModel(library, persistence, new AndroidFolderPicker(), history) { DeviceMusic = AndroidDeviceMusic.Create(context) };
+        var libraryView = new LibraryViewModel(library, persistence, new AndroidFolderPicker(), history) { DeviceMusic = AndroidDeviceMusic.Create(context), SortOffUiThread = true };
         _finder = CreateFinder(context, library, libraryView);
         nowPlaying.OnlineSearch = _finder?.Search;
         Noctis.Services.Search.IOnlineMusicSearch? onlineSearch = _finder?.Search;
