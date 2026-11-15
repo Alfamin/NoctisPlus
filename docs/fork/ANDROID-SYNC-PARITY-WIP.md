@@ -18,7 +18,7 @@ Port the useful Noctis Plus personal-library sync to Android using the existing 
 - `Noctis.TelegramSync` already contains the ledger, conflict rules, snapshots, device identity, durable batch/transfer queues, and fake-drive tests.
 - `Noctis.Finder/Sync/WTelegramDrive.cs` already wraps Telegram operations around a host-provided connection callback. `FinderSession` owns the phone's Telegram account, so an adapter can use that same client without a copied or second session.
 - The missing vertical connection is the host/controller that maps the phone library, playlists, sidecars, play history, and preferences to the shared log, plus the native opt-in/settings/status UI. The older `CLOUD-260-STATUS.md` also marks this integration open.
-- No sync network operation, Android build, or emulator test was run during this audit. Android SDK download remains blocked at `dl.google.com`.
+- At the initial audit timestamp, no sync network operation, Android build, or emulator test was run; `dl.google.com` was unreachable then. Host follow-up on 2026-11-16 confirmed an installed Android SDK (`android-36`) and ADB 37.0.1; no device was attached. This does not establish that the app builds, and no Android package build or emulator run has been performed for this sync slice.
 
 ## Implementation order
 
@@ -68,3 +68,11 @@ Added an Android-only preferences file for future Telegram sync controls, separa
 - The existing phone LAN route remains `NoctisAccountService.SyncNowAsync`; this audit found no Telegram controller consuming `SyncDrive` or `PhoneTelegramSyncPreferences`. Keep those routes distinct and preserve LAN behavior.
 
 No code, live Telegram request, library/profile data, or `D:\music` was touched in this mapping pass. The next implementation decision is the smallest fake-drive-backed controller boundary: durable device/cursor state and account guard first, then map one domain at a time with idempotency tests. Do not add a visible setting until the opted-in route is complete.
+
+## Quota wrap-up checkpoint — 2026-11-16 02:20 Tehran
+
+- Direct `get_usage_limits`: 90% used in the primary 30-day window, no secondary window, and no reset credits. The quota watcher reports `wrapUp: true`; stop implementation/build/research until a later safe ordinary window. The one reset authorized for #268 remains fulfilled; do not try another.
+- Dedicated branch `codex-android-sync-parity` was clean at `5a76e062` before this documentation-only wrap-up. Its current saved scope is the existing-account drive adapter, default-off policy store, Wi-Fi/charging transfer predicate with focused test evidence (4/0), and the host/domain mapping. It is not end-to-end sync: no controller, UI, scheduler, Telegram request, Android build, APK, emulator, or live account test.
+- `codex-android-262` remains clean at `8f243e9a`; no active test gate, Android build, or emulator was found. Android SDK/ADB binaries are present, but no device is attached; do not infer a successful build.
+- No profile or login was changed, no Telegram session was copied, and `D:\music` was not accessed. Keep this work on its dedicated branch; no main/native merge, tag, or release.
+- Resume only after an actual fresh quota read shows headroom. Next planned work is fake-drive controller/state integration, beginning with durable cursor/device identity and account-mismatch gating; continue to avoid user-facing controls until the opted-in path is complete and validated.
