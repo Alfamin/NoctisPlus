@@ -46,3 +46,7 @@ The release already has a separate LAN path: `Noctis.Core.Services.Sync.LibraryS
 - Direct `get_usage_limits` at 09:06 UTC reported 71% used in the primary 30-day window, no secondary limit, and no reset credits. The local watcher status file instead reported 100% / `wrapUp: true` with `checkedUtc` 08:14 UTC (52 minutes old). Treat the watcher record as stale; obtain a fresh direct quota read and fresh watcher status before any further implementation. No reset is authorized or available.
 - Android SDK/ADB remains absent; the official `dl.google.com` SDK host was unreachable. No build or emulator is active.
 - Next: resolve quota-watcher freshness, then continue the bounded Android/Telegram sync host audit. Keep the feature opt-in-only and distinct from the already bidirectional PC-hosted LAN sync.
+
+## Reused-account adapter seam — 2026-11-15
+
+`FinderSession` now creates one `WTelegramDrive` over its already-owned `TelegramAccount`; `PhoneFinderHost.SyncDrive` exposes that stable adapter to a future controller. Constructing or reading the property makes no network call and creates no second Telegram session. Focused `PhoneSyncDriveTests`: 1 passed, 0 failed. The test assets were restored into this isolated worktree; only source compilation plus this one filtered test was run. This is an adapter seam, not a wired sync controller or enabled feature.

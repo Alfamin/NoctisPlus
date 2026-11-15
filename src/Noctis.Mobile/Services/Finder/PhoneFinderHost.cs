@@ -3,6 +3,7 @@ using Noctis.Mobile.Services.Telegram;
 using Noctis.Mobile.ViewModels;
 using Noctis.Services;
 using Noctis.Services.Search;
+using Noctis.TelegramSync;
 
 namespace Noctis.Mobile.Services.Finder;
 
@@ -19,6 +20,8 @@ internal sealed class PhoneFinderHost : IDisposable
     private readonly SemaphoreSlim _importGate = new(1, 1);
 
     public FinderSession Session { get; }
+    /// <summary>Cloud sync adapter shares the phone Finder's own Telegram session; it is inert until an opted-in sync calls it.</summary>
+    public ITelegramDrive SyncDrive => Session.SyncDrive;
     public IPhoneTelegramSignIn SignIn { get; }
     public IOnlineMusicSearch Search => Session.Online;
     public IOnlineDiscovery? Discovery => Session.Discovery;

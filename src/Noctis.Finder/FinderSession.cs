@@ -1,4 +1,5 @@
 using Noctis.Services;
+using Noctis.TelegramSync;
 
 namespace FreeMusicFinder;
 
@@ -18,6 +19,8 @@ internal sealed class FinderSession : IDisposable
     public AudioQuality Quality { get; set; } = AudioQuality.FLAC;
     public string FirstBot { get; set; } = BotSelections.Hunters;
     public TelegramAccount Telegram { get; }
+    /// <summary>Telegram sync over this Finder's one signed-in account; creating the adapter performs no network calls.</summary>
+    public ITelegramDrive SyncDrive { get; }
     public Downloads Downloads { get; }
     public FinderOnlineSearch Online { get; }
     public CatalogPages Pages { get; }
@@ -32,6 +35,7 @@ internal sealed class FinderSession : IDisposable
         DataFolder = Path.GetFullPath(data); MusicFolder = Path.GetFullPath(music); _log = log;
         Directory.CreateDirectory(data); Directory.CreateDirectory(music);
         Telegram = new TelegramAccount(Path.Combine(data, "telegram.dat"), () => _proxy, log, defaultsPath);
+        SyncDrive = new WTelegramDrive(Telegram);
         _catalog = new ArtistCatalog(Path.Combine(data, "artist-catalog"), PlaylistCatalog.MetadataHandler("", log));
         async Task<IEnumerable<MusicRequest>> CatalogLinks(MusicRequest request, CancellationToken ct)
             => (await _catalog.SearchSongsAsync(BotQuery.For(request), ct).ConfigureAwait(false)).Value.Select(s => s.Song.Request);
