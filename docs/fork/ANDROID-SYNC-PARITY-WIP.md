@@ -31,3 +31,7 @@ Port the useful Noctis Plus personal-library sync to Android using the existing 
 ## Status
 
 **Planning/audit only.** No source implementation or live account test is claimed. This work remains incomplete until automated tests, build evidence, and owner-side live verification are recorded separately.
+
+## Sync model audit — 2026-11-15
+
+The release already has a separate LAN path: `Noctis.Core.Services.Sync.LibrarySyncService` carries favorites, ratings, play counts, and playlists through the PC's Noctis server, while Android's account client talks to that server. The Telegram protocol in `Noctis.TelegramSync` adds cloud media/library state and its own ledger. These must not echo each other's updates or overwrite the established LAN route. `IPlayHistoryService` also preserves the original play timestamp, which matters when adding offline phone plays. Before implementing the controller, map these existing application and protocol models together and retain idempotent apply/echo guards.
