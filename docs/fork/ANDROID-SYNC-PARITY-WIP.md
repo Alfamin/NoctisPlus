@@ -39,3 +39,10 @@ The release already has a separate LAN path: `Noctis.Core.Services.Sync.LibraryS
 ## Scope correction — Android LAN sync already has both directions
 
 `NoctisAccountService.SyncNowAsync` pulls pages with `NoctisServerClient.GetSyncChangesAsync` and pushes local changes with `PushSyncChangesAsync`; that PC-hosted LAN/account path is already bidirectional in the release. The remaining gap tracked here is a separate Telegram-backed personal cloud transport, not a replacement for LAN sync and not evidence that the existing LAN route is one-way. Any bridge must preserve the current account client and avoid applying the same local change twice.
+
+## Checkpoint — 2026-11-15 09:06 UTC
+
+- Dedicated branch `codex-android-sync-parity` is clean and pushed through `a0366407`; the only changes are this planning/audit document. No sync source code, live Telegram operation, release integration, or profile change has occurred.
+- Direct `get_usage_limits` at 09:06 UTC reported 71% used in the primary 30-day window, no secondary limit, and no reset credits. The local watcher status file instead reported 100% / `wrapUp: true` with `checkedUtc` 08:14 UTC (52 minutes old). Treat the watcher record as stale; obtain a fresh direct quota read and fresh watcher status before any further implementation. No reset is authorized or available.
+- Android SDK/ADB remains absent; the official `dl.google.com` SDK host was unreachable. No build or emulator is active.
+- Next: resolve quota-watcher freshness, then continue the bounded Android/Telegram sync host audit. Keep the feature opt-in-only and distinct from the already bidirectional PC-hosted LAN sync.
