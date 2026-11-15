@@ -32,4 +32,12 @@ The first direct `FastGates.ps1` call targeted the script's hardcoded `C:\Users\
 3. Only then build/install a fresh audit APK and use the isolated signed-out AVD for a real UI check. Do not reuse the owner's profile or copy a Telegram session. No model/audio downloads for this step.
 4. Continue the actual phone audio-fit seam, offline/restart cache behavior, and exact current + next-two queue priority from `PHONE-WORD-TIMING-NEXT-277.md`. Keep unverified lyrics visibly provisional; do not claim audio fit from catalog duration.
 
-No live app check was done. No release, tag, main/native merge, profile change, or Telegram operation was made. At this checkpoint quota status is wrap-up-only; make no new feature/build/research work until a later natural quota window.
+## Follow-up verification — 2026-11-15
+
+The source selection correction is already in pushed commit `fd0e370f`: the phone parses `SyncedLyrics` (the Core provider's converted LRC/ELRC) and does not try to parse raw `OriginalTtml`. A regression test was added for a result carrying both fields, but its initial `with` expression did not compile because `LrcLibResult` is a class. The test fixture now uses ordinary property assignment.
+
+Focused `PlusOnlineLyricsSourceTests`: 5 passed, 0 failed. Sharded gate `android-ttml-fd0e370f-rerun`: 9,602 passed, 0 failed, 83 skipped; isolated frame groups 19/0 and 26/0; Finder 1,796 OK, 0 wrong. An earlier sharded pass had one intermittent unrelated `WordLyricsBackendTests.APlayedSong_LetsARunFarThroughFinishItsSong_ThenGoesNext` timeout; it passed isolated and all tests passed on the next full run. The gate wrapper returns success despite shard failures, so inspect its summary, not only the process exit status.
+
+Android build/live proof is blocked in this environment. The .NET Android workload is present (10.0.403), but there is no Android SDK directory or `adb`; both Debug x64 and ARM64 builds fail immediately with XA5300. No APK or emulator was changed. Do not mark #287 DONE. Remaining: actual phone audio fit (metadata duration is not fit evidence), offline cache/restart, provider status, and current + exact next-two queue priority; then a fresh Android build and signed-out AVD verification.
+
+No release, tag, main/native merge, profile change, or Telegram operation was made. The source fix is already pushed; the compiling regression fixture and this checkpoint update remain to be committed on `codex-android-262`.

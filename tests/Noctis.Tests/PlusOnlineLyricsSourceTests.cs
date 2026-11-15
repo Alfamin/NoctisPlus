@@ -34,11 +34,10 @@ public sealed class PlusOnlineLyricsSourceTests : IDisposable
     [Fact]
     public async Task ConvertedWordLyricsWinOverRawTtmlProvenance()
     {
+        var resultWithTtml = WordResult(WordLrc);
+        resultWithTtml.OriginalTtml = "<tt><body><div><p begin=\"1s\">raw provider TTML</p></div></body></tt>";
         var provider = new PlusOnlineLyricsSource.Provider("lrc.red", (_, _) =>
-            Task.FromResult<LrcLibResult?>(WordResult(WordLrc) with
-            {
-                OriginalTtml = "<tt><body><div><p begin=\"1s\">raw provider TTML</p></div></body></tt>",
-            }));
+            Task.FromResult<LrcLibResult?>(resultWithTtml));
 
         var result = await MakeSource(new[] { provider }).FindAsync(Track(), CancellationToken.None);
 

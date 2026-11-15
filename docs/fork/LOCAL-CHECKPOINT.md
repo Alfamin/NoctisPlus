@@ -1,5 +1,17 @@
 # Noctis Plus Android — saved green checkpoint, 2026-11-05 22:01 Tehran
 
+## Latest continuation — 2026-11-15 Tehran
+
+Actual service usage: 59% used in the reported 30-day primary window, no secondary limit, no reset credits. The quota watcher is active. Do not redeem a reset or buy credits.
+
+Current worktree is `C:\Users\Alfamine\nplus-codex-257`, branch `codex-android-262`, tracking `origin/codex-android-262`. Source fix `fd0e370f` selects converted `SyncedLyrics` for LRC parsing while keeping raw `OriginalTtml` as provenance. Its regression fixture initially failed compilation because `LrcLibResult` is a class; the fixture now sets the property normally. Focused `PlusOnlineLyricsSourceTests`: 5 passed, 0 failed.
+
+Full verification after the fixture correction: `android-ttml-fd0e370f-rerun` — 9,602 tests, 0 failed, 83 skipped; isolated frame groups 19/0 and 26/0; Finder 1,796 OK, 0 wrong. The first sharded run had one unrelated `WordLyricsBackendTests.APlayedSong_LetsARunFarThroughFinishItsSong_ThenGoesNext` timeout; it passed alone and the second full sharded run was green. The direct unsharded `dotnet test --no-build` attempt stalled and was stopped; use the sharded gate scripts.
+
+Android compilation/live status is blocked here: .NET Android workload 10.0.403 is present, but the Android SDK directory and `adb` are absent. Debug `android-x64` and `android-arm64` builds both fail with XA5300. No APK was built or installed, no AVD was touched, and no real-app timing/audio-fit/cache proof exists. Do not mark #287 DONE or infer audio fit from metadata duration. Next: restore a valid Android SDK/ADB environment, then use only the isolated signed-out audit profile to prove provider selection, offline cache/restart, skip cancellation, and exact current + next-two queue priority. Keep timing provisional until actual audio fit is measured.
+
+The only pending source-file correction is `tests/Noctis.Tests/PlusOnlineLyricsSourceTests.cs`; source `fd0e370f` is already pushed. Save the test correction and exact-file checkpoint/handoff/parity documentation on this dedicated branch. Keep it separate from newer `android-merge-169`; no merge, profile/account changes, or Telegram operation was made.
+
 ## Latest continuation — 2026-11-06 15:10 Tehran
 
 Worktree `C:\Users\Alfamine\nplus-codex-257`, branch `codex-android-262`; original `noctis-fork` untouched. Latest usage read: 6% used in the currently reported 30-day window, no secondary window, no earned reset credits; watcher is active and below wrap-up. Do not infer resets or redeem anything. Android lyrics page now cancels the prior online lookup when the selected song changes or the page is disposed, while retaining the generation guard so a provider that ignores cancellation still cannot replace the new song. Cancellation is not shown as a lyrics-service error.
