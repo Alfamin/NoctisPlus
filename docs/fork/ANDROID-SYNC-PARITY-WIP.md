@@ -30,7 +30,7 @@ Port the useful Noctis Plus personal-library sync to Android using the existing 
 
 ## Status
 
-**Planning/audit only.** No source implementation or live account test is claimed. This work remains incomplete until automated tests, build evidence, and owner-side live verification are recorded separately.
+**In progress; not end-to-end.** The shared-drive adapter seam, default-off preferences store, and pure transfer-policy predicate are implemented and have focused headless coverage. No controller, UI, scheduler, or live account test is claimed. Automated integration tests, Android build evidence, and owner-side live verification are still required before this work can be called complete.
 
 ## Sync model audit — 2026-11-15
 
@@ -58,3 +58,13 @@ Added an Android-only preferences file for future Telegram sync controls, separa
 ## Transfer-policy predicate — 2026-11-15
 
 `PhoneTelegramSyncPreferences.AllowsTransfer(onWifi, charging)` now centralizes the start rule: transfer requires explicit enablement and honors saved Wi-Fi-only / charging-only choices. The focused `PhoneTelegramSyncPreferencesStoreTests` passed 4/4 on the Windows test target (exit 0; existing analyzer warnings only). The existing default-off persistence and corruption behavior remain covered. This remains policy groundwork only: no UI, controller, scheduler, Telegram network call, Android package build, emulator validation, or live account check was performed. Do not describe it as end-to-end sync. Dedicated branch remains `codex-android-sync-parity`; next work requires mapping the controller seam and fake-drive coverage before any user-facing setting.
+
+## Phone host/domain mapping audit — 2026-11-16
+
+- `PhoneFinderHost.SyncDrive` forwards to `FinderSession.SyncDrive`; `FinderSession` creates one `WTelegramDrive` over its existing `TelegramAccount`. The constructor seam itself does not sign in or make a network call. Keep using this account owner; do not add another Telegram session.
+- The Telegram log's domain split is explicit: `song` is library membership keyed by Telegram document id; `track` is user state (favorite/rating/dislike/snooze); `playlist` is header/tombstone; `playlistEntry` is per-song membership; `plays` is one cumulative counter per song and device. `TgLibraryView` sums the counters and resolves playlist membership/order. These are not interchangeable with the PC-hosted LAN `track`/`playlist` items.
+- `TgTrackMap` is the boundary between Telegram document ids and phone track ids. Its existing-file match uses file size plus normalized recording key; do not assume title/artist alone uniquely identifies a recording or download into `D:\music`.
+- The phone's `ILibraryService` owns the track catalog and `LibraryViewModel` owns playlist mutation. Playlist edits are already serialized through the phone playlist writer/UI dispatcher; a background sync worker must marshal mutations rather than editing observable models directly. `IPlayHistoryService.Events` stores timestamped play events, while the Telegram `plays` kind stores per-device totals only. A controller must define how counters and timestamped history interact before it imports either, or it can double-count or fabricate history.
+- The existing phone LAN route remains `NoctisAccountService.SyncNowAsync`; this audit found no Telegram controller consuming `SyncDrive` or `PhoneTelegramSyncPreferences`. Keep those routes distinct and preserve LAN behavior.
+
+No code, live Telegram request, library/profile data, or `D:\music` was touched in this mapping pass. The next implementation decision is the smallest fake-drive-backed controller boundary: durable device/cursor state and account guard first, then map one domain at a time with idempotency tests. Do not add a visible setting until the opted-in route is complete.
