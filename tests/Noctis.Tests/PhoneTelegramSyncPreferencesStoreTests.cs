@@ -45,4 +45,16 @@ public sealed class PhoneTelegramSyncPreferencesStoreTests
         }
         finally { try { Directory.Delete(root, recursive: true); } catch { } }
     }
+
+    [Fact]
+    public void TransferPolicyRequiresOptInAndHonorsWifiAndChargingChoices()
+    {
+        Assert.False(PhoneTelegramSyncPreferencesStore.Default.AllowsTransfer(onWifi: true, charging: true));
+        Assert.False(new PhoneTelegramSyncPreferences(Enabled: true).AllowsTransfer(onWifi: false, charging: true));
+        Assert.True(new PhoneTelegramSyncPreferences(Enabled: true).AllowsTransfer(onWifi: true, charging: false));
+        Assert.False(new PhoneTelegramSyncPreferences(Enabled: true, WifiOnly: false, ChargingOnly: true)
+            .AllowsTransfer(onWifi: false, charging: false));
+        Assert.True(new PhoneTelegramSyncPreferences(Enabled: true, WifiOnly: false, ChargingOnly: true)
+            .AllowsTransfer(onWifi: false, charging: true));
+    }
 }

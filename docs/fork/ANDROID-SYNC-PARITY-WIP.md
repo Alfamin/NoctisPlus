@@ -54,3 +54,7 @@ The release already has a separate LAN path: `Noctis.Core.Services.Sync.LibraryS
 ## Default-off phone policy store — 2026-11-15
 
 Added an Android-only preferences file for future Telegram sync controls, separate from the LAN `SyncEnabled` account setting. Missing settings default to sync off, Wi-Fi-only transfers, and charging not required; malformed JSON reports corruption and returns the safe disabled defaults. Writes use a flushed temporary file followed by replacement. Focused `PhoneTelegramSyncPreferencesStoreTests`: 3 passed, 0 failed. No UI, scheduler, Telegram calls, or sync controller is wired yet; do not present this store as end-to-end sync.
+
+## Transfer-policy predicate — 2026-11-15
+
+`PhoneTelegramSyncPreferences.AllowsTransfer(onWifi, charging)` now centralizes the start rule: transfer requires explicit enablement and honors saved Wi-Fi-only / charging-only choices. The focused `PhoneTelegramSyncPreferencesStoreTests` passed 4/4 on the Windows test target (exit 0; existing analyzer warnings only). The existing default-off persistence and corruption behavior remain covered. This remains policy groundwork only: no UI, controller, scheduler, Telegram network call, Android package build, emulator validation, or live account check was performed. Do not describe it as end-to-end sync. Dedicated branch remains `codex-android-sync-parity`; next work requires mapping the controller seam and fake-drive coverage before any user-facing setting.
