@@ -76,3 +76,7 @@ No code, live Telegram request, library/profile data, or `D:\music` was touched 
 - `codex-android-262` remains clean at `8f243e9a`; no active test gate, Android build, or emulator was found. Android SDK/ADB binaries are present, but no device is attached; do not infer a successful build.
 - No profile or login was changed, no Telegram session was copied, and `D:\music` was not accessed. Keep this work on its dedicated branch; no main/native merge, tag, or release.
 - Resume only after an actual fresh quota read shows headroom. Next planned work is fake-drive controller/state integration, beginning with durable cursor/device identity and account-mismatch gating; continue to avoid user-facing controls until the opted-in path is complete and validated.
+
+## Wrap-up continuation — 2026-11-16 03:15 Tehran
+
+Direct usage is now 91% in the primary window, no secondary window, and zero reset credits. Watcher status refreshed at 23:45:57 UTC and agrees at 91% / `wrapUp: true`. The last saved code checkpoint is `d199309f`; the documentation-only wrap-up is `c2227ae4`. Dedicated branch is clean before this note. No Android build, emulator, or active test gate is running. This remains documentation-only until the service reports a later safe ordinary window; do not redeem the already-consumed #268 reset.
