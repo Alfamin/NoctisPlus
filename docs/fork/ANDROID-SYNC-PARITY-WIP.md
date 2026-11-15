@@ -50,3 +50,7 @@ The release already has a separate LAN path: `Noctis.Core.Services.Sync.LibraryS
 ## Reused-account adapter seam — 2026-11-15
 
 `FinderSession` now creates one `WTelegramDrive` over its already-owned `TelegramAccount`; `PhoneFinderHost.SyncDrive` exposes that stable adapter to a future controller. Constructing or reading the property makes no network call and creates no second Telegram session. Focused `PhoneSyncDriveTests`: 1 passed, 0 failed. The test assets were restored into this isolated worktree; only source compilation plus this one filtered test was run. This is an adapter seam, not a wired sync controller or enabled feature.
+
+## Default-off phone policy store — 2026-11-15
+
+Added an Android-only preferences file for future Telegram sync controls, separate from the LAN `SyncEnabled` account setting. Missing settings default to sync off, Wi-Fi-only transfers, and charging not required; malformed JSON reports corruption and returns the safe disabled defaults. Writes use a flushed temporary file followed by replacement. Focused `PhoneTelegramSyncPreferencesStoreTests`: 3 passed, 0 failed. No UI, scheduler, Telegram calls, or sync controller is wired yet; do not present this store as end-to-end sync.
