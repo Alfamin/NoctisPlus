@@ -80,3 +80,8 @@ No code, live Telegram request, library/profile data, or `D:\music` was touched 
 ## Wrap-up continuation — 2026-11-16 03:15 Tehran
 
 Direct usage is now 91% in the primary window, no secondary window, and zero reset credits. Watcher status refreshed at 23:45:57 UTC and agrees at 91% / `wrapUp: true`. The last saved code checkpoint is `d199309f`; the documentation-only wrap-up is `c2227ae4`. Dedicated branch is clean before this note. No Android build, emulator, or active test gate is running. This remains documentation-only until the service reports a later safe ordinary window; do not redeem the already-consumed #268 reset.
+
+## Wrap-up check — 2026-11-16 09:20 Tehran
+
+Direct usage is 92% in the primary window; no secondary limit or reset credits. Watcher record was stale at 91%, so the direct read governs. No implementation/build/research; branch was clean at 4c02ea72. #268 remains fulfilled. Continue wrap-up only.
+
