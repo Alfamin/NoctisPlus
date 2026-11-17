@@ -154,7 +154,7 @@ public sealed partial class PlaylistListPageViewModel : MobilePage, ISortable
         var counts = imports.Where(j => j.Complete && !j.Stopped).ToDictionary(j => j.Id, j => j.Total);
         var covers = imports.ToDictionary(j => j.Id, j => j.ArtworkUrl);
         MobileLibrary.ReplaceIfChanged(Rows, Playlists.Select(p => new PlaylistRow(p, p.CoverArtPath ?? Shell.Library.PlaylistArtwork(p),
-            counts.TryGetValue(p.Id, out var total) ? total : null, Shell.OnlineSearch, covers.GetValueOrDefault(p.Id) ?? "")).ToList());
+            counts.TryGetValue(p.Id, out var total) ? total : null, Shell.OnlineSearch, covers.GetValueOrDefault(p.Id) ?? "", Shell.Library.PlaylistSongCount(p))).ToList());
         OnPropertyChanged(nameof(ShowNoMatches));
     }
 
@@ -175,10 +175,11 @@ public sealed partial class PlaylistListPageViewModel : MobilePage, ISortable
 
 public enum PlaylistSort { Title, RecentlyUpdated, RecentlyAdded }
 
-/// <summary>A playlist row: its cover (the first of its songs that has one) and its song count.</summary>
+/// <summary>A playlist row: its cover (the first of its songs that has one) and its song count (the songs its page lists,
+/// <see cref="LibraryViewModel.PlaylistSongCount"/>; an imported playlist says its catalog total instead).</summary>
 public sealed record PlaylistRow(Playlist Playlist, string? ArtworkPath, int? CatalogCount = null,
-    Noctis.Services.Search.IOnlineMusicSearch? CoverSource = null, string CoverUrl = "")
+    Noctis.Services.Search.IOnlineMusicSearch? CoverSource = null, string CoverUrl = "", int SongCount = -1)
 {
     public string Name => Playlist.Name;
-    public string Subtitle => Loc.Plural("Mobile.Count.Songs", CatalogCount ?? Playlist.TrackIds.Count);
+    public string Subtitle => Loc.Plural("Mobile.Count.Songs", CatalogCount ?? (SongCount >= 0 ? SongCount : Playlist.TrackIds.Count));
 }

@@ -46,13 +46,17 @@ public sealed partial class ContextSheetViewModel : ObservableObject
         new(shell, artist.Name, Loc.T("Mobile.Artist"), shell.ArtistPhotos?.CachedPhoto(artist.Name) ?? artworkPath,
             MobileLibrary.SongsBy(shell.Library.Service, artist.Name)) { Artist = artist };
 
-    public static ContextSheetViewModel ForPlaylist(ShellViewModel shell, Playlist playlist) =>
-        new(shell, playlist.Name, PlaylistSubtitle(shell, playlist),
-            shell.Library.PlaylistArtwork(playlist), shell.ResolvePlaylist(playlist).ToList()) { Playlist = playlist };
-
-    private static string PlaylistSubtitle(ShellViewModel shell, Playlist playlist)
+    /// <summary>A playlist's sheet: an imported playlist says its catalog total; any other counts the songs it acts on (those the phone has), as its page says.</summary>
+    public static ContextSheetViewModel ForPlaylist(ShellViewModel shell, Playlist playlist)
     {
-        var count = shell.OnlineSearch?.PlaylistImports?.Snapshot().FirstOrDefault(j => j.Id == playlist.Id && j.Complete && !j.Stopped)?.Total ?? playlist.TrackIds.Count;
+        var tracks = shell.ResolvePlaylist(playlist).ToList();
+        return new(shell, playlist.Name, PlaylistSubtitle(shell, playlist, tracks.Count),
+            shell.Library.PlaylistArtwork(playlist), tracks) { Playlist = playlist };
+    }
+
+    private static string PlaylistSubtitle(ShellViewModel shell, Playlist playlist, int phoneSongs)
+    {
+        var count = shell.OnlineSearch?.PlaylistImports?.Snapshot().FirstOrDefault(j => j.Id == playlist.Id && j.Complete && !j.Stopped)?.Total ?? phoneSongs;
         return Loc.Plural("Mobile.Count.Songs", count);
     }
 

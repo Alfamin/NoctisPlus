@@ -350,6 +350,12 @@ public sealed partial class LibraryViewModel : ObservableObject
         HasCustomCover(playlist) ? playlist.CoverArtPath
             : playlist.TrackIds.Select(_library.GetTrackById).FirstOrDefault(t => !string.IsNullOrEmpty(t?.AlbumArtworkPath))?.AlbumArtworkPath;
 
+    /// <summary>A playlist's song count as its page shows it: the songs the phone has. A playlist
+    /// synced from the computer can name songs that are not here (not in the phone's catalog,
+    /// hidden on the phone); counting its ids said more songs than the page lists.</summary>
+    public int PlaylistSongCount(Playlist playlist) =>
+        playlist.TrackIds.Count(id => _library.GetTrackById(id) != null);
+
     public static bool HasCustomCover(Playlist playlist) =>
         !string.IsNullOrEmpty(playlist.CoverArtPath) && File.Exists(playlist.CoverArtPath);
 
@@ -1098,7 +1104,7 @@ public sealed partial class LibraryViewModel : ObservableObject
         var imported = (_onlineImports?.Snapshot() ?? []).Where(j => j.Complete && !j.Stopped).ToDictionary(j => j.Id);
         RailItem PlaylistTile(Playlist playlist)
         {
-            var tile = RailItem.ForPlaylist(playlist, playlist.CoverArtPath ?? PlaylistArtwork(playlist));
+            var tile = RailItem.ForPlaylist(playlist, playlist.CoverArtPath ?? PlaylistArtwork(playlist), PlaylistSongCount(playlist));
             return imported.TryGetValue(playlist.Id, out var job) ? tile with
             {
                 Subtitle = job.Total == 1 ? "1 song" : $"{job.Total} songs",
