@@ -85,3 +85,8 @@ Direct usage is now 91% in the primary window, no secondary window, and zero res
 
 Direct usage is 92% in the primary window; no secondary limit or reset credits. Watcher record was stale at 91%, so the direct read governs. No implementation/build/research; branch was clean at 4c02ea72. #268 remains fulfilled. Continue wrap-up only.
 
+
+## Final quota wrap-up — 2026-11-17 05:28 Tehran
+
+Direct service usage reached 100% of the primary 30-day window; no secondary capacity or reset credits are available. Wrap-up only. The last source checkpoint remains d199309f; documentation checkpoints are c2227ae4, 4c02ea72, and 1850329d. Dedicated branch was clean at 1850329d; no active build, gate, emulator, or source changes. Do not attempt another reset for #268. Resume implementation only after an actual fresh usage read shows ordinary headroom.
+
