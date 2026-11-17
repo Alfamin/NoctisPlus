@@ -76,7 +76,7 @@ public sealed record SettingsFolder(string Root, string Name, bool AccessLost)
 public sealed record LicenseEntry(string Name, string License, string Detail);
 
 /// <summary>Settings is one sheet: its top level, or one of the pages pushed inside it.</summary>
-public enum SettingsPane { Main, Folders, Lyrics, Background, Scrobbling, History, Accent, PlayerBar, Downloads, WhatsNew, Licenses, Language, Theme, Telegram, Hidden }
+public enum SettingsPane { Main, Folders, Lyrics, Background, Scrobbling, History, Accent, PlayerBar, Downloads, WhatsNew, Licenses, Language, Theme, Telegram, Hidden, TabBar }
 
 /// <summary>One line of Settings › Theme: a small preview of the theme (its page, a card and the
 /// chrome glass on it, its accent when it has one), its name, and a tick on the one in use.</summary>
@@ -183,6 +183,7 @@ public sealed partial class SettingsPageViewModel : MobilePage
             };
             Telegram.PropertyChanged += OnTelegramChanged;
         }
+        TabBar = new TabBarSettingsViewModel(shell);
         Shell.Library.Folders.CollectionChanged += OnFoldersChanged;
         Shell.Library.PropertyChanged += OnLibraryChanged;
         Shell.Library.Refreshed += OnLibraryRefreshed;
@@ -209,6 +210,8 @@ public sealed partial class SettingsPageViewModel : MobilePage
     public bool HasTelegram => Telegram != null;
     public string TelegramValue => Telegram?.Summary ?? "";
     public string TelegramRowName => Named("Telegram", TelegramValue);
+    /// <summary>Settings › Tab Bar: which tabs are on the bottom bar, in what order.</summary>
+    public TabBarSettingsViewModel TabBar { get; }
 
     /// <summary>The clock behind the profile row's "Synced 5 min ago"; tests pin it.</summary>
     internal Func<DateTime> UtcNow { get; init; } = () => DateTime.UtcNow;
@@ -229,7 +232,7 @@ public sealed partial class SettingsPageViewModel : MobilePage
     [NotifyPropertyChangedFor(nameof(ShowsFoldersPane), nameof(ShowsLyricsPane), nameof(ShowsBackgroundPane), nameof(ShowsScrobblingPane),
         nameof(ShowsHistoryPane), nameof(ShowsAccentPane), nameof(ShowsPlayerBarPane), nameof(ShowsDownloadsPane),
         nameof(ShowsWhatsNewPane), nameof(ShowsLicensesPane), nameof(ShowsLanguagePane), nameof(ShowsThemePane), nameof(ShowsTelegramPane),
-        nameof(ShowsHiddenPane), nameof(LanguageListSource))]
+        nameof(ShowsHiddenPane), nameof(ShowsTabBarPane), nameof(LanguageListSource))]
     private SettingsPane _shownSubPane = SettingsPane.Folders;
 
     public bool IsMainPane => Pane == SettingsPane.Main;
@@ -247,6 +250,7 @@ public sealed partial class SettingsPageViewModel : MobilePage
     public bool ShowsTelegramPane => ShownSubPane == SettingsPane.Telegram;
     public bool ShowsLanguagePane => ShownSubPane == SettingsPane.Language;
     public bool ShowsThemePane => ShownSubPane == SettingsPane.Theme;
+    public bool ShowsTabBarPane => ShownSubPane == SettingsPane.TabBar;
 
     /// <summary>The header's title: "Settings", or the pushed page's name.</summary>
     public string HeaderTitle => Pane switch
@@ -265,6 +269,7 @@ public sealed partial class SettingsPageViewModel : MobilePage
         SettingsPane.Theme => Loc.T("Mobile.Settings.Theme"),
         SettingsPane.Telegram => "Telegram",
         SettingsPane.Hidden => Loc.T("Mobile.Settings.Hidden"),
+        SettingsPane.TabBar => Loc.T("Mobile.Settings.TabBar"),
         _ => Title,
     };
 
@@ -1107,6 +1112,7 @@ public sealed partial class SettingsPageViewModel : MobilePage
         Background.Relabel();
         Scrobbling.Relabel();
         History.Relabel();
+        TabBar.Relabel();
         // The account card's numbers carry the language too ("48 МБ", "5 201" stayed Russian
         // after picking English).
         RefreshStats();
@@ -1330,6 +1336,10 @@ public sealed partial class SettingsPageViewModel : MobilePage
         {
             OnPropertyChanged(nameof(PlayerBarValue));
             OnPropertyChanged(nameof(PlayerBarRowName));
+        }
+        else if (e.PropertyName == nameof(ShellViewModel.BarTabs))
+        {
+            TabBar.Sync();
         }
         else if (e.PropertyName == nameof(ShellViewModel.SongRowMark))
         {
