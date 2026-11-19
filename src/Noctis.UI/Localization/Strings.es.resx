@@ -7064,192 +7064,200 @@
   <data name="Settings.DataFolderCancelled" xml:space="preserve"><value>Traslado cancelado. Tus datos se quedan donde están.</value><comment>Settings › Advanced › Data Folder (GitHub #165)</comment></data>
   <data name="Settings.DataFolderPreparing" xml:space="preserve"><value>Preparando…</value><comment>Settings › Advanced › Data Folder (GitHub #165): shown while the folder is checked and measured</comment></data>
   <!-- Phone app (Noctis.Mobile): keys prefixed Mobile. Plural values hold their forms separated by |, see Loc.Plural. -->
-  <data name="Mobile.BackToSettings" xml:space="preserve"><value>Volver a Ajustes</value></data>
-  <data name="Mobile.Account.SignInTitle" xml:space="preserve"><value>Inicia sesión en tu equipo</value></data>
-  <data name="Mobile.Account.SignInSubtitle" xml:space="preserve"><value>Escucha y descarga aquí la música de tu equipo.</value></data>
-  <data name="Mobile.Account.ScanQrHeader" xml:space="preserve"><value>Escanear código QR</value></data>
-  <data name="Mobile.Account.QrStep1" xml:space="preserve"><value>En tu equipo, abre Noctis › Ajustes › Cuenta y dispositivos</value></data>
-  <data name="Mobile.Account.QrStep2" xml:space="preserve"><value>Activa Noctis en tu teléfono y haz clic en Conectar un teléfono</value></data>
-  <data name="Mobile.Account.QrStep3" xml:space="preserve"><value>Toca Escanear código QR y apunta la cámara al código</value></data>
-  <data name="Mobile.Account.ScanQrButton" xml:space="preserve"><value>Escanear código QR</value></data>
-  <data name="Mobile.Account.ManualHeader" xml:space="preserve"><value>Introducir a mano</value></data>
-  <data name="Mobile.Account.ManualStep1" xml:space="preserve"><value>En tu equipo, haz clic en Conectar un teléfono y luego en Introducir a mano</value></data>
-  <data name="Mobile.Account.ManualStep2" xml:space="preserve"><value>Escribe la dirección que aparece, tu correo y tu contraseña</value></data>
-  <data name="Mobile.Account.ManualStep3" xml:space="preserve"><value>Comprueba que el código de seguridad coincide</value></data>
-  <data name="Mobile.Account.ServerAddress" xml:space="preserve"><value>Dirección del servidor</value></data>
-  <data name="Mobile.Account.EmailOrUsername" xml:space="preserve"><value>Correo o nombre de usuario</value></data>
-  <data name="Mobile.Account.Password" xml:space="preserve"><value>Contraseña</value></data>
-  <data name="Mobile.Account.Required" xml:space="preserve"><value>Obligatorio</value></data>
-  <data name="Mobile.Account.ShowPassword" xml:space="preserve"><value>Mostrar contraseña</value></data>
-  <data name="Mobile.Account.SignIn" xml:space="preserve"><value>Iniciar sesión</value></data>
-  <data name="Mobile.Account.CheckCodeTitle" xml:space="preserve"><value>Comprueba el código de seguridad</value></data>
-  <data name="Mobile.Account.CheckCodeText" xml:space="preserve"><value>Tu equipo muestra un código de seguridad en Conectar un teléfono. Inicia sesión solo si coincide con este.</value></data>
-  <data name="Mobile.Account.TrustAndSignIn" xml:space="preserve"><value>Confiar e iniciar sesión</value></data>
-  <data name="Mobile.Cancel" xml:space="preserve"><value>Cancelar</value></data>
-  <data name="Mobile.Account.SyncNow" xml:space="preserve"><value>Sincronizar ahora</value></data>
-  <data name="Mobile.Account.DownloadEverything" xml:space="preserve"><value>Descargar todo</value></data>
-  <data name="Mobile.Account.DownloadEverythingHint" xml:space="preserve"><value>Guarda todas las canciones en este teléfono para escuchar sin conexión</value></data>
-  <data name="Mobile.Downloaded" xml:space="preserve"><value>Descargado</value></data>
-  <data name="Mobile.Account.RemoveAllDownloads" xml:space="preserve"><value>Eliminar todas las descargas</value></data>
-  <data name="Mobile.Account.RemoveDownloads" xml:space="preserve"><value>Eliminar descargas</value></data>
-  <data name="Mobile.Account.SignOut" xml:space="preserve"><value>Cerrar sesión</value></data>
-  <data name="Mobile.NoAlbums" xml:space="preserve"><value>No hay álbumes</value></data>
-  <data name="Mobile.Play" xml:space="preserve"><value>Reproducir</value></data>
-  <data name="Mobile.Album.More" xml:space="preserve"><value>MÁS</value></data>
-  <data name="Mobile.Album.RecordLabel" xml:space="preserve"><value>SELLO DISCOGRÁFICO</value></data>
-  <data name="Mobile.Artists.Find" xml:space="preserve"><value>Buscar en Artistas</value></data>
-  <data name="Mobile.Artists.NoMatch" xml:space="preserve"><value>Ningún artista coincide</value></data>
-  <data name="Mobile.Artists.None" xml:space="preserve"><value>No hay artistas</value></data>
-  <data name="Mobile.Shuffle" xml:space="preserve"><value>Aleatorio</value></data>
-  <data name="Mobile.Favorite" xml:space="preserve"><value>Favorito</value></data>
-  <data name="Mobile.Artist.TopSongs" xml:space="preserve"><value>Canciones principales</value></data>
-  <data name="Mobile.Artist.SinglesEps" xml:space="preserve"><value>Sencillos y EP</value></data>
-  <data name="Mobile.Artist.AppearsOn" xml:space="preserve"><value>Aparece en</value></data>
-  <data name="Mobile.AddToPlaylist" xml:space="preserve"><value>Añadir a una playlist</value></data>
-  <data name="Mobile.NewPlaylist" xml:space="preserve"><value>Nueva playlist</value></data>
-  <data name="Mobile.Pinned" xml:space="preserve"><value>Fijados</value></data>
-  <data name="Mobile.Home.PinnedHint" xml:space="preserve"><value>Mantén pulsado un álbum, artista, playlist o canción y elige Fijar para tenerlo aquí.</value></data>
-  <data name="Mobile.RecentlyPlayed" xml:space="preserve"><value>Escuchado recientemente</value></data>
-  <data name="Mobile.OnRepeat" xml:space="preserve"><value>En bucle</value></data>
-  <data name="Mobile.Notice.AddMusicTitle" xml:space="preserve"><value>Añade tu música</value></data>
-  <data name="Mobile.Notice.AddMusicText" xml:space="preserve"><value>Elige la carpeta donde está tu música. Noctis la lee en su sitio y nunca sube nada.</value></data>
-  <data name="Mobile.Notice.ChooseFolder" xml:space="preserve"><value>Elegir carpeta</value></data>
-  <data name="Mobile.Notice.ReconnectFolder" xml:space="preserve"><value>Volver a conectar carpeta</value></data>
-  <data name="Mobile.More" xml:space="preserve"><value>Más</value></data>
-  <data name="Mobile.RecentlyAdded" xml:space="preserve"><value>Añadido recientemente</value></data>
-  <data name="Mobile.Lyrics.Close" xml:space="preserve"><value>Cerrar letra</value></data>
-  <data name="Mobile.Lyrics.Translation" xml:space="preserve"><value>Traducción</value></data>
-  <data name="Mobile.Lyrics.Romaji" xml:space="preserve"><value>Romaji</value></data>
-  <data name="Mobile.PlaybackPosition" xml:space="preserve"><value>Posición de reproducción</value></data>
-  <data name="Mobile.Previous" xml:space="preserve"><value>Anterior</value></data>
-  <data name="Mobile.PlayPause" xml:space="preserve"><value>Reproducir o pausar</value></data>
-  <data name="Mobile.Next" xml:space="preserve"><value>Siguiente</value></data>
-  <data name="Mobile.Output" xml:space="preserve"><value>Salida</value></data>
-  <data name="Mobile.AudioQuality" xml:space="preserve"><value>Calidad de audio</value></data>
-  <data name="Mobile.Volume" xml:space="preserve"><value>Volumen</value></data>
-  <data name="Mobile.Playlists.Find" xml:space="preserve"><value>Buscar en playlists</value></data>
-  <data name="Mobile.Playlists.None" xml:space="preserve"><value>Aún no hay playlists. Mantén pulsada una canción para crear una.</value></data>
-  <data name="Mobile.Playlists.NoMatch" xml:space="preserve"><value>Ninguna playlist coincide</value></data>
-  <data name="Mobile.Playlists.SortName" xml:space="preserve"><value>Ordenar playlists</value></data>
-  <data name="Mobile.Playlists.New" xml:space="preserve"><value>Nueva playlist</value></data>
-  <data name="Mobile.Create" xml:space="preserve"><value>Crear</value></data>
-  <data name="Mobile.PlayNext" xml:space="preserve"><value>Reproducir a continuación</value></data>
-  <data name="Mobile.AddToQueue" xml:space="preserve"><value>Añadir a la cola</value></data>
-  <data name="Mobile.AddBeforeCurrent" xml:space="preserve"><value>Añadir antes de la canción actual</value></data>
-  <data name="Mobile.AddedBeforeCurrent" xml:space="preserve"><value>Añadida antes de la canción actual</value></data>
-  <data name="Mobile.GoToAlbum" xml:space="preserve"><value>Ir al álbum</value></data>
-  <data name="Mobile.GoToArtist" xml:space="preserve"><value>Ir al artista</value></data>
-  <data name="Mobile.Rename" xml:space="preserve"><value>Renombrar</value></data>
-  <data name="Mobile.ChangeCover" xml:space="preserve"><value>Cambiar portada</value></data>
-  <data name="Mobile.RemoveCover" xml:space="preserve"><value>Quitar portada</value></data>
-  <data name="Mobile.CoverNotPicture" xml:space="preserve"><value>Ese archivo no es una imagen que Noctis pueda usar como portada.</value></data>
-  <data name="Mobile.RemoveFromPlaylist" xml:space="preserve"><value>Quitar de la playlist</value></data>
-  <data name="Mobile.DeletePlaylist" xml:space="preserve"><value>Eliminar playlist</value></data>
-  <data name="Mobile.AddFolderMenu" xml:space="preserve"><value>Añadir carpeta…</value></data>
-  <data name="Mobile.RescanLibrary" xml:space="preserve"><value>Volver a escanear biblioteca</value></data>
-  <data name="Mobile.OK" xml:space="preserve"><value>OK</value></data>
-  <data name="Mobile.ProfileButton" xml:space="preserve"><value>Perfil y ajustes</value></data>
-  <data name="Mobile.Queue.UpNext" xml:space="preserve"><value>A continuación</value></data>
-  <data name="Mobile.Queue.Clear" xml:space="preserve"><value>Borrar</value></data>
-  <data name="Mobile.Queue.Empty" xml:space="preserve"><value>No hay nada a continuación</value></data>
-  <data name="Mobile.Queue.History" xml:space="preserve"><value>Historial</value></data>
-  <data name="Mobile.Queue.HideHistory" xml:space="preserve"><value>Ocultar</value></data>
-  <data name="Mobile.Queue.ShowHistory" xml:space="preserve"><value>Mostrar</value></data>
-  <data name="Mobile.Repeat" xml:space="preserve"><value>Repetir</value></data>
-  <data name="Mobile.NothingHere" xml:space="preserve"><value>Aún no hay nada aquí</value></data>
-  <data name="Mobile.Search" xml:space="preserve"><value>Buscar</value></data>
-  <data name="Mobile.Search.Placeholder" xml:space="preserve"><value>Artistas, canciones, álbumes, playlists</value></data>
-  <data name="Mobile.Search.All" xml:space="preserve"><value>Todo</value></data>
-  <data name="Mobile.Search.Hint" xml:space="preserve"><value>Busca en tu biblioteca</value></data>
-  <data name="Mobile.Search.NoResults" xml:space="preserve"><value>Sin resultados</value></data>
-  <data name="Mobile.Artist" xml:space="preserve"><value>Artista</value></data>
-  <data name="Mobile.Background.SlowMotion" xml:space="preserve"><value>Cámara lenta</value></data>
-  <data name="Mobile.Background.SlowMotionHint" xml:space="preserve"><value>Los colores se mueven suavemente</value></data>
-  <data name="Mobile.Background.Strength" xml:space="preserve"><value>Intensidad</value></data>
-  <data name="Mobile.Background.FromArtwork" xml:space="preserve"><value>De la portada</value></data>
-  <data name="Mobile.NowPlaying" xml:space="preserve"><value>Ahora suena</value></data>
-  <data name="Mobile.Background.NowPlayingHint" xml:space="preserve"><value>Cambia con la portada de cada canción</value></data>
-  <data name="Mobile.Off" xml:space="preserve"><value>No</value></data>
-  <data name="Mobile.Background.OffHint" xml:space="preserve"><value>El color liso del tema</value></data>
-  <data name="Mobile.Background.Neutral" xml:space="preserve"><value>Neutros</value></data>
-  <data name="Mobile.Background.Colour" xml:space="preserve"><value>Color</value></data>
-  <data name="Mobile.History.ThisWeek" xml:space="preserve"><value>Esta semana</value></data>
-  <data name="Mobile.History.NothingPlayed" xml:space="preserve"><value>Aún no has escuchado nada</value></data>
-  <data name="Mobile.ShowAll" xml:space="preserve"><value>Mostrar todo</value></data>
-  <data name="Mobile.Source.All" xml:space="preserve"><value>Toda la música</value></data>
-  <data name="Mobile.Source.Phone" xml:space="preserve"><value>En este teléfono</value></data>
-  <data name="Mobile.Source.Computer" xml:space="preserve"><value>Del equipo</value></data>
-  <data name="Mobile.Source.Name" xml:space="preserve"><value>Origen de la música</value></data>
-  <data name="Mobile.History.Header" xml:space="preserve"><value>Historial</value></data>
-  <data name="Mobile.History.Keep" xml:space="preserve"><value>Conservar historial</value></data>
-  <data name="Mobile.History.CountAfter" xml:space="preserve"><value>Contar como escuchada tras</value></data>
-  <data name="Mobile.History.Share" xml:space="preserve"><value>Compartir con el equipo</value></data>
-  <data name="Mobile.History.ShareHint" xml:space="preserve"><value>Los recuentos y Escuchado recientemente coinciden en ambos</value></data>
-  <data name="Mobile.History.ClearName" xml:space="preserve"><value>Borrar historial de escucha</value></data>
-  <data name="Mobile.History.ClearRow" xml:space="preserve"><value>Borrar historial de escucha…</value></data>
-  <data name="Mobile.History.ClearHint" xml:space="preserve"><value>Las reproducciones ya enviadas a Last.fm se quedan allí</value></data>
-  <data name="Mobile.Scrobbling.ThisPhone" xml:space="preserve"><value>Este teléfono</value></data>
-  <data name="Mobile.Scrobbling.Computer" xml:space="preserve"><value>Equipo</value></data>
-  <data name="Mobile.Scrobbling.Services" xml:space="preserve"><value>Servicios</value></data>
-  <data name="Mobile.Scrobbling.ThroughComputer" xml:space="preserve"><value>A través del equipo</value></data>
-  <data name="Mobile.Scrobbling.FromPhone" xml:space="preserve"><value>Desde este teléfono</value></data>
-  <data name="Mobile.Scrobbling.WhileListening" xml:space="preserve"><value>Mientras escuchas</value></data>
-  <data name="Mobile.Scrobbling.SendPlays" xml:space="preserve"><value>Enviar reproducciones</value></data>
-  <data name="Mobile.Scrobbling.ShowNowPlaying" xml:space="preserve"><value>Mostrar lo que suena</value></data>
-  <data name="Mobile.Scrobbling.Waiting" xml:space="preserve"><value>Pendientes de envío</value></data>
-  <data name="Mobile.Settings.OnPhone" xml:space="preserve"><value>En el teléfono</value></data>
-  <data name="Mobile.Settings.Appearance" xml:space="preserve"><value>Apariencia</value></data>
-  <data name="Mobile.Settings.Background" xml:space="preserve"><value>Fondo</value></data>
-  <data name="Mobile.Settings.Theme" xml:space="preserve"><value>Tema</value></data>
-  <data name="Mobile.Settings.Accent" xml:space="preserve"><value>Color de énfasis</value></data>
-  <data name="Mobile.Settings.PlayerBar" xml:space="preserve"><value>Barra del reproductor</value></data>
-  <data name="Mobile.Settings.NowPlayingArtwork" xml:space="preserve"><value>Portada en Reproduciendo</value></data>
-  <data name="Mobile.NowPlayingArtwork.Cover" xml:space="preserve"><value>Portada</value></data>
-  <data name="Mobile.NowPlayingArtwork.Vinyl" xml:space="preserve"><value>Vinilo</value></data>
-  <data name="Mobile.NowPlayingArtwork.CD" xml:space="preserve"><value>CD</value></data>
-  <data name="Mobile.Settings.NowPlayingBrightness" xml:space="preserve"><value>Fondo de Reproduciendo</value></data>
-  <data name="Mobile.Settings.NowPlayingBrightnessName" xml:space="preserve"><value>Brillo del fondo de Reproduciendo</value></data>
-  <data name="Mobile.Settings.NowPlayingBrightnessHint" xml:space="preserve"><value>Colores más oscuros o más claros detrás de Reproduciendo</value></data>
-  <data name="Mobile.Settings.MusicFolders" xml:space="preserve"><value>Carpetas de música</value></data>
-  <data name="Mobile.Settings.Downloads" xml:space="preserve"><value>Descargas</value></data>
-  <data name="Mobile.Settings.Listening" xml:space="preserve"><value>Escucha</value></data>
-  <data name="Mobile.Settings.Scrobbling" xml:space="preserve"><value>Scrobbling</value></data>
-  <data name="Mobile.Settings.ListeningHistory" xml:space="preserve"><value>Historial de escucha</value></data>
-  <data name="Mobile.Settings.PickUpName" xml:space="preserve"><value>Continuar en el equipo, tu cola y el punto exacto te siguen</value></data>
-  <data name="Mobile.Settings.PickUp" xml:space="preserve"><value>Continuar en el equipo</value></data>
-  <data name="Mobile.Settings.PickUpHint" xml:space="preserve"><value>Tu cola y el punto exacto te siguen</value></data>
-  <data name="Mobile.Settings.Help" xml:space="preserve"><value>Ayuda</value></data>
-  <data name="Mobile.Settings.ReportName" xml:space="preserve"><value>Informar de un problema, se abre en el navegador</value></data>
-  <data name="Mobile.Settings.Report" xml:space="preserve"><value>Informar de un problema</value></data>
-  <data name="Mobile.Settings.ExportLogs" xml:space="preserve"><value>Exportar registros</value></data>
-  <data name="Mobile.Settings.WebsiteName" xml:space="preserve"><value>Sitio web de Noctis, se abre en el navegador</value></data>
-  <data name="Mobile.Settings.Website" xml:space="preserve"><value>Sitio web de Noctis</value></data>
-  <data name="Mobile.Settings.PrivacyName" xml:space="preserve"><value>Política de privacidad, se abre en el navegador</value></data>
-  <data name="Mobile.Settings.Privacy" xml:space="preserve"><value>Política de privacidad</value></data>
-  <data name="Mobile.Settings.About" xml:space="preserve"><value>Acerca de</value></data>
-  <data name="Mobile.Settings.Version" xml:space="preserve"><value>Versión</value></data>
-  <data name="Mobile.Settings.WhatsNew" xml:space="preserve"><value>Novedades</value></data>
-  <data name="Mobile.Settings.Licenses" xml:space="preserve"><value>Licencias de código abierto</value></data>
-  <data name="Mobile.Settings.Tagline" xml:space="preserve"><value>Noctis · tu música, en tus dispositivos.</value></data>
-  <data name="Mobile.Folders.AccessLost" xml:space="preserve"><value>Se perdió el acceso. Vuelve a añadir esta carpeta para reproducir sus canciones.</value></data>
-  <data name="Mobile.Folders.Unavailable" xml:space="preserve"><value>No disponible. Vuelve a conectar su almacenamiento y escanea de nuevo.</value></data>
-  <data name="Mobile.Folders.None" xml:space="preserve"><value>Aún no hay carpetas de música</value></data>
-  <data name="Mobile.Folders.Footnote" xml:space="preserve"><value>Tu biblioteca es la música de estas carpetas</value></data>
-  <data name="Mobile.Folders.Add" xml:space="preserve"><value>Añadir carpeta</value></data>
-  <data name="Mobile.Folders.ScanOnStartup" xml:space="preserve"><value>Escanear al abrir</value></data>
-  <data name="Mobile.Folders.ScanOnStartupHint" xml:space="preserve"><value>Busca canciones nuevas cada vez que se abre Noctis</value></data>
-  <data name="Mobile.Settings.AlbumColours" xml:space="preserve"><value>Colores del álbum</value></data>
-  <data name="Mobile.Settings.ColourPages" xml:space="preserve"><value>Colorear páginas con la portada</value></data>
-  <data name="Mobile.Settings.ColourPagesHint" xml:space="preserve"><value>Las páginas de álbum y artista toman el color de la portada</value></data>
-  <data name="Mobile.Settings.ProgressColour" xml:space="preserve"><value>Color de progreso</value></data>
-  <data name="Mobile.Settings.ProgressLine" xml:space="preserve"><value>Línea de progreso</value></data>
-  <data name="Mobile.Settings.PlayerBarHint" xml:space="preserve"><value>Rellena la barra o dibuja una línea fina mientras suena la canción</value></data>
-  <data name="Mobile.Settings.WifiOnly" xml:space="preserve"><value>Descargar solo con Wi-Fi</value></data>
-  <data name="Mobile.Settings.WifiOnlyHint" xml:space="preserve"><value>Las descargas esperan al Wi-Fi pero el streaming sigue funcionando</value></data>
-  <data name="Mobile.Settings.SmoothMotion" xml:space="preserve"><value>Movimiento fluido</value></data>
-  <data name="Mobile.Settings.SmoothMotionHint" xml:space="preserve"><value>Hasta 120 Hz</value></data>
-  <data name="Mobile.Settings.SmoothMotionFootnote" xml:space="preserve"><value>Desplazamiento más fluido en pantallas de 120 Hz pero gasta más batería</value></data>
-  <data name="Mobile.Settings.GlassTabPill" xml:space="preserve"><value>Pestaña de Liquid Glass</value></data>
+  <data name="Mobile.BackToSettings" xml:space="preserve"><value>Volver a Ajustes</value><comment>Screen reader name of the back button on a Settings sub-page</comment></data>
+  <data name="Mobile.Account.SignInTitle" xml:space="preserve"><value>Inicia sesión en tu equipo</value><comment>Account page title before signing in, and the Settings profile row</comment></data>
+  <data name="Mobile.Account.SignInSubtitle" xml:space="preserve"><value>Escucha y descarga aquí la música de tu equipo.</value><comment>Account page, under the sign-in title</comment></data>
+  <data name="Mobile.Account.ScanQrHeader" xml:space="preserve"><value>Escanear código QR</value><comment>Account page section header</comment></data>
+  <data name="Mobile.Account.QrStep1" xml:space="preserve"><value>En tu equipo, abre Noctis › Ajustes › Cuenta y dispositivos</value><comment>Sign-in step 1 (QR). "Settings › Account &amp; Devices" names the desktop page</comment></data>
+  <data name="Mobile.Account.QrStep2" xml:space="preserve"><value>Activa Noctis en tu teléfono y haz clic en Conectar un teléfono</value><comment>Sign-in step 2 (QR). "Noctis on your phone" and "Connect a phone" are desktop labels</comment></data>
+  <data name="Mobile.Account.QrStep3" xml:space="preserve"><value>Toca Escanear código QR y apunta la cámara al código</value><comment>Sign-in step 3 (QR)</comment></data>
+  <data name="Mobile.Account.ScanQrButton" xml:space="preserve"><value>Escanear código QR</value><comment>Account page button</comment></data>
+  <data name="Mobile.Account.ManualHeader" xml:space="preserve"><value>Introducir a mano</value><comment>Account page section header</comment></data>
+  <data name="Mobile.Account.ManualStep1" xml:space="preserve"><value>En tu equipo, haz clic en Conectar un teléfono y luego en Introducir a mano</value><comment>Manual sign-in step 1</comment></data>
+  <data name="Mobile.Account.ManualStep2" xml:space="preserve"><value>Escribe la dirección que aparece, tu correo y tu contraseña</value><comment>Manual sign-in step 2</comment></data>
+  <data name="Mobile.Account.ManualStep3" xml:space="preserve"><value>Comprueba que el código de seguridad coincide</value><comment>Manual sign-in step 3</comment></data>
+  <data name="Mobile.Account.ServerAddress" xml:space="preserve"><value>Dirección del servidor</value><comment>Field label</comment></data>
+  <data name="Mobile.Account.EmailOrUsername" xml:space="preserve"><value>Correo o nombre de usuario</value><comment>Field label</comment></data>
+  <data name="Mobile.Account.Password" xml:space="preserve"><value>Contraseña</value><comment>Field label</comment></data>
+  <data name="Mobile.Account.Required" xml:space="preserve"><value>Obligatorio</value><comment>Password field placeholder</comment></data>
+  <data name="Mobile.Account.ShowPassword" xml:space="preserve"><value>Mostrar contraseña</value><comment>Screen reader name of the eye button</comment></data>
+  <data name="Mobile.Account.SignIn" xml:space="preserve"><value>Iniciar sesión</value><comment>Button</comment></data>
+  <data name="Mobile.Account.CheckCodeTitle" xml:space="preserve"><value>Comprueba el código de seguridad</value><comment>Heading over the pairing security code</comment></data>
+  <data name="Mobile.Account.CheckCodeText" xml:space="preserve"><value>Tu equipo muestra un código de seguridad en Conectar un teléfono. Inicia sesión solo si coincide con este.</value><comment>Under the security code</comment></data>
+  <data name="Mobile.Account.TrustAndSignIn" xml:space="preserve"><value>Confiar e iniciar sesión</value><comment>Button</comment></data>
+  <data name="Mobile.Cancel" xml:space="preserve"><value>Cancelar</value><comment>Button</comment></data>
+  <data name="Mobile.Account.SyncNow" xml:space="preserve"><value>Sincronizar ahora</value><comment>Account page tile</comment></data>
+  <data name="Mobile.Account.DownloadEverything" xml:space="preserve"><value>Descargar todo</value><comment>Account page tile</comment></data>
+  <data name="Mobile.Account.DownloadEverythingHint" xml:space="preserve"><value>Guarda todas las canciones en este teléfono para escuchar sin conexión</value><comment>Account page footnote</comment></data>
+  <data name="Mobile.Downloaded" xml:space="preserve"><value>Descargado</value><comment>Songs kept on the phone (label, filter, Library row)</comment></data>
+  <data name="Mobile.Account.RemoveAllDownloads" xml:space="preserve"><value>Eliminar todas las descargas</value><comment>Screen reader name of the Remove downloads button</comment></data>
+  <data name="Mobile.Account.RemoveDownloads" xml:space="preserve"><value>Eliminar descargas</value><comment>Account page button</comment></data>
+  <data name="Mobile.Account.SignOut" xml:space="preserve"><value>Cerrar sesión</value><comment>Account page button</comment></data>
+  <data name="Mobile.NoAlbums" xml:space="preserve"><value>No hay álbumes</value><comment>Empty Albums page</comment></data>
+  <data name="Mobile.Play" xml:space="preserve"><value>Reproducir</value><comment>Play button (album, list, artist)</comment></data>
+  <data name="Mobile.Album.More" xml:space="preserve"><value>MÁS</value><comment>Album description: expands the text. Upper case as Apple shows it</comment></data>
+  <data name="Mobile.Album.RecordLabel" xml:space="preserve"><value>SELLO DISCOGRÁFICO</value><comment>Album page footer caption. Upper case as Apple shows it</comment></data>
+  <data name="Mobile.Artists.Find" xml:space="preserve"><value>Buscar en Artistas</value><comment>Search field placeholder on the Artists page</comment></data>
+  <data name="Mobile.Artists.NoMatch" xml:space="preserve"><value>Ningún artista coincide</value><comment>Artists page: the search found nothing</comment></data>
+  <data name="Mobile.Artists.None" xml:space="preserve"><value>No hay artistas</value><comment>Empty Artists page</comment></data>
+  <data name="Mobile.Shuffle" xml:space="preserve"><value>Aleatorio</value><comment>Shuffle button</comment></data>
+  <data name="Mobile.Favorite" xml:space="preserve"><value>Favorito</value><comment>Favorite button / action</comment></data>
+  <data name="Mobile.Artist.TopSongs" xml:space="preserve"><value>Canciones principales</value><comment>Artist page section</comment></data>
+  <data name="Mobile.Artist.SinglesEps" xml:space="preserve"><value>Sencillos y EP</value><comment>Artist page section</comment></data>
+  <data name="Mobile.Artist.AppearsOn" xml:space="preserve"><value>Aparece en</value><comment>Artist page section: albums by others the artist is on</comment></data>
+  <data name="Mobile.AddToPlaylist" xml:space="preserve"><value>Añadir a una playlist</value><comment>Menu action and sheet title</comment></data>
+  <data name="Mobile.NewPlaylist" xml:space="preserve"><value>Nueva playlist</value><comment>Placeholder of the new playlist name field</comment></data>
+  <data name="Mobile.Pinned" xml:space="preserve"><value>Fijados</value><comment>Home section and page title: what the user pinned</comment></data>
+  <data name="Mobile.Home.PinnedHint" xml:space="preserve"><value>Mantén pulsado un álbum, artista, playlist o canción y elige Fijar para tenerlo aquí.</value><comment>Home: nothing pinned yet</comment></data>
+  <data name="Mobile.RecentlyPlayed" xml:space="preserve"><value>Escuchado recientemente</value><comment>Section and page title</comment></data>
+  <data name="Mobile.OnRepeat" xml:space="preserve"><value>En bucle</value><comment>Home section and page title: songs played most lately (Apple Music: On Repeat)</comment></data>
+  <data name="Mobile.Notice.AddMusicTitle" xml:space="preserve"><value>Añade tu música</value><comment>First-run card title</comment></data>
+  <data name="Mobile.Notice.AddMusicText" xml:space="preserve"><value>Elige la carpeta donde está tu música. Noctis la lee en su sitio y nunca sube nada.</value><comment>First-run card text</comment></data>
+  <data name="Mobile.Notice.ChooseFolder" xml:space="preserve"><value>Elegir carpeta</value><comment>First-run card button</comment></data>
+  <data name="Mobile.Notice.ReconnectFolder" xml:space="preserve"><value>Volver a conectar carpeta</value><comment>Button on the folder-unavailable card</comment></data>
+  <data name="Mobile.More" xml:space="preserve"><value>Más</value><comment>Screen reader name of a … button</comment></data>
+  <data name="Mobile.RecentlyAdded" xml:space="preserve"><value>Añadidas recientemente</value><comment>Section, page title and sort order</comment></data>
+  <data name="Mobile.Lyrics.Close" xml:space="preserve"><value>Cerrar letra</value><comment>Screen reader name</comment></data>
+  <data name="Mobile.Lyrics.Translation" xml:space="preserve"><value>Traducción</value><comment>Lyrics page toggle</comment></data>
+  <data name="Mobile.Lyrics.Romaji" xml:space="preserve"><value>Romaji</value><comment>Lyrics page toggle (romanized Japanese)</comment></data>
+  <data name="Mobile.PlaybackPosition" xml:space="preserve"><value>Posición de reproducción</value><comment>Screen reader name of the seek bar</comment></data>
+  <data name="Mobile.Previous" xml:space="preserve"><value>Anterior</value><comment>Screen reader name</comment></data>
+  <data name="Mobile.PlayPause" xml:space="preserve"><value>Reproducir o pausar</value><comment>Screen reader name</comment></data>
+  <data name="Mobile.Next" xml:space="preserve"><value>Siguiente</value><comment>Screen reader name</comment></data>
+  <data name="Mobile.Output" xml:space="preserve"><value>Salida</value><comment>Screen reader name of the output device button</comment></data>
+  <data name="Mobile.AudioQuality" xml:space="preserve"><value>Calidad de audio</value><comment>Screen reader name of the quality badge</comment></data>
+  <data name="Mobile.Volume" xml:space="preserve"><value>Volumen</value><comment>Screen reader name</comment></data>
+  <data name="Mobile.Playlists.Find" xml:space="preserve"><value>Buscar en playlists</value><comment>Search field placeholder on Playlists</comment></data>
+  <data name="Mobile.Playlists.None" xml:space="preserve"><value>Aún no hay playlists. Mantén pulsada una canción para crear una.</value><comment>Empty Playlists page</comment></data>
+  <data name="Mobile.Playlists.NoMatch" xml:space="preserve"><value>Ninguna playlist coincide</value><comment>Playlists search found nothing</comment></data>
+  <data name="Mobile.Playlists.SortName" xml:space="preserve"><value>Ordenar playlists</value><comment>Screen reader name</comment></data>
+  <data name="Mobile.Playlists.New" xml:space="preserve"><value>Nueva playlist</value><comment>Playlists page: the + button's name and the prompt's title</comment></data>
+  <data name="Mobile.Create" xml:space="preserve"><value>Crear</value><comment>Button: makes the new playlist</comment></data>
+  <data name="Mobile.PlayNext" xml:space="preserve"><value>Reproducir a continuación</value><comment>Menu action</comment></data>
+  <data name="Mobile.AddToQueue" xml:space="preserve"><value>Añadir a la cola</value><comment>Menu action</comment></data>
+  <data name="Mobile.AddBeforeCurrent" xml:space="preserve"><value>Añadir antes de la canción actual</value><comment>Menu action: the song goes just before the playing one (Previous plays it)</comment></data>
+  <data name="Mobile.AddedBeforeCurrent" xml:space="preserve"><value>Añadida antes de la canción actual</value><comment>Banner after Add Before Current Song</comment></data>
+  <data name="Mobile.GoToAlbum" xml:space="preserve"><value>Ir al álbum</value><comment>Menu action</comment></data>
+  <data name="Mobile.GoToArtist" xml:space="preserve"><value>Ir al artista</value><comment>Menu action</comment></data>
+  <data name="Mobile.Rename" xml:space="preserve"><value>Renombrar</value><comment>Menu action</comment></data>
+  <data name="Mobile.ChangeCover" xml:space="preserve"><value>Cambiar portada</value><comment>Playlist menu action: pick a picture on the phone as the playlist cover</comment></data>
+  <data name="Mobile.RemoveCover" xml:space="preserve"><value>Quitar portada</value><comment>Playlist menu action: back to the automatic cover</comment></data>
+  <data name="Mobile.CoverNotPicture" xml:space="preserve"><value>Ese archivo no es una imagen que Noctis pueda usar como portada.</value><comment>Notice when the picked file is not a usable picture</comment></data>
+  <data name="Mobile.RemoveFromPlaylist" xml:space="preserve"><value>Quitar de la playlist</value><comment>Menu action</comment></data>
+  <data name="Mobile.DeletePlaylist" xml:space="preserve"><value>Eliminar playlist</value><comment>Menu action and confirm button</comment></data>
+  <data name="Mobile.AddFolderMenu" xml:space="preserve"><value>Añadir carpeta…</value><comment>Library … menu</comment></data>
+  <data name="Mobile.RescanLibrary" xml:space="preserve"><value>Volver a escanear biblioteca</value><comment>Library … menu and Settings row</comment></data>
+  <data name="Mobile.OK" xml:space="preserve"><value>OK</value><comment>Button</comment></data>
+  <data name="Mobile.ProfileButton" xml:space="preserve"><value>Perfil y ajustes</value><comment>Screen reader name of the profile circle</comment></data>
+  <data name="Mobile.Queue.UpNext" xml:space="preserve"><value>A continuación</value><comment>Queue section (Apple Music: Up Next)</comment></data>
+  <data name="Mobile.Queue.Clear" xml:space="preserve"><value>Borrar</value><comment>Clears Up Next</comment></data>
+  <data name="Mobile.Queue.Empty" xml:space="preserve"><value>No hay nada a continuación</value><comment>Empty Up Next</comment></data>
+  <data name="Mobile.Queue.History" xml:space="preserve"><value>Historial</value><comment>Queue section above the current track: songs already played</comment></data>
+  <data name="Mobile.Queue.HideHistory" xml:space="preserve"><value>Ocultar</value><comment>Folds the Queue History section</comment></data>
+  <data name="Mobile.Queue.ShowHistory" xml:space="preserve"><value>Mostrar</value><comment>Unfolds the Queue History section</comment></data>
+  <data name="Mobile.Repeat" xml:space="preserve"><value>Repetir</value><comment>Screen reader name</comment></data>
+  <data name="Mobile.NothingHere" xml:space="preserve"><value>Aún no hay nada aquí</value><comment>Empty grid page</comment></data>
+  <data name="Mobile.Search" xml:space="preserve"><value>Buscar</value><comment>Search tab label and title</comment></data>
+  <data name="Mobile.Search.Placeholder" xml:space="preserve"><value>Artistas, canciones, álbumes, playlists</value><comment>Search field placeholder</comment></data>
+  <data name="Mobile.Search.All" xml:space="preserve"><value>Todo</value><comment>Search scope chip</comment></data>
+  <data name="Mobile.Search.Hint" xml:space="preserve"><value>Busca en tu biblioteca</value><comment>Search page before typing</comment></data>
+  <data name="Mobile.Search.NoResults" xml:space="preserve"><value>Sin resultados</value><comment>Search found nothing</comment></data>
+  <data name="Mobile.Artist" xml:space="preserve"><value>Artista</value><comment>Row subtitle: the result is an artist</comment></data>
+  <data name="Mobile.Background.SlowMotion" xml:space="preserve"><value>Cámara lenta</value><comment>Background setting switch</comment></data>
+  <data name="Mobile.Background.SlowMotionHint" xml:space="preserve"><value>Los colores se mueven suavemente</value><comment>Under Slow Motion</comment></data>
+  <data name="Mobile.Background.Strength" xml:space="preserve"><value>Intensidad</value><comment>Background setting slider</comment></data>
+  <data name="Mobile.Background.FromArtwork" xml:space="preserve"><value>De la portada</value><comment>Background group header</comment></data>
+  <data name="Mobile.NowPlaying" xml:space="preserve"><value>Ahora suena</value><comment>Background choice: colours of the playing song’s cover</comment></data>
+  <data name="Mobile.Background.NowPlayingHint" xml:space="preserve"><value>Cambia con la portada de cada canción</value><comment>Under Now Playing</comment></data>
+  <data name="Mobile.Off" xml:space="preserve"><value>Desactivado</value><comment>Setting value: off</comment></data>
+  <data name="Mobile.Background.OffHint" xml:space="preserve"><value>El color liso del tema</value><comment>Under Off</comment></data>
+  <data name="Mobile.Background.Neutral" xml:space="preserve"><value>Neutros</value><comment>Background group header: muted colours</comment></data>
+  <data name="Mobile.Background.Colour" xml:space="preserve"><value>Color</value><comment>Background group header: vivid colours</comment></data>
+  <data name="Mobile.History.ThisWeek" xml:space="preserve"><value>Esta semana</value><comment>Listening History card</comment></data>
+  <data name="Mobile.History.NothingPlayed" xml:space="preserve"><value>Aún no has escuchado nada</value><comment>Listening History, empty</comment></data>
+  <data name="Mobile.ShowAll" xml:space="preserve"><value>Mostrar todo</value><comment>Button / filter reset</comment></data>
+  <data name="Mobile.Source.All" xml:space="preserve"><value>Toda la música</value><comment>Library source menu: every song</comment></data>
+  <data name="Mobile.Source.Phone" xml:space="preserve"><value>En este teléfono</value><comment>Library source menu: the phone's own songs</comment></data>
+  <data name="Mobile.Source.Computer" xml:space="preserve"><value>Del equipo</value><comment>Library source menu: the signed-in computer's songs</comment></data>
+  <data name="Mobile.Source.Name" xml:space="preserve"><value>Origen de la música</value><comment>Library source button (screen reader) and menu</comment></data>
+  <data name="Mobile.History.Header" xml:space="preserve"><value>Historial</value><comment>Group header</comment></data>
+  <data name="Mobile.History.Keep" xml:space="preserve"><value>Conservar historial</value><comment>Setting row and sheet title</comment></data>
+  <data name="Mobile.History.CountAfter" xml:space="preserve"><value>Contar como escuchada tras</value><comment>Setting row and sheet title</comment></data>
+  <data name="Mobile.History.Share" xml:space="preserve"><value>Compartir con el equipo</value><comment>Setting switch</comment></data>
+  <data name="Mobile.History.ShareHint" xml:space="preserve"><value>Los recuentos y Escuchado recientemente coinciden en ambos</value><comment>Under Share with Computer</comment></data>
+  <data name="Mobile.History.ClearName" xml:space="preserve"><value>Borrar historial de escucha</value><comment>Screen reader name and confirm button</comment></data>
+  <data name="Mobile.History.ClearRow" xml:space="preserve"><value>Borrar historial de escucha…</value><comment>Settings row</comment></data>
+  <data name="Mobile.History.ClearHint" xml:space="preserve"><value>Las reproducciones ya enviadas a Last.fm se quedan allí</value><comment>Footnote</comment></data>
+  <data name="Mobile.Scrobbling.ThisPhone" xml:space="preserve"><value>Este teléfono</value><comment>Diagram caption</comment></data>
+  <data name="Mobile.Scrobbling.Computer" xml:space="preserve"><value>Equipo</value><comment>Diagram caption and summary value</comment></data>
+  <data name="Mobile.Scrobbling.Services" xml:space="preserve"><value>Servicios</value><comment>Diagram caption and group header</comment></data>
+  <data name="Mobile.Scrobbling.ThroughComputer" xml:space="preserve"><value>A través del equipo</value><comment>Choice: plays go through the computer</comment></data>
+  <data name="Mobile.Scrobbling.FromPhone" xml:space="preserve"><value>Desde este teléfono</value><comment>Choice: the phone sends plays itself</comment></data>
+  <data name="Mobile.Scrobbling.WhileListening" xml:space="preserve"><value>Mientras escuchas</value><comment>Group header</comment></data>
+  <data name="Mobile.Scrobbling.SendPlays" xml:space="preserve"><value>Enviar reproducciones</value><comment>Setting switch</comment></data>
+  <data name="Mobile.Scrobbling.ShowNowPlaying" xml:space="preserve"><value>Mostrar lo que suena</value><comment>Setting switch</comment></data>
+  <data name="Mobile.Scrobbling.Waiting" xml:space="preserve"><value>Pendientes de envío</value><comment>Row: plays not yet sent</comment></data>
+  <data name="Mobile.Settings.OnPhone" xml:space="preserve"><value>En el teléfono</value><comment>Stats strip: songs only on this phone</comment></data>
+  <data name="Mobile.Settings.Appearance" xml:space="preserve"><value>Apariencia</value><comment>Settings group</comment></data>
+  <data name="Mobile.Settings.Background" xml:space="preserve"><value>Fondo</value><comment>Settings row and page</comment></data>
+  <data name="Mobile.Settings.Theme" xml:space="preserve"><value>Tema</value><comment>Settings row</comment></data>
+  <data name="Mobile.Settings.Accent" xml:space="preserve"><value>Color de acento</value><comment>Settings row and page: accent colour</comment></data>
+  <data name="Mobile.Settings.PlayerBar" xml:space="preserve"><value>Barra del reproductor</value><comment>Settings row and page: the mini player</comment></data>
+  <data name="Mobile.Settings.NowPlayingArtwork" xml:space="preserve"><value>Portada en Reproduciendo</value><comment>Settings row: how Now Playing shows the cover</comment></data>
+  <data name="Mobile.NowPlayingArtwork.Cover" xml:space="preserve"><value>Portada</value><comment>Now Playing Artwork choice: the plain square cover</comment></data>
+  <data name="Mobile.NowPlayingArtwork.Vinyl" xml:space="preserve"><value>Vinilo</value><comment>Now Playing Artwork choice: the cover as a spinning record's label</comment></data>
+  <data name="Mobile.NowPlayingArtwork.CD" xml:space="preserve"><value>CD</value><comment>Now Playing Artwork choice: the cover printed on a spinning compact disc</comment></data>
+  <data name="Mobile.Settings.NowPlayingBrightness" xml:space="preserve"><value>Fondo de Reproduciendo</value><comment>Settings row: a slider for how dark or bright the Now Playing background is</comment></data>
+  <data name="Mobile.Settings.NowPlayingBrightnessName" xml:space="preserve"><value>Brillo del fondo de Reproduciendo</value><comment>Screen reader name of the slider</comment></data>
+  <data name="Mobile.Settings.NowPlayingBrightnessHint" xml:space="preserve"><value>Colores más oscuros o más claros detrás de Reproduciendo</value><comment>Footnote under the slider</comment></data>
+  <data name="Mobile.Settings.NowPlayingBrightnessLevel" xml:space="preserve"><value>Brillo</value><comment>Settings row: the slider under it makes the Now Playing wash darker or brighter</comment></data>
+  <data name="Mobile.NowPlayingBackground.Wash" xml:space="preserve"><value>Velo de color</value><comment>Now Playing Background choice: the cover's colours as a soft wash (the default)</comment></data>
+  <data name="Mobile.NowPlayingBackground.BlurredCover" xml:space="preserve"><value>Portada desenfocada</value><comment>Now Playing Background choice: the cover itself, blurred, behind the player</comment></data>
+  <data name="Mobile.Settings.NowPlayingBlur" xml:space="preserve"><value>Desenfoque</value><comment>Settings row: a slider for how blurred the cover behind Now Playing is</comment></data>
+  <data name="Mobile.Settings.NowPlayingBlurName" xml:space="preserve"><value>Desenfoque del fondo de Reproduciendo</value><comment>Screen reader name of the Blur slider</comment></data>
+  <data name="Mobile.Settings.NowPlayingDim" xml:space="preserve"><value>Oscurecer</value><comment>Settings row: a slider for the dark tint over the blurred cover</comment></data>
+  <data name="Mobile.Settings.NowPlayingDimName" xml:space="preserve"><value>Oscurecimiento del fondo de Reproduciendo</value><comment>Screen reader name of the Dim slider</comment></data>
+  <data name="Mobile.Settings.NowPlayingBlurHint" xml:space="preserve"><value>La portada de la canción, desenfocada, detrás de Reproduciendo y la letra. Oscurecer la vuelve más oscura.</value><comment>Footnote under the Blurred Cover sliders</comment></data>
+  <data name="Mobile.Settings.MusicFolders" xml:space="preserve"><value>Carpetas de música</value><comment>Settings row and page</comment></data>
+  <data name="Mobile.Settings.Downloads" xml:space="preserve"><value>Descargas</value><comment>Settings row and page</comment></data>
+  <data name="Mobile.Settings.Listening" xml:space="preserve"><value>Escucha</value><comment>Settings group</comment></data>
+  <data name="Mobile.Settings.Scrobbling" xml:space="preserve"><value>Scrobbling</value><comment>Settings row and page</comment></data>
+  <data name="Mobile.Settings.ListeningHistory" xml:space="preserve"><value>Historial de escucha</value><comment>Settings row and page</comment></data>
+  <data name="Mobile.Settings.PickUpName" xml:space="preserve"><value>Continuar en el equipo, tu cola y el punto exacto te siguen</value><comment>Screen reader name: the switch and its subtitle</comment></data>
+  <data name="Mobile.Settings.PickUp" xml:space="preserve"><value>Continuar en el equipo</value><comment>Settings switch: continue on the desktop</comment></data>
+  <data name="Mobile.Settings.PickUpHint" xml:space="preserve"><value>Tu cola y el punto exacto te siguen</value><comment>Under Pick Up on Computer</comment></data>
+  <data name="Mobile.Settings.Help" xml:space="preserve"><value>Ayuda</value><comment>Settings group</comment></data>
+  <data name="Mobile.Settings.ReportName" xml:space="preserve"><value>Informar de un problema, se abre en el navegador</value><comment>Screen reader name</comment></data>
+  <data name="Mobile.Settings.Report" xml:space="preserve"><value>Informar de un problema</value><comment>Settings row</comment></data>
+  <data name="Mobile.Settings.ExportLogs" xml:space="preserve"><value>Exportar registros</value><comment>Settings row</comment></data>
+  <data name="Mobile.Settings.WebsiteName" xml:space="preserve"><value>Sitio web de Noctis, se abre en el navegador</value><comment>Screen reader name</comment></data>
+  <data name="Mobile.Settings.Website" xml:space="preserve"><value>Sitio web de Noctis</value><comment>Settings row</comment></data>
+  <data name="Mobile.Settings.PrivacyName" xml:space="preserve"><value>Política de privacidad, se abre en el navegador</value><comment>Screen reader name</comment></data>
+  <data name="Mobile.Settings.Privacy" xml:space="preserve"><value>Política de privacidad</value><comment>Settings row</comment></data>
+  <data name="Mobile.Settings.About" xml:space="preserve"><value>Acerca de</value><comment>Settings group</comment></data>
+  <data name="Mobile.Settings.Version" xml:space="preserve"><value>Versión</value><comment>Settings row</comment></data>
+  <data name="Mobile.Settings.WhatsNew" xml:space="preserve"><value>Novedades</value><comment>Settings row and page</comment></data>
+  <data name="Mobile.Settings.Licenses" xml:space="preserve"><value>Licencias de código abierto</value><comment>Settings row and page</comment></data>
+  <data name="Mobile.Settings.Tagline" xml:space="preserve"><value>Noctis · tu música, en tus dispositivos.</value><comment>Footer at the end of Settings</comment></data>
+  <data name="Mobile.Folders.AccessLost" xml:space="preserve"><value>Se perdió el acceso. Vuelve a añadir esta carpeta para reproducir sus canciones.</value><comment>Under a music folder</comment></data>
+  <data name="Mobile.Folders.Unavailable" xml:space="preserve"><value>No disponible. Vuelve a conectar su almacenamiento y escanea de nuevo.</value><comment>Under a music folder</comment></data>
+  <data name="Mobile.Folders.None" xml:space="preserve"><value>Aún no hay carpetas de música</value><comment>Music Folders, empty</comment></data>
+  <data name="Mobile.Folders.Footnote" xml:space="preserve"><value>Tu biblioteca es la música de estas carpetas</value><comment>Music Folders footnote</comment></data>
+  <data name="Mobile.Folders.Add" xml:space="preserve"><value>Añadir carpeta</value><comment>Button</comment></data>
+  <data name="Mobile.Folders.ScanOnStartup" xml:space="preserve"><value>Escanear al abrir</value><comment>Setting switch</comment></data>
+  <data name="Mobile.Folders.ScanOnStartupHint" xml:space="preserve"><value>Busca canciones nuevas cada vez que se abre Noctis</value><comment>Footnote</comment></data>
+  <data name="Mobile.Settings.AlbumColours" xml:space="preserve"><value>Colores del álbum</value><comment>Group header</comment></data>
+  <data name="Mobile.Settings.ColourPages" xml:space="preserve"><value>Colorear páginas con la portada</value><comment>Setting switch</comment></data>
+  <data name="Mobile.Settings.ColourPagesHint" xml:space="preserve"><value>Las páginas de álbum y artista toman el color de la portada</value><comment>Footnote</comment></data>
+  <data name="Mobile.Settings.ProgressColour" xml:space="preserve"><value>Color de progreso</value><comment>Player Bar switch and value</comment></data>
+  <data name="Mobile.Settings.ProgressLine" xml:space="preserve"><value>Línea de progreso</value><comment>Player Bar switch and value</comment></data>
+  <data name="Mobile.Settings.PlayerBarHint" xml:space="preserve"><value>Rellena la barra o dibuja una línea fina mientras suena la canción</value><comment>Footnote</comment></data>
+  <data name="Mobile.Settings.WifiOnly" xml:space="preserve"><value>Descargar solo con Wi-Fi</value><comment>Setting switch</comment></data>
+  <data name="Mobile.Settings.WifiOnlyHint" xml:space="preserve"><value>Las descargas esperan al Wi-Fi pero el streaming sigue funcionando</value><comment>Footnote</comment></data>
+  <data name="Mobile.Settings.SmoothMotion" xml:space="preserve"><value>Movimiento fluido</value><comment>Setting switch (screen refresh rate)</comment></data>
+  <data name="Mobile.Settings.SmoothMotionHint" xml:space="preserve"><value>Hasta 120 Hz</value><comment>Switch subtitle</comment></data>
+  <data name="Mobile.Settings.SmoothMotionFootnote" xml:space="preserve"><value>Desplazamiento más fluido en pantallas de 120 Hz pero gasta más batería</value><comment>Footnote</comment></data>
+  <data name="Mobile.Settings.GlassTabPill" xml:space="preserve"><value>Pestaña de Liquid Glass</value> <comment>Setting switch (tab bar selection pill look)</comment></data>
   <data name="Mobile.Settings.GlassTabPillHint" xml:space="preserve"><value>La pestaña elegida queda en cristal claro</value></data>
   <data name="Mobile.Settings.TabBar" xml:space="preserve"><value>Barra de pestañas</value></data>
   <data name="Mobile.TabBar.Hint" xml:space="preserve"><value>Elige de 2 a 5 pestañas y arrastra ≡ para ordenarlas. Biblioteca siempre se queda en la barra, así todas las listas y los Ajustes siguen a mano.</value></data>
