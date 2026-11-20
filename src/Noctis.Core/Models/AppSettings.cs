@@ -183,6 +183,14 @@ public class AppSettings : IJsonOnDeserializing
     /// line on, #284). Later choices are kept: it runs only while this is below the current level.</summary>
     public int MobilePlusDefaultsLevel { get; set; }
 
+    /// <summary>Phone (#305): the shuffle mode the user chose last in Now Playing's Shuffle menu ("Off", "NoctisShuffle",
+    /// "EqualChance", "NoRepeats", "Discovery", "NeverPlayed"), kept across restarts and across plain plays; the next
+    /// Shuffle button uses it. Empty until a choice was made.</summary>
+    public string MobileShuffleModePref { get; set; } = "";
+
+    /// <summary>Phone (#305): the shuffle scope chosen last ("CurrentQueue", "WholeLibrary", "OpenPlaylist"). Empty until chosen.</summary>
+    public string MobileShuffleScopePref { get; set; } = "";
+
     /// <summary>Phone, Settings › Appearance › Album Colours: album and artist pages painted in a
     /// deep shade of the cover's colour. Off, they keep the theme's plain pages. On by default.</summary>
     public bool MobileArtworkPageColors { get; set; } = true;

@@ -47,6 +47,49 @@ public class NativePhoneShuffleTests
         }
     }
     [Fact]
+    public async Task TheShuffleChoice_SurvivesAPlainPlay_AndARestartWithNoQueue()
+    {
+        // #305: Equal chance chosen in the Shuffle menu was lost as soon as a song was played from a list (mode Off for
+        // that queue) or the app restarted: the Shuffle button went back to the plain shuffle.
+        var songs = Enumerable.Range(0, 6).Select(i => MobileFixtures.Song("Song " + i)).ToArray();
+        using var rig = MobileFixtures.MakeRig(songs);
+        rig.Shell.Player.PlayTracks(songs, 0);
+        await rig.Shell.Player.ChooseShuffleFromMenuAsync(PhoneShuffleMode.EqualChance);
+        await rig.Shell.Player.ChooseShuffleFromMenuAsync(null, ShuffleScope.WholeLibrary); // a scope pick keeps the mode
+        rig.Shell.Player.PlayTracks(songs, 1);                                               // a plain play: this queue is Off
+        Assert.Equal(PhoneShuffleMode.Off, rig.Shell.Player.TrueShuffleMode);
+        await rig.Shell.Player.SaveStateAsync();
+        var settings = await rig.Persistence.LoadSettingsAsync();
+        Assert.Equal("EqualChance", settings.MobileShuffleModePref);
+        Assert.Equal("WholeLibrary", settings.MobileShuffleScopePref);
+
+        // "Restart": a new player over the same data. The Shuffle button starts with Equal chance.
+        using var restored = new NowPlayingViewModel(new FakeAudioPlayer(), rig.Library, rig.Persistence, marshal: a => a());
+        await restored.RestoreStateAsync();
+        Assert.Equal(PhoneShuffleMode.Off, restored.TrueShuffleMode); // the restored queue was a plain one
+        restored.PlayShuffled(songs, source: "Source");
+        for (var i = 0; i < 300 && restored.TrueShuffleMode != PhoneShuffleMode.EqualChance; i++) await Task.Delay(10);
+        Assert.Equal(PhoneShuffleMode.EqualChance, restored.TrueShuffleMode);
+
+        // Off chosen on purpose is remembered too: the Shuffle button is the plain shuffle again.
+        await restored.ChooseShuffleFromMenuAsync(PhoneShuffleMode.Off);
+        restored.PlayTracks(songs, 0);
+        restored.PlayShuffled(songs, source: "Source");
+        Assert.Equal(PhoneShuffleMode.NoctisShuffle, restored.TrueShuffleMode);
+    }
+
+    [Fact]
+    public async Task NoQueueToRestore_TheShuffleMenuStillShowsTheChoiceMadeLast()
+    {
+        var songs = Enumerable.Range(0, 3).Select(i => MobileFixtures.Song("Song " + i)).ToArray();
+        using var rig = MobileFixtures.MakeRig(songs);
+        await rig.Persistence.UpdateSettingsAsync(s => { s.MobileShuffleModePref = "Discovery"; s.MobileShuffleScopePref = "WholeLibrary"; });
+        using var fresh = new NowPlayingViewModel(new FakeAudioPlayer(), rig.Library, rig.Persistence, marshal: a => a());
+        await fresh.RestoreStateAsync();
+        Assert.Equal(PhoneShuffleMode.Discovery, fresh.TrueShuffleMode);
+        Assert.Equal(ShuffleScope.WholeLibrary, fresh.TrueShuffleScope);
+    }
+    [Fact]
     public async Task NeverPlayedUsesTheLibrarySource_ExcludesDislikedAndSnoozed_AndNeverFallsBack()
     {
         var songs = Enumerable.Range(0, 5).Select(i => MobileFixtures.Song("Song " + i)).ToArray();

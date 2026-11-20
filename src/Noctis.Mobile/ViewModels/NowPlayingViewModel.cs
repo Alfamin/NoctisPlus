@@ -289,9 +289,12 @@ public sealed partial class NowPlayingViewModel : ObservableObject, IDisposable
     public void PlayShuffled(IReadOnlyList<Track> tracks, Random? rng = null, string? source = null)
     {
         if (tracks.Count == 0) return;
-        if (PhoneShuffle.ToEngine(TrueShuffleMode) != null)
+        // #305: a plain play leaves the queue unshuffled (mode Off); the Shuffle button still starts with the mode
+        // the user chose last, not with the plain shuffle.
+        var mode = PhoneShuffle.ToEngine(TrueShuffleMode) != null ? TrueShuffleMode : _preferredShuffleMode;
+        if (PhoneShuffle.ToEngine(mode) != null)
         {
-            _ = ChooseShuffleAsync(TrueShuffleMode, Noctis.Features.TrueShuffle.ShuffleScope.OpenPlaylist, tracks, source);
+            _ = ChooseShuffleAsync(mode, Noctis.Features.TrueShuffle.ShuffleScope.OpenPlaylist, tracks, source);
             return;
         }
         InvalidateShufflePlan();
@@ -1002,10 +1005,20 @@ public sealed partial class NowPlayingViewModel : ObservableObject, IDisposable
     /// <summary>Cold start: bring the queue back paused at the saved position. Never auto-plays.</summary>
     public async Task RestoreStateAsync()
     {
+        await LoadShufflePreferenceAsync();
         var state = await _persistence.LoadQueueStateAsync();
         // A song tapped while the start was still loading (the songs list before the restore)
         // already plays: the saved queue must not replace it under the running engine.
-        if (state == null || CurrentTrack != null) return;
+        if (state == null || CurrentTrack != null)
+        {
+            // #305: no queue to bring back: the Shuffle menu still shows the choice made last.
+            if (state == null && CurrentTrack == null)
+            {
+                TrueShuffleMode = _preferredShuffleMode;
+                if (_preferredShuffleScope is { } preferred) TrueShuffleScope = preferred;
+            }
+            return;
+        }
 
         var online = new Dictionary<Guid, Track>();
         if (OnlineSearch is { } source && state.MobileOnlineTracks is { } savedOnline)

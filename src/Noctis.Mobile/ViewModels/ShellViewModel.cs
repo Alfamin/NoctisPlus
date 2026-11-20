@@ -1489,7 +1489,7 @@ public sealed partial class ShellViewModel : ObservableObject
         var items = new List<OptionsMenuItem>();
         foreach (var mode in PhoneShuffle.Visible)
             items.Add(new OptionsMenuItem(this, NowPlayingViewModel.ModeName(mode), Player.TrueShuffleMode == mode,
-                () => _ = Player.ChooseShuffleAsync(mode)));
+                () => _ = Player.ChooseShuffleFromMenuAsync(mode)));
         foreach (var (scope, label) in new[]
         {
             (Noctis.Features.TrueShuffle.ShuffleScope.CurrentQueue, "Queue"),
@@ -1497,7 +1497,7 @@ public sealed partial class ShellViewModel : ObservableObject
             (Noctis.Features.TrueShuffle.ShuffleScope.OpenPlaylist, "Source"),
         })
             items.Add(new OptionsMenuItem(this, label, Player.TrueShuffleScope == scope,
-                () => _ = Player.ChooseShuffleAsync(Player.TrueShuffleMode, scope)) { StartsGroup = label == "Queue" });
+                () => _ = Player.ChooseShuffleFromMenuAsync(null, scope)) { StartsGroup = label == "Queue" });
         ShowOptions(OptionsMenuViewModel.ForItems(items));
     }
 

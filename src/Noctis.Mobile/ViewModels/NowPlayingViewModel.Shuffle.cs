@@ -57,6 +57,38 @@ public sealed partial class NowPlayingViewModel
         _ => "Off",
     };
 
+    // #305: what the user last chose in the Shuffle menu outlives the queue (a plain play, the app closing, the phone
+    // restarting): the next Shuffle button starts with it.
+    private PhoneShuffleMode _preferredShuffleMode = PhoneShuffleMode.Off;
+    private ShuffleScope? _preferredShuffleScope;
+
+    /// <summary>The Shuffle menu's choice: remembered for later shuffles, then applied to the queue.</summary>
+    internal async Task ChooseShuffleFromMenuAsync(PhoneShuffleMode? mode, ShuffleScope? scope = null)
+    {
+        // A scope pick alone (mode null) keeps the remembered mode and applies it to the queue as it is now.
+        await RememberShufflePreferenceAsync(mode ?? _preferredShuffleMode, scope ?? TrueShuffleScope);
+        await ChooseShuffleAsync(mode ?? TrueShuffleMode, scope);
+    }
+
+    private async Task RememberShufflePreferenceAsync(PhoneShuffleMode mode, ShuffleScope scope)
+    {
+        if (_preferredShuffleMode == mode && _preferredShuffleScope == scope) return;
+        _preferredShuffleMode = mode; _preferredShuffleScope = scope;
+        try { await _persistence.UpdateSettingsAsync(s => { s.MobileShuffleModePref = mode.ToString(); s.MobileShuffleScopePref = scope.ToString(); }); }
+        catch (Exception ex) when (ex is not OutOfMemoryException) { DebugLog.Write("Shuffle", $"Shuffle choice not saved: {ex.GetType().Name}"); }
+    }
+
+    private async Task LoadShufflePreferenceAsync()
+    {
+        try
+        {
+            var settings = await _persistence.LoadSettingsAsync();
+            if (Enum.TryParse<PhoneShuffleMode>(settings.MobileShuffleModePref, out var mode) && Enum.IsDefined(mode)) _preferredShuffleMode = mode;
+            if (Enum.TryParse<ShuffleScope>(settings.MobileShuffleScopePref, out var scope) && Enum.IsDefined(scope)) _preferredShuffleScope = scope;
+        }
+        catch (Exception ex) when (ex is not OutOfMemoryException) { DebugLog.Write("Shuffle", $"Shuffle choice not read: {ex.GetType().Name}"); }
+    }
+
     private void InvalidateShufflePlan()
     {
         _shuffleGeneration++;
