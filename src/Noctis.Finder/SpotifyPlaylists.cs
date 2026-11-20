@@ -309,6 +309,34 @@ internal sealed class SpotifyPlaylists : IDisposable
         }
         finally { Busy = false; _operation.Release(); Publish(); }
     }
+    /// <summary>#304 (phone): deleting an imported playlist leaves its import record behind, stopped with
+    /// "PLAYLIST_REMOVED", and pasting the same link again only found that record, so the playlist was never
+    /// made again. Pasting a link is an explicit import: such a record is dropped and the playlist is created as
+    /// the first time (a new playlist; nothing is ever recreated automatically, <see cref="ImportAsync"/> and
+    /// the library check still stop for a deleted playlist, as on the computer).</summary>
+    public async Task ImportReplacingDeletedAsync(string text, CancellationToken ct)
+    {
+        await ForgetDeletedAsync(text, ct).ConfigureAwait(false);
+        await ImportAsync(text, ct).ConfigureAwait(false);
+        // A deletion is only noticed when the import reads the playlist: that first pass marks the old
+        // record, this one drops it and imports again.
+        if (await ForgetDeletedAsync(text, ct).ConfigureAwait(false)) await ImportAsync(text, ct).ConfigureAwait(false);
+    }
+    private async Task<bool> ForgetDeletedAsync(string text, CancellationToken ct)
+    {
+        IReadOnlyList<string> urls;
+        try { urls = Links(text); }
+        catch (FormatException) { return false; } // ImportAsync reports a bad paste
+        var forgot = false;
+        foreach (var url in urls)
+        {
+            ct.ThrowIfCancellationRequested();
+            if (Jobs.FirstOrDefault(j => j.Url == url && j.FillingStopped && j.Status.StartsWith("PLAYLIST_REMOVED:", StringComparison.Ordinal)) is not { } old) continue;
+            await RemoveAsync(old).ConfigureAwait(false);
+            forgot = true;
+        }
+        return forgot;
+    }
     internal static string Explain(Exception ex)
     {
         while (ex is System.Reflection.TargetInvocationException && ex.InnerException is {} inner) ex = inner;

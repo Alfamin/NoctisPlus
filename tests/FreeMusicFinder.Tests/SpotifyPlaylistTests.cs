@@ -54,7 +54,33 @@ internal static class SpotifyPlaylistTests
     }
     public static async Task RunAsync()
     {
-        Links(); Matching(); await Imports(); await OnePlaylist(); await Failures(); await HeldQueue(); await UnavailableAndMoved();
+        Links(); Matching(); await Imports(); await ReimportAfterDelete(); await OnePlaylist(); await Failures(); await HeldQueue(); await UnavailableAndMoved();
+    }
+    private static async Task ReimportAfterDelete()
+    {
+        Check.Section("a deleted imported playlist can be imported again (phone, #304)");
+        var folder = Check.NewFolder("playlist-reimport"); var library = new Library();
+        library.Add(folder, "Song 0"); library.Add(folder, "Song 1");
+        var sources = new MusicSources(new TransferTests.Source("DeezLoad"), new TransferTests.Source("Music Hunters"), _ => { });
+        using var downloads = new Downloads(_ => { }, Path.Combine(folder, "queue.json"), sources.Track);
+        using var imports = new SpotifyPlaylists(Path.Combine(folder, "imports.json"), library, downloads, sources.Track, new PlaylistCatalog(new Http()));
+        await imports.ImportReplacingDeletedAsync(Url(1), default);
+        var first = imports.Jobs.Single();
+        Check.True(first.Created && library.Lists.ContainsKey(first.LibraryId), "the first import makes the playlist");
+        await imports.ImportReplacingDeletedAsync(Url(1), default);
+        Check.Equal(first.LibraryId, imports.Jobs.Single().LibraryId, "pasting a link that still exists keeps the same playlist");
+        library.Lists.Remove(first.LibraryId); // the user deletes it
+        await imports.ImportAsync(Url(1), default);
+        Check.True(imports.Jobs.Single().Status.StartsWith("PLAYLIST_REMOVED"), "the computer's import still stops for a deleted playlist");
+        await imports.ImportReplacingDeletedAsync(Url(1), default);
+        var again = imports.Jobs.Single();
+        Check.True(again.Created && !again.FillingStopped, "pasting the link again makes it again");
+        Check.True(again.LibraryId != first.LibraryId && library.Lists.ContainsKey(again.LibraryId), "as a new playlist");
+        // Deleted and never noticed by an import: the paste itself finds it out and imports once more.
+        library.Lists.Remove(again.LibraryId);
+        await imports.ImportReplacingDeletedAsync(Url(1), default);
+        Check.True(library.Lists.ContainsKey(imports.Jobs.Single().LibraryId) && imports.Jobs.Single().Created, "a deletion the app had not seen yet is handled in one paste");
+        Check.Equal(1, imports.Jobs.Count, "no stale records pile up");
     }
     private static async Task OnePlaylist()
     {

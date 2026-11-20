@@ -30,7 +30,8 @@ internal sealed partial class FinderOnlineSearch
             return new(Row(job), entries.Select(e => new OnlinePlaylistEntry(e.Position,
                 e.Song is { } song ? _source.Remember(new(song, null, e.Artwork)) with { Album = e.Album, LocalTrackId = e.LocalId } : null, e.Issue)).ToArray());
         }
-        public Task ImportAsync(string links, CancellationToken ct) => _imports.ImportAsync(links, ct);
+        /// <summary>Pasting a link on the phone is an explicit import: a deleted playlist's old record is dropped and it is made again (#304).</summary>
+        public Task ImportAsync(string links, CancellationToken ct) => _imports.ImportReplacingDeletedAsync(links, ct);
         public Task CheckLibraryAsync(CancellationToken ct) => _imports.CheckLibraryAsync(ct);
         public Task<int> DownloadMissingAsync(Guid playlistId, CancellationToken ct)
         {
