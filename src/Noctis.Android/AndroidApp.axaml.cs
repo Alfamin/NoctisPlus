@@ -176,6 +176,7 @@ public partial class AndroidApp : Avalonia.Application, IThemeHost
             QrScanner = new AndroidQrScanner(),
             // Playlists ⋯ › Import Playlist: .m3u / .m3u8 files from the system document picker.
             PlaylistFiles = new AndroidPlaylistFilePicker(context),
+            SongFiles = new AndroidSongFileRemover(context),
             VersionText = DescribeVersion(context),
             Account = account,
             // Plays sent from the phone itself to Last.fm / ListenBrainz (Settings → Scrobbling).

@@ -45,7 +45,7 @@ public sealed partial class TrackSelection : ObservableObject
 
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(HeaderText), nameof(HasSelection), nameof(AllSelected), nameof(SelectAllLabel),
-        nameof(CanRemoveFromPlaylist), nameof(CanDownload), nameof(IsAllFavourite), nameof(FavouriteLabel))]
+        nameof(CanRemoveFromPlaylist), nameof(CanRemoveFromPhone), nameof(CanDownload), nameof(IsAllFavourite), nameof(FavouriteLabel))]
     private int _count;
 
     public bool HasSelection => Count > 0;
@@ -231,6 +231,17 @@ public sealed partial class TrackSelection : ObservableObject
         End();
         if (missing.Count > 0) await DownloadMissing!(missing);
         if (tracks.Count > 0) await _shell.DownloadTracksAsync(tracks);
+    }
+
+    /// <summary>#306: Remove from Phone: the ticked songs and their files leave the phone (asks first).</summary>
+    public bool CanRemoveFromPhone => HasSelection;
+
+    [RelayCommand]
+    private void RemoveFromPhone()
+    {
+        var tracks = SelectedTracks;
+        if (tracks.Count == 0) return;
+        _shell.AskRemoveSongs(tracks, End);
     }
 
     [RelayCommand]

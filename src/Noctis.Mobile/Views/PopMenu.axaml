@@ -240,6 +240,14 @@
                                                     <Border Grid.Column="1" Classes="np-line" />
                                                 </Grid>
                                             </Button>
+                                            <!-- #306: the song and its file leave the phone (asks first). -->
+                                            <Button Name="MenuRemoveFromPhone" Classes="row np-row" Command="{Binding RemoveFromPhoneCommand}" IsVisible="{Binding CanRemoveFromPhone}">
+                                                <Grid ColumnDefinitions="56,*">
+                                                    <PathIcon Data="{DynamicResource PhTrash}" />
+                                                    <TextBlock Grid.Column="1" Classes="np-label" Text="Remove from Phone" VerticalAlignment="Center" />
+                                                    <Border Grid.Column="1" Classes="np-line" />
+                                                </Grid>
+                                            </Button>
                                             <Button Name="MenuGoToAlbum" Classes="row np-row" Command="{Binding GoToAlbumCommand}" IsVisible="{Binding CanGoToAlbum}">
                                                 <Grid ColumnDefinitions="56,*">
                                                     <PathIcon Data="{DynamicResource PhAlbum}" />

@@ -325,6 +325,17 @@ public sealed partial class ContextSheetViewModel : ObservableObject
 
     // ── Snooze for a Month (the desktop's song and album menus) ──
 
+    /// <summary>#306: Remove from Phone: the song and its file leave the phone (asks first).</summary>
+    public bool CanRemoveFromPhone => Track != null && ShellViewModel.CanRemoveFromPhone(Track);
+
+    [RelayCommand]
+    private void RemoveFromPhone()
+    {
+        var tracks = Tracks.ToList();
+        _shell.CloseSheet();
+        _shell.AskRemoveSongs(tracks);
+    }
+
     /// <summary>A song's or an album's menu: Shuffle and the mixes leave the songs out for a month.</summary>
     public bool CanSnooze => (Track != null || Album != null) && Tracks.Count > 0;
 

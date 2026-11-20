@@ -31,6 +31,10 @@
                 IsVisible="{Binding OffersDownload}" AutomationProperties.Name="{loc:T Mobile.Download}">
             <PathIcon Data="{DynamicResource PhDownload}" />
         </Button>
+        <Button Name="SelectRemoveFromPhone" Classes="icon" Command="{Binding RemoveFromPhoneCommand}" IsEnabled="{Binding CanRemoveFromPhone}"
+                AutomationProperties.Name="Remove from Phone">
+            <PathIcon Data="{DynamicResource PhTrash}" />
+        </Button>
         <Button Name="SelectRemoveFromPlaylist" Classes="icon" Command="{Binding RemoveFromPlaylistCommand}" IsEnabled="{Binding CanRemoveFromPlaylist}"
                 IsVisible="{Binding OffersRemoveFromPlaylist}" AutomationProperties.Name="{loc:T Mobile.RemoveFromPlaylist}">
             <PathIcon Data="{DynamicResource PhPlaylistRemove}" />

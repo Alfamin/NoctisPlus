@@ -215,7 +215,9 @@ internal sealed class FakeLibraryService : ILibraryService
         RemovedTrackIds.Add(id);
         return Task.CompletedTask;
     }
-    public Task RemoveTracksAsync(IEnumerable<Guid> ids) => Task.CompletedTask;
+    /// <summary>Every id of a RemoveTracksAsync batch (Remove from Phone), in order.</summary>
+    public List<Guid> RemovedBatchIds { get; } = new();
+    public Task RemoveTracksAsync(IEnumerable<Guid> ids) { RemovedBatchIds.AddRange(ids); return Task.CompletedTask; }
     /// <summary>Old id → new id that RelocateTracksAsync reports (empty by default).</summary>
     public Dictionary<Guid, Guid> RelocateRemap { get; } = new();
     public Task<IReadOnlyDictionary<Guid, Guid>> RelocateTracksAsync(IReadOnlyList<(string oldPath, string newPath)> moves, CancellationToken ct = default)
