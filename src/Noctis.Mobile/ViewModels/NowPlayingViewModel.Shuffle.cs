@@ -98,11 +98,15 @@ public sealed partial class NowPlayingViewModel
     private static Song ShuffleSong(Track track)
     {
         // No per-song file opens. SAF document addresses and library IDs are stable across rescans.
-        var identity = track.IsRemoteStream ? "id:" + track.Id : track.FilePath;
+        // #303: a song not on the phone yet (a stand-in on an artist or imported playlist page) has no file
+        // path, so every one of them got the same identity and the shuffle kept ONE of them next to the songs
+        // the phone has; its own id (made from the catalog song) tells them apart.
+        var remote = track.IsRemoteStream || track.IsPendingStream;
+        var identity = remote || track.FilePath.Length == 0 ? "id:" + track.Id : track.FilePath;
         var key = Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(identity)));
         return new(track.Id.ToString(), track.FilePath, track.Title, track.Artist, track.PlayCount,
             track.SkipWhenShuffling, track.IsExplicit, track.IsDisliked, track.SnoozedUntil,
-            track.IsRemoteStream, key);
+            remote, key);
     }
 
     /// <summary>Native mode selection. Only the latest request may change the queue. File identity,

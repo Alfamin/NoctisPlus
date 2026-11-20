@@ -29,6 +29,24 @@ public class NativePhoneShuffleTests
     }
 
     [Fact]
+    public async Task SongsNotOnThePhone_AreEachInTheShuffle_NotCollapsedIntoOne()
+    {
+        // #303: Shuffle on an artist or imported playlist page with a True Shuffle mode on played only the
+        // songs the phone has (plus one stand-in): every stand-in had the same empty-path identity.
+        var owned = Enumerable.Range(0, 3).Select(i => MobileFixtures.Song("Owned " + i)).ToArray();
+        var online = Enumerable.Range(0, 5).Select(i => new Noctis.Models.Track
+        { Id = Guid.NewGuid(), Title = "Online " + i, Artist = "Drake", PendingStream = new object() }).ToArray();
+        var all = owned.Concat(online).ToArray();
+        foreach (var mode in new[] { PhoneShuffleMode.EqualChance, PhoneShuffleMode.NoRepeats, PhoneShuffleMode.Discovery })
+        {
+            using var rig = MobileFixtures.MakeRig(owned);
+            await rig.Shell.Player.ChooseShuffleAsync(mode, ShuffleScope.OpenPlaylist, all, "Drake");
+            var queued = rig.Shell.Player.UpNext.Prepend(rig.Shell.Player.CurrentTrack!).ToArray();
+            Assert.Equal(all.Length, queued.Distinct().Count());
+            Assert.Equal(online.Length, queued.Count(t => t.IsPendingStream));
+        }
+    }
+    [Fact]
     public async Task NeverPlayedUsesTheLibrarySource_ExcludesDislikedAndSnoozed_AndNeverFallsBack()
     {
         var songs = Enumerable.Range(0, 5).Select(i => MobileFixtures.Song("Song " + i)).ToArray();
