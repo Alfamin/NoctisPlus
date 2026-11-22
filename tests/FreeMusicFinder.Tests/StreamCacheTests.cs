@@ -16,7 +16,7 @@ internal static class StreamCacheTests
 
     public static async Task RunAsync()
     {
-        Choices(); Folders(); Purging(); Copying(); PhoneRoomAndPaths();
+        Choices(); Folders(); Purging(); Copying(); PhoneRoomAndPaths(); ParallelFileChecks();
         await PhonePlayNeverSaves();
         await PlayedSongsStayOutOfTheLibrary();
         await AddWhileStillDownloading();
@@ -60,6 +60,25 @@ internal static class StreamCacheTests
         Check.True(!StreamCache.Usable(blocked), "a cache that cannot be made or written is not used");
         Check.True(StreamCache.Fits(@"C:\Users\Someone\AppData\Local\Noctis Plus\stream-cache", "Artist - Song [1234abcd]"), "a normal name fits");
         Check.True(!StreamCache.Fits(@"C:\Users\Someone\AppData\Local\Noctis Plus\stream-cache", new string('x', 200)), "a name past the player's path limit does not");
+    }
+
+    private static void ParallelFileChecks()
+    {
+        Check.Section("#307 the phone's matcher asks the files eight at a time and finds exactly what the one-by-one matcher finds");
+        var songs = Enumerable.Range(0, 200).Select(i => new LocalSong(Guid.NewGuid(), "Artist " + i % 7, "Song " + i, "content://docs/tree/x/song" + i + ".mp3", TimeSpan.FromSeconds(180))).ToArray();
+        var gone = new HashSet<string>(songs.Where((_, i) => i % 5 == 0).Select(s => s.Path));
+        var asked = 0;
+        bool Exists(string path) { Interlocked.Increment(ref asked); return !gone.Contains(path); }
+        var sequential = new PlaylistMatcher(songs, Exists);
+        var each = asked; asked = 0;
+        var parallel = new PlaylistMatcher(songs, Exists, parallel: true);
+        Check.Equal(each, asked, "every song is asked once either way");
+        foreach (var i in new[] { 0, 1, 5, 6, 99, 100, 199 })
+        {
+            var request = new MusicRequest("Song " + i, "Artist " + i % 7, 180);
+            Check.Equal(sequential.Find(request)?.Id ?? Guid.Empty, parallel.Find(request)?.Id ?? Guid.Empty, $"song {i}: the same answer, a missing file is not found");
+        }
+        Check.True(parallel.Find(new MusicRequest("Song 5", "Artist 5", 180)) is null && parallel.Find(new MusicRequest("Song 6", "Artist 6", 180)) is not null, "a song whose file is gone is not owned, the others are");
     }
 
     private static void PhoneRoomAndPaths()

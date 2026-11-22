@@ -14,10 +14,21 @@ internal sealed class PlaylistMatcher
 {
     private readonly ILookup<string, LocalSong> _titles;
     private readonly LocalSong[] _songs, _starred;
-    public PlaylistMatcher(IEnumerable<LocalSong> songs, Func<string, bool>? exists = null)
+    /// <param name="parallel">Owner #307: the phone's check is a call into Android's document provider per song (~2,000 of them
+    /// one after another held Search up); it asks eight at a time. Same answers, same order; off elsewhere.</param>
+    public PlaylistMatcher(IEnumerable<LocalSong> songs, Func<string, bool>? exists = null, bool parallel = false)
     {
         exists ??= File.Exists;
-        _songs = songs.Where(s => exists(s.Path)).OrderBy(s => s.Path, StringComparer.OrdinalIgnoreCase).ToArray();
+        var all = songs as IReadOnlyList<LocalSong> ?? songs.ToArray();
+        IEnumerable<LocalSong> present;
+        if (parallel && all.Count > 16)
+        {
+            var found = new bool[all.Count];
+            Parallel.For(0, all.Count, new ParallelOptions { MaxDegreeOfParallelism = 8 }, i => found[i] = exists(all[i].Path));
+            present = all.Where((_, i) => found[i]);
+        }
+        else present = all.Where(s => exists(s.Path));
+        _songs = present.OrderBy(s => s.Path, StringComparer.OrdinalIgnoreCase).ToArray();
         _starred = _songs.Where(s => s.Title.Contains('*')).ToArray();
         _titles = _songs.SelectMany(s => Keys(s.Title).Select(key => (key, s))).ToLookup(pair => pair.key, pair => pair.s);
     }
