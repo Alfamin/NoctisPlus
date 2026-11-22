@@ -453,6 +453,36 @@ public class NoctisAccountServiceTests : IAsyncLifetime
         Assert.Equal(3, _phoneLibrary.Tracks.Count(t => t.SourceType == SourceType.NoctisServer));
     }
 
+    [Fact]
+    public async Task CatalogSync_AListThatIsSuddenlyAFractionOfABigLibrary_RemovesNothing_UntilItIsListedAgain()
+    {
+        var ct = TestContext.Current.CancellationToken;
+        var many = Enumerable.Range(0, 300).Select(i => new Track
+        {
+            Id = Guid.NewGuid(), Title = $"Big {i}", Artist = "Yolanda", AlbumArtist = "Yolanda", Album = "Second", AlbumId = AlbumB,
+            FilePath = _t1.FilePath, Duration = TimeSpan.FromSeconds(60), TrackNumber = i + 2, FileSize = _audio.Length,
+        }).ToList();
+        _desk.Show(many.ToArray());
+        var svc = await SignedInAsync();
+        Assert.Equal(300, (await svc.SyncNowAsync(ct)).Songs);
+
+        // #308: a desktop that has only loaded 20 of its songs reports two agreeing counts: not a reason to forget 280.
+        _desk.Show(many.Take(20).ToArray());
+        await svc.SyncNowAsync(ct);
+        Assert.Equal(300, _phoneLibrary.Tracks.Count(t => t.SourceType == SourceType.NoctisServer));
+
+        // The full list comes back: nothing was lost, and the next short list starts the wait over.
+        _desk.Show(many.ToArray());
+        await svc.SyncNowAsync(ct);
+        _desk.Show(many.Take(20).ToArray());
+        await svc.SyncNowAsync(ct);
+        Assert.Equal(300, _phoneLibrary.Tracks.Count(t => t.SourceType == SourceType.NoctisServer));
+
+        // The same short list again: the computer really got smaller.
+        await svc.SyncNowAsync(ct);
+        Assert.Equal(20, _phoneLibrary.Tracks.Count(t => t.SourceType == SourceType.NoctisServer));
+    }
+
     // ── Downloads and playback ───────────────────────────────────────────
 
     [Fact]

@@ -590,6 +590,7 @@ public sealed partial class NoctisAccountService : INoctisAccountService, ITrack
         await LibraryReady.WaitAsync(ct).ConfigureAwait(false);
         var albumArtists = await client.GetAlbumArtistsAsync(ct).ConfigureAwait(false);
         var (songs, settled) = await FetchCatalogAsync(client, ct).ConfigureAwait(false);
+        if (settled && LooksPartial(songs.Count)) settled = false;
         var (tracks, linked) = await ImportCatalogAsync(songs, albumArtists, keepUnlisted: !settled, ct).ConfigureAwait(false);
         RaiseSyncProgress(NoctisSyncStage.Catalog, tracks.Count + linked, tracks.Count + linked);
 
@@ -658,6 +659,25 @@ public sealed partial class NoctisAccountService : INoctisAccountService, ITrack
         await PrefetchDownloadedLyricsAsync(ct).ConfigureAwait(false);
         if (syncOff is not null) throw syncOff;
         return new NoctisSyncResult(tracks.Count + linked, playlistCount, pulled, pushed, plays);
+    }
+
+    private int _shrunkTo = -1;
+
+    /// <summary>
+    /// Owner #308: the library fell from about 2,000 songs to 160 after one sync. A desktop that has only loaded part of its
+    /// library counts the same songs before and after the read, so the list looked settled and every other desktop song was
+    /// removed (their downloaded files stayed, hence "2,000 downloaded, 160 songs"). A big library that suddenly lists less than
+    /// half of what the phone has is therefore added to only, never removed from; the same short list twice in a row in this
+    /// run is believed (the computer really got smaller).
+    /// </summary>
+    private bool LooksPartial(int listed)
+    {
+        var have = _library.AllTracks.Count(t => t.SourceType == SourceType.NoctisServer);
+        if (have < 100 || listed >= have / 2) { _shrunkTo = -1; return false; }
+        if (_shrunkTo == listed) return false;
+        _shrunkTo = listed;
+        DebugLog.Write("Account", $"catalog: the desktop listed {listed} songs, the phone has {have}; adding only, nothing removed unless it lists the same again");
+        return true;
     }
 
     /// <summary>
