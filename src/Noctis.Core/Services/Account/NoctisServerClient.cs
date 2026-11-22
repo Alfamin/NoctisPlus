@@ -15,6 +15,8 @@ internal sealed record RemoteSong(
     string Suffix, int Track, int Disc, int Year, string Genre, int BitRate, int SamplingRate,
     int UserRating, bool Starred, int PlayCount, DateTime? Created);
 
+internal sealed record CatalogFile(List<RemoteSong> Songs, Dictionary<Guid, string> AlbumArtists);
+
 internal sealed record SignInResult(string ApiKey, string? User, string? Server, bool SyncEnabled, string? DisplayName = null);
 
 /// <summary>What noctisUploadTrack did with a song: added it, or found the same file already there.</summary>

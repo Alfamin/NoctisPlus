@@ -453,6 +453,32 @@ public class NoctisAccountServiceTests : IAsyncLifetime
         Assert.Equal(3, _phoneLibrary.Tracks.Count(t => t.SourceType == SourceType.NoctisServer));
     }
 
+    /// <summary>Owner #308: after a phone restart the saved library came back with the phone's own songs only, and a phone away from the
+    /// computer's network had none of the computer's. Still signed in, the list is put back from the copy the last sync kept.</summary>
+    [Fact]
+    public async Task ComputerSongsTheLibraryLost_ArePutBackAtTheNextStart_ButNotAfterASignOut()
+    {
+        var ct = TestContext.Current.CancellationToken;
+        var svc = await SignedInAsync();
+        await svc.SyncNowAsync(ct);
+        Assert.Equal(3, _phoneLibrary.Tracks.Count(t => t.SourceType == SourceType.NoctisServer));
+
+        // The saved library comes back without them (the failure of the log of 11-23).
+        await _phoneLibrary.RemoveRemoteTracksAsync();
+        Assert.Empty(_phoneLibrary.Tracks.Where(t => t.SourceType == SourceType.NoctisServer));
+
+        Restart();
+        var deadline = DateTime.UtcNow.AddSeconds(10);
+        while (_phoneLibrary.Tracks.Count(t => t.SourceType == SourceType.NoctisServer) < 3 && DateTime.UtcNow < deadline) await Task.Delay(25, ct);
+        Assert.Equal(3, _phoneLibrary.Tracks.Count(t => t.SourceType == SourceType.NoctisServer));
+
+        // Signed out on purpose: the copy goes with the account, so nothing comes back at the next start.
+        await svc.SignOutAsync(removeDownloads: false, ct);
+        Assert.Empty(_phoneLibrary.Tracks.Where(t => t.SourceType == SourceType.NoctisServer));
+        Restart();
+        await Task.Delay(300, ct);
+        Assert.Empty(_phoneLibrary.Tracks.Where(t => t.SourceType == SourceType.NoctisServer));
+    }
     [Fact]
     public async Task CatalogSync_AListThatIsSuddenlyAFractionOfABigLibrary_RemovesNothing_UntilItIsListedAgain()
     {

@@ -102,6 +102,7 @@ public sealed class NoctisAccountStore
     private string SyncPath => Path.Combine(Directory, "sync.json");
     private string PendingPath => Path.Combine(Directory, "pending.json");
     private string UploadsPath => Path.Combine(Directory, "uploads.json");
+    private string CatalogPath => Path.Combine(Directory, "catalog.json");
 
     /// <summary>This install's device id: 16 random bytes as hex, created on first use and kept for good.</summary>
     public string LoadOrCreateDeviceId()
@@ -152,6 +153,17 @@ public sealed class NoctisAccountStore
         lock (_writeGate) WriteAtomic(PendingPath, json);
     }
 
+    /// <summary>Owner #308: the computer's song list as the last settled sync read it, kept apart from library.json. The
+    /// library lost every computer song once (the saved library came back with the phone's own songs only), and a phone
+    /// that is not on the computer's network could not get them back: the list is put back from this at the next start.</summary>
+    internal CatalogFile? LoadCatalog() => Read<CatalogFile>(CatalogPath);
+
+    internal void SaveCatalog(CatalogFile catalog)
+    {
+        var json = JsonSerializer.Serialize(catalog, Json);
+        lock (_writeGate) WriteAtomic(CatalogPath, json);
+    }
+
     internal NoctisUploadState LoadUploads() => Read<NoctisUploadState>(UploadsPath) ?? new NoctisUploadState();
 
     internal void SaveUploads(NoctisUploadState uploads)
@@ -169,6 +181,7 @@ public sealed class NoctisAccountStore
             NoctisServerClient.TryDelete(SyncPath);
             NoctisServerClient.TryDelete(PendingPath);
             NoctisServerClient.TryDelete(UploadsPath);
+            NoctisServerClient.TryDelete(CatalogPath);
         }
     }
 
