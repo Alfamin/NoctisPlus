@@ -17,6 +17,8 @@ internal sealed class DiscoveryActions(IPlaylistLibrary library, Downloads downl
     /// <summary>The computer saves a played song into the library when its stream cache cannot be used, so Play always works.
     /// The phone sets this false: a played song is never added to Songs without the owner asking (#309).</summary>
     public bool PlayFallsBackToLibrary { get; init; } = true;
+    /// <summary>The phone asks whether each library file exists eight at a time (#307); the computer one by one, as before.</summary>
+    public bool ParallelFileChecks { get; init; }
     internal static readonly TimeSpan RetryPause = TimeSpan.FromSeconds(15);
     internal static bool JustFailed(Download d) => d.FailedAt is { } at && DateTimeOffset.UtcNow - at < RetryPause;
 
@@ -29,7 +31,7 @@ internal sealed class DiscoveryActions(IPlaylistLibrary library, Downloads downl
         foreach (var s in snapshot) key = key * 31 + s.Id.GetHashCode() + StringComparer.OrdinalIgnoreCase.GetHashCode(s.Path);
         var now = DateTimeOffset.UtcNow;
         if (_matcher is { } cached && cached.Key == key && now - cached.At < TimeSpan.FromMinutes(2)) return cached.Matcher;
-        var matcher = new PlaylistMatcher(snapshot, library.Exists);
+        var matcher = new PlaylistMatcher(snapshot, library.Exists, ParallelFileChecks);
         _matcher = (key, now, matcher);
         return matcher;
     }
@@ -42,7 +44,7 @@ internal sealed class DiscoveryActions(IPlaylistLibrary library, Downloads downl
         var rows = songs.ToArray(); var snapshot = await library.SnapshotAsync(); ct.ThrowIfCancellationRequested();
         return await Task.Run(() =>
         {
-            var matcher = reuse ? Matcher(snapshot) : new PlaylistMatcher(snapshot, library.Exists); var history = downloads.History;
+            var matcher = reuse ? Matcher(snapshot) : new PlaylistMatcher(snapshot, library.Exists, ParallelFileChecks); var history = downloads.History;
             return rows.DistinctBy(s => s.Id).ToDictionary(s => s.Id, s =>
             {
                 var local = anySong ? matcher.FindSong(s.Request) : matcher.Find(s.Request);

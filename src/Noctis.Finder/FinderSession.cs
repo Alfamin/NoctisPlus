@@ -54,7 +54,7 @@ internal sealed class FinderSession : IDisposable
         Downloads.ResetConnection = () => Telegram.RetireCurrentConnectionAsync();
         Downloads.AskAhead = (download, ct) => download.Track.Fetch(new AskOnlyStream(), null, ct);
         Downloads.Finished += Say;
-        _actions = new DiscoveryActions(library, Downloads, _sources.Track, () => MusicFolder, () => Telegram.IsLoggedIn) { PlayFallsBackToLibrary = !playNeverSaves };
+        _actions = new DiscoveryActions(library, Downloads, _sources.Track, () => MusicFolder, () => Telegram.IsLoggedIn) { PlayFallsBackToLibrary = !playNeverSaves, ParallelFileChecks = playNeverSaves };
         Pages = new CatalogPages(() => _catalog, _actions, log, () => true, service, Path.Combine(data, "artist-choices.json"));
         Playlists = new SpotifyPlaylists(Path.Combine(data, "spotify-playlists.json"), library, Downloads, _sources.Track,
             new PlaylistCatalog(PlaylistCatalog.MetadataHandler("", log)));
