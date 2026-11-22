@@ -33,13 +33,17 @@ internal sealed class PhoneFinderHost : IDisposable
         LibraryViewModel playlists, Func<Func<Task>, Task> onUi, Action<string> log, Func<string, bool>? localExists = null)
     {
         _library = library;
-        Session = new FinderSession(dataFolder, musicFolder, new PhonePlaylistLibrary(library, playlists, onUi, localExists), () => library,
+        _files = new PhonePlaylistLibrary(library, playlists, onUi, localExists);
+        Session = new FinderSession(dataFolder, musicFolder, _files, () => library,
             // The phone player reads a song still arriving through ProgressiveDataSource (Noctis.Android), so Play
             // may start on the received bytes; MP3 and FLAC only, other formats wait for the complete file.
             log, defaultsPath, completeFilesOnly: false, profileData: playlists.Persistence.DataDirectory, lastFmUser: () => LastFmUser(), playNeverSaves: true);
         SignIn = new PhoneTelegramSignIn(Session);
         // Owner #309: played-only songs live in the private stream cache; only the PC cleaned it, so on the phone it never shrank.
         _ = Task.Run(() => Session.CleanStreamCache());
+        // Owner #307: Search's library check is answered from these, so the first search after a change is not a wait.
+        library.LibraryUpdated += OnLibraryUpdated;
+        ScheduleWarm();
         Session.Downloads.Changed += OnDownloadChanged;
         // Files saved while the app was closed (the queue resumes them): make sure each is in Songs.
         foreach (var d in Session.Downloads.History) OnDownloadChanged(d);
@@ -76,8 +80,26 @@ internal sealed class PhoneFinderHost : IDisposable
         return Path.GetFullPath(path).StartsWith(root, StringComparison.Ordinal);
     }
 
+    private readonly PhonePlaylistLibrary _files;
+    private int _warmQueued;
+
+    private void OnLibraryUpdated(object? sender, EventArgs e) => ScheduleWarm();
+
+    /// <summary>One warm-up after a quiet moment, however many library updates came (a scan publishes every 1.5 s).</summary>
+    private void ScheduleWarm()
+    {
+        if (Interlocked.Exchange(ref _warmQueued, 1) == 1) return;
+        _ = Task.Run(async () =>
+        {
+            await Task.Delay(TimeSpan.FromSeconds(4)).ConfigureAwait(false);
+            Volatile.Write(ref _warmQueued, 0);
+            _files.Warm();
+        });
+    }
+
     public void Dispose()
     {
+        _library.LibraryUpdated -= OnLibraryUpdated;
         Session.Downloads.Changed -= OnDownloadChanged;
         Session.Dispose();
     }

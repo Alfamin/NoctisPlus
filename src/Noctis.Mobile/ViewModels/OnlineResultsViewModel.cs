@@ -66,7 +66,8 @@ public sealed class OnlineAlbumItem(OnlineAlbum release, IOnlineMusicSearch sour
 public sealed partial class OnlineResultsViewModel : ObservableObject, IDisposable
 {
     internal const int SongCap = 10;
-    internal static readonly TimeSpan Debounce = TimeSpan.FromMilliseconds(450);
+    // Owner #307: 450 ms of waiting before the first request is felt on every search; 300 ms still skips the letters typed in a burst.
+    internal static readonly TimeSpan Debounce = TimeSpan.FromMilliseconds(300);
 
     private readonly IOnlineMusicSearch _source;
     private readonly Action<Action> _marshal;
@@ -158,9 +159,14 @@ public sealed partial class OnlineResultsViewModel : ObservableObject, IDisposab
         {
             await _delay(Debounce, ct).ConfigureAwait(false);
             _source.WarmUp();
+            var clock = System.Diagnostics.Stopwatch.StartNew();
+            var first = -1L;
             await foreach (var result in _source.SearchAsync(query, ct).ConfigureAwait(false))
             {
                 ct.ThrowIfCancellationRequested();
+                if (first < 0) first = clock.ElapsedMilliseconds;
+                if (result.Complete)
+                    Noctis.Services.DebugLog.Write("Search",$"online search of {query.Length} letters: first answer {first} ms, complete {clock.ElapsedMilliseconds} ms");
                 // The source's recording match: the library row already stands for it.
                 _marshal(() => { if (generation == _generation) { _lastResult = result; ShowSearch(result); } });
                 if (result.Complete) break;

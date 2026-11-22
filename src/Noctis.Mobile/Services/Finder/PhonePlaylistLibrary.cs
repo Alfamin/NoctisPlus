@@ -29,11 +29,38 @@ internal sealed class PhonePlaylistLibrary(ILibraryService library, LibraryViewM
     {
         if (library.IsScanning || library.IsPublishingPartial)
             throw new IOException("LIBRARY_SCANNING: Noctis is still scanning. Wait for it to finish, then check the library again.");
-        var available = library.AllTracks.Where(t => IsLocalFile(t) && Exists(t.FilePath)).Select(t => t.Id).ToHashSet();
+        var available = library.AllTracks.Where(t => IsLocalFile(t) && Check(t.FilePath)).Select(t => t.Id).ToHashSet();
         return onUi(() => playlists.ApplyImportedPlaylistAsync(id, name, Description(url), tracks, create, expected, remappedExpected, available));
     }
 
-    public bool Exists(string path) => accessible?.Invoke(path) ?? File.Exists(path);
+    // Owner #307: Search builds a matcher that asks "does this file still exist" of every library song, and on the phone each
+    // answer is a call into Android's document provider (a content:// song): ~2,000 of them held the search up every time the
+    // library changed or two minutes passed. An answer is kept for 30 minutes, and the library fills them in beforehand (Warm).
+    private readonly System.Collections.Concurrent.ConcurrentDictionary<string, (bool Found, long At)> _found = new(StringComparer.Ordinal);
+    private static readonly long KeepMs = (long)TimeSpan.FromMinutes(30).TotalMilliseconds;
+
+    public bool Exists(string path)
+    {
+        var now = Environment.TickCount64;
+        if (_found.TryGetValue(path, out var known) && now - known.At < KeepMs) return known.Found;
+        var found = Check(path);
+        _found[path] = (found, now);
+        return found;
+    }
+
+    private bool Check(string path) => accessible?.Invoke(path) ?? File.Exists(path);
+
+    /// <summary>Asks about the library's songs that have no fresh answer yet, four at a time, off the UI thread.</summary>
+    internal void Warm()
+    {
+        if (library.IsScanning || library.IsPublishingPartial) return;
+        var now = Environment.TickCount64;
+        var paths = library.AllTracks.Where(IsLocalFile).Select(t => t.FilePath)
+            .Where(p => !(_found.TryGetValue(p, out var known) && now - known.At < KeepMs)).ToArray();
+        if (paths.Length == 0) return;
+        try { Parallel.ForEach(paths, new ParallelOptions { MaxDegreeOfParallelism = 4 }, p => _found[p] = (Check(p), Environment.TickCount64)); }
+        catch (Exception ex) when (ex is not OutOfMemoryException) { DebugLog.Write("Finder", $"Library file check stopped: {ex.GetType().Name}"); }
+    }
 
     private static bool IsLocalFile(Noctis.Models.Track t) => !t.IsRemoteStream &&
         (Path.IsPathFullyQualified(t.FilePath) || t.FilePath.StartsWith("content://", StringComparison.Ordinal));
