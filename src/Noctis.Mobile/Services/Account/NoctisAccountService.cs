@@ -189,6 +189,29 @@ public sealed partial class NoctisAccountService : INoctisAccountService, ITrack
         stateRecorder?.Attach(this);
         _recorder = stateRecorder;
         _library.TracksAdded += OnLibraryTracksAdded;
+        _ = Task.Run(RestoreLostCatalogAsync);
+    }
+
+    /// <summary>
+    /// Owner #308: signed in, downloads on the phone, yet not one computer song in the library: the saved library lost them (it came
+    /// back with the phone's own 158 songs). The list is put back from the copy the last settled sync kept, so the phone shows
+    /// its songs without the computer, as it did before. A sign-out removes the copy, so nothing returns after one.
+    /// </summary>
+    private async Task RestoreLostCatalogAsync()
+    {
+        try
+        {
+            await LibraryReady.ContinueWith(_ => { }, TaskScheduler.Default).ConfigureAwait(false);
+            if (_account is null || _library.AllTracks.Any(t => t.SourceType == SourceType.NoctisServer)) return;
+            var copy = _store.LoadCatalog();
+            if (copy is null || copy.Songs.Count == 0) return;
+            DebugLog.Write("Account", $"the library has none of the computer's songs; putting back the {copy.Songs.Count} from the last sync");
+            await ImportCatalogAsync(copy.Songs, copy.AlbumArtists, keepUnlisted: true, CancellationToken.None).ConfigureAwait(false);
+        }
+        catch (Exception ex) when (ex is not OutOfMemoryException)
+        {
+            DebugLog.Write("Account", $"restoring the computer's songs failed ({ex.GetType().Name})");
+        }
     }
 
     private readonly NoctisStateRecorder? _recorder;
@@ -592,6 +615,12 @@ public sealed partial class NoctisAccountService : INoctisAccountService, ITrack
         var (songs, settled) = await FetchCatalogAsync(client, ct).ConfigureAwait(false);
         if (settled && LooksPartial(songs.Count)) settled = false;
         var (tracks, linked) = await ImportCatalogAsync(songs, albumArtists, keepUnlisted: !settled, ct).ConfigureAwait(false);
+        if (settled && songs.Count > 0)
+        {
+            try { _store.SaveCatalog(new CatalogFile(songs, albumArtists)); }
+            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or System.Text.Json.JsonException)
+            { DebugLog.Write("Account", $"catalog copy not saved ({ex.GetType().Name})"); }
+        }
         RaiseSyncProgress(NoctisSyncStage.Catalog, tracks.Count + linked, tracks.Count + linked);
 
         // 2. Covers.
