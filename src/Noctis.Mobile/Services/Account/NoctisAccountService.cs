@@ -2030,6 +2030,7 @@ public sealed partial class NoctisAccountService : INoctisAccountService, ITrack
                 if (!NoctisRemoteIds.IsLowerHex32(name.AsSpan(0, 32)) || !Guid.TryParseExact(name.AsSpan(0, 32), "N", out var id)) continue;
                 _downloaded[id] = new DownloadedFile(Path.GetFullPath(file), new FileInfo(file).Length);
             }
+            DebugLog.Write("Account", $"downloads on disk: {_downloaded.Count} songs");
         }
         catch (Exception ex) { DebugLog.Write("Account", $"offline folder unreadable ({ex.GetType().Name})"); }
     }

@@ -1768,6 +1768,8 @@ public class LibraryService : ILibraryService
                 }
             }
 
+            if (known.Count != seen.Count || added.Count > 0)
+                DebugLog.Write("Library", $"Computer's songs: {known.Count} before, {seen.Count} listed, {added.Count} new, now {merged.Count(IsServerTrack)}");
             // Every sync hands in the whole catalog; when nothing changed, skip the rebuild, the
             // library.json rewrite and the page refreshes (the scan's no-change fast path).
             if (added.Count == 0 && kept == known.Count && kept == seen.Count) return;
@@ -1806,6 +1808,7 @@ public class LibraryService : ILibraryService
             var current = _tracks;
             var removed = current.Where(IsServerTrack).ToList();
             if (removed.Count == 0) return;
+            DebugLog.Write("Library", $"Removing the computer's {removed.Count} songs (signed out)");
             _tracks = current.Where(t => !IsServerTrack(t)).ToList();
             // Covers fetched for the desktop's albums go with them (a phone album sharing the
             // AlbumId keeps its cover). No exclusion list: these were never files.
@@ -2094,6 +2097,8 @@ public class LibraryService : ILibraryService
                 foreach (var t in tracks)
                     t.IsInInbox = false;
             _tracks = tracks;
+            var remoteLoaded = tracks.Count(IsServerTrack);
+            if (remoteLoaded > 0) DebugLog.Write("Library", $"Loaded {tracks.Count} songs, {remoteLoaded} of them the computer's");
 
             // Overlay journaled user state (ratings, favorites, play counts, ...)
             // on top of the JSON values before anything publishes or saves them.
