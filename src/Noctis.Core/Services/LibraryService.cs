@@ -2098,6 +2098,7 @@ public class LibraryService : ILibraryService
                     t.IsInInbox = false;
             _tracks = tracks;
             var remoteLoaded = tracks.Count(IsServerTrack);
+            _lastSavedRemote = remoteLoaded;
             if (remoteLoaded > 0) DebugLog.Write("Library", $"Loaded {tracks.Count} songs, {remoteLoaded} of them the computer's");
 
             // Overlay journaled user state (ratings, favorites, play counts, ...)
@@ -2212,10 +2213,19 @@ public class LibraryService : ILibraryService
         }
     }
 
+    private int _lastSavedRemote;
+
     public async Task SaveAsync()
     {
         try
         {
+            // Owner #308: the computer's songs were once missing from the saved library after a restart. The save that drops them
+            // all names itself here, with where it was called from.
+            var remote = _tracks.Count(IsServerTrack);
+            if (remote == 0 && _lastSavedRemote > 0)
+                DebugLog.Write("Library", $"Saving with none of the computer's songs (the last save had {_lastSavedRemote}) from: " +
+                    string.Join(" < ", new System.Diagnostics.StackTrace(1, false).GetFrames().Take(8).Select(f => f.GetMethod()?.Name ?? "?")));
+            _lastSavedRemote = remote;
             await _persistence.SaveLibraryAsync(_tracks);
         }
         catch (Exception ex)
