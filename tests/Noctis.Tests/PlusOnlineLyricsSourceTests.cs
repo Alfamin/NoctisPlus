@@ -142,6 +142,47 @@ public sealed class PlusOnlineLyricsSourceTests : IDisposable
         Assert.Equal(0, fallback.Calls);
     }
 
+    /// <summary>Owner #312: a song that only has plain or line-timed lyrics is asked for word timing; a real "no" is
+    /// remembered for a week, so playing it again does not ask every source again.</summary>
+    [Fact]
+    public async Task WordTimingForASongWithLineLyrics_IsAskedOnce_ThenLeftAloneForAWeek()
+    {
+        const string LineLrc = "[00:01.00]line one\n[00:03.00]line two\n[00:05.00]line three";
+        var order = new List<string>();
+        var fallback = new FakeFallback();
+        var source = MakeSource(new[] { MakeProvider("lrc.red", order, WordResult(LineLrc)), MakeProvider("Unison", order, null) }, fallback);
+
+        Assert.Null(await source.FindWordTimedAsync(Track(), CancellationToken.None));
+        Assert.Equal(new[] { "lrc.red", "Unison" }, order);
+        Assert.Equal(0, fallback.Calls);   // LRCLIB has no word timing: not asked for this
+
+        Assert.Null(await source.FindWordTimedAsync(Track(), CancellationToken.None));
+        Assert.Equal(2, order.Count);      // remembered: no provider was asked again
+
+        // A week later it is asked again.
+        var miss = Path.Combine(_root, "cache", Track().Id.ToString("N") + ".miss");
+        File.WriteAllText(miss, DateTimeOffset.UtcNow.AddDays(-8).ToString("O") + "\ntest song|test artist|60");
+        Assert.Null(await source.FindWordTimedAsync(Track(), CancellationToken.None));
+        Assert.Equal(4, order.Count);
+    }
+
+    [Fact]
+    public async Task WordTimingLookup_FailureIsNotRemembered_AndAFindIsKept()
+    {
+        var calls = 0;
+        var flaky = MakeSource(new[] { new PlusOnlineLyricsSource.Provider("lrc.red", (_, _) => { calls++; throw new IOException("offline"); }) });
+        Assert.Null(await flaky.FindWordTimedAsync(Track(), CancellationToken.None));
+        Assert.Null(await flaky.FindWordTimedAsync(Track(), CancellationToken.None));
+        Assert.Equal(2, calls);            // a failure is asked again on the next play
+
+        var order = new List<string>();
+        var good = MakeSource(new[] { MakeProvider("lrc.red", order, WordResult(WordLrc)) });
+        var found = await good.FindWordTimedAsync(Track(), CancellationToken.None);
+        Assert.Equal("lrc.red", found?.Provider);
+        var again = await MakeSource(new[] { MakeProvider("lrc.red", order, null) }).FindWordTimedAsync(Track(), CancellationToken.None);
+        Assert.Equal("lrc.red", again?.Provider);
+        Assert.Single(order);              // a found word timing stays: nobody is asked twice
+    }
     private PlusOnlineLyricsSource MakeSource(IEnumerable<PlusOnlineLyricsSource.Provider> providers, FakeFallback? fallback = null) =>
         new(providers, fallback ?? new FakeFallback(), Path.Combine(_root, "cache"), new OnlineAccess());
 

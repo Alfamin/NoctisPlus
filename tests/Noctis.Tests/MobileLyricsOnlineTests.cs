@@ -19,6 +19,9 @@ public class MobileLyricsOnlineTests : IDisposable
     {
         public Func<Track, Task<OnlineLyrics?>> Answer { get; set; } = _ => Task.FromResult<OnlineLyrics?>(null);
         public List<string> Asked { get; } = new();
+        public Func<Track, Task<OnlineLyrics?>> WordAnswer { get; set; } = _ => Task.FromResult<OnlineLyrics?>(null);
+        public List<string> WordAsked { get; } = new();
+        public Task<OnlineLyrics?> FindWordTimedAsync(Track track, CancellationToken ct) { WordAsked.Add(track.Title); return WordAnswer(track); }
 
         public Task<OnlineLyrics?> FindAsync(Track track, CancellationToken ct)
         {
@@ -90,6 +93,69 @@ public class MobileLyricsOnlineTests : IDisposable
         Assert.True(condition());
     }
 
+    private static string WordElrc()
+    {
+        var text = new System.Text.StringBuilder("[00:01.00]");
+        for (var i = 0; i < 35; i++)
+            text.Append($"<{TimeSpan.FromSeconds(1 + i * 0.5).ToString(@"mm\:ss\.ff", System.Globalization.CultureInfo.InvariantCulture)}>word{i} ");
+        return text.ToString();
+    }
+
+    /// <summary>Owner #312: lyrics the song already has (line-timed here) are shown at once; the song being played is asked for
+    /// word timing, and the page swaps to it.</summary>
+    [Fact]
+    public async Task LineTimedLyrics_AreUpgradedToWordTiming_WhenASourceHasIt()
+    {
+        var online = new FakeOnline { WordAnswer = _ => Task.FromResult<OnlineLyrics?>(new OnlineLyrics(WordElrc(), false) { Provider = "lrc.red" }) };
+        var (vm, np, _, files, _) = Make(online);
+        files.Sidecars[".lrc"] = "[00:01.00]one\n[00:04.00]two";
+
+        np.PlayTracks(new[] { NewTrack("a") }, 0);
+        await WaitForAsync(() => vm.HasLyrics);
+        await WaitForAsync(() => LyricsPageViewModel.HasWordTiming(vm.Lines));
+
+        Assert.Equal(new[] { "a" }, online.WordAsked);
+        Assert.Empty(online.Asked);                       // not the "nothing of its own" lookup
+        Assert.Equal("lrc.red", vm.OnlineProvider);
+        Assert.True(vm.IsSynced);
+    }
+
+    [Fact]
+    public async Task LyricsThatAlreadyHaveWordTiming_AreNeverAskedFor()
+    {
+        var online = new FakeOnline { WordAnswer = _ => Task.FromResult<OnlineLyrics?>(new OnlineLyrics(WordElrc(), false)) };
+        var (vm, np, _, files, _) = Make(online);
+        files.Sidecars[".elrc"] = WordElrc();
+
+        np.PlayTracks(new[] { NewTrack("a") }, 0);
+        await WaitForAsync(() => vm.HasLyrics);
+        await Task.Delay(150);
+
+        Assert.True(LyricsPageViewModel.HasWordTiming(vm.Lines));
+        Assert.Empty(online.WordAsked);
+        Assert.Empty(online.Asked);
+    }
+
+    [Fact]
+    public async Task PlainLyrics_StayWhenNoSourceHasWordTiming_AndAreNotAskedWithTheOnlineSettingOff()
+    {
+        var online = new FakeOnline();
+        var (vm, np, _, files, _) = Make(online);
+        files.Sidecars[".lrc"] = "[00:01.00]one\n[00:04.00]two";
+        np.PlayTracks(new[] { NewTrack("a") }, 0);
+        await WaitForAsync(() => vm.HasLyrics);
+        await WaitForAsync(() => online.WordAsked.Count == 1);
+        Assert.Contains(vm.Lines, l => l.Text == "two");   // the lyrics it had are still there
+
+        var off = new FakeOnline();
+        var second = Make(off);
+        second.Vm.FindLyricsOnline = false;
+        second.Files.Sidecars[".lrc"] = "[00:01.00]one\n[00:04.00]two";
+        second.Np.PlayTracks(new[] { NewTrack("b") }, 0);
+        await WaitForAsync(() => second.Vm.HasLyrics);
+        await Task.Delay(150);
+        Assert.Empty(off.WordAsked);
+    }
     [Fact]
     public async Task NoLyricsOfItsOwn_LooksOnline_AndShowsSyncedLines()
     {

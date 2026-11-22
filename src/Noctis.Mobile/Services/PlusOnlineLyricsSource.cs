@@ -16,6 +16,8 @@ public sealed class PlusOnlineLyricsSource : IOnlineLyricsSource
 {
     public static readonly TimeSpan ProviderTimeout = TimeSpan.FromSeconds(8);
     private static readonly TimeSpan CacheLifetime = TimeSpan.FromDays(7);
+    /// <summary>Word timing that was found stays (the PC writes it beside the song for good): asking again would only repeat it (#312).</summary>
+    private static readonly TimeSpan WordCacheLifetime = TimeSpan.FromDays(180);
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
 
     private readonly IReadOnlyList<Provider> _providers;
@@ -60,9 +62,57 @@ public sealed class PlusOnlineLyricsSource : IOnlineLyricsSource
         if (cached != null) return cached;
         if (_access.IsOffline) return null;
 
-        var hadTransientFailure = false;
         // Owner #290: LRCLIB is the last resort, as on the PC. A provider with line timing only is kept and used
         // before LRCLIB when no provider has word timing (no second request).
+        var (word, lineTimed, hadTransientFailure) = await AskProvidersAsync(track, ct).ConfigureAwait(false);
+        if (word is { } timed)
+        {
+            await WriteCacheAsync(cachePath, new CacheEntry(queryKey, timed.Text, timed.Provider!, DateTimeOffset.UtcNow, true), ct).ConfigureAwait(false);
+            return timed;
+        }
+        if (lineTimed is { } line)
+        {
+            var found = new OnlineLyrics(line.Text, false) { Provider = line.Provider, AudioFitVerified = false };
+            await WriteCacheAsync(cachePath, new CacheEntry(queryKey, found.Text, line.Provider, DateTimeOffset.UtcNow), ct).ConfigureAwait(false);
+            return found;
+        }
+        var fallback = await _lrclib.FindAsync(track, ct).ConfigureAwait(false);
+        if (fallback is { Failed: true } || hadTransientFailure && fallback == null)
+            return OnlineLyrics.Unreachable;
+        return fallback is null ? null : fallback with { Provider = "LRCLIB" };
+    }
+
+    /// <summary>How long a song that no source has word timing for is left alone before it is asked again (#312).</summary>
+    public static readonly TimeSpan MissLifetime = TimeSpan.FromDays(7);
+
+    /// <inheritdoc />
+    public async Task<OnlineLyrics?> FindWordTimedAsync(Track track, CancellationToken ct)
+    {
+        if (string.IsNullOrWhiteSpace(track.Title)) return null;
+        var queryKey = QueryKey(track);
+        var id = track.Id.ToString("N");
+        var cachePath = Path.Combine(_cacheDirectory, id + ".json");
+        var cached = await ReadCacheAsync(cachePath, queryKey, ct).ConfigureAwait(false);
+        if (cached != null && HasWordLevelTiming(cached.Text)) return cached;
+
+        var missPath = Path.Combine(_cacheDirectory, id + ".miss");
+        if (RecentMiss(missPath, queryKey)) return null;
+        if (_access.IsOffline) return null;
+
+        var (word, _, hadTransientFailure) = await AskProvidersAsync(track, ct).ConfigureAwait(false);
+        if (word is { } timed)
+        {
+            await WriteCacheAsync(cachePath, new CacheEntry(queryKey, timed.Text, timed.Provider!, DateTimeOffset.UtcNow, true), ct).ConfigureAwait(false);
+            return timed;
+        }
+        // A real "no": remembered for a week. A failure (offline, busy, timed out) is not, so the next play asks again.
+        if (!hadTransientFailure) WriteMiss(missPath, queryKey);
+        return null;
+    }
+
+    private async Task<(OnlineLyrics? Word, (string Provider, string Text)? LineTimed, bool Transient)> AskProvidersAsync(Track track, CancellationToken ct)
+    {
+        var hadTransientFailure = false;
         (string Provider, string Text)? lineTimed = null;
         foreach (var provider in _providers)
         {
@@ -81,15 +131,7 @@ public sealed class PlusOnlineLyricsSource : IOnlineLyricsSource
                     if (lineTimed is null && LyricsLoader.FromOnlineText(text ?? "")?.IsSynced == true) lineTimed = (provider.Name, text!);
                     continue;
                 }
-
-                var found = new OnlineLyrics(text!, false)
-                {
-                    Provider = provider.Name,
-                    AudioFitVerified = false,
-                };
-                await WriteCacheAsync(cachePath, new CacheEntry(queryKey, found.Text, provider.Name,
-                    DateTimeOffset.UtcNow), ct).ConfigureAwait(false);
-                return found;
+                return (new OnlineLyrics(text!, false) { Provider = provider.Name, AudioFitVerified = false }, lineTimed, hadTransientFailure);
             }
             catch (OperationCanceledException) when (!ct.IsCancellationRequested)
             {
@@ -102,20 +144,34 @@ public sealed class PlusOnlineLyricsSource : IOnlineLyricsSource
                 DebugLog.Write("Lyrics", $"{provider.Name} phone timing lookup failed: {ex.GetType().Name}");
             }
         }
-
         ct.ThrowIfCancellationRequested();
-        if (lineTimed is { } line)
-        {
-            var found = new OnlineLyrics(line.Text, false) { Provider = line.Provider, AudioFitVerified = false };
-            await WriteCacheAsync(cachePath, new CacheEntry(queryKey, found.Text, line.Provider, DateTimeOffset.UtcNow), ct).ConfigureAwait(false);
-            return found;
-        }
-        var fallback = await _lrclib.FindAsync(track, ct).ConfigureAwait(false);
-        if (fallback is { Failed: true } || hadTransientFailure && fallback == null)
-            return OnlineLyrics.Unreachable;
-        return fallback is null ? null : fallback with { Provider = "LRCLIB" };
+        return (null, lineTimed, hadTransientFailure);
     }
 
+    private static bool RecentMiss(string path, string queryKey)
+    {
+        try
+        {
+            if (!File.Exists(path)) return false;
+            var parts = File.ReadAllText(path).Split('\n', 2);
+            return parts.Length == 2 && parts[1] == queryKey && DateTimeOffset.TryParse(parts[0], System.Globalization.CultureInfo.InvariantCulture,
+                System.Globalization.DateTimeStyles.RoundtripKind, out var at) && DateTimeOffset.UtcNow - at < MissLifetime;
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or ArgumentException) { return false; }
+    }
+
+    private static void WriteMiss(string path, string queryKey)
+    {
+        try
+        {
+            Directory.CreateDirectory(Path.GetDirectoryName(path)!);
+            File.WriteAllText(path, DateTimeOffset.UtcNow.ToString("O", System.Globalization.CultureInfo.InvariantCulture) + "\n" + queryKey);
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or ArgumentException)
+        {
+            DebugLog.Write("Lyrics", $"Phone timing miss write failed: {ex.GetType().Name}");
+        }
+    }
     private static bool IsMatchingRecording(LrcLibResult result, Track track)
     {
         if (!LyricsSearchSelector.MatchesTrack(result, track.Artist, track.Title, track.Duration.TotalSeconds)) return false;
@@ -145,7 +201,7 @@ public sealed class PlusOnlineLyricsSource : IOnlineLyricsSource
         {
             if (!File.Exists(path) || (File.GetAttributes(path) & FileAttributes.ReparsePoint) != 0) return null;
             var entry = JsonSerializer.Deserialize<CacheEntry>(await File.ReadAllTextAsync(path, ct).ConfigureAwait(false), JsonOptions);
-            if (entry == null || entry.QueryKey != queryKey || DateTimeOffset.UtcNow - entry.SavedAtUtc >= CacheLifetime ||
+            if (entry == null || entry.QueryKey != queryKey || DateTimeOffset.UtcNow - entry.SavedAtUtc >= (entry.Words ? WordCacheLifetime : CacheLifetime) ||
                 string.IsNullOrWhiteSpace(entry.Text)) return null;
             return new OnlineLyrics(entry.Text, false) { Provider = entry.Provider, AudioFitVerified = false };
         }
@@ -174,5 +230,5 @@ public sealed class PlusOnlineLyricsSource : IOnlineLyricsSource
         }
     }
 
-    private sealed record CacheEntry(string QueryKey, string Text, string Provider, DateTimeOffset SavedAtUtc);
+    private sealed record CacheEntry(string QueryKey, string Text, string Provider, DateTimeOffset SavedAtUtc, bool Words = false);
 }

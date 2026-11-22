@@ -404,6 +404,7 @@ public sealed partial class LyricsPageViewModel : ObservableObject, IDisposable
 
         if (generation != _generation || _disposed) return;   // a newer track won
 
+        var askedOnline = false;
         // Its own lyrics only say it is instrumental (GitHub #236): shown as such, not looked up.
         if (result.Source == LyricsSource.Instrumental) IsInstrumental = true;
 
@@ -411,6 +412,7 @@ public sealed partial class LyricsPageViewModel : ObservableObject, IDisposable
         // online in exactly this case).
         else if (result.Lines.Count == 0 && FindLyricsOnline && Online is { } online)
         {
+            askedOnline = true;
             IsSearchingOnline = true;
             using var lookupStop = new CancellationTokenSource();
             var priorLookup = Interlocked.Exchange(ref _onlineLookupStop, lookupStop);
@@ -465,6 +467,70 @@ public sealed partial class LyricsPageViewModel : ObservableObject, IDisposable
             ApplyOpacities(-1);
             OnFrame(NowMs());
         }
+
+        // Owner #312: lyrics with no word timing (plain, or timed by line) are shown at once, and the song, being played now,
+        // is asked for a word-timed version, as the computer does. Not when the online lookup above already tried the same
+        // sources, and not when the song already has word timing (its own, Lyrics Studio's, or the computer's).
+        if (FindLyricsOnline && Online is { } timing && !askedOnline && !IsInstrumental && result.Lines.Count > 0 && !HasWordTiming(result.Lines))
+            _ = UpgradeToWordTimingAsync(timing, track, generation);
+    }
+
+    /// <summary>Enough real word spans for the karaoke sweep (the same bar the online source uses): a line-timed LRC reads as one
+    /// word per line.</summary>
+    internal static bool HasWordTiming(IReadOnlyList<LyricLine> lines)
+    {
+        var words = 0;
+        var spans = false;
+        foreach (var line in lines)
+        {
+            var count = line.Words?.Count ?? 0;
+            words += count;
+            if (count >= 2) spans = true;
+        }
+        return spans && words >= 30;
+    }
+
+    private async Task UpgradeToWordTimingAsync(IOnlineLyricsSource online, Track track, int generation)
+    {
+        using var stop = new CancellationTokenSource();
+        Interlocked.Exchange(ref _onlineLookupStop, stop)?.Cancel();
+        try
+        {
+            OnlineLyrics? found;
+            try { found = await online.FindWordTimedAsync(track, stop.Token); }
+            catch (OperationCanceledException) { return; }
+            catch (Exception ex)
+            {
+                DebugLog.Write("Lyrics", $"Word timing lookup failed for {track.Title}: {ex.GetType().Name}");
+                return;
+            }
+            if (found is null or { Failed: true } or { Instrumental: true } || generation != _generation || _disposed) return;
+            LoadedLyrics upgraded;
+            try { upgraded = await _runBackground(() => LyricsLoader.FromOnlineText(found.Text) ?? LoadedLyrics.None); }
+            catch (Exception ex)
+            {
+                DebugLog.Write("Lyrics", $"Word timing parse failed for {track.Title}: {ex.Message}");
+                return;
+            }
+            if (generation != _generation || _disposed || !upgraded.IsSynced || !HasWordTiming(upgraded.Lines)) return;
+
+            // The same swap a new song gets, so the page restarts its line and scroll on the new lines.
+            _timeline.Reset();
+            _clock.Reset();
+            ActiveLineIndex = -1;
+            ScrollLineIndex = -1;
+            OnlineProvider = found.Provider ?? "online";
+            OnlineAudioFitVerified = found.AudioFitVerified;
+            Source = upgraded.Source;
+            Lines.ReplaceAll(upgraded.Lines);
+            IsSynced = true;
+            HasLyrics = true;
+            HasTranslations = upgraded.Lines.Any(l => l.HasTranslation);
+            HasRomanizations = upgraded.Lines.Any(l => l.HasTransliteration);
+            ApplyOpacities(-1);
+            OnFrame(NowMs());
+        }
+        finally { Interlocked.CompareExchange(ref _onlineLookupStop, null, stop); }
     }
 
     private static async Task<OnlineLyrics?> FindOnlineAsync(IOnlineLyricsSource online, Track track, CancellationToken ct)

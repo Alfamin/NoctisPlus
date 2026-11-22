@@ -30,6 +30,12 @@ public sealed record OnlineLyrics(string Text, bool Instrumental)
 public interface IOnlineLyricsSource
 {
     Task<OnlineLyrics?> FindAsync(Track track, CancellationToken ct);
+
+    /// <summary>
+    /// Owner #312: a song that already has plain or line-timed lyrics, asked for word timing only (null when no source has it, or
+    /// for a song whose last miss is under a week old). Sources without word timing keep the default: nothing.
+    /// </summary>
+    Task<OnlineLyrics?> FindWordTimedAsync(Track track, CancellationToken ct) => Task.FromResult<OnlineLyrics?>(null);
 }
 
 /// <summary>
