@@ -49,7 +49,13 @@ internal static class StreamCache
     }
 
     /// <summary>Would this song's cached file name stay within the path limit?</summary>
-    public static bool Fits(string folder, string fileName) => Path.Combine(folder, fileName).Length + ".flac.part".Length <= MaxPath;
+    public static bool Fits(string folder, string fileName) => Fits(folder, fileName, OperatingSystem.IsWindows());
+
+    /// <summary>Windows keeps the whole-path limit the player has; elsewhere (the phone) only the file name has one (255
+    /// bytes, with room for the extension and ".part"): a long app folder must not push Play into the library (#309).</summary>
+    internal static bool Fits(string folder, string fileName, bool windows)
+        => windows ? Path.Combine(folder, fileName).Length + ".flac.part".Length <= MaxPath
+            : System.Text.Encoding.UTF8.GetByteCount(fileName) + ".flac.part".Length <= 240;
 
     /// <summary>Days a streamed song is kept after it was last played; null = forever.</summary>
     /// <summary>Owner #147: how many of the next songs in the queue download ahead (only the ones you don't have).</summary>
@@ -90,9 +96,15 @@ internal static class StreamCache
     /// the drive has under 3 GB free (streaming must never fill the disk).</summary>
     public static long? Cap(int? days, long freeBytes) => freeBytes < LowDisk ? LowDiskCap : days is null ? null : NormalCap;
 
+    /// <summary>What to ask for the room: Windows asks the drive; elsewhere the folder itself (statvfs takes any path inside
+    /// the volume). On Android the path's root is "/", the nearly full system image (49 MB free beside 7 GB of data), which
+    /// made every cache look unusable so each Play was saved into the library (#309).</summary>
+    internal static string VolumeFor(string folder, bool windows)
+        => windows ? Path.GetPathRoot(Path.GetFullPath(folder))! : Path.GetFullPath(folder);
+
     public static long FreeSpace(string folder)
     {
-        try { return new DriveInfo(Path.GetPathRoot(Path.GetFullPath(folder))!).AvailableFreeSpace; }
+        try { return new DriveInfo(VolumeFor(folder, OperatingSystem.IsWindows())).AvailableFreeSpace; }
         catch (Exception ex) when (ex is ArgumentException or IOException or UnauthorizedAccessException) { return long.MaxValue; }
     }
 

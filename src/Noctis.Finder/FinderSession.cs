@@ -27,7 +27,8 @@ internal sealed class FinderSession : IDisposable
     public event Action<string>? Notice;
 
     public FinderSession(string data, string music, IPlaylistLibrary library, Func<ILibraryService?> service,
-        Action<string> log, string? defaultsPath = null, bool completeFilesOnly = false, string? profileData = null, Func<string>? lastFmUser = null)
+        Action<string> log, string? defaultsPath = null, bool completeFilesOnly = false, string? profileData = null, Func<string>? lastFmUser = null,
+        bool playNeverSaves = false)
     {
         DataFolder = Path.GetFullPath(data); MusicFolder = Path.GetFullPath(music); _log = log;
         Directory.CreateDirectory(data); Directory.CreateDirectory(music);
@@ -53,7 +54,7 @@ internal sealed class FinderSession : IDisposable
         Downloads.ResetConnection = () => Telegram.RetireCurrentConnectionAsync();
         Downloads.AskAhead = (download, ct) => download.Track.Fetch(new AskOnlyStream(), null, ct);
         Downloads.Finished += Say;
-        _actions = new DiscoveryActions(library, Downloads, _sources.Track, () => MusicFolder, () => Telegram.IsLoggedIn);
+        _actions = new DiscoveryActions(library, Downloads, _sources.Track, () => MusicFolder, () => Telegram.IsLoggedIn) { PlayFallsBackToLibrary = !playNeverSaves };
         Pages = new CatalogPages(() => _catalog, _actions, log, () => true, service, Path.Combine(data, "artist-choices.json"));
         Playlists = new SpotifyPlaylists(Path.Combine(data, "spotify-playlists.json"), library, Downloads, _sources.Track,
             new PlaylistCatalog(PlaylistCatalog.MetadataHandler("", log)));
@@ -92,6 +93,27 @@ internal sealed class FinderSession : IDisposable
         _proxy = value;
     }
     private void Say(string text) { _log(text); Notice?.Invoke(text); }
+    /// <summary>Owner #309: the phone has no row for it, so played-only songs not played for <paramref name="days"/> days go, and the
+    /// cache (with the partial downloads) stays under <paramref name="maxBytes"/>. A song still downloading or named by
+    /// <paramref name="keep"/> (the queue) stays. Returns how many files were deleted.</summary>
+    public int CleanStreamCache(int days = 30, long maxBytes = 3L * 1024 * 1024 * 1024, Func<string, bool>? keep = null)
+    {
+        try
+        {
+            if (Downloads.CacheFolder is not { } cache) return 0;
+            var cap = Math.Min(maxBytes, StreamCache.Cap(days, StreamCache.FreeSpace(cache)) ?? maxBytes);
+            PartialAudio.Clean(days, cap);
+            long partial = PartialAudio.Folder is { } folder && Directory.Exists(folder)
+                ? Directory.EnumerateFiles(folder).Sum(f => new FileInfo(f).Length) : 0;
+            var busy = Downloads.Active.Where(d => Downloads.IsCached(d)).Select(d => d.Track.FileName).ToHashSet(StringComparer.OrdinalIgnoreCase);
+            var removed = StreamCache.Purge(cache, days, DateTime.UtcNow,
+                file => busy.Contains(Path.GetFileNameWithoutExtension(file)) || keep?.Invoke(file) == true, Math.Max(0, cap - partial));
+            if (removed > 0) _log($"removed {removed} played-only song file{(removed == 1 ? "" : "s")} from the stream cache");
+            return removed;
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException) { _log("stream cache clean-up failed: " + ex.Message); return 0; }
+    }
+
     public void Dispose()
     {
         _forYou?.Dispose(); _similar?.Dispose(); _lastFm?.Dispose(); _listens?.Dispose();

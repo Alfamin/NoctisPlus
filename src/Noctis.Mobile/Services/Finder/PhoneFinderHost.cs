@@ -36,8 +36,10 @@ internal sealed class PhoneFinderHost : IDisposable
         Session = new FinderSession(dataFolder, musicFolder, new PhonePlaylistLibrary(library, playlists, onUi, localExists), () => library,
             // The phone player reads a song still arriving through ProgressiveDataSource (Noctis.Android), so Play
             // may start on the received bytes; MP3 and FLAC only, other formats wait for the complete file.
-            log, defaultsPath, completeFilesOnly: false, profileData: playlists.Persistence.DataDirectory, lastFmUser: () => LastFmUser());
+            log, defaultsPath, completeFilesOnly: false, profileData: playlists.Persistence.DataDirectory, lastFmUser: () => LastFmUser(), playNeverSaves: true);
         SignIn = new PhoneTelegramSignIn(Session);
+        // Owner #309: played-only songs live in the private stream cache; only the PC cleaned it, so on the phone it never shrank.
+        _ = Task.Run(() => Session.CleanStreamCache());
         Session.Downloads.Changed += OnDownloadChanged;
         // Files saved while the app was closed (the queue resumes them): make sure each is in Songs.
         foreach (var d in Session.Downloads.History) OnDownloadChanged(d);

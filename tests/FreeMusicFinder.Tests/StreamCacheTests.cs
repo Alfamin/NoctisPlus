@@ -16,7 +16,8 @@ internal static class StreamCacheTests
 
     public static async Task RunAsync()
     {
-        Choices(); Folders(); Purging(); Copying();
+        Choices(); Folders(); Purging(); Copying(); PhoneRoomAndPaths();
+        await PhonePlayNeverSaves();
         await PlayedSongsStayOutOfTheLibrary();
         await AddWhileStillDownloading();
         await KeepSurvivesRestart();
@@ -59,6 +60,42 @@ internal static class StreamCacheTests
         Check.True(!StreamCache.Usable(blocked), "a cache that cannot be made or written is not used");
         Check.True(StreamCache.Fits(@"C:\Users\Someone\AppData\Local\Noctis Plus\stream-cache", "Artist - Song [1234abcd]"), "a normal name fits");
         Check.True(!StreamCache.Fits(@"C:\Users\Someone\AppData\Local\Noctis Plus\stream-cache", new string('x', 200)), "a name past the player's path limit does not");
+    }
+
+    private static void PhoneRoomAndPaths()
+    {
+        Check.Section("#309 the room is asked where the cache is, not at the drive root (Android: / has 49 MB, /data 7 GB)");
+        var app = Path.Combine(Path.GetTempPath(), "data", "no_backup", "finder", "stream-cache");
+        Check.Equal(Path.GetFullPath(app), StreamCache.VolumeFor(app, false), "off Windows the folder itself is asked");
+        Check.Equal(@"C:\", StreamCache.VolumeFor(@"C:\Users\Someone\cache", true), "Windows still asks the drive");
+        var folder = Check.NewFolder("stream-room");
+        Check.True(StreamCache.FreeSpace(folder) is > 0 and < long.MaxValue, "a real folder reports real room");
+        var longApp = "/data/user/0/com.alfamin.noctisplus/no_backup/finder/stream-cache";
+        var name = "Some Artist, Another Artist - A fairly long song title (Deluxe Edition Remastered) [1234abcd]";
+        Check.True(StreamCache.Fits(longApp, name, false), "a long app folder and a long name still fit on the phone (only the name has a limit)");
+        Check.True(!StreamCache.Fits(longApp, new string('x', 250), false), "a name past 255 bytes does not");
+        Check.True(!StreamCache.Fits(@"C:\Users\Someone\AppData\Local\Noctis Plus\stream-cache", new string('x', 200), true), "Windows keeps the whole-path limit");
+    }
+
+    private static async Task PhonePlayNeverSaves()
+    {
+        Check.Section("#309 the phone never saves a played song into the library, even when its cache cannot be used");
+        var root = Check.NewFolder("stream-phone");
+        var library = new SpotifyPlaylistTests.Library();
+        var blocked = Path.Combine(root, "not-a-folder"); File.WriteAllText(blocked, "a file where the cache folder should be");
+        var songs = Path.Combine(root, "songs");
+        using var downloads = new Downloads(_ => { }) { CacheFolder = blocked }; downloads.SetPaused(true);
+        BotTrack Make(MusicRequest r) => Track(r.Title);
+        var phone = new DiscoveryActions(library, downloads, Make, () => songs, () => true) { PlayFallsBackToLibrary = false };
+        await Check.ThrowsAsync<IOException>(() => phone.QueueAsync([DiscoveryTests.Song("deezer:9", "Played")], true, default, stream: true),
+            "a cache that cannot be used says so instead of saving into the library");
+        Check.Equal(0, downloads.History.Count, "and nothing was queued for the library");
+        Check.True(!Directory.Exists(songs) || !Directory.EnumerateFiles(songs).Any(), "no file went into the song folder");
+
+        var computer = new DiscoveryActions(library, downloads, Make, () => songs, () => true);
+        var queued = await computer.QueueAsync([DiscoveryTests.Song("deezer:9", "Played")], true, default, stream: true);
+        Check.Equal(1, queued.Added, "the computer keeps its old fallback: Play saves into the library when the cache cannot be used");
+        Check.True(downloads.History.Count == 1 && !downloads.IsCached(downloads.History[0]), "into the library folder");
     }
 
     private static void Purging()

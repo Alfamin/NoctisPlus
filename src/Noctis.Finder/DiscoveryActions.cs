@@ -14,6 +14,9 @@ internal sealed class DiscoveryActions(IPlaylistLibrary library, Downloads downl
     public BotTrack TrackFor(MusicRequest request) => track(request);
     /// <summary>The download folder: where "Add to songs" puts a played song (owner #87).</summary>
     public string LibraryFolder => folder();
+    /// <summary>The computer saves a played song into the library when its stream cache cannot be used, so Play always works.
+    /// The phone sets this false: a played song is never added to Songs without the owner asking (#309).</summary>
+    public bool PlayFallsBackToLibrary { get; init; } = true;
     internal static readonly TimeSpan RetryPause = TimeSpan.FromSeconds(15);
     internal static bool JustFailed(Download d) => d.FailedAt is { } at && DateTimeOffset.UtcNow - at < RetryPause;
 
@@ -85,6 +88,12 @@ internal sealed class DiscoveryActions(IPlaylistLibrary library, Downloads downl
                 var into = target;
                 if (stream && string.Equals(target, downloads.CacheFolder, StringComparison.OrdinalIgnoreCase) && !(StreamCache.Usable(target) && StreamCache.Fits(target, request.FileName)))
                 {
+                    // Owner #309: the phone never saves a played song into Songs by itself; it says why Play cannot start.
+                    if (!PlayFallsBackToLibrary)
+                    {
+                        Noctis.Services.DebugLog.Write("Finder", $"stream cache not usable for \"{song.Request.Title}\" (free {StreamCache.FreeSpace(target) / 1048576} MB)");
+                        throw new IOException("Not enough free storage to play this song. Free up some space and try again.");
+                    }
                     into = folder();
                     Noctis.Services.DebugLog.Write("Finder", $"stream cache not usable for \"{song.Request.Title}\"; saving it into the library instead");
                 }
