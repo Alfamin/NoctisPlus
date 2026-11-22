@@ -81,6 +81,8 @@ public class MobileMostPlayedTests
         var b = Played("B", 1);
         var c = MobileFixtures.Song("C");   // 90 s, never played
         using var rig = MobileFixtures.MakeRig(new[] { a, b, c });
+        // Count a Play After: half the song. Upstream's new-install default (49d0142a, not taken in Plus: owner undecided), so set here.
+        await rig.Persistence.UpdateSettingsAsync(s => s.PlayCountThresholdPercent = 50);
         await rig.Shell.LoadHistoryPrefsAsync();   // Count a Play After: half the song
         Assert.False(rig.Shell.Library.HasMostPlayed);
 
